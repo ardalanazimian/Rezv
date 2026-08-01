@@ -14,14 +14,15 @@ const bodySchema = z.object({
  * POST /api/v1/restaurants/:slug/chat — شروع (یا بازگرداندن) گفتگو با یک رستوران.
  * پاسخ: { thread_id }. اگر از قبل thread باشد، همان برمی‌گردد (idempotent).
  */
-export async function POST(req: Request, { params }: { params: { slug: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
     await enforceRateLimit(clientIp(req), RULES.auth);
 
+    const { slug } = await params;
     const restaurant = await db.restaurant.findUnique({
-      where: { slug: params.slug }, select: { id: true },
+      where: { slug }, select: { id: true },
     });
     if (!restaurant) throw Err.notFound('رستوران');
 

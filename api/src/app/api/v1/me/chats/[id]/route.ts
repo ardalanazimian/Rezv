@@ -20,15 +20,16 @@ const getQuery = z.object({ after: z.string().max(40).optional() });
  * پارامترِ after برای polling: فقط پیام‌های جدیدتر از آن زمان (کارآمد).
  * همچنین پیام‌های staff را خوانده‌شده علامت می‌زند.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
     await enforceRateLimit(clientIp(req), RULES.search);
-    await ownedThread(params.id, auth.sub);
+    const { id } = await params;
+    await ownedThread(id, auth.sub);
     const { after } = parseQuery(req, getQuery);
 
-    const where: Record<string, unknown> = { threadId: params.id };
+    const where: Record<string, unknown> = { threadId: id };
     if (after) {
       const d = new Date(after);
       if (!isNaN(+d)) where.createdAt = { gt: d };
@@ -39,7 +40,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
     // فقط اگر پیام جدیدی از سمت staff بوده، read بزن (کاهش نوشتنِ بی‌مورد در polling)
     if (!after || messages.some(m => m.sender === 'staff')) {
-      await markRead(params.id, 'user').catch(() => {});
+      await markRead(id, 'user').catch(() => {});
     }
 
     return NextResponse.json({ items: messages.map(serializeMessage), server_time: new Date().toISOString() });
@@ -49,14 +50,15 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 const postSchema = z.object({ body: z.string().min(1).max(2000).trim() });
 
 /** POST /api/v1/me/chats/:id — ارسال پیام مشتری در یک گفتگوی موجود */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
     await enforceRateLimit(clientIp(req), RULES.auth);
-    await ownedThread(params.id, auth.sub);
+    const { id } = await params;
+    await ownedThread(id, auth.sub);
     const { body } = await parseBody(req, postSchema);
-    const msg = await postMessage({ threadId: params.id, sender: 'user', body });
+    const msg = await postMessage({ threadId: id, sender: 'user', body });
     return NextResponse.json(serializeMessage(msg), { status: 201 });
   } catch (e) { return errorResponse(e); }
 }

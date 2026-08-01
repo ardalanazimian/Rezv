@@ -66,7 +66,7 @@ curl -X POST $API/api/v1/auth/otp/verify -H 'Content-Type: application/json' \
 ```
 
 ### `POST /v1/auth/refresh` — `public`
-Body: `{ refresh_token }` (**uncertain exact key** — verify against `route.ts`).
+Body: `{ refresh }`.
 Verifies the refresh token and issues a new access token **of the same
 principal** (kind/tenant/role preserved). Returns a new access (+ rotated
 refresh).
@@ -75,9 +75,15 @@ refresh).
 Staff OTP login (same shape as customer OTP). `verify` returns tokens with
 `kind='staff'`, `tenantId`, `role`.
 
+### `POST /v1/auth/admin/request` · `POST /v1/auth/admin/verify` — `public`
+Platform-admin OTP login for the company panel. Both routes require an active
+`owner` staff account belonging to `PLATFORM_ADMIN_TENANT_ID`; a normal
+restaurant staff account cannot use these routes. `verify` returns the same
+staff JWT shape with the platform tenant and `role='owner'`.
+
 ### `POST /v1/auth/logout` — `public`
-Client-side token discard; **(uncertain)** server-side revocation depends on a
-`jti` denylist (a `jti` is present in refresh tokens for this purpose).
+Body: `{ refresh? }`. The refresh token is revoked server-side through its `jti`
+denylist; omitting it is allowed and remains idempotent.
 
 ---
 

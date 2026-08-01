@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authFromRequest } from '@/lib/jwt';
+import { db } from '@/lib/db';
 import { errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 import { clientIp, enforceRateLimit } from '@/lib/ratelimit';
@@ -57,14 +58,22 @@ export async function POST(req: Request) {
     const ua = req.headers.get('user-agent')?.slice(0, 400) || undefined;
     const device = ua ? { ua } : undefined;
 
+    const restaurantIds = [...new Set(body.events.map((e) => e.restaurantId).filter((id): id is string => Boolean(id)))];
+    const restaurants = restaurantIds.length
+      ? await db.restaurant.findMany({ where: { id: { in: restaurantIds } }, select: { id: true, tenantId: true } })
+      : [];
+    const restaurantMap = new Map(restaurants.map((r) => [r.id, r]));
+
     const events: PlatformEventInput[] = body.events.map((e) => ({
       type: e.type,
       occurredAt: e.occurredAt,
       source: e.source,
       // userId سروری‌ست؛ مقدارِ بدنه (اگر بود) نادیده گرفته می‌شود.
       userId,
-      restaurantId: e.restaurantId ?? null,
-      tenantId: e.tenantId ?? null,
+      // زمینهٔ tenant فقط از رکورد معتبر رستوران می‌آید؛ client نمی‌تواند
+      // event را به tenant دلخواه نسبت دهد یا tenantId مستقل جعل کند.
+      restaurantId: e.restaurantId && restaurantMap.has(e.restaurantId) ? e.restaurantId : null,
+      tenantId: e.restaurantId ? restaurantMap.get(e.restaurantId)?.tenantId ?? null : null,
       sessionId: e.sessionId ?? null,
       correlationId: e.correlationId ?? null,
       device,

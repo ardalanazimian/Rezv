@@ -8,11 +8,11 @@ const paramsSchema = z.object({ code: zReservationCode });
 
 /** POST — staff می‌زند «رسید» → وضعیت arrived + امتیاز + SMS خوش‌آمد.
  *  منطق در لایه‌ی سرویس (lib/reservations.ts → markArrival) است؛ این route لاغر است. */
-export async function POST(req: Request, { params }: { params: { code: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'staff') throw Err.forbidden();
-    const { code } = parseParams(params, paramsSchema);
+    const { code } = parseParams(await params, paramsSchema);
     const result = await markArrival({ code, tenantId: auth.tenantId });
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }

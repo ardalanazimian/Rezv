@@ -74,7 +74,7 @@
 .ib-btn:active{transform:scale(.94)}
 .ib-close{flex-shrink:0;background:var(--s-100);color:var(--t3);border:none;width:28px;height:28px;border-radius:50%;font-size:12px;cursor:pointer}
 /* دکمه‌ی شناورِ تغییر تم */
-.theme-fab{position:fixed;top:16px;left:16px;z-index:60;width:46px;height:46px;border-radius:15px;cursor:pointer;
+.theme-fab{position:fixed;top:calc(64px + env(safe-area-inset-top,0px));left:16px;z-index:110;width:46px;height:46px;border-radius:15px;cursor:pointer;
   display:grid;place-items:center;font-size:19px;color:var(--t1);border-radius:15px;transition:transform .2s var(--spring)}
 .theme-fab:active{transform:scale(.88)}
 @media(prefers-reduced-motion:reduce){.reveal{opacity:1!important;transform:none!important}*{animation:none!important}}

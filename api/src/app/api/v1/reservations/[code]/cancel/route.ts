@@ -20,11 +20,11 @@ const bodySchema = z.object({ reason: z.string().max(500).optional() });
  * audit ثبت می‌کند، اعلان می‌فرستد و کش availability را درست (pattern-based) باطل
  * می‌کند. تمایز کاربر/رستوران در actor و دلیل حفظ می‌شود (سازگاری رفتاری).
  */
-export async function POST(req: Request, { params }: { params: { code: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     const auth = authFromRequest(req);
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const { code } = parseParams(params, paramsSchema);
+    const { code } = parseParams(await params, paramsSchema);
     const { reason } = bodySchema.parse(await safeJson(req));
 
     const resv = await db.reservation.findUnique({

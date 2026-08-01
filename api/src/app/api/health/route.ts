@@ -4,6 +4,7 @@ import { redis } from '@/lib/redis';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('health');
+export const runtime = 'nodejs';
 
 /**
  * GET /api/health — بررسی سلامت واقعی برای load balancer / k8s.

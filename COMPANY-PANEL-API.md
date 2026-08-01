@@ -4,6 +4,17 @@
 سطح-پلتفرم (همه‌ی رستوران‌ها) را برای CEO/تیم جمع می‌کنند. همه نیاز به
 احراز هویت admin دارند (`adminAuthFromRequest` + role='owner').
 
+## ورود مدیر پلتفرم
+
+### `POST /api/v1/auth/admin/request`
+Body: `{ "phone": "09123456789" }`. فقط شماره‌ی فعالِ `owner` در
+`PLATFORM_ADMIN_TENANT_ID` پذیرفته می‌شود. در حالت production کد از طریق SMS
+ارسال می‌شود؛ `OTP_DEV_MODE` فقط برای development است.
+
+### `POST /api/v1/auth/admin/verify`
+Body: `{ "phone": "09123456789", "code": "123456" }`. پاسخ شامل `access` و
+`refresh` است و access token برای endpointهای admin پنل شرکت معتبر است.
+
 ## دیدن (Read)
 
 ### `GET /api/v1/admin/overview` (ارتقایافته)
@@ -38,11 +49,12 @@ no-show، اقدامات ناموفق اخیر، و رویدادهای حساس 
 
 ---
 
-## تست‌شده روی PostgreSQL واقعی
-- کوئری‌های همه‌ی endpointها روی Supabase اجرا و تأیید شدند
-- منطق کنترل (فعال/غیرفعال + تغییر پلن + audit) با ROLLBACK تست شد
-- همه type-check تمیز
+## وضعیت اعتبارسنجی
+- typecheck، lint و تست‌های واحد backend سبز هستند.
+- Prisma schema با یک datasource placeholder معتبر است.
+- اجرای واقعی روی PostgreSQL/Supabase و تست rollback نیازمند `DATABASE_URL` واقعی است.
 
-## باقی‌مانده (فرانت‌اند)
-این لایه‌ی بک‌اند است. اتصال به فرانت `apps/company/index.html` (افزودن
-نماهای system-health، BI، security، و دکمه‌های کنترل) قدم بعدی است.
+## وضعیت فرانت‌اند
+پنل `apps/company/index.html` به endpointهای overview، system-health، BI، security
+و control متصل است. اجرای end-to-end با API واقعی هنوز نیازمند environment کامل
+و اجرای Playwright است.

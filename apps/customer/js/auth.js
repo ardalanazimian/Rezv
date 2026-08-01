@@ -31,6 +31,11 @@ export async function sendOtp(){
   const btn = phoneEl.nextElementSibling;
   if (btn) { btn.disabled = true; btn.textContent = 'در حال ارسال...'; }
 
+  if (location.protocol === 'file:') {
+    showOtpStep('۱۲۳۴', true);
+    return;
+  }
+
   const res = await API.requestOtp(normalized);
   if (!res.ok && !res.offline) {
     // خطای واقعی از سرور (مثلاً ریت‌لیمیت)
@@ -61,6 +66,17 @@ export async function confirmOtp(){
   if (!/^\d{4,6}$/.test(code)) { toast('','کد ورود رو کامل وارد کن'); return; }
   const btn = codeEl.nextElementSibling;
   if (btn) { btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+
+  if (location.protocol === 'file:') {
+    if (code === '1234') {
+      setUSER({ phone: _loginPhone });
+      showRegisterStep(true);
+    } else {
+      toast('','در حالت دمو، کد ۱۲۳۴ است');
+      if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
+    }
+    return;
+  }
 
   const res = await API.verifyOtp(_loginPhone, code);
   if (res.ok && res.data?.user) {

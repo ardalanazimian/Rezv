@@ -11,9 +11,9 @@ const querySchema = z.object({
 });
 
 /** GET /api/v1/restaurants/{slug}/availability?date=2026-06-12&party=2 */
-export async function GET(req: Request, { params }: { params: { slug: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
-    const { slug } = parseParams(params, paramsSchema);
+    const { slug } = parseParams(await params, paramsSchema);
     const { date, party } = parseQuery(req, querySchema);
     const r = await db.restaurant.findUnique({ where: { slug }, select: { id: true } });
     if (!r) throw Err.notFound('رستوران');

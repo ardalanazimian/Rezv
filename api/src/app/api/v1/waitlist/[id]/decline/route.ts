@@ -15,10 +15,10 @@ function callerId(req: Request): string | undefined {
 }
 
 /** POST /api/v1/waitlist/:id/decline — رد آفر → آفر به نفر بعدی */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const { id } = parseParams(params, paramsSchema);
+    const { id } = parseParams(await params, paramsSchema);
     const result = await declineOffer(id, 'customer', callerId(req));
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }

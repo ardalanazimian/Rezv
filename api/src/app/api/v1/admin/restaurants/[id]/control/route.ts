@@ -23,11 +23,11 @@ const bodySchema = z.object({
  *  { action: 'extend_plan', plan: 'pro'|'enterprise', months: number }  — تمدید واقعی با تاریخ انقضای جدید
  *  { action: 'cancel_subscription' }  — لغو فوری (انقضا = الان)
  */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = adminAuthFromRequest(req);
-    const { id: restaurantId } = parseParams(params, paramsSchema);
+    const { id: restaurantId } = parseParams(await params, paramsSchema);
     const body = await parseBody(req, bodySchema);
     const action = body.action;
 

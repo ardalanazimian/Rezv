@@ -57,7 +57,18 @@
 **رفع اضافه:** هدرهای امنیتی روی همه‌ی پاسخ‌های API در middleware (nosniff, X-Frame DENY, no-store).
 
 ### 🔴 A06 — Vulnerable Components
-**موجود:** نسخه‌های ثابت در package.json. **توصیه:** اجرای منظم `npm audit` و به‌روزرسانی.
+**وضعیت فعلی (۲۰۲۶-۰۸-۰۱):** `npm audit --audit-level=high` روی API و SEO اجرا شد.
+اصلاح non-breaking با `npm audit fix` انجام شد، اما دو زنجیره‌ی high باقی ماند:
+
+- Next.js 14 و وابستگی PostCSS — رفع رسمی پیشنهادی به upgrade major نسخه‌ی Next نیاز دارد.
+- در SEO، زنجیره‌ی ESLint/`glob` نیز با نسخه‌ی فعلی Next به upgrade major وابسته است.
+
+`npm audit fix --force` عمداً اجرا نشد، چون Next 16 تغییر breaking است و باید در شاخه‌ی
+مهاجرت جداگانه با React، build، E2E و deployment کامل تست شود. تا آن زمان این مورد
+**ریسک باز P1 برای production** است؛ استفاده از image optimizer/Server Actions و
+remotePatterns باید در deployment محدود بماند. بررسی کد نشان داد این repository
+فعلاً از `next/image`، Server Actions، `remotePatterns` و rewrites استفاده نمی‌کند؛
+پس چند مسیر exploit در وضعیت فعلی فعال نیستند، اما patch سطح framework همچنان لازم است.
 
 ### 🔴 A07 — Authentication Failures
 **موجود و تأییدشده (قوی):**

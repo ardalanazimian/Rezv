@@ -285,6 +285,10 @@ async function adminSendOtp(){
   _adminPhone = normalized;
   const btn = document.getElementById('adminSendBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'در حال ارسال...'; }
+  if (location.protocol === 'file:') {
+    showAdminLoginCode('۱۲۳۴', true);
+    return;
+  }
   const res = await API.requestAdminOtp(normalized);
   if (!res.ok && !res.offline){
     toast('', res.error?.message || 'این شماره دسترسی ندارد');
@@ -312,6 +316,11 @@ async function adminConfirmOtp(){
   if (!/^\d{4,6}$/.test(code)) { toast('','کد ورود را کامل وارد کن'); return; }
   const btn = document.getElementById('adminVerifyBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+  if (location.protocol === 'file:') {
+    if (code === '1234'){ await enterAdminPanel(true); }
+    else { toast('','در حالت دمو، کد ۱۲۳۴ است'); if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } }
+    return;
+  }
   const res = await API.verifyAdminOtp(_adminPhone, code);
   if (res.ok && res.data?.access){
     await enterAdminPanel();

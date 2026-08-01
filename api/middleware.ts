@@ -18,6 +18,7 @@ import { rateLimit, clientIp, rateLimitHeaders, RULES, isBanned, recordViolation
 // ═══════════════════════════════════════════════════════════════════════
 
 export const config = { matcher: '/api/:path*' };
+export const runtime = 'nodejs';
 
 // تأیید پیکربندی حیاتی در production (fail-fast) — عمداً «تنبل»، دقیقاً مثل
 // accessSecret/refreshSecret در jwt.ts.

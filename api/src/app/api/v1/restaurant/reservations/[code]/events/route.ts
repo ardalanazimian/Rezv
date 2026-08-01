@@ -8,11 +8,11 @@ import { parseParams, zReservationCode, z } from '@/lib/schemas';
 const paramsSchema = z.object({ code: zReservationCode });
 
 /** GET /api/v1/restaurant/reservations/:code/events — تاریخچه‌ی تغییر وضعیت (audit log) */
-export async function GET(req: Request, { params }: { params: { code: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'staff') throw Err.forbidden();
-    const { code } = parseParams(params, paramsSchema);
+    const { code } = parseParams(await params, paramsSchema);
     const resv = await db.reservation.findUnique({
       where: { code },
       select: { id: true, restaurant: { select: { tenantId: true } } },

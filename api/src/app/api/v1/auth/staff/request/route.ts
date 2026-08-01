@@ -17,6 +17,6 @@ export async function POST(req: Request) {
     if (!staff) throw Err.forbidden('این شماره دسترسی پنل رستوران ندارد');
     if (!staff.isActive) throw Err.forbidden('این حساب غیرفعال شده است');
     const r = await requestOtp(normalized);
-    return NextResponse.json(r, { status: r.devCode ? 200 : 204 });
+    return r.devCode ? NextResponse.json(r) : new NextResponse(null, { status: 204 });
   } catch (e) { return errorResponse(e); }
 }

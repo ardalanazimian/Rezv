@@ -13,9 +13,9 @@ import { parseParams, z } from '@/lib/schemas';
 
 const paramsSchema = z.object({ slug: z.string().min(1).max(150) });
 
-export async function GET(_req: Request, { params }: { params: { slug: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
-    const { slug } = parseParams(params, paramsSchema);
+    const { slug } = parseParams(await params, paramsSchema);
     const key = cacheKey('restaurant-detail', slug);
 
     const data = await cached(key, 60, async () => {

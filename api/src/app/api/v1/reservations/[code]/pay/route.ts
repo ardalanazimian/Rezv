@@ -12,10 +12,10 @@ import { parseParams, zReservationCode, z } from '@/lib/schemas';
 const paramsSchema = z.object({ code: zReservationCode });
 
 /** POST /api/v1/reservations/:code/pay — شروعِ پرداختِ بیعانه؛ خروجی: آدرسِ ریدایرکت به درگاه */
-export async function POST(req: Request, { params }: { params: { code: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     const auth = authFromRequest(req);
-    const { code } = parseParams(params, paramsSchema);
+    const { code } = parseParams(await params, paramsSchema);
 
     const resv = await db.reservation.findUnique({
       where: { code },

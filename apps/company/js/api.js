@@ -48,9 +48,9 @@ const API = {
   get(path){ return this.request(path); },
   post(path, body){ return this.request(path, { method:'POST', body: JSON.stringify(body||{}) }); },
   patch(path, body){ return this.request(path, { method:'PATCH', body: JSON.stringify(body||{}) }); },
-  async requestAdminOtp(phone){ return this.request('/auth/staff/request', { method:'POST', body: JSON.stringify({ phone }) }); },
+  async requestAdminOtp(phone){ return this.request('/auth/admin/request', { method:'POST', body: JSON.stringify({ phone }) }); },
   async verifyAdminOtp(phone, code){
-    const res = await this.request('/auth/staff/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
+    const res = await this.request('/auth/admin/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
     if (res.ok && res.data?.access) { this.setToken(res.data.access); this.setRefresh(res.data.refresh); }
     return res;
   },

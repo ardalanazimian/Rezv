@@ -15,21 +15,21 @@ const topupSchema = z.object({ amount: z.number().int().min(1).max(1_000_000), n
  *
  * body (POST): { amount: number, note?: string }
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     adminAuthFromRequest(req);
-    const { id } = parseParams(params, paramsSchema);
+    const { id } = parseParams(await params, paramsSchema);
     const balance = await getSmsBalance(id);
     return NextResponse.json(balance);
   } catch (e) { return errorResponse(e); }
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = adminAuthFromRequest(req);
-    const { id } = parseParams(params, paramsSchema);
+    const { id } = parseParams(await params, paramsSchema);
     const body = await parseBody(req, topupSchema);
     const amount = body.amount;
 

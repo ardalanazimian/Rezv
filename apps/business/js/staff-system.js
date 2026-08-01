@@ -331,6 +331,10 @@ async function staffSendOtp(){
   _staffPhone = normalized;
   const btn = document.getElementById('staffSendBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'در حال ارسال...'; }
+  if (location.protocol === 'file:') {
+    showStaffLoginCode('۱۲۳۴', true);
+    return;
+  }
   const res = await API.requestStaffOtp(normalized);
   if (!res.ok && !res.offline){
     // خطای واقعی (مثلاً شماره staff نیست)
@@ -359,6 +363,11 @@ async function staffConfirmOtp(){
   if (!/^\d{4,6}$/.test(code)) { toast('','کد ورود رو کامل وارد کن'); return; }
   const btn = document.getElementById('staffVerifyBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+  if (location.protocol === 'file:') {
+    if (code === '1234'){ STAFF_INFO = { role:'owner', restaurant_name:'کافه‌رستوران ویستا' }; enterPanel(true); }
+    else { toast('','در حالت دمو، کد ۱۲۳۴ است'); if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } }
+    return;
+  }
   const res = await API.verifyStaffOtp(_staffPhone, code);
   if (res.ok && res.data?.staff){
     STAFF_INFO = res.data.staff;

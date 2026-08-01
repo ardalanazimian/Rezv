@@ -15,11 +15,11 @@ const paramsSchema = z.object({ code: zReservationCode });
 //  • مشتری فقط رزرو خودش را می‌بیند (userId == sub)،
 //  • staff فقط رزروهای رستوران خودش را (tenantId منطبق)،
 //  • و rate-limit برای جلوگیری از enumeration.
-export async function GET(req: Request, { params }: { params: { code: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     const auth = authFromRequest(req);
-    const { code } = parseParams(params, paramsSchema);
+    const { code } = parseParams(await params, paramsSchema);
 
     const r = await db.reservation.findUnique({
       where: { code },

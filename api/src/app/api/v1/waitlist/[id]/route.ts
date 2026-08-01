@@ -19,10 +19,10 @@ function callerId(req: Request): string | undefined {
 // رفع IDOR: اگر کاربر احراز‌هویت‌شده باشد، فقط ورودی خودش را می‌بیند. برای ورودی
 // مهمان (userId=null) دسترسی باز است چون شناسه UUID و غیرقابل‌حدس است و فقط داده‌ی
 // موقعیت صف برمی‌گرداند (نه PII حساس فراتر از آنچه خودش وارد کرده).
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    const { id } = parseParams(params, paramsSchema);
+    const { id } = parseParams(await params, paramsSchema);
     const e = await db.waitlistEntry.findUnique({ where: { id } });
     if (!e) return NextResponse.json({ error: { code: 'NOT_FOUND', message: 'پیدا نشد' } }, { status: 404 });
     const cid = callerId(req);
@@ -42,10 +42,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 }
 
 /** DELETE /api/v1/waitlist/:id — خروج از صف */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const { id } = parseParams(params, paramsSchema);
+    const { id } = parseParams(await params, paramsSchema);
     const result = await leaveWaitlist(id, callerId(req));
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }

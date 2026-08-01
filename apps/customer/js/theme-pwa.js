@@ -25,7 +25,7 @@ export function armReveals(root){
 // ═══════════════════════════════════════════════════════════
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('/sw.js').catch(()=>{ /* آفلاین یا محیطِ ناسازگار — اپ بدون SW هم کار می‌کند */ });
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* آفلاین یا محیطِ ناسازگار — اپ بدون SW هم کار می‌کند */ });
   });
 }
 
