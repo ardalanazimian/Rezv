@@ -1022,3 +1022,260 @@ model PlatformEvent {
   @@index([correlationId])
   @@map("platform_events")
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  وب‌سایتِ عمومیِ رزرونو (apps/seo) — CMS + قیفِ فروش
+//
+//  چرا در همین اسکیما و نه یک سرویسِ جدا: وب‌سایت باید پلن‌های واقعی را نشان
+//  دهد، حسابِ دموی واقعی بسازد (Tenant/Restaurant/Staff) و درخواستِ خرید را به
+//  پنلِ شرکت برساند. همه‌ی این‌ها همین دیتابیس را لمس می‌کنند؛ جداکردنشان یعنی
+//  یک لایه‌ی همگام‌سازیِ اضافی بدونِ سود.
+//
+//  محتوا (SitePage/SiteArticle/...) از استودیوی سایت ویرایش می‌شود؛ کدِ سایت
+//  متنِ سختِ غیرقابل‌ویرایش ندارد (fallbackِ محتوایی فقط برای وقتی است که CMS
+//  هنوز seed نشده — و دقیقاً با همان متن‌ها seed می‌شود).
+//  migration: prisma/sql/031-site-cms-and-funnel.sql
+// ═══════════════════════════════════════════════════════════════════════
+
+enum SiteStatus {
+  draft
+  published
+
+  @@map("site_status")
+}
+
+enum SiteOrderKind {
+  trial     // دموی رایگانِ ۳۰ روزه — بلافاصله provision می‌شود
+  purchase  // خریدِ اشتراک — پنلِ شرکت باید فعال کند
+
+  @@map("site_order_kind")
+}
+
+enum SiteOrderStatus {
+  pending    // ثبت شد، منتظرِ اقدامِ پنلِ شرکت
+  contacted  // تیمِ فروش تماس گرفت
+  activated  // اشتراک فعال شد (planExpiresAt ست شد)
+  rejected   // رد شد (با دلیل)
+  cancelled  // متقاضی منصرف شد
+
+  @@map("site_order_status")
+}
+
+enum SiteInquiryStatus {
+  open
+  in_progress
+  closed
+
+  @@map("site_inquiry_status")
+}
+
+// صفحه‌ی محتوایی/بازاریابیِ سایت. sections آرایه‌ی بلوک‌هاست (hero/features/…)؛
+// سایت بلوکِ ناشناخته را نادیده می‌گیرد تا افزودنِ بلوکِ جدید از CMS رندر را نشکند.
+model SitePage {
+  id             String     @id @default(uuid()) @db.Uuid
+  slug           String     @unique                        // 'home' | 'pricing' | 'about' | ...
+  title          String
+  description    String?    @db.Text
+  sections       Json       @default("[]")                 // بلوک‌های محتوایی به ترتیب
+  seoTitle       String?    @map("seo_title")
+  seoDescription String?    @map("seo_description") @db.Text
+  seoKeywords    String[]   @default([]) @map("seo_keywords")
+  ogImage        String?    @map("og_image")
+  noindex        Boolean    @default(false)
+  structuredData Json?      @map("structured_data")        // JSON-LD دستیِ اضافی (اختیاری)
+  status         SiteStatus @default(draft)
+  publishedAt    DateTime?  @map("published_at") @db.Timestamptz
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String?    @map("updated_by") @db.Uuid
+  @@index([status, slug])
+  @@map("site_pages")
+}
+
+// مقاله‌ی بلاگ. بدنه Markdownِ ساده است (رندرِ سمتِ سرور) نه HTMLِ خام،
+// تا محتوای CMS نتواند اسکریپت تزریق کند.
+model SiteArticle {
+  id             String     @id @default(uuid()) @db.Uuid
+  slug           String     @unique
+  title          String
+  excerpt        String     @db.Text
+  body           String     @db.Text
+  coverUrl       String?    @map("cover_url")
+  coverAlt       String?    @map("cover_alt")
+  tags           String[]   @default([])
+  authorName     String     @default("تیم رزرونو") @map("author_name")
+  authorRole     String?    @map("author_role")
+  readingMinutes Int        @default(5) @map("reading_minutes") @db.SmallInt
+  seoTitle       String?    @map("seo_title")
+  seoDescription String?    @map("seo_description") @db.Text
+  seoKeywords    String[]   @default([]) @map("seo_keywords")
+  ogImage        String?    @map("og_image")
+  noindex        Boolean    @default(false)
+  status         SiteStatus @default(draft)
+  featured       Boolean    @default(false)
+  publishedAt    DateTime?  @map("published_at") @db.Timestamptz
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String?    @map("updated_by") @db.Uuid
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("site_articles")
+}
+
+// پرسشِ متداول. scope تعیین می‌کند در کدام صفحه بیاید و در FAQPage schemaی همان
+// صفحه شرکت کند: general | pricing | demo | business | customer.
+model SiteFaq {
+  id        String     @id @default(uuid()) @db.Uuid
+  question  String     @db.Text
+  answer    String     @db.Text
+  scope     String     @default("general")
+  sortOrder Int        @default(0) @map("sort_order")
+  status    SiteStatus @default(published)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String?    @map("updated_by") @db.Uuid
+  @@index([status, scope, sortOrder])
+  @@map("site_faqs")
+}
+
+// پلنِ اشتراکِ قابل‌فروش. قیمت و مدت اینجا منبعِ حقیقت‌اند — فرمِ خرید هرگز قیمت
+// را از کلاینت نمی‌گیرد. tenantPlan تعیین می‌کند فعال‌سازی تنانت را روی کدام تیر بگذارد.
+model SitePlan {
+  id             String           @id @default(uuid()) @db.Uuid
+  key            String           @unique                  // 'm3' | 'm6' | 'm12'
+  name           String
+  tagline        String?
+  months         Int              @db.SmallInt
+  priceToman     Int              @map("price_toman")      // قیمتِ کلِ دوره (تومان)
+  compareAtToman Int?             @map("compare_at_toman") // قیمتِ مرجع برای نمایشِ صرفه‌جویی
+  badge          String?
+  features       String[]         @default([])
+  highlight      Boolean          @default(false)
+  tenantPlan     SubscriptionPlan @default(pro) @map("tenant_plan")
+  sortOrder      Int              @default(0) @map("sort_order")
+  status         SiteStatus       @default(published)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String?          @map("updated_by") @db.Uuid
+  @@index([status, sortOrder])
+  @@map("site_plans")
+}
+
+model SiteTestimonial {
+  id        String     @id @default(uuid()) @db.Uuid
+  quote     String     @db.Text
+  author    String
+  role      String?
+  company   String?
+  avatarUrl String?    @map("avatar_url")
+  rating    Int        @default(5) @db.SmallInt
+  sortOrder Int        @default(0) @map("sort_order")
+  status    SiteStatus @default(published)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String?    @map("updated_by") @db.Uuid
+  @@index([status, sortOrder])
+  @@map("site_testimonials")
+}
+
+// بنرِ تبلیغاتیِ بالای سایت. بازه‌ی زمانی اختیاری است؛ اگر ست باشد فقط در همان
+// بازه نمایش داده می‌شود (کمپینِ زمان‌دار بدونِ ری‌دیپلوی).
+model SiteBanner {
+  id        String     @id @default(uuid()) @db.Uuid
+  message   String     @db.Text
+  ctaLabel  String?    @map("cta_label")
+  ctaHref   String?    @map("cta_href")
+  tone      String     @default("brand")  // brand | success | warning | info
+  startsAt  DateTime?  @map("starts_at") @db.Timestamptz
+  endsAt    DateTime?  @map("ends_at") @db.Timestamptz
+  sortOrder Int        @default(0) @map("sort_order")
+  status    SiteStatus @default(draft)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String?    @map("updated_by") @db.Uuid
+  @@index([status, sortOrder])
+  @@map("site_banners")
+}
+
+model SiteReleaseNote {
+  id         String     @id @default(uuid()) @db.Uuid
+  version    String
+  title      String
+  body       String     @db.Text  // Markdown
+  tags       String[]   @default([])
+  releasedAt DateTime   @map("released_at") @db.Timestamptz
+  status     SiteStatus @default(published)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String?    @map("updated_by") @db.Uuid
+  @@index([status, releasedAt(sort: Desc)])
+  @@map("site_release_notes")
+}
+
+// سفارشِ سایت — هم دموی رایگان (kind=trial) و هم درخواستِ خرید (kind=purchase).
+// یک صف، یک تاریخچه: پنلِ شرکت همین جدول را می‌بیند و فعال‌سازی روی همین ردیف ثبت
+// می‌شود (چه‌کسی، چه‌زمانی، با چه یادداشتی) → مسیرِ فعال‌سازیِ قابل‌ردیابی.
+model SiteOrder {
+  id             String          @id @default(uuid()) @db.Uuid
+  code           String          @unique                     // کدِ پیگیریِ عمومی: RZO-XXXXXX
+  kind           SiteOrderKind
+  status         SiteOrderStatus @default(pending)
+  // بدونِ FK به SitePlan: پلن ممکن است حذف/بازنویسی شود ولی تاریخچه‌ی سفارش باید بماند.
+  planKey        String?         @map("plan_key")
+  planName       String?         @map("plan_name")           // اسنپ‌شاتِ نامِ پلن در لحظه‌ی سفارش
+  months         Int?            @db.SmallInt                // اسنپ‌شاتِ مدت
+  amountToman    Int?            @map("amount_toman")        // اسنپ‌شاتِ قیمت (سمتِ سرور محاسبه می‌شود)
+  businessName   String          @map("business_name")
+  contactName    String          @map("contact_name")
+  phone          String                                      // نرمال‌شده (+98…)
+  email          String?
+  city           String?
+  branchCount    Int?            @map("branch_count") @db.SmallInt
+  note           String?         @db.Text
+  tenantId       String?         @map("tenant_id") @db.Uuid  // بعد از provision/فعال‌سازی
+  restaurantId   String?         @map("restaurant_id") @db.Uuid
+  staffId        String?         @map("staff_id") @db.Uuid
+  trialEndsAt    DateTime?       @map("trial_ends_at") @db.Timestamptz
+  activatedAt    DateTime?       @map("activated_at") @db.Timestamptz
+  activatedBy    String?         @map("activated_by") @db.Uuid
+  planExpiresAt  DateTime?       @map("plan_expires_at") @db.Timestamptz
+  adminNote      String?         @map("admin_note") @db.Text
+  rejectedReason String?         @map("rejected_reason") @db.Text
+  utmSource      String?         @map("utm_source")
+  utmMedium      String?         @map("utm_medium")
+  utmCampaign    String?         @map("utm_campaign")
+  landingPath    String?         @map("landing_path")
+  referrer       String?
+  ip             String?
+  userAgent      String?         @map("user_agent") @db.Text
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  @@index([status, createdAt(sort: Desc)])
+  @@index([kind, status])
+  @@index([phone])
+  @@index([tenantId])
+  @@map("site_orders")
+}
+
+// تماس با فروش / پرسشِ عمومیِ سایت.
+model SiteInquiry {
+  id          String            @id @default(uuid()) @db.Uuid
+  code        String            @unique                    // RZQ-XXXXXX
+  name        String
+  phone       String
+  email       String?
+  company     String?
+  topic       String            @default("sales")          // sales | support | partnership | press | other
+  message     String            @db.Text
+  status      SiteInquiryStatus @default(open)
+  adminNote   String?           @map("admin_note") @db.Text
+  handledBy   String?           @map("handled_by") @db.Uuid
+  handledAt   DateTime?         @map("handled_at") @db.Timestamptz
+  utmSource   String?           @map("utm_source")
+  landingPath String?           @map("landing_path")
+  ip          String?
+  userAgent   String?           @map("user_agent") @db.Text
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  @@index([status, createdAt(sort: Desc)])
+  @@map("site_inquiries")
+}

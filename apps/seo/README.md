@@ -1,32 +1,133 @@
-# apps/seo — لایه‌ی عمومیِ SEO رزرونو (Next.js SSR/ISR)
+# apps/seo — وب‌سایتِ عمومیِ رزرونو (Next.js SSR/ISR)
 
-> اپِ **جداگانه و ایزوله** برای صفحاتِ عمومیِ ایندکس‌پذیر (رستوران/شهر/آشپزی).
-> اپ‌های `customer`/`business`/`company` دست‌نخورده و static می‌مانند.
-> مبنا: [`docs/adr/0001-seo-rendering-architecture.md`](../../docs/adr/0001-seo-rendering-architecture.md)
-> و [`SEO_AUDIT_REPORT.md`](../../SEO_AUDIT_REPORT.md).
+دامنه‌ی عمومی (`rezervno.ir`): هم صفحاتِ بازاریابی/محصول/قیمت و هم صفحاتِ
+ایندکس‌پذیرِ رستوران. جدا از اپِ مشتری، پنلِ کسب‌وکار و پنلِ شرکت.
 
-## چرا جدا
-این تنها فرانتِ رزرونو است که **build step** دارد (Next.js). SSR/ISR + URLهای per-entity
-برای رقابتِ SEO لازم‌اند و در معماریِ static/no-buildِ بقیه‌ی اپ‌ها ممکن نیستند. جداسازی
-یعنی خرابیِ اینجا به اپ‌های زنده آسیب نمی‌زند.
+معماری: [`docs/adr/0001`](../../docs/adr/0001-seo-rendering-architecture.md) (رندر)
+و [`docs/adr/0002`](../../docs/adr/0002-public-website-and-cms.md) (وب‌سایت، CMS، قیفِ فروش).
 
-## اجرا (محلی)
-```bash
+---
+
+## اجرا
+
+```sh
 cd apps/seo
 npm install
-SEO_API_BASE=http://localhost:3000 npm run dev   # http://localhost:3100
-npm run build && npm start                        # تولید
+SEO_API_BASE=http://localhost:3000 NEXT_PUBLIC_API_BASE=http://localhost:3000 npm run dev
+# → http://localhost:3100
 ```
 
-## پیکربندی
-- `SEO_API_BASE` — آدرسِ پایه‌ی `api/` رزرونو (مثلِ `https://api.rezervno.ir`)، بدونِ اسلشِ انتهایی.
-  اگر تنظیم نشود، صفحات به‌جای داده، حالتِ خالی/۴۰۴ می‌دهند (build همچنان سبز است).
+بدونِ `SEO_API_BASE` هم بالا می‌آید و از **حالتِ امن** (`content/site-content.json`)
+رندر می‌کند — همان چیزی که CI با آن build می‌گیرد.
+
+| اسکریپت | کار |
+|---|---|
+| `npm run dev` | سرورِ توسعه روی ۳۱۰۰ |
+| `npm run build` | بیلدِ تولید |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm test` | تستِ واحد: JSON-LD، Markdownِ امن، محتوای پیش‌فرض |
+
+---
+
+## متغیرهای محیطی
+
+| متغیر | سمت | توضیح |
+|---|---|---|
+| `SEO_API_BASE` | سرور | خواندنِ محتوا در SSR/ISR و ساختِ sitemap |
+| `NEXT_PUBLIC_API_BASE` | مرورگر | فرم‌های دمو/خرید/تماس و استودیو |
+| `NEXT_PUBLIC_BUSINESS_APP_URL` | مرورگر | دکمه‌ی ورود به پنلِ کسب‌وکار |
+| `NEXT_PUBLIC_CUSTOMER_APP_URL` | مرورگر | دکمه‌ی ورود به اپِ مشتری |
+| `NEXT_PUBLIC_COMPANY_APP_URL` | مرورگر | دکمه‌ی ورود به پنلِ شرکت |
+
+⚠️ دامنه‌ی این سایت باید در `ALLOWED_ORIGINS`ِ اپِ `api/` باشد، وگرنه فرم‌ها
+با خطای CORS رد می‌شوند. لینک‌های ورودی که آدرسشان تنظیم نشده باشد، به‌جای
+دکمه‌ی مرده، مسیرِ جایگزینِ واقعی (تماس با پشتیبانی) نشان می‌دهند.
+
+---
+
+## ساختار
+
+```
+app/
+  page.tsx                 صفحه‌ی اصلی (از CMS)
+  product|customer-app|business-app|features|how-it-works|about|terms|privacy
+                           صفحه‌های CMS — هرکدام ۵ خط، محتوا از دیتابیس
+  pricing/                 قیمت‌گذاری + مسیرِ خرید (اختصاصی)
+  demo/                    فرمِ دموی ۳۰ روزه (اختصاصی)
+  faq/ blog/ changelog/ contact/ login/
+  order/[code]/            پیگیریِ عمومیِ وضعیتِ سفارش
+  studio/                  استودیوی محتوا (پشتِ احرازِ هویتِ مدیر)
+  r|city|cuisine/          صفحاتِ رستوران (ADR 0001)
+  api/revalidate/          تازه‌سازیِ فوریِ کش بعد از ویرایشِ استودیو
+  sitemap.ts robots.ts opengraph-image.tsx not-found.tsx
+components/
+  site/                    هدر، فوتر، آیکن، حرکت، تمِ روشن/تاریک، JSON-LD
+  sections/                موتورِ رندرِ بلوک‌های CMS + تصویرسازی‌های محصولی
+  pricing/ forms/ order/ studio/
+lib/
+  site-api.ts              خواندنِ CMS (با حالتِ امن)
+  content-types.ts         انواع + پلِ حالتِ امن
+  site-schema.ts seo.ts    JSON-LD و Metadata
+  markdown.ts format.ts    Markdownِ امن، اعداد/تاریخِ فارسی
+  client-api.ts studio-api.ts
+content/site-content.json  ⚠️ کپیِ خودکار از shared/content — دستی ویرایش نکن
+```
+
+---
+
+## محتوا و CMS
+
+منبعِ حقیقت **دیتابیس** است؛ ویرایش از `/studio` (ورود با شماره‌ی مدیرِ پلتفرم).
+هفت مجموعه: صفحه‌ها، مقاله‌ها، پرسش‌ها، پلن‌ها، نظرها، بنرها، تغییرات — هرکدام
+با فیلدهای سئوی مستقل (عنوان، توضیحِ متا، کلیدواژه، تصویرِ اشتراک‌گذاری، noindex).
+
+`content/site-content.json` فقط **حالتِ امن** است: وقتی API در دسترس نیست
+(بیلدِ CI یا قطعیِ موقت) سایت با همان متن رندر می‌شود. ویرایشش را در
+`shared/content/site-content.json` انجام بده و بعد:
+
+```sh
+sh tools/sync-design-system.sh          # کپی به apps/seo و api/prisma/seed
+cd api && npm run db:seed:site          # کاشتن در دیتابیس
+```
+
+CI با `sync-design-system.sh --check` واگراییِ کپی‌ها را می‌گیرد.
+
+### بلوک‌های صفحه
+
+`hero` · `metrics` · `apps` · `features` · `split` · `steps` · `comparison` ·
+`showcase` · `pricing` · `testimonials` · `faq` · `cta` · `prose` · `legal`
+
+بلوکِ ناشناخته بی‌صدا رد می‌شود — پس افزودنِ نوعِ تازه از استودیو صفحه‌ی زنده را
+نمی‌شکند.
+
+---
+
+## سئو
+
+- `Metadata` یک‌جا در `lib/seo.ts`: canonical، hreflang، Open Graph، Twitter، robots
+- JSON-LD در یک `@graph` به‌ازای هر صفحه: `Organization` + `WebSite` در ریشه،
+  و `WebPage`/`BreadcrumbList`/`FAQPage`/`SoftwareApplication`+`Offer`/`BlogPosting`
+  به‌تناسبِ صفحه
+- قیمت‌های `Offer` از همان پلن‌هایی می‌آیند که کاربر می‌بیند (تومان → ریال)
+- `sitemap.xml` پویا: صفحاتِ ثابت + مقاله‌ها + صفحه‌های CMS + رستوران/شهر/آشپزی؛
+  ردیف‌های `noindex` وارد نمی‌شوند تا سیگنالِ متناقض نرود
+- تصویرِ اشتراک‌گذاری در زمانِ اجرا ساخته می‌شود (`opengraph-image`)
+
+---
+
+## دسترسی‌پذیری و حرکت
+
+- بدونِ کتابخانه‌ی انیمیشن؛ یک `IntersectionObserver` مشترک + CSS
+- `prefers-reduced-motion` همه‌ی حرکت‌ها را خاموش می‌کند و محتوا کاملاً دیده می‌ماند
+- بدونِ جاوااسکریپت هم هیچ محتوایی پنهان نمی‌ماند (کلاسِ `js-reveal`)
+- آکاردئونِ پرسش‌ها با `<details>` — خزنده و اسکرین‌ریدر متن را می‌بینند
+- تمِ روشن/تاریک با انتخابِ صریحِ کاربر (غالب بر ترجیحِ سیستم) و بدونِ پرشِ تم
+
+---
 
 ## دیپلوی
-یک **پروژه‌ی Vercelِ مستقل**، Root Directory = `apps/seo`، framework = Next.js
-(`vercel.json`). صفحاتِ SEO روی دامنه‌ی اصلی از طریقِ Vercel rewrites سرو می‌شوند
-(routing نهایی در فازِ P4/P5 قطعی می‌شود).
 
-## وضعیت
-- ✅ اسکلت (این PR): layout، صفحه‌ی اصلیِ استاتیک، کلاینتِ API (`lib/api.ts`)، CI (build/typecheck).
-- ⏳ بعدی: `/r/{slug}` با SSR/ISR + schema (P4) → `/city/{c}`، `/cuisine/{c}` (P5) → sitemap پویا (P6).
+پروژه‌ی Vercelِ مستقل، `Root Directory = apps/seo`، framework = Next.js.
+متغیرهای بالا را در Environment Variables بگذار و مطمئن شو دامنه در
+`ALLOWED_ORIGINS`ِ بک‌اند هست.

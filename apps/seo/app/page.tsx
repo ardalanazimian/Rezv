@@ -1,17 +1,24 @@
-// صفحه‌ی اصلیِ اپِ SEO (اسکلت). عمداً استاتیک است تا build بدونِ نیاز به API سبز باشد.
-// صفحاتِ واقعیِ محتوایی در فازهای بعد اضافه می‌شوند: /r/{slug}، /city/{c}، /cuisine/{c}.
-export default function Home() {
-  return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: 40, textAlign: 'center', lineHeight: 1.9 }}>
-      <h1>🍽️ رزرونو</h1>
-      <p>لایه‌ی عمومیِ SEO — کشف و رزرو آنلاین رستوران.</p>
-      <p style={{ color: '#666', fontSize: 14 }}>
-        این اپ (Next.js SSR/ISR) صفحاتِ ایندکس‌پذیرِ رستوران/شهر/آشپزی را سرو می‌کند.
-        اپِ رزرو/حسابِ کاربری جداست. جزئیاتِ معماری: <code>docs/adr/0001</code>.
-      </p>
-    </main>
-  );
+import type { Metadata } from 'next';
+import { CmsPage, cmsMetadata, type CmsPageOptions } from '@/lib/cms-page';
+
+// صفحه‌ی اصلی — همان موتورِ CMS، فقط بدونِ مسیرِ راهنما (خودش ریشه است).
+const OPTS: CmsPageOptions = {
+  slug: 'home',
+  path: '/',
+  fallbackTitle: 'رزرونو | نرم‌افزارِ رزروِ میز و مدیریتِ رستوران',
+  fallbackDescription:
+    'رزرونو پلتفرمِ رزروِ آنلاینِ میز و مدیریتِ رستوران است: اپِ مشتری برای کشف و رزرو، و پنلِ کسب‌وکار برای رزرو، میز، لیستِ انتظار، باشگاهِ مشتریان و تحلیل. دموی ۳۰ روزه‌ی رایگان.',
+  crumbs: [],
+};
+
+export const revalidate = 300;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const meta = await cmsMetadata(OPTS);
+  // صفحه‌ی اصلی از قالبِ «%s | رزرونو» مستثناست تا عنوانش دوباره برندسازی نشود.
+  return { ...meta, title: { absolute: (meta.title as string) ?? OPTS.fallbackTitle } };
 }
 
-// اسکلت پایدار و کم‌تغییر؛ فعلاً استاتیک (revalidate بعد از افزودنِ صفحاتِ داده‌محور تنظیم می‌شود).
-export const dynamic = 'force-static';
+export default function HomePage() {
+  return <CmsPage {...OPTS} />;
+}

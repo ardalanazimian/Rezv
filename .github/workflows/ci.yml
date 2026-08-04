@@ -173,8 +173,10 @@ jobs:
       - name: Check design-system in sync with shared/
         run: sh tools/sync-design-system.sh --check
 
-  # ── اپِ SEO (apps/seo · Next.js SSR/ISR، ADR 0001) — build + typecheck + lint ──
-  # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند. build خودِ Next تایپ‌چک/لینت می‌کند.
+  # ── وب‌سایتِ عمومی (apps/seo · Next.js SSR/ISR، ADR 0001 و 0002) ──
+  # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند.
+  # build عمداً بدونِ SEO_API_BASE اجرا می‌شود: باید در «حالتِ امن» (بدونِ API)
+  # هم سبز باشد، وگرنه یک قطعیِ API می‌تواند دیپلوی را هم زمین بزند.
   seo:
     runs-on: ubuntu-latest
     defaults:
@@ -190,7 +192,11 @@ jobs:
           cache-dependency-path: apps/seo/package-lock.json
       - name: Install dependencies
         run: npm ci || npm install
-      - name: Schema unit tests (JSON-LD sanity — پایشِ خودکار)
+      - name: Unit tests (JSON-LD، Markdownِ امن، محتوای پیش‌فرض)
         run: npm test
-      - name: Build (Next.js — typecheck + lint + build)
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Build (Next.js)
         run: npm run build
