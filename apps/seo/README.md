@@ -131,3 +131,19 @@ CI با `sync-design-system.sh --check` واگراییِ کپی‌ها را می
 پروژه‌ی Vercelِ مستقل، `Root Directory = apps/seo`، framework = Next.js.
 متغیرهای بالا را در Environment Variables بگذار و مطمئن شو دامنه در
 `ALLOWED_ORIGINS`ِ بک‌اند هست.
+
+### چیدمانِ دامنه
+
+این اپ مالکِ **ریشه‌ی دامنه** است — چون `sitemap.xml`، `robots.txt` و
+canonicalها از اینجا می‌آیند. بقیه روی زیردامنه‌اند و با Caddy از سرورِ خودت
+سرو می‌شوند (`deploy/caddy/Caddyfile`):
+
+| دامنه | چه چیزی | میزبان |
+|---|---|---|
+| `rezervno.ir` | همین اپ | Vercel |
+| `api.rezervno.ir` | بک‌اند | سرورِ خودت |
+| `app.rezervno.ir` | اپِ مشتری | سرورِ خودت |
+| `business.rezervno.ir` | پنلِ کسب‌وکار | سرورِ خودت |
+| `admin.rezervno.ir` | پنلِ شرکت | سرورِ خودت |
+
+DNS: ریشه و `www` به Vercel، چهار زیردامنه‌ی دیگر با رکوردِ A به آی‌پیِ سرور.

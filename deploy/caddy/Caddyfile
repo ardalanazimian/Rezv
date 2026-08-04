@@ -1,16 +1,36 @@
 # ═══════════════════════════════════════════════════════════
 #  رزرونو — Caddy: HTTPS خودکار + دفاع امنیتی محکم
 #  دامنه در .env: DOMAIN=rezervno.ir
+#
+#  ── چیدمانِ دامنه (ADR 0002) ──
+#    {$DOMAIN}          → وب‌سایتِ عمومی، روی Vercel. Caddy عمداً دستش نمی‌زند.
+#    api.{$DOMAIN}      → بک‌اند (مصرف‌کننده‌اش وب‌سایتِ Vercel است)
+#    app.{$DOMAIN}      → اپِ مشتری
+#    business.{$DOMAIN} → پنلِ کسب‌وکار
+#    admin.{$DOMAIN}    → پنلِ شرکت
+#
+#  ⚠️ تغییرِ شکننده نسبت به چیدمانِ قبلی (مسیرمحور):
+#     قبلاً اپِ مشتری روی ریشه و پنل‌ها روی /business و /company بودند. حالا
+#     ریشه به Vercel واگذار شده تا وب‌سایت مالکِ sitemap/robots/canonical باشد.
+#     برای هر زیردامنه یک رکوردِ A به آی‌پیِ همین سرور لازم است.
+#
+#  ── چرا هر پنل خودش /api/* را پروکسی می‌کند؟ ──
+#     پنل‌ها API را same-origin صدا می‌زنند (resolveApiBase() پیش‌فرض '' است).
+#     با پروکسیِ محلی نه متاتگِ rz-api-base لازم است، نه preflightِ CORS، و نه
+#     بازکردنِ connect-src در CSP. یعنی پنل‌ها بدونِ حتی یک خط تغییر کار می‌کنند.
+#
+#     ⚠️ ولی این جای ALLOWED_ORIGINS را نمی‌گیرد: مرورگر روی POST/PATCH/DELETE
+#     حتی same-origin هم هدرِ Origin می‌فرستد، و api/src/middleware.ts هر
+#     Originِ خارج از فهرست را ۴۰۳ می‌کند. پس هر چهار زیردامنه باید در
+#     ALLOWED_ORIGINS باشند — به .env.example نگاه کن.
 # ═══════════════════════════════════════════════════════════
 {
 	# ریت‌لیمیت سراسری (plugin)
 	order rate_limit before basicauth
 }
 
-{$DOMAIN} {
-	encode gzip zstd
-
-	# ── هدرهای امنیتی کامل ──
+# ── هدرهای امنیتی برای سایت‌هایی که HTML سرو می‌کنند ──
+(html_security) {
 	header {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		X-Frame-Options "SAMEORIGIN"
@@ -21,58 +41,102 @@
 		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
 		-Server
 	}
+}
 
-	# ── بلاک فایل‌های حساس ──
+# ── دفاعِ مشترک: فایل‌های حساس و اسکنرهای بد ──
+#
+# ⚠️ دو باگ که تا پیش از این هر دو قانون را بی‌اثر کرده بودند (با caddy adapt دیده شد):
+#
+#   ۱) `respond @x` به‌جای `handle @x { respond }`: Caddy دستورها را بر اساسِ
+#      ترتیبِ استانداردِ خودش بازچینش می‌کند و `handle` را جلوتر از `respond`
+#      می‌گذارد. چون این سایت‌ها یک `handle`ِ فراگیر دارند، همه‌ی درخواست‌ها
+#      همان‌جا پاسخ می‌گرفتند و این دو `respond` هرگز اجرا نمی‌شدند. حالا خودشان
+#      `handle` هستند و چون بالاتر import می‌شوند، اولِ گروه قرار می‌گیرند.
+#
+#   ۲) `header User-Agent a b c …`: نحوِ مچرِ header جفتِ <field> <value> می‌گیرد،
+#      پس آن فهرست به {User-Agent: sqlmap, *nmap*: *masscan*, …} تبدیل می‌شد —
+#      یعنی عملاً فقط sqlmap چک می‌شد. با header_regexp یک‌جا و بی‌حساس به
+#      بزرگی/کوچکیِ حروف بررسی می‌شود.
+(hardening) {
 	@sensitive path *.env *.git* *.sql *.sh *.bak *.yml *.yaml
-	respond @sensitive 404
+	handle @sensitive {
+		respond 404
+	}
 
-	# ── بلاک اسکنرهای بد ──
-	@badbots header User-Agent *sqlmap* *nikto* *nmap* *masscan* *nessus* *acunetix* *havij*
-	respond @badbots 403
+	@badbots header_regexp User-Agent (?i)(sqlmap|nikto|nmap|masscan|nessus|acunetix|havij)
+	handle @badbots {
+		respond 403
+	}
+}
 
-	# ── ریت‌لیمیت سخت‌گیرانه برای ورود/OTP ──
+# ── ریت‌لیمیت + پروکسیِ بک‌اند ──
+# آرگومان = پیشوندِ یکتا برای نامِ zone. نامِ zone در Caddy سراسری است، پس اگر
+# این snippet چند بار import شود هر بار باید zoneهای جدا بسازد وگرنه خطا می‌دهد.
+(api_upstream) {
+	# ریت‌لیمیت سخت‌گیرانه برای ورود/OTP
 	@auth path /api/v1/auth/*
 	rate_limit @auth {
-		zone auth_zone {
+		zone {args[0]}_auth {
 			key {remote_host}
 			events 5
 			window 1m
 		}
 	}
 
-	# ── ریت‌لیمیت عمومی API ──
+	# ریت‌لیمیت عمومی API
 	@api path /api/*
 	rate_limit @api {
-		zone api_zone {
+		zone {args[0]}_api {
 			key {remote_host}
 			events 100
 			window 10s
 		}
 	}
 
-	# ── API → بک‌اند ──
 	handle /api/* {
 		reverse_proxy api:3000 {
 			header_up X-Real-IP {remote_host}
 			header_up X-Forwarded-For {remote_host}
 		}
 	}
+}
 
-	# ── پنل رستوران ──
-	handle_path /business* {
-		root * /srv/business
-		try_files {path} /index.html
-		file_server
+# ═══════════════════════════════════════════════════════════
+#  بک‌اند — مصرف‌کننده‌اش وب‌سایتِ Vercel است
+# ═══════════════════════════════════════════════════════════
+api.{$DOMAIN} {
+	encode gzip zstd
+	import hardening
+
+	# عمداً بدونِ CSP: این دامنه JSON می‌دهد و CSPاش را خودِ
+	# api/src/middleware.ts می‌سازد. هدرِ دومِ Caddy با آن تداخل می‌کرد.
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
 	}
 
-	# ── پنل شرکت ──
-	handle_path /company* {
-		root * /srv/company
-		try_files {path} /index.html
-		file_server
-	}
+	import api_upstream apisub
 
-	# ── اپ مشتری ──
+	# هرچه /api/* نبود هم به بک‌اند می‌رود (health، og، …)
+	handle {
+		reverse_proxy api:3000 {
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+}
+
+# ═══════════════════════════════════════════════════════════
+#  اپِ مشتری
+# ═══════════════════════════════════════════════════════════
+app.{$DOMAIN} {
+	encode gzip zstd
+	import html_security
+	import hardening
+	import api_upstream appsub
+
 	handle {
 		root * /srv/customer
 		try_files {path} /index.html
@@ -80,8 +144,36 @@
 	}
 }
 
-www.{$DOMAIN} {
-	redir https://{$DOMAIN}{uri} permanent
+# ═══════════════════════════════════════════════════════════
+#  پنلِ کسب‌وکار
+# ═══════════════════════════════════════════════════════════
+business.{$DOMAIN} {
+	encode gzip zstd
+	import html_security
+	import hardening
+	import api_upstream bizsub
+
+	handle {
+		root * /srv/business
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# ═══════════════════════════════════════════════════════════
+#  پنلِ شرکت
+# ═══════════════════════════════════════════════════════════
+admin.{$DOMAIN} {
+	encode gzip zstd
+	import html_security
+	import hardening
+	import api_upstream adminsub
+
+	handle {
+		root * /srv/company
+		try_files {path} /index.html
+		file_server
+	}
 }
 
 # ── healthcheckِ داخلیِ کانتینر ──
