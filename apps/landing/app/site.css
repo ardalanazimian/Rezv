@@ -1107,3 +1107,28 @@
   line-height: 1;
   letter-spacing: var(--ls-tight);
 }
+
+/* ═══════════════ هدفِ لمسی روی دستگاه‌های لمسی ═══════════════
+   tokens.css استانداردِ --touch-min: 44px را تعریف کرده (Apple HIG / Material)
+   ولی چند کنترل زیرِ آن بودند. با تستِ واقعی روی ۸ گوشی اندازه‌گیری شد:
+     .site-footer__link  ۲۰px   ← بدترین مورد، کمتر از نصفِ استاندارد
+     .brand              ۳۰px
+     .btn--sm            ۳۶px
+     .chip               ۳۸px
+
+   فقط روی pointer: coarse اعمال می‌شود تا تناسبِ بصریِ دسکتاپ دست نخورد.
+   ارتفاع با padding بزرگ نمی‌شود (فاصله‌ها را به‌هم می‌ریزد)؛ به‌جایش
+   min-block-size + مرکزچینی، که ناحیه‌ی لمس را بزرگ می‌کند و ظاهر را نه. */
+@media (pointer: coarse) {
+  .btn--sm,
+  .chip,
+  .brand {
+    min-block-size: var(--touch-min);
+  }
+
+  .site-footer__link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--touch-min);
+  }
+}

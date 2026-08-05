@@ -58,6 +58,12 @@
   --r-2xl: 32px;
   --r-full: 9999px;
 
+  /* ── Primitive: کوچک‌ترین هدفِ لمسی (Apple HIG / Material) ──
+     هم‌ارزِ --touch-min در shared/css/tokens.css. عمداً اینجا هم تعریف شده:
+     این اپ توکن‌هایش را از shared نمی‌گیرد (دو سیستمِ موازی — ADR 0002)، پس
+     var(--touch-min) بدونِ این خط به هیچ resolve می‌شد و قاعده بی‌اثر بود. */
+  --touch-min: 44px;
+
   /* ── Primitive: حرکت ── */
   --t-fast: 130ms;
   --t-base: 220ms;
