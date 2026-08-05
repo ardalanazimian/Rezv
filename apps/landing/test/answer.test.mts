@@ -110,3 +110,17 @@ describe('رتبه‌بندی', () => {
     assert.ok(DOCS.some((d) => d.body === a.text));
   });
 });
+
+// ── محافظ در برابرِ بازگشتِ باگِ «پنلِ چت از اول باز است» ──
+//
+// ویژگیِ hidden فقط display:none پیش‌فرضِ مرورگر است. هر قاعده‌ای که برای
+// .askbot یک display بگذارد بر آن غلبه می‌کند و پنل از لحظه‌ی ورود باز
+// می‌ماند. این تست فایلِ CSS را می‌خواند تا مطمئن شود قاعده‌ی خنثی‌کننده
+// هست — یک بار واقعاً این اتفاق افتاد و در مرورگر پیدا شد.
+describe('CSS دستیار', () => {
+  test('.askbot[hidden] باید display را خنثی کند', async () => {
+    const { readFileSync } = await import('node:fs');
+    const css = readFileSync(new URL('../app/site.css', import.meta.url), 'utf8');
+    assert.match(css, /\.askbot\[hidden\]\s*\{\s*display:\s*none/);
+  });
+});

@@ -1227,6 +1227,10 @@
   background: var(--surface); box-shadow: var(--sh-xl); overflow: hidden;
   animation: askIn var(--t-base) var(--ease-out);
 }
+/* ⚠️ لازم است: ویژگیِ hidden فقط display:none پیش‌فرضِ مرورگر است و
+   display:flexِ بالا بر آن غلبه می‌کند. بدونِ این خط، پنلِ چت از همان
+   لحظه‌ی بازشدنِ صفحه باز دیده می‌شود. با تست روی موبایل گرفته شد. */
+.askbot[hidden] { display: none; }
 @keyframes askIn { from { opacity: 0; transform: translateY(10px) scale(.985); } }
 
 .askbot__head {
