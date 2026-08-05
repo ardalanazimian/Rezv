@@ -19,6 +19,26 @@ let PHOTO_FILTER = 'pending';   // pending | approved | rejected | all
 let PHOTO_LOADING = false;
 let PHOTO_ERROR = null;
 let PHOTO_BADGE = 0;
+let PHOTO_DEMO = false;         // آیا چیزی که روی صفحه است دادهٔ نمونه است؟
+
+// نمونه‌ی نمایشی — فقط وقتی سرور در دسترس نیست (نسخه‌ی آفلاینِ پنل برای
+// ارائه). نام‌ها عمداً با [DEMO] برچسب خورده‌اند تا هیچ‌وقت با دادهٔ واقعی
+// اشتباه گرفته نشوند، و در این حالت دکمه‌های تأیید/رد کاری انجام نمی‌دهند —
+// تصمیمِ انتشار نباید روی دادهٔ ساختگی گرفته شود.
+const PHOTO_SAMPLE = [
+  { id: 'demo-1', url: '', caption: 'میزهای کنارِ پنجره', category: 'interior', status: 'pending',
+    width: 1600, height: 1067, byte_size: 384000, original_name: 'salon-window.jpg',
+    created_at: new Date(Date.now() - 36e5 * 3).toISOString(), reviewed_at: null, rejection_reason: null,
+    restaurant: { id: 'd1', name: '[DEMO] کافه‌رستوران ویستا', slug: 'demo-vista', city: 'تهران' } },
+  { id: 'demo-2', url: '', caption: 'خورشتِ ویژه‌ی شب', category: 'food', status: 'pending',
+    width: 1200, height: 1200, byte_size: 268000, original_name: 'dish-01.jpg',
+    created_at: new Date(Date.now() - 36e5 * 9).toISOString(), reviewed_at: null, rejection_reason: null,
+    restaurant: { id: 'd2', name: '[DEMO] سفره‌خانه گرام', slug: 'demo-geram', city: 'اصفهان' } },
+  { id: 'demo-3', url: '', caption: '', category: 'drink', status: 'pending',
+    width: 900, height: 1600, byte_size: 512000, original_name: 'bar.png',
+    created_at: new Date(Date.now() - 36e5 * 26).toISOString(), reviewed_at: null, rejection_reason: null,
+    restaurant: { id: 'd3', name: '[DEMO] کافه هانا', slug: 'demo-hana', city: 'تهران' } },
+];
 
 const PHOTO_STATUS = {
   pending: { label: 'در انتظار تأیید', cls: 'expiring' },
@@ -59,13 +79,21 @@ async function loadPhotos() {
   PHOTO_LOADING = false;
 
   if (!res.ok) {
-    // بدونِ بک‌اند دادهٔ نمونه نشان داده نمی‌شود: اینجا تصمیمِ انتشار گرفته
-    // می‌شود و عکسِ ساختگی می‌تواند باعثِ تأییدِ چیزی شود که وجود ندارد.
-    PHOTO_ERROR = res.offline
-      ? 'اتصال به سرور برقرار نیست — این بخش دادهٔ نمونه ندارد چون تصمیمِ انتشار روی آن گرفته می‌شود.'
-      : (res.error && res.error.message) || 'دریافتِ صفِ بازبینی ناموفق بود.';
-    PHOTO_ITEMS = [];
+    if (res.offline) {
+      // نسخه‌ی آفلاینِ پنل (برای ارائه): نمونه نشان داده می‌شود ولی با برچسبِ
+      // آشکار و بدونِ اینکه دکمه‌ها کاری کنند. تصمیمِ انتشار نباید روی دادهٔ
+      // ساختگی گرفته شود — همان قاعده، فقط به‌جای صفحه‌ی خالی، شفاف.
+      PHOTO_DEMO = true;
+      PHOTO_ERROR = null;
+      PHOTO_ITEMS = PHOTO_FILTER === 'pending' || PHOTO_FILTER === 'all' ? PHOTO_SAMPLE : [];
+      PHOTO_BADGE = PHOTO_SAMPLE.length;
+    } else {
+      PHOTO_DEMO = false;
+      PHOTO_ERROR = (res.error && res.error.message) || 'دریافتِ صفِ بازبینی ناموفق بود.';
+      PHOTO_ITEMS = [];
+    }
   } else {
+    PHOTO_DEMO = false;
     PHOTO_ITEMS = res.data.items || [];
     PHOTO_BADGE = res.data.pending_count || 0;
   }
@@ -121,6 +149,10 @@ function rPhotos() {
         </div>
       </div>
 
+      ${PHOTO_DEMO ? `<div style="margin:0 0 14px;padding:11px 14px;background:var(--amber-50);border:1px solid #FDE68A;border-radius:10px;font-size:12.5px;color:#92400E;line-height:1.7">
+        <b>نمایشِ نمونه.</b> سرور در دسترس نیست، پس این عکس‌ها ساختگی‌اند و با <b>[DEMO]</b> برچسب خورده‌اند.
+        دکمه‌های تأیید و رد در این حالت چیزی را تغییر نمی‌دهند.
+      </div>` : ''}
       ${PHOTO_ERROR ? `<div style="padding:22px;text-align:center;color:var(--red-600);font-size:13px">${esc(PHOTO_ERROR)}</div>` : ''}
       ${PHOTO_LOADING ? `<div style="padding:22px;text-align:center;color:var(--muted);font-size:13px">در حال دریافت…</div>` : ''}
       ${!PHOTO_LOADING && !PHOTO_ERROR ? renderPhotoQueue() : ''}
@@ -138,9 +170,9 @@ function renderPhotoQueue() {
     ${PHOTO_ITEMS.map((p) => {
       const st = PHOTO_STATUS[p.status] || PHOTO_STATUS.pending;
       return `<div class="photo-card">
-        <a class="photo-card__img" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">
+        ${p.url ? `<a class="photo-card__img" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">
           <img src="${esc(p.url)}" alt="${esc(p.caption || 'عکسِ گالری')}" loading="lazy">
-        </a>
+        </a>` : `<div class="photo-card__img photo-card__img--demo">${PHOTO_CATEGORY[p.category] || 'عکس'}</div>`}
         <div class="photo-card__body">
           <div class="photo-card__top">
             <span class="photo-card__rest">${esc(p.restaurant.name)}</span>
@@ -166,7 +198,15 @@ function renderPhotoQueue() {
 
 // ════════ عملیات ════════
 
+/** در حالتِ نمونه هیچ تصمیمی ثبت نمی‌شود — و کاربر باید بداند، نه اینکه حدس بزند. */
+function demoBlocked() {
+  if (!PHOTO_DEMO) return false;
+  toast('', 'این یک نمایشِ نمونه است — برای تأیید یا رد باید به سرور وصل باشی');
+  return true;
+}
+
 async function approvePhoto(id) {
+  if (demoBlocked()) return;
   const res = await API.patch('/admin/photos/' + id, { action: 'approve' });
   if (!res.ok) { toast('✕', (res.error && res.error.message) || 'تأیید ناموفق بود'); return; }
   toast('✓', 'عکس تأیید شد و روی صفحه‌ی رستوران منتشر شد');
@@ -174,6 +214,7 @@ async function approvePhoto(id) {
 }
 
 async function rejectPhoto(id) {
+  if (demoBlocked()) return;
   // دلیل اختیاری است ولی خواسته می‌شود: رستوران‌دار همین متن را در پنلش
   // می‌بیند و بدونِ آن فقط می‌فهمد «نشد»، نه اینکه چه چیزی را اصلاح کند.
   const reason = window.prompt('دلیلِ رد (برای رستوران نمایش داده می‌شود):', '');
@@ -185,6 +226,7 @@ async function rejectPhoto(id) {
 }
 
 async function deletePhotoHard(id) {
+  if (demoBlocked()) return;
   if (!window.confirm('عکس و فایلش برای همیشه حذف می‌شود. مطمئنی؟')) return;
   const res = await API.del('/admin/photos/' + id);
   if (!res.ok) { toast('✕', (res.error && res.error.message) || 'حذف ناموفق بود'); return; }

@@ -340,3 +340,8 @@ button{font-family:inherit;cursor:pointer}
 .photo-card__actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 /* روی موبایل یک‌ستونی می‌شود تا عکس بزرگ‌تر و تصمیم دقیق‌تر باشد */
 @media (max-width:640px){.photo-queue{grid-template-columns:1fr}}
+/* جایگزینِ تصویر در حالتِ نمونه (سرور در دسترس نیست) — تا کارت بدونِ عکسِ
+   شکسته هم ساختارش را نشان بدهد. */
+.photo-card__img--demo{display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:var(--t3);
+  background:repeating-linear-gradient(45deg,#F1F5F9,#F1F5F9 10px,#E2E8F0 10px,#E2E8F0 20px)}
