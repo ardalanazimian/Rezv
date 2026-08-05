@@ -91,9 +91,9 @@ export function LogoMark({ size = 30 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
       <defs>
         <linearGradient id="rz-logo" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#6366F1" />
-          <stop offset="0.55" stopColor="#7C3AED" />
-          <stop offset="1" stopColor="#E8925A" />
+          <stop stopColor="#E2612C" />
+          <stop offset="0.55" stopColor="#C74D1E" />
+          <stop offset="1" stopColor="#C79A2C" />
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="9" fill="url(#rz-logo)" />

@@ -168,7 +168,7 @@
   font-size: var(--fs-sm);
   font-weight: 600;
   text-align: center;
-  background: linear-gradient(100deg, var(--brand-500), var(--violet-500));
+  background: linear-gradient(100deg, var(--ember-500), var(--brass-500));
   color: #fff;
 }
 .announce--success { background: var(--success); }
@@ -324,7 +324,7 @@
 .viz__chart span {
   flex: 1;
   border-radius: var(--r-xs) var(--r-xs) 2px 2px;
-  background: linear-gradient(180deg, var(--brand-400), var(--brand-500));
+  background: linear-gradient(180deg, var(--ember-400), var(--ember-500));
   opacity: 0.85;
   transform-origin: bottom;
   animation: growBar 0.9s var(--ease-out) backwards;
@@ -486,7 +486,7 @@
   font-weight: 800;
   font-size: var(--fs-sm);
 }
-:root[data-theme='dark'] .step::before { color: #0b1020; background: var(--brand-400); }
+:root[data-theme='dark'] .step::before { color: #0b1020; background: var(--ember-400); }
 .step__title { font-weight: 700; font-size: var(--fs-lg); }
 .step__body { color: var(--text-2); font-size: var(--fs-md); }
 
@@ -579,7 +579,7 @@
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(160deg, var(--brand-500), var(--violet-500), transparent 65%);
+  background: linear-gradient(160deg, var(--ember-500), var(--brass-500), transparent 65%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -594,7 +594,7 @@
   transform: translate(50%, -50%);
   padding: 0.3125rem 0.875rem;
   border-radius: var(--r-full);
-  background: linear-gradient(135deg, var(--brand-500), var(--violet-500));
+  background: linear-gradient(135deg, var(--ember-500), var(--brass-500));
   color: #fff;
   font-size: var(--fs-xs);
   font-weight: 800;
@@ -686,7 +686,7 @@
   font-weight: 800;
   flex: 0 0 auto;
 }
-.quote__stars { display: flex; gap: 2px; color: var(--warm-500); }
+.quote__stars { display: flex; gap: 2px; color: var(--brass-500); }
 
 /* حالتِ خالی — وقتی هنوز محتوایی منتشر نشده */
 .empty-state {
@@ -715,7 +715,7 @@
   overflow: hidden;
   border-radius: var(--r-2xl);
   padding: clamp(var(--sp-10), 6vw, var(--sp-20));
-  background: linear-gradient(135deg, var(--brand-600), var(--violet-500) 55%, var(--brand-500));
+  background: linear-gradient(135deg, var(--ember-600), var(--brass-500) 55%, var(--ember-500));
   color: #fff;
   text-align: center;
   box-shadow: var(--sh-xl);
@@ -732,7 +732,7 @@
 .cta-band p { color: rgba(255, 255, 255, 0.9); }
 .cta-band .btn--primary {
   --btn-bg: #fff;
-  --btn-fg: var(--brand-600);
+  --btn-fg: var(--ember-600);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
 }
 .cta-band .btn--ghost {
@@ -1131,4 +1131,44 @@
     align-items: center;
     min-block-size: var(--touch-min);
   }
+}
+
+/* ═══════════════ صحنه‌ی «شبِ سرویس» ═══════════════ */
+.night { position: relative; display: grid; gap: var(--sp-4); }
+.night__canvas {
+  position: relative;
+  aspect-ratio: 16 / 11;
+  border-radius: var(--r-xl);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(120% 90% at 70% 0%, var(--aurora-1), transparent 60%),
+    var(--bg-sunken);
+  overflow: hidden;
+  box-shadow: var(--sh-xl);
+}
+.night__canvas canvas { display: block; inline-size: 100%; block-size: 100%; }
+.night__hud {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-3);
+}
+.night__stat {
+  display: grid; gap: 2px;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.night__num {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  letter-spacing: var(--ls-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.night__lbl { font-size: var(--fs-2xs); color: var(--text-3); letter-spacing: .02em; }
+
+@media (max-width: 620px) {
+  .night__hud { grid-template-columns: 1fr; }
+  .night__canvas { aspect-ratio: 4 / 5; }
 }

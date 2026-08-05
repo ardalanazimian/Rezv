@@ -72,176 +72,101 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 
-  /* ── Primitive: برند ── */
-  --brand-50: #eef2ff;
-  --brand-100: #e0e7ff;
-  --brand-200: #c7d2fe;
-  --brand-300: #a5b4fc;
-  --brand-400: #818cf8;
-  --brand-500: #4f46e5;
-  --brand-600: #4338ca;
-  --brand-700: #3730a3;
-  --violet-500: #7c3aed;
-  --violet-400: #a78bfa;
-  --warm-500: #e8925a;
-  --warm-400: #f0ad7f;
-  --teal-500: #0d9488;
+  /* ── Primitive: برند — «شبِ سرویس» ──
+     زمینه از دنیای خودِ محصول می‌آید: سالنِ رستوران بعد از غروب. برای همین
+     خنثی‌ها گرم‌اند (متمایل به قهوه‌ای)، نه مشکیِ آبی‌مایلِ داشبوردی.
+     دو رنگِ گرمِ هم‌خانواده کار می‌کنند — اخرا (آتشِ آشپزخانه) و برنجی (نورِ
+     گرمِ سرویس) — نه یک رنگِ نئونِ تنها روی مشکی.
+     فیروزه‌ای عمداً رنگِ برند نیست: فقط معنای «زنده/آزاد» را حمل می‌کند. */
+  --ember-700: #a83c14;
+  --ember-600: #c74d1e;
+  --ember-500: #e2612c;   /* اخرا — رنگِ اصلیِ کنش */
+  --ember-400: #f07f4d;
+  --ember-300: #f7a37b;
+  --ember-100: #fce6da;
+  --ember-50:  #fdf3ee;
+
+  --brass-600: #a8801f;
+  --brass-500: #c79a2c;   /* برنجی — عددها، تأکیدِ گرم */
+  --brass-400: #ddb457;
+  --brass-300: #ebcd8b;
+
+  /* وضعیت‌های زنده — معنایی، نه تزئینی */
+  --live-500: #2aa87c;
+  --live-400: #45c99a;
+
+  --clay-500: #8c6a52;    /* خنثیِ گرمِ میانی، برای خط و جداکننده */
 
   --container: 1200px;
   --container-narrow: 760px;
   --header-h: 68px;
 }
 
-/* ── Semantic: حالتِ روشن (پیش‌فرض) ── */
-:root,
-:root[data-theme='light'] {
-  color-scheme: light;
+/* ── Semantic: هر توکن یک بار، با light-dark() ──
+   چرا این‌طور و نه سه بلوکِ جدا (روشن / تاریک / prefers-color-scheme):
+   آن ساختار هر رنگ را سه بار تکرار می‌کرد و همین باعثِ یک باگِ واقعی شد —
+   موقعِ تغییرِ پالت، بلوکِ @media جا ماند و کاربری که تم را دستی انتخاب
+   نکرده بود هنوز رنگ‌های قدیمی می‌دید.
 
-  --bg: #ffffff;
-  --bg-subtle: #f7f8fc;
-  --bg-sunken: #eef0f7;
+   حالا مقدارها یک‌جا هستند و انتخاب با color-scheme انجام می‌شود:
+     :root            → color-scheme: light dark  (پیروی از سیستم)
+     [data-theme=...] → فقط color-scheme را قفل می‌کند
+   یعنی افزودنِ رنگِ تازه دیگر نمی‌تواند نیمه‌کاره بماند. */
+:root {
+  color-scheme: light dark;
 
-  --surface: #ffffff;
-  --surface-2: #f7f8fc;
-  --surface-3: #eef0f7;
-  --surface-inverse: #0b1020;
+  --bg:         light-dark(#f6f4f1, #100c0a);
+  --bg-subtle:  light-dark(#efece7, #171210);
+  --bg-sunken:  light-dark(#e6e2db, #0a0706);
 
-  --text-1: #0b1020;
-  --text-2: #4a5265;
-  --text-3: #7b8397;
-  --text-inverse: #ffffff;
+  --surface:         light-dark(#ffffff, #1a1513);
+  --surface-2:       light-dark(#f6f4f1, #221b18);
+  --surface-3:       light-dark(#eae6e0, #2c231f);
+  --surface-inverse: light-dark(#17120f, #f7f2ec);
 
-  --border: rgba(11, 16, 32, 0.09);
-  --border-strong: rgba(11, 16, 32, 0.16);
+  --text-1:       light-dark(#17120f, #f4ece3);
+  --text-2:       light-dark(#5a504a, #b7a89c);
+  --text-3:       light-dark(#8b8078, #8a7a6e);
+  --text-inverse: light-dark(#f7f2ec, #17120f);
 
-  --brand: var(--brand-500);
-  --brand-ink: var(--brand-600);
-  --brand-soft: var(--brand-50);
+  --border:        light-dark(rgba(23, 18, 15, 0.11), rgba(244, 236, 227, 0.1));
+  --border-strong: light-dark(rgba(23, 18, 15, 0.2), rgba(244, 236, 227, 0.2));
+
+  --brand:          light-dark(#c74d1e, #e2612c);
+  --brand-ink:      light-dark(#a83c14, #f07f4d);
+  --brand-soft:     light-dark(#fdf3ee, rgba(226, 97, 44, 0.16));
   --brand-contrast: #ffffff;
-  --accent: var(--warm-500);
+  --accent:         light-dark(#a8801f, #ddb457);
 
-  --success: #0f8a48;
-  --success-soft: #e7f6ee;
-  --warning: #b45309;
-  --warning-soft: #fef3e7;
-  --danger: #c62828;
-  --danger-soft: #fdecec;
-  --info: #1d4ed8;
-  --info-soft: #e8f0fe;
+  --success:      light-dark(#16794f, #45c99a);
+  --success-soft: light-dark(#e3f3ec, rgba(69, 201, 154, 0.15));
+  --warning:      light-dark(#a35a0d, #ddb457);
+  --warning-soft: light-dark(#fbf0e2, rgba(221, 180, 87, 0.15));
+  --danger:       light-dark(#b8341f, #ef7361);
+  --danger-soft:  light-dark(#fbe9e6, rgba(239, 115, 97, 0.15));
+  --info:         light-dark(#2a6b8f, #6fb3d1);
+  --info-soft:    light-dark(#e6f0f5, rgba(111, 179, 209, 0.15));
 
-  --sh-sm: 0 1px 2px rgba(11, 16, 32, 0.05), 0 1px 3px rgba(11, 16, 32, 0.04);
-  --sh-md: 0 6px 16px rgba(11, 16, 32, 0.07), 0 2px 5px rgba(11, 16, 32, 0.04);
-  --sh-lg: 0 18px 40px rgba(11, 16, 32, 0.1), 0 6px 12px rgba(11, 16, 32, 0.05);
-  --sh-xl: 0 32px 72px rgba(11, 16, 32, 0.14), 0 10px 20px rgba(11, 16, 32, 0.06);
-  --sh-brand: 0 12px 32px rgba(79, 70, 229, 0.24);
+  --sh-sm: light-dark(0 1px 2px rgba(23,18,15,.06), 0 1px 2px rgba(0,0,0,.55));
+  --sh-md: light-dark(0 6px 16px rgba(23,18,15,.08), 0 6px 18px rgba(0,0,0,.55));
+  --sh-lg: light-dark(0 18px 40px rgba(23,18,15,.11), 0 20px 44px rgba(0,0,0,.62));
+  --sh-xl: light-dark(0 32px 72px rgba(23,18,15,.15), 0 34px 80px rgba(0,0,0,.7));
+  --sh-brand: light-dark(0 14px 34px rgba(199,77,30,.26), 0 14px 38px rgba(226,97,44,.36));
 
-  /* شیشه: لایه‌ی مات + blur. آلفا عمداً بالاست تا خوانایی حفظ شود. */
-  --glass-bg: rgba(255, 255, 255, 0.82);
-  --glass-border: rgba(11, 16, 32, 0.08);
+  /* شیشه: آلفا عمداً بالاست تا متن روی محتوای متحرک خوانا بماند. */
+  --glass-bg:     light-dark(rgba(246, 244, 241, 0.84), rgba(26, 21, 19, 0.8));
+  --glass-border: light-dark(rgba(23, 18, 15, 0.1), rgba(244, 236, 227, 0.11));
   --glass-blur: 16px;
 
-  --aurora-1: rgba(79, 70, 229, 0.16);
-  --aurora-2: rgba(124, 58, 237, 0.13);
-  --aurora-3: rgba(232, 146, 90, 0.1);
-  --grid-line: rgba(11, 16, 32, 0.045);
+  --aurora-1:  light-dark(rgba(226, 97, 44, 0.13), rgba(226, 97, 44, 0.24));
+  --aurora-2:  light-dark(rgba(199, 154, 44, 0.12), rgba(199, 154, 44, 0.18));
+  --aurora-3:  light-dark(rgba(140, 106, 82, 0.09), rgba(140, 106, 82, 0.14));
+  --grid-line: light-dark(rgba(23, 18, 15, 0.05), rgba(244, 236, 227, 0.055));
 }
 
-/* ── Semantic: حالتِ تاریک ── */
-:root[data-theme='dark'] {
-  color-scheme: dark;
-
-  --bg: #08090f;
-  --bg-subtle: #0d0f17;
-  --bg-sunken: #05060b;
-
-  --surface: #10121c;
-  --surface-2: #171a26;
-  --surface-3: #1f2331;
-  --surface-inverse: #ffffff;
-
-  --text-1: #f2f4f9;
-  --text-2: #a9b0c2;
-  --text-3: #767e93;
-  --text-inverse: #0b1020;
-
-  --border: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(255, 255, 255, 0.17);
-
-  --brand: var(--brand-400);
-  --brand-ink: var(--brand-300);
-  --brand-soft: rgba(129, 140, 248, 0.14);
-  --brand-contrast: #0b1020;
-  --accent: var(--warm-400);
-
-  --success: #34d399;
-  --success-soft: rgba(52, 211, 153, 0.14);
-  --warning: #fbbf24;
-  --warning-soft: rgba(251, 191, 36, 0.14);
-  --danger: #f87171;
-  --danger-soft: rgba(248, 113, 113, 0.14);
-  --info: #60a5fa;
-  --info-soft: rgba(96, 165, 250, 0.14);
-
-  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --sh-md: 0 6px 18px rgba(0, 0, 0, 0.5);
-  --sh-lg: 0 20px 44px rgba(0, 0, 0, 0.58);
-  --sh-xl: 0 34px 80px rgba(0, 0, 0, 0.66);
-  --sh-brand: 0 12px 34px rgba(99, 102, 241, 0.34);
-
-  --glass-bg: rgba(16, 18, 28, 0.78);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-blur: 18px;
-
-  --aurora-1: rgba(99, 102, 241, 0.26);
-  --aurora-2: rgba(139, 92, 246, 0.2);
-  --aurora-3: rgba(232, 146, 90, 0.12);
-  --grid-line: rgba(255, 255, 255, 0.05);
-}
-
-/* اگر کاربر هنوز انتخابی نکرده، از ترجیحِ سیستم پیروی کن. data-theme صریح
-   همیشه برنده است چون گزینشگرِ :root[data-theme] در بلوکِ بالا تکرار شده. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    color-scheme: dark;
-    --bg: #08090f;
-    --bg-subtle: #0d0f17;
-    --bg-sunken: #05060b;
-    --surface: #10121c;
-    --surface-2: #171a26;
-    --surface-3: #1f2331;
-    --surface-inverse: #ffffff;
-    --text-1: #f2f4f9;
-    --text-2: #a9b0c2;
-    --text-3: #767e93;
-    --text-inverse: #0b1020;
-    --border: rgba(255, 255, 255, 0.09);
-    --border-strong: rgba(255, 255, 255, 0.17);
-    --brand: var(--brand-400);
-    --brand-ink: var(--brand-300);
-    --brand-soft: rgba(129, 140, 248, 0.14);
-    --brand-contrast: #0b1020;
-    --accent: var(--warm-400);
-    --success: #34d399;
-    --success-soft: rgba(52, 211, 153, 0.14);
-    --warning: #fbbf24;
-    --warning-soft: rgba(251, 191, 36, 0.14);
-    --danger: #f87171;
-    --danger-soft: rgba(248, 113, 113, 0.14);
-    --info: #60a5fa;
-    --info-soft: rgba(96, 165, 250, 0.14);
-    --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --sh-md: 0 6px 18px rgba(0, 0, 0, 0.5);
-    --sh-lg: 0 20px 44px rgba(0, 0, 0, 0.58);
-    --sh-xl: 0 34px 80px rgba(0, 0, 0, 0.66);
-    --sh-brand: 0 12px 34px rgba(99, 102, 241, 0.34);
-    --glass-bg: rgba(16, 18, 28, 0.78);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --aurora-1: rgba(99, 102, 241, 0.26);
-    --aurora-2: rgba(139, 92, 246, 0.2);
-    --aurora-3: rgba(232, 146, 90, 0.12);
-    --grid-line: rgba(255, 255, 255, 0.05);
-  }
-}
+/* انتخابِ صریحِ کاربر فقط color-scheme را قفل می‌کند — مقدارها بالا یک‌جا هستند. */
+:root[data-theme='light'] { color-scheme: light; }
+:root[data-theme='dark']  { color-scheme: dark; }
 
 /* ═══════════════ پایه ═══════════════ */
 
@@ -404,13 +329,13 @@ button, input, textarea, select {
 }
 
 .text-gradient {
-  background: linear-gradient(100deg, var(--brand) 0%, var(--violet-500) 45%, var(--accent) 100%);
+  background: linear-gradient(100deg, var(--brand) 0%, var(--brass-500) 45%, var(--accent) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 :root[data-theme='dark'] .text-gradient {
-  background: linear-gradient(100deg, var(--brand-300) 0%, var(--violet-400) 48%, var(--warm-400) 100%);
+  background: linear-gradient(100deg, var(--ember-300) 0%, var(--brass-400) 48%, var(--brass-400) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -460,7 +385,7 @@ button, input, textarea, select {
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .btn--primary {
-  --btn-bg: linear-gradient(135deg, var(--brand-500), var(--violet-500));
+  --btn-bg: linear-gradient(135deg, var(--ember-500), var(--brass-500));
   --btn-fg: #ffffff;
   --btn-border: transparent;
   box-shadow: var(--sh-brand);
@@ -469,7 +394,7 @@ button, input, textarea, select {
   box-shadow: 0 16px 40px rgba(79, 70, 229, 0.34);
 }
 :root[data-theme='dark'] .btn--primary {
-  --btn-bg: linear-gradient(135deg, var(--brand-400), var(--violet-400));
+  --btn-bg: linear-gradient(135deg, var(--ember-400), var(--brass-400));
   --btn-fg: #0b1020;
 }
 
@@ -816,7 +741,7 @@ button, input, textarea, select {
   inset-inline: 0;
   height: 2px;
   z-index: 60;
-  background: linear-gradient(90deg, var(--brand-500), var(--violet-500), var(--accent));
+  background: linear-gradient(90deg, var(--ember-500), var(--brass-500), var(--accent));
   transform-origin: 100% 50%;
   transform: scaleX(var(--progress, 0));
   transition: transform 90ms linear;

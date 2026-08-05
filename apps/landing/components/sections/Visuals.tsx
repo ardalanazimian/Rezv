@@ -176,8 +176,8 @@ function SearchPanel() {
 function GrowthPanel() {
   const segments = [
     { label: 'مهمانِ وفادار', value: 38, tone: 'var(--brand)' },
-    { label: 'مهمانِ تازه', value: 44, tone: 'var(--violet-500)' },
-    { label: 'در حالِ از دست رفتن', value: 18, tone: 'var(--warm-500)' },
+    { label: 'مهمانِ تازه', value: 44, tone: 'var(--brass-500)' },
+    { label: 'در حالِ از دست رفتن', value: 18, tone: 'var(--brass-500)' },
   ];
   return (
     <div className="viz" aria-hidden="true">
@@ -298,6 +298,8 @@ function FlowPanel() {
   );
 }
 
+import { ServiceNight } from './ServiceNight';
+
 const PANELS: Record<string, () => JSX.Element> = {
   reservation: ReservationPanel,
   floor: FloorPanel,
@@ -312,6 +314,9 @@ const PANELS: Record<string, () => JSX.Element> = {
 
 /** انتخابِ پنل بر اساسِ نامِ آمده از CMS؛ نامِ ناشناخته → پنلِ پیش‌فرض. */
 export function Visual({ kind }: { kind?: string }) {
-  const Panel = (kind && PANELS[kind]) || ReservationPanel;
+  // پنلِ رزرو دیگر تصویرِ ثابت نیست: صحنه‌ی زنده‌ی «شبِ سرویس» جایش را گرفته
+  // که با اسکرول پیش می‌رود. بقیه‌ی پنل‌ها همان تصویرسازی‌های SVG می‌مانند.
+  if (!kind || kind === 'reservation') return <ServiceNight />;
+  const Panel = PANELS[kind] || ReservationPanel;
   return <Panel />;
 }
