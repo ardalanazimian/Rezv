@@ -1,4 +1,5 @@
 import { CmsPage, cmsMetadata, type CmsPageOptions } from '@/lib/cms-page';
+import { Intro } from '@/components/site/Intro';
 
 // صفحه‌ی اصلی — همان موتورِ CMS، فقط بدونِ مسیرِ راهنما (خودش ریشه است).
 const OPTS: CmsPageOptions = {
@@ -17,5 +18,12 @@ export const revalidate = 300;
 export const generateMetadata = () => cmsMetadata(OPTS);
 
 export default function HomePage() {
-  return <CmsPage {...OPTS} />;
+  // پرده فقط روی صفحه‌ی اصلی و فقط یک بار در هر نشست — صفحه‌های داخلی باید
+  // بی‌درنگ باز شوند (کاربری که از گوگل به یک مقاله می‌رسد پرده نمی‌خواهد).
+  return (
+    <>
+      <Intro />
+      <CmsPage {...OPTS} />
+    </>
+  );
 }

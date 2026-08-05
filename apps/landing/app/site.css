@@ -1323,6 +1323,23 @@
 }
 @keyframes kxWord { to { transform: translateY(0) rotate(0); opacity: 1; } }
 
+/* گرادیانِ عنوان باید روی خودِ کلمه بنشیند، نه روی پوسته.
+   دلیل: .kx-word__in یک transform دارد و transform لایه‌ی رنگ‌آمیزیِ جدا
+   می‌سازد؛ پس‌زمینه‌ی برش‌خورده‌ی والد (background-clip: text) به داخلِ آن
+   نمی‌رسد و چون رنگِ متن transparent است، کلمه کاملاً نامرئی می‌شود.
+   در مرورگر دیده شد: نیمی از تیترِ هیرو غیب شده بود. */
+.text-gradient .kx-word__in {
+  background: linear-gradient(100deg, var(--brand) 0%, var(--brass-500) 55%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+:root[data-theme='dark'] .text-gradient .kx-word__in {
+  background: linear-gradient(100deg, var(--ember-300) 0%, var(--brass-400) 55%, var(--brass-300) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
 /* Magnetic — خودِ جابه‌جایی با JS است؛ اینجا فقط لایه‌ی رندر تثبیت می‌شود */
 .kx-mag { display: inline-block; will-change: transform; }
 

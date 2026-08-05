@@ -864,6 +864,191 @@ button, input, textarea, select {
 }
 .skip-link:focus-visible { transform: none; }
 
+/* ═══════════════════════════════════════════════════════════════════
+   لایه‌ی سینمایی — پرده‌ی ورود، نشانگر، دانه‌ی فیلم، میدانِ جریان
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── ۱) پرده‌ی ورود ─────────────────────────────────────────────────
+   کلِ کار با CSS انجام می‌شود و با forwards تمام می‌شود، پس بدونِ JS هم
+   پرده بالا می‌رود. مدتِ کل ۱٫۲s است تا LCP را بلند نکند. */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  pointer-events: none;
+  /* پس از پایانِ انیمیشن، هیچ لایه‌ای روی صفحه نمی‌ماند.
+     کارِ اصلی را opacity می‌کند نه visibility: کروم مقدارِ visibility را در
+     حالتِ fill-forwards اعمال نمی‌کرد و پرده روی صفحه می‌ماند (در مرورگر
+     دیده شد). opacity همه‌جا قطعی است؛ visibility فقط یک امتیازِ اضافه. */
+  animation: intro-off 10ms linear 1.2s forwards;
+}
+@keyframes intro-off { to { opacity: 0; visibility: hidden; } }
+
+.intro__bar {
+  flex: 1 1 0;
+  background: var(--bg-sunken);
+  transform-origin: 50% 0%;
+  will-change: transform;
+  /* هر تیغه ۵۰ms دیرتر از قبلی بالا می‌رود → موجی از راست به چپ در RTL.
+     آخرین تیغه در 0.40 + 5×0.05 + 0.55 = ۱٫۲۰s تمام می‌شود؛ intro-off دقیقاً
+     همان‌جاست تا پرده وسطِ کار قطع نشود. */
+  animation: intro-bar 0.55s cubic-bezier(0.76, 0, 0.24, 1) forwards;
+  animation-delay: calc(0.4s + var(--i) * 0.05s);
+}
+@keyframes intro-bar {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0); }
+}
+
+.intro__mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  animation: intro-mark 0.34s var(--ease) 0.36s forwards;
+}
+@keyframes intro-mark {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+.intro__word {
+  font-size: clamp(2rem, 7vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(100deg, var(--ember-400), var(--brass-400));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* حروف از پشتِ یک ماسک بالا می‌آیند */
+  animation: intro-word 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes intro-word {
+  from { opacity: 0; transform: translateY(0.5em) scale(0.97); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+.intro__line {
+  inline-size: min(38vw, 15rem);
+  block-size: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--ember-500), transparent);
+  transform-origin: 50% 50%;
+  animation: intro-line 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+@keyframes intro-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* شمارنده‌ی چرخان — نوارِ عمودیِ اعداد که با steps بالا می‌رود.
+   بدونِ @property و بدونِ JS، پس همه‌جا کار می‌کند. */
+.intro__count {
+  block-size: 1.15em;
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.intro__roll {
+  display: flex;
+  flex-direction: column;
+  animation: intro-roll 0.62s steps(5, end) 0.06s both;
+}
+.intro__roll b { display: block; block-size: 1.15em; line-height: 1.15em; font-weight: 600; }
+@keyframes intro-roll { to { transform: translateY(-5.75em); } }
+
+/* بازگشتِ دوباره در همان نشست → بدونِ پرده. همین‌طور در حالتِ کاهشِ حرکت. */
+html[data-intro='done'] .intro { display: none; }
+@media (prefers-reduced-motion: reduce) { .intro { display: none; } }
+
+/* ── ۲) نشانگرِ سفارشی ───────────────────────────────────────────── */
+.cur {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 210;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms linear;
+  /* difference یعنی روی هر پس‌زمینه‌ای — روشن یا تاریک — دیده می‌شود */
+  mix-blend-mode: difference;
+}
+html.cur-on .cur { opacity: 1; }
+.cur--dot {
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: #fff;
+}
+.cur--ring {
+  inline-size: 30px;
+  block-size: 30px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.75);
+  transition: opacity 160ms linear, border-color 180ms var(--ease), background-color 180ms var(--ease);
+}
+.cur--ring.is-hot { border-color: #fff; background: rgba(255, 255, 255, 0.12); }
+.cur--ring.is-down { background: rgba(255, 255, 255, 0.3); }
+/* نشانگرِ سیستم فقط وقتی خاموش می‌شود که جایگزینش واقعاً ساخته شده باشد */
+html.has-cursor,
+html.has-cursor * { cursor: none !important; }
+/* ورودی‌های متنی استثنا هستند: caret بدونِ نشانگرِ متن قابلِ‌هدف‌گیری نیست */
+html.has-cursor :is(input, textarea, [contenteditable]) { cursor: text !important; }
+
+/* ── ۳) دانه‌ی فیلم ───────────────────────────────────────────────
+   یک تکسچرِ feTurbulence که هر ۸ فریم می‌پرد. گرادیان‌ها را از حالتِ
+   «رندرِ تخت» در می‌آورد و به تصویر عمق می‌دهد. هزینه‌اش یک لایه‌ی
+   composite است، نه محاسبه‌ی هر فریم. */
+.grain {
+  position: fixed;
+  inset: -150%;
+  z-index: 95;
+  pointer-events: none;
+  opacity: light-dark(0.035, 0.055);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 0.9s steps(8, end) infinite;
+  will-change: transform;
+}
+@keyframes grain {
+  0%   { transform: translate3d(0, 0, 0); }
+  12%  { transform: translate3d(-3%, -4%, 0); }
+  25%  { transform: translate3d(-6%, 2%, 0); }
+  37%  { transform: translate3d(4%, -3%, 0); }
+  50%  { transform: translate3d(-2%, 5%, 0); }
+  62%  { transform: translate3d(3%, 3%, 0); }
+  75%  { transform: translate3d(-4%, -2%, 0); }
+  87%  { transform: translate3d(5%, -5%, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .grain { animation: none; } }
+
+/* ── ۴) میدانِ جریان (بومِ هیرو) ─────────────────────────────────── */
+.flowfield {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  z-index: 0;
+  pointer-events: none;
+  /* پایینِ بوم محو می‌شود تا مرزِ تیزی با بخشِ بعدی نسازد */
+  mask-image: linear-gradient(to bottom, #000 58%, transparent 96%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 96%);
+}
+
+/* ── ۵) کِششِ سرعتِ اسکرول ────────────────────────────────────────
+   --vel را ScrollProgress می‌نویسد (۱- تا ۱). اثر عمداً روی عنصرهای
+   انتخاب‌شده اعمال می‌شود، نه روی <main>: هر transform روی نیای یک عنصرِ
+   sticky زمینه‌ی چسبندگی را می‌شکند و صحنه‌ی سنجاق‌شده از کار می‌افتد. */
+.vel {
+  transform: scaleY(calc(1 + var(--vel, 0) * 0.022)) translateY(calc(var(--vel, 0) * -6px));
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) { .vel { transform: none; } }
+
 @media print {
-  .site-header, .site-footer, .scroll-progress, .aurora, .grid-bg { display: none !important; }
+  .site-header, .site-footer, .scroll-progress, .aurora, .grid-bg,
+  .intro, .grain, .flowfield, .cur { display: none !important; }
 }

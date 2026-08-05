@@ -14,6 +14,7 @@ import { Icon } from '../site/Icon';
 import { Reveal, CountUp } from '../site/Motion';
 import { LiveFlow } from './LiveFlow';
 import { PinnedStory } from './PinnedStory';
+import { FlowField } from './FlowField';
 import { SplitText, Magnetic, Ambient, Tilt, Parallax } from '../site/Kinetic';
 import { Visual } from './Visuals';
 import { PlanCards } from '../pricing/PlanCards';
@@ -83,9 +84,9 @@ function Hero({ sec }: { sec: Section }) {
 
   return (
     <section className={`hero${compact ? ' hero--compact' : ''}${hasPanel ? '' : ' hero--center'}`}>
-      <div className="aurora" aria-hidden="true">
-        <span className="aurora__blob" /><span className="aurora__blob" /><span className="aurora__blob" />
-      </div>
+      {/* میدانِ جریان جای لکه‌های محوِ گرادیانی را گرفت: آن‌ها امضای قالبِ
+          آماده‌اند، این یکی هر بار تصویرِ متفاوتی می‌سازد. */}
+      <FlowField />
       <div className="grid-bg" aria-hidden="true" />
       <Ambient />
 
@@ -158,7 +159,9 @@ function Metrics({ sec }: { sec: Section }) {
     <section className="section section--tight">
       <div className="container">
         <Head eyebrow={s(sec.eyebrow)} title={s(sec.title)} subtitle={s(sec.subtitle)} />
-        <div className="grid grid-4">
+        {/* vel: با اسکرولِ سریع کمی کشیده می‌شود و بعد جا می‌افتد — همان حسِ
+            اسکرولِ اینرسیایی، بدونِ اینکه اسکرولِ مرورگر دست بخورد. */}
+        <div className="grid grid-4 vel">
           {items.map((m, i) => (
             <Reveal key={`${m.label}-${i}`} delay={i * 70}>
               <div className="metric">
@@ -255,7 +258,7 @@ function Features({ sec }: { sec: Section }) {
     <section className="section">
       <div className="container">
         <Head eyebrow={s(sec.eyebrow)} title={s(sec.title)} subtitle={s(sec.subtitle)} />
-        <div className="grid grid-3">
+        <div className="grid grid-3 vel">
           {items.map((f, i) => (
             <Reveal key={f.title ?? i} delay={(i % 3) * 80}>
               <article className="card card--hover feature">
