@@ -2,8 +2,11 @@
 //  کلاینتِ محتوای سایت — خواندنِ CMS از api/ رزرونو (سمتِ سرور)
 //
 //  دو منبعِ آدرس:
-//    SEO_API_BASE            → فقط سرور (Server Components، sitemap)
+//    SITE_API_BASE           → فقط سرور (Server Components، sitemap)
 //    NEXT_PUBLIC_API_BASE    → مرورگر (فرم‌ها و استودیو)
+//
+//  SEO_API_BASE نامِ قدیمی است (زمانی که این اپ داخلِ apps/seo بود) و هنوز
+//  به‌عنوانِ fallback خوانده می‌شود تا محیط‌هایی که آن را ست کرده‌اند نشکنند.
 //
 //  «حالتِ امن»: اگر API تنظیم/در دسترس نباشد، محتوا از فایلِ همگام‌شده‌ی
 //  content/site-content.json خوانده می‌شود (همان متنی که seed در دیتابیس
@@ -16,9 +19,9 @@ import type {
 } from './content-types';
 import { fallbackPage, fallbackPlans, fallbackFaqs, fallbackArticles, fallbackReleaseNotes } from './content-types';
 
-const SERVER_BASE = (process.env.SEO_API_BASE || '').replace(/\/$/, '');
+const SERVER_BASE = (process.env.SITE_API_BASE || process.env.SEO_API_BASE || '').replace(/\/$/, '');
 
-/** آدرسِ API برای مرورگر (فرم‌ها/استودیو). در سرور به SEO_API_BASE برمی‌گردد. */
+/** آدرسِ API برای مرورگر (فرم‌ها/استودیو). در سرور به SITE_API_BASE برمی‌گردد. */
 export function browserApiBase(): string {
   const pub = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
   return pub || SERVER_BASE;

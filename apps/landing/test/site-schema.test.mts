@@ -8,6 +8,7 @@ const {
   ORG_ID, WEBSITE_ID,
 } = await import('../lib/site-schema.ts');
 const { renderMarkdown, markdownToText } = await import('../lib/markdown.ts');
+const { buildMetadata } = await import('../lib/seo.ts');
 const { fallbackPlans, fallbackFaqs, fallbackPage } = await import('../lib/content-types.ts');
 import content from '../content/site-content.json';
 
@@ -223,5 +224,28 @@ describe('حالتِ امن — همان محتوایی که seed می‌کار�
     const page = fallbackPage(content, 'no-such-page');
     assert.deepEqual(page.sections, []);
     assert.equal(page.slug, 'no-such-page');
+  });
+});
+
+// ── عنوانِ صفحه: جلوگیری از تکرارِ نامِ برند ─────────────────────────────
+//
+// لایه‌اوت قالبِ «%s | رزرونو» دارد. عنوان‌هایی که خودشان نامِ برند را دارند
+// باید absolute برگردند وگرنه نتیجه «درباره رزرونو | تیم | رزرونو» می‌شود.
+// این باگ روی همه‌ی صفحه‌ها بود و با تستِ واقعیِ <title> پیدا شد.
+describe('buildMetadata — عنوان', () => {
+  test('عنوانی که نامِ برند دارد، absolute می‌شود (قالب دوباره نمی‌چسبد)', () => {
+    const m = buildMetadata({ title: 'درباره رزرونو | تیم', description: 'x', path: '/about' });
+    assert.deepEqual(m.title, { absolute: 'درباره رزرونو | تیم' });
+  });
+
+  test('عنوانی بدونِ نامِ برند رشته می‌ماند تا قالب برندش کند', () => {
+    const m = buildMetadata({ title: 'تماس با فروش', description: 'x', path: '/contact' });
+    assert.equal(m.title, 'تماس با فروش');
+  });
+
+  test('عنوانِ Open Graph و Twitter همیشه رشته‌ی خام است', () => {
+    const m = buildMetadata({ title: 'درباره رزرونو | تیم', description: 'x', path: '/about' });
+    assert.equal(m.openGraph?.title, 'درباره رزرونو | تیم');
+    assert.equal((m.twitter as { title?: string })?.title, 'درباره رزرونو | تیم');
   });
 });

@@ -13,10 +13,10 @@
 #                         global (چون با <script> کلاسیک لود می‌شوند و export مجاز نیست)
 #
 #   content/site-content.json → محتوای پیش‌فرضِ وب‌سایتِ عمومی؛ به دو مصرف‌کننده
-#                         کپی می‌شود: apps/seo (حالتِ امن وقتی API در دسترس
+#                         کپی می‌شود: apps/landing (حالتِ امن وقتی API در دسترس
 #                         نیست) و api/prisma/seed (نصبِ تازه). هر دو باید فایل
 #                         را داخلِ ریشه‌ی خودشان داشته باشند چون جدا دیپلوی
-#                         می‌شوند (Vercel با root=apps/seo، و ایمیجِ داکرِ api).
+#                         می‌شوند (Vercel با root=apps/landing، و ایمیجِ داکرِ api).
 #
 # چه چیزی sync نمی‌شود (app-owned):
 #   css/theme.css       → تمِ مخصوصِ هر اپ (بعد از tokens.css لود می‌شود)
@@ -123,7 +123,7 @@ done
 
 # analytics.js پنل‌ها (business/company) — از منبعِ واحدِ shared/js/analytics.panel.js
 # محتوای پیش‌فرضِ وب‌سایتِ عمومی — عیناً (بدونِ تبدیل) به هر دو مصرف‌کننده.
-place "$SRC/content/site-content.json" "$ROOT/apps/seo/content/site-content.json"
+place "$SRC/content/site-content.json" "$ROOT/apps/landing/content/site-content.json"
 place "$SRC/content/site-content.json" "$ROOT/api/prisma/seed/site-content.json"
 
 make_panel_analytics "پنل کسب‌وکار" "data.js (کلاینتِ API)" "business" "rz_sid_biz" "rz_evq_biz" > "$TMP/analytics.business.js"

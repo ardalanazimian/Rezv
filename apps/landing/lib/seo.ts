@@ -27,12 +27,26 @@ function defaultImage(path: string): string {
   return `${SITE}${path === '/' ? '' : path}/opengraph-image`;
 }
 
+/**
+ * عنوانِ نهایی برای تگِ <title>.
+ *
+ * لایه‌اوت قالبِ «%s | رزرونو» دارد. اگر عنوانِ صفحه خودش نامِ برند را داشته
+ * باشد، قالب دوباره‌اش می‌چسباند و نتیجه می‌شود «درباره رزرونو | تیم | رزرونو».
+ * در اینجا با absolute جلوی تکرار گرفته می‌شود.
+ *
+ * این حالتِ رایج است نه استثنا: هم عنوان‌های پیش‌فرضِ صفحه‌ها و هم فیلدِ سئویی
+ * که مدیر در استودیو می‌نویسد معمولاً نامِ برند را دارند.
+ */
+function titleField(title: string): string | { absolute: string } {
+  return title.includes(BRAND_NAME) ? { absolute: title } : title;
+}
+
 export function buildMetadata(input: PageSeoInput): Metadata {
   const url = `${SITE}${input.path}`;
   const image = input.image ?? defaultImage(input.path);
 
   const meta: Metadata = {
-    title: input.title,
+    title: titleField(input.title),
     description: input.description,
     alternates: alternates(input.path),
     keywords: input.keywords?.length ? input.keywords : undefined,

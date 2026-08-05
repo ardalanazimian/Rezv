@@ -173,10 +173,8 @@ jobs:
       - name: Check design-system in sync with shared/
         run: sh tools/sync-design-system.sh --check
 
-  # ── وب‌سایتِ عمومی (apps/seo · Next.js SSR/ISR، ADR 0001 و 0002) ──
+  # ── صفحاتِ ایندکس‌پذیرِ رستوران (apps/seo · Next.js SSR/ISR، ADR 0001) ──
   # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند.
-  # build عمداً بدونِ SEO_API_BASE اجرا می‌شود: باید در «حالتِ امن» (بدونِ API)
-  # هم سبز باشد، وگرنه یک قطعیِ API می‌تواند دیپلوی را هم زمین بزند.
   seo:
     runs-on: ubuntu-latest
     defaults:
@@ -190,6 +188,34 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: apps/seo/package-lock.json
+      - name: Install dependencies
+        run: npm ci || npm install
+      - name: Unit tests (JSON-LD رستوران)
+        run: npm test
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Build (Next.js)
+        run: npm run build
+
+  # ── وب‌سایتِ عمومی (apps/landing · Next.js SSR/ISR، ADR 0002) ──
+  # اپِ جدا از apps/seo با دامنه، sitemap و canonicalِ مستقلِ خودش.
+  # build عمداً بدونِ SITE_API_BASE اجرا می‌شود: باید در «حالتِ امن» (بدونِ API)
+  # هم سبز باشد، وگرنه یک قطعیِ API می‌تواند دیپلوی را هم زمین بزند.
+  landing:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/landing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/landing/package-lock.json
       - name: Install dependencies
         run: npm ci || npm install
       - name: Unit tests (JSON-LD، Markdownِ امن، محتوای پیش‌فرض)

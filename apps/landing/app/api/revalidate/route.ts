@@ -14,7 +14,7 @@ import { revalidatePath } from 'next/cache';
 //  گرفته می‌شود که همیشه گرفته می‌شود — نه اینجا.
 // ═══════════════════════════════════════════════════════════════════════
 
-const API_BASE = (process.env.SEO_API_BASE || process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
+const API_BASE = (process.env.SITE_API_BASE || process.env.SEO_API_BASE || process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
 
 export async function POST(req: Request) {
   const auth = req.headers.get('authorization');
