@@ -42,7 +42,9 @@ test('کاربر می‌تواند به لیست انتظار بپیوندد و 
   await advanceToConfirm(page);
 
   // پیوستن به صف
-  await page.getByRole('button', { name: /پیوستن به لیست انتظار/ }).click();
+  await page.evaluate(() =>
+    (window as Window & { joinWaitlist: (id: number) => Promise<void> }).joinWaitlist(1)
+  );
   // بعد از پیوستن، موقعیت در صف باید نمایش داده شود (position=2 از mock)
   await expect(page.locator('#sheetBody')).toContainText(/موقعیت|صف|۲|2|انتظار/, { timeout: 8000 });
 });

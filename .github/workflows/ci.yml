@@ -34,6 +34,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build (Next.js)
         run: npm run build
         env:
@@ -103,8 +106,9 @@ jobs:
           # لازم چون middleware در production نبودِ آن را خطا می‌دهد؛
           # مقدارِ ساختگی فقط برای عبورِ build است، نه استفاده‌ی واقعی.
           ALLOWED_ORIGINS: https://ci.example.invalid
-          JWT_SECRET: ci-test-secret
-          JWT_REFRESH_SECRET: ci-test-refresh-secret
+          # حداقل ۳۲ کاراکتر — همان قیدی که jwt.ts در زمانِ اجرا اعمال می‌کند.
+          JWT_SECRET: ci-test-secret-at-least-32-chars-long
+          JWT_REFRESH_SECRET: ci-test-refresh-secret-at-least-32-chars
 
   # ── مرحله ۳: چک امنیتی پایه ──
   security:
