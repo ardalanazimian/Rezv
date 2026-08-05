@@ -14,7 +14,7 @@ let RESTAURANTS = RESTAURANTS_SAMPLE;
 const PLAN_LABEL={free:'رایگان',pro:'حرفه‌ای',enterprise:'سازمانی'};
 const STATUS_LABEL={active:'فعال',expiring:'رو به اتمام',expired:'منقضی',trial:'دوره آزمایشی',trial_expired:'آزمایشی تمام‌شده'};
 
-const TITLES={overview:'داشبورد',restaurants:'رستوران‌ها',detail:'جزئیات رستوران',analytics:'آنالیز پلتفرم',customers:'هوش تجاری مشتریان',billing:'اشتراک و پیامک',sales:'درخواست‌های سایت',systemhealth:'سلامت سیستم',security:'امنیت پلتفرم',support:'مدیریت رستوران‌ها'};
+const TITLES={overview:'داشبورد',restaurants:'رستوران‌ها',detail:'جزئیات رستوران',analytics:'آنالیز پلتفرم',customers:'هوش تجاری مشتریان',billing:'اشتراک و پیامک',sales:'درخواست‌های سایت',photos:'بازبینی عکسِ گالری',systemhealth:'سلامت سیستم',security:'امنیت پلتفرم',support:'مدیریت رستوران‌ها'};
 let restFilter='all';
 let currentRest=null; // رستوران انتخاب‌شده برای صفحه‌ی جزئیات
 
@@ -25,7 +25,8 @@ function nav(v){
   document.getElementById('v-'+v).classList.add('active');
   document.getElementById('pageTitle').textContent=TITLES[v]||'';
   // «درخواست‌های سایت» به‌جای رندرِ مستقیم، اول از API می‌خواند (rSales را خودش صدا می‌زند).
-  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,sales:loadSales,systemhealth:rSystemHealth,security:rSecurity,support:rSupport})[v]();
+  // «درخواست‌های سایت» و «بازبینی عکس» اول از API می‌خوانند (رندر را خودشان صدا می‌زنند).
+  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,sales:loadSales,photos:loadPhotos,systemhealth:rSystemHealth,security:rSecurity,support:rSupport})[v]();
   if(window.innerWidth<=900){document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOverlay').classList.remove('show')}
 }
 

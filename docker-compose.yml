@@ -82,6 +82,12 @@ services:
       FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
       EMAIL_API_KEY: ${EMAIL_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@rezervno.ir}
+      # محلِ فایلِ عکس‌های گالری. روی ولومِ نام‌دار می‌نشیند تا با هر بازسازیِ
+      # کانتینر پاک نشود. عمداً داخلِ Postgres نیست: چند گیگابایت عکس،
+      # pg_dumpِ سرویسِ backup را غیرعملی می‌کند.
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
     expose:
       - "3000"
     # ── بررسی سلامت واقعی (DB + Redis) — ارکستریتور pod ناسالم را خارج می‌کند ──
@@ -141,6 +147,9 @@ services:
       BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
       # تعداد بک‌آپ برای نگه‌داشتن
       BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      # عکس‌های گالری در دیتابیس نیستند؛ همین ولوم را هم tar می‌گیریم وگرنه
+      # بازیابی، ردیف‌های سالم و فایل‌های گم‌شده می‌داد.
+      UPLOADS_DIR: /data/uploads
       # بک‌آپ فوری هنگام استارت
       BACKUP_ON_START: ${BACKUP_ON_START:-true}
       # ── آپلود اختیاری به آبجکت‌استوریج (S3-compatible) ──
@@ -150,6 +159,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-}
     volumes:
       - ./backup/data:/backups       # بک‌آپ‌ها اینجا روی هاست ذخیره می‌شوند
+      - uploads:/data/uploads:ro     # فقط برای خواندن — بک‌آپ نباید چیزی را تغییر دهد
 
   # ── سرویس Background Jobs: انتقال‌های خودکار چرخه‌ی حیات و لیست انتظار ──
   cron:
@@ -166,3 +176,4 @@ services:
 volumes:
   pgdata:
   redisdata:
+  uploads:   # عکس‌های گالریِ رستوران‌ها (تأییدشده و در انتظار)

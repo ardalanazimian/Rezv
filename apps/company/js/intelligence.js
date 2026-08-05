@@ -338,8 +338,10 @@ async function enterAdminPanel(demo){
   if (API.getToken() && !demo){
     const [fresh] = await Promise.all([loadAdminRestaurants(), loadPlatformStats()]);
     RESTAURANTS = fresh;
-    // نشانِ «درخواست‌های سایت» باید از همان ابتدا عددِ واقعی را نشان دهد.
+    // نشان‌ها باید از همان ابتدا عددِ واقعی را نشان دهند، وگرنه کارِ منتظر
+    // فقط وقتی دیده می‌شود که کاربر اتفاقی وارد آن صفحه شود.
     refreshSalesBadge();
+    refreshPhotoBadge();
   }
   rOverview();
   toast('','خوش آمدید · پنل شرکت');
@@ -367,9 +369,10 @@ if (API.getToken()) {
     const active = document.querySelector('.view.active');
     if (active) {
       const id = active.id.replace('v-', '');
-      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, systemhealth:rSystemHealth, security:rSecurity, support:rSupport})[id]?.();
+      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, systemhealth:rSystemHealth, security:rSecurity, support:rSupport})[id]?.();
     }
     refreshSalesBadge();
+    refreshPhotoBadge();
   })();
 } else {
   showAdminLoginPhone();

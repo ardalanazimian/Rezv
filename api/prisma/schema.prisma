@@ -858,17 +858,58 @@ model Review {
 }
 
 // ── گالری عکس رستوران ──
+//
+// عکس‌ها با آپلودِ مستقیم اضافه می‌شوند و پیش از نمایش در اپ مشتری و صفحه‌ی
+// عمومی باید در پنل شرکت تأیید شوند. یعنی هیچ تصویری بدونِ بازبینیِ انسانی
+// روی برندِ پلتفرم منتشر نمی‌شود.
+//
+// چرا بایت‌ها در دیتابیس نیستند: یک گالریِ چندصد رستورانی به‌سرعت چند گیگابایت
+// می‌شود و pg_dump (سرویسِ backup) را غیرعملی می‌کند. فایل روی ولومِ uploads
+// می‌نشیند و storageKey فقط ارجاعِ آن است.
 model RestaurantPhoto {
   id           String     @id @default(uuid()) @db.Uuid
   restaurantId String     @map("restaurant_id") @db.Uuid
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  /// برای عکس‌های آپلودشده مسیرِ داخلیِ سرو (/api/v1/media/<key>) و برای
+  /// ردیف‌های قدیمیِ لینکی همان آدرسِ بیرونی است.
   url          String
   caption      String?
   category     String     @default("food")
   sortOrder    Int        @default(0) @map("sort_order")
-  createdAt    DateTime   @default(now()) @map("created_at")
+
+  // ── فایلِ آپلودشده (برای ردیف‌های لینکیِ قدیمی خالی است) ──
+  storageKey   String?    @map("storage_key")
+  mimeType     String?    @map("mime_type")
+  byteSize     Int?       @map("byte_size")
+  width        Int?
+  height       Int?
+  originalName String?    @map("original_name")
+
+  // ── بازبینی ──
+  /// pending | approved | rejected
+  status          PhotoStatus @default(pending)
+  reviewedAt      DateTime?   @map("reviewed_at")
+  /// staffِ مدیرِ پلتفرم که تصمیم گرفت (بدونِ relation: مدیر ممکن است حذف شود
+  /// ولی سابقه‌ی بازبینی باید بماند)
+  reviewedById    String?     @map("reviewed_by_id") @db.Uuid
+  rejectionReason String?     @map("rejection_reason")
+
+  uploadedByStaffId String?  @map("uploaded_by_staff_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
   @@index([restaurantId, sortOrder])
+  // صفِ بازبینی: «همه‌ی pendingها، قدیمی‌ترین اول» بدونِ این ایندکس full-scan بود
+  @@index([status, createdAt])
   @@map("restaurant_photos")
+}
+
+enum PhotoStatus {
+  pending
+  approved
+  rejected
+
+  @@map("photo_status")
 }
 
 // ── یادداشت‌های داخلی تیم رستوران ──

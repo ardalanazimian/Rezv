@@ -506,6 +506,18 @@ img{display:block;max-width:100%}
 .gal-item .gal-del{position:absolute;top:6px;left:6px;width:24px;height:24px;border-radius:50%;background:rgba(239,68,68,.92);
   color:#fff;border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity var(--t-fast)}
 .gal-item:hover .gal-del{opacity:1}
+/* ─── وضعیت بازبینی عکس ───
+   عکسِ تأییدنشده باید در نگاه اول از منتشرشده جدا باشد، وگرنه رستوران‌دار
+   فکر می‌کند گالریش کامل است در حالی که نیمی از آن روی سایت نیست. */
+.gal-item--pending{opacity:.72}
+.gal-item--pending img,.gal-item--rejected img{filter:grayscale(.55)}
+.gal-item--rejected{opacity:.6;border-color:var(--danger)}
+.gal-status{position:absolute;top:6px;right:6px;display:flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;padding:3px 8px;border-radius:50px;color:#fff;line-height:1.4}
+.gal-status--pending{background:rgba(217,119,6,.94)}
+.gal-status--rejected{background:rgba(239,68,68,.94);cursor:pointer}
+/* هدفِ لمسِ قابل‌استفاده روی موبایل — نشانِ «رد شد» کلیک‌پذیر است */
+@media (pointer:coarse){.gal-status--rejected{padding:8px 12px}}
 .gal-upload{aspect-ratio:4/3;border:2px dashed var(--border-strong);border-radius:var(--r);background:transparent;cursor:pointer;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--t3);transition:all var(--t-fast)}
 .gal-upload:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-50)}

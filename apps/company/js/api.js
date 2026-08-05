@@ -48,6 +48,7 @@ const API = {
   get(path){ return this.request(path); },
   post(path, body){ return this.request(path, { method:'POST', body: JSON.stringify(body||{}) }); },
   patch(path, body){ return this.request(path, { method:'PATCH', body: JSON.stringify(body||{}) }); },
+  del(path){ return this.request(path, { method:'DELETE' }); },
   async requestAdminOtp(phone){ return this.request('/auth/admin/request', { method:'POST', body: JSON.stringify({ phone }) }); },
   async verifyAdminOtp(phone, code){
     const res = await this.request('/auth/admin/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
@@ -63,6 +64,9 @@ const API = {
   businessIntelligence(){ return this.get('/admin/business-intelligence'); },
   security(){ return this.get('/admin/security'); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
+  // ── بازبینیِ عکسِ گالری ──
+  photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },
+  photoDecide(id, body){ return this.patch(`/admin/photos/${id}`, body); },
 };
 
 // نگاشت رستوران API به ساختار پنل
