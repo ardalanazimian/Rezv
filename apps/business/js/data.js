@@ -419,6 +419,13 @@ const RES = [
 const BK2UI_STATE = { free:'free', reserved:'reserved', occupied:'seated', cleaning:'free', maintenance:'free' };
 const UI2BK_STATE = { free:'free', reserved:'reserved', seated:'occupied' };
 let TABLES = [];
+// میزهای نمونه برای حالت دمو/آفلاین — هم‌راستا با رزروهای نمونه (میزهای ۱ تا ۹)
+const DEMO_TABLES = [
+  {id:'demo-t1',n:1,c:2,s:'free'},{id:'demo-t2',n:2,c:2,s:'free'},{id:'demo-t3',n:3,c:4,s:'free'},
+  {id:'demo-t4',n:4,c:2,s:'free'},{id:'demo-t5',n:5,c:4,s:'free'},{id:'demo-t6',n:6,c:4,s:'free'},
+  {id:'demo-t7',n:7,c:6,s:'free'},{id:'demo-t8',n:8,c:6,s:'free'},{id:'demo-t9',n:9,c:8,s:'free'},
+  {id:'demo-t10',n:10,c:2,s:'free'},
+];
 function mapApiTable(t){
   return { id:t.id, n:t.number, c:t.capacity, name:t.name||undefined, s:BK2UI_STATE[t.state]||'free', _raw:t };
 }
@@ -426,6 +433,10 @@ async function loadTables(){
   const res = await API.listTables();
   if (res.ok && Array.isArray(res.data?.items)) {
     TABLES = res.data.items.map(mapApiTable);
+  } else if (!TABLES.length) {
+    // بک‌اند در دسترس نیست → میزهای نمونه (مثل بقیه‌ی داده‌های دمو) تا پلان سالن و
+    // KPI اشغال خالی نمانند
+    TABLES = DEMO_TABLES.map(t=>({...t}));
   }
   _tablesLoaded = true;
   return TABLES;

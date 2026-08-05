@@ -405,6 +405,11 @@ function enterPanel(demo){
     loadBranches();               // سوییچر شعبه را با داده‌ی واقعی پر کن
     Heartbeat.start();           // رستوران را در اپ مشتری آنلاین نگه می‌دارد
     Outbox.sync();               // اگر عملیات آفلاینِ در انتظار هست، همگام کن
+  } else if(!TABLES.length){
+    // حالت دمو — میزهای نمونه تا پلان سالن و KPI اشغال خالی نمانند
+    TABLES = DEMO_TABLES.map(t=>({...t}));
+    _tablesLoaded = true;
+    rOverview();
   }
   toast('', `خوش اومدی${STAFF_INFO?.restaurant_name?' · '+STAFF_INFO.restaurant_name:''}`);
 }

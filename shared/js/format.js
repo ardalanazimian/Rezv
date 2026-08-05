@@ -10,5 +10,5 @@
    esc : escape کردنِ ورودی قبل از تزریق به HTML (ضدِّ XSS) — تنها پیاده‌سازیِ
          کانونیِ پنل‌ها؛ رفعِ باگِ escape یک‌جا برای هر دو پنل اعمال می‌شود.
    ═══════════════════════════════════════════════════════════ */
-export function fa(n){return n.toLocaleString('fa-IR')}
+export function fa(n){return (n==null||Number.isNaN(n))?'۰':n.toLocaleString('fa-IR')}
 export function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
