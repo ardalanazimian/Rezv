@@ -36,3 +36,6 @@ playwright/.cache/
 .env.production
 .env.development
 .env.*.local
+
+# اسنپ‌شاتِ Redis هنگامِ اجرای محلی (در api/ ساخته می‌شود؛ نباید کامیت شود)
+dump.rdb
