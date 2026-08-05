@@ -1003,7 +1003,10 @@ html.has-cursor :is(input, textarea, [contenteditable]) { cursor: text !importan
    composite است، نه محاسبه‌ی هر فریم. */
 .grain {
   position: fixed;
-  inset: -150%;
+  /* فقط به‌اندازه‌ی جابه‌جاییِ کی‌فریم (حداکثر ۶٪) حاشیه لازم است. مقدارِ
+     بزرگ‌تر هم سطحِ رنگ‌آمیزی را بیهوده زیاد می‌کند و هم می‌تواند به ناحیه‌ی
+     اسکرول اضافه شود. */
+  inset: -20%;
   z-index: 95;
   pointer-events: none;
   opacity: light-dark(0.035, 0.055);

@@ -26,6 +26,14 @@ const SCOPE_HREF: Record<string, string> = {
   general: '/faq',
 };
 
+/** ورودیِ خامِ پیکره — از API یا از فایلِ حالتِ امن. */
+export interface KbSource {
+  faqs: Awaited<ReturnType<typeof getFaqs>>;
+  articles: Awaited<ReturnType<typeof getArticles>>;
+  plans: Awaited<ReturnType<typeof getPlans>>;
+  pageSlugs?: string[];
+}
+
 export async function buildKb(): Promise<KbDoc[]> {
   const [faqs, articles, plans] = await Promise.all([
     getFaqs(),          // بدونِ scope = همه‌ی حوزه‌ها
@@ -33,6 +41,22 @@ export async function buildKb(): Promise<KbDoc[]> {
     getPlans(),
   ]);
 
+  let pageSlugs: string[] | undefined;
+  try {
+    pageSlugs = (await getSitemapData()).pages.map((p) => p.slug);
+  } catch {
+    // بدونِ API هم دستیار باید کار کند — فقط با پرسش‌ها و مقاله‌ها.
+  }
+
+  return kbFrom({ faqs, articles, plans, pageSlugs });
+}
+
+/**
+ * نگاشتِ خالصِ «محتوا → پیکره». از buildKb جدا است تا پیش‌نمایشِ آفلاین هم
+ * بتواند با همان قواعد و از روی فایلِ محتوا پیکره بسازد، بدونِ اینکه این
+ * منطق جای دیگری دوباره نوشته شود و از هم واگرا شوند.
+ */
+export function kbFrom({ faqs, articles, plans, pageSlugs }: KbSource): KbDoc[] {
   const docs: KbDoc[] = [];
 
   for (const f of faqs) {
@@ -79,14 +103,9 @@ export async function buildKb(): Promise<KbDoc[]> {
 
   // صفحه‌های محتوایی: عنوان و توضیحِ سئو کافی است؛ متنِ بلوک‌ها ساختارِ
   // تودرتو دارد و برای بازیابی نویز می‌شود.
-  try {
-    const data = await getSitemapData();
-    for (const p of data.pages) {
-      const href = PAGE_HREF[p.slug] ?? `/${p.slug}`;
-      docs.push({ id: `page:${p.slug}`, title: p.slug, body: '', href, kind: 'page' });
-    }
-  } catch {
-    // بدونِ API هم دستیار باید کار کند — فقط با پرسش‌ها و مقاله‌ها.
+  for (const slug of pageSlugs ?? []) {
+    const href = PAGE_HREF[slug] ?? `/${slug}`;
+    docs.push({ id: `page:${slug}`, title: slug, body: '', href, kind: 'page' });
   }
 
   // سندِ بی‌متن ارزشِ بازیابی ندارد
