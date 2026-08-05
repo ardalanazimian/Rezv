@@ -1376,3 +1376,122 @@
   .kx-ticker__row { animation: none; }
   .kx-tilt { transition: none; }
 }
+
+/* ═══════════════ صحنه‌ی سنجاق‌شده ═══════════════ */
+.pin { position: relative; }
+.pin__stage {
+  position: sticky;
+  inset-block-start: 0;
+  block-size: 100vh;
+  display: flex; align-items: center;
+  overflow: hidden;
+}
+.pin__stage::before {
+  content: ''; position: absolute; inset: 0;
+  background:
+    radial-gradient(70% 60% at 20% 30%, var(--aurora-1), transparent 62%),
+    radial-gradient(60% 55% at 85% 70%, var(--aurora-2), transparent 60%);
+  pointer-events: none;
+}
+.pin__grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--sp-16);
+  align-items: center;
+}
+
+/* ── ریلِ فصل‌ها ── */
+.pin__rail { position: relative; display: grid; gap: var(--sp-5); padding-inline-start: var(--sp-5); }
+.pin__bar {
+  position: absolute; inset-block: 6px; inset-inline-start: 0;
+  inline-size: 2px; background: var(--border); border-radius: 2px; overflow: hidden;
+}
+.pin__bar-fill { display: block; inline-size: 100%; background: var(--brand); border-radius: 2px; }
+.pin__step {
+  display: flex; align-items: center; gap: var(--sp-3);
+  border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: var(--fs-md); color: var(--text-3);
+  padding: 0; text-align: start; min-block-size: var(--touch-min);
+  transition: color var(--t-base) var(--ease);
+}
+.pin__step.is-done { color: var(--text-2); }
+.pin__step.is-on { color: var(--text-1); font-weight: 700; }
+.pin__dot {
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 36px; block-size: 36px; flex: 0 0 36px;
+  border-radius: 50%; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-3);
+  transition: transform var(--t-base) var(--ease-spring),
+              background-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+.pin__step.is-on .pin__dot {
+  background: var(--brand); color: var(--brand-contrast);
+  border-color: transparent; transform: scale(1.14);
+  box-shadow: var(--sh-brand);
+}
+.pin__step.is-done .pin__dot { border-color: var(--brand); color: var(--brand); }
+
+/* ── پنلِ فصل ── */
+.pin__panel { position: relative; min-block-size: 340px; }
+.pin__chapter {
+  position: absolute; inset-block-start: 0; inset-inline: 0;
+  display: grid; gap: var(--sp-4);
+  opacity: 0; transform: translateY(28px) scale(.985);
+  filter: blur(6px);
+  transition: opacity .55s var(--ease-out), transform .55s var(--ease-out), filter .55s var(--ease-out);
+  pointer-events: none;
+}
+.pin__chapter.is-on { opacity: 1; transform: none; filter: none; pointer-events: auto; }
+.pin__num {
+  font-size: var(--fs-sm); font-weight: 800; letter-spacing: .08em;
+  color: var(--brand); font-variant-numeric: tabular-nums;
+}
+.pin__num-of { color: var(--text-3); }
+.pin__title {
+  font-size: clamp(1.9rem, 4.2vw, 3.1rem); font-weight: 800;
+  line-height: 1.12; letter-spacing: var(--ls-tight); margin: 0;
+  text-wrap: balance;
+}
+.pin__body { font-size: var(--fs-lg); color: var(--text-2); margin: 0; max-inline-size: 46ch; }
+.pin__points { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+.pin__points li {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  font-size: var(--fs-md); color: var(--text-2);
+}
+.pin__points li svg { color: var(--brand); flex: 0 0 auto; margin-block-start: 3px; }
+
+.pin__plain { display: grid; gap: var(--sp-3); }
+
+@media (max-width: 900px) {
+  .pin { block-size: auto !important; }
+  .pin__stage { position: static; block-size: auto; padding-block: var(--sp-16); }
+  .pin__grid { grid-template-columns: 1fr; gap: var(--sp-8); }
+  .pin__rail {
+    display: flex; overflow-x: auto; gap: var(--sp-3);
+    padding-inline-start: 0; scrollbar-width: none;
+  }
+  .pin__rail::-webkit-scrollbar { display: none; }
+  .pin__bar { display: none; }
+  .pin__step-label { white-space: nowrap; }
+  .pin__panel { min-block-size: 0; }
+  .pin__chapter { position: static; opacity: 1; transform: none; filter: none; pointer-events: auto; }
+  .pin__chapter:not(.is-on) { display: none; }
+}
+
+/* کاهشِ حرکت: صحنه از حالتِ سنجاق‌شده به فهرستِ ساده تبدیل می‌شود و همه‌ی
+   فصل‌ها هم‌زمان دیده می‌شوند — هیچ محتوایی پشتِ انیمیشن پنهان نمی‌ماند.
+   عمداً در CSS و نه با شاخه‌ی جداگانه در JS، تا دو نسخه‌ی موازیِ markup
+   نداشته باشیم که از هم واگرا شوند. */
+@media (prefers-reduced-motion: reduce) {
+  .pin { block-size: auto !important; }
+  .pin__stage { position: static; block-size: auto; padding-block: var(--sp-16); }
+  .pin__grid { grid-template-columns: 1fr; gap: var(--sp-8); }
+  .pin__rail, .pin__bar { display: none; }
+  .pin__panel { min-block-size: 0; display: grid; gap: var(--sp-16); }
+  .pin__chapter {
+    position: static; opacity: 1; transform: none; filter: none;
+    pointer-events: auto; transition: none;
+  }
+  .pin__chapter[aria-hidden='true'] { display: grid; }
+}

@@ -13,6 +13,7 @@ import type { ReactNode } from 'react';
 import { Icon } from '../site/Icon';
 import { Reveal, CountUp } from '../site/Motion';
 import { LiveFlow } from './LiveFlow';
+import { PinnedStory } from './PinnedStory';
 import { SplitText, Magnetic, Ambient, Tilt, Parallax } from '../site/Kinetic';
 import { Visual } from './Visuals';
 import { PlanCards } from '../pricing/PlanCards';
@@ -584,6 +585,7 @@ const BLOCKS: Record<string, (props: { sec: Section; data: SectionData }) => Rea
   metrics: ({ sec }) => <Metrics sec={sec} />,
   apps: ({ sec }) => <Apps sec={sec} />,
   ticker: ({ sec }) => <Ticker sec={sec} />,
+  story: () => <PinnedStory />,
   features: ({ sec }) => <Features sec={sec} />,
   split: ({ sec }) => <Split sec={sec} />,
   steps: ({ sec }) => <Steps sec={sec} />,
