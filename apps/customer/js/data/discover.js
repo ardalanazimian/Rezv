@@ -3,7 +3,7 @@ import { API } from '../api.js';
 import { esc, toast, undoSnack } from '../auth.js';
 import { openRest } from './detail.js';
 import { quickBook } from './booking.js';
-import { GRAD, favs, pts } from './seed.js';
+import { GRAD, favs, saveFavs, pts } from './seed.js';
 import { renderProfile } from '../features/food-dna.js';
 import { renderLoyalty } from '../features/loyalty.js';
 import { R } from '../init.js';
@@ -130,7 +130,7 @@ export function hCardHTML(r,extra){
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${r.id})">
     <div class="hcard-img" style="background:${GRAD[r.id]||GRAD[1]}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
-    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}</div>
+    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rt||r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}</div>
   </div>`;
 }
 export function renderNearby(){
@@ -142,7 +142,7 @@ export function renderNearby(){
 export function renderTrending(){
   const el=document.getElementById('trendingScroll');if(!el)return;
   // پرطرفدارترین‌ها بر اساس امتیاز
-  const trend=[...R].sort((a,b)=>(b.rating||0)-(a.rating||0)).slice(0,6);
+  const trend=[...R].sort((a,b)=>(b.rt||b.rating||0)-(a.rt||a.rating||0)).slice(0,6);
   el.innerHTML=trend.map((r,i)=>hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true})} داغ`:'')).join('');
 }
 // ── رویدادهای ویژه ──
@@ -183,15 +183,22 @@ export function renderDiscoverSections(){
 }
 export function doSearch(){
   const q=document.getElementById('sQ').value.trim();
-  if(!q){renderFeed(R);return}
+  const sub=document.querySelector('#page-discover .section-sub');
+  if(!q){
+    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
+    if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+    renderFeed(R);return;
+  }
   const list=R.filter(r=>r.n.includes(q)||r.cuisine.includes(q)||r.vibes.some(v=>v.includes(q)));
   document.getElementById('feedTitle').textContent=`نتایج «${q}»`;
+  if(sub) sub.textContent=list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد';
   renderFeed(list.length?list:R);
   if(!list.length)toast('','چیزی پیدا نشد — همه رو نشون می‌دیم');
 }
 export function toggleFav(id,el){
   const on=!favs.has(id);
   on?favs.add(id):favs.delete(id);
+  saveFavs();
   if(el){
     el.innerHTML=icon('heart',{size:20,fill:on});
     el.setAttribute('aria-pressed',String(on));
@@ -202,6 +209,7 @@ export function toggleFav(id,el){
     // Undo روی حذفِ علاقه (کاملاً client-side)
     undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
       favs.add(id);
+      saveFavs();
       if(el){ el.innerHTML=icon('heart',{size:20,fill:true}); el.setAttribute('aria-pressed','true'); el.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
       if(document.getElementById('page-favorites')?.classList.contains('active')) renderFavs();
     });
@@ -213,6 +221,7 @@ export function toggleRestFav(id){
   const btn=document.getElementById('rpFav');
   const on=!favs.has(id);
   on?favs.add(id):favs.delete(id);
+  saveFavs();
   if(btn){
     btn.innerHTML=icon('heart',{size:22,fill:on});
     btn.setAttribute('aria-pressed',String(on));
@@ -222,6 +231,7 @@ export function toggleRestFav(id){
   else {
     undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
       favs.add(id);
+      saveFavs();
       if(btn){ btn.innerHTML=icon('heart',{size:22,fill:true}); btn.setAttribute('aria-pressed','true'); btn.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
     });
   }
