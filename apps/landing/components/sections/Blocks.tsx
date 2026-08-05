@@ -12,6 +12,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Icon } from '../site/Icon';
 import { Reveal, CountUp } from '../site/Motion';
+import { LiveFlow } from './LiveFlow';
 import { Visual } from './Visuals';
 import { PlanCards } from '../pricing/PlanCards';
 import { FaqAccordion } from '../site/FaqAccordion';
@@ -179,6 +180,11 @@ function Apps({ sec }: { sec: Section }) {
     <section className="section section--subtle section--edge">
       <div className="container">
         <Head eyebrow={s(sec.eyebrow)} title={s(sec.title)} subtitle={s(sec.subtitle)} />
+        {/* ادعای «یک دادهٔ واحد بینِ دو اپ» را نشان می‌دهد، نه فقط می‌گوید:
+            رزروها از سمتِ اپِ مشتری حرکت می‌کنند و در پنل می‌نشینند. */}
+        <Reveal>
+          <div style={{ marginBlockEnd: 'var(--sp-10)' }}><LiveFlow /></div>
+        </Reveal>
         <div className="grid grid-2">
           {cards.map((card, i) => (
             <Reveal key={card.title ?? i} delay={i * 100}>

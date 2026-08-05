@@ -1172,3 +1172,31 @@
   .night__hud { grid-template-columns: 1fr; }
   .night__canvas { aspect-ratio: 4 / 5; }
 }
+
+/* ═══════════════ صحنه‌ی «جریانِ زنده» ═══════════════ */
+.flow { display: grid; gap: var(--sp-4); }
+.flow__canvas {
+  position: relative;
+  aspect-ratio: 16 / 7;
+  min-block-size: 220px;
+  border-radius: var(--r-xl);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(90% 120% at 85% 50%, var(--aurora-1), transparent 55%),
+    radial-gradient(90% 120% at 10% 50%, rgba(69, 201, 154, .1), transparent 55%),
+    var(--bg-sunken);
+  overflow: hidden;
+}
+.flow__canvas canvas { display: block; inline-size: 100%; block-size: 100%; }
+.flow__cap {
+  display: flex; align-items: baseline; gap: var(--sp-2);
+  font-size: var(--fs-md); color: var(--text-2); margin: 0;
+}
+.flow__num {
+  font-size: var(--fs-2xl); font-weight: 800; color: var(--accent);
+  font-variant-numeric: tabular-nums; letter-spacing: var(--ls-tight);
+}
+@media (max-width: 620px) {
+  .flow__canvas { aspect-ratio: 4 / 3; }
+  .flow__cap { flex-direction: column; gap: 2px; }
+}
