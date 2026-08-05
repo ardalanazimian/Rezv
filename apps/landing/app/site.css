@@ -1309,3 +1309,70 @@
   .askbot { animation: none; }
   .askbot__fab:hover { transform: none; }
 }
+
+/* ═══════════════ لایه‌ی حرکت (Kinetic) ═══════════════ */
+
+/* SplitText — هر کلمه از پایین بالا می‌آید. overflow روی پوسته تا کلمه
+   واقعاً از «زیرِ خط» بیرون بیاید، نه اینکه فقط محو شود. */
+.kx-word { display: inline-block; overflow: hidden; vertical-align: bottom; padding-block-end: .08em; }
+.kx-word__in {
+  display: inline-block;
+  transform: translateY(110%) rotate(2deg);
+  opacity: 0;
+  animation: kxWord .82s cubic-bezier(.16,1,.3,1) forwards;
+}
+@keyframes kxWord { to { transform: translateY(0) rotate(0); opacity: 1; } }
+
+/* Magnetic — خودِ جابه‌جایی با JS است؛ اینجا فقط لایه‌ی رندر تثبیت می‌شود */
+.kx-mag { display: inline-block; will-change: transform; }
+
+/* Tilt — کارتِ سه‌بعدی با هاله‌ای که اشاره‌گر را دنبال می‌کند */
+.kx-tilt {
+  position: relative;
+  transition: transform .42s cubic-bezier(.16,1,.3,1);
+  transform-style: preserve-3d;
+}
+.kx-tilt::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(320px circle at var(--kx-mx, 50%) var(--kx-my, 50%),
+    var(--brand-soft), transparent 62%);
+  opacity: 0; transition: opacity .3s var(--ease);
+  pointer-events: none;
+}
+.kx-tilt:hover::after { opacity: 1; }
+
+/* Ambient — میدانِ ذره پشتِ محتوا */
+.kx-ambient {
+  position: absolute; inset: 0;
+  inline-size: 100%; block-size: 100%;
+  pointer-events: none; z-index: 0;
+}
+.hero > .container, .section > .container { position: relative; z-index: 1; }
+
+/* نوارِ متحرکِ قابلیت‌ها */
+.kx-ticker {
+  position: relative; overflow: hidden;
+  border-block: 1px solid var(--border);
+  background: var(--bg-subtle);
+  padding-block: var(--sp-4);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.kx-ticker__row { display: flex; inline-size: max-content; animation: kxSlide 34s linear infinite; }
+.kx-ticker:hover .kx-ticker__row { animation-play-state: paused; }
+.kx-ticker__item {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding-inline: var(--sp-6);
+  font-size: var(--fs-md); font-weight: 600; color: var(--text-2);
+  white-space: nowrap;
+}
+.kx-ticker__item svg { color: var(--brand); }
+@keyframes kxSlide { to { transform: translateX(50%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .kx-word__in { transform: none; opacity: 1; animation: none; }
+  .kx-ticker__row { animation: none; }
+  .kx-tilt { transition: none; }
+}

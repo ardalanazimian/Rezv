@@ -13,6 +13,7 @@ import type { ReactNode } from 'react';
 import { Icon } from '../site/Icon';
 import { Reveal, CountUp } from '../site/Motion';
 import { LiveFlow } from './LiveFlow';
+import { SplitText, Magnetic, Ambient, Tilt, Parallax } from '../site/Kinetic';
 import { Visual } from './Visuals';
 import { PlanCards } from '../pricing/PlanCards';
 import { FaqAccordion } from '../site/FaqAccordion';
@@ -44,10 +45,12 @@ function CtaButtons({ primary, secondary, size = 'lg' }: { primary: Cta | null; 
   return (
     <div className="row cta-row" style={{ gap: 'var(--sp-3)' }}>
       {primary && (
-        <Link href={primary.href} className={`btn btn--primary ${cls}`}>
-          {primary.label}
-          <Icon name="arrowLeft" size={18} className="btn__arrow" />
-        </Link>
+        <Magnetic>
+          <Link href={primary.href} className={`btn btn--primary ${cls}`}>
+            {primary.label}
+            <Icon name="arrowLeft" size={18} className="btn__arrow" />
+          </Link>
+        </Magnetic>
       )}
       {secondary && (
         <Link href={secondary.href} className={`btn btn--ghost ${cls}`}>{secondary.label}</Link>
@@ -83,6 +86,7 @@ function Hero({ sec }: { sec: Section }) {
         <span className="aurora__blob" /><span className="aurora__blob" /><span className="aurora__blob" />
       </div>
       <div className="grid-bg" aria-hidden="true" />
+      <Ambient />
 
       <div className={`container hero__inner${hasPanel ? ' hero__inner--split' : ''}`}>
         <div className="hero__content">
@@ -95,12 +99,13 @@ function Hero({ sec }: { sec: Section }) {
             </Reveal>
           )}
 
-          <Reveal delay={60}>
-            <h1 className="display">
-              {s(sec.title)}
-              {s(sec.highlight) && <> <span className="text-gradient">{s(sec.highlight)}</span></>}
-            </h1>
-          </Reveal>
+          {/* عنوان کلمه‌به‌کلمه از پایین می‌آید — نه یک بلوکِ محو */}
+          <h1 className="display">
+            {s(sec.title) && <SplitText text={s(sec.title) as string} delay={120} />}
+            {s(sec.highlight) && (
+              <> <SplitText className="text-gradient" text={s(sec.highlight) as string} delay={340} /></>
+            )}
+          </h1>
 
           {s(sec.subtitle) && (
             <Reveal delay={120}>
@@ -130,9 +135,11 @@ function Hero({ sec }: { sec: Section }) {
         </div>
 
         {hasPanel && (
-          <Reveal delay={140}>
-            <Visual kind={panelKind} />
-          </Reveal>
+          <Parallax speed={0.1}>
+            <Reveal delay={140}>
+              <Visual kind={panelKind} />
+            </Reveal>
+          </Parallax>
         )}
       </div>
     </section>
@@ -188,7 +195,7 @@ function Apps({ sec }: { sec: Section }) {
         <div className="grid grid-2">
           {cards.map((card, i) => (
             <Reveal key={card.title ?? i} delay={i * 100}>
-              <article className="app-card">
+              <Tilt><article className="app-card">
                 {card.badge && <span className="eyebrow" style={{ alignSelf: 'flex-start' }}>{card.badge}</span>}
                 {card.title && <h3 className="h3">{card.title}</h3>}
                 {card.body && <p className="body">{card.body}</p>}
@@ -205,12 +212,34 @@ function Apps({ sec }: { sec: Section }) {
                     <Icon name="arrowLeft" size={16} className="btn__arrow" />
                   </Link>
                 )}
-              </article>
+              </article></Tilt>
             </Reveal>
           ))}
         </div>
       </div>
     </section>
+  );
+}
+
+
+// ═══════════════ ticker — نوارِ متحرکِ قابلیت‌ها ═══════════════
+
+function Ticker({ sec }: { sec: Section }) {
+  const items = list<string>(sec.items);
+  if (!items.length) return null;
+  // دو بار تکرار می‌شود چون انیمیشن تا ۵۰٪ می‌رود و بی‌درز حلقه می‌زند.
+  const row = [...items, ...items];
+  return (
+    <div className="kx-ticker" aria-label={s(sec.title) ?? 'قابلیت‌ها'}>
+      <div className="kx-ticker__row">
+        {row.map((it, i) => (
+          <span className="kx-ticker__item" key={i} aria-hidden={i >= items.length}>
+            <Icon name="sparkle" size={15} />
+            {it}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -554,6 +583,7 @@ const BLOCKS: Record<string, (props: { sec: Section; data: SectionData }) => Rea
   hero: ({ sec }) => <Hero sec={sec} />,
   metrics: ({ sec }) => <Metrics sec={sec} />,
   apps: ({ sec }) => <Apps sec={sec} />,
+  ticker: ({ sec }) => <Ticker sec={sec} />,
   features: ({ sec }) => <Features sec={sec} />,
   split: ({ sec }) => <Split sec={sec} />,
   steps: ({ sec }) => <Steps sec={sec} />,
