@@ -46,3 +46,6 @@ tools/__pycache__/
 # بسته‌های تولیدشده برای تحویل (از standalone/ و git خودش دوباره ساخته می‌شوند)
 /rezervno-website.zip
 /rezervno-site.bundle
+
+# خروجیِ افزایشیِ tsc (آرتیفکتِ build، نه منبع)
+api/tsconfig.tsbuildinfo
