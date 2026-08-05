@@ -4,6 +4,8 @@
 //  demo-safe و client-side. a11y: dialog، فوکوس، Enter=بعدی، Esc=رد شدن،
 //  reduced-motion. تست‌های e2e با ست‌کردنِ rz_onboarded این را رد می‌کنند.
 // ═══════════════════════════════════════════════════════════
+import { lockAppSurfaces, unlockAppSurfaces } from '../auth.js';
+
 const KEY = 'rz_onboarded';
 const SLIDES = [
   { emoji:'🍽️', title:'بهترین رستوران‌های شهر', text:'کشف کن، ببین کجا شلوغه و چی محبوبه — با پیشنهادِ هوشمند بر اساس سلیقه‌ات.' },
@@ -14,7 +16,10 @@ let _i = 0;
 
 function done(){
   try{ localStorage.setItem(KEY, '1'); }catch(e){}
-  const ov = document.getElementById('onb'); if(ov) ov.classList.remove('show');
+  const ov = document.getElementById('onb');
+  const wasOpen = !!ov && ov.classList.contains('show');
+  if(ov) ov.classList.remove('show');
+  if(wasOpen) unlockAppSurfaces();
 }
 
 function paint(){
@@ -52,7 +57,9 @@ function show(){
     });
   }
   _i = 0; paint();
+  const wasOpen = ov.classList.contains('show');
   ov.classList.add('show');
+  if(!wasOpen) lockAppSurfaces();
   setTimeout(()=>{ const b=ov.querySelector('.onb-next'); if(b) try{b.focus()}catch(e){} }, 40);
 }
 

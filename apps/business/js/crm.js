@@ -488,7 +488,7 @@ let custSort='churn';
 async function custRenderProfiles(){
   const el=document.getElementById('ct-profiles');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای دیدن این بخش وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const res=await API.customers('sort='+custSort+'&limit=20');
   if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
   const items=res.data.items||[];
@@ -545,7 +545,7 @@ async function loadHours(){
 
 function profRenderHours(){
   const el=document.getElementById('pt-hours'); if(!el) return;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای ویرایش ساعات کاری وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const oh=HOURS_STATE.opening_hours||{};
   el.innerHTML=`
     <div class="panel">
@@ -689,7 +689,7 @@ async function custRenderCampaign(){
 async function loadCampaignHistory(){
   const el=document.getElementById('campHistoryList');
   if(!el)return;
-  if(!API.getToken()){ el.innerHTML='برای دیدن تاریخچه وارد شو'; return; }
+  if(!API.getToken()){ el.innerHTML='تاریخچه به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست'; return; }
   const res=await API.campaignHistory();
   if(!res.ok){ el.innerHTML=`<div class="error-state"><div class="error-state-icon">${icon('alert',{size:32})}</div><div>بارگذاری تاریخچه ناموفق بود</div></div>`; return; }
   const logs=res.data.items||[];
@@ -703,7 +703,7 @@ async function loadCampaignHistory(){
 async function custRenderAI(){
   const el=document.getElementById('ct-ai');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای دیدن این بخش وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const res=await API.aiRecommendations();
   if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
   const cards=res.data.cards||[];

@@ -32,7 +32,7 @@ function setMktTab(t){
 }
 function renderCoupons(){
   const el=document.getElementById('mkt-coupons'); if(!el) return;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای مدیریت کوپن‌ها وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">مدیریت کوپن‌ها به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   el.innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کوپن جدید</div><div class="panel-sub">تخفیف درصدی یا مبلغ ثابت برای مشتریان</div></div></div>
@@ -82,7 +82,7 @@ async function createCoupon(){
 }
 function renderAutomations(){
   const el=document.getElementById('mkt-automations'); if(!el) return;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای مدیریت اتوماسیون وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">اتوماسیون به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   el.innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">قانونِ خودکار جدید</div><div class="panel-sub">پیامک خودکار وقتی یه رویداد خاص افتاد</div></div></div>

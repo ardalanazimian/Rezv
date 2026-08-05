@@ -690,6 +690,7 @@ img{display:block;max-width:100%}
 
 @media(max-width:880px){
   .nav-links{display:none}
+  .nav-right{display:none}
   .botnav{display:flex}
   body{padding-bottom:70px}
   .searchbar{flex-wrap:wrap;border-radius:var(--r-xl);padding:6px}

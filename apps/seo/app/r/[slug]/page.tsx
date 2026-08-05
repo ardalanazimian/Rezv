@@ -12,16 +12,17 @@ const pageUrl = (slug: string) => `${SITE}/r/${encodeURIComponent(slug)}`;
 
 const BAND = ['', 'اقتصادی', 'متوسط', 'گران', 'لوکس'];
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const r = await fetchRestaurant(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const r = await fetchRestaurant(slug);
   if (!r) return { title: 'رستوران یافت نشد' };
   const parts = [r.cuisine, r.location.city].filter(Boolean).join('، ');
   const description = `رزرو آنلاین میز در ${r.name}${parts ? ` — ${parts}` : ''}. مشاهده‌ی منو، عکس‌ها، ساعتِ کاری و امتیاز.`;
-  const url = pageUrl(params.slug);
+  const url = pageUrl(slug);
   return {
     title: `${r.name} — رزرو آنلاین`,
     description,
-    alternates: alternates(`/r/${encodeURIComponent(params.slug)}`),
+    alternates: alternates(`/r/${encodeURIComponent(slug)}`),
     openGraph: {
       type: 'website', title: r.name, description, url,
       images: r.photos[0]?.url ? [r.photos[0].url] : undefined,
@@ -29,11 +30,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function RestaurantPage({ params }: { params: { slug: string } }) {
-  const r = await fetchRestaurant(params.slug);
+export default async function RestaurantPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const r = await fetchRestaurant(slug);
   if (!r) notFound();
 
-  const url = pageUrl(params.slug);
+  const url = pageUrl(slug);
   const jsonLd = restaurantJsonLd(r, url);
   const locLine = [r.location.district, r.location.city].filter(Boolean).join('، ');
 

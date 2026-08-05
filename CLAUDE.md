@@ -1,81 +1,163 @@
-# RezervoNo — Claude Code Working Rules
+# RezervnoOSv2 — Claude Code Guidelines
 
-## Your role
-You are the senior engineer of RezervoNo: a restaurant-reservation SaaS
-for Iran's Gen-Z market. Every push auto-deploys to Vercel, so all work
-must be production-grade.
+---
 
-## Repo architecture
-The **customer/business/company** apps are static, **no build step / no bundler** —
-plain static files served as-is. Each deploys as its **own** Vercel project (Root
-Directory = that app's folder), so their assets use **root-absolute** paths
-(`/css/…`, `/js/…`) — each app is served at its own domain root. **Do not add a
-build step to these three apps.**
+## 1. Project Vision & Quality Goals
 
-> **Sanctioned evolution (ADR 0001, approved 2026-07-30):** a **new** `apps/seo`
-> Next.js (SSR/ISR) project will serve the public, indexable SEO pages
-> (`/r/{slug}`, `/city/{c}`, `/cuisine/{c}`). It is a **separate, isolated** Vercel
-> project — the three static apps stay exactly as they are and are not put at risk.
-> See `docs/adr/0001-seo-rendering-architecture.md` and `SEO_AUDIT_REPORT.md`.
+Why this project exists:  
+RezervnoOSv2 is a modern, multi-tenant restaurant reservation platform for the Iranian market. It aims to be:
 
-- `apps/customer` — customer PWA. ES-module JS (entry `js/main.js`), plus `sw.js`,
-  `index.html`, `css/`. Scripts load as `<script type="module">`.
-- `apps/business` and `apps/company` — single-page Vanilla-JS panels. **Classic**
-  `<script>` tags (shared global scope, **load order matters**), not ES modules.
-- `apps/seo` *(planned, ADR 0001)* — Next.js SSR/ISR for public SEO pages; its
-  **own** Vercel project (Root Directory = `apps/seo`); reads data from `api/`.
-  This is the **only** front-end allowed a build step.
-- `shared/` — the **single source of truth** for cross-app assets: CSS
-  (`tokens.css`, `foundation.css`, `ds-bridge.css`), `js/icons.js`,
-  `js/api-core.js` (HTTP transport `httpJson` + `resolveApiBase`), `js/format.js`
-  (`fa`/`esc`), `js/analytics.panel.js`. Never hand-edit the per-app copies —
-  edit `shared/` and re-run the sync tool (see next section).
-- `api/` — Next.js 14 (App Router) + Prisma + PostgreSQL(Supabase) + Redis + JWT.
-  Deployed as a **SEPARATE** Vercel project with **Root Directory = `api`**.
-- `e2e/` — Playwright specs (customer + panels), run on mobile + desktop viewports.
-- The root `.vercelignore` must always ignore `api` and infra folders ("api" at repo
-  root is a reserved Vercel functions folder) — never delete it.
+- Reliable — no double-bookings, no data loss, always consistent.
+- Performant — fast UI, minimal API latency, efficient caching.
+- Secure — JWT-based auth, input validation, environment isolation.
+- Maintainable — clean architecture, shared code, type safety.
+- User-friendly — Persian/RTL UI, mobile-first, accessible.
 
-## Single-source design system (`shared/` → `apps/`)
-`shared/` is canonical; `tools/sync-design-system.sh` copies it into each app.
-customer receives the ES-module version verbatim; business/company receive a
-**global** variant with `export` stripped (for classic `<script>`). CI runs
-`sh tools/sync-design-system.sh --check` and **fails on any drift**.
-Workflow: edit `shared/…` → run `sh tools/sync-design-system.sh` (no `--check`) to
-regenerate every per-app copy → commit `shared/` **and** the generated app files
-together.
+Our north star: Every push should make the system more reliable, faster, or easier to understand. If a change doesn't improve at least one of these, question its value.
 
-## When you receive a new zip
-1. Extract and map contents to the structure above (front-ends to `apps/*`, shared
-   assets to `shared/`, backend to `api/`)
-2. Before merging, check every .ts/.js file for "markdown tails" (text like ## or --- after the code ends — a known corruption pattern in this project)
-3. Make surgical changes, never rewrites; don't touch healthy existing files
-4. If anything under `apps/customer/js` or `apps/customer/css` changes, bump
-   `CACHE_VERSION` in `apps/customer/sw.js` (rezervno-vN → vN+1), otherwise users
-   keep seeing the cached version (the panels have no service worker)
-5. Never break the front-end demo mode (accepting code 1234 when the backend is absent)
+---
 
-## Line endings (EOL) — don't flip them
-Some files are stored **CRLF** and must stay CRLF: `apps/customer/{index.html,
-api.js,sw.js}`, `apps/business/index.html`, `apps/company/{index.html,js/api.js}`.
-Most other files are LF. Editing a CRLF file with a naive writer can silently
-convert it to LF and produce a huge noise diff — edit those at the byte level and
-verify the EOL is preserved.
+## 2. Definition of Done (DoD)
 
-## Checks before every push
-- `sh tools/sync-design-system.sh --check` — zero drift between `shared/` and `apps/`
-- Inside `api/` (after `npx prisma generate`): `npx tsc --noEmit` **and**
-  `npm run lint` **and** `npm test` — all clean/zero errors
-- Playwright e2e green for the areas you touched, on **mobile + desktop** (CI runs
-  iPhone 13 + Pixel 5 + Desktop Chrome; a test that passes only on desktop is not done)
-- Every script/css reference in HTML files and every ES module import must resolve to a real file
-- Never commit real secrets, keys, or .env files
-- Demo data must be labeled [DEMO]; never fabricate real restaurant names
+A task/feature is DONE only when ALL of these are true:
 
-## Reporting (honest)
-- Write commit messages in Persian: what, why, and whether it was "tested" or "only type-checked" — never overstate validation
-- For high-risk changes (DB schema, auth, reservation/double-booking logic), open a PR instead of pushing directly, and wait
-- Prefer small, single-purpose PRs merged on green CI (merge-on-green)
+- [ ] Code is written, reviewed (if PR), and merged to develop or main.
+- [ ] All mandatory pre-push checks pass (see Section 3).
+- [ ] New features have unit tests (if backend logic) and E2E tests (if UI flow).
+- [ ] Manual smoke test on mobile (iPhone 13, Pixel 5) and desktop (Chrome) passes.
+- [ ] Database migrations (if any) are tested on a fresh copy of production-like data.
+- [ ] No new lint warnings or TypeScript errors.
+- [ ] Commit message clearly states what, why, and test status.
+- [ ] Documentation updated (if public API or complex logic changed).
+- [ ] No secrets, .env, or debug code left behind.
 
-## Language
-Speak Persian with the user. The UI is Persian/RTL using the Vazirmatn font.
+---
+
+## 3. Mandatory Pre-Push Checks (Zero Tolerance)
+
+Run these in order. If any fails, STOP and fix before pushing.
+
+| # | Check | Command | Expected Result |
+|---|-------|---------|-----------------|
+| 1 | Design System Sync | sh tools/sync-design-system.sh --check | Zero drift between shared/ and apps/ |
+| 2 | TypeScript (no emit) | cd api && npx tsc --noEmit | No errors |
+| 3 | Lint | cd api && npm run lint | No errors/warnings |
+| 4 | Unit Tests | cd api && npm test | All green |
+| 5 | E2E (touched areas) | npm run test:e2e | Green on iPhone 13, Pixel 5, Desktop Chrome |
+| 6 | File Resolution | Manual or automated scan | All import/script/css paths resolve to existing files |
+| 7 | Security Scan | npm audit (optional but recommended) | No critical/high vulnerabilities |
+
+> If you're unsure about any check, ask Claude: "Run pre-push checks for me." I'll execute them step by step.
+
+---
+
+## 4. Code Quality & Performance Standards
+
+### Code Style
+- Use TypeScript strictly (no any unless absolutely necessary, then comment why).
+- Use ES modules (import/export) — no CommonJS in frontend code.
+- Use Zod for all input validation (API routes, server actions).
+- Use enums instead of magic strings (e.g., OrderStatus.PENDING).
+- Keep functions small and single-responsibility.
+- Prefer early returns over deep nesting.
+
+### Performance Targets
+- Lighthouse score ≥ 90 on mobile and desktop (for critical pages).
+- First Contentful Paint (FCP) ≤ 1.8s on 3G.
+- API p95 latency ≤ 200ms for reads, ≤ 500ms for writes.
+- Cache hit rate ≥ 80% for read-heavy endpoints (use Redis).
+- Bundle size — keep each app under 200KB (gzipped) initial load.
+
+### Accessibility (a11y)
+- All interactive elements must be keyboard-navigable.
+- Images must have alt text.
+- Color contrast ratio ≥ 4.5:1 for text.
+- Use semantic HTML (button, nav, main, etc.).
+
+---
+
+## 5. Testing Culture
+
+We don't just "test" — we verify behavior.
+
+- Unit tests (Jest/Vitest) — for pure functions, utils, and business logic.
+- Integration tests — for API endpoints (with a real test DB).
+- E2E tests (Playwright) — for critical user journeys (reservation flow, login, restaurant dashboard).
+- Snapshot tests — for UI components (but use sparingly; prefer runtime checks).
+When to write a test:
+- New feature → at least one E2E + unit coverage for backend.
+- Bug fix → write a test that reproduces the bug, then fix it (red-green).
+- Refactor → tests must stay green; if they don't, you broke something.
+
+Test data: Always use [DEMO] prefix for dummy data. Never use real restaurant names or personal info.
+
+---
+
+## 6. Git Workflow & Branching
+
+- main — production-ready, tagged releases.
+- develop — integration branch for features.
+- feature/* — branch off develop, merge back via PR.
+- hotfix/* — branch off main for urgent fixes, then merge to both main and develop.
+
+PR Requirements:
+- Title: clear and concise (Persian or English, but be consistent).
+- Description: link to issue, summary of changes, test evidence (screenshots/recordings if UI).
+- At least one reviewer approval.
+- All CI checks must pass (merge-on-green).
+- Keep PRs small (<400 LOC if possible) — big PRs are harder to review and riskier.
+
+---
+
+## 7. Review & Feedback Culture
+
+- Be kind but honest. Point out issues, but also highlight good stuff.
+- Use the "why" — don't just say "change this", explain *why* it's better.
+- If you disagree, propose an alternative with reasoning.
+- Learn from each other — every review is a chance to grow.
+
+When you receive feedback:
+- Don't take it personally — it's about the code, not you.
+- Ask clarifying questions if something is unclear.
+- If you change your mind, say so and adapt.
+
+---
+
+## 8. Continuous Improvement (How This File Evolves)
+
+This CLAUDE.md is not set in stone. It's a living document.
+
+- Every month, review the rules — do they still make sense? Are they too strict? Too loose?
+- If you find a better way, propose an update via PR (yes, even this file goes through review).
+- After each major release, reflect on what went well and what could be better.
+- Track metrics: bug count, build time, test pass rate, deployment frequency. Use them to guide improvements.
+
+Golden rule: The goal is not to follow rules blindly. The goal is to build a great product. Rules exist to help us achieve that — if a rule hinders progress, change it.
+
+---
+
+## 9. Quick Reference (Cheat Sheet)
+
+| Action | Command |
+|--------|---------|
+| Sync design | sh tools/sync-design-system.sh |
+| DB migrate | npm run db:migrate |
+| DB seed | npm run db:seed |
+| Run all checks | npm run typecheck && npm run lint && npm test |
+| E2E tests | npm run test:e2e |
+| Local docker up | docker compose --profile http up -d --build |
+| Prod deploy | docker compose -f docker-compose.prod.yml up -d --build |
+
+---
+
+## 10. Final Words (Always Remember)
+
+- Speak Persian with the user (me) — but code, comments, and this file are in English for consistency.
+- RTL UI — test your UI in both RTL and LTR layouts (use dir="rtl" on HTML).
+- Vazirmatn font — ensure it's loaded and renders correctly.
+- Demo mode — never break OTP 1234 — it's essential for client testing.
+- If in doubt, ask. Better to ask twice than to break production.
+
+---
+
+Now, let's build something great — together. 🚀

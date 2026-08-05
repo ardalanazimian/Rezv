@@ -4,6 +4,34 @@ import type { RestaurantDetail, RestaurantListItem } from './api';
 
 const SITE = 'https://rezervno.ir';
 
+export function organizationJsonLd(): object {
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${SITE}/#organization`,
+        name: 'رزرونو',
+        url: SITE,
+        logo: `${SITE}/logo.png`,
+        description: 'پلتفرم رزرو آنلاین میز در بهترین رستوران‌های ایران با تمرکز بر تجربه‌ی مشتری و مدیریت رستوران.',
+        sameAs: ['https://www.instagram.com/rezervno', 'https://www.linkedin.com/company/rezervno'],
+        areaServed: 'IR',
+        availableLanguage: ['fa', 'en'],
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${SITE}/#website`,
+        name: 'رزرونو',
+        url: SITE,
+        inLanguage: 'fa-IR',
+        description: 'کشف و رزرو آنلاین میز در رستوران‌های برتر شهر با جست‌وجوی سریع و تجربه‌ی موبایل‌محور.',
+        publisher: { '@id': `${SITE}/#organization` },
+      },
+    ],
+  };
+}
+
 /**
  * JSON-LD برای صفحاتِ لیست (شهر/آشپزی): CollectionPage + ItemList + BreadcrumbList.
  * items با ترتیب در ItemList قرار می‌گیرند و هرکدام به صفحه‌ی رستوران لینک می‌شوند.

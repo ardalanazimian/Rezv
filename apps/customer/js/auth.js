@@ -8,6 +8,25 @@ import { icon } from './icons.js';
 import { faTime } from './data/booking.js';
 import { renderProfile } from './features/food-dna.js';
 export let _loginPhone = '';
+let _appSurfaceLockCount = 0;
+function setAppSurfacesLocked(locked){
+  const nodes = document.querySelectorAll('.nav, #app-main, .botnav');
+  nodes.forEach(node=>{
+    node.setAttribute('aria-hidden', locked ? 'true' : 'false');
+    if ('inert' in node) node.inert = locked;
+  });
+}
+export function lockAppSurfaces(){
+  _appSurfaceLockCount += 1;
+  if (_appSurfaceLockCount === 1) setAppSurfacesLocked(true);
+}
+export function unlockAppSurfaces(){
+  if (_appSurfaceLockCount > 0) _appSurfaceLockCount -= 1;
+  if (_appSurfaceLockCount === 0) setAppSurfacesLocked(false);
+}
+// ادامه‌ی جریانِ ناتمام بعد از ورود (مثلاً رزروِ نیمه‌کاره) — one-shot با انقضای ۱۰ دقیقه
+let _afterLogin = null;
+export function setAfterLogin(fn){ _afterLogin = fn ? { fn, at: Date.now() } : null; }
 export function openLogin(){
   _loginPhone = '';
   openSheet(`
@@ -148,6 +167,11 @@ export function finishLogin(demo){
   toast('✅', `خوش اومدی ${USER.firstName||''}!`);
   // اگر در صفحه‌ی پروفایل بود، تازه‌سازی کن
   if (document.getElementById('page-profile')?.classList.contains('active')) renderProfile();
+  // جریانِ ناتمام (مثلاً رزروِ نیمه‌کاره) را ادامه بده
+  const cont = _afterLogin; _afterLogin = null;
+  if (cont && Date.now() - cont.at < 10*60*1000) {
+    setTimeout(()=>{ try{ cont.fn(); }catch(e){} }, 450);
+  }
 }
 // تبدیل ارقام انگلیسی به فارسی برای نمایش
 export function faNum(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
@@ -184,6 +208,7 @@ export function openSheet(html){
   const wasOpen=sheet.classList.contains('show');
   document.getElementById('sheetBody').innerHTML=html;
   sheet.classList.add('show');
+  if(!wasOpen) lockAppSurfaces();
   if(!wasOpen) _sheetLastFocus=document.activeElement;
   if(_sheetTrap) sheet.removeEventListener('keydown',_sheetTrap);
   _sheetTrap=(e)=>{
@@ -200,7 +225,9 @@ export function openSheet(html){
 }
 export function closeSheet(){
   const sheet=document.getElementById('sheet');
+  const wasOpen=sheet.classList.contains('show');
   sheet.classList.remove('show');
+  if(wasOpen) unlockAppSurfaces();
   if(_sheetTrap){ sheet.removeEventListener('keydown',_sheetTrap); _sheetTrap=null; }
   if(_sheetLastFocus && _sheetLastFocus.focus){ try{_sheetLastFocus.focus()}catch(e){} _sheetLastFocus=null; }
 }

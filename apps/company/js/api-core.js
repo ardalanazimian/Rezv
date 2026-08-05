@@ -23,6 +23,13 @@ function resolveApiBase() {
 }
 
 async function httpJson(url, opts = {}, timeoutMs = 8000) {
+  // روی پروتکل file: (باز کردن مستقیم HTML) درخواستِ نسبی به file:///api/… می‌رود
+  // و همیشه شکست می‌خورد + خطای کنسول می‌سازد؛ مستقیم حالتِ offline برگردان.
+  try {
+    if (typeof location !== 'undefined' && location.protocol === 'file:' && !/^https?:/i.test(url)) {
+      return { ok: false, offline: true, error: { message: 'اتصال به سرور برقرار نشد' } };
+    }
+  } catch { /* noop */ }
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {

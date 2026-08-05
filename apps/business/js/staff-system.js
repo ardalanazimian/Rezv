@@ -312,7 +312,17 @@ async function cbApply(){
 // ═══════════ ورود کارمند (فاز ۳ تکه ۷) ═══════════
 let _staffPhone = '';
 let STAFF_INFO = null;
+function setStaffGateLocked(locked){
+  const app = document.querySelector('.shell') || document.querySelector('.app');
+  const overlay = document.getElementById('loginOverlay');
+  if (app) {
+    app.setAttribute('aria-hidden', locked ? 'true' : 'false');
+    if ('inert' in app) app.inert = locked;
+  }
+  if (overlay) overlay.setAttribute('aria-hidden', locked ? 'false' : 'true');
+}
 function showStaffLoginPhone(){
+  setStaffGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('utensils',{size:34})}</div>
     <div class="login-title">پنل رستوران رزرونو</div>
@@ -346,6 +356,7 @@ async function staffSendOtp(){
   showStaffLoginCode(devCode, res.offline);
 }
 function showStaffLoginCode(devCode, offline){
+  setStaffGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('mail',{size:34})}</div>
     <div class="login-title">کد ورود رو وارد کن</div>
@@ -383,6 +394,7 @@ async function staffConfirmOtp(){
 }
 function enterPanel(demo){
   document.getElementById('loginOverlay').classList.add('hidden');
+  setStaffGateLocked(false);
   // منو را با مجوزهای واقعیِ کاربر هم‌راستا کن — قبل از رندرِ هر صفحه.
   if (typeof applyPermissionsToNav === 'function') applyPermissionsToNav();
   renderNotifList();
@@ -393,6 +405,11 @@ function enterPanel(demo){
     loadBranches();               // سوییچر شعبه را با داده‌ی واقعی پر کن
     Heartbeat.start();           // رستوران را در اپ مشتری آنلاین نگه می‌دارد
     Outbox.sync();               // اگر عملیات آفلاینِ در انتظار هست، همگام کن
+  } else if(!TABLES.length){
+    // حالت دمو — میزهای نمونه تا پلان سالن و KPI اشغال خالی نمانند
+    TABLES = DEMO_TABLES.map(t=>({...t}));
+    _tablesLoaded = true;
+    rOverview();
   }
   toast('', `خوش اومدی${STAFF_INFO?.restaurant_name?' · '+STAFF_INFO.restaurant_name:''}`);
 }
@@ -402,6 +419,7 @@ async function staffLogout(){
   STAFF_INFO = null;
   if (typeof applyPermissionsToNav === 'function') applyPermissionsToNav();  // بازگرداندنِ منو برای کاربرِ بعدی
   document.getElementById('loginOverlay').classList.remove('hidden');
+  setStaffGateLocked(true);
   showStaffLoginPhone();
   toast('','از پنل خارج شدی');
 }
@@ -409,6 +427,7 @@ async function staffLogout(){
 function onStaffSessionExpired(){
   STAFF_INFO = null;
   document.getElementById('loginOverlay').classList.remove('hidden');
+  setStaffGateLocked(true);
   showStaffLoginPhone();
   toast('','نشست منقضی شد، دوباره وارد شو');
 }
@@ -420,6 +439,7 @@ Outbox._updateBadge();         // نمایش تعداد عملیات در انت
 if (API.getToken()) {
   // توکن ذخیره‌شده هست → مستقیم پنل (اگر منقضی باشد، اولین درخواست refresh می‌کند)
   document.getElementById('loginOverlay').classList.add('hidden');
+  setStaffGateLocked(false);
   renderNotifList();
   rOverview();
   loadTables();
@@ -427,5 +447,6 @@ if (API.getToken()) {
   Heartbeat.start();           // شروع ارسال heartbeat (رستوران را در اپ مشتری آنلاین نگه می‌دارد)
 } else {
   // نیاز به ورود
+  setStaffGateLocked(true);
   showStaffLoginPhone();
 }
