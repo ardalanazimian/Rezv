@@ -5,9 +5,11 @@ import './globals.css';
 import './site.css';
 import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
+import { AskBot } from '@/components/site/AskBot';
 import { AnnounceBanner } from '@/components/site/AnnounceBanner';
 import { ThemeScript } from '@/components/site/ThemeToggle';
 import { ScrollProgress } from '@/components/site/Motion';
+import { buildKb } from '@/lib/kb';
 import { JsonLd } from '@/components/site/JsonLd';
 import { getBanner } from '@/lib/site-api';
 import { alternates, SITE } from '@/lib/i18n';
@@ -59,6 +61,9 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // بنر از CMS می‌آید؛ نبودش یعنی هیچ نواری رندر نمی‌شود (نه یک جای خالی).
   const banner = await getBanner();
+  // پیکره‌ی دستیار در سرور ساخته می‌شود تا جست‌وجو در مرورگر انجام شود:
+  // بدونِ رفت‌وبرگشتِ شبکه و بدونِ اینکه سؤالِ کاربر جایی فرستاده شود.
+  const kb = await buildKb();
 
   return (
     // suppressHydrationWarning لازم است چون ThemeScript پیش از hydration
@@ -78,6 +83,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <Header />
         <main id="main">{children}</main>
         <Footer />
+        <AskBot docs={kb} />
       </body>
     </html>
   );
