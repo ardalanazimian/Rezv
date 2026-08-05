@@ -24,6 +24,9 @@ export function unlockAppSurfaces(){
   if (_appSurfaceLockCount > 0) _appSurfaceLockCount -= 1;
   if (_appSurfaceLockCount === 0) setAppSurfacesLocked(false);
 }
+// ادامه‌ی جریانِ ناتمام بعد از ورود (مثلاً رزروِ نیمه‌کاره) — one-shot با انقضای ۱۰ دقیقه
+let _afterLogin = null;
+export function setAfterLogin(fn){ _afterLogin = fn ? { fn, at: Date.now() } : null; }
 export function openLogin(){
   _loginPhone = '';
   openSheet(`
@@ -164,6 +167,11 @@ export function finishLogin(demo){
   toast('✅', `خوش اومدی ${USER.firstName||''}!`);
   // اگر در صفحه‌ی پروفایل بود، تازه‌سازی کن
   if (document.getElementById('page-profile')?.classList.contains('active')) renderProfile();
+  // جریانِ ناتمام (مثلاً رزروِ نیمه‌کاره) را ادامه بده
+  const cont = _afterLogin; _afterLogin = null;
+  if (cont && Date.now() - cont.at < 10*60*1000) {
+    setTimeout(()=>{ try{ cont.fn(); }catch(e){} }, 450);
+  }
 }
 // تبدیل ارقام انگلیسی به فارسی برای نمایش
 export function faNum(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }

@@ -33,6 +33,8 @@
 
   function flush(useBeacon) {
     if (!queue.length) return;
+    // روی file: (باز کردن مستقیم HTML) ارسال ممکن نیست — بی‌صدا در صف بماند
+    try { if (location.protocol === 'file:' && !/^https?:/i.test(endpoint())) return; } catch (e) { /* noop */ }
     var batch = queue.slice(0, MAX_BATCH);
     var body = JSON.stringify({ events: batch });
     var url = endpoint();
