@@ -42,3 +42,7 @@ dump.rdb
 
 # کشِ پایتونِ ابزارها
 tools/__pycache__/
+
+# بسته‌های تولیدشده برای تحویل (از standalone/ و git خودش دوباره ساخته می‌شوند)
+/rezervno-website.zip
+/rezervno-site.bundle
