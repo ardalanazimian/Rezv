@@ -28,9 +28,7 @@ export function go(p){
 }
 export function fmtFa(n){return n.toLocaleString('fa-IR')}
 export function cardHTML(r){
-  const weekly = (r.reviews||0) >= 5 ? Math.max(3, Math.round((r.reviews||0)/8)) : 0;
-  const avatars = Array.from({length: Math.min(3, Math.max(1, Math.ceil(weekly/4)))}, (_,i)=>i);
-  const hot = r.rt >= 4.7 && (r.reviews||0) >= 80;
+  const hot = isHot(r);
   // کارت خودش دکمه نمی‌شود چون داخلش دکمه دارد (تودرتوییِ نامعتبر). به‌جایش یک
   // دکمه‌ی واقعیِ کشیده روی کلِ کارت می‌نشیند و z-indexِ ۱ می‌گیرد — یعنی زیرِ
   // دکمه‌ی علاقه‌مندی (۳) و چیپ‌های ساعت (پنل، ۲). این تنها راهی است که هم با
@@ -44,42 +42,63 @@ export function cardHTML(r){
     <div class="rc-panel">
       <div class="rc-top"><div class="rc-name">${r.n}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
       <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
-      ${weekly?`<div class="rc-social"><div class="rc-avas" aria-hidden="true">${avatars.map(()=>`<span class="avatar avatar-sm"></span>`).join('')}</div><div class="rc-social-t"><b>${fmtFa(weekly)} نفر</b> این هفته اومدن</div></div>`:''}
+      ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
       <div class="rc-slots">${r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');buzz&&buzz()">${s}</button>`).join('')}</div>
     </div>
   </article>`;
 }
-// اثبات اجتماعیِ امن: از داده‌ی تجمیعی (تعداد نظر/بازدید) — نه موقعیت زنده‌ی کسی.
-// این حس «اینجا محبوبه» رو می‌ده بدون لو دادن حریم خصوصی هیچ‌کس.
-// اثبات اجتماعی صفحه‌ی جزئیات — سیگنال اعتماد قوی‌تر موقع تصمیم رزرو
-export function detailSocialProof(r){
-  const reviews = r.reviews || 0;
-  if(reviews < 5) return '';
-  const weekly = Math.max(3, Math.round(reviews/8));
-  const recommend = Math.min(98, Math.round(r.rt/5*100)+6);
-  return `<div class="rp-social">
-    <div class="rp-social-item">
-      <div class="rp-social-avas" aria-hidden="true">${[0,1,2,3].map(()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>
-      <div class="rp-social-txt"><b>${fmtFa(weekly)} نفر</b> این هفته اینجا رزرو کردن</div>
-    </div>
-    <div class="rp-social-item">
-      <span style="color:var(--success);display:inline-flex">${icon('heart',{size:18,fill:true})}</span>
-      <div class="rp-social-txt"><b>${fmtFa(recommend)}٪</b> مهمان‌ها این‌جا رو پیشنهاد می‌کنن</div>
-    </div>
-  </div>`;
+// ═══════════════════════════════════════════════════════════
+//  اثباتِ اجتماعی — فقط از دادهٔ واقعیِ بک‌اند
+//
+//  نسخه‌ی قبل هر دو عدد را در فرانت می‌ساخت:
+//    weekly    = Math.max(3, reviews/8)        ← از کلِ نظرها، نه از این هفته
+//    recommend = Math.min(98, rt/5*100 + 6)    ← از امتیاز، نه از نظرِ کسی
+//  هیچ‌کدام اندازه‌گیری نبودند. روی صفحه‌ای که کارش جلبِ اعتماد است، عددِ
+//  ساختگی دقیقاً همان چیزی را از بین می‌برد که می‌خواهد بسازد — و رقیبِ اصلیِ
+//  این حوزه دقیقاً روی «فقط مشتریِ واقعی می‌تواند نظر بدهد» ساخته شده.
+//
+//  حالا visits7d و recommendPct از API می‌آیند و اگر نبودند (null) هیچ
+//  ادعایی نشان داده نمی‌شود. صفر هم نشان داده نمی‌شود: «۰ نفر این هفته
+//  اومدن» فنی درست ولی گمراه‌کننده است.
+// ═══════════════════════════════════════════════════════════
+
+/** آواتارهای تزئینی — تعدادشان بر پایه‌ی عددِ واقعی، خودشان aria-hidden. */
+function avatarStack(n, max = 4){
+  const count = Math.min(max, Math.max(1, Math.ceil(n / 4)));
+  return `<div class="rc-avas" aria-hidden="true">${Array.from({length:count},()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>`;
 }
+
+export function detailSocialProof(r){
+  const rows = [];
+  if (Number.isFinite(r.visits7d) && r.visits7d > 0){
+    rows.push(`<div class="rp-social-item">
+      ${avatarStack(r.visits7d)}
+      <div class="rp-social-txt"><b>${fmtFa(r.visits7d)} رزرو</b> در هفته‌ی گذشته اینجا انجام شده</div>
+    </div>`);
+  }
+  if (Number.isFinite(r.recommendPct)){
+    rows.push(`<div class="rp-social-item">
+      <span style="color:var(--success);display:inline-flex">${icon('heart',{size:18,fill:true})}</span>
+      <div class="rp-social-txt"><b>${fmtFa(r.recommendPct)}٪</b> از نظرها ۴ ستاره یا بالاتر بوده</div>
+    </div>`);
+  }
+  return rows.length ? `<div class="rp-social">${rows.join('')}</div>` : '';
+}
+
 export function socialProofHTML(r){
-  const reviews = r.reviews || 0;
-  if(reviews < 5) return ''; // رستوران تازه — اثبات اجتماعی الکی نساز
-  // تخمین بازدید این هفته از تعداد نظر (قطعی و منطقی، نه رندوم بی‌معنی)
-  const weekly = Math.max(3, Math.round(reviews / 8));
-  const avatars = Array.from({length: Math.min(3, Math.max(1, Math.ceil(weekly/4)))}, (_,i)=>i);
-  const hot = r.rt >= 4.7 && reviews >= 80;
+  if (!Number.isFinite(r.visits7d) || r.visits7d <= 0) return '';
+  const hot = isHot(r);
   return `<div class="rc-social">
-    <div class="rc-social-ava" aria-hidden="true">${avatars.map(()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>
-    <div class="rc-social-txt"><b>${fmtFa(weekly)} نفر</b> این هفته اومدن</div>
+    ${avatarStack(r.visits7d, 3)}
+    <div class="rc-social-txt"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div>
     ${hot?`<span class="rc-hot" style="margin-inline-start:auto">${icon('flame',{size:12,fill:true})} داغ</span>`:''}
   </div>`;
+}
+
+/** «داغ» = هم امتیازِ بالا، هم رفت‌وآمدِ واقعیِ این هفته. فقط امتیاز کافی نیست:
+ *  رستورانی با ۵ نظرِ عالی از پارسال «داغ» نیست. */
+export function isHot(r){
+  return r.rt >= 4.7 && (r.reviews||0) >= 80 && Number.isFinite(r.visits7d) && r.visits7d >= 10;
 }
 export function renderFeed(list){
   const f=document.getElementById('feed');
@@ -138,11 +157,59 @@ export function hCardHTML(r,extra){
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rt||r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}</div>
   </div>`;
 }
+// ═══════════════════════════════════════════════════════════
+//  «نزدیک تو» — فاصله‌ی واقعی یا هیچ
+//
+//  نسخه‌ی قبل ترتیب را با Math.random() به‌هم می‌ریخت و بعد برچسبِ
+//  «۰٫۷ کیلومتر» رویش می‌گذاشت که از i حساب می‌شد، نه از موقعیتِ کسی.
+//  یعنی هم «نزدیک» دروغ بود، هم عددش.
+//
+//  حالا: اگر کاربر اجازه‌ی موقعیت داده باشد و رستوران مختصات داشته باشد،
+//  فاصله‌ی واقعی (هاورساین) حساب و مرتب می‌شود. وگرنه عنوانِ بخش به
+//  «پیشنهاد برای تو» عوض می‌شود و هیچ عددِ فاصله‌ای نشان داده نمی‌شود.
+//  اجازه هم خودبه‌خود پرسیده نمی‌شود — فقط اگر قبلاً داده شده باشد.
+// ═══════════════════════════════════════════════════════════
+let userPos=null;
+
+/** فاصله‌ی دو نقطه روی کره، به کیلومتر. */
+function haversineKm(a,b){
+  const toRad=d=>d*Math.PI/180, Rk=6371;
+  const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 2*Rk*Math.asin(Math.sqrt(s));
+}
+const hasCoords=r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng);
+
 export function renderNearby(){
   const el=document.getElementById('nearbyScroll');if(!el)return;
-  // مرتب بر اساس «فاصله» شبیه‌سازی‌شده (در واقعیت از موقعیت کاربر)
-  const near=[...R].sort(()=>Math.random()-0.5).slice(0,6);
-  el.innerHTML=near.map((r,i)=>hCardHTML(r,`${fmtFa((i+1)*0.4+0.3).slice(0,3)} کیلومتر`)).join('');
+  const title=document.getElementById('nearbyTitle');
+
+  if(userPos){
+    const withDist=R.filter(hasCoords)
+      .map(r=>({r,km:haversineKm(userPos,{lat:r.lat,lng:r.lng})}))
+      .sort((a,b)=>a.km-b.km).slice(0,6);
+    if(withDist.length){
+      if(title)title.textContent='نزدیک تو';
+      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,
+        km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`)).join('');
+      return;
+    }
+  }
+  // بدونِ موقعیت، ادعای «نزدیک» بی‌پایه است — عنوان و محتوا صادقانه عوض می‌شوند.
+  if(title)title.textContent='پیشنهاد برای تو';
+  el.innerHTML=[...R].sort((a,b)=>(b.rt||0)-(a.rt||0)).slice(0,6).map(r=>hCardHTML(r,'')).join('');
+}
+
+/** اگر اجازه‌ی موقعیت از قبل داده شده، بگیر و «نزدیک تو» را دوباره بساز.
+ *  عمداً prompt نمی‌زند: پرسیدنِ اجازه در لحظه‌ی ورود، رفتارِ مزاحمی است. */
+export function initNearby(){
+  if(!navigator.geolocation||!navigator.permissions?.query)return;
+  navigator.permissions.query({name:'geolocation'}).then(p=>{
+    if(p.state!=='granted')return;
+    navigator.geolocation.getCurrentPosition(
+      pos=>{ userPos={lat:pos.coords.latitude,lng:pos.coords.longitude}; renderNearby(); },
+      ()=>{}, {maximumAge:300000,timeout:5000});
+  }).catch(()=>{});
 }
 export function renderTrending(){
   const el=document.getElementById('trendingScroll');if(!el)return;
@@ -179,6 +246,7 @@ export async function renderEvents(){
 // رندر همه‌ی بخش‌های کشف
 export function renderDiscoverSections(){
   renderNearby();
+  initNearby();     // اگر اجازه‌ی موقعیت از قبل هست، «نزدیک تو» را واقعی می‌کند
   renderTrending();
   renderEvents();
   // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
@@ -197,8 +265,21 @@ export function doSearch(){
   const list=R.filter(r=>r.n.includes(q)||r.cuisine.includes(q)||r.vibes.some(v=>v.includes(q)));
   document.getElementById('feedTitle').textContent=`نتایج «${q}»`;
   if(sub) sub.textContent=list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد';
-  renderFeed(list.length?list:R);
-  if(!list.length)toast('','چیزی پیدا نشد — همه رو نشون می‌دیم');
+  if(list.length){ renderFeed(list); return; }
+  // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
+  // می‌داد — کاربر شش کارت می‌دید و گمان می‌کرد این‌ها نتیجه‌ی جست‌وجویش‌اند.
+  document.getElementById('feed').innerHTML=`
+    <div class="empty" style="grid-column:1/-1">
+      <div class="empty-emoji" aria-hidden="true">🔍</div>
+      <div class="empty-title">چیزی برای «${esc(q)}» پیدا نشد</div>
+      <div class="empty-text">اسمِ رستوران، نوعِ آشپزی یا حال‌وهوا رو امتحان کن</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="clearSearch()">دیدنِ همه‌ی رستوران‌ها</button>
+    </div>`;
+}
+/** پاک‌کردنِ جست‌وجو و برگشت به فید — از حالتِ خالی صدا زده می‌شود. */
+export function clearSearch(){
+  const q=document.getElementById('sQ'); if(q) q.value='';
+  doSearch();
 }
 export function toggleFav(id,el){
   const on=!favs.has(id);
@@ -249,5 +330,6 @@ window.go = go;
 window.pickOccasion = pickOccasion;
 window.filterVibe = filterVibe;
 window.doSearch = doSearch;
+window.clearSearch = clearSearch;
 window.toggleFav = toggleFav;
 window.toggleRestFav = toggleRestFav;

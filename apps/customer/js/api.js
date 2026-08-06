@@ -169,6 +169,14 @@ export function mapApiRestaurant(apiR, sampleFallback){
     price: apiR.price_range || sampleFallback?.price || '$$',
     rt: apiR.rating ?? sampleFallback?.rt ?? 0,
     reviews: apiR.reviews_count ?? apiR.review_count ?? sampleFallback?.reviews ?? 0,
+    // ── سیگنال‌های اجتماعی: فقط از API، بدونِ fallbackِ نمونه ──
+    // اگر بک‌اند نگفته، null می‌ماند و UI هیچ ادعایی نشان نمی‌دهد. عمداً از
+    // sampleFallback پر نمی‌شوند: دادهٔ نمونه برای «شکلِ صفحه» است، نه برای
+    // ادعای آماری درباره‌ی یک کسب‌وکارِ واقعی.
+    visits7d: apiR.visits_7d ?? null,
+    recommendPct: apiR.recommend_pct ?? null,
+    lat: apiR.latitude ?? null,
+    lng: apiR.longitude ?? null,
     vibes: apiR.vibes || sampleFallback?.vibes || [],
     cb: (apiR.cbBasePct ?? apiR.cashback_percent) ?? sampleFallback?.cb ?? 0,
     slots: apiR.available_slots || sampleFallback?.slots || [],

@@ -3,6 +3,7 @@ import { dbRead as db } from '@/lib/db';
 import { cached, cacheKey } from '@/lib/cache';
 import { errorResponse } from '@/lib/errors';
 import { parseQuery, zUuid, z } from '@/lib/schemas';
+import { visitedStatusList } from '@/lib/reservation-status';
 
 // ═══════════════════════════════════════════════════════════
 //  GET /api/v1/restaurants — لیست رستوران‌ها
@@ -47,7 +48,10 @@ export async function GET(req: Request) {
             { lastSeenAt: { gte: onlineThreshold } },
           ],
         },
-        select: { id: true, slug: true, name: true, cuisine: true, city: true, vibes: true, priceBand: true, cbBasePct: true },
+        // latitude/longitude لازم‌اند تا اپ مشتری فاصله را واقعاً حساب کند؛
+        // پیش از این عددِ «۰٫۷ کیلومتر» در فرانت ساخته می‌شد و هیچ ربطی به
+        // موقعیتِ واقعی نداشت.
+        select: { id: true, slug: true, name: true, cuisine: true, city: true, vibes: true, priceBand: true, cbBasePct: true, latitude: true, longitude: true },
         orderBy: { id: 'desc' },           // ترتیب پایدار برای cursor
         take: PAGE_SIZE + 1,                // یکی بیشتر بگیر تا بفهمی صفحه‌ی بعد هست
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -57,27 +61,58 @@ export async function GET(req: Request) {
       const page = hasMore ? items.slice(0, PAGE_SIZE) : items;
       const nextCursor = hasMore ? page[page.length - 1].id : null;
 
-      // امتیاز واقعی از جدول reviews — فقط برای همین صفحه (یک کوئری گروهی، scale-safe)
+      // ── سیگنال‌های اجتماعی، همه از دادهٔ واقعی ──
+      // سه کوئریِ گروهیِ موازی، هر سه محدود به همین صفحه (scale-safe).
+      // اپ مشتری پیش از این هر سه را در فرانت از روی امتیاز «تخمین» می‌زد؛
+      // عددِ ساختگی روی صفحه‌ای که کارش جلبِ اعتماد است، خودش ضدِ هدف است.
       const ids = page.map(p => p.id);
-      const ratingRows = ids.length
-        ? await db.review.groupBy({
-            by: ['restaurantId'],
-            where: { restaurantId: { in: ids }, isPublished: true },
-            _avg: { rating: true }, _count: true,
-          })
-        : [];
-      const ratingMap = new Map(ratingRows.map(r => [r.restaurantId, { avg: r._avg.rating, count: r._count }]));
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60_000);
+      const [ratingRows, recommendRows, visitRows] = ids.length
+        ? await Promise.all([
+            db.review.groupBy({
+              by: ['restaurantId'],
+              where: { restaurantId: { in: ids }, isPublished: true },
+              _avg: { rating: true }, _count: true,
+            }),
+            // «پیشنهاد می‌کنند» = سهمِ نظرهای ۴ و ۵ ستاره از کلِ نظرها
+            db.review.groupBy({
+              by: ['restaurantId'],
+              where: { restaurantId: { in: ids }, isPublished: true, rating: { gte: 4 } },
+              _count: true,
+            }),
+            // «این هفته» = رزروهایی که در ۷ روزِ گذشته به حضور رسیده‌اند
+            db.reservation.groupBy({
+              by: ['restaurantId'],
+              where: {
+                restaurantId: { in: ids },
+                status: { in: visitedStatusList() as never[] },
+                slotStart: { gte: weekAgo, lte: new Date() },
+              },
+              _count: true,
+            }),
+          ])
+        : [[], [], []];
 
-      const pageWithRatings = page.map(p => {
+      const ratingMap = new Map(ratingRows.map(r => [r.restaurantId, { avg: r._avg.rating, count: r._count }]));
+      const recommendMap = new Map(recommendRows.map(r => [r.restaurantId, Number(r._count)]));
+      const visitMap = new Map(visitRows.map(r => [r.restaurantId, Number(r._count)]));
+
+      const pageWithSignals = page.map(p => {
         const rt = ratingMap.get(p.id);
+        const total = rt?.count ?? 0;
+        const liked = recommendMap.get(p.id) ?? 0;
         return {
           ...p,
           rating: rt?.avg ? Math.round(rt.avg * 10) / 10 : null,
-          reviews_count: rt?.count ?? 0,
+          reviews_count: total,
+          // null یعنی «هنوز نمی‌دانیم» — نه صفر و نه عددِ ساختگی. اپ مشتری در
+          // این حالت اصلاً ادعایی نشان نمی‌دهد.
+          recommend_pct: total >= 5 ? Math.round((liked / total) * 100) : null,
+          visits_7d: visitMap.get(p.id) ?? 0,
         };
       });
 
-      return { items: pageWithRatings, next_cursor: nextCursor, has_more: hasMore };
+      return { items: pageWithSignals, next_cursor: nextCursor, has_more: hasMore };
     });
 
     return NextResponse.json(result);
