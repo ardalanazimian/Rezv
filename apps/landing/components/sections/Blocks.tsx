@@ -15,6 +15,7 @@ import { Reveal, CountUp } from '../site/Motion';
 import { LiveFlow } from './LiveFlow';
 import { PinnedStory } from './PinnedStory';
 import { FlowField } from './FlowField';
+import { HeroLight } from './Caustics';
 import { SplitText, Magnetic, Ambient, Tilt, Parallax } from '../site/Kinetic';
 import { Visual } from './Visuals';
 import { PlanCards } from '../pricing/PlanCards';
@@ -79,18 +80,23 @@ function Head({ eyebrow, title, subtitle, center = true }: {
 function Hero({ sec }: { sec: Section }) {
   const panelKind = (sec.panel as { kind?: string } | undefined)?.kind;
   const hasPanel = Boolean(panelKind);
-  const compact = s(sec.variant) === 'compact';
+  const variant = s(sec.variant);
+  const compact = variant === 'compact';
+  // «stage» = هیروِ تمام‌قد: تیترِ درشت روی نورِ زنده و پنل به‌جای کارتِ کنارِ
+  // متن، پشتِ آن و بریده از لبه. چیدمانِ دوستونیِ «متن | کارت» رایج‌ترین
+  // امضای قالب‌های آماده است؛ صفحه‌ی اصلی از آن بیرون می‌آید.
+  const stage = variant === 'stage';
   const bullets = list<string>(sec.bullets);
 
   return (
-    <section className={`hero${compact ? ' hero--compact' : ''}${hasPanel ? '' : ' hero--center'}`}>
-      {/* میدانِ جریان جای لکه‌های محوِ گرادیانی را گرفت: آن‌ها امضای قالبِ
-          آماده‌اند، این یکی هر بار تصویرِ متفاوتی می‌سازد. */}
-      <FlowField />
+    <section
+      className={`hero${compact ? ' hero--compact' : ''}${stage ? ' hero--stage' : ''}${hasPanel && !stage ? '' : ' hero--center'}`}
+    >
+      {stage ? <HeroLight /> : <FlowField />}
       <div className="grid-bg" aria-hidden="true" />
       <Ambient />
 
-      <div className={`container hero__inner${hasPanel ? ' hero__inner--split' : ''}`}>
+      <div className={`container hero__inner${hasPanel && !stage ? ' hero__inner--split' : ''}`}>
         <div className="hero__content">
           {s(sec.eyebrow) && (
             <Reveal>
@@ -136,7 +142,7 @@ function Hero({ sec }: { sec: Section }) {
           )}
         </div>
 
-        {hasPanel && (
+        {hasPanel && !stage && (
           <Parallax speed={0.1}>
             <Reveal delay={140}>
               <Visual kind={panelKind} />
@@ -144,6 +150,25 @@ function Hero({ sec }: { sec: Section }) {
           </Parallax>
         )}
       </div>
+
+      {/* در حالتِ stage پنل کارتِ کنارِ متن نیست: یک صحنه‌ی پهن زیرِ تیتر که
+          از لبه‌ی پایین بیرون می‌زند. همین «بریدگی» است که به صفحه عمق می‌دهد
+          و از حسِ «قالبِ آماده» بیرونش می‌آورد. */}
+      {hasPanel && stage && (
+        <div className="hero__stage" aria-hidden="false">
+          <Parallax speed={0.06}>
+            <Reveal delay={220}>
+              <div className="hero__stage-inner"><Visual kind={panelKind} /></div>
+            </Reveal>
+          </Parallax>
+        </div>
+      )}
+
+      {stage && (
+        <span className="hero__scroll" aria-hidden="true">
+          <span className="hero__scroll-line" />
+        </span>
+      )}
     </section>
   );
 }

@@ -514,7 +514,8 @@
           ],
           "panel": {
             "kind": "reservation"
-          }
+          },
+          "variant": "stage"
         },
         {
           "type": "metrics",

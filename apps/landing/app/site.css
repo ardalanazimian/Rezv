@@ -1512,3 +1512,123 @@
   }
   .pin__chapter[aria-hidden='true'] { display: grid; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   هیروِ تمام‌قد (hero--stage)
+   ───────────────────────────────────────────────────────────────────
+   سه تفاوتِ عمدی با هیروِ معمولی:
+   ۱) مقیاس. تیتر تا ۹vw می‌رود، نه ۶٫۲vw. «heroic» بیش از هر چیز یعنی
+      اندازه؛ تیترِ محتاط همیشه معمولی به‌نظر می‌رسد.
+   ۲) چیدمان. کارتِ کنارِ متن حذف شد. صحنه زیرِ تیتر می‌نشیند و از لبه‌ی
+      پایین بیرون می‌زند — همان بریدگی است که عمق می‌سازد.
+   ۳) نور. پس‌زمینه یک شیدرِ زنده است (کاستیک)، نه گرادیانِ ثابت.
+   ═══════════════════════════════════════════════════════════════════ */
+.hero--stage {
+  min-block-size: min(100svh, 60rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-block: clamp(var(--sp-16), 12vh, var(--sp-32)) 0;
+  isolation: isolate;
+}
+
+/* بومِ شیدر — پشتِ همه‌چیز، بیرون از جریانِ چیدمان */
+.caustics {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  z-index: 0;
+  pointer-events: none;
+  /* بومِ کم‌رزولوشن بزرگ می‌شود؛ نرمیِ کاستیک این را پنهان می‌کند */
+  image-rendering: auto;
+  mask-image: linear-gradient(to bottom, #000 62%, transparent 98%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 98%);
+}
+
+/* لایه‌ی یکدست‌کننده زیرِ نور: بدونِ آن، تیغه‌های روشن روی متن می‌افتند و
+   کنتراست را می‌شکنند. */
+.hero__wash {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* فقط پایینِ قاب یکدست می‌شود تا صحنه از نور بیرون بیاید. نسخه‌ی قبلی
+     لبه‌ها را هم می‌پوشاند و در تمِ روشن کاستیک را کاملاً می‌خورد. */
+  background: linear-gradient(to bottom, transparent 46%, var(--bg) 96%);
+}
+
+.hero--stage .hero__inner { justify-items: center; }
+.hero--stage .hero__content {
+  align-items: center;
+  text-align: center;
+  max-width: 60rem;
+  margin-inline: auto;
+  gap: var(--sp-5);
+}
+.hero--stage .display {
+  font-size: clamp(2.6rem, 9vw, 7.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  /* تیترِ درشت روی نورِ متحرک به یک هاله‌ی نازک نیاز دارد تا لبه‌هایش گم نشود */
+  text-shadow: light-dark(none, 0 2px 40px rgba(0,0,0,.5));
+}
+.hero--stage .lead {
+  max-width: 46ch !important;
+  font-size: clamp(1rem, 1.9vw, 1.3rem);
+}
+.hero--stage .hero__bullets { justify-content: center; }
+
+/* ── صحنه: پنل زیرِ تیتر، بریده از لبه‌ی پایین ── */
+.hero__stage {
+  position: relative;
+  z-index: 1;
+  /* فاصله‌ی سخاوتمندانه: با مقدارِ کم، گوشه‌های صحنه‌ی کج‌شده روی ردیفِ
+     ویژگی‌ها می‌افتادند (در مرورگر دیده شد). */
+  margin-block-start: clamp(var(--sp-12), 9vh, var(--sp-24));
+  margin-inline: auto;
+  inline-size: min(100%, 78rem);
+  padding-inline: var(--sp-5);
+  /* بریدگی: پایینِ صحنه محو می‌شود تا حس کند ادامه دارد */
+  mask-image: linear-gradient(to bottom, #000 74%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 74%, transparent 100%);
+}
+.hero__stage-inner {
+  transform: perspective(1800px) rotateX(5deg);
+  transform-origin: 50% 0%;
+  filter: drop-shadow(0 40px 80px light-dark(rgba(90,50,20,.22), rgba(0,0,0,.6)));
+}
+@media (max-width: 720px) {
+  /* روی موبایل چرخشِ سه‌بعدی فقط ارتفاع می‌خورد و چیزی اضافه نمی‌کند */
+  .hero__stage-inner { transform: none; }
+  .hero--stage { min-block-size: auto; }
+}
+
+/* ── نشانگرِ اسکرول ── */
+.hero__scroll {
+  position: absolute;
+  inset-block-end: var(--sp-6);
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  z-index: 2;
+  inline-size: 1px;
+  block-size: 46px;
+  overflow: hidden;
+  background: var(--border);
+  pointer-events: none;
+}
+.hero__scroll-line {
+  display: block;
+  inline-size: 100%;
+  block-size: 45%;
+  background: linear-gradient(to bottom, transparent, var(--brand));
+  animation: heroScroll 2.1s var(--ease) infinite;
+}
+@keyframes heroScroll {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(230%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero__scroll-line { animation: none; }
+  .hero__stage-inner { transform: none; }
+}

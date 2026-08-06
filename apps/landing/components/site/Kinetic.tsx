@@ -123,14 +123,25 @@ export function Magnetic({
     let raf = 0;
     let tx = 0, ty = 0, cx = 0, cy = 0;
 
+    // بیشینه‌ی جابه‌جایی. دکمه باید «کشیده شود»، نه اینکه پرواز کند: نسخه‌ی
+    // قبلی شعاعِ ۱٫۱ برابرِ عرض داشت و کشش خطی بود، یعنی از فاصله‌ی ۲۰۰px هم
+    // ۶۴px جابه‌جا می‌شد و روی متنِ بالای خودش می‌افتاد (در مرورگر دیده شد).
+    const MAX_PULL = 16;
+    const clamp = (v: number) => (v > MAX_PULL ? MAX_PULL : v < -MAX_PULL ? -MAX_PULL : v);
+
     const onMove = (e: PointerEvent) => {
       const r = el.getBoundingClientRect();
       const dx = e.clientX - (r.left + r.width / 2);
       const dy = e.clientY - (r.top + r.height / 2);
       const dist = Math.hypot(dx, dy);
-      const radius = Math.max(r.width, r.height) * 1.1;
-      if (dist < radius) { tx = dx * strength; ty = dy * strength; }
-      else { tx = 0; ty = 0; }
+      const radius = Math.min(Math.max(r.width, r.height) * 0.9, 180);
+      if (dist < radius) {
+        // افتِ خطی تا لبه: روی مرزِ شعاع کشش صفر می‌شود، پس دکمه هنگامِ
+        // ورود/خروجِ اشاره‌گر نمی‌پرد.
+        const pull = strength * (1 - dist / radius);
+        tx = clamp(dx * pull);
+        ty = clamp(dy * pull);
+      } else { tx = 0; ty = 0; }
     };
     const onLeave = () => { tx = 0; ty = 0; };
 
