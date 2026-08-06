@@ -84,13 +84,16 @@
           <label>کجا</label>
           <input id="sQ" placeholder="رستوران، آشپزی، محله..." onkeydown="if(event.key==='Enter')doSearch()">
         </div>
+        <!-- گزینه‌های این دو از js/data/booking.js پر می‌شوند (تاریخِ واقعیِ ۶۰ روز)
+             و مقدارشان مستقیم در زمینه‌ی رزرو می‌نشیند. پیش از این هر دو ثابت
+             بودند و هیچ‌جا خوانده نمی‌شدند — کنترلی که کار نمی‌کند. -->
         <div class="search-field">
           <label>کِی</label>
-          <select id="sWhen"><option>امروز</option><option>فردا</option><option>آخر هفته</option></select>
+          <select id="sWhen" onchange="syncSearchCtx()"></select>
         </div>
         <div class="search-field">
           <label>چند نفر</label>
-          <select id="sParty"><option>۲ نفر</option><option>۱ نفر</option><option>۳ نفر</option><option>۴ نفر</option><option>۵+ نفر</option></select>
+          <select id="sParty" onchange="syncSearchCtx()"></select>
         </div>
         <button class="search-go" onclick="doSearch()" aria-label="جستجو">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>

@@ -207,6 +207,11 @@ img{display:block;max-width:100%}
   border-radius:inherit;-webkit-appearance:none;appearance:none}
 .rc-open:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
 .rc:has(.rc-open:hover) .rc-bg{transform:scale(1.06)}
+/* پنل روی .rc-open می‌نشیند (z-index 2)، پس بدونِ این، کلیک روی نامِ رستوران —
+   طبیعی‌ترین جای لمس — به هیچ‌جا نمی‌رسید. متنِ پنل تعاملی نیست، فقط چیپ‌های
+   ساعت هستند؛ همان‌ها کلیک را پس می‌گیرند و بقیه به دکمه‌ی زیر می‌افتد. */
+.rc-panel,.rc-emoji{pointer-events:none}
+.rc-slots,.rc-slot{pointer-events:auto}
 .rc-emoji{position:absolute;top:16px;right:18px;z-index:3;font-size:46px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));
   transition:transform .3s var(--spring)}
 .rc:hover .rc-emoji{transform:scale(1.12) rotate(6deg)}

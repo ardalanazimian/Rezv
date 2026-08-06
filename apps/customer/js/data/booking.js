@@ -4,19 +4,54 @@
 //  رفتار دقیقاً همان قبل است؛ فقط از یک فایلِ مجزا export می‌شود.
 // ═══════════════════════════════════════════════════════════
 import { API, USER, isLoggedIn, userName } from '../api.js';
-import { closeSheet, esc, openLogin, openSheet, setAfterLogin, toApiDateTime, toast } from '../auth.js';
+import { closeSheet, esc, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
 import { fmtFa } from './discover.js';
-import { TRIPS, bk, pts, setBk, setPts } from './seed.js';
+import { TRIPS, bk, bookingCtx, pts, setBk, setBookingCtx, setPts, todayISO } from './seed.js';
 import { R } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
+
+// ═══════════════════════════════════════════════════════════
+//  تاریخ‌های قابلِ رزرو
+//
+//  پیش از این چهار گزینه‌ی ثابت بود: امروز، فردا، پنجشنبه، جمعه. یعنی برای
+//  اپی که کارش رزروِ میز است، «سالگردمون ماه بعد» اصلاً ممکن نبود.
+//
+//  حالا ۶۰ روزِ واقعی. برچسب‌ها با تقویمِ شمسی ساخته می‌شوند (Intl با تقویمِ
+//  fa-IR این را بومی می‌دهد؛ نیازی به کتابخانه‌ی تبدیلِ تاریخ نیست) و مقدارِ
+//  هر گزینه مستقیماً همان ISO است که بک‌اند می‌خواهد — پس هیچ تبدیلِ حدسی
+//  بینِ «کلمه‌ی فارسی» و «تاریخِ واقعی» باقی نمی‌ماند.
+// ═══════════════════════════════════════════════════════════
+const HORIZON_DAYS = 60;
+const faDate = new Intl.DateTimeFormat('fa-IR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+export function dateOptions(){
+  const out = [];
+  const base = new Date(); base.setHours(12, 0, 0, 0); // ظهر: از پرشِ ساعتِ تابستانی مصون است
+  for (let i = 0; i < HORIZON_DAYS; i++){
+    const d = new Date(base); d.setDate(base.getDate() + i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const label = i === 0 ? 'امروز' : i === 1 ? 'فردا' : faDate.format(d);
+    out.push({ iso, label });
+  }
+  return out;
+}
+const PARTY_MAX = 12;
 
 // شیت رزرو که با دکمه‌ی پایین باز می‌شود (تاریخ/ساعت/نفر)
 export function openBookSheet(id){
   const r=R.find(x=>x.id===id);
+  // پیش‌فرض‌ها از زمینه‌ی مشترک می‌آیند، نه از صفر — اگر کاربر قبلاً گفته
+  // «پنجشنبه، ۴ نفر»، همان‌جا می‌ماند و لازم نیست دوباره واردش کند.
+  const dates = dateOptions();
+  const dateSel = dates.some(d=>d.iso===bookingCtx.date) ? bookingCtx.date : dates[0].iso;
   openSheet(`
     <div class="bs-head"><div class="bs-title">رزرو میز</div><div class="bs-rest">${esc(r.n)}</div></div>
-    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${id})"><option value="today">امروز</option><option value="tomorrow">فردا</option><option value="thu">پنجشنبه</option><option value="fri">جمعه</option></select></div>
-    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots(${id})"><option>۲ نفر</option><option>۱ نفر</option><option>۳ نفر</option><option>۴ نفر</option><option>۵ نفر</option><option>۶ نفر</option></select></div>
+    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${id})">${
+      dates.map(d=>`<option value="${d.iso}"${d.iso===dateSel?' selected':''}>${esc(d.label)}</option>`).join('')
+    }</select></div>
+    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots(${id})">${
+      Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
+    }</select></div>
     <div class="bw-field"><label>ساعت</label><select id="bwTime"><option>در حال بررسی...</option></select></div>
     <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook(${id})">بررسی میزهای موجود</button>
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">هنوز پولی پرداخت نمی‌کنی</div>
@@ -33,9 +68,11 @@ export async function refreshSlots(id){
     sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');
     return;
   }
-  const dateVal=document.getElementById('bwDate')?.value||'today';
-  const partyVal=parseInt(String(document.getElementById('bwParty')?.value||'۲').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))||2;
-  const apiDate=dateValToISO(dateVal);
+  // مقدارِ select حالا خودش ISO است — نه کلمه‌ای که باید حدس زده شود.
+  const apiDate=document.getElementById('bwDate')?.value||todayISO();
+  const partyVal=parseInt(document.getElementById('bwParty')?.value,10)||2;
+  // هر تغییرِ کاربر بلافاصله در زمینه‌ی مشترک می‌نشیند تا رستورانِ بعدی هم بداند
+  setBookingCtx({ date: apiDate, party: partyVal });
   sel.innerHTML='<option>در حال بررسی...</option>';
   const res=await API.get(`/restaurants/${r.slug}/availability?date=${apiDate}&party=${partyVal}`);
   if(res.ok && Array.isArray(res.data?.slots)){
@@ -54,21 +91,29 @@ export async function refreshSlots(id){
     sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');
   }
 }
-export function dateValToISO(v){
-  const d=new Date();
-  if(v==='tomorrow')d.setDate(d.getDate()+1);
-  else if(v==='thu'){const dow=d.getDay();d.setDate(d.getDate()+((4-dow+7)%7||7));}
-  else if(v==='fri'){const dow=d.getDay();d.setDate(d.getDate()+((5-dow+7)%7||7));}
-  return d.toISOString().slice(0,10);
-}
 export function faTime(t){return (t||'').replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);}
-export function quickBook(id,slot){setBk({id,date:'امروز',time:slot,party:'۲ نفر'});openSheet(bookStep2(R.find(x=>x.id===id)))}
+/** برچسبِ فارسیِ یک تاریخِ ISO — برای نمایش در خلاصه و سفرها. */
+export function labelForISO(iso){
+  const hit = dateOptions().find(d=>d.iso===iso);
+  if (hit) return hit.label;
+  const [y,m,d] = String(iso||'').split('-').map(Number);
+  return (y && m && d) ? faDate.format(new Date(y, m-1, d, 12)) : iso;
+}
+// رزروِ یک‌ضربی از چیپِ ساعتِ روی کارت. تاریخ و تعداد از زمینه‌ی مشترک می‌آید،
+// نه «امروز / ۲ نفر»ِ ثابت — وگرنه چیپ بی‌صدا انتخابِ کاربر را دور می‌ریخت.
+export function quickBook(id,slot){
+  setBk({id,date:labelForISO(bookingCtx.date),dateVal:bookingCtx.date,time:slot,
+         timeRaw:String(slot).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
+         party:`${fmtFa(bookingCtx.party)} نفر`,partyN:bookingCtx.party});
+  openSheet(bookStep2(R.find(x=>x.id===id)));
+}
 export function startBook(id){
   const t=document.getElementById('bwTime').value;
   if(!t){toast('','برای این روز ساعت خالی نیست — روز دیگه‌ای انتخاب کن');return;}
-  const dateSel=document.getElementById('bwDate');
-  const dateLabel=dateSel.options[dateSel.selectedIndex].text;
-  setBk({id,date:dateLabel,dateVal:dateSel.value,time:faTime(t),timeRaw:t,party:document.getElementById('bwParty').value});
+  const iso=document.getElementById('bwDate').value;
+  const partyN=parseInt(document.getElementById('bwParty').value,10)||2;
+  setBookingCtx({ date: iso, party: partyN });
+  setBk({id,date:labelForISO(iso),dateVal:iso,time:faTime(t),timeRaw:t,party:`${fmtFa(partyN)} نفر`,partyN});
   openSheet(bookStep2(R.find(x=>x.id===id)));
 }
 export function bookStep2(r){
@@ -107,13 +152,12 @@ export async function confirmBook(id){
   const confirmBtn=sheetBody.querySelector('.btn-primary');
   if(confirmBtn){confirmBtn.disabled=true;confirmBtn.textContent='در حال ثبت رزرو...';}
 
-  // تلاش برای ثبت در بک‌اند — اگر مقدار خام از availability داریم، دقیق‌تره
-  const apiDT = (bk.timeRaw && bk.dateVal) ? { date: dateValToISO(bk.dateVal), time: bk.timeRaw } : toApiDateTime(bk.date, bk.time);
+  // تاریخ دیگر حدس زده نمی‌شود: bk.dateVal همان ISO است که کاربر انتخاب کرده.
   const res=await API.post('/reservations',{
     restaurant_id:id,
-    date:apiDT.date,
-    time:apiDT.time,
-    party_size:parseInt(String(bk.party).replace(/[^\d۰-۹]/g,'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))||2,
+    date:bk.dateVal||todayISO(),
+    time:bk.timeRaw||String(bk.time||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
+    party_size:bk.partyN||2,
     notify_sms:true,
   });
 
@@ -152,6 +196,27 @@ export async function confirmBook(id){
 }
 export function copyCode(c){const done=()=>toast('⧉','کد کپی شد');if(navigator.clipboard?.writeText)navigator.clipboard.writeText(c).then(done).catch(done);else done()}
 
+// ── نوارِ جست‌وجوی صفحه‌ی اصلی ──
+// «کِی» و «چند نفر» پیش از این سه/پنج گزینه‌ی ثابت داشتند که هیچ‌کجا خوانده
+// نمی‌شد؛ کاربر انتخاب می‌کرد و هیچ اتفاقی نمی‌افتاد. حالا همان زمینه‌ی رزرو را
+// می‌نویسند، پس انتخابشان تا شیتِ رزرو و تا رستورانِ بعدی دنبال می‌آید.
+export function initSearchCtx(){
+  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
+  if(!when||!party) return;
+  const dates=dateOptions();
+  const sel=dates.some(d=>d.iso===bookingCtx.date)?bookingCtx.date:dates[0].iso;
+  when.innerHTML=dates.map(d=>`<option value="${d.iso}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');
+  party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)
+    .map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('');
+}
+export function syncSearchCtx(){
+  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
+  setBookingCtx({
+    date: when?.value || bookingCtx.date,
+    party: parseInt(party?.value,10) || bookingCtx.party,
+  });
+}
+
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
 window.openBookSheet = openBookSheet;
 window.quickBook = quickBook;
@@ -160,3 +225,8 @@ window.bookStep3 = bookStep3;
 window.toBookStep3 = toBookStep3;
 window.confirmBook = confirmBook;
 window.copyCode = copyCode;
+window.refreshSlots = refreshSlots;
+window.syncSearchCtx = syncSearchCtx;
+// نوارِ جست‌وجو باید همان اول پر شود، وگرنه دو selectِ خالی دیده می‌شوند.
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSearchCtx);
+else initSearchCtx();
