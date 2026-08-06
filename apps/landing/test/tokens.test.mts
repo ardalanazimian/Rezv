@@ -22,6 +22,7 @@ const site = readFileSync(new URL('../app/site.css', import.meta.url), 'utf8');
 const RUNTIME = new Set([
   '--i',            // نمایه‌ی تیغه‌های پرده‌ی ورود (style خطی)
   '--n',            // نمایه‌ی درها در صفحه‌ی ورود (style خطی)
+  '--open',         // کلیدِ ۰/۱ حالتِ بازِ در — در همان بلوک با انتخابگرِ حالت ست می‌شود
   '--mx', '--my',   // مکانِ اشاره‌گر روی کارتِ سه‌بعدی
   '--kx-mx', '--kx-my',
   '--progress',     // نوارِ پیشرفتِ اسکرول

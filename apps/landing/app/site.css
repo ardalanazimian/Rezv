@@ -1883,11 +1883,27 @@
 
 /* درِ باز جلو می‌آید، بقیه عقب می‌روند. همین «عقب رفتن» است که انتخاب را
    بدونِ هیچ برچسبی معلوم می‌کند. */
+/* ── حالتِ «باز» ──
+   یک گروهِ انتخابگرِ واحد برای هر سه حالت. ویژگی (specificity) عمداً یکسان و
+   بالاتر از قاعده‌ی کم‌رنگ‌کننده است:
+     .doors:hover .door        → (۰،۳،۰)  کم‌رنگ‌کننده
+     .doors:hover .door:hover  → (۰،۴،۰)  برنده
+   نسخه‌ی قبلی «.door:hover» بود (۰،۲،۰) و می‌باخت، یعنی درِ زیرِ اشاره‌گر هم
+   کم‌رنگ می‌شد (در مرورگر اندازه‌گیری شد: ۰٫۵۸ به‌جای ۱٫۰۰).
+
+   --open یک کلیدِ ۰/۱ است که به فرزندها ارث می‌رسد، پس آیکن و پیکان بدونِ
+   تکرارِ همین سه انتخابگر واکنش نشان می‌دهند. */
+.door { --open: 0; }
+
 .doors:hover .door,
 .doors:focus-within .door { opacity: 0.58; }
-.door.is-open {
+
+.doors:hover .door:hover,
+.doors:focus-within .door:focus-visible,
+.doors:not(:hover):not(:focus-within) .door:first-child {
+  --open: 1;
   flex-grow: 1.75;
-  opacity: 1 !important;
+  opacity: 1;
   border-color: color-mix(in srgb, var(--brand) 55%, transparent);
   transform: translateY(-6px);
   box-shadow: 0 26px 60px light-dark(rgba(90,50,20,.16), rgba(0,0,0,.5));
@@ -1905,7 +1921,7 @@
   z-index: 0;
   border-radius: inherit;
   padding: 1.5px;
-  opacity: 0;
+  opacity: var(--open);
   transition: opacity 340ms var(--ease);
   background: conic-gradient(from var(--door-angle, 0deg),
     transparent 0deg,
@@ -1918,12 +1934,13 @@
   -webkit-mask-composite: xor;
           mask-composite: exclude;
   pointer-events: none;
+  /* چرخشِ زاویه‌ی گرادیان، نه چرخشِ خودِ عنصر — عنصر ماسک دارد و rotate آن
+     ماسک را هم می‌چرخاند. background-image بینِ دو مقدار درون‌یابی نمی‌شود،
+     پس زاویه باید یک متغیرِ ثبت‌شده باشد (@property بالای همین بخش). */
+  animation: doorSpin 4.5s linear infinite;
 }
-.door.is-open .door__edge { opacity: 1; animation: doorSpin 4.5s linear infinite; }
-/* چرخشِ زاویه‌ی گرادیان، نه چرخشِ خودِ عنصر — عنصر ماسک دارد و rotate آن
-   ماسک را هم می‌چرخاند. background-image بینِ دو مقدار درون‌یابی نمی‌شود،
-   پس زاویه باید یک متغیرِ ثبت‌شده باشد. */
 @keyframes doorSpin { to { --door-angle: 360deg; } }
+
 /* محتوای در باید بالای حلقه بماند */
 .door > *:not(.door__edge) { position: relative; z-index: 1; }
 
@@ -1933,10 +1950,10 @@
   line-height: 1;
   letter-spacing: -0.04em;
   color: transparent;
-  -webkit-text-stroke: 1.5px var(--border-strong, var(--border));
+  -webkit-text-stroke: 1.5px color-mix(in srgb,
+    var(--brand) calc(var(--open) * 70%), var(--border-strong, var(--border)));
   transition: -webkit-text-stroke-color 340ms var(--ease);
 }
-.door.is-open .door__num { -webkit-text-stroke-color: color-mix(in srgb, var(--brand) 70%, transparent); }
 
 .door__ic {
   inline-size: 46px;
@@ -1947,11 +1964,13 @@
   background: var(--surface-2);
   color: var(--text-2);
   transition: background 340ms var(--ease), color 340ms var(--ease), transform 420ms cubic-bezier(0.22,1,0.28,1);
+  transform: scale(calc(1 + 0.08 * var(--open))) rotate(calc(-4deg * var(--open)));
 }
-.door.is-open .door__ic {
+.doors:hover .door:hover .door__ic,
+.doors:focus-within .door:focus-visible .door__ic,
+.doors:not(:hover):not(:focus-within) .door:first-child .door__ic {
   background: linear-gradient(135deg, var(--ember-500), var(--brass-500));
   color: #fff;
-  transform: scale(1.08) rotate(-4deg);
 }
 
 .door__title { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.015em; }
@@ -1959,7 +1978,6 @@
   font-size: var(--fs-sm);
   color: var(--text-2);
   line-height: 1.9;
-  /* توضیح فقط روی درِ باز کامل باز می‌شود — بقیه فشرده می‌مانند */
   flex: 1;
 }
 
@@ -1973,14 +1991,13 @@
 .door__go {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  /* پیکان با بازشدنِ در جلو می‌رود */
+  gap: calc(6px + 6px * var(--open));
   font-weight: 700;
   font-size: var(--fs-sm);
   color: var(--brand);
-  /* پیکان با بازشدنِ در جلو می‌رود */
   transition: gap 320ms var(--ease);
 }
-.door.is-open .door__go { gap: 12px; }
 
 .door:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 
@@ -1989,8 +2006,9 @@
    هر سه در باز و هم‌اندازه می‌مانند. */
 @media (max-width: 900px) {
   .doors { flex-direction: column; max-inline-size: 34rem; }
-  .door, .doors:hover .door, .doors:focus-within .door { opacity: 1; flex-grow: 1; }
-  .door.is-open { transform: none; }
+  .door, .doors:hover .door, .doors:focus-within .door,
+  .doors:hover .door:hover, .doors:focus-within .door:focus-visible,
+  .doors:not(:hover):not(:focus-within) .door:first-child { opacity: 1; flex-grow: 1; transform: none; }
   .gate { min-block-size: auto; }
 }
 @media (hover: none) {
@@ -1999,10 +2017,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .door { animation: none; transition: none; }
-  .door.is-open { transform: none; flex-grow: 1; }
+  .doors:hover .door:hover, .doors:focus-within .door:focus-visible,
+  .doors:not(:hover):not(:focus-within) .door:first-child { transform: none; flex-grow: 1; }
   .doors:hover .door, .doors:focus-within .door { opacity: 1; }
-  /* ویژگیِ انتخابگر باید با «.door.is-open .door__edge» برابر باشد وگرنه
-     قاعده‌ی کاهشِ حرکت می‌بازد (اندازه‌گیری شد: animationName=doorSpin). */
-  .door.is-open .door__edge { animation: none; }
-  .door__ic, .door.is-open .door__ic { transform: none; }
+  /* ویژگیِ انتخابگر باید با انتخابگرِ حالتِ باز برابر باشد وگرنه قاعده‌ی
+     کاهشِ حرکت می‌بازد (اندازه‌گیری شد: animationName=doorSpin). */
+  .door__edge { animation: none; }
+  .door__ic { transform: none; }
 }

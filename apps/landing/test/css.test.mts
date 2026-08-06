@@ -90,6 +90,14 @@ describe('دروازه‌ی ورود', () => {
     assert.match(m[0], /\bbackwards\b/);
   });
 
+  // حالتِ باز نباید به state وابسته باشد: با useState افکت تا پیش از
+  // hydration مرده بود و در رندرِ ایستا اصلاً کار نمی‌کرد (در نسخه‌ی آفلاین
+  // دیده شد: درِ باز اشاره‌گر را دنبال نمی‌کرد).
+  test('بازشدنِ در با CSS انجام می‌شود، نه با کلاسی که JS می‌گذارد', () => {
+    assert.doesNotMatch(site, /\.door\.is-open/);
+    assert.match(site, /\.doors:not\(:hover\):not\(:focus-within\)\s+\.door:first-child/);
+  });
+
   test('حلقه‌ی نورانی با ماسک ساخته می‌شود، نه با روکشِ کدر', () => {
     // روکش روی پس‌زمینه‌ی نیمه‌شفافِ شیشه‌ای کار نمی‌کرد و گرادیان از پشتش
     // دیده می‌شد (یک گُوِه‌ی نارنجی روی کلِ کارت).
@@ -100,6 +108,6 @@ describe('دروازه‌ی ورود', () => {
     // «.door__edge { animation: none }» به‌تنهایی می‌بازد چون
     // «.door.is-open .door__edge» ویژگیِ بالاتری دارد.
     const rm = site.slice(site.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-    assert.match(rm, /\.door\.is-open\s+\.door__edge\s*\{\s*animation:\s*none/);
+    assert.match(rm, /\.door__edge\s*\{\s*animation:\s*none/);
   });
 });

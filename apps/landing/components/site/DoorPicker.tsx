@@ -12,19 +12,14 @@
 //  می‌شوند. چشم بدونِ هیچ راهنمایی می‌فهمد کجاست. حرکت اینجا تزئین نیست —
 //  خودِ بازخوردِ انتخاب است.
 //
-//  ── دسترس‌پذیری، که معمولاً قربانیِ همین افکت‌ها می‌شود ──
-//   • هر در یک لینکِ واقعی است، نه div با onClick.
-//   • با Tab بینِ درها می‌روید و همان دری که فوکوس دارد باز می‌شود — یعنی
-//     کاربرِ کیبورد دقیقاً همان اطلاعاتی را می‌بیند که کاربرِ ماوس.
-//   • کلیدهای جهت‌دار هم بینِ درها جابه‌جا می‌شوند (در RTL، راست و چپ
-//     جابه‌جا شده‌اند).
-//   • با prefers-reduced-motion هیچ دری باز و بسته نمی‌شود؛ هر سه هم‌اندازه
-//     و کاملاً خوانا می‌مانند.
-//   • روی تاچ هم هر سه باز می‌مانند: «باز شدن با هاور» روی موبایل معنا
-//     ندارد و فقط یک لمسِ اضافه تحمیل می‌کند.
+//  ── چرا حالتِ باز در CSS است، نه در state ──
+//  با useState، افکت تا پیش از hydration مرده بود و در هر رندرِ ایستا
+//  (مثلِ نسخه‌ی آفلاینِ سایت) اصلاً کار نمی‌کرد. :hover و :focus-within
+//  همان کار را بدونِ هیچ جاوااسکریپتی انجام می‌دهند. این کامپوننت فقط برای
+//  یک چیز کلاینتی مانده: جابه‌جایی با کلیدهای جهت‌دار.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Icon } from './Icon';
 
@@ -43,11 +38,10 @@ export interface Door {
 const FA = ['۰۱', '۰۲', '۰۳', '۰۴'];
 
 export function DoorPicker({ doors }: { doors: Door[] }) {
-  const [active, setActive] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // کلیدهای جهت‌دار بینِ درها. در RTL جهتِ بصری برعکسِ ترتیبِ منطقی است، پس
-  // ArrowLeft یعنی «بعدی».
+  // ArrowLeft یعنی «بعدی». (Tab هم مثلِ همیشه کار می‌کند؛ این فقط میان‌بر است.)
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -65,7 +59,7 @@ export function DoorPicker({ doors }: { doors: Door[] }) {
   }, []);
 
   return (
-    <div className="doors" ref={wrapRef} data-active={active}>
+    <div className="doors" ref={wrapRef}>
       {doors.map((d, i) => {
         const href = d.href ?? d.fallbackHref;
         const external = Boolean(d.href);
@@ -73,11 +67,9 @@ export function DoorPicker({ doors }: { doors: Door[] }) {
           <Link
             key={d.key}
             href={href}
-            className={`door${i === active ? ' is-open' : ''}`}
+            className="door"
             style={{ '--n': i } as React.CSSProperties}
             {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-            onPointerEnter={() => setActive(i)}
-            onFocus={() => setActive(i)}
           >
             {/* حاشیه‌ی متحرک فقط روی درِ باز — یک لایه‌ی جدا تا انیمیشنش
                 رویِ خودِ کارت رندرِ دوباره تحمیل نکند. */}
