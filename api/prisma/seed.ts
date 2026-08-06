@@ -71,6 +71,8 @@ async function main() {
 
     // ── ساخت ۱۵ مشتری با عضویت باشگاه و رزرو، برای داده‌ی واقعی آنالیز ──
     const memberCount = r.slug === 'ava' ? 8 : 15; // آوا کمتر (جدیدتر)
+    // هر (میز، روز) فقط یک رزرو — در سطح رستوران مشترک است تا constraint رد نکند
+    const usedDayTable = new Set<string>();
     for (let i = 0; i < memberCount; i++) {
       userCounter++;
       const phone = `+98912${String(1000000 + userCounter).slice(-7)}`;
@@ -96,13 +98,19 @@ async function main() {
 
       // ── رزروها: تعداد متغیر تا آنالیز رفتار معنادار شود ──
       // بعضی ۱ بار، بعضی چند بار، بعضی وفادار
+      // ⚠️ از تکرارِ (میز، تاریخ) اجتناب می‌شود تا constraint «no_table_overlap»
+      //    رد نکند — هر میز در هر روز فقط یک اسلات ۲ساعته می‌گیرد.
       const visitCount = i < 4 ? 1 : i < 10 ? Math.floor(Math.random() * 3) + 2 : Math.floor(Math.random() * 4) + 5;
-      for (let v = 0; v < visitCount; v++) {
+      let v = 0;
+      while (v < visitCount) {
         const daysAgo = Math.floor(Math.random() * 60); // در ۲ ماه گذشته
         const start = new Date(); start.setDate(start.getDate() - daysAgo);
         start.setHours(18 + Math.floor(Math.random() * 4), [0, 30][Math.floor(Math.random() * 2)], 0, 0);
         const end = new Date(start); end.setHours(start.getHours() + 2);
         const table = rand(rest.tables);
+        const key = start.toISOString().slice(0, 10) + ':' + table.id;
+        if (usedDayTable.has(key)) continue; // این میز در این روز پر است — جای دیگری امتحان کن
+        usedDayTable.add(key);
         await db.reservation.create({
           data: {
             code: 'RZ' + Math.random().toString(36).slice(2, 8).toUpperCase(),
@@ -112,21 +120,48 @@ async function main() {
             status: daysAgo < 1 ? 'confirmed' : 'arrived', source: 'app',
           },
         });
+        v++;
       }
+    }
+
+    // ── همگام‌سازیِ شمارنده‌ی کدِ باشگاه با بیشترینِ کدِ ساخته‌شده ──
+    // ⚠️ بدونِ این، createWalkin/createReservation از nextValue پیش‌فرضِ ۱۰۰۲ شروع
+    //    می‌کردند و با کدِ seeded (مثلاً VIS-1001) در constraintِ
+    //    «club_members(restaurant_id, code)» تداخل می‌کردند و ۵۰۰ می‌دادند.
+    const maxClub = await db.clubMember.findFirst({
+      where: { restaurantId: rest.id },
+      orderBy: { code: 'desc' },
+      select: { code: true },
+    });
+    if (maxClub) {
+      const maxNum = parseInt(maxClub.code.split('-')[1] ?? '0', 10);
+      await db.clubCodeCounter.upsert({
+        where: { restaurantId: rest.id },
+        create: { restaurantId: rest.id, nextValue: maxNum + 1 },
+        update: { nextValue: maxNum + 1 },
+      });
     }
 
     // ── چند رزرو امروز و فردا (برای صفحه‌ی رزروهای پنل) ──
     const todayUsers = await db.clubMember.findMany({ where: { restaurantId: rest.id }, take: 5, include: { user: true } });
+    // هر رزرو امروز/فردا روی میزِ متفاوت تا تداخلِ constraint رخ ندهد
     for (let i = 0; i < todayUsers.length; i++) {
       const isToday = i < 3;
       const start = new Date();
       if (!isToday) start.setDate(start.getDate() + 1);
       start.setHours(19 + i % 3, [0, 30][i % 2], 0, 0);
       const end = new Date(start); end.setHours(start.getHours() + 2);
+      let table = rest.tables[i];
+      let tk = start.toISOString().slice(0, 10) + ':' + table.id;
+      if (usedDayTable.has(tk)) {
+        table = rest.tables.find((t) => !usedDayTable.has(start.toISOString().slice(0, 10) + ':' + t.id)) ?? table;
+        tk = start.toISOString().slice(0, 10) + ':' + table.id;
+      }
+      usedDayTable.add(tk);
       await db.reservation.create({
         data: {
           code: 'RZ' + Math.random().toString(36).slice(2, 8).toUpperCase(),
-          restaurantId: rest.id, tableId: rest.tables[i].id, userId: todayUsers[i].userId,
+          restaurantId: rest.id, tableId: table.id, userId: todayUsers[i].userId,
           partySize: Math.floor(Math.random() * 4) + 2,
           slotStart: start, slotEnd: end,
           status: isToday && i === 0 ? 'arrived' : 'confirmed', source: 'app',

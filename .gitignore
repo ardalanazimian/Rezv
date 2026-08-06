@@ -58,3 +58,5 @@ RezervnoOSv2/
 
 # فایل‌های موقتِ ابزارهای AI/ادیتور
 .copilot-temp/
+
+.idea/

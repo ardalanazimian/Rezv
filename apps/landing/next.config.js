@@ -3,6 +3,10 @@
 module.exports = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // نصبِ زیرپوشه (مثلِ rezervno.local/landing) — از env می‌آید؛ خالی = ریشه.
+  basePath: process.env.BASE_PATH || '',
+  // دسترسی به dev server از طریقِ دامنه‌ی محلی (برعکسِ localhost).
+  allowedDevOrigins: ['rezervno.local'],
 
   images: {
     // AVIF اول: برای عکسِ غذا و فضا معمولاً ۲۰–۳۰٪ کوچک‌تر از WebP است و

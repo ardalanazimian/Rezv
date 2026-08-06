@@ -993,7 +993,7 @@ html.cur-on .cur { opacity: 1; }
 .cur--ring.is-down { background: rgba(255, 255, 255, 0.3); }
 /* نشانگرِ سیستم فقط وقتی خاموش می‌شود که جایگزینش واقعاً ساخته شده باشد */
 html.has-cursor,
-html.has-cursor * { cursor: none !important; }
+/*html.has-cursor * { cursor: none !important; }*/
 /* ورودی‌های متنی استثنا هستند: caret بدونِ نشانگرِ متن قابلِ‌هدف‌گیری نیست */
 html.has-cursor :is(input, textarea, [contenteditable]) { cursor: text !important; }
 
