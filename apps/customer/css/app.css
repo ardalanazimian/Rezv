@@ -43,7 +43,11 @@
 /* ═══════════ تمِ روشن ═══════════ */
 [data-theme="light"]{
   --bg:#EEE9FA; --white:#FFFFFF;
-  --t1:#160F26; --t2:#5A5182; --t3:#948BB6;
+  /* --t3 در تمِ روشن ۲٫۶۷:۱ بود (اندازه‌گیری‌شده روی .hcard-meta، .event-desc و
+     برچسبِ .botnav-item) — زیرِ آستانه‌ی ۴٫۵ در WCAG 1.4.3 AA. همان رنگ‌مایه با
+     ۷۳٪ روشنایی: حالا ۴٫۶۰:۱ روی زمینه‌ی صفحه و ۵٫۴۷:۱ روی کارتِ سفید.
+     تمِ تاریک دست نخورد چون از قبل ۵٫۹۳:۱ بود. */
+  --t1:#160F26; --t2:#5A5182; --t3:#6C6585;
   --s-50:#FBFAFF; --s-100:#F4F1FC; --s-200:#ECE7F8; --s-300:#E0DAF0;
   --s-400:#948BB6; --s-500:#5A5182; --s-600:#433C66; --s-700:#2B2547; --s-900:#160F26;
   --border:rgba(22,15,38,.08); --border-strong:rgba(22,15,38,.14);
@@ -119,7 +123,7 @@ img{display:block;max-width:100%}
 .btn-ghost:hover{border-color:var(--border-strong);background:var(--s-50)}
 .btn-lg{padding:14px 26px;font-size:15px;min-height:50px;border-radius:var(--r)}
 .btn-block{width:100%}
-.btn-sm{padding:8px 14px;min-height:36px;font-size:13px;border-radius:var(--r-xs)}
+.btn-sm{padding:8px 14px;min-height:var(--touch-min);font-size:13px;border-radius:var(--r-xs)}
 
 /* ─────────── NAV (top, desktop) ─────────── */
 .nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.85);backdrop-filter:blur(16px) saturate(1.2);
@@ -167,7 +171,11 @@ img{display:block;max-width:100%}
 .search-field:hover{background:var(--s-50)}
 .search-field+.search-field{border-right:1px solid var(--border)}
 .search-field label{font-size:11px;font-weight:700;color:var(--t1);margin-bottom:1px}
-.search-field input,.search-field select{border:none;outline:none;background:none;font-size:13px;color:var(--t2);width:100%;cursor:pointer;padding:0}
+/* ورودی ۱۵px بود. تکیه‌کردن به «کلِ .search-field ناحیه‌ی لمس است» کافی نیست:
+   معیارِ ۲.۵.۵ خودِ عنصرِ تعاملی را می‌سنجد، و کاربر هم مستقیم به متن می‌زند. */
+.search-field input,.search-field select{border:none;outline:none;background:none;font-size:13px;color:var(--t2);width:100%;cursor:pointer;padding:0;
+  min-block-size:var(--touch-min);font-family:inherit}
+.search-field{justify-content:center}
 .search-go{width:48px;height:48px;border-radius:50%;background:var(--blue);border:none;cursor:pointer;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;color:#fff;transition:all var(--t);box-shadow:var(--sh-blue)}
 .search-go:hover{background:var(--blue-600);transform:scale(1.05)}
@@ -175,7 +183,8 @@ img{display:block;max-width:100%}
 /* ─────────── VIBE CHIPS ─────────── */
 .chips{display:flex;gap:9px;overflow-x:auto;padding:4px 0 8px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--white);border:1px solid var(--border);
+/* ۳۴px بود. min-block-size به‌جای padding تا ریتمِ عمودیِ ردیف به‌هم نریزد. */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;min-block-size:var(--touch-min);background:var(--white);border:1px solid var(--border);
   border-radius:50px;font-size:13px;font-weight:600;color:var(--t2);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all var(--t) var(--ease)}
 .chip:hover{border-color:var(--border-strong);color:var(--t1);transform:translateY(-1px);box-shadow:var(--sh-sm)}
 .chip.active{background:var(--s-900);border-color:var(--s-900);color:#fff}
@@ -191,6 +200,13 @@ img{display:block;max-width:100%}
 .rc:active{transform:scale(.99)}
 .rc-bg{position:absolute;inset:0;z-index:0;transition:transform .6s var(--ease)}
 .rc:hover .rc-bg{transform:scale(1.06)}
+/* دکمه‌ی کشیده: کلِ کارت را کلیک‌پذیر و — مهم‌تر — با کیبورد قابلِ فوکوس می‌کند.
+   z-index 1 یعنی زیرِ پنل (۲) و دکمه‌ی علاقه (۳) می‌ماند، پس چیپ‌های ساعت و
+   دکمه‌ی قلب همچنان کلیکِ خودشان را می‌گیرند. */
+.rc-open{position:absolute;inset:0;z-index:1;border:none;background:none;padding:0;cursor:pointer;
+  border-radius:inherit;-webkit-appearance:none;appearance:none}
+.rc-open:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
+.rc:has(.rc-open:hover) .rc-bg{transform:scale(1.06)}
 .rc-emoji{position:absolute;top:16px;right:18px;z-index:3;font-size:46px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));
   transition:transform .3s var(--spring)}
 .rc:hover .rc-emoji{transform:scale(1.12) rotate(6deg)}
@@ -199,12 +215,21 @@ img{display:block;max-width:100%}
   color:#fff;z-index:3;transition:transform var(--motion-base) var(--ease-spring)}
 .rc-fav:active{transform:scale(.88)}
 .rc-fav[aria-pressed="true"]{color:#FF4B7A}
+/* --grad-warm (#FF9A3B→#FF4B7A) با متنِ سفید ۲٫۱۱:۱ می‌داد — نشانی که کارِ
+   اصلی‌اش خوانده‌شدن است. همان دو رنگ‌مایه، اشباع‌شده و تیره‌تر: ۵٫۱۸:۱.
+   هاله‌ی رنگیِ اصلی در box-shadow می‌ماند تا گرمای بصری حفظ شود. */
 .rc-hotbadge{position:absolute;top:var(--sp-5);inset-inline-end:calc(var(--touch-min) + var(--sp-5));z-index:3;font-size:var(--fs-2xs);font-weight:800;color:#fff;padding:var(--sp-1) var(--sp-3);
-  border-radius:var(--radius-full);display:flex;align-items:center;gap:var(--sp-1);background:var(--grad-warm);box-shadow:0 6px 16px rgba(255,75,122,.5)}
+  border-radius:var(--radius-full);display:flex;align-items:center;gap:var(--sp-1);background:linear-gradient(135deg,#C2410C,#BE185D);box-shadow:0 6px 16px rgba(255,75,122,.5)}
 .rc-hotbadge.ai{background:var(--grad);inset-inline-end:var(--sp-3)}
-/* پنلِ شیشه‌ی شناور پایینِ کارت */
+/* پنلِ شیشه‌ی شناور پایینِ کارت
+   آلفای اسکریم عددی انتخاب شده، نه چشمی: با ۰٫۳۸ متنِ .rc-meta و .rc-slot روی
+   روشن‌ترین گرادیانِ پالت به ۱٫۳۲:۱ می‌رسید (نمونه‌برداریِ پیکسلی از رندرِ واقعی).
+   آلفا روی همه‌ی شش گرادیان و شش رنگِ متن حل شد؛ ۰٫۶۶ کمینه‌ای است که همه‌ی
+   متن‌ها را با حاشیه‌ی امن بالای آستانه‌ی خودشان می‌برد (ضعیف‌ترین ۱٫۳۲× آستانه).
+   backdrop-filter تضمینی نیست (بهینه‌سازِ CSS نسخه‌ی استاندارد را حذف می‌کند)،
+   پس خوانایی نباید به بلور تکیه کند — همین آلفا به‌تنهایی کافی است. */
 .rc-panel{position:relative;z-index:2;margin:0 12px 12px;border-radius:20px;padding:15px 16px;overflow:hidden;isolation:isolate;
-  background:rgba(14,10,26,.38);-webkit-backdrop-filter:blur(22px) saturate(200%);backdrop-filter:blur(22px) saturate(200%);
+  background:rgba(14,10,26,.66);-webkit-backdrop-filter:blur(22px) saturate(200%);backdrop-filter:blur(22px) saturate(200%);
   border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .rc-panel::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
   background:linear-gradient(140deg,rgba(255,255,255,.5),transparent 40%);
@@ -221,9 +246,12 @@ img{display:block;max-width:100%}
   display:grid;place-items:center;font-size:10px;background:rgba(255,255,255,.16)}
 .rc-social-t{font-size:12px;color:#dcd6f2;font-weight:600}.rc-social-t b{color:#fff}
 .rc-slots{display:flex;gap:8px;margin-top:13px}
-.rc-slot{padding:9px 14px;border-radius:13px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;
+/* چیپِ ساعت = CTAِ تبدیل. اندازه‌گیری شده بود ۶۳×۴۰px — زیرِ حداقلِ ۴۴px.
+   min-block-size به‌جای padding بزرگ می‌کند تا فاصله‌های داخلی به‌هم نریزد. */
+.rc-slot{padding:9px 14px;min-block-size:var(--touch-min);border-radius:13px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
   background:rgba(255,255,255,.14);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);
-  transition:transform .16s var(--spring)}
+  transition:transform .16s var(--spring);font-family:inherit}
 .rc-slot:active{transform:scale(.88)}
 .rc-slot.go{background:var(--grad);border:none;box-shadow:0 8px 20px rgba(106,75,255,.5)}
 
@@ -606,7 +634,12 @@ img{display:block;max-width:100%}
 .bw-field{border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;margin-bottom:10px;cursor:pointer;transition:border-color var(--t-fast)}
 .bw-field:hover{border-color:var(--border-strong)}
 .bw-field label{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:2px}
-.bw-field select,.bw-field input{border:none;outline:none;width:100%;font-size:14px;font-weight:600;color:var(--t1);background:none;cursor:pointer}
+/* اندازه‌گیری شده بود ۱۷px ارتفاع — روی ورودی‌های خودِ قیفِ رزرو، یعنی جایی که
+   خطای لمس مستقیماً تبدیل را از دست می‌دهد. کادرِ کلیک به ۴۴px می‌رسد بدونِ
+   اینکه ارتفاعِ بصریِ فیلد عوض شود (label بالای آن است، مجموع همچنان جمع‌وجور). */
+.bw-field select,.bw-field input{border:none;outline:none;width:100%;font-size:14px;font-weight:600;color:var(--t1);background:none;cursor:pointer;
+  min-block-size:var(--touch-min);font-family:inherit}
+.bw-field:focus-within{border-color:var(--blue)}
 
 /* ─────────── LOYALTY ─────────── */
 .loy-card{background:linear-gradient(125deg,var(--blue),var(--teal));border-radius:var(--r-2xl);padding:28px;color:#fff;position:relative;overflow:hidden;box-shadow:var(--sh-lg)}
@@ -798,9 +831,22 @@ img{display:block;max-width:100%}
 .occ-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
 .occ-row::-webkit-scrollbar{display:none}
 .occ-card{flex-shrink:0;width:104px;height:120px;border-radius:18px;padding:14px;cursor:pointer;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;transition:transform var(--t) var(--spring)}
+/* گرادیانِ هر کارت به‌صورتِ style خطی در HTML است و بعضی‌شان خیلی روشن‌اند
+   (مثلِ #f6d365→#fda085): متنِ سفید روی آن‌ها ۳٫۰۳:۱ اندازه‌گیری شد.
+   به‌جای عوض‌کردنِ دوازده رنگ — که هویتِ رنگیِ کارت‌ها را از بین می‌برد — یک
+   اسکریمِ یکنواخت زیرِ متن می‌نشیند. آلفا روی هر دوازده توقفِ گرادیان حل شد:
+   ۰٫۵۰ کمینه‌ای است که بدترین حالت را به ۴٫۶۱:۱ می‌رساند. */
+/* محتوا باید بالای اسکریمِ ::after بنشیند، وگرنه خودِ متن هم کم‌جان می‌شود. */
+.occ-card > *{position:relative;z-index:1}
 .occ-card:active{transform:scale(.96)}
 .occ-card.on{outline:3px solid var(--t1);outline-offset:2px}
-.occ-card::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.28))}
+/* اسکریمِ خوانایی. قبلاً «transparent 40% → rgba(0,0,0,.28)» بود و متنِ سفیدِ
+   .occ-label را روی گرادیان‌های روشن (مثلِ #f6d365→#fda085) به ۳٫۰۳:۱ می‌رساند.
+   آلفا روی هر دوازده توقفِ رنگِ کارت‌ها حل شد: ۰٫۵۰ کمینه‌ی قبولی است، اینجا
+   با حاشیه تا ۰٫۶۲ در پایین می‌رود چون متن همان‌جاست. بالای کارت سبک می‌ماند
+   تا رنگِ هویتیِ هر مناسبت دیده شود. */
+.occ-card::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(to top,rgba(12,8,24,.62) 0%,rgba(12,8,24,.52) 50%,rgba(12,8,24,.26) 100%)}
 .occ-emoji{font-size:30px;position:relative;filter:drop-shadow(0 3px 8px rgba(0,0,0,.25))}
 .occ-label{font-size:14px;font-weight:800;color:#fff;position:relative;line-height:1.2;text-shadow:0 1px 4px rgba(0,0,0,.3)}
 .occ-sub{font-size:11px;color:rgba(255,255,255,.9);position:relative;margin-top:2px;font-weight:600}

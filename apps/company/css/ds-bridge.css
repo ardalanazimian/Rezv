@@ -49,7 +49,9 @@
 }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-sm { min-height: 36px; font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
+/* ۳۶px زیرِ حداقلِ ۴۴px هر دو پلتفرم بود (WCAG 2.5.5). «کوچک» به عرض و وزنِ
+   بصری برمی‌گردد، نه به کوچک‌کردنِ ناحیه‌ی لمس. */
+.btn-sm { min-height: var(--touch-min); font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
 .btn-lg { min-height: 44px; font-size: var(--fs-lg); padding: var(--sp-3) var(--sp-6); }
 
 /* ── ۳) هم‌ترازیِ .inp (کلاسِ قدیمی) به استانداردِ .field-input ── */

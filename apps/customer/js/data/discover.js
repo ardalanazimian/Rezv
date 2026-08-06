@@ -31,8 +31,13 @@ export function cardHTML(r){
   const weekly = (r.reviews||0) >= 5 ? Math.max(3, Math.round((r.reviews||0)/8)) : 0;
   const avatars = Array.from({length: Math.min(3, Math.max(1, Math.ceil(weekly/4)))}, (_,i)=>i);
   const hot = r.rt >= 4.7 && (r.reviews||0) >= 80;
-  return `<article class="rc reveal" onclick="openRest(${r.id})">
+  // کارت خودش دکمه نمی‌شود چون داخلش دکمه دارد (تودرتوییِ نامعتبر). به‌جایش یک
+  // دکمه‌ی واقعیِ کشیده روی کلِ کارت می‌نشیند و z-indexِ ۱ می‌گیرد — یعنی زیرِ
+  // دکمه‌ی علاقه‌مندی (۳) و چیپ‌های ساعت (پنل، ۲). این تنها راهی است که هم با
+  // کیبورد قابلِ فوکوس باشد، هم ترتیبِ فوکوس منطقی بماند.
+  return `<article class="rc reveal">
     <div class="rc-bg" style="background:${GRAD[r.id]}"></div>
+    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${r.id})"></button>
     <span class="rc-emoji">${r.e}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
     <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${r.id},this);buzz&&buzz()">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
@@ -40,7 +45,7 @@ export function cardHTML(r){
       <div class="rc-top"><div class="rc-name">${r.n}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
       <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${weekly?`<div class="rc-social"><div class="rc-avas" aria-hidden="true">${avatars.map(()=>`<span class="avatar avatar-sm"></span>`).join('')}</div><div class="rc-social-t"><b>${fmtFa(weekly)} نفر</b> این هفته اومدن</div></div>`:''}
-      <div class="rc-slots">${r.slots.slice(0,3).map((s,i)=>`<span class="rc-slot ${i===0?'go':''}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');buzz&&buzz()">${s}</span>`).join('')}</div>
+      <div class="rc-slots">${r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');buzz&&buzz()">${s}</button>`).join('')}</div>
     </div>
   </article>`;
 }

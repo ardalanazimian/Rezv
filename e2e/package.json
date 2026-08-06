@@ -9,10 +9,12 @@
     "test:desktop": "playwright test --project=desktop-chrome",
     "test:booking": "playwright test booking",
     "test:ui": "playwright test --ui",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "audit": "node ux-audit.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
+    "pngjs": "^7.0.0",
     "serve": "^14.2.0"
   }
 }

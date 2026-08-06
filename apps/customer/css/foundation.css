@@ -41,7 +41,7 @@
 }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-.btn-sm { --btn-h: 36px; font-size: var(--fs-sm); padding: 0 var(--sp-3); }
+.btn-sm { --btn-h: var(--touch-min); font-size: var(--fs-sm); padding: 0 var(--sp-3); }
 .btn-lg { --btn-h: 44px; font-size: var(--fs-lg); padding: 0 var(--sp-6); }
 
 .btn-primary { background: var(--brand-500); color: #fff; }
