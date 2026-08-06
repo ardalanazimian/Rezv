@@ -11,8 +11,10 @@ import { test, expect, type Page } from '@playwright/test';
 const BIZ = 'http://localhost:8081/';
 const CO = 'http://localhost:8082/';
 
-// mockِ سطحِ پنل: فقط staff-auth را واقعی جواب می‌دهد؛ بقیه‌ی /api پاسخِ خالیِ موفق
+// mockِ سطحِ پنل: فقط auth را واقعی جواب می‌دهد؛ بقیه‌ی /api پاسخِ خالیِ موفق
 // تا viewها بدونِ خطا رندر شوند (دادهٔ نمونه/خالی).
+// نکته: business از /auth/staff/* استفاده می‌کند و company از /auth/admin/* —
+// هر دو باید mock شوند وگرنه ورودِ پنلِ شرکت به شاخه‌ی «کد اشتباه است» می‌افتد.
 async function mockPanelApi(page: Page) {
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url());
@@ -20,10 +22,17 @@ async function mockPanelApi(page: Page) {
     const json = (body: unknown, status = 200) =>
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
-    if (path === '/auth/staff/request') return json({ devCode: '1234' });
+    if (path === '/auth/staff/request' || path === '/auth/admin/request') return json({ devCode: '1234' });
     if (path === '/auth/staff/verify') {
       return json({
         staff: { role: 'owner', restaurant_name: 'رستورانِ دمو', permissions: {} },
+        access: 'demo-access-token',
+        refresh: 'demo-refresh-token',
+      });
+    }
+    if (path === '/auth/admin/verify') {
+      return json({
+        admin: { phone: '09123456789', role: 'platform_admin' },
         access: 'demo-access-token',
         refresh: 'demo-refresh-token',
       });
@@ -103,6 +112,7 @@ test('پنلِ کسب‌وکار: ناوبری به «رزروها» لیستِ 
   await page.locator('#staffSendBtn').click();
   await page.locator('#staffCode').fill('1234');
   await page.locator('#staffVerifyBtn').click();
+  await expect(page.locator('#loginOverlay')).toHaveClass(/hidden/);
   await expect(page.locator('#v-overview')).toHaveClass(/active/);
 
   // ناوبری به رزروها از همان مسیرِ nav() که آیتمِ نوارِ کناری هم صدا می‌زند.
@@ -131,6 +141,9 @@ test('پنلِ شرکت: ناوبری به «رستوران‌ها» لیستِ 
   await page.locator('#adminSendBtn').click();
   await page.locator('#adminCode').fill('1234');
   await page.locator('#adminVerifyBtn').click();
+  // overlay باید واقعاً بسته شود؛ بدونِ این چک، اسرشنِ v-overview بی‌معناست
+  // (v-overview از ابتدا active است و تست حتی با شکستِ ورود سبز می‌شد).
+  await expect(page.locator('#loginOverlay')).toHaveClass(/hidden/);
   await expect(page.locator('#v-overview')).toHaveClass(/active/);
 
   // ناوبری به رستوران‌ها از همان مسیرِ nav() (روی موبایل کلیکِ مستقیمِ آیتم به‌خاطرِ

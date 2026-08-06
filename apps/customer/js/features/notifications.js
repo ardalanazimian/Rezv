@@ -10,7 +10,7 @@ import { R } from '../init.js';
 import { go } from '../data/discover.js';
 import { openRest } from '../data/detail.js';
 import { icon } from '../icons.js';
-import { esc, faNum } from '../auth.js';
+import { esc, faNum, lockAppSurfaces, unlockAppSurfaces } from '../auth.js';
 import { API, isLoggedIn } from '../api.js';
 import { mapApiTrip } from '../reservation.js';
 
@@ -116,8 +116,20 @@ function render(){
   }));
 }
 
-export function openNotif(){ const ov=ensureEl(); render(); ov.classList.add('show'); refreshNotif(); }
-export function closeNotif(){ const ov=document.getElementById('notif'); if(ov) ov.classList.remove('show'); }
+export function openNotif(){
+  const ov=ensureEl();
+  const wasOpen = ov.classList.contains('show');
+  render();
+  ov.classList.add('show');
+  if(!wasOpen) lockAppSurfaces();
+  refreshNotif();
+}
+export function closeNotif(){
+  const ov=document.getElementById('notif');
+  const wasOpen = !!ov && ov.classList.contains('show');
+  if(ov) ov.classList.remove('show');
+  if(wasOpen) unlockAppSurfaces();
+}
 
 // badge اولیه بعد از آماده‌شدنِ DOM؛ سپس تلاش برای خواندنِ رزروهای واقعی (اگر کاربر وارد شده)
 try{

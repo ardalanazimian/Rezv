@@ -34,6 +34,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build (Next.js)
         run: npm run build
         env:
@@ -103,8 +106,9 @@ jobs:
           # لازم چون middleware در production نبودِ آن را خطا می‌دهد؛
           # مقدارِ ساختگی فقط برای عبورِ build است، نه استفاده‌ی واقعی.
           ALLOWED_ORIGINS: https://ci.example.invalid
-          JWT_SECRET: ci-test-secret
-          JWT_REFRESH_SECRET: ci-test-refresh-secret
+          # حداقل ۳۲ کاراکتر — همان قیدی که jwt.ts در زمانِ اجرا اعمال می‌کند.
+          JWT_SECRET: ci-test-secret-at-least-32-chars-long
+          JWT_REFRESH_SECRET: ci-test-refresh-secret-at-least-32-chars
 
   # ── مرحله ۳: چک امنیتی پایه ──
   security:
@@ -173,8 +177,8 @@ jobs:
       - name: Check design-system in sync with shared/
         run: sh tools/sync-design-system.sh --check
 
-  # ── صفحاتِ ایندکس‌پذیرِ رستوران (apps/seo · Next.js SSR/ISR، ADR 0001) ──
-  # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند.
+  # ── اپِ SEO (apps/seo · Next.js SSR/ISR، ADR 0001) — build + typecheck + lint ──
+  # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند. build خودِ Next تایپ‌چک/لینت می‌کند.
   seo:
     runs-on: ubuntu-latest
     defaults:
@@ -190,13 +194,9 @@ jobs:
           cache-dependency-path: apps/seo/package-lock.json
       - name: Install dependencies
         run: npm ci || npm install
-      - name: Unit tests (JSON-LD رستوران)
+      - name: Schema unit tests (JSON-LD sanity — پایشِ خودکار)
         run: npm test
-      - name: Type check
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: Build (Next.js)
+      - name: Build (Next.js — typecheck + lint + build)
         run: npm run build
 
   # ── وب‌سایتِ عمومی (apps/landing · Next.js SSR/ISR، ADR 0002) ──

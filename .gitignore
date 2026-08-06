@@ -51,3 +51,10 @@ tools/__pycache__/
 api/tsconfig.tsbuildinfo
 /rezervno-changes.patch
 /rezervno-changes.patch.gz
+
+# کپیِ محلیِ تکراری از کل مخزن — به‌اشتباه به‌صورت gitlink (submodule) استیج شده بود
+# و چون .gitmodules ندارد، clone/CI را می‌شکست.
+RezervnoOSv2/
+
+# فایل‌های موقتِ ابزارهای AI/ادیتور
+.copilot-temp/

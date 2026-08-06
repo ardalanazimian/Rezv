@@ -20,7 +20,7 @@
   --t-fast:130ms;--t:200ms;--ease:cubic-bezier(.4,0,.2,1);--spring:cubic-bezier(.34,1.56,.64,1);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;overflow-x:hidden}
 body{font-family:'Vazirmatn',-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--t1);
   font-size:14px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;overflow-x:hidden}
 button,input,select,textarea{font-family:inherit;font-size:inherit}

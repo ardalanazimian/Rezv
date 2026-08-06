@@ -265,8 +265,18 @@ function rSecurity(){
 
 // ═══════════ ورود مدیر پلتفرم (فاز ۳ تکه ۷) ═══════════
 let _adminPhone = '';
+function setAdminGateLocked(locked){
+  const app = document.querySelector('.app');
+  const overlay = document.getElementById('loginOverlay');
+  if (app) {
+    app.setAttribute('aria-hidden', locked ? 'true' : 'false');
+    if ('inert' in app) app.inert = locked;
+  }
+  if (overlay) overlay.setAttribute('aria-hidden', locked ? 'false' : 'true');
+}
 function faD(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
 function showAdminLoginPhone(){
+  setAdminGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">R</div>
     <div class="login-title">پنل شرکت رزرونو</div>
@@ -299,6 +309,7 @@ async function adminSendOtp(){
   showAdminLoginCode(devCode, res.offline);
 }
 function showAdminLoginCode(devCode, offline){
+  setAdminGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('mail',{size:34})}</div>
     <div class="login-title">کد ورود را وارد کنید</div>
@@ -334,6 +345,7 @@ async function adminConfirmOtp(){
 }
 async function enterAdminPanel(demo){
   document.getElementById('loginOverlay').classList.add('hidden');
+  setAdminGateLocked(false);
   // اگر توکن واقعی داریم، داده‌ی واقعی بارگذاری کن
   if (API.getToken() && !demo){
     const [fresh] = await Promise.all([loadAdminRestaurants(), loadPlatformStats()]);
@@ -349,11 +361,13 @@ async function enterAdminPanel(demo){
 async function adminLogout(){
   await API.doLogout();
   document.getElementById('loginOverlay').classList.remove('hidden');
+  setAdminGateLocked(true);
   showAdminLoginPhone();
   toast('','از پنل خارج شدید');
 }
 function onAdminSessionExpired(){
   document.getElementById('loginOverlay').classList.remove('hidden');
+  setAdminGateLocked(true);
   showAdminLoginPhone();
   toast('','نشست منقضی شد، دوباره وارد شوید');
 }
@@ -362,6 +376,7 @@ function onAdminSessionExpired(){
 API.restoreSession();
 if (API.getToken()) {
   document.getElementById('loginOverlay').classList.add('hidden');
+  setAdminGateLocked(false);
   rOverview();
   (async () => {
     const [fresh] = await Promise.all([loadAdminRestaurants(), loadPlatformStats()]);
@@ -375,5 +390,6 @@ if (API.getToken()) {
     refreshPhotoBadge();
   })();
 } else {
+  setAdminGateLocked(true);
   showAdminLoginPhone();
 }
