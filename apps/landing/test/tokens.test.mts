@@ -21,6 +21,7 @@ const site = readFileSync(new URL('../app/site.css', import.meta.url), 'utf8');
 /** توکن‌هایی که از JS/inline می‌آیند، نه از فایلِ توکن‌ها. */
 const RUNTIME = new Set([
   '--i',            // نمایه‌ی تیغه‌های پرده‌ی ورود (style خطی)
+  '--n',            // نمایه‌ی درها در صفحه‌ی ورود (style خطی)
   '--mx', '--my',   // مکانِ اشاره‌گر روی کارتِ سه‌بعدی
   '--kx-mx', '--kx-my',
   '--progress',     // نوارِ پیشرفتِ اسکرول
@@ -28,7 +29,13 @@ const RUNTIME = new Set([
   '--vel',          // سرعتِ اسکرول
 ]);
 
-const defined = new Set([...globals.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+// توکن‌ها هم با اعلانِ عادی تعریف می‌شوند و هم با @property (که زاویه‌ی
+// انیمیشن‌پذیر می‌سازد). هر دو منبع و هر دو فایل شمرده می‌شوند.
+const defined = new Set([
+  ...[...globals.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]),
+  ...[...site.matchAll(/@property\s+(--[a-z0-9-]+)/g)].map((m) => m[1]),
+  ...[...globals.matchAll(/@property\s+(--[a-z0-9-]+)/g)].map((m) => m[1]),
+]);
 
 describe('توکن‌های CSS', () => {
   test('هر var() یا تعریف شده است یا در زمانِ اجرا ست می‌شود', () => {

@@ -1789,3 +1789,220 @@
   .psplit { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr); }
   .psplit--reverse .psplit__media { order: 2; }
 }
+
+/* زاویه‌ی حلقه‌ی نورانیِ درِ باز. بدونِ @property این یک رشته‌ی ساده است و
+   انیمیشن نمی‌گیرد؛ در مرورگرهای قدیمی‌تر حلقه ثابت می‌ماند (نه شکسته). */
+@property --door-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   دروازه‌ی ورود (/login)
+   ───────────────────────────────────────────────────────────────────
+   انتخابِ حساب تنها کاری است که در این صفحه انجام می‌شود، پس تمامِ قاب را
+   می‌گیرد. سه در کنارِ هم‌اند و آنکه فوکوس دارد باز می‌شود — بقیه عقب
+   می‌روند. حرکت اینجا تزئین نیست، خودِ بازخوردِ انتخاب است.
+   ═══════════════════════════════════════════════════════════════════ */
+.gate {
+  position: relative;
+  min-block-size: calc(100svh - var(--header-h, 64px));
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  padding-block: clamp(var(--sp-10), 7vh, var(--sp-20));
+}
+.gate__inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--sp-5);
+}
+.gate__title {
+  font-size: clamp(2.4rem, 8vw, 6rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+}
+.gate__lead { font-size: clamp(1rem, 1.7vw, 1.2rem); color: var(--text-2); max-width: 42ch; }
+.gate__foot { font-size: var(--fs-sm); color: var(--text-3); max-width: 52ch; line-height: 2; }
+.gate__link { color: var(--brand); font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+.gate__link:hover { text-decoration: underline; }
+
+/* ── درها ── */
+.doors {
+  display: flex;
+  gap: var(--sp-4);
+  inline-size: 100%;
+  max-inline-size: 68rem;
+  margin-block-start: var(--sp-6);
+}
+
+.door {
+  position: relative;
+  flex: 1 1 0;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: clamp(var(--sp-5), 2.4vw, var(--sp-8));
+  border-radius: var(--r-2xl);
+  border: 1px solid var(--border);
+  background: var(--glass-bg, var(--surface));
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: inherit;
+  text-align: start;
+  overflow: hidden;
+  isolation: isolate;
+  /* فنری، نه خطی: کارت «جا می‌افتد» به‌جای اینکه بلغزد */
+  transition:
+    flex-grow 520ms cubic-bezier(0.22, 1, 0.28, 1),
+    transform 380ms cubic-bezier(0.22, 1, 0.28, 1),
+    opacity 380ms var(--ease),
+    border-color 300ms var(--ease);
+  /* ورودِ پلکانی هنگامِ بازشدنِ صفحه.
+     ⚠️ fill-mode عمداً backwards است نه both. با both، انیمیشنِ تمام‌شده
+     مقدارِ opacity: 1 را نگه می‌دارد و چون انیمیشن در آبشارِ CSS بر اعلانِ
+     عادی غلبه می‌کند، قاعده‌ی «.doors:hover .door { opacity: .58 }» هرگز
+     اعمال نمی‌شد — یعنی کلِ افکتِ کم‌رنگ‌شدنِ درهای دیگر مرده بود. با
+     backwards فقط پیش از شروع مقدار می‌گیرد و بعد از پایان، آبشار آزاد است.
+     (در مرورگر اندازه‌گیری شد: opacity همه‌ی درها ۱ می‌ماند.) */
+  animation: doorIn 620ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(260ms + var(--n) * 90ms);
+}
+@keyframes doorIn {
+  from { opacity: 0; transform: translateY(26px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* درِ باز جلو می‌آید، بقیه عقب می‌روند. همین «عقب رفتن» است که انتخاب را
+   بدونِ هیچ برچسبی معلوم می‌کند. */
+.doors:hover .door,
+.doors:focus-within .door { opacity: 0.58; }
+.door.is-open {
+  flex-grow: 1.75;
+  opacity: 1 !important;
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+  transform: translateY(-6px);
+  box-shadow: 0 26px 60px light-dark(rgba(90,50,20,.16), rgba(0,0,0,.5));
+}
+
+/* حاشیه‌ی چرخانِ درِ باز.
+   ⚠️ نسخه‌ی اول یک لایه‌ی روکش (::before) داشت تا وسطِ گرادیان را بپوشاند؛
+   کار نکرد چون --glass-bg نیمه‌شفاف است و گرادیان از پشتش دیده می‌شد —
+   نتیجه یک گُوِه‌ی نارنجیِ بزرگ روی کلِ کارت بود (در مرورگر دیده شد).
+   راهِ درست، ماسکِ دولایه است: فقط حلقه‌ی لبه رندر می‌شود، پس شفافیتِ
+   شیشه‌ایِ کارت هم دست‌نخورده می‌ماند. */
+.door__edge {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  opacity: 0;
+  transition: opacity 340ms var(--ease);
+  background: conic-gradient(from var(--door-angle, 0deg),
+    transparent 0deg,
+    var(--ember-500) 60deg,
+    var(--brass-400) 120deg,
+    transparent 200deg,
+    transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+.door.is-open .door__edge { opacity: 1; animation: doorSpin 4.5s linear infinite; }
+/* چرخشِ زاویه‌ی گرادیان، نه چرخشِ خودِ عنصر — عنصر ماسک دارد و rotate آن
+   ماسک را هم می‌چرخاند. background-image بینِ دو مقدار درون‌یابی نمی‌شود،
+   پس زاویه باید یک متغیرِ ثبت‌شده باشد. */
+@keyframes doorSpin { to { --door-angle: 360deg; } }
+/* محتوای در باید بالای حلقه بماند */
+.door > *:not(.door__edge) { position: relative; z-index: 1; }
+
+.door__num {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--border-strong, var(--border));
+  transition: -webkit-text-stroke-color 340ms var(--ease);
+}
+.door.is-open .door__num { -webkit-text-stroke-color: color-mix(in srgb, var(--brand) 70%, transparent); }
+
+.door__ic {
+  inline-size: 46px;
+  block-size: 46px;
+  border-radius: var(--r-lg);
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-2);
+  transition: background 340ms var(--ease), color 340ms var(--ease), transform 420ms cubic-bezier(0.22,1,0.28,1);
+}
+.door.is-open .door__ic {
+  background: linear-gradient(135deg, var(--ember-500), var(--brass-500));
+  color: #fff;
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.door__title { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.015em; }
+.door__body {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  line-height: 1.9;
+  /* توضیح فقط روی درِ باز کامل باز می‌شود — بقیه فشرده می‌مانند */
+  flex: 1;
+}
+
+.door__foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-block-start: var(--sp-2);
+}
+.door__hint { font-size: var(--fs-xs); color: var(--text-3); }
+.door__go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  color: var(--brand);
+  /* پیکان با بازشدنِ در جلو می‌رود */
+  transition: gap 320ms var(--ease);
+}
+.door.is-open .door__go { gap: 12px; }
+
+.door:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+/* ── موبایل و تبلت ──
+   «بازشدن با هاور» روی تاچ معنا ندارد و فقط یک لمسِ اضافه تحمیل می‌کند؛
+   هر سه در باز و هم‌اندازه می‌مانند. */
+@media (max-width: 900px) {
+  .doors { flex-direction: column; max-inline-size: 34rem; }
+  .door, .doors:hover .door, .doors:focus-within .door { opacity: 1; flex-grow: 1; }
+  .door.is-open { transform: none; }
+  .gate { min-block-size: auto; }
+}
+@media (hover: none) {
+  .doors:hover .door, .doors:focus-within .door { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .door { animation: none; transition: none; }
+  .door.is-open { transform: none; flex-grow: 1; }
+  .doors:hover .door, .doors:focus-within .door { opacity: 1; }
+  /* ویژگیِ انتخابگر باید با «.door.is-open .door__edge» برابر باشد وگرنه
+     قاعده‌ی کاهشِ حرکت می‌بازد (اندازه‌گیری شد: animationName=doorSpin). */
+  .door.is-open .door__edge { animation: none; }
+  .door__ic, .door.is-open .door__ic { transform: none; }
+}

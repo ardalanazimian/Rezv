@@ -75,3 +75,31 @@ describe('دانه‌ی فیلم', () => {
     assert.match(globals, /\.grain\s*\{[^}]*pointer-events:\s*none/);
   });
 });
+
+describe('دروازه‌ی ورود', () => {
+  // باگِ واقعی: انیمیشنِ ورودِ درها با fill-mode: both مقدارِ opacity: 1 را
+  // پس از پایان نگه می‌داشت، و چون انیمیشن در آبشارِ CSS بر اعلانِ عادی غلبه
+  // می‌کند، «.doors:hover .door { opacity: .58 }» هرگز اعمال نمی‌شد — یعنی
+  // کلِ افکتِ کم‌رنگ‌شدنِ درهای دیگر مرده بود. فقط با اندازه‌گیریِ opacity در
+  // مرورگر پیدا شد.
+  test('انیمیشنِ ورودِ در نباید opacity را پس از پایان قفل کند', () => {
+    // فقط خودِ اعلان، نه توضیحِ بالایش — متنِ توضیح واژه‌ی both را دارد.
+    const m = /animation:\s*doorIn[^;]*;/.exec(site);
+    assert.ok(m, 'انیمیشنِ doorIn باید تعریف شده باشد');
+    assert.doesNotMatch(m[0], /\bboth\b/, 'fill-mode باید backwards باشد نه both');
+    assert.match(m[0], /\bbackwards\b/);
+  });
+
+  test('حلقه‌ی نورانی با ماسک ساخته می‌شود، نه با روکشِ کدر', () => {
+    // روکش روی پس‌زمینه‌ی نیمه‌شفافِ شیشه‌ای کار نمی‌کرد و گرادیان از پشتش
+    // دیده می‌شد (یک گُوِه‌ی نارنجی روی کلِ کارت).
+    assert.match(site, /\.door__edge\s*\{[\s\S]*?mask-composite:\s*exclude/);
+  });
+
+  test('در حالتِ کاهشِ حرکت، چرخشِ حلقه با همان ویژگیِ انتخابگر خنثی می‌شود', () => {
+    // «.door__edge { animation: none }» به‌تنهایی می‌بازد چون
+    // «.door.is-open .door__edge» ویژگیِ بالاتری دارد.
+    const rm = site.slice(site.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+    assert.match(rm, /\.door\.is-open\s+\.door__edge\s*\{\s*animation:\s*none/);
+  });
+});
