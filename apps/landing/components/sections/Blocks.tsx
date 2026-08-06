@@ -18,6 +18,7 @@ import { FlowField } from './FlowField';
 import { HeroLight } from './Caustics';
 import { SplitText, Magnetic, Ambient, Tilt, Parallax } from '../site/Kinetic';
 import { Visual } from './Visuals';
+import { Scene, Gallery, PhotoSplit } from './PhotoBlocks';
 import { PlanCards } from '../pricing/PlanCards';
 import { FaqAccordion } from '../site/FaqAccordion';
 import { renderMarkdown } from '@/lib/markdown';
@@ -619,6 +620,10 @@ const BLOCKS: Record<string, (props: { sec: Section; data: SectionData }) => Rea
   steps: ({ sec }) => <Steps sec={sec} />,
   comparison: ({ sec }) => <Comparison sec={sec} />,
   showcase: ({ sec }) => <Showcase sec={sec} />,
+  // ── بلوک‌های عکس‌محور ──
+  scene: ({ sec }) => <Scene sec={sec} />,
+  gallery: ({ sec }) => <Gallery sec={sec} />,
+  photosplit: ({ sec }) => <PhotoSplit sec={sec} />,
   pricing: ({ sec, data }) => <Pricing sec={sec} data={data} />,
   testimonials: ({ sec, data }) => <Testimonials sec={sec} data={data} />,
   faq: ({ sec, data }) => <Faq sec={sec} data={data} />,

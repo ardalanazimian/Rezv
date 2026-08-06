@@ -1632,3 +1632,160 @@
   .hero__scroll-line { animation: none; }
   .hero__stage-inner { transform: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   عکس — پایه‌ی مشترکِ همه‌ی تصویرها
+   ═══════════════════════════════════════════════════════════════════ */
+.ph {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-xl);
+  background: var(--surface-2);
+  margin: 0;
+  isolation: isolate;
+}
+.ph img { object-fit: cover; }
+
+/* گریدِ برند: یک لایه‌ی گرمِ خیلی ملایم روی همه‌ی عکس‌ها. عکس‌هایی که با
+   دوربین و نورِ متفاوت گرفته شده‌اند بدونِ این، کنارِ هم مثلِ یک مجموعه
+   دیده نمی‌شوند. شدتش عمداً کم است — قرار نیست عکس را رنگی کند. */
+.ph--grade::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--ember-500) 7%, transparent) 0%,
+    transparent 45%,
+    color-mix(in srgb, var(--ember-700) 12%, transparent) 100%);
+  mix-blend-mode: multiply;
+}
+:root[data-theme='dark'] .ph--grade::after { mix-blend-mode: screen; opacity: .45; }
+
+/* حالتِ خالی — صادقانه برچسب می‌خورد، نه یک قابِ شکسته و نه تصویرِ ساختگی */
+.ph--empty {
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border-strong, var(--border));
+  background:
+    repeating-linear-gradient(135deg,
+      var(--surface-2) 0 12px,
+      var(--surface-3) 12px 24px);
+}
+.ph__label {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-3);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: 50px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.ph__cap {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 2;
+  padding: var(--sp-6) var(--sp-5) var(--sp-4);
+  font-size: var(--fs-sm);
+  color: #fff;
+  background: linear-gradient(to top, rgba(0,0,0,.62), transparent);
+}
+.ph__credit { display: block; font-size: var(--fs-xs); opacity: .72; margin-block-start: 2px; }
+
+/* ═══════════════ scene — عکسِ تمام‌عرض با متن روی آن ═══════════════ */
+.scene {
+  position: relative;
+  display: grid;
+  align-items: center;
+  min-block-size: clamp(24rem, 62vh, 40rem);
+  overflow: hidden;
+  isolation: isolate;
+}
+.scene--tall { min-block-size: clamp(30rem, 84vh, 52rem); }
+.scene__media { position: absolute; inset: 0; z-index: 0; }
+.scene__img, .scene__media > * { block-size: 100%; }
+.scene__img { border-radius: 0; aspect-ratio: auto !important; block-size: 100%; }
+.scene__img img { object-fit: cover; }
+
+/* پرده‌ی خوانایی. گرادیانِ دوطرفه است نه یک لایه‌ی یکنواخت: متن خوانا
+   می‌شود ولی خودِ عکس زیرِ یک پوششِ کدر دفن نمی‌شود. */
+.scene__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, rgba(12,8,6,.86) 0%, rgba(12,8,6,.42) 45%, rgba(12,8,6,.12) 100%),
+    radial-gradient(120% 80% at 50% 100%, rgba(12,8,6,.5), transparent 70%);
+}
+.scene__body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding-block: var(--sp-16);
+  color: #fff;
+}
+.scene--center .scene__body { align-items: center; text-align: center; }
+.scene--center .scene__body > * { max-width: 46rem; }
+.scene__title {
+  font-size: clamp(1.9rem, 5vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+.scene__lead { font-size: clamp(1rem, 1.7vw, 1.25rem); color: rgba(255,255,255,.86); line-height: 1.85; }
+.eyebrow--on-photo {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.26);
+  color: #fff;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.scene .btn--primary { align-self: center; }
+.scene--start .btn--primary { align-self: flex-start; }
+
+/* ═══════════════ gallery — شبکه‌ی تحریریه ═══════════════ */
+.gal {
+  display: grid;
+  gap: var(--sp-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* ارتفاعِ ردیف صریح است، نه برآمده از نسبتِ هر عکس. با ارتفاعِ محتوامحور،
+     خانه‌ی بزرگ یک ردیفِ سوم می‌ساخت که بقیه پرش نمی‌کردند و یک ربعِ خالی
+     می‌ماند (در مرورگر دیده شد). */
+  grid-auto-rows: clamp(8rem, 30vw, 11rem);
+}
+.gal__cell { position: relative; min-inline-size: 0; }
+/* داخلِ گالری ارتفاع را شبکه تعیین می‌کند، نه نسبتِ خودِ عکس */
+.gal .ph { block-size: 100%; aspect-ratio: auto; }
+.gal__cell--1 { grid-column: span 2; grid-row: span 2; }
+.gal__cap {
+  display: block;
+  margin-block-start: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+@media (min-width: 860px) {
+  /* چهار ستون × دو ردیف: خانه‌ی بزرگ ۲×۲ و چهار خانه‌ی کوچک — مستطیلی
+     کامل بدونِ حفره، با ریتمی که «آلبومِ چهارخانه» ندارد. */
+  .gal {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: clamp(9rem, 15vw, 15rem);
+  }
+}
+
+/* ═══════════════ photosplit — عکسِ عمودی کنارِ متن ═══════════════ */
+.psplit {
+  display: grid;
+  gap: clamp(var(--sp-8), 5vw, var(--sp-16));
+  align-items: center;
+}
+.psplit__body { display: flex; flex-direction: column; gap: var(--sp-5); align-items: flex-start; }
+@media (min-width: 900px) {
+  .psplit { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr); }
+  .psplit--reverse .psplit__media { order: 2; }
+}
