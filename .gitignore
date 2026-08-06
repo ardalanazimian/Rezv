@@ -49,3 +49,5 @@ tools/__pycache__/
 
 # خروجیِ افزایشیِ tsc (آرتیفکتِ build، نه منبع)
 api/tsconfig.tsbuildinfo
+/rezervno-changes.patch
+/rezervno-changes.patch.gz
