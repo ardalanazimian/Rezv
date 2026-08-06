@@ -16,7 +16,8 @@ function rOverview(){
   const top=[...RESTAURANTS].sort((a,b)=>b.reservations-a.reservations).slice(0,5);
   // هشدارهای واقعی اشتراک (از tenant.plan_expires_at)
   const alerts=RESTAURANTS.filter(r=>r.status==='expiring'||r.status==='expired'||r.status==='trial'||r.status==='trial_expired');
-  const sub = PLATFORM_STATS?.subscription_breakdown || {active:0,expiring:0,expired:0,trial:0,trial_expired:0};
+  // اگر آمار پلتفرم از API نیامده (حالت دمو/آفلاین)، از داده‌ی محلی رستوران‌ها بشمار
+  const sub = PLATFORM_STATS?.subscription_breakdown || RESTAURANTS.reduce((a,r)=>{ a[r.status]=(a[r.status]||0)+1; return a; },{active:0,expiring:0,expired:0,trial:0,trial_expired:0});
   const health = PLATFORM_STATS?.system_health || (API.online ? '—' : null);
   const healthMeta = {healthy:['checkCircle','سالم','green'],warning:['alert','نیاز به بررسی','amber'],critical:['alert','بحرانی','red']}[health] || ['info','نامشخص','s-400'];
   const clv = PLATFORM_STATS?.platform_clv_toman;

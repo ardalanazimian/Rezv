@@ -3,6 +3,7 @@ import { dbRead as db } from '@/lib/db';
 import { cached, cacheKey } from '@/lib/cache';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, z } from '@/lib/schemas';
+import { PUBLIC_STATUS } from '@/lib/photo-moderation';
 
 // ═══════════════════════════════════════════════════════════
 //  GET /api/v1/restaurants/{slug} — جزئیاتِ عمومیِ یک رستوران
@@ -29,7 +30,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
             where: { isActive: true }, orderBy: { soldCount: 'desc' },
             select: { name: true, emoji: true, priceToman: true },
           },
+          // فقط عکسِ تأییدشده. این تنها مسیری است که گالری را به بیرون
+          // می‌دهد — هم اپ مشتری و هم صفحه‌ی سئوی /r/[slug] از همین می‌خوانند
+          // — پس همین یک فیلتر، مرزِ «منتشرشده» است.
           photos: {
+            where: { status: PUBLIC_STATUS },
             orderBy: { sortOrder: 'asc' },
             select: { url: true, caption: true, category: true },
           },

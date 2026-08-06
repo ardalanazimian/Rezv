@@ -30,6 +30,7 @@ export default defineConfig({
     video: 'retain-on-failure',
     locale: 'fa-IR',
     timezoneId: 'Asia/Tehran',
+    reducedMotion: 'reduce',
     // service worker را در تست بلاک می‌کنیم: کشِ SW در reload از سرو شدنِ نسخه‌ی
     // تازه جلوگیری می‌کرد (boot دوباره اجرا نمی‌شد) و منبعِ flake بود؛ تست‌ها به SW
     // نیازی ندارند.

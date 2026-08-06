@@ -36,3 +36,25 @@ playwright/.cache/
 .env.production
 .env.development
 .env.*.local
+
+# اسنپ‌شاتِ Redis هنگامِ اجرای محلی (در api/ ساخته می‌شود؛ نباید کامیت شود)
+dump.rdb
+
+# کشِ پایتونِ ابزارها
+tools/__pycache__/
+
+# بسته‌های تولیدشده برای تحویل (از standalone/ و git خودش دوباره ساخته می‌شوند)
+/rezervno-website.zip
+/rezervno-site.bundle
+
+# خروجیِ افزایشیِ tsc (آرتیفکتِ build، نه منبع)
+api/tsconfig.tsbuildinfo
+/rezervno-changes.patch
+/rezervno-changes.patch.gz
+
+# کپیِ محلیِ تکراری از کل مخزن — به‌اشتباه به‌صورت gitlink (submodule) استیج شده بود
+# و چون .gitmodules ندارد، clone/CI را می‌شکست.
+RezervnoOSv2/
+
+# فایل‌های موقتِ ابزارهای AI/ادیتور
+.copilot-temp/

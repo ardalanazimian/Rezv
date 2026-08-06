@@ -14,8 +14,9 @@ function decode(s: string): string {
   try { return decodeURIComponent(s); } catch { return s; }
 }
 
-export async function generateMetadata({ params }: { params: { city: string } }): Promise<Metadata> {
-  const city = decode(params.city);
+export async function generateMetadata({ params }: { params: Promise<{ city: string }> }): Promise<Metadata> {
+  const { city: rawCity } = await params;
+  const city = decode(rawCity);
   const url = `${SITE}/city/${encodeURIComponent(city)}`;
   return {
     title: `بهترین رستوران‌های ${city}`,
@@ -25,8 +26,9 @@ export async function generateMetadata({ params }: { params: { city: string } })
   };
 }
 
-export default async function CityPage({ params }: { params: { city: string } }) {
-  const city = decode(params.city);
+export default async function CityPage({ params }: { params: Promise<{ city: string }> }) {
+  const { city: rawCity } = await params;
+  const city = decode(rawCity);
   const items = await fetchRestaurantList({ city });
   if (items.length < MIN_LISTINGS) notFound();
 

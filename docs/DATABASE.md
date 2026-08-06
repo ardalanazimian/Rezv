@@ -75,7 +75,7 @@ erDiagram
 | `Table` / `tables` | `number`, `capacity`, `min/maxPartySize`, `shape`, `zone`, VIP/smoking/accessible flags, merge/split, `state` (TableState), `qrCode?` | Unique `(restaurantId, number)`. |
 | `MenuItem` / `menu_items` | `priceToman`, `soldCount` | |
 | `SpecialEvent` / `special_events` | `startsAt`, `priceToman?`, `capacity?` | Public events feed. |
-| `RestaurantPhoto` / `restaurant_photos` | `url`, `category`, `sortOrder` | Gallery. |
+| `RestaurantPhoto` / `restaurant_photos` | `url`, `category`, `sortOrder`, `status`, `storageKey`, `width`/`height`, `rejectionReason` | Gallery with moderation. `status` (`photo_status` enum: pending/approved/rejected) gates public visibility — only `approved` is exposed by `/v1/restaurants/[slug]`. `storageKey` points at a file on the `uploads` volume; the bytes are **not** in Postgres, so back up that volume too. Unique partial index on `storage_key` prevents two rows sharing one file. |
 | `RestaurantClosure` / `restaurant_closures` | PK `(restaurantId, closureDate)` | Manual day closures. |
 
 ### Reservations

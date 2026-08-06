@@ -133,6 +133,24 @@ const API = {
     return this._refreshing;
   },
   _onSessionExpired(){ this.setToken(null); this.setRefresh(null); if (typeof onStaffSessionExpired === 'function') onStaffSessionExpired(); },
+  /**
+   * POSTِ بدنه‌ی خام (FormData) — بدونِ Content-Type تا مرورگر خودش
+   * boundaryِ multipart را بگذارد. بقیه‌ی منطقِ auth (توکن، شعبه‌ی فعال،
+   * ۴۰۱ → refresh → تلاشِ دوباره) دقیقاً همان request است.
+   */
+  async requestRaw(path, body, timeoutMs = 60000, _retried = false){
+    const headers = {};
+    if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
+    if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
+    const r = await httpJson(this.base + '/api/v1' + path, { method: 'POST', body, headers }, timeoutMs);
+    if (!r.ok && !r.offline && r.status === 401 && this._refresh && !_retried) {
+      if (await this._doRefresh()) return this.requestRaw(path, body, timeoutMs, true);
+      this._onSessionExpired();
+    }
+    if (r.ok) return { ok: true, status: r.status, data: r.data };
+    if (r.offline) return { ok: false, offline: true, error: r.error };
+    return { ok: false, status: r.status, error: r.error || { message: `خطای ${r.status}` } };
+  },
   get(path){ return this.request(path); },
   post(path, body){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}) }); },
   patch(path, body){ return this.request(path, { method: 'PATCH', body: JSON.stringify(body || {}) }); },
@@ -193,7 +211,18 @@ const API = {
   reviews(qs){ return this.get('/restaurant/reviews'+(qs?'?'+qs:'')); },
   replyReview(id, reply){ return this.patch('/restaurant/reviews', { id, reply }); },
   photos(){ return this.get('/restaurant/photos'); },
-  addPhoto(body){ return this.post('/restaurant/photos', body); },
+  // آپلودِ فایل، نه لینک. عمداً از post استفاده نمی‌کند: request همیشه
+  // Content-Type: application/json می‌گذارد و برای multipart باید مرورگر
+  // خودش هدر را با boundary بسازد، وگرنه سرور بدنه را نمی‌تواند پارس کند.
+  uploadPhoto(file, { category, caption } = {}){
+    const fd = new FormData();
+    fd.append('file', file);
+    if (category) fd.append('category', category);
+    if (caption)  fd.append('caption', caption);
+    // مهلتِ بلندتر از پیش‌فرضِ ۸ ثانیه: یک عکسِ چندمگابایتی روی اینترنتِ
+    // موبایل به‌راحتی بیشتر طول می‌کشد و قطع‌شدنش شبیهِ خطای سرور دیده می‌شد.
+    return this.requestRaw('/restaurant/photos', fd, 60000);
+  },
   deletePhoto(id){ return this.delete('/restaurant/photos?id='+encodeURIComponent(id)); },
   notes(){ return this.get('/restaurant/notes'); },
   addNote(body){ return this.post('/restaurant/notes', body); },
@@ -419,6 +448,13 @@ const RES = [
 const BK2UI_STATE = { free:'free', reserved:'reserved', occupied:'seated', cleaning:'free', maintenance:'free' };
 const UI2BK_STATE = { free:'free', reserved:'reserved', seated:'occupied' };
 let TABLES = [];
+// میزهای نمونه برای حالت دمو/آفلاین — هم‌راستا با رزروهای نمونه (میزهای ۱ تا ۹)
+const DEMO_TABLES = [
+  {id:'demo-t1',n:1,c:2,s:'free'},{id:'demo-t2',n:2,c:2,s:'free'},{id:'demo-t3',n:3,c:4,s:'free'},
+  {id:'demo-t4',n:4,c:2,s:'free'},{id:'demo-t5',n:5,c:4,s:'free'},{id:'demo-t6',n:6,c:4,s:'free'},
+  {id:'demo-t7',n:7,c:6,s:'free'},{id:'demo-t8',n:8,c:6,s:'free'},{id:'demo-t9',n:9,c:8,s:'free'},
+  {id:'demo-t10',n:10,c:2,s:'free'},
+];
 function mapApiTable(t){
   return { id:t.id, n:t.number, c:t.capacity, name:t.name||undefined, s:BK2UI_STATE[t.state]||'free', _raw:t };
 }
@@ -426,6 +462,10 @@ async function loadTables(){
   const res = await API.listTables();
   if (res.ok && Array.isArray(res.data?.items)) {
     TABLES = res.data.items.map(mapApiTable);
+  } else if (!TABLES.length) {
+    // بک‌اند در دسترس نیست → میزهای نمونه (مثل بقیه‌ی داده‌های دمو) تا پلان سالن و
+    // KPI اشغال خالی نمانند
+    TABLES = DEMO_TABLES.map(t=>({...t}));
   }
   _tablesLoaded = true;
   return TABLES;

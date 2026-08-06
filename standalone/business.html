@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>رزرونو | پنل کسب‌وکار</title>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style data-src="/css/tokens.css">
+<style data-src="css/tokens.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — سیستم توکنِ طراحیِ مشترک (Design Tokens)
    منبعِ واحدِ حقیقت برای هر سه اپ. دو لایه:
@@ -146,6 +146,13 @@
   }
 }
 
+</style>
+<style data-src="css/theme.css">
+/* theme.css — تمِ مخصوصِ این اپ (app-owned، از shared/ sync نمی‌شود).
+ * پایه‌ی مشترکِ توکن‌ها در tokens.css است (منبع: shared/css/tokens.css)؛
+ * این فایل فقط نگاشتِ semantic مخصوصِ همین اپ را روی آن سوار می‌کند.
+ * باید در HTML بلافاصله بعد از tokens.css لود شود (همان ترتیبِ cascadeِ قبلی). */
+
 /* ── پلِ تم: پنل بیزنس (لایت) ── */
 :root {
   --surface: #FFFFFF;
@@ -161,7 +168,7 @@
 }
 
 </style>
-<style data-src="/css/foundation.css">
+<style data-src="css/foundation.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — لایه‌ی Foundation (کامپوننت‌های پایه)
    روی tokens.css سوار است. کلاس‌های یوتیلیتی و کامپوننتِ مشترک.
@@ -441,7 +448,7 @@
 .sheet-handle { width: 36px; height: 4px; background: var(--border, #ddd); border-radius: 2px; margin: 0 auto var(--sp-4); }
 
 </style>
-<style data-src="/css/panel.css">
+<style data-src="css/panel.css">
 /* ═══ رزرونو — پنل business: استایل‌ها (جدا از HTML) ═══ */
 :root{
   /* پالت پریمیوم-مینیمال: رنگ اصلی ایندیگو عمیق (نه آبی جنریک) */
@@ -950,6 +957,18 @@ img{display:block;max-width:100%}
 .gal-item .gal-del{position:absolute;top:6px;left:6px;width:24px;height:24px;border-radius:50%;background:rgba(239,68,68,.92);
   color:#fff;border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity var(--t-fast)}
 .gal-item:hover .gal-del{opacity:1}
+/* ─── وضعیت بازبینی عکس ───
+   عکسِ تأییدنشده باید در نگاه اول از منتشرشده جدا باشد، وگرنه رستوران‌دار
+   فکر می‌کند گالریش کامل است در حالی که نیمی از آن روی سایت نیست. */
+.gal-item--pending{opacity:.72}
+.gal-item--pending img,.gal-item--rejected img{filter:grayscale(.55)}
+.gal-item--rejected{opacity:.6;border-color:var(--danger)}
+.gal-status{position:absolute;top:6px;right:6px;display:flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;padding:3px 8px;border-radius:50px;color:#fff;line-height:1.4}
+.gal-status--pending{background:rgba(217,119,6,.94)}
+.gal-status--rejected{background:rgba(239,68,68,.94);cursor:pointer}
+/* هدفِ لمسِ قابل‌استفاده روی موبایل — نشانِ «رد شد» کلیک‌پذیر است */
+@media (pointer:coarse){.gal-status--rejected{padding:8px 12px}}
 .gal-upload{aspect-ratio:4/3;border:2px dashed var(--border-strong);border-radius:var(--r);background:transparent;cursor:pointer;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--t3);transition:all var(--t-fast)}
 .gal-upload:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-50)}
@@ -1296,7 +1315,7 @@ img{display:block;max-width:100%}
   box-shadow:0 0 0 3px color-mix(in srgb, var(--danger) 20%, transparent)}
 
 </style>
-<style data-src="/css/ds-bridge.css">
+<style data-src="css/ds-bridge.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — لایه‌ی سازگاریِ Design System (DS Bridge)
    هدف: هم‌ترازکردنِ کامپوننت‌های قدیمیِ اپ‌ها با Design System،
@@ -1511,7 +1530,7 @@ img{display:block;max-width:100%}
 </div>
 
 <!-- ── پنل business: ماژول‌های Vanilla JS (بدون build، ترتیب مهم) ── -->
-<script data-src="/js/icons.js">
+<script data-src="js/icons.js">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — سیستم آیکون (Iconography)
    آیکون‌های خطیِ یکدست: viewBox 24×24، stroke 1.5، currentColor.
@@ -1611,10 +1630,72 @@ if (typeof window !== 'undefined') window.icon = icon;
 if (typeof window !== "undefined") window.ICON_NAMES = Object.keys(PATHS);
 
 </script>
-<script data-src="/js/data.js">
+<script data-src="js/api-core.js">
+/* ═══════════════════════════════════════════════════════════
+   رزرونو — هسته‌ی مشترکِ HTTP (transport) — منبعِ واحد
+   این فایل منبعِ حقیقت است؛ tools/sync-design-system.sh آن را به اپ‌ها می‌سازد
+   (customer نسخه‌ی ESM عیناً؛ در آینده پنل‌ها نسخه‌ی global).
+
+   httpJson: یک fetchِ کم‌سطحِ بدونِ حالت — timeout، پارس JSON، envelope یکدست،
+   و حالتِ offline. هیچ منطقِ auth/token/refresh اینجا نیست (آن سطح در هر اپ می‌ماند).
+   خروجی:
+     موفق   → { ok:true,  status, data }
+     ناموفق → { ok:false, status, data, error }
+     خطا/timeout → { ok:false, offline:true, error }
+   ═══════════════════════════════════════════════════════════ */
+// آدرسِ پایه‌ی API — قابلِ تنظیم بدونِ build: window.RZ_API_BASE یا
+// <meta name="rz-api-base" content="https://...">. پیش‌فرض '' = same-origin
+// (رفتارِ فعلی/دمو بدونِ تغییر). منبعِ واحد برای هر سه اپ.
+function resolveApiBase() {
+  try {
+    if (typeof window !== 'undefined' && window.RZ_API_BASE) return String(window.RZ_API_BASE).replace(/\/$/, '');
+    const m = (typeof document !== 'undefined') && document.querySelector('meta[name="rz-api-base"]');
+    if (m && m.content) return String(m.content).trim().replace(/\/$/, '');
+  } catch { /* noop */ }
+  return '';
+}
+
+async function httpJson(url, opts = {}, timeoutMs = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    clearTimeout(timer);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, status: res.status, data, error: data?.error || { message: `خطای ${res.status}` } };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (e) {
+    clearTimeout(timer);
+    return { ok: false, offline: true, error: { message: e.name === 'AbortError' ? 'زمان درخواست تمام شد' : 'اتصال به سرور برقرار نشد' } };
+  }
+}
+
+if (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveApiBase = resolveApiBase; }
+
+</script>
+<script data-src="js/format.js">
+/* ═══════════════════════════════════════════════════════════
+   رزرونو — helperهای خالصِ نمایش/امنیت (منبعِ واحد؛ فقط پنل‌ها)
+   این فایل منبعِ حقیقت است؛ tools/sync-design-system.sh نسخه‌ی global آن را
+   به پنل‌های business/company می‌سازد (export حذف می‌شود؛ برای <script> کلاسیک).
+
+   نکته: اپ customer عمداً اینجا نیست — `fa` در customer معنایِ متفاوتی دارد
+   (تبدیلِ رقمِ ASCII به فارسی، نه فرمتِ عددِ fa-IR)، پس نباید یکی شود.
+
+   fa  : فرمتِ عدد با جداکننده‌ی فارسی (۱۲٬۳۴۵).
+   esc : escape کردنِ ورودی قبل از تزریق به HTML (ضدِّ XSS) — تنها پیاده‌سازیِ
+         کانونیِ پنل‌ها؛ رفعِ باگِ escape یک‌جا برای هر دو پنل اعمال می‌شود.
+   ═══════════════════════════════════════════════════════════ */
+function fa(n){return n.toLocaleString('fa-IR')}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+</script>
+<script data-src="js/data.js">
 // ═══ رزرونو — پنل business: داده و پیکربندی (Vanilla JS، بدون build، scope مشترک) ═══
 // ═══════════ DATA ═══════════
-function fa(n){return n.toLocaleString('fa-IR')}
+// fa/esc از js/format.js (منبعِ واحدِ پنل‌ها) می‌آیند — قبل از این فایل لود می‌شود.
 // ── چرخه‌ی حیات کامل رزرو: برچسب فارسی، آیکون، و رنگ هر وضعیت ──
 const STATUS_META={
   pending:        {label:'در انتظار',     icon:'clock', bg:'#FEF3C7', fg:'#92400E'},
@@ -1697,7 +1778,7 @@ async function viewHistory(i){
 //  با توکن staff کار می‌کند. مثل اپ مشتری: تلاش API، fallback به نمونه.
 // ═══════════════════════════════════════════════════════════
 const API = {
-  base: '',
+  base: resolveApiBase(),            // '' = same-origin؛ قابلِ override با window.RZ_API_BASE یا <meta rz-api-base> (از api-core.js)
   timeout: 8000,
   _token: null,                      // توکن staff (بعد از ورود مدیر/کارمند)
   _refresh: null,                    // توکن تمدید staff
@@ -1720,28 +1801,19 @@ const API = {
   setActiveRestaurant(id){ this._restaurantId = id||null; try { if(id) localStorage.setItem('rz_biz_restaurant_id', id); else localStorage.removeItem('rz_biz_restaurant_id'); } catch {} },
   getActiveRestaurant(){ return this._restaurantId; },
   async request(path, opts = {}, _retried = false){
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), this.timeout);
-    try {
-      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-      if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
-      if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
-      const res = await fetch(this.base + '/api/v1' + path, { ...opts, headers, signal: ctrl.signal });
-      clearTimeout(timer);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        // ۴۰۱ روی توکن منقضی → یک‌بار refresh و تکرار درخواست
-        if (res.status === 401 && this._refresh && !_retried && !path.startsWith('/auth/')) {
-          if (await this._doRefresh()) return this.request(path, opts, true);
-          this._onSessionExpired();
-        }
-        return { ok: false, status: res.status, error: data?.error || { message: `خطای ${res.status}` } };
-      }
-      return { ok: true, status: res.status, data };
-    } catch (e) {
-      clearTimeout(timer);
-      return { ok: false, offline: true, error: { message: e.name === 'AbortError' ? 'زمان درخواست تمام شد' : 'اتصال به سرور برقرار نشد' } };
+    // transportِ خام به httpJsonِ مشترک (window.httpJson از api-core.js) واگذار می‌شود؛
+    // منطقِ auth (Authorization، X-Restaurant-Id، ۴۰۱→refresh→retry) اینجا و بدونِ تغییر می‌ماند.
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
+    if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
+    const r = await httpJson(this.base + '/api/v1' + path, { ...opts, headers }, this.timeout);
+    if (!r.ok && !r.offline && r.status === 401 && this._refresh && !_retried && !path.startsWith('/auth/')) {
+      if (await this._doRefresh()) return this.request(path, opts, true);
+      this._onSessionExpired();
     }
+    if (r.ok) return { ok: true, status: r.status, data: r.data };
+    if (r.offline) return { ok: false, offline: true, error: r.error };
+    return { ok: false, status: r.status, error: r.error || { message: `خطای ${r.status}` } };
   },
   async _doRefresh(){
     if (this._refreshing) return this._refreshing;
@@ -1756,6 +1828,24 @@ const API = {
     return this._refreshing;
   },
   _onSessionExpired(){ this.setToken(null); this.setRefresh(null); if (typeof onStaffSessionExpired === 'function') onStaffSessionExpired(); },
+  /**
+   * POSTِ بدنه‌ی خام (FormData) — بدونِ Content-Type تا مرورگر خودش
+   * boundaryِ multipart را بگذارد. بقیه‌ی منطقِ auth (توکن، شعبه‌ی فعال،
+   * ۴۰۱ → refresh → تلاشِ دوباره) دقیقاً همان request است.
+   */
+  async requestRaw(path, body, timeoutMs = 60000, _retried = false){
+    const headers = {};
+    if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
+    if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
+    const r = await httpJson(this.base + '/api/v1' + path, { method: 'POST', body, headers }, timeoutMs);
+    if (!r.ok && !r.offline && r.status === 401 && this._refresh && !_retried) {
+      if (await this._doRefresh()) return this.requestRaw(path, body, timeoutMs, true);
+      this._onSessionExpired();
+    }
+    if (r.ok) return { ok: true, status: r.status, data: r.data };
+    if (r.offline) return { ok: false, offline: true, error: r.error };
+    return { ok: false, status: r.status, error: r.error || { message: `خطای ${r.status}` } };
+  },
   get(path){ return this.request(path); },
   post(path, body){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}) }); },
   patch(path, body){ return this.request(path, { method: 'PATCH', body: JSON.stringify(body || {}) }); },
@@ -1816,7 +1906,18 @@ const API = {
   reviews(qs){ return this.get('/restaurant/reviews'+(qs?'?'+qs:'')); },
   replyReview(id, reply){ return this.patch('/restaurant/reviews', { id, reply }); },
   photos(){ return this.get('/restaurant/photos'); },
-  addPhoto(body){ return this.post('/restaurant/photos', body); },
+  // آپلودِ فایل، نه لینک. عمداً از post استفاده نمی‌کند: request همیشه
+  // Content-Type: application/json می‌گذارد و برای multipart باید مرورگر
+  // خودش هدر را با boundary بسازد، وگرنه سرور بدنه را نمی‌تواند پارس کند.
+  uploadPhoto(file, { category, caption } = {}){
+    const fd = new FormData();
+    fd.append('file', file);
+    if (category) fd.append('category', category);
+    if (caption)  fd.append('caption', caption);
+    // مهلتِ بلندتر از پیش‌فرضِ ۸ ثانیه: یک عکسِ چندمگابایتی روی اینترنتِ
+    // موبایل به‌راحتی بیشتر طول می‌کشد و قطع‌شدنش شبیهِ خطای سرور دیده می‌شد.
+    return this.requestRaw('/restaurant/photos', fd, 60000);
+  },
   deletePhoto(id){ return this.delete('/restaurant/photos?id='+encodeURIComponent(id)); },
   notes(){ return this.get('/restaurant/notes'); },
   addNote(body){ return this.post('/restaurant/notes', body); },
@@ -2019,8 +2120,6 @@ const Heartbeat = {
 function dataSourceNote(){
   return API.online ? '' : `<div style="font-size:11px;color:var(--amber-600);background:var(--amber-50);padding:6px 12px;border-radius:8px;margin-bottom:14px;text-align:center">${icon('info',{size:13})} داده‌ی نمونه (بک‌اند متصل نیست)</div>`;
 }
-// امنیت: escape کردن ورودی کاربر قبل از تزریق به HTML (جلوگیری از XSS)
-function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const RES = [
   {t:'۱۸:۳۰',name:'نیلوفر رضایی',party:2,table:3,status:'arrived',seg:'vip',pre:true,note:'تولد همسر',phone:'۰۹۱۲۱۱۱۲۲۳۳',date:'today',dLabel:'امروز'},
   {t:'۱۹:۰۰',name:'امیر حسینی',party:4,table:7,status:'confirmed',seg:'new',pre:false,note:'',phone:'۰۹۱۲۲۲۲۳۳۴۴',date:'today',dLabel:'امروز'},
@@ -2182,7 +2281,80 @@ const TITLES={overview:'داشبورد',reservations:'مدیریت رزروها'
 // ═══════════ ROUTING ═══════════
 
 </script>
-<script data-src="/js/routing.js">
+<script data-src="js/analytics.js">
+// ═══════════════════════════════════════════════════════════
+//  رزرونو (پنل کسب‌وکار) — امیترِ رویدادِ رفتاری (Data Platform · فاز۲)
+//
+//  اسکریپتِ کلاسیک (global، بدونِ import/export). رویدادها را دسته‌ای و بی‌صدا
+//  به POST /api/v1/telemetry می‌فرستد. هرگز چیزی نمی‌شکند (همه‌ی مسیرها try/catch)؛
+//  دمومود امن. ناشناس بر پایه‌ی sessionId. بعد از data.js (کلاینتِ API) بارگذاری شود.
+//  window.rzTrack(type, payload) را در دسترس می‌گذارد.
+//  معماری: docs/INTELLIGENCE-PLATFORM-ARCHITECTURE.md
+// ═══════════════════════════════════════════════════════════
+(function () {
+  'use strict';
+  var SOURCE = 'business';
+  var SID_KEY = 'rz_sid_biz';
+  var Q_KEY = 'rz_evq_biz';
+  var MAX_BATCH = 50;
+  var FLUSH_AT = 10;
+
+  function endpoint() {
+    var base = (typeof API !== 'undefined' && API && API.base) ? API.base : '';
+    return base + '/api/v1/telemetry';
+  }
+  function sessionId() {
+    try {
+      var s = localStorage.getItem(SID_KEY);
+      if (!s) { s = 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem(SID_KEY, s); }
+      return s;
+    } catch (e) { return 'anon'; }
+  }
+
+  var queue = [];
+  try { var raw = localStorage.getItem(Q_KEY); if (raw) queue = JSON.parse(raw) || []; } catch (e) { queue = []; }
+  function persist() { try { localStorage.setItem(Q_KEY, JSON.stringify(queue.slice(-200))); } catch (e) { /* سهمیه پر */ } }
+
+  function flush(useBeacon) {
+    if (!queue.length) return;
+    var batch = queue.slice(0, MAX_BATCH);
+    var body = JSON.stringify({ events: batch });
+    var url = endpoint();
+    if (useBeacon) {
+      try {
+        if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))) {
+          queue = queue.slice(batch.length); persist(); return;
+        }
+      } catch (e) { /* به fetch برگرد */ }
+    }
+    try {
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true })
+        .then(function (r) { if (r && r.ok) { queue = queue.slice(batch.length); persist(); } })
+        .catch(function () { /* آفلاین — در صف می‌ماند */ });
+    } catch (e) { /* no-op */ }
+  }
+
+  function track(type, payload) {
+    try {
+      queue.push({ type: String(type), occurredAt: new Date().toISOString(), source: SOURCE, sessionId: sessionId(), payload: payload || {} });
+      persist();
+      if (queue.length >= FLUSH_AT) flush(false);
+    } catch (e) { /* no-op */ }
+  }
+
+  try {
+    addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flush(true); });
+    addEventListener('pagehide', function () { flush(true); });
+  } catch (e) { /* no-op */ }
+
+  try { if (queue.length) flush(false); } catch (e) { /* no-op */ }
+
+  track('app.opened', {});
+  try { window.rzTrack = track; } catch (e) { /* no-op */ }
+})();
+
+</script>
+<script data-src="js/routing.js">
 // ═══ رزرونو — پنل business: مسیریابی بین صفحات (Vanilla JS، بدون build، scope مشترک) ═══
 // ═══════════ محدودسازیِ منو بر اساسِ مجوزِ کاربر ═══════════
 // نگاشتِ هر صفحه به مجوزی که بک‌اند برای endpointهای همان صفحه اعمال می‌کند.
@@ -2224,6 +2396,7 @@ function applyPermissionsToNav(){
 function nav(v){
   // دفاعِ لایه‌ی دوم: حتی اگر کسی دکمه را دور بزند، به صفحه‌ی بدونِ مجوز نمی‌رود.
   if (!canAccessView(v)) { if (typeof toast === 'function') toast('', 'دسترسی شما به این بخش محدود شده است'); return; }
+  try{ if(window.rzTrack) window.rzTrack('page.viewed',{page:v}); }catch(e){}
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.getElementById('v-'+v).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.toggle('active',i.dataset.v===v));
@@ -2309,7 +2482,7 @@ function toggleStatus(){
 // ═══════════ OVERVIEW ═══════════
 
 </script>
-<script data-src="/js/overview.js">
+<script data-src="js/overview.js">
 // ═══ رزرونو — پنل business: داشبورد Enterprise + به‌روزرسانی زنده (Vanilla JS، بدون build، scope مشترک) ═══
 function rOverview(){
   // ═══════════ داشبورد Enterprise — مرکز فرماندهی ═══════════
@@ -2716,7 +2889,7 @@ function viewCustomerHistory(name){
 // ═══════════ RESERVATIONS ═══════════
 
 </script>
-<script data-src="/js/reservations.js">
+<script data-src="js/reservations.js">
 // ═══ رزرونو — پنل business: رزروها + پلان طبقه (Vanilla JS، بدون build، scope مشترک) ═══
 let resDate='today', resQuery='';
 function rReservations(){
@@ -3102,7 +3275,7 @@ function syncTablesFromReservations(){
 // ═══════════ WAITLIST (داشبورد لیست انتظار) ═══════════
 
 </script>
-<script data-src="/js/waitlist.js">
+<script data-src="js/waitlist.js">
 // ═══ رزرونو — پنل business: داشبورد لیست انتظار (Vanilla JS، بدون build، scope مشترک) ═══
 // داده‌ی دمو فقط fallbackِ آفلاین است (وقتی توکن نیست یا سرور در دسترس نیست)؛
 // وقتی آنلاین باشیم، rWaitlist صف و آمار واقعی را از بک‌اند می‌گیرد.
@@ -3371,7 +3544,7 @@ function toastUndo(msg,undoFn){
 // ═══════════ CRM + GUEST AI ═══════════
 
 </script>
-<script data-src="/js/crm.js">
+<script data-src="js/crm.js">
 // ═══ رزرونو — پنل business: CRM + هوش مهمان + وفاداری (Vanilla JS، بدون build، scope مشترک) ═══
 // ═══════════ مشتریان (ادغام CRM + Smart Data + مارکتینگ) ═══════════
 let custTab='profiles';
@@ -3398,10 +3571,18 @@ function rProfile(){
   }
 }
 // بارگذاری گالری واقعی از /restaurant/photos
+// وضعیتِ بازبینی هم می‌آید: عکس تا تأییدِ پنلِ شرکت روی صفحه‌ی عمومی نمی‌رود
+// و رستوران‌دار باید همین‌جا ببیند کدام عکس منتشر شده و کدام نه.
+let GALLERY_COUNTS={total:0,approved:0,pending:0,rejected:0};
 async function loadGallery(){
   const res=await API.photos();
   if(res.ok && Array.isArray(res.data?.items)){
-    GALLERY=res.data.items.map(p=>({id:p.id,url:p.url,dataUrl:p.url,label:p.caption||'',emoji:'',type:p.category}));
+    GALLERY=res.data.items.map(p=>({
+      id:p.id, url:p.url, dataUrl:p.url, label:p.caption||'', emoji:'', type:p.category,
+      status:p.status||'approved', statusLabel:p.status_label||'', isPublic:p.is_public!==false,
+      reason:p.rejection_reason||'',
+    }));
+    GALLERY_COUNTS=res.data.counts||GALLERY_COUNTS;
   }
   return GALLERY;
 }
@@ -3445,23 +3626,46 @@ function profRenderGallery(){
 
     <div class="ai-box" style="margin-bottom:18px">
       <div class="ai-box-head"><div class="icn">${icon('image',{size:16})}</div><div class="ttl">عکس‌های مجموعه</div></div>
-      <div style="font-size:13px;color:var(--t1);line-height:1.6">عکس‌های باکیفیت از فضا، غذاها و محیط رستورانت آپلود کن. این عکس‌ها توی اپ مشتری و صفحه‌ی رستوران نمایش داده می‌شن و نقش مهمی توی جذب مشتری دارن.</div>
+      <div style="font-size:13px;color:var(--t1);line-height:1.6">عکس‌های باکیفیت از فضا، غذاها و محیط رستورانت آپلود کن. بعد از تأیید، توی اپ مشتری و صفحه‌ی رستوران نمایش داده می‌شن و نقش مهمی توی جذب مشتری دارن.</div>
     </div>
+    ${GALLERY_COUNTS.pending?`
+    <div class="panel" style="margin-bottom:14px;border-inline-start:3px solid var(--brand-500)">
+      <div style="padding:14px 16px;display:flex;gap:10px;align-items:center">
+        <span style="color:var(--brand-500);flex:0 0 auto">${icon('clock',{size:18})}</span>
+        <div style="font-size:13px;line-height:1.6;color:var(--t1)">
+          <b>${fa(GALLERY_COUNTS.pending)} عکس در انتظار تأییده.</b>
+          تیم رزرونو معمولاً توی چند ساعت کاری بررسی می‌کنه. تا اون موقع فقط خودت این عکس‌ها رو می‌بینی.
+        </div>
+      </div>
+    </div>`:''}
     <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">گالری (${fa(GALLERY.length)} عکس)</div><div class="panel-sub">برای افزودن روی + بزن</div></div></div>
+      <div class="panel-head"><div><div class="panel-title">گالری (${fa(GALLERY_COUNTS.approved||0)} عکس منتشرشده)</div><div class="panel-sub">برای افزودن روی + بزن — عکس بعد از تأیید منتشر می‌شه</div></div></div>
       <div class="gallery-grid" id="galGrid">
-        ${GALLERY.map((g,i)=>`<div class="gal-item">
+        ${GALLERY.map((g,i)=>`<div class="gal-item${g.status&&g.status!=='approved'?' gal-item--'+g.status:''}">
           ${(g.url||g.dataUrl)?`<img src="${g.url||g.dataUrl}" alt="${esc(g.label)}">`:`<span class="gal-emoji">${g.emoji}</span>`}
           <button class="gal-del" onclick="removeGalleryImg(${i})">×</button>
           <span class="gal-tag">${g.type==='food'?'غذا':g.type==='interior'?'فضا':g.type==='drink'?'نوشیدنی':g.type==='event'?'رویداد':'عکس'}</span>
+          ${g.status==='pending'?`<span class="gal-status gal-status--pending">${icon('clock',{size:11})} در انتظار تأیید</span>`:''}
+          ${g.status==='rejected'?`<span class="gal-status gal-status--rejected" onclick="showRejectReason(${i})">${icon('info',{size:11})} رد شد</span>`:''}
         </div>`).join('')}
-        <button class="gal-upload" onclick="openAddPhotoByUrl()">
+        <button class="gal-upload" onclick="document.getElementById('galInput').click()">
           <span class="up-ic">${icon('plus',{size:18})}</span><span class="up-tx">افزودن عکس</span>
         </button>
       </div>
-      <input type="file" id="galInput" accept="image/*" multiple style="display:none" onchange="handleGalleryUpload(this)">
-      <div style="font-size:11px;color:var(--t3);margin-top:14px;line-height:1.5">${icon('info',{size:12})} عکس‌ها با لینک اضافه می‌شن (آپلود مستقیم فایل در فاز بعدی فعال می‌شه)</div>
+      <input type="file" id="galInput" accept="image/jpeg,image/png,image/webp" multiple style="display:none" onchange="handleGalleryUpload(this)">
+      <div style="font-size:11px;color:var(--t3);margin-top:14px;line-height:1.5">${icon('info',{size:12})} JPEG، PNG یا WebP — حداکثر ۸ مگابایت و دستِ‌کم ۲۰۰×۲۰۰ پیکسل. هر عکس پیش از انتشار توسط تیم رزرونو بررسی می‌شه.</div>
     </div>`;
+}
+
+// دلیلِ رد را نشان می‌دهد. بدونِ این، رستوران‌دار فقط می‌بیند عکسش «نیامده»
+// و همان فایل را دوباره آپلود می‌کند.
+function showRejectReason(i){
+  const g=GALLERY[i];
+  openModal(`
+    <div class="modal-title">${icon('info',{size:18})} این عکس رد شد</div>
+    <div class="modal-sub" style="line-height:1.8">${g.reason?esc(g.reason):'دلیلی ثبت نشده. می‌تونی با پشتیبانی تماس بگیری یا نسخه‌ی بهتری آپلود کنی.'}</div>
+    <button class="btn btn-danger btn-block" style="margin-top:14px" onclick="doRemoveGallery(${i})">حذف این عکس</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">بستن</button>`);
 }
 
 // ─── ویرایش لوگو ───
@@ -3558,46 +3762,79 @@ function saveRestName(){
   closeModal();profRenderGallery();
   toast('','نام رستوران به‌روز شد');
 }
+// ─── آپلود مستقیم فایل ───
+// محدودیت‌ها عیناً همان‌هایی‌اند که سرور اعمال می‌کند (src/lib/media.ts).
+// چکِ سمتِ کلاینت فقط برای این است که کاربر ۸ مگابایت را بی‌خود آپلود نکند و
+// بعد رد بشود؛ تصمیمِ واقعی همیشه سمتِ سرور گرفته می‌شود.
+const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
+const PHOTO_TYPES = ['image/jpeg','image/png','image/webp'];
+let pendingPhotoFiles = [];
+
 function handleGalleryUpload(input){
   const files=Array.from(input.files||[]);
+  input.value='';                       // تا انتخابِ دوباره‌ی همان فایل هم رویداد بدهد
   if(!files.length)return;
-  // آپلود فایل به فضای ذخیره‌سازی هنوز در بک‌اند راه‌اندازی نشده (فاز ذخیره‌سازی عکس).
-  // فعلاً صادقانه به کاربر می‌گیم و راه واقعی (افزودن با لینک) رو پیشنهاد می‌دیم.
-  input.value='';
-  openModal(`
-    <div style="text-align:center">
-      <div style="width:52px;height:52px;border-radius:14px;background:var(--amber-50);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;color:var(--brand-500)">${icon('upload',{size:24})}</div>
-      <div class="modal-title" style="text-align:center">آپلود مستقیم فایل هنوز فعال نیست</div>
-      <div class="modal-sub" style="text-align:center;line-height:1.7">فضای ذخیره‌سازی عکس (مثل S3) هنوز راه‌اندازی نشده. فعلاً می‌تونی عکست رو که جایی آنلاینه با لینک اضافه کنی — این واقعاً ذخیره می‌شه.</div>
-      <button class="btn btn-primary btn-block btn-lg" onclick="openAddPhotoByUrl()">افزودن عکس با لینک</button>
-      <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">بعداً</button>
-    </div>`);
+  if(!API.getToken()){toast('','برای افزودن عکس باید وارد شده باشی');return}
+
+  const tooBig=files.filter(f=>f.size>PHOTO_MAX_BYTES);
+  const wrongType=files.filter(f=>!PHOTO_TYPES.includes(f.type));
+  pendingPhotoFiles=files.filter(f=>f.size<=PHOTO_MAX_BYTES && PHOTO_TYPES.includes(f.type));
+
+  if(!pendingPhotoFiles.length){
+    toast('', tooBig.length?'حجم عکس نباید از ۸ مگابایت بیشتر باشه':'فقط JPEG، PNG یا WebP');
+    return;
+  }
+  openPhotoDetails(tooBig.length+wrongType.length);
 }
-function openAddPhotoByUrl(){
+
+function openPhotoDetails(skipped){
+  const n=pendingPhotoFiles.length;
   openModal(`
-    <div class="modal-title">${icon('image',{size:18})} افزودن عکس با لینک</div>
-    <div class="modal-sub">آدرس عکس (با http یا https شروع بشه)</div>
-    <div class="field-label">آدرس عکس</div>
-    <input class="inp" id="photoUrl" placeholder="https://..." inputmode="url" dir="ltr">
+    <div class="modal-title">${icon('upload',{size:18})} افزودن ${fa(n)} عکس</div>
+    <div class="modal-sub">این عکس‌ها بعد از تأیید تیم رزرونو روی صفحه‌ی رستورانت منتشر می‌شن</div>
+    ${skipped?`<div style="font-size:12px;color:var(--danger);margin-bottom:10px">${fa(skipped)} فایل نادیده گرفته شد (حجم بیش از ۸ مگابایت یا قالب غیرمجاز)</div>`:''}
+    <div class="gallery-grid" style="margin-bottom:14px">
+      ${pendingPhotoFiles.map((f,i)=>`<div class="gal-item"><img id="pvw${i}" alt="${esc(f.name)}"></div>`).join('')}
+    </div>
     <div class="field-label">دسته</div>
     <select class="inp" id="photoCat"><option value="food">غذا</option><option value="interior">فضا</option><option value="drink">نوشیدنی</option><option value="event">رویداد</option><option value="other">سایر</option></select>
     <div class="field-label">توضیح (اختیاری)</div>
     <input class="inp" id="photoCap" placeholder="مثلاً پاستا کربونارا">
-    <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" onclick="submitPhotoUrl()">افزودن</button>
+    <button class="btn btn-primary btn-block btn-lg" id="photoSubmit" style="margin-top:14px" onclick="submitPhotoUpload()">آپلود و ارسال برای تأیید</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>`);
-  setTimeout(()=>document.getElementById('photoUrl')?.focus(),150);
+
+  // پیش‌نمایشِ محلی با blob URL — بدونِ رفت‌وبرگشت به سرور.
+  pendingPhotoFiles.forEach((f,i)=>{
+    const img=document.getElementById('pvw'+i);
+    if(!img)return;
+    const u=URL.createObjectURL(f);
+    img.src=u;
+    // آزادسازیِ حافظه پس از رندر؛ بدونِ این، انتخابِ چندباره نشت می‌کند.
+    img.onload=()=>URL.revokeObjectURL(u);
+  });
 }
-async function submitPhotoUrl(){
-  const url=(document.getElementById('photoUrl')?.value||'').trim();
-  if(!/^https?:\/\//.test(url)){toast('','آدرس باید با http یا https شروع بشه');return}
+
+async function submitPhotoUpload(){
   const category=document.getElementById('photoCat')?.value||'food';
   const caption=(document.getElementById('photoCap')?.value||'').trim();
-  if(!API.getToken()){toast('','برای افزودن عکس باید وارد شده باشی');return}
-  const res=await API.addPhoto({url,category,caption});
-  if(!res.ok){toast('',res.error?.message||'افزودن عکس ناموفق بود');return}
+  const btn=document.getElementById('photoSubmit');
+  if(btn){btn.disabled=true;btn.textContent='در حال آپلود…';}
+
+  let ok=0; const errors=[];
+  for(const [i,file] of pendingPhotoFiles.entries()){
+    if(btn) btn.textContent=`در حال آپلود ${fa(i+1)} از ${fa(pendingPhotoFiles.length)}…`;
+    const res=await API.uploadPhoto(file,{category,caption});
+    if(res.ok) ok++; else errors.push(res.error?.message||'خطای نامشخص');
+  }
+
+  pendingPhotoFiles=[];
   await loadGallery();
-  closeModal();profRenderGallery();
-  toast('',`عکس اضافه شد (${fa(GALLERY.length)} عکس)`);
+  closeModal();
+  profRenderGallery();
+
+  if(ok && !errors.length) toast('',`${fa(ok)} عکس آپلود شد و برای تأیید فرستاده شد`);
+  else if(ok) toast('',`${fa(ok)} عکس آپلود شد · ${fa(errors.length)} ناموفق: ${errors[0]}`);
+  else toast('',errors[0]||'آپلود ناموفق بود');
 }
 function removeGalleryImg(i){
   const g=GALLERY[i];
@@ -4103,7 +4340,21 @@ function handleAiAction(id){
   else if(id==='noshow_upcoming'){ nav('reservations'); }
   else { toast('','این اقدام به‌زودی به‌صورت خودکار قابل‌اجراست'); }
 }
-// ═══════════ LOYALTY ═══════════
+// ═══════════ LOYALTY → منتقل شد به loyalty.js (rLoyalty + addMember) ═══════════
+// memCounter اینجا می‌ماند چون data.js آن را mutate می‌کند (VIS-code counter).
+let memCounter=1006;
+// ═══════════ MARKETING ═══════════
+
+</script>
+<script data-src="js/loyalty.js">
+// ═══════════════════════════════════════════════════════════
+//  رزرونو (پنل کسب‌وکار) — باشگاه مشتریان (Loyalty)
+//  از crm.js جدا شد (جداسازیِ مسئولیت). رفتار دقیقاً همان قبل است.
+//  اسکریپتِ کلاسیک (global)، بدون import/export. وابسته به گلوبال‌های
+//  data.js: CLUB, CUR_MONTH, loadClubMembers, enrollClub — و
+//  fa/icon/esc/toast/API. بعد از crm.js و data.js بارگذاری می‌شود.
+//  توجه: memCounter عمداً در crm.js می‌ماند (data.js آن را mutate می‌کند).
+// ═══════════════════════════════════════════════════════════
 async function rLoyalty(){
   // اگر توکن staff داریم، از API بارگذاری کن
   if(API.getToken()){
@@ -4175,7 +4426,6 @@ async function rLoyalty(){
       </div>
     </div>`;
 }
-let memCounter=1006;
 function addMember(){
   const fn=document.getElementById('cFn').value.trim(),ln=document.getElementById('cLn').value.trim(),ph=document.getElementById('cPh').value.trim();
   if(!fn||!ln){toast('','نام و فامیل رو وارد کن');return}
@@ -4192,10 +4442,9 @@ function addMember(){
   // رفرش آمار بعد از ۱.۵ ثانیه تا کاربر کد رو ببینه
   setTimeout(()=>{if(document.getElementById('v-loyalty').classList.contains('active'))rLoyalty()},1800);
 }
-// ═══════════ MARKETING ═══════════
 
 </script>
-<script data-src="/js/marketing.js">
+<script data-src="js/marketing.js">
 // ═══ رزرونو — پنل business: مارکتینگ + آنالیتیکس + هوش رستوران (Vanilla JS، بدون build، scope مشترک) ═══
 let selSeg=null;
 // ═══════════ صفحه‌ی «بازاریابی»: کوپن‌ها + اتوماسیون (وصل به بک‌اند واقعی) ═══════════
@@ -4499,7 +4748,7 @@ function rAnalyticsTail(){
 // ═══════════ STAFF ═══════════
 
 </script>
-<script data-src="/js/staff-system.js">
+<script data-src="js/staff-system.js">
 // ═══ رزرونو — پنل business: کارکنان + مودال + اعلان + کش‌بک + init (Vanilla JS، بدون build، scope مشترک) ═══
 // داده‌ی دمو فقط fallbackِ آفلاین است (وقتی توکن نیست یا سرور در دسترس نیست).
 const STAFF_DEMO=[
@@ -4833,6 +5082,10 @@ async function staffSendOtp(){
   _staffPhone = normalized;
   const btn = document.getElementById('staffSendBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'در حال ارسال...'; }
+  if (location.protocol === 'file:') {
+    showStaffLoginCode('۱۲۳۴', true);
+    return;
+  }
   const res = await API.requestStaffOtp(normalized);
   if (!res.ok && !res.offline){
     // خطای واقعی (مثلاً شماره staff نیست)
@@ -4861,6 +5114,11 @@ async function staffConfirmOtp(){
   if (!/^\d{4,6}$/.test(code)) { toast('','کد ورود رو کامل وارد کن'); return; }
   const btn = document.getElementById('staffVerifyBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+  if (location.protocol === 'file:') {
+    if (code === '1234'){ STAFF_INFO = { role:'owner', restaurant_name:'کافه‌رستوران ویستا' }; enterPanel(true); }
+    else { toast('','در حالت دمو، کد ۱۲۳۴ است'); if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } }
+    return;
+  }
   const res = await API.verifyStaffOtp(_staffPhone, code);
   if (res.ok && res.data?.staff){
     STAFF_INFO = res.data.staff;
@@ -4924,7 +5182,7 @@ if (API.getToken()) {
 }
 
 </script>
-<script data-src="/js/chat.js">
+<script data-src="js/chat.js">
 // ═══════════ رزرونو — پنل business: چت با مشتریان (Polling) ═══════════
 // اینباکس گفتگوها + پنجره‌ی گفتگو. scope مشترک (بدون import، مثل بقیه‌ی فایل‌ها).
 

@@ -24,10 +24,18 @@ function rProfile(){
   }
 }
 // بارگذاری گالری واقعی از /restaurant/photos
+// وضعیتِ بازبینی هم می‌آید: عکس تا تأییدِ پنلِ شرکت روی صفحه‌ی عمومی نمی‌رود
+// و رستوران‌دار باید همین‌جا ببیند کدام عکس منتشر شده و کدام نه.
+let GALLERY_COUNTS={total:0,approved:0,pending:0,rejected:0};
 async function loadGallery(){
   const res=await API.photos();
   if(res.ok && Array.isArray(res.data?.items)){
-    GALLERY=res.data.items.map(p=>({id:p.id,url:p.url,dataUrl:p.url,label:p.caption||'',emoji:'',type:p.category}));
+    GALLERY=res.data.items.map(p=>({
+      id:p.id, url:p.url, dataUrl:p.url, label:p.caption||'', emoji:'', type:p.category,
+      status:p.status||'approved', statusLabel:p.status_label||'', isPublic:p.is_public!==false,
+      reason:p.rejection_reason||'',
+    }));
+    GALLERY_COUNTS=res.data.counts||GALLERY_COUNTS;
   }
   return GALLERY;
 }
@@ -71,23 +79,46 @@ function profRenderGallery(){
 
     <div class="ai-box" style="margin-bottom:18px">
       <div class="ai-box-head"><div class="icn">${icon('image',{size:16})}</div><div class="ttl">عکس‌های مجموعه</div></div>
-      <div style="font-size:13px;color:var(--t1);line-height:1.6">عکس‌های باکیفیت از فضا، غذاها و محیط رستورانت آپلود کن. این عکس‌ها توی اپ مشتری و صفحه‌ی رستوران نمایش داده می‌شن و نقش مهمی توی جذب مشتری دارن.</div>
+      <div style="font-size:13px;color:var(--t1);line-height:1.6">عکس‌های باکیفیت از فضا، غذاها و محیط رستورانت آپلود کن. بعد از تأیید، توی اپ مشتری و صفحه‌ی رستوران نمایش داده می‌شن و نقش مهمی توی جذب مشتری دارن.</div>
     </div>
+    ${GALLERY_COUNTS.pending?`
+    <div class="panel" style="margin-bottom:14px;border-inline-start:3px solid var(--brand-500)">
+      <div style="padding:14px 16px;display:flex;gap:10px;align-items:center">
+        <span style="color:var(--brand-500);flex:0 0 auto">${icon('clock',{size:18})}</span>
+        <div style="font-size:13px;line-height:1.6;color:var(--t1)">
+          <b>${fa(GALLERY_COUNTS.pending)} عکس در انتظار تأییده.</b>
+          تیم رزرونو معمولاً توی چند ساعت کاری بررسی می‌کنه. تا اون موقع فقط خودت این عکس‌ها رو می‌بینی.
+        </div>
+      </div>
+    </div>`:''}
     <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">گالری (${fa(GALLERY.length)} عکس)</div><div class="panel-sub">برای افزودن روی + بزن</div></div></div>
+      <div class="panel-head"><div><div class="panel-title">گالری (${fa(GALLERY_COUNTS.approved||0)} عکس منتشرشده)</div><div class="panel-sub">برای افزودن روی + بزن — عکس بعد از تأیید منتشر می‌شه</div></div></div>
       <div class="gallery-grid" id="galGrid">
-        ${GALLERY.map((g,i)=>`<div class="gal-item">
+        ${GALLERY.map((g,i)=>`<div class="gal-item${g.status&&g.status!=='approved'?' gal-item--'+g.status:''}">
           ${(g.url||g.dataUrl)?`<img src="${g.url||g.dataUrl}" alt="${esc(g.label)}">`:`<span class="gal-emoji">${g.emoji}</span>`}
           <button class="gal-del" onclick="removeGalleryImg(${i})">×</button>
           <span class="gal-tag">${g.type==='food'?'غذا':g.type==='interior'?'فضا':g.type==='drink'?'نوشیدنی':g.type==='event'?'رویداد':'عکس'}</span>
+          ${g.status==='pending'?`<span class="gal-status gal-status--pending">${icon('clock',{size:11})} در انتظار تأیید</span>`:''}
+          ${g.status==='rejected'?`<span class="gal-status gal-status--rejected" onclick="showRejectReason(${i})">${icon('info',{size:11})} رد شد</span>`:''}
         </div>`).join('')}
-        <button class="gal-upload" onclick="openAddPhotoByUrl()">
+        <button class="gal-upload" onclick="document.getElementById('galInput').click()">
           <span class="up-ic">${icon('plus',{size:18})}</span><span class="up-tx">افزودن عکس</span>
         </button>
       </div>
-      <input type="file" id="galInput" accept="image/*" multiple style="display:none" onchange="handleGalleryUpload(this)">
-      <div style="font-size:11px;color:var(--t3);margin-top:14px;line-height:1.5">${icon('info',{size:12})} عکس‌ها با لینک اضافه می‌شن (آپلود مستقیم فایل در فاز بعدی فعال می‌شه)</div>
+      <input type="file" id="galInput" accept="image/jpeg,image/png,image/webp" multiple style="display:none" onchange="handleGalleryUpload(this)">
+      <div style="font-size:11px;color:var(--t3);margin-top:14px;line-height:1.5">${icon('info',{size:12})} JPEG، PNG یا WebP — حداکثر ۸ مگابایت و دستِ‌کم ۲۰۰×۲۰۰ پیکسل. هر عکس پیش از انتشار توسط تیم رزرونو بررسی می‌شه.</div>
     </div>`;
+}
+
+// دلیلِ رد را نشان می‌دهد. بدونِ این، رستوران‌دار فقط می‌بیند عکسش «نیامده»
+// و همان فایل را دوباره آپلود می‌کند.
+function showRejectReason(i){
+  const g=GALLERY[i];
+  openModal(`
+    <div class="modal-title">${icon('info',{size:18})} این عکس رد شد</div>
+    <div class="modal-sub" style="line-height:1.8">${g.reason?esc(g.reason):'دلیلی ثبت نشده. می‌تونی با پشتیبانی تماس بگیری یا نسخه‌ی بهتری آپلود کنی.'}</div>
+    <button class="btn btn-danger btn-block" style="margin-top:14px" onclick="doRemoveGallery(${i})">حذف این عکس</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">بستن</button>`);
 }
 
 // ─── ویرایش لوگو ───
@@ -184,46 +215,79 @@ function saveRestName(){
   closeModal();profRenderGallery();
   toast('','نام رستوران به‌روز شد');
 }
+// ─── آپلود مستقیم فایل ───
+// محدودیت‌ها عیناً همان‌هایی‌اند که سرور اعمال می‌کند (src/lib/media.ts).
+// چکِ سمتِ کلاینت فقط برای این است که کاربر ۸ مگابایت را بی‌خود آپلود نکند و
+// بعد رد بشود؛ تصمیمِ واقعی همیشه سمتِ سرور گرفته می‌شود.
+const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
+const PHOTO_TYPES = ['image/jpeg','image/png','image/webp'];
+let pendingPhotoFiles = [];
+
 function handleGalleryUpload(input){
   const files=Array.from(input.files||[]);
+  input.value='';                       // تا انتخابِ دوباره‌ی همان فایل هم رویداد بدهد
   if(!files.length)return;
-  // آپلود فایل به فضای ذخیره‌سازی هنوز در بک‌اند راه‌اندازی نشده (فاز ذخیره‌سازی عکس).
-  // فعلاً صادقانه به کاربر می‌گیم و راه واقعی (افزودن با لینک) رو پیشنهاد می‌دیم.
-  input.value='';
-  openModal(`
-    <div style="text-align:center">
-      <div style="width:52px;height:52px;border-radius:14px;background:var(--amber-50);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;color:var(--brand-500)">${icon('upload',{size:24})}</div>
-      <div class="modal-title" style="text-align:center">آپلود مستقیم فایل هنوز فعال نیست</div>
-      <div class="modal-sub" style="text-align:center;line-height:1.7">فضای ذخیره‌سازی عکس (مثل S3) هنوز راه‌اندازی نشده. فعلاً می‌تونی عکست رو که جایی آنلاینه با لینک اضافه کنی — این واقعاً ذخیره می‌شه.</div>
-      <button class="btn btn-primary btn-block btn-lg" onclick="openAddPhotoByUrl()">افزودن عکس با لینک</button>
-      <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">بعداً</button>
-    </div>`);
+  if(!API.getToken()){toast('','برای افزودن عکس باید وارد شده باشی');return}
+
+  const tooBig=files.filter(f=>f.size>PHOTO_MAX_BYTES);
+  const wrongType=files.filter(f=>!PHOTO_TYPES.includes(f.type));
+  pendingPhotoFiles=files.filter(f=>f.size<=PHOTO_MAX_BYTES && PHOTO_TYPES.includes(f.type));
+
+  if(!pendingPhotoFiles.length){
+    toast('', tooBig.length?'حجم عکس نباید از ۸ مگابایت بیشتر باشه':'فقط JPEG، PNG یا WebP');
+    return;
+  }
+  openPhotoDetails(tooBig.length+wrongType.length);
 }
-function openAddPhotoByUrl(){
+
+function openPhotoDetails(skipped){
+  const n=pendingPhotoFiles.length;
   openModal(`
-    <div class="modal-title">${icon('image',{size:18})} افزودن عکس با لینک</div>
-    <div class="modal-sub">آدرس عکس (با http یا https شروع بشه)</div>
-    <div class="field-label">آدرس عکس</div>
-    <input class="inp" id="photoUrl" placeholder="https://..." inputmode="url" dir="ltr">
+    <div class="modal-title">${icon('upload',{size:18})} افزودن ${fa(n)} عکس</div>
+    <div class="modal-sub">این عکس‌ها بعد از تأیید تیم رزرونو روی صفحه‌ی رستورانت منتشر می‌شن</div>
+    ${skipped?`<div style="font-size:12px;color:var(--danger);margin-bottom:10px">${fa(skipped)} فایل نادیده گرفته شد (حجم بیش از ۸ مگابایت یا قالب غیرمجاز)</div>`:''}
+    <div class="gallery-grid" style="margin-bottom:14px">
+      ${pendingPhotoFiles.map((f,i)=>`<div class="gal-item"><img id="pvw${i}" alt="${esc(f.name)}"></div>`).join('')}
+    </div>
     <div class="field-label">دسته</div>
     <select class="inp" id="photoCat"><option value="food">غذا</option><option value="interior">فضا</option><option value="drink">نوشیدنی</option><option value="event">رویداد</option><option value="other">سایر</option></select>
     <div class="field-label">توضیح (اختیاری)</div>
     <input class="inp" id="photoCap" placeholder="مثلاً پاستا کربونارا">
-    <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" onclick="submitPhotoUrl()">افزودن</button>
+    <button class="btn btn-primary btn-block btn-lg" id="photoSubmit" style="margin-top:14px" onclick="submitPhotoUpload()">آپلود و ارسال برای تأیید</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>`);
-  setTimeout(()=>document.getElementById('photoUrl')?.focus(),150);
+
+  // پیش‌نمایشِ محلی با blob URL — بدونِ رفت‌وبرگشت به سرور.
+  pendingPhotoFiles.forEach((f,i)=>{
+    const img=document.getElementById('pvw'+i);
+    if(!img)return;
+    const u=URL.createObjectURL(f);
+    img.src=u;
+    // آزادسازیِ حافظه پس از رندر؛ بدونِ این، انتخابِ چندباره نشت می‌کند.
+    img.onload=()=>URL.revokeObjectURL(u);
+  });
 }
-async function submitPhotoUrl(){
-  const url=(document.getElementById('photoUrl')?.value||'').trim();
-  if(!/^https?:\/\//.test(url)){toast('','آدرس باید با http یا https شروع بشه');return}
+
+async function submitPhotoUpload(){
   const category=document.getElementById('photoCat')?.value||'food';
   const caption=(document.getElementById('photoCap')?.value||'').trim();
-  if(!API.getToken()){toast('','برای افزودن عکس باید وارد شده باشی');return}
-  const res=await API.addPhoto({url,category,caption});
-  if(!res.ok){toast('',res.error?.message||'افزودن عکس ناموفق بود');return}
+  const btn=document.getElementById('photoSubmit');
+  if(btn){btn.disabled=true;btn.textContent='در حال آپلود…';}
+
+  let ok=0; const errors=[];
+  for(const [i,file] of pendingPhotoFiles.entries()){
+    if(btn) btn.textContent=`در حال آپلود ${fa(i+1)} از ${fa(pendingPhotoFiles.length)}…`;
+    const res=await API.uploadPhoto(file,{category,caption});
+    if(res.ok) ok++; else errors.push(res.error?.message||'خطای نامشخص');
+  }
+
+  pendingPhotoFiles=[];
   await loadGallery();
-  closeModal();profRenderGallery();
-  toast('',`عکس اضافه شد (${fa(GALLERY.length)} عکس)`);
+  closeModal();
+  profRenderGallery();
+
+  if(ok && !errors.length) toast('',`${fa(ok)} عکس آپلود شد و برای تأیید فرستاده شد`);
+  else if(ok) toast('',`${fa(ok)} عکس آپلود شد · ${fa(errors.length)} ناموفق: ${errors[0]}`);
+  else toast('',errors[0]||'آپلود ناموفق بود');
 }
 function removeGalleryImg(i){
   const g=GALLERY[i];
@@ -488,7 +552,7 @@ let custSort='churn';
 async function custRenderProfiles(){
   const el=document.getElementById('ct-profiles');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای دیدن این بخش وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const res=await API.customers('sort='+custSort+'&limit=20');
   if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
   const items=res.data.items||[];
@@ -545,7 +609,7 @@ async function loadHours(){
 
 function profRenderHours(){
   const el=document.getElementById('pt-hours'); if(!el) return;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای ویرایش ساعات کاری وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const oh=HOURS_STATE.opening_hours||{};
   el.innerHTML=`
     <div class="panel">
@@ -689,7 +753,7 @@ async function custRenderCampaign(){
 async function loadCampaignHistory(){
   const el=document.getElementById('campHistoryList');
   if(!el)return;
-  if(!API.getToken()){ el.innerHTML='برای دیدن تاریخچه وارد شو'; return; }
+  if(!API.getToken()){ el.innerHTML='تاریخچه به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست'; return; }
   const res=await API.campaignHistory();
   if(!res.ok){ el.innerHTML=`<div class="error-state"><div class="error-state-icon">${icon('alert',{size:32})}</div><div>بارگذاری تاریخچه ناموفق بود</div></div>`; return; }
   const logs=res.data.items||[];
@@ -703,7 +767,7 @@ async function loadCampaignHistory(){
 async function custRenderAI(){
   const el=document.getElementById('ct-ai');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای دیدن این بخش وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const res=await API.aiRecommendations();
   if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
   const cards=res.data.cards||[];

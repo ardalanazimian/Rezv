@@ -1,0 +1,105 @@
+// ═══════════════════════════════════════════════════════════════════════
+//  ساختِ Metadata — یک جا، تا هیچ صفحه‌ای بدونِ canonical/OG/Twitter نماند.
+//
+//  هر صفحه فقط عنوان/توضیح/مسیر می‌دهد؛ بقیه (canonical، hreflang، Open Graph،
+//  Twitter Card، robots) اینجا یکدست ساخته می‌شوند.
+// ═══════════════════════════════════════════════════════════════════════
+import type { Metadata } from 'next';
+import { SITE, alternates } from './i18n';
+import { BRAND_NAME } from './site-schema';
+import type { SiteSeo } from './content-types';
+
+export interface PageSeoInput {
+  title: string;
+  description: string;
+  path: string;                 // با «/» شروع می‌شود
+  keywords?: string[];
+  image?: string | null;        // آدرسِ کاملِ تصویرِ اشتراک‌گذاری
+  noindex?: boolean;
+  type?: 'website' | 'article';
+  publishedTime?: string | null;
+  modifiedTime?: string | null;
+  tags?: string[];
+}
+
+/** تصویرِ پیش‌فرضِ اشتراک‌گذاری — از روتِ opengraph-image ساخته می‌شود. */
+function defaultImage(path: string): string {
+  return `${SITE}${path === '/' ? '' : path}/opengraph-image`;
+}
+
+/**
+ * عنوانِ نهایی برای تگِ <title>.
+ *
+ * لایه‌اوت قالبِ «%s | رزرونو» دارد. اگر عنوانِ صفحه خودش نامِ برند را داشته
+ * باشد، قالب دوباره‌اش می‌چسباند و نتیجه می‌شود «درباره رزرونو | تیم | رزرونو».
+ * در اینجا با absolute جلوی تکرار گرفته می‌شود.
+ *
+ * این حالتِ رایج است نه استثنا: هم عنوان‌های پیش‌فرضِ صفحه‌ها و هم فیلدِ سئویی
+ * که مدیر در استودیو می‌نویسد معمولاً نامِ برند را دارند.
+ */
+function titleField(title: string): string | { absolute: string } {
+  return title.includes(BRAND_NAME) ? { absolute: title } : title;
+}
+
+export function buildMetadata(input: PageSeoInput): Metadata {
+  const url = `${SITE}${input.path}`;
+  const image = input.image ?? defaultImage(input.path);
+
+  const meta: Metadata = {
+    title: titleField(input.title),
+    description: input.description,
+    alternates: alternates(input.path),
+    keywords: input.keywords?.length ? input.keywords : undefined,
+    robots: input.noindex
+      ? { index: false, follow: true }
+      : {
+          index: true,
+          follow: true,
+          googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+        },
+    openGraph: {
+      type: input.type ?? 'website',
+      url,
+      siteName: BRAND_NAME,
+      locale: 'fa_IR',
+      title: input.title,
+      description: input.description,
+      images: [{ url: image, width: 1200, height: 630, alt: input.title }],
+      ...(input.type === 'article'
+        ? {
+            publishedTime: input.publishedTime ?? undefined,
+            modifiedTime: input.modifiedTime ?? undefined,
+            tags: input.tags,
+          }
+        : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: input.title,
+      description: input.description,
+      images: [image],
+    },
+  };
+
+  return meta;
+}
+
+/**
+ * متادیتای صفحه‌ای که محتوایش از CMS می‌آید. فیلدهای سئوی صفحه بر عنوان/توضیحِ
+ * پیش‌فرض غالب‌اند — یعنی ویرایشِ سئو در استودیو واقعاً روی تگ‌ها اثر می‌گذارد.
+ */
+export function metadataFromCms(
+  seo: SiteSeo | undefined,
+  fallbackTitle: string,
+  fallbackDescription: string,
+  path: string,
+): Metadata {
+  return buildMetadata({
+    title: seo?.title || fallbackTitle,
+    description: seo?.description || fallbackDescription,
+    path,
+    keywords: seo?.keywords,
+    image: seo?.og_image || null,
+    noindex: seo?.noindex ?? false,
+  });
+}

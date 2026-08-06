@@ -34,6 +34,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build (Next.js)
         run: npm run build
         env:
@@ -103,8 +106,9 @@ jobs:
           # لازم چون middleware در production نبودِ آن را خطا می‌دهد؛
           # مقدارِ ساختگی فقط برای عبورِ build است، نه استفاده‌ی واقعی.
           ALLOWED_ORIGINS: https://ci.example.invalid
-          JWT_SECRET: ci-test-secret
-          JWT_REFRESH_SECRET: ci-test-refresh-secret
+          # حداقل ۳۲ کاراکتر — همان قیدی که jwt.ts در زمانِ اجرا اعمال می‌کند.
+          JWT_SECRET: ci-test-secret-at-least-32-chars-long
+          JWT_REFRESH_SECRET: ci-test-refresh-secret-at-least-32-chars
 
   # ── مرحله ۳: چک امنیتی پایه ──
   security:
@@ -193,4 +197,32 @@ jobs:
       - name: Schema unit tests (JSON-LD sanity — پایشِ خودکار)
         run: npm test
       - name: Build (Next.js — typecheck + lint + build)
+        run: npm run build
+
+  # ── وب‌سایتِ عمومی (apps/landing · Next.js SSR/ISR، ADR 0002) ──
+  # اپِ جدا از apps/seo با دامنه، sitemap و canonicalِ مستقلِ خودش.
+  # build عمداً بدونِ SITE_API_BASE اجرا می‌شود: باید در «حالتِ امن» (بدونِ API)
+  # هم سبز باشد، وگرنه یک قطعیِ API می‌تواند دیپلوی را هم زمین بزند.
+  landing:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/landing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/landing/package-lock.json
+      - name: Install dependencies
+        run: npm ci || npm install
+      - name: Unit tests (JSON-LD، Markdownِ امن، محتوای پیش‌فرض)
+        run: npm test
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Build (Next.js)
         run: npm run build

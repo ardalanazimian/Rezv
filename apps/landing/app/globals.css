@@ -1,0 +1,1057 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   وب‌سایتِ عمومیِ رزرونو — سیستمِ طراحی
+
+   ساختار (همان دو لایه‌ی shared/css/tokens.css):
+     ۱) Primitive — مقیاس‌ها و رنگ‌های خام
+     ۲) Semantic  — نقش‌ها (سطح، متن، حاشیه). فقط این‌ها در کامپوننت‌ها.
+
+   حالتِ روشن/تاریک: هر دو کاملاً طراحی شده‌اند. انتخابِ کاربر روی
+   <html data-theme> می‌نشیند و بر ترجیحِ سیستم غالب است.
+
+   شیشه (glass): فقط روی هدرِ چسبان و عناصرِ شناور، همیشه با یک لایه‌ی
+   پس‌زمینه‌ی مات زیرِ blur → متن هیچ‌وقت روی محتوای متحرک شناور نمی‌ماند.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Primitive: تایپوگرافی ── */
+  --fs-2xs: 0.6875rem;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: 2.25rem;
+  --fs-4xl: 2.875rem;
+  --fs-5xl: 3.75rem;
+
+  --lh-tight: 1.15;
+  --lh-snug: 1.35;
+  --lh-normal: 1.65;
+  --lh-relaxed: 1.9;
+
+  --ls-tight: -0.03em;
+  --ls-snug: -0.015em;
+
+  /* ── Primitive: فاصله (شبکه‌ی ۴px) ── */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.25rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
+  --sp-10: 2.5rem;
+  --sp-12: 3rem;
+  --sp-16: 4rem;
+  --sp-20: 5rem;
+  --sp-24: 6rem;
+  --sp-32: 8rem;
+
+  /* ── Primitive: شعاع ── */
+  --r-xs: 8px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-2xl: 32px;
+  --r-full: 9999px;
+
+  /* ── Primitive: کوچک‌ترین هدفِ لمسی (Apple HIG / Material) ──
+     هم‌ارزِ --touch-min در shared/css/tokens.css. عمداً اینجا هم تعریف شده:
+     این اپ توکن‌هایش را از shared نمی‌گیرد (دو سیستمِ موازی — ADR 0002)، پس
+     var(--touch-min) بدونِ این خط به هیچ resolve می‌شد و قاعده بی‌اثر بود. */
+  --touch-min: 44px;
+
+  /* ── Primitive: حرکت ── */
+  --t-fast: 130ms;
+  --t-base: 220ms;
+  --t-slow: 420ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* ── Primitive: برند — «شبِ سرویس» ──
+     زمینه از دنیای خودِ محصول می‌آید: سالنِ رستوران بعد از غروب. برای همین
+     خنثی‌ها گرم‌اند (متمایل به قهوه‌ای)، نه مشکیِ آبی‌مایلِ داشبوردی.
+     دو رنگِ گرمِ هم‌خانواده کار می‌کنند — اخرا (آتشِ آشپزخانه) و برنجی (نورِ
+     گرمِ سرویس) — نه یک رنگِ نئونِ تنها روی مشکی.
+     فیروزه‌ای عمداً رنگِ برند نیست: فقط معنای «زنده/آزاد» را حمل می‌کند. */
+  --ember-700: #a83c14;
+  --ember-600: #c74d1e;
+  --ember-500: #e2612c;   /* اخرا — رنگِ اصلیِ کنش */
+  --ember-400: #f07f4d;
+  --ember-300: #f7a37b;
+  --ember-100: #fce6da;
+  --ember-50:  #fdf3ee;
+
+  --brass-600: #a8801f;
+  --brass-500: #c79a2c;   /* برنجی — عددها، تأکیدِ گرم */
+  --brass-400: #ddb457;
+  --brass-300: #ebcd8b;
+
+  /* وضعیت‌های زنده — معنایی، نه تزئینی */
+  --live-500: #2aa87c;
+  --live-400: #45c99a;
+
+  --clay-500: #8c6a52;    /* خنثیِ گرمِ میانی، برای خط و جداکننده */
+
+  --container: 1200px;
+  --container-narrow: 760px;
+  --header-h: 68px;
+}
+
+/* ── Semantic: هر توکن یک بار، با light-dark() ──
+   چرا این‌طور و نه سه بلوکِ جدا (روشن / تاریک / prefers-color-scheme):
+   آن ساختار هر رنگ را سه بار تکرار می‌کرد و همین باعثِ یک باگِ واقعی شد —
+   موقعِ تغییرِ پالت، بلوکِ @media جا ماند و کاربری که تم را دستی انتخاب
+   نکرده بود هنوز رنگ‌های قدیمی می‌دید.
+
+   حالا مقدارها یک‌جا هستند و انتخاب با color-scheme انجام می‌شود:
+     :root            → color-scheme: light dark  (پیروی از سیستم)
+     [data-theme=...] → فقط color-scheme را قفل می‌کند
+   یعنی افزودنِ رنگِ تازه دیگر نمی‌تواند نیمه‌کاره بماند. */
+:root {
+  color-scheme: light dark;
+
+  --bg:         light-dark(#f6f4f1, #100c0a);
+  --bg-subtle:  light-dark(#efece7, #171210);
+  --bg-sunken:  light-dark(#e6e2db, #0a0706);
+
+  --surface:         light-dark(#ffffff, #1a1513);
+  --surface-2:       light-dark(#f6f4f1, #221b18);
+  --surface-3:       light-dark(#eae6e0, #2c231f);
+  --surface-inverse: light-dark(#17120f, #f7f2ec);
+
+  --text-1:       light-dark(#17120f, #f4ece3);
+  --text-2:       light-dark(#5a504a, #b7a89c);
+  --text-3:       light-dark(#8b8078, #8a7a6e);
+  --text-inverse: light-dark(#f7f2ec, #17120f);
+
+  --border:        light-dark(rgba(23, 18, 15, 0.11), rgba(244, 236, 227, 0.1));
+  --border-strong: light-dark(rgba(23, 18, 15, 0.2), rgba(244, 236, 227, 0.2));
+
+  --brand:          light-dark(#c74d1e, #e2612c);
+  --brand-ink:      light-dark(#a83c14, #f07f4d);
+  --brand-soft:     light-dark(#fdf3ee, rgba(226, 97, 44, 0.16));
+  --brand-contrast: #ffffff;
+  --accent:         light-dark(#a8801f, #ddb457);
+
+  --success:      light-dark(#16794f, #45c99a);
+  --success-soft: light-dark(#e3f3ec, rgba(69, 201, 154, 0.15));
+  --warning:      light-dark(#a35a0d, #ddb457);
+  --warning-soft: light-dark(#fbf0e2, rgba(221, 180, 87, 0.15));
+  --danger:       light-dark(#b8341f, #ef7361);
+  --danger-soft:  light-dark(#fbe9e6, rgba(239, 115, 97, 0.15));
+  --info:         light-dark(#2a6b8f, #6fb3d1);
+  --info-soft:    light-dark(#e6f0f5, rgba(111, 179, 209, 0.15));
+
+  --sh-sm: light-dark(0 1px 2px rgba(23,18,15,.06), 0 1px 2px rgba(0,0,0,.55));
+  --sh-md: light-dark(0 6px 16px rgba(23,18,15,.08), 0 6px 18px rgba(0,0,0,.55));
+  --sh-lg: light-dark(0 18px 40px rgba(23,18,15,.11), 0 20px 44px rgba(0,0,0,.62));
+  --sh-xl: light-dark(0 32px 72px rgba(23,18,15,.15), 0 34px 80px rgba(0,0,0,.7));
+  --sh-brand: light-dark(0 14px 34px rgba(199,77,30,.26), 0 14px 38px rgba(226,97,44,.36));
+
+  /* شیشه: آلفا عمداً بالاست تا متن روی محتوای متحرک خوانا بماند. */
+  /* آلفا عمداً بالا: بهینه‌سازِ CSS نسخه‌ی استانداردِ backdrop-filter را حذف
+     می‌کند و فقط پیشوندِ webkit می‌ماند، پس نمی‌شود روی بلور حساب کرد. با
+     این آلفا متن حتی بدونِ هیچ بلوری هم خوانا می‌ماند — با تست دیده شد که
+     محتوای پشتِ هدر از لای شیشه خوانده می‌شد. */
+  --glass-bg:     light-dark(rgba(246, 244, 241, 0.95), rgba(20, 16, 14, 0.94));
+  --glass-border: light-dark(rgba(23, 18, 15, 0.1), rgba(244, 236, 227, 0.11));
+  --glass-blur: 16px;
+
+  --aurora-1:  light-dark(rgba(226, 97, 44, 0.13), rgba(226, 97, 44, 0.24));
+  --aurora-2:  light-dark(rgba(199, 154, 44, 0.12), rgba(199, 154, 44, 0.18));
+  --aurora-3:  light-dark(rgba(140, 106, 82, 0.09), rgba(140, 106, 82, 0.14));
+  --grid-line: light-dark(rgba(23, 18, 15, 0.05), rgba(244, 236, 227, 0.055));
+}
+
+/* انتخابِ صریحِ کاربر فقط color-scheme را قفل می‌کند — مقدارها بالا یک‌جا هستند. */
+:root[data-theme='light'] { color-scheme: light; }
+:root[data-theme='dark']  { color-scheme: dark; }
+
+/* ═══════════════ پایه ═══════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-h) + var(--sp-6));
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  transition: background-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+
+h1, h2, h3, h4, h5 {
+  margin: 0;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  font-weight: 800;
+  color: var(--text-1);
+  text-wrap: balance;
+}
+
+p { margin: 0; }
+ul, ol { margin: 0; padding: 0; }
+img, svg, video { max-width: 100%; height: auto; display: block; }
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color var(--t-fast) var(--ease);
+}
+
+button, input, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: var(--r-xs);
+}
+
+::selection {
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+/* اسکرول‌بارِ هماهنگ با تم */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--r-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* ═══════════════ چیدمان ═══════════════ */
+
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--sp-5);
+}
+
+.container-narrow {
+  width: 100%;
+  max-width: var(--container-narrow);
+  margin-inline: auto;
+  padding-inline: var(--sp-5);
+}
+
+.section {
+  position: relative;
+  padding-block: clamp(var(--sp-16), 9vw, var(--sp-32));
+}
+.section--tight { padding-block: clamp(var(--sp-12), 6vw, var(--sp-20)); }
+.section--subtle { background: var(--bg-subtle); }
+.section--sunken { background: var(--bg-sunken); }
+
+/* خطِ جداکننده‌ی نرم بین بخش‌ها */
+.section--edge { border-top: 1px solid var(--border); }
+
+.stack { display: flex; flex-direction: column; }
+.stack-2 { gap: var(--sp-2); }
+.stack-3 { gap: var(--sp-3); }
+.stack-4 { gap: var(--sp-4); }
+.stack-6 { gap: var(--sp-6); }
+.stack-8 { gap: var(--sp-8); }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.grid { display: grid; gap: var(--sp-5); }
+.grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); }
+.grid-4 { grid-template-columns: repeat(auto-fit, minmax(206px, 1fr)); }
+
+/* ═══════════════ تایپوگرافی ═══════════════ */
+
+.display {
+  font-size: clamp(2.25rem, 6.2vw, var(--fs-5xl));
+  font-weight: 800;
+  letter-spacing: var(--ls-tight);
+  line-height: 1.08;
+}
+
+.h1 { font-size: clamp(1.875rem, 4.6vw, var(--fs-4xl)); }
+.h2 { font-size: clamp(1.625rem, 3.6vw, var(--fs-3xl)); }
+.h3 { font-size: clamp(1.25rem, 2.4vw, var(--fs-2xl)); }
+.h4 { font-size: var(--fs-xl); font-weight: 700; }
+
+.lead {
+  font-size: clamp(var(--fs-base), 1.6vw, var(--fs-lg));
+  line-height: var(--lh-normal);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.body { color: var(--text-2); line-height: var(--lh-normal); }
+.muted { color: var(--text-3); }
+.small { font-size: var(--fs-sm); }
+.tiny { font-size: var(--fs-xs); }
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--r-full);
+  border: 1px solid color-mix(in srgb, var(--brand) 18%, transparent);
+}
+
+.text-gradient {
+  background: linear-gradient(100deg, var(--brand) 0%, var(--brass-500) 45%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+:root[data-theme='dark'] .text-gradient {
+  background: linear-gradient(100deg, var(--ember-300) 0%, var(--brass-400) 48%, var(--brass-400) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  max-width: 46rem;
+  margin-bottom: clamp(var(--sp-8), 4vw, var(--sp-12));
+}
+.section-head--center {
+  align-items: center;
+  text-align: center;
+  margin-inline: auto;
+}
+
+/* ═══════════════ دکمه ═══════════════ */
+
+.btn {
+  --btn-bg: var(--surface);
+  --btn-fg: var(--text-1);
+  --btn-border: var(--border-strong);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: 0.6875rem 1.25rem;
+  border-radius: var(--r-full);
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform var(--t-fast) var(--ease-spring),
+    box-shadow var(--t-base) var(--ease), background-color var(--t-base) var(--ease),
+    border-color var(--t-base) var(--ease), opacity var(--t-base) var(--ease);
+}
+
+.btn:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn--primary {
+  --btn-bg: linear-gradient(135deg, var(--ember-500), var(--brass-500));
+  --btn-fg: #ffffff;
+  --btn-border: transparent;
+  box-shadow: var(--sh-brand);
+}
+.btn--primary:hover:not(:disabled) {
+  box-shadow: 0 16px 40px rgba(79, 70, 229, 0.34);
+}
+:root[data-theme='dark'] .btn--primary {
+  --btn-bg: linear-gradient(135deg, var(--ember-400), var(--brass-400));
+  --btn-fg: #0b1020;
+}
+
+.btn--ghost {
+  --btn-bg: transparent;
+  --btn-border: var(--border-strong);
+}
+.btn--ghost:hover:not(:disabled) {
+  --btn-bg: var(--surface-2);
+  --btn-border: var(--text-3);
+}
+
+.btn--soft {
+  --btn-bg: var(--brand-soft);
+  --btn-fg: var(--brand-ink);
+  --btn-border: transparent;
+}
+
+.btn--quiet {
+  --btn-bg: transparent;
+  --btn-border: transparent;
+  --btn-fg: var(--text-2);
+}
+.btn--quiet:hover:not(:disabled) { --btn-fg: var(--text-1); --btn-bg: var(--surface-2); }
+
+.btn--lg { min-height: 52px; padding: 0.875rem 1.75rem; font-size: var(--fs-base); }
+.btn--sm { min-height: 36px; padding: 0.375rem 0.875rem; font-size: var(--fs-sm); }
+.btn--block { width: 100%; }
+
+/* پیکانِ ظریفی که با hover حرکت می‌کند (RTL → به چپ) */
+.btn__arrow {
+  transition: transform var(--t-base) var(--ease-spring);
+}
+.btn:hover .btn__arrow { transform: translateX(-3px); }
+
+/* ═══════════════ سطح و کارت ═══════════════ */
+
+.card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--sp-6);
+  transition: transform var(--t-base) var(--ease-out), box-shadow var(--t-base) var(--ease),
+    border-color var(--t-base) var(--ease), background-color var(--t-base) var(--ease);
+}
+
+.card--hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--sh-lg);
+  border-color: color-mix(in srgb, var(--brand) 26%, var(--border));
+}
+
+.card--flat { background: var(--surface-2); border-color: transparent; }
+.card--pad-lg { padding: var(--sp-8); }
+
+/* کارتی که با حرکتِ اشاره‌گر یک هاله‌ی نرم دنبال می‌کند (روی دسکتاپ) */
+.card--spot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    22rem circle at var(--mx, 50%) var(--my, 0%),
+    color-mix(in srgb, var(--brand) 12%, transparent),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity var(--t-slow) var(--ease);
+  pointer-events: none;
+}
+.card--spot:hover::before { opacity: 1; }
+
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  /* fallback مات برای مرورگرِ بدونِ backdrop-filter — متن هرگز روی محتوا نمی‌ماند */
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glass { background: var(--surface); }
+}
+
+.divider { height: 1px; background: var(--border); border: 0; margin: 0; }
+
+/* ═══════════════ نشان و تراشه ═══════════════ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0.1875rem 0.625rem;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  background: var(--surface-3);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.badge--brand { background: var(--brand-soft); color: var(--brand-ink); }
+.badge--success { background: var(--success-soft); color: var(--success); }
+.badge--warning { background: var(--warning-soft); color: var(--warning); }
+.badge--danger { background: var(--danger-soft); color: var(--danger); }
+.badge--info { background: var(--info-soft); color: var(--info); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 38px;
+  padding: 0.4375rem 0.9375rem;
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--t-base) var(--ease);
+}
+.chip:hover { border-color: var(--border-strong); color: var(--text-1); }
+.chip[aria-selected='true'],
+.chip[data-active='true'] {
+  background: var(--brand-soft);
+  border-color: color-mix(in srgb, var(--brand) 32%, transparent);
+  color: var(--brand-ink);
+}
+
+/* ═══════════════ آیکن ═══════════════ */
+
+.icon-tile {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: var(--r-md);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  transition: transform var(--t-base) var(--ease-spring), background-color var(--t-base) var(--ease);
+}
+.card--hover:hover .icon-tile { transform: scale(1.06) rotate(-3deg); }
+
+/* ═══════════════ فرم ═══════════════ */
+
+.field { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.label__hint { color: var(--text-3); font-weight: 400; }
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0.6875rem 0.875rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: var(--fs-md);
+  transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease),
+    background-color var(--t-base) var(--ease);
+}
+.textarea { min-height: 118px; resize: vertical; line-height: var(--lh-normal); }
+
+.input::placeholder,
+.textarea::placeholder { color: var(--text-3); }
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+.input[aria-invalid='true'],
+.textarea[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.input[aria-invalid='true']:focus,
+.textarea[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 16%, transparent);
+}
+
+.field__error {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* شماره‌ی موبایل همیشه چپ‌چین است حتی در محیطِ راست‌چین */
+.input--ltr { direction: ltr; text-align: right; }
+
+.notice {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+  border: 1px solid transparent;
+}
+.notice--error { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 24%, transparent); }
+.notice--success { background: var(--success-soft); color: var(--success); border-color: color-mix(in srgb, var(--success) 24%, transparent); }
+.notice--info { background: var(--info-soft); color: var(--info); border-color: color-mix(in srgb, var(--info) 24%, transparent); }
+.notice--warning { background: var(--warning-soft); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 24%, transparent); }
+
+/* ═══════════════ حرکت ═══════════════ */
+
+/* آشکارسازیِ اسکرول‌محور — عنصر تا وقتی دیده نشده کمی پایین‌تر و کم‌رنگ است.
+   حالتِ اولیه فقط وقتی اعمال می‌شود که JS کلاسِ js-reveal را روی <html>
+   گذاشته باشد → بدونِ جاوااسکریپت هیچ محتوایی پنهان نمی‌ماند. */
+.js-reveal .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.65s var(--ease-out), transform 0.65s var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.js-reveal .reveal[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+/* هاله‌ی رنگیِ متحرکِ پس‌زمینه‌ی هیرو */
+.aurora {
+  position: absolute;
+  inset: -30% -10% auto -10%;
+  height: 130%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+  mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+}
+.aurora__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.9;
+  animation: drift 26s var(--ease) infinite alternate;
+}
+.aurora__blob:nth-child(1) {
+  width: 46rem; height: 34rem; inset-inline-end: -8rem; top: -6rem;
+  background: var(--aurora-1);
+}
+.aurora__blob:nth-child(2) {
+  width: 38rem; height: 30rem; inset-inline-start: -6rem; top: 3rem;
+  background: var(--aurora-2);
+  animation-duration: 32s; animation-direction: alternate-reverse;
+}
+.aurora__blob:nth-child(3) {
+  width: 26rem; height: 22rem; inset-inline-start: 38%; top: 12rem;
+  background: var(--aurora-3);
+  animation-duration: 38s;
+}
+
+@keyframes drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-4%, 6%, 0) scale(1.14); }
+}
+
+/* شبکه‌ی ظریفِ پس‌زمینه */
+.grid-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 78%);
+}
+
+/* شناوریِ ملایمِ عناصرِ تزئینی */
+.float { animation: float 7s var(--ease) infinite alternate; }
+.float--slow { animation-duration: 11s; }
+@keyframes float {
+  from { transform: translateY(0); }
+  to { transform: translateY(-10px); }
+}
+
+/* نوارِ نبضِ زنده (نشانگرِ وضعیت) */
+.pulse-dot {
+  position: relative;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  flex: 0 0 auto;
+}
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--success);
+  opacity: 0;
+  animation: pulse 2.4s var(--ease) infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(0.7); opacity: 0.7; }
+  70%, 100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* اسکلتِ بارگذاری */
+.skeleton {
+  border-radius: var(--r-sm);
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 37%, var(--surface-2) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+/* اسپینرِ درون‌دکمه‌ای */
+.spinner {
+  width: 1em; height: 1em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* نوارِ پیشرفتِ اسکرولِ صفحه */
+.scroll-progress {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 2px;
+  z-index: 60;
+  background: linear-gradient(90deg, var(--ember-500), var(--brass-500), var(--accent));
+  transform-origin: 100% 50%;
+  transform: scaleX(var(--progress, 0));
+  transition: transform 90ms linear;
+  pointer-events: none;
+}
+
+/* ── احترام به ترجیحِ کاهشِ حرکت: همه‌ی حرکت‌ها خاموش، محتوا کاملاً دیده ── */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .js-reveal .reveal { opacity: 1 !important; transform: none !important; }
+  .btn:hover:not(:disabled),
+  .card--hover:hover { transform: none; }
+}
+
+/* ═══════════════ محتوای متنی (مقاله/حقوقی) ═══════════════ */
+
+.prose {
+  color: var(--text-2);
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
+  max-width: 68ch;
+}
+.prose > * + * { margin-top: var(--sp-5); }
+.prose h2 {
+  font-size: var(--fs-2xl);
+  color: var(--text-1);
+  margin-top: var(--sp-12);
+  letter-spacing: var(--ls-snug);
+}
+.prose h3 {
+  font-size: var(--fs-xl);
+  color: var(--text-1);
+  margin-top: var(--sp-8);
+}
+.prose strong { color: var(--text-1); font-weight: 700; }
+.prose ul, .prose ol { padding-inline-start: var(--sp-6); }
+.prose li + li { margin-top: var(--sp-2); }
+.prose a { color: var(--brand-ink); text-decoration: underline; text-underline-offset: 3px; }
+.prose a:hover { color: var(--brand); }
+.prose code {
+  background: var(--surface-2);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--r-xs);
+  font-size: 0.875em;
+}
+.prose blockquote {
+  border-inline-start: 3px solid var(--brand);
+  padding-inline-start: var(--sp-4);
+  color: var(--text-1);
+  font-style: normal;
+}
+
+/* ═══════════════ جدول ═══════════════ */
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  min-width: 34rem;
+}
+.table th,
+.table td {
+  padding: var(--sp-4);
+  text-align: start;
+  border-bottom: 1px solid var(--border);
+}
+.table th {
+  font-weight: 700;
+  color: var(--text-1);
+  background: var(--surface-2);
+  position: sticky;
+  top: 0;
+}
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr { transition: background-color var(--t-fast) var(--ease); }
+.table tbody tr:hover { background: var(--surface-2); }
+.table td.is-num { font-variant-numeric: tabular-nums; }
+
+/* ═══════════════ دسترسی‌پذیری ═══════════════ */
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  inset-block-start: var(--sp-3);
+  inset-inline-start: var(--sp-3);
+  z-index: 100;
+  padding: var(--sp-3) var(--sp-5);
+  border-radius: var(--r-md);
+  background: var(--brand);
+  color: #fff;
+  font-weight: 700;
+  transform: translateY(-200%);
+  transition: transform var(--t-base) var(--ease);
+}
+.skip-link:focus-visible { transform: none; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   لایه‌ی سینمایی — پرده‌ی ورود، نشانگر، دانه‌ی فیلم، میدانِ جریان
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── ۱) پرده‌ی ورود ─────────────────────────────────────────────────
+   کلِ کار با CSS انجام می‌شود و با forwards تمام می‌شود، پس بدونِ JS هم
+   پرده بالا می‌رود. مدتِ کل ۱٫۲s است تا LCP را بلند نکند. */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  pointer-events: none;
+  /* پس از پایانِ انیمیشن، هیچ لایه‌ای روی صفحه نمی‌ماند.
+     کارِ اصلی را opacity می‌کند نه visibility: کروم مقدارِ visibility را در
+     حالتِ fill-forwards اعمال نمی‌کرد و پرده روی صفحه می‌ماند (در مرورگر
+     دیده شد). opacity همه‌جا قطعی است؛ visibility فقط یک امتیازِ اضافه. */
+  animation: intro-off 10ms linear 1.2s forwards;
+}
+@keyframes intro-off { to { opacity: 0; visibility: hidden; } }
+
+.intro__bar {
+  flex: 1 1 0;
+  background: var(--bg-sunken);
+  transform-origin: 50% 0%;
+  will-change: transform;
+  /* هر تیغه ۵۰ms دیرتر از قبلی بالا می‌رود → موجی از راست به چپ در RTL.
+     آخرین تیغه در 0.40 + 5×0.05 + 0.55 = ۱٫۲۰s تمام می‌شود؛ intro-off دقیقاً
+     همان‌جاست تا پرده وسطِ کار قطع نشود. */
+  animation: intro-bar 0.55s cubic-bezier(0.76, 0, 0.24, 1) forwards;
+  animation-delay: calc(0.4s + var(--i) * 0.05s);
+}
+@keyframes intro-bar {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0); }
+}
+
+.intro__mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  animation: intro-mark 0.34s var(--ease) 0.36s forwards;
+}
+@keyframes intro-mark {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+.intro__word {
+  font-size: clamp(2rem, 7vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(100deg, var(--ember-400), var(--brass-400));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* حروف از پشتِ یک ماسک بالا می‌آیند */
+  animation: intro-word 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes intro-word {
+  from { opacity: 0; transform: translateY(0.5em) scale(0.97); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+.intro__line {
+  inline-size: min(38vw, 15rem);
+  block-size: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--ember-500), transparent);
+  transform-origin: 50% 50%;
+  animation: intro-line 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+@keyframes intro-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* شمارنده‌ی چرخان — نوارِ عمودیِ اعداد که با steps بالا می‌رود.
+   بدونِ @property و بدونِ JS، پس همه‌جا کار می‌کند. */
+.intro__count {
+  block-size: 1.15em;
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.intro__roll {
+  display: flex;
+  flex-direction: column;
+  animation: intro-roll 0.62s steps(5, end) 0.06s both;
+}
+.intro__roll b { display: block; block-size: 1.15em; line-height: 1.15em; font-weight: 600; }
+@keyframes intro-roll { to { transform: translateY(-5.75em); } }
+
+/* بازگشتِ دوباره در همان نشست → بدونِ پرده. همین‌طور در حالتِ کاهشِ حرکت. */
+html[data-intro='done'] .intro { display: none; }
+@media (prefers-reduced-motion: reduce) { .intro { display: none; } }
+
+/* ── ۲) نشانگرِ سفارشی ───────────────────────────────────────────── */
+.cur {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 210;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms linear;
+  /* difference یعنی روی هر پس‌زمینه‌ای — روشن یا تاریک — دیده می‌شود */
+  mix-blend-mode: difference;
+}
+html.cur-on .cur { opacity: 1; }
+.cur--dot {
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: #fff;
+}
+.cur--ring {
+  inline-size: 30px;
+  block-size: 30px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.75);
+  transition: opacity 160ms linear, border-color 180ms var(--ease), background-color 180ms var(--ease);
+}
+.cur--ring.is-hot { border-color: #fff; background: rgba(255, 255, 255, 0.12); }
+.cur--ring.is-down { background: rgba(255, 255, 255, 0.3); }
+/* نشانگرِ سیستم فقط وقتی خاموش می‌شود که جایگزینش واقعاً ساخته شده باشد */
+html.has-cursor,
+html.has-cursor * { cursor: none !important; }
+/* ورودی‌های متنی استثنا هستند: caret بدونِ نشانگرِ متن قابلِ‌هدف‌گیری نیست */
+html.has-cursor :is(input, textarea, [contenteditable]) { cursor: text !important; }
+
+/* ── ۳) دانه‌ی فیلم ───────────────────────────────────────────────
+   یک تکسچرِ feTurbulence که هر ۸ فریم می‌پرد. گرادیان‌ها را از حالتِ
+   «رندرِ تخت» در می‌آورد و به تصویر عمق می‌دهد. هزینه‌اش یک لایه‌ی
+   composite است، نه محاسبه‌ی هر فریم. */
+.grain {
+  position: fixed;
+  /* فقط به‌اندازه‌ی جابه‌جاییِ کی‌فریم (حداکثر ۶٪) حاشیه لازم است. مقدارِ
+     بزرگ‌تر هم سطحِ رنگ‌آمیزی را بیهوده زیاد می‌کند و هم می‌تواند به ناحیه‌ی
+     اسکرول اضافه شود. */
+  inset: -20%;
+  z-index: 95;
+  pointer-events: none;
+  opacity: light-dark(0.035, 0.055);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 0.9s steps(8, end) infinite;
+  will-change: transform;
+}
+@keyframes grain {
+  0%   { transform: translate3d(0, 0, 0); }
+  12%  { transform: translate3d(-3%, -4%, 0); }
+  25%  { transform: translate3d(-6%, 2%, 0); }
+  37%  { transform: translate3d(4%, -3%, 0); }
+  50%  { transform: translate3d(-2%, 5%, 0); }
+  62%  { transform: translate3d(3%, 3%, 0); }
+  75%  { transform: translate3d(-4%, -2%, 0); }
+  87%  { transform: translate3d(5%, -5%, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .grain { animation: none; } }
+
+/* ── ۴) میدانِ جریان (بومِ هیرو) ─────────────────────────────────── */
+.flowfield {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  z-index: 0;
+  pointer-events: none;
+  /* پایینِ بوم محو می‌شود تا مرزِ تیزی با بخشِ بعدی نسازد */
+  mask-image: linear-gradient(to bottom, #000 58%, transparent 96%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 96%);
+}
+
+/* ── ۵) کِششِ سرعتِ اسکرول ────────────────────────────────────────
+   --vel را ScrollProgress می‌نویسد (۱- تا ۱). اثر عمداً روی عنصرهای
+   انتخاب‌شده اعمال می‌شود، نه روی <main>: هر transform روی نیای یک عنصرِ
+   sticky زمینه‌ی چسبندگی را می‌شکند و صحنه‌ی سنجاق‌شده از کار می‌افتد. */
+.vel {
+  transform: scaleY(calc(1 + var(--vel, 0) * 0.022)) translateY(calc(var(--vel, 0) * -6px));
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) { .vel { transform: none; } }
+
+@media print {
+  .site-header, .site-footer, .scroll-progress, .aurora, .grid-bg,
+  .intro, .grain, .flowfield, .cur { display: none !important; }
+}

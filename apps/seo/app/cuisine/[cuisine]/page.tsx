@@ -13,8 +13,9 @@ function decode(s: string): string {
   try { return decodeURIComponent(s); } catch { return s; }
 }
 
-export async function generateMetadata({ params }: { params: { cuisine: string } }): Promise<Metadata> {
-  const cuisine = decode(params.cuisine);
+export async function generateMetadata({ params }: { params: Promise<{ cuisine: string }> }): Promise<Metadata> {
+  const { cuisine: rawCuisine } = await params;
+  const cuisine = decode(rawCuisine);
   const url = `${SITE}/cuisine/${encodeURIComponent(cuisine)}`;
   return {
     title: `رستوران‌های ${cuisine}`,
@@ -24,8 +25,9 @@ export async function generateMetadata({ params }: { params: { cuisine: string }
   };
 }
 
-export default async function CuisinePage({ params }: { params: { cuisine: string } }) {
-  const cuisine = decode(params.cuisine);
+export default async function CuisinePage({ params }: { params: Promise<{ cuisine: string }> }) {
+  const { cuisine: rawCuisine } = await params;
+  const cuisine = decode(rawCuisine);
   const items = await fetchRestaurantList({ cuisine });
   if (items.length < MIN_LISTINGS) notFound();
 

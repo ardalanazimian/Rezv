@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- آدرسِ پایه‌ی API: خالی = same-origin (دمو). برای اتصال به بک‌اندِ جدا، content را روی دامنهٔ API بگذار، مثلاً https://api.rezervno.ir -->
+<meta name="rz-api-base" content="">
 <title>رزرونو | رزرو آنلاین بهترین رستوران‌های شهر</title>
 <!-- ── SEO ── -->
 <meta name="description" content="رزرونو — رزرو آنلاین میز در بهترین رستوران‌های شهر در چند ثانیه. کشف رستوران، لیست انتظار هوشمند، باشگاه مشتریان و امتیاز وفاداری.">
@@ -25,10 +27,10 @@
 <meta name="apple-mobile-web-app-title" content="رزرونو">
 <!-- ── داده‌ی ساختاریافته (Rich Results گوگل) ── -->
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebApplication","name":"رزرونو","description":"رزرو آنلاین میز در بهترین رستوران‌های شهر","applicationCategory":"FoodEstablishmentReservation","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"IRR"}}
+{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://rezervno.ir/#org","name":"رزرونو","url":"https://rezervno.ir/","description":"پلتفرم رزرو آنلاین میز در بهترین رستوران‌های شهر","logo":"https://rezervno.ir/favicon.svg"},{"@type":"WebSite","@id":"https://rezervno.ir/#website","url":"https://rezervno.ir/","name":"رزرونو","inLanguage":"fa-IR","publisher":{"@id":"https://rezervno.ir/#org"}},{"@type":"WebApplication","name":"رزرونو","applicationCategory":"FoodEstablishmentReservation","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"IRR"}}]}
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style data-src="/css/tokens.css">
+<style data-src="css/tokens.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — سیستم توکنِ طراحیِ مشترک (Design Tokens)
    منبعِ واحدِ حقیقت برای هر سه اپ. دو لایه:
@@ -169,6 +171,13 @@
   }
 }
 
+</style>
+<style data-src="css/theme.css">
+/* theme.css — تمِ مخصوصِ این اپ (app-owned، از shared/ sync نمی‌شود).
+ * پایه‌ی مشترکِ توکن‌ها در tokens.css است (منبع: shared/css/tokens.css)؛
+ * این فایل فقط نگاشتِ semantic مخصوصِ همین اپ را روی آن سوار می‌کند.
+ * باید در HTML بلافاصله بعد از tokens.css لود شود (همان ترتیبِ cascadeِ قبلی). */
+
 /* ── پلِ تم: اپ مشتری (دارک) — نگاشتِ semantic به توکن‌های موجود ── */
 :root {
   --surface: var(--card-solid, #141026);
@@ -184,7 +193,7 @@
 }
 
 </style>
-<style data-src="/css/foundation.css">
+<style data-src="css/foundation.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — لایه‌ی Foundation (کامپوننت‌های پایه)
    روی tokens.css سوار است. کلاس‌های یوتیلیتی و کامپوننتِ مشترک.
@@ -464,7 +473,7 @@
 .sheet-handle { width: 36px; height: 4px; background: var(--border, #ddd); border-radius: 2px; margin: 0 auto var(--sp-4); }
 
 </style>
-<style data-src="/css/app.css">
+<style data-src="css/app.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — اپ کاستومر: استایل‌ها (تم دارک/لایت، Liquid Glass، حرکت)
    جدا از index.html برای نگهداریِ بهتر. Vanilla CSS، بدون build.
@@ -541,7 +550,7 @@
 .ib-btn:active{transform:scale(.94)}
 .ib-close{flex-shrink:0;background:var(--s-100);color:var(--t3);border:none;width:28px;height:28px;border-radius:50%;font-size:12px;cursor:pointer}
 /* دکمه‌ی شناورِ تغییر تم */
-.theme-fab{position:fixed;top:16px;left:16px;z-index:60;width:46px;height:46px;border-radius:15px;cursor:pointer;
+.theme-fab{position:fixed;top:calc(64px + env(safe-area-inset-top,0px));left:16px;z-index:110;width:46px;height:46px;border-radius:15px;cursor:pointer;
   display:grid;place-items:center;font-size:19px;color:var(--t1);border-radius:15px;transition:transform .2s var(--spring)}
 .theme-fab:active{transform:scale(.88)}
 @media(prefers-reduced-motion:reduce){.reveal{opacity:1!important;transform:none!important}*{animation:none!important}}
@@ -783,6 +792,107 @@ img{display:block;max-width:100%}
 /* skeleton */
 .sk{background:linear-gradient(90deg,var(--s-100) 25%,var(--s-200) 50%,var(--s-100) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:6px}
 @keyframes shimmer{to{background-position:-200% 0}}
+/* اسکلتونِ کارتِ رزرو (C2) — از .sk بازاستفاده می‌کند، بدونِ تکرارِ shimmer */
+.sk-trip{border-radius:var(--r,16px);overflow:hidden;margin-bottom:14px;background:var(--card,var(--s-100))}
+.sk-trip .sk-hero{height:120px;border-radius:0}
+.sk-trip .sk-body{padding:16px;display:flex;flex-direction:column;gap:12px}
+.sk-trip .sk-line{height:12px;border-radius:6px}
+.sk-trip .sk-line.w80{width:80%}
+.sk-trip .sk-line.w55{width:55%}
+.sk-trip .sk-line.w40{width:40%}
+/* احترام به کاهشِ حرکت (WCAG 2.3.3) — shimmer متوقف می‌شود */
+@media (prefers-reduced-motion: reduce){ .sk{animation:none} }
+/* Undo snackbar (C3) — اکشنِ بازگرداندن برای اقدام‌های مخرب */
+.undo-snack{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(env(safe-area-inset-bottom,0px) + 78px);z-index:120;display:flex;align-items:center;gap:14px;max-width:min(92vw,420px);padding:12px 16px;border-radius:14px;background:var(--s-900,#12131a);color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease}
+.undo-snack.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.undo-snack .us-msg{font-size:14px;font-weight:600;flex:1;min-width:0}
+.undo-snack .us-btn{flex-shrink:0;background:transparent;border:none;color:var(--blue,#4F8CFF);font-weight:800;font-size:14px;cursor:pointer;padding:6px 10px;min-height:24px;border-radius:8px}
+.undo-snack .us-btn:hover{background:rgba(255,255,255,.08)}
+.undo-snack .us-btn:focus-visible{outline:2px solid var(--blue,#4F8CFF);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){ .undo-snack{transition:none} }
+/* Activity timeline روی کارتِ رزرو (C5) — بدونِ کامپوننتِ تکراری */
+.tl{list-style:none;display:flex;gap:0;margin:12px 0 2px;padding:0}
+.tl-step{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;font-size:11px;color:var(--t3,#94A3B8);min-width:0}
+.tl-step::before{content:"";position:absolute;top:5px;right:50%;width:100%;height:2px;background:var(--s-200,#e5e7eb)}
+.tl-step:first-child::before{display:none}
+.tl-dot{width:12px;height:12px;border-radius:50%;background:var(--s-200,#e5e7eb);border:2px solid var(--card,#fff);z-index:1;margin-bottom:5px}
+.tl-lbl{white-space:nowrap}
+.tl-step.done .tl-dot,.tl-step.active .tl-dot{background:var(--blue,#4F8CFF)}
+.tl-step.done::before,.tl-step.active::before{background:var(--blue,#4F8CFF)}
+.tl-step.active .tl-dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--blue,#4F8CFF) 25%,transparent)}
+.tl-step.done,.tl-step.active{color:var(--t1,#0f172a)}
+.tl-step.cancel .tl-dot{background:var(--red,#EF4444)}
+.tl-step.cancel::before{background:var(--red,#EF4444)}
+.tl-step.cancel{color:var(--red,#EF4444)}
+/* Command Palette (C6) */
+.cmdk-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);display:flex;align-items:flex-start;justify-content:center;padding:14vh 16px 16px;opacity:0;pointer-events:none;transition:opacity .16s ease}
+.cmdk-overlay.show{opacity:1;pointer-events:auto}
+.cmdk{width:100%;max-width:560px;background:var(--card,#12131a);border:1px solid var(--s-200,rgba(255,255,255,.08));border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.5);overflow:hidden;transform:translateY(-8px);transition:transform .16s ease}
+.cmdk-overlay.show .cmdk{transform:translateY(0)}
+.cmdk-row{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--s-200,rgba(255,255,255,.08));color:var(--t2,#94A3B8)}
+.cmdk-input{flex:1;background:transparent;border:none;outline:none;color:var(--t1,#fff);font-family:inherit;font-size:16px}
+.cmdk-esc{font-size:11px;color:var(--t3);border:1px solid var(--s-200,rgba(255,255,255,.12));border-radius:6px;padding:2px 6px}
+.cmdk-list{list-style:none;margin:0;padding:6px;max-height:52vh;overflow-y:auto}
+.cmdk-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;color:var(--t1,#fff)}
+.cmdk-item.sel{background:var(--blue,#4F8CFF);color:#fff}
+.cmdk-item.sel .cmdk-sub,.cmdk-item.sel .cmdk-ic{color:rgba(255,255,255,.85)}
+.cmdk-ic{display:inline-flex;color:var(--t2,#94A3B8);flex-shrink:0}
+.cmdk-t{flex:1;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmdk-sub{font-size:12px;color:var(--t3,#64748B)}
+.cmdk-empty{padding:20px;text-align:center;color:var(--t3);font-size:14px}
+.nav-icn{background:transparent;border:none;color:var(--t2,#94A3B8);cursor:pointer;width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center}
+.nav-icn:hover{background:var(--s-100,rgba(0,0,0,.05));color:var(--t1)}
+.nav-icn:focus-visible{outline:2px solid var(--blue,#4F8CFF);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){ .cmdk-overlay,.cmdk{transition:none} }
+/* Notification Center (C7) */
+.notif-btn{position:relative}
+.notif-badge{position:absolute;top:2px;left:2px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:var(--red,#EF4444);color:#fff;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+.notif-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);display:flex;align-items:flex-start;justify-content:center;padding:10vh 16px 16px;opacity:0;pointer-events:none;transition:opacity .16s ease}
+.notif-overlay.show{opacity:1;pointer-events:auto}
+.notif-panel{width:100%;max-width:460px;background:var(--card,#12131a);border:1px solid var(--s-200,rgba(255,255,255,.08));border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.5);overflow:hidden;max-height:80vh;display:flex;flex-direction:column;transform:translateY(-8px);transition:transform .16s ease}
+.notif-overlay.show .notif-panel{transform:translateY(0)}
+.notif-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--s-200,rgba(255,255,255,.08))}
+.notif-head b{flex:1;font-size:16px}
+.notif-readall{background:transparent;border:none;color:var(--blue,#4F8CFF);font-weight:700;font-size:13px;cursor:pointer;padding:6px 8px;min-height:24px;border-radius:8px}
+.notif-close{background:transparent;border:none;color:var(--t2);font-size:22px;cursor:pointer;width:28px;height:28px;line-height:1}
+.notif-tabs{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--s-200,rgba(255,255,255,.06))}
+.notif-tab{background:var(--s-100,rgba(255,255,255,.05));border:none;color:var(--t2);font-size:13px;font-weight:600;padding:6px 14px;border-radius:100px;cursor:pointer;min-height:24px}
+.notif-tab.on{background:var(--blue,#4F8CFF);color:#fff}
+.notif-list{overflow-y:auto;padding:6px}
+.notif-item{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:12px}
+.notif-item.unread{background:var(--s-100,rgba(79,140,255,.06))}
+.notif-ic{display:inline-flex;color:var(--blue,#4F8CFF);flex-shrink:0;margin-top:2px}
+.notif-item.pri-high .notif-ic{color:var(--red,#EF4444)}
+.notif-body{flex:1;min-width:0}
+.notif-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;color:var(--t1)}
+.notif-dot{width:7px;height:7px;border-radius:50%;background:var(--blue,#4F8CFF);display:inline-block}
+.notif-text{font-size:13px;color:var(--t2);margin-top:2px}
+.notif-act{flex-shrink:0;background:transparent;border:1px solid var(--s-200,rgba(255,255,255,.15));color:var(--t1);font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer;min-height:24px}
+.notif-empty{text-align:center;color:var(--t3);padding:40px 20px;font-size:14px}
+.notif-empty-ic{color:var(--t3);margin-bottom:10px;display:flex;justify-content:center}
+@media (prefers-reduced-motion: reduce){ .notif-overlay,.notif-panel{transition:none} }
+/* C11: حلقه‌ی فوکوسِ عمومیِ قابل‌مشاهده (WCAG 2.4.7) */
+:focus-visible{outline:2px solid var(--blue,#4F8CFF);outline-offset:2px;border-radius:6px}
+.occ-card:focus-visible{outline-offset:3px}
+/* Onboarding wizard (C9) */
+.onb-overlay{position:fixed;inset:0;z-index:210;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s ease}
+.onb-overlay.show{opacity:1;pointer-events:auto}
+.onb-card{position:relative;width:100%;max-width:380px;background:var(--card,#12131a);border:1px solid var(--s-200,rgba(255,255,255,.08));border-radius:24px;padding:36px 24px 24px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.5);transform:translateY(12px) scale(.98);transition:transform .2s var(--spring,cubic-bezier(.34,1.56,.64,1))}
+.onb-overlay.show .onb-card{transform:none}
+.onb-skip{position:absolute;top:14px;left:16px;background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:6px 8px;min-height:24px}
+.onb-emoji{font-size:64px;line-height:1;margin:8px 0 18px}
+.onb-title{font-size:21px;font-weight:800;color:var(--t1);margin-bottom:10px}
+.onb-text{font-size:14px;color:var(--t2);line-height:1.8;margin-bottom:22px}
+.onb-dots{display:flex;gap:7px;justify-content:center;margin-bottom:22px}
+.onb-dot{width:7px;height:7px;border-radius:50%;background:var(--s-200,rgba(255,255,255,.2));transition:width .2s ease,background .2s ease}
+.onb-dot.on{width:22px;border-radius:4px;background:var(--blue,#4F8CFF)}
+@media (prefers-reduced-motion: reduce){ .onb-overlay,.onb-card,.onb-dot{transition:none} }
+/* Microinteractions (C10) — بازخوردِ لمسی/تعاملیِ سبک */
+@keyframes like-pop{0%{transform:scale(1)}35%{transform:scale(1.35)}60%{transform:scale(.9)}100%{transform:scale(1)}}
+.liked-pop{animation:like-pop .42s var(--spring,cubic-bezier(.34,1.56,.64,1))}
+.btn:active{transform:scale(.97)}
+.chip:active,.rc-fav:active,.nav-icn:active,.botnav-item:active{transform:scale(.94)}
+@media (prefers-reduced-motion: reduce){ .liked-pop{animation:none} .btn:active,.chip:active,.rc-fav:active,.nav-icn:active,.botnav-item:active{transform:none} }
 
 /* ─────────── BOTTOM NAV (mobile) ─────────── */
 .botnav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:90;background:rgba(255,255,255,.92);
@@ -1272,8 +1382,46 @@ button,[role="button"],.botnav-item,a{min-height:0}
   box-shadow:0 0 0 3px color-mix(in srgb, var(--success) 25%, transparent);animation:live-pulse 2s var(--ease-out) infinite}
 @keyframes live-pulse{0%,100%{opacity:1}50%{opacity:.55}}
 
+
+/* Pull-to-Refresh (C15) */
+.ptr{position:fixed;top:-52px;left:50%;transform:translateX(-50%);z-index:80;
+  width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--card,#12131a);border:1px solid var(--s-200,rgba(255,255,255,.10));
+  box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .18s ease}
+.ptr.show{opacity:1}
+.ptr-spin{width:18px;height:18px;border-radius:50%;border:2px solid var(--s-300,rgba(255,255,255,.25));
+  border-top-color:var(--brand,#7c5cff);transition:transform .12s ease}
+.ptr.ready .ptr-spin{border-top-color:var(--brand,#7c5cff);transform:rotate(180deg)}
+.ptr.spinning .ptr-spin{animation:ptr-rot .7s linear infinite}
+@keyframes ptr-rot{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){
+  .ptr{transition:none}.ptr-spin{transition:none}.ptr.spinning .ptr-spin{animation:none}
+  .ptr.ready .ptr-spin{transform:none}
+}
+
+/* Swipe-actions روی کارت‌های رزرو (C16) */
+.trip-card.has-swipe{position:relative}
+.trip-card-inner{position:relative;z-index:1;background:var(--s-50);border-radius:inherit;
+  transition:transform .3s var(--spring);will-change:transform}
+.trip-card.swiping .trip-card-inner{transition:none}
+.trip-swipe-pad{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;
+  gap:8px;font-weight:800;font-size:14px;color:#fff}
+.trip-swipe-pad.cancel{background:linear-gradient(90deg,var(--red,#e5484d),color-mix(in srgb,var(--red,#e5484d) 68%,#000))}
+.trip-swipe-pad.repeat{background:linear-gradient(90deg,var(--brand,#7c5cff),color-mix(in srgb,var(--brand,#7c5cff) 68%,#000))}
+.trip-card.ready .trip-swipe-pad{filter:brightness(1.08)}
+@media (prefers-reduced-motion: reduce){ .trip-card-inner{transition:none} }
+
+/* ویرایشِ inline پروفایل (C17) */
+.set-edit{padding:14px 16px;border-radius:14px;background:var(--s-50);border:1px solid var(--glass-brd);margin:2px 0}
+.set-edit-row{display:flex;gap:10px;flex-wrap:wrap}
+.set-input{flex:1;min-width:120px;padding:11px 13px;border-radius:11px;border:1px solid var(--s-200,rgba(255,255,255,.10));
+  background:var(--s-100,rgba(255,255,255,.04));color:var(--t1);font-family:inherit;font-size:15px;outline:none;
+  transition:border-color .18s ease}
+.set-input:focus-visible{border-color:var(--brand,#7c5cff)}
+.set-edit-acts{display:flex;gap:8px;margin-top:12px}
+
 </style>
-<style data-src="/css/ds-bridge.css">
+<style data-src="css/ds-bridge.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — لایه‌ی سازگاریِ Design System (DS Bridge)
    هدف: هم‌ترازکردنِ کامپوننت‌های قدیمیِ اپ‌ها با Design System،
@@ -1356,7 +1504,6 @@ button,[role="button"],.botnav-item,a{min-height:0}
 .panel { border-radius: var(--radius-lg); }
 
 </style>
-</style>
 </head>
 <body>
 <a href="#app-main" class="skip-link">پرش به محتوای اصلی</a>
@@ -1375,6 +1522,13 @@ button,[role="button"],.botnav-item,a{min-height:0}
     <button class="nav-link" data-nav="loyalty" onclick="go('loyalty')">باشگاه</button>
   </div>
   <div class="nav-right">
+    <button class="nav-icn notif-btn" type="button" onclick="openNotif()" aria-label="اعلان‌ها">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="notif-badge" id="notifBadge" aria-hidden="true"></span>
+    </button>
+    <button class="nav-icn" type="button" onclick="openPalette()" aria-label="جست‌وجو و فرمان‌ها">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    </button>
     <div class="nav-pts" onclick="go('loyalty')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></svg>
       <span id="navPts">۳۴۰</span>
@@ -1445,14 +1599,6 @@ button,[role="button"],.botnav-item,a{min-height:0}
       <button class="chip" onclick="filterVibe('سریع',this)">⚡ سریع</button>
       <button class="chip" onclick="filterVibe('خانوادگی',this)">👨‍👩‍👧 خانوادگی</button>
     </div>
-      <button class="chip active" onclick="filterVibe('all',this)">✨ همه</button>
-      <button class="chip" onclick="filterVibe('رمانتیک',this)">💫 رمانتیک</button>
-      <button class="chip" onclick="filterVibe('آروم',this)">🌿 آروم</button>
-      <button class="chip" onclick="filterVibe('لوکس',this)">👑 لوکس</button>
-      <button class="chip" onclick="filterVibe('ویو',this)">🌆 ویو</button>
-      <button class="chip" onclick="filterVibe('سریع',this)">⚡ سریع</button>
-      <button class="chip" onclick="filterVibe('خانوادگی',this)">👨‍👩‍👧 خانوادگی</button>
-    </div>
   </div>
 
   <!-- AI recommendation strip -->
@@ -1469,14 +1615,10 @@ button,[role="button"],.botnav-item,a{min-height:0}
 
   <div class="wrap section">
     <div class="section-head">
-      <div><div class="section-title" id="feedTitle">🔥 محبوب امشب</div><div class="section-sub">۲۴۷ رستوران فعال در تهران</div></div>
+      <div><div class="section-title" id="feedTitle">🔥 محبوب امشب</div><div class="section-sub">رستوران‌های فعال</div></div>
     </div>
-    <div class="live-strip" id="liveStrip">
-      <div class="live-pill"><span class="live-dot-sm"></span><b>۱۲ رستوران</b> الان در حال پر شدن</div>
-      <div class="live-pill">🔥 <b>ویستا</b> پرطرفدار امشب</div>
-      <div class="live-pill">⭐ <b>۸ جای جدید</b> این هفته</div>
-      <div class="live-pill">💰 میانگین کش‌بک <b>۷٪</b></div>
-    </div>
+    <!-- نوارِ زنده: با دادهٔ واقعی از /restaurants/live-stats پر می‌شود (features/live-strip.js). -->
+    <div class="live-strip" id="liveStrip" aria-live="polite"></div>
     <div class="grid" id="feed"></div>
   </div>
 
@@ -1714,6 +1856,8 @@ const PERKS=[['🎁','کش‌بک','تا ۱۵٪ برگشت پول'],['⚡','رز
 const BADGES=[['🍽️','اولین رزرو',1],['🔥','۵ هفته پیاپی',1],['⭐','گورمه',1],['🌙','شب‌نشین',1],['👑','VIP',0],['🗺️','کاشف',0]];
 let pts=340, favs=new Set(), curRest=null, bk={};
 function setPts(v){ pts=v; }
+function setCurRest(v){ curRest=v; }
+function setBk(v){ bk=v; }
 const TRIPS=[
   {rid:1,date:'پنجشنبه ۱۵ خرداد',time:'۲۰:۰۰',party:'۲ نفر',code:'RZ8K2M',status:'up'},
   {rid:3,date:'۲۸ اردیبهشت',time:'۱۳:۰۰',party:'۴ نفر',code:'RZ4A1C',status:'done'},
@@ -1749,7 +1893,7 @@ function armReveals(root){
 // ═══════════════════════════════════════════════════════════
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('/sw.js').catch(()=>{ /* آفلاین یا محیطِ ناسازگار — اپ بدون SW هم کار می‌کند */ });
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* آفلاین یا محیطِ ناسازگار — اپ بدون SW هم کار می‌کند */ });
   });
 }
 
@@ -1810,8 +1954,17 @@ window.dismissInstall = dismissInstall;
 //  تنظیم آدرس API: اگر فرانت و بک روی یک دامنه‌اند، همین '' کافی است
 //  (nginx مسیر /api را پراکسی می‌کند). برای دامنه‌ی جدا، URL کامل بگذار.
 // ═══════════════════════════════════════════════════════════
+
+
+
+
+
+// آدرسِ پایه‌ی API — قابلِ تنظیم بدونِ build:
+//   ۱) window.RZ_API_BASE (اگر پیش از main.js ست شود)، یا
+//   ۲) <meta name="rz-api-base" content="https://..."> در index.html
+// پیش‌فرض '' یعنی same-origin (همان رفتارِ فعلی/دمو — بدونِ تغییر).
 const API = {
-  base: '',                          // مثلاً 'https://api.your-domain.com' یا '' برای same-origin
+  base: resolveApiBase(),             // '' = same-origin؛ قابلِ override با window.RZ_API_BASE یا <meta rz-api-base>
   timeout: 8000,                     // سقف انتظار هر درخواست (ms)
   _token: null,                      // توکن دسترسی (بعد از ورود)
   _refresh: null,                    // توکن تمدید (۳۰ روزه)
@@ -1838,32 +1991,22 @@ const API = {
     return !!this._token;
   },
 
-  // درخواست پایه با مدیریت خطا، timeout، و تمدید خودکار توکن روی ۴۰۱
+  // درخواست پایه — fetchِ خام به httpJsonِ مشترک واگذار می‌شود؛ منطقِ auth/refresh
+  // (Authorization، ۴۰۱→refresh→retry، session-expired) اینجا و بدونِ تغییر می‌ماند.
   async request(path, opts = {}, _retried = false){
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), this.timeout);
-    try {
-      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-      if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
-      const res = await fetch(this.base + '/api/v1' + path, { ...opts, headers, signal: ctrl.signal });
-      clearTimeout(timer);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        // ۴۰۱ روی توکن منقضی → یک‌بار refresh کن و درخواست را تکرار کن
-        if (res.status === 401 && this._refresh && !_retried && !path.startsWith('/auth/')) {
-          const refreshed = await this._doRefresh();
-          if (refreshed) return this.request(path, opts, true);
-          // refresh هم شکست خورد → نشست تمام است
-          this._onSessionExpired();
-        }
-        const msg = data?.error?.message || `خطای ${res.status}`;
-        return { ok: false, status: res.status, error: data?.error || { message: msg } };
-      }
-      return { ok: true, status: res.status, data };
-    } catch (e) {
-      clearTimeout(timer);
-      return { ok: false, offline: true, error: { message: e.name === 'AbortError' ? 'زمان درخواست تمام شد' : 'اتصال به سرور برقرار نشد' } };
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
+    const r = await httpJson(this.base + '/api/v1' + path, { ...opts, headers }, this.timeout);
+    if (!r.ok && !r.offline && r.status === 401 && this._refresh && !_retried && !path.startsWith('/auth/')) {
+      // ۴۰۱ روی توکن منقضی → یک‌بار refresh کن و درخواست را تکرار کن
+      const refreshed = await this._doRefresh();
+      if (refreshed) return this.request(path, opts, true);
+      this._onSessionExpired(); // refresh هم شکست خورد → نشست تمام است
     }
+    if (r.ok) return { ok: true, status: r.status, data: r.data };
+    if (r.offline) return { ok: false, offline: true, error: r.error };
+    const msg = r.error?.message || `خطای ${r.status}`;
+    return { ok: false, status: r.status, error: r.error || { message: msg } };
   },
 
   // تمدید توکن — چند فراخوان همزمان یک Promise مشترک می‌گیرند (بدون رقابت)
@@ -2049,6 +2192,11 @@ async function sendOtp(){
   const btn = phoneEl.nextElementSibling;
   if (btn) { btn.disabled = true; btn.textContent = 'در حال ارسال...'; }
 
+  if (location.protocol === 'file:') {
+    showOtpStep('۱۲۳۴', true);
+    return;
+  }
+
   const res = await API.requestOtp(normalized);
   if (!res.ok && !res.offline) {
     // خطای واقعی از سرور (مثلاً ریت‌لیمیت)
@@ -2079,6 +2227,17 @@ async function confirmOtp(){
   if (!/^\d{4,6}$/.test(code)) { toast('','کد ورود رو کامل وارد کن'); return; }
   const btn = codeEl.nextElementSibling;
   if (btn) { btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+
+  if (location.protocol === 'file:') {
+    if (code === '1234') {
+      setUSER({ phone: _loginPhone });
+      showRegisterStep(true);
+    } else {
+      toast('','در حالت دمو، کد ۱۲۳۴ است');
+      if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
+    }
+    return;
+  }
 
   const res = await API.verifyOtp(_loginPhone, code);
   if (res.ok && res.data?.user) {
@@ -2178,10 +2337,51 @@ function toApiDateTime(faDate, faTime){
   const iso = target.getFullYear()+'-'+String(target.getMonth()+1).padStart(2,'0')+'-'+String(target.getDate()).padStart(2,'0');
   return { date: iso, time: time || '20:00' };
 }
-function openSheet(html){document.getElementById('sheetBody').innerHTML=html;document.getElementById('sheet').classList.add('show')}
-function closeSheet(){document.getElementById('sheet').classList.remove('show')}
+
+// focus-trap شیتِ رزرو (C8) — WCAG 2.4.3/2.1.2: تله‌ی فوکوس، Esc، بازگرداندنِ فوکوس
+let _sheetTrap=null,_sheetLastFocus=null;
+function openSheet(html){
+  const sheet=document.getElementById('sheet');
+  const wasOpen=sheet.classList.contains('show');
+  document.getElementById('sheetBody').innerHTML=html;
+  sheet.classList.add('show');
+  if(!wasOpen) _sheetLastFocus=document.activeElement;
+  if(_sheetTrap) sheet.removeEventListener('keydown',_sheetTrap);
+  _sheetTrap=(e)=>{
+    if(e.key==='Escape'){ e.preventDefault(); closeSheet(); return; }
+    if(e.key!=='Tab') return;
+    const f=sheet.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+    if(!f.length) return;
+    const first=f[0],last=f[f.length-1];
+    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+  };
+  sheet.addEventListener('keydown',_sheetTrap);
+  setTimeout(()=>{ const el=sheet.querySelector('input:not([type=hidden]),button,select,textarea,a[href],[tabindex]:not([tabindex="-1"])'); if(el) try{el.focus()}catch(e){} },30);
+}
+function closeSheet(){
+  const sheet=document.getElementById('sheet');
+  sheet.classList.remove('show');
+  if(_sheetTrap){ sheet.removeEventListener('keydown',_sheetTrap); _sheetTrap=null; }
+  if(_sheetLastFocus && _sheetLastFocus.focus){ try{_sheetLastFocus.focus()}catch(e){} _sheetLastFocus=null; }
+}
 let tt;
 function toast(icon,msg){document.getElementById('toastIcon').textContent=icon;document.getElementById('toastMsg').textContent=msg;const t=document.getElementById('toast');t.classList.add('show');t.classList.remove('toast-enter');void t.offsetWidth;t.classList.add('toast-enter');const live=document.getElementById('a11y-live');if(live)live.textContent=msg;clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400)}
+let _undo=null;
+function undoSnack(msg, onUndo, onCommit, seconds){
+  seconds=seconds||5;
+  if(_undo){ clearTimeout(_undo.timer); const c=_undo.commit; _undo=null; if(c)c(); } // commit قبلی
+  let s=document.getElementById('undoSnack');
+  if(!s){ s=document.createElement('div'); s.id='undoSnack'; s.className='undo-snack'; s.setAttribute('role','status'); s.setAttribute('aria-live','polite'); document.body.appendChild(s); }
+  s.innerHTML='<span class="us-msg"></span><button class="us-btn" type="button">بازگرداندن</button>';
+  s.querySelector('.us-msg').textContent=msg;
+  s.classList.add('show');
+  const hide=()=>s.classList.remove('show');
+  const commit=()=>{ _undo=null; hide(); try{onCommit&&onCommit();}catch(e){} };
+  const timer=setTimeout(commit, seconds*1000);
+  _undo={commit,timer};
+  s.querySelector('.us-btn').onclick=()=>{ clearTimeout(timer); _undo=null; hide(); try{onUndo&&onUndo();}catch(e){} };
+}
 
 // ═══════════ شروع اپ (فاز ۳: نمایش فوری + به‌روزرسانی از API) ═══════════
 
@@ -2195,6 +2395,7 @@ window.esc = esc;
 window.openSheet = openSheet;
 window.closeSheet = closeSheet;
 window.toast = toast;
+window.undoSnack = undoSnack;
 
 
 /* ═══ js/store.js ═══ */
@@ -2334,9 +2535,10 @@ const Actions = (() => {
 
 
 /* ═══ js/data/detail.js ═══ */
-// ═══ رزرونو — جزئیات رستوران + شیت رزرو (بخشی از اپ کاستومر) ═══
+// ═══ رزرونو — جزئیاتِ رستوران (صفحه‌ی rest) · بخشی از اپ کاستومر ═══
+//  توجه: جریانِ رزرو به data/booking.js منتقل شد (جداسازیِ مسئولیت).
 function openRest(id){
-  curRest=id;const r=R.find(x=>x.id===id);
+  setCurRest(id);const r=R.find(x=>x.id===id);
   const stars=n=>Array.from({length:5},(_,i)=>icon('star',{size:13,fill:i<Math.round(n)})).join('');
   document.getElementById('page-rest').innerHTML=`
     <div class="rp-hero" style="background:${GRAD[id]}">
@@ -2397,158 +2599,15 @@ function openRest(id){
   setTimeout(()=>document.querySelectorAll('.rb-fill').forEach(f=>f.style.width=f.dataset.w+'%'),300);
   armReveals&&armReveals();
 }
-// شیت رزرو که با دکمه‌ی پایین باز می‌شود (تاریخ/ساعت/نفر)
-function openBookSheet(id){
-  const r=R.find(x=>x.id===id);
-  openSheet(`
-    <div class="bs-head"><div class="bs-title">رزرو میز</div><div class="bs-rest">${esc(r.n)}</div></div>
-    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${id})"><option value="today">امروز</option><option value="tomorrow">فردا</option><option value="thu">پنجشنبه</option><option value="fri">جمعه</option></select></div>
-    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots(${id})"><option>۲ نفر</option><option>۱ نفر</option><option>۳ نفر</option><option>۴ نفر</option><option>۵ نفر</option><option>۶ نفر</option></select></div>
-    <div class="bw-field"><label>ساعت</label><select id="bwTime"><option>در حال بررسی...</option></select></div>
-    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook(${id})">بررسی میزهای موجود</button>
-    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">هنوز پولی پرداخت نمی‌کنی</div>
-  `);
-  refreshSlots(id);
-}
-// بارگذاری ساعت‌های واقعاً موجود از /restaurants/{slug}/availability
-async function refreshSlots(id){
-  const r=R.find(x=>x.id===id);
-  const sel=document.getElementById('bwTime');
-  if(!sel)return;
-  // اگر slug نداریم (حالت آفلاین/نمونه)، از همون slots نمونه استفاده کن
-  if(!r.slug || !API.online){
-    sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');
-    return;
-  }
-  const dateVal=document.getElementById('bwDate')?.value||'today';
-  const partyVal=parseInt(String(document.getElementById('bwParty')?.value||'۲').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))||2;
-  const apiDate=dateValToISO(dateVal);
-  sel.innerHTML='<option>در حال بررسی...</option>';
-  const res=await API.get(`/restaurants/${r.slug}/availability?date=${apiDate}&party=${partyVal}`);
-  if(res.ok && Array.isArray(res.data?.slots)){
-    const open=res.data.slots.filter(s=>s.status==='open');
-    if(open.length){
-      sel.innerHTML=open.map(s=>`<option value="${s.time}">${faTime(s.time)}</option>`).join('');
-    }else{
-      sel.innerHTML='<option value="">ساعت خالی برای این روز نیست</option>';
-    }
-    // ساعت‌های پر را هم نشان بده ولی غیرفعال
-    res.data.slots.filter(s=>s.status==='full').forEach(s=>{
-      const o=document.createElement('option');o.value='';o.disabled=true;o.textContent=`${faTime(s.time)} (پر)`;sel.appendChild(o);
-    });
-  }else{
-    // اگر availability در دسترس نبود، از نمونه fallback
-    sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');
-  }
-}
-function dateValToISO(v){
-  const d=new Date();
-  if(v==='tomorrow')d.setDate(d.getDate()+1);
-  else if(v==='thu'){const dow=d.getDay();d.setDate(d.getDate()+((4-dow+7)%7||7));}
-  else if(v==='fri'){const dow=d.getDay();d.setDate(d.getDate()+((5-dow+7)%7||7));}
-  return d.toISOString().slice(0,10);
-}
-function faTime(t){return (t||'').replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);}
-function quickBook(id,slot){bk={id,date:'امروز',time:slot,party:'۲ نفر'};openSheet(bookStep2(R.find(x=>x.id===id)))}
-function startBook(id){
-  const t=document.getElementById('bwTime').value;
-  if(!t){toast('','برای این روز ساعت خالی نیست — روز دیگه‌ای انتخاب کن');return;}
-  const dateSel=document.getElementById('bwDate');
-  const dateLabel=dateSel.options[dateSel.selectedIndex].text;
-  bk={id,date:dateLabel,dateVal:dateSel.value,time:faTime(t),timeRaw:t,party:document.getElementById('bwParty').value};
-  openSheet(bookStep2(R.find(x=>x.id===id)));
-}
-function bookStep2(r){
-  return `<div class="sheet-title">${r.n}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
-    <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
-    <div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
-    <div class="opt-row">${r.menu.map(m=>`<div class="opt" onclick="this.classList.toggle('sel')">${m[0]} ${m[1]}</div>`).join('')}</div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="openSheet(bookStep3(R.find(x=>x.id===${r.id})))">ادامه</button>`;
-}
-function bookStep3(r){
-  return `<div class="sheet-title">تأیید اطلاعات</div><div class="sheet-sub">یه قدم تا رزرو</div>
-    <div class="steps"><div class="step-bar done"></div><div class="step-bar done"></div><div class="step-bar now"></div></div>
-    <div class="field-label">نام</div><input class="inp" id="bkName" value="علی رضایی">
-    <div class="field-label">موبایل</div><input class="inp" id="bkPhone" value="۰۹۱۲۳۴۵۶۷۸۹">
-    <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${r.n}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
-    <div class="reward-row"><div class="reward"><div class="rv blue">+۵۰</div><div class="rl">امتیاز</div></div><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${r.id})">تأیید رزرو</button>`;
-}
-async function confirmBook(id){
-  const r=R.find(x=>x.id===id);
-  // رزرو نیاز به ورود دارد
-  if(!isLoggedIn()){
-    closeSheet();
-    toast('','برای رزرو اول وارد شو');
-    setTimeout(()=>openLogin(),400);
-    return;
-  }
-  // وضعیت در حال ارسال
-  const sheetBody=document.getElementById('sheetBody');
-  const confirmBtn=sheetBody.querySelector('.btn-primary');
-  if(confirmBtn){confirmBtn.disabled=true;confirmBtn.textContent='در حال ثبت رزرو...';}
 
-  // تلاش برای ثبت در بک‌اند — اگر مقدار خام از availability داریم، دقیق‌تره
-  const apiDT = (bk.timeRaw && bk.dateVal) ? { date: dateValToISO(bk.dateVal), time: bk.timeRaw } : toApiDateTime(bk.date, bk.time);
-  const res=await API.post('/reservations',{
-    restaurant_id:id,
-    date:apiDT.date,
-    time:apiDT.time,
-    party_size:parseInt(String(bk.party).replace(/[^\d۰-۹]/g,'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))||2,
-    notify_sms:true,
-  });
-
-  let code;
-  if(res.ok && res.data?.code){
-    // رزرو واقعی در دیتابیس ثبت شد (بک‌اند code را در سطحِ بالا برمی‌گرداند)
-    code=res.data.code;
-  } else if(res.offline){
-    // بک‌اند نیست → کد محلی (حالت دمو)
-    code='RZ'+Math.random().toString(36).slice(2,7).toUpperCase();
-  } else {
-    // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
-    const isFull = res.error?.code==='SLOT_FULL' || res.error?.code==='NO_TABLE_FOR_PARTY' || /پر|ظرفیت/.test(res.error?.message||'');
-    if(isFull){
-      offerWaitlist(id, r);
-      return;
-    }
-    toast('', res.error?.message || 'ثبت رزرو ناموفق بود، دوباره تلاش کن');
-    if(confirmBtn){confirmBtn.disabled=false;confirmBtn.textContent='تأیید رزرو';}
-    return;
-  }
-
-  // موفقیت (واقعی یا دمو)
-  pts+=50;document.getElementById('navPts').textContent=fmtFa(pts);
-  TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
-  sheetBody.innerHTML=`
-    <div class="success">
-      <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
-      <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
-      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}<br>یادآور با پیامک می‌فرستیم</div>
-      <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode('${esc(code)}')" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
-      <div class="reward-row"><div class="reward"><div class="rv blue">+۵۰</div><div class="rl">امتیاز گرفتی</div></div><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>
-      <button class="btn btn-primary btn-lg btn-block" onclick="closeSheet();go('trips')">رزروهای من</button>
-      <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
-    </div>`;
-}
-function copyCode(c){const done=()=>toast('⧉','کد کپی شد');if(navigator.clipboard?.writeText)navigator.clipboard.writeText(c).then(done).catch(done);else done()}
-// ═══════════════════════════════════════════════════════════
-
-
-
-// ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
+// ── نمایشِ تابعِ onclick روی window ──
 window.openRest = openRest;
-window.openBookSheet = openBookSheet;
-window.quickBook = quickBook;
-window.startBook = startBook;
-window.bookStep3 = bookStep3;
-window.confirmBook = confirmBook;
-window.copyCode = copyCode;
 
 
 /* ═══ js/data/discover.js ═══ */
 // ═══ رزرونو — ناوبری + رندرِ کشف: فید، وایب، مناسبت، رویداد (بخشی از اپ کاستومر) ═══
 function go(p){
+  try{ track('page.viewed',{page:p}); }catch{}
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('[data-nav]').forEach(n=>n.classList.toggle('active',n.dataset.nav===p));
@@ -2638,7 +2697,7 @@ function pickOccasion(occ, el){
   if(already){
     document.querySelector('.chip')?.classList.add('active');
     document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
-    const sub=document.querySelector('.section-sub'); if(sub) sub.textContent='۲۴۷ رستوران فعال در تهران';
+    const sub=document.querySelector('.section-sub'); if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
     renderFeed(R);
     return;
   }
@@ -2712,6 +2771,10 @@ function renderDiscoverSections(){
   renderNearby();
   renderTrending();
   renderEvents();
+  // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
+  const sub=document.querySelector('#page-discover .section-sub');
+  if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+  const np=document.getElementById('navPts'); if(np) np.textContent=fmtFa(pts);
 }
 function doSearch(){
   const q=document.getElementById('sQ').value.trim();
@@ -2729,7 +2792,16 @@ function toggleFav(id,el){
     el.setAttribute('aria-pressed',String(on));
     el.setAttribute('aria-label',on?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها');
   }
-  toast('',on?'ذخیره شد':'حذف شد');
+  if(on){ toast('','ذخیره شد'); if(el){ el.classList.add('liked-pop'); setTimeout(()=>el.classList.remove('liked-pop'),420); } }
+  else {
+    // Undo روی حذفِ علاقه (کاملاً client-side)
+    undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
+      favs.add(id);
+      if(el){ el.innerHTML=icon('heart',{size:20,fill:true}); el.setAttribute('aria-pressed','true'); el.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
+      if(document.getElementById('page-favorites')?.classList.contains('active')) renderFavs();
+    });
+    if(document.getElementById('page-favorites')?.classList.contains('active')) renderFavs();
+  }
 }
 // نسخه‌ی hero صفحه رستوران — با انیمیشن تپش
 function toggleRestFav(id){
@@ -2741,7 +2813,13 @@ function toggleRestFav(id){
     btn.setAttribute('aria-pressed',String(on));
     btn.setAttribute('aria-label',on?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها');
   }
-  toast('',on?'به علاقه‌مندی‌ها اضافه شد':'از علاقه‌مندی‌ها حذف شد');
+  if(on){ toast('','به علاقه‌مندی‌ها اضافه شد'); }
+  else {
+    undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
+      favs.add(id);
+      if(btn){ btn.innerHTML=icon('heart',{size:22,fill:true}); btn.setAttribute('aria-pressed','true'); btn.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
+    });
+  }
   if(btn){btn.style.transform='scale(1.3)';setTimeout(()=>btn.style.transform='',180)}
 }
 
@@ -2757,130 +2835,11 @@ window.toggleRestFav = toggleRestFav;
 
 /* ═══ js/reservation.js ═══ */
 // ═══════════════════════════════════════════════════════════
-//  رزرونو — صفحه‌ی جزئیات رستوران + جریانِ رزرو
-//  بخشی از اپ کاستومر (Vanilla JS، بدون build). scope سراسری مشترک.
-//  ترتیبِ لود در index.html مهم است (این فایل به توابع/state قبلی وابسته است).
+//  رزرونو — رندرِ سفرها/رزروها (trips) و علاقه‌مندی‌ها (favs)
+//  بخشی از اپ کاستومر (Vanilla JS، بدون build)؛ جزئی از گرافِ ماژولِ main.js.
+//  توجه: منطقِ «لیستِ انتظار» به waitlist.js منتقل شد (جداسازیِ مسئولیت).
+//  رفتار دقیقاً همان قبل است.
 // ═══════════════════════════════════════════════════════════
-//  لیست انتظار (مدل OpenTable)
-// ═══════════════════════════════════════════════════════════
-let WL=null; // ورودی فعلی لیست انتظار کاربر { id, position, ... }
-let wlTimer=null;
-// پیشنهاد پیوستن به صف وقتی ظرفیت پر است
-function offerWaitlist(id, r){
-  const sheetBody=document.getElementById('sheetBody');
-  sheetBody.innerHTML=`
-    <div class="wl-join">
-      <div class="wl-join-hero">
-        <div class="wl-join-mesh"></div>
-        <span class="wl-join-emoji">${icon('inbox',{size:28})}</span>
-      </div>
-      <div class="sheet-title" style="text-align:center">ظرفیت این ساعت پره</div>
-      <div class="sheet-sub" style="text-align:center;margin-bottom:18px">${esc(r.n)} · ${bk.date} · ${bk.time}<br>به صف بپیوند — اگه میزی آزاد شه، <b>اول به تو</b> خبر می‌دیم</div>
-      <div class="wl-benefits">
-        <div class="wl-benefit"><span class="wl-bene-ic">${icon('bell',{size:18})}</span><div><b>اطلاع فوری</b><small>پیامک + نوتیفیکیشن لحظه‌ای</small></div></div>
-        <div class="wl-benefit"><span class="wl-bene-ic">⏱️</span><div><b>تخمین زمان</b><small>می‌دونی چقدر باید صبر کنی</small></div></div>
-        <div class="wl-benefit"><span class="wl-bene-ic">${icon('check',{size:18})}</span><div><b>کنترلِ کامل</b><small>آفر رو راحت قبول یا رد کن</small></div></div>
-      </div>
-      <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="buzz&&buzz();joinWaitlist(${id})">پیوستن به لیست انتظار</button>
-      <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
-    </div>`;
-}
-async function joinWaitlist(id){
-  const r=R.find(x=>x.id===id);
-  const sheetBody=document.getElementById('sheetBody');
-  sheetBody.innerHTML=`<div style="text-align:center;padding:40px"><div class="spin" style="margin:0 auto 16px"></div>در حال پیوستن به صف...</div>`;
-  const party=parseInt(String(bk.party).replace(/[^\d۰-۹]/g,'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))||2;
-  const res=await API.post('/waitlist',{restaurant_id:id,party_size:party,notify_sms:true,notify_push:true});
-  let entry;
-  if(res.ok&&res.data?.id){ entry=res.data; }
-  else if(res.offline){ entry={id:'wl_demo',position:Math.floor(Math.random()*3)+2,estimated_wait_minutes:25,is_vip:false,status:'waiting'}; }
-  else { toast('',res.error?.message||'پیوستن ناموفق بود'); closeSheet(); return; }
-  WL={...entry,rid:id,rname:r.n};
-  showWaitlistStatus();
-}
-// داشبورد مشتری: وضعیت در صف
-function showWaitlistStatus(){
-  if(!WL)return;
-  const sheetBody=document.getElementById('sheetBody');
-  const isOffered=WL.status==='offered';
-  sheetBody.innerHTML=`
-    <div class="wl-status">
-      ${isOffered?`
-        <div class="wl-offer-banner">
-          <div class="wl-offer-mesh"></div>
-          <span class="wl-offer-emoji">${icon('checkCircle',{size:32})}</span>
-          <div class="sheet-title" style="text-align:center;color:#fff;position:relative">میزت آماده‌ست!</div>
-          <div style="text-align:center;color:rgba(255,255,255,.92);font-size:14px;position:relative">میز ${faNum(WL.offered_table||'—')} · ${esc(WL.rname||'')}</div>
-          <div class="wl-timer" id="wlTimer">۰۵:۰۰</div>
-          <div style="text-align:center;color:rgba(255,255,255,.85);font-size:12px;position:relative">برای تأیید فرصت داری</div>
-        </div>
-        <button class="btn btn-lg btn-block" style="background:#fff;color:#16A34A;margin-top:16px;font-weight:800" onclick="buzz&&buzz();acceptWL()">${icon('check',{size:18})} قبول می‌کنم</button>
-        <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="declineWL()">رد کردن</button>
-      `:`
-        <div style="text-align:center;padding:8px 0">
-          <div class="wl-position-ring">
-            <div class="wl-ring-pulse"></div>
-            <div class="wl-pos-num" id="wlPosNum">${faNum(WL.position||'—')}</div>
-            <div class="wl-pos-label">نفر در صف</div>
-          </div>
-          <div class="sheet-title" style="text-align:center;margin-top:18px">در صفِ ${esc(WL.rname||'')}</div>
-          <div class="wl-eta"><span>⏱️</span> حدود <b>${faNum(WL.estimated_wait_minutes||'؟')}</b> دقیقه تا نوبتت</div>
-          ${WL.is_vip?`<div class="wl-vip-badge">${icon('star',{size:13,fill:true})} اولویت VIP</div>`:''}
-          <div class="wl-hint">${icon('bell',{size:13})} به‌محضِ آزادشدنِ میز، با پیامک و نوتیفیکیشن خبرت می‌کنیم</div>
-        </div>
-        <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="buzz&&buzz();refreshWL()">${icon('refresh',{size:16})} به‌روزرسانی وضعیت</button>
-        <button class="btn btn-danger-ghost btn-block" style="margin-top:8px" onclick="leaveWL()">خروج از صف</button>
-      `}
-    </div>`;
-  if(isOffered){startWlTimer();}
-  else{
-    // شمارشِ متحرکِ موقعیت در صف (حسِ زنده‌بودن)
-    const pn=document.getElementById('wlPosNum'),target=parseInt(WL.position)||0;
-    if(pn&&target>0){let c=Math.min(target+3,target*2||3);const iv=setInterval(()=>{c--;pn.textContent=faNum(c);if(c<=target)clearInterval(iv);},80);}
-  }
-}
-function startWlTimer(){
-  clearInterval(wlTimer);
-  let sec=300; // ۵ دقیقه
-  const el=document.getElementById('wlTimer');
-  wlTimer=setInterval(()=>{
-    sec--;
-    if(sec<=0){clearInterval(wlTimer);toast('⌛','مهلت آفر تمام شد');WL.status='waiting';showWaitlistStatus();return;}
-    if(el){const m=String(Math.floor(sec/60)).padStart(2,'0'),s=String(sec%60).padStart(2,'0');el.textContent=faNum(`${m}:${s}`);}
-  },1000);
-}
-async function refreshWL(){
-  if(!WL)return;
-  const res=await API.get(`/waitlist/${WL.id}`);
-  if(res.ok&&res.data){WL={...WL,...res.data};showWaitlistStatus();toast('','به‌روز شد');}
-  else if(res.offline){ // دمو: شبیه‌سازی آفر
-    if(WL.position>1){WL.position--;toast('',`نفر ${faNum(WL.position)} شدی`);}
-    else{WL.status='offered';WL.offered_table=7;toast('','میزت آماده شد!');}
-    showWaitlistStatus();
-  }
-}
-async function acceptWL(){
-  clearInterval(wlTimer);
-  const res=await API.post(`/waitlist/${WL.id}/accept`);
-  if(res.ok&&res.data){
-    const code=res.data.reservation_code||'RZWL'+Math.random().toString(36).slice(2,6).toUpperCase();
-    TRIPS.unshift({rid:WL.rid,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
-    toast('','رزروت ثبت شد!');WL=null;closeSheet();go('trips');
-  }else if(res.offline){
-    const code='RZWL'+Math.random().toString(36).slice(2,6).toUpperCase();
-    TRIPS.unshift({rid:WL.rid,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
-    toast('','رزروت ثبت شد!');WL=null;closeSheet();go('trips');
-  }else{toast('',res.error?.message||'خطا');}
-}
-async function declineWL(){
-  clearInterval(wlTimer);
-  await API.post(`/waitlist/${WL.id}/decline`).catch(()=>{});
-  toast('','آفر رد شد');WL=null;closeSheet();
-}
-async function leaveWL(){
-  await API.request(`/waitlist/${WL.id}`,{method:'DELETE'}).catch(()=>{});
-  toast('','از صف خارج شدی');WL=null;closeSheet();
-}
 function renderFavs(){
   const list=R.filter(r=>favs.has(r.id));const grid=document.getElementById('favGrid'),empty=document.getElementById('favEmpty');
   document.getElementById('favSub').textContent=list.length?`${fmtFa(list.length)} رستوران ذخیره‌شده`:'';
@@ -2917,14 +2876,26 @@ function mapApiTrip(apiR){
     status:mapTripStatus(apiR.status),
   };
 }
+
+// تایم‌لاینِ روندِ رزرو (C5) — از وضعیتِ موجود مشتق می‌شود (بدونِ رویدادِ جعلی)
+function tripTimeline(status){
+  const steps = status==='cancelled'
+    ? [['ثبت','done'],['لغو','cancel']]
+    : [['ثبت','done'],['تأیید',status==='up'?'active':'done'],['حضور',status==='done'?'done':'future'],['تکمیل',status==='done'?'active':'future']];
+  return `<ol class="tl" aria-label="روند رزرو">${steps.map(([l,st])=>`<li class="tl-step ${st}"><span class="tl-dot" aria-hidden="true"></span><span class="tl-lbl">${l}</span></li>`).join('')}</ol>`;
+}
 async function renderTrips(){
   const listEl=document.getElementById('tripsList');
   let trips=TRIPS; // پیش‌فرض: داده‌ی محلی
 
   // اگر کاربر وارد شده، از API بخوان
   if(isLoggedIn()){
-    listEl.innerHTML=`<div style="text-align:center;padding:40px;color:var(--t2)">در حال بارگذاری رزروها...</div>`;
+    // اسکلتونِ بارگذاری (به‌جای متنِ خالی) — کاهشِ پرش/CLS، بازاستفاده از .sk (C2)
+    listEl.setAttribute('aria-busy','true');
+    const skTrip=`<div class="sk-trip" aria-hidden="true"><div class="sk sk-hero"></div><div class="sk-body"><div class="sk sk-line w80"></div><div class="sk sk-line w55"></div><div class="sk sk-line w40"></div></div></div>`;
+    listEl.innerHTML=skTrip.repeat(3);
     const res=await API.get('/me/reservations');
+    listEl.removeAttribute('aria-busy');
     if(res.ok && Array.isArray(res.data)){
       // داده‌ی واقعی از سرور
       trips=res.data.map(mapApiTrip);
@@ -2947,34 +2918,34 @@ async function renderTrips(){
     const name=t._name||r?.n||'رستوران';
     const gradId=t._grad||t.rid||1;
     const statusLabel=t.status==='up'?`<span class="live-dot" aria-hidden="true"></span> پیش‌رو`:t.status==='cancelled'?`${icon('close',{size:12})} لغوشده`:`${icon('check',{size:12})} تجربه‌شده`;
+    // اکشنِ swipe (C16): کارتِ «پیش‌رو» → لغو، کارتِ «تجربه‌شده» با rid → رزرو مجدد.
+    // دکمه‌ی متناظر با data-swipe-action علامت می‌خورد تا ژستِ swipe همان هندلرِ سیم‌کشی‌شده را کلیک کند.
+    const swipe=t.status==='up'?{cls:'cancel',ic:'close',label:'لغو رزرو'}
+      :(t.status!=='cancelled'&&t.rid)?{cls:'repeat',ic:'calendar',label:'رزرو مجدد'}:null;
     const acts=t.status==='up'
-      ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR('${esc(t.code)}','${esc(name)}')">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}')">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','apple')">کیف پول</button><button class="btn btn-sm btn-ghost" onclick="cancelTrip('${esc(t.code)}',this)">لغو</button>`
+      ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR('${esc(t.code)}','${esc(name)}')">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}')">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip('${esc(t.code)}',this)">لغو</button>`
       : t.status==='cancelled' ? ''
-      : `${t.rid?`<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();repeatReservation(${t.rid})">رزرو مجدد</button><button class="btn btn-sm btn-ghost" onclick="openRest(${t.rid})">ثبت نظر</button>`:''}`;
-    return `<div class="trip-card reveal ${t.status}">
-      <div class="trip-card-hero" style="background:${GRAD[gradId]||GRAD[1]}">
-        <div class="trip-card-mesh"></div>
-        <span class="trip-card-emoji">${emoji}</span>
-        <span class="trip-card-status ${t.status}">${statusLabel}</span>
-      </div>
-      <div class="trip-card-body">
-        <div class="trip-card-name">${esc(name)}</div>
-        <div class="trip-card-meta"><span>${icon('calendar',{size:13})} ${t.date}</span><span class="tcm-dot">·</span><span>${icon('clock',{size:13})} ${t.time}</span><span class="tcm-dot">·</span><span>${icon('users',{size:13})} ${t.party}</span></div>
-        <div class="trip-card-code">کد رزرو: <b>${esc(t.code)}</b></div>
-        ${acts?`<div class="trip-card-actions">${acts}</div>`:''}
+      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation(${t.rid})">رزرو مجدد</button><button class="btn btn-sm btn-ghost" onclick="openRest(${t.rid})">ثبت نظر</button>`:''}`;
+    return `<div class="trip-card reveal ${t.status}${swipe?' has-swipe':''}">
+      ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
+      <div class="trip-card-inner">
+        <div class="trip-card-hero" style="background:${GRAD[gradId]||GRAD[1]}">
+          <div class="trip-card-mesh"></div>
+          <span class="trip-card-emoji">${emoji}</span>
+          <span class="trip-card-status ${t.status}">${statusLabel}</span>
+        </div>
+        <div class="trip-card-body">
+          <div class="trip-card-name">${esc(name)}</div>
+          <div class="trip-card-meta"><span>${icon('calendar',{size:13})} ${t.date}</span><span class="tcm-dot">·</span><span>${icon('clock',{size:13})} ${t.time}</span><span class="tcm-dot">·</span><span>${icon('users',{size:13})} ${t.party}</span></div>
+          <div class="trip-card-code">کد رزرو: <b>${esc(t.code)}</b></div>
+          ${tripTimeline(t.status)}
+          ${acts?`<div class="trip-card-actions">${acts}</div>`:''}
+        </div>
       </div>
     </div>`;
   }).join('');
   armReveals&&armReveals();
 }
-
-
-// ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
-window.joinWaitlist = joinWaitlist;
-window.refreshWL = refreshWL;
-window.acceptWL = acceptWL;
-window.declineWL = declineWL;
-window.leaveWL = leaveWL;
 
 
 /* ═══ js/features/rewards.js ═══ */
@@ -3252,14 +3223,18 @@ function repeatReservation(rid){
 }
 // لغو رزرو (متصل به API اگر آنلاین)
 async function cancelTrip(code,btn){
-  const tripEl=btn.closest('.trip');
-  if(isLoggedIn()){
-    const res=await API.post('/reservations/'+encodeURIComponent(code)+'/cancel',{});
-    if(res.ok){toast('','رزرو لغو شد');if(tripEl)tripEl.style.opacity=.5;return;}
-    if(!res.offline){toast('',res.error?.message||'لغو ناموفق بود');return;}
-  }
-  // fallback (آفلاین یا مهمان)
-  toast('','رزرو لغو شد');if(tripEl)tripEl.style.opacity=.5;
+  const tripEl=btn.closest('.trip-card')||btn.closest('.trip');
+  // Undoِ امن: کارت فوراً کم‌رنگ می‌شود، ولی لغوِ واقعی ۵ ثانیه به تعویق می‌افتد.
+  if(tripEl)tripEl.style.opacity=.5;
+  undoSnack('رزرو لغو شد',
+    ()=>{ if(tripEl)tripEl.style.opacity=''; },   // Undo: هیچ APIای صدا زده نشده
+    async ()=>{                                    // Commit: حالا واقعاً لغو کن
+      if(isLoggedIn()){
+        const res=await API.post('/reservations/'+encodeURIComponent(code)+'/cancel',{});
+        if(res.ok)return;
+        if(!res.offline){ toast('',res.error?.message||'لغو ناموفق بود'); if(tripEl)tripEl.style.opacity=''; }
+      }
+    });
 }
 
 
@@ -3451,7 +3426,7 @@ function renderProfile(){
       <div class="dna-entry-cta">کشفش کن ${icon('arrowL',{size:14})}</div>
     </div>
     <div class="settings-list reveal">
-      <div class="set-item" role="button" tabindex="0" onclick="toast('','ویرایش پروفایل')"><div class="set-icon">${icon('user',{size:20})}</div><div class="set-label">ویرایش پروفایل</div><span class="set-arrow">‹</span></div>
+      <div class="set-item" id="profEditItem" role="button" tabindex="0" onclick="editProfileInline()"><div class="set-icon">${icon('user',{size:20})}</div><div class="set-label">ویرایش پروفایل</div><span class="set-arrow">‹</span></div>
       <div class="set-item" role="button" tabindex="0" onclick="toast('','کیف پول کش‌بک')"><div class="set-icon">${icon('wallet',{size:20})}</div><div class="set-label">کیف پول کش‌بک</div><span class="set-arrow">‹</span></div>
       <div class="set-item" role="button" tabindex="0" onclick="openNotifPrefs()"><div class="set-icon">${icon('bell',{size:20})}</div><div class="set-label">اعلان‌ها</div><span class="set-arrow">‹</span></div>
       <div class="set-item" role="button" tabindex="0" onclick="toast('','پشتیبانی')"><div class="set-icon">${icon('message',{size:20})}</div><div class="set-label">پشتیبانی</div><span class="set-arrow">‹</span></div>
@@ -3464,12 +3439,61 @@ function renderProfile(){
 
 
 
+// ═══════════════════════════════════════════════════════════
+//  ویرایشِ inline پروفایل (C17) — بدونِ modal، درجا در همان لیستِ تنظیمات.
+//  به endpointِ موجودِ PATCH /api/v1/me وصل است (بدونِ تغییرِ بک‌اند).
+//  demo-safe: آفلاین/دمو → به‌روزرسانیِ محلیِ USER (نامِ خودِ کاربر، نه داده‌ی جعلی).
+// ═══════════════════════════════════════════════════════════
+function editProfileInline(){
+  const host = document.getElementById('profEditItem');
+  if(!host) return;
+  const f = esc(USER?.firstName || '');
+  const l = esc(USER?.lastName || '');
+  host.outerHTML =
+    `<div class="set-edit" id="profEditItem">
+       <div class="set-edit-row">
+         <input id="peFirst" class="set-input" type="text" maxlength="50" placeholder="نام" value="${f}" autocomplete="given-name" aria-label="نام" onkeydown="if(event.key==='Enter')saveProfileInline(this)">
+         <input id="peLast" class="set-input" type="text" maxlength="50" placeholder="نام خانوادگی" value="${l}" autocomplete="family-name" aria-label="نام خانوادگی" onkeydown="if(event.key==='Enter')saveProfileInline(this)">
+       </div>
+       <div class="set-edit-acts">
+         <button class="btn btn-sm btn-primary" onclick="saveProfileInline(this)">ذخیره</button>
+         <button class="btn btn-sm btn-ghost" onclick="cancelProfileEdit()">انصراف</button>
+       </div>
+     </div>`;
+  setTimeout(()=>{ const el=document.getElementById('peFirst'); if(el){ try{ el.focus(); el.select(); }catch(e){} } }, 30);
+}
+async function saveProfileInline(btn){
+  const first = (document.getElementById('peFirst')?.value || '').trim();
+  const last  = (document.getElementById('peLast')?.value || '').trim();
+  if(!first){ toast('⚠️','اسمت رو وارد کن'); const el=document.getElementById('peFirst'); if(el) try{el.focus()}catch(e){} return; }
+  const b = (btn && btn.tagName==='BUTTON') ? btn : document.querySelector('#profEditItem .btn-primary');
+  if(b){ b.disabled = true; b.textContent = 'در حال ذخیره...'; }
+  if(isLoggedIn()){
+    const res = await API.updateProfile({ first_name: first, last_name: last });
+    if(res.ok && res.data?.user){ setUSER(res.data.user); }
+    else if(!res.offline){
+      toast('⚠️', res.error?.message || 'ذخیره ناموفق بود');
+      if(b){ b.disabled = false; b.textContent = 'ذخیره'; }
+      return;
+    } else { setUSER({ ...USER, firstName: first, lastName: last }); } // آفلاین → محلی
+  } else {
+    setUSER({ ...USER, firstName: first, lastName: last });
+  }
+  toast('✅','پروفایل به‌روزرسانی شد');
+  try{ refreshAuthUI && refreshAuthUI(); }catch(e){}
+  renderProfile();
+}
+function cancelProfileEdit(){ renderProfile(); }
+
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
 window.openFoodDNA = openFoodDNA;
 window.dnaNext = dnaNext;
 window.dnaPrev = dnaPrev;
 window.closeFoodDNA = closeFoodDNA;
 window.shareFoodDNA = shareFoodDNA;
+window.editProfileInline = editProfileInline;
+window.saveProfileInline = saveProfileInline;
+window.cancelProfileEdit = cancelProfileEdit;
 
 
 /* ═══ js/features/chat.js ═══ */
@@ -3481,6 +3505,7 @@ window.shareFoodDNA = shareFoodDNA;
 // ═══════════════════════════════════════════════════════════
 
 
+
 let _pollTimer = null;
 let _activeThreadId = null;
 let _lastMsgTime = null;   // ISO — آخرین پیامی که داریم (برای ?after)
@@ -3488,7 +3513,7 @@ let _rendered = new Set(); // idهای پیامِ نمایش‌داده‌شده
 
 const POLL_MS = 4000;
 
-function chatEsc(s){ return String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// chatEsc از auth.js (منبعِ واحد) import می‌شود — نسخه‌ی محلیِ تکراری حذف شد.
 function chatFaTime(iso){
   try { return new Date(iso).toLocaleTimeString('fa-IR', { hour:'2-digit', minute:'2-digit' }); }
   catch { return ''; }
@@ -3739,7 +3764,12 @@ async function syncRestaurants(){
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', boot);
 } else {
-  boot();
+  // اسکریپت‌های module معمولاً وقتی اجرا می‌شوند که DOM آماده است؛ اگر boot را
+  // همین‌جا همزمان صدا بزنیم، حین ارزیابیِ گرافِ ماژول (importهای حلقوی) اجرا می‌شود
+  // و به bindingهای هنوز‌مقداردهی‌نشده (API، SAMPLE_EVENTS) برمی‌خورد → خطای TDZ که
+  // restoreSession و syncRestaurants را بی‌صدا از کار می‌انداخت. با defer به تیکِ بعد،
+  // گرافِ ماژول کامل می‌شود و چرخه‌ی load-time واقعاً شکسته می‌شود.
+  setTimeout(boot, 0);
 }
 
 
@@ -3765,7 +3795,15 @@ if (document.readyState === 'loading') {
 
 
 
+
 // رزرو و امکانات
+
+
+
+
+
+
+
 
 
 

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style data-src="/css/tokens.css">
+<style data-src="css/tokens.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — سیستم توکنِ طراحیِ مشترک (Design Tokens)
    منبعِ واحدِ حقیقت برای هر سه اپ. دو لایه:
@@ -148,6 +148,13 @@
   }
 }
 
+</style>
+<style data-src="css/theme.css">
+/* theme.css — تمِ مخصوصِ این اپ (app-owned، از shared/ sync نمی‌شود).
+ * پایه‌ی مشترکِ توکن‌ها در tokens.css است (منبع: shared/css/tokens.css)؛
+ * این فایل فقط نگاشتِ semantic مخصوصِ همین اپ را روی آن سوار می‌کند.
+ * باید در HTML بلافاصله بعد از tokens.css لود شود (همان ترتیبِ cascadeِ قبلی). */
+
 /* ── پلِ تم: پنل شرکت (لایت) ── */
 :root {
   --surface: #FFFFFF;
@@ -163,7 +170,7 @@
 }
 
 </style>
-<style data-src="/css/foundation.css">
+<style data-src="css/foundation.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — لایه‌ی Foundation (کامپوننت‌های پایه)
    روی tokens.css سوار است. کلاس‌های یوتیلیتی و کامپوننتِ مشترک.
@@ -443,7 +450,7 @@
 .sheet-handle { width: 36px; height: 4px; background: var(--border, #ddd); border-radius: 2px; margin: 0 auto var(--sp-4); }
 
 </style>
-<style data-src="/css/panel.css">
+<style data-src="css/panel.css">
 /* ═══ رزرونو — پنل company (admin): استایل‌ها ═══ */
 :root{
   /* پایه — همان سیستم رستوران */
@@ -767,8 +774,33 @@ button{font-family:inherit;cursor:pointer}
 .dot-closed{width:7px;height:7px;border-radius:50%;background:var(--danger);display:inline-block;
   box-shadow:0 0 0 3px color-mix(in srgb, var(--danger) 20%, transparent)}
 
+/* ─── صفِ بازبینیِ عکسِ گالری ───
+   بازبین باید خودِ تصویر را بزرگ ببیند (تصمیم بصری است، نه متنی)، پس کارت
+   با عکسِ درشت و متادیتای کنارش چیده می‌شود، نه ردیفِ جدولی. */
+.photo-queue{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.photo-card{border:1px solid var(--border);border-radius:var(--r-lg,14px);overflow:hidden;background:#fff;
+  display:flex;flex-direction:column;transition:box-shadow .15s}
+.photo-card:hover{box-shadow:0 8px 24px rgba(15,23,42,.08)}
+.photo-card__img{display:block;aspect-ratio:4/3;background:var(--bg-soft,#F8FAFC);overflow:hidden}
+.photo-card__img img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-card__body{padding:12px 14px;display:flex;flex-direction:column;gap:7px}
+.photo-card__top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.photo-card__rest{font-weight:800;font-size:13.5px;color:var(--t1)}
+.photo-card__meta{font-size:11.5px;color:var(--t3);line-height:1.6}
+.photo-card__cap{font-size:12.5px;color:var(--t2);line-height:1.6}
+.photo-card__reason{font-size:12px;color:var(--red-600);background:var(--red-50);
+  padding:7px 10px;border-radius:8px;line-height:1.6}
+.photo-card__actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+/* روی موبایل یک‌ستونی می‌شود تا عکس بزرگ‌تر و تصمیم دقیق‌تر باشد */
+@media (max-width:640px){.photo-queue{grid-template-columns:1fr}}
+/* جایگزینِ تصویر در حالتِ نمونه (سرور در دسترس نیست) — تا کارت بدونِ عکسِ
+   شکسته هم ساختارش را نشان بدهد. */
+.photo-card__img--demo{display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:var(--t3);
+  background:repeating-linear-gradient(45deg,#F1F5F9,#F1F5F9 10px,#E2E8F0 10px,#E2E8F0 20px)}
+
 </style>
-<style data-src="/css/ds-bridge.css">
+<style data-src="css/ds-bridge.css">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — لایه‌ی سازگاریِ Design System (DS Bridge)
    هدف: هم‌ترازکردنِ کامپوننت‌های قدیمیِ اپ‌ها با Design System،
@@ -889,6 +921,16 @@ button{font-family:inherit;cursor:pointer}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
         اشتراک و پیامک
       </button>
+      <button class="sb-item" data-v="sales" onclick="nav('sales')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/><path d="M12 6v12"/></svg>
+        درخواست‌های سایت
+        <span id="salesBadge" class="badge expiring" style="display:none;margin-inline-start:auto;font-size:11px;padding:1px 7px"></span>
+      </button>
+      <button class="sb-item" data-v="photos" onclick="nav('photos')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <span>بازبینی عکس</span>
+        <span id="photoBadge" class="badge expiring" style="display:none;margin-inline-start:auto;font-size:11px;padding:1px 7px"></span>
+      </button>
       <div class="sb-nav-label">پلتفرم</div>
       <button class="sb-item" data-v="systemhealth" onclick="nav('systemhealth')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -933,6 +975,8 @@ button{font-family:inherit;cursor:pointer}
       <div id="v-analytics" class="view"></div>
       <div id="v-customers" class="view"></div>
       <div id="v-billing" class="view"></div>
+      <div id="v-sales" class="view"></div>
+      <div id="v-photos" class="view"></div>
       <div id="v-systemhealth" class="view"></div>
       <div id="v-security" class="view"></div>
       <div id="v-support" class="view"></div>
@@ -944,7 +988,7 @@ button{font-family:inherit;cursor:pointer}
 <div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()"><div class="modal" id="modalBody"></div></div>
 
 <!-- ── پنل company: ماژول‌های Vanilla JS (ترتیب مهم) ── -->
-<script data-src="/js/icons.js">
+<script data-src="js/icons.js">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — سیستم آیکون (Iconography)
    آیکون‌های خطیِ یکدست: viewBox 24×24، stroke 1.5، currentColor.
@@ -1044,10 +1088,70 @@ if (typeof window !== 'undefined') window.icon = icon;
 if (typeof window !== "undefined") window.ICON_NAMES = Object.keys(PATHS);
 
 </script>
-<script data-src="/js/api.js">
-// ═══ رزرونو — پنل company: ابزارها + لایه‌ی اتصال API admin (Vanilla JS، scope مشترک) ═══
+<script data-src="js/api-core.js">
+/* ═══════════════════════════════════════════════════════════
+   رزرونو — هسته‌ی مشترکِ HTTP (transport) — منبعِ واحد
+   این فایل منبعِ حقیقت است؛ tools/sync-design-system.sh آن را به اپ‌ها می‌سازد
+   (customer نسخه‌ی ESM عیناً؛ در آینده پنل‌ها نسخه‌ی global).
+
+   httpJson: یک fetchِ کم‌سطحِ بدونِ حالت — timeout، پارس JSON، envelope یکدست،
+   و حالتِ offline. هیچ منطقِ auth/token/refresh اینجا نیست (آن سطح در هر اپ می‌ماند).
+   خروجی:
+     موفق   → { ok:true,  status, data }
+     ناموفق → { ok:false, status, data, error }
+     خطا/timeout → { ok:false, offline:true, error }
+   ═══════════════════════════════════════════════════════════ */
+// آدرسِ پایه‌ی API — قابلِ تنظیم بدونِ build: window.RZ_API_BASE یا
+// <meta name="rz-api-base" content="https://...">. پیش‌فرض '' = same-origin
+// (رفتارِ فعلی/دمو بدونِ تغییر). منبعِ واحد برای هر سه اپ.
+function resolveApiBase() {
+  try {
+    if (typeof window !== 'undefined' && window.RZ_API_BASE) return String(window.RZ_API_BASE).replace(/\/$/, '');
+    const m = (typeof document !== 'undefined') && document.querySelector('meta[name="rz-api-base"]');
+    if (m && m.content) return String(m.content).trim().replace(/\/$/, '');
+  } catch { /* noop */ }
+  return '';
+}
+
+async function httpJson(url, opts = {}, timeoutMs = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    clearTimeout(timer);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, status: res.status, data, error: data?.error || { message: `خطای ${res.status}` } };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (e) {
+    clearTimeout(timer);
+    return { ok: false, offline: true, error: { message: e.name === 'AbortError' ? 'زمان درخواست تمام شد' : 'اتصال به سرور برقرار نشد' } };
+  }
+}
+
+if (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveApiBase = resolveApiBase; }
+
+</script>
+<script data-src="js/format.js">
+/* ═══════════════════════════════════════════════════════════
+   رزرونو — helperهای خالصِ نمایش/امنیت (منبعِ واحد؛ فقط پنل‌ها)
+   این فایل منبعِ حقیقت است؛ tools/sync-design-system.sh نسخه‌ی global آن را
+   به پنل‌های business/company می‌سازد (export حذف می‌شود؛ برای <script> کلاسیک).
+
+   نکته: اپ customer عمداً اینجا نیست — `fa` در customer معنایِ متفاوتی دارد
+   (تبدیلِ رقمِ ASCII به فارسی، نه فرمتِ عددِ fa-IR)، پس نباید یکی شود.
+
+   fa  : فرمتِ عدد با جداکننده‌ی فارسی (۱۲٬۳۴۵).
+   esc : escape کردنِ ورودی قبل از تزریق به HTML (ضدِّ XSS) — تنها پیاده‌سازیِ
+         کانونیِ پنل‌ها؛ رفعِ باگِ escape یک‌جا برای هر دو پنل اعمال می‌شود.
+   ═══════════════════════════════════════════════════════════ */
 function fa(n){return n.toLocaleString('fa-IR')}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+</script>
+<script data-src="js/api.js">
+// ═══ رزرونو — پنل company: ابزارها + لایه‌ی اتصال API admin (Vanilla JS، scope مشترک) ═══
 let tt;
 function toast(icon,msg){const t=document.getElementById('toast');document.getElementById('toastIcon').textContent=icon;document.getElementById('toastMsg').textContent=msg;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2600)}
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sbOverlay').classList.toggle('show')}
@@ -1057,7 +1161,7 @@ function toggleSidebar(){document.getElementById('sidebar').classList.toggle('op
 //  با بک‌اند → داده‌ی واقعی · بدون بک‌اند → نمونه (پنل نمی‌شکند)
 // ═══════════════════════════════════════════════════════════
 const API = {
-  base: '',
+  base: resolveApiBase(),            // '' = same-origin؛ قابلِ override با window.RZ_API_BASE یا <meta rz-api-base> (از api-core.js)
   timeout: 8000,
   _token: null,
   _refresh: null,
@@ -1068,26 +1172,18 @@ const API = {
   setRefresh(t){ this._refresh = t; try { if(t) localStorage.setItem('rz_co_refresh', t); else localStorage.removeItem('rz_co_refresh'); } catch {} },
   restoreSession(){ try { this._token = localStorage.getItem('rz_co_access')||null; this._refresh = localStorage.getItem('rz_co_refresh')||null; } catch {} return !!this._token; },
   async request(path, opts = {}, _retried = false){
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), this.timeout);
-    try {
-      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-      if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
-      const res = await fetch(this.base + '/api/v1' + path, { ...opts, headers, signal: ctrl.signal });
-      clearTimeout(timer);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        if (res.status === 401 && this._refresh && !_retried && !path.startsWith('/auth/')) {
-          if (await this._doRefresh()) return this.request(path, opts, true);
-          this._onSessionExpired();
-        }
-        return { ok: false, status: res.status, error: data?.error || { message: `خطای ${res.status}` } };
-      }
-      return { ok: true, status: res.status, data };
-    } catch (e) {
-      clearTimeout(timer);
-      return { ok: false, offline: true, error: { message: 'اتصال به سرور برقرار نشد' } };
+    // transportِ خام به httpJsonِ مشترک (window.httpJson) واگذار می‌شود؛ منطقِ auth
+    // (Authorization، ۴۰۱→refresh→retry، session-expired) اینجا و بدونِ تغییر می‌ماند.
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
+    const r = await httpJson(this.base + '/api/v1' + path, { ...opts, headers }, this.timeout);
+    if (!r.ok && !r.offline && r.status === 401 && this._refresh && !_retried && !path.startsWith('/auth/')) {
+      if (await this._doRefresh()) return this.request(path, opts, true);
+      this._onSessionExpired();
     }
+    if (r.ok) return { ok: true, status: r.status, data: r.data };
+    if (r.offline) return { ok: false, offline: true, error: r.error };
+    return { ok: false, status: r.status, error: r.error || { message: `خطای ${r.status}` } };
   },
   async _doRefresh(){
     if (this._refreshing) return this._refreshing;
@@ -1105,9 +1201,10 @@ const API = {
   get(path){ return this.request(path); },
   post(path, body){ return this.request(path, { method:'POST', body: JSON.stringify(body||{}) }); },
   patch(path, body){ return this.request(path, { method:'PATCH', body: JSON.stringify(body||{}) }); },
-  async requestAdminOtp(phone){ return this.request('/auth/staff/request', { method:'POST', body: JSON.stringify({ phone }) }); },
+  del(path){ return this.request(path, { method:'DELETE' }); },
+  async requestAdminOtp(phone){ return this.request('/auth/admin/request', { method:'POST', body: JSON.stringify({ phone }) }); },
   async verifyAdminOtp(phone, code){
-    const res = await this.request('/auth/staff/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
+    const res = await this.request('/auth/admin/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
     if (res.ok && res.data?.access) { this.setToken(res.data.access); this.setRefresh(res.data.refresh); }
     return res;
   },
@@ -1120,6 +1217,9 @@ const API = {
   businessIntelligence(){ return this.get('/admin/business-intelligence'); },
   security(){ return this.get('/admin/security'); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
+  // ── بازبینیِ عکسِ گالری ──
+  photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },
+  photoDecide(id, body){ return this.patch(`/admin/photos/${id}`, body); },
 };
 
 // نگاشت رستوران API به ساختار پنل
@@ -1172,7 +1272,80 @@ function updateOfflineBanner(){
 // ════════ داده‌ی رستوران‌ها (شبیه‌سازی — در محصول واقعی از API) ════════
 
 </script>
-<script data-src="/js/data.js">
+<script data-src="js/analytics.js">
+// ═══════════════════════════════════════════════════════════
+//  رزرونو (پنل کمپانی) — امیترِ رویدادِ رفتاری (Data Platform · فاز۲)
+//
+//  اسکریپتِ کلاسیک (global، بدونِ import/export). رویدادها را دسته‌ای و بی‌صدا
+//  به POST /api/v1/telemetry می‌فرستد. هرگز چیزی نمی‌شکند (همه‌ی مسیرها try/catch)؛
+//  دمومود امن. ناشناس بر پایه‌ی sessionId. بعد از api.js بارگذاری شود.
+//  window.rzTrack(type, payload) را در دسترس می‌گذارد.
+//  معماری: docs/INTELLIGENCE-PLATFORM-ARCHITECTURE.md
+// ═══════════════════════════════════════════════════════════
+(function () {
+  'use strict';
+  var SOURCE = 'company';
+  var SID_KEY = 'rz_sid_co';
+  var Q_KEY = 'rz_evq_co';
+  var MAX_BATCH = 50;
+  var FLUSH_AT = 10;
+
+  function endpoint() {
+    var base = (typeof API !== 'undefined' && API && API.base) ? API.base : '';
+    return base + '/api/v1/telemetry';
+  }
+  function sessionId() {
+    try {
+      var s = localStorage.getItem(SID_KEY);
+      if (!s) { s = 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem(SID_KEY, s); }
+      return s;
+    } catch (e) { return 'anon'; }
+  }
+
+  var queue = [];
+  try { var raw = localStorage.getItem(Q_KEY); if (raw) queue = JSON.parse(raw) || []; } catch (e) { queue = []; }
+  function persist() { try { localStorage.setItem(Q_KEY, JSON.stringify(queue.slice(-200))); } catch (e) { /* سهمیه پر */ } }
+
+  function flush(useBeacon) {
+    if (!queue.length) return;
+    var batch = queue.slice(0, MAX_BATCH);
+    var body = JSON.stringify({ events: batch });
+    var url = endpoint();
+    if (useBeacon) {
+      try {
+        if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))) {
+          queue = queue.slice(batch.length); persist(); return;
+        }
+      } catch (e) { /* به fetch برگرد */ }
+    }
+    try {
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true })
+        .then(function (r) { if (r && r.ok) { queue = queue.slice(batch.length); persist(); } })
+        .catch(function () { /* آفلاین — در صف می‌ماند */ });
+    } catch (e) { /* no-op */ }
+  }
+
+  function track(type, payload) {
+    try {
+      queue.push({ type: String(type), occurredAt: new Date().toISOString(), source: SOURCE, sessionId: sessionId(), payload: payload || {} });
+      persist();
+      if (queue.length >= FLUSH_AT) flush(false);
+    } catch (e) { /* no-op */ }
+  }
+
+  try {
+    addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flush(true); });
+    addEventListener('pagehide', function () { flush(true); });
+  } catch (e) { /* no-op */ }
+
+  try { if (queue.length) flush(false); } catch (e) { /* no-op */ }
+
+  track('app.opened', {});
+  try { window.rzTrack = track; } catch (e) { /* no-op */ }
+})();
+
+</script>
+<script data-src="js/data.js">
 // ═══ رزرونو — پنل company: داده‌ی نمونه + برچسب‌ها + مسیریابی (Vanilla JS، scope مشترک) ═══
 const RESTAURANTS_SAMPLE=[
   {id:1,name:'کافه‌رستوران ویستا',logo:'🌿',grad:'linear-gradient(135deg,#34D399,#059669)',city:'تهران، ولنجک',plan:'pro',status:'active',daysLeft:218,members:1240,reservations:3420,sms:8600,rating:4.8,joined:'۱۴۰۳/۰۸'},
@@ -1189,23 +1362,26 @@ let RESTAURANTS = RESTAURANTS_SAMPLE;
 const PLAN_LABEL={free:'رایگان',pro:'حرفه‌ای',enterprise:'سازمانی'};
 const STATUS_LABEL={active:'فعال',expiring:'رو به اتمام',expired:'منقضی',trial:'دوره آزمایشی',trial_expired:'آزمایشی تمام‌شده'};
 
-const TITLES={overview:'داشبورد',restaurants:'رستوران‌ها',detail:'جزئیات رستوران',analytics:'آنالیز پلتفرم',customers:'هوش تجاری مشتریان',billing:'اشتراک و پیامک',systemhealth:'سلامت سیستم',security:'امنیت پلتفرم',support:'مدیریت رستوران‌ها'};
+const TITLES={overview:'داشبورد',restaurants:'رستوران‌ها',detail:'جزئیات رستوران',analytics:'آنالیز پلتفرم',customers:'هوش تجاری مشتریان',billing:'اشتراک و پیامک',sales:'درخواست‌های سایت',photos:'بازبینی عکسِ گالری',systemhealth:'سلامت سیستم',security:'امنیت پلتفرم',support:'مدیریت رستوران‌ها'};
 let restFilter='all';
 let currentRest=null; // رستوران انتخاب‌شده برای صفحه‌ی جزئیات
 
 function nav(v){
+  try{ if(window.rzTrack) window.rzTrack('page.viewed',{page:v}); }catch(e){}
   document.querySelectorAll('.sb-item[data-v]').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.getElementById('v-'+v).classList.add('active');
   document.getElementById('pageTitle').textContent=TITLES[v]||'';
-  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,systemhealth:rSystemHealth,security:rSecurity,support:rSupport})[v]();
+  // «درخواست‌های سایت» به‌جای رندرِ مستقیم، اول از API می‌خواند (rSales را خودش صدا می‌زند).
+  // «درخواست‌های سایت» و «بازبینی عکس» اول از API می‌خوانند (رندر را خودشان صدا می‌زنند).
+  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,sales:loadSales,photos:loadPhotos,systemhealth:rSystemHealth,security:rSecurity,support:rSupport})[v]();
   if(window.innerWidth<=900){document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOverlay').classList.remove('show')}
 }
 
 // ════════ داشبورد کلی ════════
 
 </script>
-<script data-src="/js/overview.js">
+<script data-src="js/overview.js">
 // ═══ رزرونو — پنل company: داشبورد + لیست رستوران‌ها + مودال (Vanilla JS، scope مشترک) ═══
 let PLATFORM_STATS = null; // از /admin/overview — اگر null یعنی هنوز لود نشده
 async function loadPlatformStats(){
@@ -1342,7 +1518,7 @@ function openRest(id){currentRest=RESTAURANTS.find(r=>String(r.id)===String(id))
 // ════════ صفحه‌ی جزئیات رستوران ════════
 
 </script>
-<script data-src="/js/restaurant.js">
+<script data-src="js/restaurant.js">
 // ═══ رزرونو — پنل company: جزئیات رستوران + آنالیز پلتفرم (Vanilla JS، scope مشترک) ═══
 function rDetail(){
   const r=currentRest;
@@ -1432,7 +1608,7 @@ function rAnalytics(){
 // ════════ هوش تجاری مشتریان — تجمیعی و واقعی، از /admin/business-intelligence ════════
 
 </script>
-<script data-src="/js/intelligence.js">
+<script data-src="js/intelligence.js">
 // ═══ رزرونو — پنل company: هوش تجاری + سلامت سیستم + امنیت + اشتراک + init (Vanilla JS، scope مشترک) ═══
 // نکته‌ی مهم حریم خصوصی: نام/شماره‌ی تک‌تک مشتریان همه‌ی رستوران‌ها عمداً اینجا نشون داده نمی‌شه؛
 // فقط داده‌ی تجمیعی (RFM/CLV/سگمنت) که برای تصمیم‌گیری کسب‌وکار لازمه.
@@ -1720,6 +1896,10 @@ async function adminSendOtp(){
   _adminPhone = normalized;
   const btn = document.getElementById('adminSendBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'در حال ارسال...'; }
+  if (location.protocol === 'file:') {
+    showAdminLoginCode('۱۲۳۴', true);
+    return;
+  }
   const res = await API.requestAdminOtp(normalized);
   if (!res.ok && !res.offline){
     toast('', res.error?.message || 'این شماره دسترسی ندارد');
@@ -1747,6 +1927,11 @@ async function adminConfirmOtp(){
   if (!/^\d{4,6}$/.test(code)) { toast('','کد ورود را کامل وارد کن'); return; }
   const btn = document.getElementById('adminVerifyBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+  if (location.protocol === 'file:') {
+    if (code === '1234'){ await enterAdminPanel(true); }
+    else { toast('','در حالت دمو، کد ۱۲۳۴ است'); if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } }
+    return;
+  }
   const res = await API.verifyAdminOtp(_adminPhone, code);
   if (res.ok && res.data?.access){
     await enterAdminPanel();
@@ -1764,6 +1949,10 @@ async function enterAdminPanel(demo){
   if (API.getToken() && !demo){
     const [fresh] = await Promise.all([loadAdminRestaurants(), loadPlatformStats()]);
     RESTAURANTS = fresh;
+    // نشان‌ها باید از همان ابتدا عددِ واقعی را نشان دهند، وگرنه کارِ منتظر
+    // فقط وقتی دیده می‌شود که کاربر اتفاقی وارد آن صفحه شود.
+    refreshSalesBadge();
+    refreshPhotoBadge();
   }
   rOverview();
   toast('','خوش آمدید · پنل شرکت');
@@ -1791,11 +1980,539 @@ if (API.getToken()) {
     const active = document.querySelector('.view.active');
     if (active) {
       const id = active.id.replace('v-', '');
-      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, systemhealth:rSystemHealth, security:rSecurity, support:rSupport})[id]?.();
+      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, systemhealth:rSystemHealth, security:rSecurity, support:rSupport})[id]?.();
     }
+    refreshSalesBadge();
+    refreshPhotoBadge();
   })();
 } else {
   showAdminLoginPhone();
+}
+
+</script>
+<script data-src="js/sales.js">
+// ═══════════════════════════════════════════════════════════════════════
+//  رزرونو — پنل company: صفِ درخواست‌های وب‌سایت (فروش و فعال‌سازی)
+//
+//  اینجا همان صفی است که «اپِ شرکت» برای فعال‌سازیِ اشتراک مسئولش است:
+//  درخواستِ خریدی که از وب‌سایتِ عمومی ثبت شده، با یک کلیک به اشتراکِ واقعیِ
+//  کسب‌وکار تبدیل می‌شود (tenant.plan + planExpiresAt) و روی همان ردیف ثبت
+//  می‌شود چه‌کسی و چه‌زمانی فعالش کرده.
+//
+//  منبعِ داده: GET /api/v1/admin/site/orders و /admin/site/overview
+//  عملیات:    PATCH /api/v1/admin/site/orders/{id}  { action: ... }
+//
+//  بدونِ بک‌اند حالتِ خالیِ صادقانه نشان داده می‌شود (نه دادهٔ نمونه) — چون
+//  اینجا تصمیمِ مالی گرفته می‌شود و دادهٔ ساختگی می‌تواند گمراه‌کننده باشد.
+// ═══════════════════════════════════════════════════════════════════════
+
+let SALES_ORDERS = [];
+let SALES_INQUIRIES = [];
+let SALES_TAB = 'orders';       // orders | inquiries
+let SALES_FILTER = 'pending';   // pending | all
+let SALES_LOADING = false;
+let SALES_ERROR = null;
+let SALES_BADGE = 0;            // شمارشِ کارِ باقی‌مانده برای نشانِ کنارِ منو
+
+const SALES_STATUS = {
+  pending: { label: 'در انتظار', cls: 'expiring' },
+  contacted: { label: 'تماس گرفته شد', cls: 'trial' },
+  activated: { label: 'فعال شد', cls: 'active' },
+  rejected: { label: 'رد شد', cls: 'expired' },
+  cancelled: { label: 'لغو شد', cls: 'expired' },
+};
+const INQUIRY_STATUS = {
+  open: { label: 'باز', cls: 'expiring' },
+  in_progress: { label: 'در حالِ پیگیری', cls: 'trial' },
+  closed: { label: 'بسته', cls: 'active' },
+};
+const TOPIC_LABEL = {
+  sales: 'خرید و قیمت', support: 'پشتیبانی', partnership: 'همکاری', press: 'رسانه', other: 'سایر',
+};
+
+/** تومان با ارقامِ فارسی و جداکننده‌ی هزارگان. */
+function salesToman(n) {
+  if (n === null || n === undefined) return '—';
+  return fa(Number(n).toLocaleString('en-US')) + ' تومان';
+}
+
+/** تاریخِ کوتاهِ خوانا از ISO. */
+function salesDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  try {
+    return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+      year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Tehran',
+    }).format(d);
+  } catch { return fa(d.toISOString().slice(0, 10)); }
+}
+
+// ════════ بارگذاری ════════
+
+async function loadSales() {
+  SALES_LOADING = true;
+  SALES_ERROR = null;
+  rSales();
+
+  const qs = SALES_FILTER === 'pending' ? '?status=pending' : '';
+  const [orders, inquiries] = await Promise.all([
+    API.get('/admin/site/orders' + qs),
+    API.get('/admin/site/inquiries'),
+  ]);
+
+  SALES_LOADING = false;
+  if (!orders.ok) {
+    SALES_ERROR = orders.offline
+      ? 'اتصال به سرور برقرار نیست — این بخش دادهٔ نمونه ندارد چون تصمیمِ مالی روی آن گرفته می‌شود.'
+      : (orders.error && orders.error.message) || 'دریافتِ درخواست‌ها ناموفق بود.';
+    SALES_ORDERS = [];
+  } else {
+    SALES_ORDERS = orders.data.items || [];
+  }
+  SALES_INQUIRIES = inquiries.ok ? (inquiries.data.items || []) : [];
+  rSales();
+  refreshSalesBadge();
+}
+
+/** شمارشِ کارِ باقی‌مانده روی نشانِ منو (بدونِ رندرِ کلِ صفحه). */
+async function refreshSalesBadge() {
+  const res = await API.get('/admin/site/overview');
+  if (!res.ok) return;
+  SALES_BADGE = (res.data.funnel && res.data.funnel.action_required) || 0;
+  const el = document.getElementById('salesBadge');
+  if (!el) return;
+  el.textContent = SALES_BADGE ? fa(SALES_BADGE) : '';
+  el.style.display = SALES_BADGE ? 'inline-flex' : 'none';
+}
+
+// ════════ رندر ════════
+
+function rSales() {
+  const el = document.getElementById('v-sales');
+  if (!el) return;
+
+  const pendingCount = SALES_ORDERS.filter((o) => o.status === 'pending' && o.kind === 'purchase').length;
+  const openInquiries = SALES_INQUIRIES.filter((q) => q.status === 'open').length;
+
+  el.innerHTML = `
+    <div class="bill-summary">
+      <div class="bill-stat"><div class="bs-val" style="color:var(--amber-600)">${fa(pendingCount)}</div><div class="bs-label">درخواستِ خریدِ در انتظارِ فعال‌سازی</div></div>
+      <div class="bill-stat"><div class="bs-val" style="color:var(--ink)">${fa(SALES_ORDERS.filter(o=>o.kind==='trial').length)}</div><div class="bs-label">حسابِ دمو در این فهرست</div></div>
+      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${fa(openInquiries)}</div><div class="bs-label">پیامِ بازنشده‌ی سایت</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head" style="flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="panel-title">درخواست‌های وب‌سایت</div>
+          <div class="panel-sub">فعال‌سازیِ اشتراک از همین‌جا انجام می‌شود و در گزارشِ حسابرسی ثبت می‌گردد</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm ${SALES_TAB==='orders'?'btn-primary':'btn-ghost'}" onclick="salesTab('orders')">سفارش‌ها</button>
+          <button class="btn btn-sm ${SALES_TAB==='inquiries'?'btn-primary':'btn-ghost'}" onclick="salesTab('inquiries')">پیام‌ها${openInquiries?` (${fa(openInquiries)})`:''}</button>
+          ${SALES_TAB==='orders' ? `
+            <button class="btn btn-sm ${SALES_FILTER==='pending'?'btn-primary':'btn-ghost'}" onclick="salesFilter('pending')">در انتظار</button>
+            <button class="btn btn-sm ${SALES_FILTER==='all'?'btn-primary':'btn-ghost'}" onclick="salesFilter('all')">همه</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="loadSales()">${SALES_LOADING?'در حال بارگذاری…':'تازه‌سازی'}</button>
+        </div>
+      </div>
+
+      ${SALES_ERROR ? `<div style="padding:22px;text-align:center;color:var(--red-600);font-size:13px">${esc(SALES_ERROR)}</div>` : ''}
+      ${SALES_LOADING ? `<div style="padding:22px;text-align:center;color:var(--muted);font-size:13px">در حال دریافت…</div>` : ''}
+      ${!SALES_LOADING && !SALES_ERROR ? (SALES_TAB === 'orders' ? renderSalesOrders() : renderSalesInquiries()) : ''}
+    </div>`;
+}
+
+function renderSalesOrders() {
+  if (!SALES_ORDERS.length) {
+    return `<div style="padding:28px;text-align:center;color:var(--muted);font-size:13px">
+      ${SALES_FILTER === 'pending' ? 'هیچ درخواستی در انتظارِ اقدام نیست. ✓' : 'هنوز درخواستی از وب‌سایت ثبت نشده است.'}
+    </div>`;
+  }
+
+  return `<div class="mini-list">${SALES_ORDERS.map((o) => {
+    const st = SALES_STATUS[o.status] || { label: o.status, cls: 'trial' };
+    const isPurchase = o.kind === 'purchase';
+    const canAct = isPurchase && o.status !== 'activated' && o.status !== 'rejected';
+    const tenantHint = o.tenant_id
+      ? 'کسب‌وکار متصل است'
+      : (o.suggested_tenant ? `پیشنهاد: ${esc(o.suggested_tenant.tenantName)}` : 'بدونِ کسب‌وکارِ متصل');
+
+    return `<div class="mini-row" style="flex-wrap:wrap;gap:10px">
+      <div class="mini-info" style="min-width:200px;flex:1">
+        <div class="mini-name">${esc(o.business_name)} <span class="plan-badge ${isPurchase?'pro':'trial'}">${isPurchase?'خرید':'دمو'}</span></div>
+        <div class="mini-sub" style="direction:ltr;text-align:right">${esc(o.code)} · ${esc(o.contact_name)} · ${esc(o.phone)}</div>
+        <div class="mini-sub">${o.plan_name?esc(o.plan_name)+' · ':''}${salesDate(o.created_at)} · ${esc(tenantHint)}</div>
+      </div>
+      <div style="min-width:120px;font-size:13px;font-weight:700">${salesToman(o.amount_toman)}</div>
+      <span class="badge ${st.cls}" style="align-self:flex-start"><span class="bdot"></span>${st.label}</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="openSalesOrder('${esc(o.id)}')">جزئیات</button>
+        ${canAct ? `<button class="btn btn-primary btn-sm" onclick="activateSalesOrder('${esc(o.id)}')">فعال‌سازی</button>` : ''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderSalesInquiries() {
+  if (!SALES_INQUIRIES.length) {
+    return `<div style="padding:28px;text-align:center;color:var(--muted);font-size:13px">صندوقِ ورودی خالی است.</div>`;
+  }
+  return `<div class="mini-list">${SALES_INQUIRIES.map((q) => {
+    const st = INQUIRY_STATUS[q.status] || { label: q.status, cls: 'trial' };
+    return `<div class="mini-row" style="flex-wrap:wrap;gap:10px;align-items:flex-start">
+      <div class="mini-info" style="min-width:220px;flex:1">
+        <div class="mini-name">${esc(q.name)}${q.company?' — '+esc(q.company):''}</div>
+        <div class="mini-sub" style="direction:ltr;text-align:right">${esc(q.code)} · ${esc(q.phone)}${q.email?' · '+esc(q.email):''}</div>
+        <div class="mini-sub">${esc(TOPIC_LABEL[q.topic]||q.topic)} · ${salesDate(q.created_at)}</div>
+        <div style="margin-top:6px;font-size:12.5px;line-height:1.8;white-space:pre-wrap">${esc(q.message)}</div>
+      </div>
+      <span class="badge ${st.cls}" style="align-self:flex-start"><span class="bdot"></span>${st.label}</span>
+      <div style="display:flex;gap:6px">
+        ${q.status === 'open' ? `<button class="btn btn-ghost btn-sm" onclick="setInquiryStatus('${esc(q.id)}','in_progress')">در حالِ پیگیری</button>` : ''}
+        ${q.status !== 'closed' ? `<button class="btn btn-primary btn-sm" onclick="setInquiryStatus('${esc(q.id)}','closed')">بستن</button>` : ''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ════════ تعامل ════════
+
+function salesTab(tab) { SALES_TAB = tab; rSales(); }
+function salesFilter(f) { SALES_FILTER = f; loadSales(); }
+
+function openSalesOrder(id) {
+  const o = SALES_ORDERS.find((x) => String(x.id) === String(id));
+  if (!o) return;
+  const st = SALES_STATUS[o.status] || { label: o.status };
+
+  openModal(`
+    <div class="modal-title">${esc(o.business_name)}</div>
+    <div class="modal-sub" style="direction:ltr;text-align:right">${esc(o.code)} · ${st.label}</div>
+
+    <div class="field-label">تماس</div>
+    <div style="font-size:13px;line-height:2">
+      ${esc(o.contact_name)}<br>
+      <span style="direction:ltr;display:inline-block">${esc(o.phone)}</span>${o.email?`<br><span style="direction:ltr;display:inline-block">${esc(o.email)}</span>`:''}
+      ${o.city?`<br>${esc(o.city)}`:''}${o.branch_count?` · ${fa(o.branch_count)} شعبه`:''}
+    </div>
+
+    <div class="field-label">اشتراک</div>
+    <div style="font-size:13px;line-height:2">
+      ${o.kind === 'purchase' ? `${esc(o.plan_name||'—')} · ${fa(o.months||0)} ماه · ${salesToman(o.amount_toman)}` : 'دموی ۳۰ روزه'}<br>
+      ثبت: ${salesDate(o.created_at)}
+      ${o.trial_ends_at?`<br>پایانِ دمو: ${salesDate(o.trial_ends_at)}`:''}
+      ${o.plan_expires_at?`<br>اعتبار تا: ${salesDate(o.plan_expires_at)}`:''}
+    </div>
+
+    ${o.note ? `<div class="field-label">یادداشتِ متقاضی</div><div style="font-size:13px;line-height:1.9;white-space:pre-wrap">${esc(o.note)}</div>` : ''}
+    ${o.rejected_reason ? `<div class="field-label">دلیلِ رد</div><div style="font-size:13px;color:var(--red-600)">${esc(o.rejected_reason)}</div>` : ''}
+    ${(o.utm_source || o.landing_path) ? `<div class="field-label">منبعِ سرنخ</div><div style="font-size:12px;color:var(--muted);direction:ltr;text-align:right">${esc([o.utm_source,o.utm_campaign,o.landing_path].filter(Boolean).join(' · '))}</div>` : ''}
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">بستن</button>
+      ${o.status !== 'activated' && o.status !== 'rejected' ? `
+        <button class="btn btn-ghost" onclick="rejectSalesOrder('${esc(o.id)}')">رد کردن</button>
+        ${o.status === 'pending' ? `<button class="btn btn-ghost" onclick="contactSalesOrder('${esc(o.id)}')">تماس گرفتم</button>` : ''}
+        ${o.kind === 'purchase' ? `<button class="btn btn-primary" onclick="activateSalesOrder('${esc(o.id)}')">فعال‌سازیِ اشتراک</button>` : ''}
+      ` : ''}
+    </div>`);
+}
+
+/** فراخوانِ مشترکِ عملیاتِ سفارش؛ خطا را به کاربر نشان می‌دهد و فهرست را تازه می‌کند. */
+async function patchSalesOrder(id, body, successMsg) {
+  const res = await API.patch(`/admin/site/orders/${id}`, body);
+  if (!res.ok) {
+    toast('✕', (res.error && res.error.message) || 'انجامِ عملیات ناموفق بود');
+    return false;
+  }
+  closeModal();
+  toast('✓', successMsg);
+  await loadSales();
+  return true;
+}
+
+async function activateSalesOrder(id) {
+  const o = SALES_ORDERS.find((x) => String(x.id) === String(id));
+  if (!o) return;
+
+  // تنانتِ مقصد: از خودِ سفارش، وگرنه پیشنهادِ سرور، وگرنه از مدیر می‌پرسیم.
+  let tenantId = o.tenant_id || (o.suggested_tenant && o.suggested_tenant.tenantId) || null;
+  if (!tenantId) {
+    tenantId = window.prompt(
+      'شناسه‌ی کسب‌وکارِ مقصد (tenant id):\n' +
+      'این شماره هنوز به هیچ کسب‌وکاری وصل نیست. اگر حساب ندارند، اول باید دموی رایگان بسازند.',
+    );
+    if (!tenantId || !tenantId.trim()) return;
+    tenantId = tenantId.trim();
+  }
+
+  const who = o.suggested_tenant ? `«${o.suggested_tenant.tenantName}»` : 'این کسب‌وکار';
+  if (!window.confirm(
+    `اشتراکِ ${who} برای ${fa(o.months || 0)} ماه فعال شود؟\n` +
+    'تاریخِ انقضای واقعی تغییر می‌کند و عمل در گزارشِ حسابرسی ثبت می‌شود.',
+  )) return;
+
+  await patchSalesOrder(id, { action: 'activate', tenant_id: tenantId }, 'اشتراک فعال شد');
+}
+
+async function rejectSalesOrder(id) {
+  const reason = window.prompt('دلیلِ رد کردن (برای متقاضی هم در صفحه‌ی پیگیری دیده می‌شود):');
+  if (!reason || reason.trim().length < 3) return;
+  await patchSalesOrder(id, { action: 'reject', reason: reason.trim() }, 'درخواست رد شد');
+}
+
+async function contactSalesOrder(id) {
+  await patchSalesOrder(id, { action: 'contact' }, 'وضعیت به «تماس گرفته شد» تغییر کرد');
+}
+
+async function setInquiryStatus(id, status) {
+  const res = await API.patch(`/admin/site/inquiries/${id}`, { status });
+  if (!res.ok) {
+    toast('✕', (res.error && res.error.message) || 'به‌روزرسانی ناموفق بود');
+    return;
+  }
+  toast('✓', 'وضعیتِ پیام به‌روز شد');
+  await loadSales();
+}
+
+</script>
+<script data-src="js/photos.js">
+// ═══════════════════════════════════════════════════════════════════════
+//  رزرونو — پنل company: صفِ بازبینیِ عکسِ گالری
+//
+//  رستوران عکس را از پنلِ کسب‌وکار آپلود می‌کند و عکس با وضعیتِ pending
+//  می‌نشیند. تا وقتی اینجا تأیید نشود، در اپ مشتری و صفحه‌ی عمومیِ رستوران
+//  دیده نمی‌شود. یعنی هیچ تصویری بدونِ بازبینیِ انسانی روی برندِ پلتفرم
+//  منتشر نمی‌شود.
+//
+//  منبعِ داده: GET  /api/v1/admin/photos?status=pending
+//  عملیات:    PATCH /api/v1/admin/photos/{id}  { action: 'approve'|'reject', reason? }
+//             DELETE /api/v1/admin/photos/{id}  (موردِ حاد — فایل هم پاک می‌شود)
+//
+//  صف عمداً FIFO است (قدیمی‌ترین اول): وگرنه عکسِ یک رستورانِ کوچک می‌تواند
+//  هفته‌ها پشتِ آپلودهای تازه بماند.
+// ═══════════════════════════════════════════════════════════════════════
+
+let PHOTO_ITEMS = [];
+let PHOTO_FILTER = 'pending';   // pending | approved | rejected | all
+let PHOTO_LOADING = false;
+let PHOTO_ERROR = null;
+let PHOTO_BADGE = 0;
+let PHOTO_DEMO = false;         // آیا چیزی که روی صفحه است دادهٔ نمونه است؟
+
+// نمونه‌ی نمایشی — فقط وقتی سرور در دسترس نیست (نسخه‌ی آفلاینِ پنل برای
+// ارائه). نام‌ها عمداً با [DEMO] برچسب خورده‌اند تا هیچ‌وقت با دادهٔ واقعی
+// اشتباه گرفته نشوند، و در این حالت دکمه‌های تأیید/رد کاری انجام نمی‌دهند —
+// تصمیمِ انتشار نباید روی دادهٔ ساختگی گرفته شود.
+const PHOTO_SAMPLE = [
+  { id: 'demo-1', url: '', caption: 'میزهای کنارِ پنجره', category: 'interior', status: 'pending',
+    width: 1600, height: 1067, byte_size: 384000, original_name: 'salon-window.jpg',
+    created_at: new Date(Date.now() - 36e5 * 3).toISOString(), reviewed_at: null, rejection_reason: null,
+    restaurant: { id: 'd1', name: '[DEMO] کافه‌رستوران ویستا', slug: 'demo-vista', city: 'تهران' } },
+  { id: 'demo-2', url: '', caption: 'خورشتِ ویژه‌ی شب', category: 'food', status: 'pending',
+    width: 1200, height: 1200, byte_size: 268000, original_name: 'dish-01.jpg',
+    created_at: new Date(Date.now() - 36e5 * 9).toISOString(), reviewed_at: null, rejection_reason: null,
+    restaurant: { id: 'd2', name: '[DEMO] سفره‌خانه گرام', slug: 'demo-geram', city: 'اصفهان' } },
+  { id: 'demo-3', url: '', caption: '', category: 'drink', status: 'pending',
+    width: 900, height: 1600, byte_size: 512000, original_name: 'bar.png',
+    created_at: new Date(Date.now() - 36e5 * 26).toISOString(), reviewed_at: null, rejection_reason: null,
+    restaurant: { id: 'd3', name: '[DEMO] کافه هانا', slug: 'demo-hana', city: 'تهران' } },
+];
+
+const PHOTO_STATUS = {
+  pending: { label: 'در انتظار تأیید', cls: 'expiring' },
+  approved: { label: 'تأییدشده', cls: 'active' },
+  rejected: { label: 'ردشده', cls: 'expired' },
+};
+const PHOTO_CATEGORY = {
+  food: 'غذا', interior: 'فضا', drink: 'نوشیدنی', event: 'رویداد', other: 'سایر',
+};
+
+/** حجم به کیلو/مگابایت با ارقامِ فارسی. */
+function photoSize(bytes) {
+  if (!bytes) return '—';
+  return bytes >= 1024 * 1024
+    ? fa((bytes / 1024 / 1024).toFixed(1)) + ' مگابایت'
+    : fa(Math.round(bytes / 1024)) + ' کیلوبایت';
+}
+
+function photoDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  try {
+    return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran',
+    }).format(d);
+  } catch { return fa(d.toISOString().slice(0, 16).replace('T', ' ')); }
+}
+
+// ════════ بارگذاری ════════
+
+async function loadPhotos() {
+  PHOTO_LOADING = true;
+  PHOTO_ERROR = null;
+  rPhotos();
+
+  const res = await API.get('/admin/photos?status=' + PHOTO_FILTER + '&limit=100');
+  PHOTO_LOADING = false;
+
+  if (!res.ok) {
+    if (res.offline) {
+      // نسخه‌ی آفلاینِ پنل (برای ارائه): نمونه نشان داده می‌شود ولی با برچسبِ
+      // آشکار و بدونِ اینکه دکمه‌ها کاری کنند. تصمیمِ انتشار نباید روی دادهٔ
+      // ساختگی گرفته شود — همان قاعده، فقط به‌جای صفحه‌ی خالی، شفاف.
+      PHOTO_DEMO = true;
+      PHOTO_ERROR = null;
+      PHOTO_ITEMS = PHOTO_FILTER === 'pending' || PHOTO_FILTER === 'all' ? PHOTO_SAMPLE : [];
+      PHOTO_BADGE = PHOTO_SAMPLE.length;
+    } else {
+      PHOTO_DEMO = false;
+      PHOTO_ERROR = (res.error && res.error.message) || 'دریافتِ صفِ بازبینی ناموفق بود.';
+      PHOTO_ITEMS = [];
+    }
+  } else {
+    PHOTO_DEMO = false;
+    PHOTO_ITEMS = res.data.items || [];
+    PHOTO_BADGE = res.data.pending_count || 0;
+  }
+  rPhotos();
+  paintPhotoBadge();
+}
+
+function paintPhotoBadge() {
+  const el = document.getElementById('photoBadge');
+  if (!el) return;
+  el.textContent = PHOTO_BADGE ? fa(PHOTO_BADGE) : '';
+  el.style.display = PHOTO_BADGE ? 'inline-flex' : 'none';
+}
+
+/**
+ * فقط شمارشِ صف را می‌گیرد، بدونِ رندرِ صفحه.
+ * هنگامِ ورود صدا زده می‌شود تا کارِ منتظر از همان ابتدا دیده شود، نه فقط
+ * وقتی که کاربر اتفاقی وارد این صفحه شود. limit=1 چون فقط عدد را می‌خواهیم.
+ */
+async function refreshPhotoBadge() {
+  const res = await API.get('/admin/photos?status=pending&limit=1');
+  if (!res.ok) return;
+  PHOTO_BADGE = res.data.pending_count || 0;
+  paintPhotoBadge();
+}
+
+function photoFilter(f) { PHOTO_FILTER = f; loadPhotos(); }
+
+// ════════ رندر ════════
+
+function rPhotos() {
+  const el = document.getElementById('v-photos');
+  if (!el) return;
+
+  el.innerHTML = `
+    <div class="bill-summary">
+      <div class="bill-stat"><div class="bs-val" style="color:var(--amber-600)">${fa(PHOTO_BADGE)}</div><div class="bs-label">عکسِ در انتظارِ بازبینی</div></div>
+      <div class="bill-stat"><div class="bs-val" style="color:var(--ink)">${fa(PHOTO_ITEMS.length)}</div><div class="bs-label">در فهرستِ فعلی</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head" style="flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="panel-title">بازبینیِ عکسِ گالری</div>
+          <div class="panel-sub">عکس تا تأییدِ اینجا در اپ مشتری و صفحه‌ی رستوران دیده نمی‌شود · هر تصمیم در گزارشِ حسابرسی ثبت می‌گردد</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${['pending', 'approved', 'rejected', 'all'].map((f) => `
+            <button class="btn btn-sm ${PHOTO_FILTER === f ? 'btn-primary' : 'btn-ghost'}" onclick="photoFilter('${f}')">
+              ${f === 'pending' ? 'در انتظار' : f === 'approved' ? 'تأییدشده' : f === 'rejected' ? 'ردشده' : 'همه'}
+            </button>`).join('')}
+          <button class="btn btn-ghost btn-sm" onclick="loadPhotos()">${PHOTO_LOADING ? 'در حال بارگذاری…' : 'تازه‌سازی'}</button>
+        </div>
+      </div>
+
+      ${PHOTO_DEMO ? `<div style="margin:0 0 14px;padding:11px 14px;background:var(--amber-50);border:1px solid #FDE68A;border-radius:10px;font-size:12.5px;color:#92400E;line-height:1.7">
+        <b>نمایشِ نمونه.</b> سرور در دسترس نیست، پس این عکس‌ها ساختگی‌اند و با <b>[DEMO]</b> برچسب خورده‌اند.
+        دکمه‌های تأیید و رد در این حالت چیزی را تغییر نمی‌دهند.
+      </div>` : ''}
+      ${PHOTO_ERROR ? `<div style="padding:22px;text-align:center;color:var(--red-600);font-size:13px">${esc(PHOTO_ERROR)}</div>` : ''}
+      ${PHOTO_LOADING ? `<div style="padding:22px;text-align:center;color:var(--muted);font-size:13px">در حال دریافت…</div>` : ''}
+      ${!PHOTO_LOADING && !PHOTO_ERROR ? renderPhotoQueue() : ''}
+    </div>`;
+}
+
+function renderPhotoQueue() {
+  if (!PHOTO_ITEMS.length) {
+    return `<div style="padding:34px;text-align:center;color:var(--muted);font-size:13px">
+      ${PHOTO_FILTER === 'pending' ? 'صف خالی است — همه‌ی عکس‌ها بازبینی شده‌اند.' : 'موردی در این فیلتر نیست.'}
+    </div>`;
+  }
+
+  return `<div class="photo-queue">
+    ${PHOTO_ITEMS.map((p) => {
+      const st = PHOTO_STATUS[p.status] || PHOTO_STATUS.pending;
+      return `<div class="photo-card">
+        ${p.url ? `<a class="photo-card__img" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">
+          <img src="${esc(p.url)}" alt="${esc(p.caption || 'عکسِ گالری')}" loading="lazy">
+        </a>` : `<div class="photo-card__img photo-card__img--demo">${PHOTO_CATEGORY[p.category] || 'عکس'}</div>`}
+        <div class="photo-card__body">
+          <div class="photo-card__top">
+            <span class="photo-card__rest">${esc(p.restaurant.name)}</span>
+            <span class="badge ${st.cls}">${st.label}</span>
+          </div>
+          <div class="photo-card__meta">
+            ${PHOTO_CATEGORY[p.category] || p.category} ·
+            ${p.width && p.height ? fa(p.width) + '×' + fa(p.height) : '—'} ·
+            ${photoSize(p.byte_size)} · ${photoDate(p.created_at)}
+          </div>
+          ${p.caption ? `<div class="photo-card__cap">${esc(p.caption)}</div>` : ''}
+          ${p.rejection_reason ? `<div class="photo-card__reason">دلیلِ رد: ${esc(p.rejection_reason)}</div>` : ''}
+          <div class="photo-card__actions">
+            ${p.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="approvePhoto('${p.id}')">تأیید و انتشار</button>` : ''}
+            ${p.status !== 'rejected' ? `<button class="btn btn-ghost btn-sm" onclick="rejectPhoto('${p.id}')">رد</button>` : ''}
+            <button class="btn btn-ghost btn-sm" style="color:var(--red-600)" onclick="deletePhotoHard('${p.id}')">حذفِ کامل</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ════════ عملیات ════════
+
+/** در حالتِ نمونه هیچ تصمیمی ثبت نمی‌شود — و کاربر باید بداند، نه اینکه حدس بزند. */
+function demoBlocked() {
+  if (!PHOTO_DEMO) return false;
+  toast('', 'این یک نمایشِ نمونه است — برای تأیید یا رد باید به سرور وصل باشی');
+  return true;
+}
+
+async function approvePhoto(id) {
+  if (demoBlocked()) return;
+  const res = await API.patch('/admin/photos/' + id, { action: 'approve' });
+  if (!res.ok) { toast('✕', (res.error && res.error.message) || 'تأیید ناموفق بود'); return; }
+  toast('✓', 'عکس تأیید شد و روی صفحه‌ی رستوران منتشر شد');
+  loadPhotos();
+}
+
+async function rejectPhoto(id) {
+  if (demoBlocked()) return;
+  // دلیل اختیاری است ولی خواسته می‌شود: رستوران‌دار همین متن را در پنلش
+  // می‌بیند و بدونِ آن فقط می‌فهمد «نشد»، نه اینکه چه چیزی را اصلاح کند.
+  const reason = window.prompt('دلیلِ رد (برای رستوران نمایش داده می‌شود):', '');
+  if (reason === null) return;
+  const res = await API.patch('/admin/photos/' + id, { action: 'reject', reason: reason.trim() });
+  if (!res.ok) { toast('✕', (res.error && res.error.message) || 'رد کردن ناموفق بود'); return; }
+  toast('✓', 'عکس رد شد');
+  loadPhotos();
+}
+
+async function deletePhotoHard(id) {
+  if (demoBlocked()) return;
+  if (!window.confirm('عکس و فایلش برای همیشه حذف می‌شود. مطمئنی؟')) return;
+  const res = await API.del('/admin/photos/' + id);
+  if (!res.ok) { toast('✕', (res.error && res.error.message) || 'حذف ناموفق بود'); return; }
+  toast('✓', 'عکس حذف شد');
+  loadPhotos();
 }
 
 </script>

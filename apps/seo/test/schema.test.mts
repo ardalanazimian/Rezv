@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 // import پویا (سازگار با tsx+node:test) — سازنده‌های خالصِ JSON-LD.
-const { restaurantJsonLd, listJsonLd, faqJsonLd } = await import('../lib/schema.ts');
+const { restaurantJsonLd, listJsonLd, faqJsonLd, organizationJsonLd } = await import('../lib/schema.ts');
 import type { RestaurantDetail, RestaurantListItem } from '../lib/api';
 
 const PAGE = 'https://rezervno.ir/r/vista';
@@ -81,11 +81,25 @@ describe('listJsonLd', () => {
 describe('faqJsonLd', () => {
   test('FAQPage با Question/Answer', () => {
     const g = faqJsonLd([{ q: 'آیا رزرو دارد؟', a: 'بله.' }]) as Record<string, unknown>;
-    assert.equal(g['@type'], 'FAQPage');
-    const qs = g.mainEntity as Record<string, unknown>[];
-    assert.equal(qs.length, 1);
-    assert.equal(qs[0]['@type'], 'Question');
-    assert.equal(qs[0].name, 'آیا رزرو دارد؟');
-    assert.equal((qs[0].acceptedAnswer as Record<string, unknown>).text, 'بله.');
-  });
+   assert.equal(g['@type'], 'FAQPage');
+   const qs = g.mainEntity as Record<string, unknown>[];
+   assert.equal(qs.length, 1);
+   assert.equal(qs[0]['@type'], 'Question');
+   assert.equal(qs[0].name, 'آیا رزرو دارد؟');
+   assert.equal((qs[0].acceptedAnswer as Record<string, unknown>).text, 'بله.');
+ });
+});
+
+describe('organizationJsonLd', () => {
+ test('Organization + WebSite schema برای صفحه‌ی اصلی ساخته می‌شود', () => {
+   const g = organizationJsonLd() as Record<string, unknown>;
+   assert.equal(g['@context'], 'https://schema.org');
+   const graph = g['@graph'] as Record<string, unknown>[];
+   const organization = graph.find((node) => node['@type'] === 'Organization');
+   const website = graph.find((node) => node['@type'] === 'WebSite');
+   assert.ok(organization);
+   assert.ok(website);
+   assert.equal(organization?.name, 'رزرونو');
+   assert.equal((website as Record<string, unknown>).url, 'https://rezervno.ir');
+ });
 });

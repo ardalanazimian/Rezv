@@ -8,7 +8,7 @@ import { R } from '../init.js';
 import { openRest } from '../data/detail.js';
 import { go } from '../data/discover.js';
 import { icon } from '../icons.js';
-import { esc } from '../auth.js';
+import { esc, lockAppSurfaces, unlockAppSurfaces } from '../auth.js';
 import { TRIPS } from '../data/seed.js';
 
 const RECENT_KEY = 'rz_recent_search';
@@ -120,12 +120,17 @@ function onKey(e){
 
 export function openPalette(){
   const ov = ensureEl();
+  const wasOpen = ov.classList.contains('show');
   ov.classList.add('show');
+  if(!wasOpen) lockAppSurfaces();
   const inp = document.getElementById('cmdkInput');
   if(inp){ inp.value=''; render(''); setTimeout(()=>inp.focus(),20); }
 }
 export function closePalette(){
-  const ov = document.getElementById('cmdk'); if(ov) ov.classList.remove('show');
+  const ov = document.getElementById('cmdk');
+  const wasOpen = !!ov && ov.classList.contains('show');
+  if(ov) ov.classList.remove('show');
+  if(wasOpen) unlockAppSurfaces();
 }
 
 // باز شدن با Ctrl/⌘+K

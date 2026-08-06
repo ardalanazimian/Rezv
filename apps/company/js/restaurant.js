@@ -26,7 +26,7 @@ function rDetail(){
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic ink">${icon('users',{size:17})}</div></div><div class="kpi-val">${fa(r.members)}</div><div class="kpi-label">عضو باشگاه</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic violet">${icon('calendar',{size:17})}</div></div><div class="kpi-val">${fa(r.reservations)}</div><div class="kpi-label">کل رزروها</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic amber">${icon('mail',{size:17})}</div></div><div class="kpi-val">${fa(r.sms)}</div><div class="kpi-label">پیامک ارسالی</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('phone',{size:17})}</div></div><div class="kpi-val">${fa(r.smsBalance)}</div><div class="kpi-label">موجودی پیامک</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('phone',{size:17})}</div></div><div class="kpi-val">${fa(r.smsBalance||0)}</div><div class="kpi-label">موجودی پیامک</div></div>
     </div>
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">جزئیات بیشتر</div></div></div>

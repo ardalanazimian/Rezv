@@ -12,7 +12,9 @@ import { parseBody, z } from '@/lib/schemas';
 // endpointـی برای «تنظیمات پلتفرم» در پنل شرکت نبود.
 
 // فقط کلیدهای شناخته‌شده قابل‌تنظیم از این مسیرند (جلوگیری از نوشتنِ کلیدِ دلخواه)
-const ALLOWED_KEYS = ['zarinpal_merchant_id', 'zarinpal_sandbox'] as const;
+// sales_notify_email: گیرنده‌ی اعلانِ درخواست‌های وب‌سایت (ADR 0002). در دیتابیس
+// نگه داشته می‌شود تا تغییرِ مسئولِ فروش نیازی به ری‌دیپلوی نداشته باشد.
+const ALLOWED_KEYS = ['zarinpal_merchant_id', 'zarinpal_sandbox', 'sales_notify_email'] as const;
 
 const patchSchema = z.object({
   settings: z.array(z.object({

@@ -205,7 +205,7 @@ shown where relevant. Owners/managers bypass permission checks.
 | `/coupons` | GET, POST | canManageCoupons | Coupons. |
 | `/members` | GET | canViewAnalytics* | Club members. |
 | `/reviews` | GET, PATCH | — | Reviews + replies. |
-| `/photos` | GET, POST, DELETE | canManageSettings* | Photo gallery. |
+| `/photos` | GET, POST, DELETE | canManageSettings* | Photo gallery. **POST is `multipart/form-data`** (field `file`), not JSON. Uploads land as `pending` and are invisible publicly until the company panel approves them. See below. |
 | `/notes` | GET, POST, PATCH, DELETE | — | Internal staff notes. |
 | `/events` | GET, POST, PATCH, DELETE | — | Special events. |
 | `/branches` | GET, POST | canManageSettings* | Multi-branch management. |
@@ -261,9 +261,51 @@ curl "$API/api/v1/restaurant/reservations?date=2026-07-10" \
 | `/security` | GET | Security/audit view. |
 | `/system-health` | GET | System health. |
 | `/settings` | GET, PATCH | Platform settings (e.g. Zarinpal merchant id). |
+| `/photos` | GET | Gallery moderation queue (`?status=pending\|approved\|rejected\|all`). Oldest-first for `pending` so the queue is FIFO. |
+| `/photos/[id]` | PATCH, DELETE | `{ action: 'approve' \| 'reject', reason? }`. DELETE removes the row **and the file**. Both audited. |
 
 Access is **fail-closed**: if `PLATFORM_ADMIN_TENANT_ID` is unset, all admin
 routes return `FORBIDDEN_TENANT`.
+
+---
+
+## Restaurant photo gallery — upload & moderation
+
+Photos are uploaded as files and are **not public until approved**.
+
+**Upload** — `POST /v1/restaurant/photos`, `multipart/form-data`:
+
+| Field | Required | Notes |
+|---|---|---|
+| `file` | yes | JPEG, PNG or WebP only. Max 8 MB, 200–8000 px per side. |
+| `category` | no | `food` (default), `interior`, `drink`, `event`, `other`. |
+| `caption` | no | ≤ 300 chars. |
+
+Returns `201 { id, status: 'pending', url, width, height, message }`.
+
+The format is decided by the file's **magic bytes**, never by the browser's
+`Content-Type` or the filename. SVG is rejected on purpose: it is an XML
+document that can carry `<script>`, and serving it from the API origin would
+be stored XSS. Invalid input returns `422` with a Persian message.
+
+**Serving** — `GET /v1/media/<yyyy>/<mm>/<uuid>.<ext>`, public, no auth.
+Approved photos must load on the public restaurant page, so the route cannot
+require a token; unapproved ones are simply never linked anywhere public and
+their names are random UUIDs. Responses carry `nosniff`,
+`Content-Security-Policy: default-src 'none'; sandbox` and a one-year
+immutable cache (the key never changes).
+
+**Moderation** — the company panel approves or rejects. Approving or rejecting
+invalidates the `restaurant-detail` cache immediately, so a takedown is live in
+milliseconds rather than up to 60 s later.
+
+**Storage** — bytes live on the `uploads` volume (`UPLOAD_DIR`, default
+`/data/uploads`), not in Postgres, so `pg_dump` stays usable. The backup
+service tars that volume alongside the SQL dump — restoring only the database
+would give you intact rows pointing at missing files.
+
+Rows that predate this feature (added by URL) are treated as already approved;
+the migration backfills them so no live gallery went dark on deploy.
 
 ---
 

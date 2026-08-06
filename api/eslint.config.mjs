@@ -5,7 +5,7 @@ import tsPlugin from '@typescript-eslint/eslint-plugin';
 
 export default [
   {
-    files: ['src/**/*.ts', 'src/**/*.tsx', 'middleware.ts', 'prisma/**/*.ts'],
+    files: ['src/**/*.ts', 'src/**/*.tsx', 'prisma/**/*.ts'],  // middleware.ts داخلِ src/ است
     languageOptions: {
       parser: tsParser,
       parserOptions: { ecmaVersion: 2022, sourceType: 'module', ecmaFeatures: { jsx: true } },
@@ -22,8 +22,8 @@ export default [
     },
   },
   {
-    // مصرف‌کننده‌های مشروعِ console: اسکریپتِ seed (خروجیِ CLI) و خودِ ماژولِ logger.
-    files: ['prisma/seed.ts', 'src/lib/logger.ts'],
+    // مصرف‌کننده‌های مشروعِ console: اسکریپت‌های seed (خروجیِ CLI) و خودِ ماژولِ logger.
+    files: ['prisma/seed.ts', 'prisma/seed-site.ts', 'src/lib/logger.ts'],
     rules: { 'no-console': 'off' },
   },
   {

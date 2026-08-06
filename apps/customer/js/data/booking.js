@@ -3,8 +3,8 @@
 //  جدا شده از data/detail.js (ریفکتور فاز۱: جداسازیِ مسئولیت).
 //  رفتار دقیقاً همان قبل است؛ فقط از یک فایلِ مجزا export می‌شود.
 // ═══════════════════════════════════════════════════════════
-import { API, isLoggedIn } from '../api.js';
-import { closeSheet, esc, openLogin, openSheet, toApiDateTime, toast } from '../auth.js';
+import { API, USER, isLoggedIn, userName } from '../api.js';
+import { closeSheet, esc, openLogin, openSheet, setAfterLogin, toApiDateTime, toast } from '../auth.js';
 import { fmtFa } from './discover.js';
 import { TRIPS, bk, pts, setBk, setPts } from './seed.js';
 import { R } from '../init.js';
@@ -82,20 +82,23 @@ export function bookStep2(r){
 // پس lookup را اینجا (با دسترسی به R) انجام می‌دهیم.
 export function toBookStep3(id){ openSheet(bookStep3(R.find(x=>x.id===id))); }
 export function bookStep3(r){
+  // نام/موبایل از حسابِ کاربر (اگر وارد شده) — نه مقدارِ ساختگی
+  const name = isLoggedIn() ? userName() : '';
+  const phone = USER?.phone ? String(USER.phone).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]) : '';
   return `<div class="sheet-title">تأیید اطلاعات</div><div class="sheet-sub">یه قدم تا رزرو</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar done"></div><div class="step-bar now"></div></div>
-    <div class="field-label">نام</div><input class="inp" id="bkName" value="علی رضایی">
-    <div class="field-label">موبایل</div><input class="inp" id="bkPhone" value="۰۹۱۲۳۴۵۶۷۸۹">
+    <div class="field-label">نام</div><input class="inp" id="bkName" value="${esc(name)}" placeholder="نامت رو بنویس">
+    <div class="field-label">موبایل</div><input class="inp" id="bkPhone" inputmode="tel" value="${esc(phone)}" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
     <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${r.n}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
     <div class="reward-row"><div class="reward"><div class="rv blue">+۵۰</div><div class="rl">امتیاز</div></div><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${r.id})">تأیید رزرو</button>`;
 }
 export async function confirmBook(id){
   const r=R.find(x=>x.id===id);
-  // رزرو نیاز به ورود دارد
+  // رزرو نیاز به ورود دارد — بعد از ورود، همین مرحله‌ی تأیید از سر گرفته می‌شود
   if(!isLoggedIn()){
-    closeSheet();
-    toast('','برای رزرو اول وارد شو');
+    setAfterLogin(()=>{ const rr=R.find(x=>x.id===id); if(rr && bk.id===id) openSheet(bookStep3(rr)); });
+    toast('','برای رزرو اول وارد شو — بعدش ادامه می‌دیم');
     setTimeout(()=>openLogin(),400);
     return;
   }
