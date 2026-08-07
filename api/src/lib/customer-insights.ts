@@ -13,17 +13,76 @@ import { sinceDays } from './staff-helpers';
 
 export type NoShowInput = {
   userId: string | null;
+  restaurantId: string;   // برای انتخاب مدلِ یادگرفته‌ی همین رستوران (اگر فعال باشد)
   partySize: number;
   slotStart: Date;
   createdAt: Date;     // زمان ثبت رزرو
   source: string;       // app | walk_in | phone ...
 };
 
-export type NoShowResult = { score: number; tier: 'low' | 'medium' | 'high' };
+export type NoShowResult = { score: number; tier: 'low' | 'medium' | 'high'; source: 'learned' | 'heuristic' };
 
-/** امتیاز ریسک no-show یک رزرو را در لحظه‌ی ثبت محاسبه می‌کند (۰..۱۰۰). */
-export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResult> {
+/**
+ * ویژگی‌های خامی که هم فرمولِ heuristic و هم مدلِ یادگرفته از رویشان
+ * ساخته می‌شوند — تنها جایی که «سابقه‌ی مشتری» و «زمان‌بندیِ رزرو» به عدد
+ * تبدیل می‌شوند. no-show-model.ts هم همین تایپ را (فقط به‌عنوانِ type،
+ * بدونِ وابستگیِ اجرایی) import می‌کند تا دو مسیر از یک تعریف بخوانند.
+ */
+export type RawFeatureInput = {
+  hasUserId: boolean;
+  priorTotal: number;        // تعداد رزروهای حل‌شده‌ی قبلیِ همین کاربر (تکمیل‌شده + no-show)
+  priorNoShowRate: number;   // noShows / priorTotal — فقط اگر priorTotal > 0 معنا دارد
+  leadMinutes: number;
+  partySize: number;
+  source: string;
+};
+
+/**
+ * فرمولِ heuristicِ دستی — بدونِ هیچ دسترسیِ DB، فقط از رویِ ویژگی‌های خام.
+ * این تابع هم مسیرِ زنده‌ی fallback را تغذیه می‌کند (از computeNoShowRisk)
+ * و هم baselineِ مقایسه در آموزشِ مدلِ یادگرفته را (از no-show-model.ts) —
+ * منبعِ واحد، تا این دو مسیر روزی از هم جدا نیفتند.
+ */
+export function computeStaticScoreFromFeatures(f: RawFeatureInput): number {
   let score = 15; // پایه‌ی ریسک برای مهمان ناشناس (بدون سابقه)
+
+  if (f.hasUserId) {
+    if (f.priorTotal === 0) {
+      score = 25; // کاربر شناخته‌شده ولی بدون سابقه‌ی حضور قطعی
+    } else {
+      score = Math.round(f.priorNoShowRate * 90) + 5; // نگاشت نرخ no-show به امتیاز
+      if (f.priorTotal >= 5 && f.priorNoShowRate === 0) score = Math.max(2, score - 5); // مشتری وفادار با سابقه‌ی پاک
+    }
+  }
+
+  // ── lead time: رزرو دقیقه‌ی ۹۰ام (last-minute) ریسک بیشتری دارد ──
+  if (f.leadMinutes < 30) score += 12;
+  else if (f.leadMinutes > 7 * 24 * 60) score += 6; // رزرو خیلی زودهنگام هم کمی ریسک بیشتر دارد (فراموشی)
+
+  // ── گروه بزرگ بدون پیش‌سفارش/تأیید، ریسک سازمانی بیشتر دارد ──
+  if (f.partySize >= 6) score += 8;
+
+  // ── منبع رزرو: تماس تلفنی/walk-in نسبت به اپ کمی نامطمئن‌تر (داده‌ی تماس کمتر دقیق) ──
+  if (f.source === 'phone') score += 5;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+export function tierFromScore(score: number): 'low' | 'medium' | 'high' {
+  return score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low';
+}
+
+/**
+ * امتیاز ریسک no-show یک رزرو را در لحظه‌ی ثبت محاسبه می‌کند (۰..۱۰۰).
+ *
+ * اگر این رستوران مدلِ یادگرفته‌ی فعال داشته باشد (کالیبره‌شده از تاریخچه‌ی
+ * خودش، نه فرمولِ سراسری) از آن استفاده می‌کند؛ وگرنه به همان heuristicِ
+ * دستی برمی‌گردد. import پویا عمداً است: no-show-model.ts خودش این فایل را
+ * import می‌کند (برای computeStaticScoreFromFeatures)، پس یک import ثابت
+ * در این جهت یک وابستگیِ دوری واقعی در زمانِ اجرا می‌ساخت.
+ */
+export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResult> {
+  let priorTotal = 0, priorNoShows = 0;
 
   // ── سابقه‌ی شخصی مشتری: قوی‌ترین سیگنال ──
   if (input.userId) {
@@ -33,31 +92,28 @@ export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResul
       _count: { _all: true },
     });
     const completed = hist.find(h => h.status === 'completed' || h.status === 'arrived' || h.status === 'seated')?._count._all ?? 0;
-    const noShows = hist.find(h => h.status === 'no_show')?._count._all ?? 0;
-    const total = completed + noShows;
-    if (total === 0) {
-      score = 25; // کاربر شناخته‌شده ولی بدون سابقه‌ی حضور قطعی
-    } else {
-      const rate = noShows / total;
-      score = Math.round(rate * 90) + 5; // نگاشت نرخ no-show به امتیاز
-      if (total >= 5 && rate === 0) score = Math.max(2, score - 5); // مشتری وفادار با سابقه‌ی پاک → ریسک خیلی کم
-    }
+    priorNoShows = hist.find(h => h.status === 'no_show')?._count._all ?? 0;
+    priorTotal = completed + priorNoShows;
   }
 
-  // ── lead time: رزرو دقیقه‌ی ۹۰ام (last-minute) ریسک بیشتری دارد ──
-  const leadMinutes = (input.slotStart.getTime() - input.createdAt.getTime()) / 60000;
-  if (leadMinutes < 30) score += 12;
-  else if (leadMinutes > 7 * 24 * 60) score += 6; // رزرو خیلی زودهنگام هم کمی ریسک بیشتر دارد (فراموشی)
+  const features: RawFeatureInput = {
+    hasUserId: !!input.userId,
+    priorTotal,
+    priorNoShowRate: priorTotal > 0 ? priorNoShows / priorTotal : 0,
+    leadMinutes: (input.slotStart.getTime() - input.createdAt.getTime()) / 60000,
+    partySize: input.partySize,
+    source: input.source,
+  };
 
-  // ── گروه بزرگ بدون پیش‌سفارش/تأیید، ریسک سازمانی بیشتر دارد ──
-  if (input.partySize >= 6) score += 8;
+  const { getLearnedNoShowModel, predictProba, buildFeatureVector } = await import('./no-show-model');
+  const weights = await getLearnedNoShowModel(input.restaurantId).catch(() => null);
+  if (weights) {
+    const score = Math.round(predictProba(weights, buildFeatureVector(features)) * 100);
+    return { score, tier: tierFromScore(score), source: 'learned' };
+  }
 
-  // ── منبع رزرو: تماس تلفنی/walk-in نسبت به اپ کمی نامطمئن‌تر (داده‌ی تماس کمتر دقیق) ──
-  if (input.source === 'phone') score += 5;
-
-  score = Math.max(0, Math.min(100, score));
-  const tier = score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low';
-  return { score, tier };
+  const score = computeStaticScoreFromFeatures(features);
+  return { score, tier: tierFromScore(score), source: 'heuristic' };
 }
 
 // ───────────────────────────────────────────────────────────

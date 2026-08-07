@@ -31,8 +31,8 @@ const ACTIVE_STATUSES_FRAGMENT = Prisma.join(
  * در این مقیاس، over-engineering محسوب می‌شود.)
  */
 export type NoShowPredictor = (input: {
-  userId: string | null; partySize: number; slotStart: Date; createdAt: Date; source: string;
-}) => Promise<{ score: number; tier: 'low' | 'medium' | 'high' }>;
+  userId: string | null; restaurantId: string; partySize: number; slotStart: Date; createdAt: Date; source: string;
+}) => Promise<{ score: number; tier: 'low' | 'medium' | 'high'; source: 'learned' | 'heuristic' }>;
 
 // ═══════════════════════════════════════════════════════════
 //  موتور رزرو رزرونو — نسخه‌ی production
@@ -183,7 +183,7 @@ export async function createReservation(
 
   // ── فاز v2: پیش‌بینی ریسک no-show — قبل از تراکنش، فقط خوانش تاریخچه ──
   const noShowRisk = await predictNoShowRisk({
-    userId: input.userId ?? null, partySize: input.partySize, slotStart: start,
+    userId: input.userId ?? null, restaurantId: r.id, partySize: input.partySize, slotStart: start,
     createdAt: new Date(), source: input.source,
   });
 
