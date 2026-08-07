@@ -1,5 +1,7 @@
 'use client';
 
+import Script from 'next/script';
+
 // کلیدِ روشن/تاریک.
 //
 // عمداً بدونِ state در React: منبعِ حقیقت `document.documentElement.dataset.theme`
@@ -49,5 +51,5 @@ export function ThemeScript() {
     document.documentElement.dataset.theme=t;
     document.documentElement.classList.add('js-reveal');
   }catch(e){}})();`;
-  return <script dangerouslySetInnerHTML={{ __html: code }} />;
+  return <Script id="theme-script" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: code }} />;
 }

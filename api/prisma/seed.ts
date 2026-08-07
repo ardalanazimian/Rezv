@@ -13,11 +13,14 @@ async function main() {
   // ── tenant و staff (مدیر رستوران) ──
   const tenant = await db.tenant.create({ data: { name: 'گروه ویستا', plan: 'pro' } });
   await db.staff.create({ data: { tenantId: tenant.id, phone: '+989121111111', role: 'owner' } });
+  await db.staff.create({ data: { tenantId: tenant.id, phone: '+989122079763', role: 'manager' } });
 
   // ── tenant پلتفرم (شرکت) + مدیر کل، برای ورود به پنل شرکت ──
   const platformTenant = await db.tenant.create({ data: { name: 'شرکت رزرونو', plan: 'pro' } });
   await db.staff.create({ data: { tenantId: platformTenant.id, phone: '+989120000000', role: 'owner' } });
+  await db.staff.create({ data: { tenantId: platformTenant.id, phone: '+989122079763', role: 'manager' } });
   console.log('→ مدیر پلتفرم: +989120000000 (برای پنل شرکت)');
+  console.log('→ کاربر دمو برای ورود محلی: +989122079763');
   console.log('→ tenant پلتفرم را در .env بگذار: PLATFORM_ADMIN_TENANT_ID=' + platformTenant.id);
 
   const data = [

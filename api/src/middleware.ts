@@ -20,6 +20,13 @@ import { rateLimit, clientIp, rateLimitHeaders, RULES, isBanned, recordViolation
 export const config = { matcher: '/api/:path*' };
 export const runtime = 'nodejs';
 
+const DEV_ORIGINS = [
+  'http://localhost:3200',
+  'http://127.0.0.1:3200',
+  'http://localhost:8081',
+  'http://127.0.0.1:8081',
+];
+
 // تأیید پیکربندی حیاتی در production (fail-fast) — عمداً «تنبل»، دقیقاً مثل
 // accessSecret/refreshSecret در jwt.ts.
 //
@@ -41,6 +48,12 @@ function assertAllowedOriginsConfigured(): void {
   _originsChecked = true;
 }
 
+function allowedOrigins(): string[] {
+  const configured = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+  if (configured.length > 0) return configured;
+  return process.env.NODE_ENV === 'production' ? [] : DEV_ORIGINS;
+}
+
 // پاسخ بلاک استاندارد
 function blocked(message: string, status = 429, retryAfter?: number) {
   const headers: Record<string, string> = {};
@@ -53,7 +66,7 @@ function blocked(message: string, status = 429, retryAfter?: number) {
 // برای fetchِ cross-origin به این هدرها نیاز دارد؛ بدون آن‌ها پاسخ بلاک می‌شود.
 // چون auth با Bearer token است (نه کوکی)، credentials لازم نیست.
 function corsHeaders(origin: string | null): Record<string, string> {
-  const allowed = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+  const allowed = allowedOrigins();
   if (!origin || !allowed.includes(origin)) return {};
   return {
     'Access-Control-Allow-Origin': origin,
@@ -103,7 +116,7 @@ export async function middleware(req: NextRequest) {
   // اما چک Origin یک لایه‌ی دفاعی اضافه برای درخواست‌های mutating است.
   const method = req.method;
   if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
-    const allowed = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+    const allowed = allowedOrigins();
     // اگر لیست مجاز تعریف شده و Origin وجود دارد ولی مجاز نیست → رد.
     // نکته‌ی امنیتی: وقتی ALLOWED_ORIGINS تنظیم نشده، این چک skip می‌شود؛ در
     // production حتماً باید ALLOWED_ORIGINS ست شود (به docker-compose رجوع کن).

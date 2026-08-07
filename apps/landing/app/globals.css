@@ -999,11 +999,11 @@ html.cur-on .cur { opacity: 1; }
 }
 .cur--ring.is-hot { border-color: #fff; background: rgba(255, 255, 255, 0.12); }
 .cur--ring.is-down { background: rgba(255, 255, 255, 0.3); }
-/* نشانگرِ سیستم فقط وقتی خاموش می‌شود که جایگزینش واقعاً ساخته شده باشد */
+/* نشانگرِ سیستم را پنهان نمی‌کنیم تا همیشه قابل‌دیدن بماند. */
 html.has-cursor,
-html.has-cursor * { cursor: none !important; }
-/* ورودی‌های متنی استثنا هستند: caret بدونِ نشانگرِ متن قابلِ‌هدف‌گیری نیست */
-html.has-cursor :is(input, textarea, [contenteditable]) { cursor: text !important; }
+html.has-cursor * { cursor: auto; }
+html.has-cursor :is(a, button, [role='button']) { cursor: pointer; }
+html.has-cursor :is(input, textarea, [contenteditable]) { cursor: text; }
 
 /* ── ۳) دانه‌ی فیلم ───────────────────────────────────────────────
    یک تکسچرِ feTurbulence که هر ۸ فریم می‌پرد. گرادیان‌ها را از حالتِ
