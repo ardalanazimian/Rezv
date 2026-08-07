@@ -2,8 +2,14 @@
 // داده‌ی دمو فقط fallbackِ آفلاین است (وقتی توکن نیست یا سرور در دسترس نیست).
 const STAFF_DEMO=[
   {id:'demo1',phone:'۰۹۱۲۰۰۰۰۰۰۱',role:'owner',permissions:{}},
+  {id:'demo3',phone:'۰۹۱۲۲۰۷۹۷۶۳',role:'manager',permissions:{canManageReservations:true,canManageTables:true,canManageWaitlist:true,canViewAnalytics:true,canViewRevenue:true,canManageCampaigns:true,canManageCoupons:true,canManageStaff:false,canManageSettings:true}},
   {id:'demo2',phone:'۰۹۱۲۰۰۰۰۰۰۲',role:'staff',permissions:{canManageReservations:true,canManageTables:true}},
 ];
+function demoStaffForPhone(phone){
+  const normalizeDigits = (v) => String(v||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'');
+  const normalized = normalizeDigits(phone);
+  return STAFF_DEMO.find(s => normalizeDigits(s.phone) === normalized) || null;
+}
 let STAFF_LIST=STAFF_DEMO.slice();
 let _staffLoaded=false;
 
@@ -379,14 +385,21 @@ async function staffSendOtp(){
     return;
   }
   const res = await API.requestStaffOtp(normalized);
-  if (!res.ok && !res.offline){
-    // خطای واقعی (مثلاً شماره staff نیست)
-    toast('', res.error?.message || 'این شماره دسترسی ندارد');
-    if (btn){ btn.disabled = false; btn.textContent = 'ارسال کد ورود'; }
+  const demoStaff = demoStaffForPhone(normalized);
+  if (res.ok) {
+    const devCode = res.data?.devCode || null;
+    showStaffLoginCode(devCode, false);
     return;
   }
-  const devCode = res.data?.devCode || (res.offline ? '۱۲۳۴' : null);
-  showStaffLoginCode(devCode, res.offline);
+  if (demoStaff && (res.offline || res.status >= 400)) {
+    // در پیش‌نمایش محلی، اگر backend در دسترس نباشد، اجازه بده با همین
+    // شماره‌ی دمو وارد شوی تا UI بدون دیتابیس هم قابل‌تست بماند.
+    showStaffLoginCode('۱۲۳۴', true);
+    return;
+  }
+  // خطای واقعی (مثلاً شماره staff نیست)
+  toast('', res.error?.message || 'این شماره دسترسی ندارد');
+  if (btn){ btn.disabled = false; btn.textContent = 'ارسال کد ورود'; }
 }
 function showStaffLoginCode(devCode, offline){
   setStaffGateLocked(true);
@@ -413,12 +426,13 @@ async function staffConfirmOtp(){
     return;
   }
   const res = await API.verifyStaffOtp(_staffPhone, code);
+  const demoStaff = demoStaffForPhone(_staffPhone);
   if (res.ok && res.data?.staff){
     STAFF_INFO = res.data.staff;
     enterPanel();
-  } else if (res.offline){
-    // حالت دمو: کد ۱۲۳۴
-    if (code === '1234'){ STAFF_INFO = { role:'owner', restaurant_name:'کافه‌رستوران ویستا' }; enterPanel(true); }
+  } else if ((res.offline || res.status >= 400) && demoStaff){
+    // حالت دمو: کد ۱۲۳۴ برای کارکنانِ دمو، حتی اگر backend واقعی در دسترس نباشد.
+    if (code === '1234'){ STAFF_INFO = { role:demoStaff.role, restaurant_name:'کافه‌رستوران ویستا' }; enterPanel(true); }
     else { toast('','در حالت دمو، کد ۱۲۳۴ است'); if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } }
   } else {
     toast('', res.error?.message || 'کد اشتباه است');

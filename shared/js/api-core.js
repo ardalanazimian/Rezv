@@ -18,6 +18,9 @@ export function resolveApiBase() {
     if (typeof window !== 'undefined' && window.RZ_API_BASE) return String(window.RZ_API_BASE).replace(/\/$/, '');
     const m = (typeof document !== 'undefined') && document.querySelector('meta[name="rz-api-base"]');
     if (m && m.content) return String(m.content).trim().replace(/\/$/, '');
+    if (typeof location !== 'undefined' && /^localhost$|^127\.0\.0\.1$/.test(location.hostname)) {
+      return 'http://localhost:3000';
+    }
   } catch { /* noop */ }
   return '';
 }
