@@ -99,19 +99,31 @@ async function main() {
       const visitCount = i < 4 ? 1 : i < 10 ? Math.floor(Math.random() * 3) + 2 : Math.floor(Math.random() * 4) + 5;
       for (let v = 0; v < visitCount; v++) {
         const daysAgo = Math.floor(Math.random() * 60); // در ۲ ماه گذشته
-        const start = new Date(); start.setDate(start.getDate() - daysAgo);
-        start.setHours(18 + Math.floor(Math.random() * 4), [0, 30][Math.floor(Math.random() * 2)], 0, 0);
-        const end = new Date(start); end.setHours(start.getHours() + 2);
-        const table = rand(rest.tables);
-        await db.reservation.create({
-          data: {
-            code: 'RZ' + Math.random().toString(36).slice(2, 8).toUpperCase(),
-            restaurantId: rest.id, tableId: table.id, userId: user.id,
-            partySize: Math.floor(Math.random() * 4) + 2,
-            slotStart: start, slotEnd: end,
-            status: daysAgo < 1 ? 'confirmed' : 'arrived', source: 'app',
-          },
-        });
+        // میز/ساعت به‌طورِ تصادفی انتخاب می‌شود، پس برخوردِ گاه‌به‌گاه با
+        // رزروِ دیگری روی همان میز/بازه واقعاً رخ می‌دهد (constraintِ
+        // no_table_overlap در ۰۲۶ درست همین را جلوگیری می‌کند) — به‌جایِ
+        // شکستِ کلِ seed، چند بار با میز/ساعتِ تازه دوباره امتحان کن.
+        for (let attempt = 0; attempt < 8; attempt++) {
+          const start = new Date(); start.setDate(start.getDate() - daysAgo);
+          start.setHours(18 + Math.floor(Math.random() * 4), [0, 30][Math.floor(Math.random() * 2)], 0, 0);
+          const end = new Date(start); end.setHours(start.getHours() + 2);
+          const table = rand(rest.tables);
+          try {
+            await db.reservation.create({
+              data: {
+                code: 'RZ' + Math.random().toString(36).slice(2, 8).toUpperCase(),
+                restaurantId: rest.id, tableId: table.id, userId: user.id,
+                partySize: Math.floor(Math.random() * 4) + 2,
+                slotStart: start, slotEnd: end,
+                status: daysAgo < 1 ? 'confirmed' : 'arrived', source: 'app',
+              },
+            });
+            break;
+          } catch (e: any) {
+            const isOverlap = e?.code === 'P2010' || /23P01|exclusion constraint/i.test(String(e?.message));
+            if (!isOverlap || attempt === 7) throw e;
+          }
+        }
       }
     }
 

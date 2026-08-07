@@ -6,6 +6,7 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, zPhone, zOtpCode, z } from '@/lib/schemas';
 import { getEffectivePermissions } from '@/lib/permissions';
+import { resolveStaffRestaurant } from '@/lib/staff-helpers';
 
 const schema = z.object({ phone: zPhone, code: zOtpCode });
 
@@ -15,10 +16,7 @@ export async function POST(req: Request) {
     await enforceRateLimit(clientIp(req), RULES.otpVerify);
     const { phone, code } = await parseBody(req, schema);
     const normalized = normalizePhone(phone);
-    const staff = await db.staff.findFirst({
-      where: { phone: normalized },
-      include: { tenant: { select: { id: true, restaurants: { select: { id: true, name: true }, take: 1 } } } },
-    });
+    const staff = await db.staff.findFirst({ where: { phone: normalized } });
     if (!staff) throw Err.forbidden('این شماره دسترسی پنل رستوران ندارد');
     if (!staff.isActive) throw Err.forbidden('این حساب غیرفعال شده است');
     await verifyOtp(normalized, code);
@@ -29,9 +27,17 @@ export async function POST(req: Request) {
     // مجوزهای مؤثرِ همین کارمند تا پنل بتواند UI را مطابقِ دسترسیِ واقعی محدود کند.
     // بدون این، کارمندِ محدودشده همه‌ی صفحات را می‌دید و فقط هنگامِ درخواست ۴۰۳ می‌گرفت.
     const permissions = await getEffectivePermissions(staff.id, role);
+    // ⚠️ رفعِ باگ (پیدا‌شده با تستِ واقعیِ end-to-end): قبلاً اینجا از یک
+    // کوئریِ جدا (tenant.restaurants[0]، بدونِ orderBy و بدونِ احترام به
+    // قفلِ شعبه‌ی staff) استفاده می‌شد که می‌توانست با آنچه
+    // withRestaurantAuth/resolveStaffRestaurant در فراخوانی‌های بعدی
+    // برمی‌گرداند فرق کند — یعنی صفحه‌ی لاگین یک شعبه را نشان می‌داد ولی کلِ
+    // API روی شعبه‌ی دیگری کار می‌کرد. حالا از همان تابعِ واحد استفاده
+    // می‌شود تا این دو مسیر هرگز نتوانند از هم جدا بیفتند.
+    const restaurant = await resolveStaffRestaurant(principal).catch(() => null);
     return NextResponse.json({
       access, refresh,
-      staff: { id: staff.id, role, tenant_id: staff.tenantId, restaurant_id: staff.tenant.restaurants[0]?.id || null, restaurant_name: staff.tenant.restaurants[0]?.name || null, permissions },
+      staff: { id: staff.id, role, tenant_id: staff.tenantId, restaurant_id: restaurant?.id ?? null, restaurant_name: restaurant?.name ?? null, permissions },
     });
   } catch (e) { return errorResponse(e); }
 }

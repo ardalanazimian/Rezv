@@ -153,7 +153,15 @@ async function fetchTrainingRows(restaurantId: string): Promise<TrainingRow[]> {
     SELECT status, party_size, source,
            EXTRACT(EPOCH FROM (slot_start - created_at)) / 60.0 AS lead_minutes,
            (user_id IS NOT NULL) AS has_user_id,
-           prior_no_shows, prior_completions
+           -- ⚠️ ::int صریح لازم است: SUM(...) OVER (...) در Postgres حتی
+           -- روی CASE WHEN ... THEN 1 ELSE 0 END نوعِ bigint برمی‌گرداند،
+           -- و Prisma bigint را به BigInt جاوااسکریپت map می‌کند، نه number
+           -- — با اینکه TrainingRow زیر «number» اعلام شده (تایپ‌چک این
+           -- دروغِ زمانِ اجرا را نمی‌بیند، چون $queryRaw فقط assertion است).
+           -- بدونِ این cast، هر رستورانی که حتی یک مشتریِ تکراری داشته باشد
+           -- (priorTotal>0) در dot() با «Cannot mix BigInt and other types»
+           -- کرش می‌کرد — با تستِ واقعی روی Postgres پیدا شد.
+           prior_no_shows::int AS prior_no_shows, prior_completions::int AS prior_completions
     FROM (
       SELECT
         id, user_id, status, party_size, source, slot_start, created_at,
@@ -175,12 +183,19 @@ async function fetchTrainingRows(restaurantId: string): Promise<TrainingRow[]> {
 }
 
 function rowToExample(row: TrainingRow): TrainingExample {
-  const priorTotal = row.prior_no_shows + row.prior_completions;
+  // Number(...) دفاعِ لایه‌ی دوم است: کوئری بالا صریحاً ::int می‌زند، ولی
+  // اگر آن cast روزی سهواً حذف شود، Postgres باز به bigint/BigInt برمی‌گردد
+  // و بدونِ این خط، dot() در ml-core.ts با «Cannot mix BigInt and other
+  // types» کرش می‌کند (دقیقاً همان باگی که با تستِ واقعی روی Postgres پیدا
+  // شد) — اینجا مطمئن می‌شویم صرفِ‌نظر از نوعِ خام، همیشه number خالص برسد.
+  const priorNoShows = Number(row.prior_no_shows);
+  const priorCompletions = Number(row.prior_completions);
+  const priorTotal = priorNoShows + priorCompletions;
   return {
     features: {
       hasUserId: row.has_user_id,
       priorTotal,
-      priorNoShowRate: priorTotal > 0 ? row.prior_no_shows / priorTotal : 0,
+      priorNoShowRate: priorTotal > 0 ? priorNoShows / priorTotal : 0,
       leadMinutes: row.lead_minutes,
       partySize: row.party_size,
       source: row.source,
