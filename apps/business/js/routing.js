@@ -72,6 +72,15 @@ function renderBranchSwitcher(){
   if(metaEl) metaEl.textContent=BRANCH_LOCKED?'قفل‌شده به این شعبه':(BRANCHES.length>1?`${fa(BRANCHES.length)} شعبه`:'شعبه اصلی');
   const sw=document.querySelector('.sb-switch');
   if(sw) sw.classList.toggle('locked', BRANCH_LOCKED || BRANCHES.length<=1);
+  // ⚠️ رفعِ باگ: RESTAURANT.name (پیش‌فرضِ data.js) هاردکد است و هیچ‌وقت
+  // به‌تنهایی از سرور خوانده نمی‌شد — تبِ «پروفایل» همیشه نامِ دموی
+  // «کافه‌رستوران ویستا» را نشان می‌داد، صرف‌نظر از رستورانِ واقعیِ لاگین‌شده.
+  // اینجا همان دیتایی که برایِ سوییچرِ شعبه (بالا) از سرور آمده، به RESTAURANT
+  // هم می‌رسد — بدونِ فراخوانیِ اضافه — و اگر تبِ پروفایل باز است دوباره رندر می‌شود.
+  if(cur && typeof RESTAURANT!=='undefined' && RESTAURANT.name!==cur.name){
+    RESTAURANT.name=cur.name;
+    if(typeof profTab!=='undefined' && document.getElementById('v-profile')?.classList.contains('active') && typeof profRenderGallery==='function') profRenderGallery();
+  }
 }
 function openBranchSwitcher(){
   if(!API.getToken()){ toast('','برای سوییچ شعبه اول وارد شو'); return; }

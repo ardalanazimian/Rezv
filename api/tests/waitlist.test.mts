@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 // نکته: isVipTier/tierToPriority به‌عنوان توابعِ خالصِ قابل‌تست از computePriority
 // جدا شدند (همان الگوی reservation-helpers.ts) تا این تست واقعاً کدِ اصلی را
 // اجرا کند، نه یک کپیِ دستی از آن.
-const { isVipTier, tierToPriority } = await import('../src/lib/waitlist.ts');
+const { isVipTier, tierToPriority, medianMinutes, resolveAvgDiningMinutes } = await import('../src/lib/waitlist.ts');
 
 describe('isVipTier', () => {
   test('platinum و vip و gold همگی VIP محسوب می‌شوند', () => {
@@ -46,5 +46,49 @@ describe('ترتیب صف بر اساس اولویت + FIFO (شبیه‌سازی
   // tierToPriority) با ترتیبِ مورد انتظار سازگار است.
   test('VIP باید عدد اولویتِ بالاتری از مشتریِ عادی داشته باشد', () => {
     assert.ok(tierToPriority('vip') > tierToPriority('bronze'));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  تخمینِ زمانِ انتظار قبلاً همیشه از یک ثابتِ سراسری (۷۵ دقیقه) برایِ همه‌ی
+//  رستوران‌ها استفاده می‌کرد. resolveAvgDiningMinutes همان قاعده‌ی ایمنیِ
+//  no-show model/demand forecast را برایِ این پارامترِ ساده‌تر پیاده می‌کند:
+//  فقط با نمونه‌ی کافی از میانگینِ واقعیِ خودِ رستوران استفاده کن.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('medianMinutes', () => {
+  test('آرایه‌ی خالی → null', () => {
+    assert.equal(medianMinutes([]), null);
+  });
+  test('طولِ فرد → عنصرِ وسط', () => {
+    assert.equal(medianMinutes([10, 30, 20]), 20);
+  });
+  test('طولِ زوج → میانگینِ دو عنصرِ وسط', () => {
+    assert.equal(medianMinutes([10, 20, 30, 40]), 25);
+  });
+  test('نسبت به یک outlierِ بزرگ مقاوم است (برخلافِ میانگین)', () => {
+    // میانگین اینجا (60+65+70+600)/4=198.75 می‌شد؛ میانه واقع‌گراتر است
+    assert.equal(medianMinutes([60, 65, 70, 600]), 67.5);
+  });
+});
+
+describe('resolveAvgDiningMinutes — قاعده‌ی ایمنی', () => {
+  test('نمونه‌ی کم (رستورانِ تازه‌کار) → بی‌صدا به پیش‌فرض برمی‌گردد', () => {
+    const samples = Array(10).fill(50); // کمتر از حداقلِ ۱۵
+    assert.equal(resolveAvgDiningMinutes(samples, 75), 75);
+  });
+  test('نمونه‌ی کافی و معقول → میانه‌ی واقعی استفاده می‌شود', () => {
+    const samples = Array(20).fill(50);
+    assert.equal(resolveAvgDiningMinutes(samples, 75), 50);
+  });
+  test('میانه‌ی خارج از بازه‌ی معقول (دادهٔ خراب) → به پیش‌فرض برمی‌گردد', () => {
+    const tooShort = Array(20).fill(5);   // کمتر از ۱۵ دقیقه — احتمالاً رویدادِ ازقلم‌افتاده
+    const tooLong = Array(20).fill(500);  // بیشتر از ۴ ساعت
+    assert.equal(resolveAvgDiningMinutes(tooShort, 75), 75);
+    assert.equal(resolveAvgDiningMinutes(tooLong, 75), 75);
+  });
+  test('دقیقاً روی آستانه‌ی حداقلِ نمونه کار می‌کند', () => {
+    const samples = Array(15).fill(90);
+    assert.equal(resolveAvgDiningMinutes(samples, 75), 90);
   });
 });

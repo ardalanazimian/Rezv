@@ -19,6 +19,28 @@ import type { AccessPayload } from './jwt';
  *    همین تنانت باشد (جلوگیری از دسترسی متقاطع تنانت‌ها — IDOR).
  *  • در غیر این صورت → اولین رستورانِ تنانت (سازگاری با تنانت‌های تک‌شعبه‌ای).
  */
+const RESTAURANT_SELECT = { id: true, name: true, slug: true, clubPrefix: true, cbBasePct: true, cbPreorderPct: true, cbVipPct: true, cbWinbackPct: true };
+
+/**
+ * «شعبه‌ی پیش‌فرض» یک تنانتِ چندشعبه‌ای — وقتی staff به شعبه‌ی خاصی قفل
+ * نیست و هیچ انتخابِ صریحی (هدر) هم نیامده.
+ *
+ * ⚠️ رفعِ باگ (پیدا‌شده با تستِ واقعیِ end-to-end، نه فرض): این کوئری قبلاً
+ * دو جای مختلف بود — اینجا و auth/staff/verify — هرکدام بدونِ orderBy
+ * صریح، یعنی هیچ تضمینی نبود که یک ردیف را برگردانند. در عمل هم برنمی‌گرداندند:
+ * لاگین یک شعبه را «رستورانِ شما» نشان می‌داد، ولی همه‌ی API callهای بعدی
+ * (همین تابع) شعبه‌ی دیگری را برمی‌گرداندند — یعنی صاحبِ چندشعبه‌ای دیتای
+ * شعبه‌ی اشتباه را می‌دید، بدونِ هیچ خطا یا نشانه‌ای. حالا هر دو مسیر از
+ * همین یک تابع با orderBy ثابت (قدیمی‌ترین شعبه) استفاده می‌کنند.
+ */
+export async function defaultRestaurantForTenant(tenantId: string) {
+  return db.restaurant.findFirst({
+    where: { tenantId },
+    orderBy: { createdAt: 'asc' },
+    select: RESTAURANT_SELECT,
+  });
+}
+
 export async function resolveStaffRestaurant(auth: AccessPayload, req?: Request) {
   if (auth.kind !== 'staff') throw Err.forbidden();
 
@@ -28,13 +50,11 @@ export async function resolveStaffRestaurant(auth: AccessPayload, req?: Request)
   });
   if (!staff) throw Err.forbidden();
 
-  const selectFields = { id: true, name: true, slug: true, clubPrefix: true, cbBasePct: true, cbPreorderPct: true, cbVipPct: true, cbWinbackPct: true };
-
   // قفل به یک شعبه‌ی خاص — هدر کلاینت را نادیده بگیر (امنیت: نباید بتواند override شود)
   if (staff.restaurantId) {
     const restaurant = await db.restaurant.findFirst({
       where: { id: staff.restaurantId, tenantId: auth.tenantId },
-      select: selectFields,
+      select: RESTAURANT_SELECT,
     });
     if (!restaurant) throw Err.notFound('رستورانی برای این حساب یافت نشد');
     return restaurant;
@@ -45,17 +65,14 @@ export async function resolveStaffRestaurant(auth: AccessPayload, req?: Request)
   if (requestedId) {
     const restaurant = await db.restaurant.findFirst({
       where: { id: requestedId, tenantId: auth.tenantId }, // چک تنانت: جلوگیری از IDOR
-      select: selectFields,
+      select: RESTAURANT_SELECT,
     });
     if (restaurant) return restaurant;
     // هدر نامعتبر/متعلق به تنانتِ دیگر → به fallback زیر می‌افتیم به‌جای خطا،
     // چون این می‌تواند یک شعبه‌ی حذف‌شده یا انتخابِ قدیمیِ کلاینت باشد.
   }
 
-  const restaurant = await db.restaurant.findFirst({
-    where: { tenantId: auth.tenantId },
-    select: selectFields,
-  });
+  const restaurant = await defaultRestaurantForTenant(auth.tenantId);
   if (!restaurant) throw Err.notFound('رستورانی برای این حساب یافت نشد');
   return restaurant;
 }

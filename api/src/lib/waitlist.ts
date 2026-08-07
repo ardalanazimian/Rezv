@@ -4,6 +4,7 @@ import { metrics } from './metrics';
 import { Err } from './errors';
 import { enqueueSms } from './sms';
 import { queuePush, queueEmail } from './notify';
+import { cached, cacheKey } from './cache';
 
 // ═══════════════════════════════════════════════════════════
 //  سیستم لیست انتظار رزرونو (مدل OpenTable)
@@ -18,9 +19,89 @@ import { queuePush, queueEmail } from './notify';
 // ═══════════════════════════════════════════════════════════
 
 const OFFER_TTL_MINUTES = 5;          // مهلت پاسخ مشتری به آفر (تایمر انقضا)
-const AVG_DINING_MINUTES = 75;        // میانگین مدت نشستن (برای تخمین انتظار)
+const AVG_DINING_MINUTES = 75;        // پیش‌فرضِ سراسری — فقط وقتی تاریخچه‌ی خودِ رستوران کافی نیست
 const VIP_PRIORITY = 100;             // امتیاز اولویت VIP
 const CLUB_GOLD_PRIORITY = 50;        // امتیاز باشگاه طلایی/پلاتینیوم
+
+// ═══════════════════════════════════════════════════════════════════════
+//  مدتِ واقعیِ نشستنِ مهمان — به‌جایِ فرضِ سراسریِ ثابتِ ۷۵ دقیقه برایِ
+//  همه‌ی رستوران‌ها (فست‌فود و فاین‌دایینینگ الگویِ کاملاً متفاوتی دارند).
+//
+//  از reservation_events می‌خوانیم: فاصله‌ی اولین رویدادِ seated/dining تا
+//  رویدادِ completed. اگر تاریخچه‌ی رستوران کم باشد (تازه‌کار)، بی‌صدا به
+//  همان پیش‌فرضِ سراسری برمی‌گردیم — همان انضباطِ no-show model/demand
+//  forecast: هیچ‌وقت عددِ نویزی را جایِ heuristic نمی‌گذاریم.
+// ═══════════════════════════════════════════════════════════════════════
+
+const MIN_SAMPLES_FOR_REAL_AVG = 15;
+const PLAUSIBLE_MIN_MINUTES = 15;  // کمتر از این یعنی احتمالاً دادهٔ خراب (رویدادِ ازقلم‌افتاده)
+const PLAUSIBLE_MAX_MINUTES = 240; // بیشتر از این هم همین‌طور
+
+/** میانه‌ی یک آرایه‌ی عددی — نسبت به میانگین در برابرِ outlier مقاوم‌تر است. */
+export function medianMinutes(values: readonly number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+/**
+ * تصمیمِ خالص: از نمونه‌های واقعی استفاده کن یا به پیش‌فرض برگرد؟ منطقِ
+ * جدا از DB تا مستقیم تست شود.
+ */
+export function resolveAvgDiningMinutes(sampleMinutes: readonly number[], fallback = AVG_DINING_MINUTES): number {
+  if (sampleMinutes.length < MIN_SAMPLES_FOR_REAL_AVG) return fallback;
+  const med = medianMinutes(sampleMinutes);
+  if (med === null || med < PLAUSIBLE_MIN_MINUTES || med > PLAUSIBLE_MAX_MINUTES) return fallback;
+  return Math.round(med);
+}
+
+/** میانگینِ واقعیِ مدتِ نشستن برایِ این رستوران (کش‌شده — در مسیرِ داغِ
+ *  پیوستن به لیست انتظار صدا زده می‌شود). شفاف: منبع و تعدادِ نمونه هم
+ *  برمی‌گردد تا پنلِ آنالیتیکس بتواند نشان دهد این عدد از تاریخچه‌ی خودِ
+ *  رستوران است یا پیش‌فرضِ سراسری. */
+export interface AvgDiningResult {
+  minutes: number;
+  source: 'restaurant_history' | 'default';
+  sample_size: number;
+}
+
+async function computeAvgDiningResult(restaurantId: string): Promise<AvgDiningResult> {
+  const rows = await db.$queryRaw<{ minutes: number }[]>`
+    SELECT EXTRACT(EPOCH FROM (c.created_at - s.created_at)) / 60.0 AS minutes
+    FROM (
+      SELECT reservation_id, MIN(created_at) AS created_at
+      FROM reservation_events WHERE to_status IN ('seated', 'dining')
+      GROUP BY reservation_id
+    ) s
+    JOIN (
+      SELECT reservation_id, MAX(created_at) AS created_at
+      FROM reservation_events WHERE to_status = 'completed'
+      GROUP BY reservation_id
+    ) c ON c.reservation_id = s.reservation_id
+    JOIN reservations r ON r.id = s.reservation_id
+    WHERE r.restaurant_id = ${restaurantId}::uuid AND c.created_at > s.created_at
+    ORDER BY c.created_at DESC
+    LIMIT 300
+  `;
+  const sample = rows.map((r) => Number(r.minutes));
+  const med = medianMinutes(sample);
+  const usable = sample.length >= MIN_SAMPLES_FOR_REAL_AVG
+    && med !== null && med >= PLAUSIBLE_MIN_MINUTES && med <= PLAUSIBLE_MAX_MINUTES;
+  return {
+    minutes: resolveAvgDiningMinutes(sample),
+    sample_size: sample.length,
+    source: usable ? 'restaurant_history' : 'default',
+  };
+}
+
+async function getAvgDiningResult(restaurantId: string): Promise<AvgDiningResult> {
+  return cached(cacheKey('avg-dining-minutes', restaurantId), 3600, () => computeAvgDiningResult(restaurantId));
+}
+
+async function getAvgDiningMinutes(restaurantId: string): Promise<number> {
+  return (await getAvgDiningResult(restaurantId)).minutes;
+}
 
 export type JoinWaitlistInput = {
   restaurantId: string;
@@ -59,14 +140,17 @@ async function computePriority(restaurantId: string, userId?: string): Promise<{
 
 // ── تخمین زمان انتظار (دقیقه) بر اساس موقعیت در صف و ظرفیت ──
 async function estimateWait(restaurantId: string, partySize: number, aheadInQueue: number): Promise<number> {
-  // تعداد میزهای مناسب این گروه
-  const suitableTables = await db.table.count({
-    where: { restaurantId, isActive: true, state: { not: 'maintenance' }, capacity: { gte: partySize } },
-  });
-  if (suitableTables === 0) return aheadInQueue * AVG_DINING_MINUTES;
+  const [avgDiningMinutes, suitableTables] = await Promise.all([
+    getAvgDiningMinutes(restaurantId),
+    // تعداد میزهای مناسب این گروه
+    db.table.count({
+      where: { restaurantId, isActive: true, state: { not: 'maintenance' }, capacity: { gte: partySize } },
+    }),
+  ]);
+  if (suitableTables === 0) return aheadInQueue * avgDiningMinutes;
   // تخمین: هر «دور» میز ≈ میانگین مدت نشستن. نفرات جلوی صف ÷ میزهای موازی.
   const rounds = Math.ceil((aheadInQueue + 1) / suitableTables);
-  return Math.max(5, rounds * AVG_DINING_MINUTES - AVG_DINING_MINUTES + 15);
+  return Math.max(5, rounds * avgDiningMinutes - avgDiningMinutes + 15);
 }
 
 // ── پیوستن به لیست انتظار ──
@@ -443,12 +527,20 @@ export async function getWaitlistAnalytics(restaurantId: string, days = 30) {
 
   const currentQueue = await db.waitlistEntry.count({ where: { restaurantId, status: 'waiting' } });
 
+  // شفافیت: عددی که در تخمینِ ETA استفاده می‌شود از تاریخچه‌ی خودِ رستوران
+  // آمده یا هنوز پیش‌فرضِ سراسری است (رستورانِ تازه‌کار) — نه ادعایِ کاذبِ دقت.
+  const avgDining = await getAvgDiningResult(restaurantId).catch(
+    () => ({ minutes: AVG_DINING_MINUTES, source: 'default' as const, sample_size: 0 }),
+  );
+
   return {
     period_days: days,
     total_entries: total,
     seated, abandoned,
     conversion_rate: conversionRate,
     avg_wait_minutes: avgWait,
+    avg_dining_minutes: avgDining.minutes,
+    avg_dining_minutes_source: avgDining.source,
     current_queue_size: currentQueue,
     vip_entries: all.filter(e => e.isVip).length,
   };

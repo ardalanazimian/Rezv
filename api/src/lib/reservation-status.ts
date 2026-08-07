@@ -66,3 +66,37 @@ export type VisitedReservationStatus = (typeof VISITED_RESERVATION_STATUSES)[num
 export function visitedStatusList(): string[] {
   return [...VISITED_RESERVATION_STATUSES];
 }
+
+/**
+ * وضعیت‌هایی که یعنی «تقاضایِ واقعی» بوده — مشتری واقعاً قصدِ حضور داشته،
+ * چه در نهایت آمده باشد (seated/dining/completed) چه نیامده (no_show).
+ * برایِ تحلیل‌های آینده‌نگر/گذشته‌نگرِ حجمِ تقاضا استفاده می‌شود (lib/
+ * demand-forecast.ts، lib/restaurant-manager.ts) — بر خلافِ VISITED_*
+ * (که فقط «واقعاً آمد» را می‌شمارد)، اینجا no_show هم تقاضایِ واقعی حساب
+ * می‌شود چون رزرو ثبت شده بود، فقط محقق نشد.
+ *
+ * بیرون: pending/waitlisted (هنوز تثبیت نشده)، rejected/expired/cancelled*
+ * (تقاضایی که تبخیر شده و تکرارپذیر نیست).
+ */
+export const DEMAND_RESERVATION_STATUSES = [
+  'confirmed',
+  'auto_confirmed',
+  'preparing',
+  'checked_in',
+  'running_late',
+  'arrived',
+  'seated',
+  'dining',
+  'completed',
+  'no_show',
+] as const;
+
+export type DemandReservationStatus = (typeof DEMAND_RESERVATION_STATUSES)[number];
+
+/** همان مجموعه به‌صورت رشته‌ی SQL برای استفاده در $queryRaw: 'a','b','c' */
+export const DEMAND_STATUSES_SQL = DEMAND_RESERVATION_STATUSES.map((s) => `'${s}'`).join(',');
+
+/** آرایه‌ی قابل‌استفاده در Prisma `status: { in: [...] }`. */
+export function demandStatusList(): string[] {
+  return [...DEMAND_RESERVATION_STATUSES];
+}

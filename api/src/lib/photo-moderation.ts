@@ -8,7 +8,10 @@
 
 export type PhotoStatus = 'pending' | 'approved' | 'rejected';
 
-export const PHOTO_CATEGORIES = ['food', 'interior', 'drink', 'event', 'other'] as const;
+// 'logo' هم از همین مسیرِ امنِ آپلود/بازبینی رد می‌شود (lib/media.ts sniffing +
+// صفِ تأییدِ پنلِ شرکت) — نه یک مسیرِ جدا. تنها فرق: در گالریِ عمومی نشان داده
+// نمی‌شود (فیلترِ جدا در restaurants/[slug]/route.ts)، به‌جایش logo_url مجزا است.
+export const PHOTO_CATEGORIES = ['food', 'interior', 'drink', 'event', 'other', 'logo'] as const;
 export type PhotoCategory = (typeof PHOTO_CATEGORIES)[number];
 
 /** تنها وضعیتی که اجازه‌ی نمایشِ عمومی دارد. */

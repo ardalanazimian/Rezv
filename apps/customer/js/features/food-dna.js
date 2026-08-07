@@ -24,7 +24,10 @@ export function computeFoodPersona(p){
   return {emoji:'🌱', name:'تازه‌کارِ مشتاق', desc:'سفر طعم تو تازه شروع شده — ادامه بده!'};
 }
 
-// درصد بهتر از بقیه (برای حس رقابت نسل‌Z)
+// نسخه‌ی نمایشیِ ثابت — فقط برایِ حالتِ دمو (وقتی داده‌ی واقعی نیست) استفاده
+// می‌شود، همیشه همراه با برچسبِ «نمونه». برایِ کاربرِ واقعی این تابع صدا زده
+// نمی‌شود — عددِ واقعی از GET /me/profile (visit_percentile) می‌آید که با
+// رتبه‌بندیِ واقعی در بینِ همه‌ی کاربران محاسبه شده (lib/guest-profile.ts).
 export function dnaPercentile(visits){
   if(visits >= 30) return 95; if(visits >= 20) return 88;
   if(visits >= 12) return 76; if(visits >= 6) return 60; return 42;
@@ -32,19 +35,24 @@ export function dnaPercentile(visits){
 
 export async function openFoodDNA(){
   // بارگذاری داده‌ی واقعی، یا دمو
-  let p = null;
+  let p = null, visitPercentile = null;
   if(isLoggedIn()){
     const res = await API.get('/me/profile').catch(()=>null);
-    if(res?.ok && res.data?.profile) p = res.data.profile;
+    if(res?.ok && res.data?.profile){
+      p = res.data.profile;
+      // null یعنی جمعیتِ مقایسه هنوز کوچک است — عمداً نمایش داده نمی‌شود
+      visitPercentile = typeof res.data.visit_percentile==='number' ? res.data.visit_percentile : null;
+    }
   }
   if(!p){
-    // دموی جذاب — واضح که نمونه‌ست ولی تجربه‌ی کامل رو نشون می‌ده
+    // دموی جذاب — واضح که نمونه‌ست (هر اسلاید برچسبِ «نمونه» دارد) ولی تجربه‌ی کامل رو نشون می‌ده
     p = { globalVisits:47, restaurantsVisited:9, globalSpendToman:8600000, isVipAnywhere:true, _demo:true,
       restaurants:[{rfmSegment:'champions',totalVisits:18},{rfmSegment:'loyal',totalVisits:12}] };
+    visitPercentile = dnaPercentile(p.globalVisits);
   }
   _dnaData = p;
   _dnaSlide = 0;
-  buildDNASlides(p);
+  buildDNASlides(p, visitPercentile);
   document.getElementById('dnaOverlay').classList.add('open');
   // ساخت نوارهای پیشرفت (یکی برای هر اسلاید + اسلاید اشتراک)
   const nSlides = document.querySelectorAll('#dnaSlides .dna-slide').length;
@@ -52,17 +60,21 @@ export async function openFoodDNA(){
   showDNASlide(0);
 }
 
-export function buildDNASlides(p){
+export function buildDNASlides(p, visitPercentile){
   const persona = computeFoodPersona(p);
-  const pct = dnaPercentile(p.globalVisits||0);
+  const pct = visitPercentile; // ممکن است null باشد (کاربرِ واقعی با جمعیتِ مقایسه‌ی هنوز کوچک)
   const spendM = Math.round((p.globalSpendToman||0)/1000000);
   const topSeg = p.restaurants?.[0]?.rfmSegment;
   const segFa = {champions:'قهرمان',loyal:'وفادار',promising:'امیدبخش',at_risk:'دلتنگ',new_customer:'تازه‌وارد'}[topSeg]||'ویژه';
+  // در حالتِ دمو، هر اسلایدِ حاویِ عددِ شخصی برچسبِ «نمونه» می‌گیرد — قبلاً
+  // فقط اسلایدِ شخصیت و کارتِ اشتراک‌گذاری این برچسب رو داشتن، بقیه‌ی
+  // اعدادِ ساختگی (بازدید/رستوران/هزینه) بی‌هیچ نشانه‌ای نشون داده می‌شدن.
+  const demoTag = p._demo ? ' (نمونه)' : '';
   const slides = [
     {kicker:'DNA غذایی تو آماده‌ست', emoji:'🧬', label:'بریم ببینیم امسال چطور گذشت', desc:'چند ثانیه وقت بذار — نتیجه‌اش ارزش داره'},
-    {kicker:'امسال رفتی بیرون', big:faNum(p.globalVisits||0), label:'بار غذا خوردی', desc:`این یعنی بیشتر از ${faNum(pct)}٪ آدمای دور و برت!`},
-    {kicker:'کاوش کردی', big:faNum(p.restaurantsVisited||0), label:'رستوران مختلف', desc:'هر کدوم یه تجربه‌ی جدید بود'},
-    ...(spendM>0?[{kicker:'روی خاطره‌ها سرمایه‌گذاری کردی', big:faNum(spendM)+'م', label:'تومان', desc:'ارزشش رو داشت، مگه نه؟'}]:[]),
+    {kicker:'امسال رفتی بیرون'+demoTag, big:faNum(p.globalVisits||0), label:'بار غذا خوردی', desc: pct!=null ? `این یعنی بیشتر از ${faNum(pct)}٪ آدمای دور و برت!` : 'به‌زودی با بقیه مقایسه‌ات می‌کنیم'},
+    {kicker:'کاوش کردی'+demoTag, big:faNum(p.restaurantsVisited||0), label:'رستوران مختلف', desc:'هر کدوم یه تجربه‌ی جدید بود'},
+    ...(spendM>0?[{kicker:'روی خاطره‌ها سرمایه‌گذاری کردی'+demoTag, big:faNum(spendM)+'م', label:'تومان', desc:'ارزشش رو داشت، مگه نه؟'}]:[]),
     {kicker:'و اما شخصیت غذایی تو', emoji:persona.emoji, label:persona.name, desc:persona.desc, persona:true},
   ];
   window._dnaSlides = slides;
@@ -84,7 +96,7 @@ export function buildDNASlides(p){
         <div style="font-size:26px;font-weight:900;color:#fff;margin-bottom:16px;letter-spacing:-.03em">${_dnaPersona.emoji} ${esc(_dnaPersona.name)}</div>
         <div class="dna-share-row"><span class="dna-share-k">بار بیرون غذا خوردم</span><span class="dna-share-v">${faNum(p.globalVisits||0)}</span></div>
         <div class="dna-share-row"><span class="dna-share-k">رستوران کشف کردم</span><span class="dna-share-v">${faNum(p.restaurantsVisited||0)}</span></div>
-        <div class="dna-share-row"><span class="dna-share-k">بهتر از</span><span class="dna-share-v">${faNum(_dnaPct)}٪ مردم</span></div>
+        ${_dnaPct!=null?`<div class="dna-share-row"><span class="dna-share-k">بهتر از</span><span class="dna-share-v">${faNum(_dnaPct)}٪ مردم</span></div>`:''}
         <button class="dna-share-btn" onclick="shareFoodDNA()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
           اشتراک‌گذاری در استوری
@@ -132,7 +144,10 @@ export function closeFoodDNA(){ clearTimeout(_dnaTimer); document.getElementById
 export async function shareFoodDNA(){
   const p = _dnaData || {};
   const persona = window._dnaPersona || {name:'Foodie'};
-  const text = `DNA غذایی من تو رزرونو: ${persona.emoji} ${persona.name}\n${faNum(p.globalVisits||0)} بار بیرون غذا خوردم، بهتر از ${faNum(window._dnaPct||0)}٪ مردم! 🍽️`;
+  // اگر جمعیتِ مقایسه هنوز کوچک است (_dnaPct=null)، ادعای درصد کاملاً حذف
+  // می‌شود — نه یک ۰٪ گمراه‌کننده (یعنی «بدترینِ ممکن»، نه «هنوز نامعلوم»).
+  const pctPart = window._dnaPct!=null ? `، بهتر از ${faNum(window._dnaPct)}٪ مردم` : '';
+  const text = `DNA غذایی من تو رزرونو: ${persona.emoji} ${persona.name}\n${faNum(p.globalVisits||0)} بار بیرون غذا خوردم${pctPart}! 🍽️`;
   // Web Share API (موبایل) — اگر نبود، کپی در کلیپ‌بورد
   if(navigator.share){
     try{ await navigator.share({title:'DNA غذایی من', text}); return; }catch{}
@@ -161,8 +176,11 @@ export function renderProfile(){
     return;
   }
   // کاربر وارد شده → اطلاعات واقعی
-  const tier = pts>=1000?'طلایی':pts>=300?'نقره‌ای':'برنزی';
-  const tierEmoji = icon('star',{size:13,fill:true});
+  // نکته: همین آستانه‌ها باید با LOYALTY_TIERS در api/src/lib/loyalty-status.ts
+  // هم‌تراز بمانند — قبلاً اینجا یک مقیاسِ ۳سطحیِ جداگانه (۳۰۰/۱۰۰۰) بود که
+  // با مقیاسِ ۴سطحیِ صفحه‌ی loyalty (۳۰۰/۸۰۰/۲۰۰۰) ناسازگار بود؛ یعنی یک
+  // کاربر با ۹۰۰ امتیاز اینجا «نقره‌ای» و در صفحه‌ی loyalty «طلایی» می‌دید.
+  const tier = pts>=2000?{name:'پلاتینیوم',emoji:'💎'}:pts>=800?{name:'طلایی',emoji:'🥇'}:pts>=300?{name:'نقره‌ای',emoji:'🥈'}:{name:'برنزی',emoji:'🥉'};
   document.getElementById('page-profile').innerHTML=`<div class="wrap section">
     <div class="prof-card">
       <div class="prof-card-mesh"></div>
@@ -171,7 +189,7 @@ export function renderProfile(){
         <div class="prof-card-id">
           <div class="prof-card-name">${esc(userName())}</div>
           <div class="prof-card-phone">${faNum(USER.phone||'')}</div>
-          <span class="prof-tier">${tierEmoji} عضو ${tier}</span>
+          <span class="prof-tier">${tier.emoji} عضو ${tier.name}</span>
         </div>
       </div>
       <div class="prof-card-stats">

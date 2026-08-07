@@ -1,5 +1,12 @@
 // ═══ رزرونو — پنل business: داشبورد Enterprise + به‌روزرسانی زنده (Vanilla JS، بدون build، scope مشترک) ═══
 function rOverview(){
+  // ⚠️ رفعِ باگ: تا اینجا RES همیشه دیتای نمونه بود (رجوع کنید به data.js).
+  // هم‌الگو با rWaitlist: اولین ورودِ واقعی → دیتایِ واقعی را بگیر و دوباره
+  // رندر کن؛ در همین حین با هر دیتایی که الان موجود است رندرِ فوری انجام شود
+  // تا صفحه خالی نماند.
+  if(!_resLoaded && API.getToken()){
+    loadTodayReservationsForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
   // ═══════════ داشبورد Enterprise — مرکز فرماندهی ═══════════
   renderEnterpriseDashboard();
 }
@@ -366,11 +373,24 @@ function startLiveUpdates(){
     }
   },15000); // هر ۱۵ ثانیه
 }
-function refreshLiveKPIs(){
-  const k=calcTodayKPIs();
-  // فقط اعداد را به‌روز کن (بدون پرش UI)
-  const vals=document.querySelectorAll('#v-overview .kpi-val');
-  // نشانگر زنده‌بودن
+// ⚠️ رفعِ باگ: این تابع «به‌روزرسانیِ زنده» را وعده می‌داد ولی هیچ‌کاری
+// نمی‌کرد — vals پرس‌وجو می‌شد ولی هرگز جایی نوشته نمی‌شد؛ calcTodayKPIs هم
+// از هیچ سرور fetchای نمی‌گرفت، فقط دوباره روی همان RESِ ثابتِ محلی حساب
+// می‌کرد. یعنی نشانگرِ «زنده» هر ۱۵ ثانیه پالس می‌زد ولی هیچ عددی
+// (رزروِ امروز، اشغال، نوشو، درآمد، …) واقعاً به‌روز نمی‌شد — رستوران‌دار
+// فکر می‌کرد اعداد زنده‌اند در حالی که کاملاً ایستا بودند.
+// حالا: fetchِ واقعی + رندرِ کاملِ همین بخش (نه کلِ صفحه)، با نگه‌داشتنِ
+// موقعیتِ اسکرول تا پرش UI نداشته باشد.
+async function refreshLiveKPIs(){
+  if(API.getToken()){
+    const ok=await loadTodayReservationsForDashboard().catch(()=>false);
+    if(!ok) return; // fetch ناموفق → داده‌ی قبلی دست‌نخورده می‌ماند، پالسِ گمراه‌کننده نزن
+  }
+  const scroller=document.querySelector('.content');
+  const y=scroller?scroller.scrollTop:0;
+  renderEnterpriseDashboard();
+  if(scroller) scroller.scrollTop=y;
+  // نشانگر زنده‌بودن — فقط بعد از رفرشِ واقعاً موفق پالس می‌زند
   const ind=document.getElementById('liveInd');
   if(ind){ind.classList.add('pulse');setTimeout(()=>ind.classList.remove('pulse'),1000);}
 }

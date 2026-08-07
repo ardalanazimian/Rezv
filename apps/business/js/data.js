@@ -252,6 +252,8 @@ const API = {
   // ── چندشعبه‌ای: لیست شعبه‌ها + ساخت شعبه‌ی جدید ──
   branchesList(){ return this.get('/restaurant/branches'); },
   branchCreate(body){ return this.post('/restaurant/branches', body); },
+  // ── هویتِ رستوران: نام (وصل به GET/PUT /restaurant/profile واقعی) ──
+  profileSave(body){ return this.request('/restaurant/profile', { method:'PUT', body: JSON.stringify(body||{}) }); },
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -425,7 +427,17 @@ const Heartbeat = {
 function dataSourceNote(){
   return API.online ? '' : `<div style="font-size:11px;color:var(--amber-600);background:var(--amber-50);padding:6px 12px;border-radius:8px;margin-bottom:14px;text-align:center">${icon('info',{size:13})} داده‌ی نمونه (بک‌اند متصل نیست)</div>`;
 }
-const RES = [
+// ⚠️ رفعِ باگ: این آرایه قبلاً «const RES» بود — یعنی هیچ‌وقت با دیتای واقعی
+// جایگزین نمی‌شد. renderResList (تبِ رزروها) از یک متغیرِ محلیِ جدا برای
+// دیتای واقعی استفاده می‌کرد، ولی داشبورد (calcTodayKPIs در overview.js:
+// رزروِ امروز، اشغالِ میز، عدمِ‌حضور، درآمد، «رزروهایِ امشب») همیشه از همین
+// RES ثابت می‌خواند — یعنی داشبورد برایِ هر رستورانِ واقعی، در هر جلسه‌ای،
+// همیشه همین دیتایِ نمونه را نشان می‌داد، نه فقط در بارگذاریِ اول بلکه حتیٰ
+// بعد از رفرشِ «زنده»یِ هر ۱۵ ثانیه (که خودش هم فقط دوباره از همین RESِ
+// ثابت محاسبه می‌کرد، بدونِ هیچ fetchی — رجوع کنید به refreshLiveKPIs).
+// حالا RES_DEMO فقط fallbackِ آفلاین/دموست (هم‌الگو با WL_DEMO_QUEUE در
+// waitlist.js) و RES با loadTodayReservationsForDashboard از سرور پر می‌شود.
+const RES_DEMO = [
   {t:'۱۸:۳۰',name:'نیلوفر رضایی',party:2,table:3,status:'arrived',seg:'vip',pre:true,note:'تولد همسر',phone:'۰۹۱۲۱۱۱۲۲۳۳',date:'today',dLabel:'امروز'},
   {t:'۱۹:۰۰',name:'امیر حسینی',party:4,table:7,status:'confirmed',seg:'new',pre:false,note:'',phone:'۰۹۱۲۲۲۲۳۳۴۴',date:'today',dLabel:'امروز'},
   {t:'۱۹:۰۰',name:'مریم و علی',party:2,table:2,status:'arrived',seg:'regular',pre:true,note:'',phone:'۰۹۱۲۳۳۳۴۴۵۵',date:'today',dLabel:'امروز'},
@@ -443,6 +455,25 @@ const RES = [
   {t:'۲۰:۳۰',name:'کاوه مرادی',party:6,table:9,status:'cancelled',seg:'vip',pre:false,note:'',phone:'۰۹۱۲۷۸۹۰۱۲۳',cancelReason:'تماس مشتری — تغییر برنامه',date:'past',dLabel:'۲ روز پیش'},
   {t:'۱۹:۰۰',name:'سپیده یاری',party:4,table:6,status:'completed',seg:'regular',pre:true,note:'',phone:'۰۹۱۲۸۹۰۱۲۳۴',date:'past',dLabel:'۳ روز پیش'},
 ];
+let RES = RES_DEMO.slice();
+let _resLoaded = false;
+/**
+ * رزروهای «امروز» را برایِ داشبورد از سرور می‌گیرد و RES را جایگزین می‌کند.
+ * عمداً از loadReservations (بالاتر) استفاده نمی‌کند — آن تابع RES_DATE_FILTER
+ * و RES_NEXT_CURSOR را هم عوض می‌کند (paginationِ تبِ رزروها)؛ اگر داشبورد هم
+ * از همان تابع استفاده می‌کرد، وقتی کاربر هم‌زمان تبِ رزروها را روی «آینده» یا
+ * «گذشته» باز داشت، رفرشِ ۱۵ثانیه‌ایِ داشبورد آن فیلتر/cursor را خرابمی‌کرد.
+ */
+async function loadTodayReservationsForDashboard(){
+  if(!API.getToken()) return false;
+  const res=await API.get('/restaurant/reservations?date=today');
+  if(res.ok && Array.isArray(res.data?.reservations)){
+    RES=res.data.reservations.map(mapResRow);
+    _resLoaded=true;
+    return true;
+  }
+  return false;
+}
 // میزها — الان از API واقعی (/restaurant/tables) لود می‌شه، نه نمونه‌ی ثابت
 // نگاشت وضعیت: بک‌اند از 'occupied' استفاده می‌کنه، رابط کاربری همیشه 'seated' نشون می‌داده
 const BK2UI_STATE = { free:'free', reserved:'reserved', occupied:'seated', cleaning:'free', maintenance:'free' };
@@ -575,8 +606,13 @@ async function loadMoreReservations(){
 let REVIEWS=[];
 // عکس‌های گالری — از /restaurant/photos واقعی لود می‌شن
 let GALLERY=[];
-// هویت رستوران (نام + لوگو: ایموجی یا عکس)
-let RESTAURANT={name:'کافه‌رستوران ویستا',logoEmoji:'🌿',logoDataUrl:null,logoGradient:'linear-gradient(135deg,#34D399,#059669)'};
+// هویت رستوران — name اینجا فقط پیش‌فرضِ اولیه/دموست؛ با اولین اجرایِ
+// renderBranchSwitcher (routing.js، بعد از لاگینِ واقعی) از /restaurant/branches
+// همگام می‌شود، و «تغییرِ نام» (crm.js) با PUT /restaurant/profile واقعاً
+// روی سرور ذخیره می‌کند (رجوع کنید به رفعِ باگِ نامِ رستوران).
+// logoEmoji/logoGradient فقط نمایِ جایگزینِ محلی‌اند تا لوگویِ واقعی (یک
+// RestaurantPhoto با category='logo'، در GALLERY) آپلود/تأیید شود.
+let RESTAURANT={name:'کافه‌رستوران ویستا',logoEmoji:'🌿',logoGradient:'linear-gradient(135deg,#34D399,#059669)'};
 function normalizePhone(p){return (p||'').replace(/\s/g,'').replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
 // اتصال خودکار: هر رزرو → ثبت در باشگاه (بدون تکرار، کلید: تلفن)
 function enrollClub(name,phone){

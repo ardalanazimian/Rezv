@@ -66,3 +66,39 @@ export async function getGuestProfile(userId: string) {
   });
   return { ...profile, restaurants: breakdown };
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  درصدِ واقعیِ «بهتر از چند درصدِ مردم» — apps/customer/js/features/food-dna.js
+//  (DNA غذایی) قبلاً این عدد را از یک جدولِ ثابتِ حدسی می‌ساخت
+//  (dnaPercentile: visits>=30→95، visits>=20→88، ...) — یعنی حتی برای
+//  کاربرِ واقعی، «بهتر از ۹۵٪ مردم» ادعایی بدونِ هیچ مقایسه‌ی واقعی بود.
+//  اینجا واقعاً در بینِ همه‌ی GuestProfileها رتبه‌بندی می‌شود.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** حداقلِ جمعیتِ مقایسه برایِ معنادار بودنِ درصد — کمتر از این، عدد نویز است. */
+const MIN_COHORT_FOR_PERCENTILE = 20;
+
+/** محاسبه‌ی خالص از رویِ دو شمارشِ خام — بدونِ DB، مستقیماً تست‌پذیر. */
+export function computePercentile(totalProfiles: number, profilesWithFewerVisits: number): number | null {
+  if (totalProfiles < MIN_COHORT_FOR_PERCENTILE) return null;
+  return Math.round((profilesWithFewerVisits / totalProfiles) * 100);
+}
+
+/**
+ * درصدِ کاربرانی که بازدیدِ کمتری از این کاربر دارند. اگر جامعه‌ی مقایسه
+ * خیلی کوچک باشد null برمی‌گرداند — فرانت در این حالت اصلاً این آماره را
+ * نشان نمی‌دهد، به‌جایِ یک عددِ بی‌معنا (مثلاً «بهتر از ۱۰۰٪ مردم» وقتی فقط
+ * ۳ کاربر در کل پلتفرم هست).
+ */
+export async function getVisitPercentile(userId: string): Promise<number | null> {
+  const rows = await db.$queryRaw<{ total: bigint; below: bigint }[]>`
+    SELECT
+      (SELECT COUNT(*) FROM guest_profiles)::bigint AS total,
+      (SELECT COUNT(*) FROM guest_profiles gp2
+        WHERE gp2.global_visits < (SELECT global_visits FROM guest_profiles WHERE user_id = ${userId}::uuid)
+      )::bigint AS below
+  `;
+  const row = rows[0];
+  if (!row) return null;
+  return computePercentile(Number(row.total), Number(row.below));
+}
