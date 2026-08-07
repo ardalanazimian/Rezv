@@ -1,11 +1,14 @@
 // ═══ رزرونو — پنل business: داشبورد Enterprise + به‌روزرسانی زنده (Vanilla JS، بدون build، scope مشترک) ═══
 function rOverview(){
-  // ⚠️ رفعِ باگ: تا اینجا RES همیشه دیتای نمونه بود (رجوع کنید به data.js).
-  // هم‌الگو با rWaitlist: اولین ورودِ واقعی → دیتایِ واقعی را بگیر و دوباره
-  // رندر کن؛ در همین حین با هر دیتایی که الان موجود است رندرِ فوری انجام شود
-  // تا صفحه خالی نماند.
+  // ⚠️ رفعِ باگ: تا اینجا RES و GUESTS همیشه دیتای نمونه بودند (رجوع کنید
+  // به data.js). هم‌الگو با rWaitlist: اولین ورودِ واقعی → دیتایِ واقعی را
+  // بگیر و دوباره رندر کن؛ در همین حین با هر دیتایی که الان موجود است
+  // رندرِ فوری انجام شود تا صفحه خالی نماند.
   if(!_resLoaded && API.getToken()){
     loadTodayReservationsForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
+  if(!_guestsLoaded && API.getToken()){
+    loadTopGuestsForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
   }
   // ═══════════ داشبورد Enterprise — مرکز فرماندهی ═══════════
   renderEnterpriseDashboard();
@@ -383,7 +386,14 @@ function startLiveUpdates(){
 // موقعیتِ اسکرول تا پرش UI نداشته باشد.
 async function refreshLiveKPIs(){
   if(API.getToken()){
-    const ok=await loadTodayReservationsForDashboard().catch(()=>false);
+    // موازی: هردو مستقل‌اند (رزروها/KPI و مشتریانِ برتر). اگر رزروها ناموفق بود
+    // کلِ رفرش لغو می‌شود (سیگنالِ اصلیِ «زنده‌بودن»)؛ اگر فقط guests ناموفق
+    // بود، لیستِ قبلی دست‌نخورده می‌ماند — چیزِ مهمی نیست که هر ۱۵ ثانیه لازم
+    // باشد حتماً تازه شود.
+    const [ok]=await Promise.all([
+      loadTodayReservationsForDashboard().catch(()=>false),
+      loadTopGuestsForDashboard().catch(()=>false),
+    ]);
     if(!ok) return; // fetch ناموفق → داده‌ی قبلی دست‌نخورده می‌ماند، پالسِ گمراه‌کننده نزن
   }
   const scroller=document.querySelector('.content');

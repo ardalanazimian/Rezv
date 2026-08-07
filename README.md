@@ -18,8 +18,9 @@ Three separate front-ends connected to one shared backend (an "Uber-style" split
 | Customer app | `apps/customer` | Vanilla JS ES modules, PWA, RTL |
 | Business panel (restaurant) | `apps/business` | Vanilla JS single-page panel |
 | Company panel (platform admin) | `apps/company` | Vanilla JS single-page panel |
-| API | `api` | Next.js 14 · Prisma · PostgreSQL 16 · Redis · JWT |
-| Design system (source) | `shared` | CSS tokens / foundation / bridge + icons |
+| Marketing site + SEO | `apps/landing`, `apps/seo` | Separate Next.js + React apps (own package.json/CI job) |
+| API | `api` | Next.js 16 (App Router, Turbopack) · Prisma · PostgreSQL 16 · Redis · JWT |
+| Design system (source) | `shared` | CSS tokens / foundation / bridge + a few shared vanilla-JS helpers (no React components) |
 
 Auth is **Bearer JWT** (no cookies). Architecture: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 

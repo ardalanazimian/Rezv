@@ -155,11 +155,17 @@ export async function recomputeCustomerInsight(restaurantId: string, userId: str
   const noShowRatePct = totalAttempts ? Math.round((noShows / totalAttempts) * 100) : 0;
 
   // ── ریسک ریزش: چند روز از آخرین بازدید گذشته نسبت به فاصله‌ی معمول او ──
+  // ⚠️ رفعِ باگ (پیدا‌شده هنگامِ ساختِ ویجتِ «مشتریانِ برتر» در پنلِ بیزنس):
+  // قبلاً فقط سقفِ ۱۰۰ کلمپ می‌شد، نه کفِ صفر. اگر lastVisitAt به هر دلیلی
+  // (مثلاً رزروِ امروز/آینده که هنوز واقعاً اتفاق نیفتاده ولی به‌عنوانِ
+  // بازدید حساب شده) بعد از «الان» باشد، daysSince منفی می‌شد و churnRisk
+  // منفی برمی‌گشت — که در UI به‌صورتِ «۱۰۱٪ بازگشت» (بیش از صد درصد) دیده
+  // می‌شد. ریسکِ ریزش نمی‌تواند منفی باشد؛ حداقلش صفر است.
   let churnRisk = 0;
   if (lastVisit) {
     const daysSince = (Date.now() - lastVisit.getTime()) / 86_400_000;
     const expectedGap = freqDays ?? 45;
-    churnRisk = Math.round(Math.min(100, (daysSince / (expectedGap * 2)) * 100));
+    churnRisk = Math.round(Math.max(0, Math.min(100, (daysSince / (expectedGap * 2)) * 100)));
   }
 
   let segment: 'new_customer' | 'active' | 'at_risk' | 'churned' | 'vip' = 'new_customer';

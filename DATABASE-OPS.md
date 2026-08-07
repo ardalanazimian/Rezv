@@ -1,6 +1,6 @@
 # رزرونو — راهنمای عملیات دیتابیس (Pooling · Replica · Backup · Failover)
 
-این سند نتیجه‌ی ممیزی دیتابیس و تست واقعی روی PostgreSQL 17 است.
+این سند نتیجه‌ی ممیزی دیتابیس و تست واقعی روی PostgreSQL است (نسخه‌ی محلی/CI: ۱۶).
 
 ---
 
@@ -133,7 +133,45 @@ endpoint-switch را زیرساخت باید انجام دهد.
 
 ---
 
-## ۷. خلاصه‌ی ممیزی ایندکس و کوئری
+## ۷. تشخیصِ drift بینِ schema.prisma و SQLِ واقعاً اعمال‌شده (یافته‌ی ۲۰۲۶-۰۸-۰۷)
+
+چون این پروژه از `prisma migrate deploy` استفاده نمی‌کند (به‌جایش `prisma/apply-sql.sh`
+روی `prisma/sql/*.sql` — رجوع کن به بخشِ استقرار)، یک ریسکِ واقعی هست: فیلدی در
+`schema.prisma` تعریف شود ولی هیچ فایلِ SQL آن را واقعاً نسازد — روی محیطی که فقط
+از `apply-sql.sh` ساخته شده (نه از `prisma db push`)، اولین `db.model.create(...)`ِ
+بدونِ `select` صریح با `P2022` («column does not exist») می‌شکند. دو نمونه‌ی واقعی
+پیدا شد: `tenants.version` (035) و ۷ ستونِ `restaurants` + `users.email` (036).
+
+**روشِ تشخیص که در تستِ end-to-end این نشست کار کرد:**
+```bash
+cd api
+export DATABASE_URL="..."   # باید در همان فراخوانی export شود؛ .env به‌تنهایی کافی نیست
+npx prisma migrate diff \
+  --from-url "$DATABASE_URL" \
+  --to-schema-datamodel prisma/schema.prisma \
+  --script
+```
+⚠️ خروجیِ این دستور را کورکورانه اعمال نکن — علاوه بر `ADD COLUMN`/`CREATE TABLE`ِ
+واقعی، تغییراتِ کازمتیکِ «Prisma-canonical» هم پیشنهاد می‌دهد (مثلاً تبدیلِ
+`timestamptz`→`timestamp(3)`، حذفِ `DEFAULT gen_random_uuid()`) که اگر واقعاً اجرا
+شوند **مخرب**اند. فقط `ADD COLUMN IF NOT EXISTS`/`CREATE ... IF NOT EXISTS`هایِ
+واقعی را به یک فایلِ جدیدِ `prisma/sql/0NN-*.sql` منتقل کن.
+
+## ۸. گوچایِ BigInt در کوئری‌هایِ خام (یافته‌ی ۲۰۲۶-۰۸-۰۷)
+
+`SUM(...) OVER (...)`، `COUNT(*)`، و مشابه در Postgres مقدارِ `bigint` برمی‌گردانند.
+Prisma این را به **`BigInt` جاوااسکریپت** نگاشت می‌کند، نه `number` — حتی اگر
+جنریکِ TypeScriptِ `$queryRaw<T>()` بگوید `number` (این فقط یک type assertion است،
+نه تضمینِ runtime؛ تایپ‌چک این «دروغ» را نمی‌بیند). ترکیبِ `BigInt` با `number` در
+عملگرهایی مثلِ `*`/`+` با خطایِ `TypeError: Cannot mix BigInt and other types` کرش
+می‌کند — دقیقاً همین در `lib/no-show-model.ts` برایِ هر رستورانی با مشتریِ تکراری
+رخ می‌داد (فقط با اجرایِ واقعی روی Postgres پیدا شد، نه با فرض).
+
+**الگویِ رفعِ دولایه (همیشه هردو، نه فقط یکی):**
+1. cast صریح در SQL: `SUM(...)::int` یا `::bigint`.
+2. تبدیلِ دفاعیِ جاوااسکریپت: `Number(row.some_agg_field)` قبلِ هر محاسبه‌ای.
+
+## ۹. خلاصه‌ی ممیزی ایندکس و کوئری
 
 - همه‌ی foreign keyها روی ستون‌های join شده ایندکس دارند.
 - ایندکس‌های ترکیبی با ترتیب درست (برابری قبل از range/sort): مثل

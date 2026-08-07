@@ -501,12 +501,56 @@ async function loadTables(){
   _tablesLoaded = true;
   return TABLES;
 }
-const GUESTS=[
+// ⚠️ رفعِ باگ (همان الگویِ RES): این آرایه قبلاً «const GUESTS» بود — یعنی
+// ویجتِ «مشتریانِ برتر» در داشبورد (overview.js: renderTopCustomers) و مودالِ
+// «تاریخچه‌ی مشتری» (viewCustomerHistory) همیشه همین ۴ مشتریِ نمونه را نشان
+// می‌دادند، برایِ هر رستورانِ واقعی. توجه: تبِ کاملِ «هوشِ مشتری»
+// (crm.js: rCustomers/custRenderOverviewDemo) از قبل درست بود — از
+// API.customers واقعی می‌خواند و custRenderOverviewDemo فقط در نبودِ توکن/
+// خطایِ API صدا زده می‌شود؛ فقط این دو مصرف‌کننده در overview.js اشتباه بودند.
+// GUESTS_DEMO فقط fallbackِ آفلاین است (هم‌الگو با RES_DEMO/WL_DEMO_QUEUE).
+const GUESTS_DEMO=[
   {name:'کیان موسوی',ava:'',seg:'vip',visits:18,last:'۳ روز پیش',spent:'۶.۲م',vip:95,ret:92,churn:8,phone:'۰۹۱۲۵۵۵۶۶۷۷',birthday:'۱۵ خرداد',points:3400},
   {name:'نیلوفر رضایی',ava:'',seg:'regular',visits:12,last:'امروز',spent:'۳.۸م',vip:62,ret:78,churn:20,phone:'۰۹۱۲۳۳۳۴۴۵۵',birthday:'۲ آبان',points:1900},
   {name:'امیر حسینی',ava:'',seg:'new',visits:3,last:'هفته پیش',spent:'۸۹۰ک',vip:30,ret:55,churn:45,phone:'۰۹۱۲۷۷۷۸۸۹۹',birthday:'۸ دی',points:300},
   {name:'مریم احمدی',ava:'',seg:'risk',visits:6,last:'۳۵ روز پیش',spent:'۱.۵م',vip:35,ret:30,churn:82},
 ];
+let GUESTS=GUESTS_DEMO.slice();
+let _guestsLoaded=false;
+/**
+ * ۵ مشتریِ برترِ رستوران (بر اساسِ تعدادِ بازدید) را از همان
+ * /restaurant/customers که تبِ «هوشِ مشتری» استفاده می‌کند می‌گیرد.
+ * نگاشتِ فیلدها: seg فقط برایِ نشانِ VIP لازم است (is_vip بولی، نه رشته‌ی
+ * سگمنتِ RFM که تاکسونومیِ جداگانه‌ای دارد). ret (٪بازگشت) از رویِ معکوسِ
+ * churn_risk_score تخمین زده می‌شود — نزدیک‌ترین معادلِ واقعیِ موجود.
+ * birthday/points عمداً ست نمی‌شوند (این API آن‌ها را ندارد؛ رندرِ شرطیِ
+ * موجود در viewCustomerHistory به‌جایِ نمایشِ مقدارِ ساختگی، مخفی می‌ماند).
+ * predicted_clv_toman فعلاً برایِ همه صفر است چون هیچ سیستمِ صندوق/پرداختی
+ * وصل نیست (رجوع کنید به REVENUE_CONFIG.connected=false در overview.js) —
+ * صفرِ واقعی را به‌جایِ «۰ تومان» با «—» نشان می‌دهیم تا «مشتریِ VIP با ۸
+ * بازدید ولی صفر تومان خرید» به‌نظر متناقض/اشتباه نرسد؛ این یعنی «هنوز
+ * دیتایِ خرید نداریم»، نه «صفر خرج کرده».
+ */
+async function loadTopGuestsForDashboard(){
+  if(!API.getToken()) return false;
+  const res=await API.customers('sort=visits&limit=5');
+  if(res.ok && Array.isArray(res.data?.items)){
+    GUESTS=res.data.items.map(c=>({
+      name:c.name, ava:'', seg:c.is_vip?'vip':'',
+      visits:c.total_visits||0,
+      spent:c.predicted_clv_toman>0?fmtMoney(c.predicted_clv_toman):'—',
+      phone:toFaDigits(c.phone||''),
+      // Math.min هم لازم است، نه فقط max: churn_risk_score تئوریاً باید ۰-۱۰۰
+      // باشد (رفعِ باگش در customer-insights.ts)، ولی این عددِ مشتق‌شده تا
+      // ۶۰ ثانیه کش می‌شود؛ کلمپِ دولایه یعنی حتی یک مقدارِ کهنه/منفی هم
+      // «۱۰۱٪ بازگشت» در UI نشان نمی‌دهد.
+      ret:c.churn_risk_score!=null?Math.min(100,Math.max(0,100-c.churn_risk_score)):0,
+    }));
+    _guestsLoaded=true;
+    return true;
+  }
+  return false;
+}
 // باشگاه مشتریان — دیتای واقعی و زنده
 let CLUB=[
   {fn:'کیان',ln:'موسوی',phone:'۰۹۱۲۵۵۵۶۶۷۷',code:'VIS-1001',tier:'gold',points:1240,bMonth:'خرداد',joined:'۳ ماه پیش'},
