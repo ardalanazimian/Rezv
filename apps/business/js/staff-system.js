@@ -401,7 +401,15 @@ function enterPanel(demo){
   rOverview();
   initLiveUpdates();
   if(API.getToken() && !demo){
-    loadTables().then(()=>{ if(document.getElementById('v-floor')?.classList.contains('active')) rFloor(); });
+    // ⚠️ رفعِ باگ: قبلاً فقط تبِ پلانِ سالن با اتمامِ loadTables دوباره رندر
+    // می‌شد. یعنی اگر کاربر در داشبورد می‌ماند (رایج‌ترین حالت بعد از لاگین)
+    // و loadTables دیرتر از renderEnterpriseDashboardِ اولیه تمام می‌شد،
+    // KPIِ «اشغال فعلی» تا رفرشِ زنده‌ی بعدی (تا ۱۵ ثانیه) روی «۰/۰» می‌ماند
+    // — نه به‌خاطرِ نبودِ میز، بلکه چون هنوز TABLES خالی بود.
+    loadTables().then(()=>{
+      if(document.getElementById('v-floor')?.classList.contains('active')) rFloor();
+      if(document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard();
+    });
     loadBranches();               // سوییچر شعبه را با داده‌ی واقعی پر کن
     Heartbeat.start();           // رستوران را در اپ مشتری آنلاین نگه می‌دارد
     Outbox.sync();               // اگر عملیات آفلاینِ در انتظار هست، همگام کن
