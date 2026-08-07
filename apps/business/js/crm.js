@@ -233,16 +233,31 @@ function openNameEditor(){
     <div class="modal-sub">نام نمایشی توی اپ مشتری و پنل</div>
     <div class="field-label">نام رستوران</div>
     <input class="inp" id="restName" value="${esc(RESTAURANT.name)}" placeholder="نام رستوران">
-    <button class="btn btn-primary btn-lg btn-block" onclick="saveRestName()">ذخیره</button>
+    <button class="btn btn-primary btn-lg btn-block" id="saveRestNameBtn" onclick="saveRestName()">ذخیره</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>`);
   setTimeout(()=>document.getElementById('restName')?.focus(),150);
 }
-function saveRestName(){
-  const n=document.getElementById('restName').value.trim();
+// ⚠️ رفعِ باگ: قبلاً این تابع فقط RESTAURANT.name (متغیرِ محلیِ جاوااسکریپت) را
+// عوض می‌کرد — هیچ درخواستی به سرور نمی‌رفت. یعنی «ذخیره شد» به رستوران‌دار
+// نشان داده می‌شد، ولی با اولین رفرش (یا از دستگاه/شعبه‌ی دیگر) نامِ قبلی
+// برمی‌گشت، چون هیچ‌جا واقعاً ثبت نشده بود. حالا از GET/PUT /restaurant/profile
+// واقعی استفاده می‌کند (مثلِ الگویِ hoursSave/pricing).
+async function saveRestName(){
+  const input=document.getElementById('restName');
+  const n=input.value.trim();
   if(!n){toast('','نام رو وارد کن');return}
-  RESTAURANT.name=n;
+  if(n===RESTAURANT.name){closeModal();return}
+  const btn=document.getElementById('saveRestNameBtn');
+  if(btn){btn.disabled=true;btn.textContent='در حال ذخیره…';}
+  const res=await API.profileSave({name:n});
+  if(!res.ok){
+    toast('',res.error?.message||'ذخیره نشد — دوباره امتحان کن');
+    if(btn){btn.disabled=false;btn.textContent='ذخیره';}
+    return;
+  }
+  RESTAURANT.name=res.data.name;
   const swName=document.getElementById('swName');
-  if(swName)swName.textContent=n; // به‌روزرسانی زنده‌ی سایدبار
+  if(swName)swName.textContent=res.data.name; // به‌روزرسانی زنده‌ی سایدبار
   closeModal();profRenderGallery();
   toast('','نام رستوران به‌روز شد');
 }

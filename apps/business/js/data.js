@@ -252,6 +252,8 @@ const API = {
   // ── چندشعبه‌ای: لیست شعبه‌ها + ساخت شعبه‌ی جدید ──
   branchesList(){ return this.get('/restaurant/branches'); },
   branchCreate(body){ return this.post('/restaurant/branches', body); },
+  // ── هویتِ رستوران: نام (وصل به GET/PUT /restaurant/profile واقعی) ──
+  profileSave(body){ return this.request('/restaurant/profile', { method:'PUT', body: JSON.stringify(body||{}) }); },
 };
 
 // ═══════════════════════════════════════════════════════════
