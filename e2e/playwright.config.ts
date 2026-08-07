@@ -15,6 +15,12 @@ import { defineConfig, devices } from '@playwright/test';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8080';
 
+// راهِ گریزِ اختیاری برای محیط‌هایی که مرورگرِ از پیش‌نصب دارند ولی نسخه‌اش با
+// بیلدِ موردِ انتظارِ @playwright/test یکی نیست (مثلِ سندباکسِ توسعه، جایی که
+// `playwright install` مجاز/ممکن نیست). در CI تنظیم نمی‌شود و رفتار عوض نمی‌شود.
+const CHROMIUM = process.env.PW_CHROMIUM_PATH;
+const chromiumLaunch = CHROMIUM ? { launchOptions: { executablePath: CHROMIUM } } : {};
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
@@ -45,11 +51,11 @@ export default defineConfig({
     },
     {
       name: 'mobile-chrome',             // اندروید
-      use: { ...devices['Pixel 5'] },
+      use: { ...devices['Pixel 5'], ...chromiumLaunch },
     },
     {
       name: 'desktop-chrome',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], ...chromiumLaunch },
     },
   ],
 

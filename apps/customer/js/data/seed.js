@@ -58,6 +58,32 @@ export function saveFavs(){ try{ localStorage.setItem('rz_favs', JSON.stringify(
 export function setPts(v){ pts=v; }
 export function setCurRest(v){ curRest=v; }
 export function setBk(v){ bk=v; }
+
+// ═══════════════════════════════════════════════════════════
+//  زمینه‌ی رزرو — تاریخ و تعدادِ نفر، مشترک بینِ همه‌ی صفحه‌ها
+//
+//  چرا وجود دارد: کاربر تاریخ و تعداد را یک‌بار می‌گوید و بعد چند رستوران را
+//  مقایسه می‌کند. پیش از این هر بار که وارد رستورانِ بعدی می‌شد، شیتِ رزرو به
+//  «امروز / ۲ نفر» برمی‌گشت و باید دوباره واردشان می‌کرد (اندازه‌گیری شد).
+//
+//  در sessionStorage است نه localStorage: تاریخِ رزرو به همان نشستِ مرور تعلق
+//  دارد؛ باز کردنِ اپ در فردا نباید تاریخِ دیروز را پیشنهاد بدهد.
+// ═══════════════════════════════════════════════════════════
+const CTX_KEY = 'rz_booking_ctx';
+export const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+export let bookingCtx = { date: todayISO(), party: 2 };
+try{
+  const s = JSON.parse(sessionStorage.getItem(CTX_KEY)||'null');
+  // تاریخِ گذشته پذیرفته نمی‌شود — نشست ممکن است از نیمه‌شب رد شده باشد
+  if (s && typeof s.date === 'string' && s.date >= todayISO() && Number.isInteger(s.party)) bookingCtx = s;
+}catch{}
+export function setBookingCtx(patch){
+  bookingCtx = { ...bookingCtx, ...patch };
+  try{ sessionStorage.setItem(CTX_KEY, JSON.stringify(bookingCtx)); }catch{}
+}
 export const TRIPS=[
   {rid:1,date:'پنجشنبه ۱۵ خرداد',time:'۲۰:۰۰',party:'۲ نفر',code:'RZ8K2M',status:'up'},
   {rid:3,date:'۲۸ اردیبهشت',time:'۱۳:۰۰',party:'۴ نفر',code:'RZ4A1C',status:'done'},

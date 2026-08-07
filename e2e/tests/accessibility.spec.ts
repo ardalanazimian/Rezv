@@ -43,10 +43,26 @@ test('toast ناحیه‌ی زنده (aria-live) برای screen reader دارد
   await expect(page.locator('#toast')).toHaveAttribute('aria-live', /polite|assertive/);
 });
 
-test('کارت‌های رستوران با کیبورد قابلِ فوکوس‌اند', async ({ page }) => {
+// این تست پیش از این روی «.rc[role=button]» بود که هرگز وجود نداشت، پس شرطِ
+// isVisible همیشه رد می‌شد و تست بی‌صدا سبز می‌ماند. اندازه‌گیریِ واقعی نشان داد
+// کارت و چیپ‌های ساعت اصلاً فوکوس‌پذیر نیستند — یعنی رزرو با کیبورد ناممکن بود.
+test('کارت رستوران و چیپ‌های ساعت با کیبورد قابلِ استفاده‌اند', async ({ page }) => {
   await gotoApp(page);
-  const card = page.locator('.rc[role="button"]').first();
-  if (await card.isVisible().catch(() => false)) {
-    await expect(card).toHaveAttribute('tabindex', '0');
-  }
+
+  const open = page.locator('.rc .rc-open').first();
+  await expect(open).toBeVisible();
+  await open.focus();
+  await expect(open).toBeFocused();
+  // نامِ رستوران باید در نامِ دسترس‌پذیر باشد، وگرنه صفحه‌خوان فقط «دکمه» می‌گوید
+  await expect(open).toHaveAttribute('aria-label', /\S/);
+
+  // چیپِ ساعت باید دکمه‌ی واقعی باشد (نه span با onclick) و نامش ساعت را بگوید
+  const slot = page.locator('.rc .rc-slot').first();
+  await expect(slot).toBeVisible();
+  expect(await slot.evaluate((n) => n.tagName)).toBe('BUTTON');
+  await expect(slot).toHaveAttribute('aria-label', /\d|[۰-۹]/);
+
+  // Enter روی کارت باید صفحه‌ی رستوران را باز کند
+  await open.press('Enter');
+  await expect(page.locator('#page-rest')).toBeVisible();
 });

@@ -41,3 +41,28 @@ export const ACTIVE_STATUSES_SQL = ACTIVE_RESERVATION_STATUSES.map((s) => `'${s}
 export function activeStatusList(): string[] {
   return [...ACTIVE_RESERVATION_STATUSES];
 }
+
+/**
+ * وضعیت‌هایی که یعنی مهمان واقعاً آمده است.
+ *
+ * جدا از ACTIVE_* است و عمداً کوچک‌تر: آن مجموعه «میز را اشغال می‌کند» را
+ * جواب می‌دهد و pending و confirmed را هم دارد — رزروهایی که هنوز اتفاق
+ * نیفتاده‌اند. برای سیگنالِ اجتماعی («این هفته چند نفر اینجا بودند») شمردنِ
+ * آن‌ها یعنی بزرگ‌نماییِ عدد. no_show و expired و rejected هم به‌همین دلیل
+ * بیرون‌اند.
+ *
+ * arrived و checked_in هم بیرون‌اند: رسیدن هنوز نشستن نیست و اگر مهمان
+ * برگردد، حضور کامل نبوده.
+ */
+export const VISITED_RESERVATION_STATUSES = [
+  'seated',
+  'dining',
+  'completed',
+] as const;
+
+export type VisitedReservationStatus = (typeof VISITED_RESERVATION_STATUSES)[number];
+
+/** آرایه‌ی قابل‌استفاده در Prisma `status: { in: [...] }`. */
+export function visitedStatusList(): string[] {
+  return [...VISITED_RESERVATION_STATUSES];
+}

@@ -139,6 +139,8 @@ model Restaurant {
   webhooks         Webhook[]
   smsTransactions  SmsTransaction[]
   closures         RestaurantClosure[]
+  noShowModel      RestaurantNoShowModel?
+  demandForecast   RestaurantDemandForecast?
   @@index([tenantId])
   @@index([city], map: "idx_restaurants_city")
   chatThreads  ChatThread[]
@@ -556,6 +558,59 @@ enum CustomerSegment {
   churned           // مدت طولانی غیبت (بر اساس میانگین فاصله‌ی بازدید رستوران)
   vip               // بالاترین دهک CLV این رستوران
   @@map("customer_segment")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  یادگیریِ ریسکِ no-show — کالیبراسیونِ per-restaurant، نه یک فرمولِ سراسری
+//
+//  computeStaticNoShowRisk (در lib/customer-insights.ts) یک heuristic با
+//  ضرایبِ دستی‌ست: همان اعداد برای رستورانِ لوکسِ رزرو-با-هفته‌ها-قبل و
+//  فست‌فودِ walk-in-محور. این جدول نتیجه‌ی یادگیریِ واقعی از تاریخچه‌ی خودِ
+//  هر رستوران را نگه می‌دارد — رگرسیونِ لجستیکِ ساده (بدونِ نیاز به
+//  زیرساختِ ML)، شبانه با cronِ موجودِ customer-insights بازآموزی می‌شود.
+//
+//  isActive عمداً پیش‌فرضش false است: مدلِ یادگرفته فقط وقتی جایگزینِ
+//  heuristic می‌شود که روی دادهٔ نگه‌داشته‌شده (held-out، از نظرِ زمانی
+//  بعد از دادهٔ آموزش) واقعاً از آن بهتر عمل کند. اگر داده کم باشد یا
+//  یادگیری بهتر از heuristic نباشد، سیستم بی‌صدا به heuristic برمی‌گردد —
+//  هیچ‌وقت نباید مدلی که بدتر از قانونِ دستی‌ست فعال بماند.
+// ───────────────────────────────────────────────────────────────────────
+model RestaurantNoShowModel {
+  restaurantId  String     @id @map("restaurant_id") @db.Uuid
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  // ترتیب: [بایاس، دارد‌سابقه، نرخِ‌no-showِ‌قبلی، last-minute، خیلی‌زودهنگام، گروهِ‌بزرگ، منبع‌تلفن]
+  // — دقیقاً با NO_SHOW_FEATURE_NAMES در lib/no-show-model.ts هم‌ترازی دارد.
+  weights       Float[]    @map("weights")
+  sampleSize    Int        @map("sample_size")
+  positiveCount Int        @map("positive_count")       // چند no-show واقعی در دادهٔ آموزش
+  learnedBrier  Float      @map("learned_brier")         // پایین‌تر = بهتر (۰..۱)
+  staticBrier   Float      @map("static_brier")          // همان معیار برای heuristicِ فعلی، روی همان holdout
+  isActive      Boolean    @default(false) @map("is_active")
+  trainedAt     DateTime   @default(now()) @map("trained_at")
+  @@map("restaurant_no_show_models")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  پیش‌بینیِ تقاضا — شبیه‌سازیِ روزهای آینده از رویِ تاریخچه‌ی خودِ رستوران
+//
+//  همان انضباطِ RestaurantNoShowModel، این‌بار برایِ رگرسیونِ سری‌زمانی:
+//  Holt-Winters جمعی (level+trend+فصلیِ هفتگی) به‌جایِ رگرسیونِ لجستیک.
+//  جزئیاتِ کامل در lib/demand-forecast.ts.
+//
+//  countModel/coversModel هرکدام یک SeriesModelState سریالایزشده‌اند:
+//  { model: {level, trend, seasonal[7], period, phaseOffset}, mae,
+//    baselineMae, isActive, reason, lastValues[7] } — کاملاً شفاف و
+//  قابلِ‌بازرسی (JSONB)، نه یک black-box. isActive هم مثلِ no-show model
+//  پیش‌فرضش false است: فقط با بهبودِ واقعی روی هولدآوت true می‌شود.
+// ───────────────────────────────────────────────────────────────────────
+model RestaurantDemandForecast {
+  restaurantId String     @id @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  historyDays  Int        @map("history_days") // چند روزِ تاریخچه در آخرین آموزش استفاده شد
+  countModel   Json       @map("count_model")  // SeriesModelState برایِ «تعدادِ رزرو در روز»
+  coversModel  Json       @map("covers_model") // SeriesModelState برایِ «مجموعِ کاورها در روز»
+  trainedAt    DateTime   @default(now()) @map("trained_at")
+  @@map("restaurant_demand_forecasts")
 }
 
 model CustomerInsight {
