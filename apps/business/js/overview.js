@@ -10,6 +10,12 @@ function rOverview(){
   if(!_guestsLoaded && API.getToken()){
     loadTopGuestsForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
   }
+  if(!_weekdayInsightLoaded && API.getToken()){
+    loadWeekdayInsightForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
+  if(!_heatmapLoaded && API.getToken()){
+    loadHeatmapForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
   // ═══════════ داشبورد Enterprise — مرکز فرماندهی ═══════════
   renderEnterpriseDashboard();
 }
@@ -267,17 +273,34 @@ function renderPeakChart(){
 }
 
 // ── Heatmap هفتگی (روز × بازه‌ی زمانی) ──
+// بازه‌بندیِ ساعت: هم‌راستا با قواعدِ pricing.ts (ناهار ۱۲-۱۵، شب از ۱۹ به بعد).
+function slotOfHour(h){ if(h>=19||h<=5) return 2; if(h>=15&&h<=18) return 1; return 0; } // 0=ظهر 1=عصر 2=شب
 function renderHeatmap(){
-  const days=['ش','ی','د','س','چ','پ','ج'];
+  const days=['ش','ی','د','س','چ','پ','ج']; // ترتیبِ نمایش: هفته‌ی ایرانی (شنبه..جمعه)
+  const dowForDay=[6,0,1,2,3,4,5]; // dowِ واقعیِ Postgres برایِ هرکدام از days بالا (0=یکشنبه..6=شنبه)
   const slots=['ظهر','عصر','شب'];
-  // داده‌ی نمونه‌ی واقع‌گرایانه (شدت ۰-۴) — آخر هفته شب شلوغ‌تر
-  const data=[
-    [1,2,3],[1,2,3],[1,1,2],[2,2,3],[2,3,4],[3,4,4],[3,4,4]
-  ];
+  // ⚠️ رفعِ باگ: قبلاً اینجا یک جدولِ ۷×۳ کاملاً هاردکد بود («آخر هفته شب
+  // شلوغ‌تر») که عیناً برایِ هر رستوران نشان داده می‌شد، حتی اگر الگویِ
+  // واقعی‌اش کاملاً برعکس بود. حالا از HEATMAP_DATA واقعی (data.js:
+  // loadHeatmapForDashboard ← /restaurant/analytics) پر می‌شود؛ تا وقتی
+  // نیامده یا رستوران هنوز رزروِ کافی ندارد، جدول صفر (خالی) می‌ماند —
+  // صفرِ واقعی به‌مراتب صادقانه‌تر از یک الگویِ ساختگیِ محتمل است.
+  const grid=days.map(()=>[0,0,0]);
+  (HEATMAP_DATA||[]).forEach(c=>{
+    const di=dowForDay.indexOf(c.dow);
+    if(di<0) return;
+    grid[di][slotOfHour(c.hour)]+=(c.count||0);
+  });
+  let max=1;
+  grid.forEach(row=>row.forEach(v=>{ if(v>max) max=v; }));
   let html='<div class="hm-grid"><div class="hm-corner"></div>'+slots.map(s=>`<div class="hm-slot-lbl">${s}</div>`).join('');
   days.forEach((d,di)=>{
     html+=`<div class="hm-day-lbl">${d}</div>`;
-    slots.forEach((s,si)=>{ html+=`<div class="hm-cell hm-${data[di][si]}" title="${d} ${s}"></div>`; });
+    slots.forEach((s,si)=>{
+      const v=grid[di][si];
+      const lvl=v?Math.min(4,Math.ceil((v/max)*4)):0;
+      html+=`<div class="hm-cell hm-${lvl}" title="${d} ${s}: ${fa(v)} رزرو"></div>`;
+    });
   });
   html+='</div><div class="hm-legend"><span>کم</span><div class="hm-scale"><i class="hm-0"></i><i class="hm-1"></i><i class="hm-2"></i><i class="hm-3"></i><i class="hm-4"></i></div><span>زیاد</span></div>';
   document.getElementById('heatmap').innerHTML=html;
@@ -305,7 +328,11 @@ function renderInsights(){
   if(k.expectedCount>3) insights.push({ic:'clock',t:`${fa(k.expectedCount)} مهمان در راه`,d:'میزها را برای ورودشان آماده کن',c:'info'});
   const vipToday=RES.filter(r=>r.date==='today'&&r.seg==='vip').length;
   if(vipToday>0) insights.push({ic:'star',t:`${fa(vipToday)} مهمان VIP امروز`,d:'برخورد ویژه را فراموش نکن',c:'vip'});
-  insights.push({ic:'trending',t:'جمعه شب پرترددترین زمان توست',d:'کارکنان بیشتری برنامه‌ریزی کن',c:'info'});
+  // ⚠️ رفعِ باگ: قبلاً اینجا همیشه «جمعه شب پرترددترین زمان توست» هاردکد
+  // نشان داده می‌شد. WEEKDAY_INSIGHT از پاسخِ واقعیِ AI Restaurant Manager
+  // پر می‌شود (data.js: loadWeekdayInsightForDashboard)؛ اگر داده کافی
+  // نباشد null می‌ماند و این کارت به‌جایِ ادعایِ ساختگی، اصلاً نشان داده نمی‌شود.
+  if(WEEKDAY_INSIGHT) insights.push({ic:'trending',t:WEEKDAY_INSIGHT.t,d:WEEKDAY_INSIGHT.d,c:'info'});
   document.getElementById('insights').innerHTML=insights.slice(0,4).map(i=>`
     <div class="insight insight-${i.c}"><span class="insight-ic">${icon(i.ic,{size:16})}</span>
       <div><div class="insight-t">${i.t}</div><div class="insight-d">${i.d}</div></div></div>`).join('');

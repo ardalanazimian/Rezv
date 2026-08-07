@@ -254,6 +254,12 @@ const API = {
   branchCreate(body){ return this.post('/restaurant/branches', body); },
   // ── هویتِ رستوران: نام (وصل به GET/PUT /restaurant/profile واقعی) ──
   profileSave(body){ return this.request('/restaurant/profile', { method:'PUT', body: JSON.stringify(body||{}) }); },
+  // ── فعالیتِ اخیر برایِ زنگوله‌یِ اعلان (وصل به /restaurant/notifications واقعی) ──
+  recentActivity(){ return this.get('/restaurant/notifications'); },
+  // ── مدیرِ هوشمندِ رستوران: پرسش‌وپاسخِ مستندِ Finding/Evidence/Confidence ──
+  managerInsights(){ return this.get('/restaurant/manager-insights'); },
+  // ── آمار رفتار مشتری + نقشه‌ی حرارتیِ شلوغی (روز×ساعت، همان دیتایِ تبِ آنالیتیکس) ──
+  analytics(){ return this.get('/restaurant/analytics'); },
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -547,6 +553,44 @@ async function loadTopGuestsForDashboard(){
       ret:c.churn_risk_score!=null?Math.min(100,Math.max(0,100-c.churn_risk_score)):0,
     }));
     _guestsLoaded=true;
+    return true;
+  }
+  return false;
+}
+// ⚠️ رفعِ باگ (یافته‌ی سوم از همان دسته‌یِ RES/GUESTS/NOTIFS): renderInsights
+// (overview.js) یک بینشِ هاردکد داشت: «جمعه شب پرترددترین زمان توست» — عیناً
+// برایِ هر رستوران نشان داده می‌شد، حتی اگر روزِ شلوغِ واقعی‌اش چیزِ دیگری
+// بود. اینجا همان تحلیلِ واقعیِ AI Restaurant Manager (manager-insights →
+// پاسخِ strongest_weekdays) را می‌خوانیم؛ اگر داده کم باشد (کمتر از ۵ روزِ
+// متمایز یا کمتر از ۳۰ رزرو در ۶۰ روزِ اخیر) آن پاسخ اصلاً برنمی‌گردد و ما
+// هم بینش را نشان نمی‌دهیم — نه یک ادعایِ ساختگی.
+let WEEKDAY_INSIGHT=null;
+let _weekdayInsightLoaded=false;
+async function loadWeekdayInsightForDashboard(){
+  if(!API.getToken()) return false;
+  const res=await API.managerInsights();
+  if(res.ok && Array.isArray(res.data?.answers)){
+    const a=res.data.answers.find(x=>x.id==='strongest_weekdays');
+    WEEKDAY_INSIGHT=a?{t:a.finding, d:a.recommended_action||'کارکنان بیشتری برای این روزها برنامه‌ریزی کن'}:null;
+    _weekdayInsightLoaded=true;
+    return true;
+  }
+  return false;
+}
+// ⚠️ رفعِ باگ: نقشه‌ی حرارتیِ هفتگی در renderHeatmap (overview.js) یک
+// جدولِ ۷×۳ کاملاً هاردکد بود («آخر هفته شب شلوغ‌تر») بدونِ هیچ مسیری به
+// دیتایِ واقعی — برخلافِ RES/GUESTS که حداقل fallback بودند، این یکی هرگز
+// جایگزین نمی‌شد. همان heatmap واقعیِ /restaurant/analytics (که تبِ
+// مارکتینگ/آنالیتیکس هم می‌خواند) را می‌گیریم و در renderHeatmap بر اساسِ
+// ساعت به ۳ بازه‌ی ظهر/عصر/شب دسته‌بندی می‌کنیم.
+let HEATMAP_DATA=null;
+let _heatmapLoaded=false;
+async function loadHeatmapForDashboard(){
+  if(!API.getToken()) return false;
+  const res=await API.analytics();
+  if(res.ok && Array.isArray(res.data?.heatmap)){
+    HEATMAP_DATA=res.data.heatmap; // [{dow,hour,count}] — dow: 0=یکشنبه..6=شنبه (Postgres DOW)
+    _heatmapLoaded=true;
     return true;
   }
   return false;

@@ -122,12 +122,30 @@ let tt;
 function toast(icon,msg){document.getElementById('toastIcon').textContent=icon;document.getElementById('toastMsg').textContent=msg;const t=document.getElementById('toast');t.classList.add('show');t.classList.remove('toast-enter');void t.offsetWidth;t.classList.add('toast-enter');const live=document.getElementById('a11y-live');if(live)live.textContent=msg;clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400)}
 
 // ═══════════ NOTIFICATIONS ═══════════
-let NOTIFS=[
+// ⚠️ رفعِ باگ (همان الگویِ RES/GUESTS): این ۴ آیتم قبلاً هاردکد بودند —
+// «پارسا تهرانی رزرو کرد»، «نیلوفر رضایی ۵ ستاره داد»، … — برایِ هر
+// رستورانِ واقعی، همیشه همین‌ها. NOTIFS_DEMO فقط fallbackِ آفلاین است
+// (هم‌الگو با WL_DEMO_QUEUE/RES_DEMO/GUESTS_DEMO)؛ NOTIFS با
+// loadNotifications از /restaurant/notifications واقعی پر می‌شود.
+const NOTIFS_DEMO=[
   {ic:'green',emoji:'checkCircle',title:'رزرو جدید',text:'پارسا تهرانی برای امشب ساعت ۲۱:۳۰ میز رزرو کرد',time:'۲ دقیقه پیش',unread:true},
   {ic:'amber',emoji:'alert',title:'هشدار ریزش',text:'مریم احمدی ۳۵ روزه نیومده — ریسک ریزش ۸۲٪',time:'۱ ساعت پیش',unread:true},
   {ic:'blue',emoji:'star',title:'نظر جدید',text:'نیلوفر رضایی ۵ ستاره داد: «عالی بود، حتماً برمی‌گردم»',time:'۳ ساعت پیش',unread:true},
   {ic:'green',emoji:'refresh',title:'مشتری بازگشتی',text:'نیلوفر رضایی بعد از ۲ هفته دوباره رزرو کرد',time:'دیروز',unread:false},
 ];
+let NOTIFS=NOTIFS_DEMO.slice();
+let _notifsLoaded=false;
+/** فعالیتِ اخیرِ واقعی را می‌گیرد و NOTIFS را جایگزین می‌کند (خالی اگر فعالیتی نبود). */
+async function loadNotifications(){
+  if(!API.getToken()) return false;
+  const res=await API.recentActivity();
+  if(res.ok && Array.isArray(res.data?.items)){
+    NOTIFS=res.data.items.map(n=>({ic:n.ic, emoji:n.emoji, title:n.title, text:n.text, time:faRelative(n.at), unread:false}));
+    _notifsLoaded=true;
+    return true;
+  }
+  return false;
+}
 function renderNotifList(){
   const el=document.getElementById('notifList');
   const unread=NOTIFS.filter(n=>n.unread).length;
@@ -398,6 +416,7 @@ function enterPanel(demo){
   // منو را با مجوزهای واقعیِ کاربر هم‌راستا کن — قبل از رندرِ هر صفحه.
   if (typeof applyPermissionsToNav === 'function') applyPermissionsToNav();
   renderNotifList();
+  if(!_notifsLoaded && API.getToken() && !demo){ loadNotifications().then(ok=>{ if(ok) renderNotifList(); }); }
   rOverview();
   initLiveUpdates();
   if(API.getToken() && !demo){
