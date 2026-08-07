@@ -1,6 +1,10 @@
 import { db } from './db';
 import { cached, cacheKey, invalidate } from './cache';
 import { computeStaticScoreFromFeatures, type RawFeatureInput } from './customer-insights';
+import {
+  sigmoid, trainLogisticRegression, predictProba, brierScore, decideModelActivation,
+  type ActivationDecision,
+} from './ml-core';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  یادگیریِ ریسکِ no-show — کالیبراسیونِ واقعی، نه یک عدد ثابت برای همیشه
@@ -14,6 +18,11 @@ import { computeStaticScoreFromFeatures, type RawFeatureInput } from './customer
 //  اینجا یک رگرسیونِ لجستیکِ ساده (gradient descent، بدونِ کتابخانه‌ی ML)
 //  شبانه روی تاریخچه‌ی خودِ هر رستوران آموزش می‌بیند. کاملاً شفاف است — فقط
 //  چند عدد (weight) که می‌شود نشانشان داد، نه یک مدلِ black-box.
+//
+//  ریاضیاتِ خالص (sigmoid، gradient descent، Brier، قاعده‌ی ایمنیِ فعال‌سازی)
+//  در lib/ml-core.ts است — این‌جا فقط دوباره export می‌شوند تا کدِ موجود
+//  (تست‌ها، customer-insights.ts) نشکند. هرچه اینجا مانده مخصوصِ no-show
+//  است: بردارِ ویژگی، آستانه‌های ایمنی، و کوئریِ آموزش از دیتابیس.
 //
 //  قاعده‌ی ایمنی: مدلِ یادگرفته فقط وقتی جایگزینِ heuristic می‌شود که روی
 //  دادهٔ نگه‌داشته‌شده (زمانی بعد از دادهٔ آموزش — نه split تصادفی، که برای
@@ -58,86 +67,16 @@ export function buildFeatureVector(input: RawFeatureInput): number[] {
   ];
 }
 
-// ── ریاضیاتِ خالص — بدونِ هیچ وابستگی به دیتابیس، مستقیماً قابلِ تست ──
-
-export function sigmoid(z: number): number {
-  // حفاظ در برابرِ overflow برای |z| خیلی بزرگ (exp(710) بی‌نهایت می‌شود)
-  if (z >= 40) return 1;
-  if (z <= -40) return 0;
-  return 1 / (1 + Math.exp(-z));
-}
-
-function dot(a: readonly number[], b: readonly number[]): number {
-  let s = 0;
-  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
-  return s;
-}
-
-export interface TrainOptions {
-  learningRate?: number;
-  iterations?: number;
-  l2?: number; // regularization — بایاس (اندیسِ ۰) هرگز regularize نمی‌شود
-}
-
-/**
- * رگرسیونِ لجستیک با batch gradient descent. پیاده‌سازیِ دستی و ساده است چون
- * ابعاد کم است (۷ ویژگی) و دیتاست کوچک (چند صد ردیف) — کتابخانه‌ی ML برای
- * این مقیاس توجیهی ندارد و یک وابستگیِ سنگین اضافه می‌کرد.
- */
-export function trainLogisticRegression(
-  X: readonly (readonly number[])[],
-  y: readonly number[],
-  opts: TrainOptions = {},
-): number[] {
-  const { learningRate = 0.3, iterations = 800, l2 = 0.02 } = opts;
-  const n = X.length;
-  if (n === 0) throw new Error('trainLogisticRegression: دیتاست خالی است');
-  const d = X[0].length;
-  const w = new Array(d).fill(0);
-
-  for (let it = 0; it < iterations; it++) {
-    const grad = new Array(d).fill(0);
-    for (let i = 0; i < n; i++) {
-      const p = sigmoid(dot(w, X[i]));
-      const err = p - y[i];
-      for (let j = 0; j < d; j++) grad[j] += err * X[i][j];
-    }
-    for (let j = 0; j < d; j++) {
-      const reg = j === 0 ? 0 : l2 * w[j];
-      w[j] -= (learningRate / n) * (grad[j] + reg);
-    }
-  }
-  return w;
-}
-
-/** پیش‌بینیِ احتمال (۰..۱) با وزن‌های داده‌شده. */
-export function predictProba(weights: readonly number[], x: readonly number[]): number {
-  return sigmoid(dot(weights, x));
-}
-
-/**
- * Brier score: میانگینِ (احتمالِ پیش‌بینی‌شده − برچسبِ واقعی)². پایین‌تر بهتر
- * است. برخلافِ accuracy، اعتمادبه‌نفسِ نادرست را هم جریمه می‌کند (پیش‌بینیِ
- * ۹۹٪ برای چیزی که اتفاق نمی‌افتد بدتر از ۶۰٪ است) — برای مقایسه‌ی دو مدلِ
- * احتمالاتی معیارِ درست‌تری از accuracy خام است، مخصوصاً وقتی کلاس‌ها
- * نامتوازن‌اند (no-show معمولاً اقلیت است).
- */
-export function brierScore(predictions: readonly number[], labels: readonly number[]): number {
-  if (predictions.length === 0) return 1; // بدترینِ ممکن — نباید در عمل رخ دهد
-  let sum = 0;
-  for (let i = 0; i < predictions.length; i++) sum += (predictions[i] - labels[i]) ** 2;
-  return sum / predictions.length;
-}
+// ── ریاضیاتِ خالصِ عمومی از lib/ml-core.ts — این‌جا re-export می‌شود تا
+//    importهای موجود (تست‌ها، customer-insights.ts) بدونِ تغییر کار کنند. ──
+export { sigmoid, trainLogisticRegression, predictProba, brierScore };
 
 export interface TrainingExample {
   features: RawFeatureInput;
   label: 0 | 1; // 1 = no_show
 }
 
-export interface ActivationDecision {
-  isActive: boolean;
-  reason: string;
-}
+export type { ActivationDecision };
 
 const MIN_SAMPLE_SIZE = 40;
 const MIN_POSITIVE_COUNT = 5;
@@ -145,7 +84,13 @@ const MIN_POSITIVE_COUNT = 5;
  *  نباید هر شب heuristic را با یک مدلِ تصادفاً کمی بهتر عوض کند. */
 const MIN_RELATIVE_IMPROVEMENT = 0.05;
 
-/** آیا مدلِ یادگرفته باید جایگزینِ heuristic شود؟ منطقِ خالص، بدونِ DB — مستقیماً تست‌پذیر. */
+/**
+ * آیا مدلِ یادگرفته باید جایگزینِ heuristic شود؟ منطقِ خالص، بدونِ DB —
+ * مستقیماً تست‌پذیر. قاعده‌ی ایمنیِ عمومی در decideModelActivation
+ * (lib/ml-core.ts) پیاده شده؛ اینجا فقط آستانه‌های مخصوصِ no-show
+ * (MIN_SAMPLE_SIZE/MIN_POSITIVE_COUNT/MIN_RELATIVE_IMPROVEMENT) و گیتِ
+ * اضافیِ «تعدادِ no-show کافی» را روی آن پیاده می‌کنیم.
+ */
 export function decideActivation(params: {
   sampleSize: number;
   positiveCount: number;
@@ -153,20 +98,17 @@ export function decideActivation(params: {
   staticBrier: number;
 }): ActivationDecision {
   const { sampleSize, positiveCount, learnedBrier, staticBrier } = params;
-  if (sampleSize < MIN_SAMPLE_SIZE) {
-    return { isActive: false, reason: `دادهٔ کافی نیست (${sampleSize} < ${MIN_SAMPLE_SIZE})` };
-  }
-  if (positiveCount < MIN_POSITIVE_COUNT) {
-    return { isActive: false, reason: `تعدادِ no-show برای یادگیری کم است (${positiveCount} < ${MIN_POSITIVE_COUNT})` };
-  }
-  if (staticBrier <= 0) {
-    return { isActive: false, reason: 'baseline نامعتبر' };
-  }
-  const improvement = (staticBrier - learnedBrier) / staticBrier;
-  if (improvement < MIN_RELATIVE_IMPROVEMENT) {
-    return { isActive: false, reason: `بهبود کافی نیست (${(improvement * 100).toFixed(1)}٪ < ${MIN_RELATIVE_IMPROVEMENT * 100}٪)` };
-  }
-  return { isActive: true, reason: `${(improvement * 100).toFixed(1)}٪ دقیق‌تر از heuristic روی هولدآوت` };
+  return decideModelActivation({
+    sampleSize,
+    minSampleSize: MIN_SAMPLE_SIZE,
+    learnedError: learnedBrier,
+    baselineError: staticBrier,
+    minRelativeImprovement: MIN_RELATIVE_IMPROVEMENT,
+    baselineLabel: 'heuristic',
+    extraGate: positiveCount < MIN_POSITIVE_COUNT
+      ? { ok: false, reason: `تعدادِ no-show برای یادگیری کم است (${positiveCount} < ${MIN_POSITIVE_COUNT})` }
+      : { ok: true, reason: '' },
+  });
 }
 
 /** ساختِ X,y از فهرستی از مثال‌ها — کمکیِ خالص برای تست و برای trainAndCalibrate. */

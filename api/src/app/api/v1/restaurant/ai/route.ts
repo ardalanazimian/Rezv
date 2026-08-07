@@ -4,6 +4,7 @@ import { cached, cacheKey } from '@/lib/cache';
 import { sinceDays } from '@/lib/staff-helpers';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { NO_SHOW_FEATURE_NAMES } from '@/lib/no-show-model';
+import { getDemandForecast } from '@/lib/demand-forecast';
 
 // ═══════════════════════════════════════════════════════════
 //  GET /restaurant/ai/recommendations
@@ -117,5 +118,12 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
       }
     : { active: false, sample_size: 0, no_show_count_in_sample: 0, accuracy_vs_default_pct: 0, trained_at: null, weights: null };
 
-  return NextResponse.json({ cards, no_show_model: noShowModelStatus });
+  // ── پیش‌بینیِ تقاضا — «۱۴ روزِ آینده چقدر تقاضا داریم؟» ──
+  // null یعنی هنوز تاریخچه‌ی کافی برایِ حتی یک تلاشِ آموزش نبوده (رستورانِ
+  // تازه). وگرنه همیشه یک پیش‌بینی برمی‌گردد — یا از مدلِ یادگرفته
+  // (source:'learned'، وقتی واقعاً از baseline بهتر بوده) یا از پیش‌بینیِ
+  // فصلیِ ساده (source:'naive'، شفاف برچسب‌خورده، نه ادعای کاذبِ AI).
+  const demandForecast = await getDemandForecast(restaurant.id, 14);
+
+  return NextResponse.json({ cards, no_show_model: noShowModelStatus, demand_forecast: demandForecast });
 });

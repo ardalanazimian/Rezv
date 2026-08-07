@@ -140,6 +140,7 @@ model Restaurant {
   smsTransactions  SmsTransaction[]
   closures         RestaurantClosure[]
   noShowModel      RestaurantNoShowModel?
+  demandForecast   RestaurantDemandForecast?
   @@index([tenantId])
   @@index([city], map: "idx_restaurants_city")
   chatThreads  ChatThread[]
@@ -587,6 +588,29 @@ model RestaurantNoShowModel {
   isActive      Boolean    @default(false) @map("is_active")
   trainedAt     DateTime   @default(now()) @map("trained_at")
   @@map("restaurant_no_show_models")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  پیش‌بینیِ تقاضا — شبیه‌سازیِ روزهای آینده از رویِ تاریخچه‌ی خودِ رستوران
+//
+//  همان انضباطِ RestaurantNoShowModel، این‌بار برایِ رگرسیونِ سری‌زمانی:
+//  Holt-Winters جمعی (level+trend+فصلیِ هفتگی) به‌جایِ رگرسیونِ لجستیک.
+//  جزئیاتِ کامل در lib/demand-forecast.ts.
+//
+//  countModel/coversModel هرکدام یک SeriesModelState سریالایزشده‌اند:
+//  { model: {level, trend, seasonal[7], period, phaseOffset}, mae,
+//    baselineMae, isActive, reason, lastValues[7] } — کاملاً شفاف و
+//  قابلِ‌بازرسی (JSONB)، نه یک black-box. isActive هم مثلِ no-show model
+//  پیش‌فرضش false است: فقط با بهبودِ واقعی روی هولدآوت true می‌شود.
+// ───────────────────────────────────────────────────────────────────────
+model RestaurantDemandForecast {
+  restaurantId String     @id @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  historyDays  Int        @map("history_days") // چند روزِ تاریخچه در آخرین آموزش استفاده شد
+  countModel   Json       @map("count_model")  // SeriesModelState برایِ «تعدادِ رزرو در روز»
+  coversModel  Json       @map("covers_model") // SeriesModelState برایِ «مجموعِ کاورها در روز»
+  trainedAt    DateTime   @default(now()) @map("trained_at")
+  @@map("restaurant_demand_forecasts")
 }
 
 model CustomerInsight {
