@@ -122,21 +122,54 @@ let tt;
 function toast(icon,msg){document.getElementById('toastIcon').textContent=icon;document.getElementById('toastMsg').textContent=msg;const t=document.getElementById('toast');t.classList.add('show');t.classList.remove('toast-enter');void t.offsetWidth;t.classList.add('toast-enter');const live=document.getElementById('a11y-live');if(live)live.textContent=msg;clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400)}
 
 // ═══════════ NOTIFICATIONS ═══════════
-let NOTIFS=[
+// ⚠️ رفعِ باگ (همان الگویِ RES/GUESTS): این ۴ آیتم قبلاً هاردکد بودند —
+// «پارسا تهرانی رزرو کرد»، «نیلوفر رضایی ۵ ستاره داد»، … — برایِ هر
+// رستورانِ واقعی، همیشه همین‌ها. NOTIFS_DEMO فقط fallbackِ آفلاین است
+// (هم‌الگو با WL_DEMO_QUEUE/RES_DEMO/GUESTS_DEMO)؛ NOTIFS با
+// loadNotifications از /restaurant/notifications واقعی پر می‌شود.
+const NOTIFS_DEMO=[
   {ic:'green',emoji:'checkCircle',title:'رزرو جدید',text:'پارسا تهرانی برای امشب ساعت ۲۱:۳۰ میز رزرو کرد',time:'۲ دقیقه پیش',unread:true},
   {ic:'amber',emoji:'alert',title:'هشدار ریزش',text:'مریم احمدی ۳۵ روزه نیومده — ریسک ریزش ۸۲٪',time:'۱ ساعت پیش',unread:true},
   {ic:'blue',emoji:'star',title:'نظر جدید',text:'نیلوفر رضایی ۵ ستاره داد: «عالی بود، حتماً برمی‌گردم»',time:'۳ ساعت پیش',unread:true},
   {ic:'green',emoji:'refresh',title:'مشتری بازگشتی',text:'نیلوفر رضایی بعد از ۲ هفته دوباره رزرو کرد',time:'دیروز',unread:false},
 ];
+let NOTIFS=NOTIFS_DEMO.slice();
+let _notifsLoaded=false;
+/** فعالیتِ اخیرِ واقعی را می‌گیرد و NOTIFS را جایگزین می‌کند (خالی اگر فعالیتی نبود). */
+async function loadNotifications(){
+  if(!API.getToken()) return false;
+  const res=await API.recentActivity();
+  if(res.ok && Array.isArray(res.data?.items)){
+    NOTIFS=res.data.items.map(n=>({ic:n.ic, emoji:n.emoji, title:n.title, text:n.text, time:faRelative(n.at), unread:false}));
+    _notifsLoaded=true;
+    return true;
+  }
+  // ⚠️ رفعِ باگ (یافته‌ی ریویوی Copilot): این endpoint حالا پشتِ
+  // canViewAnalytics است؛ کارمندی که این مجوز را ندارد همیشه ۴۰۳ می‌گیرد.
+  // اگر همینجا false برگردانیم و NOTIFS دست‌نخورده بماند، همان باگِ اصلیِ
+  // این PR برایِ همین زیرمجموعه از کاربران دوباره زنده می‌شود: NOTIFS_DEMو
+  // برای همیشه به‌جایِ دیتایِ واقعی نشان داده می‌شود. ۴۰۳ یعنی «قطعاً و
+  // برایِ همیشه صلاحیت نداری»، نه یک خطایِ موقت — پس فوراً خالی کن و
+  // دیگر تلاش نکن (نه دیتایِ ساختگی، نه تلاشِ بی‌فایده‌ی هر رفرش).
+  if(res.status===403){
+    NOTIFS=[];
+    _notifsLoaded=true;
+    return true;
+  }
+  return false;
+}
 function renderNotifList(){
   const el=document.getElementById('notifList');
   const unread=NOTIFS.filter(n=>n.unread).length;
   document.getElementById('notifPing').style.display=unread?'block':'none';
   if(!NOTIFS.length){el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('bell',{size:32})}</div><div class="empty-state-desc">اعلانی نیست</div></div>`;return}
+  // ⚠️ رفعِ باگ امنیتی (یافته‌ی ریویوی Copilot روی PR): title/text حالا از
+  // نامِ مهمان/متنِ نظر (ورودیِ قابل‌کنترلِ کاربر) می‌آیند، نه رشته‌ی هاردکد
+  // مثلِ قبل — بدونِ esc اینجا یک stored XSS واقعی در پنلِ کارکنان بود.
   el.innerHTML=NOTIFS.map((n,i)=>`<div class="notif-item ${n.unread?'unread':''}" onclick="readNotif(${i})">
     ${n.unread?'<span class="notif-dot"></span>':''}
     <div class="notif-ic ${n.ic}">${icon(n.emoji,{size:16})}</div>
-    <div class="notif-body"><div class="notif-title">${n.title}</div><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div>
+    <div class="notif-body"><div class="notif-title">${esc(n.title)}</div><div class="notif-text">${esc(n.text)}</div><div class="notif-time">${esc(n.time)}</div></div>
   </div>`).join('');
 }
 function toggleNotif(e){
@@ -398,6 +431,7 @@ function enterPanel(demo){
   // منو را با مجوزهای واقعیِ کاربر هم‌راستا کن — قبل از رندرِ هر صفحه.
   if (typeof applyPermissionsToNav === 'function') applyPermissionsToNav();
   renderNotifList();
+  if(!_notifsLoaded && API.getToken() && !demo){ loadNotifications().then(ok=>{ if(ok) renderNotifList(); }); }
   rOverview();
   initLiveUpdates();
   if(API.getToken() && !demo){
@@ -449,6 +483,11 @@ if (API.getToken()) {
   document.getElementById('loginOverlay').classList.add('hidden');
   setStaffGateLocked(false);
   renderNotifList();
+  // ⚠️ رفعِ باگ (ریویوی Copilot روی PR): این مسیرِ بازیابیِ نشست (رفرشِ
+  // صفحه وقتی از قبل لاگین بودی) قبلاً loadNotifications را صدا نمی‌زد —
+  // فقط enterPanel این کار را می‌کرد. یعنی با هر رفرشِ صفحه، اعلان‌های
+  // دموی اولیه (NOTIFS_DEMO) برایِ همیشه به‌جایِ فعالیتِ واقعی می‌ماندند.
+  if(!_notifsLoaded){ loadNotifications().then(ok=>{ if(ok) renderNotifList(); }); }
   rOverview();
   loadTables();
   loadBranches();               // سوییچر شعبه را با داده‌ی واقعی پر کن

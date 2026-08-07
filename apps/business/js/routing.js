@@ -107,9 +107,27 @@ async function selectBranch(id){
   if(typeof _segCounts!=='undefined') _segCounts=null;
   if(typeof _mktLoaded!=='undefined') _mktLoaded=false;
   if(typeof _hoursLoaded!=='undefined') _hoursLoaded=false;
+  // ⚠️ رفعِ باگ (ریویوی Copilot روی PR + یافته‌ی مشابه در خودِ RES/GUESTS
+  // که از PR #5 جا مانده بود): این ۵ کش هم به‌شعبه وابسته‌اند ولی اینجا
+  // reset نمی‌شدند — یعنی بعد از سوییچِ شعبه، داشبورد تا مدتی دیتایِ
+  // شعبه‌ی قبلی (رزروها، مهمان‌های برتر، اعلان‌ها، بینشِ روزِ هفته، نقشه‌ی
+  // حرارتی) را نشان می‌داد، چون گاردِ «if(!_xLoaded)» اجازه‌ی fetchِ
+  // دوباره را نمی‌داد.
+  if(typeof _resLoaded!=='undefined') _resLoaded=false;
+  if(typeof _guestsLoaded!=='undefined') _guestsLoaded=false;
+  if(typeof _notifsLoaded!=='undefined') _notifsLoaded=false;
+  if(typeof _weekdayInsightLoaded!=='undefined') _weekdayInsightLoaded=false;
+  if(typeof _heatmapLoaded!=='undefined') _heatmapLoaded=false;
   await loadBranches();
   await loadTables();
   refreshActiveView();
+  // زنگوله‌ی اعلان برخلافِ تب‌ها (که refreshActiveView فقط تبِ فعال را
+  // دوباره fetch می‌کند) همیشه روی صفحه است، مستقلِ تبِ جاری — پس باید
+  // اینجا صریحاً دوباره بارگذاری شود، وگرنه اعلان‌های شعبه‌ی قبلی تا
+  // لاگینِ بعدی روی صفحه می‌مانند حتی با وجودِ ریست‌شدنِ _notifsLoaded.
+  if(typeof loadNotifications==='function' && API.getToken()){
+    loadNotifications().then(ok=>{ if(ok && typeof renderNotifList==='function') renderNotifList(); });
+  }
   toast('','شعبه عوض شد');
 }
 function toggleSidebar(){
