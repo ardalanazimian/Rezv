@@ -575,8 +575,11 @@ async function loadMoreReservations(){
 let REVIEWS=[];
 // عکس‌های گالری — از /restaurant/photos واقعی لود می‌شن
 let GALLERY=[];
-// هویت رستوران (نام + لوگو: ایموجی یا عکس)
-let RESTAURANT={name:'کافه‌رستوران ویستا',logoEmoji:'🌿',logoDataUrl:null,logoGradient:'linear-gradient(135deg,#34D399,#059669)'};
+// هویت رستوران — name اینجا فقط نمایِ پیش‌فرض/دمو است (هنوز از سرور
+// بارگذاری نمی‌شود؛ یافته‌ی جداگانه، خارج از محدوده‌ی این تغییر).
+// logoEmoji/logoGradient فقط نمایِ جایگزینِ محلی‌اند تا لوگویِ واقعی (یک
+// RestaurantPhoto با category='logo'، در GALLERY) آپلود/تأیید شود.
+let RESTAURANT={name:'کافه‌رستوران ویستا',logoEmoji:'🌿',logoGradient:'linear-gradient(135deg,#34D399,#059669)'};
 function normalizePhone(p){return (p||'').replace(/\s/g,'').replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
 // اتصال خودکار: هر رزرو → ثبت در باشگاه (بدون تکرار، کلید: تلفن)
 function enrollClub(name,phone){

@@ -18,7 +18,7 @@ function rProfile(){
   profRenderHours();
   // داده‌ی واقعی را در پس‌زمینه بکش و دوباره رندر کن
   if(API.getToken()){
-    loadGallery().then(()=>{ if(profTab==='gallery') profRenderGallery(); });
+    loadGallery().then(()=>{ refreshLogoDisplay(); if(profTab==='gallery') profRenderGallery(); });
     loadReviews().then(()=>{ if(profTab==='reviews') profRenderReviews(); });
     loadHours().then(()=>{ if(profTab==='hours') profRenderHours(); });
   }
@@ -60,16 +60,38 @@ function setProfTab(t){
 }
 
 // ─── تب گالری: آپلود عکس ───
+// لوگو یک عکسِ واقعی با category='logo' در همان RestaurantPhoto است — از
+// همان مسیرِ امنِ آپلود/بازبینیِ گالری رد می‌شود (lib/media.ts + صفِ تأیید)،
+// نه یک dataURL محلی که با رفرشِ صفحه از بین می‌رفت و هیچ‌جا ذخیره نمی‌شد.
+// آخرین آیتمِ دسته‌ی logo در GALLERY همیشه لوگویِ فعلی است (تأییدشده یا در
+// انتظار)؛ فقط وقتی status==='approved' باشد در سطحِ عمومی هم دیده می‌شود.
+function currentLogoPhoto(){
+  for(let i=GALLERY.length-1;i>=0;i--) if(GALLERY[i].type==='logo') return GALLERY[i];
+  return null;
+}
+// نمایِ ایموجی/گرادیان فقط یک نمایِ جایگزینِ سبک است تا لوگویِ واقعی آپلود/تأیید
+// شود — با آن اشتباه گرفته نشود (سایدبار هم از همین‌جا به‌روز می‌ماند).
+function refreshLogoDisplay(){
+  const logoPhoto=currentLogoPhoto();
+  const useImg=logoPhoto && logoPhoto.status==='approved';
+  const swEmoji=document.getElementById('swEmoji');
+  if(swEmoji){
+    if(useImg){swEmoji.style.background='transparent';swEmoji.innerHTML=`<img src="${logoPhoto.url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9px">`}
+    else{swEmoji.style.background=RESTAURANT.logoGradient;swEmoji.textContent=RESTAURANT.logoEmoji}
+  }
+}
 function profRenderGallery(){
+  const logoPhoto=currentLogoPhoto();
   document.getElementById('pt-gallery').innerHTML=`
     <!-- هویت رستوران: نام + لوگو -->
     <div class="identity-card">
-      <div class="identity-logo" style="background:${RESTAURANT.logoDataUrl?'transparent':RESTAURANT.logoGradient}">
-        ${RESTAURANT.logoDataUrl?`<img src="${RESTAURANT.logoDataUrl}" alt="logo">`:RESTAURANT.logoEmoji}
+      <div class="identity-logo" style="background:${logoPhoto?'transparent':RESTAURANT.logoGradient}">
+        ${logoPhoto?`<img src="${logoPhoto.url}" alt="logo">`:RESTAURANT.logoEmoji}
       </div>
       <div class="identity-info">
         <div class="identity-name">${esc(RESTAURANT.name)}</div>
         <div class="identity-sub">این لوگو و نام توی اپ مشتری و پنل نمایش داده می‌شه</div>
+        ${logoPhoto&&logoPhoto.status!=='approved'?`<div class="gal-status gal-status--${logoPhoto.status}" style="position:static;display:inline-flex;margin-top:4px;width:fit-content" ${logoPhoto.status==='rejected'?`onclick="showRejectReason(${GALLERY.indexOf(logoPhoto)})"`:''}>${icon(logoPhoto.status==='pending'?'clock':'info',{size:11})} ${esc(logoPhoto.statusLabel||(logoPhoto.status==='pending'?'در انتظار تأیید':'رد شد'))}</div>`:''}
         <div class="identity-actions">
           <button class="btn btn-primary btn-sm" onclick="openLogoEditor()">${icon('palette',{size:14})} تغییر لوگو</button>
           <button class="btn btn-ghost btn-sm" onclick="openNameEditor()">${icon('edit',{size:14})} تغییر نام</button>
@@ -122,9 +144,15 @@ function showRejectReason(i){
 }
 
 // ─── ویرایش لوگو ───
-let logoChoice={emoji:null,gradient:null,dataUrl:null};
+// آپلودِ عکس از همان مسیرِ امنِ گالری رد می‌شود (API.uploadPhoto، category='logo')
+// — قبلاً اینجا FileReader.readAsDataURL می‌کرد و فقط در حافظه‌ی مرورگر
+// می‌ماند: نه به سرور می‌رسید، نه رفرشِ صفحه دووم می‌آورد، نه رستوران‌های
+// دیگر/دستگاه‌های دیگر می‌دیدنش. ایموجی/گرادیان فقط نمایِ جایگزینِ سبک است
+// تا لوگویِ واقعی تأیید شود — با برندِ واقعی اشتباه گرفته نمی‌شود.
+let logoChoice={emoji:null,gradient:null};
 function openLogoEditor(){
-  logoChoice={emoji:RESTAURANT.logoEmoji,gradient:RESTAURANT.logoGradient,dataUrl:RESTAURANT.logoDataUrl};
+  logoChoice={emoji:RESTAURANT.logoEmoji,gradient:RESTAURANT.logoGradient};
+  const logoPhoto=currentLogoPhoto();
   const emojis=['🌿','🍽️','☕','🍕','🍔','🍜','🥗','🍣','🍰','🍷','🔥','⭐','🏛️','🌟','🍴','👨‍🍳'];
   const grads=[
     'linear-gradient(135deg,#34D399,#059669)',
@@ -136,31 +164,31 @@ function openLogoEditor(){
   ];
   openModal(`
     <div class="modal-title">${icon('palette',{size:18})} تغییر لوگو</div>
-    <div class="modal-sub">یه عکس آپلود کن، یا ایموجی و رنگ انتخاب کن</div>
-    <div class="logo-preview" id="logoPreview" style="background:${logoChoice.dataUrl?'transparent':logoChoice.gradient}">
-      ${logoChoice.dataUrl?`<img src="${logoChoice.dataUrl}" alt="">`:logoChoice.emoji}
+    <div class="modal-sub">عکسِ لوگو رو آپلود کن — بعد از تأییدِ تیم رزرونو (مثلِ بقیه‌ی گالری) روی صفحه‌ی رستورانت می‌شینه</div>
+    <div class="logo-preview" id="logoPreview" style="background:${logoPhoto?'transparent':logoChoice.gradient}">
+      ${logoPhoto?`<img src="${logoPhoto.url}" alt="">`:logoChoice.emoji}
     </div>
-    <button class="btn btn-ghost btn-block" onclick="document.getElementById('logoInput').click()">${icon('upload',{size:15})} آپلود عکس لوگو</button>
-    <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="handleLogoUpload(this)">
-    <div class="field-label" style="margin-top:18px">یا یک ایموجی انتخاب کن</div>
+    ${logoPhoto?`<div class="gal-status gal-status--${logoPhoto.status}" style="position:static;display:inline-flex;margin-top:8px;width:fit-content${logoPhoto.status==='approved'?';background:rgba(5,150,105,.94)':''}">${icon(logoPhoto.status==='approved'?'check':logoPhoto.status==='pending'?'clock':'info',{size:11})} ${esc(logoPhoto.statusLabel||logoPhoto.status)}</div>`:''}
+    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="document.getElementById('logoInput').click()" id="logoUploadBtn">${icon('upload',{size:15})} ${logoPhoto?'آپلودِ عکسِ جدید':'آپلود عکس لوگو'}</button>
+    <input type="file" id="logoInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleLogoUpload(this)">
+    <div class="field-label" style="margin-top:18px">تا وقتی عکس تأیید بشه، این ایموجی/رنگ به‌جاش نشون داده می‌شه</div>
     <div class="logo-pick-grid" id="logoEmojiGrid">
-      ${emojis.map(e=>`<div class="logo-emoji-opt ${e===logoChoice.emoji&&!logoChoice.dataUrl?'sel':''}" onclick="pickLogoEmoji('${e}')">${e}</div>`).join('')}
+      ${emojis.map(e=>`<div class="logo-emoji-opt ${e===logoChoice.emoji?'sel':''}" onclick="pickLogoEmoji('${e}')">${e}</div>`).join('')}
     </div>
     <div class="field-label">رنگ پس‌زمینه</div>
     <div class="logo-grad-grid" id="logoGradGrid">
       ${grads.map((g,gi)=>`<div class="logo-grad-opt ${g===logoChoice.gradient?'sel':''}" data-gi="${gi}" style="background:${g}" onclick="pickLogoGrad(${gi},'${g}')"></div>`).join('')}
     </div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="saveLogo()">ذخیره لوگو</button>
+    <button class="btn btn-primary btn-lg btn-block" onclick="saveLogoFallback()">ذخیره</button>
   `);
 }
 function refreshLogoPreview(){
   const pv=document.getElementById('logoPreview');
-  if(!pv)return;
-  if(logoChoice.dataUrl){pv.style.background='transparent';pv.innerHTML=`<img src="${logoChoice.dataUrl}" alt="">`}
-  else{pv.style.background=logoChoice.gradient;pv.textContent=logoChoice.emoji}
+  if(!pv || currentLogoPhoto())return; // وقتی عکسِ واقعی هست، پیش‌نمایشِ ایموجی جایگزینش نمی‌شود
+  pv.style.background=logoChoice.gradient;pv.textContent=logoChoice.emoji;
 }
 function pickLogoEmoji(e){
-  logoChoice.emoji=e;logoChoice.dataUrl=null; // انتخاب ایموجی، عکس رو پاک کن
+  logoChoice.emoji=e;
   document.querySelectorAll('#logoEmojiGrid .logo-emoji-opt').forEach(o=>o.classList.toggle('sel',o.textContent===e));
   refreshLogoPreview();
 }
@@ -169,31 +197,34 @@ function pickLogoGrad(gi,g){
   document.querySelectorAll('#logoGradGrid .logo-grad-opt').forEach(o=>o.classList.toggle('sel',+o.dataset.gi===gi));
   refreshLogoPreview();
 }
-function handleLogoUpload(input){
+async function handleLogoUpload(input){
   const file=input.files?.[0];
-  if(!file)return;
-  if(!file.type.startsWith('image/')){toast('','فقط فایل عکس مجاز است');return}
-  if(file.size>5*1024*1024){toast('','عکس بزرگ‌تر از ۵ مگابایته');return}
-  const reader=new FileReader();
-  reader.onload=e=>{logoChoice.dataUrl=e.target.result;refreshLogoPreview();
-    document.querySelectorAll('#logoEmojiGrid .logo-emoji-opt').forEach(o=>o.classList.remove('sel'));
-    toast('','عکس لوگو بارگذاری شد')};
-  reader.onerror=()=>toast('','خطا در خواندن فایل');
-  reader.readAsDataURL(file);
   input.value='';
+  if(!file)return;
+  if(!PHOTO_TYPES.includes(file.type)){toast('','فقط JPEG، PNG یا WebP مجازه');return}
+  if(file.size>PHOTO_MAX_BYTES){toast('',`حجم عکس نباید از ${PHOTO_MAX_BYTES/1024/1024} مگابایت بیشتر باشه`);return}
+  const btn=document.getElementById('logoUploadBtn');
+  if(btn){btn.disabled=true;btn.textContent='در حال آپلود…';}
+  const res=await API.uploadPhoto(file,{category:'logo'});
+  await loadGallery();
+  refreshLogoDisplay();
+  if(res.ok){
+    toast('','عکس لوگو آپلود شد و برای تأیید فرستاده شد');
+    closeModal();
+    profRenderGallery();
+  } else {
+    toast('',res.error?.message||'آپلود ناموفق بود');
+    if(btn){btn.disabled=false;btn.textContent='آپلود عکس لوگو';}
+  }
 }
-function saveLogo(){
+// ذخیره‌یِ نمایِ جایگزینِ ایموجی/گرادیان — محلی است (فقط برایِ زمانی که هنوز
+// عکسِ واقعی تأیید نشده)؛ خودِ لوگو با handleLogoUpload به سرور می‌رود.
+function saveLogoFallback(){
   RESTAURANT.logoEmoji=logoChoice.emoji||'🌿';
   RESTAURANT.logoGradient=logoChoice.gradient;
-  RESTAURANT.logoDataUrl=logoChoice.dataUrl;
-  // به‌روزرسانی لوگوی سایدبار (زنده)
-  const swEmoji=document.getElementById('swEmoji');
-  if(swEmoji){
-    if(RESTAURANT.logoDataUrl){swEmoji.style.background='transparent';swEmoji.innerHTML=`<img src="${RESTAURANT.logoDataUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9px">`}
-    else{swEmoji.style.background=RESTAURANT.logoGradient;swEmoji.textContent=RESTAURANT.logoEmoji}
-  }
+  refreshLogoDisplay();
   closeModal();profRenderGallery();
-  toast('','لوگو به‌روز شد');
+  toast('','ذخیره شد');
 }
 // ─── ویرایش نام ───
 function openNameEditor(){
