@@ -18,7 +18,8 @@ front-end applications that all talk to a single Next.js backend API:
 | **Customer app** | Diners (public) | `apps/customer/` | PWA to discover restaurants, book tables, join waitlists, earn loyalty points, chat with restaurants. |
 | **Business panel** | Restaurant staff | `apps/business/` | Single-page panel for reservations, tables, waitlist, CRM, marketing, staff. |
 | **Company panel** | Platform admins | `apps/company/` | Platform-owner console (all tenants, billing, SMS, security, settings). |
-| **API** | All clients | `api/` | Next.js 14 App Router route handlers + Prisma + PostgreSQL + Redis. |
+| **Marketing site + SEO** | Public/prospects | `apps/landing/`, `apps/seo/` | Separate Next.js + React apps (own package.json, own CI job) — SSR, sitemap, JSON-LD, CMS-backed content. *(added after this doc's original pass — verify against the apps directly if in doubt.)* |
+| **API** | All clients | `api/` | Next.js 16 App Router route handlers + Prisma + PostgreSQL + Redis. |
 
 Supporting outputs derived from the apps:
 
@@ -56,7 +57,7 @@ flowchart LR
     N["nginx / Caddy<br/>(self-host)"]
   end
 
-  subgraph API["Next.js 14 API (api/)"]
+  subgraph API["Next.js 16 API (api/)"]
     MW["middleware.ts<br/>CORS · CSRF · rate-limit · security headers"]
     RH["Route handlers<br/>/api/v1/*"]
     LIB["lib/ services<br/>reservations · loyalty · waitlist · queue ..."]
@@ -113,7 +114,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full breakdown.
 - **RTL / Persian**, Vazirmatn font.
 
 ### Backend
-- **Next.js 14** (App Router) — API-only, route handlers under
+- **Next.js 16** (App Router) — API-only, route handlers under
   `api/src/app/api/`.
 - **Prisma** ORM + **PostgreSQL** (Supabase in production).
 - **Redis** via **ioredis** — rate limiting, slot locks, caches, OTP throttling.
@@ -150,7 +151,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full breakdown.
 ├── design-preview/      # Design system preview page(s)
 ├── tools/
 │   └── build-standalone.py   # Bundles apps/* → standalone/*.html
-├── api/                 # Next.js 14 backend (separate Vercel project)
+├── api/                 # Next.js 16 backend (separate Vercel project)
 │   ├── src/app/api/     # Route handlers (/api/v1/*)
 │   ├── src/lib/         # Services / domain logic (~45 modules)
 │   ├── prisma/          # schema.prisma, migrations/, seed
