@@ -225,7 +225,10 @@ interface DailyRow {
  * waitlist عبور کرده و لغو/رد/منقضی نشده — یعنی مشتری واقعاً قصدِ حضور
  * داشته، چه در نهایت آمده باشد (seated/dining/completed) چه نیامده
  * (no_show). لغوها و ردها بیرون‌اند چون آن تقاضا در عمل تبخیر شده و
- * تکرارپذیر نیست.
+ * تکرارپذیر نیست. (این لیست بعداً هم‌نامِ DEMAND_RESERVATION_STATUSES در
+ * lib/reservation-status.ts استخراج شد — اینجا لفظی مانده تا کوئریِ
+ * تست‌شده‌ی موجود دست‌نخورده بماند؛ در تغییرِ بعدی که این فایل لمس شود
+ * می‌تواند یکی شود.)
  */
 async function fetchDailySeries(restaurantId: string): Promise<{ counts: number[]; covers: number[] }> {
   const start = new Date();
