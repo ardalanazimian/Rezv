@@ -48,6 +48,28 @@ export function weekdayInTz(dateISO: string, timezone: string): number {
 }
 
 /**
+ * ساعتِ محلی (۰..۲۳) یک لحظه‌ی UTC واقعی در تایم‌زونِ داده‌شده — برایِ
+ * دسته‌بندیِ رفتاری (مثلاً «مشتریِ شب‌نشین») که باید در وقتِ محلیِ کاربر
+ * سنجیده شود، نه وقتِ سرور. سرور معمولاً UTC اجرا می‌شود، پس Date.getHours()
+ * ساده اینجا غلط بود (یک رزروِ ساعتِ ۲۳ تهران را ۱۹ می‌دید).
+ */
+export function hourInTz(d: Date, timezone: string): number {
+  const s = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: '2-digit', hour12: false }).format(d);
+  const h = Number(s);
+  return h === 24 ? 0 : h;
+}
+
+/** تاریخِ تقویمیِ محلی (سال/ماه/روز) یک لحظه‌ی UTC در تایم‌زونِ داده‌شده. */
+export function dateInTz(d: Date, timezone: string): { y: number; m: number; day: number } {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  const parts: Record<string, string> = {};
+  for (const p of dtf.formatToParts(d)) parts[p.type] = p.value;
+  return { y: Number(parts.year), m: Number(parts.month), day: Number(parts.day) };
+}
+
+/**
  * آیا رستوران در این تاریخ اصلاً باز است؟ (نه تعطیلِ هفتگی، نه تعطیلِ خاص)
  * @param closureDates مجموعه‌ی تاریخ‌های تعطیلِ خاص ("YYYY-MM-DD")
  */
