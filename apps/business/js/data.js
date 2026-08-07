@@ -575,6 +575,10 @@ async function loadWeekdayInsightForDashboard(){
     _weekdayInsightLoaded=true;
     return true;
   }
+  // manager-insights پشتِ canViewAnalytics است — کارمندِ بدونِ این مجوز
+  // همیشه ۴۰۳ می‌گیرد. بدونِ این شرط، rOverview هر بار دوباره تلاش می‌کرد
+  // (fetch بی‌فایده‌ی تکراری)؛ ۴۰۳ یعنی دیگر تلاش نکن، نه یک خطایِ موقت.
+  if(res.status===403){ _weekdayInsightLoaded=true; return false; }
   return false;
 }
 // ⚠️ رفعِ باگ: نقشه‌ی حرارتیِ هفتگی در renderHeatmap (overview.js) یک
@@ -593,6 +597,9 @@ async function loadHeatmapForDashboard(){
     _heatmapLoaded=true;
     return true;
   }
+  // analytics هم پشتِ canViewAnalytics است — همان دلیلِ weekday insight:
+  // ۴۰۳ یعنی دیگر تلاش نکن، وگرنه هر rOverview دوباره fetch بی‌فایده می‌زد.
+  if(res.status===403){ _heatmapLoaded=true; return false; }
   return false;
 }
 // باشگاه مشتریان — دیتای واقعی و زنده

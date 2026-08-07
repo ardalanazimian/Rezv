@@ -144,6 +144,18 @@ async function loadNotifications(){
     _notifsLoaded=true;
     return true;
   }
+  // ⚠️ رفعِ باگ (یافته‌ی ریویوی Copilot): این endpoint حالا پشتِ
+  // canViewAnalytics است؛ کارمندی که این مجوز را ندارد همیشه ۴۰۳ می‌گیرد.
+  // اگر همینجا false برگردانیم و NOTIFS دست‌نخورده بماند، همان باگِ اصلیِ
+  // این PR برایِ همین زیرمجموعه از کاربران دوباره زنده می‌شود: NOTIFS_DEMو
+  // برای همیشه به‌جایِ دیتایِ واقعی نشان داده می‌شود. ۴۰۳ یعنی «قطعاً و
+  // برایِ همیشه صلاحیت نداری»، نه یک خطایِ موقت — پس فوراً خالی کن و
+  // دیگر تلاش نکن (نه دیتایِ ساختگی، نه تلاشِ بی‌فایده‌ی هر رفرش).
+  if(res.status===403){
+    NOTIFS=[];
+    _notifsLoaded=true;
+    return true;
+  }
   return false;
 }
 function renderNotifList(){
@@ -151,10 +163,13 @@ function renderNotifList(){
   const unread=NOTIFS.filter(n=>n.unread).length;
   document.getElementById('notifPing').style.display=unread?'block':'none';
   if(!NOTIFS.length){el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('bell',{size:32})}</div><div class="empty-state-desc">اعلانی نیست</div></div>`;return}
+  // ⚠️ رفعِ باگ امنیتی (یافته‌ی ریویوی Copilot روی PR): title/text حالا از
+  // نامِ مهمان/متنِ نظر (ورودیِ قابل‌کنترلِ کاربر) می‌آیند، نه رشته‌ی هاردکد
+  // مثلِ قبل — بدونِ esc اینجا یک stored XSS واقعی در پنلِ کارکنان بود.
   el.innerHTML=NOTIFS.map((n,i)=>`<div class="notif-item ${n.unread?'unread':''}" onclick="readNotif(${i})">
     ${n.unread?'<span class="notif-dot"></span>':''}
     <div class="notif-ic ${n.ic}">${icon(n.emoji,{size:16})}</div>
-    <div class="notif-body"><div class="notif-title">${n.title}</div><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div>
+    <div class="notif-body"><div class="notif-title">${esc(n.title)}</div><div class="notif-text">${esc(n.text)}</div><div class="notif-time">${esc(n.time)}</div></div>
   </div>`).join('');
 }
 function toggleNotif(e){
@@ -468,6 +483,11 @@ if (API.getToken()) {
   document.getElementById('loginOverlay').classList.add('hidden');
   setStaffGateLocked(false);
   renderNotifList();
+  // ⚠️ رفعِ باگ (ریویوی Copilot روی PR): این مسیرِ بازیابیِ نشست (رفرشِ
+  // صفحه وقتی از قبل لاگین بودی) قبلاً loadNotifications را صدا نمی‌زد —
+  // فقط enterPanel این کار را می‌کرد. یعنی با هر رفرشِ صفحه، اعلان‌های
+  // دموی اولیه (NOTIFS_DEMO) برایِ همیشه به‌جایِ فعالیتِ واقعی می‌ماندند.
+  if(!_notifsLoaded){ loadNotifications().then(ok=>{ if(ok) renderNotifList(); }); }
   rOverview();
   loadTables();
   loadBranches();               // سوییچر شعبه را با داده‌ی واقعی پر کن

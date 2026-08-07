@@ -36,6 +36,73 @@ function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + '…' : s;
 }
 
+// ── ریاضیاتِ خالص (merge/sort/limit) — بدونِ DB، مستقیماً تست‌پذیر ──
+// هم‌فلسفه با restaurant-manager.ts: منطقِ واقعی از فراخوانیِ DB جدا نگه
+// داشته می‌شود تا رگرسیون در ادغام/ترتیب/برش بدونِ نیاز به دیتابیس تست شود
+// (یافته‌ی ریویوی Copilot روی PR).
+
+export interface ReservationRow {
+  id: string;
+  createdAt: Date;
+  partySize: number;
+  guestName: string | null;
+  user: { firstName: string | null; lastName: string | null } | null;
+}
+export interface ReviewRow {
+  id: string;
+  createdAt: Date;
+  rating: number;
+  body: string | null;
+  user: { firstName: string | null; lastName: string | null } | null;
+}
+export interface AtRiskRow {
+  userId: string;
+  updatedAt: Date;
+  churnRiskScore: number;
+  user: { firstName: string | null; lastName: string | null } | null;
+}
+
+/** ادغام سه منبع به یک فیدِ واحد: نگاشت، مرتب‌سازیِ نزولی بر اساسِ زمان، برش به limit. */
+export function buildActivityFeed(
+  reservations: readonly ReservationRow[],
+  reviews: readonly ReviewRow[],
+  atRisk: readonly AtRiskRow[],
+  limit: number,
+): ActivityItem[] {
+  const items: ActivityItem[] = [];
+
+  for (const r of reservations) {
+    items.push({
+      id: `resv:${r.id}`, ic: 'green', emoji: 'checkCircle',
+      title: 'رزرو جدید',
+      text: `${displayName(r.user, r.guestName)} برایِ ${r.partySize} نفر رزرو کرد`,
+      at: r.createdAt.toISOString(),
+    });
+  }
+  for (const rv of reviews) {
+    const quote = rv.body ? `: «${truncate(rv.body, 60)}»` : '';
+    items.push({
+      id: `rev:${rv.id}`, ic: 'blue', emoji: 'star',
+      title: 'نظر جدید',
+      text: `${displayName(rv.user, null)} ${rv.rating} ستاره داد${quote}`,
+      at: rv.createdAt.toISOString(),
+    });
+  }
+  for (const ci of atRisk) {
+    items.push({
+      id: `risk:${ci.userId}`, ic: 'amber', emoji: 'alert',
+      title: 'هشدارِ ریزش',
+      text: `${displayName(ci.user, null)} — ریسکِ ریزش ${ci.churnRiskScore}٪`,
+      at: ci.updatedAt.toISOString(),
+    });
+  }
+
+  // مرتب‌سازیِ پایدار بر اساسِ زمان (نزولی)؛ در تساویِ دقیق، ترتیبِ ورودی
+  // (رزرو، نظر، ریسک) حفظ می‌شود چون Array.prototype.sort در Node پایدار است.
+  items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return items.slice(0, limit);
+}
+
 /** فعالیتِ اخیرِ واقعیِ رستوران: رزروِ جدید، نظرِ جدید، هشدارِ ریزش. */
 export async function getRecentActivity(restaurantId: string, limit = 10): Promise<ActivityItem[]> {
   const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -70,34 +137,5 @@ export async function getRecentActivity(restaurantId: string, limit = 10): Promi
     }),
   ]);
 
-  const items: ActivityItem[] = [];
-
-  for (const r of reservations) {
-    items.push({
-      id: `resv:${r.id}`, ic: 'green', emoji: 'checkCircle',
-      title: 'رزرو جدید',
-      text: `${displayName(r.user, r.guestName)} برایِ ${r.partySize} نفر رزرو کرد`,
-      at: r.createdAt.toISOString(),
-    });
-  }
-  for (const rv of reviews) {
-    const quote = rv.body ? `: «${truncate(rv.body, 60)}»` : '';
-    items.push({
-      id: `rev:${rv.id}`, ic: 'blue', emoji: 'star',
-      title: 'نظر جدید',
-      text: `${displayName(rv.user, null)} ${rv.rating} ستاره داد${quote}`,
-      at: rv.createdAt.toISOString(),
-    });
-  }
-  for (const ci of atRisk) {
-    items.push({
-      id: `risk:${ci.userId}`, ic: 'amber', emoji: 'alert',
-      title: 'هشدارِ ریزش',
-      text: `${displayName(ci.user, null)} — ریسکِ ریزش ${ci.churnRiskScore}٪`,
-      at: ci.updatedAt.toISOString(),
-    });
-  }
-
-  items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-  return items.slice(0, limit);
+  return buildActivityFeed(reservations, reviews, atRisk, limit);
 }

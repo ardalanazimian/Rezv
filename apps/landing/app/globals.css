@@ -965,9 +965,17 @@ html[data-intro='done'] .intro { display: none; }
 
 /* ── ۲) نشانگرِ سفارشی ───────────────────────────────────────────── */
 .cur {
+  /* ⚠️ رفعِ باگ: نشانگرِ سفارشی نامرئی بود چون لنگرِ CSS منطقی
+     (inset-inline-start) بود ولی جابه‌جاییِ آن در Cursor.tsx با
+     translate3d(e.clientX, e.clientY, 0) — یعنی مختصاتِ فیزیکیِ همیشه از
+     گوشه‌یِ چپِ-بالا — انجام می‌شود. در این صفحه‌ی dir="rtl"،
+     inset-inline-start معادلِ right:0 است، پس نقطه‌یِ لنگر از گوشه‌یِ
+     راست بود و translateِ فیزیکی نشانگر را کاملاً خارج از صفحه می‌فرستاد
+     (نشانگرِ سیستم هم با cursor:none مخفی بود ← ماوس کلاً دیده نمی‌شد).
+     چون مختصاتِ pointer همیشه فیزیکی‌اند، لنگر هم باید فیزیکی (left) باشد. */
   position: fixed;
-  inset-block-start: 0;
-  inset-inline-start: 0;
+  top: 0;
+  left: 0;
   z-index: 210;
   pointer-events: none;
   opacity: 0;
