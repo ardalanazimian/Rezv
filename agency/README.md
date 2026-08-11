@@ -1,0 +1,81 @@
+# Rezv AI Agency OS — Charter
+
+> **Status: SPECIFICATION, not a running system.** This directory defines a
+> governance and organization layer for how AI-assisted work on this
+> repository *should* be structured, gated, and remembered. Nothing in this
+> directory makes anything "autonomous" or "continuously operating" by
+> itself — no cron job, no scheduled agent, no persistent process reads
+> these files today. Treat every claim below as `DOCUMENTED_ONLY` unless a
+> section explicitly says otherwise, per the classification rules in
+> [`DISCOVERY.md`](./DISCOVERY.md).
+
+Activation keyword: `REZV`. Highest-level command: `REZV FULL`. Both are
+conventions for prompting a human-operated Claude Code session against this
+repo — they are not wired to any trigger, webhook, or script.
+
+## What this actually is
+
+A request was made to build "a persistent AI organization" with ~23 agents
+that continuously monitors, researches, and ships changes to Rezv with no
+human in the loop. That literal system does not exist and was not built in
+this change, for a concrete reason: this repository's own rules
+(`CLAUDE.md`) require type-check + lint + test + Playwright E2E + a design-
+system diff to be **green before every push**, forbid claiming "tested" work
+that wasn't actually run, and require human-approved PRs for anything
+touching auth, reservations, or double-booking locks. A "continuously
+operating" agent that pushes without those gates would violate the
+project's own highest-priority rule. So this change implements the parts of
+the request that are real and honest to ship right now:
+
+1. **An org chart and agent registry** (`registry/agents.yaml`) — every
+   agent from the request, with real permissions, forbidden actions, and
+   escalation rules expressed in terms of tools that actually exist in this
+   environment (GitHub MCP, Claude Code Remote sessions/Routines,
+   Playwright, `sync-design-system.sh`, etc.) rather than invented tooling.
+2. **A discovery index** (`DISCOVERY.md`) — this repo already contains
+   dozens of real audits (`docs/architecture-audit/`, `docs/backend-audit/`,
+   `SECURITY-AUDIT.md`, `AUDIT-REPORT-2026-08-07.md`, …). Re-running that
+   discovery from scratch would duplicate real work and risk contradicting
+   it. `DISCOVERY.md` indexes what already exists as evidence and states
+   what is genuinely still `UNKNOWN`.
+3. **A capability matrix** (`CAPABILITY_MATRIX.md`) grounded in citations to
+   those existing audits, not fabricated end-to-end verification.
+4. **Governance** (`governance/GOVERNANCE.md`) — evidence hierarchy,
+   security/approval gates, branch strategy, PR lifecycle, release states,
+   cost control, observability, AI-security rules, failure handling — as
+   concrete policy for *human-run* Claude Code sessions working this repo.
+5. **A knowledge system** (`knowledge/KNOWLEDGE_SYSTEM.md`) — the eleven
+   memory categories from the request, seeded only with facts that already
+   have a citation in the repo (mostly from `CLAUDE.md` and
+   `PROJECT-KNOWLEDGE.md`), not invented ones.
+6. **An orchestration model** (`ORCHESTRATION.md`) — the
+   PROPOSAL → VALIDATION → APPROVAL → EXECUTION → VERIFICATION →
+   LEARNING lifecycle mapped onto tools this environment genuinely has
+   (Claude Code Remote `create_trigger`/Routines, GitHub PR subscriptions),
+   with an explicit note that turning any of it into a scheduled,
+   unattended trigger is a governance change requiring human sign-off
+   (Section 36 of the original request, and `CLAUDE.md`'s "high-risk
+   changes get a PR + human approval" rule) — not something this change
+   enables unilaterally.
+
+## What this is not
+
+- Not a multi-agent runtime. No agent in `registry/agents.yaml` calls
+  another agent automatically. Each "agent" is a role definition a human
+  (or a human-directed Claude Code session) adopts on purpose.
+- Not continuous. Nothing here polls, schedules, or watches the repo unless
+  a human explicitly creates a Routine/trigger and says so (see
+  `ORCHESTRATION.md`).
+- Not a replacement for `CLAUDE.md`. `CLAUDE.md` remains the binding project
+  rulebook; this directory is additive governance for how a "Rezv AI
+  Agency" role-plays inside those same rules, never a way around them.
+
+## Reading order
+
+1. `DISCOVERY.md` — what is actually known about this repo, and from where.
+2. `CAPABILITY_MATRIX.md` — capability-by-capability status with citations.
+3. `registry/agents.yaml` — the agent org chart.
+4. `governance/GOVERNANCE.md` — the rules every agent role operates under.
+5. `knowledge/KNOWLEDGE_SYSTEM.md` — the persistent memory categories.
+6. `ORCHESTRATION.md` — how proposals move from idea to merged PR, and what
+   "activating" continuous operation would actually require.
