@@ -40,15 +40,21 @@ the request that are real and honest to ship right now:
    what is genuinely still `UNKNOWN`.
 3. **A capability matrix** (`CAPABILITY_MATRIX.md`) grounded in citations to
    those existing audits, not fabricated end-to-end verification.
-4. **Governance** (`governance/GOVERNANCE.md`) — evidence hierarchy,
+4. **A full-repo code search** (`CODE_SEARCH_AUDIT.md`) — the Section-7
+   marker sweep (`TODO`/`FIXME`/`MOCK`/`STUB`/`FAKE`/`BYPASS`/…) actually
+   run this session, with every hit hand-classified, not just counted.
+5. **A CEO briefing** (`CEO_BRIEFING.md`) — the first real output of the
+   `rezv-ceo` role: the above synthesized into FACT/EVIDENCE/INFERENCE/
+   RECOMMENDATION/UNKNOWN statements, per Section 12's own requirement.
+6. **Governance** (`governance/GOVERNANCE.md`) — evidence hierarchy,
    security/approval gates, branch strategy, PR lifecycle, release states,
    cost control, observability, AI-security rules, failure handling — as
    concrete policy for *human-run* Claude Code sessions working this repo.
-5. **A knowledge system** (`knowledge/KNOWLEDGE_SYSTEM.md`) — the eleven
+7. **A knowledge system** (`knowledge/KNOWLEDGE_SYSTEM.md`) — the eleven
    memory categories from the request, seeded only with facts that already
    have a citation in the repo (mostly from `CLAUDE.md` and
    `PROJECT-KNOWLEDGE.md`), not invented ones.
-6. **An orchestration model** (`ORCHESTRATION.md`) — the
+8. **An orchestration model** (`ORCHESTRATION.md`) — the
    PROPOSAL → VALIDATION → APPROVAL → EXECUTION → VERIFICATION →
    LEARNING lifecycle mapped onto tools this environment genuinely has
    (Claude Code Remote `create_trigger`/Routines, GitHub PR subscriptions),
@@ -73,9 +79,13 @@ the request that are real and honest to ship right now:
 ## Reading order
 
 1. `DISCOVERY.md` — what is actually known about this repo, and from where.
-2. `CAPABILITY_MATRIX.md` — capability-by-capability status with citations.
-3. `registry/agents.yaml` — the agent org chart.
-4. `governance/GOVERNANCE.md` — the rules every agent role operates under.
-5. `knowledge/KNOWLEDGE_SYSTEM.md` — the persistent memory categories.
-6. `ORCHESTRATION.md` — how proposals move from idea to merged PR, and what
+2. `CODE_SEARCH_AUDIT.md` — the Section-7 full-repo marker search
+   (TODO/FIXME/MOCK/STUB/…), classified, not just counted.
+3. `CAPABILITY_MATRIX.md` — capability-by-capability status with citations.
+4. `CEO_BRIEFING.md` — the CEO agent role's synthesis of the above into
+   FACT/EVIDENCE/INFERENCE/RECOMMENDATION/UNKNOWN statements.
+5. `registry/agents.yaml` — the agent org chart.
+6. `governance/GOVERNANCE.md` — the rules every agent role operates under.
+7. `knowledge/KNOWLEDGE_SYSTEM.md` — the persistent memory categories.
+8. `ORCHESTRATION.md` — how proposals move from idea to merged PR, and what
    "activating" continuous operation would actually require.
