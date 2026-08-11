@@ -1,13 +1,16 @@
 # Rezv AI Agency OS — Charter
 
-> **Status: SPECIFICATION, not a running system.** This directory defines a
-> governance and organization layer for how AI-assisted work on this
-> repository *should* be structured, gated, and remembered. Nothing in this
-> directory makes anything "autonomous" or "continuously operating" by
-> itself — no cron job, no scheduled agent, no persistent process reads
-> these files today. Treat every claim below as `DOCUMENTED_ONLY` unless a
-> section explicitly says otherwise, per the classification rules in
-> [`DISCOVERY.md`](./DISCOVERY.md).
+> **Status: mostly SPECIFICATION, plus one narrow live Routine.** This
+> directory defines a governance and organization layer for how AI-assisted
+> work on this repository *should* be structured, gated, and remembered.
+> As of 2026-08-11, exactly one piece of it is actually scheduled: a daily,
+> **report-only** (no commits, no pushes, no PRs) health-check Routine the
+> human explicitly authorized — see `ORCHESTRATION.md#activating-a-routine`
+> and `knowledge/KNOWLEDGE_SYSTEM.md § DECISION_MEMORY`. Every other agent
+> role and capability in this directory remains `DOCUMENTED_ONLY`: no
+> agent has standing write, push, or PR authority. Treat every claim below
+> as `DOCUMENTED_ONLY` unless a section explicitly says otherwise, per the
+> classification rules in [`DISCOVERY.md`](./DISCOVERY.md).
 
 Activation keyword: `REZV`. Highest-level command: `REZV FULL`. Both are
 conventions for prompting a human-operated Claude Code session against this

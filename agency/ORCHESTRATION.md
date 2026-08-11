@@ -55,7 +55,34 @@ them on:
 
 ## Activating a Routine
 
-None of the above is wired up by this change. Doing so — e.g. creating a
+**Status as of 2026-08-11: one Routine is live, everything else in this
+directory is still `DOCUMENTED_ONLY`.** When asked exactly what scope to
+grant, the human chose "report-only, no writing" out of four options. A
+daily cron Routine (`trig_017G3nMLE9anexdJvVRFnSfr`, `0 6 * * *` UTC) now
+fires into a session acting as `rezv-ceo`/`rezv-security`: it checks new
+commits on `main`, CI/PR status (only if GitHub MCP tools happen to be
+available on that particular firing — they may not be, see the note
+below), and greps changed files for the same markers as
+`CODE_SEARCH_AUDIT.md`. Its prompt hard-forbids `git commit`, `git push`,
+file edits, and any GitHub write (PR/issue/comment) — see
+`knowledge/KNOWLEDGE_SYSTEM.md` § `DECISION_MEMORY` for the full record
+and how to revoke it. This is the **only** capability in
+`registry/agents.yaml` promoted out of `DOCUMENTED_ONLY`; no agent role
+has standing write/push/PR authority as a result of this decision.
+
+*Known limitation, disclosed rather than hidden*: `create_trigger` warned
+at creation time that fired sessions may run without MCP connector tools
+(`mcp__github__*` included), depending on how the trigger fires. The
+Routine's prompt was written to detect and report that gracefully ("چکِ
+CI/PR این‌بار به‌خاطرِ نبودِ ابزارِ GitHub انجام نشد") instead of silently
+skipping or fabricating a status — but it means the CI/PR-status part of
+this Routine may not always run, only the git-log/grep part reliably will.
+
+Everything below this point describes the general model for activating
+*further* Routines beyond this one — each additional grant needs its own
+explicit human scope decision, the same way this one did.
+
+Going further than the one report-only Routine above — e.g. creating a
 Routine that fires `rezv-security` on a schedule to re-scan the repo, or a
 Routine that auto-merges on green CI — is a **governance change** under
 `governance/GOVERNANCE.md#approval-gates` and requires the human to say so

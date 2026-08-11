@@ -95,3 +95,21 @@ itself the honest state, not a gap to paper over.
   migrated to React; Landing/SEO are intentionally kept as separate Next.js
   apps rather than unified with the panels. — `CLAUDE.md`, original request
   §5
+- **2026-08-11 — first live Routine activated, scope: report-only.** The
+  human explicitly chose "فقط گزارش (بدونِ نوشتن)" (report-only, no
+  writing) when asked, via `AskUserQuestion`, exactly what a scheduled
+  agent should be allowed to do — out of four options ranging from
+  report-only up to "open PRs" and "full babysit-PR posture." This is the
+  first (and, as of this entry, only) piece of `ORCHESTRATION.md` promoted
+  out of `DOCUMENTED_ONLY`: a daily cron Routine (`trig_017G3nMLE9anexdJvVRFnSfr`,
+  `0 6 * * *` UTC, self-bound to the session that created it) acting in an
+  `rezv-ceo`/`rezv-security` read-only capacity — checks new commits on
+  `main`, CI/PR status if GitHub tools are available in that firing, and a
+  light grep-based scan of changed files only. Its prompt hard-forbids
+  `git commit`/`git push`/file edits/PR/issue/comment creation and
+  instructs it to say so explicitly rather than guess if a check couldn't
+  run (e.g. GitHub MCP tools unavailable on that firing). Every other
+  agent role and every other capability in `registry/agents.yaml` remains
+  `DOCUMENTED_ONLY` — this decision authorizes exactly this one Routine's
+  exact scope, not a general "agents may act autonomously" grant. To
+  revoke: `delete_trigger` on the ID above, or ask the session to do it.
