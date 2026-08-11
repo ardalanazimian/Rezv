@@ -17,15 +17,26 @@ guesses. Every item below is classified:
 - No pre-existing "agent"/"agency" infrastructure in the repo (`grep -ril
   agent **/*.md` outside this change only matches `docs/adr/0002-*.md` and
   `docs/figma-mcp-rules.md`, neither of which describes an agent system).
-- CI (`.github/workflows/ci.yml`) runs two jobs on push/PR to `main`/
-  `develop`: `build` (Prisma generate → `tsc --noEmit` → lint → `next
-  build`) and `test` (real Postgres 17 + Redis 7 service containers →
-  `prisma db push` + `prisma/apply-sql.sh` → test suite). There is no
-  workflow that runs Playwright E2E or `sync-design-system.sh --check` in
-  CI today — `CLAUDE.md` requires both before a human pushes, but nothing
-  enforces them automatically in `.github/workflows/`. **Gap, not a
-  contradiction**: the human-run pre-push checklist and CI are not the same
-  set of checks.
+- CI (`.github/workflows/ci.yml`, 228 lines, 7 jobs, re-read in full after
+  an initial partial read missed this — correcting that mistake here
+  rather than leaving it) runs on push/PR to `main`/`develop`: `build`
+  (Prisma generate → `tsc --noEmit` → lint → `next build`), `test` (real
+  Postgres 17 + Redis 7 service containers → `prisma db push` +
+  `prisma/apply-sql.sh` → `npm test`), `security` (`npm audit`, blocks on
+  `critical`, warns on `high`), `e2e` (Playwright against the customer app
+  with the API fully mocked — `npm test` in `e2e/` runs **all** configured
+  projects since no `--project` filter is passed, and
+  `e2e/playwright.config.ts` defines exactly `mobile-safari`/iPhone 13,
+  `mobile-chrome`/Pixel 5, and `desktop-chrome`/Desktop Chrome — i.e. CI
+  *does* cover the three profiles `CLAUDE.md` mandates, for the customer
+  app at least), `design-system` (`sh tools/sync-design-system.sh
+  --check`), `seo` (JSON-LD schema unit tests + `next build`
+  typecheck/lint/build for `apps/seo`), `landing` (unit tests + `npm run
+  typecheck` + `npm run lint` + `next build` for `apps/landing`). So the
+  `CLAUDE.md` pre-push checklist and CI are in fact largely the same set of
+  checks for `api/`, `apps/landing/`, `apps/seo/`, and E2E — CI does not
+  duplicate business/company-panel E2E coverage specifically, which is the
+  one real gap between "CI green" and the full manual checklist.
 - `api/src/lib/` contains 58 modules (auth, RBAC, rate limiting, fraud,
   loyalty, no-show ML, forecasting, Zarinpal payments, waitlist, etc.) —
   this is the real surface the "Backend" and "Database" agent roles operate
@@ -35,6 +46,14 @@ guesses. Every item below is classified:
 - Root `package.json` only declares `playwright`, `@tanstack/react-query`,
   `zod` — confirming `CLAUDE.md`'s note that the repo root has no build of
   its own; real work happens inside `api/`, `apps/landing/`, `apps/seo/`.
+- `e2e/tests/` includes `panels-smoke.spec.ts`, whose own header comment
+  states `business`/`company` panels had **no** E2E at all until this smoke
+  test, and it only verifies each panel loads without a JS error and
+  renders its shell (brand/sidebar/landmarks) — not full reservation/staff
+  flows, which the same comment flags as a follow-up needing staff/admin
+  API mocks. So the customer app has real flow-level E2E (`booking.spec.ts`,
+  `waitlist.spec.ts`, `auth.spec.ts`, …) across all three device profiles,
+  while business/company have structural smoke coverage only.
 
 ## 2. Existing discovery/audit documents (EVIDENCE — already in repo)
 
@@ -78,12 +97,13 @@ stale, rather than re-auditing from zero.
 
 ## 3. What is genuinely still UNKNOWN
 
-- Whether the checks `CLAUDE.md` mandates before push (design-system sync
-  `--check`, Playwright E2E on iPhone 13/Pixel 5/Desktop Chrome) are green
-  *right now* on `main` — not verified in this session, and CI does not run
-  them, so "green in CI" cannot be used as a proxy.
-  `apps/landing/`/`apps/seo/` typecheck/lint/test status independently —
-  not verified in this session.
+- Whether `main`'s CI is actually green *right now* — not checked in this
+  session for `main` itself (only this PR's own run was observed, and only
+  while it was still in progress). CI does cover design-system `--check`,
+  the three-profile Playwright E2E for the customer app, and
+  `api`/`apps/landing`/`apps/seo` typecheck/lint/test/build (see §1), so a
+  green run on `main` would be a reasonable proxy for those — this item is
+  "not yet checked," not "CI doesn't cover it."
 - Current production incident/error state — no telemetry was queried in
   this session (no observability backend credentials in scope here).
 - Whether `docs/architecture-audit/` and `docs/backend-audit/` reports are

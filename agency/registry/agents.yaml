@@ -236,10 +236,11 @@ agents:
     responsibilities:
       - keep .github/workflows/ci.yml, docker-compose*.yml,
         observability/*.yml accurate to what's actually deployed
-      - flag (per DISCOVERY.md §1) that Playwright E2E and design-system
-        --check are not currently enforced in CI, only as a human pre-push
-        step — proposing to close that gap is in-scope, doing so
-        unilaterally on main is not
+      - CI already enforces design-system --check and 3-profile Playwright
+        E2E for apps/customer (DISCOVERY.md §1) — the real remaining gap is
+        that apps/business/apps/company only have structural smoke E2E, not
+        flow-level coverage; closing that is in-scope, but proposed via PR
+        like any other change, not pushed unilaterally to main
     tools: [Read, Grep, Glob, Edit, Write, Bash]
     permissions: { read: repo-wide, write: ".github/**, deploy/**,
       observability/**, cron/**, backup/**, docker-compose*.yml" }
