@@ -135,15 +135,30 @@ async function main() {
       if (!isToday) start.setDate(start.getDate() + 1);
       start.setHours(19 + i % 3, [0, 30][i % 2], 0, 0);
       const end = new Date(start); end.setHours(start.getHours() + 2);
-      await db.reservation.create({
-        data: {
-          code: 'RZ' + Math.random().toString(36).slice(2, 8).toUpperCase(),
-          restaurantId: rest.id, tableId: rest.tables[i].id, userId: todayUsers[i].userId,
-          partySize: Math.floor(Math.random() * 4) + 2,
-          slotStart: start, slotEnd: end,
-          status: isToday && i === 0 ? 'arrived' : 'confirmed', source: 'app',
-        },
-      });
+      // ⚠️ رفعِ باگ (live-test ۲۰۲۶-۰۸-۱۲): این تخصیصِ میز/ساعت با میزِ
+      // ثابتِ tables[i] بود، درحالی‌که حلقه‌ی بالا هم‌زمان می‌تواند رزروی
+      // با daysAgo=0 (امروز) روی همان میز و بازه‌ی نزدیک بگذارد — همان
+      // constraintِ no_table_overlap که چند خط بالاتر توضیح داده شده،
+      // ولی اینجا try/catchِ متناظرش جا افتاده بود و کلِ seed را کرش
+      // می‌کرد. حالا مثلِ حلقه‌ی بالا، با میزِ تصادفی و چند بار تلاش.
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const table = attempt === 0 ? rest.tables[i] : rand(rest.tables);
+        try {
+          await db.reservation.create({
+            data: {
+              code: 'RZ' + Math.random().toString(36).slice(2, 8).toUpperCase(),
+              restaurantId: rest.id, tableId: table.id, userId: todayUsers[i].userId,
+              partySize: Math.floor(Math.random() * 4) + 2,
+              slotStart: start, slotEnd: end,
+              status: isToday && i === 0 ? 'arrived' : 'confirmed', source: 'app',
+            },
+          });
+          break;
+        } catch (e: any) {
+          const isOverlap = e?.code === 'P2010' || /23P01|exclusion constraint/i.test(String(e?.message));
+          if (!isOverlap || attempt === 7) throw e;
+        }
+      }
     }
 
     console.log(`✓ ${rest.name} — ${memberCount} عضو باشگاه + رزروها`);
