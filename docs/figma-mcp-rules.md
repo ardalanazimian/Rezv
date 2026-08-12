@@ -6,16 +6,23 @@
 > ⚠️ **مهم‌ترین نکته‌ی این سند:** رزرونو **یک** دیزاین‌سیستم ندارد، **دو** تا
 > دارد که موازی‌اند و به‌هم sync نمی‌شوند. پیش از هر کاری بخشِ ۰ را بخوان.
 
+> **اصلاح‌شده (۲۰۲۶-۰۸-۱۲):** این سند تا امروز همه‌جا «دنیایِ B» را
+> `apps/seo` می‌نامید — از قبل از جدا شدنِ وب‌سایتِ عمومی به `apps/landing`ِ
+> مستقل (ADR 0002، بازنگری‌شده). چک‌شده: `apps/seo` امروز اصلاً فایلِ CSS یا
+> `Icon.tsx` ندارد؛ همه‌ی جزئیاتِ فنیِ این سند (تعدادِ آیکن ۴۴، لیستِ
+> کامپوننت‌ها، نسخه‌های Next/React) با `apps/landing` تأیید و مسیرها اصلاح
+> شدند — خودِ محتوا درست بود، فقط اسمِ اپ اشتباه.
+
 ---
 
 ## ۰) اول این را بدان: دو دنیای جدا
 
 | | دنیای A — پنل‌ها | دنیای B — وب‌سایت |
 |---|---|---|
-| اپ‌ها | `apps/customer` · `apps/business` · `apps/company` | `apps/seo` |
+| اپ‌ها | `apps/customer` · `apps/business` · `apps/company` | `apps/landing` |
 | فناوری | HTML + CSS + JS خام | Next.js 16 + React 18 + TypeScript |
 | مرحله‌ی build | **ندارد** — فایل مستقیم سرو می‌شود | دارد (Turbopack) |
-| منبعِ توکن | `shared/css/tokens.css` | `apps/seo/app/globals.css` |
+| منبعِ توکن | `shared/css/tokens.css` | `apps/landing/app/globals.css` |
 | توزیعِ توکن | `tools/sync-design-system.sh` کپی می‌کند | کپی نمی‌شود — مستقل است |
 | آیکن | `shared/js/icons.js` (رشته‌ی SVG) | `components/site/Icon.tsx` (React) |
 
@@ -95,7 +102,7 @@ Primitive فقط ورودیِ لایه‌ی Semantic است.
 ⚠️ سایه (`--sh-*`) عمداً در bridge نگاشت **نشده** — کامنتِ خودِ فایل توضیح
 می‌دهد که نگاشتِ سراسری، سایه را در دارک‌مود نامرئی می‌کرد. دست نزن.
 
-### تم در دنیای B (`apps/seo/app/globals.css:89-240`)
+### تم در دنیای B (`apps/landing/app/globals.css:89-240`)
 
 سه لایه، با این اولویت:
 
@@ -112,7 +119,7 @@ Primitive فقط ورودیِ لایه‌ی Semantic است.
 
 ## ۲) کتابخانه‌ی کامپوننت
 
-### دنیای B — React (`apps/seo/components/`)
+### دنیای B — React (`apps/landing/components/`)
 
 ```
 site/       Header · Footer · Icon · Motion · ThemeToggle · JsonLd
@@ -156,7 +163,7 @@ HTMLِ مستقلِ اکتشافی. اینها **منبعِ حقیقت نیست�
 
 ## ۳) فریم‌ورک‌ها و کتابخانه‌ها
 
-وابستگی‌های زمانِ اجرای `apps/seo` **دقیقاً سه تاست**:
+وابستگی‌های زمانِ اجرای `apps/landing` **دقیقاً سه تاست**:
 
 ```json
 { "next": "^16.2.12", "react": "^18.3.0", "react-dom": "^18.3.0" }
@@ -179,7 +186,7 @@ CSS Modules، MUI/Chakra/shadcn، Framer Motion، clsx، date-fns، آیکن‌�
 
 ## ۴) مدیریتِ دارایی
 
-- کلِ `apps/seo/public/` فقط **یک فایل** دارد: `icon.svg`
+- کلِ `apps/landing/public/` فقط **یک فایل** دارد: `icon.svg`
 - **هیچ فایلِ تصویری در مخزن نیست** — هرچه دیده می‌شود SVG/CSS تولیدشده است
 - تصویرِ اشتراک‌گذاری در **زمانِ اجرا** ساخته می‌شود: `app/opengraph-image.tsx`
 - **CDN تنظیم نشده**
@@ -211,7 +218,7 @@ el.innerHTML = icon('search', { size: 20, class: 'nav-ic' });
 
 مقدار = **رشته‌ی کاملِ عناصرِ داخلی** (می‌تواند چند تگ باشد).
 
-### دنیای B — `apps/seo/components/site/Icon.tsx` (۴۴ آیکن)
+### دنیای B — `apps/landing/components/site/Icon.tsx` (۴۴ آیکن)
 
 ```tsx
 const PATHS: Record<string, string> = {
@@ -259,7 +266,7 @@ const PATHS: Record<string, string> = {
 <link rel="stylesheet" href="css/ds-bridge.css">  <!-- ۵ اصلاحِ واگرایی — آخر -->
 ```
 
-دنیای B (`apps/seo/app/layout.tsx`): `globals.css` سپس `site.css`.
+دنیای B (`apps/landing/app/layout.tsx`): `globals.css` سپس `site.css`.
 
 ### واکنش‌گرایی
 
@@ -291,8 +298,8 @@ const PATHS: Record<string, string> = {
 | `shared/css/tokens.css` | ۰ |
 | `shared/css/foundation.css` | ۰ |
 | `shared/css/ds-bridge.css` | ۰ |
-| `apps/seo/app/globals.css` | ۰ |
-| `apps/seo/app/site.css` | ۰ |
+| `apps/landing/app/globals.css` | ۰ |
+| `apps/landing/app/site.css` | ۰ |
 
 ولی CSSِ قدیمیِ خودِ پنل‌ها هنوز پاک نشده — بدهیِ فنیِ موجود:
 
@@ -342,7 +349,7 @@ shared/                 منبعِ حقیقتِ دنیای A
 apps/
   customer|business|company/   HTML+CSS+JS خام، بدونِ build
     css/{tokens,theme,foundation,panel,ds-bridge}.css   ← کپیِ خودکار
-  seo/                         Next.js — وب‌سایتِ عمومی
+  landing/                     Next.js — وب‌سایتِ عمومی
     app/        مسیرها (App Router) + globals.css + site.css
     components/ بخشِ ۲
     lib/        seo · site-schema · markdown · format · api

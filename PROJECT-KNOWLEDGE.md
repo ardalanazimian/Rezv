@@ -77,7 +77,9 @@ Supabase فقط **host مدیریت‌شده‌ی Postgres** است — نه cli
   (قابل‌ویرایش از پنلِ شرکت بدون ری‌دیپلوی، کش ۳۰ ثانیه‌ای)، با fallback به env.
 - فعال/غیرفعال per-restaurant: `Restaurant.payment_enabled` (پنل شرکت → جزئیات رستوران).
 - جدولِ `payments` جداست (نه فقط فیلد روی Reservation) چون یک رزرو می‌تواند چند تلاشِ پرداخت داشته باشد.
-- روت‌ها: `POST /reservations/:code/pay`، `GET /payments/callback` (verify سمت سرور، idempotent، هیچ‌وقت به Status در URL اعتماد نمی‌کند)، `PATCH /restaurant/reservations/:code/deposit`، `GET/PATCH /admin/settings`.
+- روت‌ها: `POST /reservations/:code/pay`، `GET /payments/callback` (verify سمت سرور، idempotent، هیچ‌وقت به Status در URL اعتماد نمی‌کند)، `GET/PATCH /admin/settings`.
+  **⚠️ اصلاح‌شده (۲۰۲۶-۰۸-۱۲):** این خط قبلاً یک روتِ `PATCH /restaurant/reservations/:code/deposit` را هم اینجا فهرست کرده بود — چنین روتی در کدِ فعلی وجود ندارد (چک‌شده: `api/src/app/api/v1/restaurant/reservations/[code]/` فقط `events` و `status` دارد؛ `status` فقط انتقالِ وضعیت را می‌پذیرد، نه مبلغِ پیش‌پرداخت). یا این قابلیت هیچ‌وقت واقعاً ساخته نشده، یا بعداً حذف شده — سندسازی نشده بود.
+- **⚠️ یافته‌ی تأییدشده (۲۰۲۶-۰۸-۱۲):** با وجودِ اینکه `POST /reservations/:code/pay` در بک‌اند پیاده‌سازی شده، **هیچ‌کدام از سه پنل (customer/business/company) این روت را صدا نمی‌زنند** — جست‌وجوی کامل برایِ `pay`/`zarinpal`/`deposit` در `apps/customer/js`, `apps/business/js`, `apps/company/js` صفر نتیجه داد. یعنی جریانِ پرداختِ آنلاین از سمتِ UI قابلِ‌دسترسی نیست، برخلافِ ادعایِ «Complete» در `docs/architecture-audit/FEATURE_COVERAGE_MATRIX.md`. قبل از اتکا به این قابلیت، یا UI را بسازید یا آن سند را اصلاح کنید.
 - **هنوز نیاز به:** merchant ID واقعیِ زرین‌پال (owner از پنل شرکت وارد کند) + تعریفِ قالبِ پیامکِ `rezervno-deposit` در پنلِ کاوه‌نگار.
 
 ## ۶.۵ چت مشتری ↔ رستوران (Polling-based)

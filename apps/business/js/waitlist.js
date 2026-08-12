@@ -25,6 +25,12 @@ function rWaitlist(){
   if(!_wlLoaded && API.getToken()){ loadWaitlist().then(()=>rWaitlist()); }
   const A=WL_ANALYTICS;
   const queue=WAITLIST.filter(w=>w.status==='waiting'||w.status==='offered');
+  // ⚠️ رفعِ باگ: badgeِ سایدبارِ #wlBadge با اینکه id داشت هیچ‌جا آپدیت نمی‌شد —
+  // همیشه مقدارِ استاتیکِ HTML («۳») می‌ماند حتی وقتی صفِ واقعی خالی بود
+  // (با live-test پیدا شد). حالا با همان A.current_queue_sizeِ واقعی که
+  // کارت‌های آمار هم استفاده می‌کنند پر می‌شود.
+  const wlBadge = document.getElementById('wlBadge');
+  if (wlBadge) wlBadge.textContent = queue.length > 0 ? fa(queue.length) : '';
   document.getElementById('v-waitlist').innerHTML=`
     <!-- آمار لیست انتظار -->
     <div class="wl-stats-grid">

@@ -143,6 +143,12 @@ function callGuest(idx){
 }
 function renderEnterpriseDashboard(){
   const k = calcTodayKPIs();
+  // ⚠️ رفعِ باگ: badgeِ سایدبارِ «رزروها» قبلاً همیشه هاردکدِ «۱۲» در HTML بود
+  // (هیچ‌جا با JS آپدیت نمی‌شد — با live-testِ واقعی روی دیتای seedشده پیدا شد:
+  // عددِ واقعیِ امروز ۳ بود ولی سایدبار همیشه ۱۲ نشان می‌داد). حالا از همان
+  // k.todayCountِ واقعی که KPI هم استفاده می‌کند پر می‌شود؛ صفر → مخفی.
+  const resBadge = document.getElementById('resBadge');
+  if (resBadge) resBadge.textContent = k.todayCount > 0 ? fa(k.todayCount) : '';
   const elap = REVENUE_CONFIG.connected ? '' : '<span class="kpi-est" title="تخمینی تا اتصال صندوق">≈</span>';
   document.getElementById('v-overview').innerHTML = `
     <div class="dash-live-row">${liveStatusBadge()}<span class="dash-live-time">به‌روزرسانی خودکار هر ۱۵ ثانیه</span><span id="offlineBadge"></span></div>
