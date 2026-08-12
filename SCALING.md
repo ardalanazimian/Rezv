@@ -19,14 +19,27 @@
 ## ۲. گلوگاه‌هایی که پیدا و رفع شدند (refactor واقعی)
 
 ### ۲.۱ صف SMS — مهم‌ترین رفع
-**مشکل:** `enqueueSms` با وجود نامش، **همزمان** یک `fetch` به کاوه‌نگار می‌زد، آن هم داخل مسیر request (مثلاً بعد از ثبت رزرو). در ۲۰۰هزار کاربر، latency رزرو به سرعت ارائه‌دهنده‌ی SMS گره می‌خورد و connectionها بلاک می‌شدند.
 
-**رفع:** صف واقعی Redis-backed:
-- `enqueueSms` حالا job را به لیست `queue:sms` در Redis push می‌کند و **فوراً** برمی‌گردد (غیرمسدود).
-- worker (`maintenance/sms-drain`, هر دقیقه از cron) صف را مصرف می‌کند.
-- `lpop` اتمیک است → می‌توان چند worker موازی داشت بدون پردازش تکراری.
-- retry با سقف ۳ تلاش؛ trim صف به ۵۰هزار برای جلوگیری از رشد بی‌رویه.
-- **استثنا:** OTP همزمان می‌رود (کاربر منتظر کد است).
+> ⚠️ **اصلاح‌شده (۲۰۲۶-۰۸-۱۲):** این بخش قبلاً یک صفِ Redis-list-based
+> (`queue:sms` + `lpop` + cron جداگانه‌یِ `maintenance/sms-drain`) توصیف
+> می‌کرد. با خواندنِ مستقیمِ `api/src/lib/sms.ts` (کدِ فعلی) تأیید شد که
+> این توصیف دیگه درست نیست — مکانیزم از اون زمان به صفِ یکپارچه‌یِ
+> **Postgres**ِ (`api/src/lib/queue.ts`, جدولِ `jobs`، claim با
+> `FOR UPDATE SKIP LOCKED`) مهاجرت کرده که در `QUEUE.md` مستندشده؛
+> `sms` فقط یکی از شش `JobKind` (`sms`/`email`/`push`/`report`/`image`/`webhook`)
+> است، نه یک صفِ اختصاصیِ جدا. جستجو در کدِ فعلی هیچ اثری از `queue:sms`
+> یا `sms-drain` پیدا نکرد (مسیرهایِ واقعیِ `maintenance/` عبارتند از
+> `jobs-drain`, `retention`, `rewards`, `ensure-partitions`, `waitlist`,
+> `expire`, `lifecycle`, `customer-insights`).
+
+**مشکل (تاریخی):** `enqueueSms` با وجود نامش، **همزمان** یک `fetch` به کاوه‌نگار می‌زد، آن هم داخل مسیر request (مثلاً بعد از ثبت رزرو). در ۲۰۰هزار کاربر، latency رزرو به سرعت ارائه‌دهنده‌ی SMS گره می‌خورد و connectionها بلاک می‌شدند.
+
+**رفع (وضعیتِ فعلی):** صفِ یکپارچه‌یِ Postgres-based (نه Redis list):
+- `enqueueSms` حالا (به‌جز OTP) یک job با `kind: 'sms'` به تابعِ `enqueue()`ِ صفِ عمومی در `api/src/lib/queue.ts` می‌فرستد و **فوراً** برمی‌گردد (غیرمسدود) — جزئیاتِ کاملِ صف (اولویت، retry، `jobs-drain`) در `QUEUE.md`.
+- worker (هندلرِ `sms` در `api/src/lib/worker.ts`، صدا‌زده‌شده از cronِ `maintenance/jobs-drain`) صف را مصرف می‌کند.
+- claim با `FOR UPDATE SKIP LOCKED` اتمیک است → می‌توان چند worker موازی داشت بدون پردازش تکراری.
+- اگر خودِ صف در دسترس نبود (مثلاً خطایِ اتصالِ DB)، `enqueueSms` به ارسالِ مستقیم (`sendSmsNow`) fallback می‌کند — بهتر از گم‌شدنِ پیام.
+- **استثنا:** OTP همزمان و مستقیم می‌رود (کاربر منتظر کد است) — هیچ‌وقت وارد صف نمی‌شود.
 
 ### ۲.۲ Redis آماده‌ی Cluster
 **مشکل:** client تک‌نود بود؛ یک نود Redis در ۲۰۰هزار کاربر گلوگاه است.
@@ -57,7 +70,7 @@
                     └─────────────┼─────────────┘
               ┌───────────────────┼───────────────────┐
         ┌─────▼─────┐      ┌──────▼──────┐      ┌──────▼──────┐
-        │ Redis     │      │ PgBouncer   │      │ SMS workers │
+        │ Redis     │      │ PgBouncer   │      │ Job workers │
         │ Cluster   │      │ (pooler)    │      │ (cron pods) │
         │ (shard)   │      └──────┬──────┘      └─────────────┘
         └───────────┘      ┌──────▼──────┐
@@ -78,7 +91,7 @@
 | Load balancer | ALB / Nginx / Caddy | 🔧 infra (health-check به `/api/v1/health` وصل شود) |
 | Redis Cluster | Redis Cluster ۳+ نود | ✅ کد آماده (`REDIS_CLUSTER_NODES`) |
 | DB replicas | Postgres streaming replication | ✅ کد آماده (`dbRead` + `DATABASE_REPLICA_URL`) |
-| Queue system | Redis list (`queue:sms`) | ✅ پیاده شد + worker |
+| Queue system | صفِ یکپارچه‌یِ Postgres (جدولِ `jobs`، شاملِ کارِ `sms`) | ✅ پیاده شد + worker (رجوع کن به `QUEUE.md`) |
 | Connection pooling | PgBouncer / Supabase Pooler | ✅ کد آماده (`?pgbouncer=true`) |
 | Auto scaling | HPA (k8s) یا ASG | 🔧 infra (متریک: CPU + p95 latency) |
 
@@ -116,7 +129,7 @@ podها یکی‌یکی با نسخه‌ی جدید جایگزین می‌شون
 | API pods (stateless) | خطی با تعداد pod | فقط هزینه؛ گلوگاه نیست |
 | Redis Cluster (۳ shard) | ~۳۰۰هزار+ op/s | بالاتر از نیاز |
 | Postgres + PgBouncer + replica | **اینجا گلوگاه واقعی است** | write throughput روی primary |
-| صف SMS | نامحدود (async) | دیگر در مسیر request نیست |
+| صفِ jobها (شاملِ SMS) | نامحدود (async، محدود به throughputِ نوشتنِ Postgres) | دیگر در مسیر request نیست |
 
 **گلوگاه نهایی = نوشتن روی Postgres primary.** خواندن‌ها با replica + cache مقیاس می‌شوند، اما هر رزرو/تغییر وضعیت یک write است. یک Postgres منفرد روی سخت‌افزار خوب ~۵٬۰۰۰–۱۵٬۰۰۰ write/s را می‌کشد.
 
@@ -130,7 +143,7 @@ podها یکی‌یکی با نسخه‌ی جدید جایگزین می‌شون
 ## ۶. گام بعدی برای عبور از ۱۰۰هزار (اگر واقعاً لازم شد)
 
 1. **Sharding دیتابیس** بر اساس `restaurant_id` (داده‌ها به‌طور طبیعی per-restaurant جدا هستند → shard-friendly). Citus یا تقسیم منطقی.
-2. **صف عمومی‌تر** (BullMQ روی همان Redis) برای انواع دیگر کار async (نه فقط SMS).
+2. ~~صف عمومی‌تر (BullMQ روی همان Redis) برای انواع دیگر کار async (نه فقط SMS)~~ — **انجام شد**: صفِ یکپارچه‌یِ Postgres در `api/src/lib/queue.ts` از قبل شش نوع کار (`sms`/`email`/`push`/`report`/`image`/`webhook`) را پشتیبانی می‌کند (رجوع کن به `QUEUE.md`)؛ اگر throughputِ همین صف (نوشتن روی Postgres) خودش گلوگاه شد، آن زمان مهاجرت به BullMQ/Redis قابلِ بازبینی است، نه به‌عنوانِ کارِ باقی‌مانده‌یِ فعلی.
 3. **CQRS برای آنالیتیکس:** خواندن‌های سنگین گزارش به یک read-store جدا (مثلاً ClickHouse) منتقل شود.
 4. **لود تست واقعی** با k6/Gatling روی staging — تنها راه تأیید قطعی اعداد بالا.
 
