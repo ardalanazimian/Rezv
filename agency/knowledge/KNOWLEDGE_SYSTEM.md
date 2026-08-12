@@ -75,6 +75,18 @@ itself the honest state, not a gap to paper over.
   read from data the page already fetches; re-tested live, confirmed
   correct. — `apps/business/index.html`, `apps/business/js/overview.js`,
   `apps/business/js/waitlist.js` (commit `427028f`)
+- **2026-08-12 — `npm run db:seed` crash root-caused and fixed.** The
+  "today/tomorrow reservations for the panel" loop in `api/prisma/seed.ts`
+  had no overlap-retry protection, unlike the visit-history loop 20 lines
+  above it (which already handles this exact `no_table_overlap` exclusion
+  constraint, with a comment explaining why). When the random loop
+  happened to place a "today" reservation on the same table/near-time as
+  the deterministic second loop, the second loop's unprotected `create()`
+  threw and crashed the whole seed with zero recovery. Fixed by applying
+  the same retry-with-random-table pattern. Verified live: full DB reset +
+  reseed, twice in a row, both completed all 3 restaurants with no crash
+  (previously crashed after 2 of 3, reliably). — `api/prisma/seed.ts`
+  (commit `3c056ca`)
 
 ## PRODUCT_MEMORY
 - **2026-08-12 — online payment (Zarinpal) is backend-only, not reachable
