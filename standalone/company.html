@@ -800,6 +800,25 @@ button{font-family:inherit;cursor:pointer}
   font-size:13px;font-weight:700;color:var(--t3);
   background:repeating-linear-gradient(45deg,#F1F5F9,#F1F5F9 10px,#E2E8F0 10px,#E2E8F0 20px)}
 
+/* ── توزیعِ سطحِ اعتبارِ مشتری (تبِ امنیتِ پلتفرم) ───────────────────
+   کارتِ هر سطح رنگِ هویتیِ خودش را از --tier-fg می‌گیرد (همان رنگی که
+   اپِ مشتری و پنلِ بیزنس برایِ همان سطح استفاده می‌کنند) تا مدیر و مشتری
+   یک چیز را یک‌جور ببینند. اعداد از توکن‌های ۴px می‌آیند، نه دستی. */
+.tier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--sp-3,12px)}
+.tier-card{position:relative;padding:var(--sp-4,16px);border:1px solid var(--border);
+  border-radius:var(--radius-md,12px);background:var(--white);overflow:hidden}
+/* نوارِ باریکِ رنگی به‌جایِ رنگ‌کردنِ کلِ کارت — سطح را از هم تفکیک می‌کند
+   بدونِ اینکه چهار بلوکِ پررنگ با هم رقابت کنند. */
+.tier-card::before{content:'';position:absolute;inset-block-start:0;inset-inline:0;
+  height:3px;background:var(--tier-fg,var(--t3))}
+.tier-ic{color:var(--tier-fg,var(--t3));margin-bottom:var(--sp-2,8px);line-height:0}
+.tier-name{font-size:var(--fs-sm,13px);font-weight:var(--fw-bold,700);color:var(--t1)}
+.tier-count{font-size:var(--fs-2xl,24px);font-weight:var(--fw-extra,800);
+  line-height:var(--lh-tight,1.2);margin-top:var(--sp-1,4px);letter-spacing:var(--ls-tight,-.02em)}
+.tier-meta{font-size:var(--fs-2xs,11px);color:var(--t2);margin-top:var(--sp-1,4px)}
+/* IP در فهرستِ سوءاستفاده — عددی و هم‌عرض، ولی هم‌اندازه‌ی بقیه‌ی نام‌ها */
+.mono-ip{font-variant-numeric:tabular-nums;letter-spacing:.01em}
+
 </style>
 <style data-src="css/ds-bridge.css">
 /* ═══════════════════════════════════════════════════════════
@@ -1861,6 +1880,35 @@ function rSystemHealth(){
 }
 
 // ═══════════ امنیت پلتفرم — واقعی، از /admin/security ═══════════
+
+// هویتِ سطحِ اعتبار — عمداً همون نام/آیکون/رنگی که اپِ مشتری
+// (js/features/economy.js) و پنلِ بیزنس (js/reservations.js) استفاده می‌کنن.
+// یه محصول باید همه‌جا یه زبان حرف بزنه؛ نشون‌دادنِ bronze/gold خام به مدیر
+// در حالی که مشتری «مهمانِ ممتاز» می‌بینه، دو محصولِ جدا می‌سازه نه یکی.
+const REP_ID = {
+  bronze:   { name:'مهمانِ تازه',  ic:'sparkle', fg:'var(--t2)' },
+  silver:   { name:'مهمانِ معتبر', ic:'star',    fg:'#0D9488' },
+  gold:     { name:'مهمانِ ممتاز', ic:'shield',  fg:'#4F46E5' },
+  platinum: { name:'مهمانِ نمونه', ic:'crown',   fg:'#7C3AED' },
+};
+function repName(tier){ return REP_ID[tier]?.name || tier; }
+
+// ترجمه‌ی اقدام‌های حساسِ audit به فارسی — مدیرِ پلتفرم نباید مجبور باشه
+// اسمِ فنیِ رویداد (plan.changed) رو بخونه تا بفهمه چی شده. اگر اقدامِ
+// جدیدی اضافه شد و اینجا نبود، همون کلیدِ خام نشون داده می‌شه (بی‌صدا خراب
+// نمی‌شه، فقط ترجمه‌نشده می‌مونه).
+const ACTION_LABEL = {
+  'restaurant.activated':   { fa:'رستوران فعال شد',            ic:'checkCircle' },
+  'restaurant.deactivated': { fa:'رستوران غیرفعال شد',          ic:'close' },
+  'staff.permission_change':{ fa:'دسترسیِ کارمند تغییر کرد',    ic:'lock' },
+  'plan.changed':           { fa:'پلنِ اشتراک تغییر کرد',        ic:'creditCard' },
+  'subscription.cancelled': { fa:'اشتراک لغو شد',               ic:'close' },
+  'coupon.created':         { fa:'کوپنِ جدید ساخته شد',         ic:'ticket' },
+  'security.abuse_flag':    { fa:'نشانِ سوءاستفاده تغییر کرد',   ic:'shield' },
+};
+/** حرفِ اولِ نام برایِ آواتارِ متنی (وقتی عکسی نیست) — مثلِ بقیه‌ی لیست‌های پنل. */
+function initialOf(name){ return (String(name||'').trim()[0]) || '؟'; }
+
 function rSecurity(){
   document.getElementById('v-security').innerHTML=`<div style="text-align:center;padding:60px;color:var(--t2)">در حال بارگذاری...</div>`;
   (async()=>{
@@ -1877,53 +1925,103 @@ function rSecurity(){
       </div>
       <div class="panel" style="margin-bottom:20px">
         <div class="panel-head"><div><div class="panel-title">اقتصادِ یکپارچه‌ی مشتری — نمایِ سراسریِ پلتفرم</div><div class="panel-sub">${fa(eo.total_economy_profiles)} پروفایل · مجموعِ XPِ اعطاشده: ${fa(eo.total_xp_granted)}</div></div></div>
-        ${eo.tier_distribution.length?`<div style="display:flex;gap:10px;flex-wrap:wrap">${eo.tier_distribution.map(t=>`<div style="flex:1;min-width:110px;padding:12px;border:1px solid var(--border);border-radius:10px;text-align:center"><div style="font-weight:800;font-size:15px">${esc(t.tier)}</div><div style="color:var(--t2);font-size:12px;margin-top:4px">${fa(t.count)} مشتری · اعتبارِ میانگین ${fa(t.avg_reliability)}</div></div>`).join('')}</div>`:'<div style="text-align:center;color:var(--t2);padding:20px">هنوز پروفایلی نیست</div>'}
+        ${eo.tier_distribution.length?`<div class="tier-grid">${eo.tier_distribution.map(t=>{
+          const r=REP_ID[t.tier]||REP_ID.bronze;
+          return `<div class="tier-card" style="--tier-fg:${r.fg}">
+            <div class="tier-ic">${icon(r.ic,{size:18})}</div>
+            <div class="tier-name">${esc(r.name)}</div>
+            <div class="tier-count">${fa(t.count)}</div>
+            <div class="tier-meta">اعتبارِ میانگین ${fa(t.avg_reliability)}</div>
+          </div>`;
+        }).join('')}</div>`:`<div class="empty-state"><div class="empty-state-icon">${icon('users',{size:32})}</div><div class="empty-state-desc">هنوز مشتری‌ای وارد این چرخه نشده</div></div>`}
       </div>
       <div class="panel" style="margin-bottom:20px">
-        <div class="panel-head"><div><div class="panel-title">مشتریانِ فلگ‌دارِ سوءاستفاده</div><div class="panel-sub">می‌تونی فلگِ اشتباه رو پاک کنی یا دستی فلگ بزنی</div></div></div>
-        ${d.flagged_abuse_users.length?d.flagged_abuse_users.map(u=>`
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px">
-            <div>
-              <div style="font-weight:700">${esc(u.name)} <span style="font-weight:400;color:var(--t2);font-size:11px">${esc(u.phone)}</span></div>
-              <div style="color:var(--t2);font-size:11.5px;margin-top:2px">tier: ${esc(u.reputation_tier)} · اعتبار: ${fa(u.reliability_score)} · strike: ${fa(u.strike_count)} · ${u.flagged_by==='admin'?'فلگِ دستی':'خودکار'}${u.reason?` (${esc(u.reason)})`:''}</div>
+        <div class="panel-head"><div><div class="panel-title">مشتریانِ نشان‌دارِ سوءاستفاده</div><div class="panel-sub">رزروِ این‌ها بیعانه می‌خواد و خودکار تأیید نمی‌شه — اگر اشتباه بوده، نشان رو بردار</div></div></div>
+        ${d.flagged_abuse_users.length?d.flagged_abuse_users.map(u=>{
+          const rep=REP_ID[u.reputation_tier]||REP_ID.bronze;
+          return `<div class="mini-row">
+            <div class="mini-ava">${esc(initialOf(u.name))}</div>
+            <div class="mini-info">
+              <div class="mini-name">${esc(u.name)}
+                <span class="badge ${u.flagged_by==='admin'?'badge-warning':'badge-danger'}">${u.flagged_by==='admin'?'نشانِ دستی':'تشخیصِ خودکار'}</span>
+              </div>
+              <div class="mini-sub">${esc(u.phone)} · <span style="color:${rep.fg};font-weight:700">${esc(rep.name)}</span> · اعتبار ${fa(u.reliability_score)} از ۱۰۰${u.strike_count?` · ${fa(u.strike_count)} تخلف`:''}</div>
+              ${u.reason?`<div class="mini-sub" style="margin-top:var(--sp-1)">دلیل: ${esc(u.reason)}</div>`:''}
             </div>
-            <button class="btn btn-sm" data-uid="${esc(u.user_id)}" onclick="clearAbuseFlagUi(this.dataset.uid)">پاک‌کردنِ فلگ</button>
-          </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">فعلاً کسی فلگ نداره</div></div>`}
-        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
-          <input id="manualFlagUserId" class="login-inp" style="flex:1;min-width:200px" placeholder="userId برایِ فلگِ دستی">
-          <button class="btn btn-sm" onclick="flagAbuseUi()">فلگِ دستی</button>
-        </div>
+            <button class="btn btn-sm" data-uid="${esc(u.user_id)}" onclick="clearAbuseFlagUi(this.dataset.uid)">برداشتنِ نشان</button>
+          </div>`;
+        }).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">هیچ مشتری‌ای نشان نخورده — همه‌چیز آرومه</div></div>`}
       </div>
       <div class="panel" style="margin-bottom:20px">
         <div class="panel-head"><div><div class="panel-title">الگوی سوءاستفاده از کوپن (یک IP، چند حساب)</div></div></div>
-        ${d.coupon_abuse_signals.length?d.coupon_abuse_signals.map(c=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="font-family:monospace">${esc(c.ip)}</span><span>${fa(c.distinct_accounts)} حساب · ${fa(c.total_redemptions)} استفاده</span></div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('shield',{size:32})}</div><div class="empty-state-desc">چیز مشکوکی نیست</div></div>`}
+        ${d.coupon_abuse_signals.length?d.coupon_abuse_signals.map(c=>`<div class="mini-row">
+          <div class="mini-ava">${icon('ticket',{size:16})}</div>
+          <div class="mini-info">
+            <div class="mini-name mono-ip">${esc(c.ip)}</div>
+            <div class="mini-sub">${fa(c.distinct_accounts)} حسابِ مختلف · ${fa(c.total_redemptions)} بار استفاده</div>
+          </div>
+          <span class="badge badge-warning">نیازِ بررسیِ دستی</span>
+        </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('shield',{size:32})}</div><div class="empty-state-desc">چیز مشکوکی نیست</div></div>`}
       </div>
       <div class="panel" style="margin-bottom:20px">
-        <div class="panel-head"><div><div class="panel-title">مشتریان با نرخ عدم‌حضور بالا</div></div></div>
-        ${d.high_no_show_customers.length?d.high_no_show_customers.map(h=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="font-family:monospace;font-size:11px">${esc(h.user_id).slice(0,12)}…</span><span style="color:var(--red-600);font-weight:700">${fa(Math.round(h.no_show_rate_pct))}٪</span></div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:20px">موردی نیست</div>'}
+        <div class="panel-head"><div><div class="panel-title">مشتریان با نرخ عدم‌حضور بالا</div><div class="panel-sub">اگر الگویِ سوءاستفاده دیدی، از همین‌جا نشان بزن</div></div></div>
+        ${d.high_no_show_customers.length?d.high_no_show_customers.map(h=>{
+          const flagged=d.flagged_abuse_users.some(u=>u.user_id===h.user_id);
+          return `<div class="mini-row">
+            <div class="mini-ava" style="color:var(--red-600)">${icon('close',{size:16})}</div>
+            <div class="mini-info">
+              <div class="mini-name">نرخِ عدم‌حضور <span style="color:var(--red-600)">${fa(Math.round(h.no_show_rate_pct))}٪</span></div>
+              <div class="mini-sub">شناسه‌ی مشتری: ${esc(h.user_id).slice(0,8)}…</div>
+            </div>
+            ${flagged
+              ? `<span class="badge badge-danger">نشان خورده</span>`
+              : `<button class="btn btn-sm" data-uid="${esc(h.user_id)}" onclick="flagAbuseUi(this.dataset.uid)">نشان‌گذاری</button>`}
+          </div>`;
+        }).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">هیچ‌کس الگویِ نگران‌کننده‌ای نداره</div></div>`}
       </div>
       <div class="panel">
         <div class="panel-head"><div><div class="panel-title">آخرین اقدامات حساس ادمین</div><div class="panel-sub">۷ روز اخیر</div></div></div>
-        ${d.sensitive_actions.length?d.sensitive_actions.map(a=>`<div style="padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px"><b>${esc(a.action)}</b><div style="color:var(--t2);margin-top:2px">${new Date(a.at).toLocaleString('fa-IR')}</div></div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:20px">موردی نیست</div>'}
+        ${d.sensitive_actions.length?d.sensitive_actions.map(a=>`<div class="mini-row">
+          <div class="mini-ava">${icon(ACTION_LABEL[a.action]?.ic||'info',{size:16})}</div>
+          <div class="mini-info">
+            <div class="mini-name">${esc(ACTION_LABEL[a.action]?.fa||a.action)}</div>
+            <div class="mini-sub">${new Date(a.at).toLocaleString('fa-IR')}</div>
+          </div>
+        </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">اقدامِ حساسی ثبت نشده</div></div>`}
       </div>`;
   })();
 }
 
-async function clearAbuseFlagUi(userId){
-  const res=await API.abuseFlagAction(userId,'clear');
-  if(!res.ok){toast('','خطا: '+(res.error?.message||'نامشخص'));return;}
-  toast('','فلگ پاک شد');
+// هر دو اقدام رویِ حسابِ یک آدمِ واقعی اثر می‌ذارن (بیعانه‌ی اجباری، لغوِ
+// تأییدِ خودکار) — پس هیچ‌کدوم نباید با یه کلیکِ اتفاقی انجام بشه. دکمه هم
+// حینِ درخواست قفل می‌شه تا دوبار ارسال نشه.
+async function abuseFlagAct(btn, userId, action, confirmMsg, okMsg){
+  if(!userId) return;
+  if(!confirm(confirmMsg)) return;
+  if(btn){ btn.disabled=true; btn.textContent='در حال انجام…'; }
+  const reason = action==='flag' ? 'نشان‌گذاریِ دستی توسطِ مدیرِ پلتفرم (از فهرستِ عدم‌حضورِ بالا)' : undefined;
+  const res=await API.abuseFlagAction(userId,action,reason);
+  if(!res.ok){
+    if(btn){ btn.disabled=false; btn.textContent = action==='flag'?'نشان‌گذاری':'برداشتنِ نشان'; }
+    toast('','انجام نشد: '+(res.error?.message||'خطای نامشخص'));
+    return;
+  }
+  toast('',okMsg);
   rSecurity();
 }
-async function flagAbuseUi(){
-  const el=document.getElementById('manualFlagUserId');
-  const userId=(el?.value||'').trim();
-  if(!userId){toast('','userId رو وارد کن');return;}
-  const res=await API.abuseFlagAction(userId,'flag','فلگِ دستیِ ادمینِ پلتفرم از پنلِ امنیت');
-  if(!res.ok){toast('','خطا: '+(res.error?.message||'نامشخص'));return;}
-  toast('','کاربر فلگ شد');
-  if(el) el.value='';
-  rSecurity();
+function clearAbuseFlagUi(userId){
+  return abuseFlagAct(
+    event?.currentTarget, userId, 'clear',
+    'نشانِ سوءاستفاده‌ی این مشتری برداشته بشه؟ بعدش رزروهاش دوباره عادی تأیید می‌شن.',
+    'نشان برداشته شد',
+  );
+}
+function flagAbuseUi(userId){
+  return abuseFlagAct(
+    event?.currentTarget, userId, 'flag',
+    'این مشتری نشانِ سوءاستفاده بخوره؟ از این به بعد رزروش بیعانه می‌خواد و خودکار تأیید نمی‌شه.',
+    'مشتری نشان خورد',
+  );
 }
 
 // ═══════════ ورود مدیر پلتفرم (فاز ۳ تکه ۷) ═══════════
