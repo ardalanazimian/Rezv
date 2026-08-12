@@ -346,3 +346,22 @@ button{font-family:inherit;cursor:pointer}
 .photo-card__img--demo{display:flex;align-items:center;justify-content:center;
   font-size:13px;font-weight:700;color:var(--t3);
   background:repeating-linear-gradient(45deg,#F1F5F9,#F1F5F9 10px,#E2E8F0 10px,#E2E8F0 20px)}
+
+/* ── توزیعِ سطحِ اعتبارِ مشتری (تبِ امنیتِ پلتفرم) ───────────────────
+   کارتِ هر سطح رنگِ هویتیِ خودش را از --tier-fg می‌گیرد (همان رنگی که
+   اپِ مشتری و پنلِ بیزنس برایِ همان سطح استفاده می‌کنند) تا مدیر و مشتری
+   یک چیز را یک‌جور ببینند. اعداد از توکن‌های ۴px می‌آیند، نه دستی. */
+.tier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--sp-3,12px)}
+.tier-card{position:relative;padding:var(--sp-4,16px);border:1px solid var(--border);
+  border-radius:var(--radius-md,12px);background:var(--white);overflow:hidden}
+/* نوارِ باریکِ رنگی به‌جایِ رنگ‌کردنِ کلِ کارت — سطح را از هم تفکیک می‌کند
+   بدونِ اینکه چهار بلوکِ پررنگ با هم رقابت کنند. */
+.tier-card::before{content:'';position:absolute;inset-block-start:0;inset-inline:0;
+  height:3px;background:var(--tier-fg,var(--t3))}
+.tier-ic{color:var(--tier-fg,var(--t3));margin-bottom:var(--sp-2,8px);line-height:0}
+.tier-name{font-size:var(--fs-sm,13px);font-weight:var(--fw-bold,700);color:var(--t1)}
+.tier-count{font-size:var(--fs-2xl,24px);font-weight:var(--fw-extra,800);
+  line-height:var(--lh-tight,1.2);margin-top:var(--sp-1,4px);letter-spacing:var(--ls-tight,-.02em)}
+.tier-meta{font-size:var(--fs-2xs,11px);color:var(--t2);margin-top:var(--sp-1,4px)}
+/* IP در فهرستِ سوءاستفاده — عددی و هم‌عرض، ولی هم‌اندازه‌ی بقیه‌ی نام‌ها */
+.mono-ip{font-variant-numeric:tabular-nums;letter-spacing:.01em}

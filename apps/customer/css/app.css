@@ -995,3 +995,11 @@ button,[role="button"],.botnav-item,a{min-height:0}
   transition:border-color .18s ease}
 .set-input:focus-visible{border-color:var(--brand,#7c5cff)}
 .set-edit-acts{display:flex;gap:8px;margin-top:12px}
+
+/* ── موجودی‌های اقتصاد (سکه و تجربه) ────────────────────────────
+   این دو یک جفت‌اند — هر دو «چیزی که داری» — پس روی صفحه‌ی بزرگ‌تر کنارِ
+   هم می‌نشینند نه پشتِ سرِ هم. margin-top کارت داخل صفر می‌شود چون
+   فاصله را خودِ گرید می‌دهد. */
+.econ-balances{display:grid;gap:12px;margin-top:12px}
+.econ-balances > .loy-action-card{margin-top:0}
+@media (min-width:560px){.econ-balances{grid-template-columns:1fr 1fr}}

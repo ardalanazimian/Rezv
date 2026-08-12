@@ -21,7 +21,7 @@ const REPUTATION_BADGE = {
 function missionCard(m){
   const pct = Math.round((m.progress / Math.max(1,m.target_count)) * 100);
   const rewardBits = [];
-  if (m.xp_reward > 0) rewardBits.push(`${fmtFa(m.xp_reward)} XP`);
+  if (m.xp_reward > 0) rewardBits.push(`${fmtFa(m.xp_reward)} تجربه`);
   if (m.wallet_reward > 0) rewardBits.push(`${fmtFa(m.wallet_reward)} سکه`);
   if (m.strike_relief > 0) rewardBits.push('ترمیمِ اعتبار');
   const btn = m.claimed
@@ -106,14 +106,16 @@ export async function renderEconomy(){
   root.innerHTML=`<div class="wrap section">
     ${repBlock}
 
-    <div class="loy-action-card reveal" style="cursor:default">
-      <div class="lac-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)">${icon('wallet',{size:20})}</div>
-      <div class="lac-body"><div class="lac-title">${fmtFa(econ.wallet_balance)} سکه</div><div class="lac-sub">قابلِ‌خرج در فروشگاهِ جایزه — جدا از امتیازِ باشگاه</div></div>
-    </div>
+    <div class="econ-balances">
+      <div class="loy-action-card reveal" style="cursor:default">
+        <div class="lac-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)">${icon('wallet',{size:20})}</div>
+        <div class="lac-body"><div class="lac-title">${fmtFa(econ.wallet_balance)} سکه</div><div class="lac-sub">خرجش کن در فروشگاهِ جایزه — جدا از امتیازِ باشگاه</div></div>
+      </div>
 
-    <div class="loy-action-card reveal" style="cursor:default">
-      <div class="lac-icon" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">${icon('sparkle',{size:20})}</div>
-      <div class="lac-body"><div class="lac-title">${fmtFa(econ.xp_total)} XP</div><div class="lac-sub">مجموعِ تجربه‌ای که تا حالا جمع کردی — با هر رزروِ موفق و هر ماموریت بالا می‌ره</div></div>
+      <div class="loy-action-card reveal" style="cursor:default">
+        <div class="lac-icon" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">${icon('sparkle',{size:20})}</div>
+        <div class="lac-body"><div class="lac-title">${fmtFa(econ.xp_total)} تجربه</div><div class="lac-sub">با هر رزروِ سرِوقت و هر ماموریت بالا می‌ره</div></div>
+      </div>
     </div>
 
     ${missions.length ? `<div class="section-head reveal" style="margin-top:32px"><div class="section-title">ماموریت‌ها</div></div>
