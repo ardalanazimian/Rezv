@@ -9,18 +9,22 @@ function rProfile(){
       <button class="itab ${profTab==='gallery'?'active':''}" onclick="setProfTab('gallery')">${icon('image',{size:14})} عکس‌های مجموعه</button>
       <button class="itab ${profTab==='reviews'?'active':''}" onclick="setProfTab('reviews')">${icon('star',{size:14,fill:true})} نظرات مشتری‌ها</button>
       <button class="itab ${profTab==='hours'?'active':''}" onclick="setProfTab('hours')">${icon('clock',{size:14})} ساعات کاری</button>
+      <button class="itab ${profTab==='cancellation'?'active':''}" onclick="setProfTab('cancellation')">${icon('shield',{size:14})} سیاستِ کنسلی</button>
     </div>
     <div id="pt-gallery" class="isub ${profTab==='gallery'?'active':''}"></div>
     <div id="pt-reviews" class="isub ${profTab==='reviews'?'active':''}"></div>
-    <div id="pt-hours" class="isub ${profTab==='hours'?'active':''}"></div>`;
+    <div id="pt-hours" class="isub ${profTab==='hours'?'active':''}"></div>
+    <div id="pt-cancellation" class="isub ${profTab==='cancellation'?'active':''}"></div>`;
   profRenderGallery();
   profRenderReviews();
   profRenderHours();
+  profRenderCancellationPolicy();
   // داده‌ی واقعی را در پس‌زمینه بکش و دوباره رندر کن
   if(API.getToken()){
     loadGallery().then(()=>{ refreshLogoDisplay(); if(profTab==='gallery') profRenderGallery(); });
     loadReviews().then(()=>{ if(profTab==='reviews') profRenderReviews(); });
     loadHours().then(()=>{ if(profTab==='hours') profRenderHours(); });
+    loadCancellationPolicy().then(()=>{ if(profTab==='cancellation') profRenderCancellationPolicy(); });
   }
 }
 // بارگذاری گالری واقعی از /restaurant/photos
@@ -55,7 +59,7 @@ async function loadReviews(){
 }
 function setProfTab(t){
   profTab=t;
-  document.querySelectorAll('#v-profile .itab').forEach((b,i)=>b.classList.toggle('active',['gallery','reviews','hours'][i]===t));
+  document.querySelectorAll('#v-profile .itab').forEach((b,i)=>b.classList.toggle('active',['gallery','reviews','hours','cancellation'][i]===t));
   document.querySelectorAll('#v-profile .isub').forEach(s=>s.classList.toggle('active',s.id==='pt-'+t));
 }
 
@@ -717,6 +721,65 @@ async function saveHours(){
   if(!API.getToken()){ toast('','برای ذخیره باید وارد شده باشی'); return; }
   const res=await API.hoursSave({opening_hours:HOURS_STATE.opening_hours, closures:HOURS_STATE.closures});
   if(res.ok){ _hoursDirty=false; toast('','ساعات کاری ذخیره شد'); }
+  else{ toast('', res.error?.message||'ذخیره ناموفق بود'); }
+}
+
+// ─── تب سیاستِ کنسلی (وصل به GET/PUT /restaurant/cancellation-policy واقعی) ───
+// این فقط لایه‌ی پایه‌ست — لایه‌هایِ دینامیک (تقاضایِ بالا، رویدادِ ویژه،
+// سطحِ اعتبارِ مشتری، abuse) خودکار و سمتِ بک‌اند (lib/cancellation-policy.ts
+// → resolvePolicy) روی همین پایه اعمال می‌شن، اینجا فقط پیکربندیِ پایه رو
+// می‌بینی/عوض می‌کنی.
+let CANCEL_POLICY_STATE={free_cancel_hours:24,partial_penalty_hours:2,partial_penalty_pct:50,deposit_required:false,auto_confirm:true,is_customized:false};
+let _cancelPolicyDirty=false;
+
+async function loadCancellationPolicy(){
+  if(!API.getToken()) return;
+  const res=await API.cancellationPolicyGet();
+  if(res.ok && res.data){ CANCEL_POLICY_STATE={...res.data}; _cancelPolicyDirty=false; }
+}
+
+function profRenderCancellationPolicy(){
+  const el=document.getElementById('pt-cancellation'); if(!el) return;
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایشِ سیاستِ کنسلی به اتصالِ بک‌اند نیاز دارد — در حالتِ دمو در دسترس نیست.</div>`; return; }
+  const s=CANCEL_POLICY_STATE;
+  el.innerHTML=`
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">سیاستِ کنسلی</div><div class="panel-sub">${s.is_customized?'پیکربندیِ اختصاصیِ این رستوران':'در حالِ استفاده از پیش‌فرضِ پلتفرم'}</div></div>
+        <button class="btn btn-primary btn-sm" onclick="saveCancellationPolicy()">ذخیره</button></div>
+
+      <div class="staff-row">
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">پنجره‌ی کنسلیِ آزاد (ساعت)</div><div style="font-size:12px;color:var(--t2)">تا این‌قدر ساعت قبل از رزرو، کنسلی بدونِ جریمه‌ست</div></div>
+        <input class="inp" style="width:80px" type="number" min="0" max="720" value="${esc(s.free_cancel_hours)}" onchange="updateCancelPolicyField('free_cancel_hours',this.value)">
+      </div>
+      <div class="staff-row">
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">آستانه‌ی جریمه‌یِ جزئی (ساعت)</div><div style="font-size:12px;color:var(--t2)">بینِ این و پنجره‌ی آزاد، جریمه‌ی جزئی اعمال می‌شه</div></div>
+        <input class="inp" style="width:80px" type="number" min="0" max="720" value="${esc(s.partial_penalty_hours)}" onchange="updateCancelPolicyField('partial_penalty_hours',this.value)">
+      </div>
+      <div class="staff-row">
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">درصدِ جریمه‌یِ جزئی</div><div style="font-size:12px;color:var(--t2)">درصدی از بیعانه که در این بازه کسر می‌شه</div></div>
+        <input class="inp" style="width:80px" type="number" min="0" max="100" value="${esc(s.partial_penalty_pct)}" onchange="updateCancelPolicyField('partial_penalty_pct',this.value)">
+      </div>
+      <div class="staff-row">
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">بیعانه اجباری باشه</div><div style="font-size:12px;color:var(--t2)">مستقل از این، در تقاضایِ بالا/مشتریِ پرریسک خودکار فعال می‌شه</div></div>
+        <button class="toggle ${s.deposit_required?'on':'off'}" onclick="toggleCancelPolicyField('deposit_required')"></button>
+      </div>
+      <div class="staff-row">
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">تأییدِ خودکارِ رزرو</div><div style="font-size:12px;color:var(--t2)">خاموش یعنی همه‌ی رزروها منتظرِ تأییدِ دستیِ تو می‌مونن</div></div>
+        <button class="toggle ${s.auto_confirm?'on':'off'}" onclick="toggleCancelPolicyField('auto_confirm')"></button>
+      </div>
+    </div>`;
+}
+function updateCancelPolicyField(key,val){ CANCEL_POLICY_STATE[key]=Number(val)||0; _cancelPolicyDirty=true; }
+function toggleCancelPolicyField(key){ CANCEL_POLICY_STATE[key]=!CANCEL_POLICY_STATE[key]; _cancelPolicyDirty=true; profRenderCancellationPolicy(); }
+async function saveCancellationPolicy(){
+  if(!API.getToken()){ toast('','برای ذخیره باید وارد شده باشی'); return; }
+  const s=CANCEL_POLICY_STATE;
+  if(Number(s.partial_penalty_hours)>Number(s.free_cancel_hours)){ toast('','آستانه‌ی جریمه‌ی جزئی نمی‌تونه از پنجره‌ی آزاد بزرگ‌تر باشه'); return; }
+  const res=await API.cancellationPolicySave({
+    free_cancel_hours:Number(s.free_cancel_hours), partial_penalty_hours:Number(s.partial_penalty_hours),
+    partial_penalty_pct:Number(s.partial_penalty_pct), deposit_required:!!s.deposit_required, auto_confirm:!!s.auto_confirm,
+  });
+  if(res.ok){ CANCEL_POLICY_STATE={...res.data}; _cancelPolicyDirty=false; toast('','سیاستِ کنسلی ذخیره شد'); profRenderCancellationPolicy(); }
   else{ toast('', res.error?.message||'ذخیره ناموفق بود'); }
 }
 

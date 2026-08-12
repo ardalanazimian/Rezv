@@ -45,6 +45,19 @@ export const GET = withRestaurantAuth(
     const hasMore = rows.length > limit;
     const list = hasMore ? rows.slice(0, limit) : rows;
 
+    // ── نشانِ اعتبارِ مشتری (reputationTier) — یه کوئریِ batch، نه N+1 ──
+    // فقط برایِ کاربرانِ لاگین‌کرده (userId موجود)؛ مهمانانِ بدونِ حساب فعلاً
+    // بدونِ نشان می‌مونن (PhoneReliabilityShadow برایِ نمایشِ عمومی طراحی نشده).
+    const userIds = [...new Set(list.map(r => r.userId).filter((id): id is string => !!id))];
+    const tierByUserId = userIds.length
+      ? new Map(
+          (await db.customerEconomyProfile.findMany({
+            where: { userId: { in: userIds } },
+            select: { userId: true, reputationTier: true },
+          })).map(p => [p.userId, p.reputationTier]),
+        )
+      : new Map<string, string>();
+
     return NextResponse.json({
       reservations: list.map(r => ({
         code: r.code, status: r.status, party_size: r.partySize, slot_start: r.slotStart,
@@ -54,6 +67,7 @@ export const GET = withRestaurantAuth(
         source: r.source,
         preorder: r.items.map(i => i.menuItem.name),
         note: r.preferences.join('، '),
+        reputation_tier: r.userId ? (tierByUserId.get(r.userId) ?? 'bronze') : null,
       })),
       next_cursor: hasMore ? list[list.length - 1].code : null,
     });

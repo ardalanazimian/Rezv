@@ -53,6 +53,7 @@
     <button class="nav-link" data-nav="trips" onclick="go('trips')">رزروهای من</button>
     <button class="nav-link" data-nav="chats" onclick="go('chats')">پیام‌ها</button>
     <button class="nav-link" data-nav="loyalty" onclick="go('loyalty')">باشگاه</button>
+    <button class="nav-link" data-nav="economy" onclick="go('economy')">اعتبار</button>
   </div>
   <div class="nav-right">
     <button class="nav-icn notif-btn" type="button" onclick="openNotif()" aria-label="اعلان‌ها">
@@ -207,6 +208,9 @@
 <!-- ═══════════ LOYALTY ═══════════ -->
 <div id="page-loyalty" class="page"></div>
 
+<!-- ═══════════ ECONOMY (اعتبارِ رزرو + ماموریت + فروشگاهِ جایزه) ═══════════ -->
+<div id="page-economy" class="page"></div>
+
 <!-- ═══════════ PROFILE ═══════════ -->
 <div id="page-profile" class="page"></div>
 <div id="page-chats" class="page"></div>
@@ -234,6 +238,9 @@
   </button>
   <button class="botnav-item" data-nav="loyalty" aria-label="باشگاه" onclick="go('loyalty')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></svg>باشگاه
+  </button>
+  <button class="botnav-item" data-nav="economy" aria-label="اعتبار و ماموریت" onclick="go('economy')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>اعتبار
   </button>
 </nav>
 

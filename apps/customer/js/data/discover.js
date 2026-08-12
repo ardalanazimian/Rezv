@@ -6,6 +6,7 @@ import { quickBook } from './booking.js';
 import { GRAD, favs, saveFavs, pts } from './seed.js';
 import { renderProfile } from '../features/food-dna.js';
 import { renderLoyalty } from '../features/loyalty.js';
+import { renderEconomy } from '../features/economy.js';
 import { R } from '../init.js';
 import { renderFavs, renderTrips } from '../reservation.js';
 import { buzz } from '../theme-pwa.js';
@@ -23,6 +24,7 @@ export function go(p){
   if(p==='favorites')renderFavs();
   if(p==='trips')renderTrips();
   if(p==='loyalty')renderLoyalty();
+  if(p==='economy')renderEconomy();
   if(p==='profile')renderProfile();
   if(p==='chats' && typeof renderChats==='function')renderChats();
 }

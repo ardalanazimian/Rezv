@@ -249,6 +249,9 @@ const API = {
   // ── ساعات کاری + تعطیلات (وصل به /restaurant/hours واقعی) ──
   hoursGet(){ return this.get('/restaurant/hours'); },
   hoursSave(body){ return this.request('/restaurant/hours', { method:'PUT', body: JSON.stringify(body||{}) }); },
+  // ── سیاستِ کنسلی (وصل به /restaurant/cancellation-policy واقعی) ──
+  cancellationPolicyGet(){ return this.get('/restaurant/cancellation-policy'); },
+  cancellationPolicySave(body){ return this.request('/restaurant/cancellation-policy', { method:'PUT', body: JSON.stringify(body||{}) }); },
   // ── چندشعبه‌ای: لیست شعبه‌ها + ساخت شعبه‌ی جدید ──
   branchesList(){ return this.get('/restaurant/branches'); },
   branchCreate(body){ return this.post('/restaurant/branches', body); },
@@ -673,6 +676,9 @@ function mapResRow(r){
     status:mapResStatus(r.status), seg:'regular', pre:(r.preorder&&r.preorder.length>0),
     note:r.note||'', phone:toFaDigits(r.phone||''), date:cat,
     dLabel:{today:'امروز',tomorrow:'فردا',upcoming:'آینده',past:'گذشته'}[cat], code:r.code,
+    // نشانِ اعتبارِ رزرو (economy.ts) — از loyalty/seg کاملاً جداست، رجوع کن
+    // به توضیحِ REPUTATION_BADGE در reservations.js
+    reputationTier:r.reputation_tier||null,
   };
 }
 async function loadReservations(dateFilter){
