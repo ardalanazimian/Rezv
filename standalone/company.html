@@ -214,7 +214,7 @@
 }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-.btn-sm { --btn-h: 36px; font-size: var(--fs-sm); padding: 0 var(--sp-3); }
+.btn-sm { --btn-h: var(--touch-min); font-size: var(--fs-sm); padding: 0 var(--sp-3); }
 .btn-lg { --btn-h: 44px; font-size: var(--fs-lg); padding: 0 var(--sp-6); }
 
 .btn-primary { background: var(--brand-500); color: #fff; }
@@ -474,7 +474,8 @@
   --t-fast:130ms;--t:200ms;--ease:cubic-bezier(.4,0,.2,1);--spring:cubic-bezier(.34,1.56,.64,1);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Vazirmatn',sans-serif;background:var(--bg);color:var(--t1);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+html{-webkit-text-size-adjust:100%;overflow-x:hidden}
+body{font-family:'Vazirmatn',sans-serif;background:var(--bg);color:var(--t1);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 button{font-family:inherit;cursor:pointer}
 ::selection{background:var(--ink-100)}
 
@@ -852,7 +853,9 @@ button{font-family:inherit;cursor:pointer}
 }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-sm { min-height: 36px; font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
+/* ۳۶px زیرِ حداقلِ ۴۴px هر دو پلتفرم بود (WCAG 2.5.5). «کوچک» به عرض و وزنِ
+   بصری برمی‌گردد، نه به کوچک‌کردنِ ناحیه‌ی لمس. */
+.btn-sm { min-height: var(--touch-min); font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
 .btn-lg { min-height: 44px; font-size: var(--fs-lg); padding: var(--sp-3) var(--sp-6); }
 
 /* ── ۳) هم‌ترازیِ .inp (کلاسِ قدیمی) به استانداردِ .field-input ── */
@@ -1114,6 +1117,13 @@ function resolveApiBase() {
 }
 
 async function httpJson(url, opts = {}, timeoutMs = 8000) {
+  // روی پروتکل file: (باز کردن مستقیم HTML) درخواستِ نسبی به file:///api/… می‌رود
+  // و همیشه شکست می‌خورد + خطای کنسول می‌سازد؛ مستقیم حالتِ offline برگردان.
+  try {
+    if (typeof location !== 'undefined' && location.protocol === 'file:' && !/^https?:/i.test(url)) {
+      return { ok: false, offline: true, error: { message: 'اتصال به سرور برقرار نشد' } };
+    }
+  } catch { /* noop */ }
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -1146,7 +1156,7 @@ if (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveA
    esc : escape کردنِ ورودی قبل از تزریق به HTML (ضدِّ XSS) — تنها پیاده‌سازیِ
          کانونیِ پنل‌ها؛ رفعِ باگِ escape یک‌جا برای هر دو پنل اعمال می‌شود.
    ═══════════════════════════════════════════════════════════ */
-function fa(n){return n.toLocaleString('fa-IR')}
+function fa(n){return (n==null||Number.isNaN(n))?'۰':n.toLocaleString('fa-IR')}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
 </script>
@@ -1308,6 +1318,8 @@ function updateOfflineBanner(){
 
   function flush(useBeacon) {
     if (!queue.length) return;
+    // روی file: (باز کردن مستقیم HTML) ارسال ممکن نیست — بی‌صدا در صف بماند
+    try { if (location.protocol === 'file:' && !/^https?:/i.test(endpoint())) return; } catch (e) { /* noop */ }
     var batch = queue.slice(0, MAX_BATCH);
     var body = JSON.stringify({ events: batch });
     var url = endpoint();
@@ -1348,18 +1360,18 @@ function updateOfflineBanner(){
 <script data-src="js/data.js">
 // ═══ رزرونو — پنل company: داده‌ی نمونه + برچسب‌ها + مسیریابی (Vanilla JS، scope مشترک) ═══
 const RESTAURANTS_SAMPLE=[
-  {id:1,name:'کافه‌رستوران ویستا',logo:'🌿',grad:'linear-gradient(135deg,#34D399,#059669)',city:'تهران، ولنجک',plan:'pro',status:'active',daysLeft:218,members:1240,reservations:3420,sms:8600,rating:4.8,joined:'۱۴۰۳/۰۸'},
-  {id:2,name:'سفره‌خانه سنتی گرام',logo:'🍵',grad:'linear-gradient(135deg,#F59E0B,#D97706)',city:'اصفهان، چهارباغ',plan:'pro',status:'active',daysLeft:142,members:890,reservations:2180,sms:5400,rating:4.6,joined:'۱۴۰۳/۰۹'},
-  {id:3,name:'رستوران دریایی سارا',logo:'🦞',grad:'linear-gradient(135deg,#0EA5E9,#0369A1)',city:'بندرعباس، ساحل',plan:'basic',status:'expiring',daysLeft:8,members:430,reservations:920,sms:1900,rating:4.4,joined:'۱۴۰۴/۰۱'},
-  {id:4,name:'کافه هانا',logo:'☕',grad:'linear-gradient(135deg,#8B5CF6,#6D28D9)',city:'تهران، فرشته',plan:'pro',status:'active',daysLeft:95,members:670,reservations:1540,sms:3200,rating:4.7,joined:'۱۴۰۳/۱۱'},
-  {id:5,name:'پیتزا ایتالیا',logo:'🍕',grad:'linear-gradient(135deg,#EF4444,#B91C1C)',city:'شیراز، معالی‌آباد',plan:'basic',status:'expired',daysLeft:-12,members:310,reservations:760,sms:1200,rating:4.2,joined:'۱۴۰۳/۱۲'},
-  {id:6,name:'رستوران آوا',logo:'🍽️',grad:'linear-gradient(135deg,#EC4899,#BE185D)',city:'تهران، سعادت‌آباد',plan:'trial',status:'trial',daysLeft:5,members:48,reservations:62,sms:140,rating:4.5,joined:'۱۴۰۴/۰۳'},
-  {id:7,name:'کبابسرای البرز',logo:'🔥',grad:'linear-gradient(135deg,#F97316,#C2410C)',city:'کرج، گوهردشت',plan:'pro',status:'active',daysLeft:174,members:1020,reservations:2650,sms:6100,rating:4.5,joined:'۱۴۰۳/۰۷'},
-  {id:8,name:'سوشی توکیو',logo:'🍣',grad:'linear-gradient(135deg,#14B8A6,#0F766E)',city:'تهران، زعفرانیه',plan:'basic',status:'active',daysLeft:56,members:520,reservations:1180,sms:2400,rating:4.6,joined:'۱۴۰۳/۱۰'},
+  {id:1,smsBalance:2400,name:'کافه‌رستوران ویستا',logo:'🌿',grad:'linear-gradient(135deg,#34D399,#059669)',city:'تهران، ولنجک',plan:'pro',status:'active',isOpen:true,daysLeft:218,members:1240,reservations:3420,sms:8600,rating:4.8,joined:'۱۴۰۳/۰۸'},
+  {id:2,smsBalance:1150,name:'سفره‌خانه سنتی گرام',logo:'🍵',grad:'linear-gradient(135deg,#F59E0B,#D97706)',city:'اصفهان، چهارباغ',plan:'pro',status:'active',isOpen:true,daysLeft:142,members:890,reservations:2180,sms:5400,rating:4.6,joined:'۱۴۰۳/۰۹'},
+  {id:3,smsBalance:60,name:'رستوران دریایی سارا',logo:'🦞',grad:'linear-gradient(135deg,#0EA5E9,#0369A1)',city:'بندرعباس، ساحل',plan:'basic',status:'expiring',isOpen:true,daysLeft:8,members:430,reservations:920,sms:1900,rating:4.4,joined:'۱۴۰۴/۰۱'},
+  {id:4,smsBalance:820,name:'کافه هانا',logo:'☕',grad:'linear-gradient(135deg,#8B5CF6,#6D28D9)',city:'تهران، فرشته',plan:'pro',status:'active',isOpen:true,daysLeft:95,members:670,reservations:1540,sms:3200,rating:4.7,joined:'۱۴۰۳/۱۱'},
+  {id:5,smsBalance:0,name:'پیتزا ایتالیا',logo:'🍕',grad:'linear-gradient(135deg,#EF4444,#B91C1C)',city:'شیراز، معالی‌آباد',plan:'basic',status:'expired',isOpen:false,daysLeft:-12,members:310,reservations:760,sms:1200,rating:4.2,joined:'۱۴۰۳/۱۲'},
+  {id:6,smsBalance:140,name:'رستوران آوا',logo:'🍽️',grad:'linear-gradient(135deg,#EC4899,#BE185D)',city:'تهران، سعادت‌آباد',plan:'trial',status:'trial',isOpen:true,daysLeft:5,members:48,reservations:62,sms:140,rating:4.5,joined:'۱۴۰۴/۰۳'},
+  {id:7,smsBalance:1900,name:'کبابسرای البرز',logo:'🔥',grad:'linear-gradient(135deg,#F97316,#C2410C)',city:'کرج، گوهردشت',plan:'pro',status:'active',isOpen:true,daysLeft:174,members:1020,reservations:2650,sms:6100,rating:4.5,joined:'۱۴۰۳/۰۷'},
+  {id:8,smsBalance:75,name:'سوشی توکیو',logo:'🍣',grad:'linear-gradient(135deg,#14B8A6,#0F766E)',city:'تهران، زعفرانیه',plan:'basic',status:'active',isOpen:true,daysLeft:56,members:520,reservations:1180,sms:2400,rating:4.6,joined:'۱۴۰۳/۱۰'},
 ];
 // RESTAURANTS متغیر زنده: اول نمونه (فقط تا قبل از بارگذاری اول)، بعد همیشه از API
 let RESTAURANTS = RESTAURANTS_SAMPLE;
-const PLAN_LABEL={free:'رایگان',pro:'حرفه‌ای',enterprise:'سازمانی'};
+const PLAN_LABEL={free:'رایگان',trial:'آزمایشی',basic:'پایه',pro:'حرفه‌ای',enterprise:'سازمانی'};
 const STATUS_LABEL={active:'فعال',expiring:'رو به اتمام',expired:'منقضی',trial:'دوره آزمایشی',trial_expired:'آزمایشی تمام‌شده'};
 
 const TITLES={overview:'داشبورد',restaurants:'رستوران‌ها',detail:'جزئیات رستوران',analytics:'آنالیز پلتفرم',customers:'هوش تجاری مشتریان',billing:'اشتراک و پیامک',sales:'درخواست‌های سایت',photos:'بازبینی عکسِ گالری',systemhealth:'سلامت سیستم',security:'امنیت پلتفرم',support:'مدیریت رستوران‌ها'};
@@ -1400,7 +1412,8 @@ function rOverview(){
   const top=[...RESTAURANTS].sort((a,b)=>b.reservations-a.reservations).slice(0,5);
   // هشدارهای واقعی اشتراک (از tenant.plan_expires_at)
   const alerts=RESTAURANTS.filter(r=>r.status==='expiring'||r.status==='expired'||r.status==='trial'||r.status==='trial_expired');
-  const sub = PLATFORM_STATS?.subscription_breakdown || {active:0,expiring:0,expired:0,trial:0,trial_expired:0};
+  // اگر آمار پلتفرم از API نیامده (حالت دمو/آفلاین)، از داده‌ی محلی رستوران‌ها بشمار
+  const sub = PLATFORM_STATS?.subscription_breakdown || RESTAURANTS.reduce((a,r)=>{ a[r.status]=(a[r.status]||0)+1; return a; },{active:0,expiring:0,expired:0,trial:0,trial_expired:0});
   const health = PLATFORM_STATS?.system_health || (API.online ? '—' : null);
   const healthMeta = {healthy:['checkCircle','سالم','green'],warning:['alert','نیاز به بررسی','amber'],critical:['alert','بحرانی','red']}[health] || ['info','نامشخص','s-400'];
   const clv = PLATFORM_STATS?.platform_clv_toman;
@@ -1547,7 +1560,7 @@ function rDetail(){
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic ink">${icon('users',{size:17})}</div></div><div class="kpi-val">${fa(r.members)}</div><div class="kpi-label">عضو باشگاه</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic violet">${icon('calendar',{size:17})}</div></div><div class="kpi-val">${fa(r.reservations)}</div><div class="kpi-label">کل رزروها</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic amber">${icon('mail',{size:17})}</div></div><div class="kpi-val">${fa(r.sms)}</div><div class="kpi-label">پیامک ارسالی</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('phone',{size:17})}</div></div><div class="kpi-val">${fa(r.smsBalance)}</div><div class="kpi-label">موجودی پیامک</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('phone',{size:17})}</div></div><div class="kpi-val">${fa(r.smsBalance||0)}</div><div class="kpi-label">موجودی پیامک</div></div>
     </div>
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">جزئیات بیشتر</div></div></div>
@@ -1876,8 +1889,18 @@ function rSecurity(){
 
 // ═══════════ ورود مدیر پلتفرم (فاز ۳ تکه ۷) ═══════════
 let _adminPhone = '';
+function setAdminGateLocked(locked){
+  const app = document.querySelector('.app');
+  const overlay = document.getElementById('loginOverlay');
+  if (app) {
+    app.setAttribute('aria-hidden', locked ? 'true' : 'false');
+    if ('inert' in app) app.inert = locked;
+  }
+  if (overlay) overlay.setAttribute('aria-hidden', locked ? 'false' : 'true');
+}
 function faD(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
 function showAdminLoginPhone(){
+  setAdminGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">R</div>
     <div class="login-title">پنل شرکت رزرونو</div>
@@ -1910,6 +1933,7 @@ async function adminSendOtp(){
   showAdminLoginCode(devCode, res.offline);
 }
 function showAdminLoginCode(devCode, offline){
+  setAdminGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('mail',{size:34})}</div>
     <div class="login-title">کد ورود را وارد کنید</div>
@@ -1945,6 +1969,7 @@ async function adminConfirmOtp(){
 }
 async function enterAdminPanel(demo){
   document.getElementById('loginOverlay').classList.add('hidden');
+  setAdminGateLocked(false);
   // اگر توکن واقعی داریم، داده‌ی واقعی بارگذاری کن
   if (API.getToken() && !demo){
     const [fresh] = await Promise.all([loadAdminRestaurants(), loadPlatformStats()]);
@@ -1960,11 +1985,13 @@ async function enterAdminPanel(demo){
 async function adminLogout(){
   await API.doLogout();
   document.getElementById('loginOverlay').classList.remove('hidden');
+  setAdminGateLocked(true);
   showAdminLoginPhone();
   toast('','از پنل خارج شدید');
 }
 function onAdminSessionExpired(){
   document.getElementById('loginOverlay').classList.remove('hidden');
+  setAdminGateLocked(true);
   showAdminLoginPhone();
   toast('','نشست منقضی شد، دوباره وارد شوید');
 }
@@ -1973,6 +2000,7 @@ function onAdminSessionExpired(){
 API.restoreSession();
 if (API.getToken()) {
   document.getElementById('loginOverlay').classList.add('hidden');
+  setAdminGateLocked(false);
   rOverview();
   (async () => {
     const [fresh] = await Promise.all([loadAdminRestaurants(), loadPlatformStats()]);
@@ -1986,6 +2014,7 @@ if (API.getToken()) {
     refreshPhotoBadge();
   })();
 } else {
+  setAdminGateLocked(true);
   showAdminLoginPhone();
 }
 

@@ -8,21 +8,35 @@
 
 ## پیش‌نیازها
 
+⚠️ **اصلاح‌شده (۲۰۲۶-۰۸-۱۲):** این بخش قبلاً فقط از یک رکوردِ DNS برایِ کلِ
+دامنه حرف می‌زد — از دورانی مانده که هنوز چیدمانِ زیردامنه (ADR 0002) وجود
+نداشت. چک‌شده روی خودِ `deploy/caddy/Caddyfile`: امروز Caddy اصلاً بلوکی
+برایِ ریشه‌ی دامنه (`rezervno.ir` بدونِ زیردامنه) **ندارد** — ریشه عمداً
+دستِ Vercel است (وب‌سایتِ عمومی/apps/landing)؛ Caddy فقط چهار زیردامنه را
+سرو می‌کند. با DNSِ قدیمیِ زیر، Caddy برای زیردامنه‌ها اصلاً گواهی نمی‌گیرد
+و پنل‌ها/بک‌اند بالا نمی‌آیند.
+
 1. **دامنه** — مثلاً `rezervno.ir` (از ایرنیک یا هر ثبت‌کننده‌ای)
-2. **رکورد DNS** — یک رکورد `A` که دامنه را به آی‌پی سرورت اشاره دهد:
+2. **رکوردهایِ DNS** — پنج رکوردِ `A` لازم است، نه یکی:
    ```
-   rezervno.ir.       A    188.x.x.x   (آی‌پی سرورت)
-   www.rezervno.ir.   A    188.x.x.x
+   rezervno.ir.            A    (آی‌پیِ Vercel — طبقِ داشبوردِ Vercel، نه سرورِ خودت)
+   www.rezervno.ir.         A    (همون، طبقِ Vercel)
+   api.rezervno.ir.         A    188.x.x.x   (آی‌پیِ سرورِ خودت — بک‌اند)
+   app.rezervno.ir.         A    188.x.x.x   (اپِ مشتری)
+   business.rezervno.ir.    A    188.x.x.x   (پنلِ کسب‌وکار)
+   admin.rezervno.ir.       A    188.x.x.x   (پنلِ شرکت)
    ```
+   (ریشه/`www` به Vercel اشاره می‌کنند، نه به این سرور — رجوع کن به
+   `docs/adr/0002-public-website-and-cms.md` و `deploy/caddy/Caddyfile`.)
 3. **پورت‌های باز** — ۸۰ و ۴۴۳ روی سرور (فایروال/security group):
    ```bash
    sudo ufw allow 80
    sudo ufw allow 443
    ```
 
-> **مهم:** قبل از ادامه، مطمئن شو دامنه واقعاً به سرور اشاره می‌کند:
+> **مهم:** قبل از ادامه، مطمئن شو **هر چهار زیردامنه** واقعاً به سرور اشاره می‌کنن:
 > ```bash
-> dig +short rezervno.ir     # باید آی‌پی سرورت را نشان دهد
+> dig +short api.rezervno.ir business.rezervno.ir app.rezervno.ir admin.rezervno.ir
 > ```
 > اگر DNS هنوز منتشر نشده (تا چند ساعت طول می‌کشد)، Caddy نمی‌تواند گواهی بگیرد.
 
@@ -44,10 +58,11 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 - HTTP را به HTTPS ریدایرکت می‌کند
 - گواهی را هر ۹۰ روز قبل از انقضا تمدید می‌کند
 
-بررسی:
+بررسی (رویِ زیردامنه‌ها، نه ریشه — ریشه دستِ Vercel است و از این سرور جواب نمی‌ده):
 ```bash
-docker compose logs caddy        # باید «certificate obtained» ببینی
-curl -I https://rezervno.ir      # باید 200 برگردد
+docker compose logs caddy              # باید «certificate obtained» ببینی
+curl -I https://api.rezervno.ir/api/health   # باید 200 برگردد
+curl -I https://app.rezervno.ir        # اپ مشتری — باید 200 برگردد
 ```
 
 ---

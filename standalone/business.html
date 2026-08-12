@@ -212,7 +212,7 @@
 }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-.btn-sm { --btn-h: 36px; font-size: var(--fs-sm); padding: 0 var(--sp-3); }
+.btn-sm { --btn-h: var(--touch-min); font-size: var(--fs-sm); padding: 0 var(--sp-3); }
 .btn-lg { --btn-h: 44px; font-size: var(--fs-lg); padding: 0 var(--sp-6); }
 
 .btn-primary { background: var(--brand-500); color: #fff; }
@@ -471,7 +471,7 @@
   --t-fast:130ms;--t:200ms;--ease:cubic-bezier(.4,0,.2,1);--spring:cubic-bezier(.34,1.56,.64,1);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;overflow-x:hidden}
 body{font-family:'Vazirmatn',-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--t1);
   font-size:14px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;overflow-x:hidden}
 button,input,select,textarea{font-family:inherit;font-size:inherit}
@@ -1367,7 +1367,9 @@ img{display:block;max-width:100%}
 }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-sm { min-height: 36px; font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
+/* ۳۶px زیرِ حداقلِ ۴۴px هر دو پلتفرم بود (WCAG 2.5.5). «کوچک» به عرض و وزنِ
+   بصری برمی‌گردد، نه به کوچک‌کردنِ ناحیه‌ی لمس. */
+.btn-sm { min-height: var(--touch-min); font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
 .btn-lg { min-height: 44px; font-size: var(--fs-lg); padding: var(--sp-3) var(--sp-6); }
 
 /* ── ۳) هم‌ترازیِ .inp (کلاسِ قدیمی) به استانداردِ .field-input ── */
@@ -1427,7 +1429,7 @@ img{display:block;max-width:100%}
       </button>
       <button class="sb-item" data-v="reservations" onclick="nav('reservations')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        رزروها<span class="badge">۱۲</span>
+        رزروها<span class="badge" id="resBadge"></span>
       </button>
       <button class="sb-item" data-v="chat" onclick="nav('chat')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
@@ -1435,7 +1437,7 @@ img{display:block;max-width:100%}
       </button>
       <button class="sb-item" data-v="waitlist" onclick="nav('waitlist')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-        لیست انتظار<span class="badge" id="wlBadge">۳</span>
+        لیست انتظار<span class="badge" id="wlBadge"></span>
       </button>
       <button class="sb-item" data-v="floor" onclick="nav('floor')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
@@ -1656,6 +1658,13 @@ function resolveApiBase() {
 }
 
 async function httpJson(url, opts = {}, timeoutMs = 8000) {
+  // روی پروتکل file: (باز کردن مستقیم HTML) درخواستِ نسبی به file:///api/… می‌رود
+  // و همیشه شکست می‌خورد + خطای کنسول می‌سازد؛ مستقیم حالتِ offline برگردان.
+  try {
+    if (typeof location !== 'undefined' && location.protocol === 'file:' && !/^https?:/i.test(url)) {
+      return { ok: false, offline: true, error: { message: 'اتصال به سرور برقرار نشد' } };
+    }
+  } catch { /* noop */ }
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -1688,7 +1697,7 @@ if (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveA
    esc : escape کردنِ ورودی قبل از تزریق به HTML (ضدِّ XSS) — تنها پیاده‌سازیِ
          کانونیِ پنل‌ها؛ رفعِ باگِ escape یک‌جا برای هر دو پنل اعمال می‌شود.
    ═══════════════════════════════════════════════════════════ */
-function fa(n){return n.toLocaleString('fa-IR')}
+function fa(n){return (n==null||Number.isNaN(n))?'۰':n.toLocaleString('fa-IR')}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
 </script>
@@ -1947,6 +1956,14 @@ const API = {
   // ── چندشعبه‌ای: لیست شعبه‌ها + ساخت شعبه‌ی جدید ──
   branchesList(){ return this.get('/restaurant/branches'); },
   branchCreate(body){ return this.post('/restaurant/branches', body); },
+  // ── هویتِ رستوران: نام (وصل به GET/PUT /restaurant/profile واقعی) ──
+  profileSave(body){ return this.request('/restaurant/profile', { method:'PUT', body: JSON.stringify(body||{}) }); },
+  // ── فعالیتِ اخیر برایِ زنگوله‌یِ اعلان (وصل به /restaurant/notifications واقعی) ──
+  recentActivity(){ return this.get('/restaurant/notifications'); },
+  // ── مدیرِ هوشمندِ رستوران: پرسش‌وپاسخِ مستندِ Finding/Evidence/Confidence ──
+  managerInsights(){ return this.get('/restaurant/manager-insights'); },
+  // ── آمار رفتار مشتری + نقشه‌ی حرارتیِ شلوغی (روز×ساعت، همان دیتایِ تبِ آنالیتیکس) ──
+  analytics(){ return this.get('/restaurant/analytics'); },
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -2120,7 +2137,17 @@ const Heartbeat = {
 function dataSourceNote(){
   return API.online ? '' : `<div style="font-size:11px;color:var(--amber-600);background:var(--amber-50);padding:6px 12px;border-radius:8px;margin-bottom:14px;text-align:center">${icon('info',{size:13})} داده‌ی نمونه (بک‌اند متصل نیست)</div>`;
 }
-const RES = [
+// ⚠️ رفعِ باگ: این آرایه قبلاً «const RES» بود — یعنی هیچ‌وقت با دیتای واقعی
+// جایگزین نمی‌شد. renderResList (تبِ رزروها) از یک متغیرِ محلیِ جدا برای
+// دیتای واقعی استفاده می‌کرد، ولی داشبورد (calcTodayKPIs در overview.js:
+// رزروِ امروز، اشغالِ میز، عدمِ‌حضور، درآمد، «رزروهایِ امشب») همیشه از همین
+// RES ثابت می‌خواند — یعنی داشبورد برایِ هر رستورانِ واقعی، در هر جلسه‌ای،
+// همیشه همین دیتایِ نمونه را نشان می‌داد، نه فقط در بارگذاریِ اول بلکه حتیٰ
+// بعد از رفرشِ «زنده»یِ هر ۱۵ ثانیه (که خودش هم فقط دوباره از همین RESِ
+// ثابت محاسبه می‌کرد، بدونِ هیچ fetchی — رجوع کنید به refreshLiveKPIs).
+// حالا RES_DEMO فقط fallbackِ آفلاین/دموست (هم‌الگو با WL_DEMO_QUEUE در
+// waitlist.js) و RES با loadTodayReservationsForDashboard از سرور پر می‌شود.
+const RES_DEMO = [
   {t:'۱۸:۳۰',name:'نیلوفر رضایی',party:2,table:3,status:'arrived',seg:'vip',pre:true,note:'تولد همسر',phone:'۰۹۱۲۱۱۱۲۲۳۳',date:'today',dLabel:'امروز'},
   {t:'۱۹:۰۰',name:'امیر حسینی',party:4,table:7,status:'confirmed',seg:'new',pre:false,note:'',phone:'۰۹۱۲۲۲۲۳۳۴۴',date:'today',dLabel:'امروز'},
   {t:'۱۹:۰۰',name:'مریم و علی',party:2,table:2,status:'arrived',seg:'regular',pre:true,note:'',phone:'۰۹۱۲۳۳۳۴۴۵۵',date:'today',dLabel:'امروز'},
@@ -2138,11 +2165,37 @@ const RES = [
   {t:'۲۰:۳۰',name:'کاوه مرادی',party:6,table:9,status:'cancelled',seg:'vip',pre:false,note:'',phone:'۰۹۱۲۷۸۹۰۱۲۳',cancelReason:'تماس مشتری — تغییر برنامه',date:'past',dLabel:'۲ روز پیش'},
   {t:'۱۹:۰۰',name:'سپیده یاری',party:4,table:6,status:'completed',seg:'regular',pre:true,note:'',phone:'۰۹۱۲۸۹۰۱۲۳۴',date:'past',dLabel:'۳ روز پیش'},
 ];
+let RES = RES_DEMO.slice();
+let _resLoaded = false;
+/**
+ * رزروهای «امروز» را برایِ داشبورد از سرور می‌گیرد و RES را جایگزین می‌کند.
+ * عمداً از loadReservations (بالاتر) استفاده نمی‌کند — آن تابع RES_DATE_FILTER
+ * و RES_NEXT_CURSOR را هم عوض می‌کند (paginationِ تبِ رزروها)؛ اگر داشبورد هم
+ * از همان تابع استفاده می‌کرد، وقتی کاربر هم‌زمان تبِ رزروها را روی «آینده» یا
+ * «گذشته» باز داشت، رفرشِ ۱۵ثانیه‌ایِ داشبورد آن فیلتر/cursor را خرابمی‌کرد.
+ */
+async function loadTodayReservationsForDashboard(){
+  if(!API.getToken()) return false;
+  const res=await API.get('/restaurant/reservations?date=today');
+  if(res.ok && Array.isArray(res.data?.reservations)){
+    RES=res.data.reservations.map(mapResRow);
+    _resLoaded=true;
+    return true;
+  }
+  return false;
+}
 // میزها — الان از API واقعی (/restaurant/tables) لود می‌شه، نه نمونه‌ی ثابت
 // نگاشت وضعیت: بک‌اند از 'occupied' استفاده می‌کنه، رابط کاربری همیشه 'seated' نشون می‌داده
 const BK2UI_STATE = { free:'free', reserved:'reserved', occupied:'seated', cleaning:'free', maintenance:'free' };
 const UI2BK_STATE = { free:'free', reserved:'reserved', seated:'occupied' };
 let TABLES = [];
+// میزهای نمونه برای حالت دمو/آفلاین — هم‌راستا با رزروهای نمونه (میزهای ۱ تا ۹)
+const DEMO_TABLES = [
+  {id:'demo-t1',n:1,c:2,s:'free'},{id:'demo-t2',n:2,c:2,s:'free'},{id:'demo-t3',n:3,c:4,s:'free'},
+  {id:'demo-t4',n:4,c:2,s:'free'},{id:'demo-t5',n:5,c:4,s:'free'},{id:'demo-t6',n:6,c:4,s:'free'},
+  {id:'demo-t7',n:7,c:6,s:'free'},{id:'demo-t8',n:8,c:6,s:'free'},{id:'demo-t9',n:9,c:8,s:'free'},
+  {id:'demo-t10',n:10,c:2,s:'free'},
+];
 function mapApiTable(t){
   return { id:t.id, n:t.number, c:t.capacity, name:t.name||undefined, s:BK2UI_STATE[t.state]||'free', _raw:t };
 }
@@ -2150,16 +2203,109 @@ async function loadTables(){
   const res = await API.listTables();
   if (res.ok && Array.isArray(res.data?.items)) {
     TABLES = res.data.items.map(mapApiTable);
+  } else if (!TABLES.length) {
+    // بک‌اند در دسترس نیست → میزهای نمونه (مثل بقیه‌ی داده‌های دمو) تا پلان سالن و
+    // KPI اشغال خالی نمانند
+    TABLES = DEMO_TABLES.map(t=>({...t}));
   }
   _tablesLoaded = true;
   return TABLES;
 }
-const GUESTS=[
+// ⚠️ رفعِ باگ (همان الگویِ RES): این آرایه قبلاً «const GUESTS» بود — یعنی
+// ویجتِ «مشتریانِ برتر» در داشبورد (overview.js: renderTopCustomers) و مودالِ
+// «تاریخچه‌ی مشتری» (viewCustomerHistory) همیشه همین ۴ مشتریِ نمونه را نشان
+// می‌دادند، برایِ هر رستورانِ واقعی. توجه: تبِ کاملِ «هوشِ مشتری»
+// (crm.js: rCustomers/custRenderOverviewDemo) از قبل درست بود — از
+// API.customers واقعی می‌خواند و custRenderOverviewDemo فقط در نبودِ توکن/
+// خطایِ API صدا زده می‌شود؛ فقط این دو مصرف‌کننده در overview.js اشتباه بودند.
+// GUESTS_DEMO فقط fallbackِ آفلاین است (هم‌الگو با RES_DEMO/WL_DEMO_QUEUE).
+const GUESTS_DEMO=[
   {name:'کیان موسوی',ava:'',seg:'vip',visits:18,last:'۳ روز پیش',spent:'۶.۲م',vip:95,ret:92,churn:8,phone:'۰۹۱۲۵۵۵۶۶۷۷',birthday:'۱۵ خرداد',points:3400},
   {name:'نیلوفر رضایی',ava:'',seg:'regular',visits:12,last:'امروز',spent:'۳.۸م',vip:62,ret:78,churn:20,phone:'۰۹۱۲۳۳۳۴۴۵۵',birthday:'۲ آبان',points:1900},
   {name:'امیر حسینی',ava:'',seg:'new',visits:3,last:'هفته پیش',spent:'۸۹۰ک',vip:30,ret:55,churn:45,phone:'۰۹۱۲۷۷۷۸۸۹۹',birthday:'۸ دی',points:300},
   {name:'مریم احمدی',ava:'',seg:'risk',visits:6,last:'۳۵ روز پیش',spent:'۱.۵م',vip:35,ret:30,churn:82},
 ];
+let GUESTS=GUESTS_DEMO.slice();
+let _guestsLoaded=false;
+/**
+ * ۵ مشتریِ برترِ رستوران (بر اساسِ تعدادِ بازدید) را از همان
+ * /restaurant/customers که تبِ «هوشِ مشتری» استفاده می‌کند می‌گیرد.
+ * نگاشتِ فیلدها: seg فقط برایِ نشانِ VIP لازم است (is_vip بولی، نه رشته‌ی
+ * سگمنتِ RFM که تاکسونومیِ جداگانه‌ای دارد). ret (٪بازگشت) از رویِ معکوسِ
+ * churn_risk_score تخمین زده می‌شود — نزدیک‌ترین معادلِ واقعیِ موجود.
+ * birthday/points عمداً ست نمی‌شوند (این API آن‌ها را ندارد؛ رندرِ شرطیِ
+ * موجود در viewCustomerHistory به‌جایِ نمایشِ مقدارِ ساختگی، مخفی می‌ماند).
+ * predicted_clv_toman فعلاً برایِ همه صفر است چون هیچ سیستمِ صندوق/پرداختی
+ * وصل نیست (رجوع کنید به REVENUE_CONFIG.connected=false در overview.js) —
+ * صفرِ واقعی را به‌جایِ «۰ تومان» با «—» نشان می‌دهیم تا «مشتریِ VIP با ۸
+ * بازدید ولی صفر تومان خرید» به‌نظر متناقض/اشتباه نرسد؛ این یعنی «هنوز
+ * دیتایِ خرید نداریم»، نه «صفر خرج کرده».
+ */
+async function loadTopGuestsForDashboard(){
+  if(!API.getToken()) return false;
+  const res=await API.customers('sort=visits&limit=5');
+  if(res.ok && Array.isArray(res.data?.items)){
+    GUESTS=res.data.items.map(c=>({
+      name:c.name, ava:'', seg:c.is_vip?'vip':'',
+      visits:c.total_visits||0,
+      spent:c.predicted_clv_toman>0?fmtMoney(c.predicted_clv_toman):'—',
+      phone:toFaDigits(c.phone||''),
+      // Math.min هم لازم است، نه فقط max: churn_risk_score تئوریاً باید ۰-۱۰۰
+      // باشد (رفعِ باگش در customer-insights.ts)، ولی این عددِ مشتق‌شده تا
+      // ۶۰ ثانیه کش می‌شود؛ کلمپِ دولایه یعنی حتی یک مقدارِ کهنه/منفی هم
+      // «۱۰۱٪ بازگشت» در UI نشان نمی‌دهد.
+      ret:c.churn_risk_score!=null?Math.min(100,Math.max(0,100-c.churn_risk_score)):0,
+    }));
+    _guestsLoaded=true;
+    return true;
+  }
+  return false;
+}
+// ⚠️ رفعِ باگ (یافته‌ی سوم از همان دسته‌یِ RES/GUESTS/NOTIFS): renderInsights
+// (overview.js) یک بینشِ هاردکد داشت: «جمعه شب پرترددترین زمان توست» — عیناً
+// برایِ هر رستوران نشان داده می‌شد، حتی اگر روزِ شلوغِ واقعی‌اش چیزِ دیگری
+// بود. اینجا همان تحلیلِ واقعیِ AI Restaurant Manager (manager-insights →
+// پاسخِ strongest_weekdays) را می‌خوانیم؛ اگر داده کم باشد (کمتر از ۵ روزِ
+// متمایز یا کمتر از ۳۰ رزرو در ۶۰ روزِ اخیر) آن پاسخ اصلاً برنمی‌گردد و ما
+// هم بینش را نشان نمی‌دهیم — نه یک ادعایِ ساختگی.
+let WEEKDAY_INSIGHT=null;
+let _weekdayInsightLoaded=false;
+async function loadWeekdayInsightForDashboard(){
+  if(!API.getToken()) return false;
+  const res=await API.managerInsights();
+  if(res.ok && Array.isArray(res.data?.answers)){
+    const a=res.data.answers.find(x=>x.id==='strongest_weekdays');
+    WEEKDAY_INSIGHT=a?{t:a.finding, d:a.recommended_action||'کارکنان بیشتری برای این روزها برنامه‌ریزی کن'}:null;
+    _weekdayInsightLoaded=true;
+    return true;
+  }
+  // manager-insights پشتِ canViewAnalytics است — کارمندِ بدونِ این مجوز
+  // همیشه ۴۰۳ می‌گیرد. بدونِ این شرط، rOverview هر بار دوباره تلاش می‌کرد
+  // (fetch بی‌فایده‌ی تکراری)؛ ۴۰۳ یعنی دیگر تلاش نکن، نه یک خطایِ موقت.
+  if(res.status===403){ _weekdayInsightLoaded=true; return false; }
+  return false;
+}
+// ⚠️ رفعِ باگ: نقشه‌ی حرارتیِ هفتگی در renderHeatmap (overview.js) یک
+// جدولِ ۷×۳ کاملاً هاردکد بود («آخر هفته شب شلوغ‌تر») بدونِ هیچ مسیری به
+// دیتایِ واقعی — برخلافِ RES/GUESTS که حداقل fallback بودند، این یکی هرگز
+// جایگزین نمی‌شد. همان heatmap واقعیِ /restaurant/analytics (که تبِ
+// مارکتینگ/آنالیتیکس هم می‌خواند) را می‌گیریم و در renderHeatmap بر اساسِ
+// ساعت به ۳ بازه‌ی ظهر/عصر/شب دسته‌بندی می‌کنیم.
+let HEATMAP_DATA=null;
+let _heatmapLoaded=false;
+async function loadHeatmapForDashboard(){
+  if(!API.getToken()) return false;
+  const res=await API.analytics();
+  if(res.ok && Array.isArray(res.data?.heatmap)){
+    HEATMAP_DATA=res.data.heatmap; // [{dow,hour,count}] — dow: 0=یکشنبه..6=شنبه (Postgres DOW)
+    _heatmapLoaded=true;
+    return true;
+  }
+  // analytics هم پشتِ canViewAnalytics است — همان دلیلِ weekday insight:
+  // ۴۰۳ یعنی دیگر تلاش نکن، وگرنه هر rOverview دوباره fetch بی‌فایده می‌زد.
+  if(res.status===403){ _heatmapLoaded=true; return false; }
+  return false;
+}
 // باشگاه مشتریان — دیتای واقعی و زنده
 let CLUB=[
   {fn:'کیان',ln:'موسوی',phone:'۰۹۱۲۵۵۵۶۶۷۷',code:'VIS-1001',tier:'gold',points:1240,bMonth:'خرداد',joined:'۳ ماه پیش'},
@@ -2259,8 +2405,13 @@ async function loadMoreReservations(){
 let REVIEWS=[];
 // عکس‌های گالری — از /restaurant/photos واقعی لود می‌شن
 let GALLERY=[];
-// هویت رستوران (نام + لوگو: ایموجی یا عکس)
-let RESTAURANT={name:'کافه‌رستوران ویستا',logoEmoji:'🌿',logoDataUrl:null,logoGradient:'linear-gradient(135deg,#34D399,#059669)'};
+// هویت رستوران — name اینجا فقط پیش‌فرضِ اولیه/دموست؛ با اولین اجرایِ
+// renderBranchSwitcher (routing.js، بعد از لاگینِ واقعی) از /restaurant/branches
+// همگام می‌شود، و «تغییرِ نام» (crm.js) با PUT /restaurant/profile واقعاً
+// روی سرور ذخیره می‌کند (رجوع کنید به رفعِ باگِ نامِ رستوران).
+// logoEmoji/logoGradient فقط نمایِ جایگزینِ محلی‌اند تا لوگویِ واقعی (یک
+// RestaurantPhoto با category='logo'، در GALLERY) آپلود/تأیید شود.
+let RESTAURANT={name:'کافه‌رستوران ویستا',logoEmoji:'🌿',logoGradient:'linear-gradient(135deg,#34D399,#059669)'};
 function normalizePhone(p){return (p||'').replace(/\s/g,'').replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
 // اتصال خودکار: هر رزرو → ثبت در باشگاه (بدون تکرار، کلید: تلفن)
 function enrollClub(name,phone){
@@ -2317,6 +2468,8 @@ const TITLES={overview:'داشبورد',reservations:'مدیریت رزروها'
 
   function flush(useBeacon) {
     if (!queue.length) return;
+    // روی file: (باز کردن مستقیم HTML) ارسال ممکن نیست — بی‌صدا در صف بماند
+    try { if (location.protocol === 'file:' && !/^https?:/i.test(endpoint())) return; } catch (e) { /* noop */ }
     var batch = queue.slice(0, MAX_BATCH);
     var body = JSON.stringify({ events: batch });
     var url = endpoint();
@@ -2429,6 +2582,15 @@ function renderBranchSwitcher(){
   if(metaEl) metaEl.textContent=BRANCH_LOCKED?'قفل‌شده به این شعبه':(BRANCHES.length>1?`${fa(BRANCHES.length)} شعبه`:'شعبه اصلی');
   const sw=document.querySelector('.sb-switch');
   if(sw) sw.classList.toggle('locked', BRANCH_LOCKED || BRANCHES.length<=1);
+  // ⚠️ رفعِ باگ: RESTAURANT.name (پیش‌فرضِ data.js) هاردکد است و هیچ‌وقت
+  // به‌تنهایی از سرور خوانده نمی‌شد — تبِ «پروفایل» همیشه نامِ دموی
+  // «کافه‌رستوران ویستا» را نشان می‌داد، صرف‌نظر از رستورانِ واقعیِ لاگین‌شده.
+  // اینجا همان دیتایی که برایِ سوییچرِ شعبه (بالا) از سرور آمده، به RESTAURANT
+  // هم می‌رسد — بدونِ فراخوانیِ اضافه — و اگر تبِ پروفایل باز است دوباره رندر می‌شود.
+  if(cur && typeof RESTAURANT!=='undefined' && RESTAURANT.name!==cur.name){
+    RESTAURANT.name=cur.name;
+    if(typeof profTab!=='undefined' && document.getElementById('v-profile')?.classList.contains('active') && typeof profRenderGallery==='function') profRenderGallery();
+  }
 }
 function openBranchSwitcher(){
   if(!API.getToken()){ toast('','برای سوییچ شعبه اول وارد شو'); return; }
@@ -2455,9 +2617,27 @@ async function selectBranch(id){
   if(typeof _segCounts!=='undefined') _segCounts=null;
   if(typeof _mktLoaded!=='undefined') _mktLoaded=false;
   if(typeof _hoursLoaded!=='undefined') _hoursLoaded=false;
+  // ⚠️ رفعِ باگ (ریویوی Copilot روی PR + یافته‌ی مشابه در خودِ RES/GUESTS
+  // که از PR #5 جا مانده بود): این ۵ کش هم به‌شعبه وابسته‌اند ولی اینجا
+  // reset نمی‌شدند — یعنی بعد از سوییچِ شعبه، داشبورد تا مدتی دیتایِ
+  // شعبه‌ی قبلی (رزروها، مهمان‌های برتر، اعلان‌ها، بینشِ روزِ هفته، نقشه‌ی
+  // حرارتی) را نشان می‌داد، چون گاردِ «if(!_xLoaded)» اجازه‌ی fetchِ
+  // دوباره را نمی‌داد.
+  if(typeof _resLoaded!=='undefined') _resLoaded=false;
+  if(typeof _guestsLoaded!=='undefined') _guestsLoaded=false;
+  if(typeof _notifsLoaded!=='undefined') _notifsLoaded=false;
+  if(typeof _weekdayInsightLoaded!=='undefined') _weekdayInsightLoaded=false;
+  if(typeof _heatmapLoaded!=='undefined') _heatmapLoaded=false;
   await loadBranches();
   await loadTables();
   refreshActiveView();
+  // زنگوله‌ی اعلان برخلافِ تب‌ها (که refreshActiveView فقط تبِ فعال را
+  // دوباره fetch می‌کند) همیشه روی صفحه است، مستقلِ تبِ جاری — پس باید
+  // اینجا صریحاً دوباره بارگذاری شود، وگرنه اعلان‌های شعبه‌ی قبلی تا
+  // لاگینِ بعدی روی صفحه می‌مانند حتی با وجودِ ریست‌شدنِ _notifsLoaded.
+  if(typeof loadNotifications==='function' && API.getToken()){
+    loadNotifications().then(ok=>{ if(ok && typeof renderNotifList==='function') renderNotifList(); });
+  }
   toast('','شعبه عوض شد');
 }
 function toggleSidebar(){
@@ -2485,6 +2665,22 @@ function toggleStatus(){
 <script data-src="js/overview.js">
 // ═══ رزرونو — پنل business: داشبورد Enterprise + به‌روزرسانی زنده (Vanilla JS، بدون build، scope مشترک) ═══
 function rOverview(){
+  // ⚠️ رفعِ باگ: تا اینجا RES و GUESTS همیشه دیتای نمونه بودند (رجوع کنید
+  // به data.js). هم‌الگو با rWaitlist: اولین ورودِ واقعی → دیتایِ واقعی را
+  // بگیر و دوباره رندر کن؛ در همین حین با هر دیتایی که الان موجود است
+  // رندرِ فوری انجام شود تا صفحه خالی نماند.
+  if(!_resLoaded && API.getToken()){
+    loadTodayReservationsForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
+  if(!_guestsLoaded && API.getToken()){
+    loadTopGuestsForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
+  if(!_weekdayInsightLoaded && API.getToken()){
+    loadWeekdayInsightForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
+  if(!_heatmapLoaded && API.getToken()){
+    loadHeatmapForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
   // ═══════════ داشبورد Enterprise — مرکز فرماندهی ═══════════
   renderEnterpriseDashboard();
 }
@@ -2612,6 +2808,12 @@ function callGuest(idx){
 }
 function renderEnterpriseDashboard(){
   const k = calcTodayKPIs();
+  // ⚠️ رفعِ باگ: badgeِ سایدبارِ «رزروها» قبلاً همیشه هاردکدِ «۱۲» در HTML بود
+  // (هیچ‌جا با JS آپدیت نمی‌شد — با live-testِ واقعی روی دیتای seedشده پیدا شد:
+  // عددِ واقعیِ امروز ۳ بود ولی سایدبار همیشه ۱۲ نشان می‌داد). حالا از همان
+  // k.todayCountِ واقعی که KPI هم استفاده می‌کند پر می‌شود؛ صفر → مخفی.
+  const resBadge = document.getElementById('resBadge');
+  if (resBadge) resBadge.textContent = k.todayCount > 0 ? fa(k.todayCount) : '';
   const elap = REVENUE_CONFIG.connected ? '' : '<span class="kpi-est" title="تخمینی تا اتصال صندوق">≈</span>';
   document.getElementById('v-overview').innerHTML = `
     <div class="dash-live-row">${liveStatusBadge()}<span class="dash-live-time">به‌روزرسانی خودکار هر ۱۵ ثانیه</span><span id="offlineBadge"></span></div>
@@ -2742,17 +2944,36 @@ function renderPeakChart(){
 }
 
 // ── Heatmap هفتگی (روز × بازه‌ی زمانی) ──
+// بازه‌بندیِ ساعت: هم‌راستا با قواعدِ pricing.ts (ناهار ۱۲ تا ۱۵ شاملِ خودِ
+// ۱۵، شب از ۱۹ به بعد). رفعِ باگ (ریویوی Copilot): مرزِ عصر قبلاً از ۱۵
+// شروع می‌شد، یعنی ساعتِ ۱۵ برخلافِ pricing.ts در «عصر» می‌افتاد، نه «ظهر».
+function slotOfHour(h){ if(h>=19||h<=5) return 2; if(h>=16&&h<=18) return 1; return 0; } // 0=ظهر(≤۱۵) 1=عصر(۱۶-۱۸) 2=شب(۱۹+)
 function renderHeatmap(){
-  const days=['ش','ی','د','س','چ','پ','ج'];
+  const days=['ش','ی','د','س','چ','پ','ج']; // ترتیبِ نمایش: هفته‌ی ایرانی (شنبه..جمعه)
+  const dowForDay=[6,0,1,2,3,4,5]; // dowِ واقعیِ Postgres برایِ هرکدام از days بالا (0=یکشنبه..6=شنبه)
   const slots=['ظهر','عصر','شب'];
-  // داده‌ی نمونه‌ی واقع‌گرایانه (شدت ۰-۴) — آخر هفته شب شلوغ‌تر
-  const data=[
-    [1,2,3],[1,2,3],[1,1,2],[2,2,3],[2,3,4],[3,4,4],[3,4,4]
-  ];
+  // ⚠️ رفعِ باگ: قبلاً اینجا یک جدولِ ۷×۳ کاملاً هاردکد بود («آخر هفته شب
+  // شلوغ‌تر») که عیناً برایِ هر رستوران نشان داده می‌شد، حتی اگر الگویِ
+  // واقعی‌اش کاملاً برعکس بود. حالا از HEATMAP_DATA واقعی (data.js:
+  // loadHeatmapForDashboard ← /restaurant/analytics) پر می‌شود؛ تا وقتی
+  // نیامده یا رستوران هنوز رزروِ کافی ندارد، جدول صفر (خالی) می‌ماند —
+  // صفرِ واقعی به‌مراتب صادقانه‌تر از یک الگویِ ساختگیِ محتمل است.
+  const grid=days.map(()=>[0,0,0]);
+  (HEATMAP_DATA||[]).forEach(c=>{
+    const di=dowForDay.indexOf(c.dow);
+    if(di<0) return;
+    grid[di][slotOfHour(c.hour)]+=(c.count||0);
+  });
+  let max=1;
+  grid.forEach(row=>row.forEach(v=>{ if(v>max) max=v; }));
   let html='<div class="hm-grid"><div class="hm-corner"></div>'+slots.map(s=>`<div class="hm-slot-lbl">${s}</div>`).join('');
   days.forEach((d,di)=>{
     html+=`<div class="hm-day-lbl">${d}</div>`;
-    slots.forEach((s,si)=>{ html+=`<div class="hm-cell hm-${data[di][si]}" title="${d} ${s}"></div>`; });
+    slots.forEach((s,si)=>{
+      const v=grid[di][si];
+      const lvl=v?Math.min(4,Math.ceil((v/max)*4)):0;
+      html+=`<div class="hm-cell hm-${lvl}" title="${d} ${s}: ${fa(v)} رزرو"></div>`;
+    });
   });
   html+='</div><div class="hm-legend"><span>کم</span><div class="hm-scale"><i class="hm-0"></i><i class="hm-1"></i><i class="hm-2"></i><i class="hm-3"></i><i class="hm-4"></i></div><span>زیاد</span></div>';
   document.getElementById('heatmap').innerHTML=html;
@@ -2780,7 +3001,11 @@ function renderInsights(){
   if(k.expectedCount>3) insights.push({ic:'clock',t:`${fa(k.expectedCount)} مهمان در راه`,d:'میزها را برای ورودشان آماده کن',c:'info'});
   const vipToday=RES.filter(r=>r.date==='today'&&r.seg==='vip').length;
   if(vipToday>0) insights.push({ic:'star',t:`${fa(vipToday)} مهمان VIP امروز`,d:'برخورد ویژه را فراموش نکن',c:'vip'});
-  insights.push({ic:'trending',t:'جمعه شب پرترددترین زمان توست',d:'کارکنان بیشتری برنامه‌ریزی کن',c:'info'});
+  // ⚠️ رفعِ باگ: قبلاً اینجا همیشه «جمعه شب پرترددترین زمان توست» هاردکد
+  // نشان داده می‌شد. WEEKDAY_INSIGHT از پاسخِ واقعیِ AI Restaurant Manager
+  // پر می‌شود (data.js: loadWeekdayInsightForDashboard)؛ اگر داده کافی
+  // نباشد null می‌ماند و این کارت به‌جایِ ادعایِ ساختگی، اصلاً نشان داده نمی‌شود.
+  if(WEEKDAY_INSIGHT) insights.push({ic:'trending',t:WEEKDAY_INSIGHT.t,d:WEEKDAY_INSIGHT.d,c:'info'});
   document.getElementById('insights').innerHTML=insights.slice(0,4).map(i=>`
     <div class="insight insight-${i.c}"><span class="insight-ic">${icon(i.ic,{size:16})}</span>
       <div><div class="insight-t">${i.t}</div><div class="insight-d">${i.d}</div></div></div>`).join('');
@@ -2851,11 +3076,31 @@ function startLiveUpdates(){
     }
   },15000); // هر ۱۵ ثانیه
 }
-function refreshLiveKPIs(){
-  const k=calcTodayKPIs();
-  // فقط اعداد را به‌روز کن (بدون پرش UI)
-  const vals=document.querySelectorAll('#v-overview .kpi-val');
-  // نشانگر زنده‌بودن
+// ⚠️ رفعِ باگ: این تابع «به‌روزرسانیِ زنده» را وعده می‌داد ولی هیچ‌کاری
+// نمی‌کرد — vals پرس‌وجو می‌شد ولی هرگز جایی نوشته نمی‌شد؛ calcTodayKPIs هم
+// از هیچ سرور fetchای نمی‌گرفت، فقط دوباره روی همان RESِ ثابتِ محلی حساب
+// می‌کرد. یعنی نشانگرِ «زنده» هر ۱۵ ثانیه پالس می‌زد ولی هیچ عددی
+// (رزروِ امروز، اشغال، نوشو، درآمد، …) واقعاً به‌روز نمی‌شد — رستوران‌دار
+// فکر می‌کرد اعداد زنده‌اند در حالی که کاملاً ایستا بودند.
+// حالا: fetchِ واقعی + رندرِ کاملِ همین بخش (نه کلِ صفحه)، با نگه‌داشتنِ
+// موقعیتِ اسکرول تا پرش UI نداشته باشد.
+async function refreshLiveKPIs(){
+  if(API.getToken()){
+    // موازی: هردو مستقل‌اند (رزروها/KPI و مشتریانِ برتر). اگر رزروها ناموفق بود
+    // کلِ رفرش لغو می‌شود (سیگنالِ اصلیِ «زنده‌بودن»)؛ اگر فقط guests ناموفق
+    // بود، لیستِ قبلی دست‌نخورده می‌ماند — چیزِ مهمی نیست که هر ۱۵ ثانیه لازم
+    // باشد حتماً تازه شود.
+    const [ok]=await Promise.all([
+      loadTodayReservationsForDashboard().catch(()=>false),
+      loadTopGuestsForDashboard().catch(()=>false),
+    ]);
+    if(!ok) return; // fetch ناموفق → داده‌ی قبلی دست‌نخورده می‌ماند، پالسِ گمراه‌کننده نزن
+  }
+  const scroller=document.querySelector('.content');
+  const y=scroller?scroller.scrollTop:0;
+  renderEnterpriseDashboard();
+  if(scroller) scroller.scrollTop=y;
+  // نشانگر زنده‌بودن — فقط بعد از رفرشِ واقعاً موفق پالس می‌زند
   const ind=document.getElementById('liveInd');
   if(ind){ind.classList.add('pulse');setTimeout(()=>ind.classList.remove('pulse'),1000);}
 }
@@ -3303,6 +3548,12 @@ function rWaitlist(){
   if(!_wlLoaded && API.getToken()){ loadWaitlist().then(()=>rWaitlist()); }
   const A=WL_ANALYTICS;
   const queue=WAITLIST.filter(w=>w.status==='waiting'||w.status==='offered');
+  // ⚠️ رفعِ باگ: badgeِ سایدبارِ #wlBadge با اینکه id داشت هیچ‌جا آپدیت نمی‌شد —
+  // همیشه مقدارِ استاتیکِ HTML («۳») می‌ماند حتی وقتی صفِ واقعی خالی بود
+  // (با live-test پیدا شد). حالا با همان A.current_queue_sizeِ واقعی که
+  // کارت‌های آمار هم استفاده می‌کنند پر می‌شود.
+  const wlBadge = document.getElementById('wlBadge');
+  if (wlBadge) wlBadge.textContent = queue.length > 0 ? fa(queue.length) : '';
   document.getElementById('v-waitlist').innerHTML=`
     <!-- آمار لیست انتظار -->
     <div class="wl-stats-grid">
@@ -3565,7 +3816,7 @@ function rProfile(){
   profRenderHours();
   // داده‌ی واقعی را در پس‌زمینه بکش و دوباره رندر کن
   if(API.getToken()){
-    loadGallery().then(()=>{ if(profTab==='gallery') profRenderGallery(); });
+    loadGallery().then(()=>{ refreshLogoDisplay(); if(profTab==='gallery') profRenderGallery(); });
     loadReviews().then(()=>{ if(profTab==='reviews') profRenderReviews(); });
     loadHours().then(()=>{ if(profTab==='hours') profRenderHours(); });
   }
@@ -3607,16 +3858,38 @@ function setProfTab(t){
 }
 
 // ─── تب گالری: آپلود عکس ───
+// لوگو یک عکسِ واقعی با category='logo' در همان RestaurantPhoto است — از
+// همان مسیرِ امنِ آپلود/بازبینیِ گالری رد می‌شود (lib/media.ts + صفِ تأیید)،
+// نه یک dataURL محلی که با رفرشِ صفحه از بین می‌رفت و هیچ‌جا ذخیره نمی‌شد.
+// آخرین آیتمِ دسته‌ی logo در GALLERY همیشه لوگویِ فعلی است (تأییدشده یا در
+// انتظار)؛ فقط وقتی status==='approved' باشد در سطحِ عمومی هم دیده می‌شود.
+function currentLogoPhoto(){
+  for(let i=GALLERY.length-1;i>=0;i--) if(GALLERY[i].type==='logo') return GALLERY[i];
+  return null;
+}
+// نمایِ ایموجی/گرادیان فقط یک نمایِ جایگزینِ سبک است تا لوگویِ واقعی آپلود/تأیید
+// شود — با آن اشتباه گرفته نشود (سایدبار هم از همین‌جا به‌روز می‌ماند).
+function refreshLogoDisplay(){
+  const logoPhoto=currentLogoPhoto();
+  const useImg=logoPhoto && logoPhoto.status==='approved';
+  const swEmoji=document.getElementById('swEmoji');
+  if(swEmoji){
+    if(useImg){swEmoji.style.background='transparent';swEmoji.innerHTML=`<img src="${logoPhoto.url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9px">`}
+    else{swEmoji.style.background=RESTAURANT.logoGradient;swEmoji.textContent=RESTAURANT.logoEmoji}
+  }
+}
 function profRenderGallery(){
+  const logoPhoto=currentLogoPhoto();
   document.getElementById('pt-gallery').innerHTML=`
     <!-- هویت رستوران: نام + لوگو -->
     <div class="identity-card">
-      <div class="identity-logo" style="background:${RESTAURANT.logoDataUrl?'transparent':RESTAURANT.logoGradient}">
-        ${RESTAURANT.logoDataUrl?`<img src="${RESTAURANT.logoDataUrl}" alt="logo">`:RESTAURANT.logoEmoji}
+      <div class="identity-logo" style="background:${logoPhoto?'transparent':RESTAURANT.logoGradient}">
+        ${logoPhoto?`<img src="${logoPhoto.url}" alt="logo">`:RESTAURANT.logoEmoji}
       </div>
       <div class="identity-info">
         <div class="identity-name">${esc(RESTAURANT.name)}</div>
         <div class="identity-sub">این لوگو و نام توی اپ مشتری و پنل نمایش داده می‌شه</div>
+        ${logoPhoto&&logoPhoto.status!=='approved'?`<div class="gal-status gal-status--${logoPhoto.status}" style="position:static;display:inline-flex;margin-top:4px;width:fit-content" ${logoPhoto.status==='rejected'?`onclick="showRejectReason(${GALLERY.indexOf(logoPhoto)})"`:''}>${icon(logoPhoto.status==='pending'?'clock':'info',{size:11})} ${esc(logoPhoto.statusLabel||(logoPhoto.status==='pending'?'در انتظار تأیید':'رد شد'))}</div>`:''}
         <div class="identity-actions">
           <button class="btn btn-primary btn-sm" onclick="openLogoEditor()">${icon('palette',{size:14})} تغییر لوگو</button>
           <button class="btn btn-ghost btn-sm" onclick="openNameEditor()">${icon('edit',{size:14})} تغییر نام</button>
@@ -3669,9 +3942,15 @@ function showRejectReason(i){
 }
 
 // ─── ویرایش لوگو ───
-let logoChoice={emoji:null,gradient:null,dataUrl:null};
+// آپلودِ عکس از همان مسیرِ امنِ گالری رد می‌شود (API.uploadPhoto، category='logo')
+// — قبلاً اینجا FileReader.readAsDataURL می‌کرد و فقط در حافظه‌ی مرورگر
+// می‌ماند: نه به سرور می‌رسید، نه رفرشِ صفحه دووم می‌آورد، نه رستوران‌های
+// دیگر/دستگاه‌های دیگر می‌دیدنش. ایموجی/گرادیان فقط نمایِ جایگزینِ سبک است
+// تا لوگویِ واقعی تأیید شود — با برندِ واقعی اشتباه گرفته نمی‌شود.
+let logoChoice={emoji:null,gradient:null};
 function openLogoEditor(){
-  logoChoice={emoji:RESTAURANT.logoEmoji,gradient:RESTAURANT.logoGradient,dataUrl:RESTAURANT.logoDataUrl};
+  logoChoice={emoji:RESTAURANT.logoEmoji,gradient:RESTAURANT.logoGradient};
+  const logoPhoto=currentLogoPhoto();
   const emojis=['🌿','🍽️','☕','🍕','🍔','🍜','🥗','🍣','🍰','🍷','🔥','⭐','🏛️','🌟','🍴','👨‍🍳'];
   const grads=[
     'linear-gradient(135deg,#34D399,#059669)',
@@ -3683,31 +3962,31 @@ function openLogoEditor(){
   ];
   openModal(`
     <div class="modal-title">${icon('palette',{size:18})} تغییر لوگو</div>
-    <div class="modal-sub">یه عکس آپلود کن، یا ایموجی و رنگ انتخاب کن</div>
-    <div class="logo-preview" id="logoPreview" style="background:${logoChoice.dataUrl?'transparent':logoChoice.gradient}">
-      ${logoChoice.dataUrl?`<img src="${logoChoice.dataUrl}" alt="">`:logoChoice.emoji}
+    <div class="modal-sub">عکسِ لوگو رو آپلود کن — بعد از تأییدِ تیم رزرونو (مثلِ بقیه‌ی گالری) روی صفحه‌ی رستورانت می‌شینه</div>
+    <div class="logo-preview" id="logoPreview" style="background:${logoPhoto?'transparent':logoChoice.gradient}">
+      ${logoPhoto?`<img src="${logoPhoto.url}" alt="">`:logoChoice.emoji}
     </div>
-    <button class="btn btn-ghost btn-block" onclick="document.getElementById('logoInput').click()">${icon('upload',{size:15})} آپلود عکس لوگو</button>
-    <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="handleLogoUpload(this)">
-    <div class="field-label" style="margin-top:18px">یا یک ایموجی انتخاب کن</div>
+    ${logoPhoto?`<div class="gal-status gal-status--${logoPhoto.status}" style="position:static;display:inline-flex;margin-top:8px;width:fit-content${logoPhoto.status==='approved'?';background:rgba(5,150,105,.94)':''}">${icon(logoPhoto.status==='approved'?'check':logoPhoto.status==='pending'?'clock':'info',{size:11})} ${esc(logoPhoto.statusLabel||logoPhoto.status)}</div>`:''}
+    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="document.getElementById('logoInput').click()" id="logoUploadBtn">${icon('upload',{size:15})} ${logoPhoto?'آپلودِ عکسِ جدید':'آپلود عکس لوگو'}</button>
+    <input type="file" id="logoInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleLogoUpload(this)">
+    <div class="field-label" style="margin-top:18px">تا وقتی عکس تأیید بشه، این ایموجی/رنگ به‌جاش نشون داده می‌شه</div>
     <div class="logo-pick-grid" id="logoEmojiGrid">
-      ${emojis.map(e=>`<div class="logo-emoji-opt ${e===logoChoice.emoji&&!logoChoice.dataUrl?'sel':''}" onclick="pickLogoEmoji('${e}')">${e}</div>`).join('')}
+      ${emojis.map(e=>`<div class="logo-emoji-opt ${e===logoChoice.emoji?'sel':''}" onclick="pickLogoEmoji('${e}')">${e}</div>`).join('')}
     </div>
     <div class="field-label">رنگ پس‌زمینه</div>
     <div class="logo-grad-grid" id="logoGradGrid">
       ${grads.map((g,gi)=>`<div class="logo-grad-opt ${g===logoChoice.gradient?'sel':''}" data-gi="${gi}" style="background:${g}" onclick="pickLogoGrad(${gi},'${g}')"></div>`).join('')}
     </div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="saveLogo()">ذخیره لوگو</button>
+    <button class="btn btn-primary btn-lg btn-block" onclick="saveLogoFallback()">ذخیره</button>
   `);
 }
 function refreshLogoPreview(){
   const pv=document.getElementById('logoPreview');
-  if(!pv)return;
-  if(logoChoice.dataUrl){pv.style.background='transparent';pv.innerHTML=`<img src="${logoChoice.dataUrl}" alt="">`}
-  else{pv.style.background=logoChoice.gradient;pv.textContent=logoChoice.emoji}
+  if(!pv || currentLogoPhoto())return; // وقتی عکسِ واقعی هست، پیش‌نمایشِ ایموجی جایگزینش نمی‌شود
+  pv.style.background=logoChoice.gradient;pv.textContent=logoChoice.emoji;
 }
 function pickLogoEmoji(e){
-  logoChoice.emoji=e;logoChoice.dataUrl=null; // انتخاب ایموجی، عکس رو پاک کن
+  logoChoice.emoji=e;
   document.querySelectorAll('#logoEmojiGrid .logo-emoji-opt').forEach(o=>o.classList.toggle('sel',o.textContent===e));
   refreshLogoPreview();
 }
@@ -3716,31 +3995,34 @@ function pickLogoGrad(gi,g){
   document.querySelectorAll('#logoGradGrid .logo-grad-opt').forEach(o=>o.classList.toggle('sel',+o.dataset.gi===gi));
   refreshLogoPreview();
 }
-function handleLogoUpload(input){
+async function handleLogoUpload(input){
   const file=input.files?.[0];
-  if(!file)return;
-  if(!file.type.startsWith('image/')){toast('','فقط فایل عکس مجاز است');return}
-  if(file.size>5*1024*1024){toast('','عکس بزرگ‌تر از ۵ مگابایته');return}
-  const reader=new FileReader();
-  reader.onload=e=>{logoChoice.dataUrl=e.target.result;refreshLogoPreview();
-    document.querySelectorAll('#logoEmojiGrid .logo-emoji-opt').forEach(o=>o.classList.remove('sel'));
-    toast('','عکس لوگو بارگذاری شد')};
-  reader.onerror=()=>toast('','خطا در خواندن فایل');
-  reader.readAsDataURL(file);
   input.value='';
+  if(!file)return;
+  if(!PHOTO_TYPES.includes(file.type)){toast('','فقط JPEG، PNG یا WebP مجازه');return}
+  if(file.size>PHOTO_MAX_BYTES){toast('',`حجم عکس نباید از ${PHOTO_MAX_BYTES/1024/1024} مگابایت بیشتر باشه`);return}
+  const btn=document.getElementById('logoUploadBtn');
+  if(btn){btn.disabled=true;btn.textContent='در حال آپلود…';}
+  const res=await API.uploadPhoto(file,{category:'logo'});
+  await loadGallery();
+  refreshLogoDisplay();
+  if(res.ok){
+    toast('','عکس لوگو آپلود شد و برای تأیید فرستاده شد');
+    closeModal();
+    profRenderGallery();
+  } else {
+    toast('',res.error?.message||'آپلود ناموفق بود');
+    if(btn){btn.disabled=false;btn.textContent='آپلود عکس لوگو';}
+  }
 }
-function saveLogo(){
+// ذخیره‌یِ نمایِ جایگزینِ ایموجی/گرادیان — محلی است (فقط برایِ زمانی که هنوز
+// عکسِ واقعی تأیید نشده)؛ خودِ لوگو با handleLogoUpload به سرور می‌رود.
+function saveLogoFallback(){
   RESTAURANT.logoEmoji=logoChoice.emoji||'🌿';
   RESTAURANT.logoGradient=logoChoice.gradient;
-  RESTAURANT.logoDataUrl=logoChoice.dataUrl;
-  // به‌روزرسانی لوگوی سایدبار (زنده)
-  const swEmoji=document.getElementById('swEmoji');
-  if(swEmoji){
-    if(RESTAURANT.logoDataUrl){swEmoji.style.background='transparent';swEmoji.innerHTML=`<img src="${RESTAURANT.logoDataUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9px">`}
-    else{swEmoji.style.background=RESTAURANT.logoGradient;swEmoji.textContent=RESTAURANT.logoEmoji}
-  }
+  refreshLogoDisplay();
   closeModal();profRenderGallery();
-  toast('','لوگو به‌روز شد');
+  toast('','ذخیره شد');
 }
 // ─── ویرایش نام ───
 function openNameEditor(){
@@ -3749,16 +4031,31 @@ function openNameEditor(){
     <div class="modal-sub">نام نمایشی توی اپ مشتری و پنل</div>
     <div class="field-label">نام رستوران</div>
     <input class="inp" id="restName" value="${esc(RESTAURANT.name)}" placeholder="نام رستوران">
-    <button class="btn btn-primary btn-lg btn-block" onclick="saveRestName()">ذخیره</button>
+    <button class="btn btn-primary btn-lg btn-block" id="saveRestNameBtn" onclick="saveRestName()">ذخیره</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>`);
   setTimeout(()=>document.getElementById('restName')?.focus(),150);
 }
-function saveRestName(){
-  const n=document.getElementById('restName').value.trim();
+// ⚠️ رفعِ باگ: قبلاً این تابع فقط RESTAURANT.name (متغیرِ محلیِ جاوااسکریپت) را
+// عوض می‌کرد — هیچ درخواستی به سرور نمی‌رفت. یعنی «ذخیره شد» به رستوران‌دار
+// نشان داده می‌شد، ولی با اولین رفرش (یا از دستگاه/شعبه‌ی دیگر) نامِ قبلی
+// برمی‌گشت، چون هیچ‌جا واقعاً ثبت نشده بود. حالا از GET/PUT /restaurant/profile
+// واقعی استفاده می‌کند (مثلِ الگویِ hoursSave/pricing).
+async function saveRestName(){
+  const input=document.getElementById('restName');
+  const n=input.value.trim();
   if(!n){toast('','نام رو وارد کن');return}
-  RESTAURANT.name=n;
+  if(n===RESTAURANT.name){closeModal();return}
+  const btn=document.getElementById('saveRestNameBtn');
+  if(btn){btn.disabled=true;btn.textContent='در حال ذخیره…';}
+  const res=await API.profileSave({name:n});
+  if(!res.ok){
+    toast('',res.error?.message||'ذخیره نشد — دوباره امتحان کن');
+    if(btn){btn.disabled=false;btn.textContent='ذخیره';}
+    return;
+  }
+  RESTAURANT.name=res.data.name;
   const swName=document.getElementById('swName');
-  if(swName)swName.textContent=n; // به‌روزرسانی زنده‌ی سایدبار
+  if(swName)swName.textContent=res.data.name; // به‌روزرسانی زنده‌ی سایدبار
   closeModal();profRenderGallery();
   toast('','نام رستوران به‌روز شد');
 }
@@ -4099,7 +4396,7 @@ let custSort='churn';
 async function custRenderProfiles(){
   const el=document.getElementById('ct-profiles');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای دیدن این بخش وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const res=await API.customers('sort='+custSort+'&limit=20');
   if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
   const items=res.data.items||[];
@@ -4156,7 +4453,7 @@ async function loadHours(){
 
 function profRenderHours(){
   const el=document.getElementById('pt-hours'); if(!el) return;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای ویرایش ساعات کاری وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const oh=HOURS_STATE.opening_hours||{};
   el.innerHTML=`
     <div class="panel">
@@ -4300,7 +4597,7 @@ async function custRenderCampaign(){
 async function loadCampaignHistory(){
   const el=document.getElementById('campHistoryList');
   if(!el)return;
-  if(!API.getToken()){ el.innerHTML='برای دیدن تاریخچه وارد شو'; return; }
+  if(!API.getToken()){ el.innerHTML='تاریخچه به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست'; return; }
   const res=await API.campaignHistory();
   if(!res.ok){ el.innerHTML=`<div class="error-state"><div class="error-state-icon">${icon('alert',{size:32})}</div><div>بارگذاری تاریخچه ناموفق بود</div></div>`; return; }
   const logs=res.data.items||[];
@@ -4314,7 +4611,7 @@ async function loadCampaignHistory(){
 async function custRenderAI(){
   const el=document.getElementById('ct-ai');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای دیدن این بخش وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const res=await API.aiRecommendations();
   if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
   const cards=res.data.cards||[];
@@ -4479,7 +4776,7 @@ function setMktTab(t){
 }
 function renderCoupons(){
   const el=document.getElementById('mkt-coupons'); if(!el) return;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای مدیریت کوپن‌ها وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">مدیریت کوپن‌ها به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   el.innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کوپن جدید</div><div class="panel-sub">تخفیف درصدی یا مبلغ ثابت برای مشتریان</div></div></div>
@@ -4529,7 +4826,7 @@ async function createCoupon(){
 }
 function renderAutomations(){
   const el=document.getElementById('mkt-automations'); if(!el) return;
-  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">برای مدیریت اتوماسیون وارد شو.</div>`; return; }
+  if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">اتوماسیون به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   el.innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">قانونِ خودکار جدید</div><div class="panel-sub">پیامک خودکار وقتی یه رویداد خاص افتاد</div></div></div>
@@ -4873,21 +5170,54 @@ let tt;
 function toast(icon,msg){document.getElementById('toastIcon').textContent=icon;document.getElementById('toastMsg').textContent=msg;const t=document.getElementById('toast');t.classList.add('show');t.classList.remove('toast-enter');void t.offsetWidth;t.classList.add('toast-enter');const live=document.getElementById('a11y-live');if(live)live.textContent=msg;clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400)}
 
 // ═══════════ NOTIFICATIONS ═══════════
-let NOTIFS=[
+// ⚠️ رفعِ باگ (همان الگویِ RES/GUESTS): این ۴ آیتم قبلاً هاردکد بودند —
+// «پارسا تهرانی رزرو کرد»، «نیلوفر رضایی ۵ ستاره داد»، … — برایِ هر
+// رستورانِ واقعی، همیشه همین‌ها. NOTIFS_DEMO فقط fallbackِ آفلاین است
+// (هم‌الگو با WL_DEMO_QUEUE/RES_DEMO/GUESTS_DEMO)؛ NOTIFS با
+// loadNotifications از /restaurant/notifications واقعی پر می‌شود.
+const NOTIFS_DEMO=[
   {ic:'green',emoji:'checkCircle',title:'رزرو جدید',text:'پارسا تهرانی برای امشب ساعت ۲۱:۳۰ میز رزرو کرد',time:'۲ دقیقه پیش',unread:true},
   {ic:'amber',emoji:'alert',title:'هشدار ریزش',text:'مریم احمدی ۳۵ روزه نیومده — ریسک ریزش ۸۲٪',time:'۱ ساعت پیش',unread:true},
   {ic:'blue',emoji:'star',title:'نظر جدید',text:'نیلوفر رضایی ۵ ستاره داد: «عالی بود، حتماً برمی‌گردم»',time:'۳ ساعت پیش',unread:true},
   {ic:'green',emoji:'refresh',title:'مشتری بازگشتی',text:'نیلوفر رضایی بعد از ۲ هفته دوباره رزرو کرد',time:'دیروز',unread:false},
 ];
+let NOTIFS=NOTIFS_DEMO.slice();
+let _notifsLoaded=false;
+/** فعالیتِ اخیرِ واقعی را می‌گیرد و NOTIFS را جایگزین می‌کند (خالی اگر فعالیتی نبود). */
+async function loadNotifications(){
+  if(!API.getToken()) return false;
+  const res=await API.recentActivity();
+  if(res.ok && Array.isArray(res.data?.items)){
+    NOTIFS=res.data.items.map(n=>({ic:n.ic, emoji:n.emoji, title:n.title, text:n.text, time:faRelative(n.at), unread:false}));
+    _notifsLoaded=true;
+    return true;
+  }
+  // ⚠️ رفعِ باگ (یافته‌ی ریویوی Copilot): این endpoint حالا پشتِ
+  // canViewAnalytics است؛ کارمندی که این مجوز را ندارد همیشه ۴۰۳ می‌گیرد.
+  // اگر همینجا false برگردانیم و NOTIFS دست‌نخورده بماند، همان باگِ اصلیِ
+  // این PR برایِ همین زیرمجموعه از کاربران دوباره زنده می‌شود: NOTIFS_DEMو
+  // برای همیشه به‌جایِ دیتایِ واقعی نشان داده می‌شود. ۴۰۳ یعنی «قطعاً و
+  // برایِ همیشه صلاحیت نداری»، نه یک خطایِ موقت — پس فوراً خالی کن و
+  // دیگر تلاش نکن (نه دیتایِ ساختگی، نه تلاشِ بی‌فایده‌ی هر رفرش).
+  if(res.status===403){
+    NOTIFS=[];
+    _notifsLoaded=true;
+    return true;
+  }
+  return false;
+}
 function renderNotifList(){
   const el=document.getElementById('notifList');
   const unread=NOTIFS.filter(n=>n.unread).length;
   document.getElementById('notifPing').style.display=unread?'block':'none';
   if(!NOTIFS.length){el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('bell',{size:32})}</div><div class="empty-state-desc">اعلانی نیست</div></div>`;return}
+  // ⚠️ رفعِ باگ امنیتی (یافته‌ی ریویوی Copilot روی PR): title/text حالا از
+  // نامِ مهمان/متنِ نظر (ورودیِ قابل‌کنترلِ کاربر) می‌آیند، نه رشته‌ی هاردکد
+  // مثلِ قبل — بدونِ esc اینجا یک stored XSS واقعی در پنلِ کارکنان بود.
   el.innerHTML=NOTIFS.map((n,i)=>`<div class="notif-item ${n.unread?'unread':''}" onclick="readNotif(${i})">
     ${n.unread?'<span class="notif-dot"></span>':''}
     <div class="notif-ic ${n.ic}">${icon(n.emoji,{size:16})}</div>
-    <div class="notif-body"><div class="notif-title">${n.title}</div><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div>
+    <div class="notif-body"><div class="notif-title">${esc(n.title)}</div><div class="notif-text">${esc(n.text)}</div><div class="notif-time">${esc(n.time)}</div></div>
   </div>`).join('');
 }
 function toggleNotif(e){
@@ -5063,7 +5393,17 @@ async function cbApply(){
 // ═══════════ ورود کارمند (فاز ۳ تکه ۷) ═══════════
 let _staffPhone = '';
 let STAFF_INFO = null;
+function setStaffGateLocked(locked){
+  const app = document.querySelector('.shell') || document.querySelector('.app');
+  const overlay = document.getElementById('loginOverlay');
+  if (app) {
+    app.setAttribute('aria-hidden', locked ? 'true' : 'false');
+    if ('inert' in app) app.inert = locked;
+  }
+  if (overlay) overlay.setAttribute('aria-hidden', locked ? 'false' : 'true');
+}
 function showStaffLoginPhone(){
+  setStaffGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('utensils',{size:34})}</div>
     <div class="login-title">پنل رستوران رزرونو</div>
@@ -5097,6 +5437,7 @@ async function staffSendOtp(){
   showStaffLoginCode(devCode, res.offline);
 }
 function showStaffLoginCode(devCode, offline){
+  setStaffGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('mail',{size:34})}</div>
     <div class="login-title">کد ورود رو وارد کن</div>
@@ -5134,16 +5475,31 @@ async function staffConfirmOtp(){
 }
 function enterPanel(demo){
   document.getElementById('loginOverlay').classList.add('hidden');
+  setStaffGateLocked(false);
   // منو را با مجوزهای واقعیِ کاربر هم‌راستا کن — قبل از رندرِ هر صفحه.
   if (typeof applyPermissionsToNav === 'function') applyPermissionsToNav();
   renderNotifList();
+  if(!_notifsLoaded && API.getToken() && !demo){ loadNotifications().then(ok=>{ if(ok) renderNotifList(); }); }
   rOverview();
   initLiveUpdates();
   if(API.getToken() && !demo){
-    loadTables().then(()=>{ if(document.getElementById('v-floor')?.classList.contains('active')) rFloor(); });
+    // ⚠️ رفعِ باگ: قبلاً فقط تبِ پلانِ سالن با اتمامِ loadTables دوباره رندر
+    // می‌شد. یعنی اگر کاربر در داشبورد می‌ماند (رایج‌ترین حالت بعد از لاگین)
+    // و loadTables دیرتر از renderEnterpriseDashboardِ اولیه تمام می‌شد،
+    // KPIِ «اشغال فعلی» تا رفرشِ زنده‌ی بعدی (تا ۱۵ ثانیه) روی «۰/۰» می‌ماند
+    // — نه به‌خاطرِ نبودِ میز، بلکه چون هنوز TABLES خالی بود.
+    loadTables().then(()=>{
+      if(document.getElementById('v-floor')?.classList.contains('active')) rFloor();
+      if(document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard();
+    });
     loadBranches();               // سوییچر شعبه را با داده‌ی واقعی پر کن
     Heartbeat.start();           // رستوران را در اپ مشتری آنلاین نگه می‌دارد
     Outbox.sync();               // اگر عملیات آفلاینِ در انتظار هست، همگام کن
+  } else if(!TABLES.length){
+    // حالت دمو — میزهای نمونه تا پلان سالن و KPI اشغال خالی نمانند
+    TABLES = DEMO_TABLES.map(t=>({...t}));
+    _tablesLoaded = true;
+    rOverview();
   }
   toast('', `خوش اومدی${STAFF_INFO?.restaurant_name?' · '+STAFF_INFO.restaurant_name:''}`);
 }
@@ -5153,6 +5509,7 @@ async function staffLogout(){
   STAFF_INFO = null;
   if (typeof applyPermissionsToNav === 'function') applyPermissionsToNav();  // بازگرداندنِ منو برای کاربرِ بعدی
   document.getElementById('loginOverlay').classList.remove('hidden');
+  setStaffGateLocked(true);
   showStaffLoginPhone();
   toast('','از پنل خارج شدی');
 }
@@ -5160,6 +5517,7 @@ async function staffLogout(){
 function onStaffSessionExpired(){
   STAFF_INFO = null;
   document.getElementById('loginOverlay').classList.remove('hidden');
+  setStaffGateLocked(true);
   showStaffLoginPhone();
   toast('','نشست منقضی شد، دوباره وارد شو');
 }
@@ -5171,13 +5529,20 @@ Outbox._updateBadge();         // نمایش تعداد عملیات در انت
 if (API.getToken()) {
   // توکن ذخیره‌شده هست → مستقیم پنل (اگر منقضی باشد، اولین درخواست refresh می‌کند)
   document.getElementById('loginOverlay').classList.add('hidden');
+  setStaffGateLocked(false);
   renderNotifList();
+  // ⚠️ رفعِ باگ (ریویوی Copilot روی PR): این مسیرِ بازیابیِ نشست (رفرشِ
+  // صفحه وقتی از قبل لاگین بودی) قبلاً loadNotifications را صدا نمی‌زد —
+  // فقط enterPanel این کار را می‌کرد. یعنی با هر رفرشِ صفحه، اعلان‌های
+  // دموی اولیه (NOTIFS_DEMO) برایِ همیشه به‌جایِ فعالیتِ واقعی می‌ماندند.
+  if(!_notifsLoaded){ loadNotifications().then(ok=>{ if(ok) renderNotifList(); }); }
   rOverview();
   loadTables();
   loadBranches();               // سوییچر شعبه را با داده‌ی واقعی پر کن
   Heartbeat.start();           // شروع ارسال heartbeat (رستوران را در اپ مشتری آنلاین نگه می‌دارد)
 } else {
   // نیاز به ورود
+  setStaffGateLocked(true);
   showStaffLoginPhone();
 }
 
