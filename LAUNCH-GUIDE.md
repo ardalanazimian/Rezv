@@ -2,7 +2,16 @@
 
 این سند آخرین گام قبل از لانچ واقعی است: راه‌اندازی HTTPS، دفاع DDoS، بک‌آپ، و چک‌لیست نهایی. کد آماده است؛ این‌ها کار سرور و زیرساخت‌اند.
 
-> **پیش‌نیاز:** بسته‌ی `rezervno-full-deploy.zip` روی سرور مستقر شده و با `docker compose up -d` بالا آمده. اگر هنوز نشده، اول README آن بسته را دنبال کن.
+> ⚠️ **اصلاح‌شده (۲۰۲۶-۰۸-۱۲):** پیش‌نیازِ قبلی («بسته‌ی `rezervno-full-deploy.zip`
+> روی سرور») از دورانی مانده که کد به‌صورتِ zip تحویل داده می‌شد — رجوع کن به
+> `DEPLOY-COMMANDS.md`. واقعیتِ فعلی: ریپو رو `git clone` کن
+> (`github.com/ardalanazimian/Rezv`)، سپس طبقِ `README.md`ِ ریشه یا `CLAUDE.md`
+> با `docker compose --profile http up -d --build` (تست محلی) یا
+> `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`
+> (تولید با HTTPS) بالا بیار. بخش‌هایِ ۱ و ۳ زیر هم اصلاح شدن — این ریپو الان
+> Caddy و بک‌آپ رو **خودش دوکرایز و آماده** داره؛ نصبِ دستیِ جداگانه نه فقط
+> لازم نیست، بلکه با سرویسِ dockerized تداخل می‌کنه (هر دو رویِ پورتِ
+> ۸۰/۴۴۳ بالا میان).
 
 ---
 
@@ -10,44 +19,22 @@
 
 بدون HTTPS، توکن‌های ورود و کدهای OTP روی شبکه قابل شنود هستند. **هیچ‌وقت بدون این لانچ نکن.**
 
-### ساده‌ترین راه: Caddy (خودکار، رایگان)
-
-Caddy گواهی Let's Encrypt را خودکار می‌گیرد و تمدید می‌کند. به‌جای nginx یا جلوی آن بگذار:
-
-```bash
-# نصب Caddy روی سرور (Ubuntu/Debian)
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install caddy
-```
-
-فایل `/etc/caddy/Caddyfile`:
-
-```
-your-domain.com {
-    # فرانت‌اندها و API را به nginx داخلی داکر پاس بده
-    reverse_proxy localhost:80
-}
-```
-
-```bash
-sudo systemctl reload caddy
-```
-
-تمام — HTTPS خودکار فعال شد. Caddy گواهی را هر ۹۰ روز خودش تمدید می‌کند.
-
-### جایگزین: certbot + nginx
-
-اگر می‌خواهی روی همان nginx داکر بمانی:
-
-```bash
-sudo apt install certbot
-sudo certbot certonly --standalone -d your-domain.com
-# گواهی‌ها در /etc/letsencrypt/live/your-domain.com/
-```
-
-سپس در `deploy/nginx/nginx.conf` یک server block برای `443` با `ssl_certificate` اضافه کن و در `docker-compose.yml` پورت `443` و mount گواهی‌ها را باز کن (کامنت‌هایش از قبل آنجاست).
+> ⚠️ **اصلاح‌شده (۲۰۲۶-۰۸-۱۲):** این بخش قبلاً نصبِ دستیِ Caddy رویِ خودِ
+> سرور (`apt install caddy`) رو پیشنهاد می‌کرد — از دورانی که هنوز
+> `docker-compose.prod.yml` و `deploy/caddy/` وجود نداشتن. امروز این ریپو
+> خودش یک سرویسِ Caddyِ کاملاً dockerized داره (با ریت‌لیمیت، هدرهایِ
+> امنیتی، و روتینگِ زیردامنه‌ایِ از قبل تنظیم‌شده — رجوع کن به
+> `deploy/caddy/Caddyfile`). نصبِ دستیِ Caddy یا certbot **رویِ همون سرور
+> با این سرویس تداخل می‌کنه** (هر دو پورتِ ۸۰/۴۴۳ می‌خوان).
+>
+> **راهِ درستِ فعلی، کاملاً مستندشده در `HTTPS-SETUP.md`:** فقط چهار
+> رکوردِ DNSِ زیردامنه (`api.`/`app.`/`business.`/`admin.`) رو تنظیم کن،
+> `DOMAIN=` رو در `.env` بذار، و:
+> ```bash
+> docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+> ```
+> همین. `HTTPS-SETUP.md` رو برایِ DNS/عیب‌یابیِ کامل بخون — این بخش دیگه
+> جزئیاتِ نصبِ دستی رو تکرار نمی‌کنه تا با اون سند واگرا نشه.
 
 ---
 
@@ -73,41 +60,20 @@ sudo certbot certonly --standalone -d your-domain.com
 
 ## ۳. بک‌آپ خودکار دیتابیس 💾
 
-داده‌ی مشتری ارزشمندترین دارایی است. یک cron برای `pg_dump` بگذار.
+داده‌ی مشتری ارزشمندترین دارایی است.
 
-اسکریپت `/opt/rezervno/backup.sh`:
-
-```bash
-#!/bin/bash
-set -e
-BACKUP_DIR=/opt/rezervno/backups
-mkdir -p "$BACKUP_DIR"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-
-# از داخل کانتینر postgres بک‌آپ بگیر
-docker compose -f /opt/rezervno/docker-compose.yml exec -T postgres \
-  pg_dump -U rezervno rezervno | gzip > "$BACKUP_DIR/rezervno_$TIMESTAMP.sql.gz"
-
-# فقط ۱۴ بک‌آپ آخر را نگه دار
-ls -t "$BACKUP_DIR"/rezervno_*.sql.gz | tail -n +15 | xargs -r rm
-
-echo "✓ بک‌آپ: rezervno_$TIMESTAMP.sql.gz"
-```
-
-```bash
-chmod +x /opt/rezervno/backup.sh
-# هر روز ساعت ۳ صبح
-echo "0 3 * * * /opt/rezervno/backup.sh >> /var/log/rezervno-backup.log 2>&1" | crontab -
-```
-
-**بازیابی** (در صورت نیاز):
-
-```bash
-gunzip -c backups/rezervno_TIMESTAMP.sql.gz | \
-  docker compose exec -T postgres psql -U rezervno rezervno
-```
-
-> **مهم:** بک‌آپ‌ها را جای دیگری هم کپی کن (آبجکت‌استوریج آروان، یا یک سرور دیگر). بک‌آپی که روی همان سرور است، با از‌دست‌رفتن سرور از بین می‌رود.
+> ⚠️ **اصلاح‌شده (۲۰۲۶-۰۸-۱۲):** این بخش قبلاً یک اسکریپتِ دستیِ
+> `/opt/rezervno/backup.sh` + crontabِ خودِ سرور پیشنهاد می‌کرد — از
+> دورانی که هنوز سرویسِ `backup` در `docker-compose.yml` وجود نداشت.
+> امروز این ریپو خودش یک سرویسِ بک‌آپِ کاملاً dockerized داره (تشخیصِ
+> بک‌آپِ خالی/خراب، آپلودِ اختیاری به S3-compatible، بازیابیِ یک‌دستوره) —
+> نوشتنِ اسکریپتِ دستیِ موازی هم اضافی است هم بی‌فایده (سرویسِ dockerized
+> خودش هر شب اجرا می‌شه، نیازی به crontabِ سرور نیست).
+>
+> **راهِ درستِ فعلی، کاملاً مستندشده در `BACKUP-GUIDE.md`:** فقط
+> `BACKUP_CRON`/`BACKUP_KEEP`/`BACKUP_ON_START` رو در `.env` تنظیم کن؛
+> سرویسِ `backup` با همون `docker compose up -d` بالا میاد. برایِ
+> بک‌آپِ فوری/بازیابی/آبجکت‌استوریج، `BACKUP-GUIDE.md` رو بخون.
 
 ---
 
@@ -161,13 +127,15 @@ volumeِ `uploads` در `docker-compose.yml`). لوگو هم از همین مس�
 - [ ] `sms.ts` با نسخه‌ی کاوه‌نگار جایگزین شده
 - [x] ذخیره‌سازی عکس — انجام‌شده (بخشِ ۵ بالا؛ فقط مهاجرت به آبجکت‌استوریج برایِ مقیاسِ چند-سرور باقی مانده، بلاکرِ لانچ نیست)
 
-زیرساخت:
-- [ ] HTTPS فعال (Caddy یا certbot)
-- [ ] CDN/WAF جلوی دامنه (ArvanCloud/Cloudflare)
-- [ ] بک‌آپ خودکار دیتابیس (cron + کپی خارج از سرور)
-- [ ] پورت دیتابیس از بیرون بسته (فقط شبکه‌ی داکر — در compose از قبل این‌طور است)
+زیرساخت (⚠️ اصلاح‌شده ۲۰۲۶-۰۸-۱۲ — Caddy و بک‌آپ کد/کانفیگشون کاملِ و
+dockerized توی خودِ ریپوعه؛ کارِ باقی‌مونده فقط تنظیمِ DNS/`.env` و
+`docker compose up`ه، نه نصبِ دستی):
+- [ ] HTTPS فعال — `docker-compose.prod.yml` (رجوع کن به `HTTPS-SETUP.md` برایِ DNSِ زیردامنه‌ای)
+- [ ] CDN/WAF جلوی دامنه (ArvanCloud/Cloudflare) — این یکی واقعاً بیرونِ ریپوعه، دستیه
+- [ ] بک‌آپ خودکار دیتابیس — سرویسِ `backup` در `docker-compose.yml`، فقط `BACKUP_CRON`/S3 رو در `.env` تنظیم کن (`BACKUP-GUIDE.md`)
+- [x] پورت دیتابیس از بیرون بسته (فقط شبکه‌ی داکر — در compose از قبل این‌طور است)
 - [ ] `.env` با رمزها و کلیدهای قوی و تصادفی
-- [ ] `.env` در git نیست (در .gitignore هست)
+- [x] `.env` در git نیست (در .gitignore هست)
 
 امنیت:
 - [x] فرانت‌اندها XSS-safe (تابع esc)
@@ -185,7 +153,7 @@ volumeِ `uploads` در `docker-compose.yml`). لوگو هم از همین مس�
 
 **آماده است:** کل کد (سه اپ + بک‌اند + ورود + ریت‌لیمیت)، همه تست‌شده.
 
-**کار تو (روی سرور):** HTTPS، CDN، بک‌آپ، اجرای seed، گذاشتن کلید کاوه‌نگار. این‌ها چند ساعت کارند، نه چند هفته.
+**کار تو (روی سرور):** تنظیمِ DNSِ زیردامنه‌ای + `.env` و `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` (HTTPS + بک‌آپ خودشون با همین یک دستور دوکرایز میان)، CDN جلوی دامنه، اجرای seed، گذاشتن کلید کاوه‌نگار. این‌ها چند ساعت کارند، نه چند هفته.
 
 **فاز ۴ (بعد از لانچ، به‌روزرسانیِ ۲۰۲۶-۰۸-۰۷):** ذخیره‌سازیِ عکس ساخته شده (این‌ها منسوخ شدند)؛ آنچه واقعاً باقی مانده: مهاجرتِ اختیاریِ ذخیره‌سازی به آبجکت‌استوریج برایِ مقیاسِ چند-سرور، صفِ پیامکِ عمومی‌تر (BullMQ در صورتِ نیاز)، و بهبودهای تدریجی بر اساسِ بازخوردِ کاربرانِ واقعی. رجوع کن به `LAUNCH-GAPS.md` برایِ فهرستِ زنده‌یِ شکاف‌ها.
 
