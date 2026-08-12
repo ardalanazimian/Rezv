@@ -271,7 +271,9 @@ export async function applyPlatformAbuseFlags(): Promise<{ signals: FraudSignal[
  * پاک‌کردنِ آگاهانه‌ی فلگِ سوءاستفاده (مسیرِ appeal) — فقط با اقدامِ صریحِ
  * کارمند، هرگز خودکار. staffId برایِ ردِ audit ثبت می‌شود.
  */
-export async function clearAbuseFlag(userId: string, staffId: string, restaurantId: string | null): Promise<void> {
+export async function clearAbuseFlag(
+  userId: string, actorId: string, restaurantId: string | null, actorType: 'staff' | 'admin' = 'staff',
+): Promise<void> {
   const result = await db.customerEconomyProfile.updateMany({
     where: { userId },
     data: { hasActiveAbuseFlag: false },
@@ -279,11 +281,80 @@ export async function clearAbuseFlag(userId: string, staffId: string, restaurant
   if (result.count === 0) throw new Error('پروفایلِ اقتصادیِ این کاربر یافت نشد');
   await audit({
     action: 'security.abuse_flag',
-    actorType: 'staff',
-    actorId: staffId,
+    actorType,
+    actorId,
     targetId: userId,
     restaurantId,
     detail: { cleared: true },
     success: true,
   }).catch(() => {});
+}
+
+/**
+ * فلگ‌کردنِ دستیِ ادمینِ پلتفرم (پنلِ شرکت) — وقتی یه الگویِ سوءاستفاده رو
+ * تیمِ پلتفرم مستقیم می‌بینه، نه اینکه منتظرِ اسکنِ خودکارِ شبانه بمونه.
+ * دقیقاً همون فلگِ خودکار رو ست می‌کنه (hasActiveAbuseFlag)، فقط با
+ * actorType='admin' و دلیلِ دستی در audit — تا شفاف بمونه که این تصمیمِ
+ * انسانی بوده، نه یه سیگنالِ الگوریتمی.
+ */
+export async function setAbuseFlagManually(userId: string, adminId: string, reason: string): Promise<void> {
+  await db.customerEconomyProfile.upsert({
+    where: { userId },
+    create: { userId, hasActiveAbuseFlag: true, lastViolationAt: new Date() },
+    update: { hasActiveAbuseFlag: true, lastViolationAt: new Date() },
+  });
+  await audit({
+    action: 'security.abuse_flag',
+    actorType: 'admin',
+    actorId: adminId,
+    targetId: userId,
+    restaurantId: null,
+    detail: { manual: true, reason },
+    success: true,
+  }).catch(() => {});
+}
+
+/**
+ * لیستِ کاربرانِ فلگ‌دارِ سراسریِ پلتفرم (پنلِ شرکت) — با آخرین دلیلِ فلگ‌شدن
+ * (از audit_logs) تا ادمین بدونه چرا فلگ خورده، نه فقط اینکه فلگ خورده.
+ */
+export async function listFlaggedAbuseUsers(limit = 100) {
+  const profiles = await db.customerEconomyProfile.findMany({
+    where: { hasActiveAbuseFlag: true },
+    orderBy: { lastViolationAt: 'desc' },
+    take: limit,
+    select: {
+      userId: true, reliabilityScore: true, reputationTier: true, strikeCount: true, lastViolationAt: true,
+      user: { select: { firstName: true, lastName: true, phone: true } },
+    },
+  });
+  if (profiles.length === 0) return [];
+
+  const latestAudits = await db.auditLog.findMany({
+    where: { action: 'security.abuse_flag', targetId: { in: profiles.map((p) => p.userId) }, success: true },
+    orderBy: { createdAt: 'desc' },
+    select: { targetId: true, detail: true, restaurantId: true, createdAt: true },
+  });
+  const reasonByUser = new Map<string, { detail: unknown; restaurantId: string | null }>();
+  for (const a of latestAudits) {
+    if (!a.targetId || reasonByUser.has(a.targetId)) continue; // اولین (جدیدترینِ) هر کاربر کافیه
+    reasonByUser.set(a.targetId, { detail: a.detail, restaurantId: a.restaurantId });
+  }
+
+  return profiles.map((p) => {
+    const r = reasonByUser.get(p.userId);
+    const detail = (r?.detail ?? {}) as Record<string, unknown>;
+    return {
+      user_id: p.userId,
+      name: [p.user.firstName, p.user.lastName].filter(Boolean).join(' ') || 'مشتری',
+      phone: p.user.phone,
+      reliability_score: p.reliabilityScore,
+      reputation_tier: p.reputationTier,
+      strike_count: p.strikeCount,
+      last_violation_at: p.lastViolationAt,
+      flagged_by: detail.manual ? 'admin' : 'auto',
+      reason: (detail.manual ? detail.reason as string : detail.fraud as string) ?? null,
+      restaurant_id: r?.restaurantId ?? null,
+    };
+  });
 }

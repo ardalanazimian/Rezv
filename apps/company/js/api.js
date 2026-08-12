@@ -63,6 +63,7 @@ const API = {
   systemHealth(){ return this.get('/admin/system-health'); },
   businessIntelligence(){ return this.get('/admin/business-intelligence'); },
   security(){ return this.get('/admin/security'); },
+  abuseFlagAction(userId, action, reason){ return this.patch(`/admin/abuse-flags/${userId}`, { action, reason }); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },
