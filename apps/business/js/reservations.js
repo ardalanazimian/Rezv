@@ -75,6 +75,18 @@ function toFaDigits(s){return s.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
 function searchRes(v){resQuery=v;document.querySelector('.s-clear')?.classList.toggle('show',!!v);renderResList()}
 function clearResSearch(){resQuery='';const i=document.getElementById('resSearch');if(i)i.value='';document.querySelector('.s-clear')?.classList.remove('show');renderResList()}
 function setResDate(d){resDate=d;rReservations()}
+// نشانِ اعتبارِ رزرو — عمداً از تگِ seg (vip/new — سیستمِ CRM/RFM قدیمی) جداست.
+// همون اسم‌ها/آیکون‌هایی که در اپِ کاستومر (features/economy.js) نشون داده
+// می‌شه، تا رستوران‌دار بدونه این همون چیزیه که مشتری هم می‌بینه.
+const REPUTATION_BADGE_BIZ={
+  silver:{name:'مهمانِ معتبر',ic:'star',fg:'#0D9488'},
+  gold:{name:'مهمانِ ممتاز',ic:'shield',fg:'#4F46E5'},
+  platinum:{name:'مهمانِ نمونه',ic:'crown',fg:'#7C3AED'},
+};
+function reputationBadgeHTML(tier){
+  const b=REPUTATION_BADGE_BIZ[tier]; if(!b)return'';
+  return `<span class="tl-tag" style="color:${b.fg};background:${b.fg}1a" title="اعتبارِ رزروِ این مشتری بر اساسِ سابقه‌ی به‌موقع‌بودنش">${icon(b.ic,{size:11})} ${b.name}</span>`;
+}
 function resItemHTML(r,i){
   const isPast=['completed','noshow','no_show','cancelled','auto_cancelled','rejected','expired'].includes(r.status);
   const statusChip=(STATUS_META[r.status]?`<span class="chip-status" style="background:${STATUS_META[r.status].bg};color:${STATUS_META[r.status].fg}">${icon(STATUS_META[r.status].icon,{size:12})} ${STATUS_META[r.status].label}</span>`:'');
@@ -83,7 +95,7 @@ function resItemHTML(r,i){
   return `<div class="tl-item"><div class="tl-time"><div class="tl-time-v">${r.t}</div></div>
     <div class="tl-card ${r.status}${r.seg==='vip'?' vip':''}"${isPast?' style="opacity:.92"':''}>
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div class="tl-name">${esc(r.name)} ${r.seg==='vip'?'<span class="tl-tag vip">VIP</span>':r.seg==='new'?'<span class="tl-tag new">جدید</span>':''}</div>
+        <div class="tl-name">${esc(r.name)} ${r.seg==='vip'?'<span class="tl-tag vip">VIP</span>':r.seg==='new'?'<span class="tl-tag new">جدید</span>':''} ${reputationBadgeHTML(r.reputationTier)}</div>
         ${statusChip}
       </div>
       <div class="tl-meta">${dateBadge}${icon('users',{size:13})} ${fa(r.party)} نفر · میز ${fa(r.table)} · ${icon('phone',{size:13})} ${esc(r.phone)} ${r.pre?`· ${icon('utensils',{size:12})} پیش‌سفارش`:''}</div>

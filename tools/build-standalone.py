@@ -43,6 +43,7 @@ CUSTOMER_ORDER = [
     'js/data/booking.js', 'js/store.js', 'js/actions.js', 'js/api.js',
     'js/analytics.js', 'js/data/discover.js', 'js/data/detail.js',
     'js/reservation.js', 'js/features/trips.js', 'js/features/loyalty.js',
+    'js/features/economy.js',
     'js/features/rewards.js', 'js/features/food-dna.js', 'js/features/chat.js',
     'js/features/palette.js', 'js/features/notifications.js',
     'js/features/a11y.js', 'js/features/onboarding.js',

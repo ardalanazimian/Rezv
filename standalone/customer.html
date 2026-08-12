@@ -1728,6 +1728,9 @@ button,[role="button"],.botnav-item,a{min-height:0}
 <!-- ═══════════ LOYALTY ═══════════ -->
 <div id="page-loyalty" class="page"></div>
 
+<!-- ═══════════ ECONOMY (اعتبارِ رزرو + ماموریت + فروشگاهِ جایزه) ═══════════ -->
+<div id="page-economy" class="page"></div>
+
 <!-- ═══════════ PROFILE ═══════════ -->
 <div id="page-profile" class="page"></div>
 <div id="page-chats" class="page"></div>
@@ -1755,6 +1758,9 @@ button,[role="button"],.botnav-item,a{min-height:0}
   </button>
   <button class="botnav-item" data-nav="loyalty" aria-label="باشگاه" onclick="go('loyalty')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></svg>باشگاه
+  </button>
+  <button class="botnav-item" data-nav="economy" aria-label="اعتبار و ماموریت" onclick="go('economy')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>اعتبار
   </button>
 </nav>
 
@@ -2835,6 +2841,7 @@ function go(p){
   if(p==='favorites')renderFavs();
   if(p==='trips')renderTrips();
   if(p==='loyalty')renderLoyalty();
+  if(p==='economy')renderEconomy();
   if(p==='profile')renderProfile();
   if(p==='chats' && typeof renderChats==='function')renderChats();
 }
@@ -3526,6 +3533,142 @@ async function renderLoyalty(){
   armReveals&&armReveals();
 }
 // ── دعوت دوستان (Referral) ──
+
+
+/* ═══ js/features/economy.js ═══ */
+// ═══ رزرونو — اقتصادِ مشتری: اعتبارِ رزرو + ماموریت‌ها + فروشگاهِ جایزه ═══
+//  ⚠️ عمداً از سیستمِ «باشگاه/سطحِ وفاداری» (loyalty.js) جداست — دو محورِ
+//  کاملاً متفاوت: وفاداری = چقدر خرج/بازدید کردی (از PointsLedger)، این‌جا =
+//  چقدر قابلِ‌اعتمادی (کم‌کنسلی/no-show، از CustomerEconomyProfile). عمداً
+//  نه اسم مشترک («سطح») نه ایموجیِ مشترک (🥉🥈🥇💎) با وفاداری استفاده نمی‌شه
+//  تا کاربر این دو رو یکی فرض نکنه.
+
+
+
+
+
+// نمادِ اعتبار — عمداً آیکونِ SVG (نه ایموجی) و اسمِ متفاوت از tierهایِ وفاداری.
+const REPUTATION_BADGE = {
+  bronze:   null, // مهمانِ تازه — هنوز نشانی نداره، چیزی نمایش داده نمی‌شه
+  silver:   { name:'مهمانِ معتبر',  ic:'star',   grad:'linear-gradient(135deg,#2DD4BF,#0D9488)' },
+  gold:     { name:'مهمانِ ممتاز',  ic:'shield', grad:'linear-gradient(135deg,#818CF8,#4F46E5)' },
+  platinum: { name:'مهمانِ نمونه',  ic:'crown',  grad:'linear-gradient(135deg,#C084FC,#7C3AED)' },
+};
+
+function missionCard(m){
+  const pct = Math.round((m.progress / Math.max(1,m.target_count)) * 100);
+  const rewardBits = [];
+  if (m.xp_reward > 0) rewardBits.push(`${fmtFa(m.xp_reward)} XP`);
+  if (m.wallet_reward > 0) rewardBits.push(`${fmtFa(m.wallet_reward)} سکه`);
+  if (m.strike_relief > 0) rewardBits.push('ترمیمِ اعتبار');
+  const btn = m.claimed
+    ? `<span class="mission-claimed">${icon('checkCircle',{size:14})} دریافت شد</span>`
+    : m.completed
+      ? `<button class="btn btn-primary btn-sm" onclick="claimMission('${m.id}')">دریافتِ جایزه</button>`
+      : `<span class="mission-progress-label">${fmtFa(m.progress)}/${fmtFa(m.target_count)}</span>`;
+  return `<div class="loy-action-card reveal" style="align-items:flex-start;cursor:default">
+    <div class="lac-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)">${icon('sparkle',{size:20})}</div>
+    <div class="lac-body" style="flex:1">
+      <div class="lac-title">${m.title}</div>
+      ${m.description ? `<div class="lac-sub">${m.description}</div>` : ''}
+      <div class="loy-prog" style="margin-top:8px"><div class="loy-prog-fill" style="width:${pct}%;background:${m.completed?'var(--success,#16A34A)':undefined}"></div></div>
+      <div class="lac-sub" style="margin-top:6px">${rewardBits.join(' + ')}</div>
+    </div>
+    <div style="align-self:center">${btn}</div>
+  </div>`;
+}
+
+function rewardCard(it){
+  const locked = !it.unlocked;
+  const disabled = locked || !it.in_stock;
+  return `<div class="bdg ${locked?'locked':'earned'}" style="text-align:${locked?'center':'right'}">
+    <div class="bdg-emoji">${icon(it.kind==='gift_card_credit'?'creditCard':it.kind==='priority_boost'?'trending':'gift',{size:26})}</div>
+    <div class="bdg-name">${it.title}</div>
+    <div class="bdg-desc">${fmtFa(it.cost_coins)} سکه${!it.in_stock?' — موجودی تمام شد':locked?` — نیازِ ${REPUTATION_BADGE[it.min_tier]?.name || 'سطحِ بالاتر'}`:''}</div>
+    <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" ${disabled?'disabled':''} onclick="redeemReward('${it.id}')">خرج کن</button>
+  </div>`;
+}
+async function renderEconomy(){
+  const root=document.getElementById('page-economy');
+  if(!root)return;
+
+  if(!isLoggedIn()){
+    root.innerHTML=`<div class="wrap section">
+      <div style="text-align:center;padding:40px 20px">
+        <div class="login-icon" style="margin-bottom:var(--sp-5)">${icon('shield',{size:40})}</div>
+        <div style="font-size:20px;font-weight:800;margin-bottom:8px">هنوز وارد نشدی</div>
+        <div style="color:var(--t2);font-size:14px;margin-bottom:24px;line-height:1.6">برایِ دیدنِ اعتبار، ماموریت‌ها و فروشگاهِ جایزه وارد شو</div>
+        <button class="btn btn-primary btn-lg btn-block" onclick="openLogin()">ورود / ثبت‌نام</button>
+      </div>
+    </div>`;
+    armReveals&&armReveals();
+    return;
+  }
+
+  root.setAttribute('aria-busy','true');
+  root.innerHTML=`<div class="wrap section">
+    <div class="loy-card" aria-hidden="true">
+      <div class="sk" style="height:16px;width:120px;border-radius:6px"></div>
+      <div class="sk" style="height:34px;width:150px;margin-top:16px;border-radius:8px"></div>
+    </div>
+  </div>`;
+
+  const [econRes, missionsRes, rewardsRes] = await Promise.all([
+    API.get('/me/economy'), API.get('/me/missions'), API.get('/me/rewards'),
+  ]);
+  root.removeAttribute('aria-busy');
+
+  if(!econRes.ok || !econRes.data){
+    root.innerHTML=`<div class="wrap section"><div class="empty-state"><div class="empty-state-icon">${icon('alert',{size:44})}</div><div class="empty-state-title">اطلاعاتِ اقتصاد بارگذاری نشد</div><div class="empty-state-desc">اتصالت رو چک کن و دوباره امتحان کن</div></div></div>`;
+    armReveals&&armReveals();
+    return;
+  }
+
+  const econ = econRes.data;
+  const missions = (missionsRes.ok && missionsRes.data?.missions) || [];
+  const rewards = (rewardsRes.ok && rewardsRes.data?.items) || [];
+  const badge = REPUTATION_BADGE[econ.reputation_tier];
+
+  const repBlock = badge
+    ? `<div class="loy-card" style="background:${badge.grad}"><div class="loy-card-mesh"></div>
+        <div class="loy-tier">${icon(badge.ic,{size:18})} ${badge.name}</div>
+        <div class="loy-next" style="margin-top:8px">این نشان بر اساسِ سابقه‌ی رزرو‌هایِ به‌موقعِ توئه — به رستوران‌ها هم نشون داده می‌شه</div>
+      </div>`
+    : `<div class="loy-card"><div class="loy-card-mesh"></div>
+        <div class="loy-tier">${icon('sparkle',{size:18})} مهمانِ تازه</div>
+        <div class="loy-next" style="margin-top:8px">با تکمیلِ رزروهات (بدونِ کنسلیِ دیروقت/عدمِ حضور) اعتبار می‌سازی</div>
+      </div>`;
+
+  root.innerHTML=`<div class="wrap section">
+    ${repBlock}
+
+    <div class="loy-action-card reveal" style="cursor:default">
+      <div class="lac-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)">${icon('wallet',{size:20})}</div>
+      <div class="lac-body"><div class="lac-title">${fmtFa(econ.wallet_balance)} سکه</div><div class="lac-sub">قابلِ‌خرج در فروشگاهِ جایزه — جدا از امتیازِ باشگاه</div></div>
+    </div>
+
+    ${missions.length ? `<div class="section-head reveal" style="margin-top:32px"><div class="section-title">ماموریت‌ها</div></div>
+    ${missions.map(missionCard).join('')}` : ''}
+
+    ${rewards.length ? `<div class="section-head reveal" style="margin-top:32px"><div class="section-title">فروشگاهِ جایزه</div></div>
+    <div class="badge-grid reveal">${rewards.map(rewardCard).join('')}</div>` : ''}
+  </div>`;
+  armReveals&&armReveals();
+}
+
+window.claimMission = async function(id){
+  buzz&&buzz();
+  const res = await API.post(`/me/missions/${id}/claim`, {});
+  if(res.ok){ toast('🎉','جایزه دریافت شد'); renderEconomy(); }
+  else toast('', res.error?.message || 'دریافتِ جایزه ناموفق بود');
+};
+
+window.redeemReward = async function(id){
+  buzz&&buzz();
+  const res = await API.post(`/me/rewards/${id}/redeem`, {});
+  if(res.ok){ toast('✅','خریداری شد'); renderEconomy(); }
+  else toast('', res.error?.message || 'خرید ناموفق بود');
+};
 
 
 /* ═══ js/features/rewards.js ═══ */

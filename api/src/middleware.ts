@@ -59,7 +59,14 @@ function corsHeaders(origin: string | null): Record<string, string> {
     'Access-Control-Allow-Origin': origin,
     'Vary': 'Origin',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key, x-trace-id, x-maintenance-key',
+    // ⚠️ X-Restaurant-Id اضافه شد (زنده پیدا شد ۲۰۲۶-۰۸-۱۲): پنلِ business
+    // برایِ مالکِ چندشعبه‌ای این هدر رو می‌فرسته (رجوع کن به apps/business/js/
+    // data.js، setActiveRestaurant/renderBranchSwitcher) — بدونِ این خط، هر
+    // درخواستِ restaurant-scoped از یه originِ جدا (دقیقاً معماریِ تولیدِ واقعی:
+    // app./business./api. زیردامنه‌هایِ جدا) با preflightِ CORS رد می‌شد و کلِ
+    // پنلِ business خاموش می‌موند — فقط با تستِ زنده‌یِ cross-origin پیدا شد،
+    // نه با فرض.
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key, x-trace-id, x-maintenance-key, X-Restaurant-Id',
     'Access-Control-Max-Age': '86400',
   };
 }
