@@ -262,7 +262,7 @@ function rSecurity(){
               <div style="font-weight:700">${esc(u.name)} <span style="font-weight:400;color:var(--t2);font-size:11px">${esc(u.phone)}</span></div>
               <div style="color:var(--t2);font-size:11.5px;margin-top:2px">tier: ${esc(u.reputation_tier)} · اعتبار: ${fa(u.reliability_score)} · strike: ${fa(u.strike_count)} · ${u.flagged_by==='admin'?'فلگِ دستی':'خودکار'}${u.reason?` (${esc(u.reason)})`:''}</div>
             </div>
-            <button class="btn btn-sm" onclick="clearAbuseFlagUi('${esc(u.user_id)}')">پاک‌کردنِ فلگ</button>
+            <button class="btn btn-sm" data-uid="${esc(u.user_id)}" onclick="clearAbuseFlagUi(this.dataset.uid)">پاک‌کردنِ فلگ</button>
           </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">فعلاً کسی فلگ نداره</div></div>`}
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
           <input id="manualFlagUserId" class="login-inp" style="flex:1;min-width:200px" placeholder="userId برایِ فلگِ دستی">

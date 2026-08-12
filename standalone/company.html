@@ -1226,6 +1226,7 @@ const API = {
   systemHealth(){ return this.get('/admin/system-health'); },
   businessIntelligence(){ return this.get('/admin/business-intelligence'); },
   security(){ return this.get('/admin/security'); },
+  abuseFlagAction(userId, action, reason){ return this.patch(`/admin/abuse-flags/${userId}`, { action, reason }); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },
@@ -1866,11 +1867,32 @@ function rSecurity(){
     const res=await API.security();
     if(!res.ok){document.getElementById('v-security').innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`;return;}
     const d=res.data;
+    const eo=d.economy_overview||{tier_distribution:[],total_xp_granted:0,active_abuse_flags:0,total_economy_profiles:0};
     document.getElementById('v-security').innerHTML=`
       <div class="kpi-grid">
         <div class="kpi"><div class="kpi-top"><div class="kpi-ic ${d.coupon_abuse_signals.length?'red':'green'}">${icon('ticket',{size:17})}</div></div><div class="kpi-val">${fa(d.coupon_abuse_signals.length)}</div><div class="kpi-label">الگوی سوءاستفاده از کوپن</div></div>
         <div class="kpi"><div class="kpi-top"><div class="kpi-ic ${d.high_no_show_customers.length?'amber':'green'}">${icon('close',{size:17})}</div></div><div class="kpi-val">${fa(d.high_no_show_customers.length)}</div><div class="kpi-label">مشتری با عدم‌حضور بالا</div></div>
+        <div class="kpi"><div class="kpi-top"><div class="kpi-ic ${eo.active_abuse_flags?'red':'green'}">${icon('shield',{size:17})}</div></div><div class="kpi-val">${fa(eo.active_abuse_flags)}</div><div class="kpi-label">فلگِ فعالِ سوءاستفاده (اقتصادِ مشتری)</div></div>
         <div class="kpi"><div class="kpi-top"><div class="kpi-ic ${d.recent_failed_actions.length>20?'red':'amber'}">${icon('alert',{size:17})}</div></div><div class="kpi-val">${fa(d.recent_failed_actions.length)}</div><div class="kpi-label">اقدام ناموفق (۷ روز)</div></div>
+      </div>
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-head"><div><div class="panel-title">اقتصادِ یکپارچه‌ی مشتری — نمایِ سراسریِ پلتفرم</div><div class="panel-sub">${fa(eo.total_economy_profiles)} پروفایل · مجموعِ XPِ اعطاشده: ${fa(eo.total_xp_granted)}</div></div></div>
+        ${eo.tier_distribution.length?`<div style="display:flex;gap:10px;flex-wrap:wrap">${eo.tier_distribution.map(t=>`<div style="flex:1;min-width:110px;padding:12px;border:1px solid var(--border);border-radius:10px;text-align:center"><div style="font-weight:800;font-size:15px">${esc(t.tier)}</div><div style="color:var(--t2);font-size:12px;margin-top:4px">${fa(t.count)} مشتری · اعتبارِ میانگین ${fa(t.avg_reliability)}</div></div>`).join('')}</div>`:'<div style="text-align:center;color:var(--t2);padding:20px">هنوز پروفایلی نیست</div>'}
+      </div>
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-head"><div><div class="panel-title">مشتریانِ فلگ‌دارِ سوءاستفاده</div><div class="panel-sub">می‌تونی فلگِ اشتباه رو پاک کنی یا دستی فلگ بزنی</div></div></div>
+        ${d.flagged_abuse_users.length?d.flagged_abuse_users.map(u=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px">
+            <div>
+              <div style="font-weight:700">${esc(u.name)} <span style="font-weight:400;color:var(--t2);font-size:11px">${esc(u.phone)}</span></div>
+              <div style="color:var(--t2);font-size:11.5px;margin-top:2px">tier: ${esc(u.reputation_tier)} · اعتبار: ${fa(u.reliability_score)} · strike: ${fa(u.strike_count)} · ${u.flagged_by==='admin'?'فلگِ دستی':'خودکار'}${u.reason?` (${esc(u.reason)})`:''}</div>
+            </div>
+            <button class="btn btn-sm" data-uid="${esc(u.user_id)}" onclick="clearAbuseFlagUi(this.dataset.uid)">پاک‌کردنِ فلگ</button>
+          </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">فعلاً کسی فلگ نداره</div></div>`}
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <input id="manualFlagUserId" class="login-inp" style="flex:1;min-width:200px" placeholder="userId برایِ فلگِ دستی">
+          <button class="btn btn-sm" onclick="flagAbuseUi()">فلگِ دستی</button>
+        </div>
       </div>
       <div class="panel" style="margin-bottom:20px">
         <div class="panel-head"><div><div class="panel-title">الگوی سوءاستفاده از کوپن (یک IP، چند حساب)</div></div></div>
@@ -1885,6 +1907,23 @@ function rSecurity(){
         ${d.sensitive_actions.length?d.sensitive_actions.map(a=>`<div style="padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px"><b>${esc(a.action)}</b><div style="color:var(--t2);margin-top:2px">${new Date(a.at).toLocaleString('fa-IR')}</div></div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:20px">موردی نیست</div>'}
       </div>`;
   })();
+}
+
+async function clearAbuseFlagUi(userId){
+  const res=await API.abuseFlagAction(userId,'clear');
+  if(!res.ok){toast('','خطا: '+(res.error?.message||'نامشخص'));return;}
+  toast('','فلگ پاک شد');
+  rSecurity();
+}
+async function flagAbuseUi(){
+  const el=document.getElementById('manualFlagUserId');
+  const userId=(el?.value||'').trim();
+  if(!userId){toast('','userId رو وارد کن');return;}
+  const res=await API.abuseFlagAction(userId,'flag','فلگِ دستیِ ادمینِ پلتفرم از پنلِ امنیت');
+  if(!res.ok){toast('','خطا: '+(res.error?.message||'نامشخص'));return;}
+  toast('','کاربر فلگ شد');
+  if(el) el.value='';
+  rSecurity();
 }
 
 // ═══════════ ورود مدیر پلتفرم (فاز ۳ تکه ۷) ═══════════
