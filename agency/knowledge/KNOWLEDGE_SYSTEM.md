@@ -39,10 +39,37 @@ itself the honest state, not a gap to paper over.
   apps while the backend generates 6-digit codes, making real login
   impossible — fixed to `maxlength="6"` / `/^\d{4,6}$/`; another known
   regression hotspot. — `PROJECT-KNOWLEDGE.md` §3
+- **2026-08-12 — full frontend↔backend route/method audit, clean except
+  payment.** Every `API.*` call site in the three vanilla-JS panels
+  (customer/business/company) plus the server-side API clients in
+  `apps/landing` and `apps/seo` was extracted and matched against the real
+  105 backend routes (path template + allowed HTTP methods, parsed from
+  every `route.ts`). Zero real path/method mismatches (2 flagged by the
+  matching script were false positives from `'/x/' + id` string
+  concatenation, verified by hand). Same-origin API-base resolution
+  (`resolveApiBase()` returning `''`) is correct for the primary
+  self-hosted deployment — `deploy/nginx/*.conf` and
+  `deploy/caddy/Caddyfile` both reverse-proxy `/api/*` to the backend on
+  the same domain; the separate-Vercel-project path still needs manual
+  `RZ_API_BASE`/`rz-api-base` configuration, already tracked in
+  `docs/KNOWN_LIMITATIONS.md`, not a new finding. The one real gap found:
+  payment (see `PRODUCT_MEMORY`). CI's `e2e` job (3 device profiles,
+  customer app) was green on this same commit.
 
 ## PRODUCT_MEMORY
-- (empty — no product-outcome-measured entries yet; do not seed with
-  assumptions)
+- **2026-08-12 — online payment (Zarinpal) is backend-only, not reachable
+  from any app.** A full frontend↔backend connectivity sweep (every
+  `API.get/post/patch/del` call in `apps/customer/js`, `apps/business/js`,
+  `apps/company/js`, plus `apps/landing`/`apps/seo`'s server-side API
+  clients) was cross-checked programmatically against the real 105 backend
+  routes and their HTTP methods. Every call matched a real route+method —
+  **except** payment: `POST /reservations/[code]/pay` exists and is wired
+  to a real Zarinpal client (`api/src/lib/zarinpal.ts`), but zero UI in any
+  of the three panels calls it (grepped for `pay`/`zarinpal`/`deposit`,
+  zero hits). `docs/architecture-audit/FEATURE_COVERAGE_MATRIX.md` lists
+  payment as part of the "Complete" core flows — that claim does not hold
+  up against the actual frontend code as of this verification. —
+  `PROJECT-KNOWLEDGE.md` §6 (corrected same day), `agency/CAPABILITY_MATRIX.md`
 
 ## UX_MEMORY
 - (empty — see `docs/CUSTOMER_UI_AUDIT_REPORT.md` and
