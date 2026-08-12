@@ -3,6 +3,7 @@ import { dbRead as db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseParams, zUuid, z } from '@/lib/schemas';
+import { clearAbuseFlag } from '@/lib/fraud';
 
 const paramsSchema = z.object({ userId: zUuid });
 
@@ -19,6 +20,13 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
     orderBy: { slotStart: 'desc' },
     take: 20,
     select: { code: true, status: true, slotStart: true, partySize: true, items: { select: { qty: true, menuItem: { select: { name: true, priceToman: true } } } } },
+  });
+
+  // اقتصادِ مشتری (اعتبار/سوءاستفاده) سراسری/per-User است، نه per-restaurant —
+  // پس یک کوئریِ جداست، نه join با customer_insights (که restaurant-scoped است).
+  const economy = await db.customerEconomyProfile.findUnique({
+    where: { userId },
+    select: { reliabilityScore: true, reputationTier: true, strikeCount: true, hasActiveAbuseFlag: true, lastViolationAt: true },
   });
 
   return NextResponse.json({
@@ -43,6 +51,13 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
       no_show_rate_pct: insight.noShowRatePct,
       churn_risk_score: insight.churnRiskScore,
     },
+    economy: {
+      reliability_score: economy?.reliabilityScore ?? null,
+      reputation_tier: economy?.reputationTier ?? null,
+      strike_count: economy?.strikeCount ?? 0,
+      has_active_abuse_flag: economy?.hasActiveAbuseFlag ?? false,
+      last_violation_at: economy?.lastViolationAt ?? null,
+    },
     segment: insight.segment,
     is_vip: insight.isVip,
     timeline: timeline.map(r => ({
@@ -51,4 +66,18 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
       items: r.items.map(it => `${it.menuItem.name} ×${it.qty}`),
     })),
   });
+});
+
+/**
+ * پاک‌کردنِ فلگِ سوءاستفاده (appeal path) — فقط staffیِ دارایِ canManageSettings
+ * (همان سطحِ حساسیتِ تنظیماتِ رستوران/سیاستِ کنسلی). هرگز خودکار نیست.
+ */
+export const PATCH = withRestaurantAuth({ permission: 'canManageSettings', rateLimit: 'auth' }, async (_req, ctx, rawParams: { userId: string }) => {
+  const { userId } = parseParams(rawParams, paramsSchema);
+  try {
+    await clearAbuseFlag(userId, ctx.auth.sub, ctx.restaurant.id);
+  } catch (e) {
+    throw Err.notFound((e as Error).message || 'پروفایلِ اقتصادیِ این کاربر یافت نشد');
+  }
+  return NextResponse.json({ ok: true });
 });
