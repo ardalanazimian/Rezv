@@ -1,6 +1,11 @@
 .env
 .env.local
 *.env
+
+# خروجیِ محلیِ ابزارِ graphify (نگاشتِ کدبیس به knowledge graph) — تولیدی،
+# قابلِ‌بازسازی، و نباید به مخزن برود
+graphify-out/
+
 node_modules/
 api/node_modules/
 .next/
