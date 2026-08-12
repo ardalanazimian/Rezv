@@ -17,6 +17,12 @@ services:
     user: "nobody"
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # ⚠️ رفعِ باگ (۲۰۲۶-۰۸-۱۲): prometheus.yml همیشه rule_files:
+      # /etc/prometheus/alerts.yml را می‌خواست، ولی این فایل هیچ‌وقت mount
+      # نمی‌شد — یعنی همه‌ی alertهای HighErrorRate/HighLatencyP95/… بی‌صدا
+      # غیرفعال بودن (Prometheus یا با خطا بالا نمی‌اومد یا rule file رو
+      # پیدا نمی‌کرد). با live-checkِ این overlay پیدا شد.
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
       - promdata:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

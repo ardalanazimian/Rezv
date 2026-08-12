@@ -23,16 +23,37 @@ OUT  = os.path.join(ROOT, 'standalone')
 # گرافِ واقعی حلقه‌دار است (api ↔ auth، discover ↔ detail)؛ چون همه در یک scope
 # ادغام می‌شوند و function ها hoist می‌شوند، حلقه‌ها مشکلی نمی‌سازند. فقط ماژول‌های
 # بدونِ وابستگی باید اول بیایند و نقطه‌ی ورود (main) آخر.
+#
+# ⚠️ رفعِ باگ (live-test ۲۰۲۶-۰۸-۱۲): این لیست با اپِ واقعی (main.js، ۲۵ ایمپورت
+# + ۳ وابستگیِ transitive که main.js مستقیم import نمی‌کند: api-core.js،
+# waitlist.js، data/booking.js) به‌طورِ سیستماتیک مقایسه شد — ۱۱ ماژولِ واقعی
+# اصلاً در این لیست نبودن (analytics.js, api-core.js, data/booking.js,
+# waitlist.js, و ۷ فایلِ features/*). چون build_standalone.py فقط خطِ import را
+# پاک می‌کند و چک نمی‌کند اسمِ importشده واقعاً در باندل تعریف شده یا نه، اسکریپت
+# بدونِ هیچ هشداری «✅» چاپ می‌کرد، ولی HTMLِ خروجی رویِ اولین تماسِ API با
+# `ReferenceError: httpJson is not defined` می‌شکست (چون api.js از api-core.js
+# می‌خواندش و api-core.js اصلاً در باندل نبود) — بدونِ کارکردنِ کلِ لیستِ انتظار،
+# آنالیتیکس، onboarding، pull-refresh، swipe-actions، live-strip، و a11y هم.
+# لیستِ زیر از importهای واقعیِ main.js مشتق شده + ۳ وابستگیِ transitive در
+# جایگاهِ درست (api-core.js قبل از api.js؛ waitlist.js قبل از data/booking.js
+# چون booking.js از آن offerWaitlist می‌خواهد؛ data/booking.js زود، قبل از
+# auth.js/data/discover.js که از آن faTime/quickBook می‌خواهند).
 CUSTOMER_ORDER = [
-    'js/icons.js', 'js/data/seed.js', 'js/theme-pwa.js', 'js/api.js', 'js/auth.js',
-    'js/store.js', 'js/actions.js', 'js/data/detail.js', 'js/data/discover.js',
-    'js/reservation.js', 'js/features/rewards.js', 'js/features/loyalty.js',
-    'js/features/trips.js', 'js/features/food-dna.js', 'js/features/chat.js',
-    'js/user-profile.js', 'js/init.js', 'js/main.js',
+    'js/icons.js', 'js/api-core.js', 'js/data/seed.js', 'js/waitlist.js',
+    'js/data/booking.js', 'js/store.js', 'js/actions.js', 'js/api.js',
+    'js/analytics.js', 'js/data/discover.js', 'js/data/detail.js',
+    'js/reservation.js', 'js/features/trips.js', 'js/features/loyalty.js',
+    'js/features/rewards.js', 'js/features/food-dna.js', 'js/features/chat.js',
+    'js/features/palette.js', 'js/features/notifications.js',
+    'js/features/a11y.js', 'js/features/onboarding.js',
+    'js/features/pull-refresh.js', 'js/features/swipe-actions.js',
+    'js/features/live-strip.js', 'js/user-profile.js', 'js/auth.js',
+    'js/theme-pwa.js', 'js/init.js', 'js/main.js',
 ]
 
 def strip_module(code, path):
     """حذفِ نحوِ ES Module تا کد به‌عنوان اسکریپتِ کلاسیک اجرا شود."""
+    has_export = bool(re.search(r'^\s*export\b', code, re.M))
     code = re.sub(r'^\s*import\s+[^;]*?;\s*$', '', code, flags=re.M | re.S)
     code = re.sub(r'^\s*import\s*\{[^}]*\}\s*from\s*[\'"][^\'"]+[\'"]\s*;?\s*$', '', code, flags=re.M | re.S)
     code = re.sub(r'^\s*export\s+(?=(async\s+)?(function|const|let|var|class)\b)', '', code, flags=re.M)
@@ -40,9 +61,23 @@ def strip_module(code, path):
     code = re.sub(r'^\s*export\s+default\s+', '', code, flags=re.M)
     # رفعِ تصادمِ نام: chat.js نسخه‌ی محلی و متفاوتی از esc/faTime دارد.
     # در scope مشترک یکی دیگری را بازنویسی می‌کرد؛ اینجا نام‌گذاریِ مجزا می‌شود.
+    # (chat.js چیزی export می‌کند، پس IIFE-wrap عمومیِ زیر برایش صدق نمی‌کند —
+    # باید دستی و هدفمند رفع شود.)
     if path.endswith('features/chat.js'):
         code = re.sub(r'\besc\b', 'chatEsc', code)
         code = re.sub(r'\bfaTime\b', 'chatFaTime', code)
+    # ⚠️ رفعِ باگِ کلاس (live-test ۲۰۲۶-۰۸-۱۲): pull-refresh.js و swipe-actions.js
+    # هر دو `const THRESHOLD`، `let _busy`، و تابع‌های `reduced/onMove/onStart`ِ
+    # هم‌نام و کاملاً بی‌ربط داشتن — در ES modules مشکلی نبود (هرکدام scope
+    # خودشو داره)، ولی در اسکریپتِ کلاسیکِ مشترک، `const`/`let` تکراری
+    # SyntaxError می‌داد (کلِ باندل رو از کار می‌انداخت) و توابعِ تکراری بی‌صدا
+    # همدیگه رو بازنویسی می‌کردن (یکی از دو ژست‌کنترل‌کننده silently می‌شکست) —
+    # با live-test در مرورگرِ واقعی پیدا شد، نه فرض. به‌جایِ رفعِ تک‌تکِ اسم‌ها
+    # (که با هر افزودنِ ماژولِ تازه دوباره می‌شکنه)، هر ماژولی که هیچ export
+    # نداره (یعنی فقط side-effect است، چیزی از بیرون بهش دسترسی لازم نداره)
+    # در IIFEِ خودش پیچیده می‌شه تا اسکوپِ محلیِ ES module رو شبیه‌سازی کنه.
+    if not has_export:
+        code = '(function(){\n' + code + '\n})();'
     return code
 
 def inline_assets(html, base):

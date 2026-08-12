@@ -109,11 +109,45 @@ itself the honest state, not a gap to paper over.
   duplicated here until re-verified as still current)
 
 ## SECURITY_MEMORY
-- Postgres: all 35 tables have RLS **enabled** but **zero policies**
-  (deny-by-default at the DB layer); actual authorization happens in
-  application code because Prisma connects with an owner role that
-  bypasses RLS — RLS is not doing active authorization work today, it is a
-  defense-in-depth backstop only. — `PROJECT-KNOWLEDGE.md` §2
+- Postgres: as of 2026-07-19, all 35 tables *on the live production DB*
+  had RLS **enabled** but **zero policies** (deny-by-default at the DB
+  layer); actual authorization happens in application code because Prisma
+  connects with an owner role that bypasses RLS — RLS is not doing active
+  authorization work today, it is a defense-in-depth backstop only. —
+  `PROJECT-KNOWLEDGE.md` §2
+- **P2/P3 — flagged 2026-08-12, fixed same day after explicit human
+  authorization.** That "35/35 RLS" claim was true for the live DB at the
+  time, but is **not reproducible from committed migrations**. `schema.prisma`
+  now has 49 models; a database built from scratch via this repo's own
+  migrations (`prisma db push` or `migrate deploy`, both tested locally,
+  plus `0_init/migration.sql` checked directly) enables RLS on only 15 of
+  49 tables — exactly the ones migrations `023`/`024`/`029`/`031`
+  explicitly touch (`payments`, `platform_settings`,
+  `restaurant_closures`, `chat_threads`, `chat_messages`,
+  `platform_events`, 8× `site_*`). The ~34 original core tables
+  (`restaurants`, `reservations`, `users`, `staff`, `tenants`, `tables`, …)
+  have RLS enabled on the live production DB but **no migration file that
+  does it** — the same "DB drift, migration written after the fact"
+  pattern this repo already documents for `payments`/`platform_settings`/
+  `restaurant_closures` before migration 023 existed, just never closed
+  for the original tables. Practical effect: CI's test DB, a fresh local
+  dev DB, and disaster-recovery-from-migrations-only would all be missing
+  DB-level RLS on the core tables (app-layer tenant scoping still applies,
+  so this is not an active exploit — it removes one defense-in-depth
+  layer on non-production DBs, not the primary authorization control).
+  This is exactly the class of DB/security change `governance/
+  GOVERNANCE.md`'s approval gates require explicit human sign-off for
+  before an agent executes it — so it was reported and left unfixed until
+  the human explicitly authorized the fix in this same session. Once
+  authorized: `api/prisma/sql/037-rls-core-tables.sql` added (same
+  idempotent `EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',
+  t)` loop pattern migration 031 used for `site_*`, no policies — deny-by-
+  default only, app still connects with the owner role that bypasses RLS,
+  so no behavior change). Verified live: full DB reset + rebuild via
+  `prisma db push` + `apply-sql.sh` → 49/49 tables now RLS-enabled (was
+  15/49); re-running the migration is a no-op (idempotency confirmed);
+  full backend test suite (266 tests) still 0 failures after; `tsc
+  --noEmit`/`lint` clean.
 - `OTP_DEV_MODE=true` in production is a full auth bypass (OTP returned in
   the API response) and is fail-fast blocked. — `PROJECT-KNOWLEDGE.md` §3
 - `ALLOWED_ORIGINS` unset in production silently disables CSRF/Origin

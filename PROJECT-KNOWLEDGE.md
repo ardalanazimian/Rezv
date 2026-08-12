@@ -44,6 +44,35 @@ Supabase فقط **host مدیریت‌شده‌ی Postgres** است — نه cli
 **وضعیت تأییدشده روی DB زنده (۲۰۲۶-۰۷-۱۹):** ۳۵ جدول، **هر ۳۵ با RLS فعال، صفر policy**
 (deny-by-default واقعی). `block_buffer_minutes` و `restaurant_closures` روی DB موجودند.
 
+**⚠️ یافته‌ی جدیدِ live-test (۲۰۲۶-۰۸-۱۲) — این خط بالا دیگه امروز درست نیست:**
+schema.prisma الان **۴۹ مدل** داره (نه ۳۵). مهم‌تر: یک دیتابیسِ **تازه‌ساز**
+از رویِ همینِ ریپو (چه با `prisma db push` چه با `migrate deploy` — هر دو
+تست شد، `0_init/migration.sql` هم چک شد) فقط **۱۵ جدول** با RLS فعال داره
+(`payments`, `platform_settings`, `restaurant_closures`, `chat_threads`,
+`chat_messages`, `platform_events`, و هشت جدولِ `site_*`ِ CMS — دقیقاً
+همون‌هایی که migrationهای ۰۲۳/۰۲۴/۰۲۹/۰۳۱ صریحاً RLS رو براشون فعال
+می‌کنن). بقیه‌یِ ~۳۴ جدولِ اصلی (`restaurants`, `reservations`, `users`,
+`staff`, `tenants`, `tables`, …) در **هیچ فایلِ migrationِ کامیت‌شده‌ای**
+RLS فعال نمی‌شن. یعنی جمله‌ی «۳۵ از ۳۵» فقط برایِ DBِ زنده‌ی *همون‌موقع*
+صادق بوده (احتمالاً از طریقِ یک دستورِ دستی/کنسولِ Supabase که هیچ‌وقت به
+migration تبدیل نشده — دقیقاً همون الگویی که خودِ این سند برایِ
+`payments`/`platform_settings`/`restaurant_closures` در ردیفِ migration
+۰۲۳ توضیح داده). **پیامد:** یک محیطِ تازه (CI، DR، محیطِ توسعه‌ی محلی) از
+رویِ migrationهایِ فعلی، جدول‌هایِ اصلی رو بدونِ RLS می‌سازه — لایه‌ی
+امنیتیِ اپلیکیشن (tenant scoping در کد) هنوز سرِجاشه، ولی defense-in-depthِ
+سطحِ DB برایِ این جدول‌ها روی محیطِ تازه فعال نیست.
+
+**✅ رفع شد (۲۰۲۶-۰۸-۱۲، با تأییدِ صریحِ کاربر):** `api/prisma/sql/037-rls-core-tables.sql`
+اضافه شد — دقیقاً همون الگویِ idempotent (loop + `EXECUTE format('ALTER
+TABLE %I ENABLE ROW LEVEL SECURITY', t)`، بدونِ policy) که 031 برایِ
+جدول‌هایِ `site_*` استفاده کرده بود، این‌بار برایِ هر ۳۴ جدولِ اصلی.
+تست شد: ریستِ کاملِ DB (`DROP SCHEMA` + `prisma db push` + `apply-sql.sh`)
+→ حالا **۴۹ از ۴۹ جدول** RLS فعال دارن (نه ۱۵ تا)؛ اجرایِ دوباره‌ی همون
+migration بدونِ خطا (idempotency تأییدشده)؛ `npm test` کاملِ بک‌اند
+(۲۶۶ تست) بعد از این تغییر همچنان **۰ شکست**؛ `tsc --noEmit`/`lint` پاک.
+هیچ policyای اضافه نشد — همون deny-by-default؛ رفتارِ اپ (که با نقشِ owner
+وصل می‌شه) عوض نشده، فقط لایه‌ی defense-in-depthِ DB کامل شد.
+
 ## ۳. احراز هویت
 
 - **بدون پسورد، بدون ایمیل.** فقط OTP پیامکی. بک‌اند کدِ **۶ رقمی** می‌سازد (`randomInt(100000,1000000)`).

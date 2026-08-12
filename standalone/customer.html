@@ -237,7 +237,7 @@
 }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-.btn-sm { --btn-h: 36px; font-size: var(--fs-sm); padding: 0 var(--sp-3); }
+.btn-sm { --btn-h: var(--touch-min); font-size: var(--fs-sm); padding: 0 var(--sp-3); }
 .btn-lg { --btn-h: 44px; font-size: var(--fs-lg); padding: 0 var(--sp-6); }
 
 .btn-primary { background: var(--brand-500); color: #fff; }
@@ -519,7 +519,11 @@
 /* ═══════════ تمِ روشن ═══════════ */
 [data-theme="light"]{
   --bg:#EEE9FA; --white:#FFFFFF;
-  --t1:#160F26; --t2:#5A5182; --t3:#948BB6;
+  /* --t3 در تمِ روشن ۲٫۶۷:۱ بود (اندازه‌گیری‌شده روی .hcard-meta، .event-desc و
+     برچسبِ .botnav-item) — زیرِ آستانه‌ی ۴٫۵ در WCAG 1.4.3 AA. همان رنگ‌مایه با
+     ۷۳٪ روشنایی: حالا ۴٫۶۰:۱ روی زمینه‌ی صفحه و ۵٫۴۷:۱ روی کارتِ سفید.
+     تمِ تاریک دست نخورد چون از قبل ۵٫۹۳:۱ بود. */
+  --t1:#160F26; --t2:#5A5182; --t3:#6C6585;
   --s-50:#FBFAFF; --s-100:#F4F1FC; --s-200:#ECE7F8; --s-300:#E0DAF0;
   --s-400:#948BB6; --s-500:#5A5182; --s-600:#433C66; --s-700:#2B2547; --s-900:#160F26;
   --border:rgba(22,15,38,.08); --border-strong:rgba(22,15,38,.14);
@@ -595,7 +599,7 @@ img{display:block;max-width:100%}
 .btn-ghost:hover{border-color:var(--border-strong);background:var(--s-50)}
 .btn-lg{padding:14px 26px;font-size:15px;min-height:50px;border-radius:var(--r)}
 .btn-block{width:100%}
-.btn-sm{padding:8px 14px;min-height:36px;font-size:13px;border-radius:var(--r-xs)}
+.btn-sm{padding:8px 14px;min-height:var(--touch-min);font-size:13px;border-radius:var(--r-xs)}
 
 /* ─────────── NAV (top, desktop) ─────────── */
 .nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.85);backdrop-filter:blur(16px) saturate(1.2);
@@ -643,7 +647,11 @@ img{display:block;max-width:100%}
 .search-field:hover{background:var(--s-50)}
 .search-field+.search-field{border-right:1px solid var(--border)}
 .search-field label{font-size:11px;font-weight:700;color:var(--t1);margin-bottom:1px}
-.search-field input,.search-field select{border:none;outline:none;background:none;font-size:13px;color:var(--t2);width:100%;cursor:pointer;padding:0}
+/* ورودی ۱۵px بود. تکیه‌کردن به «کلِ .search-field ناحیه‌ی لمس است» کافی نیست:
+   معیارِ ۲.۵.۵ خودِ عنصرِ تعاملی را می‌سنجد، و کاربر هم مستقیم به متن می‌زند. */
+.search-field input,.search-field select{border:none;outline:none;background:none;font-size:13px;color:var(--t2);width:100%;cursor:pointer;padding:0;
+  min-block-size:var(--touch-min);font-family:inherit}
+.search-field{justify-content:center}
 .search-go{width:48px;height:48px;border-radius:50%;background:var(--blue);border:none;cursor:pointer;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;color:#fff;transition:all var(--t);box-shadow:var(--sh-blue)}
 .search-go:hover{background:var(--blue-600);transform:scale(1.05)}
@@ -651,7 +659,8 @@ img{display:block;max-width:100%}
 /* ─────────── VIBE CHIPS ─────────── */
 .chips{display:flex;gap:9px;overflow-x:auto;padding:4px 0 8px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--white);border:1px solid var(--border);
+/* ۳۴px بود. min-block-size به‌جای padding تا ریتمِ عمودیِ ردیف به‌هم نریزد. */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;min-block-size:var(--touch-min);background:var(--white);border:1px solid var(--border);
   border-radius:50px;font-size:13px;font-weight:600;color:var(--t2);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all var(--t) var(--ease)}
 .chip:hover{border-color:var(--border-strong);color:var(--t1);transform:translateY(-1px);box-shadow:var(--sh-sm)}
 .chip.active{background:var(--s-900);border-color:var(--s-900);color:#fff}
@@ -667,6 +676,18 @@ img{display:block;max-width:100%}
 .rc:active{transform:scale(.99)}
 .rc-bg{position:absolute;inset:0;z-index:0;transition:transform .6s var(--ease)}
 .rc:hover .rc-bg{transform:scale(1.06)}
+/* دکمه‌ی کشیده: کلِ کارت را کلیک‌پذیر و — مهم‌تر — با کیبورد قابلِ فوکوس می‌کند.
+   z-index 1 یعنی زیرِ پنل (۲) و دکمه‌ی علاقه (۳) می‌ماند، پس چیپ‌های ساعت و
+   دکمه‌ی قلب همچنان کلیکِ خودشان را می‌گیرند. */
+.rc-open{position:absolute;inset:0;z-index:1;border:none;background:none;padding:0;cursor:pointer;
+  border-radius:inherit;-webkit-appearance:none;appearance:none}
+.rc-open:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
+.rc:has(.rc-open:hover) .rc-bg{transform:scale(1.06)}
+/* پنل روی .rc-open می‌نشیند (z-index 2)، پس بدونِ این، کلیک روی نامِ رستوران —
+   طبیعی‌ترین جای لمس — به هیچ‌جا نمی‌رسید. متنِ پنل تعاملی نیست، فقط چیپ‌های
+   ساعت هستند؛ همان‌ها کلیک را پس می‌گیرند و بقیه به دکمه‌ی زیر می‌افتد. */
+.rc-panel,.rc-emoji{pointer-events:none}
+.rc-slots,.rc-slot{pointer-events:auto}
 .rc-emoji{position:absolute;top:16px;right:18px;z-index:3;font-size:46px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));
   transition:transform .3s var(--spring)}
 .rc:hover .rc-emoji{transform:scale(1.12) rotate(6deg)}
@@ -675,12 +696,21 @@ img{display:block;max-width:100%}
   color:#fff;z-index:3;transition:transform var(--motion-base) var(--ease-spring)}
 .rc-fav:active{transform:scale(.88)}
 .rc-fav[aria-pressed="true"]{color:#FF4B7A}
+/* --grad-warm (#FF9A3B→#FF4B7A) با متنِ سفید ۲٫۱۱:۱ می‌داد — نشانی که کارِ
+   اصلی‌اش خوانده‌شدن است. همان دو رنگ‌مایه، اشباع‌شده و تیره‌تر: ۵٫۱۸:۱.
+   هاله‌ی رنگیِ اصلی در box-shadow می‌ماند تا گرمای بصری حفظ شود. */
 .rc-hotbadge{position:absolute;top:var(--sp-5);inset-inline-end:calc(var(--touch-min) + var(--sp-5));z-index:3;font-size:var(--fs-2xs);font-weight:800;color:#fff;padding:var(--sp-1) var(--sp-3);
-  border-radius:var(--radius-full);display:flex;align-items:center;gap:var(--sp-1);background:var(--grad-warm);box-shadow:0 6px 16px rgba(255,75,122,.5)}
+  border-radius:var(--radius-full);display:flex;align-items:center;gap:var(--sp-1);background:linear-gradient(135deg,#C2410C,#BE185D);box-shadow:0 6px 16px rgba(255,75,122,.5)}
 .rc-hotbadge.ai{background:var(--grad);inset-inline-end:var(--sp-3)}
-/* پنلِ شیشه‌ی شناور پایینِ کارت */
+/* پنلِ شیشه‌ی شناور پایینِ کارت
+   آلفای اسکریم عددی انتخاب شده، نه چشمی: با ۰٫۳۸ متنِ .rc-meta و .rc-slot روی
+   روشن‌ترین گرادیانِ پالت به ۱٫۳۲:۱ می‌رسید (نمونه‌برداریِ پیکسلی از رندرِ واقعی).
+   آلفا روی همه‌ی شش گرادیان و شش رنگِ متن حل شد؛ ۰٫۶۶ کمینه‌ای است که همه‌ی
+   متن‌ها را با حاشیه‌ی امن بالای آستانه‌ی خودشان می‌برد (ضعیف‌ترین ۱٫۳۲× آستانه).
+   backdrop-filter تضمینی نیست (بهینه‌سازِ CSS نسخه‌ی استاندارد را حذف می‌کند)،
+   پس خوانایی نباید به بلور تکیه کند — همین آلفا به‌تنهایی کافی است. */
 .rc-panel{position:relative;z-index:2;margin:0 12px 12px;border-radius:20px;padding:15px 16px;overflow:hidden;isolation:isolate;
-  background:rgba(14,10,26,.38);-webkit-backdrop-filter:blur(22px) saturate(200%);backdrop-filter:blur(22px) saturate(200%);
+  background:rgba(14,10,26,.66);-webkit-backdrop-filter:blur(22px) saturate(200%);backdrop-filter:blur(22px) saturate(200%);
   border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .rc-panel::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
   background:linear-gradient(140deg,rgba(255,255,255,.5),transparent 40%);
@@ -697,9 +727,12 @@ img{display:block;max-width:100%}
   display:grid;place-items:center;font-size:10px;background:rgba(255,255,255,.16)}
 .rc-social-t{font-size:12px;color:#dcd6f2;font-weight:600}.rc-social-t b{color:#fff}
 .rc-slots{display:flex;gap:8px;margin-top:13px}
-.rc-slot{padding:9px 14px;border-radius:13px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;
+/* چیپِ ساعت = CTAِ تبدیل. اندازه‌گیری شده بود ۶۳×۴۰px — زیرِ حداقلِ ۴۴px.
+   min-block-size به‌جای padding بزرگ می‌کند تا فاصله‌های داخلی به‌هم نریزد. */
+.rc-slot{padding:9px 14px;min-block-size:var(--touch-min);border-radius:13px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
   background:rgba(255,255,255,.14);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);
-  transition:transform .16s var(--spring)}
+  transition:transform .16s var(--spring);font-family:inherit}
 .rc-slot:active{transform:scale(.88)}
 .rc-slot.go{background:var(--grad);border:none;box-shadow:0 8px 20px rgba(106,75,255,.5)}
 
@@ -1082,7 +1115,12 @@ img{display:block;max-width:100%}
 .bw-field{border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;margin-bottom:10px;cursor:pointer;transition:border-color var(--t-fast)}
 .bw-field:hover{border-color:var(--border-strong)}
 .bw-field label{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:2px}
-.bw-field select,.bw-field input{border:none;outline:none;width:100%;font-size:14px;font-weight:600;color:var(--t1);background:none;cursor:pointer}
+/* اندازه‌گیری شده بود ۱۷px ارتفاع — روی ورودی‌های خودِ قیفِ رزرو، یعنی جایی که
+   خطای لمس مستقیماً تبدیل را از دست می‌دهد. کادرِ کلیک به ۴۴px می‌رسد بدونِ
+   اینکه ارتفاعِ بصریِ فیلد عوض شود (label بالای آن است، مجموع همچنان جمع‌وجور). */
+.bw-field select,.bw-field input{border:none;outline:none;width:100%;font-size:14px;font-weight:600;color:var(--t1);background:none;cursor:pointer;
+  min-block-size:var(--touch-min);font-family:inherit}
+.bw-field:focus-within{border-color:var(--blue)}
 
 /* ─────────── LOYALTY ─────────── */
 .loy-card{background:linear-gradient(125deg,var(--blue),var(--teal));border-radius:var(--r-2xl);padding:28px;color:#fff;position:relative;overflow:hidden;box-shadow:var(--sh-lg)}
@@ -1166,6 +1204,7 @@ img{display:block;max-width:100%}
 
 @media(max-width:880px){
   .nav-links{display:none}
+  .nav-right{display:none}
   .botnav{display:flex}
   body{padding-bottom:70px}
   .searchbar{flex-wrap:wrap;border-radius:var(--r-xl);padding:6px}
@@ -1273,9 +1312,22 @@ img{display:block;max-width:100%}
 .occ-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
 .occ-row::-webkit-scrollbar{display:none}
 .occ-card{flex-shrink:0;width:104px;height:120px;border-radius:18px;padding:14px;cursor:pointer;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;transition:transform var(--t) var(--spring)}
+/* گرادیانِ هر کارت به‌صورتِ style خطی در HTML است و بعضی‌شان خیلی روشن‌اند
+   (مثلِ #f6d365→#fda085): متنِ سفید روی آن‌ها ۳٫۰۳:۱ اندازه‌گیری شد.
+   به‌جای عوض‌کردنِ دوازده رنگ — که هویتِ رنگیِ کارت‌ها را از بین می‌برد — یک
+   اسکریمِ یکنواخت زیرِ متن می‌نشیند. آلفا روی هر دوازده توقفِ گرادیان حل شد:
+   ۰٫۵۰ کمینه‌ای است که بدترین حالت را به ۴٫۶۱:۱ می‌رساند. */
+/* محتوا باید بالای اسکریمِ ::after بنشیند، وگرنه خودِ متن هم کم‌جان می‌شود. */
+.occ-card > *{position:relative;z-index:1}
 .occ-card:active{transform:scale(.96)}
 .occ-card.on{outline:3px solid var(--t1);outline-offset:2px}
-.occ-card::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.28))}
+/* اسکریمِ خوانایی. قبلاً «transparent 40% → rgba(0,0,0,.28)» بود و متنِ سفیدِ
+   .occ-label را روی گرادیان‌های روشن (مثلِ #f6d365→#fda085) به ۳٫۰۳:۱ می‌رساند.
+   آلفا روی هر دوازده توقفِ رنگِ کارت‌ها حل شد: ۰٫۵۰ کمینه‌ی قبولی است، اینجا
+   با حاشیه تا ۰٫۶۲ در پایین می‌رود چون متن همان‌جاست. بالای کارت سبک می‌ماند
+   تا رنگِ هویتیِ هر مناسبت دیده شود. */
+.occ-card::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(to top,rgba(12,8,24,.62) 0%,rgba(12,8,24,.52) 50%,rgba(12,8,24,.26) 100%)}
 .occ-emoji{font-size:30px;position:relative;filter:drop-shadow(0 3px 8px rgba(0,0,0,.25))}
 .occ-label{font-size:14px;font-weight:800;color:#fff;position:relative;line-height:1.2;text-shadow:0 1px 4px rgba(0,0,0,.3)}
 .occ-sub{font-size:11px;color:rgba(255,255,255,.9);position:relative;margin-top:2px;font-weight:600}
@@ -1473,7 +1525,9 @@ button,[role="button"],.botnav-item,a{min-height:0}
 }
 .btn:active { transform: scale(.98); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-sm { min-height: 36px; font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
+/* ۳۶px زیرِ حداقلِ ۴۴px هر دو پلتفرم بود (WCAG 2.5.5). «کوچک» به عرض و وزنِ
+   بصری برمی‌گردد، نه به کوچک‌کردنِ ناحیه‌ی لمس. */
+.btn-sm { min-height: var(--touch-min); font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
 .btn-lg { min-height: 44px; font-size: var(--fs-lg); padding: var(--sp-3) var(--sp-6); }
 
 /* ── ۳) هم‌ترازیِ .inp (کلاسِ قدیمی) به استانداردِ .field-input ── */
@@ -1551,13 +1605,16 @@ button,[role="button"],.botnav-item,a{min-height:0}
           <label>کجا</label>
           <input id="sQ" placeholder="رستوران، آشپزی، محله..." onkeydown="if(event.key==='Enter')doSearch()">
         </div>
+        <!-- گزینه‌های این دو از js/data/booking.js پر می‌شوند (تاریخِ واقعیِ ۶۰ روز)
+             و مقدارشان مستقیم در زمینه‌ی رزرو می‌نشیند. پیش از این هر دو ثابت
+             بودند و هیچ‌جا خوانده نمی‌شدند — کنترلی که کار نمی‌کند. -->
         <div class="search-field">
           <label>کِی</label>
-          <select id="sWhen"><option>امروز</option><option>فردا</option><option>آخر هفته</option></select>
+          <select id="sWhen" onchange="syncSearchCtx()"></select>
         </div>
         <div class="search-field">
           <label>چند نفر</label>
-          <select id="sParty"><option>۲ نفر</option><option>۱ نفر</option><option>۳ نفر</option><option>۴ نفر</option><option>۵+ نفر</option></select>
+          <select id="sParty" onchange="syncSearchCtx()"></select>
         </div>
         <button class="search-go" onclick="doSearch()" aria-label="جستجو">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -1624,7 +1681,9 @@ button,[role="button"],.botnav-item,a{min-height:0}
 
   <!-- نزدیک تو -->
   <div class="wrap section">
-    <div class="section-head"><div><div class="section-title">📍 نزدیک تو</div><div class="section-sub" id="nearbySub">بر اساس موقعیت تو</div></div></div>
+    <!-- عنوان و زیرعنوان در renderNearby عوض می‌شوند: بدونِ اجازه‌ی موقعیت،
+         ادعای «نزدیک تو / بر اساس موقعیت تو» بی‌پایه است. -->
+    <div class="section-head"><div><div class="section-title" id="nearbyTitle">پیشنهاد برای تو</div><div class="section-sub" id="nearbySub">پرامتیازترین‌های شهر</div></div></div>
     <div class="hscroll" id="nearbyScroll"></div>
   </div>
 
@@ -1801,6 +1860,55 @@ if (typeof window !== 'undefined') window.icon = icon;
 const ICON_NAMES = Object.keys(PATHS);
 
 
+/* ═══ js/api-core.js ═══ */
+/* ═══════════════════════════════════════════════════════════
+   رزرونو — هسته‌ی مشترکِ HTTP (transport) — منبعِ واحد
+   این فایل منبعِ حقیقت است؛ tools/sync-design-system.sh آن را به اپ‌ها می‌سازد
+   (customer نسخه‌ی ESM عیناً؛ در آینده پنل‌ها نسخه‌ی global).
+
+   httpJson: یک fetchِ کم‌سطحِ بدونِ حالت — timeout، پارس JSON، envelope یکدست،
+   و حالتِ offline. هیچ منطقِ auth/token/refresh اینجا نیست (آن سطح در هر اپ می‌ماند).
+   خروجی:
+     موفق   → { ok:true,  status, data }
+     ناموفق → { ok:false, status, data, error }
+     خطا/timeout → { ok:false, offline:true, error }
+   ═══════════════════════════════════════════════════════════ */
+// آدرسِ پایه‌ی API — قابلِ تنظیم بدونِ build: window.RZ_API_BASE یا
+// <meta name="rz-api-base" content="https://...">. پیش‌فرض '' = same-origin
+// (رفتارِ فعلی/دمو بدونِ تغییر). منبعِ واحد برای هر سه اپ.
+function resolveApiBase() {
+  try {
+    if (typeof window !== 'undefined' && window.RZ_API_BASE) return String(window.RZ_API_BASE).replace(/\/$/, '');
+    const m = (typeof document !== 'undefined') && document.querySelector('meta[name="rz-api-base"]');
+    if (m && m.content) return String(m.content).trim().replace(/\/$/, '');
+  } catch { /* noop */ }
+  return '';
+}
+async function httpJson(url, opts = {}, timeoutMs = 8000) {
+  // روی پروتکل file: (باز کردن مستقیم HTML) درخواستِ نسبی به file:///api/… می‌رود
+  // و همیشه شکست می‌خورد + خطای کنسول می‌سازد؛ مستقیم حالتِ offline برگردان.
+  try {
+    if (typeof location !== 'undefined' && location.protocol === 'file:' && !/^https?:/i.test(url)) {
+      return { ok: false, offline: true, error: { message: 'اتصال به سرور برقرار نشد' } };
+    }
+  } catch { /* noop */ }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    clearTimeout(timer);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, status: res.status, data, error: data?.error || { message: `خطای ${res.status}` } };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (e) {
+    clearTimeout(timer);
+    return { ok: false, offline: true, error: { message: e.name === 'AbortError' ? 'زمان درخواست تمام شد' : 'اتصال به سرور برقرار نشد' } };
+  }
+}
+
+
 /* ═══ js/data/seed.js ═══ */
 // ═══ رزرونو — داده‌های نمونه: رستوران‌ها، گرادیان، مزایا، نشان‌ها (بخشی از اپ کاستومر) ═══
 const GRAD = {
@@ -1855,9 +1963,38 @@ const R_SAMPLE = [
 const PERKS=[['🎁','کش‌بک','تا ۱۵٪ برگشت پول'],['⚡','رزرو سریع','اولویت در ساعات شلوغ'],['🎂','هدیه تولد','تخفیف ویژه ماه تولد'],['👑','میز VIP','دسترسی به میزهای ویژه']];
 const BADGES=[['🍽️','اولین رزرو',1],['🔥','۵ هفته پیاپی',1],['⭐','گورمه',1],['🌙','شب‌نشین',1],['👑','VIP',0],['🗺️','کاشف',0]];
 let pts=340, favs=new Set(), curRest=null, bk={};
+// علاقه‌مندی‌ها را بین رفرش‌ها نگه دار (localStorage — الگوی rz_* مثل بقیهٔ اپ)
+try{ const saved=JSON.parse(localStorage.getItem('rz_favs')||'[]'); if(Array.isArray(saved)) favs=new Set(saved); }catch{}
+function saveFavs(){ try{ localStorage.setItem('rz_favs', JSON.stringify([...favs])); }catch{} }
 function setPts(v){ pts=v; }
 function setCurRest(v){ curRest=v; }
 function setBk(v){ bk=v; }
+
+// ═══════════════════════════════════════════════════════════
+//  زمینه‌ی رزرو — تاریخ و تعدادِ نفر، مشترک بینِ همه‌ی صفحه‌ها
+//
+//  چرا وجود دارد: کاربر تاریخ و تعداد را یک‌بار می‌گوید و بعد چند رستوران را
+//  مقایسه می‌کند. پیش از این هر بار که وارد رستورانِ بعدی می‌شد، شیتِ رزرو به
+//  «امروز / ۲ نفر» برمی‌گشت و باید دوباره واردشان می‌کرد (اندازه‌گیری شد).
+//
+//  در sessionStorage است نه localStorage: تاریخِ رزرو به همان نشستِ مرور تعلق
+//  دارد؛ باز کردنِ اپ در فردا نباید تاریخِ دیروز را پیشنهاد بدهد.
+// ═══════════════════════════════════════════════════════════
+const CTX_KEY = 'rz_booking_ctx';
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+let bookingCtx = { date: todayISO(), party: 2 };
+try{
+  const s = JSON.parse(sessionStorage.getItem(CTX_KEY)||'null');
+  // تاریخِ گذشته پذیرفته نمی‌شود — نشست ممکن است از نیمه‌شب رد شده باشد
+  if (s && typeof s.date === 'string' && s.date >= todayISO() && Number.isInteger(s.party)) bookingCtx = s;
+}catch{}
+function setBookingCtx(patch){
+  bookingCtx = { ...bookingCtx, ...patch };
+  try{ sessionStorage.setItem(CTX_KEY, JSON.stringify(bookingCtx)); }catch{}
+}
 const TRIPS=[
   {rid:1,date:'پنجشنبه ۱۵ خرداد',time:'۲۰:۰۰',party:'۲ نفر',code:'RZ8K2M',status:'up'},
   {rid:3,date:'۲۸ اردیبهشت',time:'۱۳:۰۰',party:'۴ نفر',code:'RZ4A1C',status:'done'},
@@ -1867,75 +2004,508 @@ const TRIPS=[
 
 
 
-/* ═══ js/theme-pwa.js ═══ */
+/* ═══ js/waitlist.js ═══ */
 // ═══════════════════════════════════════════════════════════
-//  رزرونو — تم دارک/لایت، حرکت، نصبِ PWA
-//  بخشی از اپ کاستومر (Vanilla JS، بدون build). scope سراسری مشترک.
-//  ترتیبِ لود در index.html مهم است (این فایل به توابع/state قبلی وابسته است).
+//  رزرونو — لیستِ انتظار (مدل OpenTable)
+//  جدا شده از reservation.js (ریفکتور فاز۱: جداسازیِ مسئولیت‌ها).
+//  رفتار دقیقاً همان قبل است؛ فقط از یک فایلِ مجزا export می‌شود.
+//  همان مدلِ ماژول (بخشی از گرافِ ماژولِ main.js) + bindingهای window
+//  برای onclickهای درونِ رشته‌های HTML.
 // ═══════════════════════════════════════════════════════════
-const _root=document.documentElement;
-try{ const saved=localStorage.getItem('rz_theme'); if(saved) _root.setAttribute('data-theme',saved);
-  else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches) _root.setAttribute('data-theme','light'); }catch{}
-function toggleTheme(){ const t=_root.getAttribute('data-theme')==='dark'?'light':'dark'; _root.setAttribute('data-theme',t); try{localStorage.setItem('rz_theme',t)}catch{}; updateThemeIcon(); buzz(); }
-function updateThemeIcon(){ const k=document.getElementById('themeKnob'); if(k) k.innerHTML=icon(_root.getAttribute('data-theme')==='dark'?'moon':'sun',{size:16}); }
-function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms||8); }catch{} }  // پاسخِ لمسی روی موبایل
-// ورودِ متحرک هنگام اسکرول (کارت‌ها می‌پرن تو صفحه، مثل تیک‌تاک)
-let _io;
-function armReveals(root){
-  if(!_io) _io=new IntersectionObserver((es)=>{es.forEach((en,i)=>{if(en.isIntersecting){setTimeout(()=>en.target.classList.add('in'),Math.min(i,6)*60);_io.unobserve(en.target);}})},{threshold:.1});
-  (root||document).querySelectorAll('.reveal:not(.in)').forEach(el=>_io.observe(el));
+let WL=null; // ورودی فعلی لیست انتظار کاربر { id, position, ... }
+let wlTimer=null;
+// پیشنهاد پیوستن به صف وقتی ظرفیت پر است
+function offerWaitlist(id, r){
+  const sheetBody=document.getElementById('sheetBody');
+  sheetBody.innerHTML=`
+    <div class="wl-join">
+      <div class="wl-join-hero">
+        <div class="wl-join-mesh"></div>
+        <span class="wl-join-emoji">${icon('inbox',{size:28})}</span>
+      </div>
+      <div class="sheet-title" style="text-align:center">ظرفیت این ساعت پره</div>
+      <div class="sheet-sub" style="text-align:center;margin-bottom:18px">${esc(r.n)} · ${bk.date} · ${bk.time}<br>به صف بپیوند — اگه میزی آزاد شه، <b>اول به تو</b> خبر می‌دیم</div>
+      <div class="wl-benefits">
+        <div class="wl-benefit"><span class="wl-bene-ic">${icon('bell',{size:18})}</span><div><b>اطلاع فوری</b><small>پیامک + نوتیفیکیشن لحظه‌ای</small></div></div>
+        <div class="wl-benefit"><span class="wl-bene-ic">⏱️</span><div><b>تخمین زمان</b><small>می‌دونی چقدر باید صبر کنی</small></div></div>
+        <div class="wl-benefit"><span class="wl-bene-ic">${icon('check',{size:18})}</span><div><b>کنترلِ کامل</b><small>آفر رو راحت قبول یا رد کن</small></div></div>
+      </div>
+      <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="buzz&&buzz();joinWaitlist(${id})">پیوستن به لیست انتظار</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
+    </div>`;
 }
-// نکته: updateThemeIcon()/armReveals() اولیه در boot() (init.js) صدا زده می‌شوند
-// تا مطمئن شویم DOM آماده است (به‌جای اجرای شکننده در سطح‌بالای ماژول).
+async function joinWaitlist(id){
+  const r=R.find(x=>x.id===id);
+  const sheetBody=document.getElementById('sheetBody');
+  sheetBody.innerHTML=`<div style="text-align:center;padding:40px"><div class="spin" style="margin:0 auto 16px"></div>در حال پیوستن به صف...</div>`;
+  const party=parseInt(String(bk.party).replace(/[^\d۰-۹]/g,'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))||2;
+  const res=await API.post('/waitlist',{restaurant_id:id,party_size:party,notify_sms:true,notify_push:true});
+  let entry;
+  if(res.ok&&res.data?.id){ entry=res.data; }
+  else if(res.offline){ entry={id:'wl_demo',position:Math.floor(Math.random()*3)+2,estimated_wait_minutes:25,is_vip:false,status:'waiting'}; }
+  else { toast('',res.error?.message||'پیوستن ناموفق بود'); closeSheet(); return; }
+  WL={...entry,rid:id,rname:r.n};
+  showWaitlistStatus();
+}
+// داشبورد مشتری: وضعیت در صف
+function showWaitlistStatus(){
+  if(!WL)return;
+  const sheetBody=document.getElementById('sheetBody');
+  const isOffered=WL.status==='offered';
+  sheetBody.innerHTML=`
+    <div class="wl-status">
+      ${isOffered?`
+        <div class="wl-offer-banner">
+          <div class="wl-offer-mesh"></div>
+          <span class="wl-offer-emoji">${icon('checkCircle',{size:32})}</span>
+          <div class="sheet-title" style="text-align:center;color:#fff;position:relative">میزت آماده‌ست!</div>
+          <div style="text-align:center;color:rgba(255,255,255,.92);font-size:14px;position:relative">میز ${faNum(WL.offered_table||'—')} · ${esc(WL.rname||'')}</div>
+          <div class="wl-timer" id="wlTimer">۰۵:۰۰</div>
+          <div style="text-align:center;color:rgba(255,255,255,.85);font-size:12px;position:relative">برای تأیید فرصت داری</div>
+        </div>
+        <button class="btn btn-lg btn-block" style="background:#fff;color:#16A34A;margin-top:16px;font-weight:800" onclick="buzz&&buzz();acceptWL()">${icon('check',{size:18})} قبول می‌کنم</button>
+        <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="declineWL()">رد کردن</button>
+      `:`
+        <div style="text-align:center;padding:8px 0">
+          <div class="wl-position-ring">
+            <div class="wl-ring-pulse"></div>
+            <div class="wl-pos-num" id="wlPosNum">${faNum(WL.position||'—')}</div>
+            <div class="wl-pos-label">نفر در صف</div>
+          </div>
+          <div class="sheet-title" style="text-align:center;margin-top:18px">در صفِ ${esc(WL.rname||'')}</div>
+          <div class="wl-eta"><span>⏱️</span> حدود <b>${faNum(WL.estimated_wait_minutes||'؟')}</b> دقیقه تا نوبتت</div>
+          ${WL.is_vip?`<div class="wl-vip-badge">${icon('star',{size:13,fill:true})} اولویت VIP</div>`:''}
+          <div class="wl-hint">${icon('bell',{size:13})} به‌محضِ آزادشدنِ میز، با پیامک و نوتیفیکیشن خبرت می‌کنیم</div>
+        </div>
+        <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="buzz&&buzz();refreshWL()">${icon('refresh',{size:16})} به‌روزرسانی وضعیت</button>
+        <button class="btn btn-danger-ghost btn-block" style="margin-top:8px" onclick="leaveWL()">خروج از صف</button>
+      `}
+    </div>`;
+  if(isOffered){startWlTimer();}
+  else{
+    // شمارشِ متحرکِ موقعیت در صف (حسِ زنده‌بودن)
+    const pn=document.getElementById('wlPosNum'),target=parseInt(WL.position)||0;
+    if(pn&&target>0){let c=Math.min(target+3,target*2||3);const iv=setInterval(()=>{c--;pn.textContent=faNum(c);if(c<=target)clearInterval(iv);},80);}
+  }
+}
+function startWlTimer(){
+  clearInterval(wlTimer);
+  let sec=300; // ۵ دقیقه
+  const el=document.getElementById('wlTimer');
+  wlTimer=setInterval(()=>{
+    sec--;
+    if(sec<=0){clearInterval(wlTimer);toast('⌛','مهلت آفر تمام شد');WL.status='waiting';showWaitlistStatus();return;}
+    if(el){const m=String(Math.floor(sec/60)).padStart(2,'0'),s=String(sec%60).padStart(2,'0');el.textContent=faNum(`${m}:${s}`);}
+  },1000);
+}
+async function refreshWL(){
+  if(!WL)return;
+  const res=await API.get(`/waitlist/${WL.id}`);
+  if(res.ok&&res.data){WL={...WL,...res.data};showWaitlistStatus();toast('','به‌روز شد');}
+  else if(res.offline){ // دمو: شبیه‌سازی آفر
+    if(WL.position>1){WL.position--;toast('',`نفر ${faNum(WL.position)} شدی`);}
+    else{WL.status='offered';WL.offered_table=7;toast('','میزت آماده شد!');}
+    showWaitlistStatus();
+  }
+}
+async function acceptWL(){
+  clearInterval(wlTimer);
+  const res=await API.post(`/waitlist/${WL.id}/accept`);
+  if(res.ok&&res.data){
+    const code=res.data.reservation_code||'RZWL'+Math.random().toString(36).slice(2,6).toUpperCase();
+    TRIPS.unshift({rid:WL.rid,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
+    toast('','رزروت ثبت شد!');WL=null;closeSheet();go('trips');
+  }else if(res.offline){
+    const code='RZWL'+Math.random().toString(36).slice(2,6).toUpperCase();
+    TRIPS.unshift({rid:WL.rid,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
+    toast('','رزروت ثبت شد!');WL=null;closeSheet();go('trips');
+  }else{toast('',res.error?.message||'خطا');}
+}
+async function declineWL(){
+  clearInterval(wlTimer);
+  await API.post(`/waitlist/${WL.id}/decline`).catch(()=>{});
+  toast('','آفر رد شد');WL=null;closeSheet();
+}
+async function leaveWL(){
+  await API.request(`/waitlist/${WL.id}`,{method:'DELETE'}).catch(()=>{});
+  toast('','از صف خارج شدی');WL=null;closeSheet();
+}
+
+// ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
+window.joinWaitlist = joinWaitlist;
+window.refreshWL = refreshWL;
+window.acceptWL = acceptWL;
+window.declineWL = declineWL;
+window.leaveWL = leaveWL;
+
+
+/* ═══ js/data/booking.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — جریانِ رزرو (شیتِ رزرو، availability، مراحل، تأیید)
+//  جدا شده از data/detail.js (ریفکتور فاز۱: جداسازیِ مسئولیت).
+//  رفتار دقیقاً همان قبل است؛ فقط از یک فایلِ مجزا export می‌شود.
+// ═══════════════════════════════════════════════════════════
+
+
+
+
+
 
 // ═══════════════════════════════════════════════════════════
-//  ثبتِ Service Worker — اپِ نصب‌شدنی، آفلاین، بارگذاریِ آنی (نسل‌Z)
+//  تاریخ‌های قابلِ رزرو
+//
+//  پیش از این چهار گزینه‌ی ثابت بود: امروز، فردا، پنجشنبه، جمعه. یعنی برای
+//  اپی که کارش رزروِ میز است، «سالگردمون ماه بعد» اصلاً ممکن نبود.
+//
+//  حالا ۶۰ روزِ واقعی. برچسب‌ها با تقویمِ شمسی ساخته می‌شوند (Intl با تقویمِ
+//  fa-IR این را بومی می‌دهد؛ نیازی به کتابخانه‌ی تبدیلِ تاریخ نیست) و مقدارِ
+//  هر گزینه مستقیماً همان ISO است که بک‌اند می‌خواهد — پس هیچ تبدیلِ حدسی
+//  بینِ «کلمه‌ی فارسی» و «تاریخِ واقعی» باقی نمی‌ماند.
 // ═══════════════════════════════════════════════════════════
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{ /* آفلاین یا محیطِ ناسازگار — اپ بدون SW هم کار می‌کند */ });
+const HORIZON_DAYS = 60;
+const faDate = new Intl.DateTimeFormat('fa-IR', { weekday: 'long', day: 'numeric', month: 'long' });
+function dateOptions(){
+  const out = [];
+  const base = new Date(); base.setHours(12, 0, 0, 0); // ظهر: از پرشِ ساعتِ تابستانی مصون است
+  for (let i = 0; i < HORIZON_DAYS; i++){
+    const d = new Date(base); d.setDate(base.getDate() + i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const label = i === 0 ? 'امروز' : i === 1 ? 'فردا' : faDate.format(d);
+    out.push({ iso, label });
+  }
+  return out;
+}
+const PARTY_MAX = 12;
+
+// شیت رزرو که با دکمه‌ی پایین باز می‌شود (تاریخ/ساعت/نفر)
+function openBookSheet(id){
+  const r=R.find(x=>x.id===id);
+  // پیش‌فرض‌ها از زمینه‌ی مشترک می‌آیند، نه از صفر — اگر کاربر قبلاً گفته
+  // «پنجشنبه، ۴ نفر»، همان‌جا می‌ماند و لازم نیست دوباره واردش کند.
+  const dates = dateOptions();
+  const dateSel = dates.some(d=>d.iso===bookingCtx.date) ? bookingCtx.date : dates[0].iso;
+  openSheet(`
+    <div class="bs-head"><div class="bs-title">رزرو میز</div><div class="bs-rest">${esc(r.n)}</div></div>
+    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${id})">${
+      dates.map(d=>`<option value="${d.iso}"${d.iso===dateSel?' selected':''}>${esc(d.label)}</option>`).join('')
+    }</select></div>
+    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots(${id})">${
+      Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
+    }</select></div>
+    <div class="bw-field"><label>ساعت</label><select id="bwTime"><option>در حال بررسی...</option></select></div>
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook(${id})">بررسی میزهای موجود</button>
+    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">هنوز پولی پرداخت نمی‌کنی</div>
+  `);
+  refreshSlots(id);
+}
+// بارگذاری ساعت‌های واقعاً موجود از /restaurants/{slug}/availability
+async function refreshSlots(id){
+  const r=R.find(x=>x.id===id);
+  const sel=document.getElementById('bwTime');
+  if(!sel)return;
+  // اگر slug نداریم (حالت آفلاین/نمونه)، از همون slots نمونه استفاده کن
+  if(!r.slug || !API.online){
+    sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');
+    return;
+  }
+  // مقدارِ select حالا خودش ISO است — نه کلمه‌ای که باید حدس زده شود.
+  const apiDate=document.getElementById('bwDate')?.value||todayISO();
+  const partyVal=parseInt(document.getElementById('bwParty')?.value,10)||2;
+  // هر تغییرِ کاربر بلافاصله در زمینه‌ی مشترک می‌نشیند تا رستورانِ بعدی هم بداند
+  setBookingCtx({ date: apiDate, party: partyVal });
+  sel.innerHTML='<option>در حال بررسی...</option>';
+  const res=await API.get(`/restaurants/${r.slug}/availability?date=${apiDate}&party=${partyVal}`);
+  if(res.ok && Array.isArray(res.data?.slots)){
+    const open=res.data.slots.filter(s=>s.status==='open');
+    if(open.length){
+      sel.innerHTML=open.map(s=>`<option value="${s.time}">${faTime(s.time)}</option>`).join('');
+    }else{
+      sel.innerHTML='<option value="">ساعت خالی برای این روز نیست</option>';
+    }
+    // ساعت‌های پر را هم نشان بده ولی غیرفعال
+    res.data.slots.filter(s=>s.status==='full').forEach(s=>{
+      const o=document.createElement('option');o.value='';o.disabled=true;o.textContent=`${faTime(s.time)} (پر)`;sel.appendChild(o);
+    });
+  }else{
+    // اگر availability در دسترس نبود، از نمونه fallback
+    sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');
+  }
+}
+function faTime(t){return (t||'').replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);}
+/** برچسبِ فارسیِ یک تاریخِ ISO — برای نمایش در خلاصه و سفرها. */
+function labelForISO(iso){
+  const hit = dateOptions().find(d=>d.iso===iso);
+  if (hit) return hit.label;
+  const [y,m,d] = String(iso||'').split('-').map(Number);
+  return (y && m && d) ? faDate.format(new Date(y, m-1, d, 12)) : iso;
+}
+// رزروِ یک‌ضربی از چیپِ ساعتِ روی کارت. تاریخ و تعداد از زمینه‌ی مشترک می‌آید،
+// نه «امروز / ۲ نفر»ِ ثابت — وگرنه چیپ بی‌صدا انتخابِ کاربر را دور می‌ریخت.
+function quickBook(id,slot){
+  setBk({id,date:labelForISO(bookingCtx.date),dateVal:bookingCtx.date,time:slot,
+         timeRaw:String(slot).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
+         party:`${fmtFa(bookingCtx.party)} نفر`,partyN:bookingCtx.party});
+  openSheet(bookStep2(R.find(x=>x.id===id)));
+}
+function startBook(id){
+  const t=document.getElementById('bwTime').value;
+  if(!t){toast('','برای این روز ساعت خالی نیست — روز دیگه‌ای انتخاب کن');return;}
+  const iso=document.getElementById('bwDate').value;
+  const partyN=parseInt(document.getElementById('bwParty').value,10)||2;
+  setBookingCtx({ date: iso, party: partyN });
+  setBk({id,date:labelForISO(iso),dateVal:iso,time:faTime(t),timeRaw:t,party:`${fmtFa(partyN)} نفر`,partyN});
+  openSheet(bookStep2(R.find(x=>x.id===id)));
+}
+function bookStep2(r){
+  return `<div class="sheet-title">${r.n}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
+    <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
+    <div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
+    <div class="opt-row">${r.menu.map(m=>`<div class="opt" onclick="this.classList.toggle('sel')">${m[0]} ${m[1]}</div>`).join('')}</div>
+    <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3(${r.id})">ادامه</button>`;
+}
+// wrapperِ سراسری: onclick در scope سراسری اجرا می‌شود و به R (ماژولی) دسترسی ندارد،
+// پس lookup را اینجا (با دسترسی به R) انجام می‌دهیم.
+function toBookStep3(id){ openSheet(bookStep3(R.find(x=>x.id===id))); }
+function bookStep3(r){
+  // نام/موبایل از حسابِ کاربر (اگر وارد شده) — نه مقدارِ ساختگی
+  const name = isLoggedIn() ? userName() : '';
+  const phone = USER?.phone ? String(USER.phone).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]) : '';
+  return `<div class="sheet-title">تأیید اطلاعات</div><div class="sheet-sub">یه قدم تا رزرو</div>
+    <div class="steps"><div class="step-bar done"></div><div class="step-bar done"></div><div class="step-bar now"></div></div>
+    <div class="field-label">نام</div><input class="inp" id="bkName" value="${esc(name)}" placeholder="نامت رو بنویس">
+    <div class="field-label">موبایل</div><input class="inp" id="bkPhone" inputmode="tel" value="${esc(phone)}" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
+    <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${r.n}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
+    <div class="reward-row"><div class="reward"><div class="rv blue">+۵۰</div><div class="rl">امتیاز</div></div><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>
+    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${r.id})">تأیید رزرو</button>`;
+}
+async function confirmBook(id){
+  const r=R.find(x=>x.id===id);
+  // رزرو نیاز به ورود دارد — بعد از ورود، همین مرحله‌ی تأیید از سر گرفته می‌شود
+  if(!isLoggedIn()){
+    setAfterLogin(()=>{ const rr=R.find(x=>x.id===id); if(rr && bk.id===id) openSheet(bookStep3(rr)); });
+    toast('','برای رزرو اول وارد شو — بعدش ادامه می‌دیم');
+    setTimeout(()=>openLogin(),400);
+    return;
+  }
+  // وضعیت در حال ارسال
+  const sheetBody=document.getElementById('sheetBody');
+  const confirmBtn=sheetBody.querySelector('.btn-primary');
+  if(confirmBtn){confirmBtn.disabled=true;confirmBtn.textContent='در حال ثبت رزرو...';}
+
+  // تاریخ دیگر حدس زده نمی‌شود: bk.dateVal همان ISO است که کاربر انتخاب کرده.
+  const res=await API.post('/reservations',{
+    restaurant_id:id,
+    date:bk.dateVal||todayISO(),
+    time:bk.timeRaw||String(bk.time||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
+    party_size:bk.partyN||2,
+    notify_sms:true,
+  });
+
+  let code;
+  if(res.ok && res.data?.code){
+    // رزرو واقعی در دیتابیس ثبت شد (بک‌اند code را در سطحِ بالا برمی‌گرداند)
+    code=res.data.code;
+  } else if(res.offline){
+    // بک‌اند نیست → کد محلی (حالت دمو)
+    code='RZ'+Math.random().toString(36).slice(2,7).toUpperCase();
+  } else {
+    // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
+    const isFull = res.error?.code==='SLOT_FULL' || res.error?.code==='NO_TABLE_FOR_PARTY' || /پر|ظرفیت/.test(res.error?.message||'');
+    if(isFull){
+      offerWaitlist(id, r);
+      return;
+    }
+    toast('', res.error?.message || 'ثبت رزرو ناموفق بود، دوباره تلاش کن');
+    if(confirmBtn){confirmBtn.disabled=false;confirmBtn.textContent='تأیید رزرو';}
+    return;
+  }
+
+  // موفقیت (واقعی یا دمو)
+  setPts(pts+50);document.getElementById('navPts').textContent=fmtFa(pts);
+  TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
+  sheetBody.innerHTML=`
+    <div class="success">
+      <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
+      <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
+      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}<br>یادآور با پیامک می‌فرستیم</div>
+      <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode('${esc(code)}')" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
+      <div class="reward-row"><div class="reward"><div class="rv blue">+۵۰</div><div class="rl">امتیاز گرفتی</div></div><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>
+      <button class="btn btn-primary btn-lg btn-block" onclick="closeSheet();go('trips')">رزروهای من</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
+    </div>`;
+}
+function copyCode(c){const done=()=>toast('⧉','کد کپی شد');if(navigator.clipboard?.writeText)navigator.clipboard.writeText(c).then(done).catch(done);else done()}
+
+// ── نوارِ جست‌وجوی صفحه‌ی اصلی ──
+// «کِی» و «چند نفر» پیش از این سه/پنج گزینه‌ی ثابت داشتند که هیچ‌کجا خوانده
+// نمی‌شد؛ کاربر انتخاب می‌کرد و هیچ اتفاقی نمی‌افتاد. حالا همان زمینه‌ی رزرو را
+// می‌نویسند، پس انتخابشان تا شیتِ رزرو و تا رستورانِ بعدی دنبال می‌آید.
+function initSearchCtx(){
+  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
+  if(!when||!party) return;
+  const dates=dateOptions();
+  const sel=dates.some(d=>d.iso===bookingCtx.date)?bookingCtx.date:dates[0].iso;
+  when.innerHTML=dates.map(d=>`<option value="${d.iso}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');
+  party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)
+    .map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('');
+}
+function syncSearchCtx(){
+  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
+  setBookingCtx({
+    date: when?.value || bookingCtx.date,
+    party: parseInt(party?.value,10) || bookingCtx.party,
   });
 }
 
-// ── درخواستِ نصبِ اپ (Add to Home Screen) — هوشمند، نه مزاحم ──
-let _deferredInstall=null;
-window.addEventListener('beforeinstallprompt',(e)=>{
-  e.preventDefault();
-  _deferredInstall=e;
-  // فقط اگر کاربر فعال بوده (نه بارِ اول) — دکمه‌ی نصب را نشان بده
-  setTimeout(()=>{ if(_deferredInstall && !localStorage.getItem('rz_install_dismissed')) showInstallBanner(); }, 45000);
-});
-function showInstallBanner(){
-  if(document.getElementById('installBanner')) return;
-  const b=document.createElement('div');
-  b.id='installBanner'; b.className='install-banner glass';
-  b.innerHTML=`
-    <div class="ib-icon">${icon('utensils',{size:24})}</div>
-    <div class="ib-txt"><div class="ib-title">رزرونو رو نصب کن</div><div class="ib-sub">دسترسیِ آنی، حتی آفلاین</div></div>
-    <button class="ib-btn" onclick="doInstall()">نصب</button>
-    <button class="ib-close" onclick="dismissInstall()" aria-label="بستن">${icon('close',{size:18})}</button>`;
-  document.body.appendChild(b);
-  requestAnimationFrame(()=>b.classList.add('in'));
-}
-async function doInstall(){
-  if(!_deferredInstall) return;
-  _deferredInstall.prompt();
-  await _deferredInstall.userChoice.catch(()=>{});
-  _deferredInstall=null; dismissInstall();
-}
-function dismissInstall(){
-  const b=document.getElementById('installBanner');
-  if(b){ b.classList.remove('in'); setTimeout(()=>b.remove(),300); }
-  try{ localStorage.setItem('rz_install_dismissed','1'); }catch{}
-}
-
-
-
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
-window.toggleTheme = toggleTheme;
-window.buzz = buzz;
-window.doInstall = doInstall;
-window.dismissInstall = dismissInstall;
+window.openBookSheet = openBookSheet;
+window.quickBook = quickBook;
+window.startBook = startBook;
+window.bookStep3 = bookStep3;
+window.toBookStep3 = toBookStep3;
+window.confirmBook = confirmBook;
+window.copyCode = copyCode;
+window.refreshSlots = refreshSlots;
+window.syncSearchCtx = syncSearchCtx;
+// نوارِ جست‌وجو باید همان اول پر شود، وگرنه دو selectِ خالی دیده می‌شوند.
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSearchCtx);
+else initSearchCtx();
+
+
+/* ═══ js/store.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  Store مرکزی — تنها منبعِ حقیقتِ state اپ (بدون فریم‌ورک)
+//
+//  چرا: قبلاً state (USER, R, favs, ...) در ۵ فایلِ مختلف پخش بود. با یک Store
+//  مرکزی: پیدا کردنِ state آسان، تغییرات قابلِ ردیابی، و اشتراکِ تمیز بین ماژول‌ها.
+//
+//  الگو: یک آبجکتِ ساده‌ی reactive. با store.set() تغییر بده، با store.on() به
+//  تغییرات گوش بده (برای رندرِ خودکار). سبک، ~۴۰ خط، مناسبِ Vanilla JS.
+//
+//  استفاده:
+//    Store.user            → خواندن
+//    Store.set('user', u)  → نوشتن + اطلاع به شنونده‌ها
+//    Store.on('user', fn)  → گوش‌دادن به تغییر
+// ═══════════════════════════════════════════════════════════
+const Store = (() => {
+  const state = {
+    user: null,            // کاربرِ واردشده (یا null)
+    restaurants: [],       // لیستِ رستوران‌ها (از API یا نمونه)
+    favorites: new Set(),  // شناسه‌های علاقه‌مندی
+    trips: [],             // رزروهای کاربر
+    nextCursor: null,      // صفحه‌بندیِ lazy loading
+    currentRest: null,     // رستورانِ در حالِ نمایش
+    waitlist: null,        // ورودیِ فعلیِ لیست انتظار
+    theme: 'dark',         // تمِ فعلی
+    points: 0,             // امتیازِ وفاداری
+  };
+  const listeners = {};    // key → [callbacks]
+
+  return {
+    // خواندنِ مستقیم (getter برای هر کلید)
+    get user() { return state.user; },
+    get restaurants() { return state.restaurants; },
+    get favorites() { return state.favorites; },
+    get trips() { return state.trips; },
+    get nextCursor() { return state.nextCursor; },
+    get currentRest() { return state.currentRest; },
+    get waitlist() { return state.waitlist; },
+    get theme() { return state.theme; },
+    get points() { return state.points; },
+
+    /** نوشتنِ یک کلید + اطلاع به شنونده‌ها. */
+    set(key, value) {
+      state[key] = value;
+      (listeners[key] || []).forEach(fn => { try { fn(value); } catch {} });
+      return value;
+    },
+
+    /** گوش‌دادن به تغییرِ یک کلید (برای رندرِ واکنشی). */
+    on(key, fn) {
+      (listeners[key] = listeners[key] || []).push(fn);
+    },
+
+    /** خواندنِ کلِ snapshot (برای دیباگ). */
+    snapshot() { return { ...state, favorites: [...state.favorites] }; },
+  };
+})();
+
+
+
+/* ═══ js/actions.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  Action Layer — یک نقطه‌ی مرکزی برای همه‌ی کلیک‌ها (Event Delegation)
+//
+//  چرا: قبلاً ۱۰۱ تا onclick="fn()" داشتیم که توابع را مجبور می‌کرد global باشند
+//  (تضاد با ES Modules). با این الگو:
+//    • فقط یک listener روی document (به‌جای ۱۰۱ listener) → صفر memory leak
+//    • توابع دیگر لازم نیست global باشند → ES Modules ممکن می‌شود
+//    • در HTML: onclick="fn(x)" → data-action="fn" data-arg="x"
+//
+//  این الگویی است که اپ‌های production مدرن استفاده می‌کنند (delegation).
+//
+//  استفاده:
+//    Actions.register('go', (arg) => {...})       ثبتِ یک اکشن
+//    <button data-action="go" data-arg="discover"> در HTML
+//    (کلیک روی هر عنصرِ data-action خودکار تابعِ متناظر را صدا می‌زند)
+// ═══════════════════════════════════════════════════════════
+const Actions = (() => {
+  const registry = {};
+  let wired = false;
+
+  function handle(e) {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const name = el.dataset.action;
+    const fn = registry[name];
+    if (!fn) return;
+    // آرگومان‌ها: data-arg (تکی) یا data-args (JSON برای چندتایی)
+    let args = [];
+    if (el.dataset.args !== undefined) {
+      try { args = JSON.parse(el.dataset.args); } catch { args = [el.dataset.args]; }
+    } else if (el.dataset.arg !== undefined) {
+      const a = el.dataset.arg;
+      // تبدیلِ عددیِ خودکار (مثل شناسه‌ی رستوران)
+      args = [/^-?\d+$/.test(a) ? Number(a) : a];
+    }
+    fn(...args, el, e);
+  }
+
+  return {
+    /** ثبتِ یک اکشن (نام → تابع). */
+    register(name, fn) { registry[name] = fn; },
+
+    /** ثبتِ چند اکشن یکجا از یک آبجکت. */
+    registerAll(obj) { Object.keys(obj).forEach(k => { registry[k] = obj[k]; }); },
+
+    /** فعال‌سازیِ delegation (یک‌بار، روی document). */
+    init() {
+      if (wired) return;
+      wired = true;
+      document.addEventListener('click', handle);
+
+      // ── کیبورد: Escape برای بستن، Enter/Space برای فعال‌سازیِ عناصرِ data-action ──
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          // بستنِ هر overlay/sheet که باز است (استانداردِ UX)
+          const dna = document.getElementById('dnaOverlay');
+          const sheet = document.getElementById('sheet');
+          if (dna && dna.classList.contains('show')) { window.closeFoodDNA && window.closeFoodDNA(); return; }
+          if (sheet && sheet.classList.contains('show')) { window.closeSheet && window.closeSheet(); return; }
+        }
+        // Enter/Space روی عناصرِ تعاملیِ غیر-button (data-action یا role=button) → فعال‌سازی
+        if ((e.key === 'Enter' || e.key === ' ')) {
+          const el = e.target.closest('[data-action], [role="button"]');
+          if (el && el.tagName !== 'BUTTON' && el.tagName !== 'A') {
+            e.preventDefault();
+            el.click();
+          }
+        }
+      });
+    },
+  };
+})();
+
 
 
 /* ═══ js/api.js ═══ */
@@ -2110,6 +2680,14 @@ function mapApiRestaurant(apiR, sampleFallback){
     price: apiR.price_range || sampleFallback?.price || '$$',
     rt: apiR.rating ?? sampleFallback?.rt ?? 0,
     reviews: apiR.reviews_count ?? apiR.review_count ?? sampleFallback?.reviews ?? 0,
+    // ── سیگنال‌های اجتماعی: فقط از API، بدونِ fallbackِ نمونه ──
+    // اگر بک‌اند نگفته، null می‌ماند و UI هیچ ادعایی نشان نمی‌دهد. عمداً از
+    // sampleFallback پر نمی‌شوند: دادهٔ نمونه برای «شکلِ صفحه» است، نه برای
+    // ادعای آماری درباره‌ی یک کسب‌وکارِ واقعی.
+    visits7d: apiR.visits_7d ?? null,
+    recommendPct: apiR.recommend_pct ?? null,
+    lat: apiR.latitude ?? null,
+    lng: apiR.longitude ?? null,
     vibes: apiR.vibes || sampleFallback?.vibes || [],
     cb: (apiR.cbBasePct ?? apiR.cashback_percent) ?? sampleFallback?.cb ?? 0,
     slots: apiR.available_slots || sampleFallback?.slots || [],
@@ -2162,376 +2740,408 @@ window.isLoggedIn = isLoggedIn;
 window.logout = logout;
 
 
-/* ═══ js/auth.js ═══ */
+/* ═══ js/analytics.js ═══ */
 // ═══════════════════════════════════════════════════════════
-//  رزرونو — ورود با کد یکبارمصرف (OTP)
-//  بخشی از اپ کاستومر (Vanilla JS، بدون build). scope سراسری مشترک.
-//  ترتیبِ لود در index.html مهم است (این فایل به توابع/state قبلی وابسته است).
+//  رزرونو — امیترِ رویدادِ رفتاری (Data Platform · فاز۲، اپ کاستومر)
+//
+//  رویدادها را دسته‌ای و بی‌صدا به POST /api/v1/telemetry می‌فرستد (فاز۱).
+//  اصولِ حیاتی:
+//   • هرگز چیزی را نمی‌شکند: همه‌ی مسیرها در try/catch؛ خطا → no-op.
+//   • دمومود امن: اگر بک‌اند نبود/آفلاین، رویداد در localStorage صف می‌ماند و
+//     در بارگذاریِ بعدی دوباره تلاش می‌شود؛ UI هرگز متأثر نمی‌شود.
+//   • ناشناس بر پایه‌ی sessionId (sendBeacon نمی‌تواند هدرِ Authorization بگذارد،
+//     پس userId سمتِ سرور فقط اگر توکن در fetch بود ضمیمه می‌شود — اینجا session-based).
+//  معماری: docs/INTELLIGENCE-PLATFORM-ARCHITECTURE.md
 // ═══════════════════════════════════════════════════════════
-let _loginPhone = '';
-function openLogin(){
-  _loginPhone = '';
-  openSheet(`
-    <div class="login-icon">${icon('lock',{size:36})}</div>
-    <div style="text-align:center;margin-bottom:6px"><div class="sheet-title" style="font-size:20px;font-weight:800">ورود به رزرونو</div></div>
-    <div style="text-align:center;color:var(--t2);font-size:14px;margin-bottom:22px">شماره موبایلت رو وارد کن تا کد ورود برات بفرستیم</div>
-    <div class="field-label">شماره موبایل</div>
-    <input class="otp-input" id="loginPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹" style="font-size:18px;letter-spacing:.1em">
-    <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="sendOtp()">ارسال کد ورود</button>
-    <div style="text-align:center;font-size:11.5px;color:var(--t3);margin-top:14px;line-height:1.6">با ورود، <span style="color:var(--t2)">قوانین و حریم خصوصی</span> رزرونو رو می‌پذیری</div>
-  `);
-  setTimeout(()=>document.getElementById('loginPhone')?.focus(),200);
-}
-async function sendOtp(){
-  const phoneEl = document.getElementById('loginPhone');
-  const phone = (phoneEl?.value||'').trim();
-  // اعتبارسنجی سمت کلاینت
-  const normalized = phone.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'');
-  if (!/^09\d{9}$/.test(normalized)) { toast('','شماره موبایل معتبر وارد کن (مثل ۰۹۱۲۳۴۵۶۷۸۹)'); return; }
-  _loginPhone = normalized;
-  const btn = phoneEl.nextElementSibling;
-  if (btn) { btn.disabled = true; btn.textContent = 'در حال ارسال...'; }
 
-  if (location.protocol === 'file:') {
-    showOtpStep('۱۲۳۴', true);
+const ENDPOINT = () => (API && API.base ? API.base : '') + '/api/v1/telemetry';
+const SID_KEY = 'rz_sid';
+const Q_KEY = 'rz_evq';
+const MAX_BATCH = 50;
+const FLUSH_AT = 10;      // وقتی صف به این حد رسید، زودتر بفرست
+
+function sessionId() {
+  try {
+    let s = localStorage.getItem(SID_KEY);
+    if (!s) { s = 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem(SID_KEY, s); }
+    return s;
+  } catch { return 'anon'; }
+}
+
+let queue = [];
+try { const raw = localStorage.getItem(Q_KEY); if (raw) queue = JSON.parse(raw) || []; } catch { queue = []; }
+
+function persist() { try { localStorage.setItem(Q_KEY, JSON.stringify(queue.slice(-200))); } catch { /* سهمیه پر */ } }
+
+function flush(useBeacon) {
+  if (!queue.length) return;
+  // روی file: (باز کردن مستقیم HTML) ارسال ممکن نیست — بی‌صدا در صف بماند
+  try { if (location.protocol === 'file:' && !/^https?:/i.test(ENDPOINT())) return; } catch { /* noop */ }
+  const batch = queue.slice(0, MAX_BATCH);
+  const body = JSON.stringify({ events: batch });
+  const url = ENDPOINT();
+  // مسیرِ ۱: sendBeacon (قابل‌اعتماد هنگامِ بسته‌شدنِ صفحه)
+  if (useBeacon) {
+    try {
+      if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))) {
+        queue = queue.slice(batch.length); persist(); return;
+      }
+    } catch { /* به fetch برگرد */ }
+  }
+  // مسیرِ ۲: fetch با keepalive
+  try {
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true })
+      .then((r) => { if (r && r.ok) { queue = queue.slice(batch.length); persist(); } })
+      .catch(() => { /* آفلاین — در صف می‌ماند */ });
+  } catch { /* no-op */ }
+}
+
+/** ثبتِ یک رویدادِ رفتاری. هرگز پرتاب نمی‌کند. */
+function track(type, payload) {
+  try {
+    queue.push({ type: String(type), occurredAt: new Date().toISOString(), source: 'customer', sessionId: sessionId(), payload: payload || {} });
+    persist();
+    if (queue.length >= FLUSH_AT) flush(false);
+  } catch { /* no-op */ }
+}
+
+// فلاش هنگامِ پنهان‌شدن/بسته‌شدنِ صفحه (بهترین لحظه برای beacon)
+try {
+  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(true); });
+  addEventListener('pagehide', () => flush(true));
+} catch { /* no-op */ }
+
+// تلاش برای ارسالِ صفِ باقی‌مانده از نشستِ قبلی
+try { if (queue.length) flush(false); } catch { /* no-op */ }
+
+// رویدادِ آغازِ نشست
+track('app.opened', {});
+
+// نمایش روی window برای استفاده‌ی inline/سایر ماژول‌ها
+try { window.rzTrack = track; } catch { /* no-op */ }
+
+
+/* ═══ js/data/discover.js ═══ */
+// ═══ رزرونو — ناوبری + رندرِ کشف: فید، وایب، مناسبت، رویداد (بخشی از اپ کاستومر) ═══
+function go(p){
+  try{ track('page.viewed',{page:p}); }catch{}
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.querySelectorAll('[data-nav]').forEach(n=>n.classList.toggle('active',n.dataset.nav===p));
+  // در صفحه‌ی رستوران، نوار ناوبری مخفی می‌شود تا نوار رزرو پایین بنشیند
+  const botnav=document.querySelector('.botnav');
+  if(botnav)botnav.style.display=(p==='rest'||p==='chat')?'none':'';
+  window.scrollTo({top:0,behavior:'instant'});
+  if(p==='favorites')renderFavs();
+  if(p==='trips')renderTrips();
+  if(p==='loyalty')renderLoyalty();
+  if(p==='profile')renderProfile();
+  if(p==='chats' && typeof renderChats==='function')renderChats();
+}
+function fmtFa(n){return n.toLocaleString('fa-IR')}
+function cardHTML(r){
+  const hot = isHot(r);
+  // کارت خودش دکمه نمی‌شود چون داخلش دکمه دارد (تودرتوییِ نامعتبر). به‌جایش یک
+  // دکمه‌ی واقعیِ کشیده روی کلِ کارت می‌نشیند و z-indexِ ۱ می‌گیرد — یعنی زیرِ
+  // دکمه‌ی علاقه‌مندی (۳) و چیپ‌های ساعت (پنل، ۲). این تنها راهی است که هم با
+  // کیبورد قابلِ فوکوس باشد، هم ترتیبِ فوکوس منطقی بماند.
+  return `<article class="rc reveal">
+    <div class="rc-bg" style="background:${GRAD[r.id]}"></div>
+    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${r.id})"></button>
+    <span class="rc-emoji">${r.e}</span>
+    ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
+    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${r.id},this);buzz&&buzz()">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
+    <div class="rc-panel">
+      <div class="rc-top"><div class="rc-name">${r.n}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
+      <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
+      ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
+      <div class="rc-slots">${r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');buzz&&buzz()">${s}</button>`).join('')}</div>
+    </div>
+  </article>`;
+}
+// ═══════════════════════════════════════════════════════════
+//  اثباتِ اجتماعی — فقط از دادهٔ واقعیِ بک‌اند
+//
+//  نسخه‌ی قبل هر دو عدد را در فرانت می‌ساخت:
+//    weekly    = Math.max(3, reviews/8)        ← از کلِ نظرها، نه از این هفته
+//    recommend = Math.min(98, rt/5*100 + 6)    ← از امتیاز، نه از نظرِ کسی
+//  هیچ‌کدام اندازه‌گیری نبودند. روی صفحه‌ای که کارش جلبِ اعتماد است، عددِ
+//  ساختگی دقیقاً همان چیزی را از بین می‌برد که می‌خواهد بسازد — و رقیبِ اصلیِ
+//  این حوزه دقیقاً روی «فقط مشتریِ واقعی می‌تواند نظر بدهد» ساخته شده.
+//
+//  حالا visits7d و recommendPct از API می‌آیند و اگر نبودند (null) هیچ
+//  ادعایی نشان داده نمی‌شود. صفر هم نشان داده نمی‌شود: «۰ نفر این هفته
+//  اومدن» فنی درست ولی گمراه‌کننده است.
+// ═══════════════════════════════════════════════════════════
+
+/** آواتارهای تزئینی — تعدادشان بر پایه‌ی عددِ واقعی، خودشان aria-hidden. */
+function avatarStack(n, max = 4){
+  const count = Math.min(max, Math.max(1, Math.ceil(n / 4)));
+  return `<div class="rc-avas" aria-hidden="true">${Array.from({length:count},()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>`;
+}
+function detailSocialProof(r){
+  const rows = [];
+  if (Number.isFinite(r.visits7d) && r.visits7d > 0){
+    rows.push(`<div class="rp-social-item">
+      ${avatarStack(r.visits7d)}
+      <div class="rp-social-txt"><b>${fmtFa(r.visits7d)} رزرو</b> در هفته‌ی گذشته اینجا انجام شده</div>
+    </div>`);
+  }
+  if (Number.isFinite(r.recommendPct)){
+    rows.push(`<div class="rp-social-item">
+      <span style="color:var(--success);display:inline-flex">${icon('heart',{size:18,fill:true})}</span>
+      <div class="rp-social-txt"><b>${fmtFa(r.recommendPct)}٪</b> از نظرها ۴ ستاره یا بالاتر بوده</div>
+    </div>`);
+  }
+  return rows.length ? `<div class="rp-social">${rows.join('')}</div>` : '';
+}
+function socialProofHTML(r){
+  if (!Number.isFinite(r.visits7d) || r.visits7d <= 0) return '';
+  const hot = isHot(r);
+  return `<div class="rc-social">
+    ${avatarStack(r.visits7d, 3)}
+    <div class="rc-social-txt"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div>
+    ${hot?`<span class="rc-hot" style="margin-inline-start:auto">${icon('flame',{size:12,fill:true})} داغ</span>`:''}
+  </div>`;
+}
+
+/** «داغ» = هم امتیازِ بالا، هم رفت‌وآمدِ واقعیِ این هفته. فقط امتیاز کافی نیست:
+ *  رستورانی با ۵ نظرِ عالی از پارسال «داغ» نیست. */
+function isHot(r){
+  return r.rt >= 4.7 && (r.reviews||0) >= 80 && Number.isFinite(r.visits7d) && r.visits7d >= 10;
+}
+function renderFeed(list){
+  const f=document.getElementById('feed');
+  f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
+  setTimeout(()=>{
+    f.innerHTML=list.map(cardHTML).join('');
+    const io=new IntersectionObserver(es=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);io.unobserve(e.target)}}),{threshold:.05});
+    f.querySelectorAll('.rc').forEach(c=>io.observe(c));
+  },280);
+}
+// کشف بر اساس موقعیت — هر موقعیت به چند vibe نگاشت می‌شود (منطق واقعی روی داده)
+const OCCASION_MAP = {
+  date:     {vibes:['رمانتیک','آروم','ویو','لوکس'], title:'💕 برای قرار عاشقانه', sub:'دنج، رمانتیک و خاطره‌انگیز'},
+  friends:  {vibes:['دوستانه','کژوال','شلوغ','ارزون'], title:'🎊 برای دورهمی با رفقا', sub:'پرانرژی و باحال'},
+  birthday: {vibes:['لوکس','تجربه','ویو','شلوغ'], title:'🎂 برای جشن تولد', sub:'خاص و به‌یادموندنی'},
+  business: {vibes:['آروم','مینیمال','لوکس'], title:'💼 برای قرار کاری', sub:'آروم، حرفه‌ای و مناسب گفت‌وگو'},
+  solo:     {vibes:['آروم','مینیمال','کژوال'], title:'🧘 برای وقتِ خودت', sub:'دنج و آروم'},
+  family:   {vibes:['خانوادگی','سنتی','آروم'], title:'👨‍👩‍👧 برای خانواده', sub:'راحت و مناسب همه'},
+};
+function pickOccasion(occ, el){
+  // toggle: اگه دوباره همون رو زد، برگرد به حالت عادی
+  const already = el.classList.contains('on');
+  document.querySelectorAll('.occ-card').forEach(c=>c.classList.remove('on'));
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  if(already){
+    document.querySelector('.chip')?.classList.add('active');
+    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
+    const sub=document.querySelector('.section-sub'); if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+    renderFeed(R);
     return;
   }
-
-  const res = await API.requestOtp(normalized);
-  if (!res.ok && !res.offline) {
-    // خطای واقعی از سرور (مثلاً ریت‌لیمیت)
-    toast('', res.error?.message || 'خطا در ارسال کد');
-    if (btn) { btn.disabled = false; btn.textContent = 'ارسال کد ورود'; }
-    return;
-  }
-  // اگر بک‌اند نبود (آفلاین) → حالت دمو با کد ثابت، تا فلوی ورود قابل‌تست باشد
-  const devCode = res.data?.devCode || (res.offline ? '۱۲۳۴' : null);
-  showOtpStep(devCode, res.offline);
+  el.classList.add('on');
+  const m = OCCASION_MAP[occ];
+  // رستوران‌هایی که حداقل یکی از vibeهای این موقعیت رو دارن، مرتب‌شده بر اساس امتیاز
+  const matched = R.filter(r=>r.vibes?.some(v=>m.vibes.includes(v)))
+                   .sort((a,b)=>(b.rt||0)-(a.rt||0));
+  const list = matched.length ? matched : R;
+  document.getElementById('feedTitle').textContent = m.title;
+  const sub=document.querySelector('.section-sub'); if(sub) sub.textContent = m.sub;
+  renderFeed(list);
+  // اسکرول نرم به فید تا نتیجه دیده بشه
+  document.getElementById('feed')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function showOtpStep(devCode, offline){
-  openSheet(`
-    <div class="login-icon">${icon('mail',{size:36})}</div>
-    <div style="text-align:center;margin-bottom:6px"><div class="sheet-title" style="font-size:20px;font-weight:800">کد ورود رو وارد کن</div></div>
-    <div style="text-align:center;color:var(--t2);font-size:14px;margin-bottom:22px">کد ورود به شماره‌ی ${faNum(_loginPhone)} ارسال شد</div>
-    <div class="field-label">کد ورود</div>
-    <input class="otp-input" id="otpCode" inputmode="numeric" maxlength="6" placeholder="······" onkeydown="if(event.key==='Enter')confirmOtp()">
-    <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="confirmOtp()">تأیید و ورود</button>
-    <div class="resend">کد نیومد؟ <button onclick="openLogin()">تغییر شماره</button></div>
-    ${devCode ? `<div class="dev-hint">${offline?'حالت دمو (بک‌اند متصل نیست):':'حالت توسعه:'} کد ورود <b>${faNum(devCode)}</b> است</div>` : ''}
-  `);
-  setTimeout(()=>document.getElementById('otpCode')?.focus(),200);
+function filterVibe(v,el){
+  document.querySelectorAll('.occ-card').forEach(c=>c.classList.remove('on'));
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');
+  const list=v==='all'?R:R.filter(r=>r.vibes.includes(v));
+  document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,fill:true})+' محبوب امشب':esc(el.textContent.trim());
+  renderFeed(list);
 }
-async function confirmOtp(){
-  const codeEl = document.getElementById('otpCode');
-  const code = (codeEl?.value||'').trim().replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
-  if (!/^\d{4,6}$/.test(code)) { toast('','کد ورود رو کامل وارد کن'); return; }
-  const btn = codeEl.nextElementSibling;
-  if (btn) { btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
-
-  if (location.protocol === 'file:') {
-    if (code === '1234') {
-      setUSER({ phone: _loginPhone });
-      showRegisterStep(true);
-    } else {
-      toast('','در حالت دمو، کد ۱۲۳۴ است');
-      if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
-    }
-    return;
-  }
-
-  const res = await API.verifyOtp(_loginPhone, code);
-  if (res.ok && res.data?.user) {
-    // ورود واقعی موفق
-    setUSER(res.data.user);
-    // کاربر جدید (هنوز نام ثبت نکرده) → فرم ثبت‌نام
-    if (res.data.is_new || !USER.firstName) {
-      showRegisterStep();
-    } else {
-      finishLogin();
-    }
-  } else if (res.offline) {
-    // حالت دمو: کد ۱۲۳۴ بپذیر تا فلو قابل‌تست باشد
-    if (code === '1234') {
-      // در دمو، کاربر را جدید فرض کن تا فرم ثبت‌نام هم قابل‌تست باشد
-      setUSER({ phone: _loginPhone });
-      showRegisterStep(true);
-    } else {
-      toast('','در حالت دمو، کد ۱۲۳۴ است');
-      if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
-    }
-  } else {
-    // کد اشتباه از سرور
-    toast('', res.error?.message || 'کد اشتباه است');
-    if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
-  }
+// ── نزدیک تو (کارت افقی کوچک) ──
+function hCardHTML(r,extra){
+  return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${r.id})">
+    <div class="hcard-img" style="background:${GRAD[r.id]||GRAD[1]}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
+    <div class="hcard-name">${esc(r.n)}</div>
+    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rt||r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}</div>
+  </div>`;
 }
-// مرحله‌ی ثبت‌نام: گرفتن نام برای کاربر جدید
-function showRegisterStep(demo){
-  openSheet(`
-    <div class="login-icon">${icon('checkCircle',{size:36})}</div>
-    <div style="text-align:center;margin-bottom:6px"><div class="sheet-title" style="font-size:20px;font-weight:800">به رزرونو خوش اومدی!</div></div>
-    <div style="text-align:center;color:var(--t2);font-size:14px;margin-bottom:22px">برای تکمیل ثبت‌نام، اسمت رو بهمون بگو</div>
-    <div class="field-label">نام</div>
-    <input class="otp-input" id="regFirst" style="font-size:16px;letter-spacing:0;text-align:right" placeholder="مثلاً سارا" autocomplete="given-name">
-    <div class="field-label" style="margin-top:14px">نام خانوادگی <span style="color:var(--t3);font-weight:400">(اختیاری)</span></div>
-    <input class="otp-input" id="regLast" style="font-size:16px;letter-spacing:0;text-align:right" placeholder="مثلاً محمدی" autocomplete="family-name" onkeydown="if(event.key==='Enter')completeRegister(${demo?'true':'false'})">
-    <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="completeRegister(${demo?'true':'false'})">تکمیل ثبت‌نام</button>
-  `);
-  setTimeout(()=>document.getElementById('regFirst')?.focus(),200);
-}
-async function completeRegister(demo){
-  const first = (document.getElementById('regFirst')?.value||'').trim();
-  const last = (document.getElementById('regLast')?.value||'').trim();
-  if (!first) { toast('⚠️','اسمت رو وارد کن'); return; }
-  const btn = document.querySelector('#sheetBody .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'در حال ثبت...'; }
+// ═══════════════════════════════════════════════════════════
+//  «نزدیک تو» — فاصله‌ی واقعی یا هیچ
+//
+//  نسخه‌ی قبل ترتیب را با Math.random() به‌هم می‌ریخت و بعد برچسبِ
+//  «۰٫۷ کیلومتر» رویش می‌گذاشت که از i حساب می‌شد، نه از موقعیتِ کسی.
+//  یعنی هم «نزدیک» دروغ بود، هم عددش.
+//
+//  حالا: اگر کاربر اجازه‌ی موقعیت داده باشد و رستوران مختصات داشته باشد،
+//  فاصله‌ی واقعی (هاورساین) حساب و مرتب می‌شود. وگرنه عنوانِ بخش به
+//  «پیشنهاد برای تو» عوض می‌شود و هیچ عددِ فاصله‌ای نشان داده نمی‌شود.
+//  اجازه هم خودبه‌خود پرسیده نمی‌شود — فقط اگر قبلاً داده شده باشد.
+// ═══════════════════════════════════════════════════════════
+let userPos=null;
 
-  if (!demo) {
-    const res = await API.updateProfile({ first_name: first, last_name: last });
-    if (res.ok && res.data?.user) {
-      setUSER(res.data.user);
-    } else if (!res.offline) {
-      toast('⚠️', res.error?.message || 'ثبت‌نام ناموفق بود');
-      if (btn) { btn.disabled = false; btn.textContent = 'تکمیل ثبت‌نام'; }
+/** فاصله‌ی دو نقطه روی کره، به کیلومتر. */
+function haversineKm(a,b){
+  const toRad=d=>d*Math.PI/180, Rk=6371;
+  const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 2*Rk*Math.asin(Math.sqrt(s));
+}
+const hasCoords=r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng);
+function renderNearby(){
+  const el=document.getElementById('nearbyScroll');if(!el)return;
+  const title=document.getElementById('nearbyTitle');
+
+  if(userPos){
+    const withDist=R.filter(hasCoords)
+      .map(r=>({r,km:haversineKm(userPos,{lat:r.lat,lng:r.lng})}))
+      .sort((a,b)=>a.km-b.km).slice(0,6);
+    if(withDist.length){
+      if(title)title.textContent='نزدیک تو';
+      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,
+        km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`)).join('');
       return;
-    } else {
-      // آفلاین → محلی نگه دار
-      setUSER({ ...USER, firstName: first, lastName: last });
     }
-  } else {
-    setUSER({ ...USER, firstName: first, lastName: last });
   }
-  finishLogin();
+  // بدونِ موقعیت، ادعای «نزدیک» بی‌پایه است — عنوان و محتوا صادقانه عوض می‌شوند.
+  if(title)title.textContent='پیشنهاد برای تو';
+  el.innerHTML=[...R].sort((a,b)=>(b.rt||0)-(a.rt||0)).slice(0,6).map(r=>hCardHTML(r,'')).join('');
 }
-function finishLogin(demo){
-  closeSheet();
-  refreshAuthUI();
-  toast('✅', `خوش اومدی ${USER.firstName||''}!`);
-  // اگر در صفحه‌ی پروفایل بود، تازه‌سازی کن
-  if (document.getElementById('page-profile')?.classList.contains('active')) renderProfile();
+
+/** اگر اجازه‌ی موقعیت از قبل داده شده، بگیر و «نزدیک تو» را دوباره بساز.
+ *  عمداً prompt نمی‌زند: پرسیدنِ اجازه در لحظه‌ی ورود، رفتارِ مزاحمی است. */
+function initNearby(){
+  if(!navigator.geolocation||!navigator.permissions?.query)return;
+  navigator.permissions.query({name:'geolocation'}).then(p=>{
+    if(p.state!=='granted')return;
+    navigator.geolocation.getCurrentPosition(
+      pos=>{ userPos={lat:pos.coords.latitude,lng:pos.coords.longitude}; renderNearby(); },
+      ()=>{}, {maximumAge:300000,timeout:5000});
+  }).catch(()=>{});
 }
-// تبدیل ارقام انگلیسی به فارسی برای نمایش
-function faNum(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
-// امنیت: escape کردن ورودی کاربر قبل از تزریق به HTML (جلوگیری از XSS)
-function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-// تبدیل تاریخ/ساعت فارسی (امروز/فردا/...، ۱۹:۰۰) به فرمت ISO که بک‌اند می‌خواهد
-// بک‌اند انتظار date='YYYY-MM-DD' و time='HH:MM' (ارقام انگلیسی) دارد.
-function toApiDateTime(faDate, faTime){
-  // ساعت: ارقام فارسی → انگلیسی
-  const time = String(faTime||'').replace(/[۰-۹]/g, d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).trim();
-  // تاریخ: کلمه‌ی نسبی → تاریخ واقعی
-  const now = new Date();
-  let target = new Date(now);
-  const d = String(faDate||'').trim();
-  if (d === 'فردا') target.setDate(now.getDate()+1);
-  else if (d === 'امروز') { /* همین امروز */ }
+function renderTrending(){
+  const el=document.getElementById('trendingScroll');if(!el)return;
+  // پرطرفدارترین‌ها بر اساس امتیاز
+  const trend=[...R].sort((a,b)=>(b.rt||b.rating||0)-(a.rt||a.rating||0)).slice(0,6);
+  el.innerHTML=trend.map((r,i)=>hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true})} داغ`:'')).join('');
+}
+// ── رویدادهای ویژه ──
+const SAMPLE_EVENTS=[
+  {rid:6,emoji:'🎷',title:'شب موسیقی جاز زنده',rest:'آوا روف‌تاپ',when:'جمعه ۲۲ خرداد · ۲۱:۰۰',price:'۴۵۰ک',desc:'اجرای زنده‌ی گروه جاز با منوی ویژه'},
+  {rid:1,emoji:'🍷',title:'شب طعم و شراب‌نمایی',rest:'کافه‌رستوران ویستا',when:'پنجشنبه ۲۱ خرداد · ۲۰:۰۰',price:'۳۲۰ک',desc:'چشیدن منوی فصلی با همراهی سامان'},
+  {rid:3,emoji:'👨‍🍳',title:'میز سرآشپز',rest:'بیسترو لانه',when:'شنبه ۲۳ خرداد · ۱۹:۳۰',price:'۵۸۰ک',desc:'منوی ۷ مرحله‌ای با حضور سرآشپز'},
+];
+async function renderEvents(){
+  const el=document.getElementById('eventsList');if(!el)return;
+  let events=SAMPLE_EVENTS;
+  // اگر آنلاین، از API بخوان
+  const res=await API.get('/events');
+  if(res.ok&&Array.isArray(res.data?.events)&&res.data.events.length){
+    events=res.data.events.map(e=>({rid:e.restaurantId,emoji:e.emoji||'🎉',title:e.title,rest:'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
+  }
+  el.innerHTML=events.map(e=>`
+    <div class="event-card" role="button" tabindex="0" onclick="openRest(${e.rid})">
+      <div class="event-emoji">${e.emoji}</div>
+      <div class="event-body">
+        <div class="event-title">${esc(e.title)}</div>
+        ${e.rest?`<div class="event-rest">${esc(e.rest)}</div>`:''}
+        <div class="event-when">${icon('calendar',{size:13})} ${esc(e.when)}</div>
+        ${e.desc?`<div class="event-desc">${esc(e.desc)}</div>`:''}
+      </div>
+      ${e.price?`<div class="event-price">${esc(e.price)}<span>تومان</span></div>`:''}
+    </div>`).join('');
+}
+// رندر همه‌ی بخش‌های کشف
+function renderDiscoverSections(){
+  renderNearby();
+  initNearby();     // اگر اجازه‌ی موقعیت از قبل هست، «نزدیک تو» را واقعی می‌کند
+  renderTrending();
+  renderEvents();
+  // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
+  const sub=document.querySelector('#page-discover .section-sub');
+  if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+  const np=document.getElementById('navPts'); if(np) np.textContent=fmtFa(pts);
+}
+function doSearch(){
+  const q=document.getElementById('sQ').value.trim();
+  const sub=document.querySelector('#page-discover .section-sub');
+  if(!q){
+    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
+    if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+    renderFeed(R);return;
+  }
+  const list=R.filter(r=>r.n.includes(q)||r.cuisine.includes(q)||r.vibes.some(v=>v.includes(q)));
+  document.getElementById('feedTitle').textContent=`نتایج «${q}»`;
+  if(sub) sub.textContent=list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد';
+  if(list.length){ renderFeed(list); return; }
+  // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
+  // می‌داد — کاربر شش کارت می‌دید و گمان می‌کرد این‌ها نتیجه‌ی جست‌وجویش‌اند.
+  document.getElementById('feed').innerHTML=`
+    <div class="empty" style="grid-column:1/-1">
+      <div class="empty-emoji" aria-hidden="true">🔍</div>
+      <div class="empty-title">چیزی برای «${esc(q)}» پیدا نشد</div>
+      <div class="empty-text">اسمِ رستوران، نوعِ آشپزی یا حال‌وهوا رو امتحان کن</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="clearSearch()">دیدنِ همه‌ی رستوران‌ها</button>
+    </div>`;
+}
+/** پاک‌کردنِ جست‌وجو و برگشت به فید — از حالتِ خالی صدا زده می‌شود. */
+function clearSearch(){
+  const q=document.getElementById('sQ'); if(q) q.value='';
+  doSearch();
+}
+function toggleFav(id,el){
+  const on=!favs.has(id);
+  on?favs.add(id):favs.delete(id);
+  saveFavs();
+  if(el){
+    el.innerHTML=icon('heart',{size:20,fill:on});
+    el.setAttribute('aria-pressed',String(on));
+    el.setAttribute('aria-label',on?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها');
+  }
+  if(on){ toast('','ذخیره شد'); if(el){ el.classList.add('liked-pop'); setTimeout(()=>el.classList.remove('liked-pop'),420); } }
   else {
-    // نام روز هفته (پنجشنبه/جمعه/...) → نزدیک‌ترین آن روز در آینده
-    const weekdays = {'یکشنبه':0,'دوشنبه':1,'سه‌شنبه':2,'چهارشنبه':3,'پنجشنبه':4,'جمعه':5,'شنبه':6};
-    if (d in weekdays){
-      const want = weekdays[d];
-      for (let i=0;i<7;i++){ const t=new Date(now); t.setDate(now.getDate()+i); if(t.getDay()===want){target=t;break;} }
-    }
-    // اگر هیچ‌کدام، همان امروز می‌ماند
+    // Undo روی حذفِ علاقه (کاملاً client-side)
+    undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
+      favs.add(id);
+      saveFavs();
+      if(el){ el.innerHTML=icon('heart',{size:20,fill:true}); el.setAttribute('aria-pressed','true'); el.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
+      if(document.getElementById('page-favorites')?.classList.contains('active')) renderFavs();
+    });
+    if(document.getElementById('page-favorites')?.classList.contains('active')) renderFavs();
   }
-  const iso = target.getFullYear()+'-'+String(target.getMonth()+1).padStart(2,'0')+'-'+String(target.getDate()).padStart(2,'0');
-  return { date: iso, time: time || '20:00' };
 }
-
-// focus-trap شیتِ رزرو (C8) — WCAG 2.4.3/2.1.2: تله‌ی فوکوس، Esc، بازگرداندنِ فوکوس
-let _sheetTrap=null,_sheetLastFocus=null;
-function openSheet(html){
-  const sheet=document.getElementById('sheet');
-  const wasOpen=sheet.classList.contains('show');
-  document.getElementById('sheetBody').innerHTML=html;
-  sheet.classList.add('show');
-  if(!wasOpen) _sheetLastFocus=document.activeElement;
-  if(_sheetTrap) sheet.removeEventListener('keydown',_sheetTrap);
-  _sheetTrap=(e)=>{
-    if(e.key==='Escape'){ e.preventDefault(); closeSheet(); return; }
-    if(e.key!=='Tab') return;
-    const f=sheet.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
-    if(!f.length) return;
-    const first=f[0],last=f[f.length-1];
-    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
-    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
-  };
-  sheet.addEventListener('keydown',_sheetTrap);
-  setTimeout(()=>{ const el=sheet.querySelector('input:not([type=hidden]),button,select,textarea,a[href],[tabindex]:not([tabindex="-1"])'); if(el) try{el.focus()}catch(e){} },30);
+// نسخه‌ی hero صفحه رستوران — با انیمیشن تپش
+function toggleRestFav(id){
+  const btn=document.getElementById('rpFav');
+  const on=!favs.has(id);
+  on?favs.add(id):favs.delete(id);
+  saveFavs();
+  if(btn){
+    btn.innerHTML=icon('heart',{size:22,fill:on});
+    btn.setAttribute('aria-pressed',String(on));
+    btn.setAttribute('aria-label',on?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها');
+  }
+  if(on){ toast('','به علاقه‌مندی‌ها اضافه شد'); }
+  else {
+    undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
+      favs.add(id);
+      saveFavs();
+      if(btn){ btn.innerHTML=icon('heart',{size:22,fill:true}); btn.setAttribute('aria-pressed','true'); btn.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
+    });
+  }
+  if(btn){btn.style.transform='scale(1.3)';setTimeout(()=>btn.style.transform='',180)}
 }
-function closeSheet(){
-  const sheet=document.getElementById('sheet');
-  sheet.classList.remove('show');
-  if(_sheetTrap){ sheet.removeEventListener('keydown',_sheetTrap); _sheetTrap=null; }
-  if(_sheetLastFocus && _sheetLastFocus.focus){ try{_sheetLastFocus.focus()}catch(e){} _sheetLastFocus=null; }
-}
-let tt;
-function toast(icon,msg){document.getElementById('toastIcon').textContent=icon;document.getElementById('toastMsg').textContent=msg;const t=document.getElementById('toast');t.classList.add('show');t.classList.remove('toast-enter');void t.offsetWidth;t.classList.add('toast-enter');const live=document.getElementById('a11y-live');if(live)live.textContent=msg;clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400)}
-let _undo=null;
-function undoSnack(msg, onUndo, onCommit, seconds){
-  seconds=seconds||5;
-  if(_undo){ clearTimeout(_undo.timer); const c=_undo.commit; _undo=null; if(c)c(); } // commit قبلی
-  let s=document.getElementById('undoSnack');
-  if(!s){ s=document.createElement('div'); s.id='undoSnack'; s.className='undo-snack'; s.setAttribute('role','status'); s.setAttribute('aria-live','polite'); document.body.appendChild(s); }
-  s.innerHTML='<span class="us-msg"></span><button class="us-btn" type="button">بازگرداندن</button>';
-  s.querySelector('.us-msg').textContent=msg;
-  s.classList.add('show');
-  const hide=()=>s.classList.remove('show');
-  const commit=()=>{ _undo=null; hide(); try{onCommit&&onCommit();}catch(e){} };
-  const timer=setTimeout(commit, seconds*1000);
-  _undo={commit,timer};
-  s.querySelector('.us-btn').onclick=()=>{ clearTimeout(timer); _undo=null; hide(); try{onUndo&&onUndo();}catch(e){} };
-}
-
-// ═══════════ شروع اپ (فاز ۳: نمایش فوری + به‌روزرسانی از API) ═══════════
 
 
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
-window.openLogin = openLogin;
-window.sendOtp = sendOtp;
-window.confirmOtp = confirmOtp;
-window.completeRegister = completeRegister;
-window.esc = esc;
-window.openSheet = openSheet;
-window.closeSheet = closeSheet;
-window.toast = toast;
-window.undoSnack = undoSnack;
-
-
-/* ═══ js/store.js ═══ */
-// ═══════════════════════════════════════════════════════════
-//  Store مرکزی — تنها منبعِ حقیقتِ state اپ (بدون فریم‌ورک)
-//
-//  چرا: قبلاً state (USER, R, favs, ...) در ۵ فایلِ مختلف پخش بود. با یک Store
-//  مرکزی: پیدا کردنِ state آسان، تغییرات قابلِ ردیابی، و اشتراکِ تمیز بین ماژول‌ها.
-//
-//  الگو: یک آبجکتِ ساده‌ی reactive. با store.set() تغییر بده، با store.on() به
-//  تغییرات گوش بده (برای رندرِ خودکار). سبک، ~۴۰ خط، مناسبِ Vanilla JS.
-//
-//  استفاده:
-//    Store.user            → خواندن
-//    Store.set('user', u)  → نوشتن + اطلاع به شنونده‌ها
-//    Store.on('user', fn)  → گوش‌دادن به تغییر
-// ═══════════════════════════════════════════════════════════
-const Store = (() => {
-  const state = {
-    user: null,            // کاربرِ واردشده (یا null)
-    restaurants: [],       // لیستِ رستوران‌ها (از API یا نمونه)
-    favorites: new Set(),  // شناسه‌های علاقه‌مندی
-    trips: [],             // رزروهای کاربر
-    nextCursor: null,      // صفحه‌بندیِ lazy loading
-    currentRest: null,     // رستورانِ در حالِ نمایش
-    waitlist: null,        // ورودیِ فعلیِ لیست انتظار
-    theme: 'dark',         // تمِ فعلی
-    points: 0,             // امتیازِ وفاداری
-  };
-  const listeners = {};    // key → [callbacks]
-
-  return {
-    // خواندنِ مستقیم (getter برای هر کلید)
-    get user() { return state.user; },
-    get restaurants() { return state.restaurants; },
-    get favorites() { return state.favorites; },
-    get trips() { return state.trips; },
-    get nextCursor() { return state.nextCursor; },
-    get currentRest() { return state.currentRest; },
-    get waitlist() { return state.waitlist; },
-    get theme() { return state.theme; },
-    get points() { return state.points; },
-
-    /** نوشتنِ یک کلید + اطلاع به شنونده‌ها. */
-    set(key, value) {
-      state[key] = value;
-      (listeners[key] || []).forEach(fn => { try { fn(value); } catch {} });
-      return value;
-    },
-
-    /** گوش‌دادن به تغییرِ یک کلید (برای رندرِ واکنشی). */
-    on(key, fn) {
-      (listeners[key] = listeners[key] || []).push(fn);
-    },
-
-    /** خواندنِ کلِ snapshot (برای دیباگ). */
-    snapshot() { return { ...state, favorites: [...state.favorites] }; },
-  };
-})();
-
-
-
-/* ═══ js/actions.js ═══ */
-// ═══════════════════════════════════════════════════════════
-//  Action Layer — یک نقطه‌ی مرکزی برای همه‌ی کلیک‌ها (Event Delegation)
-//
-//  چرا: قبلاً ۱۰۱ تا onclick="fn()" داشتیم که توابع را مجبور می‌کرد global باشند
-//  (تضاد با ES Modules). با این الگو:
-//    • فقط یک listener روی document (به‌جای ۱۰۱ listener) → صفر memory leak
-//    • توابع دیگر لازم نیست global باشند → ES Modules ممکن می‌شود
-//    • در HTML: onclick="fn(x)" → data-action="fn" data-arg="x"
-//
-//  این الگویی است که اپ‌های production مدرن استفاده می‌کنند (delegation).
-//
-//  استفاده:
-//    Actions.register('go', (arg) => {...})       ثبتِ یک اکشن
-//    <button data-action="go" data-arg="discover"> در HTML
-//    (کلیک روی هر عنصرِ data-action خودکار تابعِ متناظر را صدا می‌زند)
-// ═══════════════════════════════════════════════════════════
-const Actions = (() => {
-  const registry = {};
-  let wired = false;
-
-  function handle(e) {
-    const el = e.target.closest('[data-action]');
-    if (!el) return;
-    const name = el.dataset.action;
-    const fn = registry[name];
-    if (!fn) return;
-    // آرگومان‌ها: data-arg (تکی) یا data-args (JSON برای چندتایی)
-    let args = [];
-    if (el.dataset.args !== undefined) {
-      try { args = JSON.parse(el.dataset.args); } catch { args = [el.dataset.args]; }
-    } else if (el.dataset.arg !== undefined) {
-      const a = el.dataset.arg;
-      // تبدیلِ عددیِ خودکار (مثل شناسه‌ی رستوران)
-      args = [/^-?\d+$/.test(a) ? Number(a) : a];
-    }
-    fn(...args, el, e);
-  }
-
-  return {
-    /** ثبتِ یک اکشن (نام → تابع). */
-    register(name, fn) { registry[name] = fn; },
-
-    /** ثبتِ چند اکشن یکجا از یک آبجکت. */
-    registerAll(obj) { Object.keys(obj).forEach(k => { registry[k] = obj[k]; }); },
-
-    /** فعال‌سازیِ delegation (یک‌بار، روی document). */
-    init() {
-      if (wired) return;
-      wired = true;
-      document.addEventListener('click', handle);
-
-      // ── کیبورد: Escape برای بستن، Enter/Space برای فعال‌سازیِ عناصرِ data-action ──
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          // بستنِ هر overlay/sheet که باز است (استانداردِ UX)
-          const dna = document.getElementById('dnaOverlay');
-          const sheet = document.getElementById('sheet');
-          if (dna && dna.classList.contains('show')) { window.closeFoodDNA && window.closeFoodDNA(); return; }
-          if (sheet && sheet.classList.contains('show')) { window.closeSheet && window.closeSheet(); return; }
-        }
-        // Enter/Space روی عناصرِ تعاملیِ غیر-button (data-action یا role=button) → فعال‌سازی
-        if ((e.key === 'Enter' || e.key === ' ')) {
-          const el = e.target.closest('[data-action], [role="button"]');
-          if (el && el.tagName !== 'BUTTON' && el.tagName !== 'A') {
-            e.preventDefault();
-            el.click();
-          }
-        }
-      });
-    },
-  };
-})();
-
+window.go = go;
+window.pickOccasion = pickOccasion;
+window.filterVibe = filterVibe;
+window.doSearch = doSearch;
+window.clearSearch = clearSearch;
+window.toggleFav = toggleFav;
+window.toggleRestFav = toggleRestFav;
 
 
 /* ═══ js/data/detail.js ═══ */
@@ -2602,235 +3212,6 @@ function openRest(id){
 
 // ── نمایشِ تابعِ onclick روی window ──
 window.openRest = openRest;
-
-
-/* ═══ js/data/discover.js ═══ */
-// ═══ رزرونو — ناوبری + رندرِ کشف: فید، وایب، مناسبت، رویداد (بخشی از اپ کاستومر) ═══
-function go(p){
-  try{ track('page.viewed',{page:p}); }catch{}
-  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-  document.getElementById('page-'+p).classList.add('active');
-  document.querySelectorAll('[data-nav]').forEach(n=>n.classList.toggle('active',n.dataset.nav===p));
-  // در صفحه‌ی رستوران، نوار ناوبری مخفی می‌شود تا نوار رزرو پایین بنشیند
-  const botnav=document.querySelector('.botnav');
-  if(botnav)botnav.style.display=(p==='rest'||p==='chat')?'none':'';
-  window.scrollTo({top:0,behavior:'instant'});
-  if(p==='favorites')renderFavs();
-  if(p==='trips')renderTrips();
-  if(p==='loyalty')renderLoyalty();
-  if(p==='profile')renderProfile();
-  if(p==='chats' && typeof renderChats==='function')renderChats();
-}
-function fmtFa(n){return n.toLocaleString('fa-IR')}
-function cardHTML(r){
-  const weekly = (r.reviews||0) >= 5 ? Math.max(3, Math.round((r.reviews||0)/8)) : 0;
-  const avatars = Array.from({length: Math.min(3, Math.max(1, Math.ceil(weekly/4)))}, (_,i)=>i);
-  const hot = r.rt >= 4.7 && (r.reviews||0) >= 80;
-  return `<article class="rc reveal" onclick="openRest(${r.id})">
-    <div class="rc-bg" style="background:${GRAD[r.id]}"></div>
-    <span class="rc-emoji">${r.e}</span>
-    ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
-    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${r.id},this);buzz&&buzz()">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
-    <div class="rc-panel">
-      <div class="rc-top"><div class="rc-name">${r.n}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
-      <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
-      ${weekly?`<div class="rc-social"><div class="rc-avas" aria-hidden="true">${avatars.map(()=>`<span class="avatar avatar-sm"></span>`).join('')}</div><div class="rc-social-t"><b>${fmtFa(weekly)} نفر</b> این هفته اومدن</div></div>`:''}
-      <div class="rc-slots">${r.slots.slice(0,3).map((s,i)=>`<span class="rc-slot ${i===0?'go':''}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');buzz&&buzz()">${s}</span>`).join('')}</div>
-    </div>
-  </article>`;
-}
-// اثبات اجتماعیِ امن: از داده‌ی تجمیعی (تعداد نظر/بازدید) — نه موقعیت زنده‌ی کسی.
-// این حس «اینجا محبوبه» رو می‌ده بدون لو دادن حریم خصوصی هیچ‌کس.
-// اثبات اجتماعی صفحه‌ی جزئیات — سیگنال اعتماد قوی‌تر موقع تصمیم رزرو
-function detailSocialProof(r){
-  const reviews = r.reviews || 0;
-  if(reviews < 5) return '';
-  const weekly = Math.max(3, Math.round(reviews/8));
-  const recommend = Math.min(98, Math.round(r.rt/5*100)+6);
-  return `<div class="rp-social">
-    <div class="rp-social-item">
-      <div class="rp-social-avas" aria-hidden="true">${[0,1,2,3].map(()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>
-      <div class="rp-social-txt"><b>${fmtFa(weekly)} نفر</b> این هفته اینجا رزرو کردن</div>
-    </div>
-    <div class="rp-social-item">
-      <span style="color:var(--success);display:inline-flex">${icon('heart',{size:18,fill:true})}</span>
-      <div class="rp-social-txt"><b>${fmtFa(recommend)}٪</b> مهمان‌ها این‌جا رو پیشنهاد می‌کنن</div>
-    </div>
-  </div>`;
-}
-function socialProofHTML(r){
-  const reviews = r.reviews || 0;
-  if(reviews < 5) return ''; // رستوران تازه — اثبات اجتماعی الکی نساز
-  // تخمین بازدید این هفته از تعداد نظر (قطعی و منطقی، نه رندوم بی‌معنی)
-  const weekly = Math.max(3, Math.round(reviews / 8));
-  const avatars = Array.from({length: Math.min(3, Math.max(1, Math.ceil(weekly/4)))}, (_,i)=>i);
-  const hot = r.rt >= 4.7 && reviews >= 80;
-  return `<div class="rc-social">
-    <div class="rc-social-ava" aria-hidden="true">${avatars.map(()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>
-    <div class="rc-social-txt"><b>${fmtFa(weekly)} نفر</b> این هفته اومدن</div>
-    ${hot?`<span class="rc-hot" style="margin-inline-start:auto">${icon('flame',{size:12,fill:true})} داغ</span>`:''}
-  </div>`;
-}
-function renderFeed(list){
-  const f=document.getElementById('feed');
-  f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
-  setTimeout(()=>{
-    f.innerHTML=list.map(cardHTML).join('');
-    const io=new IntersectionObserver(es=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);io.unobserve(e.target)}}),{threshold:.05});
-    f.querySelectorAll('.rc').forEach(c=>io.observe(c));
-  },280);
-}
-// کشف بر اساس موقعیت — هر موقعیت به چند vibe نگاشت می‌شود (منطق واقعی روی داده)
-const OCCASION_MAP = {
-  date:     {vibes:['رمانتیک','آروم','ویو','لوکس'], title:'💕 برای قرار عاشقانه', sub:'دنج، رمانتیک و خاطره‌انگیز'},
-  friends:  {vibes:['دوستانه','کژوال','شلوغ','ارزون'], title:'🎊 برای دورهمی با رفقا', sub:'پرانرژی و باحال'},
-  birthday: {vibes:['لوکس','تجربه','ویو','شلوغ'], title:'🎂 برای جشن تولد', sub:'خاص و به‌یادموندنی'},
-  business: {vibes:['آروم','مینیمال','لوکس'], title:'💼 برای قرار کاری', sub:'آروم، حرفه‌ای و مناسب گفت‌وگو'},
-  solo:     {vibes:['آروم','مینیمال','کژوال'], title:'🧘 برای وقتِ خودت', sub:'دنج و آروم'},
-  family:   {vibes:['خانوادگی','سنتی','آروم'], title:'👨‍👩‍👧 برای خانواده', sub:'راحت و مناسب همه'},
-};
-function pickOccasion(occ, el){
-  // toggle: اگه دوباره همون رو زد، برگرد به حالت عادی
-  const already = el.classList.contains('on');
-  document.querySelectorAll('.occ-card').forEach(c=>c.classList.remove('on'));
-  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
-  if(already){
-    document.querySelector('.chip')?.classList.add('active');
-    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
-    const sub=document.querySelector('.section-sub'); if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
-    renderFeed(R);
-    return;
-  }
-  el.classList.add('on');
-  const m = OCCASION_MAP[occ];
-  // رستوران‌هایی که حداقل یکی از vibeهای این موقعیت رو دارن، مرتب‌شده بر اساس امتیاز
-  const matched = R.filter(r=>r.vibes?.some(v=>m.vibes.includes(v)))
-                   .sort((a,b)=>(b.rt||0)-(a.rt||0));
-  const list = matched.length ? matched : R;
-  document.getElementById('feedTitle').textContent = m.title;
-  const sub=document.querySelector('.section-sub'); if(sub) sub.textContent = m.sub;
-  renderFeed(list);
-  // اسکرول نرم به فید تا نتیجه دیده بشه
-  document.getElementById('feed')?.scrollIntoView({behavior:'smooth',block:'start'});
-}
-function filterVibe(v,el){
-  document.querySelectorAll('.occ-card').forEach(c=>c.classList.remove('on'));
-  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');
-  const list=v==='all'?R:R.filter(r=>r.vibes.includes(v));
-  document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,fill:true})+' محبوب امشب':esc(el.textContent.trim());
-  renderFeed(list);
-}
-// ── نزدیک تو (کارت افقی کوچک) ──
-function hCardHTML(r,extra){
-  return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${r.id})">
-    <div class="hcard-img" style="background:${GRAD[r.id]||GRAD[1]}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
-    <div class="hcard-name">${esc(r.n)}</div>
-    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}</div>
-  </div>`;
-}
-function renderNearby(){
-  const el=document.getElementById('nearbyScroll');if(!el)return;
-  // مرتب بر اساس «فاصله» شبیه‌سازی‌شده (در واقعیت از موقعیت کاربر)
-  const near=[...R].sort(()=>Math.random()-0.5).slice(0,6);
-  el.innerHTML=near.map((r,i)=>hCardHTML(r,`${fmtFa((i+1)*0.4+0.3).slice(0,3)} کیلومتر`)).join('');
-}
-function renderTrending(){
-  const el=document.getElementById('trendingScroll');if(!el)return;
-  // پرطرفدارترین‌ها بر اساس امتیاز
-  const trend=[...R].sort((a,b)=>(b.rating||0)-(a.rating||0)).slice(0,6);
-  el.innerHTML=trend.map((r,i)=>hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true})} داغ`:'')).join('');
-}
-// ── رویدادهای ویژه ──
-const SAMPLE_EVENTS=[
-  {rid:6,emoji:'🎷',title:'شب موسیقی جاز زنده',rest:'آوا روف‌تاپ',when:'جمعه ۲۲ خرداد · ۲۱:۰۰',price:'۴۵۰ک',desc:'اجرای زنده‌ی گروه جاز با منوی ویژه'},
-  {rid:1,emoji:'🍷',title:'شب طعم و شراب‌نمایی',rest:'کافه‌رستوران ویستا',when:'پنجشنبه ۲۱ خرداد · ۲۰:۰۰',price:'۳۲۰ک',desc:'چشیدن منوی فصلی با همراهی سامان'},
-  {rid:3,emoji:'👨‍🍳',title:'میز سرآشپز',rest:'بیسترو لانه',when:'شنبه ۲۳ خرداد · ۱۹:۳۰',price:'۵۸۰ک',desc:'منوی ۷ مرحله‌ای با حضور سرآشپز'},
-];
-async function renderEvents(){
-  const el=document.getElementById('eventsList');if(!el)return;
-  let events=SAMPLE_EVENTS;
-  // اگر آنلاین، از API بخوان
-  const res=await API.get('/events');
-  if(res.ok&&Array.isArray(res.data?.events)&&res.data.events.length){
-    events=res.data.events.map(e=>({rid:e.restaurantId,emoji:e.emoji||'🎉',title:e.title,rest:'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
-  }
-  el.innerHTML=events.map(e=>`
-    <div class="event-card" role="button" tabindex="0" onclick="openRest(${e.rid})">
-      <div class="event-emoji">${e.emoji}</div>
-      <div class="event-body">
-        <div class="event-title">${esc(e.title)}</div>
-        ${e.rest?`<div class="event-rest">${esc(e.rest)}</div>`:''}
-        <div class="event-when">${icon('calendar',{size:13})} ${esc(e.when)}</div>
-        ${e.desc?`<div class="event-desc">${esc(e.desc)}</div>`:''}
-      </div>
-      ${e.price?`<div class="event-price">${esc(e.price)}<span>تومان</span></div>`:''}
-    </div>`).join('');
-}
-// رندر همه‌ی بخش‌های کشف
-function renderDiscoverSections(){
-  renderNearby();
-  renderTrending();
-  renderEvents();
-  // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
-  const sub=document.querySelector('#page-discover .section-sub');
-  if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
-  const np=document.getElementById('navPts'); if(np) np.textContent=fmtFa(pts);
-}
-function doSearch(){
-  const q=document.getElementById('sQ').value.trim();
-  if(!q){renderFeed(R);return}
-  const list=R.filter(r=>r.n.includes(q)||r.cuisine.includes(q)||r.vibes.some(v=>v.includes(q)));
-  document.getElementById('feedTitle').textContent=`نتایج «${q}»`;
-  renderFeed(list.length?list:R);
-  if(!list.length)toast('','چیزی پیدا نشد — همه رو نشون می‌دیم');
-}
-function toggleFav(id,el){
-  const on=!favs.has(id);
-  on?favs.add(id):favs.delete(id);
-  if(el){
-    el.innerHTML=icon('heart',{size:20,fill:on});
-    el.setAttribute('aria-pressed',String(on));
-    el.setAttribute('aria-label',on?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها');
-  }
-  if(on){ toast('','ذخیره شد'); if(el){ el.classList.add('liked-pop'); setTimeout(()=>el.classList.remove('liked-pop'),420); } }
-  else {
-    // Undo روی حذفِ علاقه (کاملاً client-side)
-    undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
-      favs.add(id);
-      if(el){ el.innerHTML=icon('heart',{size:20,fill:true}); el.setAttribute('aria-pressed','true'); el.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
-      if(document.getElementById('page-favorites')?.classList.contains('active')) renderFavs();
-    });
-    if(document.getElementById('page-favorites')?.classList.contains('active')) renderFavs();
-  }
-}
-// نسخه‌ی hero صفحه رستوران — با انیمیشن تپش
-function toggleRestFav(id){
-  const btn=document.getElementById('rpFav');
-  const on=!favs.has(id);
-  on?favs.add(id):favs.delete(id);
-  if(btn){
-    btn.innerHTML=icon('heart',{size:22,fill:on});
-    btn.setAttribute('aria-pressed',String(on));
-    btn.setAttribute('aria-label',on?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها');
-  }
-  if(on){ toast('','به علاقه‌مندی‌ها اضافه شد'); }
-  else {
-    undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
-      favs.add(id);
-      if(btn){ btn.innerHTML=icon('heart',{size:22,fill:true}); btn.setAttribute('aria-pressed','true'); btn.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
-    });
-  }
-  if(btn){btn.style.transform='scale(1.3)';setTimeout(()=>btn.style.transform='',180)}
-}
-
-
-// ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
-window.go = go;
-window.pickOccasion = pickOccasion;
-window.filterVibe = filterVibe;
-window.doSearch = doSearch;
-window.toggleFav = toggleFav;
-window.toggleRestFav = toggleRestFav;
 
 
 /* ═══ js/reservation.js ═══ */
@@ -2946,6 +3327,205 @@ async function renderTrips(){
   }).join('');
   armReveals&&armReveals();
 }
+
+
+/* ═══ js/features/trips.js ═══ */
+// ═══ رزرونو — سفرها: تقویم، کیف پول، QR، رزرو مجدد (بخشی از اپ کاستومر) ═══
+// ── Calendar Sync: تولید فایل .ics واقعی ──
+function addToCalendar(code,name,date,time){
+  // ساخت یک رویداد iCalendar استاندارد (سازگار با Apple/Google Calendar)
+  const dt=parseTripDateTime(date,time);
+  const start=icsDate(dt);
+  const end=icsDate(new Date(dt.getTime()+2*3600*1000)); // ۲ ساعت
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//RezervoNo//FA','CALSCALE:GREGORIAN','BEGIN:VEVENT',
+    `UID:${code}@rezervno.ir`,`DTSTAMP:${icsDate(new Date())}`,`DTSTART:${start}`,`DTEND:${end}`,
+    `SUMMARY:رزرو ${name}`,`DESCRIPTION:کد رزرو: ${code}`,`LOCATION:${name}`,
+    'BEGIN:VALARM','TRIGGER:-PT2H','ACTION:DISPLAY','DESCRIPTION:یادآوری رزرو','END:VALARM',
+    'END:VEVENT','END:VCALENDAR'].join('\r\n');
+  const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`rezervno-${code}.ics`;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('','فایل تقویم دانلود شد — بازش کن تا اضافه شه');
+}
+function icsDate(d){return d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';}
+function parseTripDateTime(date,time){
+  // تبدیل تقریبی تاریخ/ساعت فارسی به Date (برای دمو — رویداد فردا)
+  const t=String(time).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  const [h,m]=t.split(':').map(Number);
+  const d=new Date();d.setDate(d.getDate()+1);d.setHours(h||20,m||0,0,0);return d;
+}
+// ── کیف پول (Apple/Google Wallet) ──
+function addToWallet(code,name,date,time,kind){
+  // Apple Wallet واقعی به فایل .pkpass امضاشده با گواهی توسعه‌دهنده نیاز دارد
+  // (که در سرور تولید می‌شود). اینجا کارت پاس‌مانند را نمایش می‌دهیم.
+  const isApple=kind==='apple';
+  openSheet(`<div class="wallet-pass ${isApple?'wp-apple':'wp-google'}">
+    <div class="wp-top"><span class="wp-brand">رزرونو</span><span class="wp-logo">${isApple?'':icon('ticket',{size:18})}</span></div>
+    <div class="wp-rest">${esc(name)}</div>
+    <div class="wp-row"><div><div class="wp-lbl">تاریخ</div><div class="wp-val">${esc(date)}</div></div>
+      <div><div class="wp-lbl">ساعت</div><div class="wp-val">${esc(time)}</div></div></div>
+    <div class="wp-qr">${qrSVG(code)}</div>
+    <div class="wp-code">${esc(code)}</div>
+  </div>
+  <button class="btn btn-primary btn-lg btn-block" style="margin-top:16px" onclick="${isApple?`toast('','برای افزودن واقعی، سرور فایل pkpass امضاشده می‌سازد')`:`toast('','لینک Google Wallet در نسخه‌ی سرور فعال می‌شود')`}">${isApple?' افزودن به Apple Wallet':'افزودن به Google Wallet'}</button>
+  <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>`);
+}
+// ── QR Check-in (تولید QR از کد رزرو) ──
+function showCheckInQR(code,name){
+  openSheet(`<div style="text-align:center;padding:8px 0">
+    <div class="sheet-title" style="text-align:center">ورود با QR</div>
+    <div class="sheet-sub" style="text-align:center;margin-bottom:20px">این کد رو موقع ورود به ${esc(name)} نشون بده</div>
+    <div class="checkin-qr">${qrSVG(code,180)}</div>
+    <div class="checkin-code">${esc(code)}</div>
+    <div class="checkin-hint">میزبان با اسکن این کد، ورودت رو ثبت می‌کنه</div>
+  </div>
+  <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="closeSheet()">بستن</button>`);
+}
+// تولید QR ساده به‌صورت SVG (الگوی قطعی از کد — برای دمو؛ در تولید از کتابخانه‌ی QR)
+function qrSVG(text,size){
+  size=size||140;const n=21;const cell=size/n;
+  // الگوی شبه‌تصادفی قطعی از hash متن (نمایشی)
+  let h=0;for(let i=0;i<text.length;i++)h=(h*31+text.charCodeAt(i))>>>0;
+  let rects='';const rng=(s)=>{s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff;};
+  let seed=h;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    // گوشه‌های موقعیت‌یاب (finder patterns)
+    const fp=(x<7&&y<7)||(x>=n-7&&y<7)||(x<7&&y>=n-7);
+    let on;
+    if(fp){const lx=x<7?x:x-(n-7),ly=y<7?y:y-(n-7);on=(lx===0||lx===6||ly===0||ly===6||(lx>=2&&lx<=4&&ly>=2&&ly<=4));}
+    else{seed=(seed*1103515245+12345)&0x7fffffff;on=(seed/0x7fffffff)>0.5;}
+    if(on)rects+=`<rect x="${(x*cell).toFixed(1)}" y="${(y*cell).toFixed(1)}" width="${cell.toFixed(1)}" height="${cell.toFixed(1)}"/>`;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="background:#fff;border-radius:8px"><g fill="#0f172a">${rects}</g></svg>`;
+}
+// ── رزرو مجدد (پیش‌پرکردن با همان رستوران) ──
+function repeatReservation(rid){
+  const r=R.find(x=>x.id===rid);
+  if(!r){toast('','رستوران پیدا نشد');return;}
+  go('rest');openRest(rid);
+  toast('','اطلاعات رزرو قبلی آماده‌ست — فقط زمان رو انتخاب کن');
+}
+// لغو رزرو (متصل به API اگر آنلاین)
+async function cancelTrip(code,btn){
+  const tripEl=btn.closest('.trip-card')||btn.closest('.trip');
+  // Undoِ امن: کارت فوراً کم‌رنگ می‌شود، ولی لغوِ واقعی ۵ ثانیه به تعویق می‌افتد.
+  if(tripEl)tripEl.style.opacity=.5;
+  undoSnack('رزرو لغو شد',
+    ()=>{ if(tripEl)tripEl.style.opacity=''; },   // Undo: هیچ APIای صدا زده نشده
+    async ()=>{                                    // Commit: حالا واقعاً لغو کن
+      if(isLoggedIn()){
+        const res=await API.post('/reservations/'+encodeURIComponent(code)+'/cancel',{});
+        if(res.ok)return;
+        if(!res.offline){ toast('',res.error?.message||'لغو ناموفق بود'); if(tripEl)tripEl.style.opacity=''; }
+      }
+    });
+}
+
+
+// ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
+window.addToCalendar = addToCalendar;
+window.addToWallet = addToWallet;
+window.showCheckInQR = showCheckInQR;
+window.repeatReservation = repeatReservation;
+window.cancelTrip = cancelTrip;
+
+
+/* ═══ js/features/loyalty.js ═══ */
+// ═══ رزرونو — وفاداری و امتیاز (بخشی از اپ کاستومر) ═══
+//  سطح، پیشرفت تا سطحِ بعدی، و نشان‌ها همه از /me/loyalty می‌آیند — قبلاً
+//  «سطحِ طلایی»، «۱۶۰ امتیاز تا پلاتینیوم»، نوارِ ۶۸٪، و earned/locedِ
+//  نشان‌ها همیشه ثابت بودند (مستقل از امتیازِ واقعیِ کاربر). دیگر هیچ عددی
+//  اینجا هاردکد نیست.
+
+
+
+
+
+
+function perksBlock(){
+  return `<div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای باشگاه مشتریان</div></div>
+    <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>`;
+}
+async function renderLoyalty(){
+  const root=document.getElementById('page-loyalty');
+  if(!root)return;
+
+  // مهمان (وارد نشده) → دعوت به ورود، بدونِ هیچ عددِ ساختگی
+  if(!isLoggedIn()){
+    root.innerHTML=`<div class="wrap section">
+      <div style="text-align:center;padding:40px 20px">
+        <div class="login-icon" style="margin-bottom:var(--sp-5)">${icon('user',{size:40})}</div>
+        <div style="font-size:20px;font-weight:800;margin-bottom:8px">هنوز وارد نشدی</div>
+        <div style="color:var(--t2);font-size:14px;margin-bottom:24px;line-height:1.6">برای دیدنِ امتیاز، سطح و نشان‌هات وارد شو</div>
+        <button class="btn btn-primary btn-lg btn-block" onclick="openLogin()">ورود / ثبت‌نام</button>
+      </div>
+      ${perksBlock()}
+    </div>`;
+    armReveals&&armReveals();
+    return;
+  }
+
+  // اسکلتونِ بارگذاری (به‌جایِ نمایشِ اعدادِ قبلی/ساختگی تا رسیدنِ پاسخِ واقعی)
+  root.setAttribute('aria-busy','true');
+  root.innerHTML=`<div class="wrap section">
+    <div class="loy-card" aria-hidden="true">
+      <div class="sk" style="height:16px;width:90px;border-radius:6px"></div>
+      <div class="sk" style="height:34px;width:150px;margin-top:16px;border-radius:8px"></div>
+      <div class="sk" style="height:13px;width:65%;margin-top:16px;border-radius:6px"></div>
+    </div>
+  </div>`;
+
+  const res=await API.get('/me/loyalty');
+  root.removeAttribute('aria-busy');
+
+  if(!res.ok || !res.data){
+    root.innerHTML=`<div class="wrap section"><div class="empty-state"><div class="empty-state-icon">${icon('alert',{size:44})}</div><div class="empty-state-title">وضعیتِ وفاداری بارگذاری نشد</div><div class="empty-state-desc">اتصالت رو چک کن و دوباره امتحان کن</div></div></div>`;
+    armReveals&&armReveals();
+    return;
+  }
+
+  const {points, tier, next_tier, points_to_next, progress_pct, badges}=res.data;
+  setPts(points); // برایِ نمایشِ سازگار در بقیه‌ی صفحات (DNA غذایی و ...)
+
+  const nextLine=next_tier
+    ? `${fmtFa(points_to_next)} امتیاز تا سطحِ ${next_tier.name} (${next_tier.emoji})`
+    : 'به بالاترین سطح رسیدی 🎉';
+
+  root.innerHTML=`<div class="wrap section">
+    <div class="loy-card"><div class="loy-card-mesh"></div><div class="loy-tier">${tier.emoji} سطح ${tier.name}</div><div class="loy-pts"><span id="loyPts" class="loy-pts-num">${fmtFa(points)}</span> <span style="font-size:20px;font-weight:600;opacity:.9">امتیاز</span></div><div class="loy-next">${nextLine}</div><div class="loy-prog"><div class="loy-prog-fill" style="width:0" data-w="${progress_pct}"></div></div></div>
+
+    <!-- دعوت دوستان -->
+    <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openReferral()">
+      <div class="lac-icon" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">${icon('gift',{size:20})}</div>
+      <div class="lac-body"><div class="lac-title">دوستات رو دعوت کن</div><div class="lac-sub">۵۰۰ امتیاز برای هر دعوت موفق</div></div>
+      <span class="lac-arrow">›</span>
+    </div>
+    <!-- کارت هدیه -->
+    <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openGiftCards()">
+      <div class="lac-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)">${icon('creditCard',{size:20})}</div>
+      <div class="lac-body"><div class="lac-title">کارت هدیه</div><div class="lac-sub">هدیه‌ی خاص به عزیزانت بده</div></div>
+      <span class="lac-arrow">›</span>
+    </div>
+    <!-- پاداش تولد/سالگرد -->
+    <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openRewardsDates()">
+      <div class="lac-icon" style="background:linear-gradient(135deg,#F472B6,#DB2777)">${icon('calendar',{size:20})}</div>
+      <div class="lac-body"><div class="lac-title">پاداش تولد و سالگرد</div><div class="lac-sub">۱۰۰۰ امتیاز هدیه در روز خاصت</div></div>
+      <span class="lac-arrow">›</span>
+    </div>
+
+    <div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای تو</div></div>
+    <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
+    <div class="section-head reveal" style="margin-top:32px"><div class="section-title">نشان‌ها</div></div>
+    <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${b.emoji}</div><div class="bdg-name">${b.name}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
+  </div>`;
+  setTimeout(()=>{const f=document.querySelector('.loy-prog-fill');if(f)f.style.width=f.dataset.w+'%'},300);
+  // شمارشِ متحرکِ امتیاز (حسِ دستاورد)
+  const pe=document.getElementById('loyPts');
+  if(pe&&points>0){const t0=performance.now(),dur=900;const tk=(nw)=>{const p=Math.min(1,(nw-t0)/dur),e=1-Math.pow(1-p,3);pe.textContent=fmtFa(Math.round(points*e));if(p<1)requestAnimationFrame(tk);};requestAnimationFrame(tk);}
+  armReveals&&armReveals();
+}
+// ── دعوت دوستان (Referral) ──
 
 
 /* ═══ js/features/rewards.js ═══ */
@@ -3093,159 +3673,6 @@ window.openRewardsDates = openRewardsDates;
 window.saveRewardDates = saveRewardDates;
 
 
-/* ═══ js/features/loyalty.js ═══ */
-// ═══ رزرونو — وفاداری و امتیاز (بخشی از اپ کاستومر) ═══
-function renderLoyalty(){
-  // بارگذاری امتیاز واقعی از سرور (اگر وارد شده)
-  loadRealPoints();
-  document.getElementById('page-loyalty').innerHTML=`<div class="wrap section">
-    <div class="loy-card"><div class="loy-card-mesh"></div><div class="loy-tier">${icon('star',{size:15,fill:true})} سطح طلایی</div><div class="loy-pts"><span id="loyPts" class="loy-pts-num">${fmtFa(pts)}</span> <span style="font-size:20px;font-weight:600;opacity:.9">امتیاز</span></div><div class="loy-next">۱۶۰ امتیاز تا سطح بعدی (پلاتینیوم)</div><div class="loy-prog"><div class="loy-prog-fill" style="width:0" data-w="68"></div></div></div>
-
-    <!-- دعوت دوستان -->
-    <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openReferral()">
-      <div class="lac-icon" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">${icon('gift',{size:20})}</div>
-      <div class="lac-body"><div class="lac-title">دوستات رو دعوت کن</div><div class="lac-sub">۵۰۰ امتیاز برای هر دعوت موفق</div></div>
-      <span class="lac-arrow">›</span>
-    </div>
-    <!-- کارت هدیه -->
-    <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openGiftCards()">
-      <div class="lac-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)">${icon('creditCard',{size:20})}</div>
-      <div class="lac-body"><div class="lac-title">کارت هدیه</div><div class="lac-sub">هدیه‌ی خاص به عزیزانت بده</div></div>
-      <span class="lac-arrow">›</span>
-    </div>
-    <!-- پاداش تولد/سالگرد -->
-    <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openRewardsDates()">
-      <div class="lac-icon" style="background:linear-gradient(135deg,#F472B6,#DB2777)">${icon('calendar',{size:20})}</div>
-      <div class="lac-body"><div class="lac-title">پاداش تولد و سالگرد</div><div class="lac-sub">۱۰۰۰ امتیاز هدیه در روز خاصت</div></div>
-      <span class="lac-arrow">›</span>
-    </div>
-
-    <div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای تو</div></div>
-    <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
-    <div class="section-head reveal" style="margin-top:32px"><div class="section-title">نشان‌ها</div></div>
-    <div class="badge-grid reveal">${BADGES.map(b=>`<div class="bdg ${b[2]?'earned':'locked'}"><div class="bdg-emoji">${b[0]}</div><div class="bdg-name">${b[1]}</div><div class="bdg-desc">${b[2]?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
-  </div>`;
-  setTimeout(()=>{const f=document.querySelector('.loy-prog-fill');if(f)f.style.width=f.dataset.w+'%'},300);
-  // شمارشِ متحرکِ امتیاز (حسِ دستاورد)
-  const pe=document.getElementById('loyPts');
-  if(pe&&pts>0){const t0=performance.now(),dur=900;const tk=(nw)=>{const p=Math.min(1,(nw-t0)/dur),e=1-Math.pow(1-p,3);pe.textContent=fmtFa(Math.round(pts*e));if(p<1)requestAnimationFrame(tk);};requestAnimationFrame(tk);}
-  armReveals&&armReveals();
-}
-// بارگذاری امتیاز واقعی از API
-async function loadRealPoints(){
-  if(!isLoggedIn())return;
-  const res=await API.get('/me/points');
-  if(res.ok&&typeof res.data?.balance==='number'){
-    setPts(res.data.balance);
-    const el=document.getElementById('loyPts');if(el)el.textContent=fmtFa(pts);
-  }
-}
-// ── دعوت دوستان (Referral) ──
-
-
-
-/* ═══ js/features/trips.js ═══ */
-// ═══ رزرونو — سفرها: تقویم، کیف پول، QR، رزرو مجدد (بخشی از اپ کاستومر) ═══
-// ── Calendar Sync: تولید فایل .ics واقعی ──
-function addToCalendar(code,name,date,time){
-  // ساخت یک رویداد iCalendar استاندارد (سازگار با Apple/Google Calendar)
-  const dt=parseTripDateTime(date,time);
-  const start=icsDate(dt);
-  const end=icsDate(new Date(dt.getTime()+2*3600*1000)); // ۲ ساعت
-  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//RezervoNo//FA','CALSCALE:GREGORIAN','BEGIN:VEVENT',
-    `UID:${code}@rezervno.ir`,`DTSTAMP:${icsDate(new Date())}`,`DTSTART:${start}`,`DTEND:${end}`,
-    `SUMMARY:رزرو ${name}`,`DESCRIPTION:کد رزرو: ${code}`,`LOCATION:${name}`,
-    'BEGIN:VALARM','TRIGGER:-PT2H','ACTION:DISPLAY','DESCRIPTION:یادآوری رزرو','END:VALARM',
-    'END:VEVENT','END:VCALENDAR'].join('\r\n');
-  const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=`rezervno-${code}.ics`;a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
-  toast('','فایل تقویم دانلود شد — بازش کن تا اضافه شه');
-}
-function icsDate(d){return d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';}
-function parseTripDateTime(date,time){
-  // تبدیل تقریبی تاریخ/ساعت فارسی به Date (برای دمو — رویداد فردا)
-  const t=String(time).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
-  const [h,m]=t.split(':').map(Number);
-  const d=new Date();d.setDate(d.getDate()+1);d.setHours(h||20,m||0,0,0);return d;
-}
-// ── کیف پول (Apple/Google Wallet) ──
-function addToWallet(code,name,date,time,kind){
-  // Apple Wallet واقعی به فایل .pkpass امضاشده با گواهی توسعه‌دهنده نیاز دارد
-  // (که در سرور تولید می‌شود). اینجا کارت پاس‌مانند را نمایش می‌دهیم.
-  const isApple=kind==='apple';
-  openSheet(`<div class="wallet-pass ${isApple?'wp-apple':'wp-google'}">
-    <div class="wp-top"><span class="wp-brand">رزرونو</span><span class="wp-logo">${isApple?'':icon('ticket',{size:18})}</span></div>
-    <div class="wp-rest">${esc(name)}</div>
-    <div class="wp-row"><div><div class="wp-lbl">تاریخ</div><div class="wp-val">${esc(date)}</div></div>
-      <div><div class="wp-lbl">ساعت</div><div class="wp-val">${esc(time)}</div></div></div>
-    <div class="wp-qr">${qrSVG(code)}</div>
-    <div class="wp-code">${esc(code)}</div>
-  </div>
-  <button class="btn btn-primary btn-lg btn-block" style="margin-top:16px" onclick="${isApple?`toast('','برای افزودن واقعی، سرور فایل pkpass امضاشده می‌سازد')`:`toast('','لینک Google Wallet در نسخه‌ی سرور فعال می‌شود')`}">${isApple?' افزودن به Apple Wallet':'افزودن به Google Wallet'}</button>
-  <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>`);
-}
-// ── QR Check-in (تولید QR از کد رزرو) ──
-function showCheckInQR(code,name){
-  openSheet(`<div style="text-align:center;padding:8px 0">
-    <div class="sheet-title" style="text-align:center">ورود با QR</div>
-    <div class="sheet-sub" style="text-align:center;margin-bottom:20px">این کد رو موقع ورود به ${esc(name)} نشون بده</div>
-    <div class="checkin-qr">${qrSVG(code,180)}</div>
-    <div class="checkin-code">${esc(code)}</div>
-    <div class="checkin-hint">میزبان با اسکن این کد، ورودت رو ثبت می‌کنه</div>
-  </div>
-  <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="closeSheet()">بستن</button>`);
-}
-// تولید QR ساده به‌صورت SVG (الگوی قطعی از کد — برای دمو؛ در تولید از کتابخانه‌ی QR)
-function qrSVG(text,size){
-  size=size||140;const n=21;const cell=size/n;
-  // الگوی شبه‌تصادفی قطعی از hash متن (نمایشی)
-  let h=0;for(let i=0;i<text.length;i++)h=(h*31+text.charCodeAt(i))>>>0;
-  let rects='';const rng=(s)=>{s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff;};
-  let seed=h;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    // گوشه‌های موقعیت‌یاب (finder patterns)
-    const fp=(x<7&&y<7)||(x>=n-7&&y<7)||(x<7&&y>=n-7);
-    let on;
-    if(fp){const lx=x<7?x:x-(n-7),ly=y<7?y:y-(n-7);on=(lx===0||lx===6||ly===0||ly===6||(lx>=2&&lx<=4&&ly>=2&&ly<=4));}
-    else{seed=(seed*1103515245+12345)&0x7fffffff;on=(seed/0x7fffffff)>0.5;}
-    if(on)rects+=`<rect x="${(x*cell).toFixed(1)}" y="${(y*cell).toFixed(1)}" width="${cell.toFixed(1)}" height="${cell.toFixed(1)}"/>`;
-  }
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="background:#fff;border-radius:8px"><g fill="#0f172a">${rects}</g></svg>`;
-}
-// ── رزرو مجدد (پیش‌پرکردن با همان رستوران) ──
-function repeatReservation(rid){
-  const r=R.find(x=>x.id===rid);
-  if(!r){toast('','رستوران پیدا نشد');return;}
-  go('rest');openRest(rid);
-  toast('','اطلاعات رزرو قبلی آماده‌ست — فقط زمان رو انتخاب کن');
-}
-// لغو رزرو (متصل به API اگر آنلاین)
-async function cancelTrip(code,btn){
-  const tripEl=btn.closest('.trip-card')||btn.closest('.trip');
-  // Undoِ امن: کارت فوراً کم‌رنگ می‌شود، ولی لغوِ واقعی ۵ ثانیه به تعویق می‌افتد.
-  if(tripEl)tripEl.style.opacity=.5;
-  undoSnack('رزرو لغو شد',
-    ()=>{ if(tripEl)tripEl.style.opacity=''; },   // Undo: هیچ APIای صدا زده نشده
-    async ()=>{                                    // Commit: حالا واقعاً لغو کن
-      if(isLoggedIn()){
-        const res=await API.post('/reservations/'+encodeURIComponent(code)+'/cancel',{});
-        if(res.ok)return;
-        if(!res.offline){ toast('',res.error?.message||'لغو ناموفق بود'); if(tripEl)tripEl.style.opacity=''; }
-      }
-    });
-}
-
-
-// ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
-window.addToCalendar = addToCalendar;
-window.addToWallet = addToWallet;
-window.showCheckInQR = showCheckInQR;
-window.repeatReservation = repeatReservation;
-window.cancelTrip = cancelTrip;
-
-
 /* ═══ js/features/food-dna.js ═══ */
 // ═══ رزرونو — DNA غذایی (Spotify Wrapped) (بخشی از اپ کاستومر) ═══
 //  DNA غذایی — تجربه‌ی Wrapped برای نسل‌Z (قلاب ویروسی رزرونو)
@@ -3266,43 +3693,55 @@ function computeFoodPersona(p){
   return {emoji:'🌱', name:'تازه‌کارِ مشتاق', desc:'سفر طعم تو تازه شروع شده — ادامه بده!'};
 }
 
-// درصد بهتر از بقیه (برای حس رقابت نسل‌Z)
+// نسخه‌ی نمایشیِ ثابت — فقط برایِ حالتِ دمو (وقتی داده‌ی واقعی نیست) استفاده
+// می‌شود، همیشه همراه با برچسبِ «نمونه». برایِ کاربرِ واقعی این تابع صدا زده
+// نمی‌شود — عددِ واقعی از GET /me/profile (visit_percentile) می‌آید که با
+// رتبه‌بندیِ واقعی در بینِ همه‌ی کاربران محاسبه شده (lib/guest-profile.ts).
 function dnaPercentile(visits){
   if(visits >= 30) return 95; if(visits >= 20) return 88;
   if(visits >= 12) return 76; if(visits >= 6) return 60; return 42;
 }
 async function openFoodDNA(){
   // بارگذاری داده‌ی واقعی، یا دمو
-  let p = null;
+  let p = null, visitPercentile = null;
   if(isLoggedIn()){
     const res = await API.get('/me/profile').catch(()=>null);
-    if(res?.ok && res.data?.profile) p = res.data.profile;
+    if(res?.ok && res.data?.profile){
+      p = res.data.profile;
+      // null یعنی جمعیتِ مقایسه هنوز کوچک است — عمداً نمایش داده نمی‌شود
+      visitPercentile = typeof res.data.visit_percentile==='number' ? res.data.visit_percentile : null;
+    }
   }
   if(!p){
-    // دموی جذاب — واضح که نمونه‌ست ولی تجربه‌ی کامل رو نشون می‌ده
+    // دموی جذاب — واضح که نمونه‌ست (هر اسلاید برچسبِ «نمونه» دارد) ولی تجربه‌ی کامل رو نشون می‌ده
     p = { globalVisits:47, restaurantsVisited:9, globalSpendToman:8600000, isVipAnywhere:true, _demo:true,
       restaurants:[{rfmSegment:'champions',totalVisits:18},{rfmSegment:'loyal',totalVisits:12}] };
+    visitPercentile = dnaPercentile(p.globalVisits);
   }
   _dnaData = p;
   _dnaSlide = 0;
-  buildDNASlides(p);
+  buildDNASlides(p, visitPercentile);
   document.getElementById('dnaOverlay').classList.add('open');
   // ساخت نوارهای پیشرفت (یکی برای هر اسلاید + اسلاید اشتراک)
   const nSlides = document.querySelectorAll('#dnaSlides .dna-slide').length;
   document.getElementById('dnaProgress').innerHTML = Array.from({length:nSlides},()=>'<div class="dna-progress-bar"><i></i></div>').join('');
   showDNASlide(0);
 }
-function buildDNASlides(p){
+function buildDNASlides(p, visitPercentile){
   const persona = computeFoodPersona(p);
-  const pct = dnaPercentile(p.globalVisits||0);
+  const pct = visitPercentile; // ممکن است null باشد (کاربرِ واقعی با جمعیتِ مقایسه‌ی هنوز کوچک)
   const spendM = Math.round((p.globalSpendToman||0)/1000000);
   const topSeg = p.restaurants?.[0]?.rfmSegment;
   const segFa = {champions:'قهرمان',loyal:'وفادار',promising:'امیدبخش',at_risk:'دلتنگ',new_customer:'تازه‌وارد'}[topSeg]||'ویژه';
+  // در حالتِ دمو، هر اسلایدِ حاویِ عددِ شخصی برچسبِ «نمونه» می‌گیرد — قبلاً
+  // فقط اسلایدِ شخصیت و کارتِ اشتراک‌گذاری این برچسب رو داشتن، بقیه‌ی
+  // اعدادِ ساختگی (بازدید/رستوران/هزینه) بی‌هیچ نشانه‌ای نشون داده می‌شدن.
+  const demoTag = p._demo ? ' (نمونه)' : '';
   const slides = [
     {kicker:'DNA غذایی تو آماده‌ست', emoji:'🧬', label:'بریم ببینیم امسال چطور گذشت', desc:'چند ثانیه وقت بذار — نتیجه‌اش ارزش داره'},
-    {kicker:'امسال رفتی بیرون', big:faNum(p.globalVisits||0), label:'بار غذا خوردی', desc:`این یعنی بیشتر از ${faNum(pct)}٪ آدمای دور و برت!`},
-    {kicker:'کاوش کردی', big:faNum(p.restaurantsVisited||0), label:'رستوران مختلف', desc:'هر کدوم یه تجربه‌ی جدید بود'},
-    ...(spendM>0?[{kicker:'روی خاطره‌ها سرمایه‌گذاری کردی', big:faNum(spendM)+'م', label:'تومان', desc:'ارزشش رو داشت، مگه نه؟'}]:[]),
+    {kicker:'امسال رفتی بیرون'+demoTag, big:faNum(p.globalVisits||0), label:'بار غذا خوردی', desc: pct!=null ? `این یعنی بیشتر از ${faNum(pct)}٪ آدمای دور و برت!` : 'به‌زودی با بقیه مقایسه‌ات می‌کنیم'},
+    {kicker:'کاوش کردی'+demoTag, big:faNum(p.restaurantsVisited||0), label:'رستوران مختلف', desc:'هر کدوم یه تجربه‌ی جدید بود'},
+    ...(spendM>0?[{kicker:'روی خاطره‌ها سرمایه‌گذاری کردی'+demoTag, big:faNum(spendM)+'م', label:'تومان', desc:'ارزشش رو داشت، مگه نه؟'}]:[]),
     {kicker:'و اما شخصیت غذایی تو', emoji:persona.emoji, label:persona.name, desc:persona.desc, persona:true},
   ];
   window._dnaSlides = slides;
@@ -3324,7 +3763,7 @@ function buildDNASlides(p){
         <div style="font-size:26px;font-weight:900;color:#fff;margin-bottom:16px;letter-spacing:-.03em">${_dnaPersona.emoji} ${esc(_dnaPersona.name)}</div>
         <div class="dna-share-row"><span class="dna-share-k">بار بیرون غذا خوردم</span><span class="dna-share-v">${faNum(p.globalVisits||0)}</span></div>
         <div class="dna-share-row"><span class="dna-share-k">رستوران کشف کردم</span><span class="dna-share-v">${faNum(p.restaurantsVisited||0)}</span></div>
-        <div class="dna-share-row"><span class="dna-share-k">بهتر از</span><span class="dna-share-v">${faNum(_dnaPct)}٪ مردم</span></div>
+        ${_dnaPct!=null?`<div class="dna-share-row"><span class="dna-share-k">بهتر از</span><span class="dna-share-v">${faNum(_dnaPct)}٪ مردم</span></div>`:''}
         <button class="dna-share-btn" onclick="shareFoodDNA()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
           اشتراک‌گذاری در استوری
@@ -3370,7 +3809,10 @@ function closeFoodDNA(){ clearTimeout(_dnaTimer); document.getElementById('dnaOv
 async function shareFoodDNA(){
   const p = _dnaData || {};
   const persona = window._dnaPersona || {name:'Foodie'};
-  const text = `DNA غذایی من تو رزرونو: ${persona.emoji} ${persona.name}\n${faNum(p.globalVisits||0)} بار بیرون غذا خوردم، بهتر از ${faNum(window._dnaPct||0)}٪ مردم! 🍽️`;
+  // اگر جمعیتِ مقایسه هنوز کوچک است (_dnaPct=null)، ادعای درصد کاملاً حذف
+  // می‌شود — نه یک ۰٪ گمراه‌کننده (یعنی «بدترینِ ممکن»، نه «هنوز نامعلوم»).
+  const pctPart = window._dnaPct!=null ? `، بهتر از ${faNum(window._dnaPct)}٪ مردم` : '';
+  const text = `DNA غذایی من تو رزرونو: ${persona.emoji} ${persona.name}\n${faNum(p.globalVisits||0)} بار بیرون غذا خوردم${pctPart}! 🍽️`;
   // Web Share API (موبایل) — اگر نبود، کپی در کلیپ‌بورد
   if(navigator.share){
     try{ await navigator.share({title:'DNA غذایی من', text}); return; }catch{}
@@ -3398,8 +3840,11 @@ function renderProfile(){
     return;
   }
   // کاربر وارد شده → اطلاعات واقعی
-  const tier = pts>=1000?'طلایی':pts>=300?'نقره‌ای':'برنزی';
-  const tierEmoji = icon('star',{size:13,fill:true});
+  // نکته: همین آستانه‌ها باید با LOYALTY_TIERS در api/src/lib/loyalty-status.ts
+  // هم‌تراز بمانند — قبلاً اینجا یک مقیاسِ ۳سطحیِ جداگانه (۳۰۰/۱۰۰۰) بود که
+  // با مقیاسِ ۴سطحیِ صفحه‌ی loyalty (۳۰۰/۸۰۰/۲۰۰۰) ناسازگار بود؛ یعنی یک
+  // کاربر با ۹۰۰ امتیاز اینجا «نقره‌ای» و در صفحه‌ی loyalty «طلایی» می‌دید.
+  const tier = pts>=2000?{name:'پلاتینیوم',emoji:'💎'}:pts>=800?{name:'طلایی',emoji:'🥇'}:pts>=300?{name:'نقره‌ای',emoji:'🥈'}:{name:'برنزی',emoji:'🥉'};
   document.getElementById('page-profile').innerHTML=`<div class="wrap section">
     <div class="prof-card">
       <div class="prof-card-mesh"></div>
@@ -3408,7 +3853,7 @@ function renderProfile(){
         <div class="prof-card-id">
           <div class="prof-card-name">${esc(userName())}</div>
           <div class="prof-card-phone">${faNum(USER.phone||'')}</div>
-          <span class="prof-tier">${tierEmoji} عضو ${tier}</span>
+          <span class="prof-tier">${tier.emoji} عضو ${tier.name}</span>
         </div>
       </div>
       <div class="prof-card-stats">
@@ -3651,6 +4096,653 @@ window.closeChatThread = closeChatThread;
 window.renderChats = renderChats;
 
 
+/* ═══ js/features/palette.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — Command Palette + جست‌وجوی سراسری (C6)
+//  الهام از Linear/Raycast/Notion. کاملاً client-side (روی R محلی) → demo-safe،
+//  بدونِ نیازِ بک‌اند. باز شدن: Ctrl/⌘+K یا دکمه‌ی جست‌وجوی نوار بالا یا openPalette().
+//  a11y: role=dialog/listbox/option، ناوبریِ کیبورد (بالا/پایین/Enter/Esc)، فوکوس.
+// ═══════════════════════════════════════════════════════════
+
+
+
+
+
+
+const RECENT_KEY = 'rz_recent_search';
+let _sel = 0, _items = [];
+
+// نرمال‌سازی برای typo-tolerance: یکدست‌کردنِ ی/ک عربی، حذفِ نیم‌فاصله/کشیده،
+// یکدست‌کردنِ فاصله‌ها و کوچک‌کردنِ لاتین. روی هر دو سمتِ جست‌وجو اعمال می‌شود.
+function norm(s){
+  return String(s||'')
+    .replace(/ي/g,'ی')   // ي → ی
+    .replace(/ك/g,'ک')   // ك → ک
+    .replace(/[‌‏‎ـ]/g,'') // ZWNJ/کشیده/نشانه‌های جهت
+    .replace(/\s+/g,' ')
+    .trim()
+    .toLowerCase();
+}
+function has(hay, needle){ return norm(hay).includes(norm(needle)); }
+
+function recents(){ try{ return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); }catch{ return []; } }
+function pushRecent(q){ try{ const r=recents().filter(x=>x!==q); r.unshift(q); localStorage.setItem(RECENT_KEY, JSON.stringify(r.slice(0,6))); }catch{} }
+
+// فرمان‌های ناوبریِ سریع
+const COMMANDS = [
+  { t:'کشف رستوران‌ها', ic:'search',   run:()=>go('discover') },
+  { t:'رزروهای من',      ic:'calendar', run:()=>go('trips') },
+  { t:'علاقه‌مندی‌ها',   ic:'heart',    run:()=>go('favorites') },
+  { t:'باشگاه امتیازها', ic:'crown',    run:()=>go('loyalty') },
+  { t:'پروفایل',         ic:'user',     run:()=>go('profile') },
+];
+
+function ensureEl(){
+  let ov = document.getElementById('cmdk');
+  if(ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'cmdk'; ov.className = 'cmdk-overlay'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','جست‌وجو و فرمان‌ها');
+  ov.innerHTML =
+    '<div class="cmdk" role="document">' +
+      '<div class="cmdk-row">' + icon('search',{size:18}) +
+        '<input class="cmdk-input" id="cmdkInput" type="text" autocomplete="off" placeholder="جست‌وجوی رستوران یا فرمان..." aria-label="جست‌وجو" aria-controls="cmdkList" role="combobox" aria-expanded="true">' +
+        '<kbd class="cmdk-esc">Esc</kbd>' +
+      '</div>' +
+      '<ul class="cmdk-list" id="cmdkList" role="listbox" aria-label="نتایج"></ul>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e=>{ if(e.target===ov) closePalette(); });
+  ov.querySelector('#cmdkInput').addEventListener('input', e=>render(e.target.value));
+  ov.querySelector('#cmdkInput').addEventListener('keydown', onKey);
+  return ov;
+}
+
+function itemHTML(it, i){
+  return `<li class="cmdk-item ${i===_sel?'sel':''}" role="option" id="cmdk-opt-${i}" aria-selected="${i===_sel}" data-i="${i}">`+
+    `<span class="cmdk-ic">${icon(it.ic||'search',{size:16})}</span>`+
+    `<span class="cmdk-t">${esc(it.t)}</span>`+
+    (it.sub?`<span class="cmdk-sub">${esc(it.sub)}</span>`:'')+
+  `</li>`;
+}
+
+function render(q){
+  q = (q||'').trim();
+  const list = document.getElementById('cmdkList');
+  _items = [];
+  if(!q){
+    recents().forEach(r=>_items.push({ t:r, ic:'clock', run:()=>{ const inp=document.getElementById('cmdkInput'); inp.value=r; render(r); } }));
+    COMMANDS.forEach(c=>_items.push(c));
+  } else {
+    // فرمان‌های ناوبری (typo-tolerant)
+    COMMANDS.filter(c=>has(c.t, q)).forEach(c=>_items.push(c));
+    // رستوران‌ها (نام/آشپزی/حال‌وهوا) — typo-tolerant
+    (Array.isArray(R)?R:[]).filter(r=>
+        has(r.n, q) || has(r.cuisine, q) || (Array.isArray(r.vibes)&&r.vibes.some(v=>has(v, q)))
+      ).slice(0,8).forEach(r=>_items.push({ t:r.n, sub:r.cuisine, ic:'utensils', run:()=>{ pushRecent(q); openRest(r.id); } }));
+    // رزروهای من (کد رزرو یا نامِ رستوران یا تاریخ) → صفحه‌ی سفرها
+    (Array.isArray(TRIPS)?TRIPS:[]).filter(t=>{
+        const r = (Array.isArray(R)?R:[]).find(x=>x.id===t.rid);
+        return has(t.code, q) || has(r&&r.n, q) || has(t.date, q);
+      }).slice(0,5).forEach(t=>{
+        const r = (Array.isArray(R)?R:[]).find(x=>x.id===t.rid);
+        _items.push({ t:`رزرو ${t.code}`, sub:(r&&r.n)||'رستوران', ic:'calendar', run:()=>{ pushRecent(q); go('trips'); } });
+      });
+  }
+  _sel = 0;
+  list.innerHTML = _items.length ? _items.map(itemHTML).join('') : '<li class="cmdk-empty">چیزی پیدا نشد</li>';
+  list.querySelectorAll('.cmdk-item').forEach(li=>{
+    li.addEventListener('click', ()=>runItem(+li.dataset.i));
+    li.addEventListener('mousemove', ()=>{ _sel=+li.dataset.i; paintSel(); });
+  });
+}
+
+function paintSel(){
+  const list = document.getElementById('cmdkList'); if(!list) return;
+  list.querySelectorAll('.cmdk-item').forEach((li,i)=>{ li.classList.toggle('sel', i===_sel); li.setAttribute('aria-selected', String(i===_sel)); });
+  const cur = list.querySelector('.cmdk-item.sel'); if(cur) cur.scrollIntoView({block:'nearest'});
+  const inp = document.getElementById('cmdkInput'); if(inp && list.querySelector('.cmdk-item.sel')) inp.setAttribute('aria-activedescendant','cmdk-opt-'+_sel);
+}
+
+function runItem(i){
+  const it = _items[i]; if(!it) return;
+  closePalette();
+  try{ it.run && it.run(); }catch(e){}
+}
+
+function onKey(e){
+  if(e.key==='ArrowDown'){ e.preventDefault(); _sel=Math.min(_sel+1,_items.length-1); paintSel(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); _sel=Math.max(_sel-1,0); paintSel(); }
+  else if(e.key==='Enter'){ e.preventDefault(); runItem(_sel); }
+  else if(e.key==='Escape'){ e.preventDefault(); closePalette(); }
+}
+function openPalette(){
+  const ov = ensureEl();
+  const wasOpen = ov.classList.contains('show');
+  ov.classList.add('show');
+  if(!wasOpen) lockAppSurfaces();
+  const inp = document.getElementById('cmdkInput');
+  if(inp){ inp.value=''; render(''); setTimeout(()=>inp.focus(),20); }
+}
+function closePalette(){
+  const ov = document.getElementById('cmdk');
+  const wasOpen = !!ov && ov.classList.contains('show');
+  if(ov) ov.classList.remove('show');
+  if(wasOpen) unlockAppSurfaces();
+}
+
+// باز شدن با Ctrl/⌘+K
+try{
+  addEventListener('keydown', e=>{
+    if((e.metaKey||e.ctrlKey) && (e.key==='k'||e.key==='K')){ e.preventDefault(); openPalette(); }
+  });
+}catch{}
+
+try{ window.openPalette = openPalette; window.closePalette = closePalette; }catch{}
+
+
+/* ═══ js/features/notifications.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — مرکزِ اعلان (Notification Center) — C7
+//  محتوا از دادهٔ واقعیِ کلاینت مشتق می‌شود (رزروهای پیش‌رو → یادآور؛
+//  بالاترین امتیاز → پیشنهاد) — بدونِ جعلِ اعلانِ marketing/system.
+//  ویژگی‌ها: دسته‌بندی/فیلتر، خوانده‌نشده/خوانده (localStorage)، اکشن،
+//  خواندن‌همه، badge شمارنده، حالتِ خالی. a11y: dialog/list، کیبورد، Esc.
+// ═══════════════════════════════════════════════════════════
+
+
+
+
+
+
+
+
+const READ_KEY = 'rz_notif_read';
+function readSet(){ try{ return new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')); }catch{ return new Set(); } }
+function saveRead(set){ try{ localStorage.setItem(READ_KEY, JSON.stringify([...set])); }catch{} }
+
+const CATS = { all:'همه', reservation:'رزرو', ai:'پیشنهاد' };
+let _filter = 'all';
+
+// منبعِ رزروها: در صورتِ ورودِ کاربر، رزروهای واقعیِ سرور (کش‌شده)؛ در غیرِ این‌صورت
+// دادهٔ نمونهٔ محلی (demo-safe). _live با refresh() از /me/reservations پر می‌شود.
+let _live = null; // null = هنوز از سرور خوانده نشده → fallback به TRIPS
+function tripsSource(){ return Array.isArray(_live) ? _live : (Array.isArray(TRIPS)?TRIPS:[]); }
+
+// خواندنِ رزروهای واقعی از سرور (همان endpointِ صفحهٔ سفرها) و به‌روزرسانیِ badge.
+// آفلاین/خطا/مهمان → _live دست‌نخورده و اعلان‌ها روی دادهٔ محلی می‌مانند (بدونِ جعل).
+async function refreshNotif(){
+  try{
+    if(!isLoggedIn()){ _live = null; updateNotifBadge(); return; }
+    const res = await API.get('/me/reservations');
+    if(res && res.ok && Array.isArray(res.data)) _live = res.data.map(mapApiTrip);
+  }catch(e){}
+  updateNotifBadge();
+  const ov = document.getElementById('notif');
+  if(ov && ov.classList.contains('show')) render();
+}
+
+// ساختِ اعلان‌ها از دادهٔ واقعیِ کلاینت
+function build(){
+  const out = [];
+  tripsSource().filter(t=>t.status==='up').forEach(t=>{
+    const r = (Array.isArray(R)?R:[]).find(x=>x.id===t.rid);
+    const name = (r&&r.n) || t._name || 'رستوران';
+    out.push({ id:'resv-'+t.code, cat:'reservation', pri:'high', ic:'calendar',
+      title:'یادآورِ رزرو', body:`${name} — ${t.date} ساعت ${t.time}`,
+      action:{ label:'مشاهده', run:()=>go('trips') } });
+  });
+  const top = (Array.isArray(R)?[...R]:[]).sort((a,b)=>(b.rt||0)-(a.rt||0))[0];
+  if(top) out.push({ id:'ai-'+top.id, cat:'ai', pri:'low', ic:'sparkle',
+    title:'پیشنهادِ هوشمند', body:`${top.n} با امتیاز ${top.rt} — شاید دوستش داشته باشی`,
+    action:{ label:'ببین', run:()=>openRest(top.id) } });
+  return out;
+}
+function notifUnreadCount(){ const read=readSet(); return build().filter(n=>!read.has(n.id)).length; }
+function updateNotifBadge(){
+  const b = document.getElementById('notifBadge'); if(!b) return;
+  const n = notifUnreadCount();
+  b.textContent = n>9 ? '۹+' : (n?faNum(n):'');
+  b.style.display = n ? '' : 'none';
+}
+// faNum از auth.js (منبعِ واحد) import می‌شود — نسخه‌ی محلیِ تکراری حذف شد.
+
+function ensureEl(){
+  let ov = document.getElementById('notif'); if(ov) return ov;
+  ov = document.createElement('div');
+  ov.id='notif'; ov.className='notif-overlay'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','اعلان‌ها');
+  ov.innerHTML =
+    '<div class="notif-panel" role="document">' +
+      '<div class="notif-head"><b>اعلان‌ها</b>' +
+        '<button class="notif-readall" type="button" id="notifReadAll">خواندنِ همه</button>' +
+        '<button class="notif-close" type="button" id="notifClose" aria-label="بستن">×</button></div>' +
+      '<div class="notif-tabs" id="notifTabs" role="tablist"></div>' +
+      '<div class="notif-list" id="notifList"></div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e=>{ if(e.target===ov) closeNotif(); });
+  ov.querySelector('#notifClose').addEventListener('click', closeNotif);
+  ov.querySelector('#notifReadAll').addEventListener('click', ()=>{
+    const set=readSet(); build().forEach(n=>set.add(n.id)); saveRead(set); render(); updateNotifBadge();
+  });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && ov.classList.contains('show')) closeNotif(); });
+  return ov;
+}
+
+function render(){
+  const tabs = document.getElementById('notifTabs');
+  tabs.innerHTML = Object.entries(CATS).map(([k,v])=>`<button class="notif-tab ${k===_filter?'on':''}" role="tab" aria-selected="${k===_filter}" data-k="${k}">${v}</button>`).join('');
+  tabs.querySelectorAll('.notif-tab').forEach(b=>b.addEventListener('click', ()=>{ _filter=b.dataset.k; render(); }));
+
+  const read = readSet();
+  const items = build().filter(n=>_filter==='all' || n.cat===_filter);
+  const list = document.getElementById('notifList');
+  if(!items.length){
+    list.innerHTML = `<div class="notif-empty"><div class="notif-empty-ic">${icon('bell',{size:36})}</div><div>اعلانی نداری</div></div>`;
+    return;
+  }
+  list.innerHTML = items.map(n=>{
+    const unread = !read.has(n.id);
+    return `<div class="notif-item ${unread?'unread':''} pri-${n.pri}" data-id="${esc(n.id)}">`+
+      `<span class="notif-ic">${icon(n.ic,{size:18})}</span>`+
+      `<div class="notif-body"><div class="notif-title">${esc(n.title)}${unread?'<span class="notif-dot" aria-label="خوانده‌نشده"></span>':''}</div>`+
+      `<div class="notif-text">${esc(n.body)}</div></div>`+
+      `<button class="notif-act" type="button" data-act="${esc(n.id)}">${esc(n.action.label)}</button>`+
+    `</div>`;
+  }).join('');
+  list.querySelectorAll('.notif-act').forEach(btn=>btn.addEventListener('click', ()=>{
+    const id=btn.dataset.act; const n=build().find(x=>x.id===id);
+    const set=readSet(); set.add(id); saveRead(set); updateNotifBadge();
+    closeNotif(); try{ n&&n.action.run(); }catch(e){}
+  }));
+}
+function openNotif(){
+  const ov=ensureEl();
+  const wasOpen = ov.classList.contains('show');
+  render();
+  ov.classList.add('show');
+  if(!wasOpen) lockAppSurfaces();
+  refreshNotif();
+}
+function closeNotif(){
+  const ov=document.getElementById('notif');
+  const wasOpen = !!ov && ov.classList.contains('show');
+  if(ov) ov.classList.remove('show');
+  if(wasOpen) unlockAppSurfaces();
+}
+
+// badge اولیه بعد از آماده‌شدنِ DOM؛ سپس تلاش برای خواندنِ رزروهای واقعی (اگر کاربر وارد شده)
+try{
+  const boot = ()=>{ setTimeout(updateNotifBadge,0); setTimeout(refreshNotif,600); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+}catch{}
+
+try{ window.openNotif = openNotif; window.closeNotif = closeNotif; window.refreshNotif = refreshNotif; }catch{}
+
+
+/* ═══ js/features/a11y.js ═══ */
+(function(){
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — بهبودهای دسترس‌پذیری (WCAG 2.2 AA) — C11
+//  divهای کلیک‌پذیر (کارت‌های مناسبت، ناحیه‌های تپِ Food-DNA) با کیبورد
+//  عملیاتی می‌شوند: role=button + tabindex + Enter/Space → click.
+//  حلقه‌ی فوکوسِ عمومی در app.css تعریف شده (:focus-visible).
+// ═══════════════════════════════════════════════════════════
+function upgrade(){
+  try{
+    document.querySelectorAll('.occ-card').forEach(el=>{
+      if(!el.hasAttribute('role')){ el.setAttribute('role','button'); el.setAttribute('tabindex','0'); }
+    });
+    const taps = document.querySelectorAll('.dna-tap > div');
+    if(taps[0]){ taps[0].setAttribute('role','button'); taps[0].setAttribute('tabindex','0'); taps[0].setAttribute('aria-label','اسلاید قبلی'); }
+    if(taps[1]){ taps[1].setAttribute('role','button'); taps[1].setAttribute('tabindex','0'); taps[1].setAttribute('aria-label','اسلاید بعدی'); }
+  }catch(e){}
+}
+
+// Enter/Space روی هر عنصرِ role=button+tabindex → click (معادلِ رفتارِ دکمه)
+try{
+  document.addEventListener('keydown', e=>{
+    if(e.key!=='Enter' && e.key!==' ') return;
+    const t = e.target;
+    if(t && t.matches && t.matches('[role="button"][tabindex]') && !(t.closest && t.closest('input,textarea,select'))){
+      e.preventDefault();
+      if(typeof t.click==='function') t.click();
+    }
+  });
+}catch(e){}
+
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', upgrade);
+else setTimeout(upgrade, 0);
+
+})();
+
+/* ═══ js/features/onboarding.js ═══ */
+(function(){
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — Onboarding Wizard (بارِ اول) — C9
+//  چند اسلایدِ مینیمالِ معرفی؛ فقط یک‌بار (localStorage rz_onboarded).
+//  demo-safe و client-side. a11y: dialog، فوکوس، Enter=بعدی، Esc=رد شدن،
+//  reduced-motion. تست‌های e2e با ست‌کردنِ rz_onboarded این را رد می‌کنند.
+// ═══════════════════════════════════════════════════════════
+
+const KEY = 'rz_onboarded';
+const SLIDES = [
+  { emoji:'🍽️', title:'بهترین رستوران‌های شهر', text:'کشف کن، ببین کجا شلوغه و چی محبوبه — با پیشنهادِ هوشمند بر اساس سلیقه‌ات.' },
+  { emoji:'⚡', title:'رزرو، ساده مثل پیام دادن', text:'میز رزرو کن در چند ثانیه — بدون تماس، بدون معطلی.' },
+  { emoji:'🎁', title:'امتیاز بگیر، کش‌بک ببر', text:'با هر رزرو امتیاز جمع کن و از باشگاهِ مشتریان کش‌بک بگیر.' },
+];
+let _i = 0;
+
+function done(){
+  try{ localStorage.setItem(KEY, '1'); }catch(e){}
+  const ov = document.getElementById('onb');
+  const wasOpen = !!ov && ov.classList.contains('show');
+  if(ov) ov.classList.remove('show');
+  if(wasOpen) unlockAppSurfaces();
+}
+
+function paint(){
+  const s = SLIDES[_i];
+  const ov = document.getElementById('onb'); if(!ov) return;
+  ov.querySelector('.onb-emoji').textContent = s.emoji;
+  ov.querySelector('.onb-title').textContent = s.title;
+  ov.querySelector('.onb-text').textContent = s.text;
+  ov.querySelectorAll('.onb-dot').forEach((d,i)=>d.classList.toggle('on', i===_i));
+  ov.querySelector('.onb-next').textContent = _i===SLIDES.length-1 ? 'شروع کنیم' : 'بعدی';
+}
+
+function next(){ if(_i < SLIDES.length-1){ _i++; paint(); } else done(); }
+
+function show(){
+  let ov = document.getElementById('onb');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id='onb'; ov.className='onb-overlay'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','معرفیِ رزرونو');
+    ov.innerHTML =
+      '<div class="onb-card" role="document">' +
+        '<button class="onb-skip" type="button">رد شدن</button>' +
+        '<div class="onb-emoji" aria-hidden="true"></div>' +
+        '<div class="onb-title"></div>' +
+        '<div class="onb-text"></div>' +
+        '<div class="onb-dots" aria-hidden="true">' + SLIDES.map(()=> '<span class="onb-dot"></span>').join('') + '</div>' +
+        '<button class="onb-next btn btn-primary btn-lg btn-block" type="button">بعدی</button>' +
+      '</div>';
+    document.body.appendChild(ov);
+    ov.querySelector('.onb-skip').addEventListener('click', done);
+    ov.querySelector('.onb-next').addEventListener('click', next);
+    ov.addEventListener('keydown', e=>{
+      if(e.key==='Escape'){ e.preventDefault(); done(); }
+      else if(e.key==='Enter'){ e.preventDefault(); next(); }
+    });
+  }
+  _i = 0; paint();
+  const wasOpen = ov.classList.contains('show');
+  ov.classList.add('show');
+  if(!wasOpen) lockAppSurfaces();
+  setTimeout(()=>{ const b=ov.querySelector('.onb-next'); if(b) try{b.focus()}catch(e){} }, 40);
+}
+
+function maybeShow(){
+  try{ if(localStorage.getItem(KEY)) return; }catch(e){ return; }
+  setTimeout(show, 500); // بعد از رندرِ اولیه‌ی اپ
+}
+
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', maybeShow);
+else setTimeout(maybeShow, 0);
+
+// برای دیدنِ دوباره (اختیاری)
+try{ window.showOnboarding = show; }catch(e){}
+
+})();
+
+/* ═══ js/features/pull-refresh.js ═══ */
+(function(){
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — Pull-to-Refresh روی فیدِ کشف (C15)
+//  ژستِ لمسیِ «کشیدن رو-به-پایین برای تازه‌سازی»، فقط وقتی:
+//    • صفحه‌ی «کشف» فعال است، و
+//    • اسکرولِ صفحه در بالاست (window.scrollY <= 0).
+//
+//  ایمنی (تا اسکرولِ عمودی و تستِ e2e نشکند):
+//   • listenerِ touchmove فقط «حین» یک کشیدنِ فعال اضافه و در پایان حذف می‌شود
+//     (هیچ non-passive touchmoveِ سراسری روی کلِ اسکرول نمی‌ماند).
+//   • preventDefault فقط وقتی واقعاً در حالِ کشیدنِ رو-به-پایین در بالای صفحه‌ایم.
+//   • تازه‌سازی = رندرِ دوباره‌ی همان داده (renderDiscoverSections + renderFeed) —
+//     بدونِ داده‌ی جعلی؛ صرفاً view را نو می‌کند. demo-safe و client-side.
+//   • احترام به prefers-reduced-motion (بدونِ انیمیشنِ ترنسفورم).
+// ═══════════════════════════════════════════════════════════
+
+
+const THRESHOLD = 64;   // px کشیدن برای فعال‌شدنِ تازه‌سازی
+const MAX_PULL  = 96;   // سقفِ جابه‌جاییِ اندیکاتور
+const RESIST    = 0.45; // مقاومت (کشش نرم‌تر از حرکتِ انگشت)
+
+let _startY = 0, _pulling = false, _armed = false, _busy = false;
+
+function reduced(){ try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch{ return false; } }
+function discoverActive(){ const p = document.getElementById('page-discover'); return !!(p && p.classList.contains('active')); }
+function atTop(){ return (window.scrollY || document.documentElement.scrollTop || 0) <= 0; }
+
+function el(){
+  let e = document.getElementById('ptr');
+  if(e) return e;
+  e = document.createElement('div');
+  e.id = 'ptr'; e.className = 'ptr'; e.setAttribute('aria-hidden','true');
+  e.innerHTML = '<div class="ptr-spin"></div>';
+  document.body.appendChild(e);
+  return e;
+}
+
+function setPull(px){
+  const e = el();
+  const clamped = Math.min(px, MAX_PULL);
+  if(reduced()){ e.style.transform = ''; e.classList.toggle('show', clamped > 8); }
+  else { e.style.transform = `translateX(-50%) translateY(${clamped}px)`; e.classList.toggle('show', clamped > 4); }
+  e.classList.toggle('ready', px >= THRESHOLD);
+}
+
+async function doRefresh(){
+  if(_busy) return;
+  _busy = true;
+  const e = el();
+  e.classList.add('spinning', 'show');
+  if(!reduced()) e.style.transform = `translateX(-50%) translateY(${THRESHOLD}px)`;
+  try{
+    renderDiscoverSections();
+    renderFeed(Array.isArray(R) ? R : []);
+  }catch(err){}
+  // نمایشِ کوتاهِ اسپینر (بازخوردِ ملموس) سپس جمع‌شدن
+  setTimeout(()=>{
+    e.classList.remove('spinning', 'ready', 'show');
+    e.style.transform = '';
+    _busy = false;
+  }, 520);
+}
+
+function onMove(e){
+  if(!_pulling){ return; }
+  const y = e.touches && e.touches[0] ? e.touches[0].clientY : 0;
+  const dy = y - _startY;
+  if(dy <= 0 || !atTop()){ // کاربر بالا می‌رود یا دیگر در بالا نیست → لغو
+    _armed = false; setPull(0); return;
+  }
+  _armed = true;
+  // فقط وقتی واقعاً می‌کشیم، از bounce/اسکرولِ منفی جلوگیری کن
+  if(e.cancelable) e.preventDefault();
+  setPull(dy * RESIST);
+}
+
+function endPull(){
+  document.removeEventListener('touchmove', onMove, { passive: false });
+  const wasArmed = _armed;
+  const pulled = wasArmed && parseFloat((el().style.transform.match(/translateY\(([-\d.]+)px\)/)||[])[1] || '0');
+  _pulling = false; _armed = false;
+  if(wasArmed && pulled >= THRESHOLD){ doRefresh(); }
+  else { const e = el(); e.classList.remove('ready','show'); e.style.transform = ''; }
+}
+
+function onStart(e){
+  if(_busy || _pulling) return;
+  if(!discoverActive() || !atTop()) return;
+  if(!(e.touches && e.touches.length === 1)) return;
+  _startY = e.touches[0].clientY;
+  _pulling = true; _armed = false;
+  // touchmove را فقط حالا (حینِ کشیدنِ کاندید) اضافه کن؛ در پایان حذف می‌شود.
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('touchend', endPull, { once: true });
+  document.addEventListener('touchcancel', endPull, { once: true });
+}
+
+try{
+  document.addEventListener('touchstart', onStart, { passive: true });
+}catch(e){}
+
+})();
+
+/* ═══ js/features/swipe-actions.js ═══ */
+(function(){
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — Swipe-actions روی کارت‌های رزرو (C16)
+//  کشیدنِ افقیِ لمسیِ یک کارتِ رزرو (.trip-card.has-swipe) لایه‌ی اکشن را نمایان
+//  می‌کند و در عبور از آستانه، «همان دکمه‌ی سیم‌کشی‌شده» ([data-swipe-action]) را
+//  کلیک می‌کند (لغو رزرو / رزرو مجدد) — پس هیچ منطقِ جدید/تکراری نمی‌سازد و
+//  رفتار (از جمله Undoِ لغو) دقیقاً همان دکمه است. demo-safe و client-side.
+//
+//  ایمنی (تا اسکرولِ عمودی و e2e نشکند):
+//   • تشخیصِ افقی-در-برابر-عمودی: اگر حرکت عمودی غالب شود، ژست لغو و اسکرول آزاد است.
+//   • listenerِ touchmove فقط «حین» یک کشیدنِ کاندید اضافه و در پایان حذف می‌شود.
+//   • preventDefault فقط پس از قطعی‌شدنِ کشیدنِ افقی.
+//   • احترام به prefers-reduced-motion.
+// ═══════════════════════════════════════════════════════════
+
+const THRESHOLD = 88;   // px برای فعال‌شدنِ اکشن
+const MAX       = 120;  // سقفِ جابه‌جایی
+const DECIDE    = 8;    // px برای تصمیمِ جهت
+
+let _card = null, _inner = null, _btn = null;
+let _x0 = 0, _y0 = 0, _dir = 0; // 0=نامشخص، 1=افقی، -1=عمودی(لغو)
+let _dx = 0, _busy = false;
+
+function reduced(){ try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch{ return false; } }
+
+function reset(animate){
+  if(_inner){
+    if(reduced() || !animate){ _inner.style.transition='none'; }
+    else { _inner.style.transition=''; }
+    _inner.style.transform='';
+  }
+  if(_card) _card.classList.remove('swiping','ready');
+  _card=_inner=_btn=null; _dir=0; _dx=0;
+}
+
+function onMove(e){
+  if(!_card) return;
+  const tp = e.touches && e.touches[0]; if(!tp) return;
+  const dx = tp.clientX - _x0;
+  const dy = tp.clientY - _y0;
+  if(_dir===0){
+    if(Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > DECIDE){ // عمودی → بی‌خیالِ ژست، اسکرول آزاد
+      document.removeEventListener('touchmove', onMove, { passive:false });
+      reset(false); return;
+    }
+    if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > DECIDE){ _dir=1; _card.classList.add('swiping'); }
+    else return;
+  }
+  if(_dir!==1) return;
+  if(e.cancelable) e.preventDefault();
+  _dx = Math.max(-MAX, Math.min(MAX, dx));
+  _inner.style.transform = `translateX(${_dx}px)`;
+  _card.classList.toggle('ready', Math.abs(_dx) >= THRESHOLD);
+}
+
+function onEnd(){
+  document.removeEventListener('touchmove', onMove, { passive:false });
+  if(!_card){ return; }
+  const fire = _dir===1 && Math.abs(_dx) >= THRESHOLD && _btn;
+  const btn = _btn, card = _card, inner = _inner;
+  if(fire){
+    // انیمیشنِ کوتاهِ خروج، سپس کلیکِ همان دکمه‌ی موجود
+    if(!reduced()){ inner.style.transition=''; inner.style.transform = `translateX(${_dx>0?MAX:-MAX}px)`; }
+    _card=_inner=_btn=null; _dir=0; _dx=0;
+    setTimeout(()=>{
+      try{ if(btn && typeof btn.click==='function') btn.click(); }catch(e){}
+      // اگر کارت هنوز هست (اکشنی که DOM را عوض نکرد)، برگردان
+      try{ if(inner && inner.isConnected){ inner.style.transition=''; inner.style.transform=''; card.classList.remove('swiping','ready'); } }catch(e){}
+    }, reduced()?0:160);
+  } else {
+    reset(true);
+  }
+}
+
+function onStart(e){
+  if(_busy || _card) return;
+  const tp = e.touches && e.touches[0]; if(!tp || e.touches.length!==1) return;
+  const card = e.target && e.target.closest && e.target.closest('.trip-card.has-swipe');
+  if(!card) return;
+  const inner = card.querySelector('.trip-card-inner');
+  const btn = card.querySelector('[data-swipe-action]');
+  if(!inner || !btn) return;
+  // اگر روی خودِ دکمه‌ها شروع شد، بگذار کلیکِ عادی کار کند (ژست را شروع نکن)
+  if(e.target.closest && e.target.closest('.trip-card-actions')) return;
+  _card=card; _inner=inner; _btn=btn; _x0=tp.clientX; _y0=tp.clientY; _dir=0; _dx=0;
+  document.addEventListener('touchmove', onMove, { passive:false });
+  document.addEventListener('touchend', onEnd, { once:true });
+  document.addEventListener('touchcancel', onEnd, { once:true });
+}
+
+try{ document.addEventListener('touchstart', onStart, { passive:true }); }catch(e){}
+
+})();
+
+/* ═══ js/features/live-strip.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — نوارِ زنده‌ی فیدِ کشف (live-strip) — با دادهٔ واقعی
+//  منبع: GET /api/v1/restaurants/live-stats (شمارشِ واقعی از دیتابیس).
+//  اصلِ «بدونِ دادهٔ جعلی»: پیش از این نوار اعداد hard-codedِ ساختگی داشت
+//  («۱۲ رستوران در حال پر شدن»، «کش‌بک ۷٪»...). حالا:
+//    • اگر endpoint در دسترس باشد → pillها از اعدادِ واقعیِ سرور ساخته می‌شوند
+//      (فقط مقادیرِ غیرِصفر نمایش داده می‌شوند).
+//    • اگر نباشد (دمو/آفلاین) → fallbackِ صادقانه از حالتِ واقعیِ کلاینت:
+//      تعدادِ رستوران‌های بارگذاری‌شده (همان منطقِ C4). هیچ عددِ ثابتِ ساختگی نه.
+// ═══════════════════════════════════════════════════════════
+
+
+
+function pill(inner){ return `<div class="live-pill">${inner}</div>`; }
+async function refreshLiveStrip(){
+  const el = document.getElementById('liveStrip');
+  if(!el) return;
+  let out = '';
+  try{
+    const res = await API.get('/restaurants/live-stats');
+    if(res && res.ok && res.data){
+      const d = res.data;
+      if(Number(d.fillingUp) > 0)
+        out += pill(`<span class="live-dot-sm"></span><b>${fmtFa(d.fillingUp)} رستوران</b> الان در حال پر شدن`);
+      if(Number(d.openRestaurants) > 0)
+        out += pill(`<b>${fmtFa(d.openRestaurants)} رستوران</b> باز و آنلاین`);
+      if(Number(d.activeReservations) > 0)
+        out += pill(`🔥 <b>${fmtFa(d.activeReservations)} رزرو</b> فعالِ امروز`);
+    }
+  }catch(e){}
+  if(!out){
+    // fallbackِ صادقانه: تعدادِ واقعیِ رستوران‌های بارگذاری‌شده در کلاینت (نه عددِ ثابت)
+    const n = Array.isArray(R) ? R.length : 0;
+    if(n > 0) out = pill(`<b>${fmtFa(n)} رستوران</b> فعال`);
+  }
+  el.innerHTML = out; // اگر چیزی نبود → نوارِ خالی (حالتِ خالیِ صادقانه)
+}
+
+// بعد از رندرِ اولیه‌ی اپ یک بار به‌روزرسانی کن
+try{
+  const boot = ()=> setTimeout(refreshLiveStrip, 400);
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+}catch(e){}
+
+try{ window.refreshLiveStrip = refreshLiveStrip; }catch(e){}
+
+
 /* ═══ js/user-profile.js ═══ */
 // ═══════════════════════════════════════════════════════════
 //  رزرونو — پروفایل + DNA غذایی (Spotify-Wrapped)
@@ -3721,6 +4813,340 @@ window.openNotifPrefs = openNotifPrefs;
 window.requestNotifPerm = requestNotifPerm;
 
 
+/* ═══ js/auth.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — ورود با کد یکبارمصرف (OTP)
+//  بخشی از اپ کاستومر (Vanilla JS، بدون build). scope سراسری مشترک.
+//  ترتیبِ لود در index.html مهم است (این فایل به توابع/state قبلی وابسته است).
+// ═══════════════════════════════════════════════════════════
+let _loginPhone = '';
+let _appSurfaceLockCount = 0;
+function setAppSurfacesLocked(locked){
+  const nodes = document.querySelectorAll('.nav, #app-main, .botnav');
+  nodes.forEach(node=>{
+    node.setAttribute('aria-hidden', locked ? 'true' : 'false');
+    if ('inert' in node) node.inert = locked;
+  });
+}
+function lockAppSurfaces(){
+  _appSurfaceLockCount += 1;
+  if (_appSurfaceLockCount === 1) setAppSurfacesLocked(true);
+}
+function unlockAppSurfaces(){
+  if (_appSurfaceLockCount > 0) _appSurfaceLockCount -= 1;
+  if (_appSurfaceLockCount === 0) setAppSurfacesLocked(false);
+}
+// ادامه‌ی جریانِ ناتمام بعد از ورود (مثلاً رزروِ نیمه‌کاره) — one-shot با انقضای ۱۰ دقیقه
+let _afterLogin = null;
+function setAfterLogin(fn){ _afterLogin = fn ? { fn, at: Date.now() } : null; }
+function openLogin(){
+  _loginPhone = '';
+  openSheet(`
+    <div class="login-icon">${icon('lock',{size:36})}</div>
+    <div style="text-align:center;margin-bottom:6px"><div class="sheet-title" style="font-size:20px;font-weight:800">ورود به رزرونو</div></div>
+    <div style="text-align:center;color:var(--t2);font-size:14px;margin-bottom:22px">شماره موبایلت رو وارد کن تا کد ورود برات بفرستیم</div>
+    <div class="field-label">شماره موبایل</div>
+    <input class="otp-input" id="loginPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹" style="font-size:18px;letter-spacing:.1em">
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="sendOtp()">ارسال کد ورود</button>
+    <div style="text-align:center;font-size:11.5px;color:var(--t3);margin-top:14px;line-height:1.6">با ورود، <span style="color:var(--t2)">قوانین و حریم خصوصی</span> رزرونو رو می‌پذیری</div>
+  `);
+  setTimeout(()=>document.getElementById('loginPhone')?.focus(),200);
+}
+async function sendOtp(){
+  const phoneEl = document.getElementById('loginPhone');
+  const phone = (phoneEl?.value||'').trim();
+  // اعتبارسنجی سمت کلاینت
+  const normalized = phone.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'');
+  if (!/^09\d{9}$/.test(normalized)) { toast('','شماره موبایل معتبر وارد کن (مثل ۰۹۱۲۳۴۵۶۷۸۹)'); return; }
+  _loginPhone = normalized;
+  const btn = phoneEl.nextElementSibling;
+  if (btn) { btn.disabled = true; btn.textContent = 'در حال ارسال...'; }
+
+  if (location.protocol === 'file:') {
+    showOtpStep('۱۲۳۴', true);
+    return;
+  }
+
+  const res = await API.requestOtp(normalized);
+  if (!res.ok && !res.offline) {
+    // خطای واقعی از سرور (مثلاً ریت‌لیمیت)
+    toast('', res.error?.message || 'خطا در ارسال کد');
+    if (btn) { btn.disabled = false; btn.textContent = 'ارسال کد ورود'; }
+    return;
+  }
+  // اگر بک‌اند نبود (آفلاین) → حالت دمو با کد ثابت، تا فلوی ورود قابل‌تست باشد
+  const devCode = res.data?.devCode || (res.offline ? '۱۲۳۴' : null);
+  showOtpStep(devCode, res.offline);
+}
+function showOtpStep(devCode, offline){
+  openSheet(`
+    <div class="login-icon">${icon('mail',{size:36})}</div>
+    <div style="text-align:center;margin-bottom:6px"><div class="sheet-title" style="font-size:20px;font-weight:800">کد ورود رو وارد کن</div></div>
+    <div style="text-align:center;color:var(--t2);font-size:14px;margin-bottom:22px">کد ورود به شماره‌ی ${faNum(_loginPhone)} ارسال شد</div>
+    <div class="field-label">کد ورود</div>
+    <input class="otp-input" id="otpCode" inputmode="numeric" maxlength="6" placeholder="······" onkeydown="if(event.key==='Enter')confirmOtp()">
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="confirmOtp()">تأیید و ورود</button>
+    <div class="resend">کد نیومد؟ <button onclick="openLogin()">تغییر شماره</button></div>
+    ${devCode ? `<div class="dev-hint">${offline?'حالت دمو (بک‌اند متصل نیست):':'حالت توسعه:'} کد ورود <b>${faNum(devCode)}</b> است</div>` : ''}
+  `);
+  setTimeout(()=>document.getElementById('otpCode')?.focus(),200);
+}
+async function confirmOtp(){
+  const codeEl = document.getElementById('otpCode');
+  const code = (codeEl?.value||'').trim().replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  if (!/^\d{4,6}$/.test(code)) { toast('','کد ورود رو کامل وارد کن'); return; }
+  const btn = codeEl.nextElementSibling;
+  if (btn) { btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+
+  if (location.protocol === 'file:') {
+    if (code === '1234') {
+      setUSER({ phone: _loginPhone });
+      showRegisterStep(true);
+    } else {
+      toast('','در حالت دمو، کد ۱۲۳۴ است');
+      if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
+    }
+    return;
+  }
+
+  const res = await API.verifyOtp(_loginPhone, code);
+  if (res.ok && res.data?.user) {
+    // ورود واقعی موفق
+    setUSER(res.data.user);
+    // کاربر جدید (هنوز نام ثبت نکرده) → فرم ثبت‌نام
+    if (res.data.is_new || !USER.firstName) {
+      showRegisterStep();
+    } else {
+      finishLogin();
+    }
+  } else if (res.offline) {
+    // حالت دمو: کد ۱۲۳۴ بپذیر تا فلو قابل‌تست باشد
+    if (code === '1234') {
+      // در دمو، کاربر را جدید فرض کن تا فرم ثبت‌نام هم قابل‌تست باشد
+      setUSER({ phone: _loginPhone });
+      showRegisterStep(true);
+    } else {
+      toast('','در حالت دمو، کد ۱۲۳۴ است');
+      if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
+    }
+  } else {
+    // کد اشتباه از سرور
+    toast('', res.error?.message || 'کد اشتباه است');
+    if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
+  }
+}
+// مرحله‌ی ثبت‌نام: گرفتن نام برای کاربر جدید
+function showRegisterStep(demo){
+  openSheet(`
+    <div class="login-icon">${icon('checkCircle',{size:36})}</div>
+    <div style="text-align:center;margin-bottom:6px"><div class="sheet-title" style="font-size:20px;font-weight:800">به رزرونو خوش اومدی!</div></div>
+    <div style="text-align:center;color:var(--t2);font-size:14px;margin-bottom:22px">برای تکمیل ثبت‌نام، اسمت رو بهمون بگو</div>
+    <div class="field-label">نام</div>
+    <input class="otp-input" id="regFirst" style="font-size:16px;letter-spacing:0;text-align:right" placeholder="مثلاً سارا" autocomplete="given-name">
+    <div class="field-label" style="margin-top:14px">نام خانوادگی <span style="color:var(--t3);font-weight:400">(اختیاری)</span></div>
+    <input class="otp-input" id="regLast" style="font-size:16px;letter-spacing:0;text-align:right" placeholder="مثلاً محمدی" autocomplete="family-name" onkeydown="if(event.key==='Enter')completeRegister(${demo?'true':'false'})">
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="completeRegister(${demo?'true':'false'})">تکمیل ثبت‌نام</button>
+  `);
+  setTimeout(()=>document.getElementById('regFirst')?.focus(),200);
+}
+async function completeRegister(demo){
+  const first = (document.getElementById('regFirst')?.value||'').trim();
+  const last = (document.getElementById('regLast')?.value||'').trim();
+  if (!first) { toast('⚠️','اسمت رو وارد کن'); return; }
+  const btn = document.querySelector('#sheetBody .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'در حال ثبت...'; }
+
+  if (!demo) {
+    const res = await API.updateProfile({ first_name: first, last_name: last });
+    if (res.ok && res.data?.user) {
+      setUSER(res.data.user);
+    } else if (!res.offline) {
+      toast('⚠️', res.error?.message || 'ثبت‌نام ناموفق بود');
+      if (btn) { btn.disabled = false; btn.textContent = 'تکمیل ثبت‌نام'; }
+      return;
+    } else {
+      // آفلاین → محلی نگه دار
+      setUSER({ ...USER, firstName: first, lastName: last });
+    }
+  } else {
+    setUSER({ ...USER, firstName: first, lastName: last });
+  }
+  finishLogin();
+}
+function finishLogin(demo){
+  closeSheet();
+  refreshAuthUI();
+  toast('✅', `خوش اومدی ${USER.firstName||''}!`);
+  // اگر در صفحه‌ی پروفایل بود، تازه‌سازی کن
+  if (document.getElementById('page-profile')?.classList.contains('active')) renderProfile();
+  // جریانِ ناتمام (مثلاً رزروِ نیمه‌کاره) را ادامه بده
+  const cont = _afterLogin; _afterLogin = null;
+  if (cont && Date.now() - cont.at < 10*60*1000) {
+    setTimeout(()=>{ try{ cont.fn(); }catch(e){} }, 450);
+  }
+}
+// تبدیل ارقام انگلیسی به فارسی برای نمایش
+function faNum(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
+// امنیت: escape کردن ورودی کاربر قبل از تزریق به HTML (جلوگیری از XSS)
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// تبدیل تاریخ/ساعت فارسی (امروز/فردا/...، ۱۹:۰۰) به فرمت ISO که بک‌اند می‌خواهد
+// بک‌اند انتظار date='YYYY-MM-DD' و time='HH:MM' (ارقام انگلیسی) دارد.
+function toApiDateTime(faDate, faTime){
+  // ساعت: ارقام فارسی → انگلیسی
+  const time = String(faTime||'').replace(/[۰-۹]/g, d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).trim();
+  // تاریخ: کلمه‌ی نسبی → تاریخ واقعی
+  const now = new Date();
+  let target = new Date(now);
+  const d = String(faDate||'').trim();
+  if (d === 'فردا') target.setDate(now.getDate()+1);
+  else if (d === 'امروز') { /* همین امروز */ }
+  else {
+    // نام روز هفته (پنجشنبه/جمعه/...) → نزدیک‌ترین آن روز در آینده
+    const weekdays = {'یکشنبه':0,'دوشنبه':1,'سه‌شنبه':2,'چهارشنبه':3,'پنجشنبه':4,'جمعه':5,'شنبه':6};
+    if (d in weekdays){
+      const want = weekdays[d];
+      for (let i=0;i<7;i++){ const t=new Date(now); t.setDate(now.getDate()+i); if(t.getDay()===want){target=t;break;} }
+    }
+    // اگر هیچ‌کدام، همان امروز می‌ماند
+  }
+  const iso = target.getFullYear()+'-'+String(target.getMonth()+1).padStart(2,'0')+'-'+String(target.getDate()).padStart(2,'0');
+  return { date: iso, time: time || '20:00' };
+}
+
+// focus-trap شیتِ رزرو (C8) — WCAG 2.4.3/2.1.2: تله‌ی فوکوس، Esc، بازگرداندنِ فوکوس
+let _sheetTrap=null,_sheetLastFocus=null;
+function openSheet(html){
+  const sheet=document.getElementById('sheet');
+  const wasOpen=sheet.classList.contains('show');
+  document.getElementById('sheetBody').innerHTML=html;
+  sheet.classList.add('show');
+  if(!wasOpen) lockAppSurfaces();
+  if(!wasOpen) _sheetLastFocus=document.activeElement;
+  if(_sheetTrap) sheet.removeEventListener('keydown',_sheetTrap);
+  _sheetTrap=(e)=>{
+    if(e.key==='Escape'){ e.preventDefault(); closeSheet(); return; }
+    if(e.key!=='Tab') return;
+    const f=sheet.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+    if(!f.length) return;
+    const first=f[0],last=f[f.length-1];
+    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+  };
+  sheet.addEventListener('keydown',_sheetTrap);
+  setTimeout(()=>{ const el=sheet.querySelector('input:not([type=hidden]),button,select,textarea,a[href],[tabindex]:not([tabindex="-1"])'); if(el) try{el.focus()}catch(e){} },30);
+}
+function closeSheet(){
+  const sheet=document.getElementById('sheet');
+  const wasOpen=sheet.classList.contains('show');
+  sheet.classList.remove('show');
+  if(wasOpen) unlockAppSurfaces();
+  if(_sheetTrap){ sheet.removeEventListener('keydown',_sheetTrap); _sheetTrap=null; }
+  if(_sheetLastFocus && _sheetLastFocus.focus){ try{_sheetLastFocus.focus()}catch(e){} _sheetLastFocus=null; }
+}
+let tt;
+function toast(icon,msg){document.getElementById('toastIcon').textContent=icon;document.getElementById('toastMsg').textContent=msg;const t=document.getElementById('toast');t.classList.add('show');t.classList.remove('toast-enter');void t.offsetWidth;t.classList.add('toast-enter');const live=document.getElementById('a11y-live');if(live)live.textContent=msg;clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400)}
+let _undo=null;
+function undoSnack(msg, onUndo, onCommit, seconds){
+  seconds=seconds||5;
+  if(_undo){ clearTimeout(_undo.timer); const c=_undo.commit; _undo=null; if(c)c(); } // commit قبلی
+  let s=document.getElementById('undoSnack');
+  if(!s){ s=document.createElement('div'); s.id='undoSnack'; s.className='undo-snack'; s.setAttribute('role','status'); s.setAttribute('aria-live','polite'); document.body.appendChild(s); }
+  s.innerHTML='<span class="us-msg"></span><button class="us-btn" type="button">بازگرداندن</button>';
+  s.querySelector('.us-msg').textContent=msg;
+  s.classList.add('show');
+  const hide=()=>s.classList.remove('show');
+  const commit=()=>{ _undo=null; hide(); try{onCommit&&onCommit();}catch(e){} };
+  const timer=setTimeout(commit, seconds*1000);
+  _undo={commit,timer};
+  s.querySelector('.us-btn').onclick=()=>{ clearTimeout(timer); _undo=null; hide(); try{onUndo&&onUndo();}catch(e){} };
+}
+
+// ═══════════ شروع اپ (فاز ۳: نمایش فوری + به‌روزرسانی از API) ═══════════
+
+
+// ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
+window.openLogin = openLogin;
+window.sendOtp = sendOtp;
+window.confirmOtp = confirmOtp;
+window.completeRegister = completeRegister;
+window.esc = esc;
+window.openSheet = openSheet;
+window.closeSheet = closeSheet;
+window.toast = toast;
+window.undoSnack = undoSnack;
+
+
+/* ═══ js/theme-pwa.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — تم دارک/لایت، حرکت، نصبِ PWA
+//  بخشی از اپ کاستومر (Vanilla JS، بدون build). scope سراسری مشترک.
+//  ترتیبِ لود در index.html مهم است (این فایل به توابع/state قبلی وابسته است).
+// ═══════════════════════════════════════════════════════════
+const _root=document.documentElement;
+try{ const saved=localStorage.getItem('rz_theme'); if(saved) _root.setAttribute('data-theme',saved);
+  else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches) _root.setAttribute('data-theme','light'); }catch{}
+function toggleTheme(){ const t=_root.getAttribute('data-theme')==='dark'?'light':'dark'; _root.setAttribute('data-theme',t); try{localStorage.setItem('rz_theme',t)}catch{}; updateThemeIcon(); buzz(); }
+function updateThemeIcon(){ const k=document.getElementById('themeKnob'); if(k) k.innerHTML=icon(_root.getAttribute('data-theme')==='dark'?'moon':'sun',{size:16}); }
+function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms||8); }catch{} }  // پاسخِ لمسی روی موبایل
+// ورودِ متحرک هنگام اسکرول (کارت‌ها می‌پرن تو صفحه، مثل تیک‌تاک)
+let _io;
+function armReveals(root){
+  if(!_io) _io=new IntersectionObserver((es)=>{es.forEach((en,i)=>{if(en.isIntersecting){setTimeout(()=>en.target.classList.add('in'),Math.min(i,6)*60);_io.unobserve(en.target);}})},{threshold:.1});
+  (root||document).querySelectorAll('.reveal:not(.in)').forEach(el=>_io.observe(el));
+}
+// نکته: updateThemeIcon()/armReveals() اولیه در boot() (init.js) صدا زده می‌شوند
+// تا مطمئن شویم DOM آماده است (به‌جای اجرای شکننده در سطح‌بالای ماژول).
+
+// ═══════════════════════════════════════════════════════════
+//  ثبتِ Service Worker — اپِ نصب‌شدنی، آفلاین، بارگذاریِ آنی (نسل‌Z)
+// ═══════════════════════════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* آفلاین یا محیطِ ناسازگار — اپ بدون SW هم کار می‌کند */ });
+  });
+}
+
+// ── درخواستِ نصبِ اپ (Add to Home Screen) — هوشمند، نه مزاحم ──
+let _deferredInstall=null;
+window.addEventListener('beforeinstallprompt',(e)=>{
+  e.preventDefault();
+  _deferredInstall=e;
+  // فقط اگر کاربر فعال بوده (نه بارِ اول) — دکمه‌ی نصب را نشان بده
+  setTimeout(()=>{ if(_deferredInstall && !localStorage.getItem('rz_install_dismissed')) showInstallBanner(); }, 45000);
+});
+function showInstallBanner(){
+  if(document.getElementById('installBanner')) return;
+  const b=document.createElement('div');
+  b.id='installBanner'; b.className='install-banner glass';
+  b.innerHTML=`
+    <div class="ib-icon">${icon('utensils',{size:24})}</div>
+    <div class="ib-txt"><div class="ib-title">رزرونو رو نصب کن</div><div class="ib-sub">دسترسیِ آنی، حتی آفلاین</div></div>
+    <button class="ib-btn" onclick="doInstall()">نصب</button>
+    <button class="ib-close" onclick="dismissInstall()" aria-label="بستن">${icon('close',{size:18})}</button>`;
+  document.body.appendChild(b);
+  requestAnimationFrame(()=>b.classList.add('in'));
+}
+async function doInstall(){
+  if(!_deferredInstall) return;
+  _deferredInstall.prompt();
+  await _deferredInstall.userChoice.catch(()=>{});
+  _deferredInstall=null; dismissInstall();
+}
+function dismissInstall(){
+  const b=document.getElementById('installBanner');
+  if(b){ b.classList.remove('in'); setTimeout(()=>b.remove(),300); }
+  try{ localStorage.setItem('rz_install_dismissed','1'); }catch{}
+}
+
+
+
+// ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
+window.toggleTheme = toggleTheme;
+window.buzz = buzz;
+window.doInstall = doInstall;
+window.dismissInstall = dismissInstall;
+
+
 /* ═══ js/init.js ═══ */
 // ═══════════════════════════════════════════════════════════
 //  رزرونو — شروع اپ (ES Module)
@@ -3774,6 +5200,7 @@ if (document.readyState === 'loading') {
 
 
 /* ═══ js/main.js ═══ */
+(function(){
 // ═══════════════════════════════════════════════════════════
 //  main.js — نقطه‌ی ورودِ اپ کاستومر (ES Modules)
 //
@@ -3817,6 +5244,7 @@ if (document.readyState === 'loading') {
 
 // شروعِ اپ (خودش startup را در DOMContentLoaded اجرا می‌کند)
 
+})();
 </script>
 
 <!-- DNA غذایی — صفحه‌ی تمام‌قد Wrapped -->
