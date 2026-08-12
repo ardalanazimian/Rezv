@@ -55,6 +55,26 @@ itself the honest state, not a gap to paper over.
   `docs/KNOWN_LIMITATIONS.md`, not a new finding. The one real gap found:
   payment (see `PRODUCT_MEMORY`). CI's `e2e` job (3 device profiles,
   customer app) was green on this same commit.
+- **2026-08-12 — full live stack test (Postgres+Redis local, real seed,
+  real OTP login, Playwright driving actual built files) found two
+  hardcoded/dead sidebar badges in `apps/business`, fixed same session.**
+  Docker Hub pulls were blocked by org egress policy (confirmed via
+  `/root/.ccr/__agentproxy/status`, 403 on `production.cloudfront.docker.com`
+  — reported, not routed around); pivoted to natively-installed
+  Postgres 16 / Redis 7 already present in the environment. `npm run
+  db:seed` itself hit a real bug (crashed partway with a Postgres
+  `no_table_overlap` exclusion-constraint violation — the seed's slot-time
+  generation can collide depending on the run date; not investigated
+  further, enough data existed after the partial run to test). Logged in
+  live as the seeded business owner (`+989121111111`, dev-mode OTP pulled
+  from the real API response, not the offline `1234` fallback) and
+  confirmed: dashboard KPI "۳ رزرو امروز" matched a direct DB count, but
+  the sidebar "رزروها" badge showed a static "۱۲" from `index.html` with
+  zero JS wiring, and "لیست انتظار" (`#wlBadge`) showed a static "۳" (real
+  queue was 0) despite having an `id` — also zero JS wiring. Fixed both to
+  read from data the page already fetches; re-tested live, confirmed
+  correct. — `apps/business/index.html`, `apps/business/js/overview.js`,
+  `apps/business/js/waitlist.js` (commit `427028f`)
 
 ## PRODUCT_MEMORY
 - **2026-08-12 — online payment (Zarinpal) is backend-only, not reachable
