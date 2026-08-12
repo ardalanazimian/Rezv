@@ -17,11 +17,11 @@
   `maxlength="4"`→`"6"`، regex `/^\d{4}$/`→`/^\d{4,6}$/`، متنِ «کد ۴ رقمی»→«کد ورود».
 
 ### ۳. `ALLOWED_ORIGINS` بدونِ fail-fast در production (امنیتی)
-- `api/middleware.ts`: اگر `NODE_ENV=production` و `ALLOWED_ORIGINS` خالی باشد، اپ بالا نمی‌آید
+- `api/middleware.ts` (مسیرِ فعلی: `api/src/middleware.ts`): اگر `NODE_ENV=production` و `ALLOWED_ORIGINS` خالی باشد، اپ بالا نمی‌آید
   (هم‌راستا با fail-fastِ `JWT_SECRET`). وگرنه چکِ CSRF/Origin بی‌صدا خاموش می‌شد.
 
 ### ۴. RLS روی جدول‌های جدید در migrationها (امنیتی/DR)
-- `api/prisma/migrations/manual/023-rls-new-tables.sql` اضافه شد: RLS روی
+- `api/prisma/migrations/manual/023-rls-new-tables.sql` اضافه شد (مسیرِ فعلی: `api/prisma/sql/023-rls-new-tables.sql` — همان فایل، فقط پوشه‌ی `manual/` بعداً به `prisma/sql/` منتقل شد، رجوع کن به `docs/KNOWN_LIMITATIONS.md`): RLS روی
   `payments`, `platform_settings`, `restaurant_closures`. (DB زنده از قبل داشت — تأییدشده ۳۵/۳۵ جدول با RLS؛
   این فایل فقط مسیرِ بازسازیِ DB از migration را درست می‌کند.)
 

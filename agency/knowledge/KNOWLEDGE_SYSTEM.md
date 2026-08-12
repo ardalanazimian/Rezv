@@ -148,8 +148,12 @@ itself the honest state, not a gap to paper over.
 
 ## DECISION_MEMORY
 - Two design systems intentionally do not sync: `shared/css/` (panels, no
-  build) and `apps/seo/app/globals.css` (website) — same token names,
-  separate files, by design. — `CLAUDE.md`
+  build) and `apps/landing/app/globals.css` (website) — same token names,
+  separate files, by design. — `CLAUDE.md` (path corrected 2026-08-12: the
+  source said `apps/seo/app/globals.css`, which was itself stale from
+  before ADR 0002 split the public website into its own `apps/landing`
+  app; `apps/seo` today has no CSS/design-system files at all — verified
+  by checking the actual directory, not just re-copying the doc)
 - Vanilla-JS panels (`customer`/`business`/`company`) are intentionally not
   migrated to React; Landing/SEO are intentionally kept as separate Next.js
   apps rather than unified with the panels. — `CLAUDE.md`, original request
