@@ -4,6 +4,7 @@ import { recomputeAllForRestaurant } from '@/lib/customer-insights';
 import { recomputeRfmForRestaurant } from '@/lib/rfm';
 import { rebuildGuestProfiles } from '@/lib/guest-profile';
 import { runAllDueAutomations } from '@/lib/automation';
+import { applyAbuseFlags, applyPlatformAbuseFlags } from '@/lib/fraud';
 import { trainAndCalibrateNoShowModel } from '@/lib/no-show-model';
 import { trainAndCalibrateDemandForecast } from '@/lib/demand-forecast';
 import { invalidatePattern } from '@/lib/cache';
@@ -21,6 +22,9 @@ import { errorResponse } from '@/lib/errors';
  * ۵) پیش‌بینیِ تقاضای هر رستوران را بازآموزی می‌کند (lib/demand-forecast.ts —
  *    Holt-Winters هفتگی برایِ تعدادِ رزرو و کاورها) — همان انضباطِ ایمنی:
  *    فقط با بهبودِ واقعی روی هولدآوت فعال می‌شود.
+ * ۶) اسکنِ سوءاستفاده (lib/fraud.ts) را برایِ هر رستوران اجرا می‌کند و
+ *    سیگنال‌هایِ high را به CustomerEconomyProfile.hasActiveAbuseFlag وصل
+ *    می‌کند؛ در پایان یک اسکنِ سراسریِ پلتفرم (فارمینگِ رفرال) هم اجرا می‌شود.
  * در crontab با فاصله‌ی روزانه (نه هر ۲-۵ دقیقه مثل بقیه‌ی maintenance) ثبت شود.
  */
 export async function POST(req: Request) {
@@ -35,6 +39,7 @@ export async function POST(req: Request) {
     // چون nightly است، هدف کاهش دیوار زمانی و جلوگیری از timeout است.
     let i = 0, totalUsers = 0, noShowModelsTrained = 0, noShowModelsActive = 0;
     let demandForecastsTrained = 0, demandForecastsCountActive = 0, demandForecastsCoversActive = 0;
+    let abuseSignals = 0, abuseFlagged = 0;
     async function worker() {
       while (i < restaurants.length) {
         const r = restaurants[i++];
@@ -53,6 +58,12 @@ export async function POST(req: Request) {
           if (forecastResult.countActive) demandForecastsCountActive++;
           if (forecastResult.coversActive) demandForecastsCoversActive++;
         }
+        // اسکنِ سوءاستفاده هم مسیرِ حیاتی نیست — شکستش نباید بقیه‌ی رستوران‌ها را متوقف کند.
+        const abuseResult = await applyAbuseFlags(r.id).catch(() => null);
+        if (abuseResult) {
+          abuseSignals += abuseResult.signals.length;
+          abuseFlagged += abuseResult.flaggedUserIds.length;
+        }
         await invalidatePattern(`customers:${r.id}:*`);
         await invalidatePattern(`ai-recs:${r.id}`);
       }
@@ -64,12 +75,17 @@ export async function POST(req: Request) {
     // پروفایل سراسری مهمانان را از insightهای به‌روز بازسازی کن (cross-restaurant)
     const guestProfiles = await rebuildGuestProfiles().catch(() => ({ profiles: 0 }));
 
+    // اسکنِ سراسریِ فارمینگِ رفرال (restaurant-scoped نیست، یک‌بار کافی است)
+    const platformAbuse = await applyPlatformAbuseFlags().catch(() => ({ signals: [], flaggedUserIds: [] }));
+
     return NextResponse.json({
       ok: true, restaurants: restaurants.length, users_recomputed: totalUsers, guest_profiles: guestProfiles.profiles,
       no_show_models_trained: noShowModelsTrained, no_show_models_active: noShowModelsActive,
       demand_forecasts_trained: demandForecastsTrained,
       demand_forecasts_count_active: demandForecastsCountActive,
       demand_forecasts_covers_active: demandForecastsCoversActive,
+      abuse_signals: abuseSignals + platformAbuse.signals.length,
+      abuse_flagged_users: abuseFlagged + platformAbuse.flaggedUserIds.length,
       ...automationResult,
     });
   } catch (e) { return errorResponse(e); }

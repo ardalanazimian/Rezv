@@ -30,7 +30,7 @@ export type AuditAction =
   // بازبینیِ گالری: تصمیمِ انتشار روی برندِ پلتفرم است و باید ردِ انسانی
   // داشته باشد — چه کسی، کِی، و اگر رد شد به چه دلیل.
   | 'photo.uploaded' | 'photo.approved' | 'photo.rejected' | 'photo.deleted'
-  | 'security.rate_limit' | 'security.idor_attempt';
+  | 'security.rate_limit' | 'security.idor_attempt' | 'security.abuse_flag';
 
 type AuditEntry = {
   action: AuditAction;

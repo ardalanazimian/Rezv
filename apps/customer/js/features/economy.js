@@ -111,6 +111,11 @@ export async function renderEconomy(){
       <div class="lac-body"><div class="lac-title">${fmtFa(econ.wallet_balance)} سکه</div><div class="lac-sub">قابلِ‌خرج در فروشگاهِ جایزه — جدا از امتیازِ باشگاه</div></div>
     </div>
 
+    <div class="loy-action-card reveal" style="cursor:default">
+      <div class="lac-icon" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">${icon('sparkle',{size:20})}</div>
+      <div class="lac-body"><div class="lac-title">${fmtFa(econ.xp_total)} XP</div><div class="lac-sub">مجموعِ تجربه‌ای که تا حالا جمع کردی — با هر رزروِ موفق و هر ماموریت بالا می‌ره</div></div>
+    </div>
+
     ${missions.length ? `<div class="section-head reveal" style="margin-top:32px"><div class="section-title">ماموریت‌ها</div></div>
     ${missions.map(missionCard).join('')}` : ''}
 

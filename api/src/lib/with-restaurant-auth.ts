@@ -63,7 +63,17 @@ export function withRestaurantAuth(
         const restaurant = await resolveStaffRestaurant(auth, req);
         if (opts.permission) await requirePermission(auth, opts.permission);
 
-        const res = await handler(req, { auth, restaurant }, routeArg?.params);
+        // ⚠️ باگِ واقعی (زنده پیدا شد ۲۰۲۶-۰۸-۱۲، حینِ تستِ endpointِ PATCH فلگِ
+        // سوءاستفاده): در این نسخه‌ی Next.js، `params` یک Promise است (رجوع کن
+        // به node_modules/next/dist/docs/.../route.md — «params: a promise that
+        // resolves to...»). قبلاً routeArg?.params بدونِ await مستقیم به handler
+        // پاس داده می‌شد، پس هر routeِ dynamic-segment که از این wrapper استفاده
+        // می‌کرد (tables/[id]، tables/[id]/state، chats/[id]،
+        // reservations/[code]، customers/[userId]) عملاً همیشه با پیامِ
+        // «xxx: الزامی است» ۴۲۲ می‌داد — تأییدشده با یک لاگِ تشخیصیِ زنده که
+        // routeArg.params instanceof Promise === true را نشان داد، نه فرض.
+        const params = routeArg?.params ? await routeArg.params : undefined;
+        const res = await handler(req, { auth, restaurant }, params);
         status = res.status;
         res.headers.set('x-trace-id', traceId);
         return res;
@@ -95,7 +105,9 @@ export function withStaffAuth(
       const rule = RULES[opts.rateLimit ?? 'search'];
       await enforceRateLimit(clientIp(req), rule);
       const auth = authFromRequest(req);
-      return await handler(req, auth, routeArg?.params);
+      // رجوع کن به همین باگ در withRestaurantAuth بالا — params یک Promise است.
+      const params = routeArg?.params ? await routeArg.params : undefined;
+      return await handler(req, auth, params);
     } catch (e) {
       return errorResponse(e);
     }
