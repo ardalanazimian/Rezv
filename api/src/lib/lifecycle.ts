@@ -2,6 +2,10 @@ import { db } from './db';
 import { invalidateAvailability } from './availability-cache';
 import { Err } from './errors';
 import { enqueueSms, type SmsJob } from './sms';
+import { processReservationEconomyEvent } from './economy';
+import { createLogger } from './logger';
+
+const log = createLogger('lifecycle');
 
 // ═══════════════════════════════════════════════════════════
 //  چرخه‌ی حیات رزرو رزرونو — state machine + اعلان + audit log
@@ -83,7 +87,7 @@ export async function transitionReservation(opts: {
     if (!resv) throw Err.notFound('رزرو');
     const from = resv.status as RStatus;
 
-    if (from === to) return { resv, changed: false };
+    if (from === to) return { resv, changed: false, from };
     if (!canTransition(from, to)) throw Err.invalidTransition(from, to);
 
     const updated = await tx.reservation.update({
@@ -103,8 +107,28 @@ export async function transitionReservation(opts: {
       },
     });
 
-    return { resv: updated, changed: true };
+    return { resv: updated, changed: true, from };
   });
+
+  // بعد از commit: اقتصادِ یکپارچه‌ی مشتری (economy.ts) — دقیقاً همون الگویِ
+  // enqueueSms زیر: هیچ‌وقت نباید جریانِ اصلیِ تغییرِ وضعیت رو بشکنه، پس
+  // خارج از تراکنش و با catch صدا زده می‌شه.
+  if (result.changed) {
+    await processReservationEconomyEvent({
+      reservationId: result.resv.id,
+      restaurantId: result.resv.restaurantId,
+      userId: result.resv.userId,
+      guestPhone: result.resv.guestPhone,
+      fromStatus: result.from,
+      toStatus: result.resv.status,
+      actor,
+      slotStart: result.resv.slotStart,
+    }).catch((e) => {
+      log.error('پردازشِ اقتصادِ مشتری ناموفق (رزرو خودش commit شد)', {
+        reservationId: result.resv.id, error: (e as Error).message,
+      });
+    });
+  }
 
   // بعد از commit: اعلان (خارج از transaction تا تراکنش را کند نکند)
   if (result.changed && notify) {

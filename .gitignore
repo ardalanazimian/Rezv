@@ -14,6 +14,13 @@ api/.next/
 .DS_Store
 api/prisma/*.db
 
+# ۲۰۲۶-۰۸-۱۲: Next.js 16 هنگامِ `next dev` خودکار AGENTS.md/CLAUDE.md تولیدی
+# می‌سازه (ویژگیِ جدیدِ agent-rules) — این تولیدی‌ست، نه سندِ واقعیِ پروژه؛
+# اگه commit بشه با CLAUDE.mdِ واقعیِ ریشه (که این پروژه ازش پیروی می‌کنه)
+# اشتباه گرفته می‌شه. اگه لازم شد، فقط حذفش کن؛ دوباره تولید می‌شه.
+api/AGENTS.md
+api/CLAUDE.md
+
 # بک‌آپ‌های دیتابیس (نباید در git بروند)
 backup/data/*.sql.gz
 backup/data/*.sql
