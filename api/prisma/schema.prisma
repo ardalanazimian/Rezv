@@ -52,6 +52,11 @@ model User {
   reviews      Review[]
   // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19):
   guestProfile GuestProfile?
+  // ── اقتصادِ یکپارچه‌ی مشتری (migration 038) — رجوع کن به CustomerEconomyProfile ──
+  economyProfile    CustomerEconomyProfile?
+  economyLedger     EconomyLedgerEntry[]
+  missionProgress   MissionProgress[]
+  rewardRedemptions RewardRedemption[]
   @@index([createdAt])
   chatThreads  ChatThread[]
   @@map("users")
@@ -141,6 +146,11 @@ model Restaurant {
   closures         RestaurantClosure[]
   noShowModel      RestaurantNoShowModel?
   demandForecast   RestaurantDemandForecast?
+  // ── اقتصادِ یکپارچه‌ی مشتری (migration 038) ──
+  cancellationPolicy    CancellationPolicy?
+  economyLedgerEntries  EconomyLedgerEntry[]
+  missions              Mission[]
+  rewardMarketplaceItems RewardMarketplaceItem[]
   @@index([tenantId])
   @@index([city], map: "idx_restaurants_city")
   chatThreads  ChatThread[]
@@ -312,6 +322,7 @@ model Reservation {
   events       ReservationEvent[]
   reviews      Review[]
   payments     Payment[] // ⚠️ همگام‌سازی‌شده: یک رزرو می‌تواند چند تلاش پرداخت داشته باشد
+  economyLedgerEntries EconomyLedgerEntry[] // اقتصادِ یکپارچه‌ی مشتری (migration 038)
   // ── ایندکس‌های بهینه برای ۱۰M+ رزرو (بر اساس الگوی واقعی کوئری) ──
   // داشبورد رستوران: رزروهای یک رستوران در بازه‌ی زمانی با وضعیت
   @@index([restaurantId, status, slotStart])
@@ -483,6 +494,7 @@ model GiftCard {
   status       GiftCardStatus @default(active)
   expiresAt    DateTime?      @map("expires_at")
   createdAt    DateTime       @default(now()) @map("created_at")
+  rewardRedemptions RewardRedemption[] // کارتِ هدیه‌هایی که از Reward Marketplace صادر شدن (migration 038)
   @@index([recipientPhone])
   @@index([buyerId])
   @@map("gift_cards")
@@ -501,6 +513,11 @@ model SpecialEvent {
   priceToman   Int?       @map("price_toman")  // قیمت بلیت (اگر دارد)
   capacity     Int?       // ظرفیت
   isPublished  Boolean    @default(true) @map("is_published")
+  // ── override سیاستِ کنسلی برایِ این رویدادِ خاص (migration 038) ──
+  // شکل: همون فیلدهایِ CancellationPolicy (freeCancelHours/depositRequired/...)،
+  // فقط فیلدهایی که override می‌شن حضور دارن؛ در resolvePolicy (لایه‌ی ۲،
+  // همیشه locked) اعمال می‌شه. null = این رویداد سیاستِ خاصی نداره.
+  policyOverride Json?    @map("policy_override")
   createdAt    DateTime   @default(now()) @map("created_at")
   @@index([restaurantId, startsAt])
   @@index([isPublished, startsAt])
@@ -683,6 +700,7 @@ model Coupon {
   isActive      Boolean     @default(true) @map("is_active")
   createdAt     DateTime    @default(now()) @map("created_at")
   redemptions   CouponRedemption[]
+  rewardRedemptions RewardRedemption[] // کوپن‌هایی که از Reward Marketplace صادر شدن (migration 038)
   @@unique([restaurantId, code])
   @@index([restaurantId, isActive, validUntil])
   @@map("coupons")
@@ -1374,4 +1392,180 @@ model SiteInquiry {
   updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   @@index([status, createdAt(sort: Desc)])
   @@map("site_inquiries")
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  اقتصادِ یکپارچه‌ی مشتری (Unified Customer Economy) — migration 038
+//
+//  طراحیِ کامل (فرمول‌ها، الگوریتمِ resolvePolicy، جدولِ eventScore،
+//  precedenceِ سیاست‌ها) در جلسه‌ی برنامه‌ریزیِ ۲۰۲۶-۰۸-۱۲ مستند شده —
+//  رجوع کن به تاریخچه‌ی گفتگو یا (وقتی سندش کردیم) یک فایلِ docs/design.
+//  خلاصه‌ی دامنه: reliabilityScore/xpTotal/walletBalance/strikeCount
+//  سراسری‌اند (رویِ User، نه per-restaurant) — اعتماد باید بینِ
+//  رستوران‌ها منتقل بشه. ClubMember.points دست‌نخورده می‌مونه: اون
+//  ارزِ داخلیِ خودِ رستورانه، جدا از این اقتصادِ پلتفرمی.
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── پروفایلِ اقتصادیِ مشتری — یک ردیف برای هر User، سراسری (نه per-restaurant) ──
+model CustomerEconomyProfile {
+  userId       String   @id @map("user_id") @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // ۰..۱۰۰ — EMA زمان‌دار با نیم‌عمرِ ۹۰ روزه، مقدارِ اولیه‌ی ۷۵ (prior بیزی، نه صفر/صد)
+  reliabilityScore   Int      @default(75) @map("reliability_score")
+  // مشتق از reliabilityScore + سابقه — نمایشی، محاسبه‌شده در اپلیکیشن نه DB
+  reputationTier     String   @default("bronze") @map("reputation_tier") // bronze|silver|gold|platinum
+  xpTotal            Int      @default(0) @map("xp_total")               // تجمعی، هرگز کم نمی‌شود
+  walletBalance      Int      @default(0) @map("wallet_balance")         // خرج‌شدنی (سکه)
+  strikeCount        Int      @default(0) @map("strike_count")
+  hasActiveAbuseFlag Boolean  @default(false) @map("has_active_abuse_flag")
+  lastViolationAt    DateTime? @map("last_violation_at")     // برایِ decayِ ۹۰-روزه‌ی strike
+  lastRecomputedAt   DateTime @default(now()) @map("last_recomputed_at") // برایِ EMA زمان‌دار
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  @@index([reputationTier])
+  @@map("customer_economy_profiles")
+}
+
+// ── دفترِ حسابِ اقتصادِ یکپارچه (append-only) — منبعِ حقیقتِ همه‌ی حرکاتِ XP/سکه/اعتماد ──
+enum EconomyLedgerKind {
+  xp_earn             // افزایشِ XP (تجمعی)
+  wallet_earn         // افزایشِ سکه‌یِ خرج‌شدنی
+  wallet_spend        // خرجِ سکه (مثلاً Reward Marketplace)
+  reliability_event   // یک رویدادِ رزرو که reliabilityScore رو تحتِ تأثیر قرار می‌ده — amount = eventScore خام
+  strike_add          // افزودنِ یک strike
+  strike_decay        // کاهشِ یک strike (زمانی یا با Mission)
+  @@map("economy_ledger_kind")
+}
+
+model EconomyLedgerEntry {
+  id            String            @id @default(uuid()) @db.Uuid
+  userId        String            @map("user_id") @db.Uuid
+  user          User              @relation(fields: [userId], references: [id])
+  restaurantId  String?           @map("restaurant_id") @db.Uuid  // null = رویدادِ سراسری
+  restaurant    Restaurant?       @relation(fields: [restaurantId], references: [id])
+  kind          EconomyLedgerKind
+  amount        Int                // دلتا (xp_earn/wallet_*) یا eventScoreِ خام (reliability_event)
+  reservationId String?           @map("reservation_id") @db.Uuid
+  reservation   Reservation?      @relation(fields: [reservationId], references: [id])
+  missionId     String?           @map("mission_id") @db.Uuid
+  // 'reservation_completed' | 'reservation_no_show' | 'referral' | 'mission' | 'manual_adjustment' | 'marketplace_redemption' | ...
+  source        String
+  createdAt     DateTime          @default(now()) @map("created_at")
+  // محافظِ idempotency: هر (رزرو، نوع) فقط یک‌بار پردازش می‌شه. NULLها یکتا حساب
+  // نمی‌شن (رفتارِ استانداردِ Postgres) پس ردیف‌هایِ بدونِ reservationId (referral،
+  // mission، manual) هیچ محدودیتی نمی‌گیرن — دقیقاً همون چیزی که می‌خوایم.
+  @@unique([reservationId, kind])
+  @@index([userId, createdAt])
+  @@index([restaurantId, createdAt])
+  @@map("economy_ledger_entries")
+}
+
+// ── سایه‌ی اعتبار برایِ شماره‌هایِ بدونِ حساب (guest booking) — جلویِ فرار از سابقه با پاک‌کردنِ session ──
+model PhoneReliabilityShadow {
+  phone            String   @id  // نرمال‌شده به E.164 (مثلاً +98912...)
+  reliabilityScore Int      @default(75) @map("reliability_score")
+  strikeCount      Int      @default(0) @map("strike_count")
+  lastRecomputedAt DateTime @default(now()) @map("last_recomputed_at")
+  // وقتی این شماره صاحبِ حساب شد، تاریخچه merge می‌شه و این فیلد ست می‌شه
+  // (رکورد پاک نمی‌شه — برایِ audit نگه داشته می‌شه)
+  mergedIntoUserId String?  @map("merged_into_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  @@map("phone_reliability_shadows")
+}
+
+// ── سیاستِ کنسلیِ هر رستوران (لایه‌ی پایه‌ی resolvePolicy) ──
+model CancellationPolicy {
+  restaurantId        String     @id @map("restaurant_id") @db.Uuid
+  restaurant          Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  freeCancelHours     Int        @default(24) @map("free_cancel_hours")
+  partialPenaltyHours Int        @default(2) @map("partial_penalty_hours")
+  partialPenaltyPct   Int        @default(50) @map("partial_penalty_pct")
+  depositRequired     Boolean    @default(false) @map("deposit_required")
+  autoConfirm         Boolean    @default(true) @map("auto_confirm")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+  @@map("cancellation_policies")
+}
+
+// ── مأموریت/چالش (Gamification) — می‌تونه سراسری باشه یا مالِ یه رستورانِ خاص ──
+enum MissionStatus {
+  active
+  archived
+  @@map("mission_status")
+}
+
+model Mission {
+  id           String        @id @default(uuid()) @db.Uuid
+  restaurantId String?       @map("restaurant_id") @db.Uuid  // null = سراسری
+  restaurant   Restaurant?   @relation(fields: [restaurantId], references: [id])
+  title        String
+  description  String?
+  kind         String        // 'weekly' | 'seasonal' | 'onboarding' | 'recovery' | ...
+  targetCount  Int           @default(1) @map("target_count")  // مثلاً «۳ رزرو»
+  xpReward     Int           @default(0) @map("xp_reward")
+  walletReward Int           @default(0) @map("wallet_reward")
+  strikeRelief Int           @default(0) @map("strike_relief")  // برایِ Recovery Mission — کاهشِ فوریِ strike
+  startsAt     DateTime?     @map("starts_at")
+  endsAt       DateTime?     @map("ends_at")
+  status       MissionStatus @default(active)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  progress     MissionProgress[]
+  @@index([restaurantId, status])
+  @@map("missions")
+}
+
+model MissionProgress {
+  id          String    @id @default(uuid()) @db.Uuid
+  missionId   String    @map("mission_id") @db.Uuid
+  mission     Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation(fields: [userId], references: [id])
+  progress    Int       @default(0)
+  completedAt DateTime? @map("completed_at")
+  claimedAt   DateTime? @map("claimed_at")  // جایزه گرفته شد (جلویِ claimِ دوباره)
+  @@unique([missionId, userId])
+  @@map("mission_progress")
+}
+
+// ── کاتالوگِ خرجِ سکه (Reward Marketplace) ──
+enum RewardItemKind {
+  coupon_grant
+  free_item
+  priority_boost
+  gift_card_credit
+  event_access
+  @@map("reward_item_kind")
+}
+
+model RewardMarketplaceItem {
+  id             String         @id @default(uuid()) @db.Uuid
+  restaurantId   String?        @map("restaurant_id") @db.Uuid  // null = سراسری
+  restaurant     Restaurant?    @relation(fields: [restaurantId], references: [id])
+  title          String
+  description    String?
+  kind           RewardItemKind
+  costCoins      Int            @map("cost_coins")
+  minTier        String         @default("bronze") @map("min_tier")  // انحصار برایِ tierهایِ بالاتر
+  stockRemaining Int?           @map("stock_remaining")  // null = نامحدود
+  isActive       Boolean        @default(true) @map("is_active")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  redemptions    RewardRedemption[]
+  @@index([restaurantId, isActive])
+  @@map("reward_marketplace_items")
+}
+
+// ── هر بار که یه مشتری یه آیتم رو خرج می‌کنه — auditable، ردِ نتیجه‌ی واقعی ──
+model RewardRedemption {
+  id                String                 @id @default(uuid()) @db.Uuid
+  itemId            String                 @map("item_id") @db.Uuid
+  item              RewardMarketplaceItem  @relation(fields: [itemId], references: [id])
+  userId            String                 @map("user_id") @db.Uuid
+  user              User                   @relation(fields: [userId], references: [id])
+  coinsSpent        Int                    @map("coins_spent")
+  // نتیجه‌ی واقعیِ redemption — بسته به kind فقط یکی پر می‌شه
+  resultCouponId    String?                @map("result_coupon_id") @db.Uuid
+  resultCoupon      Coupon?                @relation(fields: [resultCouponId], references: [id])
+  resultGiftCardId  String?                @map("result_gift_card_id") @db.Uuid
+  resultGiftCard    GiftCard?              @relation(fields: [resultGiftCardId], references: [id])
+  createdAt         DateTime               @default(now()) @map("created_at")
+  @@index([userId, createdAt])
+  @@map("reward_redemptions")
 }
