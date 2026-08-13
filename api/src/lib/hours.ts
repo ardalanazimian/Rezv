@@ -70,6 +70,20 @@ export function dateInTz(d: Date, timezone: string): { y: number; m: number; day
 }
 
 /**
+ * کلیدِ تاریخِ محلی («YYYY-MM-DD») برایِ کشِ availability و باطل‌سازی‌اش.
+ *
+ * باگ (رفع‌شده): جاهایی که مستقیم `slotStart.toISOString().slice(0,10)` می‌زدند
+ * تاریخِ UTC رو به‌جایِ تاریخِ محلیِ رستوران استخراج می‌کردن. نزدیکِ نیمه‌شبِ
+ * تهران (UTC+03:30) این باعث می‌شد کلیدِ کشِ باطل‌شده با کلیدِ کشِ واقعاً
+ * سرو‌شده یکی نباشه — یعنی باطل‌سازی هیچ اثری نداشت و اسلاتِ تازه‌آزادشده
+ * (یا تازه‌گرفته‌شده) تا انقضایِ TTL دیده نمی‌شد.
+ */
+export function dateKeyInTz(d: Date, timezone: string): string {
+  const { y, m, day } = dateInTz(d, timezone);
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
  * آیا رستوران در این تاریخ اصلاً باز است؟ (نه تعطیلِ هفتگی، نه تعطیلِ خاص)
  * @param closureDates مجموعه‌ی تاریخ‌های تعطیلِ خاص ("YYYY-MM-DD")
  */

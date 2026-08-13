@@ -1,3 +1,4 @@
+import { randomBytes, timingSafeEqual } from 'crypto';
 import { db } from './db';
 import { redis } from './redis';
 import { metrics } from './metrics';
@@ -186,6 +187,10 @@ export async function joinWaitlist(input: JoinWaitlistInput) {
     guestPhone = u?.phone ?? null;
   }
 
+  // توکنِ دسترسیِ مهمان (رفعِ IDOR، migration 041) — فقط برایِ ورودی‌هایِ
+  // بدونِ حساب. ورودیِ متعلق‌به‌کاربر با JWT خودش احراز می‌شه، نیازی به این نداره.
+  const guestAccessToken = input.userId ? null : randomBytes(16).toString('hex');
+
   const entry = await db.waitlistEntry.create({
     data: {
       restaurantId: r.id,
@@ -198,6 +203,7 @@ export async function joinWaitlist(input: JoinWaitlistInput) {
       notifyPush: input.notifyPush ?? true,
       notifyEmail: input.notifyEmail ?? false,
       note: input.note ?? null,
+      guestAccessToken,
     },
   });
 
@@ -212,6 +218,9 @@ export async function joinWaitlist(input: JoinWaitlistInput) {
     estimated_wait_minutes: estimatedWaitMinutes,
     is_vip: isVip,
     status: entry.status,
+    // فقط همینجا (لحظه‌ی join) برمی‌گرده — کلاینت باید کنارِ id ذخیره‌اش کنه؛
+    // accept/decline/leave روی ورودیِ مهمان از این پس این توکن رو می‌خوان.
+    guest_token: guestAccessToken,
   };
 }
 
@@ -338,18 +347,42 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
   return { promoted: false }; // همه‌ی کاندیدها گرفته شدند یا تداخل داشتند
 }
 
-// ── پذیرش آفر توسط مشتری → رزرو ساخته می‌شود ──
-// ⚠️ امنیت (رفع IDOR): اگر callerUserId داده شود (مشتری احراز‌هویت‌شده)، فقط
-// می‌تواند روی ورودی متعلق به خودش عمل کند. staff/سیستم با callerUserId=undefined
-// عبور می‌کنند (آن‌ها از مسیر پنل رستوران با auth جدا می‌آیند).
-function assertOwnsEntry(entry: { userId: string | null }, callerUserId?: string) {
-  if (callerUserId && entry.userId !== callerUserId) throw Err.notFound('ورودی لیست انتظار');
+// ── مالکیتِ عملیاتِ نویسنده روی یک ورودیِ صف (accept/decline/leave) ──
+// ⚠️ رفع IDOR (۲۰۲۶-۰۸-۱۳): قبلاً این چک فقط وقتی callerUserId داده می‌شد
+// اجرا می‌شد — یعنی یک درخواستِ کاملاً بدونِ توکن (نه فقط توکنِ اشتباه) بی‌صدا
+// از کنارِ چک رد می‌شد، چون هیچ callerِ واقعیِ staff/system‌ای اصلاً وجود
+// نداشت که به این bypass نیاز داشته باشه (هر سه routeِ عمومی از همون
+// callerId(req)ِ سطحِ مشتری استفاده می‌کنن) — یعنی این «استثنا برایِ staff»
+// فقط سوراخِ امنیتی بود، نه قابلیتِ واقعی.
+//
+// حالا:
+//  • ورودیِ متعلق‌به‌کاربر (userId ست‌شده): احرازِ هویتِ مشتری الزامیه و باید
+//    دقیقاً با entry.userId یکی باشه.
+//  • ورودیِ مهمان (userId=null): guestAccessTokenِ صادرشده هنگامِ join
+//    (migration 041) باید دقیقاً مطابقت کنه — مقایسه constant-time (تایمینگ-سیف).
+function tokensEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
+function assertCanActOnEntry(
+  entry: { userId: string | null; guestAccessToken: string | null },
+  auth: { callerUserId?: string; guestToken?: string },
+) {
+  if (entry.userId) {
+    if (!auth.callerUserId || auth.callerUserId !== entry.userId) throw Err.notFound('ورودی لیست انتظار');
+    return;
+  }
+  if (!entry.guestAccessToken || !auth.guestToken || !tokensEqual(auth.guestToken, entry.guestAccessToken)) {
+    throw Err.notFound('ورودی لیست انتظار');
+  }
 }
 
-export async function acceptOffer(entryId: string, _actor = 'customer', callerUserId?: string) {
+export async function acceptOffer(entryId: string, _actor = 'customer', auth: { callerUserId?: string; guestToken?: string } = {}) {
   const e = await db.waitlistEntry.findUnique({ where: { id: entryId } });
   if (!e) throw Err.notFound('ورودی لیست انتظار');
-  assertOwnsEntry(e, callerUserId);
+  assertCanActOnEntry(e, auth);
   if (e.status !== 'offered') throw Err.validation('آفری برای پذیرش وجود ندارد');
   if (e.offerExpiresAt && e.offerExpiresAt < new Date()) throw Err.reservationExpired();
 
@@ -384,10 +417,10 @@ export async function acceptOffer(entryId: string, _actor = 'customer', callerUs
 }
 
 // ── رد آفر توسط مشتری → آفر به نفر بعدی ──
-export async function declineOffer(entryId: string, _actor = 'customer', callerUserId?: string) {
+export async function declineOffer(entryId: string, _actor = 'customer', auth: { callerUserId?: string; guestToken?: string } = {}) {
   const e = await db.waitlistEntry.findUnique({ where: { id: entryId } });
   if (!e) throw Err.notFound('ورودی لیست انتظار');
-  assertOwnsEntry(e, callerUserId);
+  assertCanActOnEntry(e, auth);
   if (e.status !== 'offered') throw Err.validation('آفری برای رد وجود ندارد');
 
   // ⚠️ همزمانی: گارد status را داخل updateMany می‌گذاریم (نه فقط چک بیرونی)
@@ -412,10 +445,10 @@ export async function declineOffer(entryId: string, _actor = 'customer', callerU
 }
 
 // ── خروج از صف ──
-export async function leaveWaitlist(entryId: string, callerUserId?: string) {
+export async function leaveWaitlist(entryId: string, auth: { callerUserId?: string; guestToken?: string } = {}) {
   const e = await db.waitlistEntry.findUnique({ where: { id: entryId } });
   if (!e) throw Err.notFound('ورودی لیست انتظار');
-  assertOwnsEntry(e, callerUserId);
+  assertCanActOnEntry(e, auth);
   if (!['waiting', 'offered'].includes(e.status)) throw Err.validation('این ورودی قابل لغو نیست');
   const updated = await db.$transaction(async (tx) => {
     const res = await tx.waitlistEntry.updateMany({

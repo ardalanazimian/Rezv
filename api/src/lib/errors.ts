@@ -24,6 +24,7 @@ export const Err = {
   slotFull:         (time: string) => new ApiError('SLOT_FULL', `ساعت ${time} پر است؛ زمان دیگری انتخاب کنید`, 409, { time }),
   tableNotFound:    (n: number) => new ApiError('TABLE_NOT_FOUND', `میز شماره ${n} وجود ندارد`, 404, { table: n }),
   tableTooSmall:    (n: number) => new ApiError('TABLE_TOO_SMALL', `ظرفیت میز ${n} برای این تعداد کافی نیست`, 422, { table: n }),
+  tableUnavailable: (n: number) => new ApiError('TABLE_UNAVAILABLE', `میز شماره ${n} غیرفعال یا در حالِ تعمیر است`, 422, { table: n }),
   pastTime:         () => new ApiError('PAST_TIME', 'زمان رزرو در گذشته است', 422),
   outsideHours:     () => new ApiError('OUTSIDE_HOURS', 'رستوران در این ساعت باز نیست', 422),
   tooFarAhead:      (days: number) => new ApiError('TOO_FAR_AHEAD', `رزرو حداکثر تا ${days} روز آینده ممکن است`, 422, { days }),

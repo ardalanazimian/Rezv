@@ -44,7 +44,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       mobile: resv.guestPhone ?? undefined,
     });
 
+    // ⚠️ رفع‌شده (idempotency، ۲۰۲۶-۰۸-۱۳): قبلاً هر فراخوانیِ این endpoint
+    // (double-click، رفرش، ری‌ترای شبکه) بدونِ چک یک authorityِ کاملاً تازه از
+    // زرین‌پال می‌گرفت و یک ردیفِ Payment(pending) جدید می‌ساخت — یعنی چند
+    // sessionِ پرداختِ همزمان برای یک رزرو باز می‌شد. حالا قبل از ساختنِ ردیفِ
+    // جدید، هر pendingِ قبلیِ همین رزرو «failed» (جایگزین‌شده) می‌شود — همان
+    // authorityِ قدیمی اگر کاربر واقعاً در زرین‌پال تکمیلش کند همچنان از طریقِ
+    // callback (که با authorityِ خودش، نه status محلی، پیدا می‌کند) قابلِ verify
+    // و success‌شدن است؛ این فقط جلوی انباشتِ ردیف‌هایِ pendingِ یتیم را می‌گیرد.
     await db.$transaction([
+      db.payment.updateMany({
+        where: { reservationId: resv.id, status: 'pending' },
+        data: { status: 'failed', failReason: 'جایگزین‌شده با تلاشِ پرداختِ جدید' },
+      }),
       db.payment.create({
         data: { reservationId: resv.id, authority, amountToman: resv.depositAmountToman, status: 'pending' },
       }),

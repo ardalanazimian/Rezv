@@ -41,12 +41,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   } catch (e) { return errorResponse(e); }
 }
 
-/** DELETE /api/v1/waitlist/:id — خروج از صف */
+/** DELETE /api/v1/waitlist/:id — خروج از صف. ورودیِ متعلق‌به‌کاربر: نیازِ
+ *  احرازِ هویتِ مشتری. ورودیِ مهمان: نیازِ ?token=... (guest_token همان که
+ *  هنگامِ join برگردانده شد). */
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const { id } = parseParams(await params, paramsSchema);
-    const result = await leaveWaitlist(id, callerId(req));
+    const guestToken = new URL(req.url).searchParams.get('token') ?? undefined;
+    const result = await leaveWaitlist(id, { callerUserId: callerId(req), guestToken });
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }
 }

@@ -4,6 +4,7 @@ import { Err } from './errors';
 import { enqueueSms, type SmsJob } from './sms';
 import { processReservationEconomyEvent } from './economy';
 import { createLogger } from './logger';
+import { dateKeyInTz } from './hours';
 
 const log = createLogger('lifecycle');
 
@@ -83,11 +84,15 @@ export async function transitionReservation(opts: {
   const { reservationId, to, actor, reason, isAutomatic = false, notify = true } = opts;
 
   const result = await db.$transaction(async (tx) => {
-    const resv = await tx.reservation.findUnique({ where: { id: reservationId } });
+    const resv = await tx.reservation.findUnique({
+      where: { id: reservationId },
+      include: { restaurant: { select: { timezone: true } } },
+    });
     if (!resv) throw Err.notFound('رزرو');
     const from = resv.status as RStatus;
+    const timezone = resv.restaurant.timezone ?? 'Asia/Tehran';
 
-    if (from === to) return { resv, changed: false, from };
+    if (from === to) return { resv, changed: false, from, timezone };
     if (!canTransition(from, to)) throw Err.invalidTransition(from, to);
 
     const updated = await tx.reservation.update({
@@ -107,7 +112,7 @@ export async function transitionReservation(opts: {
       },
     });
 
-    return { resv: updated, changed: true, from };
+    return { resv: updated, changed: true, from, timezone };
   });
 
   // بعد از commit: اقتصادِ یکپارچه‌ی مشتری (economy.ts) — دقیقاً همون الگویِ
@@ -143,7 +148,9 @@ export async function transitionReservation(opts: {
     }
     // باطل‌کردن کش availability اگر وضعیت روی ظرفیت اثر دارد (H3: pattern-based)
     if (['cancelled', 'auto_cancelled', 'rejected', 'expired', 'no_show', 'completed'].includes(to)) {
-      const dateKey = result.resv.slotStart.toISOString().slice(0, 10);
+      // کلیدِ کش با تاریخِ محلیِ رستوران ساخته می‌شه (نه UTC) — وگرنه نزدیکِ
+      // نیمه‌شبِ تهران، باطل‌سازی روی کلیدِ اشتباه می‌زد و کش واقعی دست‌نخورده می‌موند.
+      const dateKey = dateKeyInTz(result.resv.slotStart, result.timezone);
       await invalidateAvailability(result.resv.restaurantId, dateKey).catch(() => {});
     }
   }

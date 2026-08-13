@@ -10,26 +10,16 @@ import { redeemGiftCardTx } from './loyalty';
 import { computeNoShowRisk as defaultNoShowPredictor } from './customer-insights';
 import { type OpeningHours } from './hours';
 import { computeRanges, genReservationCode, isConflictError, isSerializationError } from './reservation-helpers';
-import { ACTIVE_RESERVATION_STATUSES } from './reservation-status';
 import { invalidateAvailability } from './availability-cache';
+import { transitionReservation } from './lifecycle';
+import { getOccupiedTableNumbers } from './table-occupancy';
 
-// مجموعه‌ی وضعیت‌های فعال به‌صورت Prisma.sql — برای درج امن و پارامتری در $queryRaw.
-// یک‌بار ساخته می‌شود و در همه‌ی کوئری‌های raw تداخل/اشغال استفاده می‌شود (به‌جای
-// لیست رشته‌ای دستی که قبلاً ناقص بود و باعث C1 می‌شد).
-//
-// ⚠️ باگِ واقعیِ P0 که با تستِ زنده پیدا شد (نه فرض): بدونِ کستِ صریحِ
-// `::reservation_status`، Postgres پارامترهای این fragment را از نوعِ متنِ خام
-// (`text`) می‌بیند و مقایسه‌ی `status IN (...)` با خطای
-// «operator does not exist: reservation_status = text» شکست می‌خورد — یعنی
-// همین کوئریِ اشغال‌سنجیِ میز (که مانعِ double-booking است) در مسیرِ اصلیِ
-// رزروِ آنلاین (وقتی حداقل یک میزِ کاندیدا وجود دارد) با ۵۰۰ رد می‌شد.
-// روشِ کشف: curlِ مستقیم به /api/v1/reservations رویِ Postgresِ واقعی (نه
-// mock) با یک رستوران/میزِ واقعی → ۵۰۰؛ ریشه‌یابی با یک اسکریپتِ Prismaِ جدا
-// که دقیقاً همین الگو را با/بدونِ کست اجرا کرد. جمع‌بندی به این استریمِ
-// چیدمانِ کست تأیید شد: با کست کار می‌کند، بدونِ کست هرجا کار می‌رود می‌شکند.
-const ACTIVE_STATUSES_FRAGMENT = Prisma.join(
-  ACTIVE_RESERVATION_STATUSES.map((s) => Prisma.sql`${s}::reservation_status`),
-);
+// ⚠️ درسِ تاریخی (باگِ واقعیِ P0 که با تستِ زنده پیدا شد، نه فرض): مقایسه‌ی
+// خامِ `status IN (...)` در $queryRaw بدونِ کستِ صریح با enumِ Postgres شکست
+// می‌خورد («operator does not exist: reservation_status = text»). راهِ حلِ
+// اینجا دیگه لازم نیست (کوئریِ اشغال‌سنجی به table-occupancy.ts منتقل شد که
+// با کستِ ستون به‌جایِ کستِ مقادیر همین مشکل رو دور می‌زنه)، ولی درس رو برایِ
+// هر $queryRaw جدیدی که با ستونِ enum کار می‌کنه نگه می‌داریم.
 
 /**
  * فاز v2 — Dependency Inversion: موتور رزرو (core domain) به یک «port» انتزاعی
@@ -152,15 +142,31 @@ export async function createReservation(
 
   // ── تعیین کاندیداهای میز (هنوز رزرو نمی‌کنیم) ──
   // حالت دستی: شماره‌ی مشخص. حالت خودکار: میزهای مناسب به ترتیب «کم‌هدر».
-  let candidateTableIds: string[];
+  //
+  // ⚠️ رفع‌شده (بازبینیِ یکپارچگیِ merge، ۲۰۲۶-۰۸-۱۳): میزهایِ ثانویه‌ی یک
+  // رزروِ ترکیبیِ فعال (merged_table_numbers) هیچ ردیفِ رزروِ جداگانه‌ای
+  // ندارن که EXCLUDE constraint بشناسدش — یعنی بدونِ این پیش‌چک، هم مسیرِ
+  // دستی هم مسیرِ خودکار می‌تونستن یک میزِ ثانویه‌ی یک ترکیبِ فعال رو
+  // «آزاد» ببینن و همون میز رو به رزروِ کاملاً جدیدی بدن (double-booking
+  // واقعیِ فیزیکی، نه فقط یک خطایِ نمایشی). این چک لایه‌ی اپلیکیشنیه (یک
+  // TOCTOU raceِ باریک تا commitِ نهایی هنوز ممکنه)؛ محافظِ نهاییِ میزِ
+  // *اصلی* همچنان EXCLUDE constraint است — ریسکِ باقی‌مانده‌یِ مستندشده.
+  const occupiedNumbers = await getOccupiedTableNumbers(db, r.id, start, blockEnd);
+
+  let candidateTables: { id: string; number: number }[];
   let manualTableNumber: number | null = null;
   if (input.guest?.tableNumber != null) {
     const t = await db.table.findUnique({
       where: { restaurantId_number: { restaurantId: r.id, number: input.guest.tableNumber } },
     });
     if (!t) throw Err.tableNotFound(input.guest.tableNumber);
+    // ⚠️ رفع‌شده: مسیرِ دستی (شماره‌ی میزِ مشخص) این چک رو نداشت — مسیرِ
+    // خودکار isActive/maintenance رو فیلتر می‌کرد (پایین‌تر) ولی اینجا هرکسی
+    // می‌تونست یک میزِ غیرفعال/در-تعمیر رو صریحاً درخواست کنه و رزرو بشه.
+    if (!t.isActive || t.state === 'maintenance') throw Err.tableUnavailable(input.guest.tableNumber);
+    if (occupiedNumbers.has(t.number)) throw Err.tableConflict();
     if (t.capacity < input.partySize) throw Err.tableTooSmall(input.guest.tableNumber);
-    candidateTableIds = [t.id];
+    candidateTables = [{ id: t.id, number: t.number }];
     manualTableNumber = t.number;
   } else {
     // ── تخصیص هوشمند میز (Smart Table Assignment) ──
@@ -177,10 +183,25 @@ export async function createReservation(
       },
       select: { id: true, capacity: true, maxPartySize: true, priority: true, number: true },
     });
-    // فیلتر maxPartySize (پیش‌فرض = capacity) + رتبه‌بندی هوشمند
+    // فیلتر maxPartySize (پیش‌فرض = capacity) + رتبه‌بندی هوشمند + نه اشغالِ ثانویه
     const eligible = candidates.filter(t =>
-      (t.maxPartySize ?? t.capacity) >= input.partySize);
-    if (eligible.length === 0) throw Err.noTableForParty(input.partySize);
+      (t.maxPartySize ?? t.capacity) >= input.partySize && !occupiedNumbers.has(t.number));
+    // ⚠️ رفع‌شده (باگِ واقعیِ P0 که با تستِ زنده پیدا شد، نه فرض): این کوئری از
+    // همون اول capacity >= partySize فیلتر می‌کرد — یعنی برایِ گروهی که از
+    // ظرفیتِ *هر* میزِ تکی بزرگ‌تره (دقیقاً موردی که tryMergeTables برایِ
+    // حلش ساخته شده)، candidates همیشه خالی بود و اینجا فوراً با
+    // noTableForParty رد می‌شد، بدونِ اینکه merge اصلاً امتحان بشه —
+    // یعنی merge برایِ تنها سناریویِ اصلیِ خودش (گروهِ بزرگ‌تر از هر میزِ
+    // تکی) عملاً غیرقابل‌دسترسی بود. حالا فقط وقتی واقعاً هیچ میزِ تکیِ
+    // مناسب *و* هیچ میزِ مرج‌پذیری هم در رستوران نیست، همینجا رد می‌شه؛
+    // وگرنه با candidateTables خالی وارد تراکنش می‌شه و منطقِ موجودِ
+    // merge-fallback (پایین‌تر در placeReservation) امتحانش می‌کنه.
+    if (eligible.length === 0) {
+      const hasMergeableTables = await db.table.count({
+        where: { restaurantId: r.id, isActive: true, state: { not: 'maintenance' }, isMergeable: true },
+      });
+      if (hasMergeableTables === 0) throw Err.noTableForParty(input.partySize);
+    }
     // مرتب‌سازی هوشمند:
     //  1) اولویت بالاتر اول (priority دستی اپراتور)
     //  2) کم‌ترین هدر ظرفیت (best-fit: نزدیک‌ترین ظرفیت به اندازه‌ی گروه)
@@ -189,7 +210,7 @@ export async function createReservation(
       (b.priority - a.priority) ||
       ((a.capacity - input.partySize) - (b.capacity - input.partySize)) ||
       (a.number - b.number));
-    candidateTableIds = eligible.map(c => c.id);
+    candidateTables = eligible.map(c => ({ id: c.id, number: c.number }));
   }
 
   // ── فاز v2: پیش‌بینی ریسک no-show — قبل از تراکنش، فقط خوانش تاریخچه ──
@@ -209,7 +230,7 @@ export async function createReservation(
       try {
         return await placeReservation(
           input, r, cfg, { start, end, blockEnd, duration, blockBufferMin },
-          candidateTableIds, manualTableNumber, noShowRisk,
+          candidateTables, manualTableNumber, noShowRisk,
         );
       } catch (e) {
         lastErr = e;
@@ -230,7 +251,7 @@ async function placeReservation(
   r: { id: string; name: string; clubPrefix: string; cbBasePct: number },
   cfg: TimingConfig,
   ranges: { start: Date; end: Date; blockEnd: Date; duration: number; blockBufferMin: number },
-  candidateTableIds: string[],
+  candidateTables: { id: string; number: number }[],
   manualTableNumber: number | null,
   noShowRisk: { score: number; tier: 'low' | 'medium' | 'high' },
 ) {
@@ -245,18 +266,14 @@ async function placeReservation(
     result = await db.$transaction(
       async (tx) => {
         // ── بازچک availability داخل tx و انتخاب اولین میز واقعاً آزاد (نیاز ۴) ──
-        // بهینه‌سازی N+1: یک کوئری همه‌ی کاندیداهای اشغال‌شده را می‌گیرد، نه per-table.
-        let chosenTableId: string | null = null;
-        if (candidateTableIds.length > 0) {
-          const occRows = await tx.$queryRaw<{ table_id: string }[]>`
-            SELECT DISTINCT table_id FROM reservations
-            WHERE status IN (${ACTIVE_STATUSES_FRAGMENT})
-              AND table_id = ANY(${candidateTableIds}::uuid[])
-              AND tsrange(slot_start, block_end) && tsrange(${start}::timestamp, ${blockEnd}::timestamp)
-          `;
-          const occupied = new Set(occRows.map(r => r.table_id));
-          chosenTableId = candidateTableIds.find(tid => !occupied.has(tid)) ?? null;
-        }
+        // این تنها گیت واقعیِ نهایی قبل از insert است (بیرونِ tx فقط بهینه‌سازیه؛
+        // بینِ خواندنِ بیرونی و اینجا race ممکنه). ⚠️ رفع‌شده: قبلاً فقط
+        // table_idِ اصلی چک می‌شد؛ حالا getOccupiedTableNumbers میزهایِ
+        // ثانویه‌یِ merge رو هم می‌بینه (رجوع کن به table-occupancy.ts) —
+        // بدونِ این، این گیتِ «نهایی» برایِ میزهایِ ثانویه اصلاً محافظتی نداشت.
+        const occupiedNow = await getOccupiedTableNumbers(tx, r.id, start, blockEnd);
+        const chosen = candidateTables.find(t => !occupiedNow.has(t.number)) ?? null;
+        const chosenTableId = chosen?.id ?? null;
         if (!chosenTableId) {
           // هیچ میز تکی آزاد نیست → تلاش برای ترکیب میز (merge) در حالت خودکار
           if (manualTableNumber == null) {
@@ -396,8 +413,23 @@ async function insertReservation(
     }
 
     // مبلغ پایه = جمع قیمت آیتم‌های pre-order
-    const itemIds = input.preorder.map(x => x.menuItemId);
-    const items = await tx.menuItem.findMany({ where: { id: { in: itemIds } }, select: { id: true, priceToman: true } });
+    // ⚠️ رفع‌شده (بازبینیِ امنیتی، ۲۰۲۶-۰۸-۱۳): قبلاً این کوئری restaurantId
+    // نداشت — یعنی یک menuItemId از رستورانِ دیگه هم پیدا می‌شد و قیمتِ واقعیِ
+    // *همون رستورانِ دیگه* رو برمی‌گردوند (نه فقط قیمتِ اشتباه؛ نشتِ داده‌ی
+    // بین‌رستورانی). بدتر از اون، اگر id اصلاً وجود نداشت، priceMap.get()
+    // مقدارِ undefined می‌داد و `?? 0` بی‌صدا قیمت رو صفر می‌کرد — یعنی هر
+    // UUIDِ دلخواه (حتی جعلی) یک آیتمِ «رایگان» به سبد اضافه می‌کرد. حالا
+    // restaurantId فیلتر می‌شه و اگر تعدادِ برگشتی با تعدادِ درخواستی یکی
+    // نباشه (یعنی حداقل یک id گم/غلط/متعلق‌به‌رستورانِ‌دیگه بوده)، خطای
+    // اعتبارسنجی پرتاب می‌شه — هرگز price??0 خاموش.
+    const itemIds = [...new Set(input.preorder.map(x => x.menuItemId))];
+    const items = await tx.menuItem.findMany({
+      where: { id: { in: itemIds }, restaurantId: r.id },
+      select: { id: true, priceToman: true },
+    });
+    if (items.length !== itemIds.length) {
+      throw Err.validation('یک یا چند آیتمِ منو نامعتبر است یا متعلق به این رستوران نیست');
+    }
     const priceMap = new Map(items.map(i => [i.id, i.priceToman]));
     const subtotal = input.preorder.reduce((sum, x) => sum + (priceMap.get(x.menuItemId) ?? 0) * x.qty, 0);
 
@@ -479,16 +511,16 @@ async function tryMergeTables(
   // ── بهینه‌سازی N+1: به‌جای یک کوئری tableIsFree per میز (که در رستوران با
   //    ۲۰ میز قابل‌ترکیب = ۲۰ round-trip داخل تراکنش بود)، یک کوئری همه‌ی
   //    میزهای اشغال‌شده در این بازه را برمی‌گرداند و عضویت را در حافظه چک می‌کنیم.
-  //    تست‌شده روی Postgres: ~۰.۳ms برای ۱۰۰۰ رزرو با استفاده از ایندکس GiST. ──
-  const occupiedRows = await tx.$queryRaw<{ table_id: string }[]>`
-    SELECT DISTINCT table_id FROM reservations
-    WHERE status IN (${ACTIVE_STATUSES_FRAGMENT})
-      AND table_id IS NOT NULL
-      AND tsrange(slot_start, block_end) && tsrange(${start}::timestamp, ${blockEnd}::timestamp)
-  `;
-  const occupied = new Set(occupiedRows.map(r => r.table_id));
+  //    تست‌شده روی Postgres: ~۰.۳ms برای ۱۰۰۰ رزرو با استفاده از ایندکس GiST.
+  //
+  //  ⚠️ رفع‌شده: قبلاً فقط table_idِ اصلیِ هر رزرو چک می‌شد — یعنی میزهایِ
+  //  ثانویه‌یِ یک ترکیبِ فعال (merged_table_numbers) اینجا «آزاد» دیده
+  //  می‌شدن و می‌شد دوباره به‌عنوانِ اصلی یا ثانویه‌یِ یک ترکیبِ دیگه انتخاب
+  //  بشن (double-booking واقعی). حالا getOccupiedTableNumbers هر دو رو
+  //  پوشش می‌ده (رجوع کن به table-occupancy.ts). ──
+  const occupied = await getOccupiedTableNumbers(tx, restaurantId, start, blockEnd);
   const freeFlags = new Map<number, boolean>();
-  for (const t of tList) freeFlags.set(t.number, !occupied.has(t.id));
+  for (const t of tList) freeFlags.set(t.number, !occupied.has(t.number));
 
   // برای هر میز آزاد، گروه قابل‌ترکیب آزاد را بساز و ظرفیت جمع کن
   for (const t of tList) {
@@ -547,12 +579,33 @@ export interface WalkinInput {
 }
 
 export async function createWalkin(input: WalkinInput) {
-  // اعتبارسنجی میز (مالکیت) — قبل از باز کردن transaction
+  // اعتبارسنجی میز (مالکیت + فعال‌بودن) — قبل از باز کردن transaction.
+  // ⚠️ رفع‌شده: قبلاً isActive/maintenance اینجا چک نمی‌شد (فقط مسیرِ خودکارِ
+  // createReservation این فیلتر رو داشت) — یعنی می‌شد یک میزِ در-تعمیر رو
+  // صریحاً به‌عنوانِ walk-in انتخاب کرد.
   if (input.tableId) {
     const t = await db.table.findUnique({ where: { id: input.tableId } });
     if (!t || t.restaurantId !== input.restaurantId) throw Err.notFound('میز');
+    if (!t.isActive || t.state === 'maintenance') throw Err.tableUnavailable(t.number);
   }
 
+  try {
+    return await createWalkinTx(input);
+  } catch (e) {
+    // ── لایه‌ی حقیقت: اگر EXCLUDE constraint شلیک کرد، تداخل واقعی بوده ──
+    // ⚠️ رفع‌شده: قبلاً هیچ catchی اینجا نبود — یک ریسِ همزمانیِ واقعی (دو
+    // پرسنل هم‌زمان همون میز رو walk-in می‌کنن) خطایِ خامِ Postgres رو تا
+    // بیرون leak می‌کرد و errorResponse چون ApiError نبود، ۵۰۰ی مبهم می‌داد
+    // («خطای داخلی»)، نه یک ۴۰۹ی قابلِ‌فهم برایِ پرسنل.
+    if (isConflictError(e)) {
+      metrics.reservationConflicts.inc();
+      throw Err.tableConflict();
+    }
+    throw e;
+  }
+}
+
+async function createWalkinTx(input: WalkinInput) {
   return db.$transaction(async (tx) => {
     // کاربر را پیدا یا بساز (همان الگوی ورود با OTP)
     const user = await tx.user.upsert({
@@ -614,41 +667,55 @@ export async function createWalkin(input: WalkinInput) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  markArrival — پرسنل «رسید» می‌زند: وضعیت→arrived، امتیازِ وفاداری، SMS خوش‌آمد.
+//  markArrival — پرسنل «رسید» می‌زند: وضعیت→checked_in، امتیازِ وفاداری، SMS خوش‌آمد.
 //  منطق قبلاً در route پخش شده بود؛ حالا در لایه‌ی سرویس متمرکز است تا با
 //  بقیه‌ی منطقِ رزرو هماهنگ بماند و قابلِ تست و استفاده‌ی مجدد باشد.
+//
+//  ⚠️ رفع‌شده (بازبینیِ چرخه‌یِ حیات، ۲۰۲۶-۰۸-۱۳): قبلاً این تابع مستقیم
+//  `tx.reservation.update({ data: { status: 'arrived' } })` می‌زد — یعنی
+//  state machineِ lifecycle.ts (TRANSITIONS) رو کاملاً دور می‌زد: نه
+//  reservation_event (audit) ثبت می‌شد، نه اقتصادِ پلتفرم/اعلانِ استانداردِ
+//  چرخه‌ی حیات اجرا می‌شد، و از وضعیت‌هایِ مدرن (auto_confirmed، preparing،
+//  running_late) پشتیبانی نمی‌کرد (فقط confirmed/pending). حالا از طریقِ
+//  transitionReservation (تنها نویسنده‌ی مجاز) به وضعیتِ استانداردِ جدید
+//  checked_in منتقل می‌شه؛ هر انتقالی که TRANSITIONS اجازه نده (auto_confirmed،
+//  preparing، running_late، confirmed → checked_in مجازند؛ pending نه) با
+//  ۴۲۲ ساختاریافته (INVALID_STATUS_TRANSITION) رد می‌شه.
 // ═══════════════════════════════════════════════════════════
 export interface ArrivalInput {
   code: string;
-  tenantId: string;   // از توکنِ پرسنل — برای بررسی مالکیت
+  restaurantId: string;  // از withRestaurantAuth — رزرو باید متعلق به همین شعبه باشد
+  actorStaffId: string;
 }
 
 const ARRIVAL_POINTS = 50;
 
 export async function markArrival(input: ArrivalInput) {
-  const resv = await db.reservation.findUnique({
-    where: { code: input.code },
-    include: { restaurant: { select: { tenantId: true, name: true } } },
+  const resv = await db.reservation.findUnique({ where: { code: input.code } });
+  if (!resv || resv.restaurantId !== input.restaurantId) throw Err.notFound('رزرو');
+
+  // idempotency: اگر از قبل checked_in بود، این یک تکرار (retry) است — دوباره
+  // امتیاز/SMS نده. transitionReservation خودش یک no-op امن برمی‌گردونه
+  // (from===to)، ولی تصمیمِ «آیا این بارِ اوله» باید قبل از فراخوانی گرفته بشه.
+  const wasAlreadyCheckedIn = resv.status === 'checked_in';
+
+  const updated = await transitionReservation({
+    reservationId: resv.id,
+    to: 'checked_in',
+    actor: `staff:${input.actorStaffId}`,
   });
-  if (!resv) throw Err.notFound('رزرو');
-  if (resv.restaurant.tenantId !== input.tenantId) throw Err.forbidden();
-  if (resv.status !== 'confirmed' && resv.status !== 'pending') {
-    throw Err.validation(`رزرو در وضعیت ${resv.status} قابل تأیید حضور نیست`);
+
+  // امتیازِ باشگاهِ وفاداریِ رستوران — سیستمِ کاملاً جدا از اقتصادِ یکپارچه‌ی
+  // پلتفرم (customer_economy_profiles)؛ اینجا عمداً دست‌نخورده نگه داشته شد.
+  if (!wasAlreadyCheckedIn && resv.userId) {
+    await db.clubMember.updateMany({
+      where: { restaurantId: resv.restaurantId, userId: resv.userId },
+      data: { points: { increment: ARRIVAL_POINTS } },
+    });
   }
 
-  const updated = await db.$transaction(async (tx) => {
-    const u = await tx.reservation.update({ where: { id: resv.id }, data: { status: 'arrived' } });
-    if (resv.userId) {
-      await tx.clubMember.updateMany({
-        where: { restaurantId: resv.restaurantId, userId: resv.userId },
-        data: { points: { increment: ARRIVAL_POINTS } },
-      });
-    }
-    return u;
-  });
-
-  // SMS خوش‌آمد (بعد از commit — شکستش رزرو را برنمی‌گرداند)
-  if (resv.guestPhone) {
+  // SMS خوش‌آمد — فقط بارِ اول (نه در تکرار/retry)
+  if (!wasAlreadyCheckedIn && resv.guestPhone) {
     const member = resv.userId ? await db.clubMember.findUnique({
       where: { restaurantId_userId: { restaurantId: resv.restaurantId, userId: resv.userId } },
     }) : null;
@@ -659,5 +726,5 @@ export async function markArrival(input: ArrivalInput) {
     });
   }
 
-  return { code: updated.code, status: updated.status };
+  return { code: resv.code, status: updated.status };
 }

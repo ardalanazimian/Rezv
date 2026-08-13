@@ -113,7 +113,7 @@ export async function computeAndCacheAvailability(restaurantId: string, date: st
       restaurantId, status: { in: ACTIVE_RESERVATION_STATUSES as any },
       slotStart: { lt: dayEnd }, slotEnd: { gt: dayStart },
     },
-    select: { tableId: true, slotStart: true, slotEnd: true, blockBufferMinutes: true } as any,
+    select: { tableId: true, mergedTableNumbers: true, slotStart: true, slotEnd: true, blockBufferMinutes: true } as any,
   });
 
   const blockBuffer = cfg.cleaningMinutes + cfg.bufferMinutes;
@@ -123,7 +123,11 @@ export async function computeAndCacheAvailability(restaurantId: string, date: st
     const blockEnd = new Date(+end + blockBuffer * 60_000);
     const freeTables = tables
       .filter(t => !busy.some((b: any) => {
-        if (b.tableId !== t.id) return false;
+        // ⚠️ رفع‌شده: قبلاً فقط b.tableId === t.id چک می‌شد — میزهایِ ثانویه‌ی
+        // یک رزروِ ترکیبی (merged_table_numbers) اینجا «آزاد» نشون داده
+        // می‌شدن، درحالی‌که واقعاً بخشی از یک ترکیبِ فعال بودن.
+        const isThisTable = b.tableId === t.id || (b.mergedTableNumbers as number[] | undefined)?.includes(t.number);
+        if (!isThisTable) return false;
         const bBlockEnd = new Date(+b.slotEnd + (b.blockBufferMinutes ?? 0) * 60_000);
         return b.slotStart < blockEnd && bBlockEnd > start; // هم‌پوشانی بازه‌ی بلاک
       }))
