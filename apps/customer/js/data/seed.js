@@ -51,7 +51,7 @@ export const R_SAMPLE = [
 export const PERKS=[['🎁','کش‌بک','تا ۱۵٪ برگشت پول'],['⚡','رزرو سریع','اولویت در ساعات شلوغ'],['🎂','هدیه تولد','تخفیف ویژه ماه تولد'],['👑','میز VIP','دسترسی به میزهای ویژه']];
 export const BADGES=[['🍽️','اولین رزرو',1],['🔥','۵ هفته پیاپی',1],['⭐','گورمه',1],['🌙','شب‌نشین',1],['👑','VIP',0],['🗺️','کاشف',0]];
 
-export let pts=340, favs=new Set(), curRest=null, bk={};
+export let pts=0, favs=new Set(), curRest=null, bk={};
 // علاقه‌مندی‌ها را بین رفرش‌ها نگه دار (localStorage — الگوی rz_* مثل بقیهٔ اپ)
 try{ const saved=JSON.parse(localStorage.getItem('rz_favs')||'[]'); if(Array.isArray(saved)) favs=new Set(saved); }catch{}
 export function saveFavs(){ try{ localStorage.setItem('rz_favs', JSON.stringify([...favs])); }catch{} }

@@ -154,6 +154,33 @@ export function onSessionExpired(){
 export function refreshAuthUI(){
   const av = document.querySelector('.nav-avatar');
   if (av) av.textContent = userInitial();
+  syncNavPoints();
+}
+
+// ⚠️ رفعِ باگِ واقعی (۲۰۲۶-۰۸-۱۳): چیپِ امتیازِ نوارِ بالا عددِ ثابتِ ۳۴۰ را
+// مستقیم در markup داشت و فقط وقتی کاربر تبِ «باشگاه» را باز می‌کرد با
+// مقدارِ واقعی جایگزین می‌شد. یعنی هر کاربری در نگاهِ اول امتیازِ کسِ دیگری
+// را می‌دید. حالا:
+//   • مهمانِ ناشناس → چیپ اصلاً نمایش داده نمی‌شود (امتیازی ندارد که نشان بدهیم)
+//   • کاربرِ واردشده → تا رسیدنِ پاسخِ سرور «—» و بعد عددِ واقعی
+// عمداً هیچ عددی حدس زده نمی‌شود؛ نبودِ داده یعنی نبودِ ادعا.
+let _ptsInFlight = null;
+export function syncNavPoints(){
+  const wrap = document.querySelector('.nav-pts');
+  const el = document.getElementById('navPts');
+  if (!wrap || !el) return;
+  if (!USER) { wrap.style.display = 'none'; el.textContent = '—'; return; }
+  wrap.style.display = '';
+  if (_ptsInFlight) return;
+  _ptsInFlight = API.get('/me/loyalty').then(res => {
+    if (res.ok && typeof res.data?.points === 'number') {
+      el.textContent = res.data.points.toLocaleString('fa-IR');
+      import('./data/seed.js').then(m => m.setPts(res.data.points)).catch(() => {});
+    } else {
+      el.textContent = '—';   // سرور نگفت → چیزی ادعا نمی‌کنیم
+    }
+  }).catch(() => { el.textContent = '—'; })
+    .finally(() => { _ptsInFlight = null; });
 }
 
 // نگاشت داده‌ی API به ساختار فرانت‌اند (R)

@@ -240,8 +240,25 @@ async function rAnalytics(){
     } else { API.online=false; }
   }
   window.__A_HEATMAP=window.__A_HEATMAP||[];
-  const days=[['ش',14],['ی',11],['د',13],['س',17],['چ',22],['پ',28],['ج',31]];
-  const mx=31;
+  // ⚠️ رفعِ باگِ واقعی (۲۰۲۶-۰۸-۱۳): این نمودارِ ۷روزه قبلاً اعدادِ ثابتِ
+  // هاردکد را نشان می‌داد و حتی وقتی API آنلاین بود هم عوض نمی‌شد — یعنی
+  // صاحبِ رستوران نمودارِ ساختگی می‌دید و فکر می‌کرد دادهٔ خودش است.
+  // حالا از heatmapِ واقعی (dow/hour/count) روی روز جمع زده می‌شود.
+  // نگاشتِ dowِ Postgres (۰=یکشنبه) به هفتهٔ فارسی (شنبه اولِ هفته).
+  const DOW_FA=[['ش',6],['ی',0],['د',1],['س',2],['چ',3],['پ',4],['ج',5]];
+  const heat=window.__A_HEATMAP;
+  let days, isSampleChart=false;
+  if(Array.isArray(heat) && heat.length){
+    const byDow={};
+    for(const c of heat){ byDow[c.dow]=(byDow[c.dow]||0)+(c.count||0); }
+    days=DOW_FA.map(([label,dow])=>[label, byDow[dow]||0]);
+  } else {
+    // حالتِ آفلاین/نمونه — همان قاعدهٔ بقیهٔ صفحه، و dataSourceNote بالای
+    // صفحه صراحتاً می‌گوید دادهٔ واقعی نیست.
+    days=[['ش',14],['ی',11],['د',13],['س',17],['چ',22],['پ',28],['ج',31]];
+    isSampleChart=true;
+  }
+  const mx=Math.max(1,...days.map(([,v])=>v));
   const totalGuests=A.totalCustomers;
   const returnRate=A.returnRate;
   const avgVisits=A.avgVisits;
