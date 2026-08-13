@@ -3,12 +3,13 @@
 //  جدا شده از data/detail.js (ریفکتور فاز۱: جداسازیِ مسئولیت).
 //  رفتار دقیقاً همان قبل است؛ فقط از یک فایلِ مجزا export می‌شود.
 // ═══════════════════════════════════════════════════════════
-import { API, USER, isLoggedIn, userName } from '../api.js';
+import { API, USER, isLoggedIn, syncNavPoints, userName } from '../api.js';
 import { closeSheet, esc, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
 import { fmtFa } from './discover.js';
-import { TRIPS, bk, bookingCtx, pts, setBk, setBookingCtx, setPts, todayISO } from './seed.js';
+import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js';
 import { R } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
+import { genIdempotencyKey } from '../api-core.js';
 
 // ═══════════════════════════════════════════════════════════
 //  تاریخ‌های قابلِ رزرو
@@ -135,7 +136,8 @@ export function bookStep3(r){
     <div class="field-label">نام</div><input class="inp" id="bkName" value="${esc(name)}" placeholder="نامت رو بنویس">
     <div class="field-label">موبایل</div><input class="inp" id="bkPhone" inputmode="tel" value="${esc(phone)}" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
     <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${r.n}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
-    <div class="reward-row"><div class="reward"><div class="rv blue">+۵۰</div><div class="rl">امتیاز</div></div><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>
+    ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
+    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${r.id})">تأیید رزرو</button>`;
 }
 export async function confirmBook(id){
@@ -153,20 +155,24 @@ export async function confirmBook(id){
   if(confirmBtn){confirmBtn.disabled=true;confirmBtn.textContent='در حال ثبت رزرو...';}
 
   // تاریخ دیگر حدس زده نمی‌شود: bk.dateVal همان ISO است که کاربر انتخاب کرده.
+  // Idempotency-Key: یک‌بار برای همین submit ساخته می‌شود — اگر کاربر دوبار
+  // دکمه را بزند یا شبکه retry کند، سرور رزروِ دوم نمی‌سازد، پاسخِ اول برمی‌گردد.
   const res=await API.post('/reservations',{
     restaurant_id:id,
     date:bk.dateVal||todayISO(),
     time:bk.timeRaw||String(bk.time||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
     party_size:bk.partyN||2,
     notify_sms:true,
-  });
+  },{ 'Idempotency-Key': genIdempotencyKey() });
 
-  let code;
+  let code, isOfflineDemo=false;
   if(res.ok && res.data?.code){
     // رزرو واقعی در دیتابیس ثبت شد (بک‌اند code را در سطحِ بالا برمی‌گرداند)
     code=res.data.code;
   } else if(res.offline){
-    // بک‌اند نیست → کد محلی (حالت دمو)
+    // بک‌اند نیست → کد محلی (حالت دمو) — این رزرو هیچ‌جا روی سرور ثبت نشده،
+    // پس باید همین‌جا صریح به کاربر گفته شود (نه شبیه‌سازیِ خاموشِ موفقیت).
+    isOfflineDemo=true;
     code='RZ'+Math.random().toString(36).slice(2,7).toUpperCase();
   } else {
     // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
@@ -180,16 +186,20 @@ export async function confirmBook(id){
     return;
   }
 
-  // موفقیت (واقعی یا دمو)
-  setPts(pts+50);document.getElementById('navPts').textContent=fmtFa(pts);
+  // موفقیت (واقعی یا دمو) — دیگر امتیازِ محلی جعل نمی‌شود؛ عددِ واقعی از سرور
+  // می‌آید (اگر رزروِ واقعی بود، بعداً که «انجام‌شد» علامت بخورد XP واقعی
+  // ثبت می‌شود؛ اینجا فقط چیپِ نوارِ بالا را با مقدارِ به‌روزِ سرور همگام می‌کنیم).
+  if (res.ok) syncNavPoints();
   TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
   sheetBody.innerHTML=`
     <div class="success">
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
-      <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
-      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}<br>یادآور با پیامک می‌فرستیم</div>
+      <div class="sheet-title" style="text-align:center">${isOfflineDemo?'رزرو محلی ثبت شد':'رزرو تأیید شد!'}</div>
+      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}${isOfflineDemo?'':'<br>یادآور با پیامک می‌فرستیم'}</div>
+      ${isOfflineDemo?`<div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:10px 0">⚠️ اتصال به سرورِ رزرونو برقرار نشد؛ این رزرو فقط روی همین دستگاه (به‌صورتِ آزمایشی) ذخیره شد و در سیستمِ رستوران ثبت نشده. یادآورِ پیامکی هم ارسال نمی‌شود. با وصل‌شدنِ اینترنت، دوباره از اول رزرو کن.</div>`:''}
       <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode('${esc(code)}')" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
-      <div class="reward-row"><div class="reward"><div class="rv blue">+۵۰</div><div class="rl">امتیاز گرفتی</div></div><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>
+      ${(!isOfflineDemo && r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
+      ${isOfflineDemo?'':'<div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>'}
       <button class="btn btn-primary btn-lg btn-block" onclick="closeSheet();go('trips')">رزروهای من</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
     </div>`;

@@ -55,8 +55,9 @@ make_global_apicore() {
   sed \
     -e 's/^export async function httpJson(/async function httpJson(/' \
     -e 's/^export function resolveApiBase(/function resolveApiBase(/' \
+    -e 's/^export function genIdempotencyKey(/function genIdempotencyKey(/' \
     "$SRC/js/api-core.js"
-  printf '\nif (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveApiBase = resolveApiBase; }\n'
+  printf '\nif (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveApiBase = resolveApiBase; window.genIdempotencyKey = genIdempotencyKey; }\n'
 }
 
 # نسخه‌ی global از format.js (export را برمی‌دارد؛ برای <script> کلاسیک — توابعِ

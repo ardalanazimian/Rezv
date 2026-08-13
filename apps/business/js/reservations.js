@@ -323,11 +323,13 @@ async function saveManual(){
   // اگر توکن staff داریم، رزرو واقعی در دیتابیس ثبت کن
   if(API.getToken()){
     const dt=manualDateToISO(dateVal,timeVal);
+    // Idempotency-Key: یک‌بار برای همین submit — دوبار کلیک/retry شبکه رزروِ
+    // دستیِ دوم نمی‌سازد.
     const res=await API.post('/reservations',{
       restaurant_id:STAFF_INFO?.restaurant_id||undefined,
       date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
       guest:{name:n,phone:phone,table_number:tableVal,note:'رزرو دستی'},
-    });
+    },{ 'Idempotency-Key': genIdempotencyKey() });
     if(res.ok){
       // موفق در سرور — به‌علاوه‌ی نمایش محلی
       RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.reservation?.code});

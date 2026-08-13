@@ -1,5 +1,6 @@
 import { db } from './db';
 import { createLogger } from './logger';
+import { ApiError } from './errors';
 
 const log = createLogger('idempotency');
 
@@ -101,7 +102,13 @@ export async function withIdempotency<T>(
   }
 
   // هنوز in_progressِ تازه = درخواست همزمان واقعی با همان کلید
-  throw Object.assign(new Error('درخواست تکراری در حال پردازش است'), { statusCode: 409, code: 'IDEMPOTENCY_CONFLICT' });
+  //
+  // ⚠️ باگِ واقعی که با تستِ زنده (curlِ مستقیم روی سروِ محلی + Postgres واقعی، نه
+  // فرض) پیدا شد: قبلاً اینجا یک Errorِ خام با statusCode/codeِ دستی پرتاب می‌شد.
+  // errorResponse فقط instanceof ApiError را می‌شناسد؛ Errorِ خام همیشه به ۵۰۰
+  // «خطای داخلی» تبدیل می‌شد و کلاینت هرگز ۴۰۹ِ واقعی نمی‌دید (نه فقط پیام،
+  // خودِ statusCode هم گم می‌شد). حالا واقعاً ApiError پرتاب می‌شود.
+  throw new ApiError('IDEMPOTENCY_CONFLICT', 'درخواست تکراری در حال پردازش است', 409);
 }
 
 /** پاک‌سازی کلیدهای منقضی (توسط cron نگه‌داری صدا زده می‌شود). */

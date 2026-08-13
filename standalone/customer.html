@@ -702,6 +702,8 @@ img{display:block;max-width:100%}
 .rc-hotbadge{position:absolute;top:var(--sp-5);inset-inline-end:calc(var(--touch-min) + var(--sp-5));z-index:3;font-size:var(--fs-2xs);font-weight:800;color:#fff;padding:var(--sp-1) var(--sp-3);
   border-radius:var(--radius-full);display:flex;align-items:center;gap:var(--sp-1);background:linear-gradient(135deg,#C2410C,#BE185D);box-shadow:0 6px 16px rgba(255,75,122,.5)}
 .rc-hotbadge.ai{background:var(--grad);inset-inline-end:var(--sp-3)}
+/* صداقتِ داده: چیپِ کوچکِ «نمونه» برایِ رستوران/رزروِ نمونه (نه دادهٔ واقعیِ سرور) */
+.demo-chip{display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-2xs);font-weight:800;padding:2px var(--sp-2);border-radius:var(--radius-full);background:var(--warning-soft);color:var(--warning-ink);border:1px solid rgba(194,65,12,.25);white-space:nowrap;flex:none}
 /* پنلِ شیشه‌ی شناور پایینِ کارت
    آلفای اسکریم عددی انتخاب شده، نه چشمی: با ۰٫۳۸ متنِ .rc-meta و .rc-slot روی
    روشن‌ترین گرادیانِ پالت به ۱٫۳۲:۱ می‌رسید (نمونه‌برداریِ پیکسلی از رندرِ واقعی).
@@ -1094,6 +1096,8 @@ img{display:block;max-width:100%}
 .rp-hero-badges{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .rp-hero-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;padding:6px 12px;border-radius:100px;background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.24);color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.3)}
 .rp-hero-badge.live{background:rgba(18,161,80,.28);border-color:rgba(52,211,153,.5)}
+/* صداقتِ داده: رستوران/رزروی که از دادهٔ نمونه/آفلاین می‌آید (نه بک‌اندِ واقعی) */
+.rp-hero-badge.demo{background:rgba(194,65,12,.34);border-color:rgba(251,146,60,.55)}
 .rp-hero-overlay{position:relative;z-index:2;width:100%;padding:60px 20px 22px;background:linear-gradient(to top,rgba(4,3,10,.85),rgba(4,3,10,.25) 60%,transparent);color:#fff}
 .rp-hero-name{font-size:32px;font-weight:900;letter-spacing:-.03em;margin-bottom:8px;text-shadow:0 2px 16px rgba(0,0,0,.5);line-height:1.05}
 .rp-hero-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;opacity:.96;text-shadow:0 1px 8px rgba(0,0,0,.5);font-weight:600}
@@ -1923,6 +1927,25 @@ async function httpJson(url, opts = {}, timeoutMs = 8000) {
   }
 }
 
+// ── تولیدِ کلیدِ Idempotency برای عملیاتِ نوشتنیِ حساس (مثلاً ثبتِ رزرو) ──
+// یک UUID per «قصدِ کاربر» (نه per تلاشِ HTTP): سرِ فراخوان (مثلاً confirmBook)
+// یک‌بار ساخته می‌شود و برای همه‌ی تلاش‌های داخلیِ همان submit (شاملِ retryِ
+// خودکارِ ۴۰۱→refresh) همان می‌ماند؛ submitِ بعدیِ کاربر کلیدِ تازه می‌گیرد —
+// این‌طور دوبار زدنِ دکمه/ریترایِ شبکه رزروِ دوم نمی‌سازد، ولی submitِ جدید هم
+// بی‌جهت به کلیدِ کهنه گیر نمی‌کند.
+function genIdempotencyKey() {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  } catch { /* noop */ }
+  // fallback برای مرورگر/محیطِ بدونِ crypto.randomUUID (نسخه‌ی v4-like غیررمزنگارانه؛
+  // اینجا فقط برای یکتاییِ محلیِ کلیدِ idempotency لازم است، نه امنیت).
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 
 /* ═══ js/data/seed.js ═══ */
 // ═══ رزرونو — داده‌های نمونه: رستوران‌ها، گرادیان، مزایا، نشان‌ها (بخشی از اپ کاستومر) ═══
@@ -2166,6 +2189,7 @@ window.leaveWL = leaveWL;
 
 
 
+
 // ═══════════════════════════════════════════════════════════
 //  تاریخ‌های قابلِ رزرو
 //
@@ -2290,7 +2314,8 @@ function bookStep3(r){
     <div class="field-label">نام</div><input class="inp" id="bkName" value="${esc(name)}" placeholder="نامت رو بنویس">
     <div class="field-label">موبایل</div><input class="inp" id="bkPhone" inputmode="tel" value="${esc(phone)}" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
     <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${r.n}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
-    <div class="reward-row"><div class="reward"><div class="rv blue">+۵۰</div><div class="rl">امتیاز</div></div><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>
+    ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
+    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${r.id})">تأیید رزرو</button>`;
 }
 async function confirmBook(id){
@@ -2308,20 +2333,24 @@ async function confirmBook(id){
   if(confirmBtn){confirmBtn.disabled=true;confirmBtn.textContent='در حال ثبت رزرو...';}
 
   // تاریخ دیگر حدس زده نمی‌شود: bk.dateVal همان ISO است که کاربر انتخاب کرده.
+  // Idempotency-Key: یک‌بار برای همین submit ساخته می‌شود — اگر کاربر دوبار
+  // دکمه را بزند یا شبکه retry کند، سرور رزروِ دوم نمی‌سازد، پاسخِ اول برمی‌گردد.
   const res=await API.post('/reservations',{
     restaurant_id:id,
     date:bk.dateVal||todayISO(),
     time:bk.timeRaw||String(bk.time||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
     party_size:bk.partyN||2,
     notify_sms:true,
-  });
+  },{ 'Idempotency-Key': genIdempotencyKey() });
 
-  let code;
+  let code, isOfflineDemo=false;
   if(res.ok && res.data?.code){
     // رزرو واقعی در دیتابیس ثبت شد (بک‌اند code را در سطحِ بالا برمی‌گرداند)
     code=res.data.code;
   } else if(res.offline){
-    // بک‌اند نیست → کد محلی (حالت دمو)
+    // بک‌اند نیست → کد محلی (حالت دمو) — این رزرو هیچ‌جا روی سرور ثبت نشده،
+    // پس باید همین‌جا صریح به کاربر گفته شود (نه شبیه‌سازیِ خاموشِ موفقیت).
+    isOfflineDemo=true;
     code='RZ'+Math.random().toString(36).slice(2,7).toUpperCase();
   } else {
     // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
@@ -2335,16 +2364,20 @@ async function confirmBook(id){
     return;
   }
 
-  // موفقیت (واقعی یا دمو)
-  setPts(pts+50);document.getElementById('navPts').textContent=fmtFa(pts);
+  // موفقیت (واقعی یا دمو) — دیگر امتیازِ محلی جعل نمی‌شود؛ عددِ واقعی از سرور
+  // می‌آید (اگر رزروِ واقعی بود، بعداً که «انجام‌شد» علامت بخورد XP واقعی
+  // ثبت می‌شود؛ اینجا فقط چیپِ نوارِ بالا را با مقدارِ به‌روزِ سرور همگام می‌کنیم).
+  if (res.ok) syncNavPoints();
   TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
   sheetBody.innerHTML=`
     <div class="success">
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
-      <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
-      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}<br>یادآور با پیامک می‌فرستیم</div>
+      <div class="sheet-title" style="text-align:center">${isOfflineDemo?'رزرو محلی ثبت شد':'رزرو تأیید شد!'}</div>
+      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}${isOfflineDemo?'':'<br>یادآور با پیامک می‌فرستیم'}</div>
+      ${isOfflineDemo?`<div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:10px 0">⚠️ اتصال به سرورِ رزرونو برقرار نشد؛ این رزرو فقط روی همین دستگاه (به‌صورتِ آزمایشی) ذخیره شد و در سیستمِ رستوران ثبت نشده. یادآورِ پیامکی هم ارسال نمی‌شود. با وصل‌شدنِ اینترنت، دوباره از اول رزرو کن.</div>`:''}
       <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode('${esc(code)}')" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
-      <div class="reward-row"><div class="reward"><div class="rv blue">+۵۰</div><div class="rl">امتیاز گرفتی</div></div><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>
+      ${(!isOfflineDemo && r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
+      ${isOfflineDemo?'':'<div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>'}
       <button class="btn btn-primary btn-lg btn-block" onclick="closeSheet();go('trips')">رزروهای من</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
     </div>`;
@@ -2623,7 +2656,8 @@ const API = {
   },
 
   get(path){ return this.request(path); },
-  post(path, body){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}) }); },
+  // headers اختیاری: برای عملیاتِ حساس (مثلاً رزرو) که به Idempotency-Key نیاز دارند.
+  post(path, body, headers){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}), headers }); },
 
   // ── احراز هویت (فاز ۳) ──
   async requestOtp(phone){
@@ -2895,7 +2929,7 @@ function cardHTML(r){
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
     <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${r.id},this);buzz&&buzz()">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
-      <div class="rc-top"><div class="rc-name">${r.n}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
+      <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.n}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
       <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
       <div class="rc-slots">${r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');buzz&&buzz()">${s}</button>`).join('')}</div>
@@ -3007,7 +3041,7 @@ function hCardHTML(r,extra){
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${r.id})">
     <div class="hcard-img" style="background:${GRAD[r.id]||GRAD[1]}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
-    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rt||r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}</div>
+    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rt||r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
 }
 // ═══════════════════════════════════════════════════════════
@@ -3077,17 +3111,18 @@ const SAMPLE_EVENTS=[
 ];
 async function renderEvents(){
   const el=document.getElementById('eventsList');if(!el)return;
-  let events=SAMPLE_EVENTS;
+  let events=SAMPLE_EVENTS, isDemo=true;
   // اگر آنلاین، از API بخوان
   const res=await API.get('/events');
   if(res.ok&&Array.isArray(res.data?.events)&&res.data.events.length){
     events=res.data.events.map(e=>({rid:e.restaurantId,emoji:e.emoji||'🎉',title:e.title,rest:'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
+    isDemo=false;
   }
   el.innerHTML=events.map(e=>`
     <div class="event-card" role="button" tabindex="0" onclick="openRest(${e.rid})">
       <div class="event-emoji">${e.emoji}</div>
       <div class="event-body">
-        <div class="event-title">${esc(e.title)}</div>
+        <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
         ${e.rest?`<div class="event-rest">${esc(e.rest)}</div>`:''}
         <div class="event-when">${icon('calendar',{size:13})} ${esc(e.when)}</div>
         ${e.desc?`<div class="event-desc">${esc(e.desc)}</div>`:''}
@@ -3209,6 +3244,7 @@ function openRest(id){
         <div class="rp-hero-badges">
           ${r.now?`<span class="rp-hero-badge live"><span class="live-dot" aria-hidden="true"></span> الان باز</span>`:''}
           <span class="rp-hero-badge">${icon('wallet',{size:14})} ${fmtFa(r.cb)}٪ کش‌بک</span>
+          ${r.slug?'':'<span class="rp-hero-badge demo">نمونه — دادهٔ آزمایشی</span>'}
         </div>
         <div class="rp-hero-name">${esc(r.n)}</div>
         <div class="rp-hero-meta">

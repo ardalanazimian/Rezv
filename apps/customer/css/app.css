@@ -226,6 +226,8 @@ img{display:block;max-width:100%}
 .rc-hotbadge{position:absolute;top:var(--sp-5);inset-inline-end:calc(var(--touch-min) + var(--sp-5));z-index:3;font-size:var(--fs-2xs);font-weight:800;color:#fff;padding:var(--sp-1) var(--sp-3);
   border-radius:var(--radius-full);display:flex;align-items:center;gap:var(--sp-1);background:linear-gradient(135deg,#C2410C,#BE185D);box-shadow:0 6px 16px rgba(255,75,122,.5)}
 .rc-hotbadge.ai{background:var(--grad);inset-inline-end:var(--sp-3)}
+/* صداقتِ داده: چیپِ کوچکِ «نمونه» برایِ رستوران/رزروِ نمونه (نه دادهٔ واقعیِ سرور) */
+.demo-chip{display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-2xs);font-weight:800;padding:2px var(--sp-2);border-radius:var(--radius-full);background:var(--warning-soft);color:var(--warning-ink);border:1px solid rgba(194,65,12,.25);white-space:nowrap;flex:none}
 /* پنلِ شیشه‌ی شناور پایینِ کارت
    آلفای اسکریم عددی انتخاب شده، نه چشمی: با ۰٫۳۸ متنِ .rc-meta و .rc-slot روی
    روشن‌ترین گرادیانِ پالت به ۱٫۳۲:۱ می‌رسید (نمونه‌برداریِ پیکسلی از رندرِ واقعی).
@@ -618,6 +620,8 @@ img{display:block;max-width:100%}
 .rp-hero-badges{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .rp-hero-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;padding:6px 12px;border-radius:100px;background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.24);color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.3)}
 .rp-hero-badge.live{background:rgba(18,161,80,.28);border-color:rgba(52,211,153,.5)}
+/* صداقتِ داده: رستوران/رزروی که از دادهٔ نمونه/آفلاین می‌آید (نه بک‌اندِ واقعی) */
+.rp-hero-badge.demo{background:rgba(194,65,12,.34);border-color:rgba(251,146,60,.55)}
 .rp-hero-overlay{position:relative;z-index:2;width:100%;padding:60px 20px 22px;background:linear-gradient(to top,rgba(4,3,10,.85),rgba(4,3,10,.25) 60%,transparent);color:#fff}
 .rp-hero-name{font-size:32px;font-weight:900;letter-spacing:-.03em;margin-bottom:8px;text-shadow:0 2px 16px rgba(0,0,0,.5);line-height:1.05}
 .rp-hero-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;opacity:.96;text-shadow:0 1px 8px rgba(0,0,0,.5);font-weight:600}
