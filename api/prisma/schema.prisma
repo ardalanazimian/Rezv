@@ -42,6 +42,16 @@ model User {
   referredById String?       @map("referred_by_id") @db.Uuid     // چه کسی این کاربر را دعوت کرد
   avatarUrl    String?       @map("avatar_url")
   createdAt    DateTime      @default(now()) @map("created_at")
+  // ── بن سختِ پلتفرم (migration 039) — کاملاً جدا از hasActiveAbuseFlagِ نرم ──
+  // «الان بن است» = bannedAt ست شده و unbannedAt نال است. بن‌شدنِ دوباره بعد
+  // از رفعِ بن، banned_at/banned_reason را بازنویسی می‌کند (unbanned_at ریست
+  // به null)؛ تاریخچه‌ی کامل در audit_logs (user.ban/user.unban) می‌ماند —
+  // این ستون‌ها فقط وضعیتِ *فعلی* را نشان می‌دهند، نه کل تاریخچه.
+  bannedAt        DateTime? @map("banned_at")
+  bannedReason    String?   @map("banned_reason")
+  bannedByAdminId String?   @map("banned_by_admin_id") @db.Uuid  // فقط شناسه (بدونِ relationِ Prisma) — هم‌راستا با referredById
+  unbannedAt      DateTime? @map("unbanned_at")
+  unbanReason     String?   @map("unban_reason")
   reservations Reservation[]
   memberships  ClubMember[]
   waitlistEntries WaitlistEntry[]

@@ -64,6 +64,13 @@ const API = {
   businessIntelligence(){ return this.get('/admin/business-intelligence'); },
   security(){ return this.get('/admin/security'); },
   abuseFlagAction(userId, action, reason){ return this.patch(`/admin/abuse-flags/${userId}`, { action, reason }); },
+  // ── Customer 360 (Company Control Plane، فازِ ۲) ──
+  customer360(idOrPhone){
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrPhone);
+    return isUuid ? this.get(`/admin/users/${idOrPhone}`) : this.get(`/admin/users?phone=${encodeURIComponent(idOrPhone)}`);
+  },
+  banUser(userId, reason){ return this.post(`/admin/users/${userId}/ban`, { reason }); },
+  unbanUser(userId, reason){ return this.post(`/admin/users/${userId}/unban`, reason?{reason}:{}); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },

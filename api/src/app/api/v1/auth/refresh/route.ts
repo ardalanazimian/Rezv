@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyRefresh, signAccess, signRefresh, accessFromRefresh } from '@/lib/jwt';
 import { isRefreshRevoked, revokeRefreshToken } from '@/lib/security';
 import { db } from '@/lib/db';
+import { isCurrentlyBanned } from '@/lib/ban';
 import { errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 
@@ -45,10 +46,18 @@ export async function POST(req: Request) {
       const role = (staff.role === 'owner' || staff.role === 'manager' || staff.role === 'staff') ? staff.role : 'staff';
       access = { sub: staff.id, kind: 'staff', tenantId: staff.tenantId, role };
     } else {
-      const user = await db.user.findUnique({ where: { id: payload.sub }, select: { id: true } });
+      const user = await db.user.findUnique({
+        where: { id: payload.sub },
+        select: { id: true, bannedAt: true, unbannedAt: true, bannedReason: true },
+      });
       if (!user) {
         await revokeRefreshToken(payload.jti);
         return NextResponse.json({ ok: false, error: { code: 'ACCOUNT_NOT_FOUND', message: 'حساب یافت نشد' } }, { status: 401 });
+      }
+      // بن سختِ پلتفرم: حسابِ بن‌شده نباید با refresh token همچنان access تازه بگیرد.
+      if (isCurrentlyBanned(user)) {
+        await revokeRefreshToken(payload.jti);
+        return NextResponse.json({ ok: false, error: { code: 'USER_BANNED', message: 'دسترسیِ این حساب توسطِ رزرونو مسدود شده است', details: user.bannedReason ? { reason: user.bannedReason } : {} } }, { status: 403 });
       }
     }
 

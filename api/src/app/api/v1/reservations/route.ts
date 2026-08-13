@@ -5,6 +5,7 @@ import { createReservation } from '@/lib/reservations';
 import { normalizePhone } from '@/lib/otp';
 import { withIdempotency } from '@/lib/idempotency';
 import { clientIp } from '@/lib/ratelimit';
+import { assertUserNotBanned } from '@/lib/ban';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, z, zUuid, zDateStr, zTimeStr, zPartySize, zPhone } from '@/lib/schemas';
 
@@ -42,6 +43,9 @@ const reservationSchema = z.object({
 export async function POST(req: Request) {
   try {
     const auth = authFromRequest(req);
+    // بن سختِ پلتفرم: قبل از هر پردازشِ دیگری (حتی claimِ idempotency) رد می‌شود
+    // — فقط برایِ مشتریِ آنلاین؛ رزروِ دستیِ staff برایِ مهمانِ حاضر مشمول نیست.
+    if (auth.kind === 'customer') await assertUserNotBanned(auth.sub);
     // Validation متمرکز: همه‌ی خطاها با هم، فرمتِ یکدست (به‌جای if دستی)، + سقفِ حجمِ بدنه.
     const b = await parseBody(req, reservationSchema);
 
