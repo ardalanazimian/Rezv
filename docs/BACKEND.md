@@ -177,9 +177,13 @@ Notable design choices in the code:
 
 ## 10. Tests
 
-- Unit tests: `api/tests/*.test.mts` (97 tests) run via
-  `tsx --test --test-force-exit` — `--test-force-exit` is required because the
-  queue module opens a Redis client that would otherwise keep the process alive.
+- Unit tests: `api/tests/*.test.mts` (332 tests as of 2026-08-13), all imported
+  for their side effects by `api/tests/_all.runner.mts` and run via
+  `npm test` → `tsx --test tests/_all.runner.mts` (a single file, not the
+  glob — see `docs/PROJECT_KNOWLEDGE.md` §11 for why `--test-force-exit` was
+  replaced; it caused flaky subtest counts between identical runs). Adding a
+  new `tests/x.test.mts` file requires adding a matching `import` line to
+  `_all.runner.mts`, or `npm test` won't run it.
 - Coverage areas: `jwt`, `otp`, `validate`, `reservation-helpers`, `lifecycle`,
   `loyalty`, `queue`, `waitlist`.
 - CI runs them against real Postgres + Redis service containers.

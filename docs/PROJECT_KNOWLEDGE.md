@@ -286,7 +286,7 @@ Details + rollback: [DEPLOYMENT.md](./DEPLOYMENT.md).
 | Job | What it does |
 |-----|--------------|
 | **build** | `npm ci` → `prisma generate` → `tsc --noEmit` → `next build` (with dummy env). |
-| **test** | Spins up **Postgres 17 + Redis 7** services; `prisma db push` + `sh prisma/apply-sql.sh` (applies `prisma/sql/*.sql`); runs `npm test` (unit tests via `tsx --test --test-force-exit`). |
+| **test** | Spins up **Postgres 17 + Redis 7** services; `prisma db push` + `sh prisma/apply-sql.sh` (applies `prisma/sql/*.sql`); runs `npm test` (unit tests via `tsx --test tests/_all.runner.mts`, a single wrapper file — see CI history note below). |
 | **security** | `npm audit --audit-level=critical` (fails on critical) + `--audit-level=high` (warns only). |
 | **e2e** | Installs Playwright (chromium + webkit), runs the customer-app E2E suite against a locally-served `apps/customer` with a **fully mocked API** (3 device projects: mobile-safari, mobile-chrome, desktop-chrome). Uploads the Playwright report artifact. |
 
@@ -298,5 +298,32 @@ deployments for the API + front-end projects).
 >   `prisma/migrations/manual/` folder (P3015). That folder was moved to
 >   `prisma/sql/` and is now applied via `prisma/apply-sql.sh`.
 > - The test process hung because a Redis client (from the queue module) kept
->   the event loop alive → added `--test-force-exit`.
+>   the event loop alive → `--test-force-exit` was added as a stopgap. That flag
+>   is exactly what caused a *different* bug found later: `tsx --test` isolates
+>   each of the 23 `tests/*.test.mts` files in its own child process, and
+>   `--test-force-exit` kills each child the instant its own tests finish —
+>   racing against that child's stdout pipe still flushing its TAP output to
+>   the parent aggregator. Under load, the race sometimes lost a whole file's
+>   worth of subtests from the total (never reported as `fail`, just silently
+>   missing — `# tests`/`# suites` varied between identical runs, e.g. 314 vs
+>   332). Root-caused by diffing two full TAP runs and bisecting single-file
+>   vs multi-file/concurrency=1 vs `--experimental-test-isolation=none` runs
+>   (2026-08-13). First fix attempt used `--experimental-test-isolation=none`
+>   (Node 22+, removes subprocess spawning entirely) — passed locally but broke
+>   CI outright (`node: bad option: --experimental-test-isolation=none`; CI
+>   pins Node 20, which doesn't have that flag). **Final, version-agnostic
+>   fix**: `api/tests/_all.runner.mts` statically imports all 23 test files
+>   for their side effects (their top-level `describe`/`test` registrations
+>   run), and `npm test`/`test:watch` point `tsx --test` at that *single* file
+>   instead of the `tests/*.test.mts` glob — so there's only ever one file for
+>   the test runner to isolate, on any Node version, no experimental flag
+>   needed. (Named `.runner.mts`, not `.test.mts`, so it doesn't itself match
+>   the old glob and double-count everything if someone runs `tests/*.test.mts`
+>   directly out of habit.) `--test-force-exit` was removed too — no longer
+>   needed since `redis.ts` also gained `lazyConnect: true` (importing it no
+>   longer opens a live socket just for typing/unused imports) and Prisma
+>   doesn't connect until first query, so nothing holds the event loop open.
+>   Verified stable across 5 consecutive runs (332/332/332/332/332) and
+>   ~5-10x faster (no subprocess spawn overhead per file). New test files must
+>   be added to `_all.runner.mts`'s import list or `npm test` won't run them.
 > - E2E needed `serviceWorkers: 'block'` so reloads re-run the app bootstrap.

@@ -148,7 +148,7 @@ Env vars: [`docs/ENVIRONMENT.md`](./docs/ENVIRONMENT.md).
 | `npm run dev` | Next dev server. |
 | `npm run build` | `prisma generate && next build`. |
 | `npm start` | Production server. |
-| `npm test` | Unit tests (`tsx --test --test-force-exit`). |
+| `npm test` | Unit tests (`tsx --test tests/_all.runner.mts`). |
 | `npm run typecheck` | `tsc --noEmit`. |
 | `npm run lint` | ESLint. |
 | `npm run db:migrate` / `db:seed` | Migrate (dev) / seed. |
@@ -185,7 +185,7 @@ auto-deploy. Details: [`docs/PROJECT_KNOWLEDGE.md`](./docs/PROJECT_KNOWLEDGE.md)
 | First prod request errors about `ALLOWED_ORIGINS` | Set `ALLOWED_ORIGINS` (comma-separated front-end origins). |
 | `JWT_SECRET باید حداقل ۳۲ کاراکتر باشد` | Secrets must be ≥ 32 chars. |
 | `prisma migrate deploy` → **P3015** | Fixed — the hand-written SQL moved out of `migrations/` to `prisma/sql/`, applied by `prisma/apply-sql.sh` ([`docs/DATABASE.md`](./docs/DATABASE.md)). |
-| CI `test` job hangs | `npm test` must use `--test-force-exit` (a Redis client keeps the loop alive). |
+| `npm test` shows different `# tests`/`# suites` between runs (always `fail 0`) | Fixed — was `--test-force-exit` racing a per-file subprocess's stdout flush. `npm test` now runs a single wrapper file (`tests/_all.runner.mts`) that imports all `tests/*.test.mts` for their side effects, so there's only one file (no subprocess-per-file race) and no experimental CLI flag needed — works the same on any Node version. |
 | E2E reload doesn't re-run app | Playwright must set `serviceWorkers: 'block'`. |
 | Returning users see stale UI | Bump `CACHE_VERSION` in the app's `sw.js`. |
 | Cron endpoints 401 | Expected without `CRON_SECRET`/`MAINTENANCE_KEY` — that's the protection. |

@@ -31,9 +31,16 @@ function makeRedis(): Redis | Cluster {
       redisOptions: { maxRetriesPerRequest: 3 },
       // توزیع خواندن روی replicaها در صورت وجود (کاهش بار نود master)
       scaleReads: 'slave',
+      // lazyConnect: اتصالِ واقعی فقط با اولین دستور، نه در همان لحظه‌ی import.
+      // چرا: بدونِ این، صرفِ importِ این ماژول (حتی برایِ تایپ، بدونِ صدازدنِ هیچ
+      // متدی) یک سوکتِ TCP زنده باز می‌کنه که event loop رو نگه می‌داره — دقیقاً
+      // همون هندلِ معلقی که تستِ واحد (tests/*.test.mts، با --test-force-exit)
+      // رو بین اجراها ناپایدار می‌کرد (شمارشِ subtestها بینِ اجراها فرق می‌کرد،
+      // چون force-exit گاهی قبل از flushِ کاملِ خروجیِ TAP اجرا می‌شد).
+      lazyConnect: true,
     });
   }
-  return new Redis(process.env.REDIS_URL!, { maxRetriesPerRequest: 3 });
+  return new Redis(process.env.REDIS_URL!, { maxRetriesPerRequest: 3, lazyConnect: true });
 }
 
 // ⚠️ باگ H5: مثل Prisma، اتصال Redis باید «همیشه» singleton باشد نه فقط در توسعه.
