@@ -2,6 +2,7 @@ import { dbRead as db } from './db';
 import { getCustomerEconomyProfile } from './economy';
 import { listMissionsForUser } from './missions';
 import { isCurrentlyBanned } from './ban';
+import { listActiveBadgesForUser } from './badges';
 import { Err } from './errors';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -22,7 +23,7 @@ export async function buildCustomer360(userId: string) {
   });
   if (!user) throw Err.notFound('کاربر');
 
-  const [economyProfile, ledger, missions, reservations] = await Promise.all([
+  const [economyProfile, ledger, missions, reservations, badges] = await Promise.all([
     getCustomerEconomyProfile(db as any, userId),
     db.economyLedgerEntry.findMany({
       where: { userId }, orderBy: { createdAt: 'desc' }, take: 20,
@@ -36,6 +37,7 @@ export async function buildCustomer360(userId: string) {
         restaurant: { select: { id: true, name: true, slug: true } },
       },
     }),
+    listActiveBadgesForUser(userId),
   ]);
 
   return {
@@ -65,5 +67,6 @@ export async function buildCustomer360(userId: string) {
       id: r.id, code: r.code, status: r.status, party_size: r.partySize, slot_start: r.slotStart,
       source: r.source, restaurant_id: r.restaurant.id, restaurant_name: r.restaurant.name, restaurant_slug: r.restaurant.slug,
     })),
+    badges,
   };
 }

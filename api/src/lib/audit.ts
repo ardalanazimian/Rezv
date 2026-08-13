@@ -32,7 +32,9 @@ export type AuditAction =
   | 'photo.uploaded' | 'photo.approved' | 'photo.rejected' | 'photo.deleted'
   | 'security.rate_limit' | 'security.idor_attempt' | 'security.abuse_flag'
   // ── Company Control Plane (فازِ ۲) — بن سختِ کاربر توسطِ ادمینِ پلتفرم ──
-  | 'user.ban' | 'user.unban';
+  | 'user.ban' | 'user.unban'
+  // ── Company Control Plane (فازِ ۳) — نشان‌هایِ کنترل‌شده‌یِ پلتفرم ──
+  | 'badge.created' | 'badge.updated' | 'badge.granted' | 'badge.revoked';
 
 type AuditEntry = {
   action: AuditAction;

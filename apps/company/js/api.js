@@ -71,6 +71,12 @@ const API = {
   },
   banUser(userId, reason){ return this.post(`/admin/users/${userId}/ban`, { reason }); },
   unbanUser(userId, reason){ return this.post(`/admin/users/${userId}/unban`, reason?{reason}:{}); },
+  // ── نشان‌هایِ کنترل‌شده‌یِ پلتفرم (فازِ ۳) ──
+  listBadges(){ return this.get('/admin/badges?include_inactive=true'); },
+  createBadge(body){ return this.post('/admin/badges', body); },
+  updateBadge(id, body){ return this.patch(`/admin/badges/${id}`, body); },
+  grantBadge(id, userId, note){ return this.post(`/admin/badges/${id}/grant`, { user_id: userId, note }); },
+  revokeBadge(id, userId, reason){ return this.post(`/admin/badges/${id}/revoke`, { user_id: userId, reason }); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },
