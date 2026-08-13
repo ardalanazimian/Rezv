@@ -77,6 +77,10 @@ const API = {
   updateBadge(id, body){ return this.patch(`/admin/badges/${id}`, body); },
   grantBadge(id, userId, note){ return this.post(`/admin/badges/${id}/grant`, { user_id: userId, note }); },
   revokeBadge(id, userId, reason){ return this.post(`/admin/badges/${id}/revoke`, { user_id: userId, reason }); },
+  // ── ماموریت‌های پلتفرم (فازِ ۳) ──
+  listMissions(){ return this.get('/admin/missions'); },
+  createMission(body){ return this.post('/admin/missions', body); },
+  updateMission(id, body){ return this.patch(`/admin/missions/${id}`, body); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },

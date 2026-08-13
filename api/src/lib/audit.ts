@@ -34,7 +34,11 @@ export type AuditAction =
   // ── Company Control Plane (فازِ ۲) — بن سختِ کاربر توسطِ ادمینِ پلتفرم ──
   | 'user.ban' | 'user.unban'
   // ── Company Control Plane (فازِ ۳) — نشان‌هایِ کنترل‌شده‌یِ پلتفرم ──
-  | 'badge.created' | 'badge.updated' | 'badge.granted' | 'badge.revoked';
+  | 'badge.created' | 'badge.updated' | 'badge.granted' | 'badge.revoked'
+  // ── Company Control Plane (فازِ ۳) — CRUDِ ماموریت توسطِ ادمینِ پلتفرم ──
+  | 'mission.created' | 'mission.updated'
+  // ── Company Control Plane (فازِ ۳) — سوییچ‌هایِ قابلیت (kill-switch) ──
+  | 'feature_flag.update';
 
 type AuditEntry = {
   action: AuditAction;

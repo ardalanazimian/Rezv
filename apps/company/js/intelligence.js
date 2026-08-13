@@ -172,7 +172,7 @@ async function doCancel(id){
 function refreshActive(){
   const active=document.querySelector('.view.active');if(!active)return;
   const id=active.id.replace('v-','');
-  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,systemhealth:rSystemHealth,security:rSecurity,support:rSupport,badges:rBadges})[id]?.();
+  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,systemhealth:rSystemHealth,security:rSecurity,support:rSupport,badges:rBadges,missions:rMissions})[id]?.();
 }
 
 // ════════ مدیریت رستوران‌ها — اقدامات واقعی سریع (جایگزین «پشتیبانی از راه دور» ساختگی) ════════
@@ -648,7 +648,7 @@ if (API.getToken()) {
     const active = document.querySelector('.view.active');
     if (active) {
       const id = active.id.replace('v-', '');
-      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, systemhealth:rSystemHealth, security:rSecurity, support:rSupport, badges:rBadges})[id]?.();
+      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, systemhealth:rSystemHealth, security:rSecurity, support:rSupport, badges:rBadges, missions:rMissions})[id]?.();
     }
     refreshSalesBadge();
     refreshPhotoBadge();
