@@ -732,6 +732,7 @@ img{display:block;max-width:100%}
 .live-badge{display:inline-flex;align-items:center;gap:6px;background:var(--green-50);color:var(--green);font-size:12px;font-weight:700;padding:5px 12px;border-radius:50px}
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:livePulse 2s infinite}
 .live-badge.pulse{animation:liveFlash .6s}
+.live-badge.demo{background:var(--amber-50);color:var(--amber)}
 .dash-live-time{font-size:12px;color:var(--t3)}
 @keyframes livePulse{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes liveFlash{0%{background:var(--green)}100%{background:var(--green-50)}}
@@ -2842,7 +2843,8 @@ function renderEnterpriseDashboard(){
   if (resBadge) resBadge.textContent = k.todayCount > 0 ? fa(k.todayCount) : '';
   const elap = REVENUE_CONFIG.connected ? '' : '<span class="kpi-est" title="تخمینی تا اتصال صندوق">≈</span>';
   document.getElementById('v-overview').innerHTML = `
-    <div class="dash-live-row">${liveStatusBadge()}<span class="dash-live-time">به‌روزرسانی خودکار هر ۱۵ ثانیه</span><span id="offlineBadge"></span></div>
+    <div class="dash-live-row">${liveStatusBadge()}<span class="dash-live-time">${dashboardUsingDemoData()?'':'به‌روزرسانی خودکار هر ۱۵ ثانیه'}</span><span id="offlineBadge"></span></div>
+    ${dashboardUsingDemoData()?`<div class="cash-note" style="margin-bottom:16px">${icon('info',{size:13})} این اسم‌ها و اعداد نمونه‌اند، رزروهایِ واقعیِ رستورانت نیستند — تا اتصالِ کامل به سرور جایگزین می‌شن.</div>`:''}
     <!-- کارهای سریع (بازطراحی پریمیوم) -->
     <div class="quick-grid">
       <div class="quick-btn primary" onclick="openWalkin()"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/><path d="M12 11v6M9 14h6" stroke-width="2.4"/></svg></div><div class="quick-label">ورود بدون رزرو</div></div>
@@ -3131,7 +3133,17 @@ async function refreshLiveKPIs(){
   if(ind){ind.classList.add('pulse');setTimeout(()=>ind.classList.remove('pulse'),1000);}
 }
 // نوار وضعیت زنده (بالای داشبورد)
+// ⚠️ رفعِ باگِ صداقتِ داده (یافته‌ی زنده): این نشان قبلاً همیشه «زنده» با
+// نقطه‌ی سبز نشون می‌داد، حتی وقتی RES/GUESTS/TABLES هنوز روی fallbackِ
+// دموی آفلاین بودن (بدونِ توکن، یا لودِ اولیه هنوز کامل نشده، یا خطایِ
+// موقتِ API) — یعنی صاحبِ رستوران اسم‌های نمونه (نیلوفر رضایی، امیر
+// حسینی، ...) رو با برچسبِ «زنده» می‌دید، انگار واقعاً رزروهایِ همون
+// رستورانه. حالا نشان به وضعیتِ واقعیِ لودشدنِ داده وصل شده.
+function dashboardUsingDemoData(){
+  return !API.getToken() || !_resLoaded || !_tablesLoaded;
+}
 function liveStatusBadge(){
+  if (dashboardUsingDemoData()) return `<span class="live-badge demo" id="liveInd">${icon('info',{size:12})} داده‌ی نمونه</span>`;
   return `<span class="live-badge" id="liveInd"><span class="live-dot"></span>زنده</span>`;
 }
 // شروع هنگام ورود به پنل
@@ -3192,12 +3204,17 @@ async function renderResList(){
   const el=document.getElementById('resTL');
   if(!el)return;
   // اگر توکن staff داریم، رزروها را از API بگیر (بر اساس تاریخ انتخاب‌شده)
-  let source=RES;
+  let source=RES, isDemo=true;
   if(API.getToken()){
     el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--t2)">در حال بارگذاری رزروها...</div>`;
     const fresh=await loadReservations(resDate);
-    if(fresh!==null)source=fresh; // داده‌ی واقعی؛ در غیر این صورت نمونه
+    if(fresh!==null){ source=fresh; isDemo=false; } // داده‌ی واقعی؛ در غیر این صورت نمونه
   }
+  // ⚠️ رفعِ باگِ صداقتِ داده (یافته‌ی زنده): تا اینجا این تب هیچ‌وقت نمی‌گفت
+  // که فهرست الان نمونه است — یعنی رستوران‌دار (بدونِ توکن، یا وقتی API
+  // موقتاً جواب نمی‌داد) اسم/شماره‌ی مهمانانِ ساختگی را عینِ رزروهایِ واقعیِ
+  // خودش می‌دید.
+  const demoNote=isDemo?`<div class="cash-note" style="margin-bottom:14px">${icon('info',{size:13})} این فهرست نمونه است، رزروهایِ واقعیِ تو نیست.</div>`:'';
   let list=source.map((r,i)=>({r,i}));
   // API از قبل بر اساس تاریخ فیلتر کرده؛ نمونه باید محلی فیلتر شود
   if(resDate!=='all' && !API.online)list=list.filter(x=>x.r.date===resDate);
@@ -3220,7 +3237,7 @@ async function renderResList(){
     const done=list.filter(x=>x.r.status==='completed'||x.r.status==='arrived').length;
     const noshow=list.filter(x=>x.r.status==='noshow').length;
     const cancelled=list.filter(x=>x.r.status==='cancelled').length;
-    el.innerHTML=`
+    el.innerHTML=demoNote+`
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px">
         <div style="background:var(--green-50);border:1px solid #BBF7D0;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#15803D">${fa(done)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('check',{size:12})} انجام‌شده</div></div>
         <div style="background:var(--amber-50);border:1px solid #FDE68A;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#D97706">${fa(noshow)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('alert',{size:12})} نیومدن (no-show)</div></div>
@@ -3230,7 +3247,7 @@ async function renderResList(){
     return;
   }
   const seated=list.filter(x=>x.r.status==='arrived').length;
-  el.innerHTML=`<div style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQuery?` · نتایج «${esc(resQuery)}»`:''}</div>`+
+  el.innerHTML=demoNote+`<div style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQuery?` · نتایج «${esc(resQuery)}»`:''}</div>`+
     list.map(x=>resItemHTML(x.r,x.i)).join('');
 }
 // تبدیل ارقام انگلیسی به فارسی برای جستجوی تلفن
@@ -3263,7 +3280,7 @@ function resItemHTML(r,i){
       </div>
       <div class="tl-meta">${dateBadge}${icon('users',{size:13})} ${fa(r.party)} نفر · میز ${fa(r.table)} · ${icon('phone',{size:13})} ${esc(r.phone)} ${r.pre?`· ${icon('utensils',{size:12})} پیش‌سفارش`:''}</div>
       ${r.note?`<div class="tl-meta" style="color:#D97706">${icon('inbox',{size:13})} ${esc(r.note)}</div>`:''}
-      ${r.cancelReason?`<div class="tl-meta" style="color:#B91C1C">${icon('alert',{size:13})} دلیل لغو: ${r.cancelReason}</div>`:''}
+      ${r.cancelReason?`<div class="tl-meta" style="color:#B91C1C">${icon('alert',{size:13})} دلیل لغو: ${esc(r.cancelReason)}</div>`:''}
       ${!isPast?`<div class="tl-actions">
         ${r.status!=='arrived'?`<button class="btn btn-teal btn-sm" onclick="markArrived(${i})">${icon('check',{size:14})} رسید</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="openStatusMenu(${i})">${icon('refresh',{size:14})} وضعیت</button>
@@ -3290,7 +3307,7 @@ async function markArrived(i){
   toast('',`${RES[i].name} رسید${phone?' — پیامک خوش‌آمد ارسال شد':''}`);
 }
 function cancelRes(i){
-  openModal(`<div class="modal-title">لغو رزرو</div><div class="modal-sub">${RES[i].name} — ساعت ${RES[i].t}</div>
+  openModal(`<div class="modal-title">لغو رزرو</div><div class="modal-sub">${esc(RES[i].name)} — ساعت ${esc(RES[i].t)}</div>
     <div class="field-label">دلیل لغو (الزامی)</div>
     <input class="inp" id="cancelReason" placeholder="مثلاً تماس مشتری، تداخل میز...">
     <div style="display:flex;gap:8px"><button class="btn btn-danger btn-lg" style="flex:1" onclick="doCancelRes(${i})">تأیید لغو</button><button class="btn btn-ghost btn-lg" onclick="closeModal()">انصراف</button></div>`);
@@ -3594,7 +3611,11 @@ function rWaitlist(){
   // کارت‌های آمار هم استفاده می‌کنند پر می‌شود.
   const wlBadge = document.getElementById('wlBadge');
   if (wlBadge) wlBadge.textContent = queue.length > 0 ? fa(queue.length) : '';
-  document.getElementById('v-waitlist').innerHTML=`
+  // ⚠️ رفعِ باگِ صداقتِ داده (یافته‌ی زنده، هم‌الگو با overview.js/reservations.js):
+  // تا اینجا این تب هیچ‌وقت نمی‌گفت که صف/آمار الان دموست.
+  const isDemo = !API.getToken() || !_wlLoaded;
+  const wlDemoNote = isDemo ? `<div class="cash-note" style="margin-bottom:16px">${icon('info',{size:13})} صف و آمارِ زیر نمونه‌اند، دادهٔ واقعیِ رستورانت نیستند.</div>` : '';
+  document.getElementById('v-waitlist').innerHTML=wlDemoNote+`
     <!-- آمار لیست انتظار -->
     <div class="wl-stats-grid">
       <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--blue-50)">${icon('inbox',{size:16})}</div><div><div class="wl-stat-num">${fa(A.current_queue_size)}</div><div class="wl-stat-lbl">در صف الان</div></div></div>
@@ -5199,7 +5220,8 @@ async function loadStaff(){
 function rStaff(){
   if(!_staffLoaded && API.getToken()){ loadStaff().then(()=>rStaff()); }
   const avatar=s=>(s.name||s.phone||'?').toString().trim().charAt(0);
-  document.getElementById('v-staff').innerHTML=`
+  const isDemo=!API.getToken()||!_staffLoaded;
+  document.getElementById('v-staff').innerHTML=(isDemo?`<div class="cash-note">${icon('info',{size:13})} فهرستِ زیر نمونه است، کارکنانِ واقعیِ تو نیست.</div>`:'')+`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کارکنان</div><div class="panel-sub">${fa(STAFF_LIST.length)} نفر · مدیریت دسترسی</div></div></div>
       ${STAFF_LIST.map(s=>`<div class="staff-row">

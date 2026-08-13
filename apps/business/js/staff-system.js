@@ -31,7 +31,8 @@ async function loadStaff(){
 function rStaff(){
   if(!_staffLoaded && API.getToken()){ loadStaff().then(()=>rStaff()); }
   const avatar=s=>(s.name||s.phone||'?').toString().trim().charAt(0);
-  document.getElementById('v-staff').innerHTML=`
+  const isDemo=!API.getToken()||!_staffLoaded;
+  document.getElementById('v-staff').innerHTML=(isDemo?`<div class="cash-note">${icon('info',{size:13})} فهرستِ زیر نمونه است، کارکنانِ واقعیِ تو نیست.</div>`:'')+`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کارکنان</div><div class="panel-sub">${fa(STAFF_LIST.length)} نفر · مدیریت دسترسی</div></div></div>
       ${STAFF_LIST.map(s=>`<div class="staff-row">

@@ -29,12 +29,17 @@ async function renderResList(){
   const el=document.getElementById('resTL');
   if(!el)return;
   // اگر توکن staff داریم، رزروها را از API بگیر (بر اساس تاریخ انتخاب‌شده)
-  let source=RES;
+  let source=RES, isDemo=true;
   if(API.getToken()){
     el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--t2)">در حال بارگذاری رزروها...</div>`;
     const fresh=await loadReservations(resDate);
-    if(fresh!==null)source=fresh; // داده‌ی واقعی؛ در غیر این صورت نمونه
+    if(fresh!==null){ source=fresh; isDemo=false; } // داده‌ی واقعی؛ در غیر این صورت نمونه
   }
+  // ⚠️ رفعِ باگِ صداقتِ داده (یافته‌ی زنده): تا اینجا این تب هیچ‌وقت نمی‌گفت
+  // که فهرست الان نمونه است — یعنی رستوران‌دار (بدونِ توکن، یا وقتی API
+  // موقتاً جواب نمی‌داد) اسم/شماره‌ی مهمانانِ ساختگی را عینِ رزروهایِ واقعیِ
+  // خودش می‌دید.
+  const demoNote=isDemo?`<div class="cash-note" style="margin-bottom:14px">${icon('info',{size:13})} این فهرست نمونه است، رزروهایِ واقعیِ تو نیست.</div>`:'';
   let list=source.map((r,i)=>({r,i}));
   // API از قبل بر اساس تاریخ فیلتر کرده؛ نمونه باید محلی فیلتر شود
   if(resDate!=='all' && !API.online)list=list.filter(x=>x.r.date===resDate);
@@ -57,7 +62,7 @@ async function renderResList(){
     const done=list.filter(x=>x.r.status==='completed'||x.r.status==='arrived').length;
     const noshow=list.filter(x=>x.r.status==='noshow').length;
     const cancelled=list.filter(x=>x.r.status==='cancelled').length;
-    el.innerHTML=`
+    el.innerHTML=demoNote+`
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px">
         <div style="background:var(--green-50);border:1px solid #BBF7D0;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#15803D">${fa(done)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('check',{size:12})} انجام‌شده</div></div>
         <div style="background:var(--amber-50);border:1px solid #FDE68A;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#D97706">${fa(noshow)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('alert',{size:12})} نیومدن (no-show)</div></div>
@@ -67,7 +72,7 @@ async function renderResList(){
     return;
   }
   const seated=list.filter(x=>x.r.status==='arrived').length;
-  el.innerHTML=`<div style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQuery?` · نتایج «${esc(resQuery)}»`:''}</div>`+
+  el.innerHTML=demoNote+`<div style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQuery?` · نتایج «${esc(resQuery)}»`:''}</div>`+
     list.map(x=>resItemHTML(x.r,x.i)).join('');
 }
 // تبدیل ارقام انگلیسی به فارسی برای جستجوی تلفن
@@ -100,7 +105,7 @@ function resItemHTML(r,i){
       </div>
       <div class="tl-meta">${dateBadge}${icon('users',{size:13})} ${fa(r.party)} نفر · میز ${fa(r.table)} · ${icon('phone',{size:13})} ${esc(r.phone)} ${r.pre?`· ${icon('utensils',{size:12})} پیش‌سفارش`:''}</div>
       ${r.note?`<div class="tl-meta" style="color:#D97706">${icon('inbox',{size:13})} ${esc(r.note)}</div>`:''}
-      ${r.cancelReason?`<div class="tl-meta" style="color:#B91C1C">${icon('alert',{size:13})} دلیل لغو: ${r.cancelReason}</div>`:''}
+      ${r.cancelReason?`<div class="tl-meta" style="color:#B91C1C">${icon('alert',{size:13})} دلیل لغو: ${esc(r.cancelReason)}</div>`:''}
       ${!isPast?`<div class="tl-actions">
         ${r.status!=='arrived'?`<button class="btn btn-teal btn-sm" onclick="markArrived(${i})">${icon('check',{size:14})} رسید</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="openStatusMenu(${i})">${icon('refresh',{size:14})} وضعیت</button>
@@ -127,7 +132,7 @@ async function markArrived(i){
   toast('',`${RES[i].name} رسید${phone?' — پیامک خوش‌آمد ارسال شد':''}`);
 }
 function cancelRes(i){
-  openModal(`<div class="modal-title">لغو رزرو</div><div class="modal-sub">${RES[i].name} — ساعت ${RES[i].t}</div>
+  openModal(`<div class="modal-title">لغو رزرو</div><div class="modal-sub">${esc(RES[i].name)} — ساعت ${esc(RES[i].t)}</div>
     <div class="field-label">دلیل لغو (الزامی)</div>
     <input class="inp" id="cancelReason" placeholder="مثلاً تماس مشتری، تداخل میز...">
     <div style="display:flex;gap:8px"><button class="btn btn-danger btn-lg" style="flex:1" onclick="doCancelRes(${i})">تأیید لغو</button><button class="btn btn-ghost btn-lg" onclick="closeModal()">انصراف</button></div>`);
