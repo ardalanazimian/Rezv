@@ -311,15 +311,70 @@ async function toggleFeatureFlagUi(key,next){
   rSecurity();
 }
 
+// ═══════════ Phase 4: صفِ یکپارچه‌ی نظارت (اسکلت) + بنِ IP + ویرایشگرِ قواعدِ اقتصاد ═══════════
+function moderationQueuePanelHTML(q){
+  const stat=(icon_,label,count,onclick)=>`<div class="mini-row" style="cursor:pointer" onclick="${onclick}">
+    <div class="mini-ava">${icon(icon_,{size:16})}</div>
+    <div class="mini-info"><div class="mini-name">${esc(label)}</div></div>
+    <span class="badge ${count>0?'expiring':'active'}">${fa(count)}</span>
+  </div>`;
+  return `<div class="panel" style="margin-bottom:20px">
+    <div class="panel-head"><div><div class="panel-title">${icon('shield',{size:16})} صفِ یکپارچه‌ی نظارت</div><div class="panel-sub">نمایِ کلی از همه‌ی ابزارهایِ نظارتی — رویِ هرکدوم بزن تا بری همون‌جا</div></div></div>
+    <div class="mini-list">
+      ${stat('lock','کاربرِ بن‌شده',q.banned_users_count,"document.getElementById('c360Query')?.focus()")}
+      ${stat('alert','مشتریِ نشان‌خورده',q.flagged_abuse_users_count,"document.querySelector('#v-security')?.scrollIntoView()")}
+      ${stat('close','IPِ بن‌شده',q.banned_ips_count,"document.getElementById('bannedIpsPanel')?.scrollIntoView({behavior:'smooth'})")}
+      ${stat('search','عکسِ در انتظارِ تأیید',q.pending_photos_count,"nav('photos')")}
+    </div>
+  </div>`;
+}
+function bannedIpsPanelHTML(items){
+  return `<div class="panel" style="margin-bottom:20px" id="bannedIpsPanel">
+    <div class="panel-head"><div><div class="panel-title">${icon('close',{size:16})} IPهایِ بن‌شده</div><div class="panel-sub">بنِ خودکارِ ریت‌لیمیت — بعد از ${fa(10)} تخلف در ۵ دقیقه، تا ۱ ساعت</div></div></div>
+    ${items.length?items.map(x=>`<div class="mini-row">
+      <div class="mini-ava mono-ip">${icon('close',{size:14})}</div>
+      <div class="mini-info"><div class="mini-name mono-ip">${esc(x.ip)}</div><div class="mini-sub">${fa(Math.ceil(x.ttlSeconds/60))} دقیقه تا رفعِ خودکار</div></div>
+      <button class="btn btn-sm" data-ip="${esc(x.ip)}" onclick="unbanIpUi(this.dataset.ip)">لغوِ بن</button>
+    </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">هیچ IPِ بن‌شده‌ای نیست</div></div>`}
+  </div>`;
+}
+async function unbanIpUi(ip){
+  if(!confirm(`بنِ IP «${ip}» لغو بشه؟`))return;
+  const res=await API.unbanIp(ip);
+  if(!res.ok){toast('',res.error?.message||'انجام نشد');return;}
+  toast('','بن لغو شد');
+  rSecurity();
+}
+function economyRulesPanelHTML(rules){
+  return `<div class="panel" style="margin-bottom:20px">
+    <div class="panel-head"><div><div class="panel-title">${icon('sparkle',{size:16,fill:true})} ویرایشگرِ قواعدِ اقتصاد</div><div class="panel-sub">پاداشِ XP/سکه‌ای که با انجام‌شدنِ هر رزرو به مشتری داده می‌شه</div></div></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div><div class="field-label">XPِ رزروِ انجام‌شده</div><input class="inp" id="ecoXp" type="number" min="0" value="${rules.completed_xp}" style="width:140px"></div>
+      <div><div class="field-label">سکه‌یِ رزروِ انجام‌شده</div><input class="inp" id="ecoCoins" type="number" min="0" value="${rules.completed_coins}" style="width:140px"></div>
+      <button class="btn btn-primary" onclick="saveEconomyRules()">ذخیره</button>
+    </div>
+  </div>`;
+}
+async function saveEconomyRules(){
+  const completed_xp=+((document.getElementById('ecoXp')?.value)||0);
+  const completed_coins=+((document.getElementById('ecoCoins')?.value)||0);
+  const res=await API.setEconomyRules({completed_xp,completed_coins});
+  if(!res.ok){toast('',res.error?.message||'ذخیره ناموفق بود');return;}
+  toast('','قواعدِ اقتصاد به‌روزرسانی شد');
+}
+
 function rSecurity(){
   document.getElementById('v-security').innerHTML=`<div style="text-align:center;padding:60px;color:var(--t2)">در حال بارگذاری...</div>`;
   (async()=>{
-    const [res,flagsRes]=await Promise.all([API.security(),API.getFeatureFlags()]);
+    const [res,flagsRes,mqRes,ipsRes,ecoRes]=await Promise.all([API.security(),API.getFeatureFlags(),API.getModerationQueue(),API.getBannedIps(),API.getEconomyRules()]);
     if(!res.ok){document.getElementById('v-security').innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`;return;}
     const d=res.data;
     const flags=flagsRes.ok?flagsRes.data.flags:{};
+    const mq=mqRes.ok?mqRes.data:{banned_users_count:0,flagged_abuse_users_count:0,banned_ips_count:0,pending_photos_count:0};
+    const bannedIps=ipsRes.ok?ipsRes.data.items:[];
+    const ecoRules=ecoRes.ok?ecoRes.data.rules:{completed_xp:100,completed_coins:20};
     const eo=d.economy_overview||{tier_distribution:[],total_xp_granted:0,active_abuse_flags:0,total_economy_profiles:0};
-    document.getElementById('v-security').innerHTML=featureFlagsPanelHTML(flags)+`
+    document.getElementById('v-security').innerHTML=moderationQueuePanelHTML(mq)+featureFlagsPanelHTML(flags)+`
       <div class="panel" style="margin-bottom:20px">
         <div class="panel-head"><div><div class="panel-title">${icon('search',{size:16})} جست‌وجویِ مشتری (Customer 360)</div><div class="panel-sub">با شماره‌موبایل یا شناسه‌ی کاربر — وضعیتِ کامل، اقتصاد، تاریخچه، و کنترلِ بن</div></div></div>
         <div style="display:flex;gap:8px">
@@ -399,7 +454,7 @@ function rSecurity(){
             <div class="mini-sub">${new Date(a.at).toLocaleString('fa-IR')}</div>
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">اقدامِ حساسی ثبت نشده</div></div>`}
-      </div>`;
+      </div>`+bannedIpsPanelHTML(bannedIps)+economyRulesPanelHTML(ecoRules);
   })();
 }
 

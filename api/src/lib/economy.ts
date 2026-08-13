@@ -2,6 +2,7 @@ import { db } from './db';
 import { normalizePhone } from './otp';
 import { createLogger } from './logger';
 import { updateMissionProgressTx } from './missions';
+import { getEconomyRuleConfig, type EconomyRuleConfig } from './economy-rules';
 
 const log = createLogger('economy');
 
@@ -170,6 +171,12 @@ export async function processReservationEconomyEvent(input: ReservationEconomyIn
   });
   if (!event) return;
 
+  // پاداشِ XP/سکه — عمداً بیرونِ تراکنش خوانده می‌شود (فقط یک SELECTِ کش‌شده
+  // از platform_settings است، نیازی به قفلِ ردیفِ رزرو ندارد). ویرایشگرِ
+  // قواعدِ اقتصاد (فازِ ۴) از همین‌جا اثر می‌کند؛ پیش‌فرض دقیقاً همون
+  // ۱۰۰/۲۰ِ قبلاً هاردکدشده است.
+  const ruleConfig = await getEconomyRuleConfig();
+
   await db.$transaction(async (tx) => {
     if (input.userId) {
       await applyReliabilityEventToUserTx(tx, {
@@ -178,6 +185,7 @@ export async function processReservationEconomyEvent(input: ReservationEconomyIn
         reservationId: input.reservationId,
         event,
         now,
+        ruleConfig,
       });
     } else if (input.guestPhone) {
       await applyReliabilityEventToShadowTx(tx, { guestPhone: input.guestPhone, event, now });
@@ -195,9 +203,9 @@ async function countCompletedReservations(tx: any, userId: string): Promise<numb
 
 async function applyReliabilityEventToUserTx(
   tx: any,
-  opts: { userId: string; restaurantId: string; reservationId: string; event: EconomyEvent; now: Date },
+  opts: { userId: string; restaurantId: string; reservationId: string; event: EconomyEvent; now: Date; ruleConfig: EconomyRuleConfig },
 ): Promise<void> {
-  const { userId, restaurantId, reservationId, event, now } = opts;
+  const { userId, restaurantId, reservationId, event, now, ruleConfig } = opts;
 
   // idempotency: تلاش برایِ درج؛ اگه از قبل بوده (retry)، skip بی‌صدا.
   const inserted = await tx.$queryRaw<{ id: string }[]>`
@@ -249,7 +257,8 @@ async function applyReliabilityEventToUserTx(
 
   if (event.label === 'reservation_completed') {
     await grantEconomyRewardTx(tx, {
-      userId, restaurantId, reservationId, xp: 100, coins: 20, source: 'reservation_completed',
+      userId, restaurantId, reservationId,
+      xp: ruleConfig.completedXp, coins: ruleConfig.completedCoins, source: 'reservation_completed',
     });
   }
 

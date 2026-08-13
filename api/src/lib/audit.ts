@@ -38,7 +38,9 @@ export type AuditAction =
   // ── Company Control Plane (فازِ ۳) — CRUDِ ماموریت توسطِ ادمینِ پلتفرم ──
   | 'mission.created' | 'mission.updated'
   // ── Company Control Plane (فازِ ۳) — سوییچ‌هایِ قابلیت (kill-switch) ──
-  | 'feature_flag.update';
+  | 'feature_flag.update'
+  // ── Company Control Plane (فازِ ۴) — ویرایشگرِ قواعدِ اقتصاد ──
+  | 'economy_rule.update';
 
 type AuditEntry = {
   action: AuditAction;

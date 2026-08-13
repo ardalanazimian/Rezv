@@ -84,6 +84,12 @@ const API = {
   // ── سوییچ‌هایِ قابلیت (فازِ ۳) ──
   getFeatureFlags(){ return this.get('/admin/feature-flags'); },
   setFeatureFlags(flags){ return this.patch('/admin/feature-flags', { flags }); },
+  // ── فازِ ۴: صفِ یکپارچه‌ی نظارت + بنِ IP + ویرایشگرِ قواعدِ اقتصاد ──
+  getModerationQueue(){ return this.get('/admin/moderation-queue'); },
+  getBannedIps(){ return this.get('/admin/security/banned-ips'); },
+  unbanIp(ip){ return this.post('/admin/security/banned-ips', { ip }); },
+  getEconomyRules(){ return this.get('/admin/economy-rules'); },
+  setEconomyRules(rules){ return this.patch('/admin/economy-rules', rules); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },
