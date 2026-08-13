@@ -872,7 +872,7 @@ async function loadCampaignHistory(){
   </tbody></table>`:'<div style="padding:8px">هنوز کمپینی ارسال نشده</div>';
 }
 
-// ─── تب ۴: دستیار AI (واقعی — کارت‌های پیشنهاد قانون‌محور از /restaurant/ai، نه چت ساختگی) ───
+// ─── تب ۴: دستیار AI — چت‌باکسِ آزادمتنِ واقعی (assistant.js) + کارت‌های پیشنهاد قانون‌محور از /restaurant/ai ───
 async function custRenderAI(){
   const el=document.getElementById('ct-ai');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
@@ -881,9 +881,10 @@ async function custRenderAI(){
   if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
   const cards=res.data.cards||[];
   el.innerHTML=`
+    ${assistantChatHtml()}
     <div class="ai-box" style="margin-bottom:18px">
-      <div class="ai-box-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">پیشنهادهای هوشمند</div><span class="tag">قانون‌محور · شفاف</span></div>
-      <div style="font-size:13px;color:var(--t1);line-height:1.6">این پیشنهادها از تحلیل واقعی داده‌های رستوران شما تولید می‌شن (نه چت‌بات) — هر کارت دلیل و عدد پشتش رو نشون می‌ده.</div>
+      <div class="ai-box-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">پیشنهادهای خودکار</div><span class="tag">قانون‌محور · شفاف</span></div>
+      <div style="font-size:13px;color:var(--t1);line-height:1.6">این کارت‌ها بدونِ پرسیدن، از تحلیل واقعی داده‌های رستوران شما تولید می‌شن — هر کارت دلیل و عدد پشتش رو نشون می‌ده. برای سؤالِ آزاد از چت‌باکسِ بالا استفاده کن.</div>
     </div>
     ${cards.length?cards.map(c=>`
       <div class="smart-card ${c.severity==='high'?'high':c.severity==='medium'?'med':'low'}">
@@ -896,6 +897,7 @@ async function custRenderAI(){
           <button class="btn btn-sm ${c.severity==='high'?'btn-primary':'btn-ghost'}" onclick="handleAiAction('${c.id}')">${esc(c.action_label)}</button>
         </div>
       </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}`;
+  initAssistantChat();
 }
 function handleAiAction(id){
   if(id==='winback'||id==='vip_retention'){ setCustTab('campaign'); }

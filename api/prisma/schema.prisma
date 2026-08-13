@@ -151,6 +151,9 @@ model Restaurant {
   economyLedgerEntries  EconomyLedgerEntry[]
   missions              Mission[]
   rewardMarketplaceItems RewardMarketplaceItem[]
+  // ── دستیارِ هوشمندِ رستوران (migration 039) ──
+  assistantVocab        RestaurantAssistantVocab[]
+  assistantLogs         RestaurantAssistantLog[]
   @@index([tenantId])
   @@index([city], map: "idx_restaurants_city")
   chatThreads  ChatThread[]
@@ -1568,4 +1571,41 @@ model RewardRedemption {
   createdAt         DateTime               @default(now()) @map("created_at")
   @@index([userId, createdAt])
   @@map("reward_redemptions")
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  دستیارِ هوشمندِ رستوران (migration 039) — چت‌بات آفلاینِ پرسش‌وپاسخ.
+//  یادگیری per-restaurant است (همان انضباطِ RestaurantNoShowModel):
+//  هر رستوران واژگانِ خودش را از تعاملِ واقعیِ کارمندهایش می‌سازد.
+//  جزئیاتِ کاملِ الگوریتم در lib/assistant-nlu.ts.
+// ═══════════════════════════════════════════════════════════════════════
+
+// شمارشِ کلمه→نیتِ یادگرفته‌شده — حافظه‌ی خودآموزیِ Naive Bayes.
+model RestaurantAssistantVocab {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  intent       String     // یکی از مقادیرِ ASSISTANT_INTENTS در lib/assistant-nlu.ts
+  word         String     // توکنِ نرمال‌شده‌ی فارسی (lib/assistant-nlu.ts → tokenize)
+  count        Int        @default(1)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+  @@unique([restaurantId, intent, word])
+  @@index([restaurantId])
+  @@map("restaurant_assistant_vocab")
+}
+
+// هر سؤالِ پرسیده‌شده — برایِ شفافیت (چقدر دقیقه) و منبعِ یادگیری.
+model RestaurantAssistantLog {
+  id             String     @id @default(uuid()) @db.Uuid
+  restaurantId   String     @map("restaurant_id") @db.Uuid
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id])
+  staffId        String?    @map("staff_id") @db.Uuid // بدونِ FK سخت‌گیر — مثلِ staff_notes.author_staff_id
+  question       String
+  detectedIntent String?    @map("detected_intent")
+  confidence     Float      @default(0)
+  wasCorrected   Boolean    @default(false) @map("was_corrected")
+  finalIntent    String?    @map("final_intent")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  @@index([restaurantId, createdAt(sort: Desc)])
+  @@map("restaurant_assistant_logs")
 }

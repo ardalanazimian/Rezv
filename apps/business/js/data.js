@@ -263,6 +263,10 @@ const API = {
   managerInsights(){ return this.get('/restaurant/manager-insights'); },
   // ── آمار رفتار مشتری + نقشه‌ی حرارتیِ شلوغی (روز×ساعت، همان دیتایِ تبِ آنالیتیکس) ──
   analytics(){ return this.get('/restaurant/analytics'); },
+  // ── دستیارِ هوشمندِ آفلاین: چت آزادمتن + حلقه‌ی خودآموزی (وصل به /restaurant/assistant واقعی) ──
+  assistantAsk(message){ return this.post('/restaurant/assistant', { message }); },
+  assistantFeedback(logId, intent){ return this.post('/restaurant/assistant/feedback', { log_id: logId, correct_intent: intent }); },
+  assistantStats(){ return this.get('/restaurant/assistant'); },
 };
 
 // ═══════════════════════════════════════════════════════════
