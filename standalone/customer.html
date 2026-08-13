@@ -1594,7 +1594,7 @@ button,[role="button"],.botnav-item,a{min-height:0}
     </button>
     <div class="nav-pts" onclick="go('loyalty')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></svg>
-      <span id="navPts">۳۴۰</span>
+      <span id="navPts">—</span>
     </div>
     <div class="nav-avatar" onclick="isLoggedIn()?go('profile'):openLogin()">و</div>
   </div>
@@ -1977,7 +1977,7 @@ const R_SAMPLE = [
 ];
 const PERKS=[['🎁','کش‌بک','تا ۱۵٪ برگشت پول'],['⚡','رزرو سریع','اولویت در ساعات شلوغ'],['🎂','هدیه تولد','تخفیف ویژه ماه تولد'],['👑','میز VIP','دسترسی به میزهای ویژه']];
 const BADGES=[['🍽️','اولین رزرو',1],['🔥','۵ هفته پیاپی',1],['⭐','گورمه',1],['🌙','شب‌نشین',1],['👑','VIP',0],['🗺️','کاشف',0]];
-let pts=340, favs=new Set(), curRest=null, bk={};
+let pts=0, favs=new Set(), curRest=null, bk={};
 // علاقه‌مندی‌ها را بین رفرش‌ها نگه دار (localStorage — الگوی rz_* مثل بقیهٔ اپ)
 try{ const saved=JSON.parse(localStorage.getItem('rz_favs')||'[]'); if(Array.isArray(saved)) favs=new Set(saved); }catch{}
 function saveFavs(){ try{ localStorage.setItem('rz_favs', JSON.stringify([...favs])); }catch{} }
@@ -2680,6 +2680,33 @@ function onSessionExpired(){
 function refreshAuthUI(){
   const av = document.querySelector('.nav-avatar');
   if (av) av.textContent = userInitial();
+  syncNavPoints();
+}
+
+// ⚠️ رفعِ باگِ واقعی (۲۰۲۶-۰۸-۱۳): چیپِ امتیازِ نوارِ بالا عددِ ثابتِ ۳۴۰ را
+// مستقیم در markup داشت و فقط وقتی کاربر تبِ «باشگاه» را باز می‌کرد با
+// مقدارِ واقعی جایگزین می‌شد. یعنی هر کاربری در نگاهِ اول امتیازِ کسِ دیگری
+// را می‌دید. حالا:
+//   • مهمانِ ناشناس → چیپ اصلاً نمایش داده نمی‌شود (امتیازی ندارد که نشان بدهیم)
+//   • کاربرِ واردشده → تا رسیدنِ پاسخِ سرور «—» و بعد عددِ واقعی
+// عمداً هیچ عددی حدس زده نمی‌شود؛ نبودِ داده یعنی نبودِ ادعا.
+let _ptsInFlight = null;
+function syncNavPoints(){
+  const wrap = document.querySelector('.nav-pts');
+  const el = document.getElementById('navPts');
+  if (!wrap || !el) return;
+  if (!USER) { wrap.style.display = 'none'; el.textContent = '—'; return; }
+  wrap.style.display = '';
+  if (_ptsInFlight) return;
+  _ptsInFlight = API.get('/me/loyalty').then(res => {
+    if (res.ok && typeof res.data?.points === 'number') {
+      el.textContent = res.data.points.toLocaleString('fa-IR');
+      import('./data/seed.js').then(m => m.setPts(res.data.points)).catch(() => {});
+    } else {
+      el.textContent = '—';   // سرور نگفت → چیزی ادعا نمی‌کنیم
+    }
+  }).catch(() => { el.textContent = '—'; })
+    .finally(() => { _ptsInFlight = null; });
 }
 
 // نگاشت داده‌ی API به ساختار فرانت‌اند (R)
@@ -3077,7 +3104,10 @@ function renderDiscoverSections(){
   // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
   const sub=document.querySelector('#page-discover .section-sub');
   if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
-  const np=document.getElementById('navPts'); if(np) np.textContent=fmtFa(pts);
+  // چیپِ امتیاز عمداً اینجا نوشته نمی‌شود: منبعِ واحدش syncNavPoints در
+  // api.js است که مقدار را از /me/loyalty می‌گیرد. نوشتنِ ptsِ محلی اینجا
+  // باعث می‌شد مهمانِ ناشناس عددِ ساختگی ببیند (باگِ ۳۴۰).
+  if (pts > 0) { const np=document.getElementById('navPts'); if(np) np.textContent=fmtFa(pts); }
 }
 function doSearch(){
   const q=document.getElementById('sQ').value.trim();
@@ -5326,12 +5356,15 @@ function boot(){
 
 // بازیابی نشست از localStorage — اگر توکن داشت، کاربر را دوباره وارد نگه دار
 async function restoreSession(){
-  if (!API.restoreSession()) return;
+  // ⚠️ حتی وقتی توکنی نیست هم باید UI را همگام کنیم: در غیر این صورت چیپِ
+  // امتیازِ نوارِ بالا برایِ مهمانِ ناشناس روی حالتِ اولیه‌اش می‌ماند و دیده
+  // می‌شود، در حالی که مهمان اصلاً امتیازی ندارد که نشان بدهیم.
+  if (!API.restoreSession()) { refreshAuthUI(); return; }
   const res = await API.get('/me');
   if (res.ok && res.data?.user) {
     setUSER(res.data.user);
-    refreshAuthUI();
   }
+  refreshAuthUI();
   // اگر ۴۰۱ برگشت، لایه‌ی request خودش refresh می‌کند.
 }
 

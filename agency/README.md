@@ -1,3 +1,16 @@
+> ## ⛔ AGENCY_STATUS=DISABLED — PLANNED / NOT IMPLEMENTED
+>
+> **این سند فقط «معماریِ برنامه‌ریزی‌شده» است و هیچ سیستمِ در حالِ اجرایی را توصیف نمی‌کند.**
+> در ۲۰۲۶-۰۸-۱۳ با تصمیمِ صریحِ مالکِ محصول، اجرایِ خودکارِ عامل‌ها به‌طورِ کامل
+> متوقف شد (دلیل: مصرفِ بیش از حدِ توکن/منابع). رجوع کن به `agency/AGENCY_STATUS`.
+>
+> هیچ‌چیز در این فایل دستورالعملِ اجرایی نیست. به‌طورِ مشخص ممنوع است:
+> ساختِ Routine/trigger/cron، اشتراکِ خودکارِ رویدادِ PR، حلقهٔ خودگردان،
+> پایشِ پس‌زمینه، خودآموزی، و هر عملیاتِ خودکارِ گیت‌هاب.
+> کلیدهایِ فعال‌سازیِ قدیمی (`REZV`، `REZV FULL`) بی‌اثرند.
+>
+> فعال‌سازیِ دوباره فقط با تصمیمِ مکتوبِ انسانی و تغییرِ دستیِ `agency/AGENCY_STATUS`.
+
 # Rezv AI Agency OS — Charter
 
 > **Status: mostly SPECIFICATION, plus one narrow live Routine.** This
@@ -12,7 +25,9 @@
 > as `DOCUMENTED_ONLY` unless a section explicitly says otherwise, per the
 > classification rules in [`DISCOVERY.md`](./DISCOVERY.md).
 
-Activation keyword: `REZV`. Highest-level command: `REZV FULL`. Both are
+~~Activation keyword: `REZV`. Highest-level command: `REZV FULL`.~~
+**باطل‌شده (۲۰۲۶-۰۸-۱۳): این کلیدها دیگر هیچ کاری را فعال نمی‌کنند.**
+متنِ زیر فقط برایِ ثبتِ تاریخی نگه داشته شده. هر دو زمانی قرار بود
 conventions for prompting a human-operated Claude Code session against this
 repo — they are not wired to any trigger, webhook, or script.
 

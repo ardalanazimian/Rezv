@@ -23,12 +23,15 @@ function boot(){
 
 // بازیابی نشست از localStorage — اگر توکن داشت، کاربر را دوباره وارد نگه دار
 async function restoreSession(){
-  if (!API.restoreSession()) return;
+  // ⚠️ حتی وقتی توکنی نیست هم باید UI را همگام کنیم: در غیر این صورت چیپِ
+  // امتیازِ نوارِ بالا برایِ مهمانِ ناشناس روی حالتِ اولیه‌اش می‌ماند و دیده
+  // می‌شود، در حالی که مهمان اصلاً امتیازی ندارد که نشان بدهیم.
+  if (!API.restoreSession()) { refreshAuthUI(); return; }
   const res = await API.get('/me');
   if (res.ok && res.data?.user) {
     setUSER(res.data.user);
-    refreshAuthUI();
   }
+  refreshAuthUI();
   // اگر ۴۰۱ برگشت، لایه‌ی request خودش refresh می‌کند.
 }
 

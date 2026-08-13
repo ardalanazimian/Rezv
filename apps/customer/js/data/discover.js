@@ -254,7 +254,10 @@ export function renderDiscoverSections(){
   // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
   const sub=document.querySelector('#page-discover .section-sub');
   if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
-  const np=document.getElementById('navPts'); if(np) np.textContent=fmtFa(pts);
+  // چیپِ امتیاز عمداً اینجا نوشته نمی‌شود: منبعِ واحدش syncNavPoints در
+  // api.js است که مقدار را از /me/loyalty می‌گیرد. نوشتنِ ptsِ محلی اینجا
+  // باعث می‌شد مهمانِ ناشناس عددِ ساختگی ببیند (باگِ ۳۴۰).
+  if (pts > 0) { const np=document.getElementById('navPts'); if(np) np.textContent=fmtFa(pts); }
 }
 export function doSearch(){
   const q=document.getElementById('sQ').value.trim();

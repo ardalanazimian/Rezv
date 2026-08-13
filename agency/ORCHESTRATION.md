@@ -1,3 +1,16 @@
+> ## ⛔ AGENCY_STATUS=DISABLED — PLANNED / NOT IMPLEMENTED
+>
+> **این سند فقط «معماریِ برنامه‌ریزی‌شده» است و هیچ سیستمِ در حالِ اجرایی را توصیف نمی‌کند.**
+> در ۲۰۲۶-۰۸-۱۳ با تصمیمِ صریحِ مالکِ محصول، اجرایِ خودکارِ عامل‌ها به‌طورِ کامل
+> متوقف شد (دلیل: مصرفِ بیش از حدِ توکن/منابع). رجوع کن به `agency/AGENCY_STATUS`.
+>
+> هیچ‌چیز در این فایل دستورالعملِ اجرایی نیست. به‌طورِ مشخص ممنوع است:
+> ساختِ Routine/trigger/cron، اشتراکِ خودکارِ رویدادِ PR، حلقهٔ خودگردان،
+> پایشِ پس‌زمینه، خودآموزی، و هر عملیاتِ خودکارِ گیت‌هاب.
+> کلیدهایِ فعال‌سازیِ قدیمی (`REZV`، `REZV FULL`) بی‌اثرند.
+>
+> فعال‌سازیِ دوباره فقط با تصمیمِ مکتوبِ انسانی و تغییرِ دستیِ `agency/AGENCY_STATUS`.
+
 # Orchestration Model
 
 ## Lifecycle
@@ -55,8 +68,12 @@ them on:
 
 ## Activating a Routine
 
-**Status as of 2026-08-11: one Routine is live, everything else in this
-directory is still `DOCUMENTED_ONLY`.** When asked exactly what scope to
+**Status as of 2026-08-13: هیچ Routineی زنده نیست — همه‌چیز در این
+پوشه `DOCUMENTED_ONLY` است.** کرونِ روزانه‌ی `trig_017G3nMLE9anexdJvVRFnSfr`
+در ۲۰۲۶-۰۸-۱۳ **حذف شد** و هیچ جایگزینی نباید ساخته شود.
+متنِ زیر فقط شرحِ تاریخیِ آن چیزی است که حذف شده:
+
+~~Status as of 2026-08-11: one Routine is live.~~ When asked exactly what scope to
 grant, the human chose "report-only, no writing" out of four options. A
 daily cron Routine (`trig_017G3nMLE9anexdJvVRFnSfr`, `0 6 * * *` UTC) now
 fires into a session acting as `rezv-ceo`/`rezv-security`: it checks new
