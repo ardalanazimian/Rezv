@@ -35,6 +35,9 @@ export const Err = {
 
   // ── بن سختِ پلتفرم (کاملاً جدا از فلگِ نرمِ abuse) ──
   userBanned: (reason?: string | null) => new ApiError('USER_BANNED', 'دسترسیِ این حساب توسطِ رزرونو مسدود شده است', 403, reason ? { reason } : {}),
+
+  // ── سوییچ‌هایِ قابلیت (kill-switch سطحِ پلتفرم) ──
+  featureDisabled: (label: string) => new ApiError('FEATURE_DISABLED', `«${label}» موقتاً غیرفعال است`, 503),
 };
 export function errorResponse(e: unknown) {
   if (e instanceof ApiError)

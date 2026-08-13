@@ -1292,6 +1292,9 @@ const API = {
   listMissions(){ return this.get('/admin/missions'); },
   createMission(body){ return this.post('/admin/missions', body); },
   updateMission(id, body){ return this.patch(`/admin/missions/${id}`, body); },
+  // ── سوییچ‌هایِ قابلیت (فازِ ۳) ──
+  getFeatureFlags(){ return this.get('/admin/feature-flags'); },
+  setFeatureFlags(flags){ return this.patch('/admin/feature-flags', { flags }); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },
@@ -1969,14 +1972,47 @@ const ACTION_LABEL = {
 /** حرفِ اولِ نام برایِ آواتارِ متنی (وقتی عکسی نیست) — مثلِ بقیه‌ی لیست‌های پنل. */
 function initialOf(name){ return (String(name||'').trim()[0]) || '؟'; }
 
+// سوییچ‌هایِ قابلیت — عمداً همون واژگانِ featureFlagLabel در lib/feature-flags.ts (بک‌اند)
+const FEATURE_FLAG_LABEL_FA = {
+  reservations_enabled: 'ثبتِ رزروِ آنلاین',
+  waitlist_enabled: 'پیوستن به لیستِ انتظار',
+  reward_marketplace_enabled: 'خرجِ سکه در فروشگاهِ جایزه',
+  missions_claim_enabled: 'دریافتِ جایزه‌یِ ماموریت',
+  ai_recommendations_enabled: 'پیشنهادهایِ هوشمند',
+};
+function featureFlagsPanelHTML(flags){
+  return `<div class="panel" style="margin-bottom:20px">
+    <div class="panel-head"><div><div class="panel-title">${icon('alert',{size:16})} سوییچ‌هایِ اضطراری</div><div class="panel-sub">خاموش/روشن‌کردنِ سریعِ یک قابلیت برایِ کلِ پلتفرم — بدونِ دیپلوی</div></div></div>
+    <div class="mini-list">
+      ${Object.entries(FEATURE_FLAG_LABEL_FA).map(([key,label])=>{
+        const on = flags[key] !== false;
+        return `<div class="mini-row">
+          <div class="mini-info"><div class="mini-name">${esc(label)}</div><div class="mini-sub mono-ip">${esc(key)}</div></div>
+          <span class="badge ${on?'active':'expired'}"><span class="bdot"></span>${on?'فعال':'غیرفعال'}</span>
+          <button class="btn btn-sm ${on?'btn-danger':'btn-primary'}" data-key="${esc(key)}" data-next="${on?'false':'true'}" onclick="toggleFeatureFlagUi(this.dataset.key,this.dataset.next==='true')">${on?'غیرفعال‌کردن':'فعال‌کردن'}</button>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+async function toggleFeatureFlagUi(key,next){
+  const label=FEATURE_FLAG_LABEL_FA[key]||key;
+  if(!confirm(next?`«${label}» برایِ کلِ پلتفرم دوباره فعال بشه؟`:`«${label}» برایِ کلِ پلتفرم غیرفعال بشه؟ همه‌ی کاربرها فوراً اثرش رو می‌بینن.`))return;
+  const res=await API.setFeatureFlags([{key,enabled:next}]);
+  if(!res.ok){toast('',res.error?.message||'انجام نشد');return;}
+  toast('','به‌روزرسانی شد');
+  rSecurity();
+}
+
 function rSecurity(){
   document.getElementById('v-security').innerHTML=`<div style="text-align:center;padding:60px;color:var(--t2)">در حال بارگذاری...</div>`;
   (async()=>{
-    const res=await API.security();
+    const [res,flagsRes]=await Promise.all([API.security(),API.getFeatureFlags()]);
     if(!res.ok){document.getElementById('v-security').innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`;return;}
     const d=res.data;
+    const flags=flagsRes.ok?flagsRes.data.flags:{};
     const eo=d.economy_overview||{tier_distribution:[],total_xp_granted:0,active_abuse_flags:0,total_economy_profiles:0};
-    document.getElementById('v-security').innerHTML=`
+    document.getElementById('v-security').innerHTML=featureFlagsPanelHTML(flags)+`
       <div class="panel" style="margin-bottom:20px">
         <div class="panel-head"><div><div class="panel-title">${icon('search',{size:16})} جست‌وجویِ مشتری (Customer 360)</div><div class="panel-sub">با شماره‌موبایل یا شناسه‌ی کاربر — وضعیتِ کامل، اقتصاد، تاریخچه، و کنترلِ بن</div></div></div>
         <div style="display:flex;gap:8px">

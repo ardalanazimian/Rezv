@@ -6,6 +6,7 @@ import { normalizePhone } from '@/lib/otp';
 import { withIdempotency } from '@/lib/idempotency';
 import { clientIp } from '@/lib/ratelimit';
 import { assertUserNotBanned } from '@/lib/ban';
+import { isFeatureEnabled, featureFlagLabel } from '@/lib/feature-flags';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, z, zUuid, zDateStr, zTimeStr, zPartySize, zPhone } from '@/lib/schemas';
 
@@ -46,6 +47,11 @@ export async function POST(req: Request) {
     // بن سختِ پلتفرم: قبل از هر پردازشِ دیگری (حتی claimِ idempotency) رد می‌شود
     // — فقط برایِ مشتریِ آنلاین؛ رزروِ دستیِ staff برایِ مهمانِ حاضر مشمول نیست.
     if (auth.kind === 'customer') await assertUserNotBanned(auth.sub);
+    // سوییچِ قابلیت (Company Control Plane، فازِ ۳): فقط رزروِ آنلاینِ مشتری را
+    // می‌بندد؛ رزروِ دستیِ staff (source='manual') در قطعیِ اضطراری هم کار می‌کند.
+    if (auth.kind === 'customer' && !(await isFeatureEnabled('reservations_enabled'))) {
+      throw Err.featureDisabled(featureFlagLabel('reservations_enabled'));
+    }
     // Validation متمرکز: همه‌ی خطاها با هم، فرمتِ یکدست (به‌جای if دستی)، + سقفِ حجمِ بدنه.
     const b = await parseBody(req, reservationSchema);
 

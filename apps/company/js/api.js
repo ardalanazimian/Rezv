@@ -81,6 +81,9 @@ const API = {
   listMissions(){ return this.get('/admin/missions'); },
   createMission(body){ return this.post('/admin/missions', body); },
   updateMission(id, body){ return this.patch(`/admin/missions/${id}`, body); },
+  // ── سوییچ‌هایِ قابلیت (فازِ ۳) ──
+  getFeatureFlags(){ return this.get('/admin/feature-flags'); },
+  setFeatureFlags(flags){ return this.patch('/admin/feature-flags', { flags }); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },
