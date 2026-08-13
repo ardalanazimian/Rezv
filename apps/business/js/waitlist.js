@@ -31,7 +31,11 @@ function rWaitlist(){
   // کارت‌های آمار هم استفاده می‌کنند پر می‌شود.
   const wlBadge = document.getElementById('wlBadge');
   if (wlBadge) wlBadge.textContent = queue.length > 0 ? fa(queue.length) : '';
-  document.getElementById('v-waitlist').innerHTML=`
+  // ⚠️ رفعِ باگِ صداقتِ داده (یافته‌ی زنده، هم‌الگو با overview.js/reservations.js):
+  // تا اینجا این تب هیچ‌وقت نمی‌گفت که صف/آمار الان دموست.
+  const isDemo = !API.getToken() || !_wlLoaded;
+  const wlDemoNote = isDemo ? `<div class="cash-note" style="margin-bottom:16px">${icon('info',{size:13})} صف و آمارِ زیر نمونه‌اند، دادهٔ واقعیِ رستورانت نیستند.</div>` : '';
+  document.getElementById('v-waitlist').innerHTML=wlDemoNote+`
     <!-- آمار لیست انتظار -->
     <div class="wl-stats-grid">
       <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--blue-50)">${icon('inbox',{size:16})}</div><div><div class="wl-stat-num">${fa(A.current_queue_size)}</div><div class="wl-stat-lbl">در صف الان</div></div></div>

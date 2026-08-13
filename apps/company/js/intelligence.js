@@ -172,7 +172,7 @@ async function doCancel(id){
 function refreshActive(){
   const active=document.querySelector('.view.active');if(!active)return;
   const id=active.id.replace('v-','');
-  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,systemhealth:rSystemHealth,security:rSecurity,support:rSupport})[id]?.();
+  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,systemhealth:rSystemHealth,security:rSecurity,support:rSupport,badges:rBadges,missions:rMissions})[id]?.();
 }
 
 // ════════ مدیریت رستوران‌ها — اقدامات واقعی سریع (جایگزین «پشتیبانی از راه دور» ساختگی) ════════
@@ -249,6 +249,20 @@ const REP_ID = {
 };
 function repName(tier){ return REP_ID[tier]?.name || tier; }
 
+// وضعیتِ رزرو — همون واژگانِ پنلِ بیزنس (crm.js ST_FA)، به‌علاوه‌ی چند وضعیتِ
+// دیگرِ چرخه‌ی حیاتِ رزرو که در Customer 360 هم ممکنه دیده بشن.
+const RESV_STATUS_FA = {
+  pending:'در انتظار', waitlisted:'لیستِ انتظار', confirmed:'تأییدشده', auto_confirmed:'تأییدِ خودکار',
+  preparing:'در حالِ آماده‌سازی', checked_in:'رسیده', running_late:'دیر کرده', seated:'نشسته',
+  dining:'در حالِ صرفِ غذا', completed:'انجام‌شده', no_show:'عدم‌حضور', rejected:'ردشده',
+  expired:'منقضی', cancelled:'لغوشده', auto_cancelled:'لغوِ خودکار',
+};
+// نوعِ حرکتِ دفترِ اقتصاد — رجوع کن به schema.prisma EconomyLedgerKind
+const LEDGER_KIND_FA = {
+  xp_earn:'کسبِ تجربه (XP)', wallet_earn:'افزایشِ سکه', wallet_spend:'خرجِ سکه',
+  reliability_event:'رویدادِ اعتبار', strike_add:'ثبتِ تخلف', strike_decay:'کاهشِ تخلف (زمان)',
+};
+
 // ترجمه‌ی اقدام‌های حساسِ audit به فارسی — مدیرِ پلتفرم نباید مجبور باشه
 // اسمِ فنیِ رویداد (plan.changed) رو بخونه تا بفهمه چی شده. اگر اقدامِ
 // جدیدی اضافه شد و اینجا نبود، همون کلیدِ خام نشون داده می‌شه (بی‌صدا خراب
@@ -265,14 +279,110 @@ const ACTION_LABEL = {
 /** حرفِ اولِ نام برایِ آواتارِ متنی (وقتی عکسی نیست) — مثلِ بقیه‌ی لیست‌های پنل. */
 function initialOf(name){ return (String(name||'').trim()[0]) || '؟'; }
 
+// سوییچ‌هایِ قابلیت — عمداً همون واژگانِ featureFlagLabel در lib/feature-flags.ts (بک‌اند)
+const FEATURE_FLAG_LABEL_FA = {
+  reservations_enabled: 'ثبتِ رزروِ آنلاین',
+  waitlist_enabled: 'پیوستن به لیستِ انتظار',
+  reward_marketplace_enabled: 'خرجِ سکه در فروشگاهِ جایزه',
+  missions_claim_enabled: 'دریافتِ جایزه‌یِ ماموریت',
+  ai_recommendations_enabled: 'پیشنهادهایِ هوشمند',
+};
+function featureFlagsPanelHTML(flags){
+  return `<div class="panel" style="margin-bottom:20px">
+    <div class="panel-head"><div><div class="panel-title">${icon('alert',{size:16})} سوییچ‌هایِ اضطراری</div><div class="panel-sub">خاموش/روشن‌کردنِ سریعِ یک قابلیت برایِ کلِ پلتفرم — بدونِ دیپلوی</div></div></div>
+    <div class="mini-list">
+      ${Object.entries(FEATURE_FLAG_LABEL_FA).map(([key,label])=>{
+        const on = flags[key] !== false;
+        return `<div class="mini-row">
+          <div class="mini-info"><div class="mini-name">${esc(label)}</div><div class="mini-sub mono-ip">${esc(key)}</div></div>
+          <span class="badge ${on?'active':'expired'}"><span class="bdot"></span>${on?'فعال':'غیرفعال'}</span>
+          <button class="btn btn-sm ${on?'btn-danger':'btn-primary'}" data-key="${esc(key)}" data-next="${on?'false':'true'}" onclick="toggleFeatureFlagUi(this.dataset.key,this.dataset.next==='true')">${on?'غیرفعال‌کردن':'فعال‌کردن'}</button>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+async function toggleFeatureFlagUi(key,next){
+  const label=FEATURE_FLAG_LABEL_FA[key]||key;
+  if(!confirm(next?`«${label}» برایِ کلِ پلتفرم دوباره فعال بشه؟`:`«${label}» برایِ کلِ پلتفرم غیرفعال بشه؟ همه‌ی کاربرها فوراً اثرش رو می‌بینن.`))return;
+  const res=await API.setFeatureFlags([{key,enabled:next}]);
+  if(!res.ok){toast('',res.error?.message||'انجام نشد');return;}
+  toast('','به‌روزرسانی شد');
+  rSecurity();
+}
+
+// ═══════════ Phase 4: صفِ یکپارچه‌ی نظارت (اسکلت) + بنِ IP + ویرایشگرِ قواعدِ اقتصاد ═══════════
+function moderationQueuePanelHTML(q){
+  const stat=(icon_,label,count,onclick)=>`<div class="mini-row" style="cursor:pointer" onclick="${onclick}">
+    <div class="mini-ava">${icon(icon_,{size:16})}</div>
+    <div class="mini-info"><div class="mini-name">${esc(label)}</div></div>
+    <span class="badge ${count>0?'expiring':'active'}">${fa(count)}</span>
+  </div>`;
+  return `<div class="panel" style="margin-bottom:20px">
+    <div class="panel-head"><div><div class="panel-title">${icon('shield',{size:16})} صفِ یکپارچه‌ی نظارت</div><div class="panel-sub">نمایِ کلی از همه‌ی ابزارهایِ نظارتی — رویِ هرکدوم بزن تا بری همون‌جا</div></div></div>
+    <div class="mini-list">
+      ${stat('lock','کاربرِ بن‌شده',q.banned_users_count,"document.getElementById('c360Query')?.focus()")}
+      ${stat('alert','مشتریِ نشان‌خورده',q.flagged_abuse_users_count,"document.querySelector('#v-security')?.scrollIntoView()")}
+      ${stat('close','IPِ بن‌شده',q.banned_ips_count,"document.getElementById('bannedIpsPanel')?.scrollIntoView({behavior:'smooth'})")}
+      ${stat('search','عکسِ در انتظارِ تأیید',q.pending_photos_count,"nav('photos')")}
+    </div>
+  </div>`;
+}
+function bannedIpsPanelHTML(items){
+  return `<div class="panel" style="margin-bottom:20px" id="bannedIpsPanel">
+    <div class="panel-head"><div><div class="panel-title">${icon('close',{size:16})} IPهایِ بن‌شده</div><div class="panel-sub">بنِ خودکارِ ریت‌لیمیت — بعد از ${fa(10)} تخلف در ۵ دقیقه، تا ۱ ساعت</div></div></div>
+    ${items.length?items.map(x=>`<div class="mini-row">
+      <div class="mini-ava mono-ip">${icon('close',{size:14})}</div>
+      <div class="mini-info"><div class="mini-name mono-ip">${esc(x.ip)}</div><div class="mini-sub">${fa(Math.ceil(x.ttlSeconds/60))} دقیقه تا رفعِ خودکار</div></div>
+      <button class="btn btn-sm" data-ip="${esc(x.ip)}" onclick="unbanIpUi(this.dataset.ip)">لغوِ بن</button>
+    </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">هیچ IPِ بن‌شده‌ای نیست</div></div>`}
+  </div>`;
+}
+async function unbanIpUi(ip){
+  if(!confirm(`بنِ IP «${ip}» لغو بشه؟`))return;
+  const res=await API.unbanIp(ip);
+  if(!res.ok){toast('',res.error?.message||'انجام نشد');return;}
+  toast('','بن لغو شد');
+  rSecurity();
+}
+function economyRulesPanelHTML(rules){
+  return `<div class="panel" style="margin-bottom:20px">
+    <div class="panel-head"><div><div class="panel-title">${icon('sparkle',{size:16,fill:true})} ویرایشگرِ قواعدِ اقتصاد</div><div class="panel-sub">پاداشِ XP/سکه‌ای که با انجام‌شدنِ هر رزرو به مشتری داده می‌شه</div></div></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div><div class="field-label">XPِ رزروِ انجام‌شده</div><input class="inp" id="ecoXp" type="number" min="0" value="${rules.completed_xp}" style="width:140px"></div>
+      <div><div class="field-label">سکه‌یِ رزروِ انجام‌شده</div><input class="inp" id="ecoCoins" type="number" min="0" value="${rules.completed_coins}" style="width:140px"></div>
+      <button class="btn btn-primary" onclick="saveEconomyRules()">ذخیره</button>
+    </div>
+  </div>`;
+}
+async function saveEconomyRules(){
+  const completed_xp=+((document.getElementById('ecoXp')?.value)||0);
+  const completed_coins=+((document.getElementById('ecoCoins')?.value)||0);
+  const res=await API.setEconomyRules({completed_xp,completed_coins});
+  if(!res.ok){toast('',res.error?.message||'ذخیره ناموفق بود');return;}
+  toast('','قواعدِ اقتصاد به‌روزرسانی شد');
+}
+
 function rSecurity(){
   document.getElementById('v-security').innerHTML=`<div style="text-align:center;padding:60px;color:var(--t2)">در حال بارگذاری...</div>`;
   (async()=>{
-    const res=await API.security();
+    const [res,flagsRes,mqRes,ipsRes,ecoRes]=await Promise.all([API.security(),API.getFeatureFlags(),API.getModerationQueue(),API.getBannedIps(),API.getEconomyRules()]);
     if(!res.ok){document.getElementById('v-security').innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`;return;}
     const d=res.data;
+    const flags=flagsRes.ok?flagsRes.data.flags:{};
+    const mq=mqRes.ok?mqRes.data:{banned_users_count:0,flagged_abuse_users_count:0,banned_ips_count:0,pending_photos_count:0};
+    const bannedIps=ipsRes.ok?ipsRes.data.items:[];
+    const ecoRules=ecoRes.ok?ecoRes.data.rules:{completed_xp:100,completed_coins:20};
     const eo=d.economy_overview||{tier_distribution:[],total_xp_granted:0,active_abuse_flags:0,total_economy_profiles:0};
-    document.getElementById('v-security').innerHTML=`
+    document.getElementById('v-security').innerHTML=moderationQueuePanelHTML(mq)+featureFlagsPanelHTML(flags)+`
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-head"><div><div class="panel-title">${icon('search',{size:16})} جست‌وجویِ مشتری (Customer 360)</div><div class="panel-sub">با شماره‌موبایل یا شناسه‌ی کاربر — وضعیتِ کامل، اقتصاد، تاریخچه، و کنترلِ بن</div></div></div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="c360Query" placeholder="۰۹۱۲۳۴۵۶۷۸۹ یا شناسه‌ی UUID" style="flex:1" onkeydown="if(event.key==='Enter')search360()">
+          <button class="btn btn-primary" onclick="search360()">جست‌وجو</button>
+        </div>
+        <div id="c360Result" style="margin-top:14px"></div>
+      </div>
       <div class="kpi-grid">
         <div class="kpi"><div class="kpi-top"><div class="kpi-ic ${d.coupon_abuse_signals.length?'red':'green'}">${icon('ticket',{size:17})}</div></div><div class="kpi-val">${fa(d.coupon_abuse_signals.length)}</div><div class="kpi-label">الگوی سوءاستفاده از کوپن</div></div>
         <div class="kpi"><div class="kpi-top"><div class="kpi-ic ${d.high_no_show_customers.length?'amber':'green'}">${icon('close',{size:17})}</div></div><div class="kpi-val">${fa(d.high_no_show_customers.length)}</div><div class="kpi-label">مشتری با عدم‌حضور بالا</div></div>
@@ -344,14 +454,14 @@ function rSecurity(){
             <div class="mini-sub">${new Date(a.at).toLocaleString('fa-IR')}</div>
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">اقدامِ حساسی ثبت نشده</div></div>`}
-      </div>`;
+      </div>`+bannedIpsPanelHTML(bannedIps)+economyRulesPanelHTML(ecoRules);
   })();
 }
 
 // هر دو اقدام رویِ حسابِ یک آدمِ واقعی اثر می‌ذارن (بیعانه‌ی اجباری، لغوِ
 // تأییدِ خودکار) — پس هیچ‌کدوم نباید با یه کلیکِ اتفاقی انجام بشه. دکمه هم
 // حینِ درخواست قفل می‌شه تا دوبار ارسال نشه.
-async function abuseFlagAct(btn, userId, action, confirmMsg, okMsg){
+async function abuseFlagAct(btn, userId, action, confirmMsg, okMsg, onDone){
   if(!userId) return;
   if(!confirm(confirmMsg)) return;
   if(btn){ btn.disabled=true; btn.textContent='در حال انجام…'; }
@@ -363,7 +473,7 @@ async function abuseFlagAct(btn, userId, action, confirmMsg, okMsg){
     return;
   }
   toast('',okMsg);
-  rSecurity();
+  (onDone||rSecurity)();
 }
 function clearAbuseFlagUi(userId){
   return abuseFlagAct(
@@ -377,6 +487,131 @@ function flagAbuseUi(userId){
     event?.currentTarget, userId, 'flag',
     'این مشتری نشانِ سوءاستفاده بخوره؟ از این به بعد رزروش بیعانه می‌خواد و خودکار تأیید نمی‌شه.',
     'مشتری نشان خورد',
+  );
+}
+
+// ═══════════ Customer 360 — جست‌وجو، نمایِ کامل، بن/رفعِ بن (Company Control Plane، فازِ ۲) ═══════════
+let _c360Last=null;
+function search360(presetVal){
+  const input=document.getElementById('c360Query');
+  const q=(presetVal!==undefined&&presetVal!==null?presetVal:(input?.value||'')).trim();
+  if(!q){toast('','شماره‌موبایل یا شناسه‌ی کاربر رو وارد کن');return;}
+  _c360Last=q;
+  const box=document.getElementById('c360Result');
+  if(!box)return;
+  box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--t2)">در حال جست‌وجو...</div>`;
+  API.customer360(q).then(res=>{
+    if(!res.ok){
+      box.innerHTML=`<div class="panel" style="text-align:center;padding:24px;color:var(--t2)">${icon('alert',{size:15})} ${esc(res.error?.message||'کاربر پیدا نشد')}</div>`;
+      return;
+    }
+    box.innerHTML=renderCustomer360(res.data);
+  });
+}
+function renderCustomer360(d){
+  const u=d.user, m=d.moderation, e=d.economy;
+  const name=[u.first_name,u.last_name].filter(Boolean).join(' ')||'بدونِ نام';
+  const rep=REP_ID[e.reputation_tier]||REP_ID.bronze;
+  return `
+    <div class="panel" style="background:var(--ink-50);border-color:var(--ink-100)">
+      <div class="mini-row" style="background:transparent;padding:0">
+        <div class="mini-ava">${esc(initialOf(name))}</div>
+        <div class="mini-info">
+          <div class="mini-name">${esc(name)} ${m.is_banned?'<span class="badge badge-danger">بن‌شده</span>':''}${m.has_active_abuse_flag?'<span class="badge badge-warning">نشانِ سوءاستفاده</span>':''}</div>
+          <div class="mini-sub">${esc(u.phone)} · عضو از ${new Date(u.created_at).toLocaleDateString('fa-IR')} · شناسه: <span class="mono-ip">${esc(u.id)}</span></div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${m.is_banned
+            ? `<button class="btn btn-primary btn-sm" onclick="openUnbanModal('${esc(u.id)}','${esc(name)}')">رفعِ بن</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="openBanModal('${esc(u.id)}','${esc(name)}')">بن‌کردن</button>`}
+          ${m.has_active_abuse_flag
+            ? `<button class="btn btn-sm" onclick="clearAbuseFlag360('${esc(u.id)}')">برداشتنِ نشان</button>`
+            : `<button class="btn btn-sm" onclick="flagAbuse360('${esc(u.id)}')">نشان‌گذاری</button>`}
+        </div>
+      </div>
+      ${m.is_banned?`<div style="margin-top:10px;font-size:12.5px;color:var(--red-600);line-height:1.7">${icon('alert',{size:13})} بن‌شده در ${new Date(m.banned_at).toLocaleString('fa-IR')}${m.banned_reason?` — دلیل: ${esc(m.banned_reason)}`:''}</div>`:''}
+      ${(!m.is_banned && m.unbanned_at)?`<div style="margin-top:10px;font-size:12.5px;color:var(--t2);line-height:1.7">${icon('info',{size:13})} آخرین بن در ${new Date(m.unbanned_at).toLocaleString('fa-IR')} رفع شد${m.unban_reason?` — دلیل: ${esc(m.unban_reason)}`:''}</div>`:''}
+    </div>
+    <div class="kpi-grid" style="margin-top:14px">
+      <div class="kpi"><div class="kpi-top"><div class="kpi-ic" style="color:${rep.fg}">${icon(rep.ic,{size:17})}</div></div><div class="kpi-val" style="font-size:16px">${esc(rep.name)}</div><div class="kpi-label">سطحِ اعتبار · ${fa(e.reliability_score)} از ۱۰۰</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-ic amber">${icon('sparkle',{size:17,fill:true})}</div></div><div class="kpi-val">${fa(e.xp_total)}</div><div class="kpi-label">مجموعِ تجربه (XP)</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('wallet',{size:17})}</div></div><div class="kpi-val">${fa(e.wallet_balance)}</div><div class="kpi-label">موجودیِ سکه</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-ic ${e.strike_count?'red':'green'}">${icon('close',{size:17})}</div></div><div class="kpi-val">${fa(e.strike_count)}</div><div class="kpi-label">تخلفِ فعال</div></div>
+    </div>
+    <div class="row-2" style="margin-top:14px">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">آخرین حرکاتِ اقتصاد</div><div class="panel-sub">${fa(d.recent_ledger.length)} مورد</div></div></div>
+        ${d.recent_ledger.length?d.recent_ledger.map(l=>`<div class="mini-row">
+          <div class="mini-info"><div class="mini-name">${esc(LEDGER_KIND_FA[l.kind]||l.kind)}</div><div class="mini-sub">${new Date(l.at).toLocaleString('fa-IR')}</div></div>
+          <span style="font-weight:700;color:${l.amount>=0?'var(--green-600)':'var(--red-600)'}">${l.amount>=0?'+':''}${fa(l.amount)}</span>
+        </div>`).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز حرکتی ثبت نشده</div></div>`}
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">رزروهایِ اخیر</div><div class="panel-sub">${fa(d.recent_reservations.length)} مورد</div></div></div>
+        ${d.recent_reservations.length?d.recent_reservations.map(r=>`<div class="mini-row">
+          <div class="mini-info"><div class="mini-name">${esc(r.restaurant_name)}</div><div class="mini-sub">${new Date(r.slot_start).toLocaleString('fa-IR')} · ${fa(r.party_size)} نفر</div></div>
+          <span class="badge">${esc(RESV_STATUS_FA[r.status]||r.status)}</span>
+        </div>`).join(''):`<div class="empty-state"><div class="empty-state-desc">رزروی ثبت نشده</div></div>`}
+      </div>
+    </div>
+    ${d.missions&&d.missions.length?`<div class="panel" style="margin-top:14px">
+      <div class="panel-head"><div><div class="panel-title">ماموریت‌ها</div><div class="panel-sub">${fa(d.missions.length)} مورد</div></div></div>
+      ${d.missions.map(ms=>`<div class="mini-row">
+        <div class="mini-info"><div class="mini-name">${esc(ms.title||ms.mission?.title||'')}</div><div class="mini-sub">${fa(ms.progress||0)} از ${fa(ms.targetCount||ms.target_count||0)}</div></div>
+        ${ms.completedAt||ms.completed_at?'<span class="badge badge-warning">تکمیل</span>':''}
+      </div>`).join('')}
+    </div>`:''}`;
+}
+function openBanModal(userId,name){
+  openModal(`
+    <div class="modal-title">${icon('shield',{size:18})} بن‌کردنِ ${esc(name)}</div>
+    <div class="modal-sub">این حساب دیگه نمی‌تونه وارد بشه یا رزروِ آنلاین ثبت کنه.</div>
+    <div class="field-label">دلیل (الزامی)</div>
+    <textarea class="inp" id="banReason" rows="3" placeholder="مثلاً: تخلفِ تکراری، شکایتِ رسمیِ رستوران، ..."></textarea>
+    <button class="btn btn-danger btn-block btn-lg" style="margin-top:14px" onclick="submitBan('${esc(userId)}')">تأییدِ بن</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
+  `);
+}
+async function submitBan(userId){
+  const reason=(document.getElementById('banReason')?.value||'').trim();
+  if(!reason){toast('','دلیلِ بن رو بنویس');return;}
+  if(!confirm('مطمئنی؟ این حساب فوراً از دسترسی خارج می‌شه.'))return;
+  const res=await API.banUser(userId,reason);
+  if(!res.ok){toast('',res.error?.message||'بن ناموفق بود');return;}
+  closeModal();
+  toast('',res.data?.already_banned?'این کاربر از قبل بن بود':'کاربر بن شد');
+  search360(userId);
+}
+function openUnbanModal(userId,name){
+  openModal(`
+    <div class="modal-title">${icon('checkCircle',{size:18})} رفعِ بنِ ${esc(name)}</div>
+    <div class="field-label">دلیل (اختیاری)</div>
+    <textarea class="inp" id="unbanReason" rows="3" placeholder="مثلاً: بررسی شد، تصمیمِ اشتباه بود"></textarea>
+    <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" onclick="submitUnban('${esc(userId)}')">تأییدِ رفعِ بن</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
+  `);
+}
+async function submitUnban(userId){
+  const reason=(document.getElementById('unbanReason')?.value||'').trim()||undefined;
+  if(!confirm('بنِ این کاربر برداشته بشه؟'))return;
+  const res=await API.unbanUser(userId,reason);
+  if(!res.ok){toast('',res.error?.message||'رفعِ بن ناموفق بود');return;}
+  closeModal();
+  toast('',res.data?.already_unbanned?'این کاربر بن نبود':'بن برداشته شد');
+  search360(userId);
+}
+function clearAbuseFlag360(userId){
+  return abuseFlagAct(
+    event?.currentTarget, userId, 'clear',
+    'نشانِ سوءاستفاده‌ی این مشتری برداشته بشه؟ بعدش رزروهاش دوباره عادی تأیید می‌شن.',
+    'نشان برداشته شد', ()=>search360(userId),
+  );
+}
+function flagAbuse360(userId){
+  return abuseFlagAct(
+    event?.currentTarget, userId, 'flag',
+    'این مشتری نشانِ سوءاستفاده بخوره؟ از این به بعد رزروش بیعانه می‌خواد و خودکار تأیید نمی‌شه.',
+    'مشتری نشان خورد', ()=>search360(userId),
   );
 }
 
@@ -501,7 +736,7 @@ if (API.getToken()) {
     const active = document.querySelector('.view.active');
     if (active) {
       const id = active.id.replace('v-', '');
-      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, systemhealth:rSystemHealth, security:rSecurity, support:rSupport})[id]?.();
+      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, systemhealth:rSystemHealth, security:rSecurity, support:rSupport, badges:rBadges, missions:rMissions})[id]?.();
     }
     refreshSalesBadge();
     refreshPhotoBadge();

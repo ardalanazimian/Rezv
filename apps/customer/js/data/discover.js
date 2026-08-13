@@ -42,7 +42,7 @@ export function cardHTML(r){
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
     <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${r.id},this);buzz&&buzz()">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
-      <div class="rc-top"><div class="rc-name">${r.n}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
+      <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.n}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
       <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
       <div class="rc-slots">${r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');buzz&&buzz()">${s}</button>`).join('')}</div>
@@ -156,7 +156,7 @@ export function hCardHTML(r,extra){
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${r.id})">
     <div class="hcard-img" style="background:${GRAD[r.id]||GRAD[1]}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
-    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rt||r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}</div>
+    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rt||r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
 }
 // ═══════════════════════════════════════════════════════════
@@ -227,17 +227,18 @@ export const SAMPLE_EVENTS=[
 ];
 export async function renderEvents(){
   const el=document.getElementById('eventsList');if(!el)return;
-  let events=SAMPLE_EVENTS;
+  let events=SAMPLE_EVENTS, isDemo=true;
   // اگر آنلاین، از API بخوان
   const res=await API.get('/events');
   if(res.ok&&Array.isArray(res.data?.events)&&res.data.events.length){
     events=res.data.events.map(e=>({rid:e.restaurantId,emoji:e.emoji||'🎉',title:e.title,rest:'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
+    isDemo=false;
   }
   el.innerHTML=events.map(e=>`
     <div class="event-card" role="button" tabindex="0" onclick="openRest(${e.rid})">
       <div class="event-emoji">${e.emoji}</div>
       <div class="event-body">
-        <div class="event-title">${esc(e.title)}</div>
+        <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
         ${e.rest?`<div class="event-rest">${esc(e.rest)}</div>`:''}
         <div class="event-when">${icon('calendar',{size:13})} ${esc(e.when)}</div>
         ${e.desc?`<div class="event-desc">${esc(e.desc)}</div>`:''}

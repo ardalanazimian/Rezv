@@ -3,7 +3,8 @@ import { verifyOtp } from '@/lib/otp';
 import { signAccess, signRefresh } from '@/lib/jwt';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { db } from '@/lib/db';
-import { errorResponse } from '@/lib/errors';
+import { isCurrentlyBanned } from '@/lib/ban';
+import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, zPhone, zOtpCode, z } from '@/lib/schemas';
 
 const schema = z.object({ phone: zPhone, code: zOtpCode });
@@ -17,12 +18,15 @@ export async function POST(req: Request) {
     const userId = await verifyOtp(phone, code);
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { id: true, phone: true, firstName: true, lastName: true, avatarUrl: true },
+      select: { id: true, phone: true, firstName: true, lastName: true, avatarUrl: true, bannedAt: true, unbannedAt: true, bannedReason: true },
     });
+    // بن سختِ پلتفرم: OTP درست بود، ولی حسابِ بن‌شده نباید توکن بگیرد.
+    if (user && isCurrentlyBanned(user)) throw Err.userBanned(user.bannedReason);
+    const { bannedAt: _ba, unbannedAt: _ua, bannedReason: _br, ...publicUser } = user ?? {};
     return NextResponse.json({
       access: signAccess({ sub: userId, kind: 'customer' }),
       refresh: signRefresh({ sub: userId, kind: 'customer' }),
-      user,
+      user: user ? publicUser : null,
       // کاربر جدید = هنوز نام ثبت نکرده (برای نمایش فرم ثبت‌نام در فرانت)
       is_new: !user?.firstName,
     });

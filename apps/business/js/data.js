@@ -152,7 +152,8 @@ const API = {
     return { ok: false, status: r.status, error: r.error || { message: `خطای ${r.status}` } };
   },
   get(path){ return this.request(path); },
-  post(path, body){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}) }); },
+  // headers اختیاری: برای عملیاتِ حساس (مثلاً رزروِ دستی) که به Idempotency-Key نیاز دارند.
+  post(path, body, headers){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}), headers }); },
   patch(path, body){ return this.request(path, { method: 'PATCH', body: JSON.stringify(body || {}) }); },
   chatList(){ return this.get('/restaurant/chats'); },
   chatMessages(id, after){ return this.get('/restaurant/chats/'+id+(after?('?after='+encodeURIComponent(after)):'')); },

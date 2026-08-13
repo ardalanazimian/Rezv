@@ -97,7 +97,8 @@ export const API = {
   },
 
   get(path){ return this.request(path); },
-  post(path, body){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}) }); },
+  // headers اختیاری: برای عملیاتِ حساس (مثلاً رزرو) که به Idempotency-Key نیاز دارند.
+  post(path, body, headers){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}), headers }); },
 
   // ── احراز هویت (فاز ۳) ──
   async requestOtp(phone){

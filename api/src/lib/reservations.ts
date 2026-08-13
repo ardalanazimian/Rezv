@@ -16,8 +16,19 @@ import { invalidateAvailability } from './availability-cache';
 // مجموعه‌ی وضعیت‌های فعال به‌صورت Prisma.sql — برای درج امن و پارامتری در $queryRaw.
 // یک‌بار ساخته می‌شود و در همه‌ی کوئری‌های raw تداخل/اشغال استفاده می‌شود (به‌جای
 // لیست رشته‌ای دستی که قبلاً ناقص بود و باعث C1 می‌شد).
+//
+// ⚠️ باگِ واقعیِ P0 که با تستِ زنده پیدا شد (نه فرض): بدونِ کستِ صریحِ
+// `::reservation_status`، Postgres پارامترهای این fragment را از نوعِ متنِ خام
+// (`text`) می‌بیند و مقایسه‌ی `status IN (...)` با خطای
+// «operator does not exist: reservation_status = text» شکست می‌خورد — یعنی
+// همین کوئریِ اشغال‌سنجیِ میز (که مانعِ double-booking است) در مسیرِ اصلیِ
+// رزروِ آنلاین (وقتی حداقل یک میزِ کاندیدا وجود دارد) با ۵۰۰ رد می‌شد.
+// روشِ کشف: curlِ مستقیم به /api/v1/reservations رویِ Postgresِ واقعی (نه
+// mock) با یک رستوران/میزِ واقعی → ۵۰۰؛ ریشه‌یابی با یک اسکریپتِ Prismaِ جدا
+// که دقیقاً همین الگو را با/بدونِ کست اجرا کرد. جمع‌بندی به این استریمِ
+// چیدمانِ کست تأیید شد: با کست کار می‌کند، بدونِ کست هرجا کار می‌رود می‌شکند.
 const ACTIVE_STATUSES_FRAGMENT = Prisma.join(
-  ACTIVE_RESERVATION_STATUSES.map((s) => Prisma.sql`${s}`),
+  ACTIVE_RESERVATION_STATUSES.map((s) => Prisma.sql`${s}::reservation_status`),
 );
 
 /**

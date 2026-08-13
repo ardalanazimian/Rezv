@@ -22,6 +22,7 @@ export function openRest(id){
         <div class="rp-hero-badges">
           ${r.now?`<span class="rp-hero-badge live"><span class="live-dot" aria-hidden="true"></span> الان باز</span>`:''}
           <span class="rp-hero-badge">${icon('wallet',{size:14})} ${fmtFa(r.cb)}٪ کش‌بک</span>
+          ${r.slug?'':'<span class="rp-hero-badge demo">نمونه — دادهٔ آزمایشی</span>'}
         </div>
         <div class="rp-hero-name">${esc(r.n)}</div>
         <div class="rp-hero-meta">

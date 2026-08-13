@@ -42,6 +42,16 @@ model User {
   referredById String?       @map("referred_by_id") @db.Uuid     // چه کسی این کاربر را دعوت کرد
   avatarUrl    String?       @map("avatar_url")
   createdAt    DateTime      @default(now()) @map("created_at")
+  // ── بن سختِ پلتفرم (migration 039) — کاملاً جدا از hasActiveAbuseFlagِ نرم ──
+  // «الان بن است» = bannedAt ست شده و unbannedAt نال است. بن‌شدنِ دوباره بعد
+  // از رفعِ بن، banned_at/banned_reason را بازنویسی می‌کند (unbanned_at ریست
+  // به null)؛ تاریخچه‌ی کامل در audit_logs (user.ban/user.unban) می‌ماند —
+  // این ستون‌ها فقط وضعیتِ *فعلی* را نشان می‌دهند، نه کل تاریخچه.
+  bannedAt        DateTime? @map("banned_at")
+  bannedReason    String?   @map("banned_reason")
+  bannedByAdminId String?   @map("banned_by_admin_id") @db.Uuid  // فقط شناسه (بدونِ relationِ Prisma) — هم‌راستا با referredById
+  unbannedAt      DateTime? @map("unbanned_at")
+  unbanReason     String?   @map("unban_reason")
   reservations Reservation[]
   memberships  ClubMember[]
   waitlistEntries WaitlistEntry[]
@@ -57,6 +67,8 @@ model User {
   economyLedger     EconomyLedgerEntry[]
   missionProgress   MissionProgress[]
   rewardRedemptions RewardRedemption[]
+  // ── نشان‌هایِ کنترل‌شده‌یِ پلتفرم (migration 040) — جدا از BADGES قدیمیِ اپِ کاستومر ──
+  badges            UserBadge[]
   @@index([createdAt])
   chatThreads  ChatThread[]
   @@map("users")
@@ -1568,4 +1580,52 @@ model RewardRedemption {
   createdAt         DateTime               @default(now()) @map("created_at")
   @@index([userId, createdAt])
   @@map("reward_redemptions")
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  نشان‌هایِ کنترل‌شده‌یِ پلتفرم (migration 040 — Company Control Plane، فازِ ۳)
+//
+//  عمداً کاملاً جدا از BADGES در apps/customer/js/data/seed.js (نشان‌هایِ
+//  emojiِ قدیمیِ نمایشیِ سمتِ کلاینت، بدونِ رکوردِ سرور) — این سیستم
+//  نشان‌هایی‌ست که فقط ادمینِ پلتفرم تعریف/اعطا/لغو می‌کند و در دیتابیس
+//  ثبت می‌شود (auditable). دو مدل: BadgeDefinition (تعریف/طرح) و UserBadge
+//  (یک نمونه‌ی اعطاشده به یک کاربر).
+//
+//  «آماده‌یِ بلاکچین» یعنی همین: دو ستونِ nullableِ chainTxHash/tokenId
+//  رویِ UserBadge — اگر روزی این نشان‌ها به‌صورتِ NFT مینت شدن، شناسه‌ی
+//  تراکنش/توکن همین‌جا ثبت می‌شه. هیچ runtime/کتابخانه‌ی بلاکچینی الان
+//  اضافه نشده؛ فقط جایگاهِ schema آماده است.
+// ═══════════════════════════════════════════════════════════════════════
+model BadgeDefinition {
+  id               String      @id @default(uuid()) @db.Uuid
+  key              String      @unique                       // شناسه‌ی پایدارِ ماشین‌خوان (مثلاً 'founding_member')
+  name             String                                     // نامِ نمایشیِ فارسی
+  description      String?
+  icon             String      @default("star")               // نامِ آیکون (از shared/js/icons.js)
+  color            String?                                    // رنگِ اختیاریِ برند (hex)
+  isActive         Boolean     @default(true) @map("is_active")
+  createdByAdminId String?     @map("created_by_admin_id") @db.Uuid  // اسکالر، بدونِ relation — هم‌راستا با bannedByAdminId
+  createdAt        DateTime    @default(now()) @map("created_at")
+  grants           UserBadge[]
+  @@map("badge_definitions")
+}
+
+model UserBadge {
+  id                  String          @id @default(uuid()) @db.Uuid
+  badgeId             String          @map("badge_id") @db.Uuid
+  badge               BadgeDefinition @relation(fields: [badgeId], references: [id])
+  userId              String          @map("user_id") @db.Uuid
+  user                User            @relation(fields: [userId], references: [id])
+  grantedAt           DateTime        @default(now()) @map("granted_at")
+  grantedByAdminId    String?         @map("granted_by_admin_id") @db.Uuid
+  note                String?
+  // «الان فعال است» = revokedAt نال. هم‌الگو با بن سختِ کاربر (migration 039).
+  revokedAt           DateTime?       @map("revoked_at")
+  revokedByAdminId    String?         @map("revoked_by_admin_id") @db.Uuid
+  revokeReason        String?         @map("revoke_reason")
+  chainTxHash         String?         @map("chain_tx_hash")   // آماده‌یِ بلاکچین — رجوع کن به کامنتِ بالا
+  tokenId             String?         @map("token_id")
+  @@index([userId])
+  @@index([badgeId])
+  @@map("user_badges")
 }

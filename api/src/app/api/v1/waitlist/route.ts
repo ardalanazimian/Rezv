@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { joinWaitlist } from '@/lib/waitlist';
 import { authFromRequest } from '@/lib/jwt';
+import { isFeatureEnabled, featureFlagLabel } from '@/lib/feature-flags';
 import { errorResponse, Err } from '@/lib/errors';
 import { parseBody, zUuid, zPartySize, zPhone, z } from '@/lib/schemas';
 
@@ -24,6 +25,11 @@ export async function POST(req: Request) {
     let userId: string | undefined;
     let isStaff = false;
     try { const a = authFromRequest(req); if (a.kind === 'customer') userId = a.sub; else isStaff = true; } catch {}
+    // سوییچِ قابلیت (Company Control Plane، فازِ ۳): فقط پیوستنِ مشتری/مهمان را
+    // می‌بندد؛ staff (که معمولاً مهمانِ حاضر را دستی وارد صف می‌کند) مستثناست.
+    if (!isStaff && !(await isFeatureEnabled('waitlist_enabled'))) {
+      throw Err.featureDisabled(featureFlagLabel('waitlist_enabled'));
+    }
     const b = await parseBody(req, schema);
     // هم‌راستا با POST /reservations: اگر بلوکِ مهمان داده شود، نام الزامی است —
     // بدونِ نام، ورودیِ صف بی‌فایده است (نمی‌توان مهمان را صدا زد).

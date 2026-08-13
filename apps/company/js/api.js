@@ -64,6 +64,32 @@ const API = {
   businessIntelligence(){ return this.get('/admin/business-intelligence'); },
   security(){ return this.get('/admin/security'); },
   abuseFlagAction(userId, action, reason){ return this.patch(`/admin/abuse-flags/${userId}`, { action, reason }); },
+  // ── Customer 360 (Company Control Plane، فازِ ۲) ──
+  customer360(idOrPhone){
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrPhone);
+    return isUuid ? this.get(`/admin/users/${idOrPhone}`) : this.get(`/admin/users?phone=${encodeURIComponent(idOrPhone)}`);
+  },
+  banUser(userId, reason){ return this.post(`/admin/users/${userId}/ban`, { reason }); },
+  unbanUser(userId, reason){ return this.post(`/admin/users/${userId}/unban`, reason?{reason}:{}); },
+  // ── نشان‌هایِ کنترل‌شده‌یِ پلتفرم (فازِ ۳) ──
+  listBadges(){ return this.get('/admin/badges?include_inactive=true'); },
+  createBadge(body){ return this.post('/admin/badges', body); },
+  updateBadge(id, body){ return this.patch(`/admin/badges/${id}`, body); },
+  grantBadge(id, userId, note){ return this.post(`/admin/badges/${id}/grant`, { user_id: userId, note }); },
+  revokeBadge(id, userId, reason){ return this.post(`/admin/badges/${id}/revoke`, { user_id: userId, reason }); },
+  // ── ماموریت‌های پلتفرم (فازِ ۳) ──
+  listMissions(){ return this.get('/admin/missions'); },
+  createMission(body){ return this.post('/admin/missions', body); },
+  updateMission(id, body){ return this.patch(`/admin/missions/${id}`, body); },
+  // ── سوییچ‌هایِ قابلیت (فازِ ۳) ──
+  getFeatureFlags(){ return this.get('/admin/feature-flags'); },
+  setFeatureFlags(flags){ return this.patch('/admin/feature-flags', { flags }); },
+  // ── فازِ ۴: صفِ یکپارچه‌ی نظارت + بنِ IP + ویرایشگرِ قواعدِ اقتصاد ──
+  getModerationQueue(){ return this.get('/admin/moderation-queue'); },
+  getBannedIps(){ return this.get('/admin/security/banned-ips'); },
+  unbanIp(ip){ return this.post('/admin/security/banned-ips', { ip }); },
+  getEconomyRules(){ return this.get('/admin/economy-rules'); },
+  setEconomyRules(rules){ return this.patch('/admin/economy-rules', rules); },
   control(restId, body){ return this.patch(`/admin/restaurants/${restId}/control`, body); },
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },

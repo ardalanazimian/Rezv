@@ -151,7 +151,8 @@ function renderEnterpriseDashboard(){
   if (resBadge) resBadge.textContent = k.todayCount > 0 ? fa(k.todayCount) : '';
   const elap = REVENUE_CONFIG.connected ? '' : '<span class="kpi-est" title="تخمینی تا اتصال صندوق">≈</span>';
   document.getElementById('v-overview').innerHTML = `
-    <div class="dash-live-row">${liveStatusBadge()}<span class="dash-live-time">به‌روزرسانی خودکار هر ۱۵ ثانیه</span><span id="offlineBadge"></span></div>
+    <div class="dash-live-row">${liveStatusBadge()}<span class="dash-live-time">${dashboardUsingDemoData()?'':'به‌روزرسانی خودکار هر ۱۵ ثانیه'}</span><span id="offlineBadge"></span></div>
+    ${dashboardUsingDemoData()?`<div class="cash-note" style="margin-bottom:16px">${icon('info',{size:13})} این اسم‌ها و اعداد نمونه‌اند، رزروهایِ واقعیِ رستورانت نیستند — تا اتصالِ کامل به سرور جایگزین می‌شن.</div>`:''}
     <!-- کارهای سریع (بازطراحی پریمیوم) -->
     <div class="quick-grid">
       <div class="quick-btn primary" onclick="openWalkin()"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/><path d="M12 11v6M9 14h6" stroke-width="2.4"/></svg></div><div class="quick-label">ورود بدون رزرو</div></div>
@@ -440,7 +441,17 @@ async function refreshLiveKPIs(){
   if(ind){ind.classList.add('pulse');setTimeout(()=>ind.classList.remove('pulse'),1000);}
 }
 // نوار وضعیت زنده (بالای داشبورد)
+// ⚠️ رفعِ باگِ صداقتِ داده (یافته‌ی زنده): این نشان قبلاً همیشه «زنده» با
+// نقطه‌ی سبز نشون می‌داد، حتی وقتی RES/GUESTS/TABLES هنوز روی fallbackِ
+// دموی آفلاین بودن (بدونِ توکن، یا لودِ اولیه هنوز کامل نشده، یا خطایِ
+// موقتِ API) — یعنی صاحبِ رستوران اسم‌های نمونه (نیلوفر رضایی، امیر
+// حسینی، ...) رو با برچسبِ «زنده» می‌دید، انگار واقعاً رزروهایِ همون
+// رستورانه. حالا نشان به وضعیتِ واقعیِ لودشدنِ داده وصل شده.
+function dashboardUsingDemoData(){
+  return !API.getToken() || !_resLoaded || !_tablesLoaded;
+}
 function liveStatusBadge(){
+  if (dashboardUsingDemoData()) return `<span class="live-badge demo" id="liveInd">${icon('info',{size:12})} داده‌ی نمونه</span>`;
   return `<span class="live-badge" id="liveInd"><span class="live-dot"></span>زنده</span>`;
 }
 // شروع هنگام ورود به پنل

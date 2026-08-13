@@ -32,6 +32,12 @@ export const Err = {
   reservationExpired:() => new ApiError('RESERVATION_EXPIRED', 'مهلت تأیید این رزرو گذشته است', 410),
   invalidTransition:(from: string, to: string) => new ApiError('INVALID_STATUS_TRANSITION', `تغییر وضعیت از ${from} به ${to} مجاز نیست`, 422, { from, to }),
   concurrencyRetry: () => new ApiError('CONCURRENCY_RETRY', 'به دلیل ترافیک بالا رزرو ثبت نشد؛ لطفاً دوباره تلاش کنید', 409),
+
+  // ── بن سختِ پلتفرم (کاملاً جدا از فلگِ نرمِ abuse) ──
+  userBanned: (reason?: string | null) => new ApiError('USER_BANNED', 'دسترسیِ این حساب توسطِ رزرونو مسدود شده است', 403, reason ? { reason } : {}),
+
+  // ── سوییچ‌هایِ قابلیت (kill-switch سطحِ پلتفرم) ──
+  featureDisabled: (label: string) => new ApiError('FEATURE_DISABLED', `«${label}» موقتاً غیرفعال است`, 503),
 };
 export function errorResponse(e: unknown) {
   if (e instanceof ApiError)

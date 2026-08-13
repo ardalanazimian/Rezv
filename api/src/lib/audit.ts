@@ -30,7 +30,17 @@ export type AuditAction =
   // بازبینیِ گالری: تصمیمِ انتشار روی برندِ پلتفرم است و باید ردِ انسانی
   // داشته باشد — چه کسی، کِی، و اگر رد شد به چه دلیل.
   | 'photo.uploaded' | 'photo.approved' | 'photo.rejected' | 'photo.deleted'
-  | 'security.rate_limit' | 'security.idor_attempt' | 'security.abuse_flag';
+  | 'security.rate_limit' | 'security.idor_attempt' | 'security.abuse_flag'
+  // ── Company Control Plane (فازِ ۲) — بن سختِ کاربر توسطِ ادمینِ پلتفرم ──
+  | 'user.ban' | 'user.unban'
+  // ── Company Control Plane (فازِ ۳) — نشان‌هایِ کنترل‌شده‌یِ پلتفرم ──
+  | 'badge.created' | 'badge.updated' | 'badge.granted' | 'badge.revoked'
+  // ── Company Control Plane (فازِ ۳) — CRUDِ ماموریت توسطِ ادمینِ پلتفرم ──
+  | 'mission.created' | 'mission.updated'
+  // ── Company Control Plane (فازِ ۳) — سوییچ‌هایِ قابلیت (kill-switch) ──
+  | 'feature_flag.update'
+  // ── Company Control Plane (فازِ ۴) — ویرایشگرِ قواعدِ اقتصاد ──
+  | 'economy_rule.update';
 
 type AuditEntry = {
   action: AuditAction;

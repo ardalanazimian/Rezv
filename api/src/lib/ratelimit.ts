@@ -151,6 +151,40 @@ export async function recordViolation(ip: string): Promise<void> {
   } catch { /* اگر redis نبود، بی‌صدا رد شو */ }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  دیدِ ادمین رویِ بنِ خودکارِ IP (Company Control Plane، فازِ ۴)
+//
+//  خودِ بن از قبل کار می‌کرد (recordViolation/isBanned بالا)؛ این بخش فقط
+//  دیده‌شدن/لغوِ دستی را برایِ پنلِ شرکت اضافه می‌کند — بدونِ تغییر در
+//  منطقِ تشخیص/بن‌شدنِ خودکار.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** فهرستِ IPهایِ الان‌بن‌شده + مدتِ باقی‌مانده (ثانیه). SCAN غیرمسدودکننده (نه KEYS). */
+export async function listBannedIps(): Promise<{ ip: string; ttlSeconds: number }[]> {
+  const out: { ip: string; ttlSeconds: number }[] = [];
+  try {
+    let cursor = '0';
+    do {
+      const [next, keys] = await redis.scan(cursor, 'MATCH', 'ban:*', 'COUNT', 200);
+      cursor = next;
+      for (const key of keys) {
+        const ttl = await redis.ttl(key);
+        if (ttl > 0) out.push({ ip: key.slice('ban:'.length), ttlSeconds: ttl });
+      }
+    } while (cursor !== '0');
+  } catch { /* اگر redis نبود، فهرستِ خالی */ }
+  return out.sort((a, b) => b.ttlSeconds - a.ttlSeconds);
+}
+
+/** لغوِ دستیِ بنِ یک IP (+ صفرکردنِ شمارنده‌ی تخلف تا بلافاصله دوباره بن نشود). */
+export async function unbanIp(ip: string): Promise<boolean> {
+  try {
+    const removed = await redis.del(`ban:${ip}`);
+    await redis.del(`viol:${ip}`);
+    return removed > 0;
+  } catch { return false; }
+}
+
 /** هدرهای استاندارد RateLimit برای پاسخ. */
 export function rateLimitHeaders(r: RateLimitResult, rule: RateLimitRule): Record<string, string> {
   return {
