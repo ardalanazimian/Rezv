@@ -22,8 +22,15 @@ export interface MockOptions {
   loggedIn?: boolean;
 }
 
+// ⚠️ available_slots روی آیتمِ اول (Part 1 — صداقتِ سانس، ۲۰۲۶-۰۸-۱۴): بک‌اندِ
+// واقعی هنوز این فیلد را برنمی‌گرداند (رجوع کن به توضیحِ apps/customer/js/api.js)،
+// ولی وقتی اضافه شود همین شکل را خواهد داشت. بدونِ آن، mapApiRestaurant دیگر
+// (به‌درستی) از دادهٔ نمونه‌یِ محلی برای پرکردنِ سانسِ کارت استفاده نمی‌کند
+// (رفعِ باگِ صداقت) — پس کارتِ اول با CTAِ خالیِ «ببین سانس‌ها» رندر می‌شد،
+// نه چیپِ ساعتِ واقعی؛ تستِ دسترس‌پذیریِ چیپِ ساعت را همین‌جا با یک مقدارِ
+// واقع‌گرایانه (نه فیک) پوشش می‌دهیم.
 const DEMO_RESTAURANTS = [
-  { id: 1, slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸' },
+  { id: 1, slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸', available_slots: ['19:00', '20:00'] },
   { id: 2, slug: 'demo-sushi-bar', name: '[DEMO] سوشی بار', cuisine: 'ژاپنی', rating: 4.5, price: '$$$', cashback: 8, cover_emoji: '🍣' },
   { id: 3, slug: 'demo-burger-lab', name: '[DEMO] برگر لب', cuisine: 'فست‌فود', rating: 4.6, price: '$$', cashback: 12, cover_emoji: '🍔' },
 ];
