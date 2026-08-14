@@ -118,7 +118,7 @@ export function startBook(id){
   openSheet(bookStep2(R.find(x=>x.id===id)));
 }
 export function bookStep2(r){
-  return `<div class="sheet-title">${r.n}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
+  return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
     <div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
     <div class="opt-row">${r.menu.map(m=>`<div class="opt" onclick="this.classList.toggle('sel')">${m[0]} ${m[1]}</div>`).join('')}</div>
@@ -135,7 +135,7 @@ export function bookStep3(r){
     <div class="steps"><div class="step-bar done"></div><div class="step-bar done"></div><div class="step-bar now"></div></div>
     <div class="field-label">نام</div><input class="inp" id="bkName" value="${esc(name)}" placeholder="نامت رو بنویس">
     <div class="field-label">موبایل</div><input class="inp" id="bkPhone" inputmode="tel" value="${esc(phone)}" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
-    <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${r.n}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
+    <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${esc(r.n)}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
     ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${r.id})">تأیید رزرو</button>`;

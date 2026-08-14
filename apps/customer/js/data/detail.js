@@ -17,7 +17,7 @@ export function openRest(id){
         <button class="rp-hero-icon glass" onclick="buzz&&buzz();toast('','لینک کپی شد')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
         <button class="rp-hero-icon glass" id="rpFav" onclick="buzz&&buzz();toggleRestFav(${id})" aria-pressed="${favs.has(id)}" aria-label="${favs.has(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favs.has(id)})}</button>
       </div>
-      <div class="rp-hero-emoji">${r.e}</div>
+      <div class="rp-hero-emoji">${esc(r.e)}</div>
       <div class="rp-hero-overlay">
         <div class="rp-hero-badges">
           ${r.now?`<span class="rp-hero-badge live"><span class="live-dot" aria-hidden="true"></span> الان باز</span>`:''}

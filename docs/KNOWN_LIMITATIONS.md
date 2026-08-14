@@ -93,19 +93,54 @@
   closed, PR #13.** See [SECURITY.md](./SECURITY.md) §11 for what's
   implemented and how it's verified.
 - **`localStorage` tokens** are XSS-exposed; every front-end `innerHTML` sink
-  must escape user data (`esc()` — now unit-tested, `api/tests/esc.test.mts`,
-  PR #16; the full call-site audit is still open, see below).
+  must escape user data (`esc()` — unit-tested, `api/tests/esc.test.mts`,
+  PR #16).
 - **RLS is partial** (started in `manual/023`); not all tenant tables have it.
-- **Rate-limit fail-open** (when Redis is down) reduces to a per-process
-  in-memory floor — multi-instance deployments then allow `max × instances`.
-- **Full `innerHTML` sink audit is not complete.** `esc()` is the single
-  canonical helper and is itself tested; confirming every call site actually
-  routes user/API data through it remains open (see SECURITY.md §12).
-- **Payment idempotency (P0-9) and the merge-occupancy concurrency race
-  (P0-3) are code-reviewed/unit-tested only, not exercised live.** The
-  former needs a real Zarinpal `merchant_id`; the latter needs two genuinely
-  simultaneous requests, not sequential calls — neither has been run in this
-  environment.
+- **Rate-limit fail-open — now observable, residual-hardening PR
+  (۲۰۲۶-۰۸-۱۴).** When Redis is down, the fallback to a per-process
+  in-memory floor (`max × instances` under multi-instance deployment) is
+  **unchanged as policy** — that trade-off is still accepted — but it now
+  emits `rezervno_rate_limit_fallback_total` (labels: `prefix`, `scope`) and
+  a structured `rate_limit: Redis در دسترس نیست...` warn log on every
+  fallback, plus `rezervno_rate_limit_auto_ban_total` /
+  `rezervno_ban_check_fail_open_total` for the auto-ban and ban-check
+  fail-open paths. **A real bug was fixed alongside this**: route-level
+  `enforceRateLimit` (used by ~59 route handlers via
+  `withRestaurantAuth`/`withStaffAuth`) had **no fallback at all** — a Redis
+  outage turned into an uncaught throw → a generic error response, not the
+  documented fail-open floor. Only the global `middleware.ts` path had the
+  in-memory fallback. Both paths now share one implementation
+  (`rateLimitWithFallback` in `ratelimit.ts`). Operators must still wire an
+  alert on these metrics themselves — none exists yet.
+- **Full `innerHTML`/`insertAdjacentHTML`/`document.write`/`eval` sink audit
+  — done, residual-hardening PR (۲۰۲۶-۰۸-۱۴).** `tools/xss-sink-audit.mjs`
+  automatically scans `apps/customer|business|company` + `shared/js`,
+  classifies every sink, and fails (non-zero exit) on any `unsafe` one. As
+  of this pass: **zero unsafe sinks** — 8 real gaps were found and fixed
+  (unescaped restaurant name in 3 places, an AI-generated dashboard insight,
+  a mission title/description, a badge name, 3 photo-URL `src=` attributes,
+  a pricing-rule label), the rest were either already safe or reclassified
+  with a written justification (`MANUAL_REVIEW_OVERRIDES` in the script; see
+  `docs/XSS_SINK_AUDIT.md`). The scanner is heuristic (regex, not real
+  dataflow) and is **not wired into CI** — it must be re-run by hand;
+  wiring it into the `security` CI job is a natural follow-up.
+- **Merge-occupancy concurrency race (P0-3) — proven live, residual-hardening
+  PR (۲۰۲۶-۰۸-۱۴).** Two genuinely simultaneous
+  (`Promise.all`, real Postgres, not sequential/mocked) `createReservation`
+  calls contending for the same secondary merge table were run repeatedly;
+  Postgres's existing `Serializable` isolation + the in-transaction
+  `getOccupiedTableNumbers` re-check (already present before this PR)
+  correctly allow exactly one to succeed every time, with the loser getting
+  a structured `409`-family error, never a double-booking. This is now a
+  permanent test (`api/tests/table-merge-occupancy-concurrency.test.mts`),
+  not a one-off script. **No production code changed for this** — the
+  existing design was already correct; only the live proof was missing.
+  A narrow TOCTOU window remains *theoretically* possible outside what was
+  tested (documented in `table-occupancy.ts`) but is no longer an untested
+  claim for the scenario that matters most.
+- **Payment idempotency (P0-9) is still code-reviewed/unit-tested only, not
+  exercised live** — needs a real Zarinpal `merchant_id`, not available in
+  this environment.
 
 See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
 

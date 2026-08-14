@@ -126,9 +126,18 @@ flowchart LR
   - OTP request: 3/10m per phone, 15/10m per IP; OTP verify: 8/10m per IP.
   - reservations: 10/min; search: 60/min; auth: 20/min; global: 120/min per IP.
 - **Auto-ban**: ≥ 10 rate-limit violations in 5 min → IP banned for 1 hour.
-- **Fail-open with a floor**: if Redis is down, middleware falls back to an
-  **in-memory** per-process limiter (a DDoS floor, not full protection) rather
-  than removing all limits.
+- **Fail-open with a floor**: if Redis is down, both the global middleware
+  path and every route-level `enforceRateLimit` call fall back to an
+  **in-memory** per-process limiter (a DDoS floor, not full protection)
+  rather than removing all limits or 500ing. Both paths share one
+  implementation, `rateLimitWithFallback` (`lib/ratelimit.ts`) — until
+  residual-hardening (Aug 2026), only the middleware path actually had this
+  fallback; route-level calls threw uncaught on a Redis outage. **Now
+  observable**: every fallback emits `rezervno_rate_limit_fallback_total`
+  (labels `prefix`, `scope`) and a structured warn log; auto-bans emit
+  `rezervno_rate_limit_auto_ban_total`; a failed ban-check (fail-open, ban
+  not enforced) emits `rezervno_ban_check_fail_open_total`. No alerting is
+  wired to these yet — see §12.
 - **Client IP** is derived safely (prefers `X-Real-IP`/`CF-Connecting-IP`, else
   the **right-most** `XFF` hop) to prevent spoofing (`TRUST_PROXY_HEADERS` gates
   this).
@@ -176,11 +185,20 @@ today:
   constraint only covers a reservation's primary `table_id`. Secondary tables
   in a merged reservation (`merged_table_numbers`) are additionally checked at
   the application layer (`lib/table-occupancy.ts`,
-  `getOccupiedTableNumbers`) before any new reservation — direct or via the
-  merge-fallback path — can claim them. This is an application-layer check,
-  not a second DB-level constraint: a narrow TOCTOU window between the read
-  and the commit is still possible (documented in the module itself), unlike
-  the DB-enforced guarantee the EXCLUDE constraint gives the primary table.
+  `getOccupiedTableNumbers`) — re-run **inside** the same `Serializable`
+  transaction, immediately before insert, not just once before entering it —
+  before any new reservation — direct or via the merge-fallback path — can
+  claim them. **Proven live (residual-hardening, Aug 2026):** two genuinely
+  simultaneous requests contending for the same secondary table (via
+  `Promise.all` against real Postgres, not sequential/mocked) were run
+  repeatedly; `Serializable` isolation plus this in-transaction re-check
+  correctly let exactly one succeed every time, the other getting a
+  structured `409`-family error — this is now a permanent test
+  (`table-merge-occupancy-concurrency.test.mts`), not a one-off claim. This
+  is still an application-layer check, not a second DB-level constraint: a
+  narrower TOCTOU window than what was tested remains theoretically possible
+  (documented in the module itself), unlike the DB-enforced guarantee the
+  EXCLUDE constraint gives the primary table.
 - **Preorder tenant scoping.** Preorder `menuItemId`s are filtered by
   `restaurantId`; a count mismatch (a missing or cross-tenant id) is rejected
   with a validation error instead of silently pricing the item at 0 or
@@ -199,12 +217,13 @@ today:
   state or marked inactive; a genuine concurrent conflict (the EXCLUDE
   constraint firing) is mapped to `409 TABLE_CONFLICT`, not an opaque `500`.
 
-Verified via `api/tests/*.test.mts` (incl. a real-Postgres integration test
-for the merge-occupancy case, `table-merge-occupancy.test.mts`, added in PR
-#16) — see [KNOWN_LIMITATIONS.md](./KNOWN_LIMITATIONS.md) for what's still
-open, including two items *not* covered by live testing: payment idempotency
-(needs a real Zarinpal `merchant_id`) and the true concurrent-request race for
-merge occupancy (needs two simultaneous real requests, not sequential calls).
+Verified via `api/tests/*.test.mts` (incl. real-Postgres integration tests for
+the merge-occupancy case — both a sequential one,
+`table-merge-occupancy.test.mts`, PR #16, and a genuinely concurrent one,
+`table-merge-occupancy-concurrency.test.mts`, residual-hardening) — see
+[KNOWN_LIMITATIONS.md](./KNOWN_LIMITATIONS.md) for what's still open. Payment
+idempotency (P0-9) remains code-reviewed/unit-tested only — it needs a real
+Zarinpal `merchant_id`, not available in this environment.
 
 ## 12. Security Recommendations (forward-looking)
 
@@ -212,9 +231,13 @@ merge occupancy (needs two simultaneous real requests, not sequential calls).
    revocable (via `jti`). The 15-minute residual access-token window after
    logout/deactivation/ban (§3) is an accepted trade-off; revisit only if a
    specific incident needs a shorter window.
-2. **Full XSS sink audit** of every front-end `innerHTML` call to confirm all
-   external/user data passes through `esc()` (the helper itself is now
-   tested; the call-site audit is not complete). Consider moving tokens from
+2. **XSS sink audit — automated and passing (residual-hardening, Aug 2026).**
+   `tools/xss-sink-audit.mjs` scans every `innerHTML`/`insertAdjacentHTML`/
+   `document.write`/`eval` call under `apps/customer|business|company` +
+   `shared/js` and fails on any unescaped one; currently zero. It's heuristic
+   (regex, not real dataflow) and **not wired into CI yet** — re-run it by
+   hand after touching front-end render code, and consider adding it as a
+   non-blocking (then blocking) CI job. Consider moving tokens from
    `localStorage` to memory + refresh-cookie if a stronger XSS posture is
    needed.
 3. **Rotate secrets** regularly; ensure `CRON_SECRET`/`MAINTENANCE_KEY` are set

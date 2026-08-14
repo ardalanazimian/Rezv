@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { redis } from './redis';
 import { Err } from './errors';
 import { createLogger } from './logger';
+import { metrics } from './metrics';
 const log = createLogger('security');
 
 /**
@@ -59,18 +60,55 @@ export async function rateLimit(
   if (count > rule.max) {
     await redis.zrem(key, member); // این درخواست را حذف کن (منصفانه)
     const retryAfterSec = Math.max(1, Math.ceil((resetAt - now) / 1000));
+    metrics.rateLimitHits.inc({ prefix: rule.prefix }); // متریکِ از قبل تعریف‌شده ولی تا این PR هیچ‌جا inc نمی‌شد
     return { allowed: false, remaining: 0, resetAt, retryAfterSec };
   }
 
   return { allowed: true, remaining: Math.max(0, rule.max - count), resetAt, retryAfterSec: 0 };
 }
 
-/** نسخه‌ی پرتاب‌کننده: اگر از حد گذشت، خطای 429 پرتاب می‌کند. در ابتدای route صدا بزن. */
+// ═══════════════════════════════════════════════════════════════════════
+//  A3 (سختگیریِ acquisition-grade، ۲۰۲۶-۰۸-۱۴): هستهی مشترکِ «تلاش با
+//  Redis، در صورتِ خطای واقعیِ اتصال fallback به سقفِ in-memory» — قبلاً
+//  فقط middleware.ts این fallback را داشت (با یک try/catch جداگانه، بدونِ
+//  متریک/لاگِ ساختاریافته)؛ enforceRateLimit (۵۹+ callerِ route-level، از
+//  طریقِ withRestaurantAuth/withStaffAuth) اصلاً fallback نداشت — یعنی
+//  قطعیِ Redis باعثِ throwِ خامِ rateLimit() می‌شد که فقط به یک ۵۰۰ی عمومی
+//  ترجمه می‌شد، نه fail-open. این یک باگِ واقعی بود (سیاستِ مستندشده‌ی
+//  fail-open فقط رویِ نیمی از سطحِ API واقعاً اجرا می‌شد)، نه صرفاً کمبودِ
+//  observability — رفعش هم به‌جایِ تکرارِ try/catch در ۵۹+ فایل، همینجا
+//  متمرکز شده تا هر callerِ enforceRateLimit/middleware خودکار همون سیاستِ
+//  یکسان رو بگیره.
+//
+//  `attempt` تزریق‌پذیره (پیش‌فرض: خودِ rateLimit) — همون الگویِ
+//  NoShowPredictor در reservations.ts — تا تستِ واحد بتونه بدونِ Redisِ
+//  واقعی مسیرِ fallback رو با یک stub که throw می‌کنه اجرا کنه.
+// ═══════════════════════════════════════════════════════════════════════
+export async function rateLimitWithFallback(
+  identifier: string,
+  rule: RateLimitRule,
+  scope: 'middleware' | 'route',
+  attempt: (id: string, r: RateLimitRule) => Promise<RateLimitResult> = rateLimit,
+): Promise<RateLimitResult> {
+  try {
+    return await attempt(identifier, rule);
+  } catch (e) {
+    log.warn('rate-limit: Redis در دسترس نیست، fallback به سقفِ in-memory', {
+      prefix: rule.prefix, scope, error: (e as Error).message,
+    });
+    metrics.rateLimitFallback.inc({ prefix: rule.prefix, scope });
+    return rateLimitInMemory(identifier, rule);
+  }
+}
+
+/** نسخه‌ی پرتاب‌کننده: اگر از حد گذشت، خطای 429 پرتاب می‌کند. در ابتدای route صدا بزن.
+ *  از rateLimitWithFallback رد می‌شه — یعنی قطعیِ Redis اینجا هم فقط سقفِ
+ *  in-memory رو فعال می‌کنه، نه یک throwِ خامِ ۵۰۰. */
 export async function enforceRateLimit(
   identifier: string,
   rule: RateLimitRule,
 ): Promise<RateLimitResult> {
-  const result = await rateLimit(identifier, rule);
+  const result = await rateLimitWithFallback(identifier, rule, 'route');
   if (!result.allowed) throw Err.rateLimited(result.retryAfterSec);
   return result;
 }
@@ -134,7 +172,14 @@ export async function isBanned(ip: string): Promise<boolean> {
   try {
     const banned = await redis.get(`ban:${ip}`);
     return banned !== null;
-  } catch { return false; }
+  } catch (e) {
+    // A3: قبلاً این fail-open کاملاً بی‌صدا بود — یعنی قطعیِ Redis می‌تونست
+    // بنِ فعال رو بدونِ هیچ سیگنالی دور بزنه. حالا لاگِ ساختاریافته +
+    // متریکِ قابلِ‌آلارم دارد (نه تغییرِ سیاست، فقط دیدنیدن).
+    log.warn('ban check: Redis در دسترس نیست، fail-open (بن اعمال نمی‌شود)', { ip, error: (e as Error).message });
+    metrics.banCheckFailOpen.inc();
+    return false;
+  }
 }
 
 /** ثبت یک تخلف ریت‌لیمیت؛ اگر از حد گذشت، IP را بن کن. */
@@ -146,7 +191,8 @@ export async function recordViolation(ip: string): Promise<void> {
     if (count >= BAN_THRESHOLD) {
       await redis.set(`ban:${ip}`, '1', 'EX', BAN_DURATION_S);
       await redis.del(key);
-      log.warn(`IP بن شد: ${ip}`, { violations: count });
+      log.warn(`IP بن شد: ${ip}`, { event: 'rate_limit.auto_ban', ip, violations: count });
+      metrics.rateLimitAutoBan.inc();
     }
   } catch { /* اگر redis نبود، بی‌صدا رد شو */ }
 }
