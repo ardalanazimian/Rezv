@@ -101,6 +101,13 @@ export const metrics = {
   rateLimitFallback: new Counter('rezervno_rate_limit_fallback_total', 'تعداد دفعاتی که ریت‌لیمیت به‌خاطرِ قطعیِ Redis به سقفِ in-memory سقوط کرد (label: scope=middleware|route)'),
   rateLimitAutoBan: new Counter('rezervno_rate_limit_auto_ban_total', 'تعداد بن‌هایِ خودکارِ IP به‌خاطرِ عبورِ مکرر از ریت‌لیمیت'),
   banCheckFailOpen: new Counter('rezervno_ban_check_fail_open_total', 'تعداد دفعاتی که چکِ بنِ IP به‌خاطرِ قطعیِ Redis fail-open شد (بن موقتاً اعمال نشد)'),
+  // ⚠️ اضافه‌شده برایِ حسابرسیِ Time-Range/EXCLUDE/Redis-evidence (۲۰۲۶-۰۸-۱۴):
+  // قفلِ Redisِ رزرو (withSlotLock) قبلاً هیچ fallbackی نداشت — قطعیِ Redis
+  // یک throwِ خامِ ioredis رو تا بیرون از createReservation leak می‌کرد که
+  // errorResponse آن را ۵۰۰ی عمومی ترجمه می‌کرد، با اینکه طبق معماریِ مستندشده
+  // قفل فقط بهینه‌سازی است و DB (EXCLUDE + Serializable) منبعِ حقیقتِ
+  // ضدِ double-booking. رجوع کن به redis.ts.
+  slotLockFallback: new Counter('rezervno_slot_lock_fallback_total', 'تعداد دفعاتی که قفلِ Redisِ رزرو به‌خاطرِ قطعیِ Redis fail-open شد (بدونِ قفل ادامه یافت، DB منبعِ حقیقت است)'),
   authFailures: new Counter('rezervno_auth_failures_total', 'تعداد شکست احراز هویت (سیگنال امنیتی)'),
   activeRequests: new Gauge('rezervno_active_requests', 'تعداد درخواست‌های در حال پردازش'),
   jobsPending: new Gauge('rezervno_jobs_pending', 'تعداد job‌های در انتظار در صف'),

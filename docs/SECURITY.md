@@ -216,11 +216,53 @@ today:
 - **Walk-in / manual table assignment.** Rejects a table in `maintenance`
   state or marked inactive; a genuine concurrent conflict (the EXCLUDE
   constraint firing) is mapped to `409 TABLE_CONFLICT`, not an opaque `500`.
+- **Time-range contract, formalized (Time-Range/EXCLUDE/Redis-evidence audit,
+  Aug 2026).** `computeRanges` (`lib/reservation-helpers.ts`) is the single
+  source of truth for `slot_start → slot_end → block_buffer_minutes →
+  block_end` (the generated column the EXCLUDE constraint and
+  `getOccupiedTableNumbers` both key off). Auditing every write path found one
+  real drift: `createWalkin` never set `block_buffer_minutes` (column default
+  `0`), so a walk-in's block ended exactly at `slot_end` — no cleaning/buffer
+  time — unlike every online/manual booking, which always gets
+  `cleaningMinutes + bufferMinutes`. Fixed to apply the same formula. The
+  active-status list used by the `no_table_overlap` EXCLUDE `WHERE` clause
+  (`prisma/sql/026-consolidate-exclusion-constraint.sql`) was re-verified
+  against `ACTIVE_RESERVATION_STATUSES` and found in parity; a unit test now
+  parses `026`'s SQL text directly (not a hand-copied array) so future drift
+  fails CI, not just a future audit.
+- **Redis slot-lock fail-open (Time-Range/EXCLUDE/Redis-evidence audit, Aug
+  2026).** `withSlotLock` (`lib/redis.ts`) — the Redis lock `createReservation`
+  takes before writing — previously had no fallback for Redis being
+  *unreachable* (only for the lock being genuinely held). A real Redis outage
+  threw an uncaught `ioredis` error out of `createReservation`, which
+  `errorResponse` turned into a generic `500` — contradicting the documented
+  architecture (the lock is purely a contention-reducing optimization; DB
+  `EXCLUDE` + `Serializable` + the in-transaction occupancy re-check is the
+  source of truth). Fixed: a connection-level failure on lock *acquisition*
+  now fail-opens (proceeds without a lock, `rezervno_slot_lock_fallback_total`
+  metric + a warning log), and a failure *releasing* the lock afterward no
+  longer masks a successful reservation behind a spurious `500` (the lock's
+  own TTL expires it either way). **Proven live:** the same dual-concurrent
+  `Promise.all` methodology used for the merge-occupancy case above was
+  re-run with the lock forced into this exact fail-open path (via the same
+  dependency-injection pattern already used for the no-show predictor,
+  not a real downed Redis) — direct-table and merge bookings both still
+  produced exactly one winner and one structured `409`-family loser, never a
+  `500`. This also surfaced a second, adjacent gap: under genuine simultaneous
+  contention (only reliably reachable *without* the lock damping it), Postgres
+  sometimes reports the exclusion conflict as a
+  `PrismaClientUnknownRequestError` (SQLSTATE only in the message text) rather
+  than the `PrismaClientKnownRequestError` shape `isConflictError`/
+  `isSerializationError` previously recognized — also fixed, with the exact
+  failure shape captured as a regression test.
 
 Verified via `api/tests/*.test.mts` (incl. real-Postgres integration tests for
 the merge-occupancy case — both a sequential one,
-`table-merge-occupancy.test.mts`, PR #16, and a genuinely concurrent one,
-`table-merge-occupancy-concurrency.test.mts`, residual-hardening) — see
+`table-merge-occupancy.test.mts`, PR #16, and two genuinely concurrent ones,
+`table-merge-occupancy-concurrency.test.mts` — with Redis lock available
+(residual-hardening) and with it forced fail-open (Time-Range/EXCLUDE/Redis-
+evidence audit) — plus `redis.test.mts` for `withSlotLock` in isolation and
+`reservation-status.test.mts` for EXCLUDE status-list parity) — see
 [KNOWN_LIMITATIONS.md](./KNOWN_LIMITATIONS.md) for what's still open. Payment
 idempotency (P0-9) remains code-reviewed/unit-tested only — it needs a real
 Zarinpal `merchant_id`, not available in this environment.
@@ -244,8 +286,10 @@ Zarinpal `merchant_id`, not available in this environment.
    in every environment (cron endpoints must never be public).
 4. **RLS everywhere**: extend Row-Level Security (started in `manual/023`) to all
    tenant-scoped tables as defense-in-depth behind the application checks.
-5. **Alerting** on the rate-limit fail-open path and auto-bans (currently
-   log-only in places).
+5. **Alerting** on the rate-limit fail-open path, auto-bans, and (as of
+   Time-Range/EXCLUDE/Redis-evidence, Aug 2026) the reservation slot-lock
+   fail-open path (`rezervno_slot_lock_fallback_total`, §11) — currently
+   log-only in places.
 6. **Pen-test the payment callback** (`/payments/callback`) — it is
    intentionally unauthenticated and relies on `authority + code + amount`
    matching; confirm amount/authority binding is strict. Payment idempotency

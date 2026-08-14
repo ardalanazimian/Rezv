@@ -138,6 +138,41 @@
   A narrow TOCTOU window remains *theoretically* possible outside what was
   tested (documented in `table-occupancy.ts`) but is no longer an untested
   claim for the scenario that matters most.
+- **Time-range contract + Redis slot-lock fail-open — audited and hardened,
+  Time-Range/EXCLUDE/Redis-evidence PR (۲۰۲۶-۰۸-۱۴).** Three real, minimal
+  fixes came out of this audit (not a rewrite of the booking engine — that was
+  explicitly out of scope):
+  1. `createWalkin` never set `block_buffer_minutes` (defaulted to `0`), so a
+     walk-in's `block_end` = its `slot_end` exactly — no cleaning/buffer time,
+     unlike every online/manual booking. Fixed to apply the same
+     `cleaningMinutes + bufferMinutes` formula `computeRanges` uses.
+  2. `withSlotLock` (the Redis lock `createReservation` takes before writing)
+     had no fallback for Redis being *unreachable* — only for the lock being
+     genuinely held. A Redis outage threw an uncaught error out of
+     `createReservation` → a generic `500`, contradicting the documented
+     "Redis lock is only an optimization" architecture. Now fails open on a
+     connection-level error (metric: `rezervno_slot_lock_fallback_total`), and
+     a failed unlock no longer masks an already-successful reservation behind
+     a `500`.
+  3. Proving fix (2) live (via the same `Promise.all` dual-concurrent
+     methodology as the merge-occupancy test, with the lock forced fail-open
+     through dependency injection — not a real downed Redis) surfaced a second
+     bug: under genuine simultaneous contention, Postgres sometimes reports
+     the exclusion conflict as a `PrismaClientUnknownRequestError` (SQLSTATE
+     only in the message text, not `.code`/`.meta`) rather than the
+     `PrismaClientKnownRequestError` shape `isConflictError`/
+     `isSerializationError` recognized — so a *real* conflict, correctly
+     prevented by the DB, was leaking out as an unhandled `500` instead of the
+     intended `409`. Fixed in `reservation-helpers.ts`.
+  Also verified (no drift, no code change needed): the EXCLUDE constraint's
+  active-status `WHERE` list (`prisma/sql/026`) still matches
+  `ACTIVE_RESERVATION_STATUSES` exactly — now enforced by a test that parses
+  `026`'s SQL text directly, so a future one-sided edit fails CI instead of
+  silently reopening the double-booking hole `016` originally fixed.
+  `computeRanges` itself was not changed (kept pure/O(1) per the audit's
+  explicit constraint) — only its test coverage was extended (a real
+  Asia/Tehran UTC-day-boundary case, an explicit non-default-timezone case,
+  and a determinism/purity check).
 - **Payment idempotency (P0-9) is still code-reviewed/unit-tested only, not
   exercised live** — needs a real Zarinpal `merchant_id`, not available in
   this environment.
