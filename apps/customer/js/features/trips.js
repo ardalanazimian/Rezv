@@ -6,9 +6,19 @@ import { closeSheet, esc, openSheet, toast, undoSnack } from '../auth.js';
 import { openRest } from '../data/detail.js';
 import { go } from '../data/discover.js';
 import { R } from '../init.js';
-export function addToCalendar(code,name,date,time){
+// ⚠️ رفع‌شده (R2 — حسابرسیِ تقویم، ۲۰۲۶-۰۸-۱۴): این تابع همیشه «فردا» فرض
+// می‌کرد (setDate(+1))، بدونِ توجه به اینکه پارامترِ date واقعاً چه بود —
+// یعنی رزروِ ۱۵ خرداد یا ماهِ بعد، همیشه با تاریخِ «فردا» به تقویمِ کاربر
+// اضافه می‌شد. حالا slotStartIso (زمانِ خامِ سرور، در reservation.js
+// اضافه شد) منبعِ حقیقت است؛ اگر نبود/نامعتبر بود، دیگر چیزی اختراع
+// نمی‌کنیم — فقط صادقانه می‌گیم که نمی‌دونیم.
+export function addToCalendar(code,name,date,time,slotStartIso){
+  const dt = slotStartIso ? new Date(slotStartIso) : null;
+  if(!dt || isNaN(dt.getTime())){
+    toast('','تاریخِ دقیقِ این رزرو در دسترس نیست — نمی‌شه فایلِ تقویم ساخت');
+    return;
+  }
   // ساخت یک رویداد iCalendar استاندارد (سازگار با Apple/Google Calendar)
-  const dt=parseTripDateTime(date,time);
   const start=icsDate(dt);
   const end=icsDate(new Date(dt.getTime()+2*3600*1000)); // ۲ ساعت
   const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//RezervoNo//FA','CALSCALE:GREGORIAN','BEGIN:VEVENT',
@@ -23,12 +33,6 @@ export function addToCalendar(code,name,date,time){
   toast('','فایل تقویم دانلود شد — بازش کن تا اضافه شه');
 }
 export function icsDate(d){return d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';}
-export function parseTripDateTime(date,time){
-  // تبدیل تقریبی تاریخ/ساعت فارسی به Date (برای دمو — رویداد فردا)
-  const t=String(time).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
-  const [h,m]=t.split(':').map(Number);
-  const d=new Date();d.setDate(d.getDate()+1);d.setHours(h||20,m||0,0,0);return d;
-}
 // ── کیف پول (Apple/Google Wallet) ──
 export function addToWallet(code,name,date,time,kind){
   // Apple Wallet واقعی به فایل .pkpass امضاشده با گواهی توسعه‌دهنده نیاز دارد

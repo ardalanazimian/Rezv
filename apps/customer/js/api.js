@@ -184,10 +184,24 @@ export function syncNavPoints(){
     .finally(() => { _ptsInFlight = null; });
 }
 
+// ⚠️ رفع‌شده (R1 — حسابرسیِ صداقتِ دادهٔ غنی، ۲۰۲۶-۰۸-۱۴): تا امروز فقط
+// slots از این باگ رفع شده بود. فیلدهایِ روایی/محتواییِ دیگر (menu, rb,
+// revs, about, feats, good, bad, ai) همچنان بدونِ قیدِ apiR.slug از
+// sampleFallback پر می‌شدند — یعنی هر رستورانِ واقعی که این فیلدها را از
+// بک‌اند نمی‌گرفت (که فعلاً همیشه همین‌طور است)، منو/نظر/توضیحاتِ یک
+// رستورانِ کاملاً نامرتبط را به‌عنوانِ محتوایِ خودش نشان می‌داد — دقیقاً
+// همان الگویِ ممنوع‌شده که برایِ slots رفع شده بود. حالا همان قاعده:
+// اگر apiR.slug هست (یعنی رستورانِ واقعی/زنده)، این فیلدها فقط از خودِ
+// API می‌آیند؛ نبودشان یعنی خالی/null، نه قرض‌گرفتن از نمونه. sampleFallback
+// فقط در مسیرِ کاملاً آفلاین/بدونِ‌slug استفاده می‌شود.
+const EMPTY_RB = { food: 0, service: 0, atmo: 0, value: 0 };
+
 // نگاشت داده‌ی API به ساختار فرانت‌اند (R)
 // بک‌اند فاز ۱ این فیلدها را می‌دهد: id, slug, name, cuisine, ...
-// فیلدهای غنی (منو، نظرات، تفکیک امتیاز) که هنوز در API نیستند از نمونه پر می‌شوند.
+// فیلدهای غنی (منو، نظرات، تفکیک امتیاز) که هنوز در API نیستند، برایِ
+// رستورانِ واقعی خالی می‌مانند (نه از نمونه) — رجوع به توضیحِ بالا.
 export function mapApiRestaurant(apiR, sampleFallback){
+  const isLive = !!apiR.slug; // رستورانِ واقعی/زنده — نه مسیرِ کاملاً آفلاین
   return {
     id: apiR.id,
     slug: apiR.slug || sampleFallback?.slug || null,
@@ -223,17 +237,38 @@ export function mapApiRestaurant(apiR, sampleFallback){
     // یعنی [] خالی — کارت به CTAِ «ببین سانس‌ها»یِ آرام می‌افته، نه سانسِ جعلی.
     // توجه: همین باگِ id-mismatch رویِ فیلدهایِ دیگه (menu/rb/feats/about/...)
     // هم هست — خارج از دامنه‌ی این ماموریت (فقط سانس)؛ در KNOWN_LIMITATIONS ثبت شد.
-    slots: apiR.available_slots || (apiR.slug ? [] : sampleFallback?.slots) || [],
+    slots: apiR.available_slots || (isLive ? [] : sampleFallback?.slots) || [],
     badge: apiR.badge ?? sampleFallback?.badge ?? null,
-    ai: sampleFallback?.ai ?? false,
-    about: apiR.description || sampleFallback?.about || '',
-    feats: apiR.features || sampleFallback?.feats || [],
-    rb: apiR.rating_breakdown || sampleFallback?.rb || {food:0,service:0,atmo:0,value:0},
-    menu: apiR.menu || sampleFallback?.menu || [],
-    good: sampleFallback?.good || [],
-    bad: sampleFallback?.bad || [],
-    revs: apiR.reviews || sampleFallback?.revs || [],
+    // ai/good/bad قبلاً بدونِ هیچ‌شرطی از sampleFallback می‌آمدند — یعنی حتی
+    // برایِ رستورانِ واقعی هم «مهمان‌ها تعریف می‌کنن از...» با جمله‌هایِ
+    // رستورانِ نمونه پر می‌شد. حالا برایِ رستورانِ زنده همیشه خالی/false‌اند.
+    ai: isLive ? false : (sampleFallback?.ai ?? false),
+    about: apiR.description || (isLive ? '' : sampleFallback?.about) || '',
+    feats: apiR.features || (isLive ? [] : sampleFallback?.feats) || [],
+    rb: apiR.rating_breakdown || (isLive ? EMPTY_RB : sampleFallback?.rb) || EMPTY_RB,
+    menu: apiR.menu || (isLive ? [] : sampleFallback?.menu) || [],
+    good: isLive ? [] : (sampleFallback?.good || []),
+    bad: isLive ? [] : (sampleFallback?.bad || []),
+    revs: apiR.reviews || (isLive ? [] : sampleFallback?.revs) || [],
   };
+}
+
+// ⚠️ رفع‌شده (R1): این تابع قبلاً همیشه یک نمونه‌ی *ثابت* انتخاب می‌کرد —
+// apiR.id همیشه UUID واقعی است و هیچ‌وقت با idِ عددیِ R_SAMPLE برابر
+// نمی‌شود، پس R_SAMPLE.find(...) همیشه شکست می‌خورد و `|| R_SAMPLE[0]`
+// برایِ *همه‌ی* رستوران‌های واقعی یک sampleFallbackِ یکسان می‌ساخت — حتی
+// فیلدهایِ صرفاً تزئینی (ایموجی/رنگ/vibes) هم همیشه از رستورانِ نمونه‌ی
+// شماره‌ی ۱ می‌آمدند. حالا: اگر R_SAMPLE بعداً slug گرفت، اول با slug مچ
+// می‌شود؛ وگرنه یک نمونه‌ی متنوع (نه همیشه [0]) بر اساسِ هشِ id انتخاب
+// می‌شود — فیلدهایِ روایی/محتوایی که در mapApiRestaurant پشتِ isLive
+// قفل شده‌اند اصلاً به این تابع کاری ندارند.
+function pickSampleFallback(apiR){
+  if(!R_SAMPLE.length) return undefined;
+  const bySlug = apiR.slug && R_SAMPLE.find(s=>s.slug===apiR.slug);
+  if(bySlug) return bySlug;
+  const key=String(apiR.id||'');
+  let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))>>>0;
+  return R_SAMPLE[h % R_SAMPLE.length];
 }
 
 // بارگذاری رستوران‌ها: تلاش برای API، در صورت شکست → نمونه
@@ -245,10 +280,7 @@ export async function loadRestaurants(){
   if (list && list.length) {
     API.online = true;
     NEXT_CURSOR = res.data?.next_cursor || null;  // برای بارگذاری صفحه‌ی بعد
-    return list.map(apiR => {
-      const fb = R_SAMPLE.find(s => s.id === apiR.id) || R_SAMPLE[0];
-      return mapApiRestaurant(apiR, fb);
-    });
+    return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
   }
   // fallback
   API.online = false;
@@ -262,7 +294,7 @@ export async function loadMoreRestaurants(){
   const res = await API.get(`/restaurants?cursor=${encodeURIComponent(NEXT_CURSOR)}`);
   const list = res.ok ? (res.data?.items || []) : [];
   NEXT_CURSOR = res.data?.next_cursor || null;
-  return list.map(apiR => mapApiRestaurant(apiR, R_SAMPLE.find(s => s.id === apiR.id) || R_SAMPLE[0]));
+  return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
 }
 
 // ═══════════ DATA ═══════════

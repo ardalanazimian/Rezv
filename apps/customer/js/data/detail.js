@@ -59,22 +59,34 @@ export function openRest(id){
     <div class="wrap rp-body">
       ${detailSocialProof(r)}
 
-      <div class="rp-section reveal"><h3>درباره</h3><p class="rp-about">${esc(r.about)}</p><div class="feat-row">${r.feats.map(f=>`<span class="feat">${icon('check',{size:13})} ${esc(f)}</span>`).join('')}</div></div>
+      <div class="rp-section reveal"><h3>درباره</h3>${r.about?`<p class="rp-about">${esc(r.about)}</p>`:`<p class="rp-empty">این رستوران هنوز توضیحی ثبت نکرده.</p>`}${r.feats.length?`<div class="feat-row">${r.feats.map(f=>`<span class="feat">${icon('check',{size:13})} ${esc(f)}</span>`).join('')}</div>`:''}</div>
 
-      <div class="rp-section reveal"><h3>منو</h3><div class="menu-list">${r.menu.map(m=>`<div class="menu-item glass"><div class="menu-emoji">${m[0]}</div><div class="menu-info"><div class="menu-name">${esc(m[1])}</div><div class="menu-price">${m[2]} تومان</div></div></div>`).join('')}</div></div>
+      <div class="rp-section reveal"><h3>منو</h3>${r.menu.length?`<div class="menu-list">${r.menu.map(m=>`<div class="menu-item glass"><div class="menu-emoji">${m[0]}</div><div class="menu-info"><div class="menu-name">${esc(m[1])}</div><div class="menu-price">${m[2]} تومان</div></div></div>`).join('')}</div>`:`<p class="rp-empty">این رستوران هنوز منویی ثبت نکرده.</p>`}</div>
 
       <div class="rp-section reveal">
         <h3>امتیازها و نظرها</h3>
-        <div class="rb-grid glass">
+        ${(() => {
+          // ⚠️ رفع‌شده (R1): اگر rb/good/bad/revs همه خالی‌اند (رستورانِ زنده‌یِ
+          // بدونِ نظرِ ثبت‌شده)، رندرِ نوارهایِ امتیازِ صفر/۵ برایِ همه‌ی
+          // معیارها گمراه‌کننده است — به‌جایِ «داده‌ای نیست» می‌خواند «همه‌چیز
+          // بد است». به‌جایش یک وضعیتِ خالیِ صریح نشان داده می‌شود.
+          const hasRatingBars = r.rb.food || r.rb.service || r.rb.atmo || r.rb.value;
+          const hasAiSummary = r.good.length || r.bad.length;
+          if (!hasRatingBars && !hasAiSummary && !r.revs.length) {
+            return `<p class="rp-empty">هنوز نظری برای این رستوران ثبت نشده.</p>`;
+          }
+          return `
+        ${hasRatingBars?`<div class="rb-grid glass">
           <div class="rb-overall"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">${fmtFa(r.reviews)} نظر</div></div>
           <div class="rb-bars">${[['غذا',r.rb.food],['سرویس',r.rb.service],['فضا',r.rb.atmo],['ارزش',r.rb.value]].map(([l,v])=>`<div class="rb-bar-row"><span class="rl">${l}</span><div class="rb-track"><div class="rb-fill" style="width:0" data-w="${v/5*100}"></div></div><span class="rv">${fmtFa(v)}</span></div>`).join('')}</div>
-        </div>
-        <div class="ai-review glass">
+        </div>`:''}
+        ${hasAiSummary?`<div class="ai-review glass">
           <div class="ai-review-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">خلاصه‌ی هوشمند نظرها</div><span class="tag">AI</span></div>
-          <div class="ai-col"><div class="ai-col-label">${icon('thumbsUp',{size:14})} مهمان‌ها تعریف می‌کنن از:</div>${r.good.map(g=>`<div class="ai-point"><span class="ic good">${icon('check',{size:12})}</span>${esc(g)}</div>`).join('')}</div>
-          <div class="ai-col"><div class="ai-col-label">${icon('thumbsDown',{size:14})} گاهی گله دارن از:</div>${r.bad.map(b=>`<div class="ai-point"><span class="ic bad">!</span>${esc(b)}</div>`).join('')}</div>
-        </div>
-        ${r.revs.map(rv=>`<div class="review reveal"><div class="review-ava">${rv[1]}</div><div class="review-body"><div class="review-top"><span class="review-name">${esc(rv[0])}</span><span class="review-date">${esc(rv[4])}</span></div><div class="review-stars">${Array.from({length:+rv[2]},()=>icon('star',{size:12,fill:true})).join('')}</div><div class="review-text">${esc(rv[3])}</div></div></div>`).join('')}
+          ${r.good.length?`<div class="ai-col"><div class="ai-col-label">${icon('thumbsUp',{size:14})} مهمان‌ها تعریف می‌کنن از:</div>${r.good.map(g=>`<div class="ai-point"><span class="ic good">${icon('check',{size:12})}</span>${esc(g)}</div>`).join('')}</div>`:''}
+          ${r.bad.length?`<div class="ai-col"><div class="ai-col-label">${icon('thumbsDown',{size:14})} گاهی گله دارن از:</div>${r.bad.map(b=>`<div class="ai-point"><span class="ic bad">!</span>${esc(b)}</div>`).join('')}</div>`:''}
+        </div>`:''}
+        ${r.revs.map(rv=>`<div class="review reveal"><div class="review-ava">${rv[1]}</div><div class="review-body"><div class="review-top"><span class="review-name">${esc(rv[0])}</span><span class="review-date">${esc(rv[4])}</span></div><div class="review-stars">${Array.from({length:+rv[2]},()=>icon('star',{size:12,fill:true})).join('')}</div><div class="review-text">${esc(rv[3])}</div></div></div>`).join('')}`;
+        })()}
       </div>
     </div>
     <div class="rp-bookbar glass">

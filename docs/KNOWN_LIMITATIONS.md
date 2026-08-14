@@ -103,6 +103,88 @@
     instruction. Full hero/sheet/mood-rail rebuilds were similarly out of
     scope — those surfaces were already close to the target and audited for
     correctness rather than restyled.
+- **2026-08-14 — customer-app product-risk sweep (R1–R8 mission).** Verified
+  against the running `main` at the time (not assumed from a prior audit):
+  - **R1 — Fixed.** `mapApiRestaurant` (`apps/customer/js/api.js`) let `menu`,
+    `rating_breakdown`, `reviews`, `description`, `features`, `good`, `bad`,
+    and `ai` fall back to an *unrelated* sample restaurant's content for any
+    live (slug-bearing) restaurant the API didn't fully populate — the same
+    class of bug already fixed for `slots` in an earlier pass, just never
+    applied to the rest of the rich fields. All eight now stay empty/null for
+    live restaurants instead of borrowing another business's menu or reviews.
+    `data/detail.js` and `data/booking.js` (pre-order) now show an honest
+    "not provided yet" empty state instead of blank sections or (worse) a
+    full row of misleading all-zero rating bars. Also fixed the root cause
+    that made `sampleFallback` always resolve to `R_SAMPLE[0]`:
+    `loadRestaurants`/`loadMoreRestaurants` matched a real restaurant's UUID
+    against `R_SAMPLE`'s small-integer `id`, which can never match.
+    `pickSampleFallback()` now tries a `slug` match first and otherwise picks
+    a **varied**, deterministic sample by hashing the real id, so purely
+    cosmetic fields (emoji/cuisine/price/vibes/badge) at least stop collapsing
+    onto the exact same sample restaurant for every card. **Residual:**
+    `R_SAMPLE` entries still have no `slug` field, so the slug-match branch is
+    inert until one is added.
+  - **R2 — Fixed.** `parseTripDateTime` (`features/trips.js`) always did
+    `setDate(+1)` regardless of a reservation's actual date — every calendar
+    (.ics) export said "tomorrow" no matter when the reservation really was.
+    `mapApiTrip` now threads the server's raw `slotStart` ISO timestamp
+    through as `slotStartIso`; `addToCalendar` uses it directly and, if it's
+    missing/invalid, shows an honest toast and generates **no file** — the
+    always-wrong guesser was deleted rather than kept as a fallback.
+  - **R3 — Fixed.** `mapTripStatus` recognized only 4 of the ~17 backend
+    reservation statuses (`api/src/lib/lifecycle.ts`); everything else —
+    notably the two most common terminal states, `completed` and the
+    *current* `cancelled` (it only checked the legacy
+    `cancelled_by_user`/`cancelled_by_restaurant`) — silently defaulted to
+    "پیش‌رو" (upcoming). A finished or genuinely cancelled reservation could
+    sit in the customer's upcoming list forever. Replaced with an explicit
+    map covering every literal in the backend's status type; a truly unknown
+    future status still safely defaults to "up" (documented, not a silent
+    gap). Restaurant matching in `mapApiTrip` moved from fragile name-string
+    comparison to `restaurantId` (already returned by `GET /me/reservations`
+    — no backend change needed), falling back to `slug`.
+  - **R4 — Fixed.** The "کِی"/"چند نفر" search selects wrote `bookingCtx` but
+    nothing read it back — `doSearch()` was a pure text filter, so picking
+    "فردا، ۴ نفر" changed nothing visible. The discover feed's subtitle now
+    always appends the selected date + party size, refreshed on
+    `syncSearchCtx()` (not just after pressing search) and on initial load.
+    Per-card live-availability annotation (marked optional in the mission)
+    was **not** attempted — would need a bulk availability endpoint that
+    doesn't exist yet, and inventing per-card slot data would violate the
+    same honesty rule R1 fixes.
+  - **R5 — Fixed (customer app, as scoped).** Added explicit `color-scheme:
+    dark`/`light` to `app.css`'s theme blocks — without it, native `<select>`
+    dropdown popups follow the OS color scheme instead of the page's
+    `data-theme`, so a dark-mode user on a light-OS could get a native white
+    dropdown list. Added explicit `::placeholder` colors instead of relying
+    on each browser's own default opacity. `apps/business`/`apps/company`
+    still have **no dark-mode infrastructure at all** (documented in a prior
+    pass) — unchanged, out of scope here.
+  - **R6 — N/A, already correct.** `availability.ts` already prefers
+    `generateTimesFromHours` and only falls back to `SERVICE_TIMES` when the
+    weekday is undefined (fixed in a prior PR; re-verified against current
+    `main`). The discover-card `.slice(0,3)` is a deliberate card-preview cap
+    — the booking sheet itself lists every real open slot uncapped. No
+    changes made.
+  - **R7 — N/A, already correct.** The Business hours form already sends a
+    pending proposal ("ارسالِ پیشنهاد برای تأیید", never "ذخیره شد" on a
+    pending change) and `apps/company/js/hours.js` already exists as the
+    approval queue (fixed in a prior PR; re-verified). No changes made.
+  - **R8 — Fixed.** `confirmBook`'s name/mobile confirm-step inputs
+    (`#bkName`/`#bkPhone`) were never read — a user could clear them and
+    "تأیید رزرو" still succeeded, because the POST body never included them
+    (a logged-in customer's identity comes from the JWT, not this form).
+    Added real validation (non-empty name, `09xxxxxxxxx` phone) before
+    submission. **Residual, explicitly not fixed:** editing these fields
+    still has *no effect* on the created reservation — the backend's
+    `reservationSchema` only honors a `guest` override for `staff`-kind auth,
+    not `customer`-kind. Wiring a customer-supplied override into the
+    reservation is a backend schema change with its own security questions
+    (should a customer be able to book "as" a different phone number?) and
+    was judged out of scope for a targeted risk-reduction pass — flagged
+    here rather than left unmentioned. Idempotency-Key, "success only on a
+    real `res.ok`", and explicit offline labeling were already correct and
+    are unchanged.
 
 ## 3. Backend / Domain
 
