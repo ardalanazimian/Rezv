@@ -156,3 +156,53 @@ test('پنلِ شرکت: ناوبری به «رستوران‌ها» لیستِ 
 
   expect(errors, `خطاهای JS: ${errors.join(' | ')}`).toEqual([]);
 });
+
+test('پنلِ شرکت: صفِ «تأییدِ ساعتِ کاری» پیشنهاد را با تفاوتِ روزها رندر می‌کند', async ({ page }) => {
+  // Part 3 (تأییدِ ساعتِ کاری، ۲۰۲۶-۰۸-۱۴): بعد از mockِ عمومیِ panel API
+  // (که فقط {ok:true} می‌دهد)، اینجا مسیرِ hours-changes را با یک پیشنهادِ
+  // واقعی override می‌کنیم تا خودِ رندرِ کارت/دیفِ روزها (نه فقط حالتِ خالی)
+  // تست شود.
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await mockPanelApi(page);
+  await page.route('**/api/v1/admin/hours-changes**', async (route) => {
+    await route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({
+        items: [{
+          id: 'r1',
+          restaurant: { id: 'r1', name: '[DEMO] رستورانِ تستِ e2e', city: 'تهران' },
+          status: 'pending', status_label: 'در انتظارِ تأییدِ شرکت',
+          rejection_reason: null, requested_at: new Date().toISOString(), reviewed_at: null,
+          live_opening_hours: { '6': [['12:00', '22:00']] },
+          proposed_opening_hours: { '6': [['12:00', '23:00']] },
+        }],
+        total: 1, pending_count: 1, limit: 50, offset: 0,
+      }),
+    });
+  });
+
+  await page.goto(CO);
+  await page.locator('#adminPhone').fill('09123456789');
+  await page.locator('#adminSendBtn').click();
+  await page.locator('#adminCode').fill('1234');
+  await page.locator('#adminVerifyBtn').click();
+  await expect(page.locator('#loginOverlay')).toHaveClass(/hidden/);
+  await expect(page.locator('#v-overview')).toHaveClass(/active/);
+
+  // بجِ سایدبار باید از همان لحظه‌ی ورود عددِ صف را نشان بدهد (refreshHoursChangeBadge)
+  await expect(page.locator('#hoursBadge')).toBeVisible();
+
+  await page.evaluate(() => (window as unknown as { nav: (v: string) => void }).nav('hours'));
+
+  await expect(page.locator('#v-hours')).toHaveClass(/active/);
+  const card = page.locator('.hchange-card').first();
+  await expect(card).toBeVisible();
+  await expect(card.locator('.hchange-rest')).toContainText('رستورانِ تستِ e2e');
+  // روزِ شنبه بینِ زنده (۲۲:۰۰) و پیشنهاد (۲۳:۰۰) فرق دارد — باید هایلایت شود
+  await expect(card.locator('.hchange-day.diff').first()).toBeVisible();
+  await expect(card.getByRole('button', { name: 'تأیید و زنده‌سازی' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'رد' })).toBeVisible();
+
+  expect(errors, `خطاهای JS: ${errors.join(' | ')}`).toEqual([]);
+});

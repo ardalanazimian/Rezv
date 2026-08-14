@@ -1,5 +1,26 @@
 // ═══ رزرونو — پنل business: رزروها + پلان طبقه (Vanilla JS، بدون build، scope مشترک) ═══
 let resDate='today', resQuery='';
+// ⚠️ اضافه‌شده (Part 2 — Tonight Board، ۲۰۲۶-۰۸-۱۴): فیلترِ عملیاتیِ «امشب»،
+// جدا از resDate (که فقط بازه‌ی روز را انتخاب می‌کند). فقط وقتی resDate==='today'
+// نمایش داده می‌شود — دقیقاً همان طراحیِ ماموریت («تخته‌ی امشب» = تبِ امروز،
+// نه یک صفحه‌ی جدا).
+let tonightFilter='all'; // all | soon30 | notArrived | arrived
+const TONIGHT_FILTERS=[
+  {v:'all',l:'همه'},
+  {v:'soon30',l:'بعدی ۳۰ دقیقه'},
+  {v:'notArrived',l:'نرسیده'},
+  {v:'arrived',l:'رسیده'},
+];
+const TONIGHT_NOT_ARRIVED=['pending','confirmed','auto_confirmed','preparing','running_late'];
+const TONIGHT_ARRIVED=['checked_in','arrived','seated','dining'];
+function tonightFilterSet(f){tonightFilter=f;renderResList();}
+/** «HH:MM» فارسی/انگلیسی → دقیقه از نیمه‌شب، برای مرتب‌سازیِ زمانی. نامعتبر → Infinity (آخرِ لیست). */
+function timeToMinutes(t){
+  const s=String(t||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  const m=s.match(/^(\d{1,2}):(\d{2})/);
+  if(!m)return Infinity;
+  return (+m[1])*60+(+m[2]);
+}
 function rReservations(){
   document.getElementById('v-reservations').innerHTML=`
     <div class="pg-head"><div class="pg-title">رزروها</div><div class="pg-sub">مدیریت و جستجوی همه‌ی رزروهای امروز و آینده</div></div>
@@ -20,6 +41,7 @@ function rReservations(){
       <button class="date-tab ${resDate==='past'?'active':''}" onclick="setResDate('past')">${icon('inbox',{size:14})} گزارش گذشته</button>
       <button class="date-tab ${resDate==='all'?'active':''}" onclick="setResDate('all')">همه</button>
     </div>
+    ${resDate==='today'?`<div class="tonight-filters">${TONIGHT_FILTERS.map(f=>`<button class="chip ${tonightFilter===f.v?'is-active':''}" aria-pressed="${tonightFilter===f.v}" onclick="tonightFilterSet('${f.v}')">${f.l}</button>`).join('')}</div>`:''}
     <div class="panel">
       <div id="resTL"></div>
     </div>`;
@@ -51,6 +73,18 @@ async function renderResList(){
       const phone=(x.r.phone||'').replace(/\s/g,'');
       return name.includes(resQuery.trim())||phone.includes(q)||phone.includes(qFa);
     });
+  }
+  // ⚠️ اضافه‌شده (Part 2 — Tonight Board، ۲۰۲۶-۰۸-۱۴): تبِ «امروز» = تخته‌ی
+  // امشب — همیشه بر اساسِ ساعت مرتب و طبقِ فیلترِ فعال محدود می‌شود. تبِ‌های
+  // دیگر (فردا/آینده/گذشته/همه) دست‌نخورده می‌مانند — این‌ها «امشب» نیستند.
+  if(resDate==='today'){
+    list.sort((a,b)=>timeToMinutes(a.r.t)-timeToMinutes(b.r.t));
+    if(tonightFilter==='notArrived')list=list.filter(x=>TONIGHT_NOT_ARRIVED.includes(x.r.status));
+    else if(tonightFilter==='arrived')list=list.filter(x=>TONIGHT_ARRIVED.includes(x.r.status));
+    else if(tonightFilter==='soon30'){
+      const now=new Date(); const nowMin=now.getHours()*60+now.getMinutes();
+      list=list.filter(x=>{const t=timeToMinutes(x.r.t); return t>=nowMin && t<=nowMin+30;});
+    }
   }
   const dateLabel={today:'امروز',tomorrow:'فردا',upcoming:'روزهای آینده',past:'گذشته',all:'همه روزها'}[resDate];
   if(!list.length){
@@ -95,6 +129,13 @@ function reputationBadgeHTML(tier){
 function resItemHTML(r,i){
   const isPast=['completed','noshow','no_show','cancelled','auto_cancelled','rejected','expired'].includes(r.status);
   const statusChip=(STATUS_META[r.status]?`<span class="chip-status" style="background:${STATUS_META[r.status].bg};color:${STATUS_META[r.status].fg}">${icon(STATUS_META[r.status].icon,{size:12})} ${STATUS_META[r.status].label}</span>`:'');
+  // ⚠️ اضافه‌شده (Part 2 — Tonight Board، ۲۰۲۶-۰۸-۱۴): دکمه‌های عملیاتی دیگر
+  // بر اساسِ حدسِ ثابت («اگه arrived نیست دکمه‌ی رسید رو نشون بده») نیستند —
+  // مستقیماً از STATUS_TRANSITIONS (آینه‌ی lifecycle.ts بک‌اند) می‌آیند، یعنی
+  // هیچ‌وقت دکمه‌ای که سرور رد می‌کند نشان داده نمی‌شود (MUST #7 ماموریت).
+  const allowed=STATUS_TRANSITIONS[r.status]||[];
+  const isTonight=resDate==='today'; // دکمه‌های فربه فقط روی تخته‌ی امشب
+  const actBtn='btn-sm'+(isTonight?' btn-tonight':'');
   // برچسب تاریخ (وقتی تب «همه» یا گذشته‌ست مفیده)
   const dateBadge=(resDate==='all'||resDate==='past'||resDate==='upcoming')&&r.dLabel?`<span style="font-size:11px;color:var(--t3);font-weight:600">${r.dLabel} · </span>`:'';
   return `<div class="tl-item"><div class="tl-time"><div class="tl-time-v">${r.t}</div></div>
@@ -107,29 +148,47 @@ function resItemHTML(r,i){
       ${r.note?`<div class="tl-meta" style="color:#D97706">${icon('inbox',{size:13})} ${esc(r.note)}</div>`:''}
       ${r.cancelReason?`<div class="tl-meta" style="color:#B91C1C">${icon('alert',{size:13})} دلیل لغو: ${esc(r.cancelReason)}</div>`:''}
       ${!isPast?`<div class="tl-actions">
-        ${r.status!=='arrived'?`<button class="btn btn-teal btn-sm" onclick="markArrived(${i})">${icon('check',{size:14})} رسید</button>`:''}
+        ${allowed.includes('checked_in')?`<button class="btn btn-teal ${actBtn}" onclick="markArrived(${i})">${icon('check',{size:14})} رسید</button>`:''}
+        ${allowed.includes('seated')?`<button class="btn btn-primary ${actBtn}" onclick="markSeated(${i})">${icon('utensils',{size:14})} نشاند</button>`:''}
+        ${allowed.includes('no_show')?`<button class="btn btn-ghost ${actBtn}" onclick="markNoShow(${i})">${icon('alert',{size:14})} نیومد</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="openStatusMenu(${i})">${icon('refresh',{size:14})} وضعیت</button>
         <button class="btn btn-ghost btn-sm" onclick="toast('','تماس با '+${JSON.stringify(esc(r.name))})">تماس</button>
-        <button class="btn btn-danger btn-sm" onclick="cancelRes(${i})">لغو</button>
+        ${allowed.includes('cancelled')?`<button class="btn btn-danger ${actBtn}" onclick="cancelRes(${i})">لغو</button>`:''}
       </div>`:`<div class="tl-actions"><button class="btn btn-ghost btn-sm" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه</button><button class="btn btn-ghost btn-sm" onclick="toast('','تماس با '+${JSON.stringify(esc(r.name))})">تماس</button>${r.status==='completed'?`<button class="btn btn-ghost btn-sm" onclick="openManual()">رزرو مجدد</button>`:''}</div>`}
     </div></div>`;
 }
+// ⚠️ رفعِ باگِ زنده (Tonight Board، ۲۰۲۶-۰۸-۱۴): این تابع قبلاً وقتی آنلاین
+// بود هیچ‌وقت PATCHِ واقعیِ تغییرِ وضعیت رو صدا نمی‌زد — فقط وضعیت رو محلی
+// عوض می‌کرد و پیامکِ خوش‌آمد می‌فرستاد؛ یعنی سرور هیچ‌وقت نمی‌فهمید مهمان
+// رسیده (رزرو برای بقیه‌ی سیستم‌ها — مثلِ پلانِ سالن یا گزارش — همچنان
+// «نرسیده» می‌موند). حالا از مسیرِ واحدِ changeStatus (optimistic + PATCHِ
+// واقعی + rollback روی خطا) استفاده می‌شه؛ رفتارِ صف‌بندیِ آفلاینِ قبلی
+// (Outbox) هم عیناً حفظ شده چون آن بخش واقعاً درست بود.
 async function markArrived(i){
-  RES[i].status='arrived';rReservations();
-  // ارسال واقعی پیامک خوش‌آمد (اگر شماره و توکن داریم)
-  const phone=RES[i].phone;
-  // اگر آفلاین: تغییر وضعیت را برای همگام‌سازی صف کن (روی داده‌ی محلی از قبل اعمال شد)
+  const r=RES[i]; if(!r)return;
   if(isOffline() && API.getToken()){
-    Outbox.enqueue({ type:'checkin', path:`/restaurant/reservations/${RES[i].code||RES[i].id||''}/status`, method:'PATCH', body:{ status:'checked_in' }, label:`ثبت ورود ${RES[i].name}` });
-    toast('',`${RES[i].name} رسید — با برگشت اینترنت همگام می‌شود`);
+    r.status='checked_in';rReservations();
+    Outbox.enqueue({ type:'checkin', path:`/restaurant/reservations/${r.code||r.id||''}/status`, method:'PATCH', body:{ status:'checked_in' }, label:`ثبت ورود ${r.name}` });
+    toast('',`${r.name} رسید — با برگشت اینترنت همگام می‌شود`);
     return;
   }
+  const phone=r.phone;
+  await changeStatus(i,'checked_in');
+  // ارسال پیامکِ خوش‌آمد فقط بعد از تأییدِ واقعیِ تغییرِ وضعیت (نه قبلش)
   if(API.getToken() && phone){
     const res=await API.sendSms({kind:'campaign',phones:[phone.replace(/\s/g,'')],message:'welcome'});
-    if(res.ok){toast('',`${RES[i].name} رسید — پیامک خوش‌آمد ارسال شد`);return;}
+    if(res.ok)toast('',`پیامکِ خوش‌آمد برایِ ${r.name} ارسال شد`);
   }
-  // fallback
-  toast('',`${RES[i].name} رسید${phone?' — پیامک خوش‌آمد ارسال شد':''}`);
+}
+async function markSeated(i){
+  await changeStatus(i,'seated');
+}
+// no_show وضعیتِ نهایی/برگشت‌ناپذیره (STATUS_TRANSITIONS['no_show']=[]) —
+// طبقِ ماموریت با تأییدِ صریح انجام می‌شه تا لمسِ اشتباه، رزروِ واقعی رو خراب نکنه.
+async function markNoShow(i){
+  const r=RES[i]; if(!r)return;
+  if(!window.confirm(`${r.name} به‌عنوانِ «نیومد» ثبت بشه؟ این وضعیت برگشت‌پذیر نیست.`))return;
+  await changeStatus(i,'no_show');
 }
 function cancelRes(i){
   openModal(`<div class="modal-title">لغو رزرو</div><div class="modal-sub">${esc(RES[i].name)} — ساعت ${esc(RES[i].t)}</div>
@@ -137,10 +196,16 @@ function cancelRes(i){
     <input class="inp" id="cancelReason" placeholder="مثلاً تماس مشتری، تداخل میز...">
     <div style="display:flex;gap:8px"><button class="btn btn-danger btn-lg" style="flex:1" onclick="doCancelRes(${i})">تأیید لغو</button><button class="btn btn-ghost btn-lg" onclick="closeModal()">انصراف</button></div>`);
 }
-function doCancelRes(i){
+// ⚠️ رفعِ باگِ زنده: قبلاً این تابع فقط RES.splice(i,1) می‌کرد — هیچ درخواستِ
+// واقعی به بک‌اند نمی‌رفت، یعنی رزرو از پنل محو می‌شد ولی روی سرور همچنان
+// فعال می‌موند (میزِ رزروشده هیچ‌وقت واقعاً آزاد نمی‌شد). حالا از مسیرِ
+// واحدِ changeStatus استفاده می‌کنیم — هم دلیل رو می‌فرسته، هم واقعاً PATCH
+// می‌زنه، هم روی خطای واقعی rollback می‌کنه (RES.splice هم دیگه حذف نمی‌کنه؛
+// رزروِ لغوشده در تاریخچه/تبِ گذشته باقی می‌مونه — درست‌تر از پاک‌کردنِ کامل).
+async function doCancelRes(i){
   const reason=document.getElementById('cancelReason').value.trim();
   if(!reason){toast('','دلیل لغو الزامیه');return}
-  RES.splice(i,1);closeModal();rReservations();toast('','رزرو لغو شد — دلیل ثبت شد');
+  await changeStatus(i,'cancelled',reason);
 }
 // تولید تاریخ‌های شمسی تا ۱ ماه آینده (نمونه: از پنجشنبه ۱۵ خرداد)
 function buildDateOptions(){

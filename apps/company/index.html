@@ -61,6 +61,11 @@
         <span>بازبینی عکس</span>
         <span id="photoBadge" class="badge expiring" style="display:none;margin-inline-start:auto;font-size:11px;padding:1px 7px"></span>
       </button>
+      <button class="sb-item" data-v="hours" onclick="nav('hours')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        <span>تأیید ساعت کاری</span>
+        <span id="hoursBadge" class="badge expiring" style="display:none;margin-inline-start:auto;font-size:11px;padding:1px 7px"></span>
+      </button>
       <div class="sb-nav-label">پلتفرم</div>
       <button class="sb-item" data-v="systemhealth" onclick="nav('systemhealth')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -119,6 +124,7 @@
       <div id="v-billing" class="view"></div>
       <div id="v-sales" class="view"></div>
       <div id="v-photos" class="view"></div>
+      <div id="v-hours" class="view"></div>
       <div id="v-systemhealth" class="view"></div>
       <div id="v-aihealth" class="view"></div>
       <div id="v-security" class="view"></div>
@@ -146,5 +152,6 @@
 <script src="js/missions.js"></script>
 <script src="js/sales.js"></script>
 <script src="js/photos.js"></script>
+<script src="js/hours.js"></script>
 </body>
 </html>

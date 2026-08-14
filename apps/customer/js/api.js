@@ -207,7 +207,23 @@ export function mapApiRestaurant(apiR, sampleFallback){
     lng: apiR.longitude ?? null,
     vibes: apiR.vibes || sampleFallback?.vibes || [],
     cb: (apiR.cbBasePct ?? apiR.cashback_percent) ?? sampleFallback?.cb ?? 0,
-    slots: apiR.available_slots || sampleFallback?.slots || [],
+    // ⚠️ رفع‌شده (Part 1 — حسابرسیِ صداقتِ سانس، ۲۰۲۶-۰۸-۱۴): sampleFallback
+    // اینجا عمداً حذف شد، هم‌ردیفِ visits7d/recommendPct بالا — به همون دلیل:
+    // این «شکلِ صفحه» نیست، ادعایِ ساعتِ رزروِ واقعی است. backend فعلاً
+    // اصلاً available_slots برنمی‌گردونه (چک‌شده — هیچ routeای این فیلد رو
+    // نمی‌ده)، پس این خط همیشه به sampleFallback?.slots می‌افتاد. مشکلِ
+    // دوم (جدی‌تر): loadRestaurants پایین‌تر sampleFallback رو با
+    // `R_SAMPLE.find(s => s.id === apiR.id) || R_SAMPLE[0]` پیدا می‌کنه —
+    // apiR.id همیشه UUIDِ واقعیه، R_SAMPLE.id عددِ کوچیکه، پس find همیشه
+    // هیچ‌چی پیدا نمی‌کنه و به‌طورِ سراسری R_SAMPLE[0] فال‌بک می‌شه. یعنی
+    // تا امروز، کارتِ *هر* رستورانِ واقعی (آنلاین) دقیقاً همون سه ساعتِ
+    // R_SAMPLE[0] رو به‌عنوانِ پیش‌نمایشِ سانس نشون می‌داد — دقیقاً همون
+    // «۱۹:۰۰/۲۰:۰۰/۲۱:۰۰ به‌عنوانِ live» که قانونِ صداقتِ این ماموریت صریحاً
+    // ممنوع کرده. حالا رستورانِ واقعی (apiR.slug موجوده) بدونِ available_slots
+    // یعنی [] خالی — کارت به CTAِ «ببین سانس‌ها»یِ آرام می‌افته، نه سانسِ جعلی.
+    // توجه: همین باگِ id-mismatch رویِ فیلدهایِ دیگه (menu/rb/feats/about/...)
+    // هم هست — خارج از دامنه‌ی این ماموریت (فقط سانس)؛ در KNOWN_LIMITATIONS ثبت شد.
+    slots: apiR.available_slots || (apiR.slug ? [] : sampleFallback?.slots) || [],
     badge: apiR.badge ?? sampleFallback?.badge ?? null,
     ai: sampleFallback?.ai ?? false,
     about: apiR.description || sampleFallback?.about || '',

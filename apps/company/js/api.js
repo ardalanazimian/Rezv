@@ -95,6 +95,9 @@ const API = {
   // ── بازبینیِ عکسِ گالری ──
   photoQueue(status){ return this.get('/admin/photos?status=' + (status||'pending')); },
   photoDecide(id, body){ return this.patch(`/admin/photos/${id}`, body); },
+  // ── تأییدِ ساعتِ کاری (Part 3) ──
+  hoursQueue(status){ return this.get('/admin/hours-changes?status=' + (status||'pending')); },
+  hoursDecide(id, body){ return this.patch(`/admin/hours-changes/${id}`, body); },
 };
 
 // نگاشت رستوران API به ساختار پنل

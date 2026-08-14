@@ -103,6 +103,15 @@ model Restaurant {
   priceBand     Int              @default(2) @map("price_band") @db.SmallInt
   isOpen        Boolean          @default(true) @map("is_open")
   openingHours  Json?            @map("opening_hours")  // ساعت کاری هفتگی؛ null=همیشه باز طبق isOpen (سازگاری با گذشته)
+  // ── تأییدِ ساعتِ کاری (Part 3، migration 045) — دقیقاً مثلِ RestaurantPhoto.status
+  //    ولی روی خودِ رستوران چون هر رستوران حداکثر یک پیشنهادِ درِ دستِ بررسی دارد.
+  //    openingHours بالا همیشه «زنده»/تأییدشده است؛ مشتری فقط همان را می‌بیند. ──
+  pendingOpeningHours Json?      @map("pending_opening_hours")  // پیشنهادِ رستوران، هنوز تأییدنشده
+  hoursChangeStatus   String?   @map("hours_change_status")     // 'pending' | 'rejected' | null
+  hoursChangeReason   String?   @map("hours_change_reason")     // دلیلِ رد (برایِ رستوران‌دار)
+  hoursChangeRequestedAt DateTime? @map("hours_change_requested_at")
+  hoursChangeReviewedAt  DateTime? @map("hours_change_reviewed_at")
+  hoursChangeReviewedBy  String?   @map("hours_change_reviewed_by") @db.Uuid
   pricingRules  Json?            @map("pricing_rules")  // قواعدِ حداقل مبلغ رزرو بر اساس شلوغی (AI Pricing)
   baseMinSpendToman Int          @default(0) @map("base_min_spend_toman") // حداقل مبلغِ پایه
   // ── اتصال (heartbeat): برای پنهان‌کردن خودکار رستوران آفلاین از اپ مشتری ──

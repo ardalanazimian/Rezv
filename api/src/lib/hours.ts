@@ -138,3 +138,53 @@ export function filterTimesByHours(
   if (!openingHours && closureDates.size === 0) return times; // مسیرِ سریعِ رفتار قدیمی
   return times.filter(t => isTimeWithinHours(openingHours, dateISO, t, timezone, closureDates));
 }
+
+/** "HH:mm" → دقیقه از نیمه‌شب. دقیقه به "HH:mm" برمی‌گرداند (padشده). */
+function fromMin(mins: number): string {
+  const h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * ⚠️ اضافه‌شده (Part 1 — حسابرسیِ صداقتِ سانس، ۲۰۲۶-۰۸-۱۴): تا امروز
+ * availability.ts فقط SERVICE_TIMES (یک لیستِ ثابتِ ۱۱تایی، هر ۳۰ دقیقه یک
+ * سانسِ ثابتِ ناهار/شام) را با شیفت‌های واقعیِ رستوران فیلتر می‌کرد
+ * (filterTimesByHours) — یعنی حتی وقتی رستوران ساعتِ کاریِ واقعی و دقیق
+ * تعریف کرده بود (مثلاً شیفتِ ۱۷:۱۵ تا ۲۲:۴۵)، فقط زیرمجموعه‌ای از همان
+ * ۱۱ زمانِ ثابت که تصادفاً داخلِ شیفت می‌افتاد نشان داده می‌شد — نه واقعاً
+ * «هر ۳۰ دقیقه از شروعِ شیفتِ واقعی».
+ *
+ * این تابع برایِ یک روزِ مشخص، اگر شیفتِ آن روز صریحاً تعریف شده باشد
+ * (openingHours[weekday] یک آرایه‌ی واقعی است، نه undefined)، سانس‌ها را
+ * مستقیماً با گامِ ۳۰دقیقه‌ای از خودِ شیفت‌ها می‌سازد — نه از SERVICE_TIMES.
+ * اگر آن روز اصلاً تعریف نشده (رفتارِ قدیمی: «همیشه باز»)، null برمی‌گرداند
+ * تا صدازننده به SERVICE_TIMES + filterTimesByHours (رفتارِ فعلی) برگردد —
+ * چون بدونِ شیفتِ واقعی، تنها منبعِ معقولِ «چه سانس‌هایی معنادارند» همان
+ * لیستِ استانداردِ سرویس است، نه یک بازه‌ی ۲۴ساعته‌ی بی‌معنا.
+ *
+ * شیفتِ بعد از نیمه‌شب (مثلاً ["19:00","01:00"]) هم پشتیبانی می‌شود.
+ */
+export function generateTimesFromHours(
+  openingHours: OpeningHours | null | undefined,
+  dateISO: string,
+  timezone: string,
+  closureDates: Set<string>,
+  stepMinutes = 30,
+): string[] | null {
+  if (closureDates.has(dateISO)) return []; // تعطیلِ خاص — هیچ سانسی نیست (نه fallback)
+  if (!openingHours) return null; // ساعتِ کاریِ تعریف‌نشده → رفتارِ قدیمی در سطحِ بالا
+  const wd = String(weekdayInTz(dateISO, timezone));
+  const shifts = openingHours[wd];
+  if (!Array.isArray(shifts)) return null; // آن روز صریحاً تعریف نشده → رفتارِ قدیمی
+  if (shifts.length === 0) return []; // [] یعنی تعطیل — صریحاً هیچ سانسی، نه fallback
+
+  const out = new Set<string>();
+  for (const [openStr, closeStr] of shifts) {
+    const o = toMin(openStr);
+    let c = toMin(closeStr);
+    if (c <= o) c += 24 * 60; // شیفتِ بعد از نیمه‌شب
+    for (let t = o; t < c; t += stepMinutes) out.add(fromMin(t));
+  }
+  return [...out].sort();
+}

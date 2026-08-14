@@ -26,6 +26,11 @@ function availabilityPattern(restaurantId: string, date: string): string {
   return `avail:${restaurantId}:${date}:*`;
 }
 
+/** الگوی همه‌ی کلیدهای یک رستوران، صرف‌نظر از تاریخ و party. */
+function allDatesPattern(restaurantId: string): string {
+  return `avail:${restaurantId}:*`;
+}
+
 /**
  * باطل‌سازی کش availability برای یک (رستوران، تاریخ) — همه‌ی اندازه‌های گروه.
  * بعد از هر تغییری که در دسترس‌بودن میز اثر دارد (رزرو، لغو، تغییر وضعیت میز) صدا زده می‌شود.
@@ -45,5 +50,30 @@ export async function invalidateAvailability(restaurantId: string, date: string)
   } catch (e) {
     // باطل‌سازی نباید مسیر اصلی را بشکند؛ کش با TTL خودش هم در نهایت منقضی می‌شود.
     log.warn('باطل‌سازی کش availability ناموفق', { restaurantId, date, error: (e as Error).message });
+  }
+}
+
+/**
+ * باطل‌سازی کش availability برایِ *همه‌ی* تاریخ‌هایِ یک رستوران.
+ *
+ * ⚠️ Part 3 (تأییدِ ساعتِ کاری، ۲۰۲۶-۰۸-۱۴): invalidateAvailability بالا فقط
+ * یک تاریخِ مشخص را پاک می‌کند — برایِ رویدادهایی مثلِ رزرو/لغوِ یک رزرو کافی
+ * است. اما تأییدِ یک پیشنهادِ ساعتِ کاری، ساعتِ کاریِ *هفتگیِ* رستوران را عوض
+ * می‌کند (مثلاً همه‌ی «سه‌شنبه»های آینده) — پاک‌کردنِ فقط یک تاریخ باعث می‌شد
+ * بقیه‌ی تاریخ‌ها تا انقضایِ TTL همچنان با ساعتِ کاریِ قدیمی محاسبه شوند.
+ */
+export async function invalidateAllAvailability(restaurantId: string): Promise<void> {
+  const pattern = allDatesPattern(restaurantId);
+  try {
+    let cursor = '0';
+    do {
+      const [next, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = next;
+      for (const k of keys) {
+        await redis.del(k).catch(() => {});
+      }
+    } while (cursor !== '0');
+  } catch (e) {
+    log.warn('باطل‌سازیِ کاملِ کش availability ناموفق', { restaurantId, error: (e as Error).message });
   }
 }
