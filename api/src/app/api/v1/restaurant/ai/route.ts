@@ -79,6 +79,57 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
         });
       }
 
+      // ── ۵.۵) روندِ هفتگیِ درآمد/تعدادِ رزروهایِ تکمیل‌شده — افتِ قابل‌توجه
+      // نسبت به هفته‌ی قبل (نقشه‌راهِ AI، فازِ ۲؛ «AI Restaurant Manager»،
+      // بدونِ LLM). آمارِ واقعیِ درصدِ تغییر است، نه پیش‌بینی — و فقط وقتی
+      // کارت می‌سازد که هر دو هفته نمونه‌ی کافی داشته باشند (رستورانِ کم‌رزرو
+      // نباید با نوسانِ آماریِ بی‌معنی هشدار بگیرد؛ همان انضباطِ MIN_SAMPLE_SIZE
+      // در ml-core.ts، این‌بار برایِ یک مقایسه‌ی آماریِ ساده نه رگرسیون).
+      const MIN_WEEKLY_SAMPLE = 3;
+      const MIN_TREND_DROP_PCT = 20;
+      const weeklyRows = await db.$queryRaw<{ week: number; revenue: bigint; orders: bigint }[]>`
+        SELECT (r.slot_start >= ${sinceDays(7)})::int AS week,
+               COALESCE(SUM(ri.qty * mi.price_toman), 0)::bigint AS revenue,
+               COUNT(DISTINCT r.id)::bigint AS orders
+        FROM reservations r
+        JOIN reservation_items ri ON ri.reservation_id = r.id
+        JOIN menu_items mi ON mi.id = ri.menu_item_id
+        WHERE r.restaurant_id = ${restaurant.id}::uuid
+          AND r.status = 'completed'
+          AND r.slot_start >= ${sinceDays(14)} AND r.slot_start < now()
+        GROUP BY week
+      `;
+      const thisWeek = weeklyRows.find((w) => w.week === 1);
+      const lastWeek = weeklyRows.find((w) => w.week === 0);
+      if (thisWeek && lastWeek) {
+        const curOrders = Number(thisWeek.orders), prevOrders = Number(lastWeek.orders);
+        if (curOrders >= MIN_WEEKLY_SAMPLE || prevOrders >= MIN_WEEKLY_SAMPLE) {
+          const curRev = Number(thisWeek.revenue), prevRev = Number(lastWeek.revenue);
+          if (prevRev > 0 && prevOrders >= MIN_WEEKLY_SAMPLE) {
+            const revChangePct = Math.round(((curRev - prevRev) / prevRev) * 100);
+            if (revChangePct <= -MIN_TREND_DROP_PCT) {
+              out.push({
+                id: 'revenue_drop', severity: revChangePct <= -35 ? 'high' : 'medium',
+                title: `درآمدِ این هفته ${Math.abs(revChangePct)}٪ نسبت به هفته‌ی قبل افت کرده`,
+                detail: `از ${prevRev.toLocaleString('en-US')} به ${curRev.toLocaleString('en-US')} تومان (بر اساسِ ${curOrders} رزروِ تکمیل‌شده در برابرِ ${prevOrders} هفته‌ی قبل). بررسی کن این افتِ یک‌هفته‌ای است یا روندِ ادامه‌دار.`,
+                action_label: 'مشاهده‌ی رزروها', action: { type: 'view_reservations' },
+              });
+            }
+          }
+          if (prevOrders >= MIN_WEEKLY_SAMPLE) {
+            const occChangePct = Math.round(((curOrders - prevOrders) / prevOrders) * 100);
+            if (occChangePct <= -MIN_TREND_DROP_PCT) {
+              out.push({
+                id: 'occupancy_drop', severity: occChangePct <= -35 ? 'high' : 'medium',
+                title: `تعدادِ رزروهایِ تکمیل‌شده ${Math.abs(occChangePct)}٪ نسبت به هفته‌ی قبل کم شده`,
+                detail: `${curOrders} رزروِ تکمیل‌شده در برابرِ ${prevOrders} هفته‌ی قبل. اگر دلیلِ مشخصی (تعطیلات، رقیبِ جدید) نمی‌دونی، یه کمپینِ کوتاه‌مدت می‌تونه جبرانش کنه.`,
+                action_label: 'ساخت کمپینِ سریع', action: { type: 'create_automation', trigger: 'winback' },
+              });
+            }
+          }
+        }
+      }
+
       // ── ۵) کمپین‌های خودکار بدون فعالیت ──
       const automations = await db.marketingAutomation.findMany({ where: { restaurantId: restaurant.id } });
       if (automations.length === 0) {
