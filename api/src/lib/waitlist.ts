@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'crypto';
+import { randomBytes, timingSafeEqual, createHash } from 'crypto';
 import { db } from './db';
 import { redis } from './redis';
 import { metrics } from './metrics';
@@ -189,7 +189,10 @@ export async function joinWaitlist(input: JoinWaitlistInput) {
 
   // توکنِ دسترسیِ مهمان (رفعِ IDOR، migration 041) — فقط برایِ ورودی‌هایِ
   // بدونِ حساب. ورودیِ متعلق‌به‌کاربر با JWT خودش احراز می‌شه، نیازی به این نداره.
-  const guestAccessToken = input.userId ? null : randomBytes(16).toString('hex');
+  // فقط hashِ توکن در DB می‌مونه (migration 044، همون الگویِ otp.ts) — خودِ
+  // توکنِ خام فقط همینجا، در پاسخِ join، یک‌بار برمی‌گرده.
+  const guestAccessTokenRaw = input.userId ? null : randomBytes(16).toString('hex');
+  const guestAccessTokenHash = guestAccessTokenRaw ? hashGuestToken(guestAccessTokenRaw) : null;
 
   const entry = await db.waitlistEntry.create({
     data: {
@@ -203,7 +206,7 @@ export async function joinWaitlist(input: JoinWaitlistInput) {
       notifyPush: input.notifyPush ?? true,
       notifyEmail: input.notifyEmail ?? false,
       note: input.note ?? null,
-      guestAccessToken,
+      guestAccessTokenHash,
     },
   });
 
@@ -220,7 +223,8 @@ export async function joinWaitlist(input: JoinWaitlistInput) {
     status: entry.status,
     // فقط همینجا (لحظه‌ی join) برمی‌گرده — کلاینت باید کنارِ id ذخیره‌اش کنه؛
     // accept/decline/leave روی ورودیِ مهمان از این پس این توکن رو می‌خوان.
-    guest_token: guestAccessToken,
+    // (خودِ توکنِ خام هرگز در DB ذخیره نمی‌شه — فقط hashش، رجوع کن به بالا.)
+    guest_token: guestAccessTokenRaw,
   };
 }
 
@@ -367,15 +371,26 @@ export function tokensEqual(a: string, b: string): boolean {
   if (ba.length !== bb.length) return false;
   return timingSafeEqual(ba, bb);
 }
+
+// hashِ توکنِ خامِ مهمان قبل از ذخیره/مقایسه (migration 044) — دقیقاً همون
+// الگویِ `hash(code)` در otp.ts (`sha256(code + JWT_SECRET)`)، دو رازِ
+// متفاوت با یک قاعده. عمداً همینجا duplicate شده (نه import از otp.ts)
+// چون آنجا export نیست و منطق آن‌قدر کوچک است که یک abstraction مشترک
+// برای دو فراخوان ارزشِ لایه‌ی اضافه ندارد.
+export function hashGuestToken(rawToken: string): string {
+  return createHash('sha256').update(rawToken + process.env.JWT_SECRET).digest('hex');
+}
+
 export function assertCanActOnEntry(
-  entry: { userId: string | null; guestAccessToken: string | null },
+  entry: { userId: string | null; guestAccessTokenHash: string | null },
   auth: { callerUserId?: string; guestToken?: string },
 ) {
   if (entry.userId) {
     if (!auth.callerUserId || auth.callerUserId !== entry.userId) throw Err.notFound('ورودی لیست انتظار');
     return;
   }
-  if (!entry.guestAccessToken || !auth.guestToken || !tokensEqual(auth.guestToken, entry.guestAccessToken)) {
+  if (!entry.guestAccessTokenHash || !auth.guestToken
+    || !tokensEqual(hashGuestToken(auth.guestToken), entry.guestAccessTokenHash)) {
     throw Err.notFound('ورودی لیست انتظار');
   }
 }

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 // نکته: isVipTier/tierToPriority به‌عنوان توابعِ خالصِ قابل‌تست از computePriority
 // جدا شدند (همان الگوی reservation-helpers.ts) تا این تست واقعاً کدِ اصلی را
 // اجرا کند، نه یک کپیِ دستی از آن.
-const { isVipTier, tierToPriority, medianMinutes, resolveAvgDiningMinutes, tokensEqual, assertCanActOnEntry } = await import('../src/lib/waitlist.ts');
+const { isVipTier, tierToPriority, medianMinutes, resolveAvgDiningMinutes, tokensEqual, assertCanActOnEntry, hashGuestToken } = await import('../src/lib/waitlist.ts');
 
 describe('isVipTier', () => {
   test('platinum و vip و gold همگی VIP محسوب می‌شوند', () => {
@@ -105,35 +105,63 @@ describe('tokensEqual — مقایسه‌ی constant-time', () => {
   });
 });
 
-describe('assertCanActOnEntry — رفعِ IDOR در waitlist (۲۰۲۶-۰۸-۱۳)', () => {
+describe('hashGuestToken — hashِ رازِ waitlist قبل از ذخیره (migration 044)', () => {
+  test('برایِ یک ورودیِ ثابت، همیشه همون خروجی رو می‌ده (deterministic)', () => {
+    assert.equal(hashGuestToken('tok123'), hashGuestToken('tok123'));
+  });
+  test('دو ورودیِ متفاوت → hashِ متفاوت', () => {
+    assert.notEqual(hashGuestToken('tok123'), hashGuestToken('tok124'));
+  });
+  test('هرگز خودِ توکنِ خام رو برنمی‌گردونه (واقعاً hash می‌کنه، نه echo)', () => {
+    const h = hashGuestToken('tok123');
+    assert.notEqual(h, 'tok123');
+    assert.equal(h.length, 64); // hex-encoded sha256
+  });
+});
+
+describe('assertCanActOnEntry — رفعِ IDOR در waitlist (۲۰۲۶-۰۸-۱۳) + hashِ توکن (۲۰۲۶-۰۸-۱۴)', () => {
+  // ⚠️ از migration 044 به بعد، entry.guestAccessTokenHash یک hash است (نه
+  // خودِ توکنِ خام) — پس در تست هم باید hashGuestToken(rawToken) ذخیره بشه،
+  // دقیقاً همون‌طور که joinWaitlist واقعی انجام می‌ده؛ auth.guestToken همچنان
+  // خامه (همونی که کلاینت واقعاً می‌فرسته).
+  const rawToken = 'tok123';
+  const storedHash = hashGuestToken(rawToken);
+
   test('ورودیِ متعلق‌به‌کاربر: با callerUserIdِ درست عبور می‌کند', () => {
     assert.doesNotThrow(() =>
-      assertCanActOnEntry({ userId: 'u1', guestAccessToken: null }, { callerUserId: 'u1' }));
+      assertCanActOnEntry({ userId: 'u1', guestAccessTokenHash: null }, { callerUserId: 'u1' }));
   });
   test('ورودیِ متعلق‌به‌کاربر: بدونِ توکن (کاملاً غیرِ‌احرازشده) رد می‌شود', () => {
     // این دقیقاً همون سوراخِ IDORِ رفع‌شده است — قبلاً callerUserIdِ نامعین
     // (نه فقط اشتباه) بی‌صدا از کنارِ چک رد می‌شد.
-    assert.throws(() => assertCanActOnEntry({ userId: 'u1', guestAccessToken: null }, {}));
+    assert.throws(() => assertCanActOnEntry({ userId: 'u1', guestAccessTokenHash: null }, {}));
   });
   test('ورودیِ متعلق‌به‌کاربر: با callerUserIdِ کاربرِ دیگر رد می‌شود', () => {
     assert.throws(() =>
-      assertCanActOnEntry({ userId: 'u1', guestAccessToken: null }, { callerUserId: 'u2' }));
+      assertCanActOnEntry({ userId: 'u1', guestAccessTokenHash: null }, { callerUserId: 'u2' }));
   });
-  test('ورودیِ مهمان: با guestTokenِ درست عبور می‌کند', () => {
+  test('ورودیِ مهمان: با guestTokenِ خامِ درست عبور می‌کند (بعدِ hash داخلی مطابقت می‌کنه)', () => {
     assert.doesNotThrow(() =>
-      assertCanActOnEntry({ userId: null, guestAccessToken: 'tok123' }, { guestToken: 'tok123' }));
+      assertCanActOnEntry({ userId: null, guestAccessTokenHash: storedHash }, { guestToken: rawToken }));
   });
   test('ورودیِ مهمان: بدونِ توکن رد می‌شود', () => {
-    assert.throws(() => assertCanActOnEntry({ userId: null, guestAccessToken: 'tok123' }, {}));
+    assert.throws(() => assertCanActOnEntry({ userId: null, guestAccessTokenHash: storedHash }, {}));
   });
   test('ورودیِ مهمان: با guestTokenِ اشتباه رد می‌شود', () => {
     assert.throws(() =>
-      assertCanActOnEntry({ userId: null, guestAccessToken: 'tok123' }, { guestToken: 'wrong' }));
+      assertCanActOnEntry({ userId: null, guestAccessTokenHash: storedHash }, { guestToken: 'wrong' }));
   });
-  test('ورودیِ مهمانی که (به‌هردلیل) guestAccessToken ندارد — همیشه رد می‌شود، حتی با توکنِ کلاینت', () => {
-    // دفاعِ لایه‌دوم: اگه یه ردیفِ قدیمی/خراب guestAccessToken=null داشته باشه،
+  test('ورودیِ مهمان: خودِ hashِ ذخیره‌شده به‌عنوانِ guestToken فرستاده بشه هم رد می‌شود (hash قابلِ‌استفاده به‌جایِ توکنِ خام نیست)', () => {
+    // دفاعِ اضافی: اگه یه‌جوری hashِ ذخیره‌شده لو بره، خودش نباید به‌عنوانِ
+    // توکنِ خام قابلِ‌استفاده باشه — چون سرور دوباره hashش می‌کنه و با
+    // hashِ ذخیره‌شده مقایسه می‌کنه، نه مقایسه‌ی مستقیم.
+    assert.throws(() =>
+      assertCanActOnEntry({ userId: null, guestAccessTokenHash: storedHash }, { guestToken: storedHash }));
+  });
+  test('ورودیِ مهمانی که (به‌هردلیل) guestAccessTokenHash ندارد — همیشه رد می‌شود، حتی با توکنِ کلاینت', () => {
+    // دفاعِ لایه‌دوم: اگه یه ردیفِ قدیمی/خراب guestAccessTokenHash=null داشته باشه،
     // نباید با هیچ توکنی قابلِ‌بایپس باشه.
     assert.throws(() =>
-      assertCanActOnEntry({ userId: null, guestAccessToken: null }, { guestToken: 'anything' }));
+      assertCanActOnEntry({ userId: null, guestAccessTokenHash: null }, { guestToken: 'anything' }));
   });
 });

@@ -430,7 +430,11 @@ model WaitlistEntry {
   // توکنِ دسترسیِ مهمان (رفعِ IDOR، migration 041) — فقط برایِ ورودی‌هایِ
   // بدونِ حساب (userId=null) صادر می‌شه؛ accept/decline/leave روی این ورودی‌ها
   // علاوه‌بر UUID، این توکن رو هم می‌خوان.
-  guestAccessToken String?       @map("guest_access_token")
+  // ⚠️ migration 044: فقط hashِ توکن ذخیره می‌شه (همون الگویِ otp_codes.code_hash
+  // در otp.ts) — نه خودِ توکنِ خام. اگر DB لو بره (backup، SQLi، دسترسیِ
+  // داخلی)، دیگه نمی‌شه مستقیم از رویِ دیتا guest tokenِ فعال رو استخراج و
+  // impersonate کرد. توکنِ خام فقط یک‌بار (لحظه‌ی join) به کلاینت برمی‌گرده.
+  guestAccessTokenHash String?    @map("guest_access_token_hash")
   @@index([restaurantId, status, priority(sort: Desc), joinedAt])
   @@index([status, offerExpiresAt])
   @@index([userId, status])
