@@ -158,6 +158,7 @@ model Restaurant {
   closures         RestaurantClosure[]
   noShowModel      RestaurantNoShowModel?
   demandForecast   RestaurantDemandForecast?
+  modelTrainingRuns ModelTrainingRun[]
   // ── اقتصادِ یکپارچه‌ی مشتری (migration 038) ──
   cancellationPolicy    CancellationPolicy?
   economyLedgerEntries  EconomyLedgerEntry[]
@@ -640,6 +641,35 @@ model RestaurantDemandForecast {
   coversModel  Json       @map("covers_model") // SeriesModelState برایِ «مجموعِ کاورها در روز»
   trainedAt    DateTime   @default(now()) @map("trained_at")
   @@map("restaurant_demand_forecasts")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  تاریخچه‌ی append-only آموزشِ مدل‌ها (migration 042، نقشه‌راهِ AI فازِ ۱)
+//
+//  RestaurantNoShowModel/RestaurantDemandForecast بالا تک‌ردیفی‌اند و هرشب
+//  overwrite می‌شوند — مسیرِ داغِ خواندنِ مدلِ فعال (getLearnedNoShowModel/
+//  getDemandForecast) دقیقاً همان دو جدول را می‌خواند و دست‌نخورده می‌ماند.
+//  این جدول کنارِ آن‌ها، نه به‌جایِ آن‌ها، هر بار که یکی از دو تابعِ آموزش
+//  اجرا می‌شود یک ردیفِ جدید اضافه می‌کند — چه مدل فعال شده باشد چه نه —
+//  تا تاریخچه‌ی کاملِ «امتحان‌شد و نتیجه چه بود» برایِ داشبوردِ سلامتِ مدل
+//  در پنلِ شرکت و برایِ تستِ بایاس در دسترس باشد. هیچ UPDATE/DELETEای رویِ
+//  این جدول انجام نمی‌شود — همان الگویِ EconomyLedgerEntry (migration 038).
+// ───────────────────────────────────────────────────────────────────────
+model ModelTrainingRun {
+  id            String     @id @default(uuid()) @db.Uuid
+  restaurantId  String     @map("restaurant_id") @db.Uuid
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  // 'no_show' | 'demand_forecast' — بدونِ enumِ Postgres تا افزودنِ نوعِ
+  // مدلِ جدید در فازِ ۲ (fraud/incentive) نیازِ به migration نداشته باشد.
+  kind          String     @map("kind")
+  sampleSize    Int        @map("sample_size")
+  // no_show: {learnedBrier, staticBrier} — demand_forecast: {mae, baselineMae}
+  metrics       Json       @map("metrics")
+  isActive      Boolean    @map("is_active")
+  reason        String?    @map("reason")
+  trainedAt     DateTime   @default(now()) @map("trained_at")
+  @@index([restaurantId, kind, trainedAt])
+  @@map("model_training_runs")
 }
 
 model CustomerInsight {

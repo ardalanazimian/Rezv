@@ -302,6 +302,23 @@ export async function trainAndCalibrateDemandForecast(restaurantId: string): Pro
       trainedAt: new Date(),
     },
   });
+  // تاریخچه‌ی append-only (migration 042) — دو ردیف (یکی برایِ سریِ «تعداد»،
+  // یکی برایِ «کاور») چون هرکدام مستقلاً train/فعال می‌شوند. هم‌الگو با
+  // no-show-model.ts — شکستِ این نوشتن نباید آموزشِ اصلی را خراب کند.
+  await db.modelTrainingRun.createMany({
+    data: [
+      {
+        restaurantId, kind: 'demand_forecast', sampleSize: n, isActive: countState.isActive,
+        reason: countState.reason,
+        metrics: { series: 'count', mae: countState.mae, baselineMae: countState.baselineMae } as unknown as Prisma.InputJsonValue,
+      },
+      {
+        restaurantId, kind: 'demand_forecast', sampleSize: n, isActive: coversState.isActive,
+        reason: coversState.reason,
+        metrics: { series: 'covers', mae: coversState.mae, baselineMae: coversState.baselineMae } as unknown as Prisma.InputJsonValue,
+      },
+    ],
+  }).catch(() => null);
   await invalidate(cacheKey('demand-forecast', restaurantId));
 
   return { trained: true, sampleSize: n, countActive: countState.isActive, coversActive: coversState.isActive };

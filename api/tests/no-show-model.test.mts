@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 const {
   sigmoid, trainLogisticRegression, predictProba, brierScore,
   decideActivation, buildFeatureVector, toMatrix, NO_SHOW_FEATURE_NAMES,
+  checkChannelBias,
 } = await import('../src/lib/no-show-model.ts');
 const { computeStaticScoreFromFeatures, tierFromScore } = await import('../src/lib/customer-insights.ts');
 
@@ -184,6 +185,47 @@ describe('toMatrix', () => {
     assert.equal(X.length, 2);
     assert.equal(y.length, 2);
     assert.deepEqual(y, [1, 0]);
+  });
+});
+
+describe('checkChannelBias — تستِ سادهِ بایاسِ کانالی (نقشه‌راهِ AI، فازِ ۱)', () => {
+  test('وزن‌هایِ همه‌صفر → بدونِ بایاس', () => {
+    const r = checkChannelBias([0, 0, 0, 0, 0, 0, 0]);
+    assert.equal(r.biased, false);
+    assert.equal(r.knownUserGap, 0);
+    assert.equal(r.phoneSourceGap, 0);
+  });
+
+  test('وزنِ بزرگِ منفی روی knownUser (یعنی «مهمان = خیلی پرریسک») → بایاس شناسایی می‌شود', () => {
+    // ترتیب: [bias, knownUser, priorNoShowRate, lastMinute, veryEarlyBooking, largeParty, phoneSource]
+    // knownUser=-5 یعنی نبودِ حساب به‌تنهایی امتیازِ ریسک را خیلی بالا می‌برد —
+    // این دقیقاً همان چیزی‌ست که نباید مجاز باشد: تبعیض بر اساسِ کانال، نه رفتار.
+    const w = [0, -5, 0, 0, 0, 0, 0];
+    const r = checkChannelBias(w);
+    assert.equal(r.biased, true);
+    assert.ok(Math.abs(r.knownUserGap) > 0.2, `انتظارِ گپِ بزرگ داشتیم، گرفتیم ${r.knownUserGap}`);
+    assert.match(r.reason, /کانالِ رزرو/);
+  });
+
+  test('وزنِ بزرگ روی phoneSource (یعنی «رزروِ تلفنی = پرریسک») → بایاس شناسایی می‌شود', () => {
+    const w = [0, 0, 0, 0, 0, 0, 4];
+    const r = checkChannelBias(w);
+    assert.equal(r.biased, true);
+    assert.ok(Math.abs(r.phoneSourceGap) > 0.2);
+  });
+
+  test('وزنِ کوچکِ منطقی (تفاوتِ کم بینِ کانال‌ها) → بدونِ بایاس', () => {
+    // یک وزنِ کوچک برای knownUser واقع‌گرایانه است (مثلاً کاربرانِ ثبت‌نامی
+    // کمی قابل‌اعتمادترند) — تا وقتی گپ کوچک بماند، این تبعیضِ ناسالم نیست.
+    const w = [0, -0.3, 0, 0, 0, 0, 0.2];
+    const r = checkChannelBias(w);
+    assert.equal(r.biased, false);
+  });
+
+  test('مدلی که فقط بر اساسِ رفتارِ واقعی (lastMinute) وزن دارد، نه هویت → بدونِ بایاس', () => {
+    const w = [0, 0, 0, 3, 0, 0, 0];
+    const r = checkChannelBias(w);
+    assert.equal(r.biased, false);
   });
 });
 

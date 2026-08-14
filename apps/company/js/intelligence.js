@@ -172,7 +172,7 @@ async function doCancel(id){
 function refreshActive(){
   const active=document.querySelector('.view.active');if(!active)return;
   const id=active.id.replace('v-','');
-  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,systemhealth:rSystemHealth,security:rSecurity,support:rSupport,badges:rBadges,missions:rMissions})[id]?.();
+  ({overview:rOverview,restaurants:rRestaurants,detail:rDetail,analytics:rAnalytics,customers:rCustomers,billing:rBilling,systemhealth:rSystemHealth,aihealth:rModelHealth,security:rSecurity,support:rSupport,badges:rBadges,missions:rMissions})[id]?.();
 }
 
 // ════════ مدیریت رستوران‌ها — اقدامات واقعی سریع (جایگزین «پشتیبانی از راه دور» ساختگی) ════════
@@ -231,6 +231,71 @@ function rSystemHealth(){
       <div class="panel" style="margin-top:20px">
         <div class="panel-head"><div><div class="panel-title">کارهای مرده (نیاز بررسی دستی)</div><div class="panel-sub">${fa(d.dead_jobs.length)} مورد</div></div></div>
         ${d.dead_jobs.length?d.dead_jobs.map(j=>`<div class="mini-row"><div class="mini-info"><div class="mini-name">${esc(j.kind)}</div><div class="mini-sub" style="color:var(--red-600)">${esc(j.error||'بدون پیام خطا')} · ${fa(j.attempts)} تلاش</div></div></div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">چیزی نیست</div></div>`}
+      </div>`;
+  })();
+}
+
+// ═══════════ سلامتِ مدل‌هایِ هوشِ مصنوعی — واقعی، از /admin/ai/model-health ═══════════
+// (نقشه‌راهِ AI، فازِ ۱) نشون می‌ده کدوم رستوران‌ها الان مدلِ یادگرفته‌ی فعال
+// دارن (یعنی روی هولدآوت واقعاً از heuristic بهتر بوده) و تاریخچه‌ی
+// append-only آموزش‌ها (model_training_runs، migration 042) — شاملِ
+// آموزش‌هایی که نتیجه‌شون فعال‌سازی نبوده، نه فقط آخرین وضعیت.
+const RUN_KIND_FA = { no_show: 'ریسکِ عدم‌حضور', demand_forecast: 'پیش‌بینیِ تقاضا' };
+function rModelHealth(){
+  document.getElementById('v-aihealth').innerHTML=`<div style="text-align:center;padding:60px;color:var(--t2)">در حال بارگذاری...</div>`;
+  (async()=>{
+    const res=await API.modelHealth();
+    if(!res.ok){document.getElementById('v-aihealth').innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`;return;}
+    const d=res.data;
+    const brierPct=(v)=>v==null?'—':fa(Math.round(v*1000)/1000);
+    const maePct=(v)=>v==null?'—':fa(Math.round(v*100)/100);
+    document.getElementById('v-aihealth').innerHTML=`
+      <div class="panel" style="margin-bottom:20px;background:var(--ink-50);border-color:var(--ink-100)">
+        <div style="font-size:13px;color:var(--ink-700);line-height:1.8">
+          ${icon('info',{size:13})} هر مدل فقط وقتی «فعال» می‌شه که شبانه روی تاریخچه‌ی خودِ همون رستوران آموزش دیده باشه و روی دادهٔ نگه‌داشته‌شده (هولدآوت) واقعاً از قانونِ دستیِ فعلی (heuristic) بهتر عمل کنه — وگرنه بی‌صدا از heuristic استفاده می‌شه. جزئیاتِ کامل در docs/ML_CONTRACT.md.
+        </div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-top"><div class="kpi-ic ink">${icon('sparkle',{size:17})}</div></div><div class="kpi-val">${fa(d.summary.no_show.restaurants_active)}</div><div class="kpi-label">رستوران با مدلِ no-showِ فعال</div></div>
+        <div class="kpi"><div class="kpi-top"><div class="kpi-ic violet">${icon('trending',{size:17})}</div></div><div class="kpi-val">${fa(d.summary.no_show.restaurants_trained)}</div><div class="kpi-label">رستورانِ آموزش‌دیده (no-show)</div></div>
+        <div class="kpi"><div class="kpi-top"><div class="kpi-ic amber">${icon('chart',{size:17})}</div></div><div class="kpi-val">${fa(d.summary.demand_forecast.restaurants_count_active)}</div><div class="kpi-label">پیش‌بینیِ تقاضا فعال (تعداد)</div></div>
+        <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('chart',{size:17})}</div></div><div class="kpi-val">${fa(d.summary.demand_forecast.restaurants_covers_active)}</div><div class="kpi-label">پیش‌بینیِ تقاضا فعال (کاور)</div></div>
+      </div>
+      <div class="panel" style="margin-top:20px">
+        <div class="panel-head"><div><div class="panel-title">مدلِ ریسکِ عدم‌حضور — وضعیتِ فعلی هر رستوران</div><div class="panel-sub">${fa(d.restaurants.no_show.length)} رستوران آموزش دیده‌اند</div></div></div>
+        ${d.restaurants.no_show.length?d.restaurants.no_show.map(r=>`
+          <div class="mini-row">
+            <div class="mini-info">
+              <div class="mini-name">${esc(r.restaurant_name)}</div>
+              <div class="mini-sub">نمونه: ${fa(r.sample_size)} (${fa(r.positive_count)} عدم‌حضورِ واقعی) · Brierِ یادگرفته ${brierPct(r.learned_brier)} در برابرِ heuristic ${brierPct(r.static_brier)} · آخرین آموزش: ${new Date(r.trained_at).toLocaleDateString('fa-IR')}</div>
+            </div>
+            <span class="badge ${r.is_active?'active':'expired'}">${r.is_active?'فعال (یادگرفته)':'heuristic'}</span>
+          </div>`).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز هیچ رستورانی آموزش ندیده — کرونِ شبانه‌ی customer-insights باید یک‌بار اجرا شده باشه</div></div>`}
+      </div>
+      <div class="panel" style="margin-top:20px">
+        <div class="panel-head"><div><div class="panel-title">پیش‌بینیِ تقاضا — وضعیتِ فعلی هر رستوران</div><div class="panel-sub">${fa(d.restaurants.demand_forecast.length)} رستوران آموزش دیده‌اند</div></div></div>
+        ${d.restaurants.demand_forecast.length?d.restaurants.demand_forecast.map(r=>`
+          <div class="mini-row">
+            <div class="mini-info">
+              <div class="mini-name">${esc(r.restaurant_name)}</div>
+              <div class="mini-sub">${fa(r.history_days)} روز تاریخچه · تعداد: MAEِ ${maePct(r.count_mae)} در برابرِ پایه ${maePct(r.count_baseline_mae)} · کاور: MAEِ ${maePct(r.covers_mae)} در برابرِ پایه ${maePct(r.covers_baseline_mae)} · آخرین آموزش: ${new Date(r.trained_at).toLocaleDateString('fa-IR')}</div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <span class="badge ${r.count_active?'active':'expired'}">تعداد: ${r.count_active?'فعال':'heuristic'}</span>
+              <span class="badge ${r.covers_active?'active':'expired'}">کاور: ${r.covers_active?'فعال':'heuristic'}</span>
+            </div>
+          </div>`).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز هیچ رستورانی آموزش ندیده</div></div>`}
+      </div>
+      <div class="panel" style="margin-top:20px">
+        <div class="panel-head"><div><div class="panel-title">تاریخچه‌ی آموزش‌ها (append-only)</div><div class="panel-sub">آخرین ${fa(d.recent_runs.length)} اجرا — شاملِ آموزش‌هایی که فعال نشدن</div></div></div>
+        ${d.recent_runs.length?d.recent_runs.map(r=>`
+          <div class="mini-row">
+            <div class="mini-info">
+              <div class="mini-name">${esc(r.restaurant_name)} · ${RUN_KIND_FA[r.kind]||esc(r.kind)}</div>
+              <div class="mini-sub">${esc(r.reason||'')} · نمونه: ${fa(r.sample_size)} · ${new Date(r.trained_at).toLocaleDateString('fa-IR')}</div>
+            </div>
+            <span class="badge ${r.is_active?'active':'expired'}">${r.is_active?'فعال شد':'فعال نشد'}</span>
+          </div>`).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز تاریخچه‌ای ثبت نشده</div></div>`}
       </div>`;
   })();
 }
@@ -736,7 +801,7 @@ if (API.getToken()) {
     const active = document.querySelector('.view.active');
     if (active) {
       const id = active.id.replace('v-', '');
-      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, systemhealth:rSystemHealth, security:rSecurity, support:rSupport, badges:rBadges, missions:rMissions})[id]?.();
+      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, systemhealth:rSystemHealth, aihealth:rModelHealth, security:rSecurity, support:rSupport, badges:rBadges, missions:rMissions})[id]?.();
     }
     refreshSalesBadge();
     refreshPhotoBadge();

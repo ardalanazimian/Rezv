@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { cached, cacheKey, invalidate } from './cache';
 import { computeStaticScoreFromFeatures, type RawFeatureInput } from './customer-insights';
@@ -109,6 +110,51 @@ export function decideActivation(params: {
       ? { ok: false, reason: `تعدادِ no-show برای یادگیری کم است (${positiveCount} < ${MIN_POSITIVE_COUNT})` }
       : { ok: true, reason: '' },
   });
+}
+
+/** حداکثرِ تفاوتِ مجازِ احتمالِ پیش‌بینی‌شده که فقط از تغییرِ کانالِ رزرو
+ *  (نه رفتارِ واقعی) ناشی می‌شود — ۲۰ درصدِ احتمال. */
+const MAX_CHANNEL_BIAS_GAP = 0.2;
+
+export interface BiasCheckResult {
+  biased: boolean;
+  /** احتمال(مهمان) − احتمال(کاربرِ ثبت‌نامی)، با همه‌ی عواملِ رفتاریِ دیگر یکسان و در حالتِ ریسکِ صفر. */
+  knownUserGap: number;
+  /** احتمال(رزروِ تلفنی) − احتمال(رزروِ غیرتلفنی)، همان شرایط. */
+  phoneSourceGap: number;
+  reason: string;
+}
+
+/**
+ * تستِ سادهِ بایاسِ کانالی (نقشه‌راهِ AI، فازِ ۱) — آیا مدلِ یادگرفته صرفاً
+ * به‌خاطرِ اینکه رزرو مهمان است یا از طریقِ تلفن ثبت شده (نه به‌خاطرِ
+ * رفتارِ واقعیِ ریسک‌زا: last-minute، سابقه‌ی no-show، گروهِ بزرگ) امتیازِ
+ * ریسک را به‌طرزِ نامتناسبی بالا/پایین می‌برد؟
+ *
+ * روش: یک بردارِ «ریسکِ صفر» می‌سازیم (بدونِ last-minute/very-early/
+ * large-party/سابقه‌ی بد) و فقط یک ویژگیِ هویتی/کانالی را در هر بار
+ * تغییر می‌دهیم. اگر تفاوتِ احتمالِ پیش‌بینی‌شده از MAX_CHANNEL_BIAS_GAP
+ * بیشتر شود، یعنی مدل دارد بر اساسِ «کی هستی/چطور رزرو کردی» تبعیض
+ * می‌گذارد، نه بر اساسِ رفتار — چنین مدلی نباید فعال شود، حتی اگر روی
+ * Brier کلی از heuristic بهتر باشد.
+ */
+export function checkChannelBias(weights: number[]): BiasCheckResult {
+  // ترتیب: [bias, knownUser, priorNoShowRate, lastMinute, veryEarlyBooking, largeParty, phoneSource]
+  const registeredZeroRisk = [1, 1, 0, 0, 0, 0, 0];
+  const guestZeroRisk = [1, 0, 0, 0, 0, 0, 0];
+  const phoneZeroRisk = [1, 1, 0, 0, 0, 0, 1];
+
+  const pRegistered = predictProba(weights, registeredZeroRisk);
+  const pGuest = predictProba(weights, guestZeroRisk);
+  const pPhone = predictProba(weights, phoneZeroRisk);
+
+  const knownUserGap = pGuest - pRegistered;
+  const phoneSourceGap = pPhone - pRegistered;
+  const biased = Math.abs(knownUserGap) > MAX_CHANNEL_BIAS_GAP || Math.abs(phoneSourceGap) > MAX_CHANNEL_BIAS_GAP;
+  const reason = biased
+    ? `مدل صرفاً بر اساسِ کانالِ رزرو (نه رفتار) تفاوتِ زیادی در امتیاز می‌دهد — گپِ مهمان: ${(knownUserGap * 100).toFixed(1)}٪، گپِ تلفنی: ${(phoneSourceGap * 100).toFixed(1)}٪`
+    : 'بدون بایاسِ کانالیِ قابل‌توجه';
+  return { biased, knownUserGap, phoneSourceGap, reason };
 }
 
 /** ساختِ X,y از فهرستی از مثال‌ها — کمکیِ خالص برای تست و برای trainAndCalibrate. */
@@ -249,22 +295,44 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
 
   const decision = decideActivation({ sampleSize: examples.length, positiveCount, learnedBrier, staticBrier });
 
+  // گیتِ ایمنیِ اضافی: حتی اگر مدل روی Brierِ کلی از heuristic بهتر باشد،
+  // اگر صرفاً بر اساسِ کانالِ رزرو (مهمان/تلفنی) تبعیض بگذارد فعال نمی‌شود —
+  // دقیقاً همان انضباطِ «مدلِ مشکوک هیچ‌وقت جایگزین نمی‌شود» که در
+  // decideModelActivation هست، این‌بار برای بایاس نه فقط دقت.
+  const biasCheck = checkChannelBias(weights);
+  const isActive = decision.isActive && !biasCheck.biased;
+  const reason = biasCheck.biased ? biasCheck.reason : decision.reason;
+
   await db.restaurantNoShowModel.upsert({
     where: { restaurantId },
     create: {
       restaurantId, weights, sampleSize: examples.length, positiveCount,
-      learnedBrier, staticBrier, isActive: decision.isActive,
+      learnedBrier, staticBrier, isActive,
     },
     update: {
       weights, sampleSize: examples.length, positiveCount,
-      learnedBrier, staticBrier, isActive: decision.isActive, trainedAt: new Date(),
+      learnedBrier, staticBrier, isActive, trainedAt: new Date(),
     },
   });
+  // تاریخچه‌ی append-only (migration 042) — هیچ‌وقت overwrite نمی‌شود، کنارِ
+  // upsert بالا نوشته می‌شود تا داشبوردِ سلامتِ مدل بتواند «امتحان‌شد ولی
+  // فعال نشد» را هم ببیند، نه فقط آخرین وضعیت. شکستِ این نوشتن نباید
+  // آموزشِ اصلی را خراب کند — فقط تاریخچه/دیباگ است.
+  await db.modelTrainingRun.create({
+    data: {
+      restaurantId, kind: 'no_show', sampleSize: examples.length,
+      metrics: {
+        learnedBrier, staticBrier,
+        knownUserGap: biasCheck.knownUserGap, phoneSourceGap: biasCheck.phoneSourceGap,
+      } as unknown as Prisma.InputJsonValue,
+      isActive, reason,
+    },
+  }).catch(() => null);
   await invalidate(cacheKey('noshow-model', restaurantId));
 
   return {
     trained: true, sampleSize: examples.length, positiveCount,
-    learnedBrier, staticBrier, isActive: decision.isActive, reason: decision.reason,
+    learnedBrier, staticBrier, isActive, reason,
   };
 }
 
