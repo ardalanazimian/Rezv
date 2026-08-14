@@ -79,13 +79,35 @@
   cache lookup on every request); the 15-minute window was judged an
   acceptable trade-off. Revisit only if a specific incident needs a shorter
   window.
+- **Waitlist guest tokens are hashed at rest — fixed, PR #16 (۲۰۲۶-۰۸-۱۴).**
+  The guest-access token issued at `joinWaitlist` (migration `041`) used to be
+  stored as plaintext in `waitlist_entries.guest_access_token`. It's now
+  stored only as `guest_access_token_hash` (`sha256(token + JWT_SECRET)`, the
+  same pattern as `otp_codes.code_hash`) via migration `044`, which also
+  drops the old plaintext column. A DB leak (backup, SQLi, insider access)
+  can no longer be used to directly extract and replay an active guest's
+  token. The client-facing shape is unchanged — `guest_token` is still
+  returned once, raw, at join time.
+- **Booking-domain P0s (lifecycle bypass, merge double-booking, cross-tenant
+  preorder, waitlist IDOR, ban coverage gaps, walk-in/maintenance guards) —
+  closed, PR #13.** See [SECURITY.md](./SECURITY.md) §11 for what's
+  implemented and how it's verified.
 - **`localStorage` tokens** are XSS-exposed; every front-end `innerHTML` sink
-  must escape user data (`esc()`).
+  must escape user data (`esc()` — now unit-tested, `api/tests/esc.test.mts`,
+  PR #16; the full call-site audit is still open, see below).
 - **RLS is partial** (started in `manual/023`); not all tenant tables have it.
 - **Rate-limit fail-open** (when Redis is down) reduces to a per-process
   in-memory floor — multi-instance deployments then allow `max × instances`.
+- **Full `innerHTML` sink audit is not complete.** `esc()` is the single
+  canonical helper and is itself tested; confirming every call site actually
+  routes user/API data through it remains open (see SECURITY.md §12).
+- **Payment idempotency (P0-9) and the merge-occupancy concurrency race
+  (P0-3) are code-reviewed/unit-tested only, not exercised live.** The
+  former needs a real Zarinpal `merchant_id`; the latter needs two genuinely
+  simultaneous requests, not sequential calls — neither has been run in this
+  environment.
 
-See [SECURITY.md](./SECURITY.md) §11 for the full list.
+See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
 
 ## 5. Data / Migrations
 
@@ -115,17 +137,38 @@ See [SECURITY.md](./SECURITY.md) §11 for the full list.
 - ~~`test` job depends on `--test-force-exit`~~ **Fixed (2026-08-13).** That flag
   was itself the cause of flaky `# tests`/`# suites` counts between identical
   runs (fail always 0, but totals varied — e.g. 314 vs 332): `tsx --test`
-  isolates each of the 23 `tests/*.test.mts` files in its own child process,
-  and force-exit killed each child right as its own tests finished, racing
-  its stdout pipe still flushing TAP output to the parent. First attempt used
-  `--experimental-test-isolation=none` (Node 22+) — worked locally but broke
-  CI outright (`bad option`, CI pins Node 20). Final fix is version-agnostic:
-  `npm test` now runs a single wrapper file (`tests/_all.runner.mts`) that
-  imports all 23 test files for their side effects, so `tsx --test` only ever
-  sees one file — no subprocess-per-file, no race, no experimental flag, no
-  Node-version dependency. Stable across 5 consecutive runs and ~5-10x faster
-  than the old force-exit approach. `redis.ts` also gained `lazyConnect: true`
-  so importing it no longer opens a live socket for typing-only imports.
+  isolates each of the 23 `tests/*.test.mts` files (at the time) in its own
+  child process, and force-exit killed each child right as its own tests
+  finished, racing its stdout pipe still flushing TAP output to the parent.
+  First attempt used `--experimental-test-isolation=none` (Node 22+) — worked
+  locally but broke CI outright (`bad option`, CI pins Node 20). Final fix is
+  version-agnostic: `npm test` now runs a single wrapper file
+  (`tests/_all.runner.mts`) that imports every test file for its side
+  effects, so `tsx --test` only ever sees one file — no subprocess-per-file,
+  no race, no experimental flag, no Node-version dependency. `redis.ts` also
+  gained `lazyConnect: true` so importing it no longer opens a live socket
+  for typing-only imports.
+- **3 test files existed but were silently never run — fixed, PR #16
+  (۲۰۲۶-۰۸-۱۴).** `ban.test.mts`, `crm-recommendations.test.mts`, and
+  `customer-intelligence.test.mts` were never `import`ed into
+  `tests/_all.runner.mts` — the single wrapper file above only runs what it
+  explicitly imports. `npm test` had silently never executed them; a PR body
+  had claimed "375/375 passing" when the real count (without those 3 files)
+  was 352. All `tests/*.test.mts` files (28 as of PR #16) are now imported;
+  `npm test` reports 392/392, stable across consecutive runs.
+- **`npm test` could hang indefinitely after a test opened a real DB/Redis
+  connection — fixed, PR #16 (۲۰۲۶-۰۸-۱۴).** `db.ts`/`redis.ts` close their
+  connections on `process.once('beforeExit', ...)`, but an open Redis socket
+  is itself a pending handle that keeps Node's event loop from ever reaching
+  the empty state `beforeExit` requires — a deadlock no test file had
+  triggered until the first real-Postgres integration test
+  (`table-merge-occupancy.test.mts`) was added; all prior test files were
+  pure-logic and never opened a live connection. Fixed with an explicit,
+  unconditional `db.$disconnect()`/`redis.quit()` in `_all.runner.mts`'s
+  top-level `after()` hook. The underlying `beforeExit` reliance inside
+  `db.ts`/`redis.ts` themselves is **unchanged** — the same deadlock remains
+  a latent risk for any other standalone script/worker that opens a live
+  Redis connection and doesn't call `process.exit()` itself. **(follow-up)**
 - **E2E fully mocks the API** — it validates the customer UI/flows but not the
   real API contract end-to-end. Consider a small contract/integration suite
   against a real backend.
