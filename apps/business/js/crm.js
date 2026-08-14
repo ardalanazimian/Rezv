@@ -611,21 +611,27 @@ async function custRenderProfiles(){
   el.innerHTML=`
     <div class="ai-box" style="margin-bottom:18px">
       <div class="ai-box-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">پروفایل‌های واقعی مشتری</div><span class="tag">داده‌ی زنده</span></div>
-      <div style="font-size:13px;color:var(--t1);line-height:1.6">مرتب‌سازی بر اساس: 
+      <div style="font-size:13px;color:var(--t1);line-height:1.6">مرتب‌سازی بر اساس:
         <button class="btn btn-sm ${custSort==='churn'?'btn-primary':'btn-ghost'}" onclick="custSort='churn';custRenderProfiles()">ریسک ریزش</button>
         <button class="btn btn-sm ${custSort==='clv'?'btn-primary':'btn-ghost'}" onclick="custSort='clv';custRenderProfiles()">ارزش (CLV)</button>
         <button class="btn btn-sm ${custSort==='visits'?'btn-primary':'btn-ghost'}" onclick="custSort='visits';custRenderProfiles()">تعداد بازدید</button>
+        <button class="btn btn-sm ${custSort==='intelligence'?'btn-primary':'btn-ghost'}" onclick="custSort='intelligence';custRenderProfiles()">${icon('sparkle',{size:12,fill:true})} امتیازِ هوش</button>
       </div>
     </div>
     ${items.length?items.map(c=>{
       const urg=c.churn_risk_score>=60?'high':c.churn_risk_score>=30?'med':'low';
       const urgClr={high:'var(--red)',med:'var(--amber)',low:'var(--green)'};
+      // امتیازِ هوشِ مشتری (فازِ ۲ AI) — ترکیبِ CLV+وفاداری+ریسکِ ریزش+قابلیتِ‌اعتماد؛
+      // null یعنی هنوز اولین اجرایِ شبانه‌ی RFM برایِ این رستوران انجام نشده.
+      const iqClr={high:'var(--green)',medium:'var(--amber)',low:'var(--t3)'};
+      const iqFa={high:'باارزش',medium:'متوسط',low:'نیازمندِ توجه'};
       return `<div class="smart-card ${urg}">
         <div class="smart-top">
           <div class="smart-ava">${c.is_vip?icon('crown',{size:18,fill:true}):icon('user',{size:18})}</div>
           <div style="flex:1"><div class="smart-name">${esc(c.name)}</div><div style="font-size:12px;color:var(--t2)">${esc(SEG_FA[c.segment]||c.segment||'')} · ${fa(c.total_visits)} بازدید · ${fnl(c.predicted_clv_toman)} تومان CLV</div></div>
           <span style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:50px;background:${urg==='high'?'var(--red-50)':urg==='med'?'var(--amber-50)':'var(--green-50)'};color:${urgClr[urg]}">${urg==='high'?'پرریسک':urg==='med'?'بررسی کن':'پایدار'}</span>
         </div>
+        ${c.intelligence_score!=null?`<div style="display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:11.5px;color:var(--t2)">${icon('sparkle',{size:12,fill:true})} امتیازِ هوشِ مشتری: <b style="color:${iqClr[c.intelligence_tier]||'var(--t2)'}">${fa(c.intelligence_score)}</b> · ${iqFa[c.intelligence_tier]||''}</div>`:''}
         <div class="sig-row">
           <div class="sig"><div class="sig-val" style="color:var(--red)">${fa(c.churn_risk_score)}٪</div><div class="sig-label">ریسک ریزش</div><div class="sig-track"><div class="sig-fill" style="width:${c.churn_risk_score}%;background:var(--red)"></div></div></div>
           <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(c.no_show_rate_pct)}٪</div><div class="sig-label">عدم‌حضور</div><div class="sig-track"><div class="sig-fill" style="width:${c.no_show_rate_pct}%;background:var(--amber)"></div></div></div>
@@ -877,9 +883,11 @@ async function custRenderAI(){
   const el=document.getElementById('ct-ai');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
-  const res=await API.aiRecommendations();
+  const [res,crmRes]=await Promise.all([API.aiRecommendations(),API.crmRecommendations()]);
   if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
   const cards=res.data.cards||[];
+  const contacts=crmRes.ok?(crmRes.data.items||[]):[];
+  const URG_FA={high:'فوری',medium:'این هفته',low:'وقتِ آزاد'};
   el.innerHTML=`
     <div class="ai-box" style="margin-bottom:18px">
       <div class="ai-box-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">پیشنهادهای هوشمند</div><span class="tag">قانون‌محور · شفاف</span></div>
@@ -895,7 +903,20 @@ async function custRenderAI(){
         <div class="smart-actions">
           <button class="btn btn-sm ${c.severity==='high'?'btn-primary':'btn-ghost'}" onclick="handleAiAction('${c.id}')">${esc(c.action_label)}</button>
         </div>
-      </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}`;
+      </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}
+    <div class="panel" style="margin-top:20px">
+      <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری</div></div></div>
+      ${contacts.length?contacts.map(c=>`
+        <div class="mini-row">
+          <div class="mini-info">
+            <div class="mini-name">${esc(c.name)} · <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:50px;background:${c.urgency==='high'?'var(--red-50)':c.urgency==='medium'?'var(--amber-50)':'var(--s-100)'};color:${c.urgency==='high'?'var(--red)':c.urgency==='medium'?'var(--amber)':'var(--t2)'}">${URG_FA[c.urgency]||''}</span></div>
+            <div class="mini-sub">${esc(c.reason)}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callCustomer('${esc(c.phone||'')}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
+          </div>
+        </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
+    </div>`;
 }
 function handleAiAction(id){
   if(id==='winback'||id==='vip_retention'){ setCustTab('campaign'); }

@@ -6,14 +6,14 @@ import { parseQuery, zUuid, z } from '@/lib/schemas';
 
 const querySchema = z.object({
   segment: z.enum(['new_customer', 'active', 'at_risk', 'churned', 'vip']).optional(),
-  sort: z.enum(['clv', 'churn', 'visits']).default('clv'),
+  sort: z.enum(['clv', 'churn', 'visits', 'intelligence']).default('clv'),
   limit: z.number().int().min(1).max(50).default(24),
   cursor: zUuid.optional(),
 });
 
 // ═══════════════════════════════════════════════════════════
 //  GET /restaurant/customers — لیست مشتریان با CLV، ریسک no-show، سگمنت
-//  Query: ?segment=vip|at_risk|churned|active|new_customer&sort=clv|churn|visits&cursor=&limit=24
+//  Query: ?segment=vip|at_risk|churned|active|new_customer&sort=clv|churn|visits|intelligence&cursor=&limit=24
 //  (پس از ریفکتور معماری: auth/ratelimit/RBAC در withRestaurantAuth — این فایل فقط منطق خودش را دارد)
 // ═══════════════════════════════════════════════════════════
 
@@ -22,6 +22,10 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
 
   const orderBy = sort === 'churn' ? { churnRiskScore: 'desc' as const }
     : sort === 'visits' ? { totalVisits: 'desc' as const }
+    // NULLS LAST صریح: مشتریانی که هنوز RFMِ شبانه برایشان اجرا نشده
+    // (intelligenceScore=null) نباید بالای لیستِ «باارزش‌ترین‌ها» بیفتند —
+    // پیش‌فرضِ Postgres برای DESC، NULLS FIRST است.
+    : sort === 'intelligence' ? { intelligenceScore: { sort: 'desc' as const, nulls: 'last' as const } }
     : { predictedClvToman: 'desc' as const };
 
   const data = await cached(cacheKey('customers', ctx.restaurant.id, segment, sort, cursor), 60, async () => {
@@ -47,6 +51,9 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
       predicted_clv_toman: r.predictedClvToman,
       no_show_rate_pct: r.noShowRatePct,
       churn_risk_score: r.churnRiskScore,
+      // امتیازِ هوشِ مشتری (فازِ ۲ AI) — null یعنی هنوز RFMِ شبانه اجرا نشده
+      intelligence_score: r.intelligenceScore,
+      intelligence_tier: r.intelligenceTier,
       segment: r.segment,
       is_vip: r.isVip,
       last_visit_at: r.lastVisitAt,

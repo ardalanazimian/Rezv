@@ -700,12 +700,20 @@ model CustomerInsight {
 
   segment           CustomerSegment @default(new_customer)
   isVip             Boolean         @default(false) @map("is_vip")
+
+  // ── امتیازِ هوشِ مشتری (نقشه‌راهِ AI، فازِ ۲) ──
+  // ترکیبِ وزن‌دارِ چهار سیگنالِ از‌قبل‌محاسبه‌شده‌ی همین جدول/rfm.ts (نه یک
+  // مدلِ یادگرفته‌ی جدید) — جزئیاتِ فرمول در lib/customer-intelligence.ts.
+  intelligenceScore Int?            @map("intelligence_score")   // ۰..۱۰۰، بالاتر = باارزش‌تر
+  intelligenceTier  String?         @map("intelligence_tier")    // low | medium | high
+
   updatedAt         DateTime        @updatedAt @map("updated_at")
 
   @@id([restaurantId, userId])
   // داشبورد: مرتب‌سازی بر اساس CLV یا فیلتر سگمنت
   @@index([restaurantId, segment, predictedClvToman(sort: Desc)])
   @@index([restaurantId, churnRiskScore(sort: Desc)])
+  @@index([restaurantId, intelligenceScore(sort: Desc)])
   @@map("customer_insights")
 }
 
