@@ -3,6 +3,12 @@
 > Security model as implemented in `api/` (middleware + `lib/`). This reflects
 > the code today; treat "Recommendations" as forward-looking.
 
+> **Status (Aug 2026):** production-hardening audits in PR #13 and PR #16
+> (both merged) closed the P0 booking/security set identified in the Aug 2026
+> review — see §11. This is a snapshot of what's mitigated today, not a claim
+> that the system is "fully hardened forever"; see
+> [KNOWN_LIMITATIONS.md](./KNOWN_LIMITATIONS.md) for what remains open.
+
 ---
 
 ## 1. Authentication
@@ -50,10 +56,16 @@ flowchart LR
 ```
 
 - Refresh preserves principal (kind/tenant/role).
-- `jti` enables a future **revocation denylist** (logout / staff deactivation).
-  `Staff.isActive=false` is intended to reject that staff's refresh. **(uncertain
-  / verify)** whether a denylist is fully wired for access tokens; access tokens
-  are short-lived (15 min) which bounds exposure.
+- **Refresh revocation is implemented and verified (Aug 2026).** `POST
+  /auth/logout` revokes the refresh token's `jti`
+  (`revokeRefreshToken`/`isRefreshRevoked` in `lib/security.ts`); `POST
+  /auth/refresh` checks the denylist on every call and re-reads
+  `Staff.isActive`/user ban status **live from the DB** (not from the refresh
+  token's own payload), revoking and rejecting immediately if the account is
+  now disabled or banned.
+- **No access-token denylist exists.** An already-issued access token stays
+  valid for its own TTL (15 min) after logout/deactivation/ban — a bounded,
+  accepted residual (see §12), not an open bug.
 
 ---
 
@@ -85,8 +97,11 @@ flowchart LR
   and `Permissions-Policy` disabling geolocation/camera/mic/payment on the API
   origin.
 - **Front-end** renders HTML template strings; user-controlled text is escaped
-  via an `esc()` helper before interpolation. **(recommendation)** audit every
-  `innerHTML` sink to ensure all external/user data passes through `esc()`.
+  via an `esc()` helper before interpolation (`shared/js/format.js` — the
+  single canonical implementation for all three panels; unit-tested since PR
+  #16, `api/tests/esc.test.mts`). **(recommendation)** a full audit of every
+  `innerHTML` sink to confirm all external/user data actually passes through
+  `esc()` has not been completed end-to-end — see §12.
 - **HSTS**: `Strict-Transport-Security: max-age=63072000; includeSubDomains;
   preload`.
 
@@ -145,12 +160,63 @@ flowchart LR
 
 ---
 
-## 11. Security Recommendations (forward-looking)
+## 11. Booking & Reservation Integrity (hardened, Aug 2026)
 
-1. **Verify/implement token revocation** end-to-end (access-token denylist keyed
-   by `jti`; ensure logout + `Staff.isActive=false` reject tokens promptly).
-2. **XSS audit** of all front-end `innerHTML` sinks; consider moving tokens from
-   `localStorage` to memory + refresh-cookie if a stronger XSS posture is needed.
+Production-hardening audits (PR #13, PR #16 — both merged) closed a set of
+booking-domain P0s identified in an Aug 2026 review. As implemented on `main`
+today:
+
+- **Reservation lifecycle.** All status transitions (arrival check-in, hold
+  expiry, late no-show) go through `transitionReservation`
+  (`lib/lifecycle.ts`) — the single writer of `reservation.status` — instead
+  of direct or bulk `UPDATE`s. Every transition produces an audit event
+  (`reservation_events`); an invalid transition is rejected with a structured
+  `422 INVALID_STATUS_TRANSITION`, not a silent write or a raw `500`.
+- **Merge / secondary-table occupancy.** Postgres's `no_table_overlap` EXCLUDE
+  constraint only covers a reservation's primary `table_id`. Secondary tables
+  in a merged reservation (`merged_table_numbers`) are additionally checked at
+  the application layer (`lib/table-occupancy.ts`,
+  `getOccupiedTableNumbers`) before any new reservation — direct or via the
+  merge-fallback path — can claim them. This is an application-layer check,
+  not a second DB-level constraint: a narrow TOCTOU window between the read
+  and the commit is still possible (documented in the module itself), unlike
+  the DB-enforced guarantee the EXCLUDE constraint gives the primary table.
+- **Preorder tenant scoping.** Preorder `menuItemId`s are filtered by
+  `restaurantId`; a count mismatch (a missing or cross-tenant id) is rejected
+  with a validation error instead of silently pricing the item at 0 or
+  charging another restaurant's price.
+- **Waitlist guest IDOR.** A guest (unauthenticated) waitlist entry requires a
+  high-entropy `guestAccessToken`, issued once at join time and returned only
+  to the joining client. The server stores just its hash
+  (`guest_access_token_hash`, `sha256(token + JWT_SECRET)` — the same pattern
+  as `otp_codes.code_hash`, §1) and compares with `timingSafeEqual`; a
+  missing or wrong token gets a not-found-shaped error (no existence leak).
+  Authenticated-customer entries instead require an exact caller/owner match.
+- **Hard ban coverage.** `assertUserNotBanned` is enforced on reservation
+  create, waitlist join, mission claim, reward redeem, and review create — the
+  customer-facing mutations identified as gaps in the Aug 2026 audit.
+- **Walk-in / manual table assignment.** Rejects a table in `maintenance`
+  state or marked inactive; a genuine concurrent conflict (the EXCLUDE
+  constraint firing) is mapped to `409 TABLE_CONFLICT`, not an opaque `500`.
+
+Verified via `api/tests/*.test.mts` (incl. a real-Postgres integration test
+for the merge-occupancy case, `table-merge-occupancy.test.mts`, added in PR
+#16) — see [KNOWN_LIMITATIONS.md](./KNOWN_LIMITATIONS.md) for what's still
+open, including two items *not* covered by live testing: payment idempotency
+(needs a real Zarinpal `merchant_id`) and the true concurrent-request race for
+merge occupancy (needs two simultaneous real requests, not sequential calls).
+
+## 12. Security Recommendations (forward-looking)
+
+1. **Access-token denylist.** None exists today — only refresh tokens are
+   revocable (via `jti`). The 15-minute residual access-token window after
+   logout/deactivation/ban (§3) is an accepted trade-off; revisit only if a
+   specific incident needs a shorter window.
+2. **Full XSS sink audit** of every front-end `innerHTML` call to confirm all
+   external/user data passes through `esc()` (the helper itself is now
+   tested; the call-site audit is not complete). Consider moving tokens from
+   `localStorage` to memory + refresh-cookie if a stronger XSS posture is
+   needed.
 3. **Rotate secrets** regularly; ensure `CRON_SECRET`/`MAINTENANCE_KEY` are set
    in every environment (cron endpoints must never be public).
 4. **RLS everywhere**: extend Row-Level Security (started in `manual/023`) to all
@@ -159,4 +225,6 @@ flowchart LR
    log-only in places).
 6. **Pen-test the payment callback** (`/payments/callback`) — it is
    intentionally unauthenticated and relies on `authority + code + amount`
-   matching; confirm amount/authority binding is strict.
+   matching; confirm amount/authority binding is strict. Payment idempotency
+   (superseding a stale pending authority) is code-reviewed and unit-tested
+   but not exercised against a real Zarinpal `merchant_id`.
