@@ -126,7 +126,12 @@ img{display:block;max-width:100%}
 .btn-sm{padding:8px 14px;min-height:var(--touch-min);font-size:13px;border-radius:var(--r-xs)}
 
 /* ─────────── NAV (top, desktop) ─────────── */
-.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.85);backdrop-filter:blur(16px) saturate(1.2);
+/* ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): پس‌زمینه قبلاً همیشه
+   rgba(255,255,255,..) هاردکد بود — یعنی در تمِ تاریک (پیش‌فرضِ نسل‌Z، طبقِ
+   کامنتِ بالایِ همین فایل) یک نوارِ روشنِ نامتجانس روی هدر می‌نشست. حالا از
+   --glass-2 (که هر دو تم را دارد) استفاده می‌کند — دقیقاً همون توکنی که
+   .install-banner/.cmdk/.onb-card از قبل برایِ سطوحِ شیشه‌ایِ روی محتوا دارن. */
+.nav{position:sticky;top:0;z-index:100;background:var(--glass-2);backdrop-filter:blur(16px) saturate(1.2);
   -webkit-backdrop-filter:blur(16px) saturate(1.2);border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:62px}
 .logo{display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:800;font-size:19px;letter-spacing:-.04em}
@@ -454,11 +459,14 @@ img{display:block;max-width:100%}
 @media (prefers-reduced-motion: reduce){ .liked-pop{animation:none} .btn:active,.chip:active,.rc-fav:active,.nav-icn:active,.botnav-item:active{transform:none} }
 
 /* ─────────── BOTTOM NAV (mobile) ─────────── */
-.botnav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:90;background:rgba(255,255,255,.92);
-  backdrop-filter:blur(16px);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));
+/* ⚠️ رفع‌شده (همون باگِ .nav بالا): پس‌زمینه هاردکدِ سفید بود، تمِ تاریک را
+   نادیده می‌گرفت. --glass-2 جایگزین شد. */
+.botnav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:90;background:var(--glass-2);
+  backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);
+  border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));
   justify-content:space-around}
 .botnav-item{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;
-  color:var(--t3);font-size:10px;font-weight:600;padding:4px 16px;transition:color var(--t-fast)}
+  color:var(--t3);font-size:10px;font-weight:600;padding:4px 16px;transition:color var(--t-fast),transform var(--t-fast) var(--spring)}
 .botnav-item.active{color:var(--blue)}
 .botnav-item svg{width:22px;height:22px}
 

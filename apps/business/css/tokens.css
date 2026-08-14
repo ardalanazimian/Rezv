@@ -88,9 +88,15 @@
 
   /* ── focus ring یکدست (دسترسی‌پذیری) ── */
   --focus-ring: 0 0 0 2px var(--bg, #fff), 0 0 0 4px var(--brand-500);
-}
 
-  /* ── لایه ۱: Primitive — Elevation (سایه‌های لایه‌ای، ۵ سطح) ── */
+  /* ── لایه ۱: Primitive — Elevation (سایه‌های لایه‌ای، ۵ سطح) ──
+     ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): این بلاک تا امروز
+     بیرونِ :root تعریف شده بود (بعد از یک `}` زودهنگام) — یعنی از نظرِ CSS
+     نامعتبر و کاملاً بی‌اثر بود؛ هر جا که var(--elevation-*)/var(--sh-*)/
+     var(--z-*)/var(--grid-*)/var(--bp-*) بدونِ fallback استفاده می‌شد (مثلِ
+     .modal، .sheet، .switch-thumb در foundation.css) مقدار به initial
+     برمی‌گشت — یعنی z-index: var(--z-modal) عملاً auto بود، نه ۵۰۰. حالا
+     داخلِ همان :root اصلی است؛ هیچ مقداری عوض نشده، فقط واقعاً اعمال می‌شود. */
   --elevation-0: none;
   --elevation-1: 0 1px 2px rgba(11,16,32,.05), 0 1px 1px rgba(11,16,32,.03);
   --elevation-2: 0 2px 6px rgba(11,16,32,.06), 0 1px 2px rgba(11,16,32,.04);
@@ -127,6 +133,37 @@
   --z-modal: 500;
   --z-toast: 600;
   --z-tooltip: 700;
+
+  /* ── لایه ۱: Primitive — حرکت: instant (فشارِ لمسی، اضافه‌شده ۲۰۲۶-۰۸-۱۴) ──
+     fast/base/slow از قبل بودند؛ instant برایِ press-state (کارت/دکمه) کم بود. */
+  --motion-instant: 90ms;
+
+  /* ── لایه ۲: Semantic — نقش‌هایِ تایپوگرافی (اضافه‌شده ۲۰۲۶-۰۸-۱۴) ──
+     روی همون Primitiveهایِ بالا سوار است؛ چیزی جایگزین/حذف نشده — فقط
+     نقش‌هایِ معنایی برایِ کارت‌هایِ دیزایر/هیرو/اعداد اضافه شده تا هر اپ به‌جایِ
+     ترکیبِ دستیِ fs+fw+lh یک نقشِ آماده داشته باشد. Persian-first (Vazirmatn،
+     از هر اپ خودش لود می‌شود)؛ اینجا فقط اندازه/وزن/تراکم تعریف می‌شود. */
+  --type-display-size: var(--fs-4xl);
+  --type-display-weight: var(--fw-extra);
+  --type-display-lh: var(--lh-tight);
+  --type-display-ls: var(--ls-tight);
+
+  --type-title-size: var(--fs-2xl);
+  --type-title-weight: var(--fw-bold);
+  --type-title-lh: var(--lh-tight);
+  --type-title-ls: var(--ls-snug);
+
+  --type-body-size: var(--fs-lg);
+  --type-body-weight: var(--fw-normal);
+  --type-body-lh: var(--lh-normal);
+
+  --type-meta-size: var(--fs-xs);
+  --type-meta-weight: var(--fw-medium);
+  --type-meta-lh: var(--lh-snug);
+
+  --type-numeric-weight: var(--fw-bold);
+  --type-numeric-feature: tabular-nums;
+}
 
 /* احترامِ سراسری به کاهشِ حرکت — یک‌بار، درست، برای همه */
 @media (prefers-reduced-motion: reduce) {
