@@ -112,9 +112,20 @@ See [SECURITY.md](./SECURITY.md) §11 for the full list.
 
 ## 7. Testing / CI
 
-- **`test` job depends on `--test-force-exit`** because a module opens a Redis
-  client that keeps the process alive; ideally the queue/redis client should be
-  closable in tests (explicit teardown) rather than force-exiting.
+- ~~`test` job depends on `--test-force-exit`~~ **Fixed (2026-08-13).** That flag
+  was itself the cause of flaky `# tests`/`# suites` counts between identical
+  runs (fail always 0, but totals varied — e.g. 314 vs 332): `tsx --test`
+  isolates each of the 23 `tests/*.test.mts` files in its own child process,
+  and force-exit killed each child right as its own tests finished, racing
+  its stdout pipe still flushing TAP output to the parent. First attempt used
+  `--experimental-test-isolation=none` (Node 22+) — worked locally but broke
+  CI outright (`bad option`, CI pins Node 20). Final fix is version-agnostic:
+  `npm test` now runs a single wrapper file (`tests/_all.runner.mts`) that
+  imports all 23 test files for their side effects, so `tsx --test` only ever
+  sees one file — no subprocess-per-file, no race, no experimental flag, no
+  Node-version dependency. Stable across 5 consecutive runs and ~5-10x faster
+  than the old force-exit approach. `redis.ts` also gained `lazyConnect: true`
+  so importing it no longer opens a live socket for typing-only imports.
 - **E2E fully mocks the API** — it validates the customer UI/flows but not the
   real API contract end-to-end. Consider a small contract/integration suite
   against a real backend.
