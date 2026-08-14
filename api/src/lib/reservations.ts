@@ -88,9 +88,16 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 // ── بررسی اینکه یک میز در بازه‌ی [start, blockEnd) آزاد است (داخل tx) ──
 export async function createReservation(
   input: CreateReservationInput,
-  deps: { predictNoShowRisk?: NoShowPredictor } = {},
+  // ⚠️ acquireSlotLock هم به همون الگویِ NoShowPredictor تزریق می‌شود: پیش‌فرضِ
+  // production همان withSlotLockِ واقعی (که خودش حالا داخلی fail-open دارد،
+  // رجوع کن به redis.ts)؛ تست می‌تواند یک تابعِ جایگزین تزریق کند که «بدونِ
+  // قفل» مستقیم fn() را اجرا می‌کند — شبیه‌سازیِ قطعیِ Redis برایِ اثباتِ
+  // زنده‌یِ C2 (رزروِ موازی بدونِ قفل هم باید دقیقاً یک برنده داشته باشد،
+  // چون DB منبعِ حقیقت است) بدونِ نیاز به یک Redisِ واقعیِ خاموش.
+  deps: { predictNoShowRisk?: NoShowPredictor; acquireSlotLock?: typeof withSlotLock } = {},
 ) {
   const predictNoShowRisk = deps.predictNoShowRisk ?? defaultNoShowPredictor;
+  const acquireSlotLock = deps.acquireSlotLock ?? withSlotLock;
   const r = await db.restaurant.findUnique({ where: { id: input.restaurantId } });
   if (!r) throw Err.notFound('رستوران');
   if (!r.isOpen) throw Err.restaurantClosed();
@@ -223,7 +230,7 @@ export async function createReservation(
   // این فشار retry را کم می‌کند ولی صحت به دیتابیس وابسته است.
   const lockKey = `resv:${r.id}:${start.toISOString()}`;
 
-  return withSlotLock(lockKey, 8000, async () => {
+  return acquireSlotLock(lockKey, 8000, async () => {
     // ── تلاش با retry برای serialization (ترافیک بالا) ──
     let lastErr: unknown;
     for (let attempt = 0; attempt < TX_MAX_RETRIES; attempt++) {
@@ -589,8 +596,22 @@ export async function createWalkin(input: WalkinInput) {
     if (!t.isActive || t.state === 'maintenance') throw Err.tableUnavailable(t.number);
   }
 
+  // ⚠️ رفع‌شده (حسابرسیِ قراردادِ زمانی، ۲۰۲۶-۰۸-۱۴): این مسیر قبلاً block_buffer_minutes
+  // رو اصلاً ست نمی‌کرد (پیش‌فرضِ ستون = 0)، یعنی block_end این رزرو دقیقاً برابرِ
+  // slot_end بود — بدونِ زمانِ نظافت/بافرِ رستوران. برخلافِ مسیرِ آنلاین/دستی
+  // (computeRanges، همین فرمول: cleaningMinutes + bufferMinutes)، بلافاصله بعدِ
+  // slotEnd یک walk-in، همون میز بدونِ هیچ فاصله‌ای قابلِ رزروِ مجدد بود —
+  // انحرافِ واقعیِ بافر، نه فرضی (getOccupiedTableNumbers/EXCLUDE هردو رویِ
+  // block_end تکیه می‌کنن). همون فرمولِ computeRanges رو اینجا هم اعمال می‌کنیم.
+  const cfgRow = await db.restaurant.findUnique({
+    where: { id: input.restaurantId },
+    select: { cleaningMinutes: true, bufferMinutes: true },
+  });
+  if (!cfgRow) throw Err.notFound('رستوران');
+  const blockBufferMin = (cfgRow.cleaningMinutes ?? 15) + (cfgRow.bufferMinutes ?? 0);
+
   try {
-    return await createWalkinTx(input);
+    return await createWalkinTx(input, blockBufferMin);
   } catch (e) {
     // ── لایه‌ی حقیقت: اگر EXCLUDE constraint شلیک کرد، تداخل واقعی بوده ──
     // ⚠️ رفع‌شده: قبلاً هیچ catchی اینجا نبود — یک ریسِ همزمانیِ واقعی (دو
@@ -605,7 +626,7 @@ export async function createWalkin(input: WalkinInput) {
   }
 }
 
-async function createWalkinTx(input: WalkinInput) {
+async function createWalkinTx(input: WalkinInput, blockBufferMin: number) {
   return db.$transaction(async (tx) => {
     // کاربر را پیدا یا بساز (همان الگوی ورود با OTP)
     const user = await tx.user.upsert({
@@ -655,7 +676,12 @@ async function createWalkinTx(input: WalkinInput) {
       data: {
         code: genReservationCode(), restaurantId: input.restaurantId, tableId: input.tableId, userId: user.id,
         partySize: input.partySize, slotStart: now, slotEnd, status: 'seated', source: 'walkin',
-      },
+        // همان فرمولِ computeRanges (cleaningMinutes + bufferMinutes) — قراردادِ
+        // زمانی باید بینِ همه‌ی مسیرهایِ نویسنده یکی باشد وگرنه block_end
+        // (ستونِ generated که EXCLUDE/getOccupiedTableNumbers به آن تکیه می‌کنن)
+        // بینِ walk-in و رزروِ آنلاین/دستی ناهم‌سو می‌شود.
+        blockBufferMinutes: blockBufferMin,
+      } as any,
     });
 
     if (input.tableId) {

@@ -1,4 +1,8 @@
 import Redis, { Cluster } from 'ioredis';
+import { createLogger } from './logger';
+import { metrics } from './metrics';
+
+const log = createLogger('security');
 
 // ═══════════════════════════════════════════════════════════════════════
 //  لایه‌ی Redis — آماده برای single-node و Cluster (مقیاس‌پذیری افقی)
@@ -59,31 +63,74 @@ if (!g.redisShutdownHooked) {
   process.once('beforeExit', closeRedis);
 }
 
+/** حداقلِ سطحِ کلاینتی که withSlotLock نیاز دارد — برای تزریقِ یک stub در تست
+ *  (همان الگویِ NoShowPredictor در reservations.ts: پیش‌فرض = پیاده‌سازیِ واقعی،
+ *  تست یک تابعِ throwکننده تزریق می‌کند تا قطعیِ Redis را بدونِ نیاز به یک
+ *  Redisِ واقعیِ خاموش شبیه‌سازی کند). */
+type LockClient = Pick<typeof redis, 'set' | 'eval'>;
+
 /** قفل کوتاه‌مدت رزرو — لایه اول جلوگیری از double-booking.
  *  از hash-tag {} استفاده می‌کنیم تا در حالت Cluster، کلید قفل روی یک نود پایدار بماند.
  *
  *  ⚠️ باگ M6: قبلاً اگر قفل آزاد نبود بلافاصله خطای ۴۲۳ می‌داد؛ یعنی دو کاربر که
  *  هم‌زمان همان اسلات را می‌گرفتند، دومی رد می‌شد حتی اگر میز دیگری آزاد بود. حالا
  *  چند بار با backoff کوتاه تلاش می‌کنیم؛ فقط اگر واقعاً قفل طولانی نگه داشته شده
- *  خطا می‌دهیم. منبع حقیقت نهایی، تراکنش serializable در دیتابیس است. */
-export async function withSlotLock<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+ *  خطا می‌دهیم. منبع حقیقت نهایی، تراکنش serializable در دیتابیس است.
+ *
+ *  ⚠️ رفع‌شده (حسابرسیِ Time-Range/EXCLUDE/Redis-evidence، ۲۰۲۶-۰۸-۱۴): قبلاً
+ *  این تابع فقط حالتِ «قفل واقعاً در دستِ کسیِ دیگر است» را مدیریت می‌کرد
+ *  (→ Err.lockTimeout، یک ۴۲۳ی معنادار). اگر خودِ Redis در دسترس نبود
+ *  (ECONNREFUSED/timeout روی connection)، redis.set از داخلِ حلقه throw
+ *  می‌کرد، این throw تا بیرونِ createReservation leak می‌کرد، و چون ApiError
+ *  نبود errorResponse آن را ۵۰۰ی عمومی می‌داد — با اینکه طبقِ همین کامنتِ
+ *  بالا و مستنداتِ SECURITY.md، قفلِ Redis فقط بهینه‌سازی است و DB (EXCLUDE +
+ *  Serializable) منبعِ حقیقتِ ضدِ double-booking است؛ نباید رزرو با قطعیِ Redis
+ *  به‌طورِ کامل قفل شود. حالا خطایِ *در دسترس‌نبودنِ* Redis (نه رقابتِ واقعیِ
+ *  قفل) صریحاً fail-open می‌شود: بدونِ قفل، مستقیم fn() اجرا می‌شود؛ صحتِ
+ *  نهایی همچنان با EXCLUDE constraint + تراکنشِ Serializable تضمین می‌شود.
+ *
+ *  همچنین: اگر Redis دقیقاً وسطِ اجرایِ fn() قطع شود، شکستِ آزادسازیِ قفل در
+ *  finally دیگر نتیجه‌ی موفقِ fn() (مثلاً یک رزروِ واقعاً ثبت‌شده) را زیرِ یک
+ *  ۵۰۰ی گمراه‌کننده پنهان نمی‌کند — قفل خودش TTL دارد و به‌زودی منقضی می‌شود.
+ *
+ *  پارامترِ `client` فقط برایِ تزریقِ تستی است؛ تولید همیشه از پیش‌فرضِ singleton
+ *  واقعی (`redis`) استفاده می‌کند. */
+export async function withSlotLock<T>(
+  key: string,
+  ttlMs: number,
+  fn: () => Promise<T>,
+  client: LockClient = redis,
+): Promise<T> {
   const token = crypto.randomUUID();
   const lockKey = `lock:{${key}}`; // hash-tag: فقط {key} برای تعیین نود hash می‌شود
   // تلاش برای گرفتن قفل با backoff نمایی کوتاه (۵ تلاش، مجموعاً ~۳۰۰ms).
   let ok: string | null = null;
   const delays = [0, 40, 80, 120, 160];
-  for (const d of delays) {
-    if (d) await new Promise(r => setTimeout(r, d));
-    ok = await redis.set(lockKey, token, 'PX', ttlMs, 'NX');
-    if (ok) break;
+  try {
+    for (const d of delays) {
+      if (d) await new Promise(r => setTimeout(r, d));
+      ok = await client.set(lockKey, token, 'PX', ttlMs, 'NX');
+      if (ok) break;
+    }
+  } catch (e) {
+    log.warn('slot-lock: Redis در دسترس نیست، بدونِ قفل ادامه می‌دهیم (DB منبعِ حقیقتِ ضدِ double-booking است)', {
+      key, error: (e as Error).message,
+    });
+    metrics.slotLockFallback.inc();
+    return fn();
   }
   if (!ok) throw (await import('./errors')).Err.lockTimeout();
   try { return await fn(); }
   finally {
-    // فقط اگر هنوز مال خودمان است آزاد کن
-    await redis.eval(
+    // فقط اگر هنوز مال خودمان است آزاد کن — اگر همین‌جا هم Redis قطع شود،
+    // نتیجه‌ی fn() (که همین الان تمام شده) را با یک throwِ جدید خراب نمی‌کنیم.
+    await client.eval(
       `if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end`,
       1, lockKey, token,
-    );
+    ).catch((e) => {
+      log.warn('slot-lock: آزادسازیِ قفل شکست خورد (نتیجه‌یِ fn حفظ می‌شود، قفل با TTL منقضی می‌شود)', {
+        key, error: (e as Error).message,
+      });
+    });
   }
 }

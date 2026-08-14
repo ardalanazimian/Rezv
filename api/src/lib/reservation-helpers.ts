@@ -43,6 +43,24 @@ export function genReservationCode(): string {
   return out;
 }
 
+// ⚠️ یافته‌یِ واقعی (حسابرسیِ Time-Range/EXCLUDE/Redis-evidence، ۲۰۲۶-۰۸-۱۴،
+// با تستِ زنده‌یِ C2 پیدا شد، نه فرض): وقتی دو تراکنشِ Serializable *واقعاً*
+// هم‌زمان (بدونِ میانجیِ قفلِ Redis که فشارِ رقابت رو کم می‌کنه) به همون
+// ردیفِ EXCLUDE برخورد می‌کنن، Prisma همیشه PrismaClientKnownRequestError
+// با meta.code نمی‌ده — گاهی PrismaClientUnknownRequestError برمی‌گردونه که
+// کدِ SQLSTATEِ خام (مثلاً «23P01») فقط داخلِ متنِ message هست، نه در یک
+// فیلدِ ساختاریافته. isConflictError/isSerializationError این شکل رو
+// نمی‌شناختن → خطای خام تا بیرون از createReservation leak می‌کرد و
+// errorResponse یک ۵۰۰ی عمومی می‌داد، دقیقاً برایِ یک تداخلِ *واقعی* و
+// *درست‌مدیریت‌شده‌ی DB* که باید ۴۰۹ی تمیز (SLOT_FULL/TABLE_CONFLICT) می‌شد.
+function pgCodeFromUnknownRequestError(e: unknown): string | undefined {
+  if (!(e instanceof Prisma.PrismaClientUnknownRequestError)) return undefined;
+  // پیامِ خامِ Postgres چیزی شبیهِ `PostgresError { code: "23P01", ... }` دارد؛
+  // این‌جا مستقیم دنبالِ همون کدهایِ شناخته‌شده در متنِ پیام می‌گردیم.
+  const m = e.message.match(/"(23P01|40001|40P01)"/);
+  return m?.[1];
+}
+
 /** تشخیص خطاهای تداخل/exclusion/serialization دیتابیس (برای retry). */
 export function isConflictError(e: unknown): boolean {
   // 23P01 = exclusion_violation (EXCLUDE constraint ما)
@@ -56,6 +74,8 @@ export function isConflictError(e: unknown): boolean {
     }
     if (e.code === 'P2034') return true; // write conflict / deadlock در Prisma
   }
+  const unknownCode = pgCodeFromUnknownRequestError(e);
+  if (unknownCode === '23P01' || unknownCode === '40001' || unknownCode === '40P01') return true;
   return false;
 }
 
@@ -64,5 +84,6 @@ export function isSerializationError(e: unknown): boolean {
   const code = (e as { code?: string })?.code;
   if (code === '40001' || code === '40P01') return true;
   if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2034') return true;
-  return false;
+  const unknownCode = pgCodeFromUnknownRequestError(e);
+  return unknownCode === '40001' || unknownCode === '40P01';
 }

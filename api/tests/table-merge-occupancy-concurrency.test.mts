@@ -130,3 +130,81 @@ describe('همزمانیِ واقعی — رزروِ مستقیمِ میزِ ث�
     assert.equal(active.length, 1, 'باید دقیقاً یک رزروِ فعال در بازه‌ی ۲۲:۰۰ بمونه');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+//  C2 (حسابرسیِ Time-Range/EXCLUDE/Redis-evidence، ۲۰۲۶-۰۸-۱۴): همون اثباتِ
+//  همزمانیِ بالا (C1) را این‌بار با قفلِ Redisِ کاملاً غیرفعال تکرار می‌کنیم —
+//  دقیقاً همون چیزی که withSlotLock موقعِ قطعیِ واقعیِ Redis انجام می‌ده
+//  (رجوع کن به redis.ts: catch روی خطایِ connection → مستقیم fn() بدونِ قفل).
+//  به‌جایِ خاموش‌کردنِ Redisِ واقعی (که در sandbox/CI پایدار نیست و روی
+//  تست‌هایِ دیگرِ همین رانرِ مشترک که هم‌زمان از همون Redisِ singleton
+//  استفاده می‌کنن اثر می‌ذاره)، از DI همون الگویِ NoShowPredictor استفاده
+//  می‌کنیم: createReservation یک acquireSlotLock جایگزین می‌گیره که دقیقاً
+//  رفتارِ fail-openِ واقعی رو تقلید می‌کنه (بدونِ قفل، مستقیم fn()).
+//
+//  هدف: ثابت کردنِ اینکه معماریِ لایه‌ای درسته — DB (EXCLUDE + Serializable +
+//  بازچکِ اپلیکیشنی) به‌تنهایی، بدونِ هیچ کمکی از Redis، هنوز دقیقاً یک
+//  برنده تضمین می‌کنه، و بازنده یک خطایِ ساختاریافته‌ی ۴۰۹-خانواده می‌گیره
+//  نه یک throwِ خامِ ۵۰۰.
+// ═══════════════════════════════════════════════════════════════════════
+const noSlotLock = async <T>(_key: string, _ttlMs: number, fn: () => Promise<T>): Promise<T> => fn();
+
+describe('C2 — قفلِ Redis کاملاً fail-open (شبیه‌سازیِ قطعیِ Redis) — DB به‌تنهایی هنوز محافظت می‌کند', () => {
+  test('دو رزروِ موازیِ مستقیم برایِ همون میزِ ۹۰۳ (بدونِ merge، پوششِ مستقیمِ EXCLUDE)، بدونِ قفلِ Redis: دقیقاً یکی موفق می‌شه', async () => {
+    const attempt = (guestName: string) => createReservation(
+      {
+        restaurantId, date: SLOT_DATE, time: '18:00', partySize: 2,
+        guest: { name: guestName, tableNumber: 903 }, source: 'manual', notifySms: false,
+      },
+      { acquireSlotLock: noSlotLock },
+    );
+    const [r1, r2] = await Promise.allSettled([attempt('[DEMO] E'), attempt('[DEMO] F')]);
+    const results = [r1, r2];
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+
+    assert.equal(fulfilled.length, 1, 'دقیقاً یکی باید موفق بشه — حتی بدونِ قفلِ Redis');
+    assert.equal(rejected.length, 1);
+
+    // بازنده باید یک ApiErrorِ ساختاریافته باشه (کد داره)، نه یک throwِ خامِ
+    // بدونِ کد که errorResponse به ۵۰۰ی عمومی ترجمه می‌کنه.
+    const loser = rejected[0] as PromiseRejectedResult;
+    assert.ok(loser.reason?.code, `بازنده باید کدِ ساختاریافته داشته باشه، نه خطایِ خام: ${loser.reason}`);
+    assert.ok(['TABLE_CONFLICT', 'SLOT_FULL'].includes(loser.reason.code),
+      `کدِ غیرمنتظره: ${loser.reason.code}`);
+
+    const active = await db.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint AS count FROM reservations
+      WHERE restaurant_id = ${restaurantId}::uuid AND status IN ('pending','confirmed')
+        AND slot_start = (${SLOT_DATE}::date + '18:00'::time) AT TIME ZONE 'Asia/Tehran'
+    `;
+    assert.equal(Number(active[0].count), 1, 'باید دقیقاً یک رزروِ فعال در بازه‌ی ۱۸:۰۰ بمونه — بدونِ double-booking حتی بدونِ قفلِ Redis');
+  });
+
+  test('merge هم بدونِ قفلِ Redis همون تضمین رو داره: دقیقاً یکی از دو merge موازی برنده می‌شه', async () => {
+    // میزهایِ ۹۰۱/۹۰۲ رو دوباره استفاده می‌کنیم ولی رویِ یک بازه‌ی زمانیِ تازه.
+    // ⚠️ درسِ خودِ این تست (یافته‌ی واقعی حینِ توسعه، نه فرض): ۱۹:۳۰ ابتدا
+    // انتخاب شده بود ولی با بلاکِ describeِ اولِ همین فایل (رزروِ ۲۰:۰۰ روی
+    // ۹۰۱+۹۰۲، با بافرِ پیش‌فرضِ ۹۰+۱۵=۱۰۵ دقیقه یعنی اشغال تا ۲۱:۴۵) هم‌پوشانی
+    // داشت — یعنی هر دو تلاشِ موازی به‌درستی SLOT_FULL می‌گرفتن چون ۹۰۱/۹۰۲ از
+    // قبل واقعاً اشغال بودن، نه یک باگِ اپ. ۱۶:۰۰ با فاصله‌ی امن قبل از هر بلاکِ
+    // دیگرِ همین فایل (۱۸:۰۰ روی ۹۰۳، ۲۰:۰۰ و ۲۲:۰۰ روی ۹۰۱/۹۰۲) انتخاب شده.
+    const attempt = (guestName: string) => createReservation(
+      {
+        restaurantId, date: SLOT_DATE, time: '16:00', partySize: 6,
+        guest: { name: guestName }, source: 'manual', notifySms: false,
+      },
+      { acquireSlotLock: noSlotLock },
+    );
+    const [r1, r2] = await Promise.allSettled([attempt('[DEMO] G'), attempt('[DEMO] H')]);
+    const fulfilled = [r1, r2].filter((r) => r.status === 'fulfilled');
+    const rejected = [r1, r2].filter((r) => r.status === 'rejected');
+
+    assert.equal(fulfilled.length, 1);
+    assert.equal(rejected.length, 1);
+    assert.equal((rejected[0] as PromiseRejectedResult).reason?.code, 'SLOT_FULL');
+
+    const winner = (fulfilled[0] as PromiseFulfilledResult<Awaited<ReturnType<typeof attempt>>>).value;
+    assert.deepEqual([...winner.merged_tables].sort((a, b) => a - b), [901, 902]);
+  });
+});
