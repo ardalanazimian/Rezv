@@ -61,6 +61,7 @@ const API = {
   },
   overview(){ return this.get('/admin/overview'); },
   systemHealth(){ return this.get('/admin/system-health'); },
+  modelHealth(){ return this.get('/admin/ai/model-health'); },
   businessIntelligence(){ return this.get('/admin/business-intelligence'); },
   security(){ return this.get('/admin/security'); },
   abuseFlagAction(userId, action, reason){ return this.patch(`/admin/abuse-flags/${userId}`, { action, reason }); },
