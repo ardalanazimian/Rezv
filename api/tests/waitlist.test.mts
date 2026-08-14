@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 // نکته: isVipTier/tierToPriority به‌عنوان توابعِ خالصِ قابل‌تست از computePriority
 // جدا شدند (همان الگوی reservation-helpers.ts) تا این تست واقعاً کدِ اصلی را
 // اجرا کند، نه یک کپیِ دستی از آن.
-const { isVipTier, tierToPriority, medianMinutes, resolveAvgDiningMinutes } = await import('../src/lib/waitlist.ts');
+const { isVipTier, tierToPriority, medianMinutes, resolveAvgDiningMinutes, tokensEqual, assertCanActOnEntry } = await import('../src/lib/waitlist.ts');
 
 describe('isVipTier', () => {
   test('platinum و vip و gold همگی VIP محسوب می‌شوند', () => {
@@ -90,5 +90,50 @@ describe('resolveAvgDiningMinutes — قاعده‌ی ایمنی', () => {
   test('دقیقاً روی آستانه‌ی حداقلِ نمونه کار می‌کند', () => {
     const samples = Array(15).fill(90);
     assert.equal(resolveAvgDiningMinutes(samples, 75), 90);
+  });
+});
+
+describe('tokensEqual — مقایسه‌ی constant-time', () => {
+  test('توکن‌هایِ برابر → true', () => {
+    assert.equal(tokensEqual('a1b2c3', 'a1b2c3'), true);
+  });
+  test('توکن‌هایِ نابرابر (طولِ یکسان) → false', () => {
+    assert.equal(tokensEqual('a1b2c3', 'a1b2c4'), false);
+  });
+  test('طولِ متفاوت → false (بدونِ کرش)', () => {
+    assert.equal(tokensEqual('short', 'a-much-longer-token-string'), false);
+  });
+});
+
+describe('assertCanActOnEntry — رفعِ IDOR در waitlist (۲۰۲۶-۰۸-۱۳)', () => {
+  test('ورودیِ متعلق‌به‌کاربر: با callerUserIdِ درست عبور می‌کند', () => {
+    assert.doesNotThrow(() =>
+      assertCanActOnEntry({ userId: 'u1', guestAccessToken: null }, { callerUserId: 'u1' }));
+  });
+  test('ورودیِ متعلق‌به‌کاربر: بدونِ توکن (کاملاً غیرِ‌احرازشده) رد می‌شود', () => {
+    // این دقیقاً همون سوراخِ IDORِ رفع‌شده است — قبلاً callerUserIdِ نامعین
+    // (نه فقط اشتباه) بی‌صدا از کنارِ چک رد می‌شد.
+    assert.throws(() => assertCanActOnEntry({ userId: 'u1', guestAccessToken: null }, {}));
+  });
+  test('ورودیِ متعلق‌به‌کاربر: با callerUserIdِ کاربرِ دیگر رد می‌شود', () => {
+    assert.throws(() =>
+      assertCanActOnEntry({ userId: 'u1', guestAccessToken: null }, { callerUserId: 'u2' }));
+  });
+  test('ورودیِ مهمان: با guestTokenِ درست عبور می‌کند', () => {
+    assert.doesNotThrow(() =>
+      assertCanActOnEntry({ userId: null, guestAccessToken: 'tok123' }, { guestToken: 'tok123' }));
+  });
+  test('ورودیِ مهمان: بدونِ توکن رد می‌شود', () => {
+    assert.throws(() => assertCanActOnEntry({ userId: null, guestAccessToken: 'tok123' }, {}));
+  });
+  test('ورودیِ مهمان: با guestTokenِ اشتباه رد می‌شود', () => {
+    assert.throws(() =>
+      assertCanActOnEntry({ userId: null, guestAccessToken: 'tok123' }, { guestToken: 'wrong' }));
+  });
+  test('ورودیِ مهمانی که (به‌هردلیل) guestAccessToken ندارد — همیشه رد می‌شود، حتی با توکنِ کلاینت', () => {
+    // دفاعِ لایه‌دوم: اگه یه ردیفِ قدیمی/خراب guestAccessToken=null داشته باشه،
+    // نباید با هیچ توکنی قابلِ‌بایپس باشه.
+    assert.throws(() =>
+      assertCanActOnEntry({ userId: null, guestAccessToken: null }, { guestToken: 'anything' }));
   });
 });

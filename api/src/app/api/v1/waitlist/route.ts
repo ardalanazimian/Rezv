@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { joinWaitlist } from '@/lib/waitlist';
 import { authFromRequest } from '@/lib/jwt';
+import { assertUserNotBanned } from '@/lib/ban';
 import { isFeatureEnabled, featureFlagLabel } from '@/lib/feature-flags';
 import { errorResponse, Err } from '@/lib/errors';
 import { parseBody, zUuid, zPartySize, zPhone, z } from '@/lib/schemas';
@@ -25,6 +26,8 @@ export async function POST(req: Request) {
     let userId: string | undefined;
     let isStaff = false;
     try { const a = authFromRequest(req); if (a.kind === 'customer') userId = a.sub; else isStaff = true; } catch {}
+    // ⚠️ رفع‌شده: بنِ سختِ پلتفرم قبلاً رویِ پیوستن به صف چک نمی‌شد.
+    if (userId) await assertUserNotBanned(userId);
     // سوییچِ قابلیت (Company Control Plane، فازِ ۳): فقط پیوستنِ مشتری/مهمان را
     // می‌بندد؛ staff (که معمولاً مهمانِ حاضر را دستی وارد صف می‌کند) مستثناست.
     if (!isStaff && !(await isFeatureEnabled('waitlist_enabled'))) {

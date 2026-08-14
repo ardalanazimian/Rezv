@@ -15,12 +15,15 @@ function callerId(req: Request): string | undefined {
   catch { return undefined; }
 }
 
-/** POST /api/v1/waitlist/:id/accept — پذیرش آفر میز → رزرو ساخته می‌شود */
+/** POST /api/v1/waitlist/:id/accept — پذیرش آفر میز → رزرو ساخته می‌شود.
+ *  ورودیِ متعلق‌به‌کاربر: نیازِ احرازِ هویتِ مشتری. ورودیِ مهمان: نیازِ
+ *  ?token=... (guest_token همان که هنگامِ join برگردانده شد). */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const { id } = parseParams(await params, paramsSchema);
-    const result = await acceptOffer(id, 'customer', callerId(req));
+    const guestToken = new URL(req.url).searchParams.get('token') ?? undefined;
+    const result = await acceptOffer(id, 'customer', { callerUserId: callerId(req), guestToken });
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }
 }

@@ -108,9 +108,13 @@ export async function refreshWL(){
     showWaitlistStatus();
   }
 }
+// توکنِ دسترسیِ مهمان (رفعِ IDOR، migration 041) — فقط برایِ ورودی‌هایِ بدونِ
+// حساب صادر می‌شه (WL.guest_token خودش هنگامِ join از سرور می‌آد و در WL
+// ذخیره می‌مونه)؛ مشتریِ واردشده نیازی نداره چون Authorization خودکار می‌ره.
+function wlAuthQS(){ return WL?.guest_token ? `?token=${encodeURIComponent(WL.guest_token)}` : ''; }
 export async function acceptWL(){
   clearInterval(wlTimer);
-  const res=await API.post(`/waitlist/${WL.id}/accept`);
+  const res=await API.post(`/waitlist/${WL.id}/accept${wlAuthQS()}`);
   if(res.ok&&res.data){
     const code=res.data.reservation_code||'RZWL'+Math.random().toString(36).slice(2,6).toUpperCase();
     TRIPS.unshift({rid:WL.rid,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
@@ -123,11 +127,11 @@ export async function acceptWL(){
 }
 export async function declineWL(){
   clearInterval(wlTimer);
-  await API.post(`/waitlist/${WL.id}/decline`).catch(()=>{});
+  await API.post(`/waitlist/${WL.id}/decline${wlAuthQS()}`).catch(()=>{});
   toast('','آفر رد شد');WL=null;closeSheet();
 }
 export async function leaveWL(){
-  await API.request(`/waitlist/${WL.id}`,{method:'DELETE'}).catch(()=>{});
+  await API.request(`/waitlist/${WL.id}${wlAuthQS()}`,{method:'DELETE'}).catch(()=>{});
   toast('','از صف خارج شدی');WL=null;closeSheet();
 }
 

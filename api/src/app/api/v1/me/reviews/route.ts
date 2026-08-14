@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authFromRequest } from '@/lib/jwt';
 import { db } from '@/lib/db';
+import { assertUserNotBanned } from '@/lib/ban';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { ApiError, Err, errorResponse } from '@/lib/errors';
 import { parseBody, zUuid, z } from '@/lib/schemas';
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
+    await assertUserNotBanned(auth.sub); // ⚠️ رفع‌شده: قبلاً اینجا چک نمی‌شد
     await enforceRateLimit(clientIp(req), RULES.auth);
     const b = await parseBody(req, bodySchema);
 

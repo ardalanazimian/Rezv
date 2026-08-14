@@ -427,6 +427,10 @@ model WaitlistEntry {
   reservationCode String?        @map("reservation_code")
   note            String?
   createdAt       DateTime       @default(now()) @map("created_at")
+  // توکنِ دسترسیِ مهمان (رفعِ IDOR، migration 041) — فقط برایِ ورودی‌هایِ
+  // بدونِ حساب (userId=null) صادر می‌شه؛ accept/decline/leave روی این ورودی‌ها
+  // علاوه‌بر UUID، این توکن رو هم می‌خوان.
+  guestAccessToken String?       @map("guest_access_token")
   @@index([restaurantId, status, priority(sort: Desc), joinedAt])
   @@index([status, offerExpiresAt])
   @@index([userId, status])
