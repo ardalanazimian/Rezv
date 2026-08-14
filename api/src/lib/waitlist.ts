@@ -360,13 +360,14 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
 //    دقیقاً با entry.userId یکی باشه.
 //  • ورودیِ مهمان (userId=null): guestAccessTokenِ صادرشده هنگامِ join
 //    (migration 041) باید دقیقاً مطابقت کنه — مقایسه constant-time (تایمینگ-سیف).
-function tokensEqual(a: string, b: string): boolean {
+// export شده تا مستقیم (بدونِ DB) تست بشه — همون الگویِ isVipTier/tierToPriority بالا.
+export function tokensEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a);
   const bb = Buffer.from(b);
   if (ba.length !== bb.length) return false;
   return timingSafeEqual(ba, bb);
 }
-function assertCanActOnEntry(
+export function assertCanActOnEntry(
   entry: { userId: string | null; guestAccessToken: string | null },
   auth: { callerUserId?: string; guestToken?: string },
 ) {

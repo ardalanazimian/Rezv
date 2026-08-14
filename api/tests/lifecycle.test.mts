@@ -59,6 +59,22 @@ describe('canTransition — وضعیت‌های قدیمی (سازگاری)', ()
   });
 });
 
+describe('canTransition — markArrival (رزروِ چرخه‌ی حیات، ۲۰۲۶-۰۸-۱۳)', () => {
+  // markArrival حالا از طریقِ transitionReservation به checked_in منتقل می‌شه
+  // (نه تنظیمِ مستقیمِ status='arrived'ِ قدیمی). این تست‌ها دقیقاً همون
+  // مجموعه‌ی مبداءهایی رو قفل می‌کنن که کامنتِ markArrival در reservations.ts
+  // ادعا می‌کنه («auto_confirmed، preparing، running_late، confirmed →
+  // checked_in مجازند؛ pending نه») — تا رگرسیونِ سکوت‌آمیز در TRANSITIONS
+  // بلافاصله در این تست دیده بشه، نه فقط در رفتارِ زنده‌ی route.
+  test('confirmed/auto_confirmed → checked_in مجازند', () => {
+    assert.equal(canTransition('confirmed', 'checked_in'), true);
+    assert.equal(canTransition('auto_confirmed', 'checked_in'), true);
+  });
+  test('pending نمی‌تواند مستقیم checked_in شود — باید اول confirm شود', () => {
+    assert.equal(canTransition('pending', 'checked_in'), false);
+  });
+});
+
 describe('canTransition — waitlist', () => {
   test('waitlisted → confirmed مجاز است (ارتقا از صف)', () => {
     assert.equal(canTransition('waitlisted', 'confirmed'), true);

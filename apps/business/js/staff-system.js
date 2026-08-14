@@ -265,12 +265,17 @@ async function rPricing(){
     const hot=s.occupancy_pct>=70, cold=s.occupancy_pct<40;
     const tag=hot?`<span class="pr-tag hot">${icon('flame',{size:11,fill:true})} شلوغ‌ترین</span>`:cold?`<span class="pr-tag cold">${icon('chevronD',{size:11})} خلوت</span>`:'';
     const dir=cold?`<span class="pr-down">${icon('chevronD',{size:12})}</span>`:`<span class="pr-up">${icon('trending',{size:12})}</span>`;
-    const daysTxt=(s.dows||[]).map(d=>dowLbl[d]).join('،')+` · ${s.from}–${s.to}`;
+    // ⚠️ رفعِ ایمنی (بازبینیِ XSS، ۲۰۲۶-۰۸-۱۴): label/reason/from/to از API میان
+    // (P.suggestions=res.data.suggestions) — امروز بک‌اند فقط رشته‌هایِ ثابتِ
+    // فارسی می‌سازه (هیچ‌جا ورودیِ کاربر نیست)، ولی چون از سرور می‌آد و این
+    // مستقیم innerHTML می‌شه، طبقِ همون قاعده‌ی esc() که بقیه‌ی sinkهایِ API
+    // رعایت می‌کنن این‌جا هم اعمال شد — دفاعِ لایه‌دوم، نه رفعِ یک باگِ فعلاً واقعی.
+    const daysTxt=(s.dows||[]).map(d=>dowLbl[d]).join('،')+` · ${esc(s.from)}–${esc(s.to)}`;
     return `<div class="pr-sug">${tag}
-      <div class="pr-sug-top"><div><div class="pr-sug-label">${s.label}</div><div class="pr-sug-days">${daysTxt}</div></div>
+      <div class="pr-sug-top"><div><div class="pr-sug-label">${esc(s.label)}</div><div class="pr-sug-days">${daysTxt}</div></div>
         <div class="pr-sug-amt"><div class="pr-sug-amt-v">${toman(s.min_toman)}</div><div class="pr-sug-amt-l">حداقل مبلغ ${dir}</div></div></div>
       <div class="pr-occ"><span style="font-size:11px;color:var(--t3);font-weight:700">اشغال</span><div class="pr-occ-track"><div class="pr-occ-fill" style="width:${s.occupancy_pct}%;background:${occColor(s.occupancy_pct)}"></div></div><span class="pr-occ-pct">${fa(s.occupancy_pct)}٪</span></div>
-      <div class="pr-reason">${icon('message',{size:13})} ${s.reason}</div>
+      <div class="pr-reason">${icon('message',{size:13})} ${esc(s.reason)}</div>
       <div class="pr-actions"><button class="btn btn-primary" style="flex:1" id="prAcc-${i}" onclick="pricingAccept(${i})">${icon('check',{size:14})} قبول این پیشنهاد</button></div>
     </div>`;
   };

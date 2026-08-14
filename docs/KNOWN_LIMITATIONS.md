@@ -67,9 +67,18 @@
 
 ## 4. Security (open recommendations)
 
-- **Token revocation** may not be fully wired (a `jti` exists for it; access
-  tokens are short-lived). Verify logout and `Staff.isActive=false` promptly
-  invalidate sessions. **(uncertain)**
+- **Token revocation — verified, ۲۰۲۶-۰۸-۱۴.** `POST /auth/logout` revokes the
+  refresh token's `jti` (`revokeRefreshToken`); `POST /auth/refresh` checks
+  `isRefreshRevoked` on every call and re-reads `Staff.isActive`/user ban
+  status live from the DB (not from the stale refresh payload), revoking and
+  rejecting immediately if the account is now disabled or banned. **Residual
+  risk (accepted, not a bug):** an already-issued **access** token stays valid
+  for its own TTL (`signAccess` → `expiresIn: '15m'`) — a deactivated
+  staff/banned user can still use a *not-yet-expired* access token for up to
+  15 minutes after logout/ban. No access-token denylist exists (would need a
+  cache lookup on every request); the 15-minute window was judged an
+  acceptable trade-off. Revisit only if a specific incident needs a shorter
+  window.
 - **`localStorage` tokens** are XSS-exposed; every front-end `innerHTML` sink
   must escape user data (`esc()`).
 - **RLS is partial** (started in `manual/023`); not all tenant tables have it.
