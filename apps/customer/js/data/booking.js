@@ -10,6 +10,7 @@ import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js
 import { R } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
 import { genIdempotencyKey } from '../api-core.js';
+import { haptic } from '../theme-pwa.js';
 
 // ═══════════════════════════════════════════════════════════
 //  تاریخ‌های قابلِ رزرو
@@ -168,12 +169,18 @@ export async function confirmBook(id){
   let code, isOfflineDemo=false;
   if(res.ok && res.data?.code){
     // رزرو واقعی در دیتابیس ثبت شد (بک‌اند code را در سطحِ بالا برمی‌گرداند)
+    // ⚠️ هپتیکِ success فقط همین‌جا زده می‌شود — دقیقاً همون شرطی که سرور واقعاً
+    // res.ok داد؛ هیچ مسیرِ دیگری (دمو/آفلاین) این الگو را نمی‌گیرد.
     code=res.data.code;
+    haptic('success');
   } else if(res.offline){
     // بک‌اند نیست → کد محلی (حالت دمو) — این رزرو هیچ‌جا روی سرور ثبت نشده،
     // پس باید همین‌جا صریح به کاربر گفته شود (نه شبیه‌سازیِ خاموشِ موفقیت).
+    // هپتیک هم عمداً ضعیف‌تر است (light، نه success) — لمس هم نباید ادعای
+    // موفقیتِ واقعی کند.
     isOfflineDemo=true;
     code='RZ'+Math.random().toString(36).slice(2,7).toUpperCase();
+    haptic('light');
   } else {
     // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
     const isFull = res.error?.code==='SLOT_FULL' || res.error?.code==='NO_TABLE_FOR_PARTY' || /پر|ظرفیت/.test(res.error?.message||'');
@@ -204,7 +211,7 @@ export async function confirmBook(id){
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
     </div>`;
 }
-export function copyCode(c){const done=()=>toast('⧉','کد کپی شد');if(navigator.clipboard?.writeText)navigator.clipboard.writeText(c).then(done).catch(done);else done()}
+export function copyCode(c){haptic('light');const done=()=>toast('⧉','کد کپی شد');if(navigator.clipboard?.writeText)navigator.clipboard.writeText(c).then(done).catch(done);else done()}
 
 // ── نوارِ جست‌وجوی صفحه‌ی اصلی ──
 // «کِی» و «چند نفر» پیش از این سه/پنج گزینه‌ی ثابت داشتند که هیچ‌کجا خوانده

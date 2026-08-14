@@ -10,7 +10,33 @@ try{ const saved=localStorage.getItem('rz_theme'); if(saved) _root.setAttribute(
   else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches) _root.setAttribute('data-theme','light'); }catch{}
 export function toggleTheme(){ const t=_root.getAttribute('data-theme')==='dark'?'light':'dark'; _root.setAttribute('data-theme',t); try{localStorage.setItem('rz_theme',t)}catch{}; updateThemeIcon(); buzz(); }
 export function updateThemeIcon(){ const k=document.getElementById('themeKnob'); if(k) k.innerHTML=icon(_root.getAttribute('data-theme')==='dark'?'moon':'sun',{size:16}); }
-export function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms||8); }catch{} }  // پاسخِ لمسی روی موبایل
+// ═══════════════════════════════════════════════════════════
+//  هپتیک — الگوهای استاندارد (اضافه‌شده ۲۰۲۶-۰۸-۱۴، حسابرسیِ دیزاینِ Desire)
+//
+//  قبلاً فقط buzz(ms) خام بود — همه‌جا یک لرزشِ عمومیِ ۸ms، بدونِ معنا و
+//  بدونِ راهِ خاموش‌کردن. حالا:
+//   • buzz(ms) کاملاً سازگارِ عقب‌رو می‌ماند (همون امضا، همون رفتار) — فقط
+//     یک لایه‌ی احترام به کلیدِ خاموشیِ کاربر رویش اضافه شده.
+//   • haptic(name) یکی از هشت الگویِ معنادار را می‌زند؛ منبعِ واحدِ حقیقتِ
+//     «این کنش چه‌جور لمسی دارد» همینجاست، نه پراکنده در هر onclick.
+//   • rz_haptics=0 در localStorage یعنی کاربر صراحتاً خاموش کرده — هم buzz
+//     هم haptic آن را رعایت می‌کنند (وگرنه خاموش‌کردن بی‌معنا بود، چون اکثرِ
+//     نقاطِ تماس هنوز از buzz خام صدا می‌زنند).
+// ═══════════════════════════════════════════════════════════
+export function hapticsEnabled(){ try{ return localStorage.getItem('rz_haptics')!=='0'; }catch{ return true; } }
+export function buzz(ms){ try{ if(navigator.vibrate && hapticsEnabled()) navigator.vibrate(ms||8); }catch{} }  // پاسخِ لمسی روی موبایل
+const HAPTIC_PATTERNS = {
+  light:   8,             // لمسِ سبک — انتخاب/تغییرِ جزئی
+  medium:  16,            // تأییدِ متوسط
+  heavy:   [12, 30, 12],  // اقدامِ مهم/برگشت‌ناپذیر (مثلاً کنسل قطعی)
+  success: [10, 40, 10],  // فقط بعدِ موفقیتِ واقعیِ سرور (res.ok) — هرگز روی دمو
+  warning: [15, 60, 15],  // هشدار (مثلاً میز پر شد)
+  error:   [20, 40, 20, 40, 20],
+  select:  6,             // انتخابِ ساعت/گزینه (کوتاه‌ترین، پرتکرارترین)
+  like:    [8, 20, 14],   // ضربانِ قلبِ لایک (شبیهِ اینستاگرام)
+};
+/** الگویِ لمسیِ نام‌دار — رجوع کن به کامنتِ بالا. نامِ ناشناس → light. */
+export function haptic(name){ buzz(HAPTIC_PATTERNS[name] ?? HAPTIC_PATTERNS.light); }
 // ورودِ متحرک هنگام اسکرول (کارت‌ها می‌پرن تو صفحه، مثل تیک‌تاک)
 let _io;
 export function armReveals(root){
@@ -66,5 +92,6 @@ export function dismissInstall(){
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
 window.toggleTheme = toggleTheme;
 window.buzz = buzz;
+window.haptic = haptic;
 window.doInstall = doInstall;
 window.dismissInstall = dismissInstall;

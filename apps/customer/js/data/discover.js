@@ -9,7 +9,6 @@ import { renderLoyalty } from '../features/loyalty.js';
 import { renderEconomy } from '../features/economy.js';
 import { R } from '../init.js';
 import { renderFavs, renderTrips } from '../reservation.js';
-import { buzz } from '../theme-pwa.js';
 import { icon } from '../icons.js';
 import { track } from '../analytics.js';
 export function go(p){
@@ -40,12 +39,18 @@ export function cardHTML(r){
     <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${r.id})"></button>
     <span class="rc-emoji">${r.e}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
-    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${r.id},this);buzz&&buzz()">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
+    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${r.id},this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
       <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
       <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
-      <div class="rc-slots">${r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');buzz&&buzz()">${s}</button>`).join('')}</div>
+      <div class="rc-slots">${r.slots.length?r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');haptic('select')">${s}</button>`).join(''):
+        // ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): قبلاً وقتی r.slots
+        // خالی بود، اینجا هیچ چیز رندر نمی‌شد — یعنی کارت بدونِ هیچ CTAیِ
+        // اقدام می‌ماند (نه ساعتِ جعلی، نه راهِ جایگزین). حالا یک CTAِ آرام به
+        // شیتِ کاملِ رزرو (که خودش availabilityِ واقعی را از API می‌خواند) باز
+        // می‌شود — هیچ ساعتِ اختراعی نشان داده نمی‌شود.
+        `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet(${r.id});haptic('select')">ببین سانس‌ها</button>`}</div>
     </div>
   </article>`;
 }

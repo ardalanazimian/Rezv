@@ -4,8 +4,28 @@ import { esc, toast } from '../auth.js';
 import { detailSocialProof, fmtFa, go, toggleRestFav } from './discover.js';
 import { GRAD, favs, setCurRest } from './seed.js';
 import { R } from '../init.js';
-import { armReveals, buzz } from '../theme-pwa.js';
+import { armReveals, buzz, haptic } from '../theme-pwa.js';
 import { icon } from '../icons.js';
+
+// ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): دکمه‌ی اشتراک‌گذاری فقط
+// toast('لینک کپی شد') می‌داد بدونِ اینکه واقعاً چیزی کپی کند — دقیقاً همون
+// دسته‌بندیِ «فیدبکِ موفقیتِ ساختگی» که این ماموریت صریحاً ممنوع کرده. حالا
+// یا Web Share API واقعی (شیتِ اشتراکِ بومی) یا کپیِ واقعیِ آدرسِ همین صفحه.
+// توجه: این اپ deep-link به‌ازایِ هر رستوران ندارد (SPA بدونِ روتینگِ URL) —
+// پس لینکِ کپی‌شده آدرسِ کلیِ اپ است، نه لینکی که مستقیم همین رستوران را باز
+// کند؛ برای همین متنِ toast صریحاً «لینکِ رزرونو» می‌گوید، نه «لینکِ این رستوران».
+// ساختنِ deep-link واقعی (routing بر اساسِ query/hash) خارج از دامنه‌ی این
+// رفعِ نقطه‌ای است — به KNOWN_LIMITATIONS اضافه شده.
+export async function shareRestaurant(name){
+  const url = location.href;
+  if (navigator.share) {
+    try { await navigator.share({ title: name, url }); } catch { /* کاربر لغو کرد یا مرورگر رد کرد — چیزی نگو */ }
+    return;
+  }
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(() => toast('', 'لینکِ رزرونو کپی شد')).catch(() => {});
+  }
+}
 export function openRest(id){
   setCurRest(id);const r=R.find(x=>x.id===id);
   const stars=n=>Array.from({length:5},(_,i)=>icon('star',{size:13,fill:i<Math.round(n)})).join('');
@@ -14,8 +34,8 @@ export function openRest(id){
       <div class="rp-hero-mesh"></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
-        <button class="rp-hero-icon glass" onclick="buzz&&buzz();toast('','لینک کپی شد')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
-        <button class="rp-hero-icon glass" id="rpFav" onclick="buzz&&buzz();toggleRestFav(${id})" aria-pressed="${favs.has(id)}" aria-label="${favs.has(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favs.has(id)})}</button>
+        <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant('${esc(r.n)}')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
+        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav(${id})" aria-pressed="${favs.has(id)}" aria-label="${favs.has(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favs.has(id)})}</button>
       </div>
       <div class="rp-hero-emoji">${esc(r.e)}</div>
       <div class="rp-hero-overlay">
@@ -72,3 +92,4 @@ export function openRest(id){
 
 // ── نمایشِ تابعِ onclick روی window ──
 window.openRest = openRest;
+window.shareRestaurant = shareRestaurant;

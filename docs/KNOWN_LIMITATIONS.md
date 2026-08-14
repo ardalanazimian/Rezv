@@ -48,6 +48,61 @@
   status or remove to avoid confusion. **(uncertain)**
 - **Service-worker cache discipline is manual.** Forgetting to bump
   `CACHE_VERSION` ships stale assets to returning users.
+- **Customer "Desire" design audit — real bugs fixed, scope deliberately narrowed
+  (۲۰۲۶-۰۸-۱۴).** A design mission asked for an Apple/TikTok/Instagram-grade visual
+  overhaul of the customer app. The existing foundation (dark-first theme, glass
+  material, mesh gradients, spring easing, an already-photo-first `.rc` desire
+  card with scrim/heart-corner/social-proof/slot-preview) was already much closer
+  to that target than a ground-up rebuild would assume, so the actual diff is
+  targeted fixes + additive tokens, not a rewrite:
+  - **Real bug, shared across all three apps:** `shared/css/tokens.css`'s `:root`
+    closed early — elevation/shadow, grid, breakpoint, and z-index tokens sat
+    *outside* any selector and were silently inert (`.modal`/`.sheet`/
+    `.switch-thumb` shadows, every `z-index: var(--z-modal)`-style rule) since
+    the day they were added. Fixed by closing `:root` around them; no values
+    changed, they just actually apply now.
+  - **Real bug:** `.nav` (desktop header) and `.botnav` (mobile tab bar) had a
+    hardcoded `rgba(255,255,255,..)` background regardless of
+    `[data-theme="dark"]` — the default theme. Fixed to `var(--glass-2)`.
+  - **Real honesty bug:** the restaurant-detail share button called
+    `toast('','لینک کپی شد')` without ever copying anything — a fabricated
+    success claim. Fixed with `navigator.share`/real clipboard copy of the
+    current URL. **Residual, left out of scope:** this app has no per-restaurant
+    deep-link (no URL routing), so the copied link opens the app, not the
+    specific restaurant — the toast copy says "لینکِ رزرونو" (Rezervno's link),
+    not "لینکِ این رستوران", to stay honest about what was actually copied.
+    Building real deep-linking is a separate, larger change.
+  - **Real gap:** a discover-feed card with zero preview slots (`r.slots`
+    empty) rendered no call-to-action at all. Fixed with a calm "ببین سانس‌ها"
+    fallback that opens the real availability sheet — never an invented time.
+  - **New:** a canonical named-haptics layer (`haptic(name)` in
+    `theme-pwa.js`: light/medium/heavy/success/warning/error/select/like) plus
+    an `rz_haptics=0` off-switch that both `haptic()` and the pre-existing
+    `buzz(ms)` respect. `buzz()` itself is unchanged in signature/behavior.
+    Wired at the two sites explicitly flagged as gaps (slot select, copy-code)
+    plus the fav/like toggle and the success-booking path — `success` fires
+    **only** on a real `res.ok`; the offline/demo path fires `light`, never
+    `success`. The ~15 pre-existing generic `buzz&&buzz()` call sites elsewhere
+    (share/message/chat/waitlist buttons, loyalty action cards) were
+    deliberately **not** migrated to named patterns — out of scope, still
+    functional as-is.
+  - **Additive-only token layer:** typography role tokens
+    (`--type-display-*`/`--type-title-*`/`--type-body-*`/`--type-meta-*`/
+    `--type-numeric-*`) and `--motion-instant` were added to
+    `shared/css/tokens.css`. `apps/customer/css/app.css`'s own long-standing,
+    already-tuned local scale (`--r-*`, `--sh-*`, `--t1`/`--t2`/`--t3`, etc.)
+    was **not** force-migrated onto the new tokens — the literal sizes don't
+    line up 1:1, and a blind swap would have been a visual regression, not a
+    polish. A real migration is a separate, measured follow-up.
+  - **Explicitly deferred (documented, not attempted):** the botnav IA
+    restructure suggested by the mission (merge "اعتبار" under "باشگاه", add a
+    "من" tab, cap at 4 tabs) — the panel already has 5 tabs and no "من" tab.
+    Doing this safely needs new routing/rendering work across `go()`/`economy`/
+    `loyalty`, which is real product surgery, not safe polish; left as a
+    residual per the mission's own "implement if low-risk, otherwise document"
+    instruction. Full hero/sheet/mood-rail rebuilds were similarly out of
+    scope — those surfaces were already close to the target and audited for
+    correctness rather than restyled.
 
 ## 3. Backend / Domain
 
