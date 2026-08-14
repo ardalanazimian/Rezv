@@ -40,7 +40,10 @@ export type AuditAction =
   // ── Company Control Plane (فازِ ۳) — سوییچ‌هایِ قابلیت (kill-switch) ──
   | 'feature_flag.update'
   // ── Company Control Plane (فازِ ۴) — ویرایشگرِ قواعدِ اقتصاد ──
-  | 'economy_rule.update';
+  | 'economy_rule.update'
+  // ── تأییدِ ساعتِ کاری (Part 3) — رستوران پیشنهاد می‌دهد، شرکت تأیید/رد می‌کند.
+  //    تغییرِ ساعتِ زنده روی برندازِ پلتفرم اثر مستقیم دارد؛ باید ردِ انسانی داشته باشد.
+  | 'hours.proposed' | 'hours.approved' | 'hours.rejected';
 
 type AuditEntry = {
   action: AuditAction;

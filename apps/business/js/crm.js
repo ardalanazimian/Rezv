@@ -651,26 +651,68 @@ function callCustomer(phone){ if(phone) window.location.href='tel:'+phone; }
 // ترتیب نمایش برای کاربر ایرانی: شنبه تا جمعه.
 const HOURS_DOW_ORDER=[6,0,1,2,3,4,5];
 const HOURS_DOW_FA={0:'یکشنبه',1:'دوشنبه',2:'سه‌شنبه',3:'چهارشنبه',4:'پنجشنبه',5:'جمعه',6:'شنبه'};
-let HOURS_STATE={opening_hours:null,timezone:'Asia/Tehran',closures:[]};
+// ⚠️ بازطراحی‌شده (Part 3 — تأییدِ ساعتِ کاری، ۲۰۲۶-۰۸-۱۴): PUT /restaurant/hours
+// دیگر ساعتِ زنده را مستقیم نمی‌نویسد (رجوع کن به توضیحِ همان route) — پس این
+// فرم هم دیگر روی opening_hours (زنده) ادیت نمی‌کند. یک draft جداگانه اضافه
+// شد که کاربر رویش کار می‌کند و با «ارسال» به‌عنوانِ پیشنهاد می‌رود؛
+// opening_hours فقط برای نمایشِ مرجعِ «چیزی که مشتری الان می‌بیند» می‌ماند.
+let HOURS_STATE={opening_hours:null,pending_opening_hours:null,hours_change_status:null,hours_change_reason:null,timezone:'Asia/Tehran',closures:[],draft:null};
 let _hoursLoaded=false, _hoursDirty=false;
 
 async function loadHours(){
   if(!API.getToken()) return;
   const res=await API.hoursGet();
   if(res.ok && res.data){
-    HOURS_STATE={opening_hours:res.data.opening_hours||{}, timezone:res.data.timezone||'Asia/Tehran', closures:res.data.closures||[]};
+    const d=res.data;
+    HOURS_STATE={
+      opening_hours: d.opening_hours||{},
+      pending_opening_hours: d.pending_opening_hours||null,
+      hours_change_status: d.hours_change_status||null,
+      hours_change_reason: d.hours_change_reason||null,
+      timezone: d.timezone||'Asia/Tehran',
+      closures: d.closures||[],
+      // اگه پیشنهادی در جریانه (pending یا rejected)، فرم از رویِ همون پیشنهاد
+      // باز می‌شه — کاربر داره رویِ پیشنهادِ خودش ادامه می‌ده، نه از ساعتِ
+      // زنده‌ی قدیمی دوباره شروع می‌کنه.
+      draft: JSON.parse(JSON.stringify(d.pending_opening_hours || d.opening_hours || {})),
+    };
     _hoursLoaded=true; _hoursDirty=false;
   }
 }
-
+/** خلاصه‌ی متنیِ فشرده‌ی یک openingHours — برای نمایشِ مرجعِ «ساعتِ زنده». */
+function formatHoursCompact(oh){
+  oh=oh||{};
+  return HOURS_DOW_ORDER.map(d=>{
+    const shifts=oh[d];
+    if(!Array.isArray(shifts)) return `${HOURS_DOW_FA[d]}: —`;
+    if(!shifts.length) return `${HOURS_DOW_FA[d]}: تعطیل`;
+    return `${HOURS_DOW_FA[d]}: ${shifts.map(s=>`${esc(s[0])}–${esc(s[1])}`).join('،')}`;
+  }).join(' · ');
+}
+function hoursStatusBannerHTML(){
+  if(HOURS_STATE.hours_change_status==='pending'){
+    return `<div class="cash-note">${icon('clock',{size:14})} پیشنهادِ تغییرِ ساعتِ کاری در انتظارِ تأییدِ شرکته — تا اون‌موقع مشتری‌ها همچنان ساعتِ کاریِ فعلی (پایین) رو می‌بینن.</div>`;
+  }
+  if(HOURS_STATE.hours_change_status==='rejected'){
+    return `<div style="background:var(--red-50);border:1px solid #FECACA;border-radius:12px;padding:12px 16px;font-size:13px;color:#B91C1C;margin-bottom:20px;display:flex;align-items:flex-start;gap:8px">
+      <span style="margin-top:1px">${icon('alert',{size:14})}</span>
+      <div><div style="font-weight:700;margin-bottom:2px">پیشنهادِ قبلی رد شد</div>${HOURS_STATE.hours_change_reason?esc(HOURS_STATE.hours_change_reason):'دلیلی ثبت نشده'}<div style="margin-top:4px;font-size:12px;color:#991B1B">پایین ویرایش کن و دوباره برای تأیید بفرست.</div></div>
+    </div>`;
+  }
+  return '';
+}
 function profRenderHours(){
   const el=document.getElementById('pt-hours'); if(!el) return;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
-  const oh=HOURS_STATE.opening_hours||{};
+  const oh=HOURS_STATE.draft||{};
   el.innerHTML=`
+    ${hoursStatusBannerHTML()}
     <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">ساعات کاری هفتگی</div><div class="panel-sub">هر روز می‌تواند چند شیفت (مثلاً ناهار/شام) داشته باشد</div></div>
-        <button class="btn btn-primary btn-sm" onclick="saveHours()">ذخیره</button></div>
+      <div class="panel-head"><div><div class="panel-title">ساعات کاری هفتگی</div><div class="panel-sub">${HOURS_STATE.hours_change_status?'این فرم پیشنهادِ توئه — بعد از ارسال باید شرکت تأیید کنه تا زنده بشه':'هر روز می‌تواند چند شیفت (مثلاً ناهار/شام) داشته باشد'}</div></div>
+        <button class="btn btn-primary btn-sm" onclick="saveHours()">${icon('checkCircle',{size:14})} ارسالِ پیشنهاد برای تأیید</button></div>
+      ${HOURS_STATE.hours_change_status?`<div style="background:var(--green-50);border:1px solid #BBF7D0;border-radius:12px;padding:10px 14px;font-size:12px;color:#15803D;margin:0 0 16px">
+        <div style="font-weight:700;margin-bottom:3px">${icon('check',{size:12})} ساعتِ کاریِ زنده (چیزی که مشتری الان می‌بینه)</div>${formatHoursCompact(HOURS_STATE.opening_hours)}
+      </div>`:''}
       ${HOURS_DOW_ORDER.map(d=>{
         const shifts=oh[d]||[];
         const isOpen=Array.isArray(oh[d]);
@@ -706,14 +748,17 @@ function profRenderHours(){
         </div>`).join(''):'<div style="text-align:center;color:var(--t2);font-size:12.5px;padding:16px">تعطیلی خاصی ثبت نشده</div>'}
     </div>`;
 }
+// ⚠️ Part 3: این چهار تابع دیگر opening_hours (زنده) را دستکاری نمی‌کنند —
+// روی HOURS_STATE.draft کار می‌کنند تا ادیت هیچ‌وقت مستقیم ساعتِ زنده را
+// عوض نکند (فقط «ارسالِ پیشنهاد» در saveHours آن را می‌فرستد).
 function toggleHoursDay(d){
-  const oh=HOURS_STATE.opening_hours=HOURS_STATE.opening_hours||{};
+  const oh=HOURS_STATE.draft=HOURS_STATE.draft||{};
   if(Array.isArray(oh[d])) delete oh[d]; else oh[d]=[['12:00','23:00']];
   _hoursDirty=true; profRenderHours();
 }
-function addHoursShift(d){ (HOURS_STATE.opening_hours[d]=HOURS_STATE.opening_hours[d]||[]).push(['12:00','23:00']); _hoursDirty=true; profRenderHours(); }
-function removeHoursShift(d,i){ HOURS_STATE.opening_hours[d]?.splice(i,1); _hoursDirty=true; profRenderHours(); }
-function updateHoursShift(d,i,pos,val){ if(HOURS_STATE.opening_hours[d]?.[i]){ HOURS_STATE.opening_hours[d][i][pos]=val; _hoursDirty=true; } }
+function addHoursShift(d){ (HOURS_STATE.draft[d]=HOURS_STATE.draft[d]||[]).push(['12:00','23:00']); _hoursDirty=true; profRenderHours(); }
+function removeHoursShift(d,i){ HOURS_STATE.draft[d]?.splice(i,1); _hoursDirty=true; profRenderHours(); }
+function updateHoursShift(d,i,pos,val){ if(HOURS_STATE.draft[d]?.[i]){ HOURS_STATE.draft[d][i][pos]=val; _hoursDirty=true; } }
 function addClosure(){
   const date=document.getElementById('closureDate')?.value;
   const reason=document.getElementById('closureReason')?.value.trim();
@@ -725,9 +770,15 @@ function addClosure(){
 function removeClosure(i){ HOURS_STATE.closures.splice(i,1); _hoursDirty=true; profRenderHours(); }
 async function saveHours(){
   if(!API.getToken()){ toast('','برای ذخیره باید وارد شده باشی'); return; }
-  const res=await API.hoursSave({opening_hours:HOURS_STATE.opening_hours, closures:HOURS_STATE.closures});
-  if(res.ok){ _hoursDirty=false; toast('','ساعات کاری ذخیره شد'); }
-  else{ toast('', res.error?.message||'ذخیره ناموفق بود'); }
+  // ⚠️ Part 3: این دیگر «ذخیره‌ی زنده» نیست — پیشنهاد می‌فرستد. بک‌اند
+  // (PUT /restaurant/hours) خودش pending می‌سازد، اینجا فقط draft را می‌فرستد.
+  const res=await API.hoursSave({opening_hours:HOURS_STATE.draft, closures:HOURS_STATE.closures});
+  if(res.ok){
+    _hoursDirty=false;
+    toast('','پیشنهادِ ساعتِ کاری برایِ تأییدِ شرکت ارسال شد — تا تأیید نشه چیزی برایِ مشتری عوض نمی‌شه');
+    await loadHours(); profRenderHours(); // تازه‌سازی برای نمایشِ بنرِ «در انتظار تأیید»
+  }
+  else{ toast('', res.error?.message||'ارسال ناموفق بود'); }
 }
 
 // ─── تب سیاستِ کنسلی (وصل به GET/PUT /restaurant/cancellation-policy واقعی) ───

@@ -46,20 +46,26 @@ function openStatusMenu(i){
     <div class="status-opts">${opts}</div>
     <button class="btn btn-ghost btn-block" style="margin-top:12px" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه‌ی تغییرات</button>`);
 }
-async function changeStatus(i,to){
+// ⚠️ گسترش‌یافته (Tonight Board، ۲۰۲۶-۰۸-۱۴): پارامترِ reason اضافه شد تا
+// «لغو» بتواند دلیل را هم در همین مسیرِ واحدِ optimistic-update+rollback
+// به بک‌اند بفرستد (به‌جایِ اینکه cancelRes/doCancelRes مسیرِ جدا و
+// ناقصِ خودشان را داشته باشند — رجوع کن به یافته‌ی reservations.js).
+async function changeStatus(i,to,reason){
   const r=RES[i]; if(!r)return;
   closeModal();
   // به‌روزرسانی خوش‌بینانه‌ی UI
-  const old=r.status; r.status=to;
+  const old=r.status, oldReason=r.cancelReason; r.status=to;
+  if(reason) r.cancelReason=reason;
   // ثبت محلی در تاریخچه (برای نمایش در حالت دمو)
   r._events=r._events||[{toStatus:old,actor:'system',createdAt:new Date(Date.now()-3600000).toISOString(),isAutomatic:false}];
-  r._events.push({toStatus:to,actor:'staff',createdAt:new Date().toISOString(),isAutomatic:false});
+  r._events.push({toStatus:to,actor:'staff',createdAt:new Date().toISOString(),isAutomatic:false,reason});
   renderResList();
   toast('',`وضعیت به «${STATUS_META[to]?.label||to}» تغییر کرد`);
   // ارسال به بک‌اند؛ فقط اگر سرور آنلاین بود و خطای واقعی داد، برگردان
   if(r.code){
-    const res=await API.request(`/restaurant/reservations/${r.code}/status`,{method:'PATCH',body:JSON.stringify({status:to})});
-    if(!res.ok&&!res.offline){ r.status=old; r._events.pop(); renderResList(); toast('','تغییر وضعیت ناموفق بود'); }
+    const body={status:to}; if(reason) body.reason=reason;
+    const res=await API.request(`/restaurant/reservations/${r.code}/status`,{method:'PATCH',body:JSON.stringify(body)});
+    if(!res.ok&&!res.offline){ r.status=old; r.cancelReason=oldReason; r._events.pop(); renderResList(); toast('','تغییر وضعیت ناموفق بود — دوباره تلاش کن'); }
   }
 }
 async function viewHistory(i){

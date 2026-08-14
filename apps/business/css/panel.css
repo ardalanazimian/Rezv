@@ -157,7 +157,11 @@ img{display:block;max-width:100%}
 .tl-tag.vip{background:var(--amber-50);color:#D97706}
 .tl-tag.new{background:var(--blue-50);color:var(--blue)}
 .tl-meta{font-size:12px;color:var(--t2);margin-top:3px}
-.tl-actions{display:flex;gap:7px;margin-top:10px}
+.tl-actions{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
+/* ⚠️ اضافه‌شده (Part 2 — Tonight Board، ۲۰۲۶-۰۸-۱۴): دکمه‌های عملیاتیِ تخته‌ی
+   امشب باید «فربه» و آسان‌لمس باشند (حداقل ۴۴px طبقِ راهنمای دسترسی‌پذیریِ
+   لمسی) — فقط روی تبِ امروز اعمال می‌شود (resItemHTML با flag isTonight). */
+.btn-tonight{min-height:44px;padding:9px 16px;font-size:13px}
 .chip-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 11px;border-radius:50px}
 .chip-status.arrived{background:var(--green-50);color:#16A34A}
 .chip-status.confirmed{background:var(--blue-50);color:var(--blue)}

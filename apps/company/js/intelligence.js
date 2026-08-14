@@ -771,6 +771,7 @@ async function enterAdminPanel(demo){
     // فقط وقتی دیده می‌شود که کاربر اتفاقی وارد آن صفحه شود.
     refreshSalesBadge();
     refreshPhotoBadge();
+    refreshHoursChangeBadge();
   }
   rOverview();
   toast('','خوش آمدید · پنل شرکت');
@@ -801,10 +802,11 @@ if (API.getToken()) {
     const active = document.querySelector('.view.active');
     if (active) {
       const id = active.id.replace('v-', '');
-      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, systemhealth:rSystemHealth, aihealth:rModelHealth, security:rSecurity, support:rSupport, badges:rBadges, missions:rMissions})[id]?.();
+      ({overview:rOverview, restaurants:rRestaurants, detail:rDetail, analytics:rAnalytics, customers:rCustomers, billing:rBilling, sales:loadSales, photos:loadPhotos, hours:loadHoursChanges, systemhealth:rSystemHealth, aihealth:rModelHealth, security:rSecurity, support:rSupport, badges:rBadges, missions:rMissions})[id]?.();
     }
     refreshSalesBadge();
     refreshPhotoBadge();
+    refreshHoursChangeBadge();
   })();
 } else {
   setAdminGateLocked(true);

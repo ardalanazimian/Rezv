@@ -16,7 +16,7 @@ import { redis } from './redis';
 import { Err } from './errors';
 import { availabilityKey } from './availability-cache';
 import { ACTIVE_RESERVATION_STATUSES } from './reservation-status';
-import { filterTimesByHours, zonedTimeToUtc, type OpeningHours } from './hours';
+import { filterTimesByHours, generateTimesFromHours, zonedTimeToUtc, type OpeningHours } from './hours';
 
 /** پیکربندیِ زمان‌بندیِ رستوران — مدت سانس، بافر، نظافت، هولد. */
 export interface TimingConfig {
@@ -93,9 +93,17 @@ export async function computeAndCacheAvailability(restaurantId: string, date: st
   const closureSet = new Set(closures.map(c => (c.closure_date instanceof Date
     ? c.closure_date.toISOString().slice(0, 10)
     : String(c.closure_date).slice(0, 10))));
-  const times = filterTimesByHours(
+  // ⚠️ Part 1 (حسابرسیِ صداقتِ سانس، ۲۰۲۶-۰۸-۱۴): اگر شیفتِ همین روز صریحاً در
+  // ساعتِ کاریِ رستوران تعریف شده باشد، سانس‌ها را مستقیماً با گامِ ۳۰دقیقه‌ای
+  // از خودِ شیفتِ واقعی می‌سازیم (generateTimesFromHours) — نه فقط زیرمجموعه‌ای
+  // از یک لیستِ ثابتِ ۱۱تایی که تصادفاً داخلِ شیفت می‌افتد. اگر آن روز تعریف
+  // نشده (رفتارِ قدیمیِ «همیشه باز»، تابع null برمی‌گرداند)، به رفتارِ قبلی
+  // (SERVICE_TIMES فیلترشده) برمی‌گردیم — مستند و عمدی، نه یک miss.
+  const hoursForDay = (r.openingHours as OpeningHours | null) ?? null;
+  const generated = generateTimesFromHours(hoursForDay, date, r.timezone ?? 'Asia/Tehran', closureSet);
+  const times = generated ?? filterTimesByHours(
     SERVICE_TIMES,
-    (r.openingHours as OpeningHours | null) ?? null,
+    hoursForDay,
     date,
     r.timezone ?? 'Asia/Tehran',
     closureSet,

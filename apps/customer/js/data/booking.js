@@ -48,6 +48,7 @@ export function openBookSheet(id){
   const dateSel = dates.some(d=>d.iso===bookingCtx.date) ? bookingCtx.date : dates[0].iso;
   openSheet(`
     <div class="bs-head"><div class="bs-title">رزرو میز</div><div class="bs-rest">${esc(r.n)}</div></div>
+    <div id="bwDemoBanner"></div>
     <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${id})">${
       dates.map(d=>`<option value="${d.iso}"${d.iso===dateSel?' selected':''}>${esc(d.label)}</option>`).join('')
     }</select></div>
@@ -60,6 +61,30 @@ export function openBookSheet(id){
   `);
   refreshSlots(id);
 }
+// ⚠️ اضافه‌شده (Part 1 — حسابرسیِ صداقتِ سانس، ۲۰۲۶-۰۸-۱۴): قبلاً وقتی
+// availabilityِ واقعی در دسترس نبود (آفلاین، بدونِ slug، یا شکستِ درخواست)،
+// این سه ساعتِ ثابت («۱۹:۰۰»، «۲۰:۰۰»، «۲۱:۰۰») بدونِ هیچ نشانه‌ای دقیقاً
+// عینِ سانس‌هایِ واقعی رندر می‌شدند — یعنی «صداقتِ آفلاین/دمو» که در بقیه‌ی
+// اپ رعایت می‌شه (مثلاً پیامِ صریحِ isOfflineDemo در تأییدِ رزرو) اینجا
+// نقض می‌شد. حالا هم متنِ گزینه‌ها صریحاً «(نمونه)» می‌گیرند، هم یک بنرِ
+// هشدارِ قابل‌دیدن (همون زبانِ بصریِ warning-soft که بقیه‌ی اپ استفاده
+// می‌کنه) بالایِ شیت ظاهر می‌شه.
+function showDemoTimesBanner(){
+  const b=document.getElementById('bwDemoBanner');
+  if(b)b.innerHTML=`<div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:12.5px;line-height:1.7;text-align:center;margin-bottom:10px">⚠️ ساعت‌هایِ زیر نمونه‌اند، نه سانسِ واقعیِ این رستوران — به availabilityِ زنده وصل نشدیم.</div>`;
+}
+function hideDemoTimesBanner(){
+  const b=document.getElementById('bwDemoBanner');
+  if(b)b.innerHTML='';
+}
+const FALLBACK_TIMES=['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰'];
+function renderDemoTimeOptions(sel,r){
+  showDemoTimesBanner();
+  // value همان زمانِ خام می‌ماند (رفتارِ قبلی، دست‌نخورده) — «(نمونه)» فقط در
+  // متنِ نمایشی اضافه می‌شود، وگرنه اگر بعداً واقعاً submit شود، رشته‌ی
+  // غیرمعتبر («۱۹:۰۰ (نمونه)») به‌جایِ زمانِ خام به بک‌اند می‌رفت.
+  sel.innerHTML=(r.slots.length?r.slots:FALLBACK_TIMES).map(s=>`<option value="${s}">${s} (نمونه)</option>`).join('');
+}
 // بارگذاری ساعت‌های واقعاً موجود از /restaurants/{slug}/availability
 export async function refreshSlots(id){
   const r=R.find(x=>x.id===id);
@@ -67,7 +92,7 @@ export async function refreshSlots(id){
   if(!sel)return;
   // اگر slug نداریم (حالت آفلاین/نمونه)، از همون slots نمونه استفاده کن
   if(!r.slug || !API.online){
-    sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');
+    renderDemoTimeOptions(sel,r);
     return;
   }
   // مقدارِ select حالا خودش ISO است — نه کلمه‌ای که باید حدس زده شود.
@@ -75,6 +100,7 @@ export async function refreshSlots(id){
   const partyVal=parseInt(document.getElementById('bwParty')?.value,10)||2;
   // هر تغییرِ کاربر بلافاصله در زمینه‌ی مشترک می‌نشیند تا رستورانِ بعدی هم بداند
   setBookingCtx({ date: apiDate, party: partyVal });
+  hideDemoTimesBanner();
   sel.innerHTML='<option>در حال بررسی...</option>';
   const res=await API.get(`/restaurants/${r.slug}/availability?date=${apiDate}&party=${partyVal}`);
   if(res.ok && Array.isArray(res.data?.slots)){
@@ -82,6 +108,7 @@ export async function refreshSlots(id){
     if(open.length){
       sel.innerHTML=open.map(s=>`<option value="${s.time}">${faTime(s.time)}</option>`).join('');
     }else{
+      // خالیِ صادقانه: هیچ ساعتِ اختراعی جایگزینش نمی‌شه.
       sel.innerHTML='<option value="">ساعت خالی برای این روز نیست</option>';
     }
     // ساعت‌های پر را هم نشان بده ولی غیرفعال
@@ -89,8 +116,9 @@ export async function refreshSlots(id){
       const o=document.createElement('option');o.value='';o.disabled=true;o.textContent=`${faTime(s.time)} (پر)`;sel.appendChild(o);
     });
   }else{
-    // اگر availability در دسترس نبود، از نمونه fallback
-    sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');
+    // درخواستِ availability شکست خورد (نه اینکه واقعاً سانسِ خالی نبود) —
+    // همون رفتارِ دمو/فال‌بک، تا کاربر این را با «امشب واقعاً پره» اشتباه نگیرد.
+    renderDemoTimeOptions(sel,r);
   }
 }
 export function faTime(t){return (t||'').replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);}
