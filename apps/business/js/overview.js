@@ -342,9 +342,13 @@ function renderInsights(){
   // پر می‌شود (data.js: loadWeekdayInsightForDashboard)؛ اگر داده کافی
   // نباشد null می‌ماند و این کارت به‌جایِ ادعایِ ساختگی، اصلاً نشان داده نمی‌شود.
   if(WEEKDAY_INSIGHT) insights.push({ic:'trending',t:WEEKDAY_INSIGHT.t,d:WEEKDAY_INSIGHT.d,c:'info'});
+  // ⚠️ رفعِ XSS defense-in-depth: WEEKDAY_INSIGHT.t/.d از پاسخِ واقعیِ سرور
+  // (AI Restaurant Manager) پر می‌شه — بقیه‌ی insightها محلی/هاردکدن، ولی
+  // چون هردو در همین آرایه مخلوط می‌شن، escِ یکسان روی همه امن‌تره (روی
+  // متنِ فارسیِ بدونِ کاراکترِ خاص، esc() بی‌اثر و بی‌ضرره).
   document.getElementById('insights').innerHTML=insights.slice(0,4).map(i=>`
-    <div class="insight insight-${i.c}"><span class="insight-ic">${icon(i.ic,{size:16})}</span>
-      <div><div class="insight-t">${i.t}</div><div class="insight-d">${i.d}</div></div></div>`).join('');
+    <div class="insight insight-${esc(i.c)}"><span class="insight-ic">${icon(i.ic,{size:16})}</span>
+      <div><div class="insight-t">${esc(i.t)}</div><div class="insight-d">${esc(i.d)}</div></div></div>`).join('');
 }
 
 // ── یادداشت کارکنان (واقعی، از /restaurant/notes) ──

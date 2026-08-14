@@ -80,7 +80,7 @@ function refreshLogoDisplay(){
   const useImg=logoPhoto && logoPhoto.status==='approved';
   const swEmoji=document.getElementById('swEmoji');
   if(swEmoji){
-    if(useImg){swEmoji.style.background='transparent';swEmoji.innerHTML=`<img src="${logoPhoto.url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9px">`}
+    if(useImg){swEmoji.style.background='transparent';swEmoji.innerHTML=`<img src="${esc(logoPhoto.url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9px">`}
     else{swEmoji.style.background=RESTAURANT.logoGradient;swEmoji.textContent=RESTAURANT.logoEmoji}
   }
 }
@@ -90,7 +90,7 @@ function profRenderGallery(){
     <!-- هویت رستوران: نام + لوگو -->
     <div class="identity-card">
       <div class="identity-logo" style="background:${logoPhoto?'transparent':RESTAURANT.logoGradient}">
-        ${logoPhoto?`<img src="${logoPhoto.url}" alt="logo">`:RESTAURANT.logoEmoji}
+        ${logoPhoto?`<img src="${esc(logoPhoto.url)}" alt="logo">`:RESTAURANT.logoEmoji}
       </div>
       <div class="identity-info">
         <div class="identity-name">${esc(RESTAURANT.name)}</div>
@@ -170,7 +170,7 @@ function openLogoEditor(){
     <div class="modal-title">${icon('palette',{size:18})} تغییر لوگو</div>
     <div class="modal-sub">عکسِ لوگو رو آپلود کن — بعد از تأییدِ تیم رزرونو (مثلِ بقیه‌ی گالری) روی صفحه‌ی رستورانت می‌شینه</div>
     <div class="logo-preview" id="logoPreview" style="background:${logoPhoto?'transparent':logoChoice.gradient}">
-      ${logoPhoto?`<img src="${logoPhoto.url}" alt="">`:logoChoice.emoji}
+      ${logoPhoto?`<img src="${esc(logoPhoto.url)}" alt="">`:logoChoice.emoji}
     </div>
     ${logoPhoto?`<div class="gal-status gal-status--${logoPhoto.status}" style="position:static;display:inline-flex;margin-top:8px;width:fit-content${logoPhoto.status==='approved'?';background:rgba(5,150,105,.94)':''}">${icon(logoPhoto.status==='approved'?'check':logoPhoto.status==='pending'?'clock':'info',{size:11})} ${esc(logoPhoto.statusLabel||logoPhoto.status)}</div>`:''}
     <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="document.getElementById('logoInput').click()" id="logoUploadBtn">${icon('upload',{size:15})} ${logoPhoto?'آپلودِ عکسِ جدید':'آپلود عکس لوگو'}</button>

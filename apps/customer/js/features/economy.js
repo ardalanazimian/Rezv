@@ -7,7 +7,7 @@
 import { API, isLoggedIn } from '../api.js';
 import { fmtFa } from '../data/discover.js';
 import { armReveals, buzz } from '../theme-pwa.js';
-import { toast } from '../auth.js';
+import { esc, toast } from '../auth.js';
 import { icon } from '../icons.js';
 
 // نمادِ اعتبار — عمداً آیکونِ SVG (نه ایموجی) و اسمِ متفاوت از tierهایِ وفاداری.
@@ -32,8 +32,8 @@ function missionCard(m){
   return `<div class="loy-action-card reveal" style="align-items:flex-start;cursor:default">
     <div class="lac-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)">${icon('sparkle',{size:20})}</div>
     <div class="lac-body" style="flex:1">
-      <div class="lac-title">${m.title}</div>
-      ${m.description ? `<div class="lac-sub">${m.description}</div>` : ''}
+      <div class="lac-title">${esc(m.title)}</div>
+      ${m.description ? `<div class="lac-sub">${esc(m.description)}</div>` : ''}
       <div class="loy-prog" style="margin-top:8px"><div class="loy-prog-fill" style="width:${pct}%;background:${m.completed?'var(--success,#16A34A)':undefined}"></div></div>
       <div class="lac-sub" style="margin-top:6px">${rewardBits.join(' + ')}</div>
     </div>

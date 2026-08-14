@@ -4,6 +4,7 @@
 //  نشان‌ها همیشه ثابت بودند (مستقل از امتیازِ واقعیِ کاربر). دیگر هیچ عددی
 //  اینجا هاردکد نیست.
 import { API, isLoggedIn } from '../api.js';
+import { esc } from '../auth.js';
 import { fmtFa } from '../data/discover.js';
 import { PERKS, setPts } from '../data/seed.js';
 import { openGiftCards, openReferral, openRewardsDates } from './rewards.js';
@@ -85,7 +86,7 @@ export async function renderLoyalty(){
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای تو</div></div>
     <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">نشان‌ها</div></div>
-    <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${b.emoji}</div><div class="bdg-name">${b.name}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
+    <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${b.emoji}</div><div class="bdg-name">${esc(b.name)}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
   </div>`;
   setTimeout(()=>{const f=document.querySelector('.loy-prog-fill');if(f)f.style.width=f.dataset.w+'%'},300);
   // شمارشِ متحرکِ امتیاز (حسِ دستاورد)

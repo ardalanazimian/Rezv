@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { rateLimit, clientIp, rateLimitHeaders, RULES, isBanned, recordViolation, rateLimitInMemory } from '@/lib/ratelimit';
+import { clientIp, rateLimitHeaders, RULES, isBanned, recordViolation, rateLimitWithFallback } from '@/lib/ratelimit';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ این middleware به ioredis (از طریق ratelimit/redis) وابسته است که به
@@ -121,23 +121,19 @@ export async function middleware(req: NextRequest) {
   }
 
   // ── لایه ۳: ریت‌لیمیت سراسری — اگر Redis قطع شد، fallback به in-memory (نه fail-open کامل) ──
-  let result: Awaited<ReturnType<typeof rateLimit>> | null = null;
-  try {
-    result = await rateLimit(ip, RULES.globalPerIp);
-  } catch {
-    // Redis در دسترس نبود → به‌جای عبورِ کامل، سقفِ حداقلیِ in-memory (ضدِ DDoS پایه)
-    result = rateLimitInMemory(ip, RULES.globalPerIp);
-  }
-  if (result && !result.allowed) {
+  // A3: از rateLimitWithFallback رد می‌شه (متمرکز در ratelimit.ts) تا هم
+  // middleware هم enforceRateLimitِ سطحِ route دقیقاً همون متریک/لاگِ
+  // fallback رو تولید کنن — قبلاً این try/catch جدا از enforceRateLimit
+  // بود و enforceRateLimit اصلاً fallback نداشت (رجوع کن به ratelimit.ts).
+  const result = await rateLimitWithFallback(ip, RULES.globalPerIp, 'middleware');
+  if (!result.allowed) {
     await recordViolation(ip).catch(() => {});
     return applySecurityHeaders(blocked('تعداد درخواست بیش از حد مجاز. کمی صبر کن.', 429, result.retryAfterSec), origin);
   }
 
   const res = applySecurityHeaders(NextResponse.next(), origin);
-  if (result) {
-    for (const [k, v] of Object.entries(rateLimitHeaders(result, RULES.globalPerIp))) {
-      res.headers.set(k, v);
-    }
+  for (const [k, v] of Object.entries(rateLimitHeaders(result, RULES.globalPerIp))) {
+    res.headers.set(k, v);
   }
   // هدر trace-id برای ردیابی درخواست (handlerها و لاگ‌ها از آن استفاده می‌کنند)
   const traceId = req.headers.get('x-trace-id') || crypto.randomUUID().replace(/-/g, '');

@@ -284,7 +284,7 @@ async function rPricing(){
     ${dataSourceNote()}
     <div class="pr-banner"><h3>${icon('sparkle',{size:16,fill:true})} پیشنهاد بر اساس داده‌ی شما</h3><p>${P.hasData?'این پیشنهادها از الگوی شلوغیِ ۹۰ روز اخیرِ خودت ساخته شدن — نه حدس.':'هنوز داده‌ی کافی نداری؛ این‌ها پیشنهادِ اولیه‌ست. با ثبت رزروها دقیق‌تر می‌شن.'} هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.</p></div>
     <div id="prSugs">${(P.suggestions.length?P.suggestions:[]).map(sugCard).join('')||'<div class="pr-empty">فعلاً پیشنهادی نیست. با ثبت رزروِ بیشتر، سیستم الگوها رو پیدا می‌کنه.</div>'}</div>
-    ${P.rules.length?`<div class="pr-active"><div class="pr-active-h">${icon('check',{size:13})} قواعدِ فعالِ فعلی</div>${P.rules.map(r=>`<div class="pr-active-row"><span>${r.label||((r.dows||[]).map(d=>dowLbl[d]).join('،'))}</span><b>${toman(r.min_toman)} تومان</b></div>`).join('')}</div>`:''}
+    ${P.rules.length?`<div class="pr-active"><div class="pr-active-h">${icon('check',{size:13})} قواعدِ فعالِ فعلی</div>${P.rules.map(r=>`<div class="pr-active-row"><span>${esc(r.label||((r.dows||[]).map(d=>dowLbl[d]).join('،')))}</span><b>${toman(r.min_toman)} تومان</b></div>`).join('')}</div>`:''}
     <div class="pr-note">${icon('info',{size:13})} رقبا مثل SevenRooms این رو «قیمت‌گذاری پویا» می‌گن و بابتش پول می‌گیرن. با یه نگاه می‌بینی کجا پول از دست می‌دی (میز خالی) و کجا می‌تونی بیشتر دربیاری (شب شلوغ).</div>`;
 }
 function pricingAccept(i){
