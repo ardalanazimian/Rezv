@@ -21,6 +21,13 @@
 }
 /* ═══════════ تمِ تاریک (پیش‌فرضِ نسل‌Z) ═══════════ */
 [data-theme="dark"]{
+  /* ⚠️ اضافه‌شده (R5 — حسابرسیِ دارک‌مود، ۲۰۲۶-۰۸-۱۴): بدونِ color-scheme،
+     مرورگر ویجت‌هایِ بومی (پاپ‌آپِ گزینه‌هایِ <select>، اسکرول‌بار) را بر
+     اساسِ تمِ سیستم‌عاملِ کاربر رنگ می‌زند، نه data-theme همین صفحه — یعنی
+     اگر سیستم‌عاملِ کاربر روشن باشد ولی این اپ را تاریک گذاشته باشد،
+     لیستِ بازشده‌ی «کِی»/«چند نفر» با پس‌زمینه‌ی سفیدِ بومی رندر می‌شد
+     (نه توکن‌های خودِ اپ) — دقیقاً چیزی که select/option در R5 اشاره کرده.*/
+  color-scheme: dark;
   --bg:#08050F; --white:rgba(255,255,255,.07);
   --t1:#FFFFFF; --t2:#CBBEF2; --t3:#8F84B8;
   --s-50:rgba(255,255,255,.04); --s-100:rgba(255,255,255,.07); --s-200:rgba(255,255,255,.10);
@@ -42,6 +49,7 @@
 }
 /* ═══════════ تمِ روشن ═══════════ */
 [data-theme="light"]{
+  color-scheme: light; /* رجوع به توضیحِ همینِ تگ در بلوکِ [data-theme="dark"] */
   --bg:#EEE9FA; --white:#FFFFFF;
   /* --t3 در تمِ روشن ۲٫۶۷:۱ بود (اندازه‌گیری‌شده روی .hcard-meta، .event-desc و
      برچسبِ .botnav-item) — زیرِ آستانه‌ی ۴٫۵ در WCAG 1.4.3 AA. همان رنگ‌مایه با
@@ -180,6 +188,10 @@ img{display:block;max-width:100%}
    معیارِ ۲.۵.۵ خودِ عنصرِ تعاملی را می‌سنجد، و کاربر هم مستقیم به متن می‌زند. */
 .search-field input,.search-field select{border:none;outline:none;background:none;font-size:13px;color:var(--t2);width:100%;cursor:pointer;padding:0;
   min-block-size:var(--touch-min);font-family:inherit}
+/* ⚠️ اضافه‌شده (R5): placeholder بدونِ رنگِ صریح به opacityِ پیش‌فرضِ
+   مرورگر روی رنگِ خودِ ورودی تکیه می‌کند — بینِ مرورگرها ناهمسان و در
+   بعضی ترکیب‌ها زیرِ آستانه‌ی خوانایی. رنگش را مستقیم از توکنِ سوم می‌گیریم. */
+.search-field input::placeholder{color:var(--t3);opacity:1}
 .search-field{justify-content:center}
 .search-go{width:48px;height:48px;border-radius:50%;background:var(--blue);border:none;cursor:pointer;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;color:#fff;transition:all var(--t);box-shadow:var(--sh-blue)}
@@ -514,6 +526,7 @@ img{display:block;max-width:100%}
 .inp{width:100%;padding:12px 15px;border:1.5px solid var(--border);border-radius:var(--r-sm);outline:none;
   font-size:14px;color:var(--t1);transition:border-color var(--t-fast);margin-bottom:14px;background:var(--white)}
 .inp:focus{border-color:var(--blue)}
+.inp::placeholder{color:var(--t3);opacity:1} /* R5: رجوع به توضیحِ .search-field input::placeholder */
 .summary{background:var(--s-50);border:1px solid var(--border);border-radius:var(--r);padding:15px;margin-bottom:18px}
 .sum-row{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}
 .sum-row+.sum-row{border-top:1px solid var(--border)}
@@ -562,6 +575,9 @@ img{display:block;max-width:100%}
 .rp-section{padding:22px 0;border-bottom:1px solid var(--border)}
 .rp-section h3{font-size:18px;font-weight:800;letter-spacing:-.02em;margin-bottom:14px}
 .rp-about{color:var(--t2);line-height:1.7;font-size:15px}
+/* وضعیتِ خالیِ صادقانه برایِ بخش‌های درباره/منو/نظرها — وقتی رستورانِ زنده
+   این فیلدها را ندارد (رجوع کن به mapApiRestaurant در api.js) */
+.rp-empty{color:var(--t3);font-size:13.5px;line-height:1.7;padding:4px 0}
 .feat-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .feat{display:flex;align-items:center;gap:7px;padding:8px 13px;background:var(--s-50);border-radius:var(--r-sm);font-size:13px;font-weight:600;color:var(--t1)}
 /* menu preview */

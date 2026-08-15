@@ -20,17 +20,39 @@ export function renderFavs(){
   if(!list.length){grid.innerHTML='';empty.style.display='block';return}
   empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.querySelectorAll('.rc').forEach(c=>c.classList.add('in'));
 }
-// تبدیل وضعیت رزرو API به وضعیت فرانت‌اند
-// enum واقعی بک‌اند: pending/confirmed/arrived/no_show/cancelled_by_user/cancelled_by_restaurant
+// ⚠️ رفع‌شده (R3 — حسابرسیِ صداقتِ سفرها، ۲۰۲۶-۰۸-۱۴): enumِ واقعیِ بک‌اند
+// (api/src/lib/lifecycle.ts) بسیار بزرگ‌تر از چهار وضعیتی است که این تابع
+// می‌شناخت — از جمله دقیقاً همان چیزی که اکثرِ رزروهای واقعی به آن می‌رسند:
+// 'completed' و 'cancelled' (ساده، بدونِ پسوندِ by_user/by_restaurant —
+// آن دو پسونددار طبقِ خودِ lifecycle.ts «قدیمی»اند). چون این تابع آن‌ها را
+// نمی‌شناخت، همه‌شان به‌طورِ پیش‌فرض 'up' (پیش‌رو) می‌گرفتند — یعنی یک رزروِ
+// کاملاً تمام‌شده یا واقعاً لغوشده تا ابد در تبِ «پیش‌رو»یِ کاربر می‌ماند.
+// حالا نگاشت صریح است؛ فقط وضعیتِ واقعاً ناشناخته (که یعنی enum بعداً عوض
+// شده) به‌صورتِ امن 'up' می‌ماند، نه چون فراموش شده، چون مستند است.
+const TRIP_STATUS_MAP = {
+  // پیش‌رو یا هم‌اکنون در جریان — هنوز به نتیجه‌ی نهایی نرسیده
+  pending:'up', waitlisted:'up', confirmed:'up', auto_confirmed:'up',
+  preparing:'up', checked_in:'up', running_late:'up', seated:'up', dining:'up',
+  // تجربه‌شده — arrived (قدیمی) از قبل همین‌جا بود، دست‌نخورده ماند
+  completed:'done', arrived:'done',
+  // لغوشده/بی‌نتیجه — 'cancelled' وضعیتِ فعلیِ واقعیِ لغو است (نه _by_user/_by_restaurant)
+  cancelled:'cancelled', auto_cancelled:'cancelled', rejected:'cancelled', expired:'cancelled',
+  no_show:'cancelled', noshow:'cancelled',
+  cancelled_by_user:'cancelled', cancelled_by_restaurant:'cancelled', // قدیمی
+};
 export function mapTripStatus(apiStatus){
-  if(apiStatus==='arrived')return'done';
-  if(apiStatus==='no_show'||apiStatus==='cancelled_by_user'||apiStatus==='cancelled_by_restaurant')return'cancelled';
-  return'up'; // pending/confirmed → پیش‌رو
+  return TRIP_STATUS_MAP[apiStatus] || 'up'; // وضعیتِ ناشناخته → پیش‌فرضِ امن، نه حدسِ لغو/تمام‌شده
 }
 // نگاشت رزرو API به ساختار trip فرانت‌اند
 export function mapApiTrip(apiR){
-  // پیدا کردن رستوران متناظر در R (با اسم) برای اموجی/گرادیان
-  const rest=R.find(x=>x.n===apiR.restaurant?.name);
+  // ⚠️ رفع‌شده (R3): قبلاً رستورانِ متناظر فقط با تطبیقِ *اسم* پیدا می‌شد —
+  // اگر دو رستوران اسمِ یکسان داشتند (یا حتی یک فاصله‌ی اضافه)، به رستورانِ
+  // اشتباه وصل می‌شد (ایموجی/گرادیانِ غلط، و بدتر: repeatReservation روی
+  // رستورانِ اشتباه). GET /me/reservations در include خودش restaurantId
+  // (کلیدِ اصلی) را همیشه برمی‌گرداند (Prisma بدونِ select صریح همه‌ی
+  // اسکالرها را می‌دهد) — همان را اول امتحان می‌کنیم؛ فقط اگر R هنوز از
+  // نمونه پر بود (id عددی، UUID مچ نمی‌شود) به slug برمی‌گردیم.
+  const rest=R.find(x=>x.id===apiR.restaurantId) || (apiR.restaurant?.slug ? R.find(x=>x.slug===apiR.restaurant.slug) : null);
   // تبدیل تاریخ ISO به نمایش فارسی ساده
   let dateStr='',timeStr='';
   if(apiR.slotStart){
@@ -45,6 +67,10 @@ export function mapApiTrip(apiR){
     _grad:rest?rest.id:null,
     date:dateStr||'—',
     time:timeStr||'—',
+    // ⚠️ اضافه‌شده (R2): زمانِ خامِ ISO برایِ تقویم — parseTripDateTime قبلاً
+    // همیشه «فردا» حدس می‌زد چون هیچ‌جا زمانِ واقعی ذخیره نمی‌شد. رجوع کن به
+    // features/trips.js برایِ استفاده.
+    slotStartIso: apiR.slotStart || null,
     party:faNum((apiR.partySize||2))+' نفر',
     code:apiR.code||'—',
     status:mapTripStatus(apiR.status),
@@ -97,7 +123,7 @@ export async function renderTrips(){
     const swipe=t.status==='up'?{cls:'cancel',ic:'close',label:'لغو رزرو'}
       :(t.status!=='cancelled'&&t.rid)?{cls:'repeat',ic:'calendar',label:'رزرو مجدد'}:null;
     const acts=t.status==='up'
-      ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR('${esc(t.code)}','${esc(name)}')">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}')">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip('${esc(t.code)}',this)">لغو</button>`
+      ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR('${esc(t.code)}','${esc(name)}')">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','${esc(t.slotStartIso||'')}')">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip('${esc(t.code)}',this)">لغو</button>`
       : t.status==='cancelled' ? ''
       : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation(${t.rid})">رزرو مجدد</button><button class="btn btn-sm btn-ghost" onclick="openRest(${t.rid})">ثبت نظر</button>`:''}`;
     return `<div class="trip-card reveal ${t.status}${swipe?' has-swipe':''}">

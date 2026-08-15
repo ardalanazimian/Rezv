@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════
 import { API, USER, isLoggedIn, syncNavPoints, userName } from '../api.js';
 import { closeSheet, esc, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
-import { fmtFa } from './discover.js';
+import { doSearch, fmtFa } from './discover.js';
 import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js';
 import { R } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
@@ -147,10 +147,17 @@ export function startBook(id){
   openSheet(bookStep2(R.find(x=>x.id===id)));
 }
 export function bookStep2(r){
+  // ⚠️ رفع‌شده (R1): وقتی رستوران منویی ثبت نکرده (r.menu=[])، قبلاً این
+  // بخش با عنوانِ «پیش‌سفارش» و یک .opt-row کاملاً خالی رندر می‌شد — یعنی
+  // شبیهِ یک باگِ بارگذاری، نه «این رستوران منو ندارد». حالا کلِ بخش با
+  // منویِ خالی اصلاً نشان داده نمی‌شود.
+  const preorderBlock = r.menu.length
+    ? `<div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
+    <div class="opt-row">${r.menu.map(m=>`<div class="opt" onclick="this.classList.toggle('sel')">${m[0]} ${m[1]}</div>`).join('')}</div>`
+    : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
-    <div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
-    <div class="opt-row">${r.menu.map(m=>`<div class="opt" onclick="this.classList.toggle('sel')">${m[0]} ${m[1]}</div>`).join('')}</div>
+    ${preorderBlock}
     <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3(${r.id})">ادامه</button>`;
 }
 // wrapperِ سراسری: onclick در scope سراسری اجرا می‌شود و به R (ماژولی) دسترسی ندارد،
@@ -178,6 +185,22 @@ export async function confirmBook(id){
     setTimeout(()=>openLogin(),400);
     return;
   }
+  // ⚠️ اضافه‌شده (R8 — حسابرسیِ صداقتِ confirmBook، ۲۰۲۶-۰۸-۱۴): این دو
+  // فیلد قبلاً اصلاً خوانده نمی‌شدند — کاربر می‌توانست نامش را پاک کند یا
+  // موبایلِ نامعتبر بنویسد و «تأیید رزرو» بی‌هیچ خطایی موفق می‌شد، چون این
+  // مقادیر هیچ‌جا submit نمی‌شدند. برایِ رزروِ مشتریِ واردشده، بک‌اند هویت
+  // را از JWT می‌گیرد (نه از این ورودی‌ها)، پس نمی‌فرستیمشان — ولی حداقل
+  // نباید بگذاریم کاربر با فیلدِ خالی/نامعتبر رد شود، وگرنه صفحه‌ی «تأیید
+  // اطلاعات» یک ادعای توخالی است. (محدودیتِ شناخته‌شده در KNOWN_LIMITATIONS
+  // ثبت شده: ویرایشِ این دو فیلد چیزی در رزرو تغییر نمی‌دهد.)
+  const nameVal=(document.getElementById('bkName')?.value||'').trim();
+  const phoneRaw=(document.getElementById('bkPhone')?.value||'').trim();
+  const phoneNorm=phoneRaw.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'');
+  if(!nameVal){ toast('','اسمت رو بنویس'); return; }
+  // این فیلد از حسابِ کاربر پیش‌پر می‌شود و ممکن است بین‌المللی ذخیره شده
+  // باشد (+۹۸...، دقیقاً شکلِ USER.phone) — نه فقط فرمِ محلیِ ۰۹...؛ رجوع
+  // کن به auth.js:sendOtp که فقط ورودیِ تازه‌ی کاربر را محلی می‌خواهد.
+  if(!/^(0|98)?9\d{9}$/.test(phoneNorm)){ toast('','شماره موبایلِ معتبر بنویس (مثل ۰۹۱۲۳۴۵۶۷۸۹)'); return; }
   // وضعیت در حال ارسال
   const sheetBody=document.getElementById('sheetBody');
   const confirmBtn=sheetBody.querySelector('.btn-primary');
@@ -260,6 +283,13 @@ export function syncSearchCtx(){
     date: when?.value || bookingCtx.date,
     party: parseInt(party?.value,10) || bookingCtx.party,
   });
+  // ⚠️ اضافه‌شده (R4): قبلاً تغییرِ «کِی»/«چند نفر» فقط bookingCtx را
+  // می‌نوشت و کاربر باید دکمه‌ی جست‌وجو را می‌زد تا سرنخی از تأثیرش ببیند.
+  // حالا هدرِ نتایج بلافاصله زمان/تعدادِ جدید را نشان می‌دهد — اگر صفحه‌ی
+  // کشف روی صفحه نباشد (مثلاً کاربر در صفحه‌ی رستوران است)، doSearch به‌طورِ
+  // بی‌خطر روی عنصرهایِ نامعتبر no-op می‌شود (querySelector آن‌ها را پیدا
+  // نمی‌کند)، پس نیازی به چک‌کردنِ صفحه‌ی فعلی نیست.
+  if(document.getElementById('sQ')) doSearch();
 }
 
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──

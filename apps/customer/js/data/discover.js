@@ -2,8 +2,8 @@
 import { API } from '../api.js';
 import { esc, toast, undoSnack } from '../auth.js';
 import { openRest } from './detail.js';
-import { quickBook } from './booking.js';
-import { GRAD, favs, saveFavs, pts } from './seed.js';
+import { labelForISO, quickBook } from './booking.js';
+import { GRAD, bookingCtx, favs, saveFavs, pts } from './seed.js';
 import { renderProfile } from '../features/food-dna.js';
 import { renderLoyalty } from '../features/loyalty.js';
 import { renderEconomy } from '../features/economy.js';
@@ -259,23 +259,32 @@ export function renderDiscoverSections(){
   renderEvents();
   // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
   const sub=document.querySelector('#page-discover .section-sub');
-  if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+  if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال · ${searchCtxLabel()}`;
   // چیپِ امتیاز عمداً اینجا نوشته نمی‌شود: منبعِ واحدش syncNavPoints در
   // api.js است که مقدار را از /me/loyalty می‌گیرد. نوشتنِ ptsِ محلی اینجا
   // باعث می‌شد مهمانِ ناشناس عددِ ساختگی ببیند (باگِ ۳۴۰).
   if (pts > 0) { const np=document.getElementById('navPts'); if(np) np.textContent=fmtFa(pts); }
+}
+// ⚠️ اضافه‌شده (R4 — حسابرسیِ جست‌وجو، ۲۰۲۶-۰۸-۱۴): انتخاب‌هایِ «کِی»/«چند
+// نفر» در نوارِ جست‌وجو قبلاً bookingCtx را می‌نوشتند ولی هیچ‌جای نتایج
+// این را نشان نمی‌داد — کاربر «فردا شب، ۴ نفر» را انتخاب می‌کرد و نتایج
+// همچنان می‌گفتند «۱۲ رستوران فعال»، بدونِ اشاره به این‌که این عدد اصلاً
+// بر اساسِ آن انتخاب فیلتر نشده (doSearch فقط رویِ متن فیلتر می‌کند).
+// این خط الان صریح می‌گوید نتایج برایِ چه زمان/چند‌نفری نمایش داده می‌شود.
+function searchCtxLabel(){
+  return `${labelForISO(bookingCtx.date)} · ${fmtFa(bookingCtx.party)} نفر`;
 }
 export function doSearch(){
   const q=document.getElementById('sQ').value.trim();
   const sub=document.querySelector('#page-discover .section-sub');
   if(!q){
     document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
-    if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+    if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال · ${searchCtxLabel()}`;
     renderFeed(R);return;
   }
   const list=R.filter(r=>r.n.includes(q)||r.cuisine.includes(q)||r.vibes.some(v=>v.includes(q)));
   document.getElementById('feedTitle').textContent=`نتایج «${q}»`;
-  if(sub) sub.textContent=list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد';
+  if(sub) sub.textContent=(list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد')+` · ${searchCtxLabel()}`;
   if(list.length){ renderFeed(list); return; }
   // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
   // می‌داد — کاربر شش کارت می‌دید و گمان می‌کرد این‌ها نتیجه‌ی جست‌وجویش‌اند.
