@@ -41,6 +41,7 @@ async function main() {
         vibes: [...r.vibes], clubPrefix: r.prefix, cbBasePct: r.cb,
         city: r.loc.city, district: r.loc.district, address: r.loc.address,
         latitude: r.loc.lat, longitude: r.loc.lng,
+        smsBalance: 50,
         tables: { create: Array.from({ length: 12 }, (_, i) => {
           const n = i + 1;
           const cap = i < 4 ? 2 : i < 9 ? 4 : i < 11 ? 6 : 8;
@@ -115,7 +116,8 @@ async function main() {
                 restaurantId: rest.id, tableId: table.id, userId: user.id,
                 partySize: Math.floor(Math.random() * 4) + 2,
                 slotStart: start, slotEnd: end,
-                status: daysAgo < 1 ? 'confirmed' : 'arrived', source: 'app',
+                status: daysAgo < 1 ? 'confirmed' : 'arrived',
+                source: 'app',
               },
             });
             break;
