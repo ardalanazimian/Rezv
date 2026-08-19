@@ -170,28 +170,33 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('e2e/package-lock.json') }}
 
+      # ⚠️ وابستگی‌های سیستمی جدا از دانلودِ مرورگر — و بدونِ retry.
+      # چرا: `install-deps` زیرِ پوسته apt-get را با کاربرِ root اجرا می‌کند.
+      # اگر وسطِ کار با timeout کشته شود، فرزندِ apt-get زنده می‌ماند و قفلِ
+      # /var/lib/apt/lists/lock را نگه می‌دارد؛ آن‌وقت هر تلاشِ بعدی بلافاصله
+      # با «Could not get lock» می‌شکند. این دقیقاً در اجرای قبلی رخ داد و
+      # retry را از کمک به ضرر تبدیل کرد. پس apt یک‌بار و بدونِ قطع اجرا شود.
+      - name: Install Playwright OS deps
+        timeout-minutes: 10
+        run: npx playwright install-deps chromium webkit
+
+      # فقط دانلودِ باینریِ مرورگر retry می‌شود — این بخش است که به CDN وابسته
+      # است، گیر می‌کند، و قطع‌کردنش هیچ حالتِ نیمه‌کاره‌ای باقی نمی‌گذارد.
+      # با cache hit اصلاً اجرا نمی‌شود.
       - name: Install Playwright browsers
-        # سقفِ مرحله‌ای به‌عنوانِ تورِ ایمنی. داخلش هم سه تلاش با سقفِ ۴ دقیقه:
-        # گیرکردنِ CDN گذراست، پس تلاشِ دوباره درستش می‌کند — به‌جای اینکه کلِ
-        # PR بابتِ یک هنگِ شبکه‌ای قرمز شود. با cache hit فقط وابستگی‌های
-        # سیستمی نصب می‌شوند (بدونِ دانلودِ مرورگر).
-        timeout-minutes: 15
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 18
         run: |
-          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
-            cmd="npx playwright install-deps chromium webkit"
-          else
-            cmd="npx playwright install --with-deps chromium webkit"
-          fi
           for attempt in 1 2 3; do
-            echo "::group::نصبِ مرورگر — تلاشِ $attempt"
-            if timeout 240 $cmd; then
+            echo "::group::دانلودِ مرورگر — تلاشِ $attempt"
+            if timeout 300 npx playwright install chromium webkit; then
               echo "::endgroup::"; exit 0
             fi
             echo "::endgroup::"
-            echo "::warning::تلاشِ $attempt برای نصبِ مرورگر شکست خورد/گیر کرد؛ دوباره تلاش می‌کنم"
-            sleep 10
+            echo "::warning::تلاشِ $attempt برای دانلودِ مرورگر شکست خورد/گیر کرد؛ دوباره تلاش می‌کنم"
+            sleep 15
           done
-          echo "::error::نصبِ مرورگرِ Playwright بعد از ۳ تلاش موفق نشد"
+          echo "::error::دانلودِ مرورگرِ Playwright بعد از ۳ تلاش موفق نشد"
           exit 1
 
       - name: Run E2E tests
