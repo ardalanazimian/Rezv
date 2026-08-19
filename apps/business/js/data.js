@@ -242,6 +242,24 @@ const API = {
   menuCreate(body){ return this.post('/restaurant/menu', body); },
   menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
   menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  /**
+   * QRِ منویِ عمومی — خروجی SVG است، نه JSON، پس نمی‌تواند از `request()`
+   * (که همیشه `res.json()` می‌زند) عبور کند و fetchِ مستقیم لازم دارد.
+   * شکلِ خروجی عمداً همان قراردادِ بقیه است ({ok,data}/{ok:false,...}) تا
+   * فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
+   */
+  async menuQrSvg(size){
+    if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
+    try{
+      const res = await fetch(this.base + '/api/v1/restaurant/menu/qr?size=' + encodeURIComponent(size||512), {
+        headers: { Authorization: 'Bearer ' + this._token },
+      });
+      if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{ svg: await res.text(), url: decodeURI(res.headers.get('X-Menu-Url') || '') } };
+    }catch{
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
   addNote(body){ return this.post('/restaurant/notes', body); },
   pinNote(id, pinned){ return this.patch('/restaurant/notes', { id, pinned }); },
   deleteNote(id){ return this.delete('/restaurant/notes?id='+encodeURIComponent(id)); },

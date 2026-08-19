@@ -1,6 +1,6 @@
 // ساختِ JSON-LD (schema.org) از دادهٔ واقعیِ رستوران — تابعِ خالص و قابل‌تست.
 // فقط فیلدهایی که داده دارند emit می‌شوند (بدونِ null/خالی → schemaِ معتبر).
-import type { RestaurantDetail, RestaurantListItem } from './api';
+import type { MenuItem, RestaurantDetail, RestaurantListItem } from './api';
 
 const SITE = 'https://rezervno.ir';
 
@@ -83,6 +83,57 @@ export function faqJsonLd(items: FaqItem[]): object {
   };
 }
 
+/**
+ * مبلغِ تومان → ریال، ارزی که در ISO 4217 با کدِ IRR ثبت شده.
+ *
+ * ⚠️ باگِ واقعیِ رفع‌شده (۲۰۲۶-۰۸-۱۹): قبلاً `price_toman` مستقیم با
+ * `priceCurrency: 'IRR'` منتشر می‌شد. تومان واحدِ رسمی نیست — ۱ تومان = ۱۰
+ * ریال — پس هر قیمتی در JSON-LD **یک‌دهمِ** مقدارِ واقعی اعلام می‌شد. یعنی
+ * چلوکبابِ ۱۸۵٬۰۰۰ تومانی به گوگل «۱۸۵٬۰۰۰ ریال» (≈۱۸٬۵۰۰ تومان) معرفی
+ * می‌شد. دادهٔ ساختاریافته‌ی غلط بدترین نوعِ غلط است: خودش را درست جا می‌زند.
+ */
+export function tomanToRial(priceToman: number): number {
+  return priceToman * 10;
+}
+
+/**
+ * schema.org Menu با بخش‌بندیِ واقعی بر اساسِ `category` هر آیتم.
+ *
+ * قبلاً همه‌ی آیتم‌ها در **یک** MenuSectionِ بی‌نام ریخته می‌شدند، حتی وقتی
+ * رستوران‌دار دسته‌بندی کرده بود — پس ساختاری که در پنل ساخته شده بود به
+ * خزنده نمی‌رسید. آیتم‌هایِ بدونِ دسته در یک بخشِ بی‌نام می‌مانند (نه یک
+ * نامِ ساختگیِ «سایر»).
+ */
+export function menuJsonLd(items: MenuItem[], menuId: string): object {
+  const sections = new Map<string, MenuItem[]>();
+  for (const m of items) {
+    const key = m.category || '';
+    const list = sections.get(key);
+    if (list) list.push(m); else sections.set(key, [m]);
+  }
+
+  const hasMenuSection = [...sections.entries()].map(([name, list]) => {
+    const section: Record<string, unknown> = {
+      '@type': 'MenuSection',
+      hasMenuItem: list.map((m) => {
+        const item: Record<string, unknown> = {
+          '@type': 'MenuItem',
+          name: m.name,
+          offers: { '@type': 'Offer', price: tomanToRial(m.price_toman), priceCurrency: 'IRR' },
+        };
+        // فقط وقتی رستوران‌دار واقعاً پرشان کرده — نه رشته‌ی خالی.
+        if (m.description) item.description = m.description;
+        if (m.image_url) item.image = m.image_url;
+        return item;
+      }),
+    };
+    if (name) section.name = name;
+    return section;
+  });
+
+  return { '@type': 'Menu', '@id': menuId, hasMenuSection };
+}
+
 /** price_band (۱..۴) → رشته‌ی priceRange به‌سبکِ schema.org. */
 function priceRange(band: number): string {
   const n = Math.min(4, Math.max(1, band || 2));
@@ -132,19 +183,7 @@ export function restaurantJsonLd(r: RestaurantDetail, pageUrl: string): object {
   if (r.photos.length) restaurant.image = r.photos.map((p) => p.url);
 
   // منو (schema.org Menu) — فقط اگر آیتم داشته باشد.
-  if (r.menu.length) {
-    restaurant.hasMenu = {
-      '@type': 'Menu',
-      hasMenuSection: {
-        '@type': 'MenuSection',
-        hasMenuItem: r.menu.map((m) => ({
-          '@type': 'MenuItem',
-          name: m.name,
-          offers: { '@type': 'Offer', price: m.price_toman, priceCurrency: 'IRR' },
-        })),
-      },
-    };
-  }
+  if (r.menu.length) restaurant.hasMenu = menuJsonLd(r.menu, `${pageUrl}#menu`);
 
   const breadcrumb = {
     '@type': 'BreadcrumbList',

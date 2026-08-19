@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
+import { IMAGE_URL_RE } from '../route';
 
 const idParamSchema = z.object({ id: zUuid });
 
@@ -12,6 +13,11 @@ const patchSchema = z.object({
   emoji: z.string().max(16).nullable().optional(),
   category: z.string().max(60).trim().nullable().optional(),
   is_active: z.boolean().optional(),
+  // فیلدهایِ منویِ عمومی/QR (مهاجرتِ ۰۵۲). nullable چون «پاک‌کردنِ توضیح/عکس»
+  // باید ممکن باشد — با فرستادنِ null، نه با رشته‌ی خالی.
+  description: z.string().max(300).trim().nullable().optional(),
+  image_url: z.string().max(500).trim().regex(IMAGE_URL_RE, 'آدرسِ عکس باید با http:// یا https:// شروع شود').nullable().optional(),
+  sort_order: z.number().int().min(0).max(100_000).optional(),
 });
 
 /**
@@ -42,6 +48,9 @@ export const PATCH = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMan
   if (b.emoji !== undefined) data.emoji = b.emoji;
   if (b.category !== undefined) data.category = b.category;
   if (b.is_active !== undefined) data.isActive = b.is_active;
+  if (b.description !== undefined) data.description = b.description;
+  if (b.image_url !== undefined) data.imageUrl = b.image_url;
+  if (b.sort_order !== undefined) data.sortOrder = b.sort_order;
   if (Object.keys(data).length === 0) throw Err.validation('چیزی برای تغییر فرستاده نشده');
 
   if (b.name !== undefined) {
@@ -55,12 +64,16 @@ export const PATCH = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMan
   const updated = await db.menuItem.update({
     where: { id },
     data,
-    select: { id: true, name: true, priceToman: true, emoji: true, category: true, isActive: true },
+    select: {
+      id: true, name: true, priceToman: true, emoji: true, category: true, isActive: true,
+      description: true, imageUrl: true, sortOrder: true,
+    },
   });
 
   return NextResponse.json({
     id: updated.id, name: updated.name, price_toman: updated.priceToman,
     emoji: updated.emoji, category: updated.category, is_active: updated.isActive,
+    description: updated.description, image_url: updated.imageUrl, sort_order: updated.sortOrder,
   });
 });
 

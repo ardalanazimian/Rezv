@@ -260,12 +260,21 @@ model MenuItem {
   emoji        String?
   priceToman   Int               @map("price_toman")
   isActive     Boolean           @default(true) @map("is_active")
+  // توضیحِ کوتاهِ آیتم برایِ منویِ عمومی/QR. NULL = رستوران‌دار ننوشته.
+  description  String?
+  // آدرسِ عکسِ غذا (منویِ QR + فیلدِ image در JSON-LD). NULL = بدونِ عکس.
+  imageUrl     String?           @map("image_url")
+  // ترتیبِ دلخواهِ نمایش در منو. کوچک‌تر = بالاتر؛ مساوی‌ها با نام مرتب می‌شوند.
+  // عمداً جدا از soldCount: آن یکی آمارِ فروش است، این یکی خواستِ رستوران‌دار.
+  sortOrder    Int               @default(0) @map("sort_order")
   soldCount    Int               @default(0) @map("sold_count")
   // دسته‌بندیِ منو (پیش‌غذا/اصلی/دسر/نوشیدنی/…). NULL = دسته‌بندی‌نشده.
   category     String?
   inOrders     ReservationItem[]
   // کوئری منو: آیتم‌های فعال یک رستوران
   @@index([restaurantId, isActive])
+  // کوئریِ منویِ عمومی: فعال‌هایِ یک رستوران به ترتیبِ نمایش (مهاجرتِ ۰۵۲).
+  @@index([restaurantId, isActive, sortOrder, name])
   @@map("menu_items")
 }
 

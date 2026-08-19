@@ -18,22 +18,38 @@ import { errorResponse } from '@/lib/errors';
 
 const MAX_RESTAURANTS = 50_000; // سقفِ ایمنی؛ فراتر از آن نیازِ sitemap-index است.
 
+/**
+ * رستوران‌هایِ دمو/آزمایشی نباید در sitemapِ عمومی بیایند.
+ *
+ * یافته‌ی ۲۰۲۶-۰۸-۱۹: این endpoint هر رستورانِ `isOpen` را بیرون می‌داد، بدونِ
+ * هیچ فیلتری. در دیتابیسِ توسعه ۳۴ رستوران از ۳۷ تا ردیفِ به‌جا‌مانده از
+ * تست‌های integration بودند (`demo-concurrency-…`، `zz-menu-a-…`) و همه‌شان
+ * در sitemap ظاهر می‌شدند. در تولید هم هر تنانتِ دمو همین‌طور منتشر می‌شد.
+ *
+ * تنها نشانه‌ی «دمو» در اسکیما پیشوندِ `[DEMO]` در نام است (فیلدِ boolean وجود
+ * ندارد) — پس همان مبناست. اگر روزی فیلدِ `isDemo` اضافه شد، اینجا باید به آن
+ * تکیه کند، نه به رشته. **(follow-up)**
+ */
+const DEMO_NAME_PREFIX = '[DEMO]';
+
 export async function GET() {
   try {
     const data = await cached(cacheKey('seo-sitemap'), 300, async () => {
       const [restaurants, cityRows, cuisineRows, articles, pages] = await Promise.all([
         db.restaurant.findMany({
-          where: { isOpen: true },
+          where: { isOpen: true, NOT: { name: { startsWith: DEMO_NAME_PREFIX } } },
           select: { slug: true, createdAt: true },
           orderBy: { id: 'desc' },
           take: MAX_RESTAURANTS,
         }),
+        // شهر و آشپزی هم از همان مجموعه‌ی غیرِ‌دمو می‌آیند — وگرنه صفحه‌ی
+        // «رستوران‌های فلان‌شهر» ساخته می‌شود که تنها ساکنش یک رستورانِ دمو است.
         db.restaurant.findMany({
-          where: { isOpen: true, city: { not: null } },
+          where: { isOpen: true, city: { not: null }, NOT: { name: { startsWith: DEMO_NAME_PREFIX } } },
           select: { city: true }, distinct: ['city'],
         }),
         db.restaurant.findMany({
-          where: { isOpen: true, cuisine: { not: null } },
+          where: { isOpen: true, cuisine: { not: null }, NOT: { name: { startsWith: DEMO_NAME_PREFIX } } },
           select: { cuisine: true }, distinct: ['cuisine'],
         }),
         // محتوایِ منتشرشده‌ی سایت — noindexها عمداً بیرون می‌مانند تا sitemap با
