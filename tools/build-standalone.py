@@ -14,7 +14,7 @@
 اجرا:  python3 tools/build-standalone.py
 خروجی: standalone/{customer,business,company}.html
 """
-import re, os, sys
+import re, os, sys, base64
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT  = os.path.join(ROOT, 'standalone')
@@ -100,10 +100,33 @@ def inline_assets(html, base):
         return '<script data-src="' + src + '">\n' + js + '\n</script>'
     return re.sub(r'<script\s+src="([^"]+\.js)"\s*></script>', js_repl, html)
 
+def inline_fonts(html, base):
+    """فونت را به‌صورتِ data: URI داخلِ CSSِ inline‌شده می‌گذارد.
+
+    چرا لازم است: tokens.css فونت را با مسیرِ نسبیِ `../fonts/x.woff2` صدا
+    می‌زند. وقتی همان CSS داخلِ HTML در پوشه‌ی standalone/ inline می‌شود، آن
+    مسیر به جایی اشاره می‌کند که وجود ندارد → فونت ۴۰۴ می‌شود.
+
+    قبلاً این مشکل دیده نمی‌شد چون فونت از Google Fonts می‌آمد؛ یعنی
+    «نسخه‌ی آفلاین» در واقع برای فونت به اینترنت وصل بود. حالا که self-host
+    شده، جاسازیِ base64 این بандл را واقعاً آفلاین می‌کند.
+    """
+    def repl(m):
+        rel = m.group(1)
+        p = os.path.normpath(os.path.join(base, 'css', rel))
+        if not os.path.exists(p):
+            print(f'   ⚠️  فونت پیدا نشد: {rel}'); return m.group(0)
+        b64 = base64.b64encode(open(p, 'rb').read()).decode('ascii')
+        print(f'   ⤷ فونت جاسازی شد: {os.path.basename(p)} ({len(b64)//1024}KB base64)')
+        return f"url('data:font/woff2;base64,{b64}')"
+    return re.sub(r"url\('(\.\./fonts/[^']+\.woff2)'\)", repl, html)
+
 def drop_dead_refs(html):
     """ارجاعاتی که در حالتِ تک‌فایلی فقط ۴۰۴ می‌دهند."""
     for pat in (r'\s*<link rel="icon"[^>]*>', r'\s*<link rel="manifest"[^>]*>',
-                r'\s*<link rel="apple-touch-icon"[^>]*>'):
+                r'\s*<link rel="apple-touch-icon"[^>]*>',
+                # preloadِ فونت هم در تک‌فایلی ۴۰۴ است؛ خودِ فونت base64 داخلِ CSS است.
+                r'\s*<link rel="preload"[^>]*as="font"[^>]*>'):
         html = re.sub(pat, '', html)
     return html
 
@@ -111,6 +134,7 @@ def build(app):
     base = os.path.join(ROOT, 'apps', app)
     html = open(os.path.join(base, 'index.html'), encoding='utf-8').read()
     html = inline_assets(html, base)
+    html = inline_fonts(html, base)
 
     if app == 'customer':
         parts = []

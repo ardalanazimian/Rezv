@@ -27,6 +27,21 @@
 
 ## 2. Frontend
 
+- **Fonts: Vazirmatn is self-hosted (fixed 2026-08-19).** Previously all three
+  panels loaded the font *only* from `fonts.googleapis.com`, with no local copy
+  anywhere in the repo. Google Fonts is commonly unreachable in Iran — the
+  product's actual market — so for a large share of real users the font request
+  failed and the Persian UI silently fell back to a system sans-serif with wrong
+  metrics and shaping. This was never a caught failure: nothing errors, the page
+  just renders in the wrong typeface.
+  Now `shared/fonts/vazirmatn-var.woff2` (112KB variable, weights 100–900) is
+  distributed to each app by `tools/sync-design-system.sh`, declared via
+  `@font-face` in `shared/css/tokens.css`, and `<link rel="preload">` in each
+  panel. Verified in a real browser with **all** non-localhost requests blocked:
+  0 external requests, `document.fonts.check('700 16px Vazirmatn') === true` in
+  customer/business/company. The `standalone/*.html` bundles embed the font as a
+  base64 `data:` URI, so they are now genuinely offline (they previously still
+  needed the network for the font, despite being the "offline" artifact).
 - **Design system: single-source with a sync script (drift eliminated for `apps/*`).**
   `shared/` is the canonical source; `tools/sync-design-system.sh` copies the shared
   base (`tokens.css`, `foundation.css`, `ds-bridge.css`, `icons.js`) into each app,

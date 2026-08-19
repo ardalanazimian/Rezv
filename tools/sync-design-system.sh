@@ -6,9 +6,10 @@
 # بدونِ build است؛ فایل‌ها باید فیزیکی داخلِ هر اپ باشند تا سرو شوند.
 #
 # چه چیزی sync می‌شود (از shared/):
-#   css/tokens.css      → پایه‌ی مشترکِ توکن‌ها
+#   css/tokens.css      → پایه‌ی مشترکِ توکن‌ها (شاملِ @font-face ِ Vazirmatn)
 #   css/foundation.css  → یکسان در هر سه اپ
 #   css/ds-bridge.css   → یکسان در هر سه اپ
+#   fonts/*.woff2       → فونتِ self-hosted؛ tokens.css با ../fonts/ صدایش می‌زند
 #   js/icons.js         → customer نسخه‌ی ESM (عیناً)؛ business/company نسخه‌ی
 #                         global (چون با <script> کلاسیک لود می‌شوند و export مجاز نیست)
 #
@@ -33,6 +34,7 @@ CHECK=0
 ESM_APPS="customer"
 GLOBAL_APPS="business company"
 CSS_FILES="tokens.css foundation.css ds-bridge.css"
+FONT_FILES="vazirmatn-var.woff2"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -97,6 +99,16 @@ place() { # place <generated-file> <dest>
 for app in $ESM_APPS $GLOBAL_APPS; do
   for f in $CSS_FILES; do
     place "$SRC/css/$f" "$ROOT/apps/$app/css/$f"
+  done
+done
+
+# فونتِ Vazirmatn — self-hosted (نه Google Fonts؛ در ایران در دسترس نیست).
+# tokens.css با مسیرِ نسبیِ ../fonts/ به آن ارجاع می‌دهد، پس فایل باید فیزیکی
+# داخلِ هر اپ باشد — دقیقاً همان دلیلی که بقیه‌ی دیزاین‌سیستم هم کپی می‌شود.
+for app in $ESM_APPS $GLOBAL_APPS; do
+  [ "$CHECK" = "1" ] || mkdir -p "$ROOT/apps/$app/fonts"
+  for f in $FONT_FILES; do
+    place "$SRC/fonts/$f" "$ROOT/apps/$app/fonts/$f"
   done
 done
 
