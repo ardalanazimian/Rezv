@@ -24,6 +24,43 @@ const log = createLogger('security');
 
 const g = globalThis as unknown as { redis?: Redis | Cluster; redisShutdownHooked?: boolean };
 
+// ⚠️ یافته‌ی واقعیِ ممیزیِ ۲۰۲۶-۰۸-۱۹ (با خاموش‌کردنِ عمدیِ Redis اندازه‌گیری شد،
+// نه با خواندنِ کد): معماری «fail-open» است و از نظرِ *درستی* هم واقعاً کار
+// می‌کرد — cached()، rateLimitWithFallback و withSlotLock همه خطایِ Redis را
+// می‌گیرند و مسیرِ اصلی را ادامه می‌دهند. ولی هیچ‌کس *زمان* را نسنجیده بود.
+// اندازه‌گیریِ واقعی با Postgresِ سالم و Redisِ خاموش:
+//     /v1/restaurants        ۰٫۰۲ ثانیه → ۸٫۵ ثانیه
+//     /v1/events             ۰٫۰۲ ثانیه → ۲۲٫۰ ثانیه
+//     /v1/restaurants/live-stats  ۰٫۲۵ ثانیه → تایم‌اوت (بیش از ۲۵ ثانیه)
+// یعنی fail-openِ «درست ولی بی‌نهایت کند» — که زیرِ بارِ واقعی از خرابیِ صریح
+// بدتر است: هر درخواست ۸ تا ۲۲ ثانیه یک اتصال را اشغال می‌کند، استخر تمام
+// می‌شود و یک قطعیِ Redis به قطعیِ کاملِ سرویس تبدیل می‌شود.
+//
+// چرا این‌قدر طول می‌کشید: ioredis به‌صورتِ پیش‌فرض commandTimeout ندارد، پس هر
+// دستور تا ته‌کشیدنِ maxRetriesPerRequest و تایم‌اوتِ اتصال منتظر می‌ماند.
+// رفع: سقفِ صریحِ زمان برایِ هر دستور و هر اتصال. اینها عمداً کوچک‌اند — Redis
+// اینجا فقط cache/rate-limit/قفلِ بهینه‌سازی است؛ منبعِ حقیقت همیشه Postgres
+// است، پس صبرکردن برایش هیچ‌وقت به‌صرفه نیست.
+//
+// ⚠️ enableOfflineQueue عمداً دست‌نخورده (true) ماند: با lazyConnect، اولین
+// دستورِ بعد از بوت همان چیزی است که اتصال را باز می‌کند — خاموش‌کردنِ صفِ
+// آفلاین آن اولین دستور را در هر cold start می‌شکند.
+// مقادیرِ پیش‌فرض با اندازه‌گیریِ واقعی انتخاب شدند، نه با حدس. تأخیرِ همان سه
+// endpoint با Postgresِ سالم و Redisِ خاموش:
+//                       Redisِ سالم   بدونِ سقف   سقفِ ۱۰۰۰ms   سقفِ ۲۵۰ms
+//   /v1/restaurants        ۰٫۰۲s        ۸٫۵۲s        ۳٫۳۳s        ۰٫۹۲s
+//   /v1/events             ۰٫۰۲s       ۲۲٫۰۳s        ۳٫۷۰s        ۱٫۰۳s
+//   /v1/restaurants/live-stats ۰٫۲۵s  تایم‌اوت(۰۰۰)   ۳٫۵۰s        ۰٫۸۶s
+// و در هر سه حالت، به‌محضِ برگشتنِ Redis تأخیر خودبه‌خود به ~۰٫۰۲s برمی‌گردد
+// (بازیابی خودکار است، نیازی به ری‌استارت نیست).
+//
+// چرا ۲۵۰ms امن است: تأخیرِ عادیِ یک دستورِ Redis در همان شبکه زیرِ ۵ms است،
+// پس ۲۵۰ms حدودِ ۵۰ برابر حاشیه دارد. بدترین حالتِ یک سقفِ خیلی تنگ هم فقط
+// «cache missِ اضافی» است، نه پاسخِ غلط — چون Postgres منبعِ حقیقت است و
+// cache/rate-limit/قفل هرسه مسیرِ fail-openِ آزموده دارند.
+const CMD_TIMEOUT_MS = Number(process.env.REDIS_COMMAND_TIMEOUT_MS ?? 250);
+const CONNECT_TIMEOUT_MS = Number(process.env.REDIS_CONNECT_TIMEOUT_MS ?? 1000);
+
 function makeRedis(): Redis | Cluster {
   const clusterNodes = process.env.REDIS_CLUSTER_NODES?.split(',').map(s => s.trim()).filter(Boolean);
   if (clusterNodes && clusterNodes.length > 0) {
@@ -32,7 +69,11 @@ function makeRedis(): Redis | Cluster {
       return { host, port: Number(port) || 6379 };
     });
     return new Cluster(nodes, {
-      redisOptions: { maxRetriesPerRequest: 3 },
+      redisOptions: {
+        maxRetriesPerRequest: 3,
+        commandTimeout: CMD_TIMEOUT_MS,
+        connectTimeout: CONNECT_TIMEOUT_MS,
+      },
       // توزیع خواندن روی replicaها در صورت وجود (کاهش بار نود master)
       scaleReads: 'slave',
       // lazyConnect: اتصالِ واقعی فقط با اولین دستور، نه در همان لحظه‌ی import.
@@ -44,7 +85,12 @@ function makeRedis(): Redis | Cluster {
       lazyConnect: true,
     });
   }
-  return new Redis(process.env.REDIS_URL!, { maxRetriesPerRequest: 3, lazyConnect: true });
+  return new Redis(process.env.REDIS_URL!, {
+    maxRetriesPerRequest: 3,
+    commandTimeout: CMD_TIMEOUT_MS,
+    connectTimeout: CONNECT_TIMEOUT_MS,
+    lazyConnect: true,
+  });
 }
 
 // ⚠️ باگ H5: مثل Prisma، اتصال Redis باید «همیشه» singleton باشد نه فقط در توسعه.
