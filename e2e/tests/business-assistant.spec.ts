@@ -104,6 +104,14 @@ test.describe('دستیارِ هوشمندِ پنلِ بیزنس', () => {
   test('با شکستِ کارت‌های پیشنهاد، چت‌باکس همچنان رندر و قابل‌استفاده می‌ماند', async ({ page }) => {
     // ⚠️ قفلِ رگرسیونِ باگِ اصلی: قبلاً خطای /restaurant/ai باعث می‌شد
     // custRenderAI زودتر return کند و چت‌باکس اصلاً ساخته نشود.
+    //
+    // مسیرِ خطا هم باید *بی‌خطا* اجرا شود: خودِ باگِ اولیه به‌شکلِ
+    // `cardsEl is not defined` بروز کرد، یعنی یک استثنایِ JS در همین مسیر.
+    // پس این‌جا هم مثلِ تستِ اول pageerror را جمع می‌کنیم تا استثنایِ تازه
+    // در مسیرِ شکست بی‌صدا رد نشود.
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+
     await loginAs(page);
     await mockAssistant(page, { aiOk: false });
     await page.goto(PANEL);
@@ -118,5 +126,7 @@ test.describe('دستیارِ هوشمندِ پنلِ بیزنس', () => {
 
     // و شکستِ کارت‌ها باید صادقانه گزارش شود، نه بی‌صدا خالی بماند.
     await expect(page.locator('#ct-ai')).toContainText('پیشنهادها بارگیری نشد');
+
+    expect(errors, `خطاهای JS: ${errors.join(' | ')}`).toEqual([]);
   });
 });
