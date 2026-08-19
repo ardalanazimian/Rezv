@@ -233,6 +233,11 @@ const API = {
   },
   deletePhoto(id){ return this.delete('/restaurant/photos?id='+encodeURIComponent(id)); },
   notes(){ return this.get('/restaurant/notes'); },
+  // ── منو (CRUDِ واقعی؛ پیش از این هیچ روتی برایِ ساختِ آیتمِ منو نبود) ──
+  menuList(){ return this.get('/restaurant/menu'); },
+  menuCreate(body){ return this.post('/restaurant/menu', body); },
+  menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
   addNote(body){ return this.post('/restaurant/notes', body); },
   pinNote(id, pinned){ return this.patch('/restaurant/notes', { id, pinned }); },
   deleteNote(id){ return this.delete('/restaurant/notes?id='+encodeURIComponent(id)); },
@@ -737,6 +742,6 @@ function enrollClub(name,phone){
   return {enrolled:true,member};
 }
 
-const TITLES={overview:'داشبورد',reservations:'مدیریت رزروها',waitlist:'لیست انتظار',floor:'پلان سالن',profile:'پروفایل و نظرات',customers:'مشتریان',loyalty:'باشگاه مشتریان',marketing:'بازاریابی',analytics:'آنالیتیکس',cashback:'تنظیم کش‌بک',staff:'کارکنان',pricing:'قیمت‌گذاری',chat:'پیام‌ها'};
+const TITLES={menu:'منو',overview:'داشبورد',reservations:'مدیریت رزروها',waitlist:'لیست انتظار',floor:'پلان سالن',profile:'پروفایل و نظرات',customers:'مشتریان',loyalty:'باشگاه مشتریان',marketing:'بازاریابی',analytics:'آنالیتیکس',cashback:'تنظیم کش‌بک',staff:'کارکنان',pricing:'قیمت‌گذاری',chat:'پیام‌ها'};
 
 // ═══════════ ROUTING ═══════════

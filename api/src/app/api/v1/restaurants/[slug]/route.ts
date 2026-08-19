@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
           latitude: true, longitude: true, openingHours: true, timezone: true,
           menuItems: {
             where: { isActive: true }, orderBy: { soldCount: 'desc' },
-            select: { name: true, emoji: true, priceToman: true },
+            select: { name: true, emoji: true, priceToman: true, category: true },
           },
           // فقط عکسِ تأییدشده. این تنها مسیری است که گالری را به بیرون
           // می‌دهد — هم اپ مشتری و هم صفحه‌ی سئوی /r/[slug] از همین می‌خوانند
@@ -70,7 +70,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
         opening_hours: r.openingHours, timezone: r.timezone,
         rating: agg._avg.rating ? Math.round(agg._avg.rating * 10) / 10 : null,
         reviews_count: agg._count,
-        menu: r.menuItems.map((m) => ({ name: m.name, emoji: m.emoji, price_toman: m.priceToman })),
+        menu: r.menuItems.map((m) => ({ name: m.name, emoji: m.emoji, price_toman: m.priceToman, category: m.category })),
         photos: r.photos.map((p) => ({ url: p.url, caption: p.caption, category: p.category })),
       };
     });
