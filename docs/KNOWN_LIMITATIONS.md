@@ -386,6 +386,78 @@
   key" state and was left unchanged — no code gap there, just missing
   production infrastructure. **(follow-up)**
 
+## 2d. Second audit pass — 2026-08-19 (the areas the first pass explicitly skipped)
+
+The first pass (§2c) listed what it had *not* audited. This section closes that
+list. Same discipline: live infrastructure, database-verified, positive controls.
+
+- **Redis outage made public endpoints unusable — fixed.** The fail-open design
+  is correct, but nobody had measured *time*. With Postgres healthy and Redis
+  stopped: `/v1/restaurants` 0.02s → **8.5s**, `/v1/events` 0.02s → **22.0s**,
+  `/v1/restaurants/live-stats` 0.25s → **timed out entirely**. ioredis has no
+  default `commandTimeout`, so every command waited out the retries. Under load
+  this converts a Redis blip into a full outage via connection-pool exhaustion.
+  Fixed with explicit `commandTimeout` (250ms) / `connectTimeout` (1000ms),
+  both env-tunable; measured again at **0.92s / 1.03s / 0.86s**, and recovery is
+  automatic once Redis returns. `enableOfflineQueue` deliberately left on —
+  with `lazyConnect` the first command is what opens the connection.
+- **24 exactly-duplicate indexes across 12 tables — dropped (migration 054).**
+  Root cause is this repo's two-source pattern: hand-written SQL migrations
+  create `idx_*` while `@@index` in `schema.prisma` creates Prisma's auto-named
+  twin. A duplicate index speeds up nothing and doubles write cost.
+- **`customer_insights.user_id` and `club_members.user_id` had no leading index
+  — added (migration 054).** Every index on those tables starts with
+  `restaurant_id`, but `lib/guest-profile.ts` filters by `userId` alone.
+  Measured on 100k rows: **Seq Scan 14.26 ms → Bitmap Index Scan 0.18 ms**
+  (~80×), buffers 1540 → 27.
+- **RBAC is enforced at runtime, not just declared — verified.** 40 of 45
+  `/v1/restaurant` route groups declare a `permission`; the 5 that don't are
+  day-to-day operations `SAFE_DEFAULTS` grants anyway. Live probe with a real
+  `role='staff'` token (no `StaffPermission` row): 403 on reports, analytics,
+  coupons, menu, profile, rfm, customers; 200 on reservations, tables,
+  waitlist — with an owner token returning 200 everywhere as positive control.
+  **10/10 as designed.**
+- **Company-panel tenant isolation is fail-closed — verified.** A normal
+  restaurant owner's token gets **403** on `/v1/admin/restaurants`; the platform
+  admin gets **200**.
+- **Telemetry cannot be forged — verified.** An attacker's own token, with a
+  body claiming a victim's `userId` and a fake `device`: the stored row carries
+  the **attacker's** id (from the token) and the **real** UA header. `source`
+  outside the three client values is rejected 422, and an unknown `restaurantId`
+  is stored as `null` rather than fabricated.
+  **Residual:** a client may attribute events to any *existing* restaurant, so
+  behavioural analytics can be polluted by a determined actor. Not a data leak
+  (no read access), but an integrity caveat. **(open)**
+- **All three panels run clean against the live API.** customer → 4 endpoints,
+  business (owner token) → 10 endpoints incl. the menu screen, company
+  (platform-admin token) → 5 endpoints and 4 sections opened. Zero JS errors,
+  zero failed requests, no horizontal scroll at 390px in any of them.
+- **CORS is the single switch that decides real-vs-sample data.** With
+  `ALLOWED_ORIGINS` unset, the customer app's calls are blocked and it falls
+  back to sample restaurants — *honestly*, badging every card «نمونه» and
+  logging it. With the origin allowed, the badges disappear and real data
+  renders. So a CORS misconfiguration at launch is not a crash; it is a silent
+  demotion to sample content. **Set `ALLOWED_ORIGINS` before launch.**
+- **Menu categories are still free text, not an entity.** `category` is
+  `String?` (max 60), with no per-restaurant catalogue, no normalization and no
+  explicit ordering: «نوشیدنی» and «نوشیدنی‌ها» silently become two sections.
+  Section order on the public QR menu follows the `sortOrder` of the first item
+  in each category (Map insertion order), so a restaurant can only control it
+  indirectly. **(open, product decision)**
+- **`prisma migrate diff` is not a usable drift alarm here.** It reports 239
+  lines against the real database, but the content is cosmetic: 41 timestamp
+  type differences, 29 default differences, 23 index renames, and FK
+  re-declarations. Zero tables or columns are genuinely missing — the one
+  "added" column is `reservations.block_end`, a generated column Prisma cannot
+  model. Every index it flags was verified present under a different name. The
+  practical consequence: real drift would be invisible in that noise. **(open)**
+- **Documentation is in good shape.** An automated claim-check over all 113
+  Markdown files found exactly one factual error (`LAUNCH-GAPS.md` cited
+  migration `046` for the SMS starter balance; the real file is `048` — the
+  behaviour itself is correct, verified live: inserting a restaurant without
+  `sms_balance` yields 50). Fixed. The remaining flagged paths are legitimate
+  history in dated audit reports, or text that already corrects itself.
+
 ## 2c. Live P0 verification — 2026-08-19 (real Postgres + Redis + running API)
 
 Everything below was run against a live stack (Postgres 16.13, Redis 7.0.15,
