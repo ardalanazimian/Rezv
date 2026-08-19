@@ -53,6 +53,7 @@ import './hours.test.mts';
 import './hours-approval.test.mts';
 import './hours-change-approval.integration.test.mts';
 import './customer-insight-spend-semantics.integration.test.mts';
+import './guest-profile-rollup.integration.test.mts';
 import './menu-crud.integration.test.mts';
 import './assistant-nlu.test.mts';
 import './incentive-engine.test.mts';

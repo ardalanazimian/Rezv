@@ -18,7 +18,12 @@
 - حالت دمو: OTP ثابت `1234` — **دو مسیرِ متفاوتِ کاملاً قانونی، هیچ‌کدام را عوض نکن**:
   1. بک‌اند با `OTP_DEV_MODE=true` کدِ واقعیِ تصادفی را در پاسخِ API برمی‌گرداند (برای تستِ محلی/CI، نه ثابت روی 1234).
   2. کلاینت (مثلاً `apps/customer/js/auth.js`, `apps/business/js/staff-system.js`) وقتی بک‌اند اصلاً در دسترس نیست (`location.protocol==='file:'` یا پاسخِ آفلاین) به‌صورتِ محلی کدِ ثابتِ `1234` را می‌پذیرد — این fallbackِ کاملاً آفلاین است، نه رفتارِ عادیِ سرور.
-- زبان UI: فارسی، راست‌چین (RTL) با فونتِ Vazirmatn.
+- زبان UI: فارسی، راست‌چین (RTL) با فونتِ Vazirmatn — **self-hosted** از
+  `shared/fonts/vazirmatn-var.woff2` (یک فایلِ variable، وزنِ ۱۰۰..۹۰۰)، نه از
+  Google Fonts. عمدی است: `fonts.googleapis.com` در ایران در دسترس نیست و تا
+  ۲۰۲۶-۰۸-۱۹ فونت بی‌صدا روی sans-serifِ سیستم می‌افتاد. `@font-face` در
+  `shared/css/tokens.css` است و فایل با `sync-design-system.sh` به هر سه اپ
+  کپی می‌شود. **هرگز `<link>`ِ Google Fonts را برنگردان.**
 
 ---
 

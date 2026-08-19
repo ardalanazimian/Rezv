@@ -27,6 +27,39 @@
 
 ## 2. Frontend
 
+- **Company panel platform metrics were silently all-zero (fixed 2026-08-19).**
+  Migration 046 made `customer_insights` money columns nullable, but the
+  cross-restaurant rollup (`lib/guest-profile.ts`) still wrote into
+  `guest_profiles`, whose money columns were `NOT NULL DEFAULT 0`. SQL `sum()`
+  returns NULL when every row in a group is NULL, so **one** guest whose only
+  restaurant has no priced menu made the whole `INSERT ... SELECT` fail — and
+  because it is a single statement, *no* profiles were written at all
+  (observed: 39 users in `customer_insights`, 0 rows in `guest_profiles`).
+  The company panel reads all its platform-wide figures from that table, so it
+  displayed 0 guests / 0 VIPs / 0 CLV — a total failure wearing the costume of
+  real "zero" data. Compounding it, the nightly job wrapped the call in
+  `.catch(() => ({ profiles: 0 }))` and still returned `ok: true`, so the
+  failure never surfaced. Fixed by migration 051 (money columns nullable,
+  matching `customer_insights`), removing the swallowing catch (the job now
+  reports `ok:false` + `guest_profiles_error`), and dropping `COALESCE(...,0)`
+  from the platform aggregate so "unmeasurable" stays `null` instead of being
+  reported as a zero value. Locked by
+  `tests/guest-profile-rollup.integration.test.mts`.
+- **Fonts: Vazirmatn is self-hosted (fixed 2026-08-19).** Previously all three
+  panels loaded the font *only* from `fonts.googleapis.com`, with no local copy
+  anywhere in the repo. Google Fonts is commonly unreachable in Iran — the
+  product's actual market — so for a large share of real users the font request
+  failed and the Persian UI silently fell back to a system sans-serif with wrong
+  metrics and shaping. This was never a caught failure: nothing errors, the page
+  just renders in the wrong typeface.
+  Now `shared/fonts/vazirmatn-var.woff2` (112KB variable, weights 100–900) is
+  distributed to each app by `tools/sync-design-system.sh`, declared via
+  `@font-face` in `shared/css/tokens.css`, and `<link rel="preload">` in each
+  panel. Verified in a real browser with **all** non-localhost requests blocked:
+  0 external requests, `document.fonts.check('700 16px Vazirmatn') === true` in
+  customer/business/company. The `standalone/*.html` bundles embed the font as a
+  base64 `data:` URI, so they are now genuinely offline (they previously still
+  needed the network for the font, despite being the "offline" artifact).
 - **Design system: single-source with a sync script (drift eliminated for `apps/*`).**
   `shared/` is the canonical source; `tools/sync-design-system.sh` copies the shared
   base (`tokens.css`, `foundation.css`, `ds-bridge.css`, `icons.js`) into each app,
