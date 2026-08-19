@@ -328,24 +328,24 @@
   up would instantly put fabricated CLV/churn numbers in front of a real
   restaurant. Not deleted in this pass because removal is the owner's call.
   **(decision needed)**
-- **Menu has no CRUD — the whole spend/CLV chain is structurally dead for real
-  restaurants.** `MenuItem` exists in Prisma and is *read* (public
-  `restaurants/[slug]` returns `menu[]`) and *consumed* (preorder on
-  `POST /reservations`, `restaurant/reports` top-items, spend in
-  `customer-insights.ts`). But there is **no route anywhere** to create, edit, or
-  delete a menu item — grep of all 134 API routes finds no menu endpoint — and no
-  menu screen in the business panel. The only code that ever inserts a `menu_items`
-  row is `prisma/seed.ts` (dev seed). Neither trial signup (`site-orders.ts`) nor
-  branch creation inserts any. Consequences, each verified in code:
-  1. every real restaurant has a permanently empty menu, with no way to fix it;
-  2. the customer preorder block is gated on `r.menu.length`, so preorder can
-     never render → no `reservation_items` rows are ever created;
-  3. therefore `customer-insights.ts` computes `totalSpend = 0` → `avgSpend = 0`
-     → `predictedClv = Math.round(visitsPerYear * 0) = 0` for **every** real
-     customer of **every** real restaurant, and writes those zeros to
-     `customer_insights` as if measured.
-  Building menu CRUD is a real feature, deliberately not attempted in this
-  audit pass. **(P1, open)**
+- **Menu has no CRUD — ~~structurally dead~~ SHIPPED 2026-08-19, entry kept for
+  history.** The original finding was correct when written: `MenuItem` was read
+  (public `restaurants/[slug]` returned `menu[]`) and consumed (preorder,
+  `restaurant/reports` top-items, spend in `customer-insights.ts`) but **no route
+  anywhere** could create, edit, or delete one, so every real restaurant had a
+  permanently empty menu. That gap is now closed — verified by listing the
+  routes, not by trusting this file:
+  `restaurant/menu/route.ts` (list + create), `restaurant/menu/[id]/route.ts`
+  (update + delete/archive), `restaurant/menu/[id]/photo/route.ts` (upload +
+  delete), `restaurant/menu/branding/route.ts`, `restaurant/menu/qr/route.ts`,
+  plus the public `restaurants/[slug]/menu` reader and a real panel screen
+  (`apps/business/js/menu.js`). Locked by `tests/menu-crud.integration.test.mts`
+  and `tests/public-menu.integration.test.mts`.
+  **What is still true:** the spend/CLV chain remains preorder-only, so a
+  restaurant that fills its menu but takes no preorders still produces
+  `totalSpend = 0 → avgSpend = 0 → predictedClv = 0`. Menu CRUD unblocked the
+  chain; it did not make Rezervno POS-aware. See the next bullet.
+  **(resolved — chain still preorder-gated)**
 - **Customer-intelligence money fields cannot express "no data".**
   `CustomerInsight.totalSpendToman` / `avgSpendToman` / `predictedClvToman` are
   `Int @default(0)` — **not nullable** — so "we have no spend data" and "they
@@ -385,6 +385,136 @@
   `sendPush()`. `sendEmail()` is in the same honest "log only, no provider
   key" state and was left unchanged — no code gap there, just missing
   production infrastructure. **(follow-up)**
+
+## 2d. Second audit pass — 2026-08-19 (the areas the first pass explicitly skipped)
+
+The first pass (§2c) listed what it had *not* audited. This section closes that
+list. Same discipline: live infrastructure, database-verified, positive controls.
+
+- **Redis outage made public endpoints unusable — fixed.** The fail-open design
+  is correct, but nobody had measured *time*. With Postgres healthy and Redis
+  stopped: `/v1/restaurants` 0.02s → **8.5s**, `/v1/events` 0.02s → **22.0s**,
+  `/v1/restaurants/live-stats` 0.25s → **timed out entirely**. ioredis has no
+  default `commandTimeout`, so every command waited out the retries. Under load
+  this converts a Redis blip into a full outage via connection-pool exhaustion.
+  Fixed with explicit `commandTimeout` (250ms) / `connectTimeout` (1000ms),
+  both env-tunable; measured again at **0.92s / 1.03s / 0.86s**, and recovery is
+  automatic once Redis returns. `enableOfflineQueue` deliberately left on —
+  with `lazyConnect` the first command is what opens the connection.
+- **24 exactly-duplicate indexes across 12 tables — dropped (migration 054).**
+  Root cause is this repo's two-source pattern: hand-written SQL migrations
+  create `idx_*` while `@@index` in `schema.prisma` creates Prisma's auto-named
+  twin. A duplicate index speeds up nothing and doubles write cost.
+- **`customer_insights.user_id` and `club_members.user_id` had no leading index
+  — added (migration 054).** Every index on those tables starts with
+  `restaurant_id`, but `lib/guest-profile.ts` filters by `userId` alone.
+  Measured on 100k rows: **Seq Scan 14.26 ms → Bitmap Index Scan 0.18 ms**
+  (~80×), buffers 1540 → 27.
+- **RBAC is enforced at runtime, not just declared — verified.** 40 of 45
+  `/v1/restaurant` route groups declare a `permission`; the 5 that don't are
+  day-to-day operations `SAFE_DEFAULTS` grants anyway. Live probe with a real
+  `role='staff'` token (no `StaffPermission` row): 403 on reports, analytics,
+  coupons, menu, profile, rfm, customers; 200 on reservations, tables,
+  waitlist — with an owner token returning 200 everywhere as positive control.
+  **10/10 as designed.**
+- **Company-panel tenant isolation is fail-closed — verified.** A normal
+  restaurant owner's token gets **403** on `/v1/admin/restaurants`; the platform
+  admin gets **200**.
+- **Telemetry cannot be forged — verified.** An attacker's own token, with a
+  body claiming a victim's `userId` and a fake `device`: the stored row carries
+  the **attacker's** id (from the token) and the **real** UA header. `source`
+  outside the three client values is rejected 422, and an unknown `restaurantId`
+  is stored as `null` rather than fabricated.
+  **Residual:** a client may attribute events to any *existing* restaurant, so
+  behavioural analytics can be polluted by a determined actor. Not a data leak
+  (no read access), but an integrity caveat. **(open)**
+- **All three panels run clean against the live API.** customer → 4 endpoints,
+  business (owner token) → 10 endpoints incl. the menu screen, company
+  (platform-admin token) → 5 endpoints and 4 sections opened. Zero JS errors,
+  zero failed requests, no horizontal scroll at 390px in any of them.
+- **CORS is the single switch that decides real-vs-sample data.** With
+  `ALLOWED_ORIGINS` unset, the customer app's calls are blocked and it falls
+  back to sample restaurants — *honestly*, badging every card «نمونه» and
+  logging it. With the origin allowed, the badges disappear and real data
+  renders. So a CORS misconfiguration at launch is not a crash; it is a silent
+  demotion to sample content. **Set `ALLOWED_ORIGINS` before launch.**
+- **Menu categories are still free text, not an entity.** `category` is
+  `String?` (max 60), with no per-restaurant catalogue, no normalization and no
+  explicit ordering: «نوشیدنی» and «نوشیدنی‌ها» silently become two sections.
+  Section order on the public QR menu follows the `sortOrder` of the first item
+  in each category (Map insertion order), so a restaurant can only control it
+  indirectly. **(open, product decision)**
+- **`prisma migrate diff` is not a usable drift alarm here.** It reports 239
+  lines against the real database, but the content is cosmetic: 41 timestamp
+  type differences, 29 default differences, 23 index renames, and FK
+  re-declarations. Zero tables or columns are genuinely missing — the one
+  "added" column is `reservations.block_end`, a generated column Prisma cannot
+  model. Every index it flags was verified present under a different name. The
+  practical consequence: real drift would be invisible in that noise. **(open)**
+- **Documentation is in good shape.** An automated claim-check over all 113
+  Markdown files found exactly one factual error (`LAUNCH-GAPS.md` cited
+  migration `046` for the SMS starter balance; the real file is `048` — the
+  behaviour itself is correct, verified live: inserting a restaurant without
+  `sms_balance` yields 50). Fixed. The remaining flagged paths are legitimate
+  history in dated audit reports, or text that already corrects itself.
+
+## 2c. Live P0 verification — 2026-08-19 (real Postgres + Redis + running API)
+
+Everything below was run against a live stack (Postgres 16.13, Redis 7.0.15,
+the API serving on `:3000`), not reasoned about from source. Every verdict is
+confirmed by querying the database directly, because an HTTP status code only
+tells you what the API *said*, not what it *wrote*.
+
+- **30 concurrent users, same restaurant / date / time / one table — PASS.**
+  A purpose-built isolated restaurant with **exactly one** table and 30 distinct
+  real users, all fired with `Promise.all` (no queue, no artificial delay — the
+  standing trap here is that serialising the requests makes the test pass
+  without ever creating a race). Result: `success: 1`, `rejected: 29`,
+  `other: 0`. Database evidence: exactly **1** reservation row, and an
+  independent self-join over `tsrange(slot_start, block_end) &&` returned
+  **0 overlapping pairs**. Correctness of the booking engine is not in question.
+- **Idempotency — PASS.** 5 concurrent `POST /reservations` with one identical
+  `Idempotency-Key`: `{201: 1, 409: 4}` with `IDEMPOTENCY_CONFLICT`, and exactly
+  **1** row in the database.
+- **Tenant isolation, tested at the API layer — PASS, with positive control.**
+  Two fully independent tenants; tenant **B** was given a real reservation and a
+  real menu item first, because a test that only asserts "A cannot see B's data"
+  passes vacuously when B has no data. With a staff token for **A** plus an
+  `X-Restaurant-Id: <B>` override header: `/restaurant/reservations`,
+  `?date=today`, `/restaurant/customers`, `/restaurant/analytics` all returned
+  **0** matches for B's secret guest, while B's own token returned **1** (the
+  control). `PATCH /restaurant/menu/branding` with the override header wrote to
+  **A**, not B. IDOR `PATCH`/`DELETE`/photo-upload against B's menu item id all
+  returned 404. `GET /restaurant/menu/qr` with the override returned **A's** own
+  slug. Now locked as an automated regression test
+  (`tests/tenant-isolation.integration.test.mts`) whose negative assertions are
+  each paired with a positive control, and which was mutation-tested: dropping
+  the `restaurantId` constraint from the IDOR query makes it fail.
+
+- **Finding, fixed in the same pass: the booking engine told 26 of 29 rejected
+  users to "try again" for a slot that was permanently full.**
+  The concurrency run above is what exposed it — reading the code would not
+  have. Original codes: `{201: 1, 409: 3, 423: 26}`; the 26 were
+  `SLOT_LOCK_TIMEOUT` («این بازه در حال رزرو توسط کاربر دیگری است؛ دوباره تلاش
+  کنید»). Correctness was never affected — the Redis lock did its job and only
+  one row was written — but the *message* was false: those users were told to
+  retry something that could never succeed, which is both bad UX and a
+  self-inflicted retry storm on an already-full slot. It also had a concrete
+  downstream cost: `apps/customer/js/data/booking.js` only offers the waitlist
+  when the error is `SLOT_FULL`/`NO_TABLE_FOR_PARTY`, so those 26 users were
+  denied the one action that would have helped them.
+  **Fix** (`api/src/lib/reservations.ts`): the lock is unchanged and the DB
+  remains the source of truth; on `SLOT_LOCK_TIMEOUT` the engine re-reads real
+  occupancy once, and only when it can *prove* every candidate table is taken
+  does it return the honest `SLOT_FULL` / `TABLE_CONFLICT`. Deliberately
+  conservative — in the merge path (no single-table candidate) or if that
+  re-read fails, the original 423 still stands.
+  **Re-run after the fix, same 30-user setup:** `{201: 1, 409: 29}`, all 29
+  `SLOT_FULL`, still exactly 1 row and 0 overlapping pairs in the database.
+  Locked by two tests in `tests/table-merge-occupancy-concurrency.test.mts`,
+  including a positive control proving the engine does *not* simply always
+  answer `SLOT_FULL` (which would be a new lie in the opposite direction), and
+  mutation-tested.
 
 ## 3. Backend / Domain
 
@@ -576,6 +706,23 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   `db.ts`/`redis.ts` themselves is **unchanged** — the same deadlock remains
   a latent risk for any other standalone script/worker that opens a live
   Redis connection and doesn't call `process.exit()` itself. **(follow-up)**
+- **The `beforeExit` deadlock above is confirmed, not hypothetical
+  (2026-08-19).** Running a single connection-opening test file directly
+  (`npx tsx --test tests/table-merge-occupancy-concurrency.test.mts`) prints a
+  full green TAP report and then **never exits** — it had to be killed by
+  `timeout`. This is exactly the latent risk the previous bullet describes:
+  the fix lives only in `_all.runner.mts`'s `after()` hook, so `npm test` is
+  fine while any standalone run of such a file hangs. Harmless for CI, a real
+  trap for local debugging and for any future worker script. **(follow-up)**
+- **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
+  The pass added `tests/tenant-isolation.integration.test.mts` (5) and two
+  lock-honesty tests in `table-merge-occupancy-concurrency.test.mts`. Both
+  additions were **mutation-tested** — the isolation lock fails when the
+  `restaurantId` constraint is removed from its IDOR query, and the
+  lock-honesty test fails when the `SLOT_LOCK_TIMEOUT` re-check is disabled —
+  so neither is a test that would pass with the bug reintroduced. The
+  registration check documented in `_all.runner.mts` was re-run: every
+  `tests/*.test.mts` file is imported.
 - **E2E fully mocks the API** — it validates the customer UI/flows but not the
   real API contract end-to-end. Consider a small contract/integration suite
   against a real backend.

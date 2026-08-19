@@ -1909,7 +1909,12 @@ const API = {
   async request(path, opts = {}, _retried = false){
     // transportِ خام به httpJsonِ مشترک (window.httpJson از api-core.js) واگذار می‌شود؛
     // منطقِ auth (Authorization، X-Restaurant-Id، ۴۰۱→refresh→retry) اینجا و بدونِ تغییر می‌ماند.
-    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    // ⚠️ برایِ FormData هدرِ Content-Type **نباید** ست شود: مرورگر باید خودش
+    // `multipart/form-data; boundary=…` را بسازد. اگر ما 'application/json'
+    // بگذاریم، boundary گم می‌شود و سرور بدنه را نمی‌تواند پارس کند — یعنی
+    // هر آپلودِ فایلی بی‌صدا با «بدنه‌ی درخواست خوانده نشد» رد می‌شود.
+    const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData;
+    const headers = { ...(isForm ? {} : { 'Content-Type': 'application/json' }), ...(opts.headers || {}) };
     if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
     if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
     const r = await httpJson(this.base + '/api/v1' + path, { ...opts, headers }, this.timeout);
@@ -2037,6 +2042,40 @@ const API = {
   menuCreate(body){ return this.post('/restaurant/menu', body); },
   menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
   menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  /**
+   * آپلود/جایگزینیِ عکسِ آیتمِ منو.
+   * multipart است، پس نمی‌تواند از `post()` (که JSON می‌فرستد) عبور کند.
+   * ⚠️ عمداً هدرِ Content-Type ست نمی‌شود: مرورگر باید خودش boundary را
+   * تولید کند و ست‌کردنِ دستی‌اش بدنه را برایِ سرور غیرقابلِ‌پارس می‌کند.
+   */
+  menuItemPhotoUpload(id, file){
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'POST', body: fd });
+  },
+  menuItemPhotoDelete(id){
+    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'DELETE' });
+  },
+  menuBranding(){ return this.get('/restaurant/menu/branding'); },
+  menuBrandingSave(body){ return this.request('/restaurant/menu/branding', { method: 'PATCH', body: JSON.stringify(body) }); },
+  /**
+   * QRِ منویِ عمومی — خروجی SVG است، نه JSON، پس نمی‌تواند از `request()`
+   * (که همیشه `res.json()` می‌زند) عبور کند و fetchِ مستقیم لازم دارد.
+   * شکلِ خروجی عمداً همان قراردادِ بقیه است ({ok,data}/{ok:false,...}) تا
+   * فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
+   */
+  async menuQrSvg(size){
+    if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
+    try{
+      const res = await fetch(this.base + '/api/v1/restaurant/menu/qr?size=' + encodeURIComponent(size||512), {
+        headers: { Authorization: 'Bearer ' + this._token },
+      });
+      if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{ svg: await res.text(), url: decodeURI(res.headers.get('X-Menu-Url') || '') } };
+    }catch{
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
   addNote(body){ return this.post('/restaurant/notes', body); },
   pinNote(id, pinned){ return this.patch('/restaurant/notes', { id, pinned }); },
   deleteNote(id){ return this.delete('/restaurant/notes?id='+encodeURIComponent(id)); },
@@ -5072,6 +5111,8 @@ let memCounter=1006;
 
 let MENU_ITEMS = [];
 let _menuLoaded = false;
+/** آدرسِ عمومیِ منو — از سرور می‌آید، نه ساختِ رشته اینجا. null = رستوران slug ندارد. */
+let MENU_PUBLIC_URL = null;
 
 /** دسته‌هایِ پیشنهادی. متنِ آزاد است — رستوران می‌تواند دسته‌ی دلخواه بنویسد. */
 const MENU_CATEGORY_SUGGESTIONS = ['پیش‌غذا', 'غذای اصلی', 'دسر', 'نوشیدنی', 'صبحانه'];
@@ -5100,6 +5141,7 @@ async function rMenu(){
     return;
   }
   MENU_ITEMS = res.data.items || [];
+  MENU_PUBLIC_URL = res.data.public_menu_url || null;
   _menuLoaded = true;
   menuRender();
 }
@@ -5130,6 +5172,8 @@ function menuRender(){
       </div>
     </div>
 
+    ${menuPublicCardHTML(active)}
+
     ${MENU_ITEMS.length === 0 ? `
       <div class="panel" style="text-align:center;padding:40px">
         <div style="margin-bottom:10px">${icon('menu',{size:30})}</div>
@@ -5145,16 +5189,299 @@ function menuRender(){
     }`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  کارتِ «منویِ عمومی / QR»
+//
+//  همان آدرسی که اینجا کپی می‌شود، داخلِ QR هم هست — چون هر دو از سرور
+//  می‌آیند (`public_menu_url` و `X-Menu-Url`)، نه از رشته‌سازیِ اینجا.
+// ═══════════════════════════════════════════════════════════════════════
+function menuPublicCardHTML(activeCount){
+  if(!MENU_PUBLIC_URL){
+    // رستوران بدونِ slug صفحه‌ی عمومی ندارد. صریح گفته می‌شود، نه اینکه
+    // کارت بی‌صدا غیب شود و رستوران‌دار فکر کند فیچر وجود ندارد.
+    return `<div class="panel" style="margin-bottom:16px">
+      <div class="panel-head"><div class="panel-title">منویِ عمومی و QR</div></div>
+      <div style="color:var(--t2);font-size:13px">
+        برای این رستوران هنوز نشانیِ عمومی (slug) ثبت نشده، پس صفحه‌ی منو و QR ساخته نمی‌شود.
+        با پشتیبانی تماس بگیر تا نشانی را فعال کنیم.
+      </div>
+    </div>`;
+  }
+
+  return `<div class="panel" style="margin-bottom:16px">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">منویِ عمومی و QR</div>
+        <div class="panel-sub">مهمان با اسکنِ این کد، منو را روی موبایلش می‌بیند — بدونِ نصبِ اپ و بدونِ ورود.</div>
+      </div>
+    </div>
+
+    ${activeCount === 0 ? `
+      <div class="cash-note" style="margin-bottom:10px;border-color:var(--amber,#d97706)">
+        ${icon('alert',{size:13})}
+        هیچ آیتمِ <b>فعالی</b> در منو نیست، پس صفحه‌ی عمومی فعلاً خالی نشان داده می‌شود.
+        قبل از چاپِ QR دستِ‌کم یک آیتم را فعال کن.
+      </div>` : ''}
+
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <input class="inp" id="menuPubUrl" readonly value="${esc(MENU_PUBLIC_URL)}" style="flex:1;min-width:200px;direction:ltr;text-align:left">
+      <button class="btn btn-sm btn-ghost" onclick="menuCopyUrl()">${icon('copy',{size:14})} کپی</button>
+      <a class="btn btn-sm btn-ghost" href="${esc(MENU_PUBLIC_URL)}" target="_blank" rel="noopener">پیش‌نمایش</a>
+    </div>
+
+    <div id="menuQrBox" style="text-align:center;padding:12px 0">
+      <button class="btn btn-primary btn-sm" onclick="menuLoadQr()">ساختنِ QR</button>
+    </div>
+
+    <div style="border-top:1px solid var(--line,#e6e8ec);margin-top:12px;padding-top:12px">
+      <div class="panel-title" style="font-size:14px;margin-bottom:2px">ظاهرِ صفحه‌ی منو</div>
+      <div class="panel-sub" style="margin-bottom:10px">
+        این تنظیمات مالِ خودِ شماست و بدونِ تأییدِ رزرونو اعمال می‌شود.
+      </div>
+      <div id="menuBrandBox">
+        <button class="btn btn-sm btn-ghost" onclick="menuLoadBranding()">تنظیمِ رنگ و ظاهر</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  شخصی‌سازیِ صفحه‌ی منو — رنگِ برند، روشن/تیره، خطِ معرفی، چیدمان.
+//  مقادیرِ مجاز از خودِ سرور می‌آیند (`options`)، نه فهرستِ هاردکد اینجا،
+//  تا با تغییرِ سرور از هم نیفتند.
+// ═══════════════════════════════════════════════════════════════════════
+let MENU_BRAND = null;
+
+const BRAND_THEME_LABEL = { light: 'روشن', dark: 'تیره', auto: 'خودکار (ترجیحِ مهمان)' };
+const BRAND_LAYOUT_LABEL = { list: 'فهرستی', grid: 'شبکه‌ای (عکس‌محور)' };
+
+async function menuLoadBranding(){
+  const box = document.getElementById('menuBrandBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال بارگیری…</div>`;
+  const res = await API.menuBranding();
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">${esc(res.offline?'اتصال به سرور برقرار نیست.':(res.error?.message||'بارگیری نشد.'))}</div>
+      <button class="btn btn-sm btn-ghost" onclick="menuLoadBranding()">تلاش دوباره</button>`;
+    return;
+  }
+  MENU_BRAND = res.data;
+  menuBrandRender();
+}
+
+function menuBrandRender(){
+  const box = document.getElementById('menuBrandBox');
+  if(!box || !MENU_BRAND) return;
+  const b = MENU_BRAND;
+  const themes = (b.options?.themes) || ['light','dark','auto'];
+  const layouts = (b.options?.layouts) || ['list','grid'];
+  box.innerHTML = `
+    <div class="field-label">رنگِ برند</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="color" id="mbAccent" value="${esc(b.menu_accent || '#2563EB')}" style="width:48px;height:36px;padding:0;border:none;background:none">
+      <button class="btn btn-sm btn-ghost" onclick="menuBrandSave({menu_accent:null})">حذفِ رنگ (پیش‌فرض)</button>
+    </div>
+    <div class="field-label">حالتِ نمایش</div>
+    <select class="inp" id="mbTheme">
+      <option value="">پیش‌فرضِ رزرونو</option>
+      ${themes.map(t=>`<option value="${esc(t)}"${b.menu_theme===t?' selected':''}>${esc(BRAND_THEME_LABEL[t]||t)}</option>`).join('')}
+    </select>
+    <div class="field-label">چیدمان</div>
+    <select class="inp" id="mbLayout">
+      <option value="">پیش‌فرضِ رزرونو</option>
+      ${layouts.map(l=>`<option value="${esc(l)}"${b.menu_layout===l?' selected':''}>${esc(BRAND_LAYOUT_LABEL[l]||l)}</option>`).join('')}
+    </select>
+    <div class="field-label">خطِ معرفی</div>
+    <input class="inp" id="mbTagline" maxlength="160" value="${esc(b.menu_tagline||'')}" placeholder="اختیاری — زیرِ نامِ رستوران دیده می‌شود">
+    <button class="btn btn-primary btn-sm btn-block" style="margin-top:12px" onclick="menuBrandSaveForm()">ذخیره‌ی ظاهر</button>`;
+}
+
+function menuBrandSaveForm(){
+  menuBrandSave({
+    menu_accent: (document.getElementById('mbAccent').value || '').toUpperCase() || null,
+    // رشته‌ی خالی = «برگرد به پیش‌فرض»؛ سرور آن را null می‌فهمد.
+    menu_theme: document.getElementById('mbTheme').value || null,
+    menu_layout: document.getElementById('mbLayout').value || null,
+    menu_tagline: (document.getElementById('mbTagline').value || '').trim() || null,
+  });
+}
+
+async function menuBrandSave(patch){
+  const res = await API.menuBrandingSave(patch);
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ذخیره نشد'));
+    return;
+  }
+  MENU_BRAND = res.data;
+  menuBrandRender();
+  toast('✓','ظاهرِ منو ذخیره شد و همین حالا روی صفحه‌ی عمومی است');
+}
+
+async function menuCopyUrl(){
+  const el = document.getElementById('menuPubUrl');
+  if(!el) return;
+  try{
+    await navigator.clipboard.writeText(el.value);
+    toast('✓','آدرس کپی شد');
+  }catch{
+    // clipboard API روی http یا مرورگرِ قدیمی کار نمی‌کند — انتخابِ متن
+    // دستِ‌کم کپیِ دستی را یک کلیدِ ترکیبی می‌کند.
+    el.select();
+    toast('','کپیِ خودکار ممکن نشد — با Ctrl+C کپی کن');
+  }
+}
+
+/** SVGِ QR را از سرور می‌گیرد و همراهِ دکمه‌های دانلود نشان می‌دهد. */
+async function menuLoadQr(){
+  const box = document.getElementById('menuQrBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال ساختِ QR…</div>`;
+
+  const res = await API.menuQrSvg(512);
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+        ${esc(res.offline ? 'اتصال به سرور برقرار نیست.' : (res.error?.message || 'ساختِ QR ناموفق بود.'))}
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="menuLoadQr()">تلاش دوباره</button>`;
+    return;
+  }
+
+  // SVG از APIِ خودمان می‌آید (نه ورودیِ کاربر) و متنِ داخلش را هم سرور از
+  // slug ساخته، نه از چیزی که کلاینت فرستاده باشد.
+  _menuQrSvg = res.data.svg;
+  // SVG با عرضِ ثابتِ ۵۱۲ می‌آید (همان اندازه‌ای که برایِ دانلود می‌خواهیم)، ولی
+  // در پنلِ موبایل باید کوچک شود وگرنه از کارت بیرون می‌زند و صفحه را افقی
+  // اسکرول می‌کند — در تستِ مرورگر روی ۴۲۰px دقیقاً همین رخ داد.
+  // `max-width` روی خودِ svg اعمال می‌شود، نه فقط قاب.
+  box.innerHTML = `
+    <div style="background:#fff;display:inline-block;padding:12px;border-radius:12px;max-width:100%">
+      <div style="max-width:260px;margin:0 auto">
+        <style>#menuQrBox svg{width:100%;height:auto;display:block}</style>
+        ${_menuQrSvg}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-ghost" onclick="menuDownloadQr('svg')">دانلودِ SVG</button>
+      <button class="btn btn-sm btn-ghost" onclick="menuDownloadQr('png')">دانلودِ PNG</button>
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:8px">
+      SVG برایِ چاپ (هر اندازه، بدونِ افتِ کیفیت) · PNG برایِ شبکه‌های اجتماعی
+    </div>`;
+}
+
+let _menuQrSvg = null;
+
+/** دانلودِ QR. PNG در خودِ مرورگر از SVG رندر می‌شود — بدونِ رفت‌وبرگشتِ اضافه. */
+function menuDownloadQr(fmt){
+  if(!_menuQrSvg) return;
+  const name = 'rezervno-menu-qr';
+  if(fmt === 'svg'){
+    menuTriggerDownload(new Blob([_menuQrSvg], { type:'image/svg+xml' }), name + '.svg');
+    return;
+  }
+  // SVG → canvas → PNG. اندازه‌ی ۱۰۲۴ عمدی است: QR در چاپ اغلب بزرگ‌تر از
+  // نمایشِ صفحه لازم می‌شود و بزرگ‌کردنِ PNGِ کوچک آن را ناخوانا می‌کند.
+  const SIZE = 1024;
+  const img = new Image();
+  const svgUrl = URL.createObjectURL(new Blob([_menuQrSvg], { type:'image/svg+xml' }));
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = c.height = SIZE;
+    const ctx = c.getContext('2d');
+    // پس‌زمینه‌ی سفیدِ صریح: PNGِ شفاف روی تمِ تیره‌ی نمایشگر/چاپ سیاه‌روی‌سیاه
+    // می‌شود و اسکنر نمی‌خواندش.
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    ctx.drawImage(img, 0, 0, SIZE, SIZE);
+    URL.revokeObjectURL(svgUrl);
+    c.toBlob(b => { if(b) menuTriggerDownload(b, name + '.png'); });
+  };
+  img.onerror = () => { URL.revokeObjectURL(svgUrl); toast('','ساختِ PNG ناموفق بود — SVG را دانلود کن'); };
+  img.src = svgUrl;
+}
+
+function menuTriggerDownload(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function menuRowHTML(i){
+  // عکسِ آیتم اگر هست جایِ ایموجی می‌نشیند — همان چیزی که مهمان در منویِ
+  // عمومی می‌بیند، تا رستوران‌دار پیش‌نمایشِ واقعی داشته باشد نه تقریبی.
+  const thumb = i.image_url
+    ? `<img src="${esc(i.image_url)}" alt="" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex:0 0 auto">`
+    : `<span class="top-ava">${i.emoji ? esc(i.emoji) : icon('menu',{size:16})}</span>`;
   return `<div class="top-cust" style="cursor:default;${i.is_active?'':'opacity:.55'}">
-    <span class="top-ava">${i.emoji ? esc(i.emoji) : icon('menu',{size:16})}</span>
+    ${thumb}
     <div class="top-body">
       <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}</div>
-      <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}</div>
+      <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}${i.image_url?'':' · بدونِ عکس'}</div>
     </div>
     <button class="btn btn-sm btn-ghost" onclick="menuOpenForm('${esc(i.id)}')">ویرایش</button>
     <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuDelete('${esc(i.id)}')">حذف</button>
   </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  عکسِ آیتم — آپلودِ واقعیِ فایل، نه آدرسِ دلخواه.
+//
+//  فایل از همان خطِ لوله‌ای می‌گذرد که گالریِ رستوران دارد: تشخیصِ فرمت از
+//  رویِ بایت‌ها (نه پسوند یا content-type)، سقفِ حجم و ابعاد، و ذخیره روی
+//  فضایِ خودمان. برخلافِ گالری، عکسِ منو بی‌درنگ منتشر می‌شود چون منو مالِ
+//  خودِ رستوران است.
+// ═══════════════════════════════════════════════════════════════════════
+/** جعبه‌ی عکسِ آیتم در فرم: پیش‌نمایش (اگر هست) + انتخابِ فایل + حذف. */
+function menuPhotoBoxHTML(it){
+  const has = !!(it && it.image_url);
+  return `
+    ${has ? `<div style="margin-bottom:8px">
+      <img src="${esc(it.image_url)}" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px">
+    </div>` : `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+      این آیتم عکس ندارد. عکسِ غذا مهم‌ترین چیزی است که مهمان سرِ میز می‌بیند.
+    </div>`}
+    <input type="file" id="miPhotoFile" accept="image/jpeg,image/png,image/webp"
+           onchange="menuPickPhoto('${esc(it.id)}')" style="width:100%;font-size:13px">
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      ${has ? `<button type="button" class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuRemovePhoto('${esc(it.id)}')">حذفِ عکس</button>` : ''}
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:6px">
+      JPEG / PNG / WebP · حداکثر ۸ مگابایت · بی‌درنگ در منویِ عمومی دیده می‌شود.
+    </div>`;
+}
+
+async function menuPickPhoto(id){
+  const input = document.getElementById('miPhotoFile');
+  if(!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const box = document.getElementById('miPhotoBox');
+  if(box) box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال آپلود…</div>`;
+
+  const res = await API.menuItemPhotoUpload(id, file);
+  if(!res.ok){
+    // پیامِ سرور عیناً نشان داده می‌شود — «عکس خیلی بزرگ است» یا «فایل تصویر
+    // نیست» را خودِ سرور دقیق‌تر از ما می‌داند.
+    if(box) box.innerHTML = `<div style="color:var(--red);font-size:13px">${esc(res.offline?'اتصال به سرور برقرار نیست':(res.error?.message||'آپلود ناموفق بود'))}</div>`;
+    return;
+  }
+  toast('✓','عکس آپلود شد و همین حالا در منویِ عمومی دیده می‌شود');
+  // فهرست تازه می‌شود تا بندانگشتیِ ردیف هم به‌روز شود.
+  await rMenu();
+  menuOpenForm(id);
+}
+
+async function menuRemovePhoto(id){
+  if(!confirm('عکسِ این آیتم برداشته شود؟')) return;
+  const res = await API.menuItemPhotoDelete(id);
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message||'حذف نشد'));
+    return;
+  }
+  toast(res.data?.removed?'✓':'', res.data?.message || 'انجام شد');
+  await rMenu();
+  menuOpenForm(id);
 }
 
 function fnMoney(n){ return fa((n||0).toLocaleString('en-US')); }
@@ -5173,6 +5500,20 @@ function menuOpenForm(id){
     <datalist id="miCatList">${MENU_CATEGORY_SUGGESTIONS.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
     <div class="field-label">ایموجی</div>
     <input class="inp" id="miEmoji" maxlength="16" value="${it&&it.emoji?esc(it.emoji):''}" placeholder="اختیاری — مثلاً 🍝">
+    <div class="field-label">توضیح</div>
+    <input class="inp" id="miDesc" maxlength="300" value="${it&&it.description?esc(it.description):''}" placeholder="اختیاری — مثلاً «با سسِ قارچ و پنیرِ پارمزان»">
+    ${it ? `
+    <div class="field-label">عکسِ آیتم</div>
+    <div id="miPhotoBox">${menuPhotoBoxHTML(it)}</div>
+    ` : `
+    <div class="cash-note" style="margin-top:12px">${icon('info',{size:13})}
+      اول آیتم را ذخیره کن، بعد می‌توانی برایش عکس آپلود کنی.
+    </div>`}
+    <div class="field-label">ترتیبِ نمایش</div>
+    <input class="inp" id="miSort" type="number" min="0" value="${it&&it.sort_order!=null?it.sort_order:0}" placeholder="۰">
+    <div style="color:var(--t2);font-size:12px;margin-top:4px">
+      عددِ کوچک‌تر بالاتر نشان داده می‌شود. آیتم‌هایِ هم‌عدد بر اساسِ نام مرتب می‌شوند.
+    </div>
     <label style="display:flex;align-items:center;gap:8px;margin:12px 0">
       <input type="checkbox" id="miActive" ${!it || it.is_active ? 'checked' : ''}>
       <span>در منو نمایش داده شود</span>
@@ -5186,12 +5527,17 @@ async function menuSave(id){
   if(!name){ toast('','نامِ آیتم لازم است'); return; }
   if(!Number.isFinite(price) || price < 0){ toast('','قیمت را درست وارد کن'); return; }
 
+  const sort = parseInt(document.getElementById('miSort').value, 10);
+
   const body = {
     name,
     price_toman: price,
     category: (document.getElementById('miCat').value||'').trim() || null,
     emoji: (document.getElementById('miEmoji').value||'').trim() || null,
     is_active: document.getElementById('miActive').checked,
+    description: (document.getElementById('miDesc').value||'').trim() || null,
+    // image_url اینجا نیست: عکس فقط با آپلودِ فایل عوض می‌شود (menuPickPhoto).
+    sort_order: Number.isFinite(sort) && sort >= 0 ? sort : 0,
   };
   const res = id ? await API.menuUpdate(id, body) : await API.menuCreate(body);
   if(!res.ok){

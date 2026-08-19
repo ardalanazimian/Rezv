@@ -603,6 +603,10 @@ model ClubMember {
   @@unique([restaurantId, code])
   // کمپین SMS و آمار باشگاه: اعضای یک رستوران بر اساس سطح
   @@index([restaurantId, tier])
+  // مهاجرتِ ۰۵۴: بدونِ این، هیچ ایندکسی با user_id شروع نمی‌شد (همه با
+  // restaurant_id شروع می‌شوند) — پس هم کوئریِ «باشگاه‌هایِ این کاربر» و هم
+  // بررسیِ FK هنگامِ حذف/به‌روزرسانیِ users کلِ جدول را می‌خواند.
+  @@index([userId])
   @@map("club_members")
 }
 
@@ -766,6 +770,11 @@ model CustomerInsight {
   @@index([restaurantId, segment, predictedClvToman(sort: Desc)])
   @@index([restaurantId, churnRiskScore(sort: Desc)])
   @@index([restaurantId, intelligenceScore(sort: Desc)])
+  // مهاجرتِ ۰۵۴: کلیدِ اصلی [restaurantId, userId] است و همه‌ی ایندکس‌هایِ
+  // بالا هم با restaurantId شروع می‌شوند — پس lib/guest-profile.ts که با
+  // `where: { userId }` تنها فیلتر می‌کند (پروفایلِ مهمان در همه‌ی رستوران‌ها)
+  // هیچ ایندکسی نداشت و کلِ جدول را می‌خواند.
+  @@index([userId])
   @@map("customer_insights")
 }
 

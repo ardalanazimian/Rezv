@@ -40,6 +40,9 @@ before(async () => {
   await db.table.create({ data: { restaurantId, number: 901, capacity: 4, isActive: true, isMergeable: true, mergeableWith: [902] } });
   await db.table.create({ data: { restaurantId, number: 902, capacity: 4, isActive: true, isMergeable: true, mergeableWith: [901] } });
   await db.table.create({ data: { restaurantId, number: 903, capacity: 2, isActive: true, isMergeable: false } });
+  // میزِ ۹۰۴ عمداً «تنها میزِ ممکن» برایِ گروهِ ۷ نفره است (۹۰۱/۹۰۲ ظرفیتِ ۴ و
+  // ۹۰۳ ظرفیتِ ۲ دارند) — لازمِ سناریویِ آخرِ این فایل، رجوع کن به توضیحش.
+  await db.table.create({ data: { restaurantId, number: 904, capacity: 8, minPartySize: 7, isActive: true, isMergeable: false } });
 });
 
 after(async () => {
@@ -206,5 +209,71 @@ describe('C2 — قفلِ Redis کاملاً fail-open (شبیه‌سازیِ ق
 
     const winner = (fulfilled[0] as PromiseFulfilledResult<Awaited<ReturnType<typeof attempt>>>).value;
     assert.deepEqual([...winner.merged_tables].sort((a, b) => a - b), [901, 902]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  صداقتِ پیامِ خطا وقتی قفلِ Redis timeout می‌شود (یافته‌ی ممیزیِ ۲۰۲۶-۰۸-۱۹)
+//
+//  این باگ با خواندنِ کد پیدا نشد — با یک تستِ زنده‌ی ۳۰ کاربرِ هم‌زمان روی
+//  دقیقاً «یک» میز پیدا شد. نتیجه‌ی آن اجرا: ۱ موفق، ۲۹ ردشده، ولی از آن ۲۹
+//  تا **۲۶** تا کدِ SLOT_LOCK_TIMEOUT (۴۲۳: «دوباره تلاش کنید») گرفتند و فقط
+//  ۳ تا SLOT_FULL. صحت سالم بود (دقیقاً یک ردیف در DB، صفر تداخلِ بازه‌ای)،
+//  ولی پیام دروغ بود: به ۲۶ کاربر گفته می‌شد اسلات «در حالِ رزرو توسطِ کسِ
+//  دیگری» است و باید دوباره تلاش کنند — در حالی که اسلات دیگر برایِ همیشه پر
+//  شده بود. یعنی هم UXِ اشتباه، هم موجِ retryِ بی‌فایده روی یک اسلاتِ پر.
+//
+//  تستِ زیر همان ترتیبِ زمانی را بازتولید می‌کند: کاندیداها وقتی محاسبه
+//  می‌شوند که میز هنوز آزاد است، بعد «برنده» رزروش را commit می‌کند، و تنها
+//  بعد از آن قفل برایِ بازنده timeout می‌شود.
+// ═══════════════════════════════════════════════════════════════════════
+const { Err } = await import('../src/lib/errors.ts');
+
+describe('صداقتِ خطا — قفل timeout شد ولی اسلات واقعاً پر شده است', () => {
+  test('۴۲۳ی گمراه‌کننده به SLOT_FULLِ صادق تبدیل می‌شود', async () => {
+    const TIME = '14:00';
+    // قفلی که دقیقاً رفتارِ «بازنده‌ی ریس» را می‌سازد: تا وقتی ما پشتِ قفل
+    // منتظریم برنده commit می‌کند، بعد قفل به ما timeout می‌دهد.
+    const lockThatLosesRace = async <T>(_k: string, _t: number, _fn: () => Promise<T>): Promise<T> => {
+      await createReservation(
+        {
+          restaurantId, date: SLOT_DATE, time: TIME, partySize: 7,
+          guest: { name: '[DEMO] برنده‌ی قفل', tableNumber: 904 }, source: 'manual', notifySms: false,
+        },
+        { acquireSlotLock: noSlotLock },
+      );
+      throw Err.lockTimeout();
+    };
+
+    await assert.rejects(
+      createReservation(
+        {
+          restaurantId, date: SLOT_DATE, time: TIME, partySize: 7,
+          guest: { name: '[DEMO] بازنده‌ی قفل' }, source: 'manual', notifySms: false,
+        },
+        { acquireSlotLock: lockThatLosesRace },
+      ),
+      (e: unknown) => (e as { code?: string }).code === 'SLOT_FULL',
+      'وقتی تنها میزِ ممکن پر شده، پیام باید «پر است» باشد نه «دوباره تلاش کنید»',
+    );
+  });
+
+  test('کنترلِ مثبت: اگر اسلات واقعاً آزاد باشد، همان ۴۲۳ی درست برمی‌گردد', async () => {
+    // بدونِ این تست، رفعِ بالا می‌توانست با «همیشه SLOT_FULL بده» هم پاس شود —
+    // که خودش یک دروغِ تازه در جهتِ عکس است (کاربری که واقعاً باید دوباره
+    // تلاش کند، بی‌دلیل ناامید می‌شود).
+    const lockAlwaysTimesOut = async <T>(_k: string, _t: number, _fn: () => Promise<T>): Promise<T> => {
+      throw Err.lockTimeout();
+    };
+    await assert.rejects(
+      createReservation(
+        {
+          restaurantId, date: SLOT_DATE, time: '12:00', partySize: 7,
+          guest: { name: '[DEMO] بازنده‌ی بی‌رقیب' }, source: 'manual', notifySms: false,
+        },
+        { acquireSlotLock: lockAlwaysTimesOut },
+      ),
+      (e: unknown) => (e as { code?: string }).code === 'SLOT_LOCK_TIMEOUT',
+    );
   });
 });
