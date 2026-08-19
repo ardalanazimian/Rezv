@@ -26,7 +26,11 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
     // (intelligenceScore=null) نباید بالای لیستِ «باارزش‌ترین‌ها» بیفتند —
     // پیش‌فرضِ Postgres برای DESC، NULLS FIRST است.
     : sort === 'intelligence' ? { intelligenceScore: { sort: 'desc' as const, nulls: 'last' as const } }
-    : { predictedClvToman: 'desc' as const };
+    // همان دلیلِ intelligenceScore بالا: predictedClvToman حالا nullable است
+    // (مبلغ اندازه‌گیری‌ناپذیر → NULL)، و DESCِ Postgres پیش‌فرض NULLS FIRST
+    // است — یعنی بدونِ این، مشتریانی که CLVشان اصلاً معلوم نیست بالایِ لیستِ
+    // «باارزش‌ترین‌ها» می‌نشستند.
+    : { predictedClvToman: { sort: 'desc' as const, nulls: 'last' as const } };
 
   const data = await cached(cacheKey('customers', ctx.restaurant.id, segment, sort, cursor), 60, async () => {
     const rows = await db.customerInsight.findMany({

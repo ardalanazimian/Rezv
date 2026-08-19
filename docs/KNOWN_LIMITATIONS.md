@@ -186,6 +186,70 @@
     real `res.ok`", and explicit offline labeling were already correct and
     are unchanged.
 
+## 2b. System audit — 2026-08-19 (read-only pass, verified against code not docs)
+
+- **`apps/business/src-v2/` is dead code — status now certain, was "(uncertain)".**
+  It holds exactly one file (`RestaurantIntelligenceDashboard.jsx`, 20 KB). Verified:
+  it is referenced by **nothing** outside itself; `apps/business` has **no
+  `package.json` and no bundler config**; `apps/business/index.html` loads only
+  classic `js/*.js` scripts. So the JSX cannot even be transpiled, let alone
+  mounted — it is unreachable *and* unbuildable. Its content is pure fabrication
+  (`MOCK_CUSTOMERS` with invented names/CLV/churn, `MOCK_CARDS` with invented
+  insights like "۱۲ مشتری در آستانه‌ی ریزش"), zero network calls, and it
+  duplicates capabilities that are **genuinely implemented** in the shipping
+  panel (`js/crm.js` really calls `API.rfm()`/`API.aiRecommendations()`/
+  `API.customers()` against real routes backed by `lib/rfm.ts`,
+  `lib/customer-insights.ts`, `lib/crm-recommendations.ts`).
+  **Classification:** Mock + Disconnected + Duplicated + Deprecated.
+  **Recommendation: delete it.** It ships no value and is a live trap — wiring it
+  up would instantly put fabricated CLV/churn numbers in front of a real
+  restaurant. Not deleted in this pass because removal is the owner's call.
+  **(decision needed)**
+- **Menu has no CRUD — the whole spend/CLV chain is structurally dead for real
+  restaurants.** `MenuItem` exists in Prisma and is *read* (public
+  `restaurants/[slug]` returns `menu[]`) and *consumed* (preorder on
+  `POST /reservations`, `restaurant/reports` top-items, spend in
+  `customer-insights.ts`). But there is **no route anywhere** to create, edit, or
+  delete a menu item — grep of all 134 API routes finds no menu endpoint — and no
+  menu screen in the business panel. The only code that ever inserts a `menu_items`
+  row is `prisma/seed.ts` (dev seed). Neither trial signup (`site-orders.ts`) nor
+  branch creation inserts any. Consequences, each verified in code:
+  1. every real restaurant has a permanently empty menu, with no way to fix it;
+  2. the customer preorder block is gated on `r.menu.length`, so preorder can
+     never render → no `reservation_items` rows are ever created;
+  3. therefore `customer-insights.ts` computes `totalSpend = 0` → `avgSpend = 0`
+     → `predictedClv = Math.round(visitsPerYear * 0) = 0` for **every** real
+     customer of **every** real restaurant, and writes those zeros to
+     `customer_insights` as if measured.
+  Building menu CRUD is a real feature, deliberately not attempted in this
+  audit pass. **(P1, open)**
+- **Customer-intelligence money fields cannot express "no data".**
+  `CustomerInsight.totalSpendToman` / `avgSpendToman` / `predictedClvToman` are
+  `Int @default(0)` — **not nullable** — so "we have no spend data" and "they
+  spent zero" are stored identically. Compounding this, Rezervno is deliberately
+  POS-agnostic (it never sees a bill), so the only spend source is preorders —
+  exactly what the schema comment on `total_spend_toman` says: «جمعِ
+  پیش‌سفارش‌ها». Labelling that column "کل خرج" (total spend) in the panel
+  overstated what it measures even when non-zero.
+  **Mitigated at the presentation layer in this pass** (`js/crm.js`): the tile is
+  relabelled «پیش‌سفارش», zero renders as «—» rather than «۰», and an explicit
+  note states that a zero is not a measurement. **Residual:** the DB still cannot
+  distinguish the two cases; a proper fix makes those columns nullable (schema +
+  migration, high-risk per repo convention) or adds a `spend_source` marker.
+  **(residual, open)**
+- **Verified healthy, no change made (checked rather than assumed):**
+  *Integrations* — there is no connector/adapter code at all and, importantly,
+  **no UI anywhere claiming a false "connected" state**; absent-and-honest beats
+  faked (matches the "integration-ready ≠ integrated" rule).
+  *Revenue widget* (`js/overview.js`) — it does estimate revenue from hardcoded
+  coefficients (`REVENUE_CONFIG.avgPerGuest`) because no POS is connected, but it
+  renders an explicit note that the figures are estimates, so it is a labelled
+  inference, not a fabricated KPI.
+  *`POST /v1/telemetry`* — a real behavioural-event ingest with
+  server-authoritative `userId`/`source`/`device` (client cannot spoof them).
+  *Live-app mock sweep* — no `MOCK_`/`FAKE_`/`SAMPLE_` constants remain in
+  `apps/{customer,business,company}/js` or `shared/js`.
+
 ## 3. Backend / Domain
 
 - **No repository layer.** Services call Prisma (and raw SQL) directly. This is
