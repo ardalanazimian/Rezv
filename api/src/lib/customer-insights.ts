@@ -133,9 +133,22 @@ export async function recomputeCustomerInsight(restaurantId: string, userId: str
   const noShows = reservations.filter(r => r.status === 'no_show').length;
   const cancels = reservations.filter(r => ['cancelled', 'cancelled_by_user', 'cancelled_by_restaurant', 'auto_cancelled'].includes(r.status)).length;
 
-  const totalSpend = visits.reduce((sum, r) => sum + r.items.reduce((s, it) => s + it.qty * it.menuItem.priceToman, 0), 0);
+  // ⚠️ صفرِ تأییدشده در برابرِ نامعلوم (ممیزیِ ۲۰۲۶-۰۸-۱۹).
+  // رزرونو POS-agnostic است و مبلغِ فاکتور را نمی‌بیند؛ تنها منبعِ مبلغ
+  // پیش‌سفارش از منوست. اگر رستوران هیچ آیتمِ منویِ فعالِ قیمت‌دار نداشته باشد،
+  // پیش‌سفارش اصلاً ممکن نیست — پس «۰ تومان» یک اندازه‌گیری نیست، یک آرتیفکت
+  // است. در آن حالت NULL می‌نویسیم (= نامعلوم). اگر منو وجود دارد ولی مهمان
+  // چیزی پیش‌سفارش نداده، ۰ یک واقعیتِ تأییدشده است و همان ۰ ذخیره می‌شود.
+  const pricedMenuCount = await db.menuItem.count({
+    where: { restaurantId, isActive: true, priceToman: { gt: 0 } },
+  });
+  const spendMeasurable = pricedMenuCount > 0;
+
   const totalVisits = visits.length;
-  const avgSpend = totalVisits ? Math.round(totalSpend / totalVisits) : 0;
+  const totalSpend = spendMeasurable
+    ? visits.reduce((sum, r) => sum + r.items.reduce((s, it) => s + it.qty * it.menuItem.priceToman, 0), 0)
+    : null;
+  const avgSpend = totalSpend === null ? null : (totalVisits ? Math.round(totalSpend / totalVisits) : 0);
 
   const firstVisit = visits[0]?.slotStart ?? null;
   const lastVisit = visits[totalVisits - 1]?.slotStart ?? null;
@@ -149,7 +162,9 @@ export async function recomputeCustomerInsight(restaurantId: string, userId: str
   // ── پیش‌بینی CLV ۱۲ ماه آینده: تعداد بازدید پیش‌بینی‌شده × میانگین هزینه ──
   // اگر فاصله‌ی بازدید نامعلوم (فقط ۱ بازدید)، فرض پایه‌ی محتاطانه: ۴ بازدید/سال در صورت بازگشت
   const visitsPerYear = freqDays ? Math.min(52, 365 / freqDays) : totalVisits === 1 ? 2 : 0;
-  const predictedClv = Math.round(visitsPerYear * (avgSpend || 0));
+  // بدونِ ورودیِ مبلغی، CLV یک پیش‌بینی نیست — حاصل‌ضرب در صفر است. به‌جایِ
+  // تولیدِ «۰ تومان» به‌عنوانِ پیش‌بینی، صریحاً «نامعلوم» می‌ماند.
+  const predictedClv = avgSpend === null ? null : Math.round(visitsPerYear * avgSpend);
 
   const totalAttempts = totalVisits + noShows;
   const noShowRatePct = totalAttempts ? Math.round((noShows / totalAttempts) * 100) : 0;

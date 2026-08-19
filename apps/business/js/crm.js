@@ -491,7 +491,11 @@ const RFM_META={
  * می‌خوانیم و خانه را خالی نشان می‌دهیم، نه «۰ تومان».
  */
 function clvHasSpend(clv){
-  return !!(clv && (clv.total_spend_toman > 0 || clv.predicted_clv_toman > 0));
+  // دقیقاً null/undefined را چک می‌کنیم، نه falsy: بعد از migration ۰۴۶ عددِ ۰
+  // یک واقعیتِ تأییدشده است («منو داشت، پیش‌سفارش نداد») و باید «۰» نشان داده
+  // شود؛ فقط null یعنی «نمی‌دانیم» و باید «—» شود. اگر اینجا `!value` بنویسیم،
+  // همان دو حالتی که در دیتابیس تفکیک کردیم دوباره در UI یکی می‌شوند.
+  return !!clv && clv.total_spend_toman != null;
 }
 
 // رندر دمو داشبورد هوش مشتری (از GUESTS نمونه) — برای دمو و آفلاین
@@ -660,7 +664,7 @@ async function custRenderProfiles(){
       return `<div class="smart-card ${urg}">
         <div class="smart-top">
           <div class="smart-ava">${c.is_vip?icon('crown',{size:18,fill:true}):icon('user',{size:18})}</div>
-          <div style="flex:1"><div class="smart-name">${esc(c.name)}</div><div style="font-size:12px;color:var(--t2)">${esc(SEG_FA[c.segment]||c.segment||'')} · ${fa(c.total_visits)} بازدید${c.predicted_clv_toman?` · ${fnl(c.predicted_clv_toman)} تومان CLV`:''}</div></div>
+          <div style="flex:1"><div class="smart-name">${esc(c.name)}</div><div style="font-size:12px;color:var(--t2)">${esc(SEG_FA[c.segment]||c.segment||'')} · ${fa(c.total_visits)} بازدید${c.predicted_clv_toman!=null?` · ${fnl(c.predicted_clv_toman)} تومان CLV`:''}</div></div>
           <span style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:50px;background:${urg==='high'?'var(--red-50)':urg==='med'?'var(--amber-50)':'var(--green-50)'};color:${urgClr[urg]}">${urg==='high'?'پرریسک':urg==='med'?'بررسی کن':'پایدار'}</span>
         </div>
         ${c.intelligence_score!=null?`<div style="display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:11.5px;color:var(--t2)">${icon('sparkle',{size:12,fill:true})} امتیازِ هوشِ مشتری: <b style="color:${iqClr[c.intelligence_tier]||'var(--t2)'}">${fa(c.intelligence_score)}</b> · ${iqFa[c.intelligence_tier]||''}</div>`:''}
@@ -895,7 +899,7 @@ async function openCustomerDetail(userId){
       <div class="sig"><div class="sig-val">${clvHasSpend(clv)?fnl(clv.total_spend_toman):'—'}</div><div class="sig-label">پیش‌سفارش (ت)</div></div>
       <div class="sig"><div class="sig-val">${clvHasSpend(clv)?fnl(clv.predicted_clv_toman):'—'}</div><div class="sig-label">CLV (ت)</div></div>
     </div>
-    ${clvHasSpend(clv)?'':`<div style="margin-top:8px;font-size:11.5px;color:var(--t2);line-height:1.7">${icon('info',{size:12})} برایِ این مشتری دادهٔ مبلغی ثبت نشده، پس CLV محاسبه‌پذیر نیست. رزرونو به صندوق وصل نیست و مبلغِ فاکتور را نمی‌بیند؛ تنها منبعِ مبلغ، <b>پیش‌سفارش از منو</b> است. تا وقتی منو تعریف نشده یا مهمان پیش‌سفارش نداده، این دو خانه خالی می‌مانند — عددِ صفر به‌معنیِ «خرجِ صفر» نیست.</div>`}
+    ${clvHasSpend(clv)?'':`<div style="margin-top:8px;font-size:11.5px;color:var(--t2);line-height:1.7">${icon('info',{size:12})} مبلغ برایِ این مشتری <b>اندازه‌گیری‌ناپذیر</b> است، پس CLV محاسبه نمی‌شود. رزرونو به صندوق وصل نیست و مبلغِ فاکتور را نمی‌بیند؛ تنها منبعِ مبلغ، <b>پیش‌سفارش از منو</b> است و این رستوران هنوز منویِ قیمت‌داری ثبت نکرده. «—» یعنی نامعلوم؛ اگر منو داشته باشید و مهمان چیزی پیش‌سفارش ندهد، به‌جایش «۰» می‌بینید که یک واقعیتِ تأییدشده است.</div>`}
     <div class="sig-row" style="margin-top:10px">
       <div class="sig"><div class="sig-val" style="color:var(--red)">${fa(risk.churn_risk_score||0)}٪</div><div class="sig-label">ریسک ریزش</div></div>
       <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(risk.no_show_rate_pct||0)}٪</div><div class="sig-label">عدم‌حضور</div></div>

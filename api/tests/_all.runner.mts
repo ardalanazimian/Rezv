@@ -52,6 +52,7 @@ import './guest-profile.test.mts';
 import './hours.test.mts';
 import './hours-approval.test.mts';
 import './hours-change-approval.integration.test.mts';
+import './customer-insight-spend-semantics.integration.test.mts';
 import './incentive-engine.test.mts';
 import './jwt.test.mts';
 import './lifecycle.test.mts';

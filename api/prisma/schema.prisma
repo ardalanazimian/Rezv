@@ -697,10 +697,10 @@ model CustomerInsight {
 
   // ── CLV ──
   totalVisits       Int             @default(0) @map("total_visits")
-  totalSpendToman   Int             @default(0) @map("total_spend_toman")     // جمع پیش‌سفارش‌ها (واقعی)
-  avgSpendToman     Int             @default(0) @map("avg_spend_toman")
+  totalSpendToman   Int?            @map("total_spend_toman")                 // جمعِ پیش‌سفارش‌ها. NULL = اندازه‌گیری‌ناپذیر (رستوران منویِ قیمت‌دار ندارد)، ۰ = واقعاً پیش‌سفارشی نداشته
+  avgSpendToman     Int?            @map("avg_spend_toman")                   // همان معنا؛ NULL ≠ ۰
   visitFrequencyDays Float?         @map("visit_frequency_days")              // میانگین فاصله‌ی بازدید
-  predictedClvToman Int             @default(0) @map("predicted_clv_toman")   // پیش‌بینی ۱۲ ماه آینده
+  predictedClvToman Int?            @map("predicted_clv_toman")               // پیش‌بینی ۱۲ ماه آینده. NULL = ورودیِ مبلغی نداریم، پس پیش‌بینی ساخته نمی‌شود
   firstVisitAt      DateTime?       @map("first_visit_at")
   lastVisitAt       DateTime?       @map("last_visit_at")
 
