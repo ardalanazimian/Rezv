@@ -1812,7 +1812,7 @@ function renderCustomers(){
     <div class="kpi-grid">
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic ink">${icon('users',{size:17})}</div></div><div class="kpi-val">${fa(d.guests.total)}</div><div class="kpi-label">کل مهمانان شناسایی‌شده</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic amber">${icon('star',{size:17,fill:true})}</div></div><div class="kpi-val">${fa(d.guests.vips)}</div><div class="kpi-label">مهمانان VIP</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('wallet',{size:17})}</div></div><div class="kpi-val">${fnl(d.guests.total_clv_toman)}</div><div class="kpi-label">ارزش طول عمر کل (تومان)</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('wallet',{size:17})}</div></div><div class="kpi-val">${fnl(d.guests.total_clv_toman)}</div><div class="kpi-label">ارزش طول عمر کل (تومان)${d.guests.total_clv_toman==null?' — اندازه‌گیری‌ناپذیر':d.guests.measured_guests!=null&&d.guests.measured_guests<d.guests.total?` (از ${fa(d.guests.measured_guests)} مهمانِ دارای مبلغ)`:''}</div></div>
     </div>
     <div class="row-2">
       <div class="panel">
@@ -1826,7 +1826,7 @@ function renderCustomers(){
     </div>
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">رستوران‌های برتر بر اساس ارزش مشتری (CLV)</div><div class="panel-sub">ارزش واقعی هر رستوران برای پلتفرم</div></div></div>
-      ${d.top_restaurants_by_value.length?d.top_restaurants_by_value.map((r,i)=>`<div class="list-stat"><div class="ls-rank">${fa(i+1)}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.customers)} مشتری تحلیل‌شده</div></div><div class="ls-val">${fnl(r.total_clv_toman)}</div></div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:20px">داده‌ای نیست</div>'}
+      ${d.top_restaurants_by_value.length?d.top_restaurants_by_value.map((r,i)=>`<div class="list-stat"><div class="ls-rank">${fa(i+1)}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.customers)} مشتری تحلیل‌شده${r.total_clv_toman==null?' · مبلغ اندازه‌گیری‌ناپذیر (منویِ قیمت‌دار ندارد)':''}</div></div><div class="ls-val">${fnl(r.total_clv_toman)}</div></div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:20px">داده‌ای نیست</div>'}
     </div>`;
 }
 
