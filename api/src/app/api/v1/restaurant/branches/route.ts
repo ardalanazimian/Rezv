@@ -64,6 +64,7 @@ export const POST = withRestaurantAuth({ permission: 'canManageSettings', rateLi
       slug,
       cuisine: b.cuisine,
       clubPrefix: clubPrefixFrom(b.name),
+      smsBalance: 50,
     },
     select: { id: true, name: true, slug: true },
   });

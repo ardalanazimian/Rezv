@@ -4,6 +4,9 @@ import { Err } from './errors';
 
 const log = createLogger('sms-balance');
 
+/** Starter SMS balance for new restaurants. */
+export const STARTER_SMS_BALANCE = 50;
+
 // ═══════════════════════════════════════════════════════════════════════
 //  مدیریت موجودی SMS
 //

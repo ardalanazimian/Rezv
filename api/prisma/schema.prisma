@@ -138,7 +138,7 @@ model Restaurant {
   cbPreorderPct Int              @default(8) @map("cb_preorder_pct") @db.SmallInt
   cbVipPct      Int              @default(12) @map("cb_vip_pct") @db.SmallInt
   cbWinbackPct  Int              @default(20) @map("cb_winback_pct") @db.SmallInt
-  smsBalance    Int              @default(0) @map("sms_balance")       // موجودی پیامک باقی‌مانده
+  smsBalance    Int              @default(50) @map("sms_balance")       // موجودی پیامک باقی‌مانده
   smsTotalSent  Int              @default(0) @map("sms_total_sent")    // کل پیامک ارسالی (آمار)
   // ⚠️ همگام‌سازی‌شده با DB زنده (migration 019/020 روی Supabase project zmyuvtpbchytqvtgyewt):
   // این فیلد و بقیه‌ی موارد مشابه («⚠️ همگام‌سازی‌شده») از قبل روی DB بودند ولی هرگز
