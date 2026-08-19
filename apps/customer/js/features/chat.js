@@ -4,7 +4,7 @@
 //  window.renderChats()                   → لیستِ همه‌ی گفتگوها.
 //  Polling فقط وقتی صفحه‌ی چت باز است فعال است (صرفه‌جویی در باتری/شبکه).
 // ═══════════════════════════════════════════════════════════
-import { API } from '../api.js';
+import { API, isLoggedIn } from '../api.js';
 import { icon } from '../icons.js';
 import { esc } from '../auth.js';
 
@@ -27,9 +27,28 @@ export async function renderChats(){
   if (!page) return;
   page.innerHTML = `<div class="chat-list-head"><button class="icon-btn" onclick="go('discover')" aria-label="بازگشت">${icon('arrowR',{size:20})}</button><h2>پیام‌ها</h2></div><div id="chatListBody" class="chat-list" aria-busy="true"><div class="skeleton skeleton-card" style="margin-bottom:var(--sp-3)"></div><div class="skeleton skeleton-card" style="margin-bottom:var(--sp-3)"></div><div class="skeleton skeleton-card"></div></div>`;
 
+  // مهمانِ وارد‌نشده اصلاً درخواست نمی‌فرستد: /me/chats قطعاً ۴۰۱ می‌دهد و
+  // نتیجه‌اش پیامِ گمراه‌کننده‌ی «اتصال برقرار نشد» بود. همان الگویی که
+  // loyalty/economy/food-dna دارند — دعوت به ورود، نه ادعای خرابیِ شبکه.
+  if (!isLoggedIn()) {
+    document.getElementById('chatListBody').innerHTML =
+      `<div class="chat-empty">برای دیدنِ گفتگوهات وارد شو.<br>
+       <button class="btn btn-primary" style="margin-top:var(--sp-4)" onclick="openLogin()">ورود / ثبت‌نام</button></div>`;
+    return;
+  }
+
   const res = await API.get('/me/chats');
   const body = document.getElementById('chatListBody');
-  if (!res.ok) { body.innerHTML = `<div class="chat-empty">اتصال برقرار نشد.</div>`; return; }
+  // سه حالتِ متفاوت، سه پیامِ متفاوت — تبدیلِ همه به «اتصال برقرار نشد»
+  // کاربر را دنبالِ عیب‌یابیِ اینترنتش می‌فرستاد در حالی که مشکل چیزِ دیگری بود.
+  if (!res.ok) {
+    let msg;
+    if (res.offline) msg = 'اتصال به سرور برقرار نشد. اینترنتت را بررسی کن و دوباره تلاش کن.';
+    else if (res.status === 401) msg = 'نشستت منقضی شده — دوباره وارد شو.<br><button class="btn btn-primary" style="margin-top:var(--sp-4)" onclick="openLogin()">ورود / ثبت‌نام</button>';
+    else msg = `بارگیریِ گفتگوها ناموفق بود${res.status ? ` (خطای ${res.status})` : ''}.`;
+    body.innerHTML = `<div class="chat-empty">${msg}</div>`;
+    return;
+  }
   const items = res.data.items || [];
   if (!items.length) { body.innerHTML = `<div class="chat-empty">هنوز گفتگویی نداری.<br>از صفحه‌ی هر رستوران می‌تونی پیام بدی.</div>`; return; }
 

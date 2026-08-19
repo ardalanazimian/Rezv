@@ -138,11 +138,18 @@ jobs:
   # ── مرحله ۴: E2E (Playwright، اپ کاستومر — API کاملاً mock می‌شود، بدونِ نیاز به DB/بک‌اند) ──
   e2e:
     runs-on: ubuntu-latest
-    # سقفِ زمانی چون این job بارها روی مرحله‌ی نصبِ مرورگر معلق مانده
-    # (۲۰۲۶-۰۸-۱۹: سه بار، یک‌بار ۴۵+ دقیقه) — دانلود از CDNِ Playwright و
-    # apt گاهی گیر می‌کند. بدونِ سقف، jobِ معلق تا پیش‌فرضِ ۶ ساعتِ گیت‌هاب
-    # ادامه می‌دهد و کلِ PR را بلاک می‌کند. با سقف، سریع قرمز می‌شود و
-    # می‌شود دوباره اجرا کرد. عدد سخاوتمندانه است: اجرای عادی ~۴ دقیقه.
+    # ایمیجِ رسمیِ Playwright: مرورگرها و کتابخانه‌های سیستمی‌شان از قبل داخلش
+    # هستند. چرا این‌طور شد (۲۰۲۶-۰۸-۱۹، بعد از چند اجرای شکست‌خورده):
+    #   • دانلودِ ~۱۵۰MB مرورگر از CDNِ Playwright بارها هنگ کرد (یک‌بار ۴۵+ دقیقه)
+    #   • بعد از رفعِ آن با کش، گلوگاه به `playwright install-deps` منتقل شد که
+    #     زیرِ پوسته apt-get است و آن هم پشتِ‌هم هنگ کرد (آخری تایم‌اوتِ ۱۲ دقیقه‌ای)
+    #   • و اندازه‌گیری شد که بدونِ آن کتابخانه‌ها WebKit اصلاً بالا نمی‌آید:
+    #     ۸۶ تستِ Chromium سبز، ۴۳ تستِ WebKit قرمز — حتی «lang=fa است؟»
+    # با این ایمیج هیچ‌کدام از آن دو مرحله لازم نیست، پس هر دو منبعِ ناپایداری
+    # (CDN و apt) از مسیرِ CI حذف می‌شوند. نسخه باید با @playwright/test در
+    # e2e/package.json یکی بماند — با ارتقاء، این تگ هم باید به‌روز شود.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
     timeout-minutes: 25
     defaults:
       run:
@@ -160,49 +167,12 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      # کشِ باینریِ مرورگرها: ریشه‌ی گیرکردنِ این job همین دانلودِ ~۱۵۰ مگابایتی
-      # از CDNِ Playwright بود. با cache hit اصلاً دانلودی در کار نیست.
-      # کلید بر پایه‌ی lockfile است تا با ارتقاء نسخه‌ی Playwright خودکار باطل شود.
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('e2e/package-lock.json') }}
-
-      # ⚠️ وابستگی‌های سیستمی جدا از دانلودِ مرورگر — و بدونِ retry.
-      # چرا: `install-deps` زیرِ پوسته apt-get را با کاربرِ root اجرا می‌کند.
-      # اگر وسطِ کار با timeout کشته شود، فرزندِ apt-get زنده می‌ماند و قفلِ
-      # /var/lib/apt/lists/lock را نگه می‌دارد؛ آن‌وقت هر تلاشِ بعدی بلافاصله
-      # با «Could not get lock» می‌شکند. این دقیقاً در اجرای قبلی رخ داد و
-      # retry را از کمک به ضرر تبدیل کرد. پس apt یک‌بار و بدونِ قطع اجرا شود.
-      - name: Install Playwright OS deps
-        timeout-minutes: 10
-        run: npx playwright install-deps chromium webkit
-
-      # فقط دانلودِ باینریِ مرورگر retry می‌شود — این بخش است که به CDN وابسته
-      # است، گیر می‌کند، و قطع‌کردنش هیچ حالتِ نیمه‌کاره‌ای باقی نمی‌گذارد.
-      # با cache hit اصلاً اجرا نمی‌شود.
-      - name: Install Playwright browsers
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        timeout-minutes: 18
-        run: |
-          for attempt in 1 2 3; do
-            echo "::group::دانلودِ مرورگر — تلاشِ $attempt"
-            if timeout 300 npx playwright install chromium webkit; then
-              echo "::endgroup::"; exit 0
-            fi
-            echo "::endgroup::"
-            echo "::warning::تلاشِ $attempt برای دانلودِ مرورگر شکست خورد/گیر کرد؛ دوباره تلاش می‌کنم"
-            sleep 15
-          done
-          echo "::error::دانلودِ مرورگرِ Playwright بعد از ۳ تلاش موفق نشد"
-          exit 1
-
       - name: Run E2E tests
         run: npm test
         env:
           CI: true
+          # مرورگرها در مسیرِ خودِ ایمیج‌اند، نه ~/.cache/ms-playwright.
+          PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
       - name: Upload Playwright report
         if: always()
