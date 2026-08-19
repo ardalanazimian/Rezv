@@ -23,7 +23,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: api/package-lock.json
-          # نکته: پس از اولین npm install و commit کردن package-lock.json، می‌توان به npm ci سوییچ کرد
+          # package-lock.json از ۲۰۲۶-۰۷-۲۹ کامیت شده — کامنتِ قبلی که می‌گفت
+          # «هنوز کامیت نشده» کهنه بود. `npm ci` واقعاً قفل را رعایت می‌کند.
 
       - name: Install dependencies
         run: npm ci || npm install
@@ -83,7 +84,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: api/package-lock.json
-          # نکته: پس از اولین npm install و commit کردن package-lock.json، می‌توان به npm ci سوییچ کرد
+          # package-lock.json از ۲۰۲۶-۰۷-۲۹ کامیت شده — کامنتِ قبلی که می‌گفت
+          # «هنوز کامیت نشده» کهنه بود. `npm ci` واقعاً قفل را رعایت می‌کند.
 
       - name: Install dependencies
         run: npm ci || npm install
@@ -123,7 +125,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: api/package-lock.json
-          # نکته: پس از اولین npm install و commit کردن package-lock.json، می‌توان به npm ci سوییچ کرد
+          # package-lock.json از ۲۰۲۶-۰۷-۲۹ کامیت شده — کامنتِ قبلی که می‌گفت
+          # «هنوز کامیت نشده» کهنه بود. `npm ci` واقعاً قفل را رعایت می‌کند.
       - name: Install dependencies
         run: npm ci || npm install
       - name: Audit dependencies
