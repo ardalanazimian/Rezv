@@ -138,6 +138,12 @@ jobs:
   # ── مرحله ۴: E2E (Playwright، اپ کاستومر — API کاملاً mock می‌شود، بدونِ نیاز به DB/بک‌اند) ──
   e2e:
     runs-on: ubuntu-latest
+    # سقفِ زمانی چون این job بارها روی مرحله‌ی نصبِ مرورگر معلق مانده
+    # (۲۰۲۶-۰۸-۱۹: سه بار، یک‌بار ۴۵+ دقیقه) — دانلود از CDNِ Playwright و
+    # apt گاهی گیر می‌کند. بدونِ سقف، jobِ معلق تا پیش‌فرضِ ۶ ساعتِ گیت‌هاب
+    # ادامه می‌دهد و کلِ PR را بلاک می‌کند. با سقف، سریع قرمز می‌شود و
+    # می‌شود دوباره اجرا کرد. عدد سخاوتمندانه است: اجرای عادی ~۴ دقیقه.
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: e2e
@@ -154,6 +160,9 @@ jobs:
         run: npm ci || npm install
 
       - name: Install Playwright browsers
+        # سقفِ مرحله‌ای: همین قدم است که معلق می‌ماند. اجرای سالم ۱.۵ تا ۵.۵
+        # دقیقه طول می‌کشد، پس ۱۲ دقیقه یعنی «واقعاً گیر کرده»، نه «کند است».
+        timeout-minutes: 12
         run: npx playwright install --with-deps chromium webkit
 
       - name: Run E2E tests
