@@ -250,6 +250,19 @@
   *Live-app mock sweep* — no `MOCK_`/`FAKE_`/`SAMPLE_` constants remain in
   `apps/{customer,business,company}/js` or `shared/js`.
 
+- **Push notifications: storage only, no real delivery.**
+  `POST/GET /api/v1/me/push-subscribe` really persists a per-user row
+  (`push_subscriptions`, migration `049`) instead of being a no-op — verified
+  live against real Postgres. But the response's `ready` field is hard-coded
+  `false` on purpose: there is still no FCM/APNs integration, so
+  `enabled:true` only means "the client's subscribe request was stored", not
+  "this device will actually receive a push". `sendPush()`
+  (`api/src/lib/notify.ts`) still only logs. Building real delivery needs a
+  provider key plus reading `token`/`endpoint` from this table inside
+  `sendPush()`. `sendEmail()` is in the same honest "log only, no provider
+  key" state and was left unchanged — no code gap there, just missing
+  production infrastructure. **(follow-up)**
+
 ## 3. Backend / Domain
 
 - **No repository layer.** Services call Prisma (and raw SQL) directly. This is

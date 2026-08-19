@@ -214,7 +214,7 @@ const API = {
   aiRecommendations(){ return this.get('/restaurant/ai'); },
   crmRecommendations(){ return this.get('/restaurant/crm/recommendations'); },
   // ── ورود بدون رزرو (walk-in واقعی، با عضویت خودکار باشگاه) ──
-  walkin(body){ return this.post('/restaurant/walkin', body); },
+  walkin(body, headers){ return this.post('/restaurant/walkin', body, headers); },
   // ── نظرات، گالری، یادداشت پرسنل، رویداد، تاریخچه‌ی کمپین (همه واقعی) ──
   reviews(qs){ return this.get('/restaurant/reviews'+(qs?'?'+qs:'')); },
   replyReview(id, reply){ return this.patch('/restaurant/reviews', { id, reply }); },
@@ -304,7 +304,11 @@ const Outbox = {
   },
   count(){ return this.load().length; },
 
-  // افزودن عملیات به صف. op = { type, path, method, body, label, localRef }
+  // افزودن عملیات به صف. op = { type, path, method, body, label, localRef, headers }
+  // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ): headers اختیاری — برای Idempotency-Key، تا
+  // وقتی این عملیات با برگشتِ اینترنت sync می‌شود همان کلیدی که موقعِ تلاشِ
+  // آنلاینِ اولیه ساخته شد استفاده شود (نه کلیدی تازه، که یعنی سرور دوباره
+  // اجرا می‌کند و رزروِ دوم می‌سازد). رجوع کن به walkinCheckinReal.
   enqueue(op){
     this.load();
     op.id = 'op_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
@@ -331,7 +335,7 @@ const Outbox = {
       op.attempts = (op.attempts||0) + 1;
       let res;
       try {
-        res = await API.request(op.path, { method: op.method || 'POST', body: op.body ? JSON.stringify(op.body) : undefined });
+        res = await API.request(op.path, { method: op.method || 'POST', body: op.body ? JSON.stringify(op.body) : undefined, headers: op.headers });
       } catch { res = { ok:false, offline:true }; }
 
       if(res.offline){
