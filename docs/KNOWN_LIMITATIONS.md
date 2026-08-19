@@ -27,6 +27,29 @@
 
 ## 2. Frontend
 
+- **Customer app invented three events for every real user (fixed 2026-08-19,
+  PR #30).** `renderEvents()` in `apps/customer/js/data/discover.js` fell back to
+  `SAMPLE_EVENTS` whenever the server's list came back empty. `special_events` is
+  empty in *every* fresh deployment — verified on this database, where
+  `GET /api/v1/events` returns exactly `{"events":[]}` — so in practice the
+  fallback was the *normal* path, not the exceptional one: essentially all real
+  users saw three invented events ("شب موسیقی جاز زنده", "شب طعم و شراب‌نمایی",
+  "میز سرآشپز") attributed by name to listed restaurants, with specific dates and
+  prices. A "نمونه" chip was shown, so it was not an outright lie, but it
+  contradicts the project's own rule — `e2e/tests/social-proof.spec.ts` locks
+  "no claim without real data". Now three cases are distinguished, matching the
+  discipline `booking.js` already had: server answered with an empty list → honest
+  empty state; server unreachable (`res.offline`) → samples with the "نمونه" chip;
+  real server error → the error plus its status code, not samples hiding it.
+  Locked by a new test in `social-proof.spec.ts`, proven by mutation test.
+- **Chat page told logged-out users "اتصال برقرار نشد" (fixed 2026-08-19,
+  PR #30).** `apps/customer/js/features/chat.js` treated every non-`ok` response
+  identically, so a **401** rendered as a connection error — sending the user to
+  debug their internet when they simply needed to log in. Every other gated page
+  (`loyalty`/`economy`/`food-dna`) already said "هنوز وارد نشدی" correctly. Chat
+  now follows the same contract: logged out → login invitation with no pointless
+  request; `offline` → connection message; `401` → "نشستت منقضی شده"; anything
+  else → the error with its status code.
 - **Company panel platform metrics were silently all-zero (fixed 2026-08-19).**
   Migration 046 made `customer_insights` money columns nullable, but the
   cross-restaurant rollup (`lib/guest-profile.ts`) still wrote into
@@ -489,8 +512,29 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
 - **E2E fully mocks the API** — it validates the customer UI/flows but not the
   real API contract end-to-end. Consider a small contract/integration suite
   against a real backend.
-- No `e2e/package-lock.json` committed yet (CI note) — E2E installs are
-  unpinned.
+- ~~No `e2e/package-lock.json` committed yet — E2E installs are unpinned.~~
+  **This was already false when written.** All four lockfiles are tracked:
+  `api/` since 2026-07-29, `apps/seo/` since 2026-07-30, and `e2e/` +
+  `apps/landing/` since 2026-08-06. The note survived long after the fact and
+  also cost the e2e job its npm cache, because `ci.yml` carried matching stale
+  comments and left `cache:` unset there. Both are corrected.
+- **The e2e job runs inside the official Playwright image (2026-08-19).**
+  `ci.yml` used to `npx playwright install --with-deps`, which made every run
+  depend on two external services, and both failed in the same day: the
+  Playwright CDN hung repeatedly (one run sat 45+ minutes on a ~150MB browser
+  download), and once that was cached the bottleneck moved to
+  `install-deps`, which is `apt-get` underneath and hung in turn. An attempt to
+  make the system libraries best-effort was measured and **rejected**: without
+  them Chromium passed 86 tests while WebKit failed all 43, down to
+  "is `lang=fa`?" — so they are genuinely required, not optional. Running the
+  job in `container: mcr.microsoft.com/playwright:v1.62.1-noble` removes both
+  steps entirely (browsers and their OS libraries ship in the image), costing
+  ~27s of container startup against a download that had hung for 45+ minutes.
+  ⚠️ **Maintenance:** the image tag must stay in lockstep with
+  `@playwright/test` in `e2e/package.json` — bump both together.
+- **Local development still needs `npx playwright install`.** Only CI changed;
+  the setup instructions in `README.md`, `e2e/README.md`, and
+  `PROJECT_KNOWLEDGE.md` remain correct for a local machine.
 
 ## 8. Scalability Concerns (summary)
 
