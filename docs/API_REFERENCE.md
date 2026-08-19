@@ -32,7 +32,7 @@
 | `TABLE_CONFLICT` / `SLOT_FULL` | 409 | Slot/table already taken. |
 | `CONCURRENCY_RETRY` | 409 | Serialization retry exhausted; retry request. |
 | `RESERVATION_EXPIRED` | 410 | Hold expired. |
-| `SLOT_LOCK_TIMEOUT` | 423 | Slot being booked by someone else. |
+| `SLOT_LOCK_TIMEOUT` | 423 | Slot genuinely contended — another request holds the lock and the slot is **not** provably full, so retrying can still succeed. Since 2026-08-19 the engine re-checks real occupancy before returning this: if every candidate table has meanwhile been taken it returns `SLOT_FULL`/`TABLE_CONFLICT` (409) instead, so a 423 is never a dead-end "try again". |
 | `RESTAURANT_CLOSED` / `RESTAURANT_OFFLINE` / `OUTSIDE_HOURS` / `PAST_TIME` / `TOO_FAR_AHEAD` / `PARTY_TOO_LARGE` / `NO_TABLE_FOR_PARTY` / `TABLE_TOO_SMALL` / `INVALID_STATUS_TRANSITION` | 422/404/409 | Reservation-engine domain errors. |
 | `RATE_LIMITED` | 429 | Per-route rate limit; `details.retryAfterSec`. |
 | `INTERNAL` | 500 | Unexpected error (details never leaked). |

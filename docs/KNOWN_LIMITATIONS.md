@@ -328,24 +328,24 @@
   up would instantly put fabricated CLV/churn numbers in front of a real
   restaurant. Not deleted in this pass because removal is the owner's call.
   **(decision needed)**
-- **Menu has no CRUD — the whole spend/CLV chain is structurally dead for real
-  restaurants.** `MenuItem` exists in Prisma and is *read* (public
-  `restaurants/[slug]` returns `menu[]`) and *consumed* (preorder on
-  `POST /reservations`, `restaurant/reports` top-items, spend in
-  `customer-insights.ts`). But there is **no route anywhere** to create, edit, or
-  delete a menu item — grep of all 134 API routes finds no menu endpoint — and no
-  menu screen in the business panel. The only code that ever inserts a `menu_items`
-  row is `prisma/seed.ts` (dev seed). Neither trial signup (`site-orders.ts`) nor
-  branch creation inserts any. Consequences, each verified in code:
-  1. every real restaurant has a permanently empty menu, with no way to fix it;
-  2. the customer preorder block is gated on `r.menu.length`, so preorder can
-     never render → no `reservation_items` rows are ever created;
-  3. therefore `customer-insights.ts` computes `totalSpend = 0` → `avgSpend = 0`
-     → `predictedClv = Math.round(visitsPerYear * 0) = 0` for **every** real
-     customer of **every** real restaurant, and writes those zeros to
-     `customer_insights` as if measured.
-  Building menu CRUD is a real feature, deliberately not attempted in this
-  audit pass. **(P1, open)**
+- **Menu has no CRUD — ~~structurally dead~~ SHIPPED 2026-08-19, entry kept for
+  history.** The original finding was correct when written: `MenuItem` was read
+  (public `restaurants/[slug]` returned `menu[]`) and consumed (preorder,
+  `restaurant/reports` top-items, spend in `customer-insights.ts`) but **no route
+  anywhere** could create, edit, or delete one, so every real restaurant had a
+  permanently empty menu. That gap is now closed — verified by listing the
+  routes, not by trusting this file:
+  `restaurant/menu/route.ts` (list + create), `restaurant/menu/[id]/route.ts`
+  (update + delete/archive), `restaurant/menu/[id]/photo/route.ts` (upload +
+  delete), `restaurant/menu/branding/route.ts`, `restaurant/menu/qr/route.ts`,
+  plus the public `restaurants/[slug]/menu` reader and a real panel screen
+  (`apps/business/js/menu.js`). Locked by `tests/menu-crud.integration.test.mts`
+  and `tests/public-menu.integration.test.mts`.
+  **What is still true:** the spend/CLV chain remains preorder-only, so a
+  restaurant that fills its menu but takes no preorders still produces
+  `totalSpend = 0 → avgSpend = 0 → predictedClv = 0`. Menu CRUD unblocked the
+  chain; it did not make Rezervno POS-aware. See the next bullet.
+  **(resolved — chain still preorder-gated)**
 - **Customer-intelligence money fields cannot express "no data".**
   `CustomerInsight.totalSpendToman` / `avgSpendToman` / `predictedClvToman` are
   `Int @default(0)` — **not nullable** — so "we have no spend data" and "they
@@ -385,6 +385,64 @@
   `sendPush()`. `sendEmail()` is in the same honest "log only, no provider
   key" state and was left unchanged — no code gap there, just missing
   production infrastructure. **(follow-up)**
+
+## 2c. Live P0 verification — 2026-08-19 (real Postgres + Redis + running API)
+
+Everything below was run against a live stack (Postgres 16.13, Redis 7.0.15,
+the API serving on `:3000`), not reasoned about from source. Every verdict is
+confirmed by querying the database directly, because an HTTP status code only
+tells you what the API *said*, not what it *wrote*.
+
+- **30 concurrent users, same restaurant / date / time / one table — PASS.**
+  A purpose-built isolated restaurant with **exactly one** table and 30 distinct
+  real users, all fired with `Promise.all` (no queue, no artificial delay — the
+  standing trap here is that serialising the requests makes the test pass
+  without ever creating a race). Result: `success: 1`, `rejected: 29`,
+  `other: 0`. Database evidence: exactly **1** reservation row, and an
+  independent self-join over `tsrange(slot_start, block_end) &&` returned
+  **0 overlapping pairs**. Correctness of the booking engine is not in question.
+- **Idempotency — PASS.** 5 concurrent `POST /reservations` with one identical
+  `Idempotency-Key`: `{201: 1, 409: 4}` with `IDEMPOTENCY_CONFLICT`, and exactly
+  **1** row in the database.
+- **Tenant isolation, tested at the API layer — PASS, with positive control.**
+  Two fully independent tenants; tenant **B** was given a real reservation and a
+  real menu item first, because a test that only asserts "A cannot see B's data"
+  passes vacuously when B has no data. With a staff token for **A** plus an
+  `X-Restaurant-Id: <B>` override header: `/restaurant/reservations`,
+  `?date=today`, `/restaurant/customers`, `/restaurant/analytics` all returned
+  **0** matches for B's secret guest, while B's own token returned **1** (the
+  control). `PATCH /restaurant/menu/branding` with the override header wrote to
+  **A**, not B. IDOR `PATCH`/`DELETE`/photo-upload against B's menu item id all
+  returned 404. `GET /restaurant/menu/qr` with the override returned **A's** own
+  slug. Now locked as an automated regression test
+  (`tests/tenant-isolation.integration.test.mts`) whose negative assertions are
+  each paired with a positive control, and which was mutation-tested: dropping
+  the `restaurantId` constraint from the IDOR query makes it fail.
+
+- **Finding, fixed in the same pass: the booking engine told 26 of 29 rejected
+  users to "try again" for a slot that was permanently full.**
+  The concurrency run above is what exposed it — reading the code would not
+  have. Original codes: `{201: 1, 409: 3, 423: 26}`; the 26 were
+  `SLOT_LOCK_TIMEOUT` («این بازه در حال رزرو توسط کاربر دیگری است؛ دوباره تلاش
+  کنید»). Correctness was never affected — the Redis lock did its job and only
+  one row was written — but the *message* was false: those users were told to
+  retry something that could never succeed, which is both bad UX and a
+  self-inflicted retry storm on an already-full slot. It also had a concrete
+  downstream cost: `apps/customer/js/data/booking.js` only offers the waitlist
+  when the error is `SLOT_FULL`/`NO_TABLE_FOR_PARTY`, so those 26 users were
+  denied the one action that would have helped them.
+  **Fix** (`api/src/lib/reservations.ts`): the lock is unchanged and the DB
+  remains the source of truth; on `SLOT_LOCK_TIMEOUT` the engine re-reads real
+  occupancy once, and only when it can *prove* every candidate table is taken
+  does it return the honest `SLOT_FULL` / `TABLE_CONFLICT`. Deliberately
+  conservative — in the merge path (no single-table candidate) or if that
+  re-read fails, the original 423 still stands.
+  **Re-run after the fix, same 30-user setup:** `{201: 1, 409: 29}`, all 29
+  `SLOT_FULL`, still exactly 1 row and 0 overlapping pairs in the database.
+  Locked by two tests in `tests/table-merge-occupancy-concurrency.test.mts`,
+  including a positive control proving the engine does *not* simply always
+  answer `SLOT_FULL` (which would be a new lie in the opposite direction), and
+  mutation-tested.
 
 ## 3. Backend / Domain
 
@@ -576,6 +634,23 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   `db.ts`/`redis.ts` themselves is **unchanged** — the same deadlock remains
   a latent risk for any other standalone script/worker that opens a live
   Redis connection and doesn't call `process.exit()` itself. **(follow-up)**
+- **The `beforeExit` deadlock above is confirmed, not hypothetical
+  (2026-08-19).** Running a single connection-opening test file directly
+  (`npx tsx --test tests/table-merge-occupancy-concurrency.test.mts`) prints a
+  full green TAP report and then **never exits** — it had to be killed by
+  `timeout`. This is exactly the latent risk the previous bullet describes:
+  the fix lives only in `_all.runner.mts`'s `after()` hook, so `npm test` is
+  fine while any standalone run of such a file hangs. Harmless for CI, a real
+  trap for local debugging and for any future worker script. **(follow-up)**
+- **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
+  The pass added `tests/tenant-isolation.integration.test.mts` (5) and two
+  lock-honesty tests in `table-merge-occupancy-concurrency.test.mts`. Both
+  additions were **mutation-tested** — the isolation lock fails when the
+  `restaurantId` constraint is removed from its IDOR query, and the
+  lock-honesty test fails when the `SLOT_LOCK_TIMEOUT` re-check is disabled —
+  so neither is a test that would pass with the bug reintroduced. The
+  registration check documented in `_all.runner.mts` was re-run: every
+  `tests/*.test.mts` file is imported.
 - **E2E fully mocks the API** — it validates the customer UI/flows but not the
   real API contract end-to-end. Consider a small contract/integration suite
   against a real backend.
