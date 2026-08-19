@@ -10,6 +10,9 @@ import { trainAndCalibrateDemandForecast } from '@/lib/demand-forecast';
 import { invalidatePattern } from '@/lib/cache';
 import { guardMaintenance } from '@/lib/maintenance-auth';
 import { errorResponse } from '@/lib/errors';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('maintenance:customer-insights');
 
 /**
  * POST /api/v1/maintenance/customer-insights — cron شبانه (هر روز یک‌بار کافی است).
@@ -73,13 +76,32 @@ export async function POST(req: Request) {
     const automationResult = await runAllDueAutomations();
 
     // پروفایل سراسری مهمانان را از insightهای به‌روز بازسازی کن (cross-restaurant)
-    const guestProfiles = await rebuildGuestProfiles().catch(() => ({ profiles: 0 }));
+    //
+    // ⚠️ شکست را دیگر به «۰ پروفایل» ترجمه نمی‌کنیم. نسخه‌ی قبلی
+    // `.catch(() => ({ profiles: 0 }))` داشت و همان یک خط باعث شد یک باگِ
+    // واقعی ماه‌ها نامرئی بماند: بعد از migration ۰۴۶ کلِ INSERT با خطای
+    // not-null می‌شکست، ولی این جاب `ok:true` و `guest_profiles: 0`
+    // برمی‌گرداند — یعنی «موفق بودم و صفر پروفایل ساختم»، درحالی‌که واقعیت
+    // «کاملاً شکست خوردم» بود. خطا باید دیده شود، نه به دادهٔ خالی تبدیل.
+    let guestProfilesCount: number | null = null;
+    let guestProfilesError: string | null = null;
+    try {
+      guestProfilesCount = (await rebuildGuestProfiles()).profiles;
+    } catch (err) {
+      guestProfilesError = err instanceof Error ? err.message : String(err);
+      log.error('بازسازیِ پروفایلِ سراسریِ مهمانان شکست خورد', { error: guestProfilesError });
+    }
 
     // اسکنِ سراسریِ فارمینگِ رفرال (restaurant-scoped نیست، یک‌بار کافی است)
     const platformAbuse = await applyPlatformAbuseFlags().catch(() => ({ signals: [], flaggedUserIds: [] }));
 
     return NextResponse.json({
-      ok: true, restaurants: restaurants.length, users_recomputed: totalUsers, guest_profiles: guestProfiles.profiles,
+      // ok فقط وقتی true است که واقعاً همه‌چیز انجام شده باشد.
+      ok: guestProfilesError === null,
+      restaurants: restaurants.length, users_recomputed: totalUsers,
+      // null = اجرا شکست خورد (دلیلش در guest_profiles_error)، نه «صفر پروفایل».
+      guest_profiles: guestProfilesCount,
+      ...(guestProfilesError ? { guest_profiles_error: guestProfilesError } : {}),
       no_show_models_trained: noShowModelsTrained, no_show_models_active: noShowModelsActive,
       demand_forecasts_trained: demandForecastsTrained,
       demand_forecasts_count_active: demandForecastsCountActive,

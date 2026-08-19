@@ -949,8 +949,10 @@ model GuestProfile {
   // FK واقعی به users نداشت.
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   globalVisits        Int      @default(0) @map("global_visits")
-  globalSpendToman    Int      @default(0) @map("global_spend_toman")
-  globalClvToman      Int      @default(0) @map("global_clv_toman")
+  // NULL = اندازه‌گیری‌ناپذیر (هیچ رستورانِ این مهمان منویِ قیمت‌دار ندارد)؛ 0 = صفرِ تأییدشده.
+  // هم‌قرارداد با customer_insights (migration ۰۴۶) — رجوع کن به migration ۰۵۱.
+  globalSpendToman    Int?     @map("global_spend_toman")
+  globalClvToman      Int?     @map("global_clv_toman")
   restaurantsVisited  Int      @default(0) @map("restaurants_visited")
   lastVisitAnywhere   DateTime? @map("last_visit_anywhere")
   isVipAnywhere       Boolean  @default(false) @map("is_vip_anywhere")
