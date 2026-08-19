@@ -122,8 +122,16 @@ async function buildYesterdayAnswer(restaurantId: string): Promise<ManagerAnswer
   };
 }
 
-/** سؤالِ ۲: «کدام روزهای هفته قوی‌ترند؟» — رتبه‌بندیِ کاملِ ۷ روز (نه فقط ضعیف‌ترین). */
-async function buildDowRankingAnswer(restaurantId: string): Promise<ManagerAnswer | null> {
+export interface DowRankingRow { dow: number; count: number }
+
+/**
+ * رتبه‌بندیِ کاملِ ۷ روزِ هفته بر اساسِ تعدادِ رزروِ ۶۰ روزِ اخیر — نزولی
+ * (پرترددترین اول). خالص از نظرِ فرمت‌بندی (فقط query+map)، تا هم
+ * buildDowRankingAnswer هم دستیارِ هوشمند (lib/assistant-answers.ts) از
+ * همین یک کوئری استفاده کنند، نه دو کپیِ جدا از همان SQL.
+ * null یعنی داده‌ی خیلی کم برایِ رتبه‌بندیِ معنادار.
+ */
+export async function getWeekdayRanking(restaurantId: string): Promise<DowRankingRow[] | null> {
   const rows = await db.$queryRaw<{ dow: number; cnt: bigint }[]>`
     SELECT EXTRACT(DOW FROM slot_start)::int AS dow, COUNT(*)::bigint AS cnt
     FROM reservations
@@ -134,7 +142,16 @@ async function buildDowRankingAnswer(restaurantId: string): Promise<ManagerAnswe
   `;
   const totalDays = rows.reduce((s, r) => s + Number(r.cnt), 0);
   if (rows.length < 5 || totalDays < 30) return null; // داده‌ی خیلی کم برایِ رتبه‌بندیِ معنادار
-  const sorted = [...rows].sort((a, b) => Number(b.cnt) - Number(a.cnt));
+  return rows
+    .map((r) => ({ dow: r.dow, count: Number(r.cnt) }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** سؤالِ ۲: «کدام روزهای هفته قوی‌ترند؟» — رتبه‌بندیِ کاملِ ۷ روز (نه فقط ضعیف‌ترین). */
+async function buildDowRankingAnswer(restaurantId: string): Promise<ManagerAnswer | null> {
+  const sorted = await getWeekdayRanking(restaurantId);
+  if (!sorted) return null;
+  const totalDays = sorted.reduce((s, r) => s + r.count, 0);
   const strongest = sorted.slice(0, 2).map((r) => DAY_NAMES_FA[r.dow]);
   const weakest = sorted[sorted.length - 1];
   const weakestName = DAY_NAMES_FA[weakest.dow];
@@ -143,7 +160,7 @@ async function buildDowRankingAnswer(restaurantId: string): Promise<ManagerAnswe
     id: 'strongest_weekdays',
     question: 'کدام روزهای هفته قوی‌ترند؟',
     finding: `${strongest.join(' و ')} پرتقاضاترین روزهای شما هستند (۶۰ روزِ اخیر).`,
-    evidence: `${sorted.map((r) => `${DAY_NAMES_FA[r.dow]}: ${fmtInt(Number(r.cnt))}`).join('، ')}.`,
+    evidence: `${sorted.map((r) => `${DAY_NAMES_FA[r.dow]}: ${fmtInt(r.count)}`).join('، ')}.`,
     confidence: totalDays >= 100 ? 'high' : 'medium',
     recommended_action: `${weakestName} کم‌تقاضاترین روز است — کوپنِ اختصاصی یا تبلیغِ همان روز می‌تواند ترافیک را جابه‌جا کند.`,
   };
