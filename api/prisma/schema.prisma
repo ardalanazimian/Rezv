@@ -257,6 +257,8 @@ model MenuItem {
   priceToman   Int               @map("price_toman")
   isActive     Boolean           @default(true) @map("is_active")
   soldCount    Int               @default(0) @map("sold_count")
+  // دسته‌بندیِ منو (پیش‌غذا/اصلی/دسر/نوشیدنی/…). NULL = دسته‌بندی‌نشده.
+  category     String?
   inOrders     ReservationItem[]
   // کوئری منو: آیتم‌های فعال یک رستوران
   @@index([restaurantId, isActive])
