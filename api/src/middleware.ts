@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientIp, rateLimitHeaders, RULES, isBanned, recordViolation, rateLimitWithFallback } from '@/lib/ratelimit';
+import { parseAllowedOrigins } from '@/lib/security';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ این middleware به ioredis (از طریق ratelimit/redis) وابسته است که به
@@ -29,14 +30,36 @@ export const runtime = 'nodejs';
 // شبیهِ خطای کامپایل به‌نظر می‌رسد. حالا build همیشه موفق است و اگر متغیر تنظیم
 // نشده باشد، نخستین درخواست در production با همین پیامِ روشن رد می‌شود؛
 // یعنی رفتارِ امنیتی حفظ شده ولی زمانِ بروزش درست است.
+//
+// ⚠️ گسترش‌یافته (ممیزیِ ۲۰۲۶-۰۸-۱۹): این گارد قبلاً فقط «خالی‌بودن» را
+// می‌گرفت. ولی خطرناک‌ترین حالت، «پرشدنِ غلط» است — و آن هیچ خطایی تولید
+// نمی‌کرد. با تستِ زنده‌ی مرورگر ثابت شد: وقتی originِ اپ در این فهرست نباشد،
+// مرورگر fetch را بلاک می‌کند، اپِ مشتری صادقانه به دادهٔ نمونه برمی‌گردد و
+// هر کارت را «نمونه» برچسب می‌زند. یعنی سایت بالاست، خطایی در لاگ نیست، و
+// همه‌ی بازدیدکننده‌ها محتوایِ نمونه می‌بینند. یک خرابیِ کاملاً خاموش.
+// حالا مقدارِ غلط هم مثلِ مقدارِ خالی، در production صریحاً fail-fast می‌کند.
 let _originsChecked = false;
 function assertAllowedOriginsConfigured(): void {
   if (_originsChecked) return;
-  if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGINS?.trim()) {
-    throw new Error(
-      'ALLOWED_ORIGINS در production تنظیم نشده — محافظت CSRF (چک Origin) خاموش می‌شود. ' +
-      'مثلاً: ALLOWED_ORIGINS=https://rezervno.ir,https://www.rezervno.ir'
-    );
+  if (process.env.NODE_ENV === 'production') {
+    const raw = process.env.ALLOWED_ORIGINS?.trim();
+    if (!raw) {
+      throw new Error(
+        'ALLOWED_ORIGINS در production تنظیم نشده — محافظت CSRF (چک Origin) خاموش می‌شود. ' +
+        'مثلاً: ALLOWED_ORIGINS=https://rezervno.ir,https://www.rezervno.ir'
+      );
+    }
+    const { valid, problems } = parseAllowedOrigins(raw);
+    if (problems.length) {
+      throw new Error(
+        'ALLOWED_ORIGINS نامعتبر است — با این مقدار مرورگر درخواست‌های اپ را بلاک می‌کند و ' +
+        'کاربران به‌جای دادهٔ واقعی، محتوایِ «نمونه» می‌بینند بدونِ هیچ خطای قابلِ‌مشاهده‌ای:\n  · ' +
+        problems.join('\n  · ')
+      );
+    }
+    if (valid.length === 0) {
+      throw new Error('ALLOWED_ORIGINS هیچ originِ معتبری ندارد.');
+    }
   }
   _originsChecked = true;
 }
@@ -53,7 +76,7 @@ function blocked(message: string, status = 429, retryAfter?: number) {
 // برای fetchِ cross-origin به این هدرها نیاز دارد؛ بدون آن‌ها پاسخ بلاک می‌شود.
 // چون auth با Bearer token است (نه کوکی)، credentials لازم نیست.
 function corsHeaders(origin: string | null): Record<string, string> {
-  const allowed = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+  const allowed = parseAllowedOrigins(process.env.ALLOWED_ORIGINS).valid;
   if (!origin || !allowed.includes(origin)) return {};
   return {
     'Access-Control-Allow-Origin': origin,
@@ -110,7 +133,7 @@ export async function middleware(req: NextRequest) {
   // اما چک Origin یک لایه‌ی دفاعی اضافه برای درخواست‌های mutating است.
   const method = req.method;
   if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
-    const allowed = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+    const allowed = parseAllowedOrigins(process.env.ALLOWED_ORIGINS).valid;
     // اگر لیست مجاز تعریف شده و Origin وجود دارد ولی مجاز نیست → رد.
     // نکته‌ی امنیتی: وقتی ALLOWED_ORIGINS تنظیم نشده، این چک skip می‌شود؛ در
     // production حتماً باید ALLOWED_ORIGINS ست شود (به docker-compose رجوع کن).

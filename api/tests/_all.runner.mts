@@ -41,6 +41,7 @@
 //     می‌شمرد (یک‌بار مستقیم، یک‌بار از طریقِ importِ اینجا).
 // ═══════════════════════════════════════════════════════════════════════
 
+import './allowed-origins.test.mts';
 import './ban.test.mts';
 import './cancellation-policy.test.mts';
 import './crm-recommendations.test.mts';

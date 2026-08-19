@@ -121,3 +121,53 @@ export async function safeJson(req: Request): Promise<any> {
   try { return text ? JSON.parse(text) : {}; }
   catch { throw Err.validation('بدنه‌ی JSON نامعتبر است'); }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ALLOWED_ORIGINS — تجزیه و اعتبارسنجی در یک جا
+//
+//  ⚠️ یافته‌ی ممیزیِ ۲۰۲۶-۰۸-۱۹ (زنده، با مرورگرِ واقعی): بدترین حالتِ خرابیِ
+//  این متغیر «تنظیم‌نشدن» نیست — گاردِ production آن را می‌گیرد. بدترین حالت
+//  «تنظیم‌شدنِ غلط» است، چون هیچ خطایی تولید نمی‌کند: مرورگر درخواست را بلاک
+//  می‌کند، اپِ مشتری صادقانه به دادهٔ نمونه برمی‌گردد و هر کارت را «نمونه»
+//  برچسب می‌زند — یعنی همه‌ی بازدیدکننده‌ها به‌جای رستورانِ واقعی، محتوایِ
+//  نمونه می‌بینند و هیچ‌کس متوجه نمی‌شود.
+//
+//  کلیدِ ماجرا: هدرِ `Origin` که مرورگر می‌فرستد **همیشه** دقیقاً
+//  `scheme://host[:port]` است — بدونِ اسلشِ پایانی، بدونِ مسیر، بدونِ query.
+//  پس مقایسه‌ی رشته‌ایِ ما با هر چیزِ دیگری هرگز مچ نمی‌شود. این تابع دقیقاً
+//  همان اشتباه‌هایی را می‌گیرد که در عمل رخ می‌دهند.
+// ═══════════════════════════════════════════════════════════════════════
+
+export type OriginsParse = { valid: string[]; problems: string[] };
+
+/** ورودیِ خامِ ALLOWED_ORIGINS را به originهای معتبر + فهرستِ ایرادها تبدیل می‌کند. */
+export function parseAllowedOrigins(raw: string | undefined | null): OriginsParse {
+  const valid: string[] = [];
+  const problems: string[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of (raw ?? '').split(',').map(s => s.trim()).filter(Boolean)) {
+    if (entry === '*') {
+      problems.push('«*» مجاز نیست — CORS با اعتبارنامه‌ی واقعی نباید همه‌جا باز باشد؛ دامنه‌ها را صریح بنویس.');
+      continue;
+    }
+    if (!/^https?:\/\//i.test(entry)) {
+      problems.push(`«${entry}» بدونِ scheme است — مرورگر Origin را همیشه با https:// یا http:// می‌فرستد.`);
+      continue;
+    }
+    let u: URL;
+    try { u = new URL(entry); }
+    catch { problems.push(`«${entry}» یک URLِ معتبر نیست.`); continue; }
+
+    // origin استانداردِ خودِ URL: scheme://host[:port] و بس.
+    const canonical = u.origin;
+    if (entry !== canonical) {
+      problems.push(`«${entry}» با originِ استاندارد فرق دارد؛ درستش «${canonical}» است (بدونِ اسلشِ پایانی و بدونِ مسیر).`);
+      continue;
+    }
+    if (seen.has(canonical)) continue;   // تکراری، ایراد نیست
+    seen.add(canonical);
+    valid.push(canonical);
+  }
+  return { valid, problems };
+}
