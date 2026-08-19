@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { withSlotLock } from './redis';
-import { Err } from './errors';
+import { ApiError, Err } from './errors';
 import { enqueueSms } from './sms';
 import { emit } from './events';
 import { metrics } from './metrics';
@@ -230,26 +230,54 @@ export async function createReservation(
   // این فشار retry را کم می‌کند ولی صحت به دیتابیس وابسته است.
   const lockKey = `resv:${r.id}:${start.toISOString()}`;
 
-  return acquireSlotLock(lockKey, 8000, async () => {
-    // ── تلاش با retry برای serialization (ترافیک بالا) ──
-    let lastErr: unknown;
-    for (let attempt = 0; attempt < TX_MAX_RETRIES; attempt++) {
-      try {
-        return await placeReservation(
-          input, r, cfg, { start, end, blockEnd, duration, blockBufferMin },
-          candidateTables, manualTableNumber, noShowRisk,
-        );
-      } catch (e) {
-        lastErr = e;
-        if (isSerializationError(e) && attempt < TX_MAX_RETRIES - 1) {
-          await sleep(20 * (attempt + 1) + Math.random() * 30); // backoff تصادفی
-          continue;
+  try {
+    return await acquireSlotLock(lockKey, 8000, async () => {
+      // ── تلاش با retry برای serialization (ترافیک بالا) ──
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < TX_MAX_RETRIES; attempt++) {
+        try {
+          return await placeReservation(
+            input, r, cfg, { start, end, blockEnd, duration, blockBufferMin },
+            candidateTables, manualTableNumber, noShowRisk,
+          );
+        } catch (e) {
+          lastErr = e;
+          if (isSerializationError(e) && attempt < TX_MAX_RETRIES - 1) {
+            await sleep(20 * (attempt + 1) + Math.random() * 30); // backoff تصادفی
+            continue;
+          }
+          throw e;
         }
-        throw e;
+      }
+      throw lastErr ?? Err.concurrencyRetry();
+    });
+  } catch (e) {
+    // ⚠️ یافته‌ی واقعیِ ممیزی (۲۰۲۶-۰۸-۱۹) — با تستِ زنده‌ی ۳۰ کاربرِ هم‌زمان
+    // روی *یک* میز پیدا شد، نه با خواندنِ کد: از ۲۹ درخواستِ ردشده، ۲۶ تا
+    // SLOT_LOCK_TIMEOUT (۴۲۳ «این بازه در حال رزرو توسط کاربر دیگری است؛
+    // دوباره تلاش کنید») گرفتند و فقط ۳ تا SLOT_FULL. صحت مشکلی نداشت —
+    // دقیقاً یک ردیف در DB ثبت شد — ولی *پیام* دروغ بود: به ۲۶ کاربر گفته
+    // می‌شد «دوباره تلاش کن» برایِ اسلاتی که دیگر هرگز آزاد نمی‌شود. نتیجه‌اش
+    // هم UXِ بد است هم موجِ retryِ بی‌فایده روی همان اسلاتِ پر.
+    //
+    // رفع: قفل همان‌طور که بود می‌ماند (منبعِ حقیقت هنوز DB است)، فقط پیش از
+    // برگرداندنِ ۴۲۳ یک‌بار وضعیتِ واقعیِ اشغال دوباره خوانده می‌شود. اگر
+    // ثابت شود همه‌ی کاندیداها پر شده‌اند، خطایِ صادق برگردانده می‌شود.
+    // محافظه‌کارانه: فقط وقتی به SLOT_FULL/TABLE_CONFLICT تبدیل می‌شود که
+    // بتوان *اثبات* کرد پر است؛ در حالتِ merge (که کاندیدایِ تکی ندارد) یا
+    // اگر خودِ این بازخوانی شکست بخورد، همان ۴۲۳ی قبلی برمی‌گردد.
+    if (e instanceof ApiError && e.code === 'SLOT_LOCK_TIMEOUT') {
+      const occupiedNow = await getOccupiedTableNumbers(db, r.id, start, blockEnd).catch(() => null);
+      if (occupiedNow) {
+        if (manualTableNumber != null) {
+          if (occupiedNow.has(manualTableNumber)) throw Err.tableConflict();
+        } else if (candidateTables.length > 0 && candidateTables.every(t => occupiedNow.has(t.number))) {
+          throw Err.slotFull(input.time);
+        }
       }
     }
-    throw lastErr ?? Err.concurrencyRetry();
-  });
+    throw e;
+  }
 }
 
 // ── هسته‌ی ثبت: transaction سریالایزبل + بازچک داخل tx + insert ──
