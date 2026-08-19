@@ -177,6 +177,18 @@ model Restaurant {
   economyLedgerEntries  EconomyLedgerEntry[]
   missions              Mission[]
   rewardMarketplaceItems RewardMarketplaceItem[]
+  // ── شخصی‌سازیِ صفحه‌ی منویِ عمومی (مهاجرتِ ۰۵۳) ──
+  // همه nullable: NULL یعنی «رستوران‌دار انتخاب نکرده» و صفحه به پیش‌فرضِ
+  // پلتفرم برمی‌گردد — نه یک مقدارِ جعلیِ ازپیش‌نشسته.
+  /// رنگِ تأکیدِ برند به شکلِ #RRGGBB (قیدِ CHECK در دیتابیس).
+  menuAccent   String?  @map("menu_accent")
+  /// light | dark | auto (قیدِ CHECK در دیتابیس).
+  menuTheme    String?  @map("menu_theme")
+  /// یک خطِ معرفی زیرِ نامِ رستوران در صفحه‌ی منو.
+  menuTagline  String?  @map("menu_tagline")
+  /// list | grid — شبکه برایِ منویِ عکس‌محور (قیدِ CHECK در دیتابیس).
+  menuLayout   String?  @map("menu_layout")
+
   @@index([tenantId])
   @@index([city], map: "idx_restaurants_city")
   chatThreads  ChatThread[]
@@ -262,8 +274,16 @@ model MenuItem {
   isActive     Boolean           @default(true) @map("is_active")
   // توضیحِ کوتاهِ آیتم برایِ منویِ عمومی/QR. NULL = رستوران‌دار ننوشته.
   description  String?
-  // آدرسِ عکسِ غذا (منویِ QR + فیلدِ image در JSON-LD). NULL = بدونِ عکس.
-  imageUrl     String?           @map("image_url")
+  /// آدرسِ سروِ عکسِ آیتم. از مهاجرتِ ۰۵۳ این مقدار را **سرور** می‌نویسد
+  /// (`/api/v1/media/<key>`) و کلاینت نمی‌تواند آدرسِ دلخواه بگذارد.
+  /// NULL = آیتم عکس ندارد.
+  imageUrl        String?        @map("image_url")
+  // ── فایلِ عکسِ آپلودشده (هم‌الگو با RestaurantPhoto) ──
+  imageStorageKey String?        @map("image_storage_key")
+  imageMime       String?        @map("image_mime")
+  imageWidth      Int?           @map("image_width")
+  imageHeight     Int?           @map("image_height")
+  imageByteSize   Int?           @map("image_byte_size")
   // ترتیبِ دلخواهِ نمایش در منو. کوچک‌تر = بالاتر؛ مساوی‌ها با نام مرتب می‌شوند.
   // عمداً جدا از soldCount: آن یکی آمارِ فروش است، این یکی خواستِ رستوران‌دار.
   sortOrder    Int               @default(0) @map("sort_order")

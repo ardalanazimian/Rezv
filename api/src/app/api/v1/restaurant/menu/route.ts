@@ -20,11 +20,16 @@ import { publicMenuUrl } from '@/lib/public-urls';
 //  آیتم‌هایِ غیرفعال را هم برمی‌گرداند تا در پنل قابلِ مدیریت باشند.
 // ═══════════════════════════════════════════════════════════════════════
 
-// آدرسِ عکسِ آیتم فقط http(s) — این تنها فیلدی در منوست که مستقیم داخلِ
-// `<img src>` می‌نشیند، پس اگر `javascript:` یا `data:` بپذیرد به یک سینکِ
-// XSS تبدیل می‌شود. anchor به ^https?:// همان را می‌بندد.
-export const IMAGE_URL_RE = /^https?:\/\/\S+$/i;
-
+// ⚠️ `image_url` عمداً در این schema **نیست**.
+//
+// مهاجرتِ ۰۵۲ این فیلد را به‌صورتِ آدرسِ آزادِ کلاینت پذیرفت. مهاجرتِ ۰۵۳
+// آن را به یک فیلدِ سرورنوشت تبدیل کرد: تنها راهِ عکس‌دار‌کردنِ آیتم
+// `POST /restaurant/menu/{id}/photo` است که فایل را با تشخیصِ magic-byte،
+// سقفِ حجم و ابعاد اعتبارسنجی می‌کند و روی ذخیره‌سازیِ خودمان می‌نشاند.
+//
+// چرا برگشت: آدرسِ آزاد یعنی (۱) هیچ تضمینی نیست محتوایش تصویر باشد،
+// (۲) منویِ روی میز به میزبانِ بیرونی وابسته می‌شود که هر وقت پایین بیاید
+// عکسِ شکسته نشان می‌دهد، (۳) هیچ نظارتی ممکن نیست.
 const createSchema = z.object({
   name: z.string().min(1).max(120).trim(),
   price_toman: z.number().int().min(0).max(1_000_000_000),
@@ -32,7 +37,6 @@ const createSchema = z.object({
   category: z.string().max(60).trim().optional(),
   is_active: z.boolean().optional(),
   description: z.string().max(300).trim().optional(),
-  image_url: z.string().max(500).trim().regex(IMAGE_URL_RE, 'آدرسِ عکس باید با http:// یا https:// شروع شود').optional(),
   sort_order: z.number().int().min(0).max(100_000).optional(),
 });
 
@@ -91,7 +95,7 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
       category: b.category || null,
       isActive: b.is_active ?? true,
       description: b.description || null,
-      imageUrl: b.image_url || null,
+      // imageUrl عمداً اینجا ست نمی‌شود — فقط روتِ آپلودِ عکس آن را می‌نویسد.
       sortOrder: b.sort_order ?? 0,
     },
     select: {

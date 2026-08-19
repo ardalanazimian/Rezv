@@ -123,3 +123,99 @@ describe('آدرس‌هایِ عمومی', () => {
     assert.equal(publicMenuUrl('x'), `${restaurantUrl('x')}/menu`);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+//  مهاجرتِ ۰۵۳ — عکسِ آیتم و شخصی‌سازیِ منو.
+//  قیدهایِ CHECK در سطحِ دیتابیس سنجیده می‌شوند، نه فقط اعتبارسنجیِ API:
+//  یک اسکریپتِ دستی یا بازگردانیِ بکاپ هم نباید بتواند مقدارِ بی‌معنا بنشاند.
+// ═══════════════════════════════════════════════════════════════════════
+describe('شخصی‌سازیِ منو — قیدهای دیتابیس', () => {
+  test('مقادیرِ معتبر پذیرفته می‌شوند', async () => {
+    const r = await db.restaurant.update({
+      where: { id: rA },
+      data: { menuAccent: '#E11D48', menuTheme: 'dark', menuLayout: 'grid', menuTagline: 'یک خط معرفی' },
+      select: { menuAccent: true, menuTheme: true, menuLayout: true, menuTagline: true },
+    });
+    assert.equal(r.menuAccent, '#E11D48');
+    assert.equal(r.menuTheme, 'dark');
+    assert.equal(r.menuLayout, 'grid');
+  });
+
+  test('NULL مجاز است — یعنی «انتخاب‌نشده»، نه یک پیش‌فرضِ جعلی', async () => {
+    const r = await db.restaurant.update({
+      where: { id: rA },
+      data: { menuAccent: null, menuTheme: null, menuLayout: null },
+      select: { menuAccent: true, menuTheme: true, menuLayout: true },
+    });
+    assert.deepEqual(r, { menuAccent: null, menuTheme: null, menuLayout: null });
+  });
+
+  test('تمِ نامعتبر را خودِ دیتابیس رد می‌کند', async () => {
+    await assert.rejects(
+      () => db.restaurant.update({ where: { id: rA }, data: { menuTheme: 'رنگین‌کمان' } }),
+      /menu_theme_chk/,
+    );
+  });
+
+  test('چیدمانِ نامعتبر را خودِ دیتابیس رد می‌کند', async () => {
+    await assert.rejects(
+      () => db.restaurant.update({ where: { id: rA }, data: { menuLayout: 'carousel' } }),
+      /menu_layout_chk/,
+    );
+  });
+
+  test('رنگِ غیرِ‌هگز را خودِ دیتابیس رد می‌کند (سینکِ CSS)', async () => {
+    // این مقدار در صفحه‌ی عمومی داخلِ `style` می‌نشیند؛ اگر از اینجا رد شود
+    // فقط گاردِ فرانت مانده است.
+    for (const bad of ['red', '#FFF', 'blue;}body{display:none']) {
+      await assert.rejects(
+        () => db.restaurant.update({ where: { id: rA }, data: { menuAccent: bad } }),
+        /menu_accent_chk/,
+        `باید رد شود: ${bad}`,
+      );
+    }
+  });
+});
+
+describe('عکسِ آیتمِ منو', () => {
+  test('ستون‌هایِ متادیتایِ عکس وجود دارند و nullable هستند', async () => {
+    const item = await db.menuItem.findFirst({
+      where: { restaurantId: rA },
+      select: {
+        id: true, imageUrl: true, imageStorageKey: true,
+        imageMime: true, imageWidth: true, imageHeight: true, imageByteSize: true,
+      },
+    });
+    assert.ok(item);
+    // آیتمی که عکس آپلود نشده، همه‌ی این‌ها NULL دارد — نه رشته‌ی خالی.
+    assert.equal(item.imageUrl, null);
+    assert.equal(item.imageStorageKey, null);
+  });
+
+  test('متادیتایِ عکس با هم نوشته و با هم پاک می‌شود', async () => {
+    const item = await db.menuItem.findFirst({ where: { restaurantId: rA }, select: { id: true } });
+    const KEY = '2026/08/test-key.png';
+    await db.menuItem.update({
+      where: { id: item!.id },
+      data: {
+        imageUrl: `/api/v1/media/${KEY}`, imageStorageKey: KEY,
+        imageMime: 'image/png', imageWidth: 240, imageHeight: 240, imageByteSize: 1234,
+      },
+    });
+    const withImg = await db.menuItem.findUnique({
+      where: { id: item!.id },
+      select: { imageUrl: true, imageStorageKey: true, imageWidth: true },
+    });
+    assert.equal(withImg!.imageStorageKey, KEY);
+    assert.equal(withImg!.imageWidth, 240);
+    // آدرس همیشه از کلیدِ ذخیره‌سازی ساخته می‌شود، نه از ورودیِ کلاینت.
+    assert.ok(withImg!.imageUrl!.endsWith(KEY));
+
+    await db.menuItem.update({
+      where: { id: item!.id },
+      data: { imageUrl: null, imageStorageKey: null, imageMime: null, imageWidth: null, imageHeight: null, imageByteSize: null },
+    });
+    const cleared = await db.menuItem.findUnique({ where: { id: item!.id }, select: { imageUrl: true, imageStorageKey: true } });
+    assert.deepEqual(cleared, { imageUrl: null, imageStorageKey: null });
+  });
+});

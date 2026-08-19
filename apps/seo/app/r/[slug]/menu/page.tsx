@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { fetchPublicMenu } from '@/lib/api';
 import { menuJsonLd } from '@/lib/schema';
 import { alternates } from '@/lib/i18n';
-import { isDemoRestaurant, menuPath, menuUrl, restaurantUrl, SITE } from '@/lib/urls';
+import { isDemoRestaurant, menuPath, menuUrl, restaurantUrl, inkFor, safeAccent, safeLayout, safeTheme, SITE } from '@/lib/urls';
 import MenuBoard, { groupByCategory, sectionId } from '@/components/MenuBoard';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -59,10 +59,25 @@ export default async function MenuPage({ params }: { params: Promise<{ slug: str
   const r = m.restaurant;
   const sections = groupByCategory(m.items);
   const named = sections.filter((s) => s.name);
-  const sub = [r.cuisine, r.city].filter(Boolean).join(' · ');
+  // خطِ معرفیِ خودِ رستوران‌دار بر توصیفِ ساختگیِ ما اولویت دارد.
+  const sub = r.menu_tagline?.trim() || [r.cuisine, r.city].filter(Boolean).join(' · ');
+
+  // شخصی‌سازی — هر سه از لایه‌ی امنِ خودشان عبور می‌کنند. null یعنی
+  // «انتخاب‌نشده» و صفحه دقیقاً همان پیش‌فرضِ پلتفرم را نگه می‌دارد.
+  const accent = safeAccent(r.menu_accent);
+  const theme = safeTheme(r.menu_theme);
+  const layout = safeLayout(r.menu_layout);
 
   return (
-    <>
+    <div
+      className={`menu-root${layout === 'grid' ? ' menu-grid' : ''}`}
+      // data-theme فقط وقتی ست می‌شود که رستوران‌دار صریحاً انتخاب کرده
+      // باشد؛ وگرنه صفحه به ترجیحِ سیستمِ خودِ مهمان احترام می‌گذارد.
+      {...(theme && theme !== 'auto' ? { 'data-theme': theme } : {})}
+      // رنگِ متنِ رویِ برند از روشناییِ خودِ رنگ حساب می‌شود؛ متنِ سفیدِ
+      // ثابت رویِ زردِ روشن ناخوانا بود.
+      {...(accent ? { style: { '--brand': accent, '--brand-ink': inkFor(accent) } as React.CSSProperties } : {})}
+    >
       <a className="skip" href="#menu">پرش به منو</a>
 
       <header className="mhead">
@@ -117,6 +132,6 @@ export default async function MenuPage({ params }: { params: Promise<{ slug: str
           </div>
         )}
       </main>
-    </>
+    </div>
   );
 }

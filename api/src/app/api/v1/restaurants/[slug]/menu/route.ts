@@ -34,6 +34,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
           // فیلدهایِ عمومیِ لازم برایِ سرصفحه‌ی صفحه‌ی منو — نه بیشتر.
           // هیچ فیلدِ کارکنان/داخلی اینجا نمی‌آید.
           id: true, slug: true, name: true, cuisine: true, city: true,
+          // شخصی‌سازیِ صفحه‌ی منو (مهاجرتِ ۰۵۳). NULL = انتخاب‌نشده →
+          // صفحه به پیش‌فرضِ پلتفرم برمی‌گردد.
+          menuAccent: true, menuTheme: true, menuTagline: true, menuLayout: true,
           menuItems: {
             where: { isActive: true },
             orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
@@ -47,7 +50,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
       if (!r) return null;
 
       return {
-        restaurant: { id: r.id, slug: r.slug, name: r.name, cuisine: r.cuisine, city: r.city },
+        restaurant: {
+          id: r.id, slug: r.slug, name: r.name, cuisine: r.cuisine, city: r.city,
+          menu_accent: r.menuAccent, menu_theme: r.menuTheme,
+          menu_tagline: r.menuTagline, menu_layout: r.menuLayout,
+        },
         // آرایه‌ی خالی یعنی «این رستوران هنوز منو ثبت نکرده» — یک حالتِ
         // کاملاً معتبر، نه خطا. کلاینت باید حالتِ خالیِ صادق نشان دهد، نه
         // منویِ نمونه (همان اشتباهی که در رویدادهای اپِ مشتری رخ داده بود).

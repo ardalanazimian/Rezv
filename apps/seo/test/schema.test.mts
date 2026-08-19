@@ -247,3 +247,37 @@ describe('groupByCategory', () => {
     assert.equal(new Set(ids).size, ids.length, 'شناسه‌ی تکراری یعنی پرشِ چیپ به بخشِ اشتباه');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+//  شخصی‌سازیِ منو — گاردهایی که بینِ دیتابیس و CSS ایستاده‌اند.
+// ═══════════════════════════════════════════════════════════════════════
+describe('گاردهای شخصی‌سازی', () => {
+  test('safeAccent فقط هگزِ ۶ رقمی را می‌پذیرد', async () => {
+    const { safeAccent } = await import('../lib/urls.ts');
+    assert.equal(safeAccent('#E11D48'), '#E11D48');
+    assert.equal(safeAccent('#e11d48'), '#e11d48');
+    for (const bad of [null, undefined, '', 'red', '#FFF', '#12345',
+                       'red;background:url(x)', '#E11D48;}body{display:none'])
+      assert.equal(safeAccent(bad), null, `باید رد شود: ${bad}`);
+  });
+
+  test('safeTheme/safeLayout مقدارِ ناشناخته را به پیش‌فرض می‌برند', async () => {
+    const { safeTheme, safeLayout } = await import('../lib/urls.ts');
+    assert.equal(safeTheme('dark'), 'dark');
+    assert.equal(safeTheme('نامعلوم'), null);
+    assert.equal(safeLayout('grid'), 'grid');
+    assert.equal(safeLayout('چیزِ دیگر'), 'list', 'پیش‌فرض فهرستی است');
+  });
+
+  test('inkFor رنگِ خوانا رویِ برند می‌دهد (قفلِ باگِ متنِ نامرئی)', async () => {
+    const { inkFor } = await import('../lib/urls.ts');
+    // رنگِ تیره → متنِ سفید
+    assert.equal(inkFor('#E11D48'), '#ffffff');
+    assert.equal(inkFor('#000000'), '#ffffff');
+    assert.equal(inkFor('#2563EB'), '#ffffff');
+    // رنگِ روشن → متنِ سیاه. متنِ سفیدِ ثابت اینجا ناخوانا بود.
+    assert.equal(inkFor('#FFFFFF'), '#111111');
+    assert.equal(inkFor('#FFEB3B'), '#111111');
+    assert.equal(inkFor('#A7F432'), '#111111');
+  });
+});

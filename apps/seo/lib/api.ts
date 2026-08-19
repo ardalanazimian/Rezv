@@ -5,6 +5,33 @@
 const API_BASE = (process.env.SEO_API_BASE || '').replace(/\/$/, '');
 
 /**
+ * دامنه‌ای که مرورگرِ کاربر باید فایل‌هایِ رسانه را از آن بگیرد.
+ *
+ * چرا جدا از `SEO_API_BASE`: آن یکی آدرسی است که *سرورِ* Next با آن به API
+ * وصل می‌شود و در داکر معمولاً داخلی است (`http://api:3000`) — رندرکردنش
+ * داخلِ `<img src>` یعنی مرورگرِ کاربر آدرسی می‌گیرد که اصلاً به آن نمی‌رسد.
+ *
+ * API آدرسِ عکس‌ها را به‌صورتِ نسبی می‌دهد (`/api/v1/media/<key>`). این
+ * وقتی درست است که SEO و API پشتِ یک دامنه باشند — که پیکربندیِ هدفِ
+ * تولید است (rewrite رویِ rezervno.ir). اگر روزی جدا شدند، همین متغیر
+ * تنها چیزی است که باید ست شود.
+ *
+ * ست‌نشده = مسیرِ نسبی دست‌نخورده می‌ماند (رفتارِ هم‌دامنه).
+ */
+const MEDIA_BASE = (process.env.NEXT_PUBLIC_MEDIA_BASE || '').replace(/\/$/, '');
+
+/**
+ * آدرسِ عکس را برایِ مرورگر قابلِ‌استفاده می‌کند.
+ * آدرسِ مطلق (http…) دست‌نخورده می‌ماند؛ مسیرِ نسبی فقط وقتی پیشوند
+ * می‌گیرد که `NEXT_PUBLIC_MEDIA_BASE` تنظیم شده باشد.
+ */
+export function resolveMediaUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  return MEDIA_BASE ? `${MEDIA_BASE}${url.startsWith('/') ? '' : '/'}${url}` : url;
+}
+
+/**
  * یک آیتمِ منو، دقیقاً همان شکلی که API عمومی می‌دهد.
  * `category`/`description`/`image_url` می‌توانند null باشند — یعنی رستوران‌دار
  * پرشان نکرده، نه اینکه خطایی رخ داده. UI باید همان را بدونِ جاگذاریِ متنِ
@@ -58,7 +85,13 @@ export async function fetchRestaurant(slug: string, revalidateSec = 300): Promis
       next: { revalidate: revalidateSec },
     });
     if (!res.ok) return null;
-    return (await res.json()) as RestaurantDetail;
+    const d = (await res.json()) as RestaurantDetail;
+    return {
+      ...d,
+      menu: (d.menu || []).map((m) => ({ ...m, image_url: resolveMediaUrl(m.image_url) })),
+      photos: (d.photos || []).map((p) => ({ ...p, url: resolveMediaUrl(p.url) || p.url })),
+      logo_url: resolveMediaUrl(d.logo_url),
+    };
   } catch {
     return null;
   }
@@ -101,8 +134,25 @@ export async function fetchRestaurantList(
   }
 }
 
+/**
+ * شخصی‌سازیِ صفحه‌ی منو که رستوران‌دار در پنلِ خودش تعیین می‌کند.
+ * هر فیلدِ null یعنی «انتخاب نشده» — صفحه به پیش‌فرضِ پلتفرم برمی‌گردد،
+ * نه به یک مقدارِ ساختگی.
+ */
+export interface MenuBranding {
+  /** #RRGGBB — در دیتابیس با قیدِ CHECK تضمین شده. */
+  menu_accent: string | null;
+  /** 'light' | 'dark' | 'auto' */
+  menu_theme: string | null;
+  menu_tagline: string | null;
+  /** 'list' | 'grid' */
+  menu_layout: string | null;
+}
+
 export interface PublicMenu {
-  restaurant: { id: string; slug: string; name: string; cuisine: string | null; city: string | null };
+  restaurant: {
+    id: string; slug: string; name: string; cuisine: string | null; city: string | null;
+  } & Partial<MenuBranding>;
   items: MenuItem[];
 }
 
@@ -125,7 +175,12 @@ export async function fetchPublicMenu(slug: string, revalidateSec = 300): Promis
     if (!res.ok) return null;
     const d = (await res.json()) as Partial<PublicMenu>;
     if (!d.restaurant) return null;
-    return { restaurant: d.restaurant, items: Array.isArray(d.items) ? d.items : [] };
+    // عکس‌ها اینجا (یک نقطه) به آدرسِ قابلِ‌استفاده در مرورگر تبدیل می‌شوند،
+    // نه در هر کامپوننتی که تصادفاً آن‌ها را رندر می‌کند.
+    const items = (Array.isArray(d.items) ? d.items : []).map((m) => ({
+      ...m, image_url: resolveMediaUrl(m.image_url),
+    }));
+    return { restaurant: d.restaurant, items };
   } catch {
     return null;
   }

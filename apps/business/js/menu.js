@@ -133,7 +133,89 @@ function menuPublicCardHTML(activeCount){
     <div id="menuQrBox" style="text-align:center;padding:12px 0">
       <button class="btn btn-primary btn-sm" onclick="menuLoadQr()">ساختنِ QR</button>
     </div>
+
+    <div style="border-top:1px solid var(--line,#e6e8ec);margin-top:12px;padding-top:12px">
+      <div class="panel-title" style="font-size:14px;margin-bottom:2px">ظاهرِ صفحه‌ی منو</div>
+      <div class="panel-sub" style="margin-bottom:10px">
+        این تنظیمات مالِ خودِ شماست و بدونِ تأییدِ رزرونو اعمال می‌شود.
+      </div>
+      <div id="menuBrandBox">
+        <button class="btn btn-sm btn-ghost" onclick="menuLoadBranding()">تنظیمِ رنگ و ظاهر</button>
+      </div>
+    </div>
   </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  شخصی‌سازیِ صفحه‌ی منو — رنگِ برند، روشن/تیره، خطِ معرفی، چیدمان.
+//  مقادیرِ مجاز از خودِ سرور می‌آیند (`options`)، نه فهرستِ هاردکد اینجا،
+//  تا با تغییرِ سرور از هم نیفتند.
+// ═══════════════════════════════════════════════════════════════════════
+let MENU_BRAND = null;
+
+const BRAND_THEME_LABEL = { light: 'روشن', dark: 'تیره', auto: 'خودکار (ترجیحِ مهمان)' };
+const BRAND_LAYOUT_LABEL = { list: 'فهرستی', grid: 'شبکه‌ای (عکس‌محور)' };
+
+async function menuLoadBranding(){
+  const box = document.getElementById('menuBrandBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال بارگیری…</div>`;
+  const res = await API.menuBranding();
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">${esc(res.offline?'اتصال به سرور برقرار نیست.':(res.error?.message||'بارگیری نشد.'))}</div>
+      <button class="btn btn-sm btn-ghost" onclick="menuLoadBranding()">تلاش دوباره</button>`;
+    return;
+  }
+  MENU_BRAND = res.data;
+  menuBrandRender();
+}
+
+function menuBrandRender(){
+  const box = document.getElementById('menuBrandBox');
+  if(!box || !MENU_BRAND) return;
+  const b = MENU_BRAND;
+  const themes = (b.options?.themes) || ['light','dark','auto'];
+  const layouts = (b.options?.layouts) || ['list','grid'];
+  box.innerHTML = `
+    <div class="field-label">رنگِ برند</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="color" id="mbAccent" value="${esc(b.menu_accent || '#2563EB')}" style="width:48px;height:36px;padding:0;border:none;background:none">
+      <button class="btn btn-sm btn-ghost" onclick="menuBrandSave({menu_accent:null})">حذفِ رنگ (پیش‌فرض)</button>
+    </div>
+    <div class="field-label">حالتِ نمایش</div>
+    <select class="inp" id="mbTheme">
+      <option value="">پیش‌فرضِ رزرونو</option>
+      ${themes.map(t=>`<option value="${esc(t)}"${b.menu_theme===t?' selected':''}>${esc(BRAND_THEME_LABEL[t]||t)}</option>`).join('')}
+    </select>
+    <div class="field-label">چیدمان</div>
+    <select class="inp" id="mbLayout">
+      <option value="">پیش‌فرضِ رزرونو</option>
+      ${layouts.map(l=>`<option value="${esc(l)}"${b.menu_layout===l?' selected':''}>${esc(BRAND_LAYOUT_LABEL[l]||l)}</option>`).join('')}
+    </select>
+    <div class="field-label">خطِ معرفی</div>
+    <input class="inp" id="mbTagline" maxlength="160" value="${esc(b.menu_tagline||'')}" placeholder="اختیاری — زیرِ نامِ رستوران دیده می‌شود">
+    <button class="btn btn-primary btn-sm btn-block" style="margin-top:12px" onclick="menuBrandSaveForm()">ذخیره‌ی ظاهر</button>`;
+}
+
+function menuBrandSaveForm(){
+  menuBrandSave({
+    menu_accent: (document.getElementById('mbAccent').value || '').toUpperCase() || null,
+    // رشته‌ی خالی = «برگرد به پیش‌فرض»؛ سرور آن را null می‌فهمد.
+    menu_theme: document.getElementById('mbTheme').value || null,
+    menu_layout: document.getElementById('mbLayout').value || null,
+    menu_tagline: (document.getElementById('mbTagline').value || '').trim() || null,
+  });
+}
+
+async function menuBrandSave(patch){
+  const res = await API.menuBrandingSave(patch);
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ذخیره نشد'));
+    return;
+  }
+  MENU_BRAND = res.data;
+  menuBrandRender();
+  toast('✓','ظاهرِ منو ذخیره شد و همین حالا روی صفحه‌ی عمومی است');
 }
 
 async function menuCopyUrl(){
@@ -228,15 +310,79 @@ function menuTriggerDownload(blob, filename){
 }
 
 function menuRowHTML(i){
+  // عکسِ آیتم اگر هست جایِ ایموجی می‌نشیند — همان چیزی که مهمان در منویِ
+  // عمومی می‌بیند، تا رستوران‌دار پیش‌نمایشِ واقعی داشته باشد نه تقریبی.
+  const thumb = i.image_url
+    ? `<img src="${esc(i.image_url)}" alt="" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex:0 0 auto">`
+    : `<span class="top-ava">${i.emoji ? esc(i.emoji) : icon('menu',{size:16})}</span>`;
   return `<div class="top-cust" style="cursor:default;${i.is_active?'':'opacity:.55'}">
-    <span class="top-ava">${i.emoji ? esc(i.emoji) : icon('menu',{size:16})}</span>
+    ${thumb}
     <div class="top-body">
       <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}</div>
-      <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}</div>
+      <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}${i.image_url?'':' · بدونِ عکس'}</div>
     </div>
     <button class="btn btn-sm btn-ghost" onclick="menuOpenForm('${esc(i.id)}')">ویرایش</button>
     <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuDelete('${esc(i.id)}')">حذف</button>
   </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  عکسِ آیتم — آپلودِ واقعیِ فایل، نه آدرسِ دلخواه.
+//
+//  فایل از همان خطِ لوله‌ای می‌گذرد که گالریِ رستوران دارد: تشخیصِ فرمت از
+//  رویِ بایت‌ها (نه پسوند یا content-type)، سقفِ حجم و ابعاد، و ذخیره روی
+//  فضایِ خودمان. برخلافِ گالری، عکسِ منو بی‌درنگ منتشر می‌شود چون منو مالِ
+//  خودِ رستوران است.
+// ═══════════════════════════════════════════════════════════════════════
+/** جعبه‌ی عکسِ آیتم در فرم: پیش‌نمایش (اگر هست) + انتخابِ فایل + حذف. */
+function menuPhotoBoxHTML(it){
+  const has = !!(it && it.image_url);
+  return `
+    ${has ? `<div style="margin-bottom:8px">
+      <img src="${esc(it.image_url)}" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px">
+    </div>` : `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+      این آیتم عکس ندارد. عکسِ غذا مهم‌ترین چیزی است که مهمان سرِ میز می‌بیند.
+    </div>`}
+    <input type="file" id="miPhotoFile" accept="image/jpeg,image/png,image/webp"
+           onchange="menuPickPhoto('${esc(it.id)}')" style="width:100%;font-size:13px">
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      ${has ? `<button type="button" class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuRemovePhoto('${esc(it.id)}')">حذفِ عکس</button>` : ''}
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:6px">
+      JPEG / PNG / WebP · حداکثر ۸ مگابایت · بی‌درنگ در منویِ عمومی دیده می‌شود.
+    </div>`;
+}
+
+async function menuPickPhoto(id){
+  const input = document.getElementById('miPhotoFile');
+  if(!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const box = document.getElementById('miPhotoBox');
+  if(box) box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال آپلود…</div>`;
+
+  const res = await API.menuItemPhotoUpload(id, file);
+  if(!res.ok){
+    // پیامِ سرور عیناً نشان داده می‌شود — «عکس خیلی بزرگ است» یا «فایل تصویر
+    // نیست» را خودِ سرور دقیق‌تر از ما می‌داند.
+    if(box) box.innerHTML = `<div style="color:var(--red);font-size:13px">${esc(res.offline?'اتصال به سرور برقرار نیست':(res.error?.message||'آپلود ناموفق بود'))}</div>`;
+    return;
+  }
+  toast('✓','عکس آپلود شد و همین حالا در منویِ عمومی دیده می‌شود');
+  // فهرست تازه می‌شود تا بندانگشتیِ ردیف هم به‌روز شود.
+  await rMenu();
+  menuOpenForm(id);
+}
+
+async function menuRemovePhoto(id){
+  if(!confirm('عکسِ این آیتم برداشته شود؟')) return;
+  const res = await API.menuItemPhotoDelete(id);
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message||'حذف نشد'));
+    return;
+  }
+  toast(res.data?.removed?'✓':'', res.data?.message || 'انجام شد');
+  await rMenu();
+  menuOpenForm(id);
 }
 
 function fnMoney(n){ return fa((n||0).toLocaleString('en-US')); }
@@ -257,8 +403,13 @@ function menuOpenForm(id){
     <input class="inp" id="miEmoji" maxlength="16" value="${it&&it.emoji?esc(it.emoji):''}" placeholder="اختیاری — مثلاً 🍝">
     <div class="field-label">توضیح</div>
     <input class="inp" id="miDesc" maxlength="300" value="${it&&it.description?esc(it.description):''}" placeholder="اختیاری — مثلاً «با سسِ قارچ و پنیرِ پارمزان»">
-    <div class="field-label">آدرسِ عکس</div>
-    <input class="inp" id="miImg" maxlength="500" value="${it&&it.image_url?esc(it.image_url):''}" placeholder="اختیاری — با https:// شروع شود" style="direction:ltr;text-align:left">
+    ${it ? `
+    <div class="field-label">عکسِ آیتم</div>
+    <div id="miPhotoBox">${menuPhotoBoxHTML(it)}</div>
+    ` : `
+    <div class="cash-note" style="margin-top:12px">${icon('info',{size:13})}
+      اول آیتم را ذخیره کن، بعد می‌توانی برایش عکس آپلود کنی.
+    </div>`}
     <div class="field-label">ترتیبِ نمایش</div>
     <input class="inp" id="miSort" type="number" min="0" value="${it&&it.sort_order!=null?it.sort_order:0}" placeholder="۰">
     <div style="color:var(--t2);font-size:12px;margin-top:4px">
@@ -277,9 +428,6 @@ async function menuSave(id){
   if(!name){ toast('','نامِ آیتم لازم است'); return; }
   if(!Number.isFinite(price) || price < 0){ toast('','قیمت را درست وارد کن'); return; }
 
-  const img = (document.getElementById('miImg').value||'').trim();
-  // همان قیدی که سرور اعمال می‌کند — اینجا فقط برایِ بازخوردِ فوری، نه به‌جایِ آن.
-  if(img && !/^https?:\/\//i.test(img)){ toast('','آدرسِ عکس باید با http:// یا https:// شروع شود'); return; }
   const sort = parseInt(document.getElementById('miSort').value, 10);
 
   const body = {
@@ -289,7 +437,7 @@ async function menuSave(id){
     emoji: (document.getElementById('miEmoji').value||'').trim() || null,
     is_active: document.getElementById('miActive').checked,
     description: (document.getElementById('miDesc').value||'').trim() || null,
-    image_url: img || null,
+    // image_url اینجا نیست: عکس فقط با آپلودِ فایل عوض می‌شود (menuPickPhoto).
     sort_order: Number.isFinite(sort) && sort >= 0 ? sort : 0,
   };
   const res = id ? await API.menuUpdate(id, body) : await API.menuCreate(body);

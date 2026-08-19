@@ -35,6 +35,45 @@
   wrong: it presents itself as authoritative. Fixed with an explicit
   `tomanToRial()` conversion, locked by a test that also asserts the raw toman
   value is *not* what gets published, and proven by mutation test.
+- **Menu item photos accepted an arbitrary client-supplied URL — replaced with
+  a real upload pipeline (2026-08-19, migration 053).** Migration 052 had added
+  `image_url` as a free-text field the panel wrote directly. Three problems:
+  nothing guaranteed the URL pointed at an image, the menu on the table depended
+  on a third-party host that would show a broken image the day it went down, and
+  no size/dimension/format validation or moderation was possible. The project
+  already had the right pipeline — `lib/media.ts` + `lib/media-store.ts`, used by
+  the restaurant gallery: magic-byte format sniffing (never the browser's claimed
+  content-type), size and dimension caps, storage keys, and serving from
+  `/api/v1/media/<key>`. `POST|DELETE /restaurant/menu/{id}/photo` now uses it, and
+  `image_url` became server-written. Verified end-to-end: a real 240×240 PNG
+  uploaded through the panel, stored, served byte-identical, and decoded in a real
+  browser at 240×240.
+  **Deliberate difference from gallery photos:** gallery uploads sit `pending`
+  until the platform approves; menu photos publish immediately, because the
+  authority model makes the menu the restaurant's own and a restaurant adding a
+  dish at 8pm cannot wait for tomorrow's review. The platform can still remove
+  abusive content — it just does not gate the normal update path.
+- **Menu page personalization — foundation shipped, not a full theme system
+  (2026-08-19, migration 053).** Until now the public menu page every restaurant
+  printed a QR for looked identical. Restaurants now control four things:
+  accent colour (`#RRGGBB`), light/dark/auto, a tagline, and list/grid layout.
+  Each is `NULL` by default, meaning "not chosen" — the page falls back to the
+  platform default rather than to a fabricated value. Validation is three-layer:
+  the API schema, `CHECK` constraints in Postgres (so a hand-run script cannot
+  seat a nonsense value either), and `safeAccent`/`safeTheme`/`safeLayout` in the
+  SEO app, because the accent lands inside an inline `style`.
+  What is **not** shipped and must not be claimed: custom fonts, per-section
+  theming, background images, multiple menu groups, AR/3D, seasonal engines, or
+  multi-language menus. This is a usable foundation, not menew parity.
+- **The branded CTA rendered invisible text — caught by browser test, fixed
+  same day.** The new rule `.menu-root a { color: var(--brand) }` (specificity
+  0,1,1) outranked `.cta { color: var(--brand-ink) }` (0,1,0), so the button's
+  text took the brand colour on a brand-coloured background: `color` and
+  `background-color` both `rgb(225,29,72)`. Found by asserting computed styles in
+  a real browser, not by looking at a screenshot. Fixed with `a:not(.cta)`, and
+  the ink colour is now derived from the accent's WCAG relative luminance
+  (`inkFor`) rather than a fixed white — a fixed white was unreadable on light
+  brand colours like yellow. Locked by tests and proven by mutation test.
 - **Public QR menu — deliberate scope (2026-08-19).** The QR on the table
   points at `https://rezervno.ir/r/{slug}/menu`, a server-rendered page with no
   client JavaScript. What it is **not**: no POS, no bill payment, no ordering

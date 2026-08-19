@@ -3,7 +3,6 @@ import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
-import { IMAGE_URL_RE } from '../route';
 
 const idParamSchema = z.object({ id: zUuid });
 
@@ -16,7 +15,8 @@ const patchSchema = z.object({
   // فیلدهایِ منویِ عمومی/QR (مهاجرتِ ۰۵۲). nullable چون «پاک‌کردنِ توضیح/عکس»
   // باید ممکن باشد — با فرستادنِ null، نه با رشته‌ی خالی.
   description: z.string().max(300).trim().nullable().optional(),
-  image_url: z.string().max(500).trim().regex(IMAGE_URL_RE, 'آدرسِ عکس باید با http:// یا https:// شروع شود').nullable().optional(),
+  // image_url اینجا نیست — عکس فقط از راهِ POST/DELETE روی `{id}/photo`
+  // عوض می‌شود (اعتبارسنجیِ واقعیِ فایل). رجوع به مهاجرتِ ۰۵۳.
   sort_order: z.number().int().min(0).max(100_000).optional(),
 });
 
@@ -49,7 +49,6 @@ export const PATCH = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMan
   if (b.category !== undefined) data.category = b.category;
   if (b.is_active !== undefined) data.isActive = b.is_active;
   if (b.description !== undefined) data.description = b.description;
-  if (b.image_url !== undefined) data.imageUrl = b.image_url;
   if (b.sort_order !== undefined) data.sortOrder = b.sort_order;
   if (Object.keys(data).length === 0) throw Err.validation('چیزی برای تغییر فرستاده نشده');
 
