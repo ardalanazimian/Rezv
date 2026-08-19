@@ -1,1 +1,1686 @@
-PLACEHOLDER
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id            String       @id @default(uuid()) @db.Uuid
+  name          String
+  plan          SubscriptionPlan @default(free)
+  planExpiresAt DateTime?    @map("plan_expires_at")
+  trialEndsAt   DateTime?    @map("trial_ends_at")
+  version       Int          @default(1)   // Optimistic Lock — جلوگیری از Lost Update در ویرایشِ همزمان
+  createdAt     DateTime     @default(now()) @map("created_at")
+  restaurants   Restaurant[]
+  staff         Staff[]
+  @@map("tenants")
+}
+
+// پلنِ اشتراک — enum به‌جای String: از ورودِ 'Pro'/'PRO'/فاصله جلوگیری می‌کند
+enum SubscriptionPlan {
+  free
+  starter
+  pro
+  enterprise
+
+  @@map("subscription_plan")
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  phone        String        @unique
+  email        String?       @unique                            // اختیاری؛ برای آینده: ورود ایمیلی، رسید، مارکتینگ
+  firstName    String?       @map("first_name")
+  lastName     String?       @map("last_name")
+  birthDate    DateTime?     @map("birth_date") @db.Date
+  anniversaryDate DateTime?  @map("anniversary_date") @db.Date  // سالگرد (برای پاداش)
+  referralCode String?       @unique @map("referral_code")       // کد دعوت یکتای کاربر
+  referredById String?       @map("referred_by_id") @db.Uuid     // چه کسی این کاربر را دعوت کرد
+  avatarUrl    String?       @map("avatar_url")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  // ── بن سختِ پلتفرم (migration 039) — کاملاً جدا از hasActiveAbuseFlagِ نرم ──
+  // «الان بن است» = bannedAt ست شده و unbannedAt نال است. بن‌شدنِ دوباره بعد
+  // از رفعِ بن، banned_at/banned_reason را بازنویسی می‌کند (unbanned_at ریست
+  // به null)؛ تاریخچه‌ی کامل در audit_logs (user.ban/user.unban) می‌ماند —
+  // این ستون‌ها فقط وضعیتِ *فعلی* را نشان می‌دهند، نه کل تاریخچه.
+  bannedAt        DateTime? @map("banned_at")
+  bannedReason    String?   @map("banned_reason")
+  bannedByAdminId String?   @map("banned_by_admin_id") @db.Uuid  // فقط شناسه (بدونِ relationِ Prisma) — هم‌راستا با referredById
+  unbannedAt      DateTime? @map("unbanned_at")
+  unbanReason     String?   @map("unban_reason")
+  reservations Reservation[]
+  memberships  ClubMember[]
+  waitlistEntries WaitlistEntry[]
+  pointsLedger PointsLedger[]
+  referrals    Referral[]    @relation("Referrer")
+  giftCardsPurchased GiftCard[] @relation("GiftBuyer")
+  customerInsights CustomerInsight[]
+  reviews      Review[]
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19):
+  guestProfile GuestProfile?
+  // ── اقتصادِ یکپارچه‌ی مشتری (migration 038) — رجوع کن به CustomerEconomyProfile ──
+  economyProfile    CustomerEconomyProfile?
+  economyLedger     EconomyLedgerEntry[]
+  missionProgress   MissionProgress[]
+  rewardRedemptions RewardRedemption[]
+  // ── نشان‌هایِ کنترل‌شده‌یِ پلتفرم (migration 040) — جدا از BADGES قدیمیِ اپِ کاستومر ──
+  badges            UserBadge[]
+  @@index([createdAt])
+  chatThreads  ChatThread[]
+  @@map("users")
+}
+
+model Staff {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  phone    String
+  // نامِ نمایشیِ کارمند (اختیاری) — پنلِ بیزنس آن را نشان/ویرایش می‌کند (migration 027).
+  name     String?
+  role     StaffRole @default(staff)
+  isActive Boolean @default(true) @map("is_active")  // غیرفعال‌سازی کارمند (اخراج) — توکن refreshش رد می‌شود
+  permission StaffPermission?
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 018_staff_branch_scoping):
+  // NULL = دسترسی به همه‌ی شعبه‌های تنانت (owner/manager)؛ ست‌شده = قفل به یک شعبه.
+  restaurantId String? @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  @@unique([tenantId, phone])
+  @@map("staff")
+}
+
+model Restaurant {
+  id            String           @id @default(uuid()) @db.Uuid
+  tenantId      String           @map("tenant_id") @db.Uuid
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  slug          String           @unique
+  name          String
+  cuisine       String?
+  vibes         String[]         @default([])
+  priceBand     Int              @default(2) @map("price_band") @db.SmallInt
+  isOpen        Boolean          @default(true) @map("is_open")
+  openingHours  Json?            @map("opening_hours")  // ساعت کاری هفتگی؛ null=همیشه باز طبق isOpen (سازگاری با گذشته)
+  // ── تأییدِ ساعتِ کاری (Part 3، migration 045) — دقیقاً مثلِ RestaurantPhoto.status
+  //    ولی روی خودِ رستوران چون هر رستوران حداکثر یک پیشنهادِ درِ دستِ بررسی دارد.
+  //    openingHours بالا همیشه «زنده»/تأییدشده است؛ مشتری فقط همان را می‌بیند. ──
+  pendingOpeningHours Json?      @map("pending_opening_hours")  // پیشنهادِ رستوران، هنوز تأییدنشده
+  hoursChangeStatus   String?   @map("hours_change_status")     // 'pending' | 'rejected' | null
+  hoursChangeReason   String?   @map("hours_change_reason")     // دلیلِ رد (برایِ رستوران‌دار)
+  hoursChangeRequestedAt DateTime? @map("hours_change_requested_at")
+  hoursChangeReviewedAt  DateTime? @map("hours_change_reviewed_at")
+  hoursChangeReviewedBy  String?   @map("hours_change_reviewed_by") @db.Uuid
+  pricingRules  Json?            @map("pricing_rules")  // قواعدِ حداقل مبلغ رزرو بر اساس شلوغی (AI Pricing)
+  baseMinSpendToman Int          @default(0) @map("base_min_spend_toman") // حداقل مبلغِ پایه
+  // ── اتصال (heartbeat): برای پنهان‌کردن خودکار رستوران آفلاین از اپ مشتری ──
+  lastSeenAt    DateTime?        @map("last_seen_at")   // آخرین heartbeat از پنل بیزنس
+  onlineGating  Boolean          @default(true) @map("online_gating") // آیا رزرو آنلاین وابسته به آنلاین‌بودن است
+  // ── پیکربندی زمان‌بندی رزرو (با پیش‌فرض امن — API نمی‌شکند) ──
+  slotMinutes      Int @default(90) @map("slot_minutes") @db.SmallInt   // مدت پیش‌فرض هر رزرو
+  bufferMinutes    Int @default(0)  @map("buffer_minutes") @db.SmallInt  // فاصله‌ی ایمنی بین رزروهای یک میز
+  cleaningMinutes  Int @default(15) @map("cleaning_minutes") @db.SmallInt // زمان نظافت/چیدن میز
+  lateGraceMinutes Int @default(15) @map("late_grace_minutes") @db.SmallInt // مهلت تأخیر مهمان قبل از no_show
+  holdMinutes      Int @default(10) @map("hold_minutes") @db.SmallInt    // مدت هولد رزرو pending تا انقضا
+  timezone      String           @default("Asia/Tehran")
+  // ── دادهٔ مکانی برای Local/Restaurant SEO (ADR 0001, migration 030) — همه nullable،
+  //    backward-compatible؛ منبعِ schema.org PostalAddress + GeoCoordinates در apps/seo. ──
+  address       String?
+  city          String?
+  district      String?
+  postalCode    String?          @map("postal_code")
+  country       String           @default("IR")
+  latitude      Float?
+  longitude     Float?
+  clubPrefix    String           @map("club_prefix")
+  cbBasePct     Int              @default(5) @map("cb_base_pct") @db.SmallInt
+  cbPreorderPct Int              @default(8) @map("cb_preorder_pct") @db.SmallInt
+  cbVipPct      Int              @default(12) @map("cb_vip_pct") @db.SmallInt
+  cbWinbackPct  Int              @default(20) @map("cb_winback_pct") @db.SmallInt
+  smsBalance    Int              @default(50) @map("sms_balance")       // موجودی پیامک باقی‌مانده
+  smsTotalSent  Int              @default(0) @map("sms_total_sent")    // کل پیامک ارسالی (آمار)
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 019/020 روی Supabase project zmyuvtpbchytqvtgyewt):
+  // این فیلد و بقیه‌ی موارد مشابه («⚠️ همگام‌سازی‌شده») از قبل روی DB بودند ولی هرگز
+  // در این schema.prisma منعکس نشده بودند (drift بین DB و ریپو — کشف‌شده و رفع‌شده).
+  paymentEnabled Boolean         @default(false) @map("payment_enabled") // فعال/غیرفعال‌بودن پرداخت آنلاین این رستوران
+  createdAt     DateTime         @default(now()) @map("created_at")
+  tables        Table[]
+  menuItems     MenuItem[]
+  reservations  Reservation[]
+  members       ClubMember[]
+  reviews       Review[]
+  photos        RestaurantPhoto[]
+  staffNotes    StaffNote[]
+  campaignLogs  CampaignLog[]
+  waitlist      WaitlistEntry[]
+  specialEvents SpecialEvent[]
+  codeCounter   ClubCodeCounter?
+  customerInsights CustomerInsight[]
+  coupons       Coupon[]
+  marketingAutomations MarketingAutomation[]
+  staff         Staff[] // ⚠️ همگام‌سازی‌شده: چندشعبه‌ای — کارمندانِ قفل‌شده به این شعبه
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19) — بک‌رفرنس‌های
+  // FKهایی که تازه اضافه شدند:
+  webhooks         Webhook[]
+  smsTransactions  SmsTransaction[]
+  closures         RestaurantClosure[]
+  noShowModel      RestaurantNoShowModel?
+  demandForecast   RestaurantDemandForecast?
+  modelTrainingRuns ModelTrainingRun[]
+  // ── اقتصادِ یکپارچه‌ی مشتری (migration 038) ──
+  cancellationPolicy    CancellationPolicy?
+  economyLedgerEntries  EconomyLedgerEntry[]
+  missions              Mission[]
+  rewardMarketplaceItems RewardMarketplaceItem[]
+  @@index([tenantId])
+  @@index([city], map: "idx_restaurants_city")
+  chatThreads  ChatThread[]
+  @@map("restaurants")
+}
+
+// ── شکل میز (برای نقشه‌ی بصری و چیدمان) ──
+enum TableShape {
+  rectangle
+  round
+  booth                    // اتاقک/کابین
+  @@map("table_shape")
+}
+
+// ── ناحیه‌ی میز (موقعیت اصلی) ──
+enum TableZone {
+  indoor                   // داخل سالن
+  outdoor                  // فضای باز/حیاط
+  window                   // کنار پنجره
+  vip                      // بخش ویژه
+  smoking                  // بخش سیگار
+  @@map("table_zone")
+}
+
+// ── وضعیت لحظه‌ای میز (real-time) ──
+enum TableState {
+  free                     // آزاد
+  reserved                 // رزروشده
+  occupied                 // اشغال (مهمان نشسته)
+  cleaning                 // در حال نظافت
+  maintenance              // خارج از سرویس (تعمیر)
+  @@map("table_state")
+}
+
+model Table {
+  id           String        @id @default(uuid()) @db.Uuid
+  restaurantId String        @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id])
+  number       Int           @db.SmallInt
+  name         String?       // نام دلخواه میز (مثلاً «میز شاه‌نشین») — اختیاری
+  capacity     Int           @db.SmallInt
+  // ── محدوده‌ی ظرفیت (نیاز: Min/Max Party Size) ──
+  minPartySize Int           @default(1) @map("min_party_size") @db.SmallInt
+  maxPartySize Int?          @map("max_party_size") @db.SmallInt // پیش‌فرض = capacity اگر null
+  // ── شکل و ناحیه (نیاز: Shape, VIP, Outdoor, Window, Smoking) ──
+  shape        TableShape    @default(rectangle)
+  zone         TableZone     @default(indoor)
+  isVip        Boolean       @default(false) @map("is_vip")
+  isSmoking    Boolean       @default(false) @map("is_smoking")
+  isAccessible Boolean       @default(false) @map("is_accessible") // دسترس‌پذیر ویلچر
+  // ── ترکیب/تقسیم (نیاز: Mergeable, Splittable) ──
+  isMergeable  Boolean       @default(false) @map("is_mergeable")
+  mergeableWith Int[]        @default([]) @map("mergeable_with") @db.SmallInt // شماره میزهای قابل‌ترکیب
+  isSplittable Boolean       @default(false) @map("is_splittable")
+  // ── چیدمان بصری (نیاز: Priority, Rotation) ──
+  priority     Int           @default(0) @db.SmallInt // اولویت در تخصیص هوشمند (بالاتر = ترجیح بیشتر)
+  posX         Int?          @map("pos_x") @db.SmallInt // مختصات روی نقشه‌ی سالن
+  posY         Int?          @map("pos_y") @db.SmallInt
+  rotation     Int           @default(0) @db.SmallInt // چرخش (درجه) روی نقشه
+  // ── محدودیت زمانی (نیاز: Maximum Duration) ──
+  maxDurationMinutes Int?    @map("max_duration_minutes") @db.SmallInt // سقف مدت رزرو این میز
+  // ── وضعیت لحظه‌ای (نیاز: Cleaning/Occupied/Reserved/Maintenance) ──
+  state        TableState    @default(free)
+  isActive     Boolean       @default(true) @map("is_active") // میز در دسترس رزرو است؟
+  // ── کد QR برای check-in سر میز (نیاز: QR Code) ──
+  qrCode       String?       @unique @map("qr_code")
+  attributes   String[]      @default([]) // ویژگی‌های آزاد اضافی
+  reservations Reservation[]
+  @@unique([restaurantId, number])
+  @@index([restaurantId, isActive, capacity])
+  @@index([restaurantId, state])
+  @@index([restaurantId, zone])
+  @@map("tables")
+}
+
+model MenuItem {
+  id           String            @id @default(uuid()) @db.Uuid
+  restaurantId String            @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id])
+  name         String
+  emoji        String?
+  priceToman   Int               @map("price_toman")
+  isActive     Boolean           @default(true) @map("is_active")
+  soldCount    Int               @default(0) @map("sold_count")
+  inOrders     ReservationItem[]
+  // کوئری منو: آیتم‌های فعال یک رستوران
+  @@index([restaurantId, isActive])
+  @@map("menu_items")
+}
+
+enum ReservationStatus {
+  // ── چرخه‌ی حیات کامل رزرو ──
+  pending                  // در انتظار تأیید (هولد موقت)
+  waitlisted               // در لیست انتظار (ظرفیت پر بود)
+  confirmed                // تأییدشده (دستی توسط رستوران/مشتری)
+  auto_confirmed           // تأیید خودکار (سیستم)
+  preparing                // در حال آماده‌سازی میز (نزدیک زمان رزرو)
+  checked_in               // مهمان رسیده و check-in کرده
+  running_late             // مهمان دیر کرده (از زمان گذشته، هنوز نرسیده)
+  seated                   // سر میز نشسته
+  dining                   // در حال صرف غذا
+  completed                // تمام‌شده (مهمان رفت)
+  no_show                  // مهمان نیامد
+  rejected                 // ردشده توسط رستوران (قبل از تأیید)
+  expired                  // هولد منقضی شد
+  cancelled                // لغوشده (کلی)
+  auto_cancelled           // لغو خودکار (سیستم — مثلاً waitlist که جا باز نشد)
+  // ── وضعیت‌های قدیمی (حفظ‌شده برای سازگاری داده‌ی موجود) ──
+  arrived                  // [قدیمی] معادل checked_in
+  cancelled_by_user        // [قدیمی] معادل cancelled (توسط مشتری)
+  cancelled_by_restaurant  // [قدیمی] معادل cancelled (توسط رستوران)
+  @@map("reservation_status")
+}
+
+// ⚠️ همگام‌سازی‌شده با DB زنده (migration 019_payments_deposit):
+enum DepositStatus {
+  none      // بیعانه لازم نیست
+  pending   // منتظر پرداخت
+  paid      // پرداخت‌شده
+  refunded  // برگشت‌داده‌شده (لغو رزرو بعد از پرداخت)
+  failed    // پرداخت ناموفق
+  @@map("deposit_status")
+}
+
+// ⚠️ همگام‌سازی‌شده با DB زنده (migration 019_payments_deposit):
+enum PaymentStatus {
+  pending   // در انتظار بازگشت از درگاه
+  success   // پرداخت موفق و verify‌شده
+  failed    // پرداخت ناموفق
+  refunded  // برگشت‌داده‌شده
+  @@map("payment_status")
+}
+
+model Reservation {
+  id           String            @id @default(uuid()) @db.Uuid
+  code         String            @unique
+  restaurantId String            @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id])
+  tableId      String?           @map("table_id") @db.Uuid
+  table        Table?            @relation(fields: [tableId], references: [id])
+  userId       String?           @map("user_id") @db.Uuid
+  user         User?             @relation(fields: [userId], references: [id])
+  guestName    String?           @map("guest_name")
+  guestPhone   String?           @map("guest_phone")
+  partySize    Int               @map("party_size") @db.SmallInt
+  slotStart    DateTime          @map("slot_start")
+  slotEnd      DateTime          @map("slot_end")
+  status       ReservationStatus @default(confirmed)
+  source       String            @default("app")
+  preferences  String[]          @default([])
+  note         String?
+  cancelReason String?           @map("cancel_reason")
+  // ── انقضای هولد: رزرو pending که تا این زمان تأیید نشود، expired می‌شود ──
+  holdExpiresAt DateTime?        @map("hold_expires_at")
+  // ── میزهای ترکیبی (merge): اگر گروه روی چند میز نشسته، شماره‌ی همه اینجاست ──
+  mergedTableNumbers Int[]       @default([]) @map("merged_table_numbers") @db.SmallInt
+  // ── مدت واقعی این رزرو (دقیقه) — از پیکربندی رستوران یا override ──
+  durationMinutes Int?          @map("duration_minutes") @db.SmallInt
+  blockBufferMinutes Int        @default(0) @map("block_buffer_minutes") @db.SmallInt
+  // ── ریسک no-show (فاز v2 — هوش مشتری) ──
+  noShowRiskScore  Int?         @map("no_show_risk_score") @db.SmallInt
+  noShowRiskTier   String?      @map("no_show_risk_tier")
+  depositRequested Boolean      @default(false) @map("deposit_requested")
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 019_payments_deposit):
+  depositAmountToman Int?       @map("deposit_amount_toman")
+  depositStatus      DepositStatus @default(none) @map("deposit_status")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  items        ReservationItem[]
+  events       ReservationEvent[]
+  reviews      Review[]
+  payments     Payment[] // ⚠️ همگام‌سازی‌شده: یک رزرو می‌تواند چند تلاش پرداخت داشته باشد
+  economyLedgerEntries EconomyLedgerEntry[] // اقتصادِ یکپارچه‌ی مشتری (migration 038)
+  // ── ایندکس‌های بهینه برای ۱۰M+ رزرو (بر اساس الگوی واقعی کوئری) ──
+  // داشبورد رستوران: رزروهای یک رستوران در بازه‌ی زمانی با وضعیت
+  @@index([restaurantId, status, slotStart])
+  // کوئری تداخل میز (موتور رزرو + availability)
+  @@index([tableId, status, slotStart, slotEnd])
+  // تاریخچه‌ی کاربر: رزروهای یک کاربر، جدیدترین اول
+  @@index([userId, slotStart(sort: Desc)])
+  // پاکسازی هولدهای منقضی (partial-friendly)
+  @@index([status, holdExpiresAt])
+  // گزارش‌های زمانی و تحلیل (رزروهای ثبت‌شده در بازه)
+  @@index([restaurantId, createdAt])
+  @@index([restaurantId, noShowRiskTier, slotStart])
+  chatThreads  ChatThread[]
+  @@map("reservations")
+}
+
+model ReservationItem {
+  reservationId String      @map("reservation_id") @db.Uuid
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  menuItemId    String      @map("menu_item_id") @db.Uuid
+  // Restrict: آیتم منویی که در سابقه‌ی سفارش هست نباید حذف شود (یکپارچگی تاریخچه)
+  menuItem      MenuItem    @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  qty           Int         @default(1) @db.SmallInt
+  @@id([reservationId, menuItemId])
+  // برای آمار «پرفروش‌ترین آیتم‌ها»
+  @@index([menuItemId])
+  @@map("reservation_items")
+}
+
+// ── لاگ رویداد رزرو (audit log) — هر تغییر وضعیت اینجا ثبت می‌شود ──
+model ReservationEvent {
+  id            String      @id @default(uuid()) @db.Uuid
+  reservationId String      @map("reservation_id") @db.Uuid
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  fromStatus    ReservationStatus? @map("from_status") // وضعیت قبلی (null برای رویداد اول)
+  toStatus      ReservationStatus  @map("to_status")   // وضعیت جدید
+  actor         String      @default("system")         // چه کسی: system | customer | staff:{id} | cron
+  reason        String?                                // دلیل (اختیاری)
+  isAutomatic   Boolean     @default(false) @map("is_automatic") // انتقال خودکار بود؟
+  createdAt     DateTime    @default(now()) @map("created_at")
+  @@index([reservationId, createdAt])
+  @@map("reservation_events")
+}
+
+// ── وضعیت ورودی لیست انتظار ──
+enum WaitlistStatus {
+  waiting                  // در صف انتظار
+  offered                  // میز آزاد شد، آفر داده شده (منتظر پاسخ مشتری)
+  accepted                 // مشتری آفر را پذیرفت → رزرو ساخته می‌شود
+  declined                 // مشتری آفر را رد کرد
+  expired                  // مهلت پاسخ به آفر گذشت
+  seated                   // مشتری نشست (تکمیل)
+  cancelled                // مشتری از صف خارج شد
+  no_response              // آفر بدون پاسخ منقضی شد (متفاوت از declined)
+  @@map("waitlist_status")
+}
+
+model WaitlistEntry {
+  id              String         @id @default(uuid()) @db.Uuid
+  restaurantId    String         @map("restaurant_id") @db.Uuid
+  restaurant      Restaurant     @relation(fields: [restaurantId], references: [id])
+  userId          String?        @map("user_id") @db.Uuid
+  user            User?          @relation(fields: [userId], references: [id])
+  // اطلاعات مهمان (برای ورودی بدون حساب)
+  guestName       String?        @map("guest_name")
+  guestPhone      String?        @map("guest_phone")
+  guestEmail      String?        @map("guest_email")
+  partySize       Int            @map("party_size") @db.SmallInt
+  // ── اولویت صف (بالاتر = جلوتر). VIP و باشگاه طلایی امتیاز می‌گیرند ──
+  priority        Int            @default(0) @db.SmallInt
+  isVip           Boolean        @default(false) @map("is_vip")
+  status          WaitlistStatus @default(waiting)
+  // ── زمان‌ها ──
+  joinedAt        DateTime       @default(now()) @map("joined_at")
+  offeredAt       DateTime?      @map("offered_at")        // کِی آفر داده شد
+  offerExpiresAt  DateTime?      @map("offer_expires_at")  // مهلت پاسخ (تایمر انقضا)
+  respondedAt     DateTime?      @map("responded_at")
+  seatedAt        DateTime?      @map("seated_at")
+  // ── تخصیص میز هنگام آفر ──
+  offeredTableId  String?        @map("offered_table_id") @db.Uuid
+  offeredTableNumber Int?        @map("offered_table_number") @db.SmallInt
+  // ── تخمین زمان انتظار (دقیقه) — هنگام پیوستن محاسبه و ذخیره می‌شود ──
+  estimatedWaitMinutes Int?      @map("estimated_wait_minutes") @db.SmallInt
+  // ── کانال‌های اعلان دلخواه ──
+  notifySms       Boolean        @default(true) @map("notify_sms")
+  notifyPush      Boolean        @default(true) @map("notify_push")
+  notifyEmail     Boolean        @default(false) @map("notify_email")
+  // رزرو ساخته‌شده پس از accept (در صورت وجود)
+  reservationCode String?        @map("reservation_code")
+  note            String?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  // توکنِ دسترسیِ مهمان (رفعِ IDOR، migration 041) — فقط برایِ ورودی‌هایِ
+  // بدونِ حساب (userId=null) صادر می‌شه؛ accept/decline/leave روی این ورودی‌ها
+  // علاوه‌بر UUID، این توکن رو هم می‌خوان.
+  // ⚠️ migration 044: فقط hashِ توکن ذخیره می‌شه (همون الگویِ otp_codes.code_hash
+  // در otp.ts) — نه خودِ توکنِ خام. اگر DB لو بره (backup، SQLi، دسترسیِ
+  // داخلی)، دیگه نمی‌شه مستقیم از رویِ دیتا guest tokenِ فعال رو استخراج و
+  // impersonate کرد. توکنِ خام فقط یک‌بار (لحظه‌ی join) به کلاینت برمی‌گرده.
+  guestAccessTokenHash String?    @map("guest_access_token_hash")
+  @@index([restaurantId, status, priority(sort: Desc), joinedAt])
+  @@index([status, offerExpiresAt])
+  @@index([userId, status])
+  @@map("waitlist_entries")
+}
+
+// ── دفتر امتیاز (تاریخچه‌ی کسب/خرج امتیاز وفاداری) ──
+enum PointsReason {
+  reservation              // امتیاز بابت رزرو تکمیل‌شده
+  referral                 // امتیاز بابت دعوت دوست
+  birthday                 // هدیه‌ی تولد
+  anniversary              // هدیه‌ی سالگرد
+  signup                   // امتیاز خوش‌آمد
+  cashback                 // کش‌بک خرید (pre-order) — checkout
+  redemption               // خرج امتیاز (پاداش)
+  adjustment               // تنظیم دستی
+  @@map("points_reason")
+}
+
+model PointsLedger {
+  id           String       @id @default(uuid()) @db.Uuid
+  userId       String       @map("user_id") @db.Uuid
+  user         User         @relation(fields: [userId], references: [id])
+  restaurantId String?      @map("restaurant_id") @db.Uuid
+  delta        Int          // مثبت = کسب، منفی = خرج
+  reason       PointsReason
+  note         String?
+  createdAt    DateTime     @default(now()) @map("created_at")
+  @@index([userId, createdAt])
+  // NEW-M1: unique partial index روی (user_id, reason, year) برای reason های
+  // birthday/anniversary در migration 013 ساخته می‌شود (Prisma بیان expression-based
+  // را پشتیبانی نمی‌کند). جلوگیری از پاداش سالانه‌ی دوگانه تحت همزمانی.
+  @@map("points_ledger")
+}
+
+// ── دعوت دوستان (Referral) ──
+enum ReferralStatus {
+  pending                  // دعوت‌شده ثبت‌نام نکرده
+  completed                // ثبت‌نام و اولین رزرو انجام شد → پاداش
+  rewarded                 // پاداش پرداخت شد
+  @@map("referral_status")
+}
+
+model Referral {
+  id           String         @id @default(uuid()) @db.Uuid
+  referrerId   String         @map("referrer_id") @db.Uuid
+  referrer     User           @relation("Referrer", fields: [referrerId], references: [id])
+  inviteePhone String         @map("invitee_phone")  // شماره‌ی دعوت‌شده
+  inviteeId    String?        @map("invitee_id") @db.Uuid // وقتی ثبت‌نام کرد
+  status       ReferralStatus @default(pending)
+  rewardPoints Int            @default(500) @map("reward_points")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  completedAt  DateTime?      @map("completed_at")
+  @@index([referrerId, status])
+  @@index([inviteePhone])
+  @@map("referrals")
+}
+
+// ── کارت هدیه (Gift Card) ──
+enum GiftCardStatus {
+  active                   // فعال، قابل‌استفاده
+  redeemed                 // استفاده‌شده (کامل)
+  expired                  // منقضی
+  @@map("gift_card_status")
+}
+
+model GiftCard {
+  id           String         @id @default(uuid()) @db.Uuid
+  code         String         @unique  // کد یکتای کارت هدیه
+  buyerId      String?        @map("buyer_id") @db.Uuid
+  buyer        User?          @relation("GiftBuyer", fields: [buyerId], references: [id])
+  restaurantId String?        @map("restaurant_id") @db.Uuid  // null = قابل‌استفاده همه‌جا
+  amountToman  Int            @map("amount_toman")
+  balanceToman Int            @map("balance_toman")  // مانده (برای استفاده‌ی جزئی)
+  recipientName  String?      @map("recipient_name")
+  recipientPhone String?      @map("recipient_phone")
+  message      String?        // پیام هدیه
+  status       GiftCardStatus @default(active)
+  expiresAt    DateTime?      @map("expires_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  rewardRedemptions RewardRedemption[] // کارتِ هدیه‌هایی که از Reward Marketplace صادر شدن (migration 038)
+  @@index([recipientPhone])
+  @@index([buyerId])
+  @@map("gift_cards")
+}
+
+// ── رویدادهای ویژه (Special Events) — شب موسیقی، منوی ویژه و... ──
+model SpecialEvent {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  title        String
+  description  String?
+  emoji        String?    // آیکون نمایشی
+  startsAt     DateTime   @map("starts_at")
+  endsAt       DateTime?  @map("ends_at")
+  priceToman   Int?       @map("price_toman")  // قیمت بلیت (اگر دارد)
+  capacity     Int?       // ظرفیت
+  isPublished  Boolean    @default(true) @map("is_published")
+  // ── override سیاستِ کنسلی برایِ این رویدادِ خاص (migration 038) ──
+  // شکل: همون فیلدهایِ CancellationPolicy (freeCancelHours/depositRequired/...)،
+  // فقط فیلدهایی که override می‌شن حضور دارن؛ در resolvePolicy (لایه‌ی ۲،
+  // همیشه locked) اعمال می‌شه. null = این رویداد سیاستِ خاصی نداره.
+  policyOverride Json?    @map("policy_override")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  @@index([restaurantId, startsAt])
+  @@index([isPublished, startsAt])
+  @@map("special_events")
+}
+
+model ClubMember {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  userId       String     @map("user_id") @db.Uuid
+  user         User       @relation(fields: [userId], references: [id])
+  code         String
+  tier         String     @default("bronze")
+  points       Int        @default(0)
+  joinedAt     DateTime   @default(now()) @map("joined_at")
+  @@unique([restaurantId, userId])
+  @@unique([restaurantId, code])
+  // کمپین SMS و آمار باشگاه: اعضای یک رستوران بر اساس سطح
+  @@index([restaurantId, tier])
+  @@map("club_members")
+}
+
+model ClubCodeCounter {
+  restaurantId String     @id @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  nextValue    Int        @default(1001) @map("next_value")
+  @@map("club_code_counters")
+}
+
+model OtpCode {
+  phone     String   @id
+  codeHash  String   @map("code_hash")
+  expiresAt DateTime @map("expires_at")
+  attempts  Int      @default(0)
+  // برای پاکسازی دوره‌ای کدهای منقضی
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+//  فاز v2 — هوش مشتری، کوپن، کمپین خودکار، RBAC
+// ═══════════════════════════════════════════════════════════════════════
+
+// ───────────────────────────────────────────────────────────────────────
+//  ۱) CustomerInsight — CLV + ریسک no-show + سگمنت، per (رستوران × کاربر)
+//     محاسبه‌شده توسط cron شبانه (maintenance/customer-insights) +
+//     به‌روزرسانی فوری بعد از هر completed/no_show.
+// ───────────────────────────────────────────────────────────────────────
+enum CustomerSegment {
+  new_customer      // اولین بازدید یا بدون بازدید قبلی
+  active            // بازدید منظم، فاصله‌ی کم
+  at_risk           // قبلاً منظم بود، مدتی غیبت کرده
+  churned           // مدت طولانی غیبت (بر اساس میانگین فاصله‌ی بازدید رستوران)
+  vip               // بالاترین دهک CLV این رستوران
+  @@map("customer_segment")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  یادگیریِ ریسکِ no-show — کالیبراسیونِ per-restaurant، نه یک فرمولِ سراسری
+//
+//  computeStaticNoShowRisk (در lib/customer-insights.ts) یک heuristic با
+//  ضرایبِ دستی‌ست: همان اعداد برای رستورانِ لوکسِ رزرو-با-هفته‌ها-قبل و
+//  فست‌فودِ walk-in-محور. این جدول نتیجه‌ی یادگیریِ واقعی از تاریخچه‌ی خودِ
+//  هر رستوران را نگه می‌دارد — رگرسیونِ لجستیکِ ساده (بدونِ نیاز به
+//  زیرساختِ ML)، شبانه با cronِ موجودِ customer-insights بازآموزی می‌شود.
+//
+//  isActive عمداً پیش‌فرضش false است: مدلِ یادگرفته فقط وقتی جایگزینِ
+//  heuristic می‌شود که روی دادهٔ نگه‌داشته‌شده (held-out، از نظرِ زمانی
+//  بعد از دادهٔ آموزش) واقعاً از آن بهتر عمل کند. اگر داده کم باشد یا
+//  یادگیری بهتر از heuristic نباشد، سیستم بی‌صدا به heuristic برمی‌گردد —
+//  هیچ‌وقت نباید مدلی که بدتر از قانونِ دستی‌ست فعال بماند.
+// ───────────────────────────────────────────────────────────────────────
+model RestaurantNoShowModel {
+  restaurantId  String     @id @map("restaurant_id") @db.Uuid
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  // ترتیب: [بایاس، دارد‌سابقه، نرخِ‌no-showِ‌قبلی، last-minute، خیلی‌زودهنگام، گروهِ‌بزرگ، منبع‌تلفن]
+  // — دقیقاً با NO_SHOW_FEATURE_NAMES در lib/no-show-model.ts هم‌ترازی دارد.
+  weights       Float[]    @map("weights")
+  sampleSize    Int        @map("sample_size")
+  positiveCount Int        @map("positive_count")       // چند no-show واقعی در دادهٔ آموزش
+  learnedBrier  Float      @map("learned_brier")         // پایین‌تر = بهتر (۰..۱)
+  staticBrier   Float      @map("static_brier")          // همان معیار برای heuristicِ فعلی، روی همان holdout
+  isActive      Boolean    @default(false) @map("is_active")
+  trainedAt     DateTime   @default(now()) @map("trained_at")
+  @@map("restaurant_no_show_models")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  پیش‌بینیِ تقاضا — شبیه‌سازیِ روزهای آینده از رویِ تاریخچه‌ی خودِ رستوران
+//
+//  همان انضباطِ RestaurantNoShowModel، این‌بار برایِ رگرسیونِ سری‌زمانی:
+//  Holt-Winters جمعی (level+trend+فصلیِ هفتگی) به‌جایِ رگرسیونِ لجستیک.
+//  جزئیاتِ کامل در lib/demand-forecast.ts.
+//
+//  countModel/coversModel هرکدام یک SeriesModelState سریالایزشده‌اند:
+//  { model: {level, trend, seasonal[7], period, phaseOffset}, mae,
+//    baselineMae, isActive, reason, lastValues[7] } — کاملاً شفاف و
+//  قابلِ‌بازرسی (JSONB)، نه یک black-box. isActive هم مثلِ no-show model
+//  پیش‌فرضش false است: فقط با بهبودِ واقعی روی هولدآوت true می‌شود.
+// ───────────────────────────────────────────────────────────────────────
+model RestaurantDemandForecast {
+  restaurantId String     @id @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  historyDays  Int        @map("history_days") // چند روزِ تاریخچه در آخرین آموزش استفاده شد
+  countModel   Json       @map("count_model")  // SeriesModelState برایِ «تعدادِ رزرو در روز»
+  coversModel  Json       @map("covers_model") // SeriesModelState برایِ «مجموعِ کاورها در روز»
+  trainedAt    DateTime   @default(now()) @map("trained_at")
+  @@map("restaurant_demand_forecasts")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  تاریخچه‌ی append-only آموزشِ مدل‌ها (migration 042، نقشه‌راهِ AI فازِ ۱)
+//
+//  RestaurantNoShowModel/RestaurantDemandForecast بالا تک‌ردیفی‌اند و هرشب
+//  overwrite می‌شوند — مسیرِ داغِ خواندنِ مدلِ فعال (getLearnedNoShowModel/
+//  getDemandForecast) دقیقاً همان دو جدول را می‌خواند و دست‌نخورده می‌ماند.
+//  این جدول کنارِ آن‌ها، نه به‌جایِ آن‌ها، هر بار که یکی از دو تابعِ آموزش
+//  اجرا می‌شود یک ردیفِ جدید اضافه می‌کند — چه مدل فعال شده باشد چه نه —
+//  تا تاریخچه‌ی کاملِ «امتحان‌شد و نتیجه چه بود» برایِ داشبوردِ سلامتِ مدل
+//  در پنلِ شرکت و برایِ تستِ بایاس در دسترس باشد. هیچ UPDATE/DELETEای رویِ
+//  این جدول انجام نمی‌شود — همان الگویِ EconomyLedgerEntry (migration 038).
+// ───────────────────────────────────────────────────────────────────────
+model ModelTrainingRun {
+  id            String     @id @default(uuid()) @db.Uuid
+  restaurantId  String     @map("restaurant_id") @db.Uuid
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  // 'no_show' | 'demand_forecast' — بدونِ enumِ Postgres تا افزودنِ نوعِ
+  // مدلِ جدید در فازِ ۲ (fraud/incentive) نیازِ به migration نداشته باشد.
+  kind          String     @map("kind")
+  sampleSize    Int        @map("sample_size")
+  // no_show: {learnedBrier, staticBrier} — demand_forecast: {mae, baselineMae}
+  metrics       Json       @map("metrics")
+  isActive      Boolean    @map("is_active")
+  reason        String?    @map("reason")
+  trainedAt     DateTime   @default(now()) @map("trained_at")
+  @@index([restaurantId, kind, trainedAt])
+  @@map("model_training_runs")
+}
+
+model CustomerInsight {
+  restaurantId      String          @map("restaurant_id") @db.Uuid
+  restaurant        Restaurant      @relation(fields: [restaurantId], references: [id])
+  userId            String          @map("user_id") @db.Uuid
+  user              User            @relation(fields: [userId], references: [id])
+
+  // ── CLV ──
+  totalVisits       Int             @default(0) @map("total_visits")
+  totalSpendToman   Int             @default(0) @map("total_spend_toman")     // جمع پیش‌سفارش‌ها (واقعی)
+  avgSpendToman     Int             @default(0) @map("avg_spend_toman")
+  visitFrequencyDays Float?         @map("visit_frequency_days")              // میانگین فاصله‌ی بازدید
+  predictedClvToman Int             @default(0) @map("predicted_clv_toman")   // پیش‌بینی ۱۲ ماه آینده
+  firstVisitAt      DateTime?       @map("first_visit_at")
+  lastVisitAt       DateTime?       @map("last_visit_at")
+
+  // ── ریسک رفتاری ──
+  noShowCount       Int             @default(0) @map("no_show_count")
+  cancelCount       Int             @default(0) @map("cancel_count")
+  completedCount    Int             @default(0) @map("completed_count")
+  noShowRatePct     Int             @default(0) @map("no_show_rate_pct")      // ۰..۱۰۰
+  churnRiskScore    Int             @default(0) @map("churn_risk_score")     // ۰..۱۰۰ (بالاتر = خطر بیشتر)
+  rScore            Int?            @map("r_score") @db.SmallInt             // RFM Recency 1..5
+  fScore            Int?            @map("f_score") @db.SmallInt             // RFM Frequency 1..5
+  mScore            Int?            @map("m_score") @db.SmallInt             // RFM Monetary 1..5
+  rfmSegment        String?         @map("rfm_segment")                      // champions/loyal/at_risk/hibernating/...
+
+  segment           CustomerSegment @default(new_customer)
+  isVip             Boolean         @default(false) @map("is_vip")
+
+  // ── امتیازِ هوشِ مشتری (نقشه‌راهِ AI، فازِ ۲) ──
+  // ترکیبِ وزن‌دارِ چهار سیگنالِ از‌قبل‌محاسبه‌شده‌ی همین جدول/rfm.ts (نه یک
+  // مدلِ یادگرفته‌ی جدید) — جزئیاتِ فرمول در lib/customer-intelligence.ts.
+  intelligenceScore Int?            @map("intelligence_score")   // ۰..۱۰۰، بالاتر = باارزش‌تر
+  intelligenceTier  String?         @map("intelligence_tier")    // low | medium | high
+
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@id([restaurantId, userId])
+  // داشبورد: مرتب‌سازی بر اساس CLV یا فیلتر سگمنت
+  @@index([restaurantId, segment, predictedClvToman(sort: Desc)])
+  @@index([restaurantId, churnRiskScore(sort: Desc)])
+  @@index([restaurantId, intelligenceScore(sort: Desc)])
+  @@map("customer_insights")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  ۲) Coupon Engine — مستقل از کش‌بک درصدی فعلی
+// ───────────────────────────────────────────────────────────────────────
+enum CouponKind {
+  percent           // درصدی (مثلاً ۲۰٪)
+  fixed             // مقدار ثابت تومانی
+  free_item         // آیتم رایگان (menuItemId)
+  @@map("coupon_kind")
+}
+
+model Coupon {
+  id            String      @id @default(uuid()) @db.Uuid
+  restaurantId  String      @map("restaurant_id") @db.Uuid
+  restaurant    Restaurant  @relation(fields: [restaurantId], references: [id])
+  code          String      // کد قابل‌نمایش (مثلاً WELCOME20)
+  kind          CouponKind
+  value         Int         // درصد یا تومان (برای free_item بی‌اثر)
+  freeMenuItemId String?    @map("free_menu_item_id") @db.Uuid
+  // ── محدودیت‌ها ──
+  minPartySize  Int?        @map("min_party_size") @db.SmallInt
+  maxRedemptions Int?       @map("max_redemptions")          // null = نامحدود
+  redemptionCount Int       @default(0) @map("redemption_count")
+  perUserLimit  Int         @default(1) @map("per_user_limit")
+  // ── هدف‌گیری (نیاز Campaign Manager) — اگر پر باشد، کوپن فقط برای این سگمنت فعال است ──
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19):
+  // قبلاً این تنها فیلدِ کلِ schema بود که @map نداشت → ستونِ واقعی روی Postgres
+  // mixed-case بود ("targetSegment")، برخلافِ کانوانسیونِ snake_case همه‌جای دیگر.
+  targetSegment CustomerSegment? @map("target_segment")
+  validFrom     DateTime    @default(now()) @map("valid_from")
+  validUntil    DateTime?   @map("valid_until")
+  isActive      Boolean     @default(true) @map("is_active")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  redemptions   CouponRedemption[]
+  rewardRedemptions RewardRedemption[] // کوپن‌هایی که از Reward Marketplace صادر شدن (migration 038)
+  @@unique([restaurantId, code])
+  @@index([restaurantId, isActive, validUntil])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id            String      @id @default(uuid()) @db.Uuid
+  couponId      String      @map("coupon_id") @db.Uuid
+  coupon        Coupon      @relation(fields: [couponId], references: [id])
+  userId        String?     @map("user_id") @db.Uuid
+  reservationCode String?   @map("reservation_code")
+  discountToman Int         @map("discount_toman")
+  ip            String?                              // برای تشخیص سوءاستفاده‌ی چند‌حسابی (fraud)
+  redeemedAt    DateTime    @default(now()) @map("redeemed_at")
+  @@index([couponId, userId])
+  @@map("coupon_redemptions")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  ۳) Marketing Automation — کمپین‌های خودکار trigger-based
+//     (متفاوت از کمپین دستی فعلی در sms route — این‌ها رویداد-محورند)
+// ───────────────────────────────────────────────────────────────────────
+enum AutomationTrigger {
+  birthday          // N روز قبل از تولد مشتری
+  winback           // مشتری از segment=at_risk به churned نزدیک می‌شود
+  post_visit        // X ساعت بعد از completed (نظرسنجی/تشکر)
+  vip_milestone     // مشتری به سگمنت vip ارتقا یافت
+  no_show_followup  // بعد از no_show (پیشنهاد بازگشت با تخفیف)
+  @@map("automation_trigger")
+}
+
+model MarketingAutomation {
+  id            String             @id @default(uuid()) @db.Uuid
+  restaurantId  String             @map("restaurant_id") @db.Uuid
+  restaurant    Restaurant         @relation(fields: [restaurantId], references: [id])
+  name          String
+  trigger       AutomationTrigger
+  // پارامتر trigger (مثلاً {"daysBefore":3} برای birthday یا {"hoursAfter":2} برای post_visit)
+  triggerConfig Json               @default("{}") @map("trigger_config")
+  messageTemplate String           @map("message_template")   // فقط برای پیش‌نمایش در پنل؛ ارسال واقعی از قالب ثابت Kavenegar (campaign/winback_offer) با توکن انجام می‌شود
+  couponId      String?            @map("coupon_id") @db.Uuid // کوپن خودکار پیوست‌شده (اختیاری)
+  isActive      Boolean            @default(true) @map("is_active")
+  lastRunAt     DateTime?          @map("last_run_at")
+  sentCount     Int                @default(0) @map("sent_count")
+  convertedCount Int               @default(0) @map("converted_count")  // چند نفر بعدش رزرو کردند
+  createdAt     DateTime           @default(now()) @map("created_at")
+  @@index([restaurantId, isActive, trigger])
+  @@map("marketing_automations")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  ۴) Staff Permissions — RBAC ماژولار، مکمل role ساده‌ی فعلی
+//     role فعلی (owner/manager/staff) دست‌نخورده می‌ماند؛ این جدول override می‌دهد.
+// ───────────────────────────────────────────────────────────────────────
+model StaffPermission {
+  staffId         String   @id @map("staff_id") @db.Uuid
+  staff           Staff    @relation(fields: [staffId], references: [id])
+  // پیش‌فرض همه‌چیز false برای staff عادی؛ owner/manager در کد همیشه true می‌گیرند
+  canManageReservations Boolean @default(true)  @map("can_manage_reservations")
+  canManageTables       Boolean @default(true)  @map("can_manage_tables")
+  canManageWaitlist     Boolean @default(true)  @map("can_manage_waitlist")
+  canViewAnalytics      Boolean @default(false) @map("can_view_analytics")
+  canViewRevenue        Boolean @default(false) @map("can_view_revenue")     // حساس‌ترین: درآمد مالی
+  canManageCampaigns    Boolean @default(false) @map("can_manage_campaigns")
+  canManageCoupons      Boolean @default(false) @map("can_manage_coupons")
+  canManageStaff        Boolean @default(false) @map("can_manage_staff")
+  canManageSettings     Boolean @default(false) @map("can_manage_settings")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  @@map("staff_permissions")
+}
+
+// ── Audit Log عمومی برای رویدادهای امنیتی/حاکمیتی (observability) ──
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  action       String                                   // مثل 'auth.failure'، 'staff.permission_change'
+  actorId      String?  @map("actor_id") @db.Uuid
+  actorType    String   @default("anonymous") @map("actor_type")
+  targetId     String?  @map("target_id") @db.Uuid
+  restaurantId String?  @map("restaurant_id") @db.Uuid
+  ip           String?
+  traceId      String?  @map("trace_id")
+  success      Boolean  @default(true)
+  detail       Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([action, createdAt])
+  @@index([actorId, createdAt])
+  @@index([restaurantId, createdAt])
+  @@map("audit_logs")
+}
+
+// ── صف Job عمومی (Postgres-based با FOR UPDATE SKIP LOCKED) ──
+// برای انتقال پردازش‌های سنگین/کند به پس‌زمینه: SMS، Email، Push، Report، Image.
+// تست‌شده روی PostgreSQL واقعی: claim اتمیک، priority، retry+backoff، DLQ، idempotency.
+enum JobStatus {
+  pending
+  processing
+  completed
+  failed
+  dead      // dead-letter: بعد از اتمام تلاش‌ها
+
+  @@map("job_status")
+}
+
+// نقشِ پرسنل — enum به‌جای String: از ورودِ 'Admin'/'ADMIN' نامعتبر جلوگیری می‌کند
+enum StaffRole {
+  owner
+  manager
+  staff
+  admin
+
+  @@map("staff_role")
+}
+
+model Job {
+  id             String    @id @default(uuid()) @db.Uuid
+  kind           String                                    // 'sms'|'email'|'push'|'report'|'image'
+  payload        Json      @default("{}")
+  priority       Int       @default(5) @db.SmallInt        // 1=بالاترین ... 9=پایین‌ترین
+  status         JobStatus @default(pending)
+  idempotencyKey String?   @unique @map("idempotency_key")  // جلوگیری از کار تکراری (dedup به این وابسته است)
+  attempts       Int       @default(0) @db.SmallInt
+  maxAttempts    Int       @default(5) @map("max_attempts") @db.SmallInt
+  runAfter       DateTime  @default(now()) @map("run_after") // برای backoff
+  lastError      String?   @map("last_error")
+  lockedAt       DateTime? @map("locked_at")
+  result         Json?                                      // خروجی کار (اختیاری)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, priority, runAfter])
+  @@map("jobs")
+}
+
+// ── Idempotency سطح HTTP — جلوگیری از double-submit (رزرو/پرداخت) ──
+model IdempotencyKey {
+  key       String   @id
+  scope     String                                 // 'reservation' و غیره
+  response  Json?                                  // پاسخ cache‌شده‌ی اولین درخواست موفق
+  status    String   @default("in_progress")       // in_progress | done
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+// ── Webhook خروجی — ادغام شخص ثالث (POS، حسابداری، Zapier) ──
+model Webhook {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19):
+  // این مدل با raw SQL ساخته شده بود بدونِ relation field → بدونِ FK واقعی روی DB.
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  url          String
+  events       String[]                              // رویدادهایی که این webhook می‌خواهد
+  secret       String?                               // برای امضای HMAC
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([restaurantId, isActive])
+  @@map("webhooks")
+}
+
+// ── GuestProfile سراسری — نمای cross-restaurant مشتری (شکاف ساختاری CRM) ──
+// برخلاف CustomerInsight که per-restaurant است، این پروفایل کلیدش فقط userId
+// است: یک مهمان، یک پروفایل در کل پلتفرم. تجمیع‌شده از همه‌ی CustomerInsightها.
+// تست‌شده روی PG واقعی (sum/bool_or/array_agg برای رستوران ترجیحی).
+model GuestProfile {
+  userId              String   @id @map("user_id") @db.Uuid
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19):
+  // این مدل با raw SQL ساخته شده بود بدونِ relation field → حتی روی خودِ PK هم
+  // FK واقعی به users نداشت.
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  globalVisits        Int      @default(0) @map("global_visits")
+  globalSpendToman    Int      @default(0) @map("global_spend_toman")
+  globalClvToman      Int      @default(0) @map("global_clv_toman")
+  restaurantsVisited  Int      @default(0) @map("restaurants_visited")
+  lastVisitAnywhere   DateTime? @map("last_visit_anywhere")
+  isVipAnywhere       Boolean  @default(false) @map("is_vip_anywhere")
+  preferredRestaurantId String? @map("preferred_restaurant_id") @db.Uuid
+  dietaryTags         String[] @default([]) @map("dietary_tags")    // آلرژی/رژیم (پیش‌نیاز personalization)
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([isVipAnywhere])
+  @@map("guest_profiles")
+}
+
+// ── تراکنش‌های SMS — هر شارژ یا مصرف (برای حسابرسی موجودی پیامک) ──
+model SmsTransaction {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19):
+  // این مدل با raw SQL ساخته شده بود بدونِ relation field → بدونِ FK واقعی روی DB.
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  delta        Int        // مثبت = شارژ، منفی = مصرف
+  reason       String     // 'admin_topup' | 'campaign' | 'reservation_notify'
+  balanceAfter Int        @map("balance_after")
+  actorId      String?    @map("actor_id") @db.Uuid
+  note         String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+  @@index([restaurantId, createdAt(sort: Desc)])
+  @@map("sms_transactions")
+}
+
+// ── نظرات مشتری درباره‌ی رستوران (به رزرو واقعی وصل، هر رزرو یک نظر) ──
+model Review {
+  id               String       @id @default(uuid()) @db.Uuid
+  restaurantId     String       @map("restaurant_id") @db.Uuid
+  restaurant       Restaurant   @relation(fields: [restaurantId], references: [id])
+  userId           String?      @map("user_id") @db.Uuid
+  user             User?        @relation(fields: [userId], references: [id])
+  reservationId    String?      @map("reservation_id") @db.Uuid
+  reservation      Reservation? @relation(fields: [reservationId], references: [id])
+  rating           Int          @db.SmallInt
+  foodRating       Int?         @map("food_rating") @db.SmallInt
+  serviceRating    Int?         @map("service_rating") @db.SmallInt
+  atmosphereRating Int?         @map("atmosphere_rating") @db.SmallInt
+  body             String?
+  reply            String?
+  repliedAt        DateTime?    @map("replied_at")
+  isPublished      Boolean      @default(true) @map("is_published")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  @@index([restaurantId, createdAt(sort: Desc)])
+  @@index([userId])          // بدون این، حذف کاربر یا کوئریِ نظراتِ کاربر full-scan می‌شد
+  @@index([reservationId])   // چکِ «آیا این رزرو نظر داده؟»
+  @@map("reviews")
+}
+
+// ── گالری عکس رستوران ──
+//
+// عکس‌ها با آپلودِ مستقیم اضافه می‌شوند و پیش از نمایش در اپ مشتری و صفحه‌ی
+// عمومی باید در پنل شرکت تأیید شوند. یعنی هیچ تصویری بدونِ بازبینیِ انسانی
+// روی برندِ پلتفرم منتشر نمی‌شود.
+//
+// چرا بایت‌ها در دیتابیس نیستند: یک گالریِ چندصد رستورانی به‌سرعت چند گیگابایت
+// می‌شود و pg_dump (سرویسِ backup) را غیرعملی می‌کند. فایل روی ولومِ uploads
+// می‌نشیند و storageKey فقط ارجاعِ آن است.
+model RestaurantPhoto {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  /// برای عکس‌های آپلودشده مسیرِ داخلیِ سرو (/api/v1/media/<key>) و برای
+  /// ردیف‌های قدیمیِ لینکی همان آدرسِ بیرونی است.
+  url          String
+  caption      String?
+  category     String     @default("food")
+  sortOrder    Int        @default(0) @map("sort_order")
+
+  // ── فایلِ آپلودشده (برای ردیف‌های لینکیِ قدیمی خالی است) ──
+  storageKey   String?    @map("storage_key")
+  mimeType     String?    @map("mime_type")
+  byteSize     Int?       @map("byte_size")
+  width        Int?
+  height       Int?
+  originalName String?    @map("original_name")
+
+  // ── بازبینی ──
+  /// pending | approved | rejected
+  status          PhotoStatus @default(pending)
+  reviewedAt      DateTime?   @map("reviewed_at")
+  /// staffِ مدیرِ پلتفرم که تصمیم گرفت (بدونِ relation: مدیر ممکن است حذف شود
+  /// ولی سابقه‌ی بازبینی باید بماند)
+  reviewedById    String?     @map("reviewed_by_id") @db.Uuid
+  rejectionReason String?     @map("rejection_reason")
+
+  uploadedByStaffId String?  @map("uploaded_by_staff_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@index([restaurantId, sortOrder])
+  // صفِ بازبینی: «همه‌ی pendingها، قدیمی‌ترین اول» بدونِ این ایندکس full-scan بود
+  @@index([status, createdAt])
+  @@map("restaurant_photos")
+}
+
+enum PhotoStatus {
+  pending
+  approved
+  rejected
+
+  @@map("photo_status")
+}
+
+// ── یادداشت‌های داخلی تیم رستوران ──
+model StaffNote {
+  id            String     @id @default(uuid()) @db.Uuid
+  restaurantId  String     @map("restaurant_id") @db.Uuid
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  authorStaffId String?    @map("author_staff_id") @db.Uuid
+  authorName    String?    @map("author_name")
+  body          String
+  pinned        Boolean    @default(false)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  @@index([restaurantId, pinned(sort: Desc), createdAt(sort: Desc)])
+  @@map("staff_notes")
+}
+
+// ── تاریخچه‌ی کمپین پیامکی ──
+model CampaignLog {
+  id              String     @id @default(uuid()) @db.Uuid
+  restaurantId    String     @map("restaurant_id") @db.Uuid
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
+  segment         String
+  message         String
+  recipientsCount Int        @default(0) @map("recipients_count")
+  sentByStaffId   String?    @map("sent_by_staff_id") @db.Uuid
+  createdAt       DateTime   @default(now()) @map("created_at")
+  @@index([restaurantId, createdAt(sort: Desc)])
+  @@map("campaign_logs")
+}
+
+// ── تعطیلاتِ خاصِ رستوران (بستنِ دستیِ روزهای مشخص) ──
+// فقط از طریق SQL خام در hours/availability/reservations استفاده می‌شود؛ اینجا
+// تعریف می‌شود تا db push / migrate diff هم جدول را بسازد (قبلاً هیچ مایگریشنی
+// آن را نمی‌ساخت و PUT /restaurant/hours با «relation does not exist» می‌شکست).
+model RestaurantClosure {
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19):
+  // این مدل با raw SQL ساخته شده بود بدونِ relation field → بدونِ FK واقعی روی DB.
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  closureDate  DateTime   @map("closure_date") @db.Date
+  reason       String?
+  @@id([restaurantId, closureDate])
+  @@map("restaurant_closures")
+}
+
+// ⚠️ همگام‌سازی‌شده با DB زنده (migration 019_payments_deposit — Zarinpal).
+// یک رزرو می‌تواند چند تلاش پرداخت داشته باشد (کاربر پرداخت را رها/تکرار می‌کند)،
+// برای همین payments جدولِ مستقل است نه فیلدِ روی Reservation.
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  reservationId String        @map("reservation_id") @db.Uuid
+  reservation   Reservation   @relation(fields: [reservationId], references: [id])
+  provider      String        @default("zarinpal")
+  authority     String?       @unique // شناسه‌ی تراکنشِ زرین‌پال (قبل از verify)
+  refId         String?       @map("ref_id") // شماره‌ی پیگیریِ نهایی (بعد از verify موفق)
+  amountToman   Int           @map("amount_toman")
+  status        PaymentStatus @default(pending)
+  failReason    String?       @map("fail_reason")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  verifiedAt    DateTime?     @map("verified_at") @db.Timestamptz
+  @@index([reservationId])
+  @@map("payments")
+}
+
+// ⚠️ همگام‌سازی‌شده با DB زنده (migration 020_platform_settings_payment_toggle).
+// تنظیمات سطح‌پلتفرم (کلید/مقدار) — مثل merchant_id زرین‌پال، sandbox flag،
+// کلید کاوه‌نگار — از دیتابیس خوانده می‌شود (نه فقط env)، قابل‌ویرایش از پنل
+// شرکت بدون ری‌دیپلوی. کش ۳۰ ثانیه‌ای در لایه‌ی lib (طبق مستندات پروژه).
+model PlatformSettings {
+  key       String    @id
+  value     String
+  updatedAt DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+  updatedBy String?   @map("updated_by") @db.Uuid
+  @@map("platform_settings")
+}
+
+
+// ═══════════════════════════════════════════════════════════
+//  چت مشتری ↔ رستوران (Polling-based).
+//  یک Thread بین یک کاربر و یک رستوران؛ اختیاری به یک رزرو لینک می‌شود.
+//  دو حالت: مربوط به رزرو (reservationId ست) یا عمومی (reservationId=null).
+// ═══════════════════════════════════════════════════════════
+model ChatThread {
+  id             String        @id @default(uuid()) @db.Uuid
+  restaurantId   String        @map("restaurant_id") @db.Uuid
+  restaurant     Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  userId         String        @map("user_id") @db.Uuid
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservationId  String?       @map("reservation_id") @db.Uuid
+  reservation    Reservation?  @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  lastMessageAt  DateTime      @default(now()) @map("last_message_at") @db.Timestamptz
+  unreadForUser  Int           @default(0) @map("unread_for_user")
+  unreadForStaff Int           @default(0) @map("unread_for_staff")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  messages       ChatMessage[]
+  // یکتایی با partial unique index در migration 024 اعمال می‌شود (نه @@unique)،
+  // چون Postgres هر NULL را در UNIQUE یکتا می‌بیند و thread عمومی تکراری می‌شد.
+  @@index([restaurantId, lastMessageAt(sort: Desc)])
+  @@index([userId, lastMessageAt(sort: Desc)])
+  @@map("chat_threads")
+}
+
+enum ChatSender {
+  user
+  staff
+  @@map("chat_sender")
+}
+
+model ChatMessage {
+  id        String     @id @default(uuid()) @db.Uuid
+  threadId  String     @map("thread_id") @db.Uuid
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender    ChatSender
+  staffId   String?    @map("staff_id") @db.Uuid
+  body      String     @db.Text
+  readAt    DateTime?  @map("read_at") @db.Timestamptz
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  @@index([threadId, createdAt])
+  @@map("chat_messages")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  رویدادبوسِ رفتاری (Data Platform · فاز ۱)
+//
+//  جدولِ کانونیِ append-only برای رویدادهای رفتاریِ همه‌ی دامنه‌ها (نه فقط رزرو،
+//  که ReservationEvent پوشش می‌دهد). عمداً بدونِ رابطه‌ی FKِ سخت به موجودیت‌ها →
+//  درجِ بی‌قفل و سریع، و anonymize بدونِ شکستنِ ارجاع. هرگز UPDATE/DELETE نمی‌شود
+//  (به‌جز job نگه‌داشت/anonymize). زمینه (tenant/restaurant/user/session) همه
+//  اختیاری‌اند چون رویدادِ ناشناس هم پذیرفته می‌شود. جزئیاتِ معماری:
+//  docs/INTELLIGENCE-PLATFORM-ARCHITECTURE.md
+// ───────────────────────────────────────────────────────────────────────
+model PlatformEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  type          String                                            // نامِ نام‌فضادار: "search.performed"
+  occurredAt    DateTime @map("occurred_at") @db.Timestamptz      // زمانِ وقوع (کلاینت یا سرور)
+  ingestedAt    DateTime @default(now()) @map("ingested_at") @db.Timestamptz
+  tenantId      String?  @map("tenant_id") @db.Uuid
+  restaurantId  String?  @map("restaurant_id") @db.Uuid
+  userId        String?  @map("user_id") @db.Uuid                 // مشتری (اگر شناخته‌شده)
+  staffId       String?  @map("staff_id") @db.Uuid
+  sessionId     String?  @map("session_id")                       // نشستِ ناشناس
+  correlationId String?  @map("correlation_id")                   // زنجیره‌ی علّی
+  source        String                                            // customer|business|company|backend|cron
+  device        Json?    @db.JsonB                                // ua/platform (بدونِ PII)
+  geo           Json?    @db.JsonB
+  payload       Json     @db.JsonB                                // بدنه‌ی رویداد (schema-per-type)
+  schemaVersion Int      @default(1) @map("schema_version")
+  @@index([type, occurredAt])
+  @@index([restaurantId, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([correlationId])
+  @@map("platform_events")
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  وب‌سایتِ عمومیِ رزرونو (apps/seo) — CMS + قیفِ فروش
+//
+//  چرا در همین اسکیما و نه یک سرویسِ جدا: وب‌سایت باید پلن‌های واقعی را نشان
+//  دهد، حسابِ دموی واقعی بسازد (Tenant/Restaurant/Staff) و درخواستِ خرید را به
+//  پنلِ شرکت برساند. همه‌ی این‌ها همین دیتابیس را لمس می‌کنند؛ جداکردنشان یعنی
+//  یک لایه‌ی همگام‌سازیِ اضافی بدونِ سود.
+//
+//  محتوا (SitePage/SiteArticle/...) از استودیوی سایت ویرایش می‌شود؛ کدِ سایت
+//  متنِ سختِ غیرقابل‌ویرایش ندارد (fallbackِ محتوایی فقط برای وقتی است که CMS
+//  هنوز seed نشده — و دقیقاً با همان متن‌ها seed می‌شود).
+//  migration: prisma/sql/031-site-cms-and-funnel.sql
+// ═══════════════════════════════════════════════════════════════════════
+
+enum SiteStatus {
+  draft
+  published
+
+  @@map("site_status")
+}
+
+enum SiteOrderKind {
+  trial     // دموی رایگانِ ۳۰ روزه — بلافاصله provision می‌شود
+  purchase  // خریدِ اشتراک — پنلِ شرکت باید فعال کند
+
+  @@map("site_order_kind")
+}
+
+enum SiteOrderStatus {
+  pending    // ثبت شد، منتظرِ اقدامِ پنلِ شرکت
+  contacted  // تیمِ فروش تماس گرفت
+  activated  // اشتراک فعال شد (planExpiresAt ست شد)
+  rejected   // رد شد (با دلیل)
+  cancelled  // متقاضی منصرف شد
+
+  @@map("site_order_status")
+}
+
+enum SiteInquiryStatus {
+  open
+  in_progress
+  closed
+
+  @@map("site_inquiry_status")
+}
+
+// صفحه‌ی محتوایی/بازاریابیِ سایت. sections آرایه‌ی بلوک‌هاست (hero/features/…)؛
+// سایت بلوکِ ناشناخته را نادیده می‌گیرد تا افزودنِ بلوکِ جدید از CMS رندر را نشکند.
+model SitePage {
+  id             String     @id @default(uuid()) @db.Uuid
+  slug           String     @unique                        // 'home' | 'pricing' | 'about' | ...
+  title          String
+  description    String?    @db.Text
+  sections       Json       @default("[]")                 // بلوک‌های محتوایی به ترتیب
+  seoTitle       String?    @map("seo_title")
+  seoDescription String?    @map("seo_description") @db.Text
+  seoKeywords    String[]   @default([]) @map("seo_keywords")
+  ogImage        String?    @map("og_image")
+  noindex        Boolean    @default(false)
+  structuredData Json?      @map("structured_data")        // JSON-LD دستیِ اضافی (اختیاری)
+  status         SiteStatus @default(draft)
+  publishedAt    DateTime?  @map("published_at") @db.Timestamptz
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String?    @map("updated_by") @db.Uuid
+  @@index([status, slug])
+  @@map("site_pages")
+}
+
+// مقاله‌ی بلاگ. بدنه Markdownِ ساده است (رندرِ سمتِ سرور) نه HTMLِ خام،
+// تا محتوای CMS نتواند اسکریپت تزریق کند.
+model SiteArticle {
+  id             String     @id @default(uuid()) @db.Uuid
+  slug           String     @unique
+  title          String
+  excerpt        String     @db.Text
+  body           String     @db.Text
+  coverUrl       String?    @map("cover_url")
+  coverAlt       String?    @map("cover_alt")
+  tags           String[]   @default([])
+  authorName     String     @default("تیم رزرونو") @map("author_name")
+  authorRole     String?    @map("author_role")
+  readingMinutes Int        @default(5) @map("reading_minutes") @db.SmallInt
+  seoTitle       String?    @map("seo_title")
+  seoDescription String?    @map("seo_description") @db.Text
+  seoKeywords    String[]   @default([]) @map("seo_keywords")
+  ogImage        String?    @map("og_image")
+  noindex        Boolean    @default(false)
+  status         SiteStatus @default(draft)
+  featured       Boolean    @default(false)
+  publishedAt    DateTime?  @map("published_at") @db.Timestamptz
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String?    @map("updated_by") @db.Uuid
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("site_articles")
+}
+
+// پرسشِ متداول. scope تعیین می‌کند در کدام صفحه بیاید و در FAQPage schemaی همان
+// صفحه شرکت کند: general | pricing | demo | business | customer.
+model SiteFaq {
+  id        String     @id @default(uuid()) @db.Uuid
+  question  String     @db.Text
+  answer    String     @db.Text
+  scope     String     @default("general")
+  sortOrder Int        @default(0) @map("sort_order")
+  status    SiteStatus @default(published)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String?    @map("updated_by") @db.Uuid
+  @@index([status, scope, sortOrder])
+  @@map("site_faqs")
+}
+
+// پلنِ اشتراکِ قابل‌فروش. قیمت و مدت اینجا منبعِ حقیقت‌اند — فرمِ خرید هرگز قیمت
+// را از کلاینت نمی‌گیرد. tenantPlan تعیین می‌کند فعال‌سازی تنانت را روی کدام تیر بگذارد.
+model SitePlan {
+  id             String           @id @default(uuid()) @db.Uuid
+  key            String           @unique                  // 'm3' | 'm6' | 'm12'
+  name           String
+  tagline        String?
+  months         Int              @db.SmallInt
+  priceToman     Int              @map("price_toman")      // قیمتِ کلِ دوره (تومان)
+  compareAtToman Int?             @map("compare_at_toman") // قیمتِ مرجع برای نمایشِ صرفه‌جویی
+  badge          String?
+  features       String[]         @default([])
+  highlight      Boolean          @default(false)
+  tenantPlan     SubscriptionPlan @default(pro) @map("tenant_plan")
+  sortOrder      Int              @default(0) @map("sort_order")
+  status         SiteStatus       @default(published)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy      String?          @map("updated_by") @db.Uuid
+  @@index([status, sortOrder])
+  @@map("site_plans")
+}
+
+model SiteTestimonial {
+  id        String     @id @default(uuid()) @db.Uuid
+  quote     String     @db.Text
+  author    String
+  role      String?
+  company   String?
+  avatarUrl String?    @map("avatar_url")
+  rating    Int        @default(5) @db.SmallInt
+  sortOrder Int        @default(0) @map("sort_order")
+  status    SiteStatus @default(published)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String?    @map("updated_by") @db.Uuid
+  @@index([status, sortOrder])
+  @@map("site_testimonials")
+}
+
+// بنرِ تبلیغاتیِ بالای سایت. بازه‌ی زمانی اختیاری است؛ اگر ست باشد فقط در همان
+// بازه نمایش داده می‌شود (کمپینِ زمان‌دار بدونِ ری‌دیپلوی).
+model SiteBanner {
+  id        String     @id @default(uuid()) @db.Uuid
+  message   String     @db.Text
+  ctaLabel  String?    @map("cta_label")
+  ctaHref   String?    @map("cta_href")
+  tone      String     @default("brand")  // brand | success | warning | info
+  startsAt  DateTime?  @map("starts_at") @db.Timestamptz
+  endsAt    DateTime?  @map("ends_at") @db.Timestamptz
+  sortOrder Int        @default(0) @map("sort_order")
+  status    SiteStatus @default(draft)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String?    @map("updated_by") @db.Uuid
+  @@index([status, sortOrder])
+  @@map("site_banners")
+}
+
+model SiteReleaseNote {
+  id         String     @id @default(uuid()) @db.Uuid
+  version    String
+  title      String
+  body       String     @db.Text  // Markdown
+  tags       String[]   @default([])
+  releasedAt DateTime   @map("released_at") @db.Timestamptz
+  status     SiteStatus @default(published)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String?    @map("updated_by") @db.Uuid
+  @@index([status, releasedAt(sort: Desc)])
+  @@map("site_release_notes")
+}
+
+// سفارشِ سایت — هم دموی رایگان (kind=trial) و هم درخواستِ خرید (kind=purchase).
+// یک صف، یک تاریخچه: پنلِ شرکت همین جدول را می‌بیند و فعال‌سازی روی همین ردیف ثبت
+// می‌شود (چه‌کسی، چه‌زمانی، با چه یادداشتی) → مسیرِ فعال‌سازیِ قابل‌ردیابی.
+model SiteOrder {
+  id             String          @id @default(uuid()) @db.Uuid
+  code           String          @unique                     // کدِ پیگیریِ عمومی: RZO-XXXXXX
+  kind           SiteOrderKind
+  status         SiteOrderStatus @default(pending)
+  // بدونِ FK به SitePlan: پلن ممکن است حذف/بازنویسی شود ولی تاریخچه‌ی سفارش باید بماند.
+  planKey        String?         @map("plan_key")
+  planName       String?         @map("plan_name")           // اسنپ‌شاتِ نامِ پلن در لحظه‌ی سفارش
+  months         Int?            @db.SmallInt                // اسنپ‌شاتِ مدت
+  amountToman    Int?            @map("amount_toman")        // اسنپ‌شاتِ قیمت (سمتِ سرور محاسبه می‌شود)
+  businessName   String          @map("business_name")
+  contactName    String          @map("contact_name")
+  phone          String                                      // نرمال‌شده (+98…)
+  email          String?
+  city           String?
+  branchCount    Int?            @map("branch_count") @db.SmallInt
+  note           String?         @db.Text
+  tenantId       String?         @map("tenant_id") @db.Uuid  // بعد از provision/فعال‌سازی
+  restaurantId   String?         @map("restaurant_id") @db.Uuid
+  staffId        String?         @map("staff_id") @db.Uuid
+  trialEndsAt    DateTime?       @map("trial_ends_at") @db.Timestamptz
+  activatedAt    DateTime?       @map("activated_at") @db.Timestamptz
+  activatedBy    String?         @map("activated_by") @db.Uuid
+  planExpiresAt  DateTime?       @map("plan_expires_at") @db.Timestamptz
+  adminNote      String?         @map("admin_note") @db.Text
+  rejectedReason String?         @map("rejected_reason") @db.Text
+  utmSource      String?         @map("utm_source")
+  utmMedium      String?         @map("utm_medium")
+  utmCampaign    String?         @map("utm_campaign")
+  landingPath    String?         @map("landing_path")
+  referrer       String?
+  ip             String?
+  userAgent      String?         @map("user_agent") @db.Text
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  @@index([status, createdAt(sort: Desc)])
+  @@index([kind, status])
+  @@index([phone])
+  @@index([tenantId])
+  @@map("site_orders")
+}
+
+// تماس با فروش / پرسشِ عمومیِ سایت.
+model SiteInquiry {
+  id          String            @id @default(uuid()) @db.Uuid
+  code        String            @unique                    // RZQ-XXXXXX
+  name        String
+  phone       String
+  email       String?
+  company     String?
+  topic       String            @default("sales")          // sales | support | partnership | press | other
+  message     String            @db.Text
+  status      SiteInquiryStatus @default(open)
+  adminNote   String?           @map("admin_note") @db.Text
+  handledBy   String?           @map("handled_by") @db.Uuid
+  handledAt   DateTime?         @map("handled_at") @db.Timestamptz
+  utmSource   String?           @map("utm_source")
+  landingPath String?           @map("landing_path")
+  ip          String?
+  userAgent   String?           @map("user_agent") @db.Text
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  @@index([status, createdAt(sort: Desc)])
+  @@map("site_inquiries")
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  اقتصادِ یکپارچه‌ی مشتری (Unified Customer Economy) — migration 038
+//
+//  طراحیِ کامل (فرمول‌ها، الگوریتمِ resolvePolicy، جدولِ eventScore،
+//  precedenceِ سیاست‌ها) در جلسه‌ی برنامه‌ریزیِ ۲۰۲۶-۰۸-۱۲ مستند شده —
+//  رجوع کن به تاریخچه‌ی گفتگو یا (وقتی سندش کردیم) یک فایلِ docs/design.
+//  خلاصه‌ی دامنه: reliabilityScore/xpTotal/walletBalance/strikeCount
+//  سراسری‌اند (رویِ User، نه per-restaurant) — اعتماد باید بینِ
+//  رستوران‌ها منتقل بشه. ClubMember.points دست‌نخورده می‌مونه: اون
+//  ارزِ داخلیِ خودِ رستورانه، جدا از این اقتصادِ پلتفرمی.
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── پروفایلِ اقتصادیِ مشتری — یک ردیف برای هر User، سراسری (نه per-restaurant) ──
+model CustomerEconomyProfile {
+  userId       String   @id @map("user_id") @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // ۰..۱۰۰ — EMA زمان‌دار با نیم‌عمرِ ۹۰ روزه، مقدارِ اولیه‌ی ۷۵ (prior بیزی، نه صفر/صد)
+  reliabilityScore   Int      @default(75) @map("reliability_score")
+  // مشتق از reliabilityScore + سابقه — نمایشی، محاسبه‌شده در اپلیکیشن نه DB
+  reputationTier     String   @default("bronze") @map("reputation_tier") // bronze|silver|gold|platinum
+  xpTotal            Int      @default(0) @map("xp_total")               // تجمعی، هرگز کم نمی‌شود
+  walletBalance      Int      @default(0) @map("wallet_balance")         // خرج‌شدنی (سکه)
+  strikeCount        Int      @default(0) @map("strike_count")
+  hasActiveAbuseFlag Boolean  @default(false) @map("has_active_abuse_flag")
+  lastViolationAt    DateTime? @map("last_violation_at")     // برایِ decayِ ۹۰-روزه‌ی strike
+  lastRecomputedAt   DateTime @default(now()) @map("last_recomputed_at") // برایِ EMA زمان‌دار
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  @@index([reputationTier])
+  @@map("customer_economy_profiles")
+}
+
+// ── دفترِ حسابِ اقتصادِ یکپارچه (append-only) — منبعِ حقیقتِ همه‌ی حرکاتِ XP/سکه/اعتماد ──
+enum EconomyLedgerKind {
+  xp_earn             // افزایشِ XP (تجمعی)
+  wallet_earn         // افزایشِ سکه‌یِ خرج‌شدنی
+  wallet_spend        // خرجِ سکه (مثلاً Reward Marketplace)
+  reliability_event   // یک رویدادِ رزرو که reliabilityScore رو تحتِ تأثیر قرار می‌ده — amount = eventScore خام
+  strike_add          // افزودنِ یک strike
+  strike_decay        // کاهشِ یک strike (زمانی یا با Mission)
+  @@map("economy_ledger_kind")
+}
+
+model EconomyLedgerEntry {
+  id            String            @id @default(uuid()) @db.Uuid
+  userId        String            @map("user_id") @db.Uuid
+  user          User              @relation(fields: [userId], references: [id])
+  restaurantId  String?           @map("restaurant_id") @db.Uuid  // null = رویدادِ سراسری
+  restaurant    Restaurant?       @relation(fields: [restaurantId], references: [id])
+  kind          EconomyLedgerKind
+  amount        Int                // دلتا (xp_earn/wallet_*) یا eventScoreِ خام (reliability_event)
+  reservationId String?           @map("reservation_id") @db.Uuid
+  reservation   Reservation?      @relation(fields: [reservationId], references: [id])
+  missionId     String?           @map("mission_id") @db.Uuid
+  // 'reservation_completed' | 'reservation_no_show' | 'referral' | 'mission' | 'manual_adjustment' | 'marketplace_redemption' | ...
+  source        String
+  createdAt     DateTime          @default(now()) @map("created_at")
+  // محافظِ idempotency: هر (رزرو، نوع) فقط یک‌بار پردازش می‌شه. NULLها یکتا حساب
+  // نمی‌شن (رفتارِ استانداردِ Postgres) پس ردیف‌هایِ بدونِ reservationId (referral،
+  // mission، manual) هیچ محدودیتی نمی‌گیرن — دقیقاً همون چیزی که می‌خوایم.
+  @@unique([reservationId, kind])
+  @@index([userId, createdAt])
+  @@index([restaurantId, createdAt])
+  @@map("economy_ledger_entries")
+}
+
+// ── سایه‌ی اعتبار برایِ شماره‌هایِ بدونِ حساب (guest booking) — جلویِ فرار از سابقه با پاک‌کردنِ session ──
+model PhoneReliabilityShadow {
+  phone            String   @id  // نرمال‌شده به E.164 (مثلاً +98912...)
+  reliabilityScore Int      @default(75) @map("reliability_score")
+  strikeCount      Int      @default(0) @map("strike_count")
+  lastRecomputedAt DateTime @default(now()) @map("last_recomputed_at")
+  // وقتی این شماره صاحبِ حساب شد، تاریخچه merge می‌شه و این فیلد ست می‌شه
+  // (رکورد پاک نمی‌شه — برایِ audit نگه داشته می‌شه)
+  mergedIntoUserId String?  @map("merged_into_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  @@map("phone_reliability_shadows")
+}
+
+// ── سیاستِ کنسلیِ هر رستوران (لایه‌ی پایه‌ی resolvePolicy) ──
+model CancellationPolicy {
+  restaurantId        String     @id @map("restaurant_id") @db.Uuid
+  restaurant          Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  freeCancelHours     Int        @default(24) @map("free_cancel_hours")
+  partialPenaltyHours Int        @default(2) @map("partial_penalty_hours")
+  partialPenaltyPct   Int        @default(50) @map("partial_penalty_pct")
+  depositRequired     Boolean    @default(false) @map("deposit_required")
+  autoConfirm         Boolean    @default(true) @map("auto_confirm")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+  @@map("cancellation_policies")
+}
+
+// ── مأموریت/چالش (Gamification) — می‌تونه سراسری باشه یا مالِ یه رستورانِ خاص ──
+enum MissionStatus {
+  active
+  archived
+  @@map("mission_status")
+}
+
+model Mission {
+  id           String        @id @default(uuid()) @db.Uuid
+  restaurantId String?       @map("restaurant_id") @db.Uuid  // null = سراسری
+  restaurant   Restaurant?   @relation(fields: [restaurantId], references: [id])
+  title        String
+  description  String?
+  kind         String        // 'weekly' | 'seasonal' | 'onboarding' | 'recovery' | ...
+  targetCount  Int           @default(1) @map("target_count")  // مثلاً «۳ رزرو»
+  xpReward     Int           @default(0) @map("xp_reward")
+  walletReward Int           @default(0) @map("wallet_reward")
+  strikeRelief Int           @default(0) @map("strike_relief")  // برایِ Recovery Mission — کاهشِ فوریِ strike
+  startsAt     DateTime?     @map("starts_at")
+  endsAt       DateTime?     @map("ends_at")
+  status       MissionStatus @default(active)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  progress     MissionProgress[]
+  @@index([restaurantId, status])
+  @@map("missions")
+}
+
+model MissionProgress {
+  id          String    @id @default(uuid()) @db.Uuid
+  missionId   String    @map("mission_id") @db.Uuid
+  mission     Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation(fields: [userId], references: [id])
+  progress    Int       @default(0)
+  completedAt DateTime? @map("completed_at")
+  claimedAt   DateTime? @map("claimed_at")  // جایزه گرفته شد (جلویِ claimِ دوباره)
+  @@unique([missionId, userId])
+  @@map("mission_progress")
+}
+
+// ── کاتالوگِ خرجِ سکه (Reward Marketplace) ──
+enum RewardItemKind {
+  coupon_grant
+  free_item
+  priority_boost
+  gift_card_credit
+  event_access
+  @@map("reward_item_kind")
+}
+
+model RewardMarketplaceItem {
+  id             String         @id @default(uuid()) @db.Uuid
+  restaurantId   String?        @map("restaurant_id") @db.Uuid  // null = سراسری
+  restaurant     Restaurant?    @relation(fields: [restaurantId], references: [id])
+  title          String
+  description    String?
+  kind           RewardItemKind
+  costCoins      Int            @map("cost_coins")
+  minTier        String         @default("bronze") @map("min_tier")  // انحصار برایِ tierهایِ بالاتر
+  stockRemaining Int?           @map("stock_remaining")  // null = نامحدود
+  isActive       Boolean        @default(true) @map("is_active")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  redemptions    RewardRedemption[]
+  @@index([restaurantId, isActive])
+  @@map("reward_marketplace_items")
+}
+
+// ── هر بار که یه مشتری یه آیتم رو خرج می‌کنه — auditable، ردِ نتیجه‌ی واقعی ──
+model RewardRedemption {
+  id                String                 @id @default(uuid()) @db.Uuid
+  itemId            String                 @map("item_id") @db.Uuid
+  item              RewardMarketplaceItem  @relation(fields: [itemId], references: [id])
+  userId            String                 @map("user_id") @db.Uuid
+  user              User                   @relation(fields: [userId], references: [id])
+  coinsSpent        Int                    @map("coins_spent")
+  // نتیجه‌ی واقعیِ redemption — بسته به kind فقط یکی پر می‌شه
+  resultCouponId    String?                @map("result_coupon_id") @db.Uuid
+  resultCoupon      Coupon?                @relation(fields: [resultCouponId], references: [id])
+  resultGiftCardId  String?                @map("result_gift_card_id") @db.Uuid
+  resultGiftCard    GiftCard?              @relation(fields: [resultGiftCardId], references: [id])
+  createdAt         DateTime               @default(now()) @map("created_at")
+  @@index([userId, createdAt])
+  @@map("reward_redemptions")
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  نشان‌هایِ کنترل‌شده‌یِ پلتفرم (migration 040 — Company Control Plane، فازِ ۳)
+//
+//  عمداً کاملاً جدا از BADGES در apps/customer/js/data/seed.js (نشان‌هایِ
+//  emojiِ قدیمیِ نمایشیِ سمتِ کلاینت، بدونِ رکوردِ سرور) — این سیستم
+//  نشان‌هایی‌ست که فقط ادمینِ پلتفرم تعریف/اعطا/لغو می‌کند و در دیتابیس
+//  ثبت می‌شود (auditable). دو مدل: BadgeDefinition (تعریف/طرح) و UserBadge
+//  (یک نمونه‌ی اعطاشده به یک کاربر).
+//
+//  «آماده‌یِ بلاکچین» یعنی همین: دو ستونِ nullableِ chainTxHash/tokenId
+//  رویِ UserBadge — اگر روزی این نشان‌ها به‌صورتِ NFT مینت شدن، شناسه‌ی
+//  تراکنش/توکن همین‌جا ثبت می‌شه. هیچ runtime/کتابخانه‌ی بلاکچینی الان
+//  اضافه نشده؛ فقط جایگاهِ schema آماده است.
+// ═══════════════════════════════════════════════════════════════════════
+model BadgeDefinition {
+  id               String      @id @default(uuid()) @db.Uuid
+  key              String      @unique                       // شناسه‌ی پایدارِ ماشین‌خوان (مثلاً 'founding_member')
+  name             String                                     // نامِ نمایشیِ فارسی
+  description      String?
+  icon             String      @default("star")               // نامِ آیکون (از shared/js/icons.js)
+  color            String?                                    // رنگِ اختیاریِ برند (hex)
+  isActive         Boolean     @default(true) @map("is_active")
+  createdByAdminId String?     @map("created_by_admin_id") @db.Uuid  // اسکالر، بدونِ relation — هم‌راستا با bannedByAdminId
+  createdAt        DateTime    @default(now()) @map("created_at")
+  grants           UserBadge[]
+  @@map("badge_definitions")
+}
+
+model UserBadge {
+  id                  String          @id @default(uuid()) @db.Uuid
+  badgeId             String          @map("badge_id") @db.Uuid
+  badge               BadgeDefinition @relation(fields: [badgeId], references: [id])
+  userId              String          @map("user_id") @db.Uuid
+  user                User            @relation(fields: [userId], references: [id])
+  grantedAt           DateTime        @default(now()) @map("granted_at")
+  grantedByAdminId    String?         @map("granted_by_admin_id") @db.Uuid
+  note                String?
+  // «الان فعال است» = revokedAt نال. هم‌الگو با بن سختِ کاربر (migration 039).
+  revokedAt           DateTime?       @map("revoked_at")
+  revokedByAdminId    String?         @map("revoked_by_admin_id") @db.Uuid
+  revokeReason        String?         @map("revoke_reason")
+  chainTxHash         String?         @map("chain_tx_hash")   // آماده‌یِ بلاکچین — رجوع کن به کامنتِ بالا
+  tokenId             String?         @map("token_id")
+  @@index([userId])
+  @@index([badgeId])
+  @@map("user_badges")
+}
