@@ -114,7 +114,12 @@ const API = {
   async request(path, opts = {}, _retried = false){
     // transportِ خام به httpJsonِ مشترک (window.httpJson از api-core.js) واگذار می‌شود؛
     // منطقِ auth (Authorization، X-Restaurant-Id، ۴۰۱→refresh→retry) اینجا و بدونِ تغییر می‌ماند.
-    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    // ⚠️ برایِ FormData هدرِ Content-Type **نباید** ست شود: مرورگر باید خودش
+    // `multipart/form-data; boundary=…` را بسازد. اگر ما 'application/json'
+    // بگذاریم، boundary گم می‌شود و سرور بدنه را نمی‌تواند پارس کند — یعنی
+    // هر آپلودِ فایلی بی‌صدا با «بدنه‌ی درخواست خوانده نشد» رد می‌شود.
+    const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData;
+    const headers = { ...(isForm ? {} : { 'Content-Type': 'application/json' }), ...(opts.headers || {}) };
     if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
     if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
     const r = await httpJson(this.base + '/api/v1' + path, { ...opts, headers }, this.timeout);
@@ -242,6 +247,22 @@ const API = {
   menuCreate(body){ return this.post('/restaurant/menu', body); },
   menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
   menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  /**
+   * آپلود/جایگزینیِ عکسِ آیتمِ منو.
+   * multipart است، پس نمی‌تواند از `post()` (که JSON می‌فرستد) عبور کند.
+   * ⚠️ عمداً هدرِ Content-Type ست نمی‌شود: مرورگر باید خودش boundary را
+   * تولید کند و ست‌کردنِ دستی‌اش بدنه را برایِ سرور غیرقابلِ‌پارس می‌کند.
+   */
+  menuItemPhotoUpload(id, file){
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'POST', body: fd });
+  },
+  menuItemPhotoDelete(id){
+    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'DELETE' });
+  },
+  menuBranding(){ return this.get('/restaurant/menu/branding'); },
+  menuBrandingSave(body){ return this.request('/restaurant/menu/branding', { method: 'PATCH', body: JSON.stringify(body) }); },
   /**
    * QRِ منویِ عمومی — خروجی SVG است، نه JSON، پس نمی‌تواند از `request()`
    * (که همیشه `res.json()` می‌زند) عبور کند و fetchِ مستقیم لازم دارد.

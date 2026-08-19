@@ -54,6 +54,48 @@ export function isDemoRestaurant(name: string): boolean {
   return name.trimStart().startsWith('[DEMO]');
 }
 
+/**
+ * رنگِ تأکیدِ رستوران را فقط وقتی برمی‌گرداند که واقعاً یک هگزِ ۶ رقمی باشد.
+ *
+ * چرا گاردِ دوباره در فرانت، وقتی هم API اعتبارسنجی می‌کند و هم دیتابیس قیدِ
+ * CHECK دارد: این مقدار مستقیم داخلِ یک `style` تزریق می‌شود. اگر روزی یکی
+ * از آن دو لایه دور زده شود (اسکریپتِ دستی، مهاجرتِ آینده، بازگردانیِ بکاپ)،
+ * رشته‌ی دلخواه به CSS راه پیدا می‌کند. سه لایه‌ی مستقل برایِ چیزی که در
+ * سبکِ صفحه می‌نشیند زیاده‌روی نیست.
+ */
+export function safeAccent(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return /^#[0-9A-Fa-f]{6}$/.test(value) ? value : null;
+}
+
+/**
+ * رنگِ متنی که رویِ رنگِ برند خوانا باشد — سیاه یا سفید.
+ *
+ * چرا لازم است: رستوران‌دار هر رنگی می‌تواند انتخاب کند. متنِ سفیدِ ثابت
+ * رویِ زردِ روشن یا سبزِ لیمویی عملاً ناخواناست. این تابع روشناییِ نسبی را
+ * (فرمولِ WCAG) حساب می‌کند و آن‌که کنتراستِ بیشتری می‌دهد را برمی‌گرداند.
+ *
+ * آستانه‌ی ۰٫۱۷۹ نقطه‌ای است که کنتراستِ سیاه و سفید با پس‌زمینه برابر
+ * می‌شود؛ بالاتر از آن سیاه بهتر است، پایین‌تر سفید.
+ */
+export function inkFor(accent: string): string {
+  const hex = accent.replace('#', '');
+  const toLin = (v: number) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const [r, g, b] = [0, 2, 4].map((i) => toLin(parseInt(hex.slice(i, i + 2), 16) / 255));
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.179 ? '#111111' : '#ffffff';
+}
+
+/** حالتِ نمایشِ معتبر یا null (یعنی پیش‌فرضِ پلتفرم). */
+export function safeTheme(value: string | null | undefined): 'light' | 'dark' | 'auto' | null {
+  return value === 'light' || value === 'dark' || value === 'auto' ? value : null;
+}
+
+/** چیدمانِ معتبر؛ پیش‌فرض «فهرست» است. */
+export function safeLayout(value: string | null | undefined): 'list' | 'grid' {
+  return value === 'grid' ? 'grid' : 'list';
+}
+
 /** مسیرِ نسبی‌ها — برایِ `alternates()` و لینک‌هایِ داخلی. */
 export function restaurantPath(slug: string): string {
   return `/r/${encodeURIComponent(slug)}`;
