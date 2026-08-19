@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
+import { publicMenuUrl } from '@/lib/public-urls';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  مدیریتِ منو — پنلِ بیزنس
@@ -19,31 +20,53 @@ import { parseBody, z } from '@/lib/schemas';
 //  آیتم‌هایِ غیرفعال را هم برمی‌گرداند تا در پنل قابلِ مدیریت باشند.
 // ═══════════════════════════════════════════════════════════════════════
 
+// آدرسِ عکسِ آیتم فقط http(s) — این تنها فیلدی در منوست که مستقیم داخلِ
+// `<img src>` می‌نشیند، پس اگر `javascript:` یا `data:` بپذیرد به یک سینکِ
+// XSS تبدیل می‌شود. anchor به ^https?:// همان را می‌بندد.
+export const IMAGE_URL_RE = /^https?:\/\/\S+$/i;
+
 const createSchema = z.object({
   name: z.string().min(1).max(120).trim(),
   price_toman: z.number().int().min(0).max(1_000_000_000),
   emoji: z.string().max(16).optional(),
   category: z.string().max(60).trim().optional(),
   is_active: z.boolean().optional(),
+  description: z.string().max(300).trim().optional(),
+  image_url: z.string().max(500).trim().regex(IMAGE_URL_RE, 'آدرسِ عکس باید با http:// یا https:// شروع شود').optional(),
+  sort_order: z.number().int().min(0).max(100_000).optional(),
 });
 
 /** GET — همه‌ی آیتم‌هایِ منویِ این رستوران (شاملِ غیرفعال‌ها، برایِ مدیریت در پنل) */
 export const GET = withRestaurantAuth({ permission: 'canManageSettings' }, async (_req, ctx) => {
+  // slug برایِ ساختنِ آدرسِ عمومی لازم است و در ctx نیست.
+  const r = await db.restaurant.findUnique({
+    where: { id: ctx.restaurant.id },
+    select: { slug: true },
+  });
+
   const items = await db.menuItem.findMany({
     // فیلترِ restaurantId از ctx می‌آید (که withRestaurantAuth آن را از توکن/هدر
     // با چکِ مالکیتِ تنانت رزولو کرده) — هرگز از ورودیِ کلاینت.
     where: { restaurantId: ctx.restaurant.id },
-    orderBy: [{ category: 'asc' }, { soldCount: 'desc' }, { name: 'asc' }],
+    // همان ترتیبی که مشتری در منویِ عمومی می‌بیند (sortOrder، سپس نام)، تا
+    // رستوران‌دار در پنل دقیقاً چیدمانِ واقعی را ببیند نه ترتیبِ فروش.
+    orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     select: {
       id: true, name: true, emoji: true, priceToman: true,
       isActive: true, soldCount: true, category: true,
+      description: true, imageUrl: true, sortOrder: true,
     },
   });
   return NextResponse.json({
     items: items.map(m => ({
       id: m.id, name: m.name, emoji: m.emoji, price_toman: m.priceToman,
       is_active: m.isActive, sold_count: m.soldCount, category: m.category,
+      description: m.description, image_url: m.imageUrl, sort_order: m.sortOrder,
     })),
+    // آدرسِ عمومی از سرور می‌آید، نه ساختِ رشته در پنل — همان آدرسی که
+    // داخلِ QR هم می‌رود، پس «لینکی که کپی می‌کنی» و «QRی که چاپ می‌کنی»
+    // نمی‌توانند از هم بیفتند.
+    public_menu_url: r?.slug ? publicMenuUrl(r.slug) : null,
   });
 });
 
@@ -67,12 +90,19 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
       emoji: b.emoji || null,
       category: b.category || null,
       isActive: b.is_active ?? true,
+      description: b.description || null,
+      imageUrl: b.image_url || null,
+      sortOrder: b.sort_order ?? 0,
     },
-    select: { id: true, name: true, priceToman: true, category: true, isActive: true },
+    select: {
+      id: true, name: true, priceToman: true, category: true, isActive: true,
+      description: true, imageUrl: true, sortOrder: true,
+    },
   });
 
   return NextResponse.json({
     id: item.id, name: item.name, price_toman: item.priceToman,
     category: item.category, is_active: item.isActive,
+    description: item.description, image_url: item.imageUrl, sort_order: item.sortOrder,
   }, { status: 201 });
 });

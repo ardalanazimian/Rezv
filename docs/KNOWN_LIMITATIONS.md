@@ -27,6 +27,34 @@
 
 ## 2. Frontend
 
+- **JSON-LD published every menu price at one-tenth its real value — fixed
+  2026-08-19.** `apps/seo/lib/schema.ts` emitted `price_toman` directly with
+  `priceCurrency: 'IRR'`. Toman is not an ISO 4217 currency; IRR is the rial,
+  and 1 toman = 10 rials — so a 185,000-toman dish was declared to Google as
+  185,000 rials (≈18,500 toman). Wrong structured data is the worst kind of
+  wrong: it presents itself as authoritative. Fixed with an explicit
+  `tomanToRial()` conversion, locked by a test that also asserts the raw toman
+  value is *not* what gets published, and proven by mutation test.
+- **Public QR menu — deliberate scope (2026-08-19).** The QR on the table
+  points at `https://rezervno.ir/r/{slug}/menu`, a server-rendered page with no
+  client JavaScript. What it is **not**: no POS, no bill payment, no ordering
+  from the table, no inventory, no delivery. Pre-ordering still exists only in
+  the customer app's reservation flow and was not touched. The page reads the
+  same `MenuItem` rows the business panel edits — there is no second menu store.
+  Two consequences worth knowing: a menu edit takes up to the 300s ISR window to
+  appear publicly (no on-demand revalidation hook is wired for menu changes
+  yet — `apps/landing` has that pattern if it becomes necessary), and a
+  restaurant with no active items gets an honest empty page marked
+  `noindex, follow` rather than a sample menu.
+- **`apps/seo` had no CSS at all, so its font never loaded — fixed 2026-08-19.**
+  `layout.tsx` set `fontFamily: 'Vazirmatn'` from the start, but the app
+  shipped no stylesheet, so no `@font-face` ever bound that name to a file and
+  the Persian UI silently fell back to a system sans-serif. Same class of bug as
+  the panels' Google-Fonts failure fixed the same day, except here there was not
+  even a broken link to notice. Now `app/globals.css` declares the self-hosted
+  `public/fonts/vazirmatn-var.woff2`; verified in a real browser with
+  `document.fonts.check('700 16px Vazirmatn') === true` and zero external requests.
+
 - **Customer app invented three events for every real user (fixed 2026-08-19,
   PR #30).** `renderEvents()` in `apps/customer/js/data/discover.js` fell back to
   `SAMPLE_EVENTS` whenever the server's list came back empty. `special_events` is

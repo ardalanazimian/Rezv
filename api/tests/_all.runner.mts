@@ -78,6 +78,7 @@ import './site-orders.test.mts';
 import './table-merge-occupancy-concurrency.test.mts';
 import './table-merge-occupancy.test.mts';
 import './validate.test.mts';
+import './public-menu.integration.test.mts';
 import './waitlist.test.mts';
 
 // ═══════════════════════════════════════════════════════════════════════

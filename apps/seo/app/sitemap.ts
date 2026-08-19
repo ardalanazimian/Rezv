@@ -16,11 +16,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   for (const r of data.restaurants) {
+    const lastModified = r.updated_at ? new Date(r.updated_at) : undefined;
     entries.push({
       url: `${SITE}/r/${encodeURIComponent(r.slug)}`,
-      lastModified: r.updated_at ? new Date(r.updated_at) : undefined,
+      lastModified,
       changeFrequency: 'weekly',
       priority: 0.8,
+    });
+    // صفحه‌ی منو هم ایندکس‌پذیر است (canonicalِ خودش را دارد، محتوایش در
+    // صفحه‌ی رستوران تکرار نمی‌شود). رستورانِ بدونِ منو خودش `noindex`
+    // می‌دهد، پس بودنِ آدرس در sitemap تناقضی نمی‌سازد: sitemap «این آدرس
+    // وجود دارد» می‌گوید، نه «حتماً ایندکسش کن».
+    entries.push({
+      url: `${SITE}/r/${encodeURIComponent(r.slug)}/menu`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.6,
     });
   }
   for (const city of data.cities) {

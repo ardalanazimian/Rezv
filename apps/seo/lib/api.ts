@@ -4,6 +4,23 @@
 
 const API_BASE = (process.env.SEO_API_BASE || '').replace(/\/$/, '');
 
+/**
+ * یک آیتمِ منو، دقیقاً همان شکلی که API عمومی می‌دهد.
+ * `category`/`description`/`image_url` می‌توانند null باشند — یعنی رستوران‌دار
+ * پرشان نکرده، نه اینکه خطایی رخ داده. UI باید همان را بدونِ جاگذاریِ متنِ
+ * ساختگی نشان دهد.
+ */
+export interface MenuItem {
+  id: string;
+  name: string;
+  emoji: string | null;
+  price_toman: number;
+  category: string | null;
+  description: string | null;
+  image_url: string | null;
+  sort_order: number;
+}
+
 export interface RestaurantDetail {
   id: string;
   slug: string;
@@ -11,6 +28,8 @@ export interface RestaurantDetail {
   cuisine: string | null;
   vibes: string[];
   price_band: number;
+  /** لوگویِ تأییدشده (جدا از گالری). null = هنوز آپلود/تأیید نشده. */
+  logo_url: string | null;
   location: {
     address: string | null;
     city: string | null;
@@ -24,7 +43,7 @@ export interface RestaurantDetail {
   timezone: string;
   rating: number | null;
   reviews_count: number;
-  menu: { name: string; emoji: string | null; price_toman: number }[];
+  menu: MenuItem[];
   photos: { url: string; caption: string | null; category: string }[];
 }
 
@@ -79,6 +98,36 @@ export async function fetchRestaurantList(
     return Array.isArray(data.items) ? data.items : [];
   } catch {
     return [];
+  }
+}
+
+export interface PublicMenu {
+  restaurant: { id: string; slug: string; name: string; cuisine: string | null; city: string | null };
+  items: MenuItem[];
+}
+
+/**
+ * منویِ عمومیِ یک رستوران (GET /api/v1/restaurants/{slug}/menu).
+ *
+ * سه نتیجه‌ی متفاوت که **نباید** با هم قاطی شوند — همان درسِ صفحه‌ی رویدادهایِ
+ * اپِ مشتری که یک fallbackِ نمونه، دادهٔ ساختگی را به همه‌ی کاربران نشان می‌داد:
+ *   • آبجکت با items پر  → منویِ واقعی
+ *   • آبجکت با items خالی → رستوران هست ولی هنوز منو ثبت نکرده (حالتِ خالیِ صادق)
+ *   • null                 → رستوران پیدا نشد یا API در دسترس نیست (۴۰۴/خطا)
+ * هیچ‌کدام نباید به «منویِ نمونه» تبدیل شود.
+ */
+export async function fetchPublicMenu(slug: string, revalidateSec = 300): Promise<PublicMenu | null> {
+  if (!API_BASE) return null;
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/restaurants/${encodeURIComponent(slug)}/menu`, {
+      next: { revalidate: revalidateSec },
+    });
+    if (!res.ok) return null;
+    const d = (await res.json()) as Partial<PublicMenu>;
+    if (!d.restaurant) return null;
+    return { restaurant: d.restaurant, items: Array.isArray(d.items) ? d.items : [] };
+  } catch {
+    return null;
   }
 }
 

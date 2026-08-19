@@ -1,0 +1,216 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   استایلِ اپِ عمومیِ SEO — سبک، بدونِ فریم‌ورک، بدونِ درخواستِ بیرونی.
+
+   چرا این فایل تازه ساخته شد (۲۰۲۶-۰۸-۱۹): `layout.tsx` از همان اول
+   `fontFamily: 'Vazirmatn'` را ست می‌کرد، ولی این اپ **هیچ فایلِ CSSی
+   نداشت** — پس هیچ‌جا `@font-face`ی نبود که آن نام را به فایلی وصل کند و
+   فونت بی‌صدا روی sans-serifِ سیستم می‌افتاد. همان کلاسِ باگی که در
+   پنل‌ها رفع شد، فقط اینجا حتی لینکِ Google Fonts هم نبود که بشکند.
+
+   فونت self-hosted است (`public/fonts/`)، عمداً: fonts.googleapis.com در
+   ایران — بازارِ واقعیِ این محصول — در دسترس نیست.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/vazirmatn-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --text: #14171c;
+  --text-2: #545b66;
+  --text-3: #858c97;
+  --line: #e6e8ec;
+  --brand: #2563eb;
+  --brand-ink: #ffffff;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(16, 20, 28, .06), 0 8px 24px rgba(16, 20, 28, .06);
+}
+
+/* حالتِ تیره فقط با ترجیحِ سیستم — این اپ سوییچِ دستی ندارد. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --surface: #161a20;
+    --surface-2: #1c212a;
+    --text: #f2f4f7;
+    --text-2: #b3bac5;
+    --text-3: #8790a0;
+    --line: #262c36;
+    --brand: #5b8dff;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Vazirmatn, system-ui, sans-serif;
+  line-height: 1.85;
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--brand); }
+
+/* لینکِ پرشِ محتوا — فقط با کیبورد دیده می‌شود. */
+.skip {
+  position: absolute;
+  right: -9999px;
+  top: 0;
+  background: var(--brand);
+  color: var(--brand-ink);
+  padding: 10px 16px;
+  border-radius: 0 0 10px 0;
+  z-index: 50;
+}
+.skip:focus { right: 0; }
+
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+/* ── چیدمانِ صفحه ───────────────────────────────────────────────── */
+.wrap { max-width: 820px; margin: 0 auto; padding: 24px 20px 64px; }
+.crumb { font-size: 13px; color: var(--text-2); }
+.crumb a { color: inherit; }
+.lede { color: var(--text-2); margin-top: 0; }
+
+.cta {
+  display: inline-block;
+  background: var(--brand);
+  color: var(--brand-ink);
+  padding: 12px 22px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+/* ── سرصفحه‌ی چسبانِ صفحه‌ی منو (QR) ─────────────────────────────── */
+.mhead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 16px;
+}
+.mhead-row { display: flex; align-items: center; gap: 12px; max-width: 820px; margin: 0 auto; }
+.mhead-t { flex: 1; min-width: 0; }
+.mhead-t h1 { font-size: 19px; margin: 0; line-height: 1.4; }
+.mhead-t p { margin: 0; font-size: 13px; color: var(--text-2); }
+.mhead .cta { padding: 9px 16px; font-size: 14px; white-space: nowrap; }
+
+/* نوارِ چیپ‌هایِ دسته — پیمایشِ افقی، بدونِ جاوااسکریپت.
+   لنگرها با scroll-margin زیرِ سرصفحه‌ی چسبان گیر نمی‌کنند. */
+.chips {
+  position: sticky;
+  top: 61px;
+  z-index: 19;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── تخته‌ی منو ─────────────────────────────────────────────────── */
+.mcat { scroll-margin-top: 116px; }
+.mcat-h {
+  font-size: 16px;
+  color: var(--text-2);
+  margin: 26px 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.mlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.mi {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.mi-img {
+  width: 72px; height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+  flex: 0 0 auto;
+  background: var(--surface-2);
+}
+.mi-emoji {
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  font-size: 24px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  flex: 0 0 auto;
+}
+.mi-body { flex: 1; min-width: 0; }
+.mi-top { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
+.mi-name { font-weight: 700; }
+.mi-price { color: var(--text-2); font-size: 14px; white-space: nowrap; }
+.mi-desc {
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.7;
+  /* سه خط، بعدش «…» — توضیحِ بلند نباید کارت را بترکاند. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── حالتِ خالیِ صادق ─────────────────────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.empty-t { font-weight: 700; color: var(--text); margin-bottom: 6px; }
+
+/* ── گالری و FAQ در صفحه‌ی رستوران ───────────────────────────────── */
+.gal { display: flex; gap: 8px; flex-wrap: wrap; padding: 0; margin: 16px 0; list-style: none; }
+.gal img { width: 160px; height: 120px; object-fit: cover; border-radius: 10px; }
+.faq { border-bottom: 1px solid var(--line); padding: 8px 0; }
+.faq summary { font-weight: 600; cursor: pointer; }
+.faq p { margin: 6px 0 0; color: var(--text-2); }
+
+.hours { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; max-width: 340px; }
+.hours li { display: flex; justify-content: space-between; gap: 16px; font-size: 15px; }
+.hours .d { color: var(--text-2); }
+
+.rel { list-style: none; padding: 0; display: grid; gap: 8px; }
+.rel a { font-weight: 600; text-decoration: none; color: var(--text); }
+.rel span { color: var(--text-2); font-size: 13px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
