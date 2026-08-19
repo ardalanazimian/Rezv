@@ -152,18 +152,47 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # نکته: e2e/package-lock.json فعلاً کامیت نشده؛ بعد از اولین npm install و
-          # کامیتِ آن، cache: 'npm' + cache-dependency-path: e2e/package-lock.json را
-          # اضافه کن تا نصب سریع‌تر شود.
+          # e2e/package-lock.json از ۲۰۲۶-۰۸-۱۲ کامیت شده (کامنتِ قبلی که
+          # می‌گفت کامیت نشده کهنه بود) — پس کشِ npm واقعاً کار می‌کند.
+          cache: 'npm'
+          cache-dependency-path: e2e/package-lock.json
 
       - name: Install dependencies
         run: npm ci || npm install
 
+      # کشِ باینریِ مرورگرها: ریشه‌ی گیرکردنِ این job همین دانلودِ ~۱۵۰ مگابایتی
+      # از CDNِ Playwright بود. با cache hit اصلاً دانلودی در کار نیست.
+      # کلید بر پایه‌ی lockfile است تا با ارتقاء نسخه‌ی Playwright خودکار باطل شود.
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('e2e/package-lock.json') }}
+
       - name: Install Playwright browsers
-        # سقفِ مرحله‌ای: همین قدم است که معلق می‌ماند. اجرای سالم ۱.۵ تا ۵.۵
-        # دقیقه طول می‌کشد، پس ۱۲ دقیقه یعنی «واقعاً گیر کرده»، نه «کند است».
-        timeout-minutes: 12
-        run: npx playwright install --with-deps chromium webkit
+        # سقفِ مرحله‌ای به‌عنوانِ تورِ ایمنی. داخلش هم سه تلاش با سقفِ ۴ دقیقه:
+        # گیرکردنِ CDN گذراست، پس تلاشِ دوباره درستش می‌کند — به‌جای اینکه کلِ
+        # PR بابتِ یک هنگِ شبکه‌ای قرمز شود. با cache hit فقط وابستگی‌های
+        # سیستمی نصب می‌شوند (بدونِ دانلودِ مرورگر).
+        timeout-minutes: 15
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            cmd="npx playwright install-deps chromium webkit"
+          else
+            cmd="npx playwright install --with-deps chromium webkit"
+          fi
+          for attempt in 1 2 3; do
+            echo "::group::نصبِ مرورگر — تلاشِ $attempt"
+            if timeout 240 $cmd; then
+              echo "::endgroup::"; exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::تلاشِ $attempt برای نصبِ مرورگر شکست خورد/گیر کرد؛ دوباره تلاش می‌کنم"
+            sleep 10
+          done
+          echo "::error::نصبِ مرورگرِ Playwright بعد از ۳ تلاش موفق نشد"
+          exit 1
 
       - name: Run E2E tests
         run: npm test
