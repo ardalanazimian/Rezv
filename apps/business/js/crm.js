@@ -966,17 +966,28 @@ async function loadCampaignHistory(){
   </tbody></table>`:'<div style="padding:8px">هنوز کمپینی ارسال نشده</div>';
 }
 
-// ─── تب ۴: دستیار AI (واقعی — کارت‌های پیشنهاد قانون‌محور از /restaurant/ai، نه چت ساختگی) ───
+// ─── تب ۴: دستیار AI — چت‌باکسِ آزادمتنِ آفلاین (assistant.js) + کارت‌های پیشنهادِ قانون‌محور از /restaurant/ai ───
 async function custRenderAI(){
   const el=document.getElementById('ct-ai');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
+
+  // ⚠️ چت‌باکسِ دستیار عمداً *پیش از* fetchِ کارت‌ها و بیرونِ گاردِ آن رندر
+  // می‌شود. این دو قابلیتِ مستقل‌اند (چت از /restaurant/assistant می‌آید،
+  // کارت‌ها از /restaurant/ai) و اگر داخلِ یک قالب بمانند، خطای یکی دیگری را
+  // هم از بین می‌برد — در تستِ مرورگر دقیقاً همین دیده شد: با ۴۰۱ شدنِ
+  // کارت‌ها، چت‌باکس اصلاً در DOM نبود.
+  const chatHtml = (typeof assistantChatHtml==='function') ? assistantChatHtml() : '';
+  if(chatHtml){ el.innerHTML=chatHtml+`<div id="aiCards"><div style="text-align:center;padding:30px;color:var(--t2)">در حال بارگذاری پیشنهادها...</div></div>`; }
+  if(typeof initAssistantChat==='function') initAssistantChat();
+  const cardsEl = document.getElementById('aiCards') || el;
+
   const [res,crmRes]=await Promise.all([API.aiRecommendations(),API.crmRecommendations()]);
-  if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
+  if(!res.ok){ cardsEl.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} پیشنهادها بارگیری نشد — دستیار همچنان در دسترس است.</div>`; return; }
   const cards=res.data.cards||[];
   const contacts=crmRes.ok?(crmRes.data.items||[]):[];
   const URG_FA={high:'فوری',medium:'این هفته',low:'وقتِ آزاد'};
-  el.innerHTML=`
+  cardsEl.innerHTML=`
     <div class="ai-box" style="margin-bottom:18px">
       <div class="ai-box-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">پیشنهادهای هوشمند</div><span class="tag">قانون‌محور · شفاف</span></div>
       <div style="font-size:13px;color:var(--t1);line-height:1.6">این پیشنهادها از تحلیل واقعی داده‌های رستوران شما تولید می‌شن (نه چت‌بات) — هر کارت دلیل و عدد پشتش رو نشون می‌ده.</div>

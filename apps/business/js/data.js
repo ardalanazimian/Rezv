@@ -234,6 +234,10 @@ const API = {
   deletePhoto(id){ return this.delete('/restaurant/photos?id='+encodeURIComponent(id)); },
   notes(){ return this.get('/restaurant/notes'); },
   // ── منو (CRUDِ واقعی؛ پیش از این هیچ روتی برایِ ساختِ آیتمِ منو نبود) ──
+  // ── دستیارِ هوشمندِ آفلاین: چت آزادمتن + حلقه‌ی خودآموزی (وصل به /restaurant/assistant واقعی) ──
+  assistantAsk(message){ return this.post('/restaurant/assistant', { message }); },
+  assistantFeedback(logId, intent){ return this.post('/restaurant/assistant/feedback', { log_id: logId, correct_intent: intent }); },
+  assistantStats(){ return this.get('/restaurant/assistant'); },
   menuList(){ return this.get('/restaurant/menu'); },
   menuCreate(body){ return this.post('/restaurant/menu', body); },
   menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
