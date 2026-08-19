@@ -478,6 +478,22 @@ const RFM_META={
   lost:{fa:'از دست‌رفته',c:'#6B7280',d:'احتمالاً رفته'},
   unknown:{fa:'نامشخص',c:'#CBD5E1',d:''},
 };
+/**
+ * آیا برایِ این مشتری اصلاً دادهٔ مبلغی وجود دارد؟
+ *
+ * ⚠️ افزوده در ممیزیِ ۲۰۲۶-۰۸-۱۹. رزرونو عمداً POS-agnostic است و هرگز مبلغِ
+ * فاکتور را نمی‌بیند؛ تنها منبعِ مبلغ، `reservation_items` (پیش‌سفارش از منو)
+ * است — دقیقاً همان چیزی که کامنتِ خودِ schema رویِ `total_spend_toman`
+ * می‌گوید: «جمعِ پیش‌سفارش‌ها». چون این ستون‌ها در دیتابیس `Int @default(0)`
+ * (غیرِ nullable) هستند، «دادهٔ نداریم» و «خرجش صفر بود» هردو صفر ذخیره
+ * می‌شوند و از هم قابلِ تفکیک نیستند. نمایشِ خامِ آن صفر به رستوران‌دار یعنی
+ * ادعایِ اندازه‌گیری‌شده‌ای که هرگز اندازه‌گیری نشده. اینجا صفر را «بدونِ داده»
+ * می‌خوانیم و خانه را خالی نشان می‌دهیم، نه «۰ تومان».
+ */
+function clvHasSpend(clv){
+  return !!(clv && (clv.total_spend_toman > 0 || clv.predicted_clv_toman > 0));
+}
+
 // رندر دمو داشبورد هوش مشتری (از GUESTS نمونه) — برای دمو و آفلاین
 function custRenderOverviewDemo(el){
   const total=GUESTS.length*32+1216; // عدد نمونه‌ی واقع‌گرایانه
@@ -539,7 +555,23 @@ async function custRenderOverview(){
   // حالت دمو/آفلاین: با داده‌ی نمونه رندر کن تا فیچر همیشه قابل‌نمایش باشد (برای دمو به رستوران‌دار)
   if(!API.getToken()){ return custRenderOverviewDemo(el); }
   const [rfmRes,aiRes,vipRes]=await Promise.all([API.rfm(),API.aiRecommendations(),API.customers('segment=vip&limit=50')]);
-  if(!rfmRes.ok){ return custRenderOverviewDemo(el); }
+  // ⚠️ رفعِ باگِ صداقت (ممیزیِ ۲۰۲۶-۰۸-۱۹): قبلاً اینجا هم `custRenderOverviewDemo`
+  // صدا زده می‌شد. یعنی رستوران‌دارِ **واردشده** که فقط APIاش خطا داده بود
+  // (۵۰۰، قطعیِ شبکه، rate-limit) اعدادِ ساخته‌شده‌ی دمو را به‌جایِ دادهٔ خودش
+  // می‌دید — با برچسبِ «[نمونه]» ولی بدونِ هیچ نشانه‌ای که «بارگیری شکست خورد».
+  // دمو فقط برایِ حالتِ بدونِ توکن مجاز است؛ خطای واقعی باید دیده شود، نه پنهان.
+  if(!rfmRes.ok){
+    const msg = rfmRes.offline
+      ? 'اتصال به سرور برقرار نیست.'
+      : (rfmRes.error?.message || 'بارگیریِ هوشِ مشتری ناموفق بود.');
+    el.innerHTML=`<div class="panel" style="text-align:center;padding:40px">
+      <div style="margin-bottom:8px">${icon('alert',{size:28})}</div>
+      <div style="font-weight:700;margin-bottom:6px">دادهٔ هوشِ مشتری بارگیری نشد</div>
+      <div style="color:var(--t2);font-size:13px;margin-bottom:16px">${esc(msg)}</div>
+      <button class="btn btn-primary" onclick="custRenderOverview()">تلاش دوباره</button>
+    </div>`;
+    return;
+  }
   const total=rfmRes.data.total||0;
   const segs=(rfmRes.data.segments||[]).slice().sort((a,b)=>b.count-a.count);
   const vipCount=vipRes.ok?(vipRes.data.items?.length||0):0;
@@ -628,7 +660,7 @@ async function custRenderProfiles(){
       return `<div class="smart-card ${urg}">
         <div class="smart-top">
           <div class="smart-ava">${c.is_vip?icon('crown',{size:18,fill:true}):icon('user',{size:18})}</div>
-          <div style="flex:1"><div class="smart-name">${esc(c.name)}</div><div style="font-size:12px;color:var(--t2)">${esc(SEG_FA[c.segment]||c.segment||'')} · ${fa(c.total_visits)} بازدید · ${fnl(c.predicted_clv_toman)} تومان CLV</div></div>
+          <div style="flex:1"><div class="smart-name">${esc(c.name)}</div><div style="font-size:12px;color:var(--t2)">${esc(SEG_FA[c.segment]||c.segment||'')} · ${fa(c.total_visits)} بازدید${c.predicted_clv_toman?` · ${fnl(c.predicted_clv_toman)} تومان CLV`:''}</div></div>
           <span style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:50px;background:${urg==='high'?'var(--red-50)':urg==='med'?'var(--amber-50)':'var(--green-50)'};color:${urgClr[urg]}">${urg==='high'?'پرریسک':urg==='med'?'بررسی کن':'پایدار'}</span>
         </div>
         ${c.intelligence_score!=null?`<div style="display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:11.5px;color:var(--t2)">${icon('sparkle',{size:12,fill:true})} امتیازِ هوشِ مشتری: <b style="color:${iqClr[c.intelligence_tier]||'var(--t2)'}">${fa(c.intelligence_score)}</b> · ${iqFa[c.intelligence_tier]||''}</div>`:''}
@@ -860,9 +892,10 @@ async function openCustomerDetail(userId){
     <div class="modal-sub">${esc(SEG_FA[d.segment]||d.segment||'')}${u.phone?' · '+esc(u.phone):''}</div>
     <div class="sig-row" style="margin-top:14px">
       <div class="sig"><div class="sig-val">${fa(clv.total_visits||0)}</div><div class="sig-label">بازدید</div></div>
-      <div class="sig"><div class="sig-val">${fnl(clv.total_spend_toman)}</div><div class="sig-label">کل خرج (ت)</div></div>
-      <div class="sig"><div class="sig-val">${fnl(clv.predicted_clv_toman)}</div><div class="sig-label">CLV (ت)</div></div>
+      <div class="sig"><div class="sig-val">${clvHasSpend(clv)?fnl(clv.total_spend_toman):'—'}</div><div class="sig-label">پیش‌سفارش (ت)</div></div>
+      <div class="sig"><div class="sig-val">${clvHasSpend(clv)?fnl(clv.predicted_clv_toman):'—'}</div><div class="sig-label">CLV (ت)</div></div>
     </div>
+    ${clvHasSpend(clv)?'':`<div style="margin-top:8px;font-size:11.5px;color:var(--t2);line-height:1.7">${icon('info',{size:12})} برایِ این مشتری دادهٔ مبلغی ثبت نشده، پس CLV محاسبه‌پذیر نیست. رزرونو به صندوق وصل نیست و مبلغِ فاکتور را نمی‌بیند؛ تنها منبعِ مبلغ، <b>پیش‌سفارش از منو</b> است. تا وقتی منو تعریف نشده یا مهمان پیش‌سفارش نداده، این دو خانه خالی می‌مانند — عددِ صفر به‌معنیِ «خرجِ صفر» نیست.</div>`}
     <div class="sig-row" style="margin-top:10px">
       <div class="sig"><div class="sig-val" style="color:var(--red)">${fa(risk.churn_risk_score||0)}٪</div><div class="sig-label">ریسک ریزش</div></div>
       <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(risk.no_show_rate_pct||0)}٪</div><div class="sig-label">عدم‌حضور</div></div>
