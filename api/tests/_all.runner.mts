@@ -93,6 +93,7 @@ import './reservation-helpers.test.mts';
 import './reservation-status.test.mts';
 import './restaurant-manager.test.mts';
 import './shell-scripts-lf.test.mts';
+import './sms-balance.integration.test.mts';
 import './site-orders.test.mts';
 import './table-merge-occupancy-concurrency.test.mts';
 import './table-merge-occupancy.test.mts';
