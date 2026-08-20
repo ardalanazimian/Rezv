@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
 import { fetchTrainingRows } from '../src/lib/no-show-model.ts';
 import { loadPriorHistory } from '../src/lib/no-show-features.ts';
+import { fixturePhone } from './_phone.helper.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  فازِ ۴ — برابریِ ویژگی بینِ آموزش و سرو
@@ -61,7 +62,9 @@ before(async () => {
   });
   restaurantA = a.id; restaurantB = b.id;
   const u = await db.user.create({
-    data: { phone: `0938${String(Date.now()).slice(-7)}`.slice(0, 11), firstName: '[DEMO]', lastName: 'برابری' },
+    // ⚠️ پیشوندِ ۰۹۳۸ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش
+    // نکن. شرحِ کاملِ flakeی که این را لازم کرد در tests/_phone.helper.mts.
+    data: { phone: fixturePhone('0938'), firstName: '[DEMO]', lastName: 'برابری' },
     select: { id: true },
   });
   userId = u.id;
