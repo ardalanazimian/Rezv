@@ -715,9 +715,9 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
-  - **Updated 2026-08-20: 617 tests, 156 suites, 0 failures** (real Postgres + Redis).
+  - **Updated 2026-08-20: 632 tests, 159 suites, 0 failures** (real Postgres + Redis).
     The last additions were the untested-module pass: availability, coupons, SMS
-    balance, idempotency, and pricing (§2h). Earlier that same day the count was
+    balance, idempotency, pricing (§2h), and the automatic lifecycle crons (§2j). Earlier that same day the count was
     564; the growth is
     phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
     drift detection, train/serve feature parity, the outreach ledger, and the CRM
@@ -991,3 +991,50 @@ cancel می‌کند — ۶۱۷ تست از یک برخوردِ تصادفی، �
 برخورد کنند چون پیشوند و حتی طولِ نهایی‌شان فرق دارد (۱۳ در برابرِ ۱۲
 کاراکتر) — بررسی شد، عوض نشد تا دیفِ PR بی‌دلیل بزرگ نشود. ولی هر فایلِ
 تستِ **جدید** باید از `fixturePhone` استفاده کند، نه از کپیِ این الگو.
+
+### ۲j) چهار cronِ چرخه‌ی حیات هیچ پوششی نداشتند + یک تابعِ تله — **رفع شد** (۲۰۲۶-۰۸-۲۰)
+
+`tests/lifecycle.test.mts` فقط جدولِ **خالصِ** `canTransition` را می‌سنجید.
+چهار تابعی که واقعاً رزروها را به وضعیتِ پایانی می‌برند — و همگی از
+`POST /api/v1/maintenance/lifecycle` هر چند دقیقه اجرا می‌شوند — **صفر
+پوشش** داشتند:
+
+| تابع | اگر بی‌صدا بشکند |
+|---|---|
+| `expireStaleHolds` | هولدِ منقضی، میز را در آن سانس برای همیشه اشغال نگه می‌دارد |
+| `autoMarkRunningLate` | مهمانِ دیرکرده هرگز وارد مسیرِ عدمِ حضور نمی‌شود |
+| `autoMarkNoShow` | no_show ثبت نمی‌شود → مدلِ no-show و آمارِ CRM روی دادهٔ ناقص کار می‌کنند |
+| `autoComplete` | مهمانِ نشسته completed نمی‌شود → اقتصاد/وفاداری هرگز شلیک نمی‌کند |
+
+**تله‌ی کشف‌شده — `markLateNoShows` حذف شد.** صفر صداکننده داشت (grep در
+کلِ ریپو: فقط تعریفِ خودش، یک re-export، و بандлـهای build). ولی کدِ مرده‌ی
+بی‌ضرر نبود: همان کار را **متفاوت** انجام می‌داد. `autoMarkNoShow` (مسیرِ
+واقعی) فقط `running_late` را no_show می‌کند، ولی این یکی `confirmed` و
+`auto_confirmed` را هم مستقیم no_show می‌کرد. هر دو انتقال طبقِ `TRANSITIONS`
+مجازند، پس اگر کسی روزی این را — به‌گمانِ هم‌ارزی — به cron وصل می‌کرد،
+مهمان **بدونِ عبور از `running_late`** غایب ثبت می‌شد: بدونِ هیچ اعلانِ «شما
+دیر کرده‌اید» و با دور زدنِ طراحیِ دومرحله‌ایِ مهلتِ تأخیر. همان الگویِ
+`redeemCouponAtomic`/`redeemCoupon` در PR #46.
+
+**پوششِ تست.** `tests/lifecycle-cron.integration.test.mts` — ۱۵ تستِ زنده
+روی Postgresِ واقعی. جهش‌آزمایی، با تأییدِ اعمالِ هر جهش پیش از اجرا:
+
+| جهش | چه شکست |
+|---|---|
+| `autoMarkNoShow` مستقیم از `confirmed` (همان تله) | ۱ |
+| هاردکدکردنِ مهلتِ تأخیر روی ۱۵ (نادیده‌گرفتنِ `lateGraceMinutes`) | ۱ |
+| معیارِ `autoComplete` از `slotEnd` به `slotStart` | ۱ |
+| جاافتادنِ `preparing` از `autoMarkRunningLate` | ۱ |
+| نادیده‌گرفتنِ `holdExpiresAt` در `expireStaleHolds` | ۱ |
+| حذفِ باطل‌سازیِ کش — فقط از یکی از دو سایت | **۰ (زنده ماند)** |
+| حذفِ باطل‌سازیِ کش — از **هر دو** سایت هم‌زمان | ۱ |
+
+⚠️ **جهش‌آزمایی ادعای اولِ من را اصلاح کرد.** وقتی حذفِ باطل‌سازی از
+`expireStaleHolds` هیچ تستی را نینداخت، برداشتِ اولم این بود که تستِ کش
+پوچ است. نبود: این تضمین را **دو لایه‌ی افزونه** می‌دهند (یکی در
+`transitionReservation`، یکی در خودِ `expireStaleHolds` — و افزونگی در
+کامنتِ همان‌جا از قبل توضیح داده شده بود). هر جهشِ تکی را لایه‌ی دیگر جبران
+می‌کند؛ حذفِ هم‌زمانِ هر دو تست را می‌اندازد. درس: وقتی یک جهش زنده می‌ماند،
+اول باید پرسید «آیا مسیرِ دومی هست؟» — نه اینکه فوراً تست را ضعیف اعلام کرد
+یا برای گرفتنِ آن یک خط، تست را به خطِ خاصی گره زد. تست عمداً *نتیجه* را
+قفل می‌کند، نه پیاده‌سازی را.

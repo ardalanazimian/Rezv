@@ -73,6 +73,7 @@ import './idempotency.integration.test.mts';
 import './incentive-engine.test.mts';
 import './jwt.test.mts';
 import './lifecycle.test.mts';
+import './lifecycle-cron.integration.test.mts';
 import './loyalty-status.test.mts';
 import './loyalty.test.mts';
 import './media.test.mts';

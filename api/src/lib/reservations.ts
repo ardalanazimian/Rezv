@@ -619,7 +619,10 @@ async function tryMergeTables(
 // ═══════════════════════════════════════════════════════════
 // ── عملیاتِ cronِ چرخه‌ی حیات به ماژول جدا منتقل شد (reservation-lifecycle-ops.ts) ──
 // re-export برای سازگاری با گذشته.
-export { expireStaleHolds, markLateNoShows } from './reservation-lifecycle-ops';
+// ⚠️ markLateNoShows از این خط حذف شد (۲۰۲۶-۰۸-۲۰) — صفر صداکننده داشت و
+// رفتارش با مسیرِ واقعیِ تولید (autoMarkNoShow) فرق داشت. دلیلِ کامل در
+// reservation-lifecycle-ops.ts.
+export { expireStaleHolds } from './reservation-lifecycle-ops';
 
 
 // ═══════════════════════════════════════════════════════════
