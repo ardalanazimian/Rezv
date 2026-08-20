@@ -4,6 +4,7 @@ import { recomputeAllForRestaurant } from '@/lib/customer-insights';
 import { recomputeRfmForRestaurant } from '@/lib/rfm';
 import { rebuildGuestProfiles } from '@/lib/guest-profile';
 import { runAllDueAutomations } from '@/lib/automation';
+import { resolveOutreachConversions } from '@/lib/outreach-ledger';
 import { applyAbuseFlags, applyPlatformAbuseFlags } from '@/lib/fraud';
 import { trainAndCalibrateNoShowModel } from '@/lib/no-show-model';
 import { trainAndCalibrateDemandForecast } from '@/lib/demand-forecast';
@@ -75,6 +76,17 @@ export async function POST(req: Request) {
 
     const automationResult = await runAllDueAutomations();
 
+    // ۷) حلقه‌ی بازخوردِ ارتباط‌گیری را ببند: رزروهای پس از هر تماس/پیامک را
+    //    نسبت بده و پنجره‌های تمام‌شده را حل‌شده علامت بزن (migration 057).
+    //    ⚠️ *پس از* اجرای automationها می‌آید تا ارسال‌های همین اجرا هم دیده
+    //    شوند. شکستش نباید بقیه‌ی جاب را باطل کند — آمار است، نه مسیرِ حیاتی.
+    const outreachResult = await resolveOutreachConversions().catch((err) => {
+      log.error('حلِ تبدیل‌های دفترِ ارتباط‌گیری شکست خورد', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    });
+
     // پروفایل سراسری مهمانان را از insightهای به‌روز بازسازی کن (cross-restaurant)
     //
     // ⚠️ شکست را دیگر به «۰ پروفایل» ترجمه نمی‌کنیم. نسخه‌ی قبلی
@@ -109,6 +121,9 @@ export async function POST(req: Request) {
       abuse_signals: abuseSignals + platformAbuse.signals.length,
       abuse_flagged_users: abuseFlagged + platformAbuse.flaggedUserIds.length,
       ...automationResult,
+      // null = اجرا شکست خورد، نه «صفر تبدیل».
+      outreach_converted: outreachResult ? outreachResult.converted : null,
+      outreach_expired: outreachResult ? outreachResult.expired : null,
     });
   } catch (e) { return errorResponse(e); }
 }

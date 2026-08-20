@@ -80,6 +80,7 @@ import './no-dynamic-import-in-hot-path.test.mts';
 import './no-show-model.test.mts';
 import './notifications.test.mts';
 import './otp.test.mts';
+import './outreach-ledger.integration.test.mts';
 import './permissions.test.mts';
 import './photo-moderation.test.mts';
 import './queue.test.mts';
