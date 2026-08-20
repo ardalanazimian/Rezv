@@ -715,10 +715,10 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
-  - **Updated 2026-08-20: 647 tests, 164 suites, 0 failures** (real Postgres + Redis).
+  - **Updated 2026-08-20: 665 tests, 168 suites, 0 failures** (real Postgres + Redis).
     The last additions were the untested-module pass: availability, coupons, SMS
-    balance, idempotency, pricing (§2h), the automatic lifecycle crons (§2j), and
-    the customer-economy ledger (§2k). Earlier that same day the count was
+    balance, idempotency, pricing (§2h), the automatic lifecycle crons (§2j),
+    the customer-economy ledger (§2k), and the waitlist writer core (§2l). Earlier that same day the count was
     564; the growth is
     phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
     drift detection, train/serve feature parity, the outreach ledger, and the CRM
@@ -1090,3 +1090,64 @@ cancel می‌کند — ۶۱۷ تست از یک برخوردِ تصادفی، �
 می‌فرستاد، **کلِ جریمه‌ی لغوِ دیرهنگام مرده بود**. بررسی شد: مسیرِ واقعی
 (`reservations/[code]/cancel/route.ts`) `` `customer:${auth.sub}` `` می‌فرستد.
 پس باگ نیست — فقط کامنتِ تایپ کهنه است.
+
+### ۲l) `expireOffers` گاردِ همزمانی نداشت — **باگ رفع شد** (۲۰۲۶-۰۸-۲۰)
+
+`declineOffer` و `leaveWaitlist` هر دو عمداً `updateMany` با گاردِ
+`status: 'offered'` دارند و کامنتشان دقیقاً همین رقابت را نام می‌برد:
+«گارد status را داخل updateMany می‌گذاریم (نه فقط چک بیرونی) تا اگر همزمان
+cron همین آفر را expire کند … فقط یکی واقعاً اعمال شود». اما **خودِ cron
+(`expireOffers`) آن گارد را نداشت** — `update`ِ بی‌قیدوشرط رویِ id. یعنی
+نیمه‌ی دومِ همان رقابت باز مانده بود.
+
+**اثبات با اجرای زنده** (نه استدلال). `expireOffers` فهرست را یک‌جا می‌خواند و
+بینِ هر تکرارِ حلقه `notifyEntry` و `promoteNext` را await می‌کند — پنجره‌ای
+چندده‌میلی‌ثانیه‌ای و کاملاً واقعی. سناریو: مشتری وسطِ حلقه آفرش را رد می‌کند.
+
+| پیامد | پیش از رفع | پس از رفع |
+|---|---|---|
+| وضعیتِ نهاییِ ورودی | `no_response` (تصمیمِ مشتری بازنویسی شد) | `declined` |
+| میزِ آفرشده به نفرِ بعدی | در ۱ از ۶ دور `state='free'` شد | ۰ از ۶ |
+
+پیامدِ دوم جدی‌تر است: یک ورودی با **آفرِ زنده** که میزش `free` علامت خورده،
+یعنی `promoteNext` بعدی می‌تواند همان میزِ فیزیکی را به نفرِ دوم هم آفر
+بدهد — دقیقاً همان کلاسِ باگِ H8 که چند خط بالاتر، در `promoteNext`، با
+ادعایِ اتمیکِ میز بسته شده بود.
+
+**رفع:** همان الگویِ `updateMany` + گاردِ status، و شمردن/اعلان/ارتقا فقط
+وقتی `count === 1`.
+
+**چرا گاردِ status کافی است** (و چکِ جداگانه‌ی مالکیتِ میز لازم نیست): میز فقط
+وقتی `free` می‌شود که همین ورودی decline/leave/expire شود، و هر سه وضعیتش را
+عوض می‌کنند. پس «هنوز offered است» ⟹ «میز هنوز مالِ همین ورودی است».
+
+**پوششِ تست.** `tests/waitlist-flow.integration.test.mts` — ۱۸ تستِ زنده روی
+هسته‌ی نویسنده (`joinWaitlist`، `promoteNext`، `declineOffer`،
+`leaveWaitlist`، `expireOffers`)، که تا امروز هیچ‌کدام پوشش نداشتند؛
+`tests/waitlist.test.mts` فقط کمکی‌هایِ خالص را می‌سنجید.
+
+جهش‌آزمایی، با تأییدِ اعمالِ هر جهش پیش از اجرا — **۶ از ۶**:
+
+| جهش | چه شکست |
+|---|---|
+| بازگرداندنِ دقیقِ خودِ باگ (`update`ِ بی‌قیدوشرط) | ۱ |
+| حذفِ ادعایِ اتمیکِ میز در `promoteNext` (باگِ H8) | ۱ |
+| حذفِ `priority` از ترتیبِ `promoteNext` | ۱ |
+| حذفِ گاردِ ظرفیتِ میز | ۱ |
+| آزادنکردنِ میز در `declineOffer` | ۱ |
+| ذخیره‌ی توکنِ خامِ مهمان به‌جای hash | ۱ |
+
+⚠️ **جهشِ سوم اول زنده ماند و گپی در خودِ تستِ من را لو داد:** تستِ اولویتم
+فقط `getPosition` را می‌سنجید، نه انتخابِ نفرِ بعدی در `promoteNext`. یعنی
+`promoteNext` می‌توانست VIP را نادیده بگیرد و هیچ تستی نمی‌گرفتش — در حالی
+که کلِ ارزشِ `tierToPriority` همان‌جاست. تستِ جداگانه اضافه شد و حالا گرفته
+می‌شود.
+
+**یافته‌ی ثبت‌شده‌ی رفع‌نشده — پنجره‌ی مشابه در `acceptOffer`:** آن هم پس از
+`createReservation` (که کند است) وضعیت را بی‌گارد می‌نویسد. اگر آفر دقیقاً
+در همان فاصله منقضی شود، cron ورودی را `no_response` می‌کند و میز را آزاد،
+و بعد `acceptOffer` آن را `accepted` می‌نویسد. عمداً در این PR رفع نشد چون
+برخلافِ `expireOffers` یک رفعِ مکانیکی نیست: در آن نقطه رزرو **از قبل ساخته
+شده**، پس «گارد بگذار و رد شو» یعنی رزروی بی‌صاحب می‌ماند — این یک تصمیمِ
+محصولی می‌خواهد. آسیبش هم محدودتر است: قیدِ `EXCLUDE` دیتابیس جلویِ رزروِ
+هم‌پوشانِ واقعی را می‌گیرد.

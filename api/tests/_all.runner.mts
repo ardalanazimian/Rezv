@@ -107,6 +107,7 @@ import './public-menu.integration.test.mts';
 import './temporal-leakage.integration.test.mts';
 import './tenant-isolation.integration.test.mts';
 import './waitlist.test.mts';
+import './waitlist-flow.integration.test.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ یافته‌ی واقعیِ دوم (۲۰۲۶-۰۸-۱۴، همون ممیزی): table-merge-occupancy.test.mts
