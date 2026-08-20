@@ -16,6 +16,19 @@ const log = createLogger('retention');
  *  • jobs کامل‌شده‌ی قدیمی‌تر از ۷ روز → حذف
  *  • jobs مرده (DLQ) قدیمی‌تر از ۹۰ روز → حذف (تا آن زمان برای تحقیق می‌مانند)
  *  • audit_logs قدیمی‌تر از ۱ سال → حذف (برای compliance تا یک سال نگه می‌داریم)
+ *  • دفترِ پیش‌بینی/نتیجه قدیمی‌تر از ۲ سال → حذف
+ *
+ * چرا دفترها هم پاک‌سازی می‌شوند: model_predictions/model_outcomes
+ * (migration 055) append-only‌اند و با هر رزرو رشد می‌کنند — بدونِ سقف،
+ * جدولی که فقط برایِ سنجش لازم است بی‌نهایت بزرگ می‌شود. پنجره‌ی سنجشِ
+ * واقعی ۹۰ روز است (lib/model-evaluation.ts)، پس ۲ سال با فاصله‌ی زیاد
+ * محافظه‌کارانه است و هم‌زمان §۳۶ نقشه‌راه (نگه‌داشتِ محدود، نه ابدی) را
+ * رعایت می‌کند.
+ *
+ * ترتیب مهم است: اول نتیجه، بعد پیش‌بینی — چون خواندنِ سنجش با JOIN
+ * انجام می‌شود و نتیجه‌ی یتیم بی‌ضررتر از پیش‌بینیِ یتیم نیست، ولی
+ * برعکسش هم فرقی نمی‌کند؛ هر دو با یک پنجره پاک می‌شوند تا جفت‌ها
+ * نیمه‌کاره نمانند.
  */
 export async function POST(req: Request) {
   try {
@@ -34,11 +47,20 @@ export async function POST(req: Request) {
       DELETE FROM audit_logs WHERE created_at < now() - interval '1 year'
     `;
 
+    const oldOutcomes = await db.$executeRaw`
+      DELETE FROM model_outcomes WHERE occurred_at < now() - interval '2 years'
+    `;
+    const oldPredictions = await db.$executeRaw`
+      DELETE FROM model_predictions WHERE predicted_at < now() - interval '2 years'
+    `;
+
     const result = {
       idempotency_keys: idemDeleted,
       completed_jobs: completedJobs,
       dead_jobs: deadJobs,
       audit_logs: oldAudit,
+      model_outcomes: oldOutcomes,
+      model_predictions: oldPredictions,
     };
     log.info('retention cleanup', result);
     return NextResponse.json({ ok: true, deleted: result });

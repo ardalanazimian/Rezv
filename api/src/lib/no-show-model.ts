@@ -328,7 +328,9 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
       isActive, reason,
     },
   }).catch(() => null);
-  await invalidate(cacheKey('noshow-model', restaurantId));
+  // ⚠️ باید دقیقاً همان کلیدی باشد که getActiveNoShowModel می‌خواند —
+  // وگرنه مدلِ تازه‌آموزش‌دیده تا یک ساعت پشتِ کشِ کهنه می‌ماند.
+  await invalidate(cacheKey('noshow-model-v2', restaurantId));
 
   return {
     trained: true, sampleSize: examples.length, positiveCount,
@@ -336,12 +338,36 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
   };
 }
 
-/** خواندنِ مدلِ فعالِ یک رستوران (کش‌شده — این تابع در مسیرِ داغِ ثبتِ رزرو
- *  صدا زده می‌شود). null یعنی «چیزی فعال نیست، از heuristic استفاده کن». */
-export async function getLearnedNoShowModel(restaurantId: string): Promise<number[] | null> {
-  const cacheVal = await cached(cacheKey('noshow-model', restaurantId), 3600, async () => {
+/** مدلِ فعال به‌همراهِ شناسه‌ی نسخه‌اش. */
+export interface ActiveNoShowModel {
+  weights: number[];
+  /** لحظه‌ی آموزش — به‌عنوانِ نسخه‌ی تغییرناپذیرِ مدل استفاده می‌شود. هر
+   *  آموزشِ شبانه یک نسخه‌ی جدید می‌سازد، پس دفترِ پیش‌بینی می‌تواند
+   *  پیش‌بینی‌هایِ نسخه‌های مختلف را از هم تفکیک کند. */
+  trainedAt: Date;
+}
+
+/** خواندنِ مدلِ فعالِ یک رستوران به‌همراهِ نسخه (کش‌شده — در مسیرِ داغِ ثبتِ
+ *  رزرو صدا زده می‌شود). null یعنی «چیزی فعال نیست، از heuristic استفاده کن».
+ *
+ *  نسخه لازم است چون دفترِ پیش‌بینی (lib/prediction-ledger.ts) باید بداند
+ *  کدام مدل هر عدد را ساخته؛ بدونِ آن، سنجشِ تولیدی نمی‌تواند دو نسخه‌ی
+ *  متوالیِ مدل را از هم جدا کند و میانگینِ کیفیت بی‌معنا می‌شود. */
+export async function getActiveNoShowModel(restaurantId: string): Promise<ActiveNoShowModel | null> {
+  const cacheVal = await cached(cacheKey('noshow-model-v2', restaurantId), 3600, async () => {
     const row = await db.restaurantNoShowModel.findUnique({ where: { restaurantId } });
-    return row?.isActive ? row.weights : null;
+    if (!row?.isActive) return null;
+    // کشِ Redis مقدار را JSON می‌کند، پس Date سرِ برگشت رشته می‌شود —
+    // ISO ذخیره می‌کنیم و پایین صریحاً به Date برمی‌گردانیم تا در هر دو
+    // مسیر (کشِ گرم/سرد) نوعِ خروجی یکی باشد.
+    return { weights: row.weights, trainedAtIso: row.trainedAt.toISOString() };
   });
-  return cacheVal;
+  if (!cacheVal) return null;
+  return { weights: cacheVal.weights, trainedAt: new Date(cacheVal.trainedAtIso) };
+}
+
+/** نسخه‌ی سازگارِ قبلی — فقط وزن‌ها. برایِ مصرف‌کننده‌هایی که نسخه لازم ندارند. */
+export async function getLearnedNoShowModel(restaurantId: string): Promise<number[] | null> {
+  const m = await getActiveNoShowModel(restaurantId);
+  return m ? m.weights : null;
 }

@@ -169,6 +169,8 @@ model Restaurant {
   noShowModel      RestaurantNoShowModel?
   demandForecast   RestaurantDemandForecast?
   modelTrainingRuns ModelTrainingRun[]
+  modelPredictions ModelPrediction[]
+  modelOutcomes    ModelOutcome[]
   // ── دستیارِ هوشمندِ رستوران (migration 050) ──
   assistantVocab        RestaurantAssistantVocab[]
   assistantLogs         RestaurantAssistantLog[]
@@ -726,6 +728,58 @@ model ModelTrainingRun {
   trainedAt     DateTime   @default(now()) @map("trained_at")
   @@index([restaurantId, kind, trainedAt])
   @@map("model_training_runs")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  دفترِ پیش‌بینی / دفترِ نتیجه (migration 055)
+//
+//  ModelTrainingRun بالا جوابِ «موقعِ آموزش چقدر خوب بود» را نگه می‌دارد.
+//  این دو جدول جوابِ سؤالِ متفاوت و تا امروز بی‌جوابِ «در تولید چقدر درست
+//  درآمد» را می‌سازند: هر پیش‌بینیِ واقعی با نسخه‌ی مدل و بردارِ ویژگی‌اش
+//  ثبت می‌شود (ModelPrediction)، و وقتی واقعیت معلوم شد نتیجه‌اش کنارش
+//  می‌نشیند (ModelOutcome). سنجشِ تولیدی از join همین دو در
+//  lib/model-evaluation.ts می‌آید.
+//
+//  هر دو append-only — مثلِ EconomyLedgerEntry (038) و ModelTrainingRun
+//  (042). هیچ مسیرِ اپلیکیشنی روی این دو UPDATE/DELETE نمی‌زند.
+// ───────────────────────────────────────────────────────────────────────
+model ModelPrediction {
+  id             String     @id @default(uuid()) @db.Uuid
+  restaurantId   String     @map("restaurant_id") @db.Uuid
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id])
+  predictionType String     @map("prediction_type")  // 'no_show'
+  subjectType    String     @map("subject_type")     // 'reservation'
+  subjectId      String     @map("subject_id") @db.Uuid
+  modelSource    String     @map("model_source")     // 'learned' | 'heuristic'
+  // نسخه‌ی تغییرناپذیرِ مدل: ISOیِ trainedAt برایِ مدلِ یادگرفته،
+  // برچسبِ ثابتِ نسخه‌دار برایِ heuristic.
+  modelVersion   String     @map("model_version")
+  featureVersion Int        @default(1) @map("feature_version")
+  // بردارِ ویژگیِ ورودی — بدونِ PII (فقط سیگنالِ رفتاریِ عددی/بولی).
+  features       Json       @map("features")
+  probability    Float      @map("probability")      // ۰..۱، نه ۰..۱۰۰
+  predictedAt    DateTime   @default(now()) @map("predicted_at")
+  horizonAt      DateTime?  @map("horizon_at")       // کِی نتیجه قابلِ‌دانستن می‌شود
+  @@unique([predictionType, subjectType, subjectId, modelVersion], map: "model_predictions_subject_version_uidx")
+  @@index([restaurantId, predictionType, predictedAt], map: "model_predictions_restaurant_type_idx")
+  @@map("model_predictions")
+}
+
+model ModelOutcome {
+  id             String     @id @default(uuid()) @db.Uuid
+  restaurantId   String     @map("restaurant_id") @db.Uuid
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id])
+  predictionType String     @map("prediction_type")
+  subjectType    String     @map("subject_type")
+  subjectId      String     @map("subject_id") @db.Uuid
+  // ۱ = رویداد رخ داد (no_show)، ۰ = رخ نداد. Float تا نتیجه‌ی مدل‌های
+  // رگرسیونیِ بعدی (تقاضا) هم در همین دفتر جا شود.
+  outcomeLabel   Float      @map("outcome_label")
+  outcomeStatus  String     @map("outcome_status")   // وضعیتِ پایانیِ واقعی
+  occurredAt     DateTime   @default(now()) @map("occurred_at")
+  @@unique([predictionType, subjectType, subjectId], map: "model_outcomes_subject_uidx")
+  @@index([restaurantId, predictionType, occurredAt], map: "model_outcomes_restaurant_type_idx")
+  @@map("model_outcomes")
 }
 
 model CustomerInsight {

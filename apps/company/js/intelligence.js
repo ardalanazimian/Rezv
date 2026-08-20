@@ -241,6 +241,32 @@ function rSystemHealth(){
 // append-only آموزش‌ها (model_training_runs، migration 042) — شاملِ
 // آموزش‌هایی که نتیجه‌شون فعال‌سازی نبوده، نه فقط آخرین وضعیت.
 const RUN_KIND_FA = { no_show: 'ریسکِ عدم‌حضور', demand_forecast: 'پیش‌بینیِ تقاضا' };
+
+// وضعیتِ سلامتِ *تولیدی* (از دفترِ پیش‌بینی/نتیجه، migration 055).
+// عمداً از وضعیتِ «فعال/heuristic» جداست: آن یکی می‌گوید مدل سرِ آموزش برنده
+// شد، این یکی می‌گوید در عمل روی رزروهایِ واقعی چه کرد.
+const PROD_STATUS_FA = {
+  insufficient_data: { t:'دادهٔ کافی نیست', cls:'expired' },
+  normal:            { t:'سالم',            cls:'active'  },
+  warning:           { t:'حاشیه‌ی نازک',    cls:'expired' },
+  degraded:          { t:'افتِ کیفیت',      cls:'expired' },
+  critical:          { t:'بحرانی',          cls:'expired' },
+};
+
+// یک بلوکِ سنجشِ تولیدی. e ممکن است null باشد (هیچ پیش‌بینی‌ای از آن منبع).
+function prodBlock(title, e, fa, esc){
+  if(!e) return `<div class="mini-row"><div class="mini-info"><div class="mini-name">${esc(title)}</div><div class="mini-sub">هیچ پیش‌بینی‌ای از این منبع ثبت نشده</div></div></div>`;
+  const st = PROD_STATUS_FA[e.status] || { t:e.status, cls:'expired' };
+  const n = (v,d=3)=> v==null ? '—' : fa(Math.round(v*Math.pow(10,d))/Math.pow(10,d));
+  const pct = (v)=> v==null ? '—' : fa(Math.round(v*1000)/10)+'٪';
+  // ⚠️ وقتی دادهٔ کافی نیست، عدد نشان نمی‌دهیم — فقط دلیل. نمایشِ «۰» در این
+  // حالت دروغ است: کاربر آن را «خطای صفر = عالی» می‌خواند.
+  const body = e.status==='insufficient_data'
+    ? `${esc(e.reason)}`
+    : `${fa(e.sample_size)} جفتِ پیش‌بینی/نتیجه · Brierِ تولیدی ${n(e.production_brier)} در برابرِ نرخِ پایه ${n(e.baseline_brier)} · خطای کالیبراسیون ${n(e.calibration_error)} · نرخِ واقعیِ عدم‌حضور ${pct(e.observed_rate)}`;
+  return `<div class="mini-row"><div class="mini-info"><div class="mini-name">${esc(title)}</div><div class="mini-sub">${body}</div></div><span class="badge ${st.cls}">${st.t}</span></div>`;
+}
+
 function rModelHealth(){
   document.getElementById('v-aihealth').innerHTML=`<div style="text-align:center;padding:60px;color:var(--t2)">در حال بارگذاری...</div>`;
   (async()=>{
@@ -260,6 +286,17 @@ function rModelHealth(){
         <div class="kpi"><div class="kpi-top"><div class="kpi-ic violet">${icon('trending',{size:17})}</div></div><div class="kpi-val">${fa(d.summary.no_show.restaurants_trained)}</div><div class="kpi-label">رستورانِ آموزش‌دیده (no-show)</div></div>
         <div class="kpi"><div class="kpi-top"><div class="kpi-ic amber">${icon('chart',{size:17})}</div></div><div class="kpi-val">${fa(d.summary.demand_forecast.restaurants_count_active)}</div><div class="kpi-label">پیش‌بینیِ تقاضا فعال (تعداد)</div></div>
         <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('chart',{size:17})}</div></div><div class="kpi-val">${fa(d.summary.demand_forecast.restaurants_covers_active)}</div><div class="kpi-label">پیش‌بینیِ تقاضا فعال (کاور)</div></div>
+      </div>
+      <div class="panel" style="margin-top:20px">
+        <div class="panel-head"><div><div class="panel-title">کیفیت در تولید — پیش‌بینی در برابرِ واقعیت</div><div class="panel-sub">${d.production && d.production.available ? `پنجره‌ی ${fa(d.production.window_days)} روزِ اخیر` : 'در دسترس نیست'}</div></div></div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.9;margin-bottom:12px">
+          ${icon('info',{size:12})} این بخش با اعدادِ بالا فرق دارد و نباید با آن‌ها مقایسه شود: Brierهای بالا روی هولدآوتِ <em>لحظه‌ی آموزش</em> حساب شده‌اند («مدل دیشب روی دادهٔ خودش چقدر خوب بود»)، ولی این‌جا پیش‌بینی‌هایی سنجیده می‌شوند که واقعاً تحویلِ رستوران شد، در برابرِ چیزی که واقعاً اتفاق افتاد.
+        </div>
+        ${!d.production || !d.production.available
+          ? `<div class="empty-state"><div class="empty-state-desc">${esc((d.production&&d.production.reason)||'دفترِ پیش‌بینی/نتیجه در دسترس نیست')}</div></div>`
+          : prodBlock('همه‌ی پیش‌بینی‌ها', d.production.no_show, fa, esc)
+            + prodBlock('فقط مدلِ یادگرفته', d.production.no_show_by_source.learned, fa, esc)
+            + prodBlock('فقط heuristic', d.production.no_show_by_source.heuristic, fa, esc)}
       </div>
       <div class="panel" style="margin-top:20px">
         <div class="panel-head"><div><div class="panel-title">مدلِ ریسکِ عدم‌حضور — وضعیتِ فعلی هر رستوران</div><div class="panel-sub">${fa(d.restaurants.no_show.length)} رستوران آموزش دیده‌اند</div></div></div>

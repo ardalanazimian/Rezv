@@ -8,6 +8,7 @@ import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
 import { redeemGiftCardTx } from './loyalty';
 import { computeNoShowRisk as defaultNoShowPredictor } from './customer-insights';
+import { recordPrediction, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
 import { computeRanges, genReservationCode, isConflictError, isSerializationError } from './reservation-helpers';
 import { invalidateAvailability } from './availability-cache';
@@ -33,7 +34,14 @@ import { getOccupiedTableNumbers } from './table-occupancy';
  */
 export type NoShowPredictor = (input: {
   userId: string | null; restaurantId: string; partySize: number; slotStart: Date; createdAt: Date; source: string;
-}) => Promise<{ score: number; tier: 'low' | 'medium' | 'high'; source: 'learned' | 'heuristic' }>;
+}) => Promise<{
+  score: number; tier: 'low' | 'medium' | 'high'; source: 'learned' | 'heuristic';
+  // نسبِ پیش‌بینی — اختیاری عمداً: پیاده‌سازیِ واقعی
+  // (computeNoShowRisk) همیشه پرش می‌کند، ولی یک stubِ تست می‌تواند ندهد.
+  // در آن حالت چیزی در دفترِ پیش‌بینی نوشته نمی‌شود؛ نسبِ جعلی ساخته
+  // نمی‌شود (اصلِ «هرگز داده جعل نکن»).
+  probability?: number; modelVersion?: string; features?: Record<string, unknown>;
+}>;
 
 // ═══════════════════════════════════════════════════════════
 //  موتور رزرو رزرونو — نسخه‌ی production
@@ -288,7 +296,11 @@ async function placeReservation(
   ranges: { start: Date; end: Date; blockEnd: Date; duration: number; blockBufferMin: number },
   candidateTables: { id: string; number: number }[],
   manualTableNumber: number | null,
-  noShowRisk: { score: number; tier: 'low' | 'medium' | 'high' },
+  noShowRisk: {
+    score: number; tier: 'low' | 'medium' | 'high';
+    source?: 'learned' | 'heuristic';
+    probability?: number; modelVersion?: string; features?: Record<string, unknown>;
+  },
 ) {
   const { start, end, blockEnd, duration, blockBufferMin } = ranges;
   const isHold = input.hold === true;
@@ -359,6 +371,33 @@ async function placeReservation(
     restaurantId: r.id,
     payload: { code: result.resv.code, party_size: input.partySize, slot_start: result.resv.slotStart, status: result.resv.status },
   });
+
+  // ── دفترِ پیش‌بینی: ثبتِ «چه چیزی، با کدام مدل، بر اساسِ چه ورودی‌ای» ──
+  // تا امروز امتیازِ ریسک در ستونِ no_show_risk_score می‌نشست ولی منبع و
+  // نسخه‌ی مدلش دور ریخته می‌شد؛ یعنی بعداً نمی‌شد سنجید مدلِ یادگرفته در
+  // تولید واقعاً بهتر از heuristic بوده یا نه. نتیجه‌ی واقعیِ همین رزرو
+  // بعداً در lib/lifecycle.ts کنارِ این ردیف ثبت می‌شود و سنجش از join
+  // این دو می‌آید (lib/model-evaluation.ts).
+  //
+  // خارج از تراکنش و بدونِ await روی مسیرِ پاسخ — دقیقاً مثلِ emit بالا:
+  // شکستِ ثبتِ تحلیلی هرگز نباید رزروِ موفق را خراب کند. خودِ
+  // recordPrediction هم throw نمی‌کند.
+  if (noShowRisk.probability !== undefined && noShowRisk.modelVersion && noShowRisk.features) {
+    void recordPrediction({
+      restaurantId: r.id,
+      predictionType: 'no_show',
+      subjectType: 'reservation',
+      subjectId: result.resv.id,
+      modelSource: noShowRisk.source ?? 'heuristic',
+      modelVersion: noShowRisk.modelVersion,
+      featureVersion: NO_SHOW_FEATURE_VERSION,
+      features: noShowRisk.features,
+      probability: noShowRisk.probability,
+      // افقِ دانستنِ نتیجه = شروعِ اسلات. قبل از آن «هنوز معلوم نیست»،
+      // نه «مدل اشتباه کرد».
+      horizonAt: result.resv.slotStart,
+    });
+  }
 
   return {
     code: result.resv.code,

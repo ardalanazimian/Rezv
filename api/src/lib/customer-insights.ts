@@ -1,5 +1,6 @@
 import { db } from './db';
 import { sinceDays } from './staff-helpers';
+import { NO_SHOW_HEURISTIC_VERSION } from './prediction-ledger';
 
 // ═══════════════════════════════════════════════════════════
 //  موتور پیش‌بینی No-Show و محاسبه‌ی CLV — رزرونو
@@ -20,7 +21,25 @@ export type NoShowInput = {
   source: string;       // app | walk_in | phone ...
 };
 
-export type NoShowResult = { score: number; tier: 'low' | 'medium' | 'high'; source: 'learned' | 'heuristic' };
+export type NoShowResult = {
+  score: number;                              // ۰..۱۰۰ — همان چیزی که UI/DB نشان می‌دهد
+  tier: 'low' | 'medium' | 'high';
+  source: 'learned' | 'heuristic';
+  // ── نسبِ پیش‌بینی (lineage) برایِ دفترِ پیش‌بینی ───────────────────────
+  // این سه فیلد تا ۲۰۲۶-۰۸-۲۰ اصلاً وجود نداشتند و حتی خودِ source هم سرِ
+  // راه به DB دور ریخته می‌شد — یعنی نمی‌شد فهمید کدام امتیاز را مدل داده و
+  // کدام را heuristic. بدونِ آن، سنجشِ تولیدیِ مدل در برابرِ baseline
+  // غیرممکن بود. رجوع کن به lib/prediction-ledger.ts.
+  /** احتمالِ خامِ ۰..۱ — قبل از گِردکردن به امتیازِ صحیح. Brier و
+   *  کالیبراسیون باید روی همین حساب شوند، نه روی score/100 که دقتش را
+   *  از دست داده است. */
+  probability: number;
+  /** شناسه‌ی تغییرناپذیرِ نسخه‌ی مدل: ISOیِ trainedAt برایِ مدلِ یادگرفته،
+   *  NO_SHOW_HEURISTIC_VERSION برایِ heuristic. */
+  modelVersion: string;
+  /** بردارِ ویژگیِ ورودی — همان چیزی که مدل واقعاً دید (بدونِ PII). */
+  features: RawFeatureInput;
+};
 
 /**
  * ویژگی‌های خامی که هم فرمولِ heuristic و هم مدلِ یادگرفته از رویشان
@@ -105,15 +124,24 @@ export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResul
     source: input.source,
   };
 
-  const { getLearnedNoShowModel, predictProba, buildFeatureVector } = await import('./no-show-model');
-  const weights = await getLearnedNoShowModel(input.restaurantId).catch(() => null);
-  if (weights) {
-    const score = Math.round(predictProba(weights, buildFeatureVector(features)) * 100);
-    return { score, tier: tierFromScore(score), source: 'learned' };
+  const { getActiveNoShowModel, predictProba, buildFeatureVector } = await import('./no-show-model');
+  const active = await getActiveNoShowModel(input.restaurantId).catch(() => null);
+  if (active) {
+    const probability = predictProba(active.weights, buildFeatureVector(features));
+    const score = Math.round(probability * 100);
+    return {
+      score, tier: tierFromScore(score), source: 'learned',
+      probability, modelVersion: active.trainedAt.toISOString(), features,
+    };
   }
 
   const score = computeStaticScoreFromFeatures(features);
-  return { score, tier: tierFromScore(score), source: 'heuristic' };
+  return {
+    score, tier: tierFromScore(score), source: 'heuristic',
+    // heuristic ذاتاً امتیازِ صحیحِ ۰..۱۰۰ می‌دهد، پس احتمالش همان score/100
+    // است — برخلافِ مسیرِ یادگرفته اینجا دقتی از دست نمی‌رود.
+    probability: score / 100, modelVersion: NO_SHOW_HEURISTIC_VERSION, features,
+  };
 }
 
 // ───────────────────────────────────────────────────────────

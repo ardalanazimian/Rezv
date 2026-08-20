@@ -3,6 +3,7 @@ import { invalidateAvailability } from './availability-cache';
 import { Err } from './errors';
 import { enqueueSms, type SmsJob } from './sms';
 import { processReservationEconomyEvent } from './economy';
+import { recordOutcome, noShowOutcomeLabel } from './prediction-ledger';
 import { createLogger } from './logger';
 import { dateKeyInTz } from './hours';
 
@@ -133,6 +134,30 @@ export async function transitionReservation(opts: {
         reservationId: result.resv.id, error: (e as Error).message,
       });
     });
+  }
+
+  // ── دفترِ نتیجه: واقعیت، کنارِ پیش‌بینی‌ای که قبلاً ثبت شده بود ──
+  //
+  // این‌جا تنها نقطه‌ی مجازِ تغییرِ وضعیتِ رزرو در کلِ سیستم است، پس تنها
+  // جایی‌ست که می‌شود مطمئن بود هیچ نتیجه‌ای از قلم نمی‌افتد — چه انتقال از
+  // پنلِ رستوران آمده باشد، چه از cronِ markLateNoShows، چه از API مشتری.
+  //
+  // فقط وضعیت‌های پایانیِ *معنادار برای مدلِ no-show* برچسب می‌گیرند
+  // (noShowOutcomeLabel تصمیم می‌گیرد؛ لغو/انقضا برچسب نمی‌گیرند چون مدل
+  // درباره‌شان ادعایی نکرده بود). بدونِ await و با catch — مثلِ economy و
+  // SMS بالا، ثبتِ تحلیلی هرگز نباید تغییرِ وضعیت را بشکند.
+  if (result.changed) {
+    const label = noShowOutcomeLabel(result.resv.status);
+    if (label !== null) {
+      void recordOutcome({
+        restaurantId: result.resv.restaurantId,
+        predictionType: 'no_show',
+        subjectType: 'reservation',
+        subjectId: result.resv.id,
+        outcomeLabel: label,
+        outcomeStatus: result.resv.status,
+      });
+    }
   }
 
   // بعد از commit: اعلان (خارج از transaction تا تراکنش را کند نکند)
