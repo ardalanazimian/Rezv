@@ -133,6 +133,34 @@ export async function transitionReservation(opts: {
         reservationId: result.resv.id, error: (e as Error).message,
       });
     });
+
+    // ── فازِ ۵: ثبتِ نتیجه‌ی واقعی در دفترِ نتیجه ──
+    // این همان نقطه‌ای است که حلقه‌ی یادگیری بسته می‌شود: تا امروز مدل
+    // پیش‌بینی می‌کرد و هیچ‌کس نمی‌سنجید درست بود یا نه.
+    //
+    // فقط وضعیت‌هایِ *نهایی* شمرده می‌شوند. حالت‌هایِ میانی (checked_in،
+    // seated، …) هنوز نتیجه نیستند؛ اگر آن‌ها را ثبت می‌کردیم، یک رزروِ
+    // موفق چند بار و با برچسبِ غلط وارد آمار می‌شد.
+    //
+    // کنسلی عمداً نتیجه نیست: مدل «آمد یا نیامد» را پیش‌بینی می‌کند، و
+    // رزروی که کنسل شده اصلاً به آن سؤال نرسیده. شمردنش به‌عنوانِ «آمد»
+    // آمار را به نفعِ مدل منحرف می‌کرد.
+    const OUTCOME_LABELS: Record<string, number> = {
+      no_show: 1,
+      completed: 0, arrived: 0, seated: 0, dining: 0,
+    };
+    const observed = OUTCOME_LABELS[result.resv.status];
+    if (observed !== undefined) {
+      void (async () => {
+        const { recordOutcome } = await import('./prediction-ledger');
+        await recordOutcome({
+          entityType: 'reservation',
+          entityId: result.resv.id,
+          observedValue: observed,
+          source: 'reservation_status',
+        });
+      })();
+    }
   }
 
   // بعد از commit: اعلان (خارج از transaction تا تراکنش را کند نکند)

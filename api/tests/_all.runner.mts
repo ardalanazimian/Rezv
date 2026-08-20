@@ -79,6 +79,7 @@ import './site-orders.test.mts';
 import './table-merge-occupancy-concurrency.test.mts';
 import './table-merge-occupancy.test.mts';
 import './validate.test.mts';
+import './prediction-ledger.integration.test.mts';
 import './public-menu.integration.test.mts';
 import './temporal-leakage.integration.test.mts';
 import './tenant-isolation.integration.test.mts';

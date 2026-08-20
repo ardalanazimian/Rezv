@@ -7,7 +7,7 @@ import { emit } from './events';
 import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
 import { redeemGiftCardTx } from './loyalty';
-import { computeNoShowRisk as defaultNoShowPredictor } from './customer-insights';
+import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
 import { type OpeningHours } from './hours';
 import { computeRanges, genReservationCode, isConflictError, isSerializationError } from './reservation-helpers';
 import { invalidateAvailability } from './availability-cache';
@@ -33,7 +33,7 @@ import { getOccupiedTableNumbers } from './table-occupancy';
  */
 export type NoShowPredictor = (input: {
   userId: string | null; restaurantId: string; partySize: number; slotStart: Date; createdAt: Date; source: string;
-}) => Promise<{ score: number; tier: 'low' | 'medium' | 'high'; source: 'learned' | 'heuristic' }>;
+}) => Promise<NoShowResult>;
 
 // ═══════════════════════════════════════════════════════════
 //  موتور رزرو رزرونو — نسخه‌ی production
@@ -288,7 +288,9 @@ async function placeReservation(
   ranges: { start: Date; end: Date; blockEnd: Date; duration: number; blockBufferMin: number },
   candidateTables: { id: string; number: number }[],
   manualTableNumber: number | null,
-  noShowRisk: { score: number; tier: 'low' | 'medium' | 'high' },
+  // NoShowResult کامل (نه فقط score/tier): فازِ ۵ به lineage و source نیاز
+  // دارد تا پیش‌بینی با ردِ ورودی‌اش در دفتر ثبت شود.
+  noShowRisk: NoShowResult,
 ) {
   const { start, end, blockEnd, duration, blockBufferMin } = ranges;
   const isHold = input.hold === true;
@@ -360,6 +362,32 @@ async function placeReservation(
     payload: { code: result.resv.code, party_size: input.partySize, slot_start: result.resv.slotStart, status: result.resv.status },
   });
 
+  // ── فازِ ۵: ثبتِ پیش‌بینیِ no-show در دفترِ پیش‌بینی ──
+  // اینجا و نه زودتر: شناسه‌ی رزرو تازه بعد از commit وجود دارد، و پیش‌بینی
+  // باید به همان موجودیتی بسته شود که بعداً نتیجه‌اش مشاهده می‌شود.
+  //
+  // ⚠️ void و بدونِ await عمدی است (بندِ ۴۶): رزرو از قبل commit شده و پاسخ
+  // آماده است؛ نوشتنِ دفتر نباید یک میلی‌ثانیه به مسیرِ بحرانی اضافه کند یا
+  // با خطایش آن را بشکند. خودِ recordPrediction هم fail-open است.
+  if (noShowRisk.lineage) {
+    const lin = noShowRisk.lineage;
+    void (async () => {
+      const { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } = await import('./prediction-ledger');
+      await recordPrediction({
+        restaurantId: r.id,
+        predictionType: 'no_show',
+        entityType: 'reservation',
+        entityId: result.resv.id,
+        modelSource: noShowRisk.source,
+        featureVersion: NO_SHOW_FEATURE_VERSION,
+        predictedValue: lin.probability,
+        confidence: confidenceFor({ modelSource: noShowRisk.source, priorTotal: lin.features.priorTotal }),
+        features: lin.features,
+        horizonAt: result.resv.slotStart,   // نتیجه در لحظه‌ی برگزاری معلوم می‌شود
+      });
+    })();
+  }
+
   return {
     code: result.resv.code,
     status: result.resv.status,
@@ -383,7 +411,7 @@ async function insertReservation(
     holdExpiresAt: Date | null;
     start: Date; end: Date; duration: number; blockBufferMin: number;
     tableId: string; mergedNumbers: number[]; tableNumber: number;
-    noShowRisk: { score: number; tier: 'low' | 'medium' | 'high' };
+    noShowRisk: NoShowResult;
   },
 ) {
   const { input, r } = p;
