@@ -10,6 +10,7 @@ import {
   NO_SHOW_FEATURE_VERSION,
 } from '../src/lib/prediction-ledger.ts';
 import { NO_SHOW_FEATURE_NAMES } from '../src/lib/no-show-model.ts';
+import { fixturePhone } from './_phone.helper.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  دفترِ پیش‌بینی و نتیجه (فازِ ۵) — تستِ حلقه‌ی بسته
@@ -66,7 +67,8 @@ before(async () => {
   restaurantId = r.id;
   await db.table.create({ data: { restaurantId, number: 1, capacity: 4, isActive: true } });
   const u = await db.user.create({
-    data: { phone: `0937${String(Date.now()).slice(-7)}`.slice(0, 11), firstName: '[DEMO]', lastName: 'دفتر' },
+    // ⚠️ پیشوندِ ۰۹۳۷ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش نکن.
+    data: { phone: fixturePhone('0937'), firstName: '[DEMO]', lastName: 'دفتر' },
     select: { id: true },
   });
   userId = u.id;
