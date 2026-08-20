@@ -279,6 +279,47 @@ function productionAccuracyPanelHTML(pa){
     }).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز پیش‌بینی‌ای با نتیجه‌ی مشاهده‌شده ثبت نشده — دفتر از لحظه‌ی استقرارِ فازِ ۵ پر می‌شه</div></div>`}
   </div>`;
 }
+// ═══════ رانشِ مدل (فازِ ۷) ═══════
+// این پنل تنها جایی است که می‌گوید «بازآموزی لازم است» — و عمداً فقط وقتی
+// می‌گوید که شواهد کافی باشد. حکمِ insufficient_data صریحاً نمایش داده
+// می‌شود، نه اینکه به‌عنوانِ «پایدار» جا بزند؛ چون «نمی‌دانیم» و «خوب است»
+// دو چیزِ کاملاً متفاوت‌اند.
+const DRIFT_FA = {
+  drifted:            { label:'رانش کرده — بازآموزی لازم است', cls:'expired' },
+  watch:              { label:'زیرِ نظر',                      cls:'expired' },
+  stable:             { label:'پایدار',                        cls:'active'  },
+  insufficient_data:  { label:'دادهٔ کافی نیست',                cls:'expired' },
+};
+function driftPanelHTML(dr){
+  if(!dr) return '';
+  const rows = dr.restaurants || [];
+  const pct=(v)=>v==null?'—':fa((v*100).toFixed(1))+'٪';
+  const br=(v)=>v==null?'—':fa(Math.round(v*1000)/1000);
+  const drifted = rows.filter(r=>r.verdict==='drifted').length;
+  return `<div class="panel" style="margin-top:20px">
+    <div class="panel-head"><div>
+      <div class="panel-title">رانشِ مدل — آیا مدل هنوز همان‌قدر خوب است؟</div>
+      <div class="panel-sub">مقایسه‌ی Brierِ ${fa(dr.window_days)} روزِ اخیرِ تولید با Brierِ همان نسخه روی هولدآوتِ زمانِ آموزش · آستانه: ${fa((dr.threshold*100).toFixed(0))}٪ بدترشدن</div>
+    </div></div>
+    ${drifted>0?`<div class="mini-row" style="background:var(--red-50,#FEF2F2)">
+      <div class="mini-info"><div class="mini-name" style="color:var(--red-600,#DC2626)">${icon('alert',{size:14})} ${fa(drifted)} مدل رانش کرده</div>
+      <div class="mini-sub">این مدل‌ها هنوز فعال‌اند ولی در تولید محسوس بدتر از زمانِ آموزش عمل می‌کنند.</div></div>
+    </div>`:''}
+    ${rows.length?rows.map(r=>{
+      const v = DRIFT_FA[r.verdict] || { label:esc(r.verdict), cls:'expired' };
+      return `<div class="mini-row">
+        <div class="mini-info">
+          <div class="mini-name">${esc(r.restaurant_name)}</div>
+          <div class="mini-sub">${r.verdict==='insufficient_data'
+            ? `${fa(r.resolved_count)} نتیجه در پنجره — برای حکم‌دادن کافی نیست`
+            : `تولید ${br(r.production_brier)} در برابرِ هولدآوت ${br(r.holdout_brier)} · تغییر: ${pct(r.relative_change)} · ${fa(r.resolved_count)} نتیجه`}</div>
+        </div>
+        <span class="badge ${v.cls}">${v.label}</span>
+      </div>`;
+    }).join(''):`<div class="empty-state"><div class="empty-state-desc">هیچ رستورانی مدلِ فعالِ دارایِ نسب‌نامه ندارد — پس از اولین بازآموزیِ شبانه قابلِ سنجش می‌شود</div></div>`}
+  </div>`;
+}
+
 function rModelHealth(){
   document.getElementById('v-aihealth').innerHTML=`<div style="text-align:center;padding:60px;color:var(--t2)">در حال بارگذاری...</div>`;
   (async()=>{
@@ -325,6 +366,7 @@ function rModelHealth(){
           </div>`).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز هیچ رستورانی آموزش ندیده</div></div>`}
       </div>
       ${productionAccuracyPanelHTML(d.production_accuracy)}
+      ${driftPanelHTML(d.drift)}
       <div class="panel" style="margin-top:20px">
         <div class="panel-head"><div><div class="panel-title">تاریخچه‌ی آموزش‌ها (append-only)</div><div class="panel-sub">آخرین ${fa(d.recent_runs.length)} اجرا — شاملِ آموزش‌هایی که فعال نشدن</div></div></div>
         ${d.recent_runs.length?d.recent_runs.map(r=>`

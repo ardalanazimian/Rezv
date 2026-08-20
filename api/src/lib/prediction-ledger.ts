@@ -239,6 +239,69 @@ export interface LedgerHealth {
   mae: number | null;
 }
 
+export interface RunAccuracy {
+  /** null = پیش‌بینی‌هایِ heuristic یا مدل‌هایِ پیش از مهاجرتِ ۰۵۶ (بدونِ نسب‌نامه). */
+  modelRunId: string | null;
+  modelSource: string;
+  featureVersion: string;
+  resolvedCount: number;
+  brier: number | null;
+  firstAt: Date | null;
+  lastAt: Date | null;
+}
+
+/**
+ * دقتِ تولید به تفکیکِ *نسخه‌ی مدل* (فازِ ۶).
+ *
+ * این همان چیزی است که getLedgerHealth نمی‌تواند بگوید: آیا نسخه‌ی امشب بهتر
+ * از نسخه‌ی دیشب است؟ بدونِ model_run_id، همه‌ی بازآموزی‌هایِ شبانه در یک
+ * عددِ واحد قاطی می‌شدند و مقایسه‌ی نسخه‌ها ناممکن بود.
+ *
+ * همان کفِ MIN_RESOLVED_FOR_ACCURACY اعمال می‌شود — یک نسخه با ۳ نتیجه
+ * عددِ دقت نمی‌گیرد، هرچقدر هم آن ۳ تا خوب بوده باشند.
+ */
+export async function getAccuracyByModelRun(params: {
+  restaurantId: string;
+  predictionType?: string;
+  sinceDays?: number;
+}): Promise<RunAccuracy[]> {
+  const since = new Date(Date.now() - (params.sinceDays ?? 180) * 86_400_000);
+  const typeFilter = params.predictionType
+    ? Prisma.sql`AND p.prediction_type = ${params.predictionType}`
+    : Prisma.empty;
+
+  const rows = await db.$queryRaw<{
+    model_run_id: string | null; model_source: string; feature_version: string;
+    n: number; brier: number | null; first_at: Date | null; last_at: Date | null;
+  }[]>(Prisma.sql`
+    SELECT p.model_run_id, p.model_source, p.feature_version,
+           COUNT(o.id)::int              AS n,
+           AVG(o.squared_error)::float8  AS brier,
+           MIN(p.generated_at)           AS first_at,
+           MAX(p.generated_at)           AS last_at
+    FROM model_predictions p
+    JOIN model_outcomes o ON o.prediction_id = p.id
+    WHERE p.restaurant_id = ${params.restaurantId}::uuid
+      AND p.generated_at >= ${since}
+      ${typeFilter}
+    GROUP BY p.model_run_id, p.model_source, p.feature_version
+    ORDER BY MAX(p.generated_at) DESC
+  `);
+
+  return rows.map(r => {
+    const resolvedCount = Number(r.n);
+    return {
+      modelRunId: r.model_run_id,
+      modelSource: r.model_source,
+      featureVersion: r.feature_version,
+      resolvedCount,
+      brier: resolvedCount >= MIN_RESOLVED_FOR_ACCURACY && r.brier !== null ? Number(r.brier) : null,
+      firstAt: r.first_at,
+      lastAt: r.last_at,
+    };
+  });
+}
+
 /**
  * سلامتِ دفتر در سطحِ پلتفرم — همان چیزی که داشبوردِ شرکت نشان می‌دهد.
  *

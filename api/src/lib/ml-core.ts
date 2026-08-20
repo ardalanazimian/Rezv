@@ -219,3 +219,70 @@ export function computeStaticScoreFromFeatures(f: RawFeatureInput): number {
 
   return Math.max(0, Math.min(100, score));
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  شاخصِ پایداریِ جمعیت (PSI) — ریاضیاتِ خالصِ تشخیصِ رانش (فازِ ۷)
+//
+//  PSI دو توزیع را مقایسه می‌کند: «مرجع» (وقتی مدل ساخته/سنجیده شد) و
+//  «فعلی» (چیزی که الان واقعاً می‌بینیم). اگر ورودی‌ها یا خروجی‌هایِ مدل
+//  جابه‌جا شده باشند، مدل ممکن است هنوز «کار کند» ولی دیگر روی همان دنیایی
+//  نباشد که برایش کالیبره شده بود.
+//
+//  آستانه‌هایِ متعارفِ صنعت (و عمداً همان‌ها، نه اعدادِ ابداعی):
+//    PSI < 0.1        → پایدار
+//    0.1 ≤ PSI < 0.25 → جابه‌جاییِ متوسط، ارزشِ نگاه‌کردن دارد
+//    PSI ≥ 0.25       → جابه‌جاییِ قابل‌توجه
+//
+//  ⚠️ PSI روی نمونه‌ی کم بی‌معناست و عددِ بزرگ می‌سازد. تصمیمِ «کافی بودنِ
+//  نمونه» عمداً بیرونِ این تابع است (صداکننده باید کف بگذارد) تا این‌جا
+//  فقط ریاضیاتِ خالص و تست‌پذیر بماند.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** تعدادِ سطل‌ها برای توزیعِ احتمال روی بازه‌ی ۰..۱. */
+export const PSI_BUCKETS = 10;
+
+/** هموارسازی: سطلِ خالی لگاریتمِ بی‌نهایت می‌سازد. */
+const PSI_EPSILON = 1e-6;
+
+/** شمارشِ نسبیِ مقادیرِ ۰..۱ در سطل‌هایِ هم‌عرض. */
+export function bucketize01(values: readonly number[], buckets = PSI_BUCKETS): number[] {
+  const counts = new Array(buckets).fill(0);
+  if (values.length === 0) return counts;
+  for (const v of values) {
+    const clamped = Math.min(1, Math.max(0, v));
+    // مقدارِ دقیقاً ۱ باید در آخرین سطل بیفتد، نه سطلِ خارج از محدوده.
+    const idx = Math.min(buckets - 1, Math.floor(clamped * buckets));
+    counts[idx] += 1;
+  }
+  return counts.map(c => c / values.length);
+}
+
+/**
+ * PSI بینِ توزیعِ مرجع و فعلی برای مقادیرِ ۰..۱ (مثلاً احتمالِ پیش‌بینی‌شده).
+ * هر دو آرایه باید ناخالی باشند؛ وگرنه NaN برمی‌گردد که صداکننده باید
+ * به‌عنوانِ «قابلِ محاسبه نیست» رفتار کند، نه صفر.
+ */
+export function populationStabilityIndex(
+  reference: readonly number[],
+  current: readonly number[],
+  buckets = PSI_BUCKETS,
+): number {
+  if (reference.length === 0 || current.length === 0) return NaN;
+  const ref = bucketize01(reference, buckets);
+  const cur = bucketize01(current, buckets);
+  let psi = 0;
+  for (let i = 0; i < buckets; i++) {
+    const r = Math.max(ref[i], PSI_EPSILON);
+    const c = Math.max(cur[i], PSI_EPSILON);
+    psi += (c - r) * Math.log(c / r);
+  }
+  return psi;
+}
+
+export type PsiBand = 'stable' | 'moderate' | 'significant';
+
+export function psiBand(psi: number): PsiBand {
+  if (psi >= 0.25) return 'significant';
+  if (psi >= 0.1) return 'moderate';
+  return 'stable';
+}

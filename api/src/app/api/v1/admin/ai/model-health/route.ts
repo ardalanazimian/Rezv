@@ -4,6 +4,7 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { adminAuthFromRequest } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { getLedgerHealth, MIN_RESOLVED_FOR_ACCURACY } from '@/lib/prediction-ledger';
+import { getPlatformPerformanceDrift, PERFORMANCE_DRIFT_THRESHOLD } from '@/lib/model-drift';
 
 /**
  * GET /api/v1/admin/ai/model-health — داشبوردِ سلامتِ مدل‌هایِ یادگرفته (پنلِ شرکت).
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
     await enforceRateLimit(clientIp(req), RULES.search);
     adminAuthFromRequest(req);
 
-    const [noShowRows, demandRows, recentRuns, noShowActiveCount, ledgerHealth] = await Promise.all([
+    const [noShowRows, demandRows, recentRuns, noShowActiveCount, ledgerHealth, drift] = await Promise.all([
       db.restaurantNoShowModel.findMany({
         select: {
           restaurantId: true, isActive: true, sampleSize: true, positiveCount: true,
@@ -53,6 +54,8 @@ export async function GET(req: Request) {
       // با اعدادِ بالا قاطی نمی‌شود: learned_brier آنجا کاراییِ لحظه‌ی آموزش
       // روی هولدآوتِ گذشته است، این یکی چیزی که واقعاً در تولید رخ داد.
       getLedgerHealth({ sinceDays: 90 }),
+      // فازِ ۷ — رانشِ کارایی. یک کوئریِ گروهی برای کلِ پلتفرم، نه حلقه.
+      getPlatformPerformanceDrift({ windowDays: 30 }),
     ]);
 
     const demandActiveCounts = demandRows.reduce(
@@ -106,6 +109,23 @@ export async function GET(req: Request) {
           overdue_count: g.overdueCount,
           brier: g.brier,
           mae: g.mae,
+        })),
+      },
+      // ── رانشِ مدل (فازِ ۷) ──
+      // «مدلی که موقعِ ساخت خوب بود، الان هم خوب است؟» — سؤالی که تا پیش از
+      // دفترِ فازِ ۵ اصلاً قابلِ پرسیدن نبود.
+      drift: {
+        window_days: 30,
+        threshold: PERFORMANCE_DRIFT_THRESHOLD,
+        restaurants: drift.map((d) => ({
+          restaurant_id: d.restaurantId,
+          restaurant_name: d.restaurantName,
+          model_run_id: d.modelRunId,
+          holdout_brier: d.holdoutBrier,
+          production_brier: d.productionBrier,
+          relative_change: d.relativeChange,
+          resolved_count: d.resolvedCount,
+          verdict: d.verdict,
         })),
       },
       recent_runs: recentRuns.map((r) => ({
