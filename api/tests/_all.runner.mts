@@ -53,6 +53,7 @@ import './allowed-origins.test.mts';
 import './ban.test.mts';
 import './cancellation-policy.test.mts';
 import './crm-recommendations.test.mts';
+import './crm-feedback-loop.integration.test.mts';
 import './customer-intelligence.test.mts';
 import './demand-forecast.test.mts';
 import './feature-parity.integration.test.mts';

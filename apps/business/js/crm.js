@@ -682,6 +682,21 @@ async function custRenderProfiles(){
 }
 function callCustomer(phone){ if(phone) window.location.href='tel:'+phone; }
 
+// ⚠️ فازِ ۸ — نیمه‌ی گم‌شده‌ی حلقه‌ی بازخوردِ CRM: تا امروز این دکمه فقط `tel:`
+// را باز می‌کرد و هیچ ردی نمی‌گذاشت، پس هیچ‌وقت نمی‌شد فهمید توصیه‌های CRM
+// اثری داشته‌اند یا نه. حالا تماس در دفترِ ارتباط‌گیری ثبت می‌شود.
+//
+// ⚠️ ترتیب عمدی است: اول ثبت (await)، بعد `tel:`. برعکسش روی موبایل یعنی
+// مرورگر بلافاصله به اپِ تلفن سوییچ می‌کند و fetchِ نیمه‌کاره لغو می‌شود —
+// یعنی تماس‌های واقعی بی‌صدا ثبت نمی‌شدند. شکستِ ثبت هرگز جلوی خودِ تماس را
+// نمی‌گیرد: تماس گرفتن مهم‌تر از آمارش است.
+async function callRecommendedCustomer(phone,userId){
+  if(userId && API.getToken()){
+    try{ await API.crmRecommendationContacted(userId); }catch(_e){}
+  }
+  callCustomer(phone);
+}
+
 // ─── تب ساعات کاری + تعطیلات (وصل به GET/PUT /restaurant/hours واقعی) ───
 // کلید هر روز مطابق قرارداد بک‌اند: getDay() جاوااسکریپت (۰=یکشنبه ... ۶=شنبه).
 // ترتیب نمایش برای کاربر ایرانی: شنبه تا جمعه.
@@ -966,6 +981,22 @@ async function loadCampaignHistory(){
   </tbody></table>`:'<div style="padding:8px">هنوز کمپینی ارسال نشده</div>';
 }
 
+// ⚠️ فازِ ۸ — چیزی که این خط جایگزینش شد یک توضیحِ ثابت بود
+// («توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری»). حالا به‌جای توصیفِ
+// خودش، *نتیجه‌ی سنجیده‌شده‌اش* را می‌گوید — یا صریحاً می‌گوید هنوز سنجیدنی
+// نیست. هرگز عددی که اندازه نگرفته‌ایم نشان نمی‌دهد (بندِ ۲۰).
+function crmEffectivenessFa(e){
+  const base='توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری';
+  if(!e) return base;
+  if(e.conversion_status==='measured' && e.conversion_rate_pct!==null && e.conversion_rate_pct!==undefined){
+    return `${base} · ${fa(e.conversion_rate_pct)}٪ از تماس‌ها به رزرو رسید (از ${fa(e.resolved_count)} موردِ قطعی‌شده، پنجره‌ی ${fa(e.window_days)} روزه)`;
+  }
+  if(e.contacted_count>0){
+    return `${base} · ${fa(e.contacted_count)} تماس ثبت شده — نرخِ تبدیل هنوز اندازه‌پذیر نیست (${fa(e.resolved_count)} از ${fa(e.min_resolved)})`;
+  }
+  return `${base} · هنوز تماسی ثبت نشده`;
+}
+
 // ─── تب ۴: دستیار AI — چت‌باکسِ آزادمتنِ آفلاین (assistant.js) + کارت‌های پیشنهادِ قانون‌محور از /restaurant/ai ───
 async function custRenderAI(){
   const el=document.getElementById('ct-ai');
@@ -986,6 +1017,7 @@ async function custRenderAI(){
   if(!res.ok){ cardsEl.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} پیشنهادها بارگیری نشد — دستیار همچنان در دسترس است.</div>`; return; }
   const cards=res.data.cards||[];
   const contacts=crmRes.ok?(crmRes.data.items||[]):[];
+  const crmEff=crmRes.ok?(crmRes.data.effectiveness||null):null;
   const URG_FA={high:'فوری',medium:'این هفته',low:'وقتِ آزاد'};
   cardsEl.innerHTML=`
     <div class="ai-box" style="margin-bottom:18px">
@@ -1004,7 +1036,7 @@ async function custRenderAI(){
         </div>
       </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}
     <div class="panel" style="margin-top:20px">
-      <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری</div></div></div>
+      <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">${crmEffectivenessFa(crmEff)}</div></div></div>
       ${contacts.length?contacts.map(c=>`
         <div class="mini-row">
           <div class="mini-info">
@@ -1012,7 +1044,7 @@ async function custRenderAI(){
             <div class="mini-sub">${esc(c.reason)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callCustomer('${esc(c.phone||'')}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
+            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer('${esc(c.phone||'')}','${esc(c.user_id)}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
     </div>`;
