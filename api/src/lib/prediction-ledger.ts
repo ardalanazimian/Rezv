@@ -26,7 +26,11 @@ const log = createLogger('ml');
  * می‌شوند و مقایسه‌ی تاریخی بی‌معنا می‌شود. تستِ
  * tests/prediction-ledger.test.mts این هم‌ترازی را قفل کرده است.
  */
-export const NO_SHOW_FEATURE_VERSION = 'no_show/v1';
+// v2 (۲۰۲۶-۰۸-۲۰، فازِ ۴): ترکیبِ ویژگی‌ها عوض نشد، ولی *معنایِ* priorTotal
+// عوض شد — از «سابقه در کلِ پلتفرم بدونِ dining» به «سابقه در همین رستوران
+// شاملِ dining»، تا با کوئریِ آموزش یکی شود. پیش‌بینی‌هایِ v1 و v2 نباید در
+// یک آمار قاطی شوند، پس نسخه بالا رفت.
+export const NO_SHOW_FEATURE_VERSION = 'no_show/v2';
 
 export type PredictionConfidence = 'high' | 'medium' | 'low' | 'insufficient_data';
 
