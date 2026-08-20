@@ -92,6 +92,7 @@ import './photo-moderation.test.mts';
 import './pricing.test.mts';
 import './queue.test.mts';
 import './ratelimit-fallback.test.mts';
+import './rewards.integration.test.mts';
 import './redis.test.mts';
 import './reservation-helpers.test.mts';
 import './reservation-status.test.mts';

@@ -715,10 +715,11 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
-  - **Updated 2026-08-20: 665 tests, 168 suites, 0 failures** (real Postgres + Redis).
+  - **Updated 2026-08-20: 681 tests, 172 suites, 0 failures** (real Postgres + Redis).
     The last additions were the untested-module pass: availability, coupons, SMS
     balance, idempotency, pricing (§2h), the automatic lifecycle crons (§2j),
-    the customer-economy ledger (§2k), and the waitlist writer core (§2l). Earlier that same day the count was
+    the customer-economy ledger (§2k), the waitlist writer core (§2l), and the
+    reward marketplace (§2m). Earlier that same day the count was
     564; the growth is
     phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
     drift detection, train/serve feature parity, the outreach ledger, and the CRM
@@ -1151,3 +1152,54 @@ cron همین آفر را expire کند … فقط یکی واقعاً اعما�
 شده**، پس «گارد بگذار و رد شو» یعنی رزروی بی‌صاحب می‌ماند — این یک تصمیمِ
 محصولی می‌خواهد. آسیبش هم محدودتر است: قیدِ `EXCLUDE` دیتابیس جلویِ رزروِ
 هم‌پوشانِ واقعی را می‌گیرد.
+
+### ۲m) دو باگ در فروشگاهِ جایزه (مسیرِ پولِ مشتری) — **رفع شد** (۲۰۲۶-۰۸-۲۰)
+
+`lib/rewards.ts` هیچ تستی نداشت، در حالی که سرآیندِ `redeemRewardItem` —
+دقیقاً مثلِ `coupons.ts` و `sms-balance.ts` — ادعا می‌کند «زنده تست‌شده …
+TOCTOU-safe». باز هم ادعای عملکردی بدونِ قفل. و این مسیرِ پولِ واقعی است:
+سکه‌ی کاربر خرج و کوپن/گیفت‌کارتِ قابلِ‌خرج تولید می‌شود.
+
+**باگ ۱ — کاربر پول می‌داد و چیزی نمی‌گرفت.** شرط `item.kind ===
+'coupon_grant' && item.restaurantId` بود: آیتمِ `coupon_grant`ِ بدونِ رستوران
+بی‌صدا از کنارِ ساختِ کوپن رد می‌شد، در حالی که سکه **قبلاً کسر شده بود**.
+مشاهده‌ی زنده: ۵۰ سکه رفت، `result_coupon_id` برابرِ `null`، **بدونِ هیچ
+خطایی**. برخلافِ `priority_boost`/`free_item`/`event_access` که عمداً فقط ردِ
+redemption ثبت می‌کنند (و این در کد مستند است)، `coupon_grant` طبقِ تعریفش
+باید کوپن بسازد — پس نبودِ رستوران دیتای خراب است، نه حالتِ مجاز. حالا صریح
+رد می‌شود تا تراکنش برگردد و سکه دست‌نخورده بماند.
+
+**باگ ۲ — برخوردِ کدِ کوپن زیرِ بار.** کد از `Date.now().toString(36)` ساخته
+می‌شد؛ دو ردیم در یک میلی‌ثانیه کدِ یکسان می‌ساختند و
+`@@unique([restaurantId, code])` یکی را می‌شکست. اثباتِ زنده: از **۵ ردیمِ
+موازیِ یک آیتم، ۱ تا** با خطای `tx.coupon.create()` افتاد. پولِ کاربر
+برنمی‌گشت (تراکنش rollback می‌شد) ولی به‌جای جایزه یک خطای نامفهوم می‌گرفت.
+پس از رفع (آنتروپی از `randomUUID`): **۵ از ۵ موفق**. کدِ گیفت‌کارت هم که
+`@unique` است و فقط ۴ کاراکترِ تصادفی داشت (≈۱٫۷ میلیون حالت) به همان روش
+تقویت شد.
+
+**پوششِ تست.** `tests/rewards.integration.test.mts` — ۱۶ تستِ زنده.
+جهش‌آزمایی، با تأییدِ اعمالِ هر جهش پیش از اجرا — **۷ از ۷**:
+
+| جهش | چه شکست |
+|---|---|
+| بازگرداندنِ باگِ «coupon_grant بدونِ رستوران» | ۱ |
+| بازگرداندنِ کدِ زمان‌محورِ کوپن | ۱ |
+| حذفِ گاردِ موجودیِ انبار | ۱ |
+| حذفِ گاردِ موجودیِ سکه (TOCTOU) | ۲ |
+| حذفِ قفلِ سطحِ اعتبار در ردیم | ۱ |
+| اجازه‌ی ردیمِ آیتمِ غیرفعال | ۱ |
+| `unlocked: true`ِ همیشگی در فهرست | ۱ |
+
+**فرضیه‌ای که رد شد — هزینه‌ی منفی.** `costCoins` منفی باعث می‌شد
+`wallet_balance - (-n)` موجودی را *زیاد* کند و گاردِ `>= -n` هم همیشه درست
+باشد — همان الگویی که در `consumeSms` (PR #47) بستیم. ولی اینجا **قابلِ‌دسترس
+نیست**: هیچ مسیرِ کدی آیتمِ فروشگاه نمی‌سازد (نه routeِ ادمین، نه seed)؛
+ردیف‌ها فقط با SQLِ دستی وارد می‌شوند. پس گاردِ تدافعی اضافه **نشد** تا با
+باگِ واقعی اشتباه گرفته نشود. اگر روزی CRUDِ ادمین برایِ فروشگاه اضافه شد،
+اعتبارسنجیِ `costCoins > 0` باید همان‌جا بیاید.
+
+**بررسی‌شده و سالم:** `claimMission` گاردِ اتمیکِ درست دارد
+(`UPDATE … WHERE completed_at IS NOT NULL AND claimed_at IS NULL`) — دقیقاً
+همان چیزی که کامنتِ `grantEconomyRewardTx` در `economy.ts` از صداکننده
+انتظار داشت (§2k). این ادعا راستی‌آزمایی شد، نه فرض.
