@@ -491,10 +491,39 @@ export async function expireOffers(): Promise<number> {
   });
   let n = 0;
   for (const e of expired) {
-    await db.$transaction(async (tx) => {
-      await tx.waitlistEntry.update({ where: { id: e.id }, data: { status: 'no_response' } });
-      if (e.offeredTableId) await tx.table.update({ where: { id: e.offeredTableId }, data: { state: 'free' } });
+    // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰، با اجرای زنده اثبات شد نه با حدس):
+    // این‌جا `update` بی‌قیدوشرط رویِ id بود، در حالی که `declineOffer` و
+    // `leaveWaitlist` در همین فایل عمداً `updateMany` با گاردِ status دارند و
+    // کامنتشان دقیقاً همین رقابت را نام می‌برد («اگر همزمان cron همین آفر را
+    // expire کند»). خودِ cron آن گارد را نداشت — یعنی نیمه‌ی دومِ همان رقابت
+    // باز مانده بود.
+    //
+    // بازتولیدِ واقعی: فهرست بالا خوانده می‌شود، مشتری وسطِ حلقه آفرش را رد
+    // می‌کند (status=declined، میز آزاد، و promoteNext همان میز را به نفرِ
+    // بعدی آفر می‌دهد)، و بعد این تراکنش بی‌قیدوشرط اجرا می‌شد:
+    //   • وضعیتِ «declined»ِ مشتری با «no_response» بازنویسی می‌شد — یعنی
+    //     تصمیمِ صریحِ مشتری بی‌صدا پاک می‌شد.
+    //   • و بدتر: میزی که همین حالا به نفرِ بعدی آفر شده بود دوباره `free`
+    //     می‌شد. مشاهده شد: یک ورودیِ با آفرِ زنده که میزش `state='free'`
+    //     بود — یعنی `promoteNext` بعدی می‌توانست همان میزِ فیزیکی را به
+    //     نفرِ دومی هم آفر بدهد. دقیقاً همان کلاسِ باگِ H8 که چند خط بالاتر
+    //     در promoteNext با ادعای اتمیک بسته شده بود.
+    //
+    // چرا گاردِ status کافی است (و چکِ جداگانه‌ی مالکیتِ میز لازم نیست):
+    // میز فقط وقتی `free` می‌شود که همین ورودی decline/leave/expire شود، و
+    // هر سه وضعیتش را عوض می‌کنند. پس «هنوز offered است» ⟹ «میز هنوز مالِ
+    // همین ورودی است».
+    const applied = await db.$transaction(async (tx) => {
+      const res = await tx.waitlistEntry.updateMany({
+        where: { id: e.id, status: 'offered' },
+        data: { status: 'no_response' },
+      });
+      if (res.count === 1 && e.offeredTableId) {
+        await tx.table.update({ where: { id: e.offeredTableId }, data: { state: 'free' } });
+      }
+      return res.count;
     });
+    if (applied === 0) continue;   // رقیب (مشتری یا اجرای موازیِ همین cron) زودتر تغییرش داد
     await notifyEntry(e.id, 'expired', {});
     // میز آزاد شد → آفر به نفر بعدی
     await promoteNext(e.restaurantId).catch(() => {});
