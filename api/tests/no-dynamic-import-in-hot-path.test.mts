@@ -28,40 +28,32 @@ import { join } from 'node:path';
 //  تولید را نشکست — ولی کاری بدتر کرد: فازِ ۵ را در CI کاملاً بی‌آزمون گذاشت
 //  در حالی که سوئیت سبز گزارش می‌شد.
 //
-//  چرا فهرستِ فایل‌ها و نه کلِ lib/: در lib/ هشت importِ پویایِ دیگر هست
-//  (db→metrics، notify/sms→queue، redis→errors، reservations→hours،
-//  tables→lifecycle، waitlist→reservations). چندتاشان چرخه‌ی واقعی‌اند و
-//  شکستنشان یک ریفکتورِ جدا و بی‌ربط به این کار است. آن‌ها در
-//  docs/KNOWN_LIMITATIONS.md به‌عنوانِ یافته ثبت شدند. این قفل عمداً فقط
-//  مسیرِ ML/دفتر را می‌بندد — یعنی چیزی را ادعا نمی‌کند که واقعاً تضمین
-//  نمی‌کند.
+//  ⚠️ دامنه‌ی این قفل در ۲۰۲۶-۰۸-۲۰ از ۵ فایلِ مسیرِ ML به **کلِ src/lib**
+//  گسترش یافت. دلیلش یک تصحیحِ واقعی است: در دورِ قبل نوشته بودم «۸ importِ
+//  پویایِ دیگر هست که چندتاشان چرخه‌ی واقعی‌اند» — آن یک حدس بود. با ساختنِ
+//  گرافِ کاملِ importهای src/lib و بررسیِ ترانزیتیو مشخص شد **هیچ‌کدام**
+//  چرخه نمی‌سازند؛ هر هشت‌تا static شدند. پس دیگر دلیلی برای استثنا نیست و
+//  قفل می‌تواند همه‌ی lib/ را بپوشاند.
 // ═══════════════════════════════════════════════════════════════════════
 
 const LIB_DIR = new URL('../src/lib/', import.meta.url).pathname;
 
-/** فایل‌هایِ مسیرِ ML/دفتر — همان‌هایی که این باگ در آن‌ها بی‌صدا بود. */
-const ML_PATH_FILES = [
-  'customer-insights.ts',
-  'lifecycle.ts',
-  'ml-core.ts',
-  'no-show-model.ts',
-  'prediction-ledger.ts',
-];
-
 /** `import(` که بلافاصله بعدش یک specifierِ نسبی ('./x' یا '../x') بیاید. */
 const DYNAMIC_RELATIVE_IMPORT = /\bimport\s*\(\s*['"`]\.{1,2}\//;
 
-describe('importِ پویایِ نسبی در مسیرِ ML ممنوع است (باگِ Node ۲۰)', () => {
-  test('همه‌ی فایل‌هایِ فهرست‌شده واقعاً وجود دارند', () => {
-    // اگر فایلی تغییرِ نام بدهد، قفل نباید بی‌صدا از کار بیفتد.
-    const present = new Set(readdirSync(LIB_DIR));
-    const missing = ML_PATH_FILES.filter(f => !present.has(f));
-    assert.deepEqual(missing, [], 'فایلِ فهرست‌شده پیدا نشد — فهرست را به‌روز کن');
+describe('importِ پویایِ نسبی در src/lib ممنوع است (باگِ Node ۲۰)', () => {
+  const libFiles = readdirSync(LIB_DIR).filter(f => f.endsWith('.ts')).sort();
+
+  test('اسکنر واقعاً فایل پیدا می‌کند (وگرنه تستِ زیر توخالی است)', () => {
+    // بدونِ این، اگر مسیر عوض شود اسکنر صفر فایل می‌دهد و تستِ بعدی
+    // بی‌سروصدا همیشه سبز می‌ماند — یعنی هیچ‌چیز را محافظت نمی‌کند.
+    assert.ok(libFiles.length >= 20,
+      `انتظارِ دست‌کم ۲۰ فایل در src/lib، ولی ${libFiles.length} پیدا شد — مسیرِ اسکنر را چک کن`);
   });
 
-  test('هیچ‌کدام از فایل‌هایِ مسیرِ ML importِ پویایِ نسبی ندارند', () => {
+  test('هیچ فایلی در src/lib importِ پویایِ نسبی ندارد', () => {
     const offenders: string[] = [];
-    for (const f of ML_PATH_FILES) {
+    for (const f of libFiles) {
       const src = readFileSync(join(LIB_DIR, f), 'utf8');
       // خطوطِ کامنت را کنار می‌گذاریم: خودِ همین توضیحات مثالِ الگو را دارند.
       const code = src.split('\n')

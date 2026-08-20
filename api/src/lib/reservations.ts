@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { db } from './db';
+import { isTimeWithinHours } from './hours';
 import { withSlotLock } from './redis';
 import { ApiError, Err } from './errors';
 import { enqueueSms } from './sms';
@@ -140,7 +141,6 @@ export async function createReservation(
     const closureSet = new Set(closureRows.map(c => (c.closure_date instanceof Date
       ? c.closure_date.toISOString().slice(0, 10)
       : String(c.closure_date).slice(0, 10))));
-    const { isTimeWithinHours } = await import('./hours');
     const ok = isTimeWithinHours(
       r.openingHours as OpeningHours,
       input.date, input.time, r.timezone ?? 'Asia/Tehran', closureSet,

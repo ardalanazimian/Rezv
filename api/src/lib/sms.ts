@@ -1,4 +1,5 @@
 import { createLogger } from './logger';
+import { enqueue } from './queue';
 import { metrics } from './metrics';
 const log = createLogger('sms');
 
@@ -46,7 +47,6 @@ export async function enqueueSms(job: SmsJob): Promise<void> {
   // استثنا: OTP باید همزمان برود (کاربر منتظر کد است) — مسیر مستقیم.
   if (job.template === 'otp') { await sendSmsNow(job); return; }
   try {
-    const { enqueue } = await import('./queue');
     await enqueue({ kind: 'sms', payload: job as unknown as Record<string, unknown> });
   } catch (e) {
     // اگر صف در دسترس نبود، به ارسال مستقیم fallback کن (بهتر از گم‌شدن پیام)
