@@ -770,7 +770,7 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
 - Several restaurant-panel RBAC permission mappings are inferred; confirm the
   exact `permission` key per route against the handlers.
 
-### ۲e) هشت `import()`ِ پویایِ نسبیِ باقی‌مانده در `api/src/lib/` (۲۰۲۶-۰۸-۲۰)
+### ۲e) `import()`ِ پویایِ نسبی زیرِ tsx/Node ۲۰ — **رفع شد** (۲۰۲۶-۰۸-۲۰)
 
 **یافته‌ی واقعی، از لاگِ CI نه از خواندنِ کد.** زیرِ `tsx` (که فقط `npm test` و
 `db:seed` از آن استفاده می‌کنند — نه سرورِ تولید که با Next.js/Turbopack اجرا
@@ -785,25 +785,32 @@ TypeError [ERR_UNSUPPORTED_RESOLVE_REQUEST]:
 
 Node ۲۲ می‌تواند — برای همین محلی سبز بود و CI (که Node ۲۰ است) قرمز.
 
-دو موردِ مسیرِ ML (`reservations.ts` و `lifecycle.ts` → `prediction-ledger`)
-رفع شدند: چرخه‌ی `customer-insights ↔ no-show-model` با انتقالِ
-`RawFeatureInput` و `computeStaticScoreFromFeatures` به `ml-core.ts` (که هیچ
-importی ندارد) شکسته شد و همه‌ی این importها static شدند. قفلِ رگرسیون:
-`tests/no-dynamic-import-in-hot-path.test.mts`.
+**دورِ اول** دو موردِ مسیرِ ML رفع شد و در همین‌جا نوشتم «هشت موردِ دیگر باقی
+مانده که چندتاشان چرخه‌ی واقعی‌اند». ⚠️ **آن جمله یک حدس بود و غلط از آب
+درآمد.** در دورِ دوم گرافِ کاملِ importهای `src/lib` ساخته و به‌صورتِ
+ترانزیتیو بررسی شد: **هیچ‌کدام از آن هشت مورد چرخه نمی‌ساختند.** هر هشت‌تا
+static شدند:
 
-**هنوز باقی‌مانده** (هرکدام زیرِ tsx/Node ۲۰ همان خطر را دارند):
-
-| فایل | importِ پویا | چرا هنوز هست |
+| فایل | importِ پویا | وضعیت |
 |---|---|---|
-| `db.ts:92` | `./metrics` | نیاز به بررسیِ چرخه |
-| `notify.ts:61,71` | `./queue` | چرخه‌ی واقعی با worker |
-| `redis.ts:168` | `./errors` | احتمالاً بی‌خطر، بررسی نشده |
-| `reservations.ts:143` | `./hours` | احتمالاً بی‌خطر، بررسی نشده |
-| `sms.ts:49` | `./queue` | چرخه‌ی واقعی با worker |
-| `tables.ts:103` | `./lifecycle` | چرخه‌ی واقعی |
-| `waitlist.ts:406` | `./reservations` | چرخه‌ی واقعی |
+| `db.ts` | `./metrics` | ✅ static شد |
+| `notify.ts` (×۲) | `./queue` | ✅ static شد |
+| `redis.ts` | `./errors` | ✅ static شد |
+| `reservations.ts` | `./hours` | ✅ static شد |
+| `sms.ts` | `./queue` | ✅ static شد |
+| `tables.ts` | `./lifecycle` | ✅ static شد |
+| `waitlist.ts` | `./reservations` | ✅ static شد |
 
-**شدت:** تولید را نمی‌شکند (Turbopack درست resolve می‌کند). خطرش این است که
-هر کدام از این مسیرها اگر روزی در تستی زیرِ Node ۲۰ اجرا شود، بی‌صدا شکست
-می‌خورد — دقیقاً همان چیزی که فازِ ۵ را بدونِ اینکه کسی بفهمد بی‌آزمون کرده بود.
-ریفکتورِ جدا لازم دارد و عمداً در این PR انجام نشد.
+علتِ ریشه‌ایِ اصلی (چرخه‌ی `customer-insights ↔ no-show-model`) با انتقالِ
+`RawFeatureInput` و `computeStaticScoreFromFeatures` به `ml-core.ts` (که هیچ
+importی ندارد) شکسته شده بود.
+
+**قفلِ رگرسیون:** `tests/no-dynamic-import-in-hot-path.test.mts` — دامنه‌اش از
+۵ فایلِ مسیرِ ML به **کلِ `src/lib`** گسترش یافت، با کنترلِ مثبت (اثبات اینکه
+خودِ الگو واقعاً چنین چیزی را می‌گیرد) و تستِ «اسکنر واقعاً فایل پیدا می‌کند»
+تا قفل بی‌صدا توخالی نشود.
+
+**تأییدِ زنده:** سرور با importهای static بالا آمد، `GET /restaurants` ۲۰۰،
+`GET /restaurants/{slug}/availability` ۲۰۰ با دادهٔ واقعی (مسیری که از
+`hours` عبور می‌کند)، `model-health` بدونِ توکن ۴۰۱ — و صفر خطای بارگذاریِ
+ماژول در لاگ.

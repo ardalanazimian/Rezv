@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import { db } from './db';
+import { transitionReservation } from './lifecycle';
 import { Err } from './errors';
 
 // ═══════════════════════════════════════════════════════════
@@ -100,7 +101,6 @@ export async function qrCheckIn(qrCode: string): Promise<{
   // مسیر lifecycle عبور می‌کند: ابتدا checked_in، سپس seated (انتقال‌های معتبر)،
   // بعد میز occupied می‌شود. اگر رزرو در وضعیتی باشد که این انتقال نامعتبر است،
   // امن رد می‌شویم و فقط وضعیت فعلی را برمی‌گردانیم.
-  const { transitionReservation } = await import('./lifecycle');
   try {
     // اگر هنوز confirmed/auto_confirmed است، اول checked_in کن.
     if (resv.status === 'confirmed' || resv.status === 'auto_confirmed' || resv.status === 'running_late') {

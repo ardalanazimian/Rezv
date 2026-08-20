@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { createLogger } from './logger';
+import { metrics } from './metrics';
 
 const log = createLogger('db');
 
@@ -88,17 +89,19 @@ if (dbRead !== db) g.prismaReplica = dbRead;
 // چرا مهم است: بدون این نمی‌فهمی کندیِ سیستم از DB است یا از کد. سیگنالِ حیاتیِ مانیتورینگ.
 if (!g.dbMetricsHooked) {
   g.dbMetricsHooked = true;
-  // import تنبل تا چرخه‌ی وابستگی ایجاد نشود (metrics ممکن است db را نخواهد، ولی محتاطیم)
-  import('./metrics').then(({ metrics }) => {
-    const timer = async (params: unknown, next: (p: unknown) => Promise<unknown>) => {
-      const t0 = Date.now();
-      try { return await next(params); }
-      finally { metrics.dbDuration.observe((Date.now() - t0) / 1000); }
-    };
-    // $use روی هر دو کلاینت (primary و replica اگر جداست)
-    (db as unknown as { $use: (m: unknown) => void }).$use(timer);
-    if (dbRead !== db) (dbRead as unknown as { $use: (m: unknown) => void }).$use(timer);
-  }).catch(() => { /* اگر metrics در دسترس نبود، بی‌خطر رد شو */ });
+  // ⚠️ قبلاً `import('./metrics')`ِ پویا بود «برای احتیاط در برابرِ چرخه».
+  // چرخه‌ای وجود نداشت: metrics.ts هیچ importی ندارد (با ساختِ گرافِ کاملِ
+  // importهای src/lib بررسی شد، نه با حدس). و importِ پویایِ نسبی زیرِ tsx
+  // روی Node ۲۰ بی‌صدا می‌شکند — همان باگی که فازِ ۵ را از کار انداخته بود
+  // (رجوع کن به ml-core.ts). پس static شد.
+  const timer = async (params: unknown, next: (p: unknown) => Promise<unknown>) => {
+    const t0 = Date.now();
+    try { return await next(params); }
+    finally { metrics.dbDuration.observe((Date.now() - t0) / 1000); }
+  };
+  // $use روی هر دو کلاینت (primary و replica اگر جداست)
+  (db as unknown as { $use: (m: unknown) => void }).$use(timer);
+  if (dbRead !== db) (dbRead as unknown as { $use: (m: unknown) => void }).$use(timer);
 }
 
 // ── خاموشی تمیز: بستن اتصال‌ها روی سیگنال‌های خاتمه (جلوگیری از نشت اتصال هنگام deploy) ──

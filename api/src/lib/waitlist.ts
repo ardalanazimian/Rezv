@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual, createHash } from 'crypto';
 import { db } from './db';
+import { createReservation } from './reservations';
 import { redis } from './redis';
 import { metrics } from './metrics';
 import { Err } from './errors';
@@ -403,7 +404,6 @@ export async function acceptOffer(entryId: string, _actor = 'customer', auth: { 
   if (e.offerExpiresAt && e.offerExpiresAt < new Date()) throw Err.reservationExpired();
 
   // ساخت رزرو از آفر (تخصیص خودکار میز)
-  const { createReservation } = await import('./reservations');
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10);
   const timeStr = now.toTimeString().slice(0, 5);
