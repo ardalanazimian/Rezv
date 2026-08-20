@@ -167,7 +167,7 @@ export function toMatrix(examples: readonly TrainingExample[]): { X: number[][];
 
 // ── از اینجا به بعد: DB واقعی. در تستِ واحد صدا زده نمی‌شود (نیاز به Postgres دارد). ──
 
-interface TrainingRow {
+export interface TrainingRow {
   status: string;
   party_size: number;
   source: string;
@@ -197,7 +197,13 @@ interface TrainingRow {
  * دامنه‌ی برچسب همان چیزی‌ست که recomputeCustomerInsight استفاده می‌کند:
  * completed/arrived/seated/dining = «آمد» (۰)، no_show = «نیامد» (۱).
  */
-async function fetchTrainingRows(restaurantId: string): Promise<TrainingRow[]> {
+/**
+ * ⚠️ export عمدی و فقط برای تست (فازِ ۴): تستِ برابریِ ویژگی باید بتواند
+ * همین کوئریِ *واقعیِ* آموزش را اجرا کند و با مسیرِ سرو مقایسه‌اش کند.
+ * اگر به‌جایش کوئری در تست بازنویسی می‌شد، تست فقط خودش را می‌سنجید — و
+ * دقیقاً همان اختلافی که این فاز رفعش کرد، دوباره نامرئی می‌ماند.
+ */
+export async function fetchTrainingRows(restaurantId: string): Promise<TrainingRow[]> {
   return db.$queryRaw<TrainingRow[]>`
     SELECT r.status, r.party_size, r.source,
            EXTRACT(EPOCH FROM (r.slot_start - r.created_at)) / 60.0 AS lead_minutes,

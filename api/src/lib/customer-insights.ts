@@ -1,6 +1,7 @@
 import { db } from './db';
 import { sinceDays } from './staff-helpers';
 import { computeStaticScoreFromFeatures, type RawFeatureInput } from './ml-core';
+import { loadPriorHistory } from './no-show-features';
 // ⚠️ عمداً static است، نه `await import()`: چرخه‌ی import با شکستنِ آن در
 // ml-core.ts از بین رفت، و importِ پویا در این مسیر روی Node 20 واقعاً
 // می‌شکست (جزئیات در ml-core.ts).
@@ -65,19 +66,17 @@ export function tierFromScore(score: number): 'low' | 'medium' | 'high' {
  * در این جهت یک وابستگیِ دوری واقعی در زمانِ اجرا می‌ساخت.
  */
 export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResult> {
-  let priorTotal = 0, priorNoShows = 0;
-
   // ── سابقه‌ی شخصی مشتری: قوی‌ترین سیگنال ──
-  if (input.userId) {
-    const hist = await db.reservation.groupBy({
-      by: ['status'],
-      where: { userId: input.userId, status: { in: ['completed', 'no_show', 'arrived', 'seated'] } },
-      _count: { _all: true },
-    });
-    const completed = hist.find(h => h.status === 'completed' || h.status === 'arrived' || h.status === 'seated')?._count._all ?? 0;
-    priorNoShows = hist.find(h => h.status === 'no_show')?._count._all ?? 0;
-    priorTotal = completed + priorNoShows;
-  }
+  //
+  // ⚠️ فازِ ۴: این محاسبه قبلاً همین‌جا دستی انجام می‌شد و با کوئریِ آموزش
+  // اختلاف داشت (بدونِ فیلترِ رستوران، و بدونِ وضعیتِ `dining`) — یعنی مدل
+  // ورودی‌ای می‌دید که رویش آموزش ندیده بود. حالا هر دو مسیر از یک تعریفِ
+  // واحد در lib/no-show-features.ts می‌خوانند و تستِ برابری قفلش کرده.
+  const { priorNoShows, priorTotal } = await loadPriorHistory({
+    restaurantId: input.restaurantId,
+    userId: input.userId ?? null,
+    asOf: input.createdAt,
+  });
 
   const features: RawFeatureInput = {
     hasUserId: !!input.userId,

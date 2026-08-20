@@ -104,7 +104,11 @@ describe('نسخه‌ی قراردادِ ویژگی', () => {
       'bias', 'knownUser', 'priorNoShowRate', 'lastMinute',
       'veryEarlyBooking', 'largeParty', 'phoneSource',
     ], 'ترکیبِ ویژگی عوض شده — NO_SHOW_FEATURE_VERSION را هم بالا ببر و این تست را به‌روز کن');
-    assert.equal(NO_SHOW_FEATURE_VERSION, 'no_show/v1');
+    // v2 از فازِ ۴: ترکیبِ ویژگی‌ها همان است، ولی *معنایِ* priorTotal عوض شد
+    // (از «کلِ پلتفرم بدونِ dining» به «همین رستوران شاملِ dining») تا با
+    // کوئریِ آموزش یکی شود. تغییرِ معنا هم باید نسخه را بالا ببرد، وگرنه دو
+    // معنایِ متفاوت زیرِ یک برچسب در آمار قاطی می‌شوند.
+    assert.equal(NO_SHOW_FEATURE_VERSION, 'no_show/v2');
   });
 });
 
