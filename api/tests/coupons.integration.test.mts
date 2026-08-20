@@ -160,21 +160,48 @@ describe('کوپن — همزمانیِ واقعی (قفلِ ادعایِ ضدِ
     //
     // ولی تا امروز فقط یک «کامنت» بود. اگر روزی کسی redeemCouponAtomicTx را از
     // یک تراکنشِ ReadCommitted صدا بزند، سقفِ per-user بی‌سروصدا از کار می‌افتد
-    // و هیچ تستی نمی‌فهمد. این تست آن پیش‌شرط را به یک واقعیتِ *سنجیده‌شده*
-    // تبدیل می‌کند: اگر روزی گارد واقعاً self-protecting شود، این تست قرمز
-    // می‌شود و باید با خبرِ خوب به‌روزش کرد.
+    // و هیچ تستی نمی‌فهمد.
     //
-    // (همین تفاوت اولین اجرای این فایل را قرمز کرد — هارنس ReadCommitted بود
-    // و من لحظه‌ای فکر کردم باگِ تولید پیدا کرده‌ام. نبود.)
+    // ⚠️ چرا این تست *ترتیب‌دهیِ صریح* دارد و نه «۱۰ تلاشِ موازی»: نسخه‌ی اولش
+    // ۱۰ تراکنشِ همزمان می‌ساخت و `ok > 1` را ادعا می‌کرد — یعنی به **بردن در
+    // یک ریس** تکیه داشت. اگر روزی استخرِ اتصالِ CI کوچک شود یا ماشین کند باشد،
+    // آن ۱۰ تا سریالایز می‌شدند و تست بی‌دلیل قرمز می‌شد: یک flake. اینجا
+    // به‌جایش خودِ *مکانیزم* قطعی نشان داده می‌شود.
     const couponId = await makeCoupon({ code: `${TAG}-ISO`, maxRedemptions: null, perUserLimit: 1 });
     const userId = await makeUser();
 
-    const results = await Promise.all(Array.from({ length: 10 }, () =>
-      attempt(couponId, userId, Prisma.TransactionIsolationLevel.ReadCommitted)));
-    const ok = results.filter(r => r === true).length;
+    let openGate!: () => void;
+    const gate = new Promise<void>(res => { openGate = res; });
 
-    assert.ok(ok > 1,
-      `زیرِ ReadCommitted گارد نگه داشته نمی‌شود (این وضعیتِ *فعلی* است، نه مطلوب). موفق: ${ok}`);
+    // تراکنشِ A: کارش را می‌کند ولی commit نمی‌کند (پشتِ gate منتظر می‌ماند).
+    const a = db.$transaction(async tx => {
+      const r = await redeemCouponAtomicTx(tx, couponId, userId, `${TAG}-A`, 1000, null);
+      await gate;   // تراکنش باز می‌ماند
+      return r;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 20_000 });
+
+    // به A فرصت بده خواندن/نوشتنش را انجام دهد (هنوز commit نکرده).
+    await new Promise(res => setTimeout(res, 300));
+
+    // تراکنشِ B: شمارشِ per-user را انجام می‌دهد و ردیفِ **commit‌نشده‌ی** A را
+    // نمی‌بیند (ReadCommitted) → از گارد رد می‌شود. بعد روی UPDATEِ کوپن پشتِ
+    // قفلِ ردیفِ A بلاک می‌شود تا A تمام شود.
+    const b = db.$transaction(
+      tx => redeemCouponAtomicTx(tx, couponId, userId, `${TAG}-B`, 1000, null),
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 20_000 },
+    );
+
+    await new Promise(res => setTimeout(res, 300));
+    openGate();
+    const [okA, okB] = await Promise.all([a, b]);
+
+    assert.equal(okA, true, 'تراکنشِ اول باید موفق شود');
+    assert.equal(okB, true,
+      'تراکنشِ دوم هم موفق می‌شود چون شمارشِ per-userش ردیفِ commit‌نشده‌ی اولی را ندید');
+    assert.equal(await countRedemptions(couponId), 2,
+      `زیرِ ReadCommitted گارد نگه داشته نمی‌شود: دو رکورد برای کاربری با perUserLimit=1. ` +
+      `این وضعیتِ *فعلی* است، نه مطلوب — اگر روزی گارد self-protecting شود این تست ` +
+      `قرمز می‌شود و باید با خبرِ خوب به‌روزش کرد.`);
   });
 
   test('کوپنِ بدونِ سقفِ کل برای همه‌ی کاربران کار می‌کند', async () => {
@@ -186,7 +213,15 @@ describe('کوپن — همزمانیِ واقعی (قفلِ ادعایِ ضدِ
     assert.equal(results.filter(Boolean).length, 8, 'کوپنِ نامحدود نباید کسی را رد کند');
   });
 
-  test('تلاشِ ناموفق شمارنده را بالا نمی‌برد', async () => {
+  test('تلاشِ ناموفق شمارنده را بالا نمی‌برد — و همین تست گاردِ per-user را قفل می‌کند', async () => {
+    // ⚠️ یافته‌ی جهش‌آزمایی (۲۰۲۶-۰۸-۲۰): با حذفِ **کاملِ** بلوکِ per-user از
+    // redeemCouponAtomicTx، تستِ «۱۰ تلاشِ همزمان زیرِ Serializable» همچنان سبز
+    // می‌ماند — چون آنجا `UPDATE` رویِ همان ردیفِ کوپن خودش نقطه‌ی سریالایز است
+    // و بقیه abort می‌شوند. یعنی آن تست رفتارِ *سیستم* را می‌سنجد، نه سهمِ گارد را.
+    //
+    // این تستِ **ترتیبی** است که واقعاً گارد را قفل می‌کند، و هر دو جهشِ حذفِ
+    // گارد را همین گرفت. نقشِ واقعیِ گاردِ per-user هم همین است: کاربری که
+    // فردا دوباره برمی‌گردد — حالتی که هیچ مکانیزمِ دیتابیسی نمی‌گیردش.
     // اگر شمارنده در مسیرِ شکست برنگردد، کوپن به‌مرور «ظرفیتش پر» می‌شود
     // بدونِ اینکه واقعاً کسی استفاده کرده باشد — نشتِ خاموشِ ظرفیت.
     const couponId = await makeCoupon({ code: `${TAG}-LEAK`, maxRedemptions: 5, perUserLimit: 1 });

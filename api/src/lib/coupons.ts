@@ -75,6 +75,18 @@ export function calcDiscount(coupon: { kind: string; value: number }, subtotalTo
  *  فعلی (createReservation با isolationLevel: Serializable) رعایتش می‌کند. هر
  *  صداکننده‌ی جدیدی که رعایت نکند، سقفِ per-user را بی‌سروصدا از کار
  *  می‌اندازد. هر دو حالت در tests/coupons.integration.test.mts قفل شده‌اند.
+ *
+ *  ═══ دقیق‌سازی (جهش‌آزماییِ ۲۰۲۶-۰۸-۲۰) ═══
+ *  با حذفِ **کاملِ** بلوکِ per-user، سناریوی «۱۰ تلاشِ همزمانِ یک کاربر زیرِ
+ *  Serializable» همچنان فقط ۱ موفقیت می‌دهد. یعنی در حالتِ *همزمان* چیزی که
+ *  واقعاً محافظت می‌کند این گارد نیست — `UPDATE coupons SET redemption_count…`
+ *  رویِ **همان ردیف** است که خودش نقطه‌ی سریالایز می‌شود و بقیه abort می‌شوند.
+ *
+ *  پس نقشِ واقعیِ گاردِ per-user مسیرِ **ترتیبی** است: کاربری که فردا دوباره
+ *  برمی‌گردد و کوپنِ «یک‌بار به‌ازای هر نفر» را دوباره می‌زند. آن حالت را هیچ
+ *  مکانیزمِ دیتابیسی نمی‌گیرد و فقط این چند خط جلویش را می‌گیرند.
+ *  (تستِ «تلاشِ ناموفق شمارنده را بالا نمی‌برد» دقیقاً همین را قفل می‌کند —
+ *  هر دو جهشِ حذفِ گارد را همان تست گرفت، نه تستِ همزمانی.)
  */
 export async function redeemCouponAtomicTx(
   tx: any, couponId: string, userId: string | null, reservationCode: string | null,
