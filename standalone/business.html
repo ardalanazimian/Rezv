@@ -5762,12 +5762,32 @@ let COUPONS=[], AUTOMATIONS=[], _mktLoaded=false;
 const COUPON_KIND_FA={percent:'درصدی',fixed:'مبلغ ثابت',free_item:'آیتم رایگان'};
 const COUPON_SEG_FA={new_customer:'مشتری جدید',active:'فعال',at_risk:'در خطر ریزش',churned:'ازدست‌رفته',vip:'VIP'};
 const AUTOMATION_TRIGGER_FA={birthday:'تولد مشتری',winback:'بازگرداندنِ مشتریِ غایب',post_visit:'بعد از بازدید',vip_milestone:'رسیدن به سطح VIP',no_show_followup:'پیگیریِ عدم‌حضور'};
+let AUTOMATION_ATTRIBUTION=null; // {window_days, min_resolved} — از همان پاسخِ API
+
+// ⚠️ این تابع از یک باگِ زنده زاده شد (ممیزیِ ۲۰۲۶-۰۸-۲۰): اینجا قبلاً
+// `${fa(a.conversion_rate_pct||0)}٪ تبدیل` بود، و بک‌اند آن عدد را از
+// marketing_automations.converted_count می‌ساخت — ستونی که در کلِ ریپو هیچ‌جا
+// افزایش نمی‌یافت. یعنی رستوران‌دار همیشه «۱۲۰ ارسال · ۰٪ تبدیل» می‌دید و
+// نتیجه می‌گرفت کمپین‌هایش بی‌اثرند، در حالی که عدد اصلاً اندازه‌گیری نشده بود.
+//
+// حالا بک‌اند وقتی شواهد کافی نیست null می‌فرستد، نه صفر. `||0` اینجا همان
+// null را دوباره به «۰٪» تبدیل می‌کرد، پس عمداً حذف شد: «هنوز کافی نیست»
+// باید نوشته شود، نه به عددی که ادعای اندازه‌گیری دارد ترجمه شود.
+function automationConversionFa(a){
+  if(a.conversion_status==='measured' && a.conversion_rate_pct!==null && a.conversion_rate_pct!==undefined){
+    return `${fa(a.conversion_rate_pct)}٪ تبدیل (از ${fa(a.resolved_count||0)} موردِ قطعی‌شده)`;
+  }
+  const need=AUTOMATION_ATTRIBUTION&&AUTOMATION_ATTRIBUTION.min_resolved;
+  const have=a.resolved_count||0;
+  return need?`نرخِ تبدیل هنوز اندازه‌پذیر نیست (${fa(have)} از ${fa(need)})`
+             :'نرخِ تبدیل هنوز اندازه‌پذیر نیست';
+}
 
 async function loadMarketing(){
   if(!API.getToken()) return;
   const [c,a]=await Promise.all([API.couponsList(),API.automationsList()]);
   if(c.ok) COUPONS=c.data?.items||[];
-  if(a.ok) AUTOMATIONS=a.data?.items||[];
+  if(a.ok){ AUTOMATIONS=a.data?.items||[]; AUTOMATION_ATTRIBUTION=a.data?.attribution||null; }
   _mktLoaded=true;
 }
 function rMarketing(){
@@ -5857,7 +5877,7 @@ function renderAutomations(){
         <div class="staff-row">
           <div style="flex:1">
             <div style="font-size:14px;font-weight:700">${esc(a.name)}</div>
-            <div style="font-size:12px;color:var(--t2)">${AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger} · ${fa(a.sent_count||0)} ارسال · ${fa(a.conversion_rate_pct||0)}٪ تبدیل</div>
+            <div style="font-size:12px;color:var(--t2)">${AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger} · ${fa(a.sent_count||0)} ارسال · ${automationConversionFa(a)}</div>
           </div>
           <span class="chip-status ${a.is_active?'arrived':''}" style="${a.is_active?'':'background:var(--s-100);color:var(--t3)'}">${a.is_active?'فعال':'غیرفعال'}</span>
         </div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:30px">هنوز قانونی ساخته نشده</div>'}

@@ -70,6 +70,8 @@ model User {
   rewardRedemptions RewardRedemption[]
   // ── نشان‌هایِ کنترل‌شده‌یِ پلتفرم (migration 040) — جدا از BADGES قدیمیِ اپِ کاستومر ──
   badges            UserBadge[]
+  // دفترِ ارتباط‌گیری (migration 057) — تماس/پیامکِ بازاریابی که به این کاربر رفت
+  outreachLog       OutreachLog[]
   @@index([createdAt])
   chatThreads  ChatThread[]
   @@map("users")
@@ -194,6 +196,7 @@ model Restaurant {
   chatThreads  ChatThread[]
   @@map("restaurants")
   modelPredictions ModelPrediction[]
+  outreachLog      OutreachLog[]
 }
 
 // ── شکل میز (برای نقشه‌ی بصری و چیدمان) ──
@@ -381,6 +384,8 @@ model Reservation {
   reviews      Review[]
   payments     Payment[] // ⚠️ همگام‌سازی‌شده: یک رزرو می‌تواند چند تلاش پرداخت داشته باشد
   economyLedgerEntries EconomyLedgerEntry[] // اقتصادِ یکپارچه‌ی مشتری (migration 038)
+  // حداکثر یک ردیفِ ارتباط‌گیری می‌تواند این رزرو را «تبدیل» خود بداند (قیدِ UNIQUE در DB)
+  outreachConversion   OutreachLog?
   // ── ایندکس‌های بهینه برای ۱۰M+ رزرو (بر اساس الگوی واقعی کوئری) ──
   // داشبورد رستوران: رزروهای یک رستوران در بازه‌ی زمانی با وضعیت
   @@index([restaurantId, status, slotStart])
@@ -1198,6 +1203,48 @@ model CampaignLog {
   createdAt       DateTime   @default(now()) @map("created_at")
   @@index([restaurantId, createdAt(sort: Desc)])
   @@map("campaign_logs")
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  دفترِ ارتباط‌گیری (migration 057) — «به کی پیام/تماس رفت و بعدش چه شد؟»
+//
+//  ⚠️ چرا ساخته شد: marketing_automations.converted_count هیچ‌جا در کد
+//  افزایش نمی‌یافت، ولی پنلِ بیزنس نرخِ تبدیل را از رویش نشان می‌داد — یعنی
+//  همیشه «۰٪ تبدیل»، یک معیارِ عملکرد که هیچ کدی نمی‌توانست پرش کند. و چون
+//  هیچ‌کدام از مسیرهای ارسال گیرنده را ثبت نمی‌کردند، بازسازیِ بازگشتی هم
+//  ممکن نبود. توضیحِ کاملِ تصمیم‌ها در prisma/sql/057-outreach-ledger.sql.
+//
+//  CampaignLog جایگزین نشد و باقی است: آن «چه کمپینی فرستاده شد» را نگه
+//  می‌دارد (یک ردیف به‌ازای کمپین)، این «به چه کسی و با چه نتیجه‌ای»
+//  (یک ردیف به‌ازای گیرنده). دو دانه‌بندیِ متفاوت، نه تکرار.
+// ───────────────────────────────────────────────────────────────────────
+model OutreachLog {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  // NULL = شماره‌ی خامِ بدونِ حسابِ کاربری. چنین ردیفی «تبدیل‌نشده» نیست،
+  // «قابلِ انتساب نیست» — و از هر دو سویِ کسرِ نرخ بیرون می‌ماند.
+  userId       String?    @map("user_id") @db.Uuid
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  channel      String     // 'sms' | 'call'
+  source       String     // 'automation' | 'campaign' | 'crm_recommendation'
+  // شناسه‌ی منبع در جدولِ خودش. عمداً FK ندارد تا حذفِ یک automation
+  // تاریخِ ارسالش را پاک نکند.
+  sourceId     String?    @map("source_id") @db.Uuid
+  reason       String?    // چرا این مشتری انتخاب شد (شفافیت برای رستوران‌دار)
+  sentAt       DateTime   @default(now()) @map("sent_at")
+  // ── نتیجه ──
+  // هر رزرو حداکثر یک تماس را تبدیل می‌کند (انتسابِ آخرین‌تماس). قیدِ UNIQUE
+  // این را در سطحِ DB تضمین می‌کند، نه فقط در کد — وگرنه سه کمپین به یک
+  // مشتری، نرخ را سه‌برابر باد می‌کرد.
+  convertedReservationId String?      @unique @map("converted_reservation_id") @db.Uuid
+  convertedReservation   Reservation? @relation(fields: [convertedReservationId], references: [id], onDelete: SetNull)
+  convertedAt            DateTime?    @map("converted_at")
+  // NULL = هنوز در پنجره‌ی انتساب، هنوز فرصتِ تبدیل دارد → از مخرجِ نرخ بیرون.
+  resolvedAt             DateTime?    @map("resolved_at")
+  @@index([restaurantId, userId, sentAt])
+  @@index([source, sourceId, sentAt(sort: Desc)])
+  @@map("outreach_log")
 }
 
 // ── تعطیلاتِ خاصِ رستوران (بستنِ دستیِ روزهای مشخص) ──
