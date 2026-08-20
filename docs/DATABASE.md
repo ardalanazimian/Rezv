@@ -122,6 +122,20 @@ erDiagram
 | `ModelOutcome` / `model_outcomes` | `observedValue`, `squaredError` (Brier), `absoluteError` (MAE), unique `(predictionId, source)` | Observation, deliberately a separate table from the prediction. |
 | `OutreachLog` / `outreach_log` | `channel`, `source`, `sourceId?`, `sentAt`, `convertedReservationId?` (**UNIQUE**), `convertedAt?`, `resolvedAt?` | One row per contacted recipient. The UNIQUE constraint enforces last-touch attribution at the DB level: a reservation can convert **at most one** outreach. `userId` NULL = raw phone, *unattributable* (excluded from both sides of the rate). |
 
+⚠️ **`outreach_log` is NOT part of the prediction ledger chain.** It sits in this
+section because it is *measurement*, but it has **zero** foreign keys to
+`model_predictions` / `model_outcomes` / `model_training_runs` (verify:
+`grep -c model_ api/prisma/sql/057-outreach-ledger.sql` → `0`). Two independent
+feedback loops that happen to share a design philosophy:
+
+| Loop | Question it answers | Tables |
+|---|---|---|
+| Prediction ledger | "we predicted X — did X happen?" | `model_predictions` → `model_outcomes` |
+| Outreach ledger | "we contacted someone — did they book?" | `outreach_log` (self-contained; converts against `reservations`) |
+
+*(Added after an automated reviewer read this grouping and invented an
+`outreach_log ─ model_outcomes` relationship that does not exist.)*
+
 ⚠️ `marketing_automations.converted_count` is a **dead column** — it was never
 incremented anywhere and the panel showed a permanently-zero "conversion rate" from
 it. Conversion is now computed from `outreach_log`. The column was deliberately
