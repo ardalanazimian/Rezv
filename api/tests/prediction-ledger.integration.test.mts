@@ -27,6 +27,33 @@ const TAG = `pl-${randomUUID().slice(0, 8)}`;
 let tenantId: string, restaurantId: string, userId: string;
 const SLOT_DATE = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 10);
 
+/**
+ * انتظار تا وقتی شرط برقرار شود (یا مهلت تمام شود).
+ *
+ * ⚠️ چرا این تابع وجود دارد — یافته‌ی واقعیِ CI (۲۰۲۶-۰۸-۲۰، PR #37):
+ * نسخه‌ی اولِ این تست‌ها بعد از هر عمل یک `setTimeout(400)` ثابت می‌گذاشت.
+ * محلی (Node ۲۲) سه اجرای پیاپی ۵۱۱/۵۱۱ سبز بود، ولی CI (Node ۲۰) دقیقاً
+ * ۴ تست را انداخت. با تزریقِ ۹۰۰ms تأخیرِ مصنوعی در recordPrediction عیناً
+ * همان ۴ شکست بازتولید شد — پس علت قطعی شد: نوشتنِ دفتر عمداً
+ * غیرمسدودکننده است (بندِ ۴۶)، و «۴۰۰ میلی‌ثانیه» فقط یک حدس بود، نه قرارداد.
+ *
+ * انتظارِ شرطی این کلاسِ خطا را کامل حذف می‌کند: روی ماشینِ سریع فوراً
+ * برمی‌گردد، روی ماشینِ کند صبر می‌کند، و اگر واقعاً هرگز رخ ندهد با همان
+ * assertionِ معنادارِ خودِ تست می‌افتد — نه با یک شکستِ زمان‌بندیِ گمراه‌کننده.
+ */
+async function waitFor<T>(
+  probe: () => Promise<T | null | undefined>,
+  timeoutMs = 10_000,
+): Promise<T | null> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const v = await probe();
+    if (v) return v;
+    if (Date.now() >= deadline) return null;
+    await new Promise(r => setTimeout(r, 25));
+  }
+}
+
 before(async () => {
   const t = await db.tenant.create({ data: { name: `[DEMO] ${TAG}` }, select: { id: true } });
   tenantId = t.id;
@@ -93,16 +120,14 @@ describe('حلقه‌ی بسته: رزروِ واقعی → پیش‌بینی �
       restaurantId, date: SLOT_DATE, time: '20:00', partySize: 2,
       userId, source: 'app', notifySms: false,
     });
-    // ثبتِ دفتر عمداً غیرمسدودکننده است (بندِ ۴۶)، پس کمی صبر لازم است.
-    await new Promise(r => setTimeout(r, 400));
-
     const resv = await db.reservation.findFirst({ where: { restaurantId }, select: { id: true } });
     assert.ok(resv, 'رزرو باید ساخته شده باشد');
     reservationId = resv.id;
 
-    const pred = await db.modelPrediction.findFirst({
+    // ثبتِ دفتر عمداً غیرمسدودکننده است (بندِ ۴۶)، پس تا وقوعش صبر می‌کنیم.
+    const pred = await waitFor(() => db.modelPrediction.findFirst({
       where: { entityType: 'reservation', entityId: reservationId },
-    });
+    }));
     assert.ok(pred, 'پیش‌بینی باید در دفتر ثبت شده باشد');
     assert.equal(pred.predictionType, 'no_show');
     assert.equal(pred.featureVersion, NO_SHOW_FEATURE_VERSION);
@@ -120,9 +145,9 @@ describe('حلقه‌ی بسته: رزروِ واقعی → پیش‌بینی �
   test('رسیدنِ رزرو به no_show، نتیجه را ثبت می‌کند', async () => {
     await transitionReservation({ reservationId, to: 'confirmed', actor: 'system', isAutomatic: true }).catch(() => {});
     await transitionReservation({ reservationId, to: 'no_show', actor: 'staff', isAutomatic: false });
-    await new Promise(r => setTimeout(r, 400));
 
-    const outcome = await db.modelOutcome.findFirst({ where: { prediction: { entityId: reservationId } } });
+    const outcome = await waitFor(() =>
+      db.modelOutcome.findFirst({ where: { prediction: { entityId: reservationId } } }));
     assert.ok(outcome, 'نتیجه باید ثبت شده باشد');
     assert.equal(outcome.observedValue, 1, 'no_show برچسبِ ۱ است');
     assert.equal(outcome.source, 'reservation_status');
