@@ -83,6 +83,7 @@ import './validate.test.mts';
 import './intelligence-loop.integration.test.mts';
 import './prediction-ledger.integration.test.mts';
 import './public-menu.integration.test.mts';
+import './temporal-leakage.integration.test.mts';
 import './tenant-isolation.integration.test.mts';
 import './waitlist.test.mts';
 
