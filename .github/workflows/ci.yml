@@ -125,6 +125,47 @@ jobs:
           JWT_SECRET: ci-test-secret-at-least-32-chars-long
           JWT_REFRESH_SECRET: ci-test-refresh-secret-at-least-32-chars
 
+  # ── انحرافِ اسکیما: آیا تولید هرچه Prisma لازم دارد را واقعاً دارد؟ ──
+  #
+  # ⚠️ چرا این job لازم است (شکافی که هیچ تستِ دیگری نمی‌بیند):
+  # CI اسکیما را با `prisma db push` می‌سازد ولی تولید با
+  # `migrate deploy (0_init) + apply-sql.sh`. اگر کسی فیلدی به schema.prisma
+  # اضافه کند و مهاجرتِ SQL ننویسد، `db push` آن را در CI می‌سازد و همه‌ی
+  # تست‌ها سبز می‌شوند — ولی تولید آن ستون را ندارد و در زمانِ اجرا می‌شکند.
+  # «CI سبز، تولید خراب» دقیقاً همان چیزی است که این job جلویش را می‌گیرد.
+  schema-drift:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: api/package-lock.json
+      - name: Install dependencies
+        working-directory: api
+        run: npm ci || npm install
+      - name: Generate Prisma client
+        working-directory: api
+        run: npx prisma generate
+      - name: Check schema drift
+        run: sh tools/check-schema-drift.sh
+        env:
+          ADMIN_URL: postgresql://test:test@localhost:5432/postgres
+
   # ── مرحله ۳: چک امنیتی پایه ──
   security:
     runs-on: ubuntu-latest
