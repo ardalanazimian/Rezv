@@ -5,6 +5,7 @@ import { enqueueSms, type SmsJob } from './sms';
 import { processReservationEconomyEvent } from './economy';
 import { createLogger } from './logger';
 import { dateKeyInTz } from './hours';
+import { recordOutcome } from './prediction-ledger';
 
 const log = createLogger('lifecycle');
 
@@ -151,15 +152,20 @@ export async function transitionReservation(opts: {
     };
     const observed = OUTCOME_LABELS[result.resv.status];
     if (observed !== undefined) {
-      void (async () => {
-        const { recordOutcome } = await import('./prediction-ledger');
-        await recordOutcome({
-          entityType: 'reservation',
-          entityId: result.resv.id,
-          observedValue: observed,
-          source: 'reservation_status',
+      // ⚠️ importِ static (نه `await import()`) و catchِ صریح — یافته‌ی واقعیِ
+      // ۲۰۲۶-۰۸-۲۰: importِ پویا اینجا روی Node 20 با
+      // ERR_UNSUPPORTED_RESOLVE_REQUEST می‌شکست و چون داخلِ یک voidِ بی‌catch
+      // بود، بی‌صدا هیچ نتیجه‌ای ثبت نمی‌شد (توضیحِ کامل در ml-core.ts).
+      void recordOutcome({
+        entityType: 'reservation',
+        entityId: result.resv.id,
+        observedValue: observed,
+        source: 'reservation_status',
+      }).catch((e) => {
+        log.warn('ثبتِ نتیجه در دفترِ مدل ناموفق (رزرو خودش commit شد)', {
+          reservationId: result.resv.id, error: (e as Error).message,
         });
-      })();
+      });
     }
   }
 

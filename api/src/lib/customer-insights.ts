@@ -1,5 +1,10 @@
 import { db } from './db';
 import { sinceDays } from './staff-helpers';
+import { computeStaticScoreFromFeatures, type RawFeatureInput } from './ml-core';
+// ⚠️ عمداً static است، نه `await import()`: چرخه‌ی import با شکستنِ آن در
+// ml-core.ts از بین رفت، و importِ پویا در این مسیر روی Node 20 واقعاً
+// می‌شکست (جزئیات در ml-core.ts).
+import { getLearnedNoShowModelWithRun, predictProba, buildFeatureVector } from './no-show-model';
 
 // ═══════════════════════════════════════════════════════════
 //  موتور پیش‌بینی No-Show و محاسبه‌ی CLV — رزرونو
@@ -33,54 +38,18 @@ export type NoShowResult = {
   lineage?: {
     features: RawFeatureInput;
     probability: number;
+    /** فازِ ۶ — اجرایِ آموزشی که این وزن‌ها را ساخت. heuristic ندارد → null. */
+    modelRunId: string | null;
   };
 };
 
-/**
- * ویژگی‌های خامی که هم فرمولِ heuristic و هم مدلِ یادگرفته از رویشان
- * ساخته می‌شوند — تنها جایی که «سابقه‌ی مشتری» و «زمان‌بندیِ رزرو» به عدد
- * تبدیل می‌شوند. no-show-model.ts هم همین تایپ را (فقط به‌عنوانِ type،
- * بدونِ وابستگیِ اجرایی) import می‌کند تا دو مسیر از یک تعریف بخوانند.
- */
-export type RawFeatureInput = {
-  hasUserId: boolean;
-  priorTotal: number;        // تعداد رزروهای حل‌شده‌ی قبلیِ همین کاربر (تکمیل‌شده + no-show)
-  priorNoShowRate: number;   // noShows / priorTotal — فقط اگر priorTotal > 0 معنا دارد
-  leadMinutes: number;
-  partySize: number;
-  source: string;
-};
-
-/**
- * فرمولِ heuristicِ دستی — بدونِ هیچ دسترسیِ DB، فقط از رویِ ویژگی‌های خام.
- * این تابع هم مسیرِ زنده‌ی fallback را تغذیه می‌کند (از computeNoShowRisk)
- * و هم baselineِ مقایسه در آموزشِ مدلِ یادگرفته را (از no-show-model.ts) —
- * منبعِ واحد، تا این دو مسیر روزی از هم جدا نیفتند.
- */
-export function computeStaticScoreFromFeatures(f: RawFeatureInput): number {
-  let score = 15; // پایه‌ی ریسک برای مهمان ناشناس (بدون سابقه)
-
-  if (f.hasUserId) {
-    if (f.priorTotal === 0) {
-      score = 25; // کاربر شناخته‌شده ولی بدون سابقه‌ی حضور قطعی
-    } else {
-      score = Math.round(f.priorNoShowRate * 90) + 5; // نگاشت نرخ no-show به امتیاز
-      if (f.priorTotal >= 5 && f.priorNoShowRate === 0) score = Math.max(2, score - 5); // مشتری وفادار با سابقه‌ی پاک
-    }
-  }
-
-  // ── lead time: رزرو دقیقه‌ی ۹۰ام (last-minute) ریسک بیشتری دارد ──
-  if (f.leadMinutes < 30) score += 12;
-  else if (f.leadMinutes > 7 * 24 * 60) score += 6; // رزرو خیلی زودهنگام هم کمی ریسک بیشتر دارد (فراموشی)
-
-  // ── گروه بزرگ بدون پیش‌سفارش/تأیید، ریسک سازمانی بیشتر دارد ──
-  if (f.partySize >= 6) score += 8;
-
-  // ── منبع رزرو: تماس تلفنی/walk-in نسبت به اپ کمی نامطمئن‌تر (داده‌ی تماس کمتر دقیق) ──
-  if (f.source === 'phone') score += 5;
-
-  return Math.max(0, Math.min(100, score));
-}
+// RawFeatureInput و computeStaticScoreFromFeatures به lib/ml-core.ts منتقل
+// شدند تا چرخه‌ی importِ customer-insights ↔ no-show-model بشکند (توضیحِ کاملِ
+// دلیل — و باگِ Node 20ی که لو داد — در خودِ ml-core.ts). این‌جا دوباره export
+// می‌شوند چون مصرف‌کننده‌های موجود (تست‌ها، crm) از همین مسیر می‌خوانند و
+// شکستنِ آن‌ها هیچ سودی نداشت.
+export { computeStaticScoreFromFeatures };
+export type { RawFeatureInput };
 
 export function tierFromScore(score: number): 'low' | 'medium' | 'high' {
   return score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low';
@@ -119,18 +88,27 @@ export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResul
     source: input.source,
   };
 
-  const { getLearnedNoShowModel, predictProba, buildFeatureVector } = await import('./no-show-model');
-  const weights = await getLearnedNoShowModel(input.restaurantId).catch(() => null);
-  if (weights) {
-    const probability = predictProba(weights, buildFeatureVector(features));
+  const learned = await getLearnedNoShowModelWithRun(input.restaurantId).catch(() => null);
+  if (learned) {
+    const probability = predictProba(learned.weights, buildFeatureVector(features));
     const score = Math.round(probability * 100);
-    return { score, tier: tierFromScore(score), source: 'learned', lineage: { features, probability } };
+    return {
+      score, tier: tierFromScore(score), source: 'learned',
+      // فازِ ۶: نسخه‌ی مدل هم در ردِ ورودی می‌آید تا دفترِ پیش‌بینی بتواند
+      // نتیجه را به همان اجرایِ آموزش نسبت دهد. null یعنی مدلی است که پیش
+      // از مهاجرتِ ۰۵۶ آموزش دیده — نسب‌نامه‌اش را جعل نمی‌کنیم.
+      lineage: { features, probability, modelRunId: learned.runId },
+    };
   }
 
   const score = computeStaticScoreFromFeatures(features);
   // heuristic احتمالِ واقعی نمی‌دهد؛ score/100 نزدیک‌ترین تفسیرِ صادقانه است
   // و همان چیزی است که در آموزش هم به‌عنوانِ baseline با Brier سنجیده می‌شود.
-  return { score, tier: tierFromScore(score), source: 'heuristic', lineage: { features, probability: score / 100 } };
+  // heuristic اجرایِ آموزش ندارد، پس modelRunId عمداً null است.
+  return {
+    score, tier: tierFromScore(score), source: 'heuristic',
+    lineage: { features, probability: score / 100, modelRunId: null },
+  };
 }
 
 // ───────────────────────────────────────────────────────────

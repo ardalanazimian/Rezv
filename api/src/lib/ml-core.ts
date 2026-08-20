@@ -156,3 +156,66 @@ export function decideModelActivation(params: ActivationParams): ActivationDecis
   }
   return { isActive: true, reason: `${(improvement * 100).toFixed(1)}٪ دقیق‌تر از ${baselineLabel} روی هولدآوت` };
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ویژگی‌هایِ خامِ رفتارِ مهمان + فرمولِ heuristic
+//
+//  ⚠️ چرا این دو از customer-insights.ts به این‌جا منتقل شدند (۲۰۲۶-۰۸-۲۰):
+//  یک چرخه‌ی واقعیِ import وجود داشت — customer-insights به no-show-model
+//  نیاز داشت (مدلِ یادگرفته) و no-show-model به customer-insights
+//  (computeStaticScoreFromFeatures به‌عنوانِ baseline). راهِ‌حلِ قبلی یک
+//  `await import()`ِ پویا در مسیرِ داغِ رزرو بود.
+//
+//  آن راهِ‌حل روی Node 20 می‌شکند: زیرِ tsx ماژول به یک data: URL تبدیل
+//  می‌شود و Node 20 نمی‌تواند specifierِ نسبی را از داخلِ data: URL حل کند
+//  (ERR_UNSUPPORTED_RESOLVE_REQUEST). چون importهایِ پویا در آن مسیر داخلِ
+//  یک fire-and-forgetِ بی‌catch بودند، شکست بی‌صدا بود.
+//
+//  ml-core عمداً هیچ importی ندارد، پس میزبانِ درستِ این دو است: چرخه
+//  می‌شکند و هر دو طرف می‌توانند static import کنند — بدونِ هیچ importِ
+//  پویایی در مسیرِ داغ.
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * ویژگی‌های خامی که هم فرمولِ heuristic و هم مدلِ یادگرفته از رویشان ساخته
+ * می‌شوند — تنها جایی که «سابقه‌ی مشتری» و «زمان‌بندیِ رزرو» به عدد تبدیل
+ * می‌شوند.
+ */
+export type RawFeatureInput = {
+  hasUserId: boolean;
+  priorTotal: number;        // تعداد رزروهای حل‌شده‌ی قبلیِ همین کاربر (تکمیل‌شده + no-show)
+  priorNoShowRate: number;   // noShows / priorTotal — فقط اگر priorTotal > 0 معنا دارد
+  leadMinutes: number;
+  partySize: number;
+  source: string;
+};
+
+/**
+ * فرمولِ heuristicِ دستی — بدونِ هیچ دسترسیِ DB، فقط از رویِ ویژگی‌های خام.
+ * هم مسیرِ زنده‌ی fallback را تغذیه می‌کند و هم baselineِ مقایسه در آموزشِ
+ * مدلِ یادگرفته را — منبعِ واحد، تا این دو مسیر روزی از هم جدا نیفتند.
+ */
+export function computeStaticScoreFromFeatures(f: RawFeatureInput): number {
+  let score = 15; // پایه‌ی ریسک برای مهمان ناشناس (بدون سابقه)
+
+  if (f.hasUserId) {
+    if (f.priorTotal === 0) {
+      score = 25; // کاربر شناخته‌شده ولی بدون سابقه‌ی حضور قطعی
+    } else {
+      score = Math.round(f.priorNoShowRate * 90) + 5; // نگاشت نرخ no-show به امتیاز
+      if (f.priorTotal >= 5 && f.priorNoShowRate === 0) score = Math.max(2, score - 5); // مشتری وفادار با سابقه‌ی پاک
+    }
+  }
+
+  // ── lead time: رزرو دقیقه‌ی ۹۰ام (last-minute) ریسک بیشتری دارد ──
+  if (f.leadMinutes < 30) score += 12;
+  else if (f.leadMinutes > 7 * 24 * 60) score += 6; // رزرو خیلی زودهنگام هم کمی ریسک بیشتر دارد (فراموشی)
+
+  // ── گروه بزرگ بدون پیش‌سفارش/تأیید، ریسک سازمانی بیشتر دارد ──
+  if (f.partySize >= 6) score += 8;
+
+  // ── منبع رزرو: تماس تلفنی/walk-in نسبت به اپ کمی نامطمئن‌تر ──
+  if (f.source === 'phone') score += 5;
+
+  return Math.max(0, Math.min(100, score));
+}

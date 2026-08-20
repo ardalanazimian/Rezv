@@ -8,6 +8,7 @@ import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
 import { redeemGiftCardTx } from './loyalty';
 import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
+import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
 import { computeRanges, genReservationCode, isConflictError, isSerializationError } from './reservation-helpers';
 import { invalidateAvailability } from './availability-cache';
@@ -369,23 +370,29 @@ async function placeReservation(
   // ⚠️ void و بدونِ await عمدی است (بندِ ۴۶): رزرو از قبل commit شده و پاسخ
   // آماده است؛ نوشتنِ دفتر نباید یک میلی‌ثانیه به مسیرِ بحرانی اضافه کند یا
   // با خطایش آن را بشکند. خودِ recordPrediction هم fail-open است.
+  //
+  // ⚠️ importِ static (نه `await import()`) — یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۰ که فقط
+  // روی Node 20 (نسخه‌ی CI) بروز می‌کرد: زیرِ tsx این ماژول به data: URL تبدیل
+  // می‌شود و Node 20 نمی‌تواند specifierِ نسبی را از آن حل کند
+  // (ERR_UNSUPPORTED_RESOLVE_REQUEST). چون این‌جا یک voidِ بی‌catch بود، شکست
+  // کاملاً بی‌صدا بود: هیچ پیش‌بینی‌ای در دفتر ثبت نمی‌شد و هیچ‌کس نمی‌فهمید.
+  // یعنی کلِ فازِ ۵ روی Node 20 در عمل مرده بود. catchِ صریح هم اضافه شد تا
+  // خطا هرگز به unhandled rejection تبدیل نشود.
   if (noShowRisk.lineage) {
     const lin = noShowRisk.lineage;
-    void (async () => {
-      const { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } = await import('./prediction-ledger');
-      await recordPrediction({
-        restaurantId: r.id,
-        predictionType: 'no_show',
-        entityType: 'reservation',
-        entityId: result.resv.id,
-        modelSource: noShowRisk.source,
-        featureVersion: NO_SHOW_FEATURE_VERSION,
-        predictedValue: lin.probability,
-        confidence: confidenceFor({ modelSource: noShowRisk.source, priorTotal: lin.features.priorTotal }),
-        features: lin.features,
-        horizonAt: result.resv.slotStart,   // نتیجه در لحظه‌ی برگزاری معلوم می‌شود
-      });
-    })();
+    void recordPrediction({
+      restaurantId: r.id,
+      predictionType: 'no_show',
+      entityType: 'reservation',
+      entityId: result.resv.id,
+      modelSource: noShowRisk.source,
+      modelRunId: lin.modelRunId,   // فازِ ۶ — نسبت‌دادن به نسخه‌ی مدل
+      featureVersion: NO_SHOW_FEATURE_VERSION,
+      predictedValue: lin.probability,
+      confidence: confidenceFor({ modelSource: noShowRisk.source, priorTotal: lin.features.priorTotal }),
+      features: lin.features,
+      horizonAt: result.resv.slotStart,   // نتیجه در لحظه‌ی برگزاری معلوم می‌شود
+    }).catch(() => { /* recordPrediction خودش fail-open است؛ این فقط تورِ ایمنی */ });
   }
 
   return {

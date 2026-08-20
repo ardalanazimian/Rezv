@@ -72,6 +72,7 @@ import './loyalty-status.test.mts';
 import './loyalty.test.mts';
 import './media.test.mts';
 import './ml-core.test.mts';
+import './no-dynamic-import-in-hot-path.test.mts';
 import './no-show-model.test.mts';
 import './notifications.test.mts';
 import './otp.test.mts';
