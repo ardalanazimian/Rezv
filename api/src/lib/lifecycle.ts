@@ -5,6 +5,7 @@ import { enqueueSms, type SmsJob } from './sms';
 import { processReservationEconomyEvent } from './economy';
 import { createLogger } from './logger';
 import { dateKeyInTz } from './hours';
+import { recordOutcome } from './prediction-ledger';
 
 const log = createLogger('lifecycle');
 
@@ -133,6 +134,39 @@ export async function transitionReservation(opts: {
         reservationId: result.resv.id, error: (e as Error).message,
       });
     });
+
+    // ── فازِ ۵: ثبتِ نتیجه‌ی واقعی در دفترِ نتیجه ──
+    // این همان نقطه‌ای است که حلقه‌ی یادگیری بسته می‌شود: تا امروز مدل
+    // پیش‌بینی می‌کرد و هیچ‌کس نمی‌سنجید درست بود یا نه.
+    //
+    // فقط وضعیت‌هایِ *نهایی* شمرده می‌شوند. حالت‌هایِ میانی (checked_in،
+    // seated، …) هنوز نتیجه نیستند؛ اگر آن‌ها را ثبت می‌کردیم، یک رزروِ
+    // موفق چند بار و با برچسبِ غلط وارد آمار می‌شد.
+    //
+    // کنسلی عمداً نتیجه نیست: مدل «آمد یا نیامد» را پیش‌بینی می‌کند، و
+    // رزروی که کنسل شده اصلاً به آن سؤال نرسیده. شمردنش به‌عنوانِ «آمد»
+    // آمار را به نفعِ مدل منحرف می‌کرد.
+    const OUTCOME_LABELS: Record<string, number> = {
+      no_show: 1,
+      completed: 0, arrived: 0, seated: 0, dining: 0,
+    };
+    const observed = OUTCOME_LABELS[result.resv.status];
+    if (observed !== undefined) {
+      // ⚠️ importِ static (نه `await import()`) و catchِ صریح — یافته‌ی واقعیِ
+      // ۲۰۲۶-۰۸-۲۰: importِ پویا اینجا روی Node 20 با
+      // ERR_UNSUPPORTED_RESOLVE_REQUEST می‌شکست و چون داخلِ یک voidِ بی‌catch
+      // بود، بی‌صدا هیچ نتیجه‌ای ثبت نمی‌شد (توضیحِ کامل در ml-core.ts).
+      void recordOutcome({
+        entityType: 'reservation',
+        entityId: result.resv.id,
+        observedValue: observed,
+        source: 'reservation_status',
+      }).catch((e) => {
+        log.warn('ثبتِ نتیجه در دفترِ مدل ناموفق (رزرو خودش commit شد)', {
+          reservationId: result.resv.id, error: (e as Error).message,
+        });
+      });
+    }
   }
 
   // بعد از commit: اعلان (خارج از transaction تا تراکنش را کند نکند)

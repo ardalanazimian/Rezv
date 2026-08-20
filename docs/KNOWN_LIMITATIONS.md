@@ -769,3 +769,41 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   state but the automated refund path is **(uncertain)**.
 - Several restaurant-panel RBAC permission mappings are inferred; confirm the
   exact `permission` key per route against the handlers.
+
+### ۲e) هشت `import()`ِ پویایِ نسبیِ باقی‌مانده در `api/src/lib/` (۲۰۲۶-۰۸-۲۰)
+
+**یافته‌ی واقعی، از لاگِ CI نه از خواندنِ کد.** زیرِ `tsx` (که فقط `npm test` و
+`db:seed` از آن استفاده می‌کنند — نه سرورِ تولید که با Next.js/Turbopack اجرا
+می‌شود) ماژول به یک `data:` URL تبدیل می‌شود و **Node ۲۰** نمی‌تواند specifierِ
+نسبی را از داخلِ آن حل کند:
+
+```
+TypeError [ERR_UNSUPPORTED_RESOLVE_REQUEST]:
+  Failed to resolve module specifier "./prediction-ledger.ts"
+  from "data:text/javascript,..."
+```
+
+Node ۲۲ می‌تواند — برای همین محلی سبز بود و CI (که Node ۲۰ است) قرمز.
+
+دو موردِ مسیرِ ML (`reservations.ts` و `lifecycle.ts` → `prediction-ledger`)
+رفع شدند: چرخه‌ی `customer-insights ↔ no-show-model` با انتقالِ
+`RawFeatureInput` و `computeStaticScoreFromFeatures` به `ml-core.ts` (که هیچ
+importی ندارد) شکسته شد و همه‌ی این importها static شدند. قفلِ رگرسیون:
+`tests/no-dynamic-import-in-hot-path.test.mts`.
+
+**هنوز باقی‌مانده** (هرکدام زیرِ tsx/Node ۲۰ همان خطر را دارند):
+
+| فایل | importِ پویا | چرا هنوز هست |
+|---|---|---|
+| `db.ts:92` | `./metrics` | نیاز به بررسیِ چرخه |
+| `notify.ts:61,71` | `./queue` | چرخه‌ی واقعی با worker |
+| `redis.ts:168` | `./errors` | احتمالاً بی‌خطر، بررسی نشده |
+| `reservations.ts:143` | `./hours` | احتمالاً بی‌خطر، بررسی نشده |
+| `sms.ts:49` | `./queue` | چرخه‌ی واقعی با worker |
+| `tables.ts:103` | `./lifecycle` | چرخه‌ی واقعی |
+| `waitlist.ts:406` | `./reservations` | چرخه‌ی واقعی |
+
+**شدت:** تولید را نمی‌شکند (Turbopack درست resolve می‌کند). خطرش این است که
+هر کدام از این مسیرها اگر روزی در تستی زیرِ Node ۲۰ اجرا شود، بی‌صدا شکست
+می‌خورد — دقیقاً همان چیزی که فازِ ۵ را بدونِ اینکه کسی بفهمد بی‌آزمون کرده بود.
+ریفکتورِ جدا لازم دارد و عمداً در این PR انجام نشد.

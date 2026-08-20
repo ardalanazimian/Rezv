@@ -96,6 +96,19 @@ jobs:
           npx prisma db push --skip-generate
           # اجرای SQLهای دستی (prisma/sql) با همان مسیرِ کدِ Docker.
           sh prisma/apply-sql.sh
+          # بستنِ شکافِ اسکیمای تست با تولید (defaultِ uuid برای PKها) —
+          # دلیلِ کامل و شواهدش در خودِ فایل.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/test-schema-fixups.sql
+          # ⚠️ ساکت‌کردنِ لاگِ statementِ Postgres — یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۰:
+          # وقتی تست قرمز شد، GitHub در پایانِ job لاگِ کانتینرِ Postgres را چاپ
+          # می‌کند و هر ERROR همراهِ کلِ متنِ STATEMENT است (یک INSERTِ رزرو
+          # حدودِ ۲۵۰۰ کاراکتر). این‌ها ~۵۰ خطِ غول‌پیکرِ آخرِ لاگ را می‌گیرند و
+          # خلاصه‌ی «✖ failing tests» را از دیدِ tail بیرون می‌اندازند — دقیقاً
+          # همان چیزی که تشخیص را چند دور عقب انداخت. خطاها همچنان رخ می‌دهند و
+          # تست‌ها همچنان می‌بینندشان؛ فقط دیگر در لاگِ سرور تکرار نمی‌شوند.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "ALTER SYSTEM SET log_min_error_statement = 'panic';" \
+            -c "SELECT pg_reload_conf();"
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/rezervno_test
           DATABASE_DIRECT_URL: postgresql://test:test@localhost:5432/rezervno_test

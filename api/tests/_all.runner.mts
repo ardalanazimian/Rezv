@@ -35,6 +35,14 @@
 //     `comm -23 <(ls tests/*.test.mts) <(grep -oP ...)` (یا مشابه) چک کن که
 //     همه‌ی فایل‌هایِ tests/*.test.mts واقعاً اینجا import شدن.
 //
+//  ⚠️ گزارشگر عمداً `spec` است (در package.json)، نه TAPِ پیش‌فرض — یافته‌ی
+//     واقعیِ ۲۰۲۶-۰۸-۲۰: وقتی CI قرمز شد، خروجیِ TAP بیش از ۴۰۰۰ خط بود و
+//     `not ok`ها وسطِ لاگ پخش بودند، پس از رویِ tailِ لاگ اصلاً نمی‌شد فهمید
+//     *کدام* تست افتاده — تشخیص به حدس‌زدن و بازتولیدِ محلی موکول شد.
+//     گزارشگرِ spec هم شمارشِ نهایی را دارد، هم بخشِ «✖ failing tests» را با
+//     نام/پیام/خطِ فایل دقیقاً در انتها می‌گذارد، و کلِ خروجی ~۸۶۰ خط است.
+//     یعنی هر شکستِ CI از این به بعد از رویِ همان چند خطِ آخر خوانا است.
+//
 //  ⚠️ اسمِ این فایل عمداً `.runner.mts` است، نه `.test.mts` — اگر `.test.mts`
 //     بود، خودش هم با glob قدیمیِ `tests/*.test.mts` مچ می‌شد و هر کسی که
 //     دستی اون glob رو اجرا کنه (عادتِ مستندشده‌ی قبلی) هر تست رو دوبار
@@ -64,6 +72,10 @@ import './loyalty-status.test.mts';
 import './loyalty.test.mts';
 import './media.test.mts';
 import './ml-core.test.mts';
+import './model-drift.test.mts';
+import './model-drift.integration.test.mts';
+import './model-registry.integration.test.mts';
+import './no-dynamic-import-in-hot-path.test.mts';
 import './no-show-model.test.mts';
 import './notifications.test.mts';
 import './otp.test.mts';
@@ -79,6 +91,7 @@ import './site-orders.test.mts';
 import './table-merge-occupancy-concurrency.test.mts';
 import './table-merge-occupancy.test.mts';
 import './validate.test.mts';
+import './prediction-ledger.integration.test.mts';
 import './public-menu.integration.test.mts';
 import './temporal-leakage.integration.test.mts';
 import './tenant-isolation.integration.test.mts';
