@@ -206,3 +206,98 @@ export async function getProductionAccuracy(params: {
     mae: r.mae === null ? null : Number(r.mae),
   }));
 }
+
+/**
+ * کف‌ِ نمونه برای اینکه عددِ دقت اصلاً *گزارش* شود.
+ *
+ * بندِ ۲۰ دستور: هرگز قطعیتِ ساختگی نساز. Brier روی ۳ نتیجه یک عددِ واقعی
+ * است ولی یک ادعایِ بی‌معنا؛ نمایشش در داشبورد دقیقاً همان «کارایی مدلِ
+ * جعلی» است که ممنوع شده. زیرِ این کف، بک‌اند عدد را null می‌دهد و صریحاً
+ * می‌گوید داده کافی نیست — تصمیمِ آستانه اینجاست، نه در UI، تا هر مصرف‌کننده
+ * (پنل، گزارش، آینده) یک قانون داشته باشد.
+ */
+export const MIN_RESOLVED_FOR_ACCURACY = 20;
+
+export interface LedgerHealth {
+  predictionType: string;
+  modelSource: string;
+  /** پیش‌بینی‌هایی که نتیجه‌شان مشاهده شده. */
+  resolvedCount: number;
+  /** هنوز رخ نداده — انتظارِ طبیعی، نه مشکل. */
+  pendingCount: number;
+  /**
+   * افق‌شان گذشته ولی نتیجه‌ای ثبت نشده.
+   *
+   * ⚠️ این تنها عددِ این داشبورد است که «خرابی» را نشان می‌دهد: یعنی رزرو
+   * به وضعیتِ نهایی نرسیده یا ثبتِ نتیجه شکست خورده. اگر بالا برود، حلقه‌ی
+   * یادگیری نشت دارد و آمارِ دقت به‌مرور روی زیرمجموعه‌ی سوگیرانه‌ای از
+   * رزروها محاسبه می‌شود.
+   */
+  overdueCount: number;
+  /** null اگر resolvedCount زیرِ MIN_RESOLVED_FOR_ACCURACY باشد. */
+  brier: number | null;
+  mae: number | null;
+}
+
+/**
+ * سلامتِ دفتر در سطحِ پلتفرم — همان چیزی که داشبوردِ شرکت نشان می‌دهد.
+ *
+ * عمداً یک کوئریِ گروه‌بندی‌شده است، نه یک حلقه روی رستوران‌ها: پنلِ شرکت
+ * همه‌ی رستوران‌ها را می‌بیند و N+1 اینجا یعنی صدها رفت‌وبرگشت.
+ *
+ * چرا LEFT JOIN و نه JOIN: باید پیش‌بینیِ بدونِ نتیجه هم شمرده شود، وگرنه
+ * «حلقه‌ی شکسته» نامرئی می‌ماند — دقیقاً همان چیزی که باید دیده شود.
+ */
+export async function getLedgerHealth(params: {
+  restaurantId?: string;
+  predictionType?: string;
+  sinceDays?: number;
+} = {}): Promise<LedgerHealth[]> {
+  const since = new Date(Date.now() - (params.sinceDays ?? 90) * 86_400_000);
+  const restaurantFilter = params.restaurantId
+    ? Prisma.sql`AND p.restaurant_id = ${params.restaurantId}::uuid`
+    : Prisma.empty;
+  const typeFilter = params.predictionType
+    ? Prisma.sql`AND p.prediction_type = ${params.predictionType}`
+    : Prisma.empty;
+
+  const rows = await db.$queryRaw<{
+    prediction_type: string; model_source: string;
+    resolved: number; pending: number; overdue: number;
+    brier: number | null; mae: number | null;
+  }[]>(Prisma.sql`
+    SELECT p.prediction_type, p.model_source,
+           COUNT(o.id)::int AS resolved,
+           COUNT(*) FILTER (
+             WHERE o.id IS NULL AND (p.horizon_at IS NULL OR p.horizon_at > now())
+           )::int AS pending,
+           COUNT(*) FILTER (
+             WHERE o.id IS NULL AND p.horizon_at IS NOT NULL AND p.horizon_at <= now()
+           )::int AS overdue,
+           AVG(o.squared_error)::float8  AS brier,
+           AVG(o.absolute_error)::float8 AS mae
+    FROM model_predictions p
+    LEFT JOIN model_outcomes o ON o.prediction_id = p.id
+    WHERE p.generated_at >= ${since}
+      ${restaurantFilter}
+      ${typeFilter}
+    GROUP BY p.prediction_type, p.model_source
+    ORDER BY p.prediction_type, p.model_source
+  `);
+
+  return rows.map(r => {
+    const resolvedCount = Number(r.resolved);
+    const enough = resolvedCount >= MIN_RESOLVED_FOR_ACCURACY;
+    return {
+      predictionType: r.prediction_type,
+      modelSource: r.model_source,
+      resolvedCount,
+      pendingCount: Number(r.pending),
+      overdueCount: Number(r.overdue),
+      // زیرِ کف عمداً null — نه عددِ کوچک‌شمار، نه صفر. صفر یعنی «مدل بی‌نقص»
+      // که بدترین دروغِ ممکن در این جدول است.
+      brier: enough && r.brier !== null ? Number(r.brier) : null,
+      mae: enough && r.mae !== null ? Number(r.mae) : null,
+    };
+  });
+}

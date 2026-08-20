@@ -6,7 +6,8 @@ import { createReservation } from '../src/lib/reservations.ts';
 import { transitionReservation } from '../src/lib/lifecycle.ts';
 import {
   recordPrediction, recordOutcome, confidenceFor,
-  getProductionAccuracy, NO_SHOW_FEATURE_VERSION,
+  getProductionAccuracy, getLedgerHealth, MIN_RESOLVED_FOR_ACCURACY,
+  NO_SHOW_FEATURE_VERSION,
 } from '../src/lib/prediction-ledger.ts';
 import { NO_SHOW_FEATURE_NAMES } from '../src/lib/no-show-model.ts';
 
@@ -24,7 +25,7 @@ import { NO_SHOW_FEATURE_NAMES } from '../src/lib/no-show-model.ts';
 // ═══════════════════════════════════════════════════════════════════════
 
 const TAG = `pl-${randomUUID().slice(0, 8)}`;
-let tenantId: string, restaurantId: string, userId: string;
+let tenantId: string, restaurantId: string, userId: string, healthRestaurantId: string;
 const SLOT_DATE = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 10);
 
 /**
@@ -69,6 +70,15 @@ before(async () => {
     select: { id: true },
   });
   userId = u.id;
+
+  // رستورانِ دومِ ایزوله برای تست‌های تجمیعِ سلامتِ دفتر — عمداً جدا، تا
+  // شمارش‌هایش با حلقه‌ی بسته‌ی بالا قاطی نشود و هر دو گروه قابلِ‌اثبات بمانند.
+  const r2 = await db.restaurant.create({
+    data: { tenantId, slug: `${TAG}-h`, name: '[DEMO] رستورانِ سلامتِ دفتر', timezone: 'Asia/Tehran',
+            clubPrefix: 'PH', isOpen: true, onlineGating: false },
+    select: { id: true },
+  });
+  healthRestaurantId = r2.id;
 });
 
 after(async () => {
@@ -79,7 +89,7 @@ after(async () => {
   await db.clubMember.deleteMany({ where: { restaurantId } }).catch(() => {});
   await db.clubCodeCounter.deleteMany({ where: { restaurantId } }).catch(() => {});
   await db.table.deleteMany({ where: { restaurantId } }).catch(() => {});
-  await db.restaurant.deleteMany({ where: { id: restaurantId } }).catch(() => {});
+  await db.restaurant.deleteMany({ where: { id: { in: [restaurantId, healthRestaurantId] } } }).catch(() => {});
   await db.tenant.deleteMany({ where: { id: tenantId } }).catch(() => {});
   await db.user.deleteMany({ where: { id: userId } }).catch(() => {});
 });
@@ -170,6 +180,82 @@ describe('حلقه‌ی بسته: رزروِ واقعی → پیش‌بینی �
     assert.equal(acc[0].resolvedCount, 1);
     assert.ok(acc[0].brier !== null && acc[0].brier >= 0 && acc[0].brier <= 1,
       'Brier باید عددِ معتبرِ ۰..۱ باشد — این همان چیزی است که تا امروز قابلِ‌محاسبه نبود');
+  });
+});
+
+describe('سلامتِ دفتر — همان چیزی که داشبوردِ شرکت نشان می‌دهد', () => {
+  /** ثبتِ یک پیش‌بینی برای رستورانِ سلامت، با افق و نتیجه‌ی دلخواه. */
+  async function seed(opts: {
+    predicted: number; horizonAt: Date; observed?: number;
+  }): Promise<void> {
+    const entityId = randomUUID();
+    const id = await recordPrediction({
+      restaurantId: healthRestaurantId, predictionType: 'no_show',
+      entityType: 'reservation', entityId, modelSource: 'heuristic',
+      featureVersion: NO_SHOW_FEATURE_VERSION, predictedValue: opts.predicted,
+      confidence: 'low', horizonAt: opts.horizonAt,
+    });
+    assert.ok(id, 'ثبتِ پیش‌بینیِ آزمایشی باید موفق باشد');
+    if (opts.observed !== undefined) {
+      const r = await recordOutcome({
+        entityType: 'reservation', entityId,
+        observedValue: opts.observed, source: 'reservation_status',
+      });
+      assert.equal(r, 'recorded');
+    }
+  }
+
+  const past = () => new Date(Date.now() - 3 * 86_400_000);
+  const future = () => new Date(Date.now() + 3 * 86_400_000);
+
+  test('در انتظارِ وقوع با «بدونِ نتیجه» اشتباه گرفته نمی‌شود', async () => {
+    // این تمایز کلِ ارزشِ overdueCount است: اگر افقِ آینده هم «بدونِ نتیجه»
+    // شمرده می‌شد، داشبورد همیشه هشدارِ دروغ می‌داد و کسی جدی‌اش نمی‌گرفت.
+    await seed({ predicted: 0.4, horizonAt: future() });                 // در انتظار
+    await seed({ predicted: 0.4, horizonAt: past() });                   // افقش گذشته، بی‌نتیجه
+    await seed({ predicted: 0.4, horizonAt: past(), observed: 0 });      // حل‌شده
+
+    const rows = await getLedgerHealth({ restaurantId: healthRestaurantId });
+    assert.equal(rows.length, 1, 'یک گروه (no_show × heuristic)');
+    const g = rows[0];
+    assert.equal(g.pendingCount, 1, 'فقط افقِ آینده در انتظار است');
+    assert.equal(g.overdueCount, 1, 'فقط افقِ گذشته‌ی بی‌نتیجه سررسیدگذشته است');
+    assert.equal(g.resolvedCount, 1);
+  });
+
+  test('زیرِ کفِ نمونه، عددِ دقت اصلاً گزارش نمی‌شود (نه صفر، نه عددِ کم‌شمار)', async () => {
+    // بندِ ۲۰: قطعیتِ ساختگی ممنوع. با ۱ نتیجه، Brier یک عددِ واقعی ولی
+    // ادعایی بی‌معناست. اینجا باید null باشد.
+    const rows = await getLedgerHealth({ restaurantId: healthRestaurantId });
+    assert.ok(rows[0].resolvedCount < MIN_RESOLVED_FOR_ACCURACY, 'پیش‌فرضِ این تست: هنوز زیرِ کف');
+    assert.equal(rows[0].brier, null, 'زیرِ کف باید null باشد');
+    assert.equal(rows[0].mae, null);
+  });
+
+  test('کنترلِ مثبت: با رسیدن به کف، همان عدد واقعاً محاسبه و برگردانده می‌شود', async () => {
+    // بدونِ این کنترل، تستِ بالا با یک `return null`ِ همیشگی هم پاس می‌شد —
+    // یعنی هیچ‌چیز را اثبات نمی‌کرد.
+    const before = await getLedgerHealth({ restaurantId: healthRestaurantId });
+    const need = MIN_RESOLVED_FOR_ACCURACY - before[0].resolvedCount;
+    // پیش‌بینیِ کامل‌درست (۰ در برابرِ نتیجه‌ی ۰) → سهمِ Brier صفر است.
+    for (let i = 0; i < need; i++) await seed({ predicted: 0, horizonAt: past(), observed: 0 });
+
+    const rows = await getLedgerHealth({ restaurantId: healthRestaurantId });
+    const g = rows[0];
+    assert.equal(g.resolvedCount, MIN_RESOLVED_FOR_ACCURACY);
+    assert.ok(g.brier !== null, 'در کف باید عدد بدهد، نه null');
+    assert.ok(g.brier! >= 0 && g.brier! <= 1, 'Brier باید در بازه‌ی معتبر باشد');
+    assert.ok(g.mae !== null);
+  });
+
+  test('فیلترِ رستوران واقعاً جدا می‌کند (نشتِ بین‌تنانتی ندارد)', async () => {
+    // همان انضباطِ tenant-isolation، اینجا روی دفتر: داشبوردِ شرکت کلِ پلتفرم
+    // را می‌بیند، ولی هر کوئریِ رستوران‌محور باید فقط همان رستوران را بدهد.
+    const mine = await getLedgerHealth({ restaurantId: healthRestaurantId });
+    const other = await getLedgerHealth({ restaurantId });
+    assert.equal(mine[0].resolvedCount, MIN_RESOLVED_FOR_ACCURACY);
+    // رستورانِ حلقه‌ی بسته دقیقاً یک نتیجه دارد — نه بیشتر، نه صفر.
+    assert.equal(other.reduce((s, g) => s + g.resolvedCount, 0), 1);
   });
 });
 

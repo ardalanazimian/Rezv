@@ -3,6 +3,7 @@ import { dbRead as db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { adminAuthFromRequest } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
+import { getLedgerHealth, MIN_RESOLVED_FOR_ACCURACY } from '@/lib/prediction-ledger';
 
 /**
  * GET /api/v1/admin/ai/model-health — داشبوردِ سلامتِ مدل‌هایِ یادگرفته (پنلِ شرکت).
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
     await enforceRateLimit(clientIp(req), RULES.search);
     adminAuthFromRequest(req);
 
-    const [noShowRows, demandRows, recentRuns, noShowActiveCount] = await Promise.all([
+    const [noShowRows, demandRows, recentRuns, noShowActiveCount, ledgerHealth] = await Promise.all([
       db.restaurantNoShowModel.findMany({
         select: {
           restaurantId: true, isActive: true, sampleSize: true, positiveCount: true,
@@ -48,6 +49,10 @@ export async function GET(req: Request) {
         },
       }),
       db.restaurantNoShowModel.count({ where: { isActive: true } }),
+      // فازِ ۵ — دقتِ *تولید* از دفترِ پیش‌بینی/نتیجه. عمداً یک بخشِ جداست و
+      // با اعدادِ بالا قاطی نمی‌شود: learned_brier آنجا کاراییِ لحظه‌ی آموزش
+      // روی هولدآوتِ گذشته است، این یکی چیزی که واقعاً در تولید رخ داد.
+      getLedgerHealth({ sinceDays: 90 }),
     ]);
 
     const demandActiveCounts = demandRows.reduce(
@@ -86,6 +91,22 @@ export async function GET(req: Request) {
             covers_active: !!covers?.isActive, covers_mae: covers?.mae ?? null, covers_baseline_mae: covers?.baselineMae ?? null,
           };
         }),
+      },
+      // ── دقتِ واقعیِ تولید (فازِ ۵) ──
+      // window_days و min_resolved عمداً برگردانده می‌شوند تا UI قانون را
+      // دوباره اختراع نکند؛ یک منبعِ حقیقت برای آستانه.
+      production_accuracy: {
+        window_days: 90,
+        min_resolved: MIN_RESOLVED_FOR_ACCURACY,
+        groups: ledgerHealth.map((g) => ({
+          prediction_type: g.predictionType,
+          model_source: g.modelSource,
+          resolved_count: g.resolvedCount,
+          pending_count: g.pendingCount,
+          overdue_count: g.overdueCount,
+          brier: g.brier,
+          mae: g.mae,
+        })),
       },
       recent_runs: recentRuns.map((r) => ({
         id: r.id, restaurant_id: r.restaurantId, restaurant_name: r.restaurant.name,

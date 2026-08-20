@@ -241,6 +241,44 @@ function rSystemHealth(){
 // append-only آموزش‌ها (model_training_runs، migration 042) — شاملِ
 // آموزش‌هایی که نتیجه‌شون فعال‌سازی نبوده، نه فقط آخرین وضعیت.
 const RUN_KIND_FA = { no_show: 'ریسکِ عدم‌حضور', demand_forecast: 'پیش‌بینیِ تقاضا' };
+const PRED_TYPE_FA = { no_show: 'ریسکِ عدم‌حضور', demand: 'پیش‌بینیِ تقاضا' };
+const MODEL_SOURCE_FA = { learned: 'مدلِ یادگرفته', heuristic: 'قانونِ دستی (heuristic)' };
+
+// ═══════ دقتِ واقعیِ تولید (فازِ ۵) ═══════
+// تفاوتِ این پنل با پنلِ بالا حیاتی است و عمداً در متنِ UI هم گفته می‌شه:
+// «Brierِ یادگرفته» در جدولِ وضعیت، کاراییِ لحظه‌ی آموزش روی دادهٔ نگه‌داشته‌شده‌ی
+// گذشته است. این پنل چیزی رو نشون می‌ده که واقعاً در تولید رخ داد — پیش‌بینی
+// شد، بعد نتیجه‌ش مشاهده شد. تا قبل از فازِ ۵ این عدد اصلاً قابلِ محاسبه نبود.
+function productionAccuracyPanelHTML(pa){
+  if(!pa) return '';
+  const g = pa.groups || [];
+  const num=(v,d)=>v==null?null:fa(Math.round(v*Math.pow(10,d))/Math.pow(10,d));
+  const totalOverdue = g.reduce((s,x)=>s+(x.overdue_count||0),0);
+  return `<div class="panel" style="margin-top:20px">
+    <div class="panel-head"><div>
+      <div class="panel-title">دقتِ واقعی در تولید — از دفترِ پیش‌بینی و نتیجه</div>
+      <div class="panel-sub">${fa(pa.window_days)} روزِ گذشته · «پیش‌بینی کردیم، بعد واقعاً چه شد» — نه کاراییِ لحظه‌ی آموزش</div>
+    </div></div>
+    ${totalOverdue>0?`<div class="mini-row" style="background:var(--amber-50,#FFFBEB)">
+      <div class="mini-info">
+        <div class="mini-name" style="color:var(--amber-700,#B45309)">${icon('alert',{size:14})} ${fa(totalOverdue)} پیش‌بینی نتیجه‌ش ثبت نشده</div>
+        <div class="mini-sub">افقِ زمانی‌شون گذشته ولی رزرو به وضعیتِ نهایی نرسیده. تا وقتی این عدد بالا بمونه، دقتِ زیر روی زیرمجموعه‌ای از رزروها حساب می‌شه، نه همه‌شون.</div>
+      </div>
+    </div>`:''}
+    ${g.length?g.map(x=>{
+      const enough = x.resolved_count >= pa.min_resolved;
+      return `<div class="mini-row">
+        <div class="mini-info">
+          <div class="mini-name">${PRED_TYPE_FA[x.prediction_type]||esc(x.prediction_type)} · ${MODEL_SOURCE_FA[x.model_source]||esc(x.model_source)}</div>
+          <div class="mini-sub">${fa(x.resolved_count)} نتیجه‌ی مشاهده‌شده · ${fa(x.pending_count)} در انتظارِ وقوع${x.overdue_count?` · ${fa(x.overdue_count)} بدونِ نتیجه`:''}</div>
+        </div>
+        ${enough
+          ? `<span class="badge active" title="میانگینِ خطایِ مربع (Brier) روی نتایجِ واقعیِ تولید">Brier ${num(x.brier,3)}</span>`
+          : `<span class="badge expired" title="کف: ${pa.min_resolved} نتیجه">دادهٔ کافی نیست</span>`}
+      </div>`;
+    }).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز پیش‌بینی‌ای با نتیجه‌ی مشاهده‌شده ثبت نشده — دفتر از لحظه‌ی استقرارِ فازِ ۵ پر می‌شه</div></div>`}
+  </div>`;
+}
 function rModelHealth(){
   document.getElementById('v-aihealth').innerHTML=`<div style="text-align:center;padding:60px;color:var(--t2)">در حال بارگذاری...</div>`;
   (async()=>{
@@ -286,6 +324,7 @@ function rModelHealth(){
             </div>
           </div>`).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز هیچ رستورانی آموزش ندیده</div></div>`}
       </div>
+      ${productionAccuracyPanelHTML(d.production_accuracy)}
       <div class="panel" style="margin-top:20px">
         <div class="panel-head"><div><div class="panel-title">تاریخچه‌ی آموزش‌ها (append-only)</div><div class="panel-sub">آخرین ${fa(d.recent_runs.length)} اجرا — شاملِ آموزش‌هایی که فعال نشدن</div></div></div>
         ${d.recent_runs.length?d.recent_runs.map(r=>`
