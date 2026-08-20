@@ -197,7 +197,7 @@ shown where relevant. Owners/managers bypass permission checks.
 | `/waitlist/analytics` | GET | canViewAnalytics | Waitlist stats. |
 | `/hours` | GET, PUT | canManageSettings | Opening hours + closures (approval flow). |
 | `/profile` | GET, PUT | canManageSettings | Restaurant profile. |
-| `/pricing` | GET, PUT | canManageSettings | AI min-spend pricing rules. |
+| `/pricing` | GET, PUT | canManageSettings | AI min-spend pricing rules. GET returns `suggestions[]` derived from the last 90 days of the restaurant's own reservations; it is **empty** below `MIN_OBSERVATIONS` (20) rather than guessing. `occupancy_pct` is relative busyness (window average ÷ busiest hour), **not** capacity occupancy — see `KNOWN_LIMITATIONS.md` §2h. |
 | `/cashback` | GET, PATCH | canManageSettings | Cashback percentages. |
 | `/cancellation-policy` | GET, PUT | canManageSettings | Cancellation/no-show policy. |
 | `/heartbeat` | POST | — | Online presence (`lastSeenAt`). |
