@@ -52,6 +52,7 @@
 import './allowed-origins.test.mts';
 import './ban.test.mts';
 import './cancellation-policy.test.mts';
+import './coupons.integration.test.mts';
 import './crm-recommendations.test.mts';
 import './crm-feedback-loop.integration.test.mts';
 import './customer-intelligence.test.mts';
