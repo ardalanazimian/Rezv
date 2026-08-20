@@ -182,48 +182,69 @@ interface TrainingRow {
  * برمی‌گرداند — با window function، نه N کوئریِ جدا.
  *
  * نکته‌ی حیاتی برای جلوگیری از نشتِ زمانی: ROWS BETWEEN UNBOUNDED PRECEDING
- * AND 1 PRECEDING یعنی فقط رزروهای *قبلِ* همین ردیف شمرده می‌شوند — دقیقاً
- * همان چیزی که در لحظه‌ی رزروِ واقعی معلوم بوده، نه چیزی که بعداً اتفاق افتاده.
+ * ⚠️ این توضیح در ۲۰۲۶-۰۸-۲۰ بازنویسی شد: پیاده‌سازیِ قبلی window function
+ * با `ORDER BY created_at ... 1 PRECEDING` بود و همین‌جا ادعا می‌کرد «دقیقاً
+ * همان چیزی که در لحظه‌ی رزرو معلوم بوده». آن ادعا غلط بود — جزئیات و
+ * سناریویِ اثبات در خودِ کوئریِ پایین. حالا شرطِ نقطه-در-زمان صریح است:
+ * `h.slot_start < r.created_at`.
  *
- * PARTITION BY COALESCE(user_id::text, id::text): برای رزروهای مهمان (بدون
- * حساب کاربری) user_id همه NULL است و Postgres در PARTITION BY همه‌ی NULLها
- * را یک گروه می‌بیند — بدونِ این fallback، سابقه‌ی مهمان‌های کاملاً متفاوت
- * با هم قاطی می‌شد. با id::text هر مهمان پارتیشنِ یک‌نفره‌ی خودش را می‌گیرد
- * (یعنی همیشه «بدونِ سابقه»، دقیقاً مثلِ heuristicِ فعلی).
+ * COALESCE(user_id::text, id::text): برای رزروهای مهمان (بدون حساب کاربری)
+ * user_id همه NULL است و NULL = NULL هرگز true نمی‌شود؛ بدونِ این fallback
+ * هیچ مهمانی با خودش هم مطابقت نمی‌کرد. با id::text هر مهمان گروهِ
+ * یک‌نفره‌ی خودش را می‌گیرد (یعنی همیشه «بدونِ سابقه»، دقیقاً مثلِ
+ * heuristicِ فعلی) و سابقه‌ی مهمان‌های متفاوت با هم قاطی نمی‌شود.
  *
  * دامنه‌ی برچسب همان چیزی‌ست که recomputeCustomerInsight استفاده می‌کند:
  * completed/arrived/seated/dining = «آمد» (۰)، no_show = «نیامد» (۱).
  */
 async function fetchTrainingRows(restaurantId: string): Promise<TrainingRow[]> {
   return db.$queryRaw<TrainingRow[]>`
-    SELECT status, party_size, source,
-           EXTRACT(EPOCH FROM (slot_start - created_at)) / 60.0 AS lead_minutes,
-           (user_id IS NOT NULL) AS has_user_id,
-           -- ⚠️ ::int صریح لازم است: SUM(...) OVER (...) در Postgres حتی
-           -- روی CASE WHEN ... THEN 1 ELSE 0 END نوعِ bigint برمی‌گرداند،
-           -- و Prisma bigint را به BigInt جاوااسکریپت map می‌کند، نه number
-           -- — با اینکه TrainingRow زیر «number» اعلام شده (تایپ‌چک این
-           -- دروغِ زمانِ اجرا را نمی‌بیند، چون $queryRaw فقط assertion است).
+    SELECT r.status, r.party_size, r.source,
+           EXTRACT(EPOCH FROM (r.slot_start - r.created_at)) / 60.0 AS lead_minutes,
+           (r.user_id IS NOT NULL) AS has_user_id,
+           -- ⚠️ ::int صریح لازم است: COUNT/SUM در Postgres نوعِ bigint
+           -- برمی‌گرداند، و Prisma bigint را به BigInt جاوااسکریپت map می‌کند،
+           -- نه number — با اینکه TrainingRow زیر «number» اعلام شده (تایپ‌چک
+           -- این دروغِ زمانِ اجرا را نمی‌بیند، چون $queryRaw فقط assertion است).
            -- بدونِ این cast، هر رستورانی که حتی یک مشتریِ تکراری داشته باشد
            -- (priorTotal>0) در dot() با «Cannot mix BigInt and other types»
            -- کرش می‌کرد — با تستِ واقعی روی Postgres پیدا شد.
-           prior_no_shows::int AS prior_no_shows, prior_completions::int AS prior_completions
-    FROM (
+           p.prior_no_shows::int   AS prior_no_shows,
+           p.prior_completions::int AS prior_completions
+    FROM reservations r
+    CROSS JOIN LATERAL (
       SELECT
-        id, user_id, status, party_size, source, slot_start, created_at,
-        SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) OVER (
-          PARTITION BY COALESCE(user_id::text, id::text) ORDER BY created_at
-          ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
-        ) AS prior_no_shows,
-        SUM(CASE WHEN status IN ('completed','arrived','seated','dining') THEN 1 ELSE 0 END) OVER (
-          PARTITION BY COALESCE(user_id::text, id::text) ORDER BY created_at
-          ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
-        ) AS prior_completions
-      FROM reservations
-      WHERE restaurant_id = ${restaurantId}::uuid
-    ) sub
-    WHERE status IN ('completed', 'no_show', 'arrived', 'seated', 'dining')
-    ORDER BY created_at ASC
+        COUNT(*) FILTER (WHERE h.status = 'no_show') AS prior_no_shows,
+        COUNT(*) FILTER (WHERE h.status IN ('completed','arrived','seated','dining')) AS prior_completions
+      FROM reservations h
+      WHERE h.restaurant_id = r.restaurant_id
+        AND COALESCE(h.user_id::text, h.id::text) = COALESCE(r.user_id::text, r.id::text)
+        AND h.id <> r.id
+        AND h.status IN ('completed','no_show','arrived','seated','dining')
+        -- ⚠️ رفعِ نشتِ زمانی (P0، ممیزیِ ۲۰۲۶-۰۸-۲۰): شرطِ زیر عمداً
+        -- slot_start است، نه created_at.
+        --
+        -- نسخه‌ی قبلی یک window function با
+        -- ORDER BY created_at ROWS ... 1 PRECEDING بود. آن ترتیب «کدام رزرو
+        -- زودتر *ثبت* شد» را می‌سنجید، ولی نتیجه‌ی یک رزرو در لحظه‌ی
+        -- *برگزاری* معلوم می‌شود، نه لحظه‌ی ثبت. پس رزروی که زودتر ثبت شده
+        -- ولی دیرتر برگزار می‌شود، وضعیتِ no_showِ آینده‌اش وارد ویژگیِ
+        -- رزروهایی می‌شد که قبل از آن برگزار شده بودند.
+        --
+        -- با سناریوی کنترل‌شده روی همین کوئری اثبات شد:
+        --   A: ثبت ۲۰۲۶-۰۱-۰۱، برگزاری ۲۰۲۶-۰۳-۰۱، no_show
+        --   B: ثبت ۲۰۲۶-۰۲-۰۱، برگزاری ۲۰۲۶-۰۲-۰۲، completed
+        -- نسخه‌ی قبلی برای B مقدارِ prior_no_shows = 1 می‌داد — یعنی مدل از
+        -- اتفاقی که یک ماه بعد می‌افتاد «یاد می‌گرفت». این دقیقاً همان چیزی
+        -- است که مدل را در ارزیابی خوب و در تولید بی‌ارزش می‌کند.
+        --
+        -- حالا فقط سابقه‌ای شمرده می‌شود که نتیجه‌اش پیش از *ثبتِ* رزروِ
+        -- هدف قطعی شده بود.
+        AND h.slot_start < r.created_at
+    ) p
+    WHERE r.restaurant_id = ${restaurantId}::uuid
+      AND r.status IN ('completed', 'no_show', 'arrived', 'seated', 'dining')
+    ORDER BY r.created_at ASC
     LIMIT 500
   `;
 }
