@@ -30,7 +30,8 @@ guesses. Every item below is classified:
 - No pre-existing "agent"/"agency" infrastructure in the repo (`grep -ril
   agent **/*.md` outside this change only matches `docs/adr/0002-*.md` and
   `docs/figma-mcp-rules.md`, neither of which describes an agent system).
-- CI (`.github/workflows/ci.yml`, 228 lines, 7 jobs, re-read in full after
+- CI (`.github/workflows/ci.yml`, **8 jobs** as of 2026-08-20 — the `schema-drift`
+  job was added after this line was written, which said 7; re-read in full after
   an initial partial read missed this — correcting that mistake here
   rather than leaving it) runs on push/PR to `main`/`develop`: `build`
   (Prisma generate → `tsc --noEmit` → lint → `next build`), `test` (real

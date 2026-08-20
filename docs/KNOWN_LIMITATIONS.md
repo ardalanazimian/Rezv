@@ -715,6 +715,10 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
+  - **Updated 2026-08-20: 564 tests, 0 failures** (real Postgres + Redis). The growth is
+    phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
+    drift detection, train/serve feature parity, the outreach ledger, and the CRM
+    feedback loop. CI now runs **8 jobs**, including a new `schema-drift` gate.
   The pass added `tests/tenant-isolation.integration.test.mts` (5) and two
   lock-honesty tests in `table-merge-occupancy-concurrency.test.mts`. Both
   additions were **mutation-tested** — the isolation lock fails when the
