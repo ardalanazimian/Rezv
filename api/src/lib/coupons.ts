@@ -34,44 +34,15 @@ export function calcDiscount(coupon: { kind: string; value: number }, subtotalTo
   return 0; // free_item جداگانه در سطح آیتم اعمال می‌شود
 }
 
-/**
- * redemption اتمیک کوپن — ضد TOCTOU (NEW-H1).
- * به‌جای چک جدا + increment جدا، در یک UPDATE شرطی: فقط اگر هنوز ظرفیت هست
- * increment می‌کند. اگر صفر ردیف برگشت = سقف پر شده (دو درخواست همزمان امن).
- * تأییدشده روی PostgreSQL واقعی.
- * خروجی: true اگر redemption موفق بود، false اگر سقف پر بود.
- */
-export async function redeemCouponAtomic(
-  couponId: string, userId: string | null, reservationCode: string | null,
-  discountToman: number, perUserLimit: number,
-): Promise<boolean> {
-  return db.$transaction(async (tx) => {
-    // ۱) افزایش شمارنده فقط اگر ظرفیت کل هست (اتمیک)
-    const claimed = await tx.$queryRaw<{ id: string }[]>`
-      UPDATE coupons SET redemption_count = redemption_count + 1
-      WHERE id = ${couponId}::uuid
-        AND (max_redemptions IS NULL OR redemption_count < max_redemptions)
-      RETURNING id
-    `;
-    if (claimed.length === 0) return false; // سقف کل پر است
-
-    // ۲) چک سقف per-user داخل همان تراکنش (با شمارش فعلی)
-    if (userId) {
-      const used = await tx.couponRedemption.count({ where: { couponId, userId } });
-      if (used >= perUserLimit) {
-        throw Object.assign(new Error('سقف استفاده‌ی شخصی پر است'), { rollback: true });
-      }
-    }
-
-    // ۳) ثبت رکورد
-    await tx.couponRedemption.create({ data: { couponId, userId, reservationCode, discountToman } });
-    return true;
-  }).catch((e) => {
-    // اگر per-user limit خورد، تراکنش rollback شده (شمارنده هم برگشته) → false
-    if ((e as any)?.rollback) return false;
-    throw e;
-  });
-}
+// ⚠️ حذف‌شده (۲۰۲۶-۰۸-۲۰): `redeemCouponAtomic` (نسخه‌ی standalone با تراکنشِ
+// خودش) و `redeemCoupon` (نسخه‌ی «منسوخ» و **بدونِ هیچ گاردی**) هر دو حذف شدند
+// چون **صفر صداکننده** داشتند — تأییدشده با grep روی کلِ src/ و tests/.
+//
+// چرا حذف و نه نگه‌داشتن: `redeemCoupon` شمارنده را بی‌قیدوشرط بالا می‌برد و نه
+// سقفِ کل را می‌دید نه سقفِ per-user را. یک تفنگِ پُر بود — هر توسعه‌دهنده‌ای که
+// از رویِ اسم برش می‌داشت، هر دو سقف را دور می‌زد بدونِ اینکه بفهمد.
+//
+// تنها مسیرِ مجاز `redeemCouponAtomicTx` است (پایین).
 
 /** نسخه‌ی tx-aware (برای فراخوانی داخل تراکنش رزرو، بدون تراکنش تودرتو).
  *
@@ -86,6 +57,24 @@ export async function redeemCouponAtomic(
  *  کوپن‌های چندبارمصرف مجاز را هم اشتباهاً بلاک می‌کرد.)
  *
  *  ⚠️ باگ M1: ip اکنون ذخیره می‌شود تا داشبورد تشخیص سوءاستفاده‌ی چندحسابی کار کند.
+ *
+ *  ═══ پیش‌شرطِ اجباری (سنجیده‌شده، ۲۰۲۶-۰۸-۲۰) ═══
+ *  دو گاردِ این تابع **قدرتِ یکسانی ندارند**:
+ *
+ *    • سقفِ کل      → self-protecting در هر سطحِ ایزولاسیون، چون
+ *                     `UPDATE … WHERE redemption_count < max_redemptions` اتمیک است.
+ *    • سقفِ per-user → **self-protecting نیست.** یک «اول بشمار بعد بنویس» ساده
+ *                     است و امنیتش تماماً از تراکنشِ **Serializable**ِ صداکننده
+ *                     می‌آید (SSI تضادِ read/write را می‌گیرد و یکی را abort می‌کند).
+ *
+ *  اندازه‌گیریِ واقعی روی Postgres — ۱۰ تلاشِ موازیِ یک کاربر با perUserLimit=1:
+ *    Serializable  → ۱ موفق، ۶ خطای serialization، **۱ رکورد در DB**  ✅
+ *    ReadCommitted → ۱۰ موفق، **۱۰ رکورد در DB**                      ❌
+ *
+ *  ⚠️ پس این تابع را **فقط** از تراکنشِ Serializable صدا بزن. تنها صداکننده‌ی
+ *  فعلی (createReservation با isolationLevel: Serializable) رعایتش می‌کند. هر
+ *  صداکننده‌ی جدیدی که رعایت نکند، سقفِ per-user را بی‌سروصدا از کار
+ *  می‌اندازد. هر دو حالت در tests/coupons.integration.test.mts قفل شده‌اند.
  */
 export async function redeemCouponAtomicTx(
   tx: any, couponId: string, userId: string | null, reservationCode: string | null,
@@ -110,14 +99,6 @@ export async function redeemCouponAtomicTx(
   if (claimed.length === 0) return false;
   await tx.couponRedemption.create({ data: { couponId, userId, reservationCode, discountToman, ip: ip ?? null } });
   return true;
-}
-
-/** نسخه‌ی قدیمی (بدون گارد) — منسوخ. از redeemCouponAtomic استفاده کن. */
-export async function redeemCoupon(couponId: string, userId: string | null, reservationCode: string | null, discountToman: number) {
-  await db.$transaction(async tx => {
-    await tx.coupon.update({ where: { id: couponId }, data: { redemptionCount: { increment: 1 } } });
-    await tx.couponRedemption.create({ data: { couponId, userId, reservationCode, discountToman } });
-  });
 }
 
 /** کد یکتای خوانا برای کمپین خودکار می‌سازد (مثلاً WELCOME-7K2N).
