@@ -715,9 +715,10 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
-  - **Updated 2026-08-20: 632 tests, 159 suites, 0 failures** (real Postgres + Redis).
+  - **Updated 2026-08-20: 647 tests, 164 suites, 0 failures** (real Postgres + Redis).
     The last additions were the untested-module pass: availability, coupons, SMS
-    balance, idempotency, pricing (§2h), and the automatic lifecycle crons (§2j). Earlier that same day the count was
+    balance, idempotency, pricing (§2h), the automatic lifecycle crons (§2j), and
+    the customer-economy ledger (§2k). Earlier that same day the count was
     564; the growth is
     phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
     drift detection, train/serve feature parity, the outreach ledger, and the CRM
@@ -1038,3 +1039,54 @@ cancel می‌کند — ۶۱۷ تست از یک برخوردِ تصادفی، �
 اول باید پرسید «آیا مسیرِ دومی هست؟» — نه اینکه فوراً تست را ضعیف اعلام کرد
 یا برای گرفتنِ آن یک خط، تست را به خطِ خاصی گره زد. تست عمداً *نتیجه* را
 قفل می‌کند، نه پیاده‌سازی را.
+
+### ۲k) نیمه‌ی دیتابیسیِ اقتصادِ مشتری پوشش نداشت — **رفع شد** (۲۰۲۶-۰۸-۲۰)
+
+`tests/economy.test.mts` چهار تابعِ **خالص** را کامل می‌سنجید (`applyTimeDecayedScore`،
+`applyStrikeDecay`، `computeReputationTier`، `computeEventScore`) — ولی نیمه‌ای که
+واقعاً می‌نویسد هیچ پوششی نداشت: `processReservationEconomyEvent` (از **هر**
+تغییرِ وضعیتِ رزرو شلیک می‌شود)، `applyReliabilityEventToUserTx`،
+`applyReliabilityEventToShadowTx`، `grantEconomyRewardTx` و
+`getCustomerEconomyProfile`.
+
+پایِ ارزِ داخلیِ مشتری وسط است: اگر idempotency بشکند، یک retry ساده XP و
+سکه را دوباره واریز می‌کند.
+
+**سه ادعای صریحِ خودِ فایل که تا امروز قفل نشده بودند** و حالا تست دارند:
+
+1. «idempotency با `UNIQUE(reservation_id, kind)` در خودِ DB تضمین می‌شه» —
+   با پنج فراخوانیِ **موازی** سنجیده شد، نه فقط دو فراخوانیِ سریالی (که یک
+   `SELECT`-then-`INSERT`ِ معیوب هم از آن رد می‌شد).
+2. «منبعِ حقیقت ledgerه، فیلدهایِ پروفایل فقط cacheاند» — حالا تست تأیید
+   می‌کند `xpTotal` دقیقاً با مبلغِ ردیفِ دفتر می‌خواند.
+3. لنگرِ زمانیِ `2000-01-01` — کامنتِ کد می‌گفت «زنده تست شد: بدونِ این فیکس،
+   اولین completed یه کاربرِ تازه امتیازش رو عوض نمی‌کرد». آن ادعا درست بود
+   ولی هیچ‌جا قفل نشده بود؛ حالا هست.
+
+**پوششِ تست.** `tests/economy-ledger.integration.test.mts` — ۱۵ تستِ زنده.
+جهش‌آزمایی، با تأییدِ اعمالِ هر جهش پیش از اجرا — **۷ از ۷ گرفته شد**:
+
+| جهش | چه شکست |
+|---|---|
+| حذفِ `ON CONFLICT` از دفترِ سیگنالِ اعتبار | ۱ |
+| لنگرِ زمانی به «الان» (اولین رویداد بی‌اثر می‌شود) | ۲ |
+| نادیده‌گرفتنِ `CancellationPolicy` رستوران (همیشه ۲۴ ساعت) | ۱ |
+| امتیازدادن به لغوِ رستوران/staff انگار لغوِ مشتری بوده | ۱ |
+| حذفِ `ON CONFLICT` از واریزِ XP | ۱ |
+| دادنِ XP به `no_show` (حذفِ شرطِ `label`) | ۴ |
+| ثبت‌نکردنِ strike | ۲ |
+
+**رفتاری که عمداً *ثبت* شد، نه اصلاح:** `grantEconomyRewardTx` با
+`reservationId = NULL` (پاداشِ referral/mission) idempotent **نیست** — چون
+`NULL`ها در Postgres در قیدِ یکتایی با هم برخورد نمی‌کنند. کامنتِ خودِ تابع
+این را می‌گوید و مسئولیت را به caller می‌دهد. تست همان را تثبیت می‌کند تا
+اگر روزی عوض شد عمدی باشد نه تصادفی، و تا صداکننده‌ی بعدی بداند خودش باید
+گارد بگذارد.
+
+**فرضیه‌ای که رد شد:** تایپِ `Actor` در `lifecycle.ts` مقدارها را
+`'system' | 'customer' | 'staff:{id}' | 'cron'` مستند می‌کند — یعنی
+`'customer'` بدونِ کولون — در حالی که `computeEventScore` روی
+`actor.startsWith('customer:')` چک می‌کند. اگر مسیرِ واقعی رشته‌ی بدونِ کولون
+می‌فرستاد، **کلِ جریمه‌ی لغوِ دیرهنگام مرده بود**. بررسی شد: مسیرِ واقعی
+(`reservations/[code]/cancel/route.ts`) `` `customer:${auth.sub}` `` می‌فرستد.
+پس باگ نیست — فقط کامنتِ تایپ کهنه است.
