@@ -31,7 +31,9 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
   const phone = normalizePhone(b.phone);
 
   const idemKey = req.headers.get('idempotency-key') || undefined;
-  const idem = await withIdempotency<any>(idemKey, 'walkin');
+  // هویت = خودِ رستوران: دو پرسنلِ همان رستوران با کلیدِ یکسان همان عملیات را
+  // retry می‌کنند، ولی رستورانِ دیگر هرگز پاسخِ این یکی را نمی‌بیند.
+  const idem = await withIdempotency<any>(idemKey, 'walkin', `restaurant:${ctx.restaurant.id}`);
   if (idem.replayed) return NextResponse.json(idem.response, { status: 201 });
 
   const result = await createWalkin({

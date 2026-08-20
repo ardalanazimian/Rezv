@@ -69,6 +69,7 @@ import './guest-profile-rollup.integration.test.mts';
 import './menu-crud.integration.test.mts';
 import './availability.integration.test.mts';
 import './assistant-nlu.test.mts';
+import './idempotency.integration.test.mts';
 import './incentive-engine.test.mts';
 import './jwt.test.mts';
 import './lifecycle.test.mts';

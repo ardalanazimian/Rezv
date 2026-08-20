@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { db } from './db';
 import { createLogger } from './logger';
 import { ApiError } from './errors';
@@ -37,13 +38,51 @@ const STALE_IN_PROGRESS_MS = 60_000; // ۶۰ ثانیه (بیشتر از هر ع
  * می‌شوند و (۲) شکست commit مدیریت می‌شود.
  */
 export async function withIdempotency<T>(
-  key: string | undefined,
+  clientKey: string | undefined,
   scope: string,
+  actor: string,
 ): Promise<IdempotentResult<T>> {
-  if (!key) {
+  if (!clientKey) {
     // بدون کلید → بدون محافظت؛ commit کاری نمی‌کند
     return { replayed: false, commit: async () => {} };
   }
+
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰) — با اجرای زنده اثبات شد، نه از رویِ کد:
+  //
+  // `scope` گرفته و *ذخیره* می‌شد ولی هرگز در تضاد یا جست‌وجو استفاده نمی‌شد:
+  // `ON CONFLICT (key)` و `findUnique({ where: { key } })`. و هیچ‌جا هویتِ
+  // درخواست‌کننده هم دخیل نبود. یعنی کلِ کشِ پاسخ فقط به یک رشته‌ی **کاملاً
+  // کلاینت‌کنترل** بسته بود.
+  //
+  // بازتولیدِ واقعی: کاربرِ A روی scope='reservation' پاسخی ذخیره کرد، بعد
+  // همان کلید روی scope='walkin' فرستاده شد → عیناً پاسخِ A برگشت، شاملِ کدِ
+  // رزرو (که خودش شناسه‌ی دسترسیِ مهمان است). لاگ حتی scopeِ درخواست‌کننده را
+  // می‌نوشت و پاسخِ scopeِ دیگری را برمی‌گرداند.
+  //
+  // دو پیامد: (۱) تداخلِ بینِ scopeها — قطعی. (۲) بازپخشِ پاسخ بینِ کاربران —
+  // هر کسی که همان کلید را بفرستد پاسخِ نفرِ قبلی را می‌گیرد. بهره‌برداریش به
+  // آنتروپیِ کلیدِ کلاینت وابسته است (مرورگر randomUUID می‌دهد، ولی سرور هیچ
+  // الزامی نمی‌گذارد و مصرف‌کننده‌ی API می‌تواند کلیدِ ضعیف بفرستد).
+  //
+  // رفع بدونِ مهاجرت: کلیدِ ذخیره‌سازی از (scope، هویتِ درخواست‌کننده، کلیدِ
+  // کلاینت) مشتق می‌شود. ستونِ `key` همان PK می‌ماند، فقط مقدارش دیگر خامِ
+  // کلاینت نیست. `scope` هم هنوز جدا ذخیره می‌شود (برایِ دیباگ/گزارش).
+  //
+  // ⚠️ اثرِ گذارِ استقرار (کوچک ولی واقعی، پنهانش نمی‌کنم): کلیدهای قدیمی با
+  // این نگاشت مچ نمی‌شوند. اگر درخواستی *پیش از* استقرار ارسال و *پس از* آن
+  // retry شود، به‌جای replay دوباره اجرا می‌شود. پنجره‌اش چند ثانیه‌ی استقرار
+  // است و ردیف‌های قدیمی خودشان تا ۲۴ ساعت منقضی می‌شوند.
+  // ⚠️ جداکننده با *طول‌پیشوند* است، نه یک کاراکترِ ثابت: `clientKey` کاملاً
+  // کلاینت‌کنترل است، پس با هر جداکنندهٔ ساده‌ای می‌شد مرزها را جابه‌جا کرد
+  // (مثلاً کلیدی که خودش شاملِ همان جداکننده باشد تا هشِ ترکیبِ دیگری بسازد).
+  // با طول‌پیشوند این ابهام ممکن نیست.
+  //
+  // ⚠️ نسخه‌ی اولِ همین خط از بایتِ NUL به‌عنوان جداکننده استفاده می‌کرد.
+  // کار می‌کرد ولی فایل را برای grep و ابزارهای متنی «باینری» می‌کرد و در
+  // بازبینی نامرئی بود — با ASCIIِ خوانا جایگزین شد.
+  const key = createHash('sha256')
+    .update(`${scope.length}:${scope}|${actor.length}:${actor}|${clientKey}`)
+    .digest('hex');
 
   const makeCommit = () => async (response: T) => {
     // اگر ذخیره‌ی پاسخ شکست خورد، کلید را به‌جای رهاکردن در in_progress، حذف کن
@@ -74,7 +113,7 @@ export async function withIdempotency<T>(
   // کلید تکراری — وضعیتش را بخوان
   const existing = await db.idempotencyKey.findUnique({ where: { key } });
   if (existing?.status === 'done' && existing.response !== null) {
-    log.debug('replay idempotent', { key, scope });
+    log.debug('replay idempotent', { scope });
     return { replayed: true, response: existing.response as T };
   }
 
@@ -90,7 +129,7 @@ export async function withIdempotency<T>(
         RETURNING key
       `;
       if (reclaimed.length > 0) {
-        log.warn('کلید idempotency کهنه بازپس‌گرفته شد', { key, scope, ageMs: age });
+        log.warn('کلید idempotency کهنه بازپس‌گرفته شد', { scope, ageMs: age });
         return { replayed: false, commit: makeCommit() };
       }
       // اگر بازپس‌گیری نشد یعنی رقیب همین لحظه done کرد → دوباره بخوان.
