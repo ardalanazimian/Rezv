@@ -7,6 +7,7 @@ import { Actions } from './actions.js';
 import { API, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
 import { renderDiscoverSections, renderFeed } from './data/discover.js';
 import { R_SAMPLE } from './data/seed.js';
+import { runPendingCheckIn } from './features/checkin.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
 export let R = R_SAMPLE;
 
@@ -19,6 +20,10 @@ function boot(){
   armReveals();                      // انیمیشنِ اسکرول
   restoreSession();                  // بازیابی نشست
   syncRestaurants();                 // داده‌ی واقعی از بک‌اند
+  // ورود با QRِ میز — فقط وقتی لینک `?checkin=` دارد کاری می‌کند.
+  // عمداً `await` نمی‌شود و بعد از رندرِ اولیه صدا زده می‌شود: مهمانی که
+  // کدِ میز را اسکن کرده باید اپ را ببیند، نه صفحه‌ی سفیدِ منتظرِ شبکه.
+  runPendingCheckIn();
 }
 
 // بازیابی نشست از localStorage — اگر توکن داشت، کاربر را دوباره وارد نگه دار
