@@ -114,7 +114,20 @@ export async function qrCheckIn(qrCode: string): Promise<{
     return { table_number: table.number, reservation_code: resv.code, status: fresh?.status ?? resv.status };
   }
   // میز را occupied کن (بعد از seated موفق).
-  await db.table.update({ where: { id: table.id }, data: { state: 'occupied' } }).catch(() => {});
+  //
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۱، ممیزیِ ماژولِ میز): اینجا مستقیم
+  // `db.table.update({ state: 'occupied' })` نوشته می‌شد و ماشینِ وضعیتِ
+  // *همین فایل* را دور می‌زد. `ALLOWED_TRANSITIONS` انتقالِ
+  // maintenance→occupied را ممنوع کرده و کامنتش دقیقاً همین مثال را می‌زند —
+  // ولی این مسیر از کنارش رد می‌شد. نتیجه: میزی که کارکنان «خارج از سرویس»
+  // علامت زده بودند، با یک اسکنِ QR بی‌صدا «اشغال» می‌شد و نشانه‌ی خرابی
+  // بدونِ هیچ ردی پاک می‌شد.
+  //
+  // حالا از `setTableState` عبور می‌کند، پس همان قواعد اعمال می‌شود. اگر
+  // انتقال نامعتبر باشد (مثلاً میز در تعمیر است) وضعیتِ میز دست‌نخورده
+  // می‌ماند — ولی خودِ رزرو همچنان seated می‌شود، چون مهمان واقعاً نشسته
+  // است و وضعیتِ فیزیکیِ میز نباید جلوی ثبتِ آن را بگیرد.
+  await setTableState(table.id, table.restaurantId, 'occupied').catch(() => {});
 
   return { table_number: table.number, reservation_code: resv.code, status: 'seated' };
 }
