@@ -715,12 +715,13 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
-  - **Updated 2026-08-20: 720 tests, 180 suites, 0 failures** (real Postgres + Redis).
+  - **Updated 2026-08-21: 729 tests, 181 suites, 0 failures** (real Postgres + Redis).
     The last additions were the untested-module pass: availability, coupons, SMS
     balance, idempotency, pricing (§2h), the automatic lifecycle crons (§2j),
     the customer-economy ledger (§2k), the waitlist writer core (§2l), the
     reward marketplace (§2m), the tenant-isolation gate (§2n), the abuse-detection scan (§2o), the
-    waitlist offer-acceptance path (§2p), and the three closed-out findings (§2q). Earlier that same day the count was
+    waitlist offer-acceptance path (§2p), the three closed-out findings (§2q),
+    and the metrics-endpoint guard (§2r). Earlier that same day the count was
     564; the growth is
     phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
     drift detection, train/serve feature parity, the outreach ledger, and the CRM
@@ -1407,3 +1408,44 @@ const timeStr = now.toTimeString().slice(0, 5);   // ساعتِ محلیِ *سر
 محصول تصمیم گرفت که نباید باشد، تست هم باید همراهش عوض شود.
 
 **جهش‌آزمایی:** `redemption_velocity` ۳ از ۳، گاردهای تنانت ۲ از ۲.
+
+### ۲r) `/api/metrics` بدونِ `METRICS_TOKEN` عمومی بود — **رفع شد** (۲۰۲۶-۰۸-۲۱)
+
+در جمع‌بندی‌های قبلی این را در کنارِ `ALLOWED_ORIGINS` به‌عنوان «پیکربندیِ
+لانچ، نه کد» گذاشته بودم. بررسیِ دقیق‌تر نشان داد این دو **هم‌رفتار نیستند**:
+
+| متغیر | وقتی ست نشده | |
+|---|---|---|
+| `ALLOWED_ORIGINS` | در production **fail-fast** (throw در `middleware.ts`) | ✅ درست |
+| `METRICS_TOKEN` | گارد کاملاً **skip** می‌شد → endpoint عمومی | ❌ fail-open |
+
+گارد شرطی بود: `if (process.env.METRICS_TOKEN) { …چک… }`. نبودِ متغیر یعنی
+هیچ چکی. و middleware هم جلویش را نمی‌گیرد — چکِ Origin فقط روی متدهای
+تغییردهنده اجرا می‌شود و این یک `GET` است.
+
+**چه چیزی لو می‌رفت:** خروجیِ Prometheus نامِ همه‌ی routeها، تعداد و نرخِ خطای
+هرکدام، طولِ صف‌ها، شمارِ رستوران‌ها و متریک‌های مدل را دارد — نقشه‌ی نسبتاً
+کاملی از ساختار و بارِ داخلیِ سامانه.
+
+**رفع:**
+- در production، نبودِ توکن یعنی endpoint **۵۰۳** می‌دهد با پیامی که به
+  اپراتور می‌گوید چه چیزی کم است و کجا بگذاردش. در توسعه/تست باز می‌ماند.
+- مقایسه‌ی توکن **constant-time** شد (`timingSafeEqual`) — `!==` رشته‌ای
+  زودهنگام خارج می‌شود و طولِ پیشوندِ درست را لو می‌دهد. همان قاعده‌ای که
+  برای توکنِ مهمانِ لیستِ انتظار (`tokensEqual`) رعایت شده بود.
+- `.trim()` روی مقدار، تا یک مقدارِ فقط-فاصله در `.env` به‌عنوانِ «توکنِ
+  معتبر» تفسیر نشود و همه چیز را با توکنِ خالی باز نکند.
+
+**چرا ۵۰۳ و نه throwِ سراسری مثلِ `ALLOWED_ORIGINS`:** نبودِ آن متغیر کلِ
+ترافیکِ کاربر را بی‌صدا می‌شکند، پس متوقف‌کردنِ برنامه بجاست. ولی
+`METRICS_TOKEN` فقط به مانیتورینگ مربوط است — قطع‌کردنِ کلِ API به‌خاطرِ یک
+متغیرِ مانیتورینگ از خودِ نشتی بدتر است.
+
+**پوششِ تست.** `tests/metrics-endpoint.test.mts` — ۹ تستِ خالص (بدونِ DB).
+جهش‌آزمایی **۴ از ۴**: بازگرداندنِ خودِ باگ، حذفِ `trim`، تبدیلِ مقایسه به
+`startsWith`، و خرابیِ گاردِ طول در `safeEqual`.
+
+**آنچه همچنان کارِ اپراتور است (و کدی نیست):** خودِ *مقدارِ* دو متغیر باید در
+`.env`ِ تولید ست شود. هر دو از قبل در `.env.example` و `LAUNCH-GUIDE.md`
+مستندند. تفاوت این است که حالا اگر فراموش شوند، هیچ‌کدام **بی‌صدا** رد
+نمی‌شوند: یکی برنامه را بالا نمی‌آورد، دیگری endpoint را نمی‌بندد.
