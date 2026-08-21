@@ -84,7 +84,7 @@
 | اپ | صفحات (screen/view) | فایل‌های JS کلیدی |
 |---|---|---|
 | **customer** (`apps/customer`) | discover، rest (جزئیات رستوران)، favorites، loyalty، trips، profile | `main.js`, `reservation.js`, `store.js`, `features/{food-dna,loyalty,rewards,trips}.js` |
-| **business** (`apps/business`) | overview، reservations، floor (میزها)، waitlist، customers، loyalty، cashback، pricing، analytics، staff، profile | `overview.js`, `reservations.js`, `crm.js`, `marketing.js`, `staff-system.js`, `waitlist.js`, `routing.js` + `src-v2/RestaurantIntelligenceDashboard.jsx` (در حالِ مهاجرت به React) |
+| **business** (`apps/business`) | overview، reservations، floor (میزها)، waitlist، customers، loyalty، cashback، pricing، analytics، staff، profile | `overview.js`, `reservations.js`, `crm.js`, `marketing.js`, `staff-system.js`, `waitlist.js`, `routing.js` |
 | **company** (`apps/company`) | overview، restaurants، detail (جزئیاتِ یک رستوران)، customers، analytics، billing، security، system-health، support | `overview.js`, `restaurant.js`, `intelligence.js`, `api.js` |
 
 ⚠️ **نکته‌ی مهم:** هیچ‌کدام از سه اپ هنوز از endpointهای امروز (`/restaurant/branches`, `/reservations/:code/pay`, `/admin/settings`) استفاده نمی‌کنند — UI برای این فیچرها ساخته نشده.

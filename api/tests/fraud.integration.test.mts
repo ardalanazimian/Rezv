@@ -320,6 +320,47 @@ describe('تشخیصِ سوءاستفاده — مسیرِ دستی و appeal', 
       'کاربرِ فلگ‌خورده باید در فهرستِ بازبینی دیده شود');
   });
 
+  test('⚠️ فلگِ دستی هم ساعتِ ریکاوریِ strike را ریست نمی‌کند', async () => {
+    // ⚠️ باگی که ممیزیِ تاریخچه‌ی PRها پیدا کرد: PR #55 این را برای مسیرِ
+    // *خودکار* رفع کرد ولی `setAbuseFlagManually` (مسیرِ دستیِ ادمین) از قلم
+    // افتاده بود — و آن‌جا بدتر بود چون **نامتقارن** است: فلگ‌زدن مهر
+    // می‌زد، ولی `clearAbuseFlag` (مسیرِ اعتراض) مهر را برنمی‌گرداند.
+    //
+    // یعنی یک فلگِ اشتباهیِ ادمین، حتی پس از پس‌گرفتن، تا ۹۰ روزِ اضافه
+    // جلوی decayِ strikeِ مشتری را می‌گرفت — بی‌صدا و بدونِ هیچ ردی.
+    const u = await mkUser();
+    const oldViolation = new Date(Date.now() - 100 * 86_400_000);
+    await db.customerEconomyProfile.create({
+      data: { userId: u, strikeCount: 2, lastViolationAt: oldViolation, reliabilityScore: 40 },
+    });
+    assert.equal(applyStrikeDecay(2, oldViolation), 1, 'پیش‌شرط: یک strike باید decay شده باشد');
+
+    await setAbuseFlagManually(u, randomUUID(), '[DEMO] بررسیِ دستی');
+
+    const p = (await profileOf(u))!;
+    assert.equal(p.hasActiveAbuseFlag, true, 'فلگ باید خورده باشد');
+    assert.equal(+p.lastViolationAt!, +oldViolation,
+      'مهرِ نقض نباید جلو برود — فلگِ ادمین نقضِ جدیدِ رزرو نیست');
+    assert.equal(applyStrikeDecay(p.strikeCount, p.lastViolationAt), 1);
+  });
+
+  test('⚠️ پاک‌کردنِ فلگ ساعتِ ریکاوری را دست‌نخورده می‌گذارد (تقارن)', async () => {
+    // نیمه‌ی دومِ همان نامتقارنی: حالا که فلگ‌زدن مهر نمی‌زند، پاک‌کردن هم
+    // چیزی برای برگرداندن ندارد — و نباید مهرِ *واقعیِ* رزروها را پاک کند.
+    const u = await mkUser();
+    const realViolation = new Date(Date.now() - 10 * 86_400_000);
+    await db.customerEconomyProfile.create({
+      data: { userId: u, strikeCount: 1, lastViolationAt: realViolation, hasActiveAbuseFlag: true },
+    });
+
+    await clearAbuseFlag(u, randomUUID(), restaurantId, 'staff');
+
+    const p = (await profileOf(u))!;
+    assert.equal(p.hasActiveAbuseFlag, false);
+    assert.equal(+p.lastViolationAt!, +realViolation,
+      'نقضِ واقعیِ رزرو نباید با پاک‌کردنِ فلگِ سوءاستفاده پاک شود');
+  });
+
   test('⚠️ پاک‌کردنِ فلگ فقط با اقدامِ صریح انجام می‌شود و رد می‌گذارد', async () => {
     // ⚠️ ادعای صریحِ کامنتِ کد: «هرگز خودکار پاک نمی‌شود … تا false-positive
     // با یک چرخه‌ی cron دیگر خودبه‌خود ناپدید نشود و کسی متوجهِ آن نشود».
