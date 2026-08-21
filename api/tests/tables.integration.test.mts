@@ -114,18 +114,35 @@ async function makeQrTableWithLiveReservation(state: string, prefix: string) {
   return tbl;
 }
 
+/**
+ * شمارنده‌ی rate-limit را صفر می‌کند.
+ *
+ * ⚠️ چرا این تابع لازم شد (با قرمزشدنِ گیت اثبات شد، نه با حدس): رانرِ ما
+ * همه‌ی فایل‌ها را در **یک** process اجرا می‌کند و کلیدِ محدودیت بر پایه‌ی IP
+ * است — یعنی سهمیه بینِ فایل‌ها **مشترک** است. این فایل حدودِ ۲۰ فراخوانِ
+ * نوشتاریِ `rateLimit:'auth'` دارد (حلقه‌ی نُه‌وضعیتی به‌تنهایی ۹ تا)، و در
+ * اولین اجرا سهمیه را تمام کرد و فایلِ بعدی (`crm-feedback-loop`) به‌جای
+ * ۲۰۱ عددِ **۴۲۹** گرفت — پنج تستِ بی‌ربط قرمز شدند.
+ *
+ * پس این پاک‌سازی «دورزدنِ محدودیت» نیست؛ جلوگیری از نشتِ سهمیه به فایلِ
+ * دیگر است. سقفِ خودِ روت عمداً دست‌نخورده مانده و همچنان واقعی است — این
+ * فایل اصلاً ادعای تستِ rate-limit ندارد.
+ */
+async function clearRateLimit() {
+  const stale = await redis.keys('*auth*');
+  if (stale.length) await redis.del(...stale);
+}
+
 /** میز را حذف کن و بگو روت چه گفت + میز واقعاً رفت یا نه. */
 async function tryDelete(ctx: Ctx, tableId: string) {
+  await clearRateLimit();
   const res = await tableIdRoute.DELETE(req(ctx.token), routeArg(tableId));
   const stillThere = await db.table.findUnique({ where: { id: tableId }, select: { id: true } });
   return { status: res.status, deleted: stillThere === null };
 }
 
 before(async () => {
-  // شمارنده‌ی rate-limit بینِ اجراها انباشته می‌شود و از اجرایِ دوم ۴۲۹ می‌گیریم.
-  // سقفِ خودِ روت عمداً دست‌نخورده است — فقط نشتیِ بینِ اجراها صفر می‌شود.
-  const stale = await redis.keys('*auth*');
-  if (stale.length) await redis.del(...stale);
+  await clearRateLimit();
 
   const s = Date.now().toString(36);
   A = await makeTenant(`${TAG}-a-${s}`);
@@ -133,6 +150,7 @@ before(async () => {
 });
 
 after(async () => {
+  await clearRateLimit();
   const rests = [A.restaurantId, B.restaurantId];
   await db.reservation.deleteMany({ where: { restaurantId: { in: rests } } });
   await db.table.deleteMany({ where: { restaurantId: { in: rests } } });
@@ -198,6 +216,7 @@ describe('گاردِ حذفِ میز — هیچ رزروِ زنده‌ای یت�
 
   test('جداسازیِ تنانت: رستورانِ B نمی‌تواند میزِ A را حذف کند', async () => {
     const tbl = await makeTable(A);
+    await clearRateLimit();
     const res = await tableIdRoute.DELETE(req(B.token), routeArg(tbl.id));
     assert.equal(res.status, 404, 'باید «پیدا نشد» بدهد، نه حذف کند');
     const still = await db.table.findUnique({ where: { id: tbl.id }, select: { id: true } });
