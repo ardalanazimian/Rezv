@@ -102,7 +102,18 @@ export async function detectRedemptionVelocity(restaurantId: string, maxPerDay =
   `;
   return rows.map((r) => ({
     kind: 'redemption_velocity' as const,
-    severity: 'medium' as const,
+    // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰): این تنها detectorی بود که severity را
+    // **هاردکد** روی 'medium' می‌گذاشت. چون `applyAbuseFlags` فقط سیگنال‌های
+    // 'high' را فلگ می‌کند، حضورِ `redemption_velocity` در `USER_SCOPED_KINDS`
+    // عملاً یک شاخه‌ی مرده بود — هرگز اجرا نمی‌شد.
+    //
+    // این یک تصمیمِ طراحی نبود، یک ناسازگاری بود: هر چهار detectorِ دیگرِ همین
+    // فایل قاعده‌ی یکسانِ «دو برابرِ آستانه = high» را دارند
+    // (`minAccounts * 2`، `minRapidCancels * 2`، `minCompleted * 2`، و
+    // `pct >= 80` برای no-show). همان قاعده اینجا هم اعمال شد: با پیش‌فرضِ
+    // `maxPerDay = 5`، آستانه‌ی تشخیص «بیش از ۵» است و high از «۱۰ یا بیشتر»
+    // شروع می‌شود — یعنی دو برابرِ آستانه، دقیقاً مثلِ خواهرهایش.
+    severity: Number(r.cnt) >= maxPerDay * 2 ? 'high' : 'medium',
     subject: r.user_id,
     detail: `کاربر ${r.cnt} کوپن در ۲۴ ساعت استفاده کرده`,
     metrics: { redemptions: Number(r.cnt) },

@@ -184,16 +184,33 @@ describe('دروازه‌ی تنانت — هویتِ نامعتبر', () => {
     );
   });
 
-  test('⚠️ tenantIdِ جعلی در توکن، رستورانِ تنانتِ دیگر را نمی‌دهد', async () => {
-    // ⚠️ سناریوی «اگر مهاجم tenantId را در توکن دست‌کاری کند» — امضایِ JWT
-    // جلویش را می‌گیرد، ولی این لایه هم نباید تنها خطِ دفاع باشد. اینجا
-    // ownerA با tenantIdِ B ادعا می‌کند: چون staff.restaurantId او NULL است،
-    // به شاخه‌ی پیش‌فرضِ تنانتِ B می‌رود. این را *ثبت* می‌کنیم چون رفتارِ
-    // واقعیِ کد است و باید آگاهانه باشد: تنها چیزی که مانع می‌شود، امضایِ
-    // توکن است — نه یک چکِ دوم که staff واقعاً عضوِ آن تنانت باشد.
-    const got = await resolveStaffRestaurant(staffAuth(ownerA, tenantB), reqWith());
-    assert.equal(got.id, b1,
-      'رفتارِ فعلی: tenantIdِ توکن بدونِ چکِ عضویت اعتماد می‌شود — امنیتش کاملاً به امضایِ JWT وابسته است');
+  test('⚠️ tenantIdِ جعلی در توکن رد می‌شود (چکِ عضویت)', async () => {
+    // ⚠️ این تست **معکوس شد** (۲۰۲۶-۰۸-۲۰). نسخه‌ی قبلی رفتارِ آن‌روز را
+    // *ثبت* می‌کرد: `auth.tenantId` مستقیم از توکن پذیرفته می‌شد و هیچ‌جا چک
+    // نمی‌شد که این کارمند واقعاً عضوِ همان تنانت است — پس ownerA با ادعای
+    // tenantB شعبه‌ی پیش‌فرضِ B را می‌گرفت. تنها مانع، امضایِ JWT بود.
+    //
+    // حالا عضویت با ردیفِ واقعیِ staff تطبیق داده می‌شود (همان کوئری، فقط دو
+    // ستونِ بیشتر در select — بدونِ رفت‌وبرگشتِ اضافه).
+    await assert.rejects(
+      () => resolveStaffRestaurant(staffAuth(ownerA, tenantB), reqWith()),
+      'کارمندِ تنانتِ A نباید با ادعای تنانتِ B عبور کند',
+    );
+  });
+
+  test('⚠️ کارمندِ غیرفعال (اخراج‌شده) عبور نمی‌کند', async () => {
+    // ⚠️ مدلِ Staff می‌گوید «توکنِ refreshش رد می‌شود»، ولی یک accessِ
+    // منقضی‌نشده (تا ۱۵ دقیقه) هنوز کار می‌کرد. اخراج باید بلافاصله اثر کند.
+    const fired = await mkStaff(tenantA, null, 'staff');
+    await db.staff.update({ where: { id: fired }, data: { isActive: false } });
+    try {
+      await assert.rejects(
+        () => resolveStaffRestaurant(staffAuth(fired, tenantA, 'staff'), reqWith()),
+        'کارمندِ غیرفعال باید رد شود',
+      );
+    } finally {
+      await db.staff.delete({ where: { id: fired } }).catch(() => {});
+    }
   });
 });
 

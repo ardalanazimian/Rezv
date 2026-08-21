@@ -46,9 +46,23 @@ export async function resolveStaffRestaurant(auth: AccessPayload, req?: Request)
 
   const staff = await db.staff.findUnique({
     where: { id: auth.sub },
-    select: { restaurantId: true },
+    select: { restaurantId: true, tenantId: true, isActive: true },
   });
   if (!staff) throw Err.forbidden();
+
+  // ⚠️ افزوده‌شده (۲۰۲۶-۰۸-۲۰) — بستنِ دو وابستگیِ تک‌لایه‌ای که در §2n
+  // به‌عنوان «رفتارِ ثبت‌شده» مستند شده بودند، نه رفعِ باگِ زنده:
+  //
+  //  ۱) `auth.tenantId` مستقیم از توکن می‌آمد و هیچ‌جا چک نمی‌شد که این
+  //     کارمند واقعاً عضوِ همان تنانت است. تنها مانعِ جعل، امضایِ JWT بود.
+  //     حالا عضویت با ردیفِ واقعیِ staff تطبیق داده می‌شود — همان کوئری،
+  //     بدونِ رفت‌وبرگشتِ اضافه (فقط دو ستونِ بیشتر در select).
+  //
+  //  ۲) کارمندِ غیرفعال (اخراج‌شده): مدلِ Staff می‌گوید «توکنِ refreshش رد
+  //     می‌شود»، ولی یک accessِ منقضی‌نشده (تا ۱۵ دقیقه) هنوز کار می‌کرد.
+  //     این‌جا هم بسته شد تا اخراج بلافاصله اثر کند.
+  if (staff.tenantId !== auth.tenantId) throw Err.forbidden();
+  if (!staff.isActive) throw Err.forbidden();
 
   // قفل به یک شعبه‌ی خاص — هدر کلاینت را نادیده بگیر (امنیت: نباید بتواند override شود)
   if (staff.restaurantId) {
