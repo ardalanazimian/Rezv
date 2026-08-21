@@ -715,11 +715,11 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
-  - **Updated 2026-08-20: 681 tests, 172 suites, 0 failures** (real Postgres + Redis).
+  - **Updated 2026-08-20: 697 tests, 176 suites, 0 failures** (real Postgres + Redis).
     The last additions were the untested-module pass: availability, coupons, SMS
     balance, idempotency, pricing (§2h), the automatic lifecycle crons (§2j),
-    the customer-economy ledger (§2k), the waitlist writer core (§2l), and the
-    reward marketplace (§2m). Earlier that same day the count was
+    the customer-economy ledger (§2k), the waitlist writer core (§2l), the
+    reward marketplace (§2m), and the tenant-isolation gate (§2n). Earlier that same day the count was
     564; the growth is
     phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
     drift detection, train/serve feature parity, the outreach ledger, and the CRM
@@ -1203,3 +1203,63 @@ redemption ثبت می‌کنند (و این در کد مستند است)، `cou
 (`UPDATE … WHERE completed_at IS NOT NULL AND claimed_at IS NULL`) — دقیقاً
 همان چیزی که کامنتِ `grantEconomyRewardTx` در `economy.ts` از صداکننده
 انتظار داشت (§2k). این ادعا راستی‌آزمایی شد، نه فرض.
+
+### ۲n) دروازه‌ی جداسازیِ تنانت تست نداشت + یک باگِ ۵۰۰ — **رفع شد** (۲۰۲۶-۰۸-۲۰)
+
+**گپِ اصلی.** `tests/tenant-isolation.integration.test.mts` فقط کوئری‌هایِ
+**خامِ Prisma** را می‌سنجید — یعنی «اگر درست با `restaurantId` مقید کنی، چیزی
+نشت نمی‌کند». ولی خودِ تصمیمِ **«کدام `restaurantId` به تو تعلق دارد»** —
+`resolveStaffRestaurant` — هیچ تستی نداشت.
+
+این تفکیک مهم است: اگر آن تابع به کارمندِ تنانتِ A رستورانِ تنانتِ B را بدهد،
+**همه‌ی** کوئری‌هایِ کاملاً درستِ زیرش هم نشت می‌کنند — و تستِ موجود همچنان
+سبز می‌ماند، چون خودش `restaurantId` را دستی می‌دهد. این تابع دروازه‌ی هر
+endpointِ رستوران است (`withRestaurantAuth` مستقیم صدایش می‌زند)، و طبقِ
+CLAUDE.md جداسازیِ تنانت غیرقابلِ‌مذاکره است.
+
+**باگی که تست در همان اولین اجرا گرفت.** هدرِ `X-Restaurant-Id` کاملاً
+کلاینت‌کنترل است و مستقیم به یک ستونِ `uuid` داده می‌شد. مقدارِ **غیرUUID**
+(یک slug، یا مقدارِ کهنه‌ی `localStorage`) باعثِ
+`PrismaClientKnownRequestError: Error creating UUID` می‌شد؛ آن خطای خام
+`instanceof ApiError` نیست، پس `errorResponse` آن را به **۵۰۰** تبدیل می‌کرد —
+یعنی *همه‌ی* endpointهایِ رستوران برای آن کلاینت می‌مردند تا وقتی هدر را پاک
+کند. نشتِ داده نیست، ولی اختلالِ کاملِ سرویس با ماشه‌ای بی‌اهمیت.
+
+این دقیقاً **خلافِ نیتِ صریحِ خودِ کد** بود (کامنتِ سه خط پایین‌تر: «هدر
+نامعتبر … → به fallback زیر می‌افتیم به‌جای خطا») — آن نیت فقط برایِ UUIDِ
+*ناموجود* کار می‌کرد، نه برایِ رشته‌ی بدشکل. حالا شکلِ ورودی پیش از کوئری چک
+می‌شود و هر دو حالت یکسان رفتار می‌کنند.
+
+**پوششِ تست.** `tests/tenant-gate.integration.test.mts` — ۱۶ تستِ زنده.
+جهش‌آزمایی، با تأییدِ اعمالِ هر جهش — **۶ از ۶**:
+
+| جهش | چه شکست |
+|---|---|
+| بازگرداندنِ باگِ هدرِ بدشکل | ۱ |
+| حذفِ چکِ تنانت در مسیرِ هدر (IDORِ متقاطع) | ۲ |
+| حذفِ چکِ تنانت در مسیرِ کارمندِ قفل‌شده | ۱ |
+| اجازه‌ی تعویضِ شعبه به کارمندِ قفل‌شده | ۳ |
+| حذفِ `orderBy` شعبه‌ی پیش‌فرض | ۱ |
+| حذفِ گاردِ `auth.kind !== 'staff'` | ۱ |
+
+⚠️ **دو جهشِ آخر اول زنده ماندند و دو گپ در خودِ تست‌های من را لو دادند** —
+سومین بارِ متوالی که جهش‌آزمایی تست‌های خودم را اصلاح می‌کند، نه کد را:
+
+- *`orderBy`*: تستِ «۵ بار یک نتیجه» نمی‌توانست نبودش را ببیند، چون ترتیبِ
+  درج با ترتیبِ `createdAt` یکی بود و Postgres اتفاقی همان ردیفِ درست را
+  می‌داد. تستِ جدید عمداً شعبه‌ی قدیمی‌تر را **آخر** درج می‌کند.
+- *گاردِ `kind`*: تستِ «مشتری رد می‌شود» یک `sub`ِ تصادفی می‌داد، پس بدونِ گارد
+  هم `staff.findUnique` چیزی پیدا نمی‌کرد و باز `forbidden` می‌شد — سبز به
+  دلیلِ اشتباه. تستِ جدید `sub`ِ یک کارمندِ **واقعی** را با `kind='customer'`
+  می‌دهد: بدونِ گارد، `defaultRestaurantForTenant(undefined)` یک رستورانِ
+  دلخواه برمی‌گرداند و یک مشتری دیتای پنلِ رستوران را می‌گیرد.
+
+**رفتاری که عمداً *ثبت* شد، نه اصلاح.** `tenantId` مستقیم از توکن خوانده
+می‌شود و هیچ‌جا چک نمی‌شود که این `staff` واقعاً عضوِ آن تنانت است. یعنی تنها
+چیزی که مانعِ جعلِ تنانت می‌شود **امضایِ JWT** است، نه یک لایه‌ی دوم. امروز
+کافی است (توکن امضاشده است)، ولی تک‌لایه بودنش باید آگاهانه باشد؛ تست همین
+رفتار را تثبیت می‌کند تا اگر روزی عوض شد عمدی باشد.
+
+**رفتارِ عمدیِ دیگری که تست ثبت کرد:** هدرِ متعلق به تنانتِ دیگر یا شناسه‌ی
+ناموجود، بی‌صدا به شعبه‌ی پیش‌فرضِ خودِ تنانت برمی‌گردد (نه خطا) — انتخابِ
+مستندِ خودِ کد برایِ «شعبه‌ی حذف‌شده یا انتخابِ کهنه‌ی کلاینت».
