@@ -715,12 +715,12 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
-  - **Updated 2026-08-20: 715 tests, 179 suites, 0 failures** (real Postgres + Redis).
+  - **Updated 2026-08-20: 720 tests, 180 suites, 0 failures** (real Postgres + Redis).
     The last additions were the untested-module pass: availability, coupons, SMS
     balance, idempotency, pricing (§2h), the automatic lifecycle crons (§2j),
     the customer-economy ledger (§2k), the waitlist writer core (§2l), the
-    reward marketplace (§2m), the tenant-isolation gate (§2n), the abuse-detection scan (§2o), and the
-    waitlist offer-acceptance path (§2p). Earlier that same day the count was
+    reward marketplace (§2m), the tenant-isolation gate (§2n), the abuse-detection scan (§2o), the
+    waitlist offer-acceptance path (§2p), and the three closed-out findings (§2q). Earlier that same day the count was
     564; the growth is
     phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
     drift detection, train/serve feature parity, the outreach ledger, and the CRM
@@ -1361,3 +1361,49 @@ const timeStr = now.toTimeString().slice(0, 5);   // ساعتِ محلیِ *سر
    نمی‌کشاند. با گروهِ بزرگ‌تر از `MAX_PARTY_ONLINE` اهرمِ قطعی ساخته شد.
    این چهارمین بارِ متوالی در این جلسه است که جهش‌آزمایی **تست‌های من** را
    اصلاح می‌کند، نه کد را.
+
+### ۲q) بستنِ سه یافته‌ی «ثبت‌شده ولی رفع‌نشده» (۲۰۲۶-۰۸-۲۰)
+
+سه موردی که در §2l/§2n/§2o به‌عنوان «تصمیمِ محصولی» یا «رفتارِ ثبت‌شده» کنار
+گذاشته بودم، به‌درخواستِ صریحِ مالکِ محصول بازبینی و رفع شدند. بازبینی نشان
+داد **هیچ‌کدام واقعاً تصمیمِ محصولی نبودند**:
+
+**۱) `acceptOffer`** → §2p (PR جدا). دو باگ، یکی‌شان کلِ قابلیت را از کار
+انداخته بود.
+
+**۲) `redemption_velocity` — ناسازگاری بود، نه طراحی.** این تنها detectorی
+بود که `severity` را **هاردکد** روی `'medium'` می‌گذاشت. چون
+`applyAbuseFlags` فقط `'high'` را فلگ می‌کند، حضورش در `USER_SCOPED_KINDS`
+یک **شاخه‌ی مرده** بود.
+
+هر چهار detectorِ دیگرِ همان فایل قاعده‌ی یکسانی دارند:
+
+| detector | قاعده‌ی `high` |
+|---|---|
+| `coupon_multi_account` | `>= minAccounts * 2` |
+| `rapid_book_cancel` | `>= minRapidCancels * 2` |
+| `referral_farming` | `>= minCompleted * 2` |
+| `high_no_show` | `pct >= 80` |
+| ~~`redemption_velocity`~~ | ~~هاردکدِ `medium`~~ → `>= maxPerDay * 2` |
+
+با پیش‌فرضِ `maxPerDay = 5`، آستانه‌ی تشخیص «بیش از ۵» است و `high` از «۱۰ یا
+بیشتر» شروع می‌شود — دقیقاً همان نسبتِ خواهرهایش. **آستانه از قاعده‌ی موجودِ
+خودِ فایل آمد، نه از حدسِ من** — این تفاوتِ مهمی است، چون سخت‌گیرترکردنِ
+خودخوانده‌ی یک تشخیصِ سوءاستفاده همان چیزی است که خطای مثبت می‌سازد.
+
+**۳) `tenantId` — دو وابستگیِ تک‌لایه‌ای بسته شد.**
+
+- `auth.tenantId` مستقیم از توکن پذیرفته می‌شد و هیچ‌جا چک نمی‌شد که این
+  کارمند واقعاً عضوِ همان تنانت است. تنها مانعِ جعل، امضایِ JWT بود. حالا
+  عضویت با ردیفِ واقعیِ `staff` تطبیق داده می‌شود — **همان کوئری**، فقط دو
+  ستونِ بیشتر در `select`، بدونِ رفت‌وبرگشتِ اضافه به دیتابیس.
+- **کارمندِ غیرفعال (اخراج‌شده):** مدلِ `Staff` می‌گوید «توکنِ refreshش رد
+  می‌شود»، ولی یک `access`ِ منقضی‌نشده (تا ۱۵ دقیقه) هنوز کار می‌کرد. حالا
+  اخراج بلافاصله اثر می‌کند.
+
+⚠️ **تستِ §2n که رفتارِ قدیمی را ثبت می‌کرد، عمداً معکوس شد.** آن تست
+می‌گفت «tenantIdِ توکن بدونِ چک اعتماد می‌شود». حالا خلافش را می‌سنجد. ثبتِ
+یک رفتار به‌معنایِ درست‌بودنش نیست — فقط یعنی آگاهانه است؛ و وقتی مالکِ
+محصول تصمیم گرفت که نباید باشد، تست هم باید همراهش عوض شود.
+
+**جهش‌آزمایی:** `redemption_velocity` ۳ از ۳، گاردهای تنانت ۲ از ۲.

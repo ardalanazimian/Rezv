@@ -81,6 +81,8 @@ beforeEach(async () => {
   if (madeUsers.length) {
     await db.customerEconomyProfile.deleteMany({ where: { userId: { in: madeUsers } } }).catch(() => {});
   }
+  await db.$executeRaw`DELETE FROM coupon_redemptions WHERE coupon_id IN (SELECT id FROM coupons WHERE restaurant_id = ${restaurantId}::uuid)`;
+  await db.coupon.deleteMany({ where: { restaurantId } }).catch(() => {});
   await db.auditLog.deleteMany({ where: { restaurantId } }).catch(() => {});
 });
 
@@ -179,6 +181,65 @@ describe('تشخیصِ سوءاستفاده — آستانه‌ها و خطای 
   test('اسکنِ کامل روی رستورانِ بی‌داده چیزی ادعا نمی‌کند', async () => {
     assert.deepEqual(await runFraudScan(restaurantId), []);
     assert.deepEqual(await detectRedemptionVelocity(restaurantId), []);
+  });
+});
+
+/** ردیمِ کوپن برایِ سنجشِ سرعتِ استفاده. */
+async function mkRedemptions(userId: string, n: number) {
+  const c = await db.coupon.create({
+    data: {
+      restaurantId, code: `FRC${randomUUID().slice(0, 8).toUpperCase()}`,
+      kind: 'fixed', value: 1000, maxRedemptions: 1000, perUserLimit: 1000,
+    },
+    select: { id: true },
+  });
+  for (let i = 0; i < n; i++) {
+    await db.$executeRaw`
+      INSERT INTO coupon_redemptions (id, coupon_id, user_id, discount_toman, redeemed_at)
+      VALUES (${randomUUID()}::uuid, ${c.id}::uuid, ${userId}::uuid, 1000,
+              now() - (${i} * interval '1 minute'))`;
+  }
+  return c.id;
+}
+
+describe('تشخیصِ سوءاستفاده — سرعتِ ردیم (قاعده‌ی هم‌راستاشده)', () => {
+  test('زیرِ آستانه اصلاً سیگنال نمی‌سازد', async () => {
+    const u = await mkUser();
+    await mkRedemptions(u, 5);          // آستانه «بیش از ۵» است
+    assert.equal((await detectRedemptionVelocity(restaurantId)).length, 0);
+  });
+
+  test('بالایِ آستانه ولی زیرِ دو برابر → medium (فلگِ خودکار نمی‌خورد)', async () => {
+    const u = await mkUser();
+    await mkRedemptions(u, 7);
+    const sig = (await detectRedemptionVelocity(restaurantId)).find(s => s.subject === u);
+    assert.ok(sig, 'باید تشخیص داده شود');
+    assert.equal(sig.severity, 'medium');
+  });
+
+  test('⚠️ دو برابرِ آستانه یا بیشتر → high (شاخه‌ای که قبلاً مرده بود)', async () => {
+    // ⚠️ باگِ رفع‌شده: این تنها detectorی بود که severity را هاردکد روی
+    // 'medium' می‌گذاشت. چون applyAbuseFlags فقط 'high' را فلگ می‌کند، حضورِ
+    // redemption_velocity در USER_SCOPED_KINDS یک شاخه‌ی مرده بود.
+    //
+    // تصمیمِ طراحی نبود، ناسازگاری بود: چهار detectorِ دیگرِ همین فایل قاعده‌ی
+    // «دو برابرِ آستانه = high» را دارند. همان قاعده اینجا هم اعمال شد.
+    const u = await mkUser();
+    await mkRedemptions(u, 10);         // ۲ × ۵
+    const sig = (await detectRedemptionVelocity(restaurantId)).find(s => s.subject === u);
+    assert.ok(sig);
+    assert.equal(sig.severity, 'high');
+    assert.equal(sig.metrics.redemptions, 10);
+  });
+
+  test('سیگنالِ highِ سرعتِ ردیم واقعاً فلگ می‌زند', async () => {
+    // کنترلِ end-to-end: اگر فقط severity عوض شده بود ولی مسیرِ فلگ وصل نبود،
+    // این تست می‌افتاد.
+    const u = await mkUser();
+    await mkRedemptions(u, 12);
+    const res = await applyAbuseFlags(restaurantId);
+    assert.ok(res.flaggedUserIds.includes(u), 'کاربر باید فلگ بخورد');
+    assert.equal((await profileOf(u))!.hasActiveAbuseFlag, true);
   });
 });
 
