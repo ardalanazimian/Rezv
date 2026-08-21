@@ -218,10 +218,31 @@ export async function runFraudScan(restaurantId: string): Promise<FraudSignal[]>
 const USER_SCOPED_KINDS: FraudSignal['kind'][] = ['high_no_show', 'redemption_velocity', 'rapid_book_cancel', 'referral_farming'];
 
 async function flagUserForAbuse(userId: string, sig: FraudSignal, restaurantId: string | null): Promise<void> {
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰، با اجرای زنده اثبات شد): اینجا
+  // `lastViolationAt: new Date()` هم نوشته می‌شد. آن فیلد مالِ این ماژول
+  // نیست — `economy.ts` با آن **decayِ strike** را حساب می‌کند
+  // (`applyStrikeDecay`)، و معنایِ مستندش این است: «هر ۹۰ روزِ *بدونِ نقضِ
+  // جدید*، یک strike کم می‌شود».
+  //
+  // ولی این اسکن نقضِ جدیدی نمی‌بیند — همان رزروهای قدیمی را دوباره
+  // می‌بیند (پنجره‌ی تشخیصِ high_no_show ۹۰ روزه است). پس هر بار که cron
+  // اجرا می‌شد، مهرِ زمانی به «الان» می‌رفت و ساعتِ ریکاوریِ کاربر ریست
+  // می‌شد، بدونِ اینکه کارِ بدِ تازه‌ای کرده باشد.
+  //
+  // بازتولیدِ واقعی: کاربری با ۲ strike و آخرین نقض ۱۰۰ روز پیش → decay
+  // باید ۱ بدهد. یک اجرای اسکن → مهر به امروز رفت و strike دوباره ۲ شد.
+  // چون رزروهای قدیمی تا ۹۰ روز در پنجره می‌مانند، عملاً دوره‌ی ریکاوری تا
+  // دو برابر (۱۸۰ روز) کش می‌آمد — و چون `computeReputationTier` برایِ
+  // platinum شرطِ `strikeCount === 0` دارد، کاربر بی‌صدا از بالاترین سطح
+  // محروم می‌ماند.
+  //
+  // فلگِ سوءاستفاده مکانیزمِ ماندگاریِ خودش را دارد (`hasActiveAbuseFlag`،
+  // که عمداً هرگز خودکار پاک نمی‌شود — فقط با `clearAbuseFlag`). پس این
+  // ماژول نباید به ساعتِ strike دست بزند.
   await db.customerEconomyProfile.upsert({
     where: { userId },
-    create: { userId, hasActiveAbuseFlag: true, lastViolationAt: new Date() },
-    update: { hasActiveAbuseFlag: true, lastViolationAt: new Date() },
+    create: { userId, hasActiveAbuseFlag: true },
+    update: { hasActiveAbuseFlag: true },
   });
   await audit({
     action: 'security.abuse_flag',

@@ -715,11 +715,12 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
-  - **Updated 2026-08-20: 697 tests, 176 suites, 0 failures** (real Postgres + Redis).
+  - **Updated 2026-08-20: 711 tests, 179 suites, 0 failures** (real Postgres + Redis).
     The last additions were the untested-module pass: availability, coupons, SMS
     balance, idempotency, pricing (§2h), the automatic lifecycle crons (§2j),
     the customer-economy ledger (§2k), the waitlist writer core (§2l), the
-    reward marketplace (§2m), and the tenant-isolation gate (§2n). Earlier that same day the count was
+    reward marketplace (§2m), the tenant-isolation gate (§2n), and
+    the abuse-detection scan (§2o). Earlier that same day the count was
     564; the growth is
     phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
     drift detection, train/serve feature parity, the outreach ledger, and the CRM
@@ -1263,3 +1264,53 @@ CLAUDE.md جداسازیِ تنانت غیرقابلِ‌مذاکره است.
 **رفتارِ عمدیِ دیگری که تست ثبت کرد:** هدرِ متعلق به تنانتِ دیگر یا شناسه‌ی
 ناموجود، بی‌صدا به شعبه‌ی پیش‌فرضِ خودِ تنانت برمی‌گردد (نه خطا) — انتخابِ
 مستندِ خودِ کد برایِ «شعبه‌ی حذف‌شده یا انتخابِ کهنه‌ی کلاینت».
+
+### ۲o) اسکنِ تقلب ساعتِ ریکاوریِ مشتری را ریست می‌کرد — **باگ رفع شد** (۲۰۲۶-۰۸-۲۰)
+
+`lib/fraud.ts` هیچ تستی نداشت، در حالی که سرآیندش ادعا می‌کند «همه‌ی کوئری‌ها
+روی PostgreSQL واقعی تست شده‌اند». پیامدش مستقیم رویِ مشتریِ واقعی است: خطای
+مثبت یعنی سخت‌ترشدنِ قوانینِ کنسلیِ یک مشتریِ بی‌گناه در **کلِ پلتفرم**
+(`CustomerEconomyProfile` سراسری/per-User است، نه per-restaurant).
+
+**باگِ متقاطع‌ماژولی.** `flagUserForAbuse` علاوه بر `hasActiveAbuseFlag`،
+فیلدِ `lastViolationAt` را هم به «الان» می‌برد. ولی آن فیلد مالِ این ماژول
+نیست — `economy.ts` با آن `applyStrikeDecay` را حساب می‌کند، با معنایِ
+مستندِ: «هر ۹۰ روزِ **بدونِ نقضِ جدید**، یک strike کم می‌شود».
+
+این اسکن نقضِ جدیدی نمی‌بیند؛ همان رزروهای قدیمی را دوباره می‌بیند (پنجره‌ی
+`detectHighNoShow` ۹۰ روزه است). پس هر اجرای cron مهرِ زمانی را جلو می‌برد.
+
+**بازتولیدِ زنده:**
+
+| | پیش از رفع | پس از رفع |
+|---|---|---|
+| آخرین نقض (ورودی: ۱۰۰ روز پیش) | به **امروز** پرید | ۱۰۰ روز پیش ✅ |
+| strike پس از decay (ورودی: ۲) | برگشت به **۲** | ۱ ✅ |
+
+چون رزروهای قدیمی تا ۹۰ روز در پنجره می‌مانند، دوره‌ی ریکاوری عملاً تا **دو
+برابر (۱۸۰ روز)** کش می‌آمد. و چون `computeReputationTier` برایِ `platinum`
+شرطِ `strikeCount === 0` دارد، مشتری بی‌صدا از بالاترین سطح محروم می‌ماند.
+
+**رفع:** این ماژول دیگر به `lastViolationAt` دست نمی‌زند. فلگِ سوءاستفاده
+مکانیزمِ ماندگاریِ خودش را دارد (`hasActiveAbuseFlag`، که عمداً هرگز خودکار
+پاک نمی‌شود — فقط با `clearAbuseFlag`).
+
+**پوششِ تست.** `tests/fraud.integration.test.mts` — ۱۴ تستِ زنده، با تمرکز بر
+**خطای مثبت** (چون هزینه‌اش را مشتریِ بی‌گناه می‌دهد). جهش‌آزمایی — **۷ از ۷**:
+
+| جهش | چه شکست |
+|---|---|
+| بازگرداندنِ ریستِ ساعتِ ریکاوری | ۱ |
+| حذفِ حدِ نصابِ نمونه (`minReservations`) | ۱ |
+| حذفِ آستانه‌ی نرخِ no-show | ۲ |
+| فلگ‌زدنِ سیگنال‌های `medium` | ۱ |
+| جابه‌جاییِ مرزِ `high` از ۸۰٪ به ۶۰٪ | ۲ |
+| حذفِ قیدِ رستوران (نشتِ بین‌شعبه‌ای) | ۱ |
+| واردکردنِ مهمانِ بی‌حساب به محاسبه | ۱ |
+
+**یافته‌ی ثبت‌شده‌ی رفع‌نشده.** `redemption_velocity` در `USER_SCOPED_KINDS`
+هست ولی `severity` آن **همیشه** `'medium'` است، و `applyAbuseFlags` فقط
+`high` را فلگ می‌کند — یعنی آن شاخه هرگز اجرا نمی‌شود. دست نزدم چون تشخیصِ
+اینکه «باید high شود» یا «باید از فهرست حذف شود» یک تصمیمِ محصولی است، نه
+رفعِ مکانیکی؛ و سخت‌گیرترکردنِ خودکارِ یک تشخیص بدونِ داده‌ی واقعی دقیقاً
+همان چیزی است که خطای مثبت می‌سازد.
