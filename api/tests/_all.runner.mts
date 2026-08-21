@@ -79,6 +79,7 @@ import './lifecycle-cron.integration.test.mts';
 import './loyalty-status.test.mts';
 import './loyalty.test.mts';
 import './media.test.mts';
+import './metrics-endpoint.test.mts';
 import './ml-core.test.mts';
 import './model-drift.test.mts';
 import './model-drift.integration.test.mts';
