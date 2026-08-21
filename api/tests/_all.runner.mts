@@ -106,6 +106,7 @@ import './validate.test.mts';
 import './prediction-ledger.integration.test.mts';
 import './public-menu.integration.test.mts';
 import './temporal-leakage.integration.test.mts';
+import './tenant-gate.integration.test.mts';
 import './tenant-isolation.integration.test.mts';
 import './waitlist.test.mts';
 import './waitlist-flow.integration.test.mts';

@@ -62,7 +62,22 @@ export async function resolveStaffRestaurant(auth: AccessPayload, req?: Request)
 
   // owner/manager: امکان انتخاب شعبه از طریق هدر (بدون نیاز به لاگین دوباره)
   const requestedId = req?.headers.get('x-restaurant-id');
-  if (requestedId) {
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰، تستِ tenant-gate در همان اولین اجرا گرفتش):
+  // این هدر کاملاً کلاینت‌کنترل است و مستقیم به یک ستونِ `uuid` داده می‌شد.
+  // مقدارِ غیرUUID (مثلاً یک slug یا مقدارِ کهنه‌ی localStorage) باعثِ
+  // `PrismaClientKnownRequestError: Error creating UUID` می‌شد؛ آن خطای خام
+  // `instanceof ApiError` نیست، پس `errorResponse` آن را به **۵۰۰** تبدیل
+  // می‌کرد — یعنی *همه‌ی* endpointهایِ رستوران برای آن کلاینت می‌مردند تا
+  // وقتی هدر را پاک کند. نه نشتِ داده، ولی یک اختلالِ کاملِ سرویس با
+  // ماشه‌ای بی‌اهمیت.
+  //
+  // این دقیقاً خلافِ نیتِ صریحِ خودِ کد بود (سه خط پایین‌تر): «هدر نامعتبر …
+  // → به fallback زیر می‌افتیم به‌جای خطا». آن نیت فقط برایِ UUIDِ ناموجود
+  // کار می‌کرد، نه برایِ رشته‌ی بدشکل. حالا شکلِ ورودی قبل از کوئری چک
+  // می‌شود و هر دو حالت یکسان رفتار می‌کنند.
+  const looksLikeUuid = !!requestedId
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedId);
+  if (looksLikeUuid) {
     const restaurant = await db.restaurant.findFirst({
       where: { id: requestedId, tenantId: auth.tenantId }, // چک تنانت: جلوگیری از IDOR
       select: RESTAURANT_SELECT,
