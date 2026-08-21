@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbRead as db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { getLedgerHealth, MIN_RESOLVED_FOR_ACCURACY } from '@/lib/prediction-ledger';
 import { getPlatformPerformanceDrift, PERFORMANCE_DRIFT_THRESHOLD } from '@/lib/model-drift';
@@ -24,7 +24,7 @@ import { getPlatformPerformanceDrift, PERFORMANCE_DRIFT_THRESHOLD } from '@/lib/
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
 
     const [noShowRows, demandRows, recentRuns, noShowActiveCount, ledgerHealth, drift] = await Promise.all([
       db.restaurantNoShowModel.findMany({

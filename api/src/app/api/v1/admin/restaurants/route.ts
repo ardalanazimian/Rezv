@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { computeSubscriptionStatus } from '@/lib/subscription';
 
@@ -9,7 +9,7 @@ import { computeSubscriptionStatus } from '@/lib/subscription';
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const restaurants = await db.restaurant.findMany({
       orderBy: { createdAt: 'desc' },
       include: {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { audit } from '@/lib/audit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, parseQuery, z } from '@/lib/schemas';
@@ -12,7 +12,7 @@ import { COLLECTIONS, REGISTRY, isCollection, invalidateCollection, mapPrismaErr
 //  GET  → لیستِ کاملِ استودیو (پیش‌نویس + منتشرشده، با جستجو و صفحه‌بندی)
 //  POST → ساختِ ردیفِ تازه
 //
-//  احرازِ هویت: همان مدیرِ پلتفرمِ پنلِ شرکت (adminAuthFromRequest). یک هویت،
+//  احرازِ هویت: همان مدیرِ پلتفرمِ پنلِ شرکت (requireAdmin). یک هویت،
 //  یک صفِ دسترسی — استودیو نقشِ کاربریِ موازی نمی‌سازد.
 //
 //  هر نوشتن: کشِ نمای عمومیِ همان مجموعه فوراً باطل و عمل audit می‌شود.
@@ -29,7 +29,7 @@ const querySchema = z.object({
 export async function GET(req: Request, { params }: { params: Promise<{ collection: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const { collection } = parseParams(await params, paramsSchema);
     if (!isCollection(collection)) throw Err.notFound(`مجموعه (مجازها: ${COLLECTIONS.join('، ')})`);
     const { q, status, limit, offset } = parseQuery(req, querySchema);
@@ -51,7 +51,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
 export async function POST(req: Request, { params }: { params: Promise<{ collection: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const { collection } = parseParams(await params, paramsSchema);
     if (!isCollection(collection)) throw Err.notFound('مجموعه');
 

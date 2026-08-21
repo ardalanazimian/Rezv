@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbRead as db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { listFlaggedAbuseUsers } from '@/lib/fraud';
 
@@ -15,7 +15,7 @@ import { listFlaggedAbuseUsers } from '@/lib/fraud';
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
 
     const [couponAbuse, highNoShow, recentFailedActions, sensitiveActions, flaggedAbuseUsers, economyOverview] = await Promise.all([
       // الگوی fraud: چند حساب از یک IP کوپن استفاده کرده (سطح کل پلتفرم)

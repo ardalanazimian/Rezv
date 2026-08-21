@@ -31,9 +31,20 @@ export function guardMaintenance(req: Request): NextResponse | null {
   if (expected && key && safeEqual(key, expected)) return null;
   // روش ۲: Vercel Cron — هدر Authorization: Bearer ${CRON_SECRET}
   // Vercel این هدر را خودکار به درخواست‌های cron اضافه می‌کند.
+  //
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۱، ممیزیِ گاردهای بدونِ تست): این شاخه با
+  // `===` مقایسه می‌کرد، نه constant-time — در حالی که شاخه‌ی خواهرش بالا
+  // از `timingSafeEqual` استفاده می‌کند و کامنتِ بالای همین فایل مدعیِ
+  // حفاظتِ constant-time برایِ کلِ تابع است. `===` رشته‌ای در اولین بایتِ
+  // متفاوت خارج می‌شود و طولِ پیشوندِ درست را لو می‌دهد.
+  //
+  // یعنی از دو درِ همین اتاق، یکی سفت شده بود و دیگری نه — همان الگویی که
+  // در `/api/metrics` (PR #58) و `setAbuseFlagManually` (PR #59) هم دیده شد.
+  // و اینجا کلیدِ پشتِ در، مسیرهایی مثلِ `maintenance/retention` را باز
+  // می‌کند که داده پاک می‌کنند.
   const cronSecret = process.env.CRON_SECRET;
   const authz = req.headers.get('authorization');
-  if (cronSecret && authz === `Bearer ${cronSecret}`) return null;
+  if (cronSecret && authz && safeEqual(authz, `Bearer ${cronSecret}`)) return null;
   // هیچ‌کدام معتبر نبود
   return NextResponse.json(
     { ok: false, error: { code: 'UNAUTHORIZED', message: 'دسترسی غیرمجاز' } },
