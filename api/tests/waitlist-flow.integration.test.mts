@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
 import {
-  joinWaitlist, promoteNext, declineOffer, leaveWaitlist, expireOffers, getPosition,
+  joinWaitlist, promoteNext, acceptOffer, declineOffer, leaveWaitlist, expireOffers, getPosition,
 } from '../src/lib/waitlist.ts';
 import { fixturePhone } from './_phone.helper.mts';
 
@@ -68,6 +68,9 @@ before(async () => {
     data: {
       tenantId, slug: TAG, name: '[DEMO] رستورانِ صف', clubPrefix: 'WL',
       timezone: 'Asia/Tehran', isOpen: true,
+      // پذیرشِ آفر برایِ کاربرِ لاگین‌شده مسیرِ source='app' را می‌رود و به
+      // گاردِ onlineGating می‌خورد؛ پنلِ زنده heartbeat تازه دارد.
+      lastSeenAt: new Date(),
     },
     select: { id: true },
   });
@@ -81,6 +84,8 @@ before(async () => {
 });
 
 beforeEach(async () => {
+  // heartbeat را تازه نگه دار (گاردِ onlineGating پنجره‌ی ۹۰ ثانیه‌ای دارد)
+  await db.restaurant.update({ where: { id: restaurantId }, data: { lastSeenAt: new Date() } });
   await db.waitlistEntry.deleteMany({ where: { restaurantId } });
   await db.$executeRaw`DELETE FROM reservations WHERE restaurant_id = ${restaurantId}::uuid`;
   await db.table.deleteMany({ where: { restaurantId } });
@@ -319,6 +324,89 @@ describe('صف — انقضایِ آفر (قفلِ باگِ رقابتِ رفع�
     const final = (await entryOf(id)).status;
     assert.equal(final, declined ? 'declined' : 'no_response',
       declined ? 'رد کردنِ موفق نباید با no_response بازنویسی شود' : 'cron زودتر رسیده');
+  });
+
+  test('⚠️ پذیرشِ آفر با تایم‌زونِ رستوران کار می‌کند، نه تایم‌زونِ سرور', async () => {
+    // ⚠️ باگِ رفع‌شده (§2p): تاریخ از `toISOString()` (UTC) و ساعت از
+    // `toTimeString()` (محلیِ *سرور*) گرفته می‌شد، و createReservation هر دو را
+    // ساعتِ دیواریِ **تایم‌زونِ رستوران** تفسیر می‌کند. روی سرورِ UTC با
+    // رستورانِ تهران (UTC+03:30) اسلات ۳٫۵ ساعت عقب‌تر ساخته می‌شد و گاردِ
+    // «زمان در گذشته است» همیشه شلیک می‌کرد — یعنی این قابلیت در تولید اصلاً
+    // کار نمی‌کرد. این تست همان مسیر را کامل می‌رود.
+    await mkTable(1);
+    const j = await joinWaitlist({ restaurantId, partySize: 2, userId });
+    await promoteNext(restaurantId);
+
+    const res = await acceptOffer(j.id, 'customer', { callerUserId: userId });
+    assert.ok(res.reservation_code, 'کدِ رزرو باید برگردد');
+    const row = await db.waitlistEntry.findUniqueOrThrow({
+      where: { id: j.id }, select: { status: true, reservationCode: true, seatedAt: true },
+    });
+    assert.equal(row.status, 'accepted');
+    assert.equal(row.reservationCode, res.reservation_code, 'کد باید روی ورودی ثبت شود');
+    assert.ok(row.seatedAt);
+    assert.equal(await db.reservation.count({ where: { restaurantId } }), 1);
+  });
+
+  test('⚠️ آفرِ منقضی پذیرفته نمی‌شود و ورودی دست‌نخورده می‌ماند', async () => {
+    const t1 = await mkTable(1);
+    const id = await seedOffer(t1, new Date(Date.now() - 60_000));
+
+    await assert.rejects(() => acceptOffer(id, 'customer', { callerUserId: userId }),
+      'آفرِ منقضی نباید پذیرفته شود');
+    assert.equal((await entryOf(id)).status, 'offered', 'ورودی نباید accepted شود');
+    assert.equal(await db.reservation.count({ where: { restaurantId } }), 0,
+      'هیچ رزروی نباید ساخته شود');
+  });
+
+  test('⚠️ پذیرشِ همزمان فقط یک رزرو می‌سازد', async () => {
+    // ⚠️ چون ادعا حالا *پیش از* ساختِ رزرو و اتمیک است، دو درخواستِ همزمان
+    // نمی‌توانند هر دو رزرو بسازند.
+    await mkTable(1);
+    const j = await joinWaitlist({ restaurantId, partySize: 2, userId });
+    await promoteNext(restaurantId);
+
+    const out = await Promise.allSettled([
+      acceptOffer(j.id, 'customer', { callerUserId: userId }),
+      acceptOffer(j.id, 'customer', { callerUserId: userId }),
+    ]);
+    const ok = out.filter(o => o.status === 'fulfilled').length;
+    assert.equal(ok, 1, `فقط یک پذیرش باید موفق شود، نه ${ok}`);
+    assert.equal((await entryOf(j.id)).status, 'accepted');
+    assert.equal(await db.reservation.count({ where: { restaurantId } }), 1,
+      'دقیقاً یک رزرو باید ساخته شود');
+  });
+
+  test('⚠️ شکستِ ساختِ رزرو، ورودی و میز را دقیقاً به حالتِ قبل برمی‌گرداند', async () => {
+    // ⚠️ این تست را جهش‌آزمایی لازم کرد: جهشِ «حذفِ مسیرِ بازگردانی» اول زنده
+    // ماند، چون هیچ تستی createReservation را *پس از* ادعای موفق به شکست
+    // نمی‌کشاند. اهرمِ قطعی: گروهِ بزرگ‌تر از MAX_PARTY_ONLINE (=۱۲) — ادعا
+    // موفق می‌شود، بعد createReservation با partyTooLarge می‌افتد.
+    //
+    // بدونِ بازگردانی، ورودی روی `accepted` گیر می‌کرد بدونِ هیچ رزروی —
+    // یعنی مهمان نه در صف بود نه رزرو داشت، و میزش هم برای همیشه قفل می‌ماند.
+    const t1 = await db.table.create({
+      data: { restaurantId, number: 1, capacity: 20, isActive: true, state: 'free' },
+      select: { id: true, number: true },
+    });
+    const e = await db.waitlistEntry.create({
+      data: {
+        restaurantId, userId, partySize: 13, status: 'offered', priority: 0,
+        joinedAt: new Date(Date.now() - 5 * 60_000),
+        offeredAt: new Date(), offerExpiresAt: new Date(Date.now() + 5 * 60_000),
+        offeredTableId: t1.id, offeredTableNumber: t1.number,
+      },
+      select: { id: true },
+    });
+    await db.table.update({ where: { id: t1.id }, data: { state: 'reserved' } });
+
+    await assert.rejects(() => acceptOffer(e.id, 'customer', { callerUserId: userId }));
+
+    assert.equal((await entryOf(e.id)).status, 'offered',
+      'ورودی باید به offered برگردد، نه روی accepted گیر کند');
+    assert.equal(await tableState(t1.id), 'reserved',
+      'میز باید همچنان مالِ همین آفر بماند — آزادکردنش همان نشتِ §2l را می‌سازد');
+    assert.equal(await db.reservation.count({ where: { restaurantId } }), 0);
   });
 
   test('میزی که آفرِ زنده دارد هرگز free نمی‌ماند', async () => {

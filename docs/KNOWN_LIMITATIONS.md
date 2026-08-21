@@ -715,12 +715,12 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
   fine while any standalone run of such a file hangs. Harmless for CI, a real
   trap for local debugging and for any future worker script. **(follow-up)**
 - **Suite size after the 2026-08-19 audit: 486 tests, 119 suites, 0 failures.**
-  - **Updated 2026-08-20: 711 tests, 179 suites, 0 failures** (real Postgres + Redis).
+  - **Updated 2026-08-20: 715 tests, 179 suites, 0 failures** (real Postgres + Redis).
     The last additions were the untested-module pass: availability, coupons, SMS
     balance, idempotency, pricing (§2h), the automatic lifecycle crons (§2j),
     the customer-economy ledger (§2k), the waitlist writer core (§2l), the
-    reward marketplace (§2m), the tenant-isolation gate (§2n), and
-    the abuse-detection scan (§2o). Earlier that same day the count was
+    reward marketplace (§2m), the tenant-isolation gate (§2n), the abuse-detection scan (§2o), and the
+    waitlist offer-acceptance path (§2p). Earlier that same day the count was
     564; the growth is
     phases 5–8 of the intelligence work: prediction/outcome ledger, model registry,
     drift detection, train/serve feature parity, the outreach ledger, and the CRM
@@ -1314,3 +1314,50 @@ CLAUDE.md جداسازیِ تنانت غیرقابلِ‌مذاکره است.
 اینکه «باید high شود» یا «باید از فهرست حذف شود» یک تصمیمِ محصولی است، نه
 رفعِ مکانیکی؛ و سخت‌گیرترکردنِ خودکارِ یک تشخیص بدونِ داده‌ی واقعی دقیقاً
 همان چیزی است که خطای مثبت می‌سازد.
+
+### ۲p) `acceptOffer` — دو باگ، یکی از آن‌ها قابلیت را کاملاً از کار انداخته بود (۲۰۲۶-۰۸-۲۰)
+
+در §2l این تابع را به‌عنوان «یافته‌ی ثبت‌شده‌ی رفع‌نشده» کنار گذاشته بودم با
+استدلالِ «تصمیمِ محصولی می‌خواهد». آن ارزیابی **ناقص بود**: وقتی برایش تست
+نوشتم، معلوم شد دو باگ دارد که یکی‌شان اصلاً تصمیمِ محصولی نمی‌خواست.
+
+**باگ ۱ — تایم‌زون: این قابلیت در تولید کار نمی‌کرد.**
+
+```ts
+const dateStr = now.toISOString().slice(0, 10);   // تاریخِ UTC
+const timeStr = now.toTimeString().slice(0, 5);   // ساعتِ محلیِ *سرور*
+```
+
+و `createReservation` هر دو را ساعتِ دیواریِ **تایم‌زونِ رستوران** تفسیر
+می‌کند (`computeRanges` → `zonedTimeToUtc`). سه تایم‌زونِ متفاوت در یک جفت.
+
+روی سرورِ UTC با رستورانِ تهران (UTC+03:30)، اسلات **۳٫۵ ساعت عقب‌تر** از
+«الان» ساخته می‌شد و گاردِ `+start < now - 60_000` همیشه شلیک می‌کرد → **هر
+پذیرشِ آفرِ لیستِ انتظار با «زمان رزرو در گذشته است» شکست می‌خورد**. یعنی کلِ
+مسیرِ «مهمان آفر را قبول می‌کند» مرده بود. هیچ تستی این تابع را صدا نمی‌زد،
+پس هیچ‌وقت دیده نشد.
+
+رفع: `timeKeyInTz` (جفتِ `dateKeyInTz`) به `hours.ts` اضافه شد و هر دو از
+تایم‌زونِ خودِ رستوران گرفته می‌شوند.
+
+**باگ ۲ — ترتیبِ عملیات.** رزرو *اول* ساخته می‌شد و وضعیت *بعد* با
+`update`ِ بی‌قیدوشرط نوشته می‌شد؛ و مسیرِ خطا میز را آزاد می‌کرد در حالی که
+ورودی هنوز `offered` بود — همان نشتِ §2l. حالا **اول** ادعای اتمیک (گاردِ
+`status`)، بعد ساختِ رزرو، و در صورتِ شکست بازگردانی به دقیقاً حالتِ قبل
+(ورودی `offered`، میز `reserved`).
+
+**پوششِ تست.** ۴ تستِ جدید در `waitlist-flow.integration.test.mts` (مجموع ۲۲).
+جهش‌آزمایی **۵ از ۵**.
+
+⚠️ **دو تصحیحِ صادقانه در ادعاهای خودم:**
+
+۱. *شرطِ انقضا در ادعای اتمیک محافظِ مستقل نیست.* جهش‌آزمایی نشان داد حذفش
+   هیچ تستی را نمی‌اندازد — چون چکِ بیرونیِ بالای تابع همان لحظه را می‌سنجد.
+   چیزی که واقعاً رقابت با cron را می‌بندد گاردِ `status` است. کامنتِ کد
+   اصلاح شد تا این را دقیق بگوید.
+
+۲. *تستِ بازگردانی را جهش‌آزمایی لازم کرد.* جهشِ «حذفِ مسیرِ بازگردانی» اول
+   زنده ماند چون هیچ تستی `createReservation` را پس از ادعای موفق به شکست
+   نمی‌کشاند. با گروهِ بزرگ‌تر از `MAX_PARTY_ONLINE` اهرمِ قطعی ساخته شد.
+   این چهارمین بارِ متوالی در این جلسه است که جهش‌آزمایی **تست‌های من** را
+   اصلاح می‌کند، نه کد را.

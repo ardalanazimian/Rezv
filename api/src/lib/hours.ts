@@ -84,6 +84,26 @@ export function dateKeyInTz(d: Date, timezone: string): string {
 }
 
 /**
+ * ساعتِ دیواریِ محلی («HH:MM») یک لحظه‌ی UTC در تایم‌زونِ داده‌شده — جفتِ
+ * `dateKeyInTz` بالا. با هم دقیقاً همان ورودی‌ای را می‌سازند که
+ * `zonedTimeToUtc` انتظار دارد (تاریخ و ساعت، هر دو در تایم‌زونِ رستوران).
+ *
+ * ⚠️ چرا لازم شد (۲۰۲۶-۰۸-۲۰): `hourInTz` فقط ساعت را می‌داد بدونِ دقیقه، پس
+ * صداکننده‌ها به `toTimeString()` (ساعتِ محلیِ *سرور*) می‌افتادند و آن را با
+ * تاریخِ UTC جفت می‌کردند — سه تایم‌زونِ متفاوت در یک جفت. شرحِ باگی که از
+ * این ساخته می‌شد در KNOWN_LIMITATIONS §2p.
+ */
+export function timeKeyInTz(d: Date, timezone: string): string {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const parts: Record<string, string> = {};
+  for (const p of dtf.formatToParts(d)) parts[p.type] = p.value;
+  const hour = parts.hour === '24' ? 0 : Number(parts.hour);
+  return `${String(hour).padStart(2, '0')}:${parts.minute}`;
+}
+
+/**
  * آیا رستوران در این تاریخ اصلاً باز است؟ (نه تعطیلِ هفتگی، نه تعطیلِ خاص)
  * @param closureDates مجموعه‌ی تاریخ‌های تعطیلِ خاص ("YYYY-MM-DD")
  */
