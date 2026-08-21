@@ -45,6 +45,7 @@ CUSTOMER_ORDER = [
     'js/reservation.js', 'js/features/trips.js', 'js/features/loyalty.js',
     'js/features/economy.js',
     'js/features/rewards.js', 'js/features/food-dna.js', 'js/features/chat.js',
+    'js/features/checkin.js',
     'js/features/palette.js', 'js/features/notifications.js',
     'js/features/a11y.js', 'js/features/onboarding.js',
     'js/features/pull-refresh.js', 'js/features/swipe-actions.js',
