@@ -311,7 +311,7 @@
 
 ## 2b. System audit — 2026-08-19 (read-only pass, verified against code not docs)
 
-- **`apps/business/src-v2/` is dead code — status now certain, was "(uncertain)".**
+- **`apps/business/src-v2/` — DELETED 2026-08-21.** (Was: dead code, status certain.)
   It holds exactly one file (`RestaurantIntelligenceDashboard.jsx`, 20 KB). Verified:
   it is referenced by **nothing** outside itself; `apps/business` has **no
   `package.json` and no bundler config**; `apps/business/index.html` loads only

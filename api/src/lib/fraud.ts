@@ -330,10 +330,24 @@ export async function clearAbuseFlag(
  * انسانی بوده، نه یه سیگنالِ الگوریتمی.
  */
 export async function setAbuseFlagManually(userId: string, adminId: string, reason: string): Promise<void> {
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۱، ممیزیِ تاریخچه‌ی PRها): اینجا هم مثلِ
+  // `flagUserForAbuse` فیلدِ `lastViolationAt` نوشته می‌شد — همان اشتباهی که
+  // در PR #55 برای مسیرِ *خودکار* رفع شد ولی این خواهرِ *دستی* از قلم افتاد.
+  //
+  // چرا مهم است: آن فیلد مالِ سیستمِ strike در `economy.ts` است
+  // (`applyStrikeDecay`)، و بدتر از مسیرِ خودکار، اینجا **نامتقارن** بود:
+  // `setAbuseFlagManually` مهر می‌زد ولی `clearAbuseFlag` (مسیرِ اعتراض) آن
+  // را برنمی‌گرداند. پس یک فلگِ اشتباهیِ ادمین، حتی پس از پس‌گرفتن، تا ۹۰
+  // روزِ اضافه جلوی decayِ strikeِ مشتری را می‌گرفت — بی‌صدا، بدونِ هیچ ردی
+  // که توضیح دهد چرا، و بدونِ اینکه ادمین بداند چنین اثری گذاشته.
+  //
+  // فلگِ سوءاستفاده مکانیزمِ ماندگاریِ خودش را دارد (`hasActiveAbuseFlag`).
+  // سیستمِ strike با نتیجه‌ی واقعیِ رزروها (`computeEventScore`) کار می‌کند.
+  // این دو عمداً جدا هستند و این ماژول نباید به ساعتِ آن یکی دست بزند.
   await db.customerEconomyProfile.upsert({
     where: { userId },
-    create: { userId, hasActiveAbuseFlag: true, lastViolationAt: new Date() },
-    update: { hasActiveAbuseFlag: true, lastViolationAt: new Date() },
+    create: { userId, hasActiveAbuseFlag: true },
+    update: { hasActiveAbuseFlag: true },
   });
   await audit({
     action: 'security.abuse_flag',
