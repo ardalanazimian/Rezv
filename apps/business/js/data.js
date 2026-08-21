@@ -212,6 +212,27 @@ const API = {
   updateTable(id, body){ return this.patch(`/restaurant/tables/${id}`, body); },
   deleteTable(id){ return this.delete(`/restaurant/tables/${id}`); },
   setTableState(id, state){ return this.patch(`/restaurant/tables/${id}/state`, { state }); },
+  /**
+   * QRِ check-inِ یک میز — خروجی SVG است نه JSON، پس مثلِ `menuQrSvg` نمی‌تواند
+   * از `request()` (که همیشه `res.json()` می‌زند) عبور کند. شکلِ خروجی عمداً
+   * همان قراردادِ بقیه است تا فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
+   */
+  async tableQrSvg(id, size){
+    if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
+    try{
+      const res = await fetch(this.base + `/api/v1/restaurant/tables/${encodeURIComponent(id)}/qr?size=` + encodeURIComponent(size||512), {
+        headers: { Authorization: 'Bearer ' + this._token },
+      });
+      if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{
+        svg: await res.text(),
+        code: decodeURIComponent(res.headers.get('X-Table-Code') || ''),
+        url: decodeURI(res.headers.get('X-Checkin-Url') || ''),
+      } };
+    }catch{
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
   // ── هوش مشتری (RFM/CLV/AI) ──
   customers(qs){ return this.get('/restaurant/customers'+(qs?'?'+qs:'')); },
   customerDetail(userId){ return this.get('/restaurant/customers/'+encodeURIComponent(userId)); },

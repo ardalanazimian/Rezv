@@ -100,6 +100,26 @@ export const API = {
   // headers اختیاری: برای عملیاتِ حساس (مثلاً رزرو) که به Idempotency-Key نیاز دارند.
   post(path, body, headers){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}), headers }); },
 
+  /**
+   * QRِ کدِ رزرو — خروجی SVG است نه JSON، پس نمی‌تواند از `request()`
+   * (که همیشه `res.json()` می‌زند) عبور کند و fetchِ مستقیم لازم دارد.
+   * شکلِ خروجی عمداً همان قراردادِ بقیه است ({ok,data}/{ok:false,...}).
+   *
+   * سرور مالکیت را چک می‌کند: مشتری فقط رزروِ خودش. پس توکن لازم است.
+   */
+  async reservationQrSvg(code, size){
+    if (!this.getToken()) return { ok:false, error:{ message:'برای دیدنِ کد باید وارد شوی' } };
+    try {
+      const res = await fetch(`${this.base}/api/v1/reservations/${encodeURIComponent(code)}/qr?size=${encodeURIComponent(size || 360)}`, {
+        headers: { Authorization: 'Bearer ' + this.getToken() },
+      });
+      if (!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{ svg: await res.text() } };
+    } catch {
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
+
   // ── احراز هویت (فاز ۳) ──
   async requestOtp(phone){
     return this.post('/auth/otp/request', { phone });

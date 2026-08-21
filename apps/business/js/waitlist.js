@@ -232,8 +232,138 @@ function openTableSheet(i){
     <div class="field-label" style="margin-top:14px">اسم میز <span style="color:var(--t3);font-weight:400">(اختیاری)</span></div>
     <input class="inp" id="tblRename" value="${esc(t.name||'')}" placeholder="میز ${fa(t.n)}" style="width:100%">
     <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="confirmTableStatus()">تأیید تغییر</button>
+    ${t.id ? `<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="openTableQr(${i})">${icon('qr',{size:14})} QRِ ورودِ مهمان</button>` : ''}
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
   `);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  QRِ check-inِ میز — استیکری که رویِ میز چسبانده می‌شود
+//
+//  مهمان سرِ میز اسکن می‌کند → اپِ مشتری باز می‌شود → رزروِ همان بازه‌ی
+//  زمانی به `seated` می‌رود و میز `occupied` می‌شود، بدونِ اینکه کارکنان
+//  کاری کنند.
+//
+//  ⚠️ تا ۲۰۲۶-۰۸-۲۱ این قابلیت شیپ شده بود ولی برایِ هیچ رستورانِ واقعی کار
+//  نمی‌کرد: هیچ روتی `qr_code` را ست نمی‌کرد و تنها میزهایِ دارایِ کد،
+//  داده‌ی `[DEMO]`ِ seed بودند. حالا هر میز کد دارد و این دکمه نشانش می‌دهد.
+//
+//  خودِ SVG از APIِ خودمان می‌آید (نه ورودیِ کاربر) و متنِ داخلش را هم سرور
+//  از دیتابیس می‌سازد — پنل فقط شناسه‌ی میز را می‌فرستد.
+// ═══════════════════════════════════════════════════════════════════════
+let _tableQrSvg = null;
+let _tableQrLabel = '';
+
+function openTableQr(i){
+  const t = TABLES[i];
+  if(!t || !t.id){ toast('','این میز هنوز روی سرور ساخته نشده'); return; }
+  _tableQrLabel = tableLabel(t);
+  openModal(`
+    <div class="modal-title">QRِ ورودِ مهمان · ${esc(_tableQrLabel)}</div>
+    <div class="modal-sub">این کد را چاپ کن و رویِ میز بگذار. مهمان با اسکنش، ورودش خودکار ثبت می‌شود.</div>
+    <div id="tableQrBox" style="text-align:center;padding:12px 0"></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">بستن</button>
+  `);
+  tableLoadQr(t.id);
+}
+
+/** SVGِ QR را از سرور می‌گیرد و همراهِ دکمه‌های دانلود/چاپ نشان می‌دهد. */
+async function tableLoadQr(id){
+  const box = document.getElementById('tableQrBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال ساختِ QR…</div>`;
+
+  const res = await API.tableQrSvg(id, 512);
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+        ${esc(res.offline ? 'اتصال به سرور برقرار نیست.' : (res.error?.message || 'ساختِ QR ناموفق بود.'))}
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">تلاش دوباره</button>`;
+    return;
+  }
+
+  _tableQrSvg = res.data.svg;
+  // SVG با عرضِ ثابتِ ۵۱۲ می‌آید (اندازه‌ای که برایِ دانلود می‌خواهیم) ولی در
+  // پنلِ موبایل باید کوچک شود، وگرنه از کارت بیرون می‌زند و صفحه را افقی
+  // اسکرول می‌کند — همان چیزی که در QRِ منو هم رخ داده بود.
+  box.innerHTML = `
+    <div style="background:#fff;display:inline-block;padding:12px;border-radius:12px;max-width:100%">
+      <div style="max-width:240px;margin:0 auto">
+        <style>#tableQrBox svg{width:100%;height:auto;display:block}</style>
+        ${_tableQrSvg}
+      </div>
+    </div>
+    <div style="font-family:monospace;font-size:12px;color:var(--t2);margin-top:8px;direction:ltr">${esc(res.data.code)}</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-ghost" onclick="tableDownloadQr('svg')">دانلودِ SVG</button>
+      <button class="btn btn-sm btn-ghost" onclick="tableDownloadQr('png')">دانلودِ PNG</button>
+      <button class="btn btn-sm btn-ghost" onclick="tablePrintQr()">چاپ</button>
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:8px">
+      SVG برایِ چاپ (هر اندازه، بدونِ افتِ کیفیت) · PNG برایِ اشتراک‌گذاری
+    </div>`;
+}
+
+/** دانلودِ QR. PNG در خودِ مرورگر از SVG رندر می‌شود — بدونِ رفت‌وبرگشتِ اضافه. */
+function tableDownloadQr(fmt){
+  if(!_tableQrSvg) return;
+  const name = 'rezervno-table-qr';
+  if(fmt === 'svg'){
+    tableTriggerDownload(new Blob([_tableQrSvg], { type:'image/svg+xml' }), name + '.svg');
+    return;
+  }
+  // SVG → canvas → PNG. اندازه‌ی ۱۰۲۴ عمدی است: QR در چاپ اغلب بزرگ‌تر از
+  // نمایشِ صفحه لازم می‌شود و بزرگ‌کردنِ PNGِ کوچک ناخوانایش می‌کند.
+  const SIZE = 1024;
+  const img = new Image();
+  const svgUrl = URL.createObjectURL(new Blob([_tableQrSvg], { type:'image/svg+xml' }));
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = c.height = SIZE;
+    const ctx = c.getContext('2d');
+    // پس‌زمینه‌ی سفیدِ صریح: PNGِ شفاف رویِ تمِ تیره سیاه‌روی‌سیاه می‌شود و
+    // اسکنر نمی‌خواندش.
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    ctx.drawImage(img, 0, 0, SIZE, SIZE);
+    URL.revokeObjectURL(svgUrl);
+    c.toBlob(b => { if(b) tableTriggerDownload(b, name + '.png'); });
+  };
+  img.onerror = () => { URL.revokeObjectURL(svgUrl); toast('','ساختِ PNG ناموفق بود — SVG را دانلود کن'); };
+  img.src = svgUrl;
+}
+
+/** چاپِ مستقیم: یک پنجره‌ی کوچک با همان SVG و نامِ میز بالایش. */
+function tablePrintQr(){
+  if(!_tableQrSvg) return;
+  const w = window.open('', '_blank', 'width=420,height=560');
+  if(!w){ toast('','مرورگر پنجره‌ی چاپ را بست — دانلودِ SVG را امتحان کن'); return; }
+  // `esc` رویِ برچسب اعمال می‌شود چون اسمِ میز را رستوران‌دار تایپ کرده.
+  // SVG از APIِ خودمان می‌آید و ورودیِ کاربر داخلش نیست.
+  w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8">
+    <title>QR ${esc(_tableQrLabel)}</title>
+    <style>
+      body{font-family:system-ui,sans-serif;text-align:center;padding:24px;margin:0}
+      h1{font-size:20px;margin:0 0 16px}
+      svg{width:280px;height:280px}
+      p{color:#555;font-size:13px;margin-top:12px}
+      @media print{ body{padding:0} }
+    </style></head><body>
+    <h1>${esc(_tableQrLabel)}</h1>
+    ${_tableQrSvg}
+    <p>برای ثبتِ ورود، این کد را اسکن کنید</p>
+    </body></html>`);
+  w.document.close();
+  // چاپ بعد از لودِ کاملِ سند؛ بدونِ این، بعضی مرورگرها صفحه‌ی خالی چاپ می‌کنند.
+  w.onload = () => { w.focus(); w.print(); };
+}
+
+function tableTriggerDownload(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 async function confirmTableStatus(){
   if(pendingTable===null)return;
