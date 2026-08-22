@@ -166,9 +166,6 @@
   setter functions instead — keep both patterns consistent.)**
 - **No client-side test coverage beyond E2E.** Only Playwright E2E covers the
   customer app; business/company panels have **no automated tests**. **(uncertain)**
-- **`apps/business/src-v2/*.jsx`** (a React dashboard) appears to be a
-  preview/experiment not wired into the shipping vanilla-JS panel. Clarify its
-  status or remove to avoid confusion. **(uncertain)**
 - **Service-worker cache discipline is manual.** Forgetting to bump
   `CACHE_VERSION` ships stale assets to returning users.
 - **Customer "Desire" design audit — real bugs fixed, scope deliberately narrowed
@@ -324,10 +321,12 @@
   `API.customers()` against real routes backed by `lib/rfm.ts`,
   `lib/customer-insights.ts`, `lib/crm-recommendations.ts`).
   **Classification:** Mock + Disconnected + Duplicated + Deprecated.
-  **Recommendation: delete it.** It ships no value and is a live trap — wiring it
-  up would instantly put fabricated CLV/churn numbers in front of a real
-  restaurant. Not deleted in this pass because removal is the owner's call.
-  **(decision needed)**
+  It shipped no value and was a live trap — wiring it up would have instantly
+  put fabricated CLV/churn numbers in front of a real restaurant. **Deleted
+  2026-08-21** (PR #59); this entry is kept only as the historical record of
+  why. Re-verified 2026-08-22: the path no longer exists on `main`, and
+  nothing in the repo (code, build config, or docs other than this history
+  note) references it.
 - **Menu has no CRUD — ~~structurally dead~~ SHIPPED 2026-08-19, entry kept for
   history.** The original finding was correct when written: `MenuItem` was read
   (public `restaurants/[slug]` returned `menu[]`) and consumed (preorder,
