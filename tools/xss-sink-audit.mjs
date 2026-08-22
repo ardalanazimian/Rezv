@@ -12,12 +12,16 @@
 //
 //  محدودیتِ صادقانه: این طبقه‌بندی heuristic است، نه AST-level dataflow
 //  واقعی (که نیازِ یک analyzer کامل جاوااسکریپت دارد و از دامنه‌ی این ابزار
-//  خارج است). قاعده‌ی محافظه‌کارانه: خطی که escِ صریح `esc(` را در همان
-//  عبارتِ template/انتساب نبیند و ثابتِ خالص هم نباشد، `unsafe` یا `review`
-//  علامت می‌خورد — هرگز به‌صورتِ خوش‌بینانه `escaped`/`safe_static` فرض
-//  نمی‌شود صرفاً چون regex قطعی نبود.
+//  خارج است). ولی heuristic ≠ سرسری: عبارتِ sink با یک اسکنرِ واقعیِ
+//  رشته/template/پرانتز تا پایانِ statement خوانده می‌شود (grabExpression) و
+//  بعد **تک‌تکِ** عملوندها و interpolationها جداگانه ارزیابی می‌شوند
+//  (evalExpr) — بدترینشان تعیین‌کننده است. یعنی یک esc() در میانِ بیست
+//  interpolation، نوزده‌تایِ دیگر را امن اعلام نمی‌کند.
+//  هرچه اثبات‌پذیر نباشد `unsafe` می‌ماند و در فیلدِ `unproven`ِ گزارش دقیقاً
+//  نام برده می‌شود — هرگز خوش‌بینانه `escaped`/`safe_static` فرض نمی‌شود.
 //
 //  اجرا: node tools/xss-sink-audit.mjs [--paths p1,p2,...]
+//        node tools/xss-sink-audit.mjs --explain apps/x/y.js[:42]   ← استدلالِ ابزار
 //  خروجی: tools/xss-sink-audit-report.json + docs/XSS_SINK_AUDIT.md
 //  کدِ خروج: 0 اگر zero «unsafe» زیرِ apps/*+shared/js باشد، وگرنه 1.
 // ═══════════════════════════════════════════════════════════════════════
@@ -45,70 +49,148 @@ const SINK_PATTERNS = [
   { kind: 'jquery.html', re: /\$\([^)]*\)\.html\s*\(/g },
 ];
 
-/**
- * گرفتنِ «عبارتِ کاملِ» sink از رویِ متنِ خامِ فایل (نه خط‌به‌خط) — رفعِ باگِ
- * واقعیِ نسخه‌یِ اول: template literalهایِ چندخطی (خیلی رایج در این کدبیس؛
- * innerHTML=`...چند ده خط...` با escِ داخلش عمیق‌تر از حدِ دیدِ خط‌به‌خط) به‌
- * اشتباه «unsafe» می‌شدند چون تابعِ قبلی فقط ۳-۶ خط بعدی رو می‌خوند.
- *
- * الگوریتم: از ایندکسِ matchِ sink، جلو می‌ریم؛ اگر به یک backtick رسیدیم،
- * template literal رو تا backtickِ بستنِ متناظر (بدونِ escape با \) دنبال
- * می‌کنیم؛ اگر به پرانتزِ باز رسیدیم (مثلِ insertAdjacentHTML(...))، پرانتزها
- * رو balance می‌کنیم. برایِ innerHTML= با رشته‌ی معمولی (' یا ")، تا کوتیشنِ
- * بسته می‌ریم. Fallback: تا اولین ; یا سقفِ ۲۰۰۰ کاراکتر.
- */
-function grabExpression(text, matchStart, searchFrom = matchStart) {
-  const CAP = 4000;
-  let i = searchFrom;
-  const n = Math.min(text.length, matchStart + CAP);
-  // اول برو جلو تا اولین backtick/کوتیشن/پرانتز بعدِ searchFrom (پایانِ خودِ
-  // matchِ sink، نه matchStart — رجوع کن به پاراگرافِ بعدی) — ولی نه فراتر
-  // از اولین ; یا خطِ خالیِ *واقعی* (رفعِ باگِ واقعیِ نسخه‌ی اول: برایِ
-  // `x.innerHTML=someVar;` که هیچ کوتیشن/پرانتزی نداره، اسکن بدونِ این مرز
-  // به کدِ خطوطِ بعدی سرریز می‌کرد و یک «عبارتِ» بی‌ربط و طولانی می‌ساخت که
-  // به‌اشتباه unsafe طبقه‌بندی می‌شد — نه چون واقعاً بود، بلکه چون متنِ بعدی
-  // به‌طورِ تصادفی کوتیشن داشت).
-  //
-  // ⚠️ رفعِ باگِ دوم (کشف‌شده حینِ همین ممیزی): وقتی RHSِ واقعی در خطِ *بعدِ*
-  // = میاد (مثلِ `ov.innerHTML =\n    '<div>...'` — الگویِ رایج در این
-  // کدبیس برایِ concatenationِ +) ، مرزِ «تا اولین \n» قبلاً بلافاصله بعدِ =
-  // متوقف می‌شد، قبل از اینکه اصلاً RHS شروع بشه — یعنی expr خالی می‌موند و
-  // به‌غلط unsafe می‌شد. حالا: تا وقتی به کاراکترِ غیرِفاصله‌یِ واقعی نرسیدیم
-  // (شروعِ واقعیِ RHS)، \n را هم مثلِ فاصله رد می‌کنیم؛ فقط *بعدِ* شروعِ یک
-  // شناسه‌ی خام (sawIdentChar)، \n واقعاً پایانِ آن شناسه حساب می‌شه.
-  let sawIdentChar = false;
-  while (i < n) {
-    const c = text[i];
-    if (/[`'"(;]/.test(c)) break;
-    if (c === '\n') { if (sawIdentChar) break; i++; continue; }
-    if (/\S/.test(c)) sawIdentChar = true;
+/** رد کردنِ یک رشته‌یِ تک/دابل‌کوت از کوتیشنِ باز تا کوتیشنِ بسته‌یِ متناظر. */
+function skipQuoted(text, start, cap) {
+  const q = text[start];
+  let i = start + 1;
+  while (i < cap) {
+    if (text[i] === '\\') { i += 2; continue; }
+    if (text[i] === q) return i + 1;
     i++;
   }
-  if (i >= n || text[i] === ';' || text[i] === '\n') {
-    // RHS یک شناسه‌ی خام است (نه literal/template/call) — دیتافلو معلوم
-    // نیست؛ محافظه‌کارانه فقط تا همینجا برمی‌گردانیم تا classify() آن را
-    // «review» علامت بزند، نه اینکه با متنِ بی‌ربطِ بعدی اشتباه گرفته شود.
-    return text.slice(matchStart, i);
+  return cap;
+}
+
+/**
+ * رد کردنِ یک template literal از backtickِ باز تا backtickِ بستنِ **متناظر**.
+ *
+ * ⚠️ رفعِ باگِ سومِ این تابع (۲۰۲۶-۰۸-۲۳): نسخه‌یِ قبلی صرفاً تا «اولین
+ * backtickِ بدونِ backslash» جلو می‌رفت. در این کدبیس templateهایِ تودرتو
+ * (`...${arr.map(x=>`<li>...`).join('')}...`) بسیار رایج‌اند، و آنجا اولین
+ * backtickِ بعدی، backtickِ *بازِ* templateِ داخلی است نه بستنِ بیرونی —
+ * پس عبارت وسطِ کار بریده می‌شد و esc()هایِ عمیق‌تر اصلاً دیده نمی‌شدند.
+ * نتیجه: انبوهی «unsafe»ِ کاذب رویِ کدی که کاملاً escape شده بود.
+ * حالا `${...}` به‌صورتِ بازگشتی رد می‌شود.
+ */
+function skipTemplate(text, start, cap) {
+  let i = start + 1;
+  while (i < cap) {
+    const c = text[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '`') return i + 1;
+    if (c === '$' && text[i + 1] === '{') { i = skipBalanced(text, i + 1, cap, '{', '}'); continue; }
+    i++;
   }
-  const opener = text[i];
-  if (opener === '(') {
-    let depth = 0;
-    const start = i;
-    for (; i < n; i++) {
-      if (text[i] === '(') depth++;
-      else if (text[i] === ')') { depth--; if (depth === 0) { i++; break; } }
+  return cap;
+}
+
+/**
+ * balance کردنِ یک بلوکِ کد — `(...)`ِ یک فراخوانی یا `{...}`ِ داخلِ `${}`.
+ * رشته‌ها و templateهایِ تودرتو کامل رد می‌شوند تا پرانتز/آکولادِ داخلِ یک
+ * رشته (`'}'`) عمقِ شمارش را خراب نکند.
+ */
+function skipBalanced(text, start, cap, open, close) {
+  let depth = 0;
+  let i = start;
+  while (i < cap) {
+    const c = text[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '`') { i = skipTemplate(text, i, cap); continue; }
+    if (c === "'" || c === '"') { i = skipQuoted(text, i, cap); continue; }
+    if (c === open) { depth++; i++; continue; }
+    if (c === close) { depth--; i++; if (depth === 0) return i; continue; }
+    i++;
+  }
+  return cap;
+}
+
+/**
+ * تکه‌کردنِ یک عبارت رویِ یک جداکننده‌یِ **سطحِ بالا** (`,` بینِ آرگومان‌ها یا
+ * `+` بینِ عملوندهایِ concatenation). رشته/template/گروهِ تودرتو کامل رد
+ * می‌شوند تا `,`ِ داخلِ `icon('x',{size:1})` یا `+`ِ داخلِ یک رشته، اشتباهی
+ * جداکننده حساب نشود.
+ */
+function splitTopLevel(src, delim) {
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '`') { i = skipTemplate(src, i, src.length); continue; }
+    if (c === "'" || c === '"') { i = skipQuoted(src, i, src.length); continue; }
+    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+    if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
+    if (depth === 0 && c === delim) { parts.push(src.slice(start, i)); start = i + 1; }
+    i++;
+  }
+  parts.push(src.slice(start));
+  return parts;
+}
+
+// کاراکترهایی که اگر آخرِ یک خط بیایند یعنی عبارت در خطِ بعد ادامه دارد،
+// یا اگر اولِ خطِ بعد بیایند یعنی همان عبارتِ خطِ قبل است (ASIِ ساده‌شده).
+const CONTINUES_AFTER = /[+\-*/%?:,.&|=<>({[]$/;
+const CONTINUES_BEFORE = /^[+\-*/%?:,.&|)}\]]/;
+
+/**
+ * گرفتنِ «عبارتِ کاملِ» sink از رویِ متنِ خامِ فایل.
+ *
+ * ⚠️ بازنویسی (۲۰۲۶-۰۸-۲۳). نسخه‌ی قبلی «تا اولین جداکننده جلو برو، بعد
+ * همان یکی را ببند» بود؛ سه‌جور می‌شکست و هر سه‌تا در همین کدبیس واقعی بودند:
+ *   ۱. templateِ تودرتو — اولین backtickِ بعدی، backtickِ *بازِ* templateِ
+ *      داخلی بود نه بستنِ بیرونی (حالا در skipTemplate حل شده).
+ *   ۲. RHSِ زنجیره‌ای مثلِ `arr.slice(0,4).map(...).join('')` — روی `)`ِ
+ *      همان `slice(0,4)` متوقف می‌شد و اصلاً به template نمی‌رسید. (خودِ
+ *      ابزار این را در کامنتِ «الگو ۷»ِ جدولِ override به‌عنوانِ محدودیت
+ *      ثبت کرده بود.)
+ *   ۳. concatenation مثلِ `'<a>' + esc(x) + '</a>'` — بعدِ بستنِ اولین
+ *      کوتیشن تمام می‌شد و esc()ِ بعدش را نمی‌دید.
+ * حالا کلِ RHS تا پایانِ واقعیِ statement خوانده می‌شود: رشته/template/
+ * کامنت کامل رد می‌شوند و `()`/`[]`/`{}` بالانس می‌شود؛ پایان = `;` در عمقِ
+ * صفر، یا بسته‌شدنِ یک گروهِ بیرونی، یا خطِ جدیدی که ادامه‌ی عبارت نیست.
+ */
+function grabExpression(text, matchStart, searchFrom = matchStart) {
+  const CAP = 20000;
+  const n = Math.min(text.length, matchStart + CAP);
+
+  // sinkهایِ call-style (`insertAdjacentHTML(`, `document.write(`, `eval(`، …):
+  // خودِ matchِ regex به `(` ختم می‌شود؛ کلِ آرگومان‌ها تا `)`ِ متناظر.
+  if (text[searchFrom - 1] === '(') {
+    return text.slice(matchStart, skipBalanced(text, searchFrom - 1, n, '(', ')'));
+  }
+
+  // sinkهایِ انتساب (`.innerHTML =` / `.outerHTML =`): از شروعِ RHS تا پایانِ
+  // statement. فاصله و خطِ خالیِ بینِ `=` و شروعِ RHS رد می‌شود (این کدبیس
+  // زیاد `el.innerHTML =\n  '<div>…'` دارد).
+  let i = searchFrom;
+  while (i < n && /\s/.test(text[i])) i++;
+  const rhsStart = i;
+  let depth = 0;
+  while (i < n) {
+    const c = text[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '`') { i = skipTemplate(text, i, n); continue; }
+    if (c === "'" || c === '"') { i = skipQuoted(text, i, n); continue; }
+    if (c === '/' && text[i + 1] === '/') { const nl = text.indexOf('\n', i); i = nl < 0 ? n : nl; continue; }
+    if (c === '/' && text[i + 1] === '*') { const e = text.indexOf('*/', i); i = e < 0 ? n : e + 2; continue; }
+    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+    if (c === ')' || c === ']' || c === '}') {
+      if (depth === 0) break; // گروهِ بیرونی بسته شد → statement تمام است
+      depth--; i++; continue;
     }
-    return text.slice(matchStart, i);
+    if (depth === 0 && c === ';') break;
+    if (depth === 0 && c === '\n') {
+      const before = text.slice(rhsStart, i).trimEnd();
+      let k = i;
+      while (k < n && /\s/.test(text[k])) k++;
+      if (CONTINUES_AFTER.test(before) || CONTINUES_BEFORE.test(text.slice(k, k + 2))) { i = k; continue; }
+      break;
+    }
+    i++;
   }
-  // backtick یا کوتیشن: تا بستنِ متناظرِ بدونِ backslash قبلش
-  const closer = opener;
-  let j = i + 1;
-  while (j < n) {
-    if (text[j] === '\\') { j += 2; continue; }
-    if (text[j] === closer) { j++; break; }
-    j++;
-  }
-  return text.slice(matchStart, j);
+  return text.slice(matchStart, i);
 }
 
 // ── شناساییِ interpolationهایِ «قابلِ‌اعتماد» داخلِ یک template literal ──
@@ -156,23 +238,28 @@ function isTrustedInterpolation(inner) {
   return TRUSTED_INTERP_PATTERNS.some((re) => re.test(t)) || isTrustedTernary(t);
 }
 
-/** همه‌ی ${...}های سطحِ بالا را از یک template literal استخراج می‌کند (بدونِ nested backtick واقعی). */
+/**
+ * همه‌ی `${...}`هایِ **سطحِ بالایِ** یک template literal را استخراج می‌کند.
+ * نسخه‌ی قبلی فقط `{`/`}` را می‌شمرد؛ یعنی یک آکولادِ داخلِ رشته یا داخلِ
+ * متنِ HTMLِ یک templateِ تودرتو عمقِ شمارش را خراب می‌کرد. حالا از همان
+ * skipBalanced استفاده می‌شود که رشته‌ها و templateهایِ تودرتو را کامل رد
+ * می‌کند، پس هر عضوِ خروجی دقیقاً یک interpolationِ کامل است.
+ */
 function extractInterpolations(expr) {
   const out = [];
-  let i = 0;
-  while (i < expr.length) {
-    if (expr[i] === '$' && expr[i + 1] === '{') {
-      let depth = 1;
-      let j = i + 2;
-      const start = j;
-      while (j < expr.length && depth > 0) {
-        if (expr[j] === '{') depth++;
-        else if (expr[j] === '}') depth--;
-        if (depth > 0) j++;
-      }
-      out.push(expr.slice(start, j));
-      i = j + 1;
-    } else i++;
+  const n = expr.length;
+  let i = expr[0] === '`' ? 1 : 0;
+  while (i < n) {
+    const c = expr[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '`') break; // backtickِ بستنِ همین template — بقیه‌اش دیگر مالِ ما نیست
+    if (c === '$' && expr[i + 1] === '{') {
+      const end = skipBalanced(expr, i + 1, n, '{', '}'); // شاملِ `}`ِ پایانی
+      out.push(expr.slice(i + 2, end - 1));
+      i = end;
+      continue;
+    }
+    i++;
   }
   return out;
 }
@@ -193,10 +280,121 @@ function extractRhs(expr, kind) {
   const open = expr.indexOf('(');
   const close = expr.lastIndexOf(')');
   if (open === -1) return '';
-  return (close > open ? expr.slice(open + 1, close) : expr.slice(open + 1)).trim();
+  const inner = (close > open ? expr.slice(open + 1, close) : expr.slice(open + 1)).trim();
+
+  // ⚠️ رفعِ باگِ واقعیِ ابزار (۲۰۲۶-۰۸-۲۳): امضایِ insertAdjacentHTML
+  // `(position, html)` است — آرگومانِ **دوم** HTML است، نه اولی. ترکیبِ این
+  // با برشِ قدیمیِ grabExpression باعث می‌شد rhs فقط `'beforeend'` باشد و
+  // classify آن را «رشته‌یِ ثابتِ خالص» ببیند. نتیجه‌ی اندازه‌گیری‌شده:
+  // **هر ۱۴ موردِ insertAdjacentHTML در کلِ کدبیس safe_static علامت خورده
+  // بودند** — یعنی اسکنر آرگومانِ HTMLشان را هرگز ندیده بود (false-negativeِ
+  // سیستماتیک، نه گاه‌به‌گاه).
+  if (kind === 'insertAdjacentHTML') {
+    const args = splitTopLevel(inner, ',');
+    return (args.length >= 2 ? args.slice(1).join(',') : inner).trim();
+  }
+  return inner;
 }
 
-function classify(expr, kind) {
+/**
+ * بدترین (محافظه‌کارانه‌ترین) نتیجه بینِ چند عملوند: کافی است یکی نامعلوم
+ * باشد تا کلِ عبارت نامعلوم شود.
+ */
+const EVAL_RANK = { static: 0, trusted: 1, escaped: 2, unknown: 3 };
+function worstOf(list) {
+  return list.reduce((a, b) => (EVAL_RANK[b] > EVAL_RANK[a] ? b : a), 'static');
+}
+
+/**
+ * اگر عبارت شکلِ `X.map(fn)` / `.filter(fn)` / `.flatMap(fn)` داشته باشد،
+ * بدنه‌یِ arrow را برمی‌گرداند — چون HTMLِ تولیدشده همان مقدارِ بازگشتیِ
+ * callback است. الگویِ فراگیرِ این کدبیس: ``list.map(x=>`<li>${esc(x)}</li>`).join('')``.
+ * اگر شکل را نشناسد null برمی‌گرداند (یعنی محافظه‌کارانه «نامعلوم»).
+ */
+function arrowBodies(expr) {
+  const out = [];
+  const re = /\.(?:map|flatMap|filter)\s*\(/g;
+  let m;
+  while ((m = re.exec(expr)) !== null) {
+    const argsEnd = skipBalanced(expr, m.index + m[0].length - 1, expr.length, '(', ')');
+    const args = splitTopLevel(expr.slice(m.index + m[0].length, argsEnd - 1), ',');
+    const cb = (args[0] || '').trim();
+    const arrow = cb.indexOf('=>');
+    if (arrow === -1) return null; // callbackِ نام‌برده (نه arrow) — دیتافلو معلوم نیست
+    let body = cb.slice(arrow + 2).trim();
+    if (body.startsWith('{')) {
+      // بدنه‌یِ بلوکی: همه‌ی `return`هایش را ارزیابی کن
+      const rets = [...body.matchAll(/\breturn\b/g)].map((r) => body.slice(r.index + 6));
+      if (!rets.length) return null;
+      out.push(...rets);
+    } else out.push(body);
+  }
+  return out.length ? out : null;
+}
+
+/**
+ * ارزیابیِ یک عبارت که خروجی‌اش قرار است HTML شود.
+ * 'static'  = فقط رشته/عددِ ثابت
+ * 'trusted' = فراخوانیِ کمکیِ شناخته‌شده یا حالتِ محلیِ UI (icon/fa/…)
+ * 'escaped' = مقدارِ متغیر هست ولی از esc() عبور کرده
+ * 'unknown' = نمی‌شود اثبات کرد → محافظه‌کارانه unsafe
+ *
+ * ⚠️ چرا این تابع جایگزینِ قاعده‌یِ قبلی شد: قبلاً «اگر جایی در RHS رشته‌یِ
+ * `esc(` دیده شد ⇒ escaped». وقتی grabExpression برش می‌خورد این قاعده کم‌ضرر
+ * بود؛ ولی حالا که کلِ عبارتِ (گاهی چندصدخطیِ) RHS خوانده می‌شود، همان قاعده
+ * یعنی «یک esc() در میانِ ۲۰ interpolation، هر ۱۹ تایِ دیگر را هم امن اعلام
+ * کند» — دقیقاً یک false-negativeِ امنیتی. حالا **هر** عملوند/interpolation
+ * جداگانه ارزیابی می‌شود و بدترینشان تعیین‌کننده است.
+ */
+function evalExpr(src, depth = 0, unproven = null) {
+  const rec = (s, d = depth + 1) => evalExpr(s, d, unproven);
+  const t = String(src).trim().replace(/;+\s*$/, '').trim();
+  if (!t) return 'static';
+  if (depth > 8) { unproven?.push(t.slice(0, 120)); return 'unknown'; }
+
+  // ترنری اول از همه: `+` تنگ‌تر از `?:` می‌بندد، پس اگر اول رویِ `+` تکه
+  // کنیم یک ترنریِ حاویِ concatenation را وسط نصف می‌کنیم و هر دو نیمه
+  // بی‌معنا («نامعلوم») ارزیابی می‌شوند. (`?.` و `??` ترنری نیستند.)
+  const q = splitTopLevel(t, '?');
+  if (q.length === 2 && !q[1].startsWith('.') && !q[1].startsWith('?') && !q[0].endsWith('?')) {
+    const colon = splitTopLevel(q[1], ':');
+    if (colon.length === 2) return worstOf([rec(colon[0]), rec(colon[1])]);
+  }
+
+  // concatenation: `'<a>' + esc(x) + '</a>'`
+  const plus = splitTopLevel(t, '+');
+  if (plus.length > 1) return worstOf(plus.map((p) => rec(p)));
+
+  // پرانتزِ دورِ کلِ عبارت
+  if (t.startsWith('(') && skipBalanced(t, 0, t.length, '(', ')') === t.length) {
+    return rec(t.slice(1, -1));
+  }
+
+  if (/^-?\d+(?:\.\d+)?$/.test(t)) return 'static';
+  if (/^(['"])(?:(?!\1)[^\\]|\\.)*\1$/.test(t)) return 'static';
+  // esc()/chatEsc() قبل از isTrustedInterpolation چک می‌شوند: هردو در
+  // TRUSTED_CALL_NAMES هم هستند، ولی برچسبِ دقیق‌ترشان «escaped» است نه
+  // «trusted» — و همین تفکیک است که در گزارش نشان می‌دهد دیتایِ متغیرِ
+  // واقعی از escape عبور کرده، در برابرِ HTMLِ ثابتِ icon().
+  if (/^(?:esc|chatEsc)\s*\(/.test(t)) return 'escaped';
+  if (isTrustedInterpolation(t)) return 'trusted';
+
+  // template literal → همه‌ی interpolationهایش
+  if (/^`[\s\S]*`$/.test(t)) {
+    const interps = extractInterpolations(t);
+    if (!interps.length) return 'static';
+    return worstOf(interps.map((x) => rec(x)));
+  }
+
+  // زنجیره‌ی آرایه‌ای (`.map(...).join('')`) → بدنه‌یِ callback
+  const bodies = arrowBodies(t);
+  if (bodies) return worstOf(bodies.map((b) => rec(b)));
+
+  unproven?.push(t.replace(/\s+/g, ' ').slice(0, 120));
+  return 'unknown';
+}
+
+function classify(expr, kind, unproven = null) {
   // eval/new Function: همیشه لایقِ review دستی‌اند (به‌ندرت با دیتایِ کاربر، ولی خطرناکن)
   if (kind === 'eval' || kind === 'new Function') return 'review';
 
@@ -209,36 +407,20 @@ function classify(expr, kind) {
   // — «review» صادقانه‌ترین برچسبه.
   if (/^[a-zA-Z_$][\w.]*$/.test(rhs)) return 'review';
 
-  // escaped: esc( جایی در rhs حضور داره
-  if (/\besc\s*\(/.test(rhs)) return 'escaped';
-
-  // safe_static: فقط رشته‌یِ literal (تک/دابل‌کوت یا template بدونِ ${...})،
-  // بدونِ concatenation با متغیر و بدونِ ${varName} در template.
-  const isPureStringLiteral = /^(['"])(?:(?!\1)[^\\]|\\.)*\1;?$/.test(rhs);
-  const hasInterp = /\$\{/.test(rhs);
-  const isTemplateLiteral = /^`[\s\S]*`;?$/.test(rhs);
-  if (isPureStringLiteral || (isTemplateLiteral && !hasInterp)) return 'safe_static';
-
   // dom_api_safe: این خط sink است، ولی اگر بلافاصله در همون statement از
   // textContent به‌جایِ HTML استفاده شده (false-positiveِ نزدیکِ کامنت/رشته)
   if (/\btextContent\s*=/.test(rhs) && !/^\s*\.(innerHTML|outerHTML)\s*=/.test(rhs)) {
     return 'dom_api_safe';
   }
 
-  // اگر template literal است، همه‌ی interpolationها رو چک کن — اگه همه
-  // «قابلِ‌اعتماد» بودن (state محلی/آیکن/عدد)، dom_api_safe؛ وگرنه unsafe.
-  if (isTemplateLiteral && hasInterp) {
-    const interps = extractInterpolations(rhs);
-    if (interps.length > 0 && interps.every(isTrustedInterpolation)) return 'dom_api_safe';
+  // ارزیابیِ بازگشتیِ کلِ RHS — رجوع کن به توضیحِ evalExpr برایِ اینکه چرا
+  // جایِ قاعده‌یِ «هرجا esc( دیدی ⇒ escaped» را گرفت.
+  switch (evalExpr(rhs, 0, unproven)) {
+    case 'static': return 'safe_static';
+    case 'trusted': return 'dom_api_safe';
+    case 'escaped': return 'escaped';
+    default: return 'unsafe';
   }
-
-  // فراخوانیِ مستقیمِ icon()/fa() به‌عنوانِ کلِ RHS (نه داخلِ template literal) —
-  // مثلاً `el.innerHTML = icon('search');` در خودِ icons.js. icon() از یک
-  // نقشه‌ی ثابتِ SVG (PATHS در icons.js) می‌خواند، نه از دیتایِ کاربر/API.
-  const rhsNoSemi = rhs.replace(/;\s*$/, '').trim();
-  if (TRUSTED_CALL_RE.test(rhsNoSemi)) return 'dom_api_safe';
-
-  return 'unsafe';
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -398,7 +580,25 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/company/js/overview.js#ecb1f6abcac3', 'openModal(html) — همون الگویِ staff-system.js:91؛ فراخوان‌هایِ نمونه‌گیری‌شده امن بودن.'],
 ]);
 
-function scanFile(absPath, relPath) {
+/**
+ * `--explain <file>[:<line>]` — چاپِ استدلالِ خودِ ابزار برایِ هر sink:
+ * عبارتی که استخراج کرده، RHS، و ارزیابیِ تک‌تکِ interpolationها. بدونِ این،
+ * تنها راهِ دیباگ نوشتنِ یک اسکریپتِ جداگانه است که منطق را دوباره پیاده کند
+ * — و همان دوباره‌پیاده‌سازی خودش منبعِ تشخیصِ غلط می‌شود.
+ */
+function explain(expr, kind) {
+  const rhs = extractRhs(expr, kind);
+  const lines = [`   kind=${kind}  verdict=${classify(expr, kind)}  evalExpr(rhs)=${evalExpr(rhs)}`];
+  lines.push(`   expr(${expr.length}ch)= ${JSON.stringify(expr.slice(0, 220))}`);
+  lines.push(`   rhs (${rhs.length}ch)= ${JSON.stringify(rhs.slice(0, 220))}`);
+  const parts = splitTopLevel(rhs.trim().replace(/;+\s*$/, ''), '+');
+  const units = parts.length > 1 ? parts : extractInterpolations(rhs.trim());
+  const label = parts.length > 1 ? 'operand' : 'interp';
+  for (const u of units) lines.push(`     ${label} [${evalExpr(u)}] ${JSON.stringify(u.trim().slice(0, 140))}`);
+  return lines.join('\n');
+}
+
+function scanFile(absPath, relPath, explainFilter = null) {
   const text = readFileSync(absPath, 'utf8');
   const hits = [];
   for (const { kind, re } of SINK_PATTERNS) {
@@ -406,8 +606,16 @@ function scanFile(absPath, relPath) {
     let m;
     while ((m = lineRe.exec(text)) !== null) {
       const expr = grabExpression(text, m.index, m.index + m[0].length);
-      let classification = classify(expr, kind);
+      // «unproven» = دقیقاً آن زیرعبارت‌هایی که ابزار نتوانست امن‌بودنشان را
+      // اثبات کند. بدونِ این، گزارش فقط می‌گوید «unsafe» و آدم باید کلِ خطِ
+      // چندصدکاراکتری را دوباره از اول بخواند تا بفهمد کدام تکه‌اش مشکل دارد.
+      const unproven = [];
+      let classification = classify(expr, kind, unproven);
       const lineNum = text.slice(0, m.index).split('\n').length;
+      if (explainFilter && (explainFilter.line === null || explainFilter.line === lineNum)) {
+        console.log(`── ${relPath}:${lineNum}`);
+        console.log(explain(expr, kind));
+      }
       const snippet = text.split('\n')[lineNum - 1].trim().slice(0, 160);
       // ⚠️ کلیدِ override از *محتوایِ* عبارت ساخته می‌شود، نه شماره‌خط
       // (بازطراحیِ ۲۰۲۶-۰۸-۲۳ — دلیلِ کامل در کامنتِ بالایِ
@@ -420,7 +628,11 @@ function scanFile(absPath, relPath) {
       const overridable = classification === 'unsafe' || classification === 'review';
       const overrideNote = overridable ? MANUAL_REVIEW_OVERRIDES.get(overrideKey) : undefined;
       if (overrideNote) { classification = 'dom_api_safe'; USED_OVERRIDE_KEYS.add(overrideKey); }
-      hits.push({ file: relPath, line: lineNum, kind, snippet, key: overrideKey, classification, ...(overrideNote ? { manual_review_note: overrideNote } : {}) });
+      hits.push({
+        file: relPath, line: lineNum, kind, snippet, key: overrideKey, classification,
+        ...(classification === 'unsafe' && unproven.length ? { unproven: [...new Set(unproven)].slice(0, 8) } : {}),
+        ...(overrideNote ? { manual_review_note: overrideNote } : {}),
+      });
     }
   }
   return hits;
@@ -431,6 +643,16 @@ function main() {
   const pathsArgIdx = args.indexOf('--paths');
   const scanPaths = pathsArgIdx >= 0 ? args[pathsArgIdx + 1].split(',') : DEFAULT_SCAN_PATHS;
   const allScanPaths = [...scanPaths, ...REPORT_ONLY_PATHS];
+
+  // --explain path/to/file.js[:line] — استدلالِ ابزار را چاپ می‌کند و خارج می‌شود
+  const explainIdx = args.indexOf('--explain');
+  let explainTarget = null;
+  if (explainIdx >= 0) {
+    const raw = args[explainIdx + 1] || '';
+    const c = raw.lastIndexOf(':');
+    const hasLine = c > 1 && /^\d+$/.test(raw.slice(c + 1));
+    explainTarget = { file: hasLine ? raw.slice(0, c) : raw, line: hasLine ? Number(raw.slice(c + 1)) : null };
+  }
 
   const allHits = [];
   for (const rel of allScanPaths) {
@@ -452,10 +674,11 @@ function main() {
       // (همان کلاسِ باگی که در PR #64 برایِ photo-moderation.test.mts رفع
       // شد — hardcodeِ جداکننده‌ی مسیر.)
       const relPath = relative(ROOT, f).split(sep).join('/');
-      const hits = scanFile(f, relPath);
+      const hits = scanFile(f, relPath, explainTarget && relPath === explainTarget.file ? explainTarget : null);
       allHits.push(...hits);
     }
   }
+  if (explainTarget) return 0;
 
   const isReportOnly = (file) => REPORT_ONLY_PATHS.some((p) => file.startsWith(p + '/'));
   const enforced = allHits.filter((h) => !isReportOnly(h.file));

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-22T21:43:44.684Z",
+  "generated_at": "2026-08-22T22:20:25.330Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -12,10 +12,11 @@
   ],
   "total_hits": 203,
   "by_classification": {
-    "dom_api_safe": 79,
-    "safe_static": 53,
-    "unsafe": 38,
-    "escaped": 33
+    "dom_api_safe": 53,
+    "safe_static": 48,
+    "unsafe": 79,
+    "escaped": 22,
+    "review": 1
   },
   "hits": [
     {
@@ -56,8 +57,11 @@
       "line": 86,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=(r.slots.length?r.slots:FALLBACK_TIMES).map(s=>`<option value=\"${s}\">${s} (نمونه)</option>`).join('');",
-      "key": "apps/customer/js/data/booking.js#99d91ca72a7c",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/booking.js#38411f04851d",
+      "classification": "unsafe",
+      "unproven": [
+        "s"
+      ]
     },
     {
       "file": "apps/customer/js/data/booking.js",
@@ -72,8 +76,11 @@
       "line": 109,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=open.map(s=>`<option value=\"${s.time}\">${faTime(s.time)}</option>`).join('');",
-      "key": "apps/customer/js/data/booking.js#f688ebe19680",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/booking.js#ac09badeccff",
+      "classification": "unsafe",
+      "unproven": [
+        "s.time"
+      ]
     },
     {
       "file": "apps/customer/js/data/booking.js",
@@ -88,55 +95,78 @@
       "line": 252,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "key": "apps/customer/js/data/booking.js#0cc7f5812f5e",
-      "classification": "escaped"
+      "key": "apps/customer/js/data/booking.js#c6fa560ad012",
+      "classification": "unsafe",
+      "unproven": [
+        "bk.date",
+        "bk.time"
+      ]
     },
     {
       "file": "apps/customer/js/data/booking.js",
       "line": 276,
       "kind": "innerHTML",
       "snippet": "when.innerHTML=dates.map(d=>`<option value=\"${d.iso}\"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');",
-      "key": "apps/customer/js/data/booking.js#df076aa1c77c",
-      "classification": "escaped"
+      "key": "apps/customer/js/data/booking.js#16b68ea83d92",
+      "classification": "unsafe",
+      "unproven": [
+        "d.iso"
+      ]
     },
     {
       "file": "apps/customer/js/data/booking.js",
       "line": 277,
       "kind": "innerHTML",
       "snippet": "party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)",
-      "key": "apps/customer/js/data/booking.js#b2e746dd17a9",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/booking.js#2acf326b90ac",
+      "classification": "unsafe",
+      "unproven": [
+        "n"
+      ]
     },
     {
       "file": "apps/customer/js/data/detail.js",
       "line": 32,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-rest').innerHTML=`",
-      "key": "apps/customer/js/data/detail.js#4ce9c0316f60",
-      "classification": "escaped"
+      "key": "apps/customer/js/data/detail.js#36c1429d80eb",
+      "classification": "unsafe",
+      "unproven": [
+        "GRAD[id]",
+        "id",
+        "favs.has(id)",
+        "detailSocialProof(r)",
+        "m[0]",
+        "m[2]",
+        "l",
+        "v/5*100"
+      ]
     },
     {
       "file": "apps/customer/js/data/discover.js",
       "line": 112,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(()=>`<div class=\"rc\" style=\"opacity:1;transform:none\"><div class=\"rc-img sk\" style=\"border-radius:0\"></div><div class=\"rc-body\"><div class=",
-      "key": "apps/customer/js/data/discover.js#a23b40692bb7",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/discover.js#aa1741d565f5",
+      "classification": "safe_static"
     },
     {
       "file": "apps/customer/js/data/discover.js",
       "line": 114,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(cardHTML).join('');",
-      "key": "apps/customer/js/data/discover.js#121414a5b2a9",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/discover.js#a598a9d0bb0d",
+      "classification": "unsafe",
+      "unproven": [
+        "list.map(cardHTML).join('')"
+      ]
     },
     {
       "file": "apps/customer/js/data/discover.js",
       "line": 135,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';",
-      "key": "apps/customer/js/data/discover.js#fbd56af8bd52",
+      "key": "apps/customer/js/data/discover.js#1f863b3c8aa0",
       "classification": "dom_api_safe"
     },
     {
@@ -144,32 +174,41 @@
       "line": 156,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,fill:true})+' محبوب امشب':esc(el.textContent.trim());",
-      "key": "apps/customer/js/data/discover.js#71c4c33dff85",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/discover.js#60ad5bc3915f",
+      "classification": "escaped"
     },
     {
       "file": "apps/customer/js/data/discover.js",
       "line": 200,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,",
-      "key": "apps/customer/js/data/discover.js#3009e8b04d02",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/discover.js#1a878a5a57a5",
+      "classification": "unsafe",
+      "unproven": [
+        "hCardHTML(r, km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`)"
+      ]
     },
     {
       "file": "apps/customer/js/data/discover.js",
       "line": 207,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=[...R].sort((a,b)=>(b.rt||0)-(a.rt||0)).slice(0,6).map(r=>hCardHTML(r,'')).join('');",
-      "key": "apps/customer/js/data/discover.js#91988deea02f",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/discover.js#49f6f60789c2",
+      "classification": "unsafe",
+      "unproven": [
+        "hCardHTML(r,'')"
+      ]
     },
     {
       "file": "apps/customer/js/data/discover.js",
       "line": 225,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=trend.map((r,i)=>hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true})} داغ`:'')).join('');",
-      "key": "apps/customer/js/data/discover.js#720ad1284934",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/discover.js#c792783b3856",
+      "classification": "unsafe",
+      "unproven": [
+        "hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true})} داغ`:'')"
+      ]
     },
     {
       "file": "apps/customer/js/data/discover.js",
@@ -185,15 +224,21 @@
       "kind": "innerHTML",
       "snippet": "el.innerHTML=eventsHtml(events,false);",
       "key": "apps/customer/js/data/discover.js#67d5ed67287a",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "eventsHtml(events,false)"
+      ]
     },
     {
       "file": "apps/customer/js/data/discover.js",
       "line": 256,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('alert',{size:40})}</div><div class=\"empty-state-title\">رویدادها بارگذاری نشد</div><",
-      "key": "apps/customer/js/data/discover.js#7bf68eee2839",
-      "classification": "unsafe"
+      "key": "apps/customer/js/data/discover.js#8e86c154eae3",
+      "classification": "unsafe",
+      "unproven": [
+        "res.status"
+      ]
     },
     {
       "file": "apps/customer/js/data/discover.js",
@@ -201,14 +246,17 @@
       "kind": "innerHTML",
       "snippet": "el.innerHTML=eventsHtml(SAMPLE_EVENTS,true);",
       "key": "apps/customer/js/data/discover.js#f289b3a371a2",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "eventsHtml(SAMPLE_EVENTS,true)"
+      ]
     },
     {
       "file": "apps/customer/js/data/discover.js",
       "line": 303,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';",
-      "key": "apps/customer/js/data/discover.js#fbd56af8bd52",
+      "key": "apps/customer/js/data/discover.js#1f863b3c8aa0",
       "classification": "dom_api_safe"
     },
     {
@@ -273,7 +321,10 @@
       "kind": "innerHTML",
       "snippet": "body.innerHTML = `<div class=\"chat-empty\">${msg}</div>`;",
       "key": "apps/customer/js/features/chat.js#383c945874fe",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "msg"
+      ]
     },
     {
       "file": "apps/customer/js/features/chat.js",
@@ -288,8 +339,12 @@
       "line": 55,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = items.map(t => `",
-      "key": "apps/customer/js/features/chat.js#6ee5135c1a53",
-      "classification": "escaped"
+      "key": "apps/customer/js/features/chat.js#f669d8339d9c",
+      "classification": "unsafe",
+      "unproven": [
+        "t.id",
+        "t.unread"
+      ]
     },
     {
       "file": "apps/customer/js/features/chat.js",
@@ -312,16 +367,19 @@
       "line": 131,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl.insertAdjacentHTML('beforeend', bubble(m));",
-      "key": "apps/customer/js/features/chat.js#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "apps/customer/js/features/chat.js#b6c5b7c8fc32",
+      "classification": "unsafe",
+      "unproven": [
+        "bubble(m)"
+      ]
     },
     {
       "file": "apps/customer/js/features/chat.js",
       "line": 154,
       "kind": "insertAdjacentHTML",
       "snippet": "tempEl.insertAdjacentHTML('beforeend', `<div class=\"chat-bubble mine pending\"><div class=\"chat-bubble-text\">${esc(body)}</div><div class=\"chat-bubble-time\">…</d",
-      "key": "apps/customer/js/features/chat.js#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "apps/customer/js/features/chat.js#df06efc1ef88",
+      "classification": "escaped"
     },
     {
       "file": "apps/customer/js/features/economy.js",
@@ -352,26 +410,41 @@
       "line": 106,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
-      "key": "apps/customer/js/features/economy.js#e5482a47def2",
-      "classification": "dom_api_safe",
-      "manual_review_note": "missionCard(m) دیگه esc(m.title)/esc(m.description) داره (رفع‌شده در همین PR)."
+      "key": "apps/customer/js/features/economy.js#42fc76523516",
+      "classification": "unsafe",
+      "unproven": [
+        "repBlock",
+        "missions.map(missionCard).join('')",
+        "rewards.map(rewardCard).join('')"
+      ]
     },
     {
       "file": "apps/customer/js/features/food-dna.js",
       "line": 59,
       "kind": "innerHTML",
       "snippet": "document.getElementById('dnaProgress').innerHTML = Array.from({length:nSlides},()=>'<div class=\"dna-progress-bar\"><i></i></div>').join('');",
-      "key": "apps/customer/js/features/food-dna.js#a9763efb2175",
-      "classification": "dom_api_safe",
-      "manual_review_note": "Array.from محلی — نوارِ پیشرفتِ ثابت، بدونِ دیتا."
+      "key": "apps/customer/js/features/food-dna.js#afb6d4a3dfc8",
+      "classification": "unsafe",
+      "unproven": [
+        "Array.from({length:nSlides},()=>'<div class=\"dna-progress-bar\"><i></i></div>').join('')"
+      ]
     },
     {
       "file": "apps/customer/js/features/food-dna.js",
       "line": 84,
       "kind": "innerHTML",
       "snippet": "wrap.innerHTML = slides.map((s,i)=>`",
-      "key": "apps/customer/js/features/food-dna.js#f3334caae8d8",
-      "classification": "escaped"
+      "key": "apps/customer/js/features/food-dna.js#c73c9c6bcc55",
+      "classification": "unsafe",
+      "unproven": [
+        "s.emoji",
+        "s.big",
+        "slides.length",
+        "_dnaPersona.emoji",
+        "faNum(p.globalVisits||0)",
+        "faNum(p.restaurantsVisited||0)",
+        "faNum(_dnaPct)"
+      ]
     },
     {
       "file": "apps/customer/js/features/food-dna.js",
@@ -387,7 +460,13 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">",
       "key": "apps/customer/js/features/food-dna.js#d0e45b4359f0",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "userInitial()",
+        "faNum(USER.phone||'')",
+        "tier.emoji",
+        "tier.name"
+      ]
     },
     {
       "file": "apps/customer/js/features/food-dna.js",
@@ -437,16 +516,25 @@
       "line": 64,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
-      "key": "apps/customer/js/features/loyalty.js#b481bf9fee26",
-      "classification": "dom_api_safe",
-      "manual_review_note": "badges.map دیگه esc(b.name) داره (رفع‌شده در همین PR)؛ tier.emoji/tier.name از enumِ ثابتِ سطحِ باشگاهه."
+      "key": "apps/customer/js/features/loyalty.js#4f3cfabc428d",
+      "classification": "unsafe",
+      "unproven": [
+        "tier.emoji",
+        "tier.name",
+        "nextLine",
+        "progress_pct",
+        "p[0]",
+        "p[1]",
+        "p[2]",
+        "b.emoji"
+      ]
     },
     {
       "file": "apps/customer/js/features/notifications.js",
       "line": 73,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
-      "key": "apps/customer/js/features/notifications.js#3612e4e42fa5",
+      "key": "apps/customer/js/features/notifications.js#5b4340cdfd32",
       "classification": "safe_static"
     },
     {
@@ -454,9 +542,13 @@
       "line": 93,
       "kind": "innerHTML",
       "snippet": "tabs.innerHTML = Object.entries(CATS).map(([k,v])=>`<button class=\"notif-tab ${k===_filter?'on':''}\" role=\"tab\" aria-selected=\"${k===_filter}\" data-k=\"${k}\">${v",
-      "key": "apps/customer/js/features/notifications.js#ab19ad63d5ec",
-      "classification": "dom_api_safe",
-      "manual_review_note": "Object.entries(CATS) — آبجکتِ محلیِ ثابت."
+      "key": "apps/customer/js/features/notifications.js#b1e13f44a44c",
+      "classification": "unsafe",
+      "unproven": [
+        "k===_filter",
+        "k",
+        "v"
+      ]
     },
     {
       "file": "apps/customer/js/features/notifications.js",
@@ -471,15 +563,19 @@
       "line": 103,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = items.map(n=>{",
-      "key": "apps/customer/js/features/notifications.js#f0c01343bb30",
-      "classification": "escaped"
+      "key": "apps/customer/js/features/notifications.js#dcbd490df31a",
+      "classification": "unsafe",
+      "unproven": [
+        "n.pri",
+        "`</div>`; }"
+      ]
     },
     {
       "file": "apps/customer/js/features/onboarding.js",
       "line": 42,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
-      "key": "apps/customer/js/features/onboarding.js#54696bbb3576",
+      "key": "apps/customer/js/features/onboarding.js#7479ff398998",
       "classification": "safe_static"
     },
     {
@@ -487,17 +583,19 @@
       "line": 47,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
-      "key": "apps/customer/js/features/palette.js#587ccf37758c",
-      "classification": "safe_static"
+      "key": "apps/customer/js/features/palette.js#5b2683cd4c44",
+      "classification": "dom_api_safe"
     },
     {
       "file": "apps/customer/js/features/palette.js",
       "line": 94,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = _items.length ? _items.map(itemHTML).join('') : '<li class=\"cmdk-empty\">چیزی پیدا نشد</li>';",
-      "key": "apps/customer/js/features/palette.js#3a2708a1b553",
-      "classification": "dom_api_safe",
-      "manual_review_note": "itemHTML(it,i) از قبل esc(it.t)/esc(it.sub) داشت — بررسی شد."
+      "key": "apps/customer/js/features/palette.js#deaeecaa7255",
+      "classification": "unsafe",
+      "unproven": [
+        "_items.map(itemHTML).join('')"
+      ]
     },
     {
       "file": "apps/customer/js/features/pull-refresh.js",
@@ -512,9 +610,8 @@
       "line": 108,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"gift-check ${d.valid?'valid':'invalid'}\">",
-      "key": "apps/customer/js/features/rewards.js#d949731de67e",
-      "classification": "dom_api_safe",
-      "manual_review_note": "d.valid ترنری با icon(...)؛ d.balance_toman از fmtFa می‌گذره."
+      "key": "apps/customer/js/features/rewards.js#c5381a17f608",
+      "classification": "dom_api_safe"
     },
     {
       "file": "apps/customer/js/features/rewards.js",
@@ -546,7 +643,11 @@
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"background:#fff;border-radius:8px;padding:8px;display:inline-block\">",
       "key": "apps/customer/js/features/trips.js#0ebfa67399ce",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "boxId",
+        "res.data.svg"
+      ]
     },
     {
       "file": "apps/customer/js/icons.js",
@@ -569,9 +670,11 @@
       "line": 21,
       "kind": "innerHTML",
       "snippet": "empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.querySelectorAll('.rc').forEach(c=>c.classList.add('in'));",
-      "key": "apps/customer/js/reservation.js#121414a5b2a9",
-      "classification": "dom_api_safe",
-      "manual_review_note": "cardHTML() دیگه esc(r.n) داره (رفع‌شده در همین PR)."
+      "key": "apps/customer/js/reservation.js#a598a9d0bb0d",
+      "classification": "unsafe",
+      "unproven": [
+        "list.map(cardHTML).join('')"
+      ]
     },
     {
       "file": "apps/customer/js/reservation.js",
@@ -579,7 +682,10 @@
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=skTrip.repeat(3);",
       "key": "apps/customer/js/reservation.js#5a3fd778d594",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "skTrip.repeat(3)"
+      ]
     },
     {
       "file": "apps/customer/js/reservation.js",
@@ -594,8 +700,12 @@
       "line": 88,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=summary+trips.map(t=>{",
-      "key": "apps/customer/js/reservation.js#f149660d63d1",
-      "classification": "escaped"
+      "key": "apps/customer/js/reservation.js#6f2f08b04a52",
+      "classification": "unsafe",
+      "unproven": [
+        "summary",
+        "`<div class=\"trip-card reveal ${t.status}${swipe?' has-swipe':''}\"> ${swipe?`<div class=\"trip-swipe-pad ${swipe.cls}\" ar"
+      ]
     },
     {
       "file": "apps/customer/js/theme-pwa.js",
@@ -619,7 +729,12 @@
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "key": "apps/customer/js/waitlist.js#56ad6974155d",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "bk.date",
+        "bk.time",
+        "id"
+      ]
     },
     {
       "file": "apps/customer/js/waitlist.js",
@@ -634,9 +749,13 @@
       "line": 55,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "key": "apps/customer/js/waitlist.js#5a5ef1d832bf",
-      "classification": "dom_api_safe",
-      "manual_review_note": "isOffered ترنری رویِ HTMLِ استاتیک."
+      "key": "apps/customer/js/waitlist.js#34c1107768a5",
+      "classification": "unsafe",
+      "unproven": [
+        "faNum(WL.offered_table||'—')",
+        "faNum(WL.position||'—')",
+        "faNum(WL.estimated_wait_minutes||'؟')"
+      ]
     },
     {
       "file": "apps/business/js/assistant.js",
@@ -659,8 +778,8 @@
       "line": 41,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', html);",
-      "key": "apps/business/js/assistant.js#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "apps/business/js/assistant.js#74e9dc00f1a7",
+      "classification": "review"
     },
     {
       "file": "apps/business/js/chat.js",
@@ -691,9 +810,12 @@
       "line": 24,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = items.map(t => `",
-      "key": "apps/business/js/chat.js#1401bdf4e72e",
-      "classification": "dom_api_safe",
-      "manual_review_note": "chatEsc در همه‌ی فیلدها استفاده شده؛ t.id ستونِ Postgres UUID (فرمت تضمین‌شده)."
+      "key": "apps/business/js/chat.js#12e9ac911169",
+      "classification": "unsafe",
+      "unproven": [
+        "t.id",
+        "t.unread"
+      ]
     },
     {
       "file": "apps/business/js/chat.js",
@@ -716,16 +838,19 @@
       "line": 75,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
-      "key": "apps/business/js/chat.js#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "apps/business/js/chat.js#bbd67ec48fde",
+      "classification": "unsafe",
+      "unproven": [
+        "bizBubble(m)"
+      ]
     },
     {
       "file": "apps/business/js/chat.js",
       "line": 94,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
-      "key": "apps/business/js/chat.js#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "apps/business/js/chat.js#665e7d4035c8",
+      "classification": "escaped"
     },
     {
       "file": "apps/business/js/crm.js",
@@ -748,18 +873,31 @@
       "line": 89,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-gallery').innerHTML=`",
-      "key": "apps/business/js/crm.js#26d2c9882f8b",
-      "classification": "dom_api_safe",
-      "manual_review_note": "logoPhoto.url دیگه esc شده (رفع‌شده در همین PR)."
+      "key": "apps/business/js/crm.js#305c282ff51a",
+      "classification": "unsafe",
+      "unproven": [
+        "RESTAURANT.logoGradient",
+        "RESTAURANT.logoEmoji",
+        "logoPhoto.status",
+        "GALLERY.indexOf(logoPhoto)",
+        "g.status",
+        "g.url||g.dataUrl",
+        "g.emoji",
+        "g.type==='food'?'غذا':g.type==='interior'?'فضا':g.type==='drink'?'نوشیدنی':g.type==='event'?'رویداد':'عکس'"
+      ]
     },
     {
       "file": "apps/business/js/crm.js",
       "line": 379,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-reviews').innerHTML=`",
-      "key": "apps/business/js/crm.js#d459996da353",
-      "classification": "dom_api_safe",
-      "manual_review_note": "dist فقط {star:number,count:number} — بدونِ رشته."
+      "key": "apps/business/js/crm.js#6dddcad805b4",
+      "classification": "unsafe",
+      "unproven": [
+        "stars(+avg)",
+        "d.count/totalCount*100",
+        "`<div class=\"rev-card\"> <div class=\"rev-card-top\"> <div class=\"rev-ava\">${r.ava}</div> <div><div class=\"rev-name\">${esc("
+      ]
     },
     {
       "file": "apps/business/js/crm.js",
@@ -774,8 +912,11 @@
       "line": 512,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "apps/business/js/crm.js#301df20b7743",
-      "classification": "unsafe"
+      "key": "apps/business/js/crm.js#a863cbff4287",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"seg-cell\" onclick=\"setCustTab('profiles')\"> <div class=\"seg-top\"><span class=\"seg-name\">${m.fa}</span><span"
+      ]
     },
     {
       "file": "apps/business/js/crm.js",
@@ -790,8 +931,13 @@
       "line": 587,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "apps/business/js/crm.js#3f1c72632042",
-      "classification": "unsafe"
+      "key": "apps/business/js/crm.js#c0fe1132c9d3",
+      "classification": "unsafe",
+      "unproven": [
+        "c.severity==='high'?'warn':c.severity==='medium'?'info':'up'",
+        "c.severity==='high'?icon('alert',{size:15}):c.severity==='medium'?icon('trending',{size:15}):icon('check',{size:15})",
+        "`<div class=\"seg-cell\" onclick=\"setCustTab('profiles')\"> <div class=\"seg-top\"><span class=\"seg-name\">${m.fa}</span><span"
+      ]
     },
     {
       "file": "apps/business/js/crm.js",
@@ -822,8 +968,11 @@
       "line": 647,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "apps/business/js/crm.js#291386c31a73",
-      "classification": "unsafe"
+      "key": "apps/business/js/crm.js#e4f0f325399c",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"smart-card ${urg}\"> <div class=\"smart-top\"> <div class=\"smart-ava\">${c.is_vip?icon('crown',{size:18,fill:tr"
+      ]
     },
     {
       "file": "apps/business/js/crm.js",
@@ -838,8 +987,13 @@
       "line": 759,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "apps/business/js/crm.js#3b0902f30b1a",
-      "classification": "unsafe"
+      "key": "apps/business/js/crm.js#806ec67261dc",
+      "classification": "unsafe",
+      "unproven": [
+        "hoursStatusBannerHTML()",
+        "formatHoursCompact(HOURS_STATE.opening_hours)",
+        "d"
+      ]
     },
     {
       "file": "apps/business/js/crm.js",
@@ -862,8 +1016,12 @@
       "line": 953,
       "kind": "innerHTML",
       "snippet": "document.getElementById('ct-campaign').innerHTML=`",
-      "key": "apps/business/js/crm.js#ef935439f841",
-      "classification": "unsafe"
+      "key": "apps/business/js/crm.js#965496c2a008",
+      "classification": "unsafe",
+      "unproven": [
+        "s[1]",
+        "s[2]"
+      ]
     },
     {
       "file": "apps/business/js/crm.js",
@@ -886,8 +1044,8 @@
       "line": 979,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=logs.length?`<table class=\"tbl\"><thead><tr><th>سگمنت</th><th>تاریخ</th><th>گیرنده</th><th>پیام</th></tr></thead><tbody>",
-      "key": "apps/business/js/crm.js#18bf6162ee81",
-      "classification": "unsafe"
+      "key": "apps/business/js/crm.js#a1f207296296",
+      "classification": "escaped"
     },
     {
       "file": "apps/business/js/crm.js",
@@ -911,7 +1069,10 @@
       "kind": "innerHTML",
       "snippet": "if(chatHtml){ el.innerHTML=chatHtml+`<div id=\"aiCards\"><div style=\"text-align:center;padding:30px;color:var(--t2)\">در حال بارگذاری پیشنهادها...</div></div>`; }",
       "key": "apps/business/js/crm.js#731871db6674",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "chatHtml"
+      ]
     },
     {
       "file": "apps/business/js/crm.js",
@@ -926,8 +1087,17 @@
       "line": 1022,
       "kind": "innerHTML",
       "snippet": "cardsEl.innerHTML=`",
-      "key": "apps/business/js/crm.js#915305a9d643",
-      "classification": "unsafe"
+      "key": "apps/business/js/crm.js#0a7262f6fbfc",
+      "classification": "unsafe",
+      "unproven": [
+        "c.severity==='high'?'high':c.severity==='medium'?'med':'low'",
+        "c.severity==='high'?icon('alert',{size:15}):c.severity==='medium'?icon('trending',{size:15}):icon('check',{size:15})",
+        "c.id",
+        "crmEffectivenessFa(crmEff)",
+        "c.urgency==='high'?'var(--red-50)':c.urgency==='medium'?'var(--amber-50)':'var(--s-100)'",
+        "c.urgency==='high'?'var(--red)':c.urgency==='medium'?'var(--amber)':'var(--t2)'",
+        "URG_FA[c.urgency]||''"
+      ]
     },
     {
       "file": "apps/business/js/data.js",
@@ -958,9 +1128,18 @@
       "line": 22,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-loyalty').innerHTML=`",
-      "key": "apps/business/js/loyalty.js#59be0e774ff7",
-      "classification": "dom_api_safe",
-      "manual_review_note": "Array.from({length:31}) — تقویمِ محلیِ عددی."
+      "key": "apps/business/js/loyalty.js#9cb1f16e7799",
+      "classification": "unsafe",
+      "unproven": [
+        "Array.from({length:31},(_,i)=>`<option>${fa(i+1)}</option>`).join('')",
+        "m",
+        "Array.from({length:40},(_,i)=>`<option>${fa(1385-i)}</option>`).join('')",
+        "l",
+        "c/total*100",
+        "col",
+        "m.fn",
+        "m.ln"
+      ]
     },
     {
       "file": "apps/business/js/loyalty.js",
@@ -968,7 +1147,10 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('memberResult').innerHTML=`<div style=\"background:var(--teal-50);border:1px solid #99F6E4;border-radius:var(--r);padding:14px;margin-top",
       "key": "apps/business/js/loyalty.js#5f24e472445d",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "code"
+      ]
     },
     {
       "file": "apps/business/js/marketing.js",
@@ -991,8 +1173,14 @@
       "line": 56,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "apps/business/js/marketing.js#07050e516fa2",
-      "classification": "unsafe"
+      "key": "apps/business/js/marketing.js#f75265626765",
+      "classification": "unsafe",
+      "unproven": [
+        "k",
+        "v",
+        "COUPON_KIND_FA[c.kind]||c.kind",
+        "COUPON_SEG_FA[c.target_segment]||c.target_segment"
+      ]
     },
     {
       "file": "apps/business/js/marketing.js",
@@ -1007,16 +1195,33 @@
       "line": 106,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "apps/business/js/marketing.js#ccf4e863fe3e",
-      "classification": "unsafe"
+      "key": "apps/business/js/marketing.js#5a80db485837",
+      "classification": "unsafe",
+      "unproven": [
+        "k",
+        "v",
+        "c.id",
+        "AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger",
+        "automationConversionFa(a)"
+      ]
     },
     {
       "file": "apps/business/js/marketing.js",
       "line": 285,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
-      "key": "apps/business/js/marketing.js#aa838bf52db1",
-      "classification": "unsafe"
+      "key": "apps/business/js/marketing.js#73a02d2e32f2",
+      "classification": "unsafe",
+      "unproven": [
+        "dataSourceNote()",
+        "avgVisits",
+        "v/mx*100",
+        "d",
+        "A.newPct",
+        "l",
+        "p",
+        "['var(--blue)','var(--teal)','var(--green)'][i]"
+      ]
     },
     {
       "file": "apps/business/js/menu.js",
@@ -1047,8 +1252,12 @@
       "line": 60,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
-      "key": "apps/business/js/menu.js#e229e4dbf5df",
-      "classification": "unsafe"
+      "key": "apps/business/js/menu.js#a0659caf36b5",
+      "classification": "unsafe",
+      "unproven": [
+        "menuPublicCardHTML(active)",
+        "keys.map(k=>` <div class=\"panel\" style=\"margin-bottom:14px\"> <div class=\"panel-head\"><div class=\"panel-title\" style=\"fon"
+      ]
     },
     {
       "file": "apps/business/js/menu.js",
@@ -1071,7 +1280,7 @@
       "line": 179,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
-      "key": "apps/business/js/menu.js#1b9e7a3e1ca4",
+      "key": "apps/business/js/menu.js#8d403cbc60bc",
       "classification": "escaped"
     },
     {
@@ -1096,7 +1305,10 @@
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "key": "apps/business/js/menu.js#3c2080e456f1",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "_menuQrSvg"
+      ]
     },
     {
       "file": "apps/business/js/menu.js",
@@ -1119,18 +1331,29 @@
       "line": 153,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML = `",
-      "key": "apps/business/js/overview.js#126f139c2a3b",
-      "classification": "dom_api_safe",
-      "manual_review_note": "liveStatusBadge()/dashboardUsingDemoData() توابعِ محلیِ trusted‌اند."
+      "key": "apps/business/js/overview.js#704119a569f3",
+      "classification": "unsafe",
+      "unproven": [
+        "liveStatusBadge()",
+        "k.occupancyPct",
+        "elap",
+        "fmtMoney(k.revenue)",
+        "fmtMoney(k.avgSpend)",
+        "renderDashResvRows()",
+        "renderDashWaitlist()",
+        "dashAiInsight()"
+      ]
     },
     {
       "file": "apps/business/js/overview.js",
       "line": 274,
       "kind": "innerHTML",
       "snippet": "document.getElementById('peakChart').innerHTML=slots.map(h=>{",
-      "key": "apps/business/js/overview.js#0782b4d2d10d",
-      "classification": "dom_api_safe",
-      "manual_review_note": "pct محاسبه‌ی محلیِ عددیه (Math.round)."
+      "key": "apps/business/js/overview.js#2e265127020f",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"peak-col\"><div class=\"peak-bar-wrap\"><div class=\"peak-bar ${peak?'peak-hot':''}\" style=\"height:0\" data-h=\"$"
+      ]
     },
     {
       "file": "apps/business/js/overview.js",
@@ -1146,33 +1369,45 @@
       "line": 321,
       "kind": "innerHTML",
       "snippet": "document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`",
-      "key": "apps/business/js/overview.js#a17079c560a0",
-      "classification": "escaped"
+      "key": "apps/business/js/overview.js#126681e63a35",
+      "classification": "unsafe",
+      "unproven": [
+        "c.ava",
+        "c.spent"
+      ]
     },
     {
       "file": "apps/business/js/overview.js",
       "line": 349,
       "kind": "innerHTML",
       "snippet": "document.getElementById('insights').innerHTML=insights.slice(0,4).map(i=>`",
-      "key": "apps/business/js/overview.js#b164d795c4ad",
-      "classification": "dom_api_safe",
-      "manual_review_note": "RHSِ زنجیره‌ای (.slice().map().join()) — بررسیِ دستی: esc(i.c)/icon(i.ic)/esc(i.t)/esc(i.d) هرچهارتا امن‌اند."
+      "key": "apps/business/js/overview.js#f34b2b42404d",
+      "classification": "escaped"
     },
     {
       "file": "apps/business/js/overview.js",
       "line": 370,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`",
-      "key": "apps/business/js/overview.js#fec084b94053",
-      "classification": "escaped"
+      "key": "apps/business/js/overview.js#567601a188a9",
+      "classification": "unsafe",
+      "unproven": [
+        "n.time",
+        "n.id||''"
+      ]
     },
     {
       "file": "apps/business/js/reservations.js",
       "line": 25,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-reservations').innerHTML=`",
-      "key": "apps/business/js/reservations.js#600e82fc4ef2",
-      "classification": "escaped"
+      "key": "apps/business/js/reservations.js#e3f8698f8e81",
+      "classification": "unsafe",
+      "unproven": [
+        "tonightFilter===f.v",
+        "f.v",
+        "f.l"
+      ]
     },
     {
       "file": "apps/business/js/reservations.js",
@@ -1188,32 +1423,42 @@
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${resDate==='past'?icon('inbox',{size:40}):icon('search',{size:40})}</div><div style=\"font-",
       "key": "apps/business/js/reservations.js#dd383567eff7",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "dateLabel"
+      ]
     },
     {
       "file": "apps/business/js/reservations.js",
       "line": 99,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=demoNote+`",
-      "key": "apps/business/js/reservations.js#49142f358dd1",
-      "classification": "unsafe"
+      "key": "apps/business/js/reservations.js#f665acc77d2e",
+      "classification": "unsafe",
+      "unproven": [
+        "demoNote",
+        "resItemHTML(x.r,x.i)"
+      ]
     },
     {
       "file": "apps/business/js/reservations.js",
       "line": 109,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=demoNote+`<div style=\"font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600\">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQu",
-      "key": "apps/business/js/reservations.js#d0a958ac5a9a",
-      "classification": "unsafe"
+      "key": "apps/business/js/reservations.js#9ce594c6cced",
+      "classification": "unsafe",
+      "unproven": [
+        "demoNote",
+        "resItemHTML(x.r,x.i)"
+      ]
     },
     {
       "file": "apps/business/js/staff-system.js",
       "line": 35,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-staff').innerHTML=(isDemo?`<div class=\"cash-note\">${icon('info',{size:13})} فهرستِ زیر نمونه است، کارکنانِ واقعیِ تو نیست.</div>`:'')",
-      "key": "apps/business/js/staff-system.js#8da13a6228ab",
-      "classification": "dom_api_safe",
-      "manual_review_note": "isDemo ترنری + fa(STAFF_LIST.length) — عدد."
+      "key": "apps/business/js/staff-system.js#59582754a6e8",
+      "classification": "escaped"
     },
     {
       "file": "apps/business/js/staff-system.js",
@@ -1237,17 +1482,19 @@
       "line": 170,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=NOTIFS.map((n,i)=>`<div class=\"notif-item ${n.unread?'unread':''}\" onclick=\"readNotif(${i})\">",
-      "key": "apps/business/js/staff-system.js#1985d4af2aee",
-      "classification": "escaped"
+      "key": "apps/business/js/staff-system.js#c93d8bb487bf",
+      "classification": "unsafe",
+      "unproven": [
+        "n.ic"
+      ]
     },
     {
       "file": "apps/business/js/staff-system.js",
       "line": 192,
       "kind": "innerHTML",
       "snippet": "document.getElementById('popupIc').innerHTML=iconName?icon(iconName,{size:18}):'';",
-      "key": "apps/business/js/staff-system.js#3a2ae36142ab",
-      "classification": "dom_api_safe",
-      "manual_review_note": "iconName?icon(...):\"\" — ترنریِ icon، رجکسِ ابزار پارسش نکرد ولی امنه."
+      "key": "apps/business/js/staff-system.js#61ecb48ce635",
+      "classification": "dom_api_safe"
     },
     {
       "file": "apps/business/js/staff-system.js",
@@ -1262,18 +1509,29 @@
       "line": 225,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-cashback').innerHTML=`",
-      "key": "apps/business/js/staff-system.js#51181e27725d",
-      "classification": "dom_api_safe",
-      "manual_review_note": "cards آرایه‌ی literal محلیه (تعریف‌شده دو خط بالاتر در همون تابع)."
+      "key": "apps/business/js/staff-system.js#4c74802f4d8f",
+      "classification": "unsafe",
+      "unproven": [
+        "n",
+        "k",
+        "d",
+        "mx",
+        "CB[k]"
+      ]
     },
     {
       "file": "apps/business/js/staff-system.js",
       "line": 282,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-pricing').innerHTML=`",
-      "key": "apps/business/js/staff-system.js#8b0ead2c9a82",
-      "classification": "dom_api_safe",
-      "manual_review_note": "sugCard از PR#13 قبلاً esc(s.reason) داره؛ r.label هم در همین PR با esc() رفع شد."
+      "key": "apps/business/js/staff-system.js#31fd2eb179e2",
+      "classification": "unsafe",
+      "unproven": [
+        "dataSourceNote()",
+        "(P.suggestions.length?P.suggestions:[]).map(sugCard).join('')||'<div class=\"pr-empty\">فعلاً پیشنهادی نیست. با ثبت رزروِ ",
+        "toman(r.min_toman)",
+        "dowLbl[d]"
+      ]
     },
     {
       "file": "apps/business/js/staff-system.js",
@@ -1288,26 +1546,32 @@
       "line": 410,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "key": "apps/business/js/staff-system.js#f7bb138972bc",
-      "classification": "unsafe"
+      "key": "apps/business/js/staff-system.js#8c41061136ae",
+      "classification": "dom_api_safe"
     },
     {
       "file": "apps/business/js/waitlist.js",
       "line": 38,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-waitlist').innerHTML=wlDemoNote+`",
-      "key": "apps/business/js/waitlist.js#25f65b54b53c",
-      "classification": "dom_api_safe",
-      "manual_review_note": "wlCard(w,i) از قبل esc(w.name) داشت — بررسی شد."
+      "key": "apps/business/js/waitlist.js#f6ea3b9c6f50",
+      "classification": "unsafe",
+      "unproven": [
+        "wlDemoNote",
+        "wlCard(w,i)"
+      ]
     },
     {
       "file": "apps/business/js/waitlist.js",
       "line": 115,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-floor').innerHTML=`",
-      "key": "apps/business/js/waitlist.js#5cb5acb17afb",
-      "classification": "dom_api_safe",
-      "manual_review_note": "floorEdit ترنریِ بولینِ محلی رویِ HTMLِ استاتیک."
+      "key": "apps/business/js/waitlist.js#6dab293865e8",
+      "classification": "unsafe",
+      "unproven": [
+        "t.s",
+        "t._time"
+      ]
     },
     {
       "file": "apps/business/js/waitlist.js",
@@ -1331,7 +1595,10 @@
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "key": "apps/business/js/waitlist.js#48f4fa9da5ac",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "_tableQrSvg"
+      ]
     },
     {
       "file": "apps/business/js/waitlist.js",
@@ -1363,15 +1630,22 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('toastMsg').innerHTML=msg+` <button class=\"undo-btn\" onclick=\"${undoFn}();document.getElementById('toast').classList.remove('show')\">باز",
       "key": "apps/business/js/waitlist.js#546e4088f9c4",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "msg",
+        "undoFn"
+      ]
     },
     {
       "file": "apps/business/js/waitlist.js",
       "line": 385,
       "kind": "document.write",
       "snippet": "w.document.write(`<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\">",
-      "key": "apps/business/js/waitlist.js#b692a97419b4",
-      "classification": "escaped"
+      "key": "apps/business/js/waitlist.js#8bf44e47e7cb",
+      "classification": "unsafe",
+      "unproven": [
+        "_tableQrSvg"
+      ]
     },
     {
       "file": "apps/company/js/badges.js",
@@ -1394,17 +1668,21 @@
       "line": 21,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`",
-      "key": "apps/company/js/badges.js#7a9462a28ba2",
-      "classification": "dom_api_safe",
-      "manual_review_note": "BADGES_LIST.map از قبل esc(b.name)/esc(b.description)/... داشت — بررسی شد."
+      "key": "apps/company/js/badges.js#f2ce7bcec475",
+      "classification": "escaped"
     },
     {
       "file": "apps/company/js/hours.js",
       "line": 117,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
-      "key": "apps/company/js/hours.js#b9be8d4f1e19",
-      "classification": "unsafe"
+      "key": "apps/company/js/hours.js#26fbf2dcc8e4",
+      "classification": "unsafe",
+      "unproven": [
+        "f",
+        "f === 'pending' ? 'در انتظار' : f === 'rejected' ? 'ردشده' : 'همه'",
+        "renderHoursChangeQueue()"
+      ]
     },
     {
       "file": "apps/company/js/icons.js",
@@ -1435,27 +1713,38 @@
       "line": 22,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`",
-      "key": "apps/company/js/intelligence.js#f4f0cc93c4cb",
-      "classification": "dom_api_safe",
-      "manual_review_note": "fa(d.guests.total_clv_toman) + rfm_distribution.map — اعداد/توابعِ trusted."
+      "key": "apps/company/js/intelligence.js#c42fd9101de1",
+      "classification": "unsafe",
+      "unproven": [
+        "d.guests.total_clv_toman==null?' — اندازه‌گیری‌ناپذیر':d.guests.measured_guests!=null&&d.guests.measured_guests<d.guests",
+        "`<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:12px\"><span style=\"width:110px;font-size:12.5px;font",
+        "x.count"
+      ]
     },
     {
       "file": "apps/company/js/intelligence.js",
       "line": 50,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-billing').innerHTML=`",
-      "key": "apps/company/js/intelligence.js#3dd1c3e7e593",
-      "classification": "dom_api_safe",
-      "manual_review_note": "RESTAURANTS.map — فیلدهایِ نمایش‌داده‌شده اعداد/enumِ status‌اند."
+      "key": "apps/company/js/intelligence.js#8020ee864485",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"mini-row\" style=\"flex-wrap:wrap\"> <div class=\"rest-logo\" style=\"background:${r.grad};width:38px;height:38px"
+      ]
     },
     {
       "file": "apps/company/js/intelligence.js",
       "line": 183,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-support').innerHTML=`",
-      "key": "apps/company/js/intelligence.js#714a85f9e868",
-      "classification": "dom_api_safe",
-      "manual_review_note": "متنِ ثابتِ توضیحی + fa(needsAttention.length)."
+      "key": "apps/company/js/intelligence.js#9bbaebb821a0",
+      "classification": "unsafe",
+      "unproven": [
+        "r.grad",
+        "r.logo",
+        "STATUS_LABEL[r.status]||''",
+        "r.id"
+      ]
     },
     {
       "file": "apps/company/js/intelligence.js",
@@ -1478,9 +1767,12 @@
       "line": 212,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-systemhealth').innerHTML=`",
-      "key": "apps/company/js/intelligence.js#42e21e50614b",
-      "classification": "dom_api_safe",
-      "manual_review_note": "healthMeta از یک لوکاپِ محلیِ ثابت؛ d.jobs.dead عدد."
+      "key": "apps/company/js/intelligence.js#c86c29818b80",
+      "classification": "unsafe",
+      "unproven": [
+        "healthMeta[1]",
+        "k"
+      ]
     },
     {
       "file": "apps/company/js/intelligence.js",
@@ -1503,8 +1795,18 @@
       "line": 331,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-aihealth').innerHTML=`",
-      "key": "apps/company/js/intelligence.js#b2863af101ba",
-      "classification": "unsafe"
+      "key": "apps/company/js/intelligence.js#841f5cdfed83",
+      "classification": "unsafe",
+      "unproven": [
+        "brierPct(r.learned_brier)",
+        "brierPct(r.static_brier)",
+        "new Date(r.trained_at).toLocaleDateString('fa-IR')",
+        "maePct(r.count_mae)",
+        "maePct(r.count_baseline_mae)",
+        "maePct(r.covers_mae)",
+        "maePct(r.covers_baseline_mae)",
+        "productionAccuracyPanelHTML(d.production_accuracy)"
+      ]
     },
     {
       "file": "apps/company/js/intelligence.js",
@@ -1527,8 +1829,18 @@
       "line": 523,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=moderationQueuePanelHTML(mq)+featureFlagsPanelHTML(flags)+`",
-      "key": "apps/company/js/intelligence.js#0a607c6576d7",
-      "classification": "unsafe"
+      "key": "apps/company/js/intelligence.js#1700ab76b7c3",
+      "classification": "unsafe",
+      "unproven": [
+        "moderationQueuePanelHTML(mq)",
+        "featureFlagsPanelHTML(flags)",
+        "`<div class=\"tier-card\" style=\"--tier-fg:${r.fg}\"> <div class=\"tier-ic\">${icon(r.ic,{size:18})}</div> <div class=\"tier-n",
+        "`<div class=\"mini-row\"> <div class=\"mini-ava\">${esc(initialOf(u.name))}</div> <div class=\"mini-info\"> <div class=\"mini-n",
+        "`<div class=\"mini-row\"> <div class=\"mini-ava\" style=\"color:var(--red-600)\">${icon('close',{size:16})}</div> <div class=\"",
+        "new Date(a.at).toLocaleString('fa-IR')",
+        "bannedIpsPanelHTML(bannedIps)",
+        "economyRulesPanelHTML(ecoRules)"
+      ]
     },
     {
       "file": "apps/company/js/intelligence.js",
@@ -1552,7 +1864,10 @@
       "kind": "innerHTML",
       "snippet": "box.innerHTML=renderCustomer360(res.data);",
       "key": "apps/company/js/intelligence.js#2eaa3d99abf3",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "renderCustomer360(res.data)"
+      ]
     },
     {
       "file": "apps/company/js/intelligence.js",
@@ -1567,8 +1882,8 @@
       "line": 811,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "key": "apps/company/js/intelligence.js#e388dc34a94a",
-      "classification": "unsafe"
+      "key": "apps/company/js/intelligence.js#6968785083cb",
+      "classification": "dom_api_safe"
     },
     {
       "file": "apps/company/js/missions.js",
@@ -1591,18 +1906,29 @@
       "line": 21,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`",
-      "key": "apps/company/js/missions.js#90e02b824f6e",
-      "classification": "dom_api_safe",
-      "manual_review_note": "MISSIONS_LIST.map از قبل esc(m.title) داشت — بررسی شد."
+      "key": "apps/company/js/missions.js#b87563cdfeb2",
+      "classification": "unsafe",
+      "unproven": [
+        "m.status"
+      ]
     },
     {
       "file": "apps/company/js/overview.js",
       "line": 26,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML=`",
-      "key": "apps/company/js/overview.js#a55e2de7b8b0",
-      "classification": "dom_api_safe",
-      "manual_review_note": "lowBalanceCount عددِ محلیه."
+      "key": "apps/company/js/overview.js#23dbcad48eec",
+      "classification": "unsafe",
+      "unproven": [
+        "healthMeta[2]",
+        "healthMeta[1]",
+        "l",
+        "c/total*100",
+        "col",
+        "r.grad",
+        "r.logo",
+        "`<div class=\"alert-item\"> <div class=\"alert-ic ${isExpired?'danger':isTrial?'info':'warn'}\">${isExpired?icon('close',{si"
+      ]
     },
     {
       "file": "apps/company/js/overview.js",
@@ -1625,8 +1951,11 @@
       "line": 107,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=list.map(r=>{",
-      "key": "apps/company/js/overview.js#b8017f876990",
-      "classification": "escaped"
+      "key": "apps/company/js/overview.js#3f84c308826f",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"rest-row\" onclick=\"openRest('${r.id}')\"> <div class=\"rest-name-cell\"> <div class=\"rest-logo\" style=\"backgro"
+      ]
     },
     {
       "file": "apps/company/js/overview.js",
@@ -1642,35 +1971,58 @@
       "line": 131,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
-      "key": "apps/company/js/photos.js#144978537f8c",
-      "classification": "dom_api_safe",
-      "manual_review_note": "['pending','approved','rejected','all'].map — آرایه‌ی literal محلی."
+      "key": "apps/company/js/photos.js#b9e03ec23cd1",
+      "classification": "unsafe",
+      "unproven": [
+        "f",
+        "f === 'pending' ? 'در انتظار' : f === 'approved' ? 'تأییدشده' : f === 'rejected' ? 'ردشده' : 'همه'",
+        "renderPhotoQueue()"
+      ]
     },
     {
       "file": "apps/company/js/restaurant.js",
       "line": 11,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-detail').innerHTML=`",
-      "key": "apps/company/js/restaurant.js#3398dc336382",
-      "classification": "escaped"
+      "key": "apps/company/js/restaurant.js#f2b509d1d6ba",
+      "classification": "unsafe",
+      "unproven": [
+        "r.grad",
+        "r.logo",
+        "r.joined",
+        "r.plan",
+        "PLAN_LABEL[r.plan]",
+        "badgeCls",
+        "statusText",
+        "r.id"
+      ]
     },
     {
       "file": "apps/company/js/restaurant.js",
       "line": 62,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
-      "key": "apps/company/js/restaurant.js#c5203174f987",
-      "classification": "dom_api_safe",
-      "manual_review_note": "Object.entries(planDist) — شمارشِ محلیِ اعداد."
+      "key": "apps/company/js/restaurant.js#743eac81fd71",
+      "classification": "unsafe",
+      "unproven": [
+        "PLAN_LABEL[p]||p",
+        "c/RESTAURANTS.length*100",
+        "r.id",
+        "r.grad",
+        "r.logo"
+      ]
     },
     {
       "file": "apps/company/js/sales.js",
       "line": 105,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
-      "key": "apps/company/js/sales.js#f68ecc196f1b",
-      "classification": "dom_api_safe",
-      "manual_review_note": "openInquiries عددِ محلیه."
+      "key": "apps/company/js/sales.js#4be05e630b35",
+      "classification": "unsafe",
+      "unproven": [
+        "renderSalesOrders()",
+        "renderSalesInquiries()"
+      ]
     },
     {
       "file": "shared/js/icons.js",
@@ -1711,8 +2063,12 @@
       "line": 24,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = items.map(t => `",
-      "key": "demo-mvp/business/js/chat.js#1401bdf4e72e",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/chat.js#12e9ac911169",
+      "classification": "unsafe",
+      "unproven": [
+        "t.id",
+        "t.unread"
+      ]
     },
     {
       "file": "demo-mvp/business/js/chat.js",
@@ -1727,16 +2083,19 @@
       "line": 75,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
-      "key": "demo-mvp/business/js/chat.js#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "demo-mvp/business/js/chat.js#bbd67ec48fde",
+      "classification": "unsafe",
+      "unproven": [
+        "bizBubble(m)"
+      ]
     },
     {
       "file": "demo-mvp/business/js/chat.js",
       "line": 94,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
-      "key": "demo-mvp/business/js/chat.js#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "demo-mvp/business/js/chat.js#665e7d4035c8",
+      "classification": "escaped"
     },
     {
       "file": "demo-mvp/business/js/crm.js",
@@ -1744,15 +2103,23 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-profile').innerHTML=`",
       "key": "demo-mvp/business/js/crm.js#f7484b7485c4",
-      "classification": "dom_api_safe"
+      "classification": "safe_static"
     },
     {
       "file": "demo-mvp/business/js/crm.js",
       "line": 56,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-gallery').innerHTML=`",
-      "key": "demo-mvp/business/js/crm.js#f4ce61671d56",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#6a90f0c2de82",
+      "classification": "unsafe",
+      "unproven": [
+        "RESTAURANT.logoGradient",
+        "RESTAURANT.logoDataUrl",
+        "RESTAURANT.logoEmoji",
+        "g.url||g.dataUrl",
+        "g.emoji",
+        "g.type==='food'?'🍽 غذا':g.type==='interior'?'🏛 فضا':g.type==='drink'?'🥤 نوشیدنی':g.type==='event'?'🎉 رویداد':'📷 عکس"
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
@@ -1760,7 +2127,10 @@
       "kind": "innerHTML",
       "snippet": "if(logoChoice.dataUrl){pv.style.background='transparent';pv.innerHTML=`<img src=\"${logoChoice.dataUrl}\" alt=\"\">`}",
       "key": "demo-mvp/business/js/crm.js#4d53e79c9cc2",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "logoChoice.dataUrl"
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
@@ -1768,15 +2138,23 @@
       "kind": "innerHTML",
       "snippet": "if(RESTAURANT.logoDataUrl){swEmoji.style.background='transparent';swEmoji.innerHTML=`<img src=\"${RESTAURANT.logoDataUrl}\" alt=\"\" style=\"width:100%;height:100%;o",
       "key": "demo-mvp/business/js/crm.js#a8cf5e645367",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "RESTAURANT.logoDataUrl"
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
       "line": 265,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-reviews').innerHTML=`",
-      "key": "demo-mvp/business/js/crm.js#d459996da353",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#4083b814b136",
+      "classification": "unsafe",
+      "unproven": [
+        "stars(+avg)",
+        "d.count/totalCount*100",
+        "`<div class=\"rev-card\"> <div class=\"rev-card-top\"> <div class=\"rev-ava\">${r.ava}</div> <div><div class=\"rev-name\">${esc("
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
@@ -1784,23 +2162,31 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`",
       "key": "demo-mvp/business/js/crm.js#991b242d66eb",
-      "classification": "dom_api_safe"
+      "classification": "safe_static"
     },
     {
       "file": "demo-mvp/business/js/crm.js",
       "line": 378,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "demo-mvp/business/js/crm.js#75610366251b",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#1ec66d05682e",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"seg-cell\" onclick=\"setCustTab('profiles')\"> <div class=\"seg-top\"><span class=\"seg-name\">${m.fa}</span><span"
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
       "line": 437,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "demo-mvp/business/js/crm.js#570f424a90ce",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#c01790939c4f",
+      "classification": "unsafe",
+      "unproven": [
+        "c.severity==='high'?'warn':c.severity==='medium'?'info':'up'",
+        "c.severity==='high'?'🚨':c.severity==='medium'?'⚡':'✓'",
+        "`<div class=\"seg-cell\" onclick=\"setCustTab('profiles')\"> <div class=\"seg-top\"><span class=\"seg-name\">${m.fa}</span><span"
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
@@ -1831,8 +2217,11 @@
       "line": 497,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "demo-mvp/business/js/crm.js#cc2d25f263e3",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#e16b2be32dd6",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"smart-card ${urg}\"> <div class=\"smart-top\"> <div class=\"smart-ava\">${c.is_vip?'👑':'👤'}</div> <div style=\""
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
@@ -1847,16 +2236,24 @@
       "line": 550,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "demo-mvp/business/js/crm.js#21265a61ac11",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#792074677a1c",
+      "classification": "unsafe",
+      "unproven": [
+        "d"
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
       "line": 671,
       "kind": "innerHTML",
       "snippet": "document.getElementById('ct-campaign').innerHTML=`",
-      "key": "demo-mvp/business/js/crm.js#ef935439f841",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#6fa3717fcd75",
+      "classification": "unsafe",
+      "unproven": [
+        "s[0]",
+        "s[1]",
+        "s[2]"
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
@@ -1879,8 +2276,8 @@
       "line": 697,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=logs.length?`<table class=\"tbl\"><thead><tr><th>سگمنت</th><th>تاریخ</th><th>گیرنده</th><th>پیام</th></tr></thead><tbody>",
-      "key": "demo-mvp/business/js/crm.js#18bf6162ee81",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#a1f207296296",
+      "classification": "escaped"
     },
     {
       "file": "demo-mvp/business/js/crm.js",
@@ -1911,16 +2308,31 @@
       "line": 710,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "demo-mvp/business/js/crm.js#d5a1a1414bc3",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#37afd700adac",
+      "classification": "unsafe",
+      "unproven": [
+        "c.severity==='high'?'high':c.severity==='medium'?'med':'low'",
+        "c.severity==='high'?'🚨':c.severity==='medium'?'⚡':'✓'",
+        "c.id"
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
       "line": 746,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-loyalty').innerHTML=`",
-      "key": "demo-mvp/business/js/crm.js#1e49e2795577",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/crm.js#0cc863fce874",
+      "classification": "unsafe",
+      "unproven": [
+        "Array.from({length:31},(_,i)=>`<option>${fa(i+1)}</option>`).join('')",
+        "m",
+        "Array.from({length:40},(_,i)=>`<option>${fa(1385-i)}</option>`).join('')",
+        "l",
+        "c/total*100",
+        "col",
+        "m.fn",
+        "m.ln"
+      ]
     },
     {
       "file": "demo-mvp/business/js/crm.js",
@@ -1928,7 +2340,10 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('memberResult').innerHTML=`<div style=\"background:var(--teal-50);border:1px solid #99F6E4;border-radius:var(--r);padding:14px;margin-top",
       "key": "demo-mvp/business/js/crm.js#5f24e472445d",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "code"
+      ]
     },
     {
       "file": "demo-mvp/business/js/data.js",
@@ -1952,7 +2367,7 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-marketing').innerHTML=`",
       "key": "demo-mvp/business/js/marketing.js#2ca41c541bcd",
-      "classification": "dom_api_safe"
+      "classification": "safe_static"
     },
     {
       "file": "demo-mvp/business/js/marketing.js",
@@ -1967,8 +2382,14 @@
       "line": 36,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "demo-mvp/business/js/marketing.js#07050e516fa2",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/marketing.js#f75265626765",
+      "classification": "unsafe",
+      "unproven": [
+        "k",
+        "v",
+        "COUPON_KIND_FA[c.kind]||c.kind",
+        "COUPON_SEG_FA[c.target_segment]||c.target_segment"
+      ]
     },
     {
       "file": "demo-mvp/business/js/marketing.js",
@@ -1983,40 +2404,79 @@
       "line": 86,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "demo-mvp/business/js/marketing.js#ccf4e863fe3e",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/marketing.js#38d439692ac2",
+      "classification": "unsafe",
+      "unproven": [
+        "k",
+        "v",
+        "c.id",
+        "AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger"
+      ]
     },
     {
       "file": "demo-mvp/business/js/marketing.js",
       "line": 248,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
-      "key": "demo-mvp/business/js/marketing.js#9712c5942a8f",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/marketing.js#fe8d6a8e0f37",
+      "classification": "unsafe",
+      "unproven": [
+        "dataSourceNote()",
+        "avgVisits",
+        "v/mx*100",
+        "d",
+        "A.newPct",
+        "l",
+        "p",
+        "['var(--blue)','var(--teal)','var(--green)'][i]"
+      ]
     },
     {
       "file": "demo-mvp/business/js/marketing.js",
       "line": 310,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
-      "key": "demo-mvp/business/js/marketing.js#882aa00fa947",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/marketing.js#fe77baf69747",
+      "classification": "unsafe",
+      "unproven": [
+        "v/mx*100",
+        "d",
+        "100-returnRate",
+        "l",
+        "p",
+        "c",
+        "v/32*100",
+        "h"
+      ]
     },
     {
       "file": "demo-mvp/business/js/overview.js",
       "line": 131,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML = `",
-      "key": "demo-mvp/business/js/overview.js#6c509c7d357a",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/overview.js#440723d69334",
+      "classification": "unsafe",
+      "unproven": [
+        "liveStatusBadge()",
+        "k.occupancyPct",
+        "elap",
+        "fmtMoney(k.revenue)",
+        "fmtMoney(k.avgSpend)",
+        "renderDashResvRows()",
+        "renderDashWaitlist()",
+        "dashAiInsight()"
+      ]
     },
     {
       "file": "demo-mvp/business/js/overview.js",
       "line": 251,
       "kind": "innerHTML",
       "snippet": "document.getElementById('peakChart').innerHTML=slots.map(h=>{",
-      "key": "demo-mvp/business/js/overview.js#0782b4d2d10d",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/overview.js#2e265127020f",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"peak-col\"><div class=\"peak-bar-wrap\"><div class=\"peak-bar ${peak?'peak-hot':''}\" style=\"height:0\" data-h=\"$"
+      ]
     },
     {
       "file": "demo-mvp/business/js/overview.js",
@@ -2031,24 +2491,38 @@
       "line": 279,
       "kind": "innerHTML",
       "snippet": "document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`",
-      "key": "demo-mvp/business/js/overview.js#45645dfc200f",
-      "classification": "escaped"
+      "key": "demo-mvp/business/js/overview.js#54585a064edc",
+      "classification": "unsafe",
+      "unproven": [
+        "c.ava",
+        "c.spent"
+      ]
     },
     {
       "file": "demo-mvp/business/js/overview.js",
       "line": 299,
       "kind": "innerHTML",
       "snippet": "document.getElementById('insights').innerHTML=insights.slice(0,4).map(i=>`",
-      "key": "demo-mvp/business/js/overview.js#b164d795c4ad",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/overview.js#816f4bb86dd2",
+      "classification": "unsafe",
+      "unproven": [
+        "i.c",
+        "i.ic",
+        "i.t",
+        "i.d"
+      ]
     },
     {
       "file": "demo-mvp/business/js/overview.js",
       "line": 320,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`",
-      "key": "demo-mvp/business/js/overview.js#b4b870c0712d",
-      "classification": "escaped"
+      "key": "demo-mvp/business/js/overview.js#36d4ddd75e72",
+      "classification": "unsafe",
+      "unproven": [
+        "n.time",
+        "n.id||''"
+      ]
     },
     {
       "file": "demo-mvp/business/js/reservations.js",
@@ -2072,31 +2546,40 @@
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"no-results\"><div class=\"nr-emoji\">${resDate==='past'?'📋':'🔍'}</div><div style=\"font-weight:700;margin-bottom:4px\">رزروی پیدا نشد</di",
       "key": "demo-mvp/business/js/reservations.js#b75c99841f63",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "dateLabel"
+      ]
     },
     {
       "file": "demo-mvp/business/js/reservations.js",
       "line": 60,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "demo-mvp/business/js/reservations.js#d760c4886c25",
-      "classification": "dom_api_safe"
+      "key": "demo-mvp/business/js/reservations.js#6d32b9e9ee0e",
+      "classification": "unsafe",
+      "unproven": [
+        "resItemHTML(x.r,x.i)"
+      ]
     },
     {
       "file": "demo-mvp/business/js/reservations.js",
       "line": 70,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div style=\"font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600\">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQuery?` · ن",
-      "key": "demo-mvp/business/js/reservations.js#cf9cbf8954c0",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/reservations.js#9473126f4657",
+      "classification": "unsafe",
+      "unproven": [
+        "resItemHTML(x.r,x.i)"
+      ]
     },
     {
       "file": "demo-mvp/business/js/staff-system.js",
       "line": 34,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-staff').innerHTML=`",
-      "key": "demo-mvp/business/js/staff-system.js#44b6ac6d8564",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/staff-system.js#bf12c67d990c",
+      "classification": "escaped"
     },
     {
       "file": "demo-mvp/business/js/staff-system.js",
@@ -2119,24 +2602,44 @@
       "line": 101,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=NOTIFS.map((n,i)=>`<div class=\"notif-item ${n.unread?'unread':''}\" onclick=\"readNotif(${i})\">",
-      "key": "demo-mvp/business/js/staff-system.js#02cb46edabad",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/staff-system.js#d138b704f51d",
+      "classification": "unsafe",
+      "unproven": [
+        "n.ic",
+        "n.emoji",
+        "n.title",
+        "n.text",
+        "n.time"
+      ]
     },
     {
       "file": "demo-mvp/business/js/staff-system.js",
       "line": 133,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-cashback').innerHTML=`",
-      "key": "demo-mvp/business/js/staff-system.js#3eaad1dbf46c",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/staff-system.js#6ec9a35a6404",
+      "classification": "unsafe",
+      "unproven": [
+        "n",
+        "k",
+        "d",
+        "mx",
+        "CB[k]"
+      ]
     },
     {
       "file": "demo-mvp/business/js/staff-system.js",
       "line": 185,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-pricing').innerHTML=`",
-      "key": "demo-mvp/business/js/staff-system.js#270694645dc7",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/staff-system.js#08237756bdd2",
+      "classification": "unsafe",
+      "unproven": [
+        "dataSourceNote()",
+        "(P.suggestions.length?P.suggestions:[]).map(sugCard).join('')||'<div class=\"pr-empty\">فعلاً پیشنهادی نیست. با ثبت رزروِ ",
+        "dowLbl[d]",
+        "toman(r.min_toman)"
+      ]
     },
     {
       "file": "demo-mvp/business/js/staff-system.js",
@@ -2144,15 +2647,15 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "key": "demo-mvp/business/js/staff-system.js#27eb90e32bf2",
-      "classification": "unsafe"
+      "classification": "safe_static"
     },
     {
       "file": "demo-mvp/business/js/staff-system.js",
       "line": 291,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "key": "demo-mvp/business/js/staff-system.js#5fe64114a5e4",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/staff-system.js#95a63a854ee1",
+      "classification": "dom_api_safe"
     },
     {
       "file": "demo-mvp/business/js/waitlist.js",
@@ -2160,15 +2663,22 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-waitlist').innerHTML=`",
       "key": "demo-mvp/business/js/waitlist.js#e3f42b6129cf",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "wlCard(w,i)"
+      ]
     },
     {
       "file": "demo-mvp/business/js/waitlist.js",
       "line": 105,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-floor').innerHTML=`",
-      "key": "demo-mvp/business/js/waitlist.js#15c56781c223",
-      "classification": "unsafe"
+      "key": "demo-mvp/business/js/waitlist.js#a577dffb9feb",
+      "classification": "unsafe",
+      "unproven": [
+        "t.s",
+        "t._time"
+      ]
     },
     {
       "file": "demo-mvp/business/js/waitlist.js",
@@ -2176,7 +2686,11 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('toastMsg').innerHTML=msg+` <button class=\"undo-btn\" onclick=\"${undoFn}();document.getElementById('toast').classList.remove('show')\">باز",
       "key": "demo-mvp/business/js/waitlist.js#546e4088f9c4",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "msg",
+        "undoFn"
+      ]
     },
     {
       "file": "demo-mvp/company/js/intelligence.js",
@@ -2199,24 +2713,37 @@
       "line": 22,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`",
-      "key": "demo-mvp/company/js/intelligence.js#3b2cde6af17f",
-      "classification": "unsafe"
+      "key": "demo-mvp/company/js/intelligence.js#2eddbf5feb66",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:12px\"><span style=\"width:110px;font-size:12.5px;font",
+        "x.count"
+      ]
     },
     {
       "file": "demo-mvp/company/js/intelligence.js",
       "line": 50,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-billing').innerHTML=`",
-      "key": "demo-mvp/company/js/intelligence.js#3dd1c3e7e593",
-      "classification": "unsafe"
+      "key": "demo-mvp/company/js/intelligence.js#9338cc953804",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"mini-row\" style=\"flex-wrap:wrap\"> <div class=\"rest-logo\" style=\"background:${r.grad};width:38px;height:38px"
+      ]
     },
     {
       "file": "demo-mvp/company/js/intelligence.js",
       "line": 183,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-support').innerHTML=`",
-      "key": "demo-mvp/company/js/intelligence.js#c3d6296ad044",
-      "classification": "unsafe"
+      "key": "demo-mvp/company/js/intelligence.js#9dbb7c2b9cfb",
+      "classification": "unsafe",
+      "unproven": [
+        "r.grad",
+        "r.logo",
+        "STATUS_LABEL[r.status]||''",
+        "r.id"
+      ]
     },
     {
       "file": "demo-mvp/company/js/intelligence.js",
@@ -2239,8 +2766,13 @@
       "line": 212,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-systemhealth').innerHTML=`",
-      "key": "demo-mvp/company/js/intelligence.js#4186d32697d6",
-      "classification": "unsafe"
+      "key": "demo-mvp/company/js/intelligence.js#be377318dca5",
+      "classification": "unsafe",
+      "unproven": [
+        "healthMeta[0]",
+        "healthMeta[1]",
+        "k"
+      ]
     },
     {
       "file": "demo-mvp/company/js/intelligence.js",
@@ -2263,8 +2795,11 @@
       "line": 245,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=`",
-      "key": "demo-mvp/company/js/intelligence.js#2bef642e8575",
-      "classification": "unsafe"
+      "key": "demo-mvp/company/js/intelligence.js#f160832a28d0",
+      "classification": "unsafe",
+      "unproven": [
+        "new Date(a.at).toLocaleString('fa-IR')"
+      ]
     },
     {
       "file": "demo-mvp/company/js/intelligence.js",
@@ -2272,23 +2807,33 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "key": "demo-mvp/company/js/intelligence.js#b9624146ebdf",
-      "classification": "unsafe"
+      "classification": "safe_static"
     },
     {
       "file": "demo-mvp/company/js/intelligence.js",
       "line": 300,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "key": "demo-mvp/company/js/intelligence.js#da1c690ad360",
-      "classification": "unsafe"
+      "key": "demo-mvp/company/js/intelligence.js#cafcbd81bb75",
+      "classification": "dom_api_safe"
     },
     {
       "file": "demo-mvp/company/js/overview.js",
       "line": 25,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML=`",
-      "key": "demo-mvp/company/js/overview.js#a6da3d351135",
-      "classification": "unsafe"
+      "key": "demo-mvp/company/js/overview.js#a77606ddfe07",
+      "classification": "unsafe",
+      "unproven": [
+        "healthMeta[0]",
+        "healthMeta[2]",
+        "healthMeta[1]",
+        "l",
+        "c/total*100",
+        "col",
+        "r.grad",
+        "r.logo"
+      ]
     },
     {
       "file": "demo-mvp/company/js/overview.js",
@@ -2311,8 +2856,11 @@
       "line": 106,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=list.map(r=>{",
-      "key": "demo-mvp/company/js/overview.js#4acc15d4821c",
-      "classification": "escaped"
+      "key": "demo-mvp/company/js/overview.js#0ad65a12fcc4",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"rest-row\" onclick=\"openRest('${r.id}')\"> <div class=\"rest-name-cell\"> <div class=\"rest-logo\" style=\"backgro"
+      ]
     },
     {
       "file": "demo-mvp/company/js/overview.js",
@@ -2328,15 +2876,32 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-detail').innerHTML=`",
       "key": "demo-mvp/company/js/restaurant.js#bd3ebbaa7c33",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "r.grad",
+        "r.logo",
+        "r.joined",
+        "r.plan",
+        "PLAN_LABEL[r.plan]",
+        "badgeCls",
+        "statusText",
+        "r.id"
+      ]
     },
     {
       "file": "demo-mvp/company/js/restaurant.js",
       "line": 62,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
-      "key": "demo-mvp/company/js/restaurant.js#e109df27bacf",
-      "classification": "unsafe"
+      "key": "demo-mvp/company/js/restaurant.js#8f4d53555250",
+      "classification": "unsafe",
+      "unproven": [
+        "PLAN_LABEL[p]||p",
+        "c/RESTAURANTS.length*100",
+        "r.id",
+        "r.grad",
+        "r.logo"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/auth.js",
@@ -2351,16 +2916,29 @@
       "line": 12,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-rest').innerHTML=`",
-      "key": "demo-mvp/customer/js/data/detail.js#7fed7413c109",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/data/detail.js#9dadd5a4a8bd",
+      "classification": "unsafe",
+      "unproven": [
+        "GRAD[id]",
+        "id",
+        "r.e",
+        "detailSocialProof(r)",
+        "m[0]",
+        "m[2]",
+        "stars(r.rt)",
+        "l"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/data/detail.js",
       "line": 91,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');",
-      "key": "demo-mvp/customer/js/data/detail.js#4f553d651de8",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/data/detail.js#e5355f23b1e6",
+      "classification": "unsafe",
+      "unproven": [
+        "s"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/data/detail.js",
@@ -2375,8 +2953,11 @@
       "line": 102,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=open.map(s=>`<option value=\"${s.time}\">${faTime(s.time)}</option>`).join('');",
-      "key": "demo-mvp/customer/js/data/detail.js#f688ebe19680",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/data/detail.js#ac09badeccff",
+      "classification": "unsafe",
+      "unproven": [
+        "s.time"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/data/detail.js",
@@ -2391,8 +2972,11 @@
       "line": 112,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=(r.slots.length?r.slots:['۱۹:۰۰','۲۰:۰۰','۲۱:۰۰']).map(s=>`<option>${s}</option>`).join('');",
-      "key": "demo-mvp/customer/js/data/detail.js#4f553d651de8",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/data/detail.js#e5355f23b1e6",
+      "classification": "unsafe",
+      "unproven": [
+        "s"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/data/detail.js",
@@ -2400,47 +2984,64 @@
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "key": "demo-mvp/customer/js/data/detail.js#58a3adf9a1d7",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "bk.date",
+        "bk.time"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/data/discover.js",
       "line": 77,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(()=>`<div class=\"rc\" style=\"opacity:1;transform:none\"><div class=\"rc-img sk\" style=\"border-radius:0\"></div><div class=\"rc-body\"><div class=",
-      "key": "demo-mvp/customer/js/data/discover.js#a23b40692bb7",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/data/discover.js#aa1741d565f5",
+      "classification": "safe_static"
     },
     {
       "file": "demo-mvp/customer/js/data/discover.js",
       "line": 79,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(cardHTML).join('');",
-      "key": "demo-mvp/customer/js/data/discover.js#121414a5b2a9",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/data/discover.js#a598a9d0bb0d",
+      "classification": "unsafe",
+      "unproven": [
+        "list.map(cardHTML).join('')"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/data/discover.js",
       "line": 136,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=near.map((r,i)=>hCardHTML(r,`${fmtFa((i+1)*0.4+0.3).slice(0,3)} کیلومتر`)).join('');",
-      "key": "demo-mvp/customer/js/data/discover.js#d2b272b42dd8",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/data/discover.js#d97a824a9eff",
+      "classification": "unsafe",
+      "unproven": [
+        "hCardHTML(r,`${fmtFa((i+1)*0.4+0.3).slice(0,3)} کیلومتر`)"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/data/discover.js",
       "line": 142,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=trend.map((r,i)=>hCardHTML(r,i<2?'🔥 داغ':'')).join('');",
-      "key": "demo-mvp/customer/js/data/discover.js#09b4063a5973",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/data/discover.js#488d09d09159",
+      "classification": "unsafe",
+      "unproven": [
+        "hCardHTML(r,i<2?'🔥 داغ':'')"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/data/discover.js",
       "line": 158,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=events.map(e=>`",
-      "key": "demo-mvp/customer/js/data/discover.js#7c19fe776f03",
-      "classification": "escaped"
+      "key": "demo-mvp/customer/js/data/discover.js#6c2a3811ffa1",
+      "classification": "unsafe",
+      "unproven": [
+        "e.rid",
+        "e.emoji"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/features/chat.js",
@@ -2471,8 +3072,12 @@
       "line": 34,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = items.map(t => `",
-      "key": "demo-mvp/customer/js/features/chat.js#6ee5135c1a53",
-      "classification": "escaped"
+      "key": "demo-mvp/customer/js/features/chat.js#f669d8339d9c",
+      "classification": "unsafe",
+      "unproven": [
+        "t.id",
+        "t.unread"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/features/chat.js",
@@ -2495,32 +3100,47 @@
       "line": 110,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl.insertAdjacentHTML('beforeend', bubble(m));",
-      "key": "demo-mvp/customer/js/features/chat.js#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "demo-mvp/customer/js/features/chat.js#b6c5b7c8fc32",
+      "classification": "unsafe",
+      "unproven": [
+        "bubble(m)"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/features/chat.js",
       "line": 133,
       "kind": "insertAdjacentHTML",
       "snippet": "tempEl.insertAdjacentHTML('beforeend', `<div class=\"chat-bubble mine pending\"><div class=\"chat-bubble-text\">${esc(body)}</div><div class=\"chat-bubble-time\">…</d",
-      "key": "demo-mvp/customer/js/features/chat.js#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "demo-mvp/customer/js/features/chat.js#df06efc1ef88",
+      "classification": "escaped"
     },
     {
       "file": "demo-mvp/customer/js/features/food-dna.js",
       "line": 50,
       "kind": "innerHTML",
       "snippet": "document.getElementById('dnaProgress').innerHTML = Array.from({length:nSlides},()=>'<div class=\"dna-progress-bar\"><i></i></div>').join('');",
-      "key": "demo-mvp/customer/js/features/food-dna.js#a9763efb2175",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/features/food-dna.js#afb6d4a3dfc8",
+      "classification": "unsafe",
+      "unproven": [
+        "Array.from({length:nSlides},()=>'<div class=\"dna-progress-bar\"><i></i></div>').join('')"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/features/food-dna.js",
       "line": 71,
       "kind": "innerHTML",
       "snippet": "wrap.innerHTML = slides.map((s,i)=>`",
-      "key": "demo-mvp/customer/js/features/food-dna.js#a0db18191292",
-      "classification": "escaped"
+      "key": "demo-mvp/customer/js/features/food-dna.js#ba1837436832",
+      "classification": "unsafe",
+      "unproven": [
+        "s.emoji",
+        "s.big",
+        "slides.length",
+        "_dnaPersona.emoji",
+        "faNum(p.globalVisits||0)",
+        "faNum(p.restaurantsVisited||0)",
+        "faNum(_dnaPct)"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/features/food-dna.js",
@@ -2536,15 +3156,28 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">",
       "key": "demo-mvp/customer/js/features/food-dna.js#a23579497a75",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "userInitial()",
+        "faNum(USER.phone||'')",
+        "tierEmoji",
+        "tier"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/features/loyalty.js",
       "line": 10,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-loyalty').innerHTML=`<div class=\"wrap section\">",
-      "key": "demo-mvp/customer/js/features/loyalty.js#d7673d12621c",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/features/loyalty.js#dfa04e44b8b0",
+      "classification": "unsafe",
+      "unproven": [
+        "p[0]",
+        "p[1]",
+        "p[2]",
+        "b[0]",
+        "b[1]"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/features/rewards.js",
@@ -2576,7 +3209,12 @@
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "key": "demo-mvp/customer/js/reservation.js#b185dbcd1888",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "bk.date",
+        "bk.time",
+        "id"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/reservation.js",
@@ -2591,8 +3229,13 @@
       "line": 56,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "key": "demo-mvp/customer/js/reservation.js#5a5ef1d832bf",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/reservation.js#eba7bfc00116",
+      "classification": "unsafe",
+      "unproven": [
+        "faNum(WL.offered_table||'—')",
+        "faNum(WL.position||'—')",
+        "faNum(WL.estimated_wait_minutes||'؟')"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/reservation.js",
@@ -2607,8 +3250,11 @@
       "line": 138,
       "kind": "innerHTML",
       "snippet": "empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.querySelectorAll('.rc').forEach(c=>c.classList.add('in'));",
-      "key": "demo-mvp/customer/js/reservation.js#121414a5b2a9",
-      "classification": "unsafe"
+      "key": "demo-mvp/customer/js/reservation.js#a598a9d0bb0d",
+      "classification": "unsafe",
+      "unproven": [
+        "list.map(cardHTML).join('')"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/reservation.js",
@@ -2631,8 +3277,12 @@
       "line": 195,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=summary+trips.map(t=>{",
-      "key": "demo-mvp/customer/js/reservation.js#a9cf2b0be593",
-      "classification": "escaped"
+      "key": "demo-mvp/customer/js/reservation.js#6b281a1b3b7d",
+      "classification": "unsafe",
+      "unproven": [
+        "summary",
+        "`<div class=\"trip-card reveal ${t.status}\"> <div class=\"trip-card-hero\" style=\"background:${GRAD[gradId]||GRAD[1]}\"> <di"
+      ]
     },
     {
       "file": "demo-mvp/customer/js/theme-pwa.js",
@@ -2671,16 +3321,29 @@
       "line": 3004,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML = `",
-      "key": "standalone/business.html#126f139c2a3b",
-      "classification": "unsafe"
+      "key": "standalone/business.html#704119a569f3",
+      "classification": "unsafe",
+      "unproven": [
+        "liveStatusBadge()",
+        "k.occupancyPct",
+        "elap",
+        "fmtMoney(k.revenue)",
+        "fmtMoney(k.avgSpend)",
+        "renderDashResvRows()",
+        "renderDashWaitlist()",
+        "dashAiInsight()"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 3125,
       "kind": "innerHTML",
       "snippet": "document.getElementById('peakChart').innerHTML=slots.map(h=>{",
-      "key": "standalone/business.html#0782b4d2d10d",
-      "classification": "unsafe"
+      "key": "standalone/business.html#2e265127020f",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"peak-col\"><div class=\"peak-bar-wrap\"><div class=\"peak-bar ${peak?'peak-hot':''}\" style=\"height:0\" data-h=\"$"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2695,32 +3358,45 @@
       "line": 3172,
       "kind": "innerHTML",
       "snippet": "document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`",
-      "key": "standalone/business.html#a17079c560a0",
-      "classification": "escaped"
+      "key": "standalone/business.html#126681e63a35",
+      "classification": "unsafe",
+      "unproven": [
+        "c.ava",
+        "c.spent"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 3200,
       "kind": "innerHTML",
       "snippet": "document.getElementById('insights').innerHTML=insights.slice(0,4).map(i=>`",
-      "key": "standalone/business.html#b164d795c4ad",
-      "classification": "unsafe"
+      "key": "standalone/business.html#f34b2b42404d",
+      "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
       "line": 3221,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`",
-      "key": "standalone/business.html#fec084b94053",
-      "classification": "escaped"
+      "key": "standalone/business.html#567601a188a9",
+      "classification": "unsafe",
+      "unproven": [
+        "n.time",
+        "n.id||''"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 3363,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-reservations').innerHTML=`",
-      "key": "standalone/business.html#600e82fc4ef2",
-      "classification": "escaped"
+      "key": "standalone/business.html#e3f8698f8e81",
+      "classification": "unsafe",
+      "unproven": [
+        "tonightFilter===f.v",
+        "f.v",
+        "f.l"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2736,39 +3412,58 @@
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${resDate==='past'?icon('inbox',{size:40}):icon('search',{size:40})}</div><div style=\"font-",
       "key": "standalone/business.html#dd383567eff7",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "dateLabel"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 3437,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=demoNote+`",
-      "key": "standalone/business.html#49142f358dd1",
-      "classification": "unsafe"
+      "key": "standalone/business.html#f665acc77d2e",
+      "classification": "unsafe",
+      "unproven": [
+        "demoNote",
+        "resItemHTML(x.r,x.i)"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 3447,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=demoNote+`<div style=\"font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600\">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQu",
-      "key": "standalone/business.html#d0a958ac5a9a",
-      "classification": "unsafe"
+      "key": "standalone/business.html#9ce594c6cced",
+      "classification": "unsafe",
+      "unproven": [
+        "demoNote",
+        "resItemHTML(x.r,x.i)"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 3855,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-waitlist').innerHTML=wlDemoNote+`",
-      "key": "standalone/business.html#25f65b54b53c",
-      "classification": "unsafe"
+      "key": "standalone/business.html#f6ea3b9c6f50",
+      "classification": "unsafe",
+      "unproven": [
+        "wlDemoNote",
+        "wlCard(w,i)"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 3932,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-floor').innerHTML=`",
-      "key": "standalone/business.html#5cb5acb17afb",
-      "classification": "unsafe"
+      "key": "standalone/business.html#6dab293865e8",
+      "classification": "unsafe",
+      "unproven": [
+        "t.s",
+        "t._time"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2792,7 +3487,10 @@
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "key": "standalone/business.html#48f4fa9da5ac",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "_tableQrSvg"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2824,7 +3522,11 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('toastMsg').innerHTML=msg+` <button class=\"undo-btn\" onclick=\"${undoFn}();document.getElementById('toast').classList.remove('show')\">باز",
       "key": "standalone/business.html#546e4088f9c4",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "msg",
+        "undoFn"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2847,16 +3549,31 @@
       "line": 4357,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-gallery').innerHTML=`",
-      "key": "standalone/business.html#26d2c9882f8b",
-      "classification": "unsafe"
+      "key": "standalone/business.html#305c282ff51a",
+      "classification": "unsafe",
+      "unproven": [
+        "RESTAURANT.logoGradient",
+        "RESTAURANT.logoEmoji",
+        "logoPhoto.status",
+        "GALLERY.indexOf(logoPhoto)",
+        "g.status",
+        "g.url||g.dataUrl",
+        "g.emoji",
+        "g.type==='food'?'غذا':g.type==='interior'?'فضا':g.type==='drink'?'نوشیدنی':g.type==='event'?'رویداد':'عکس'"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 4647,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-reviews').innerHTML=`",
-      "key": "standalone/business.html#d459996da353",
-      "classification": "unsafe"
+      "key": "standalone/business.html#6dddcad805b4",
+      "classification": "unsafe",
+      "unproven": [
+        "stars(+avg)",
+        "d.count/totalCount*100",
+        "`<div class=\"rev-card\"> <div class=\"rev-card-top\"> <div class=\"rev-ava\">${r.ava}</div> <div><div class=\"rev-name\">${esc("
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2871,8 +3588,11 @@
       "line": 4780,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "standalone/business.html#301df20b7743",
-      "classification": "unsafe"
+      "key": "standalone/business.html#a863cbff4287",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"seg-cell\" onclick=\"setCustTab('profiles')\"> <div class=\"seg-top\"><span class=\"seg-name\">${m.fa}</span><span"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2887,8 +3607,13 @@
       "line": 4855,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "standalone/business.html#3f1c72632042",
-      "classification": "unsafe"
+      "key": "standalone/business.html#c0fe1132c9d3",
+      "classification": "unsafe",
+      "unproven": [
+        "c.severity==='high'?'warn':c.severity==='medium'?'info':'up'",
+        "c.severity==='high'?icon('alert',{size:15}):c.severity==='medium'?icon('trending',{size:15}):icon('check',{size:15})",
+        "`<div class=\"seg-cell\" onclick=\"setCustTab('profiles')\"> <div class=\"seg-top\"><span class=\"seg-name\">${m.fa}</span><span"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2919,8 +3644,11 @@
       "line": 4915,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "standalone/business.html#291386c31a73",
-      "classification": "unsafe"
+      "key": "standalone/business.html#e4f0f325399c",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"smart-card ${urg}\"> <div class=\"smart-top\"> <div class=\"smart-ava\">${c.is_vip?icon('crown',{size:18,fill:tr"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2935,8 +3663,13 @@
       "line": 5027,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "standalone/business.html#3b0902f30b1a",
-      "classification": "unsafe"
+      "key": "standalone/business.html#806ec67261dc",
+      "classification": "unsafe",
+      "unproven": [
+        "hoursStatusBannerHTML()",
+        "formatHoursCompact(HOURS_STATE.opening_hours)",
+        "d"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2959,8 +3692,12 @@
       "line": 5221,
       "kind": "innerHTML",
       "snippet": "document.getElementById('ct-campaign').innerHTML=`",
-      "key": "standalone/business.html#ef935439f841",
-      "classification": "unsafe"
+      "key": "standalone/business.html#965496c2a008",
+      "classification": "unsafe",
+      "unproven": [
+        "s[1]",
+        "s[2]"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -2983,8 +3720,8 @@
       "line": 5247,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=logs.length?`<table class=\"tbl\"><thead><tr><th>سگمنت</th><th>تاریخ</th><th>گیرنده</th><th>پیام</th></tr></thead><tbody>",
-      "key": "standalone/business.html#18bf6162ee81",
-      "classification": "unsafe"
+      "key": "standalone/business.html#a1f207296296",
+      "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
@@ -3008,7 +3745,10 @@
       "kind": "innerHTML",
       "snippet": "if(chatHtml){ el.innerHTML=chatHtml+`<div id=\"aiCards\"><div style=\"text-align:center;padding:30px;color:var(--t2)\">در حال بارگذاری پیشنهادها...</div></div>`; }",
       "key": "standalone/business.html#731871db6674",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "chatHtml"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -3023,8 +3763,17 @@
       "line": 5290,
       "kind": "innerHTML",
       "snippet": "cardsEl.innerHTML=`",
-      "key": "standalone/business.html#915305a9d643",
-      "classification": "unsafe"
+      "key": "standalone/business.html#0a7262f6fbfc",
+      "classification": "unsafe",
+      "unproven": [
+        "c.severity==='high'?'high':c.severity==='medium'?'med':'low'",
+        "c.severity==='high'?icon('alert',{size:15}):c.severity==='medium'?icon('trending',{size:15}):icon('check',{size:15})",
+        "c.id",
+        "crmEffectivenessFa(crmEff)",
+        "c.urgency==='high'?'var(--red-50)':c.urgency==='medium'?'var(--amber-50)':'var(--s-100)'",
+        "c.urgency==='high'?'var(--red)':c.urgency==='medium'?'var(--amber)':'var(--t2)'",
+        "URG_FA[c.urgency]||''"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -3055,8 +3804,12 @@
       "line": 5391,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
-      "key": "standalone/business.html#e229e4dbf5df",
-      "classification": "unsafe"
+      "key": "standalone/business.html#a0659caf36b5",
+      "classification": "unsafe",
+      "unproven": [
+        "menuPublicCardHTML(active)",
+        "keys.map(k=>` <div class=\"panel\" style=\"margin-bottom:14px\"> <div class=\"panel-head\"><div class=\"panel-title\" style=\"fon"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -3079,7 +3832,7 @@
       "line": 5510,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
-      "key": "standalone/business.html#1b9e7a3e1ca4",
+      "key": "standalone/business.html#8d403cbc60bc",
       "classification": "escaped"
     },
     {
@@ -3104,7 +3857,10 @@
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "key": "standalone/business.html#3c2080e456f1",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "_menuQrSvg"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -3143,8 +3899,18 @@
       "line": 5912,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-loyalty').innerHTML=`",
-      "key": "standalone/business.html#59be0e774ff7",
-      "classification": "unsafe"
+      "key": "standalone/business.html#9cb1f16e7799",
+      "classification": "unsafe",
+      "unproven": [
+        "Array.from({length:31},(_,i)=>`<option>${fa(i+1)}</option>`).join('')",
+        "m",
+        "Array.from({length:40},(_,i)=>`<option>${fa(1385-i)}</option>`).join('')",
+        "l",
+        "c/total*100",
+        "col",
+        "m.fn",
+        "m.ln"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -3152,7 +3918,10 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('memberResult').innerHTML=`<div style=\"background:var(--teal-50);border:1px solid #99F6E4;border-radius:var(--r);padding:14px;margin-top",
       "key": "standalone/business.html#5f24e472445d",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "code"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -3175,8 +3944,14 @@
       "line": 6044,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "standalone/business.html#07050e516fa2",
-      "classification": "unsafe"
+      "key": "standalone/business.html#f75265626765",
+      "classification": "unsafe",
+      "unproven": [
+        "k",
+        "v",
+        "COUPON_KIND_FA[c.kind]||c.kind",
+        "COUPON_SEG_FA[c.target_segment]||c.target_segment"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -3191,24 +3966,41 @@
       "line": 6094,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "key": "standalone/business.html#ccf4e863fe3e",
-      "classification": "unsafe"
+      "key": "standalone/business.html#5a80db485837",
+      "classification": "unsafe",
+      "unproven": [
+        "k",
+        "v",
+        "c.id",
+        "AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger",
+        "automationConversionFa(a)"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 6273,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
-      "key": "standalone/business.html#aa838bf52db1",
-      "classification": "unsafe"
+      "key": "standalone/business.html#73a02d2e32f2",
+      "classification": "unsafe",
+      "unproven": [
+        "dataSourceNote()",
+        "avgVisits",
+        "v/mx*100",
+        "d",
+        "A.newPct",
+        "l",
+        "p",
+        "['var(--blue)','var(--teal)','var(--green)'][i]"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 6364,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-staff').innerHTML=(isDemo?`<div class=\"cash-note\">${icon('info',{size:13})} فهرستِ زیر نمونه است، کارکنانِ واقعیِ تو نیست.</div>`:'')",
-      "key": "standalone/business.html#8da13a6228ab",
-      "classification": "unsafe"
+      "key": "standalone/business.html#59582754a6e8",
+      "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
@@ -3231,16 +4023,19 @@
       "line": 6499,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=NOTIFS.map((n,i)=>`<div class=\"notif-item ${n.unread?'unread':''}\" onclick=\"readNotif(${i})\">",
-      "key": "standalone/business.html#1985d4af2aee",
-      "classification": "escaped"
+      "key": "standalone/business.html#c93d8bb487bf",
+      "classification": "unsafe",
+      "unproven": [
+        "n.ic"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 6521,
       "kind": "innerHTML",
       "snippet": "document.getElementById('popupIc').innerHTML=iconName?icon(iconName,{size:18}):'';",
-      "key": "standalone/business.html#3a2ae36142ab",
-      "classification": "unsafe"
+      "key": "standalone/business.html#61ecb48ce635",
+      "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
@@ -3255,16 +4050,29 @@
       "line": 6554,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-cashback').innerHTML=`",
-      "key": "standalone/business.html#51181e27725d",
-      "classification": "unsafe"
+      "key": "standalone/business.html#4c74802f4d8f",
+      "classification": "unsafe",
+      "unproven": [
+        "n",
+        "k",
+        "d",
+        "mx",
+        "CB[k]"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 6611,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-pricing').innerHTML=`",
-      "key": "standalone/business.html#8b0ead2c9a82",
-      "classification": "unsafe"
+      "key": "standalone/business.html#31fd2eb179e2",
+      "classification": "unsafe",
+      "unproven": [
+        "dataSourceNote()",
+        "(P.suggestions.length?P.suggestions:[]).map(sugCard).join('')||'<div class=\"pr-empty\">فعلاً پیشنهادی نیست. با ثبت رزروِ ",
+        "toman(r.min_toman)",
+        "dowLbl[d]"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -3279,8 +4087,8 @@
       "line": 6739,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "key": "standalone/business.html#f7bb138972bc",
-      "classification": "unsafe"
+      "key": "standalone/business.html#8c41061136ae",
+      "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
@@ -3311,8 +4119,12 @@
       "line": 6872,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = items.map(t => `",
-      "key": "standalone/business.html#1401bdf4e72e",
-      "classification": "unsafe"
+      "key": "standalone/business.html#12e9ac911169",
+      "classification": "unsafe",
+      "unproven": [
+        "t.id",
+        "t.unread"
+      ]
     },
     {
       "file": "standalone/business.html",
@@ -3335,32 +4147,38 @@
       "line": 5841,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', html);",
-      "key": "standalone/business.html#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "standalone/business.html#74e9dc00f1a7",
+      "classification": "review"
     },
     {
       "file": "standalone/business.html",
       "line": 6923,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
-      "key": "standalone/business.html#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "standalone/business.html#bbd67ec48fde",
+      "classification": "unsafe",
+      "unproven": [
+        "bizBubble(m)"
+      ]
     },
     {
       "file": "standalone/business.html",
       "line": 6942,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
-      "key": "standalone/business.html#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "standalone/business.html#665e7d4035c8",
+      "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
       "line": 4202,
       "kind": "document.write",
       "snippet": "w.document.write(`<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\">",
-      "key": "standalone/business.html#b692a97419b4",
-      "classification": "escaped"
+      "key": "standalone/business.html#8bf44e47e7cb",
+      "classification": "unsafe",
+      "unproven": [
+        "_tableQrSvg"
+      ]
     },
     {
       "file": "standalone/company.html",
@@ -3375,8 +4193,18 @@
       "line": 1587,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML=`",
-      "key": "standalone/company.html#a55e2de7b8b0",
-      "classification": "unsafe"
+      "key": "standalone/company.html#23dbcad48eec",
+      "classification": "unsafe",
+      "unproven": [
+        "healthMeta[2]",
+        "healthMeta[1]",
+        "l",
+        "c/total*100",
+        "col",
+        "r.grad",
+        "r.logo",
+        "`<div class=\"alert-item\"> <div class=\"alert-ic ${isExpired?'danger':isTrial?'info':'warn'}\">${isExpired?icon('close',{si"
+      ]
     },
     {
       "file": "standalone/company.html",
@@ -3399,8 +4227,11 @@
       "line": 1668,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=list.map(r=>{",
-      "key": "standalone/company.html#b8017f876990",
-      "classification": "escaped"
+      "key": "standalone/company.html#3f84c308826f",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"rest-row\" onclick=\"openRest('${r.id}')\"> <div class=\"rest-name-cell\"> <div class=\"rest-logo\" style=\"backgro"
+      ]
     },
     {
       "file": "standalone/company.html",
@@ -3415,16 +4246,33 @@
       "line": 1710,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-detail').innerHTML=`",
-      "key": "standalone/company.html#3398dc336382",
-      "classification": "escaped"
+      "key": "standalone/company.html#f2b509d1d6ba",
+      "classification": "unsafe",
+      "unproven": [
+        "r.grad",
+        "r.logo",
+        "r.joined",
+        "r.plan",
+        "PLAN_LABEL[r.plan]",
+        "badgeCls",
+        "statusText",
+        "r.id"
+      ]
     },
     {
       "file": "standalone/company.html",
       "line": 1761,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
-      "key": "standalone/company.html#c5203174f987",
-      "classification": "unsafe"
+      "key": "standalone/company.html#743eac81fd71",
+      "classification": "unsafe",
+      "unproven": [
+        "PLAN_LABEL[p]||p",
+        "c/RESTAURANTS.length*100",
+        "r.id",
+        "r.grad",
+        "r.logo"
+      ]
     },
     {
       "file": "standalone/company.html",
@@ -3447,24 +4295,38 @@
       "line": 1811,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`",
-      "key": "standalone/company.html#f4f0cc93c4cb",
-      "classification": "unsafe"
+      "key": "standalone/company.html#c42fd9101de1",
+      "classification": "unsafe",
+      "unproven": [
+        "d.guests.total_clv_toman==null?' — اندازه‌گیری‌ناپذیر':d.guests.measured_guests!=null&&d.guests.measured_guests<d.guests",
+        "`<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:12px\"><span style=\"width:110px;font-size:12.5px;font",
+        "x.count"
+      ]
     },
     {
       "file": "standalone/company.html",
       "line": 1839,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-billing').innerHTML=`",
-      "key": "standalone/company.html#3dd1c3e7e593",
-      "classification": "unsafe"
+      "key": "standalone/company.html#8020ee864485",
+      "classification": "unsafe",
+      "unproven": [
+        "`<div class=\"mini-row\" style=\"flex-wrap:wrap\"> <div class=\"rest-logo\" style=\"background:${r.grad};width:38px;height:38px"
+      ]
     },
     {
       "file": "standalone/company.html",
       "line": 1972,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-support').innerHTML=`",
-      "key": "standalone/company.html#714a85f9e868",
-      "classification": "unsafe"
+      "key": "standalone/company.html#9bbaebb821a0",
+      "classification": "unsafe",
+      "unproven": [
+        "r.grad",
+        "r.logo",
+        "STATUS_LABEL[r.status]||''",
+        "r.id"
+      ]
     },
     {
       "file": "standalone/company.html",
@@ -3487,8 +4349,12 @@
       "line": 2001,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-systemhealth').innerHTML=`",
-      "key": "standalone/company.html#42e21e50614b",
-      "classification": "unsafe"
+      "key": "standalone/company.html#c86c29818b80",
+      "classification": "unsafe",
+      "unproven": [
+        "healthMeta[1]",
+        "k"
+      ]
     },
     {
       "file": "standalone/company.html",
@@ -3511,8 +4377,18 @@
       "line": 2120,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-aihealth').innerHTML=`",
-      "key": "standalone/company.html#b2863af101ba",
-      "classification": "unsafe"
+      "key": "standalone/company.html#841f5cdfed83",
+      "classification": "unsafe",
+      "unproven": [
+        "brierPct(r.learned_brier)",
+        "brierPct(r.static_brier)",
+        "new Date(r.trained_at).toLocaleDateString('fa-IR')",
+        "maePct(r.count_mae)",
+        "maePct(r.count_baseline_mae)",
+        "maePct(r.covers_mae)",
+        "maePct(r.covers_baseline_mae)",
+        "productionAccuracyPanelHTML(d.production_accuracy)"
+      ]
     },
     {
       "file": "standalone/company.html",
@@ -3535,8 +4411,18 @@
       "line": 2312,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=moderationQueuePanelHTML(mq)+featureFlagsPanelHTML(flags)+`",
-      "key": "standalone/company.html#0a607c6576d7",
-      "classification": "unsafe"
+      "key": "standalone/company.html#1700ab76b7c3",
+      "classification": "unsafe",
+      "unproven": [
+        "moderationQueuePanelHTML(mq)",
+        "featureFlagsPanelHTML(flags)",
+        "`<div class=\"tier-card\" style=\"--tier-fg:${r.fg}\"> <div class=\"tier-ic\">${icon(r.ic,{size:18})}</div> <div class=\"tier-n",
+        "`<div class=\"mini-row\"> <div class=\"mini-ava\">${esc(initialOf(u.name))}</div> <div class=\"mini-info\"> <div class=\"mini-n",
+        "`<div class=\"mini-row\"> <div class=\"mini-ava\" style=\"color:var(--red-600)\">${icon('close',{size:16})}</div> <div class=\"",
+        "new Date(a.at).toLocaleString('fa-IR')",
+        "bannedIpsPanelHTML(bannedIps)",
+        "economyRulesPanelHTML(ecoRules)"
+      ]
     },
     {
       "file": "standalone/company.html",
@@ -3560,7 +4446,10 @@
       "kind": "innerHTML",
       "snippet": "box.innerHTML=renderCustomer360(res.data);",
       "key": "standalone/company.html#2eaa3d99abf3",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "renderCustomer360(res.data)"
+      ]
     },
     {
       "file": "standalone/company.html",
@@ -3575,8 +4464,8 @@
       "line": 2600,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "key": "standalone/company.html#e388dc34a94a",
-      "classification": "unsafe"
+      "key": "standalone/company.html#6968785083cb",
+      "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
@@ -3599,8 +4488,8 @@
       "line": 2708,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`",
-      "key": "standalone/company.html#7a9462a28ba2",
-      "classification": "unsafe"
+      "key": "standalone/company.html#f2ce7bcec475",
+      "classification": "escaped"
     },
     {
       "file": "standalone/company.html",
@@ -3623,32 +4512,49 @@
       "line": 2842,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`",
-      "key": "standalone/company.html#90e02b824f6e",
-      "classification": "unsafe"
+      "key": "standalone/company.html#b87563cdfeb2",
+      "classification": "unsafe",
+      "unproven": [
+        "m.status"
+      ]
     },
     {
       "file": "standalone/company.html",
       "line": 3015,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
-      "key": "standalone/company.html#f68ecc196f1b",
-      "classification": "unsafe"
+      "key": "standalone/company.html#4be05e630b35",
+      "classification": "unsafe",
+      "unproven": [
+        "renderSalesOrders()",
+        "renderSalesInquiries()"
+      ]
     },
     {
       "file": "standalone/company.html",
       "line": 3329,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
-      "key": "standalone/company.html#144978537f8c",
-      "classification": "unsafe"
+      "key": "standalone/company.html#b9e03ec23cd1",
+      "classification": "unsafe",
+      "unproven": [
+        "f",
+        "f === 'pending' ? 'در انتظار' : f === 'approved' ? 'تأییدشده' : f === 'rejected' ? 'ردشده' : 'همه'",
+        "renderPhotoQueue()"
+      ]
     },
     {
       "file": "standalone/company.html",
       "line": 3553,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
-      "key": "standalone/company.html#b9be8d4f1e19",
-      "classification": "unsafe"
+      "key": "standalone/company.html#26fbf2dcc8e4",
+      "classification": "unsafe",
+      "unproven": [
+        "f",
+        "f === 'pending' ? 'در انتظار' : f === 'rejected' ? 'ردشده' : 'همه'",
+        "renderHoursChangeQueue()"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3664,7 +4570,12 @@
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "key": "standalone/customer.html#56ad6974155d",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "bk.date",
+        "bk.time",
+        "id"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3679,8 +4590,13 @@
       "line": 2169,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "key": "standalone/customer.html#5a5ef1d832bf",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#34c1107768a5",
+      "classification": "unsafe",
+      "unproven": [
+        "faNum(WL.offered_table||'—')",
+        "faNum(WL.position||'—')",
+        "faNum(WL.estimated_wait_minutes||'؟')"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3703,8 +4619,11 @@
       "line": 2344,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=(r.slots.length?r.slots:FALLBACK_TIMES).map(s=>`<option value=\"${s}\">${s} (نمونه)</option>`).join('');",
-      "key": "standalone/customer.html#99d91ca72a7c",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#38411f04851d",
+      "classification": "unsafe",
+      "unproven": [
+        "s"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3719,8 +4638,11 @@
       "line": 2367,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=open.map(s=>`<option value=\"${s.time}\">${faTime(s.time)}</option>`).join('');",
-      "key": "standalone/customer.html#f688ebe19680",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#ac09badeccff",
+      "classification": "unsafe",
+      "unproven": [
+        "s.time"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3735,47 +4657,60 @@
       "line": 2510,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "key": "standalone/customer.html#0cc7f5812f5e",
-      "classification": "escaped"
+      "key": "standalone/customer.html#c6fa560ad012",
+      "classification": "unsafe",
+      "unproven": [
+        "bk.date",
+        "bk.time"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 2534,
       "kind": "innerHTML",
       "snippet": "when.innerHTML=dates.map(d=>`<option value=\"${d.iso}\"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');",
-      "key": "standalone/customer.html#df076aa1c77c",
-      "classification": "escaped"
+      "key": "standalone/customer.html#16b68ea83d92",
+      "classification": "unsafe",
+      "unproven": [
+        "d.iso"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 2535,
       "kind": "innerHTML",
       "snippet": "party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)",
-      "key": "standalone/customer.html#b2e746dd17a9",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#2acf326b90ac",
+      "classification": "unsafe",
+      "unproven": [
+        "n"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 3211,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(()=>`<div class=\"rc\" style=\"opacity:1;transform:none\"><div class=\"rc-img sk\" style=\"border-radius:0\"></div><div class=\"rc-body\"><div class=",
-      "key": "standalone/customer.html#a23b40692bb7",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#aa1741d565f5",
+      "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
       "line": 3213,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(cardHTML).join('');",
-      "key": "standalone/customer.html#121414a5b2a9",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#a598a9d0bb0d",
+      "classification": "unsafe",
+      "unproven": [
+        "list.map(cardHTML).join('')"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 3234,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';",
-      "key": "standalone/customer.html#fbd56af8bd52",
+      "key": "standalone/customer.html#1f863b3c8aa0",
       "classification": "dom_api_safe"
     },
     {
@@ -3783,32 +4718,41 @@
       "line": 3255,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,fill:true})+' محبوب امشب':esc(el.textContent.trim());",
-      "key": "standalone/customer.html#71c4c33dff85",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#60ad5bc3915f",
+      "classification": "escaped"
     },
     {
       "file": "standalone/customer.html",
       "line": 3298,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,",
-      "key": "standalone/customer.html#3009e8b04d02",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#1a878a5a57a5",
+      "classification": "unsafe",
+      "unproven": [
+        "hCardHTML(r, km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`)"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 3305,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=[...R].sort((a,b)=>(b.rt||0)-(a.rt||0)).slice(0,6).map(r=>hCardHTML(r,'')).join('');",
-      "key": "standalone/customer.html#91988deea02f",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#49f6f60789c2",
+      "classification": "unsafe",
+      "unproven": [
+        "hCardHTML(r,'')"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 3323,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=trend.map((r,i)=>hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true})} داغ`:'')).join('');",
-      "key": "standalone/customer.html#720ad1284934",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#c792783b3856",
+      "classification": "unsafe",
+      "unproven": [
+        "hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true})} داغ`:'')"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3824,15 +4768,21 @@
       "kind": "innerHTML",
       "snippet": "el.innerHTML=eventsHtml(events,false);",
       "key": "standalone/customer.html#67d5ed67287a",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "eventsHtml(events,false)"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 3354,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('alert',{size:40})}</div><div class=\"empty-state-title\">رویدادها بارگذاری نشد</div><",
-      "key": "standalone/customer.html#7bf68eee2839",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#8e86c154eae3",
+      "classification": "unsafe",
+      "unproven": [
+        "res.status"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3840,14 +4790,17 @@
       "kind": "innerHTML",
       "snippet": "el.innerHTML=eventsHtml(SAMPLE_EVENTS,true);",
       "key": "standalone/customer.html#f289b3a371a2",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "eventsHtml(SAMPLE_EVENTS,true)"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 3401,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';",
-      "key": "standalone/customer.html#fbd56af8bd52",
+      "key": "standalone/customer.html#1f863b3c8aa0",
       "classification": "dom_api_safe"
     },
     {
@@ -3895,8 +4848,18 @@
       "line": 3509,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-rest').innerHTML=`",
-      "key": "standalone/customer.html#4ce9c0316f60",
-      "classification": "escaped"
+      "key": "standalone/customer.html#36c1429d80eb",
+      "classification": "unsafe",
+      "unproven": [
+        "GRAD[id]",
+        "id",
+        "favs.has(id)",
+        "detailSocialProof(r)",
+        "m[0]",
+        "m[2]",
+        "l",
+        "v/5*100"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3911,8 +4874,11 @@
       "line": 3598,
       "kind": "innerHTML",
       "snippet": "empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.querySelectorAll('.rc').forEach(c=>c.classList.add('in'));",
-      "key": "standalone/customer.html#121414a5b2a9",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#a598a9d0bb0d",
+      "classification": "unsafe",
+      "unproven": [
+        "list.map(cardHTML).join('')"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3920,7 +4886,10 @@
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=skTrip.repeat(3);",
       "key": "standalone/customer.html#5a3fd778d594",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "skTrip.repeat(3)"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3935,8 +4904,12 @@
       "line": 3665,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=summary+trips.map(t=>{",
-      "key": "standalone/customer.html#f149660d63d1",
-      "classification": "escaped"
+      "key": "standalone/customer.html#6f2f08b04a52",
+      "classification": "unsafe",
+      "unproven": [
+        "summary",
+        "`<div class=\"trip-card reveal ${t.status}${swipe?' has-swipe':''}\"> ${swipe?`<div class=\"trip-swipe-pad ${swipe.cls}\" ar"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3952,7 +4925,11 @@
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"background:#fff;border-radius:8px;padding:8px;display:inline-block\">",
       "key": "standalone/customer.html#0ebfa67399ce",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "boxId",
+        "res.data.svg"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3960,7 +4937,10 @@
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "key": "standalone/customer.html#1f622f4c0c0a",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "perksBlock()"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -3983,8 +4963,18 @@
       "line": 3928,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
-      "key": "standalone/customer.html#b481bf9fee26",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#4f3cfabc428d",
+      "classification": "unsafe",
+      "unproven": [
+        "tier.emoji",
+        "tier.name",
+        "nextLine",
+        "progress_pct",
+        "p[0]",
+        "p[1]",
+        "p[2]",
+        "b.emoji"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -4015,16 +5005,21 @@
       "line": 4068,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
-      "key": "standalone/customer.html#e5482a47def2",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#42fc76523516",
+      "classification": "unsafe",
+      "unproven": [
+        "repBlock",
+        "missions.map(missionCard).join('')",
+        "rewards.map(rewardCard).join('')"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 4210,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"gift-check ${d.valid?'valid':'invalid'}\">",
-      "key": "standalone/customer.html#d949731de67e",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#c5381a17f608",
+      "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
@@ -4047,16 +5042,28 @@
       "line": 4303,
       "kind": "innerHTML",
       "snippet": "document.getElementById('dnaProgress').innerHTML = Array.from({length:nSlides},()=>'<div class=\"dna-progress-bar\"><i></i></div>').join('');",
-      "key": "standalone/customer.html#a9763efb2175",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#afb6d4a3dfc8",
+      "classification": "unsafe",
+      "unproven": [
+        "Array.from({length:nSlides},()=>'<div class=\"dna-progress-bar\"><i></i></div>').join('')"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 4327,
       "kind": "innerHTML",
       "snippet": "wrap.innerHTML = slides.map((s,i)=>`",
-      "key": "standalone/customer.html#f3334caae8d8",
-      "classification": "escaped"
+      "key": "standalone/customer.html#c73c9c6bcc55",
+      "classification": "unsafe",
+      "unproven": [
+        "s.emoji",
+        "s.big",
+        "slides.length",
+        "_dnaPersona.emoji",
+        "faNum(p.globalVisits||0)",
+        "faNum(p.restaurantsVisited||0)",
+        "faNum(_dnaPct)"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -4072,7 +5079,13 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">",
       "key": "standalone/customer.html#d0e45b4359f0",
-      "classification": "escaped"
+      "classification": "unsafe",
+      "unproven": [
+        "userInitial()",
+        "faNum(USER.phone||'')",
+        "tier.emoji",
+        "tier.name"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -4096,7 +5109,10 @@
       "kind": "innerHTML",
       "snippet": "body.innerHTML = `<div class=\"chat-empty\">${msg}</div>`;",
       "key": "standalone/customer.html#383c945874fe",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "msg"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -4111,8 +5127,12 @@
       "line": 4574,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = items.map(t => `",
-      "key": "standalone/customer.html#784dbdafaa11",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#02821aa1a0e4",
+      "classification": "unsafe",
+      "unproven": [
+        "t.id",
+        "t.unread"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -4120,7 +5140,7 @@
       "kind": "innerHTML",
       "snippet": "page.innerHTML = `",
       "key": "standalone/customer.html#af932e3d332d",
-      "classification": "dom_api_safe"
+      "classification": "escaped"
     },
     {
       "file": "standalone/customer.html",
@@ -4135,23 +5155,26 @@
       "line": 4861,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
-      "key": "standalone/customer.html#587ccf37758c",
-      "classification": "safe_static"
+      "key": "standalone/customer.html#5b2683cd4c44",
+      "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
       "line": 4908,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = _items.length ? _items.map(itemHTML).join('') : '<li class=\"cmdk-empty\">چیزی پیدا نشد</li>';",
-      "key": "standalone/customer.html#3a2708a1b553",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#deaeecaa7255",
+      "classification": "unsafe",
+      "unproven": [
+        "_items.map(itemHTML).join('')"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 5029,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
-      "key": "standalone/customer.html#3612e4e42fa5",
+      "key": "standalone/customer.html#5b4340cdfd32",
       "classification": "safe_static"
     },
     {
@@ -4159,8 +5182,13 @@
       "line": 5049,
       "kind": "innerHTML",
       "snippet": "tabs.innerHTML = Object.entries(CATS).map(([k,v])=>`<button class=\"notif-tab ${k===_filter?'on':''}\" role=\"tab\" aria-selected=\"${k===_filter}\" data-k=\"${k}\">${v",
-      "key": "standalone/customer.html#ab19ad63d5ec",
-      "classification": "unsafe"
+      "key": "standalone/customer.html#b1e13f44a44c",
+      "classification": "unsafe",
+      "unproven": [
+        "k===_filter",
+        "k",
+        "v"
+      ]
     },
     {
       "file": "standalone/customer.html",
@@ -4175,15 +5203,19 @@
       "line": 5059,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = items.map(n=>{",
-      "key": "standalone/customer.html#f0c01343bb30",
-      "classification": "escaped"
+      "key": "standalone/customer.html#dcbd490df31a",
+      "classification": "unsafe",
+      "unproven": [
+        "n.pri",
+        "`</div>`; }"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 5177,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
-      "key": "standalone/customer.html#54696bbb3576",
+      "key": "standalone/customer.html#7479ff398998",
       "classification": "safe_static"
     },
     {
@@ -4240,23 +5272,30 @@
       "kind": "outerHTML",
       "snippet": "host.outerHTML =",
       "key": "standalone/customer.html#2d1a14276797",
-      "classification": "unsafe"
+      "classification": "unsafe",
+      "unproven": [
+        "f",
+        "l"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 4649,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl.insertAdjacentHTML('beforeend', bubble(m));",
-      "key": "standalone/customer.html#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "standalone/customer.html#b6c5b7c8fc32",
+      "classification": "unsafe",
+      "unproven": [
+        "bubble(m)"
+      ]
     },
     {
       "file": "standalone/customer.html",
       "line": 4672,
       "kind": "insertAdjacentHTML",
       "snippet": "tempEl.insertAdjacentHTML('beforeend', `<div class=\"chat-bubble mine pending\"><div class=\"chat-bubble-text\">${chatEsc(body)}</div><div class=\"chat-bubble-time\">",
-      "key": "standalone/customer.html#bbff8e477c57",
-      "classification": "safe_static"
+      "key": "standalone/customer.html#0feced1ea28a",
+      "classification": "escaped"
     },
     {
       "file": "standalone/website.html",
@@ -4271,16 +5310,23 @@
       "line": 4750,
       "kind": "innerHTML",
       "snippet": "`+o[i].replace(\" at new \",\" at \");return e.displayName&&u.includes(\"<anonymous>\")&&(u=u.replace(\"<anonymous>\",e.displayName)),u}while(1<=i&&0<=s);break}}}finall",
-      "key": "standalone/website.html#0179407fd9c8",
-      "classification": "safe_static"
+      "key": "standalone/website.html#619e2ce06c39",
+      "classification": "unsafe",
+      "unproven": [
+        "t.valueOf().toString()",
+        "\"</svg>\",t=Xr.firstChild"
+      ]
     },
     {
       "file": "standalone/website.html",
       "line": 4753,
       "kind": "innerHTML",
       "snippet": "`+l.stack}return{value:e,source:t,stack:o,digest:null}}function Jl(e,t,n){return{value:e,source:null,stack:n!=null?n:null,digest:t!=null?t:null}}function Ai(e,t",
-      "key": "standalone/website.html#8bdca680718f",
-      "classification": "safe_static"
+      "key": "standalone/website.html#a8e5edb22aab",
+      "classification": "unsafe",
+      "unproven": [
+        "\"<script><\\/script>\",e=e.removeChild(e.firstChild)"
+      ]
     },
     {
       "file": "standalone/website.html",
