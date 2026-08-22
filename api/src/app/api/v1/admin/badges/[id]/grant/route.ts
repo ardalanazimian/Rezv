@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { grantBadge } from '@/lib/badges';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse } from '@/lib/errors';
@@ -12,7 +12,7 @@ const bodySchema = z.object({ user_id: zUuid, note: z.string().max(300).trim().o
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const { id } = parseParams(await params, paramsSchema);
     const { user_id, note } = await parseBody(req, bodySchema);
     const result = await grantBadge(id, user_id, admin.sub, note, clientIp(req));

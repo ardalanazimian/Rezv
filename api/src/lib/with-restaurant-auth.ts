@@ -3,7 +3,8 @@ import { authFromRequest, type AccessPayload } from './jwt';
 import { enforceRateLimit, clientIp, RULES } from './ratelimit';
 import { resolveStaffRestaurant } from './staff-helpers';
 import { requirePermission, type PermissionKey } from './permissions';
-import { errorResponse } from './errors';
+import { db } from './db';
+import { Err, errorResponse } from './errors';
 import { withTrace, newTraceId } from './logger';
 import { recordHttp, metrics } from './metrics';
 
@@ -93,8 +94,34 @@ export function withRestaurantAuth(
 /**
  * نسخه‌ی سبک‌تر برای routeهایی که فقط به auth کارمند (tenant-level) نیاز دارند،
  * نه به entity رستوران (مثلاً مدیریت لیست کارکنان قبل از اینکه حتی رستورانی
- * ساخته شده باشد). عمداً resolveStaffRestaurant را صدا نمی‌زند — یک کوئری
- * اضافه‌ی غیرضروری به DB نمی‌زند و edge-case تنانت بدون رستوران را نمی‌شکند.
+ * ساخته شده باشد). عمداً `resolveStaffRestaurant` را صدا نمی‌زند — آن تابع اگر
+ * تنانت هیچ رستورانی نداشته باشد ۴۰۴ می‌دهد و این edge-case را می‌شکند.
+ *
+ * ⚠️ باگِ امنیتیِ رفع‌شده (۲۰۲۶-۰۸-۲۲): «سبک‌تر» قبلاً یعنی **هیچ کوئریِ
+ * دیتابیسی نداشت** — فقط امضایِ JWT بررسی می‌شد و بس. تنها مصرف‌کننده‌ی این
+ * wrapper، `restaurant/staff/route.ts` است، یعنی دقیقاً همان endpointی که
+ * کارکنان را اضافه/غیرفعال می‌کند. نتیجه‌اش این بود:
+ *
+ *   مدیری که همین حالا **غیرفعال (اخراج) شده**، تا ۱۵ دقیقه (عمرِ access
+ *   token — که هیچ لیستِ ابطالی هم ندارد) هنوز می‌توانست:
+ *     • `PATCH` بزند با `staff_id` خودش و `is_active: true` → **خودش را
+ *       دوباره فعال کند**؛ یعنی پنجره‌ی ۱۵ دقیقه‌ای به دسترسیِ دائمی تبدیل
+ *       می‌شد (گاردهایِ خودِ PATCH فقط جلوی `is_active: false` را می‌گیرند،
+ *       نه `true`).
+ *     • `POST` بزند و یک کارمندِ جدید با شماره‌ی موبایلِ خودش بسازد →
+ *       درِ پشتیِ ماندگار، مستقل از توکنِ فعلی.
+ *     • `GET` بزند و کلِ فهرستِ کارکنان و شماره‌هایشان را ببرد.
+ *
+ *   یعنی «اخراجِ کارمند» به‌عنوانِ یک کنترلِ امنیتی عملاً کار نمی‌کرد.
+ *
+ * خواهرش `withRestaurantAuth` این شکاف را نداشت، چون `resolveStaffRestaurant`
+ * (که صدا می‌زند) از ۲۰۲۶-۰۸-۲۰ عضویتِ تنانت و `isActive` را چک می‌کند. اینجا
+ * همان چک با یک کوئریِ سبک تکرار می‌شود — بدونِ اینکه وجودِ رستوران لازم شود.
+ *
+ * `role` هم از **DB** خوانده می‌شود نه از توکن، و همان را به handler می‌دهیم:
+ * توکن عکسِ لحظه‌ی صدور است و `assertManagerOrOwner` در همان روت به آن تکیه
+ * می‌کند. امروز مسیرِ APIی برای تغییرِ نقش وجود ندارد (پس قابلِ سوءاستفاده
+ * نبود)، ولی اگر فردا اضافه شود، این لایه از قبل درست است.
  */
 export function withStaffAuth(
   opts: { rateLimit?: keyof typeof RULES },
@@ -104,7 +131,7 @@ export function withStaffAuth(
     try {
       const rule = RULES[opts.rateLimit ?? 'search'];
       await enforceRateLimit(clientIp(req), rule);
-      const auth = authFromRequest(req);
+      const auth = await verifiedStaffAuth(req);
       // رجوع کن به همین باگ در withRestaurantAuth بالا — params یک Promise است.
       const params = routeArg?.params ? await routeArg.params : undefined;
       return await handler(req, auth, params);
@@ -112,4 +139,26 @@ export function withStaffAuth(
       return errorResponse(e);
     }
   };
+}
+
+/**
+ * توکن را تأیید می‌کند **و** وضعیتِ فعلیِ کارمند را از دیتابیس می‌پرسد.
+ * خروجی یک `AccessPayload` با نقشِ تازه از DB است، نه نقشِ داخلِ توکن.
+ *
+ * برایِ مشتری (`kind: 'customer'`) بدونِ تغییر عبور می‌دهد — این wrapper
+ * فقط مرزِ کارکنان را سفت می‌کند و مسیرِ مشتری گاردهای خودش را دارد.
+ */
+async function verifiedStaffAuth(req: Request): Promise<AccessPayload> {
+  const auth = authFromRequest(req);
+  if (auth.kind !== 'staff') return auth;
+
+  const staff = await db.staff.findUnique({
+    where: { id: auth.sub },
+    select: { tenantId: true, role: true, isActive: true },
+  });
+  if (!staff) throw Err.forbidden('این حساب دیگر وجود ندارد');
+  if (!staff.isActive) throw Err.forbidden('این حساب غیرفعال شده است');
+  if (staff.tenantId !== auth.tenantId) throw Err.forbidden();
+
+  return { sub: auth.sub, kind: 'staff', tenantId: staff.tenantId, role: staff.role as 'owner' | 'manager' | 'staff' };
 }

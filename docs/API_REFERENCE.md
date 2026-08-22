@@ -341,7 +341,7 @@ the migration backfills them so no live gallery went dark on deploy.
 | Route | Method | Auth | Purpose |
 |---|---|---|---|
 | `/v1/reservations/[code]/pay` | POST | customer | Create a Zarinpal payment; returns gateway URL. |
-| `/v1/payments/callback` | GET | public | Zarinpal return URL. Validates `authority` + `code` + amount, verifies with Zarinpal, updates `payment` + `reservation.depositStatus`, redirects to `${CUSTOMER_APP_URL}/reservations/{code}?payment=paid|failed`. |
+| `/v1/payments/callback` | GET | public | Zarinpal return URL. Validates `authority` + `code` + amount, verifies with Zarinpal, updates `payment` + `reservation.depositStatus`, redirects to `${appBase()}/reservations/{code}?payment=paid|failed` (`NEXT_PUBLIC_APP_URL`, same variable the check-in QR uses). |
 
 The callback is intentionally **unauthenticated** (the browser returns from the
 gateway without the API token); security comes from matching

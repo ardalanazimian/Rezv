@@ -347,4 +347,5 @@ flowchart LR
 | S3 (backups) | `backup/` | Off-site DB backups | `S3_*` unset (local backup only) |
 
 Payment redirect returns the user to
-`${CUSTOMER_APP_URL}/reservations/{code}?payment=paid|failed`.
+`${appBase()}/reservations/{code}?payment=paid|failed` — `NEXT_PUBLIC_APP_URL`
+(`lib/public-urls.ts`), the same variable the table check-in QR uses.

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbRead as db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { computeSubscriptionStatus } from '@/lib/subscription';
 
@@ -9,7 +9,7 @@ import { computeSubscriptionStatus } from '@/lib/subscription';
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const [totalRestaurants, activeRestaurants, totalMembers, totalReservations, topRestaurants, platformValue, systemHealth, tenants] = await Promise.all([
       db.restaurant.count(),
       db.restaurant.count({ where: { isOpen: true } }),
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
     const subCounts = { active: 0, expiring: 0, expired: 0, trial: 0, trial_expired: 0 };
     for (const t of tenants) {
-      const sub = computeSubscriptionStatus(t.plan, t.planExpiresAt, t.trialEndsAt);
+      const sub = computeSubscriptionStatus(t.planExpiresAt, t.trialEndsAt);
       subCounts[sub.status]++;
     }
 
