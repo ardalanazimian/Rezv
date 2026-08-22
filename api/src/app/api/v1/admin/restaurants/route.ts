@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     });
     return NextResponse.json({
       restaurants: restaurants.map(r => {
-        const sub = computeSubscriptionStatus(r.tenant.plan, r.tenant.planExpiresAt, r.tenant.trialEndsAt);
+        const sub = computeSubscriptionStatus(r.tenant.planExpiresAt, r.tenant.trialEndsAt);
         return {
           id: r.id, name: r.name, slug: r.slug, cuisine: r.cuisine,
           tenant_id: r.tenant.id, plan: r.tenant.plan, is_open: r.isOpen,

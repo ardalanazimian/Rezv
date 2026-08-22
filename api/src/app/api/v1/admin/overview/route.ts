@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
     const subCounts = { active: 0, expiring: 0, expired: 0, trial: 0, trial_expired: 0 };
     for (const t of tenants) {
-      const sub = computeSubscriptionStatus(t.plan, t.planExpiresAt, t.trialEndsAt);
+      const sub = computeSubscriptionStatus(t.planExpiresAt, t.trialEndsAt);
       subCounts[sub.status]++;
     }
 
