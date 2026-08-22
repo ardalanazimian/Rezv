@@ -72,6 +72,7 @@ import './menu-crud.integration.test.mts';
 import './tables.integration.test.mts';
 import './table-qr-checkin.integration.test.mts';
 import './auth-guards.integration.test.mts';
+import './staff-auth-guard.integration.test.mts';
 import './availability.integration.test.mts';
 import './assistant-nlu.test.mts';
 import './idempotency.integration.test.mts';
