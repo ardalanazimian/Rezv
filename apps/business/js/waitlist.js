@@ -301,7 +301,49 @@ async function tableLoadQr(id){
     </div>
     <div style="color:var(--t2);font-size:12px;margin-top:8px">
       SVG برایِ چاپ (هر اندازه، بدونِ افتِ کیفیت) · PNG برایِ اشتراک‌گذاری
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
+      <button class="btn btn-sm btn-ghost" style="color:var(--danger,#e5484d)"
+              onclick="tableRegenerateQr('${esc(id)}')">بازتولیدِ کد</button>
+      <div style="color:var(--t2);font-size:12px;margin-top:6px">
+        اگر استیکر گم یا کپی شده: کدِ تازه بساز. استیکرِ فعلی از همان لحظه
+        <b>باطل</b> می‌شود و باید دوباره چاپ شود.
+      </div>
     </div>`;
+}
+
+/**
+ * بازتولیدِ کدِ QRِ میز.
+ *
+ * ⚠️ برگشت‌ناپذیر است: کدِ قبلی برنمی‌گردد و هر استیکری که با آن چاپ شده از
+ * همان لحظه مرده است (مهمان با اسکنش «میز پیدا نشد» می‌گیرد). پس متنِ تأیید
+ * دقیقاً همین اثر را می‌گوید، نه یک «مطمئنی؟»ِ مبهم — رستوران‌دار باید بداند
+ * دارد چه چیزی را از بین می‌برد. سرور هم این کار را در audit ثبت می‌کند.
+ */
+async function tableRegenerateQr(id){
+  if(!window.confirm(
+    'کدِ تازه ساخته شود؟\n\n' +
+    'استیکرِ فعلیِ رویِ این میز از همین لحظه باطل می‌شود و مهمان با اسکنش به جایی نمی‌رسد. ' +
+    'باید کدِ جدید را چاپ کنی و جایگزین کنی.\n\nاین کار برگشت‌پذیر نیست.'
+  )) return;
+
+  const box = document.getElementById('tableQrBox');
+  if(box) box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال ساختِ کدِ تازه…</div>`;
+
+  const res = await API.regenerateTableQr(id);
+  if(!res.ok){
+    if(box){
+      box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+          ${esc(res.offline ? 'اتصال به سرور برقرار نیست — کد عوض نشد.' : (res.error?.message || 'بازتولیدِ کد ناموفق بود.'))}
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">نمایشِ کدِ فعلی</button>`;
+    }
+    return;
+  }
+
+  toast('', 'کدِ تازه ساخته شد — استیکرِ قبلی دیگر کار نمی‌کند');
+  // QR را از نو می‌گیریم تا کدِ جدید و تصویرش هر دو به‌روز شوند.
+  tableLoadQr(id);
 }
 
 /** دانلودِ QR. PNG در خودِ مرورگر از SVG رندر می‌شود — بدونِ رفت‌وبرگشتِ اضافه. */

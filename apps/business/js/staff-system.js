@@ -56,7 +56,7 @@ function openPermEditor(staffId){
     <div class="modal-sub">مشخص کن به کدام بخش‌ها دسترسی داشته باشد</div>
     <div style="margin-top:14px;max-height:340px;overflow-y:auto">
       ${PERM_DEFS.map(([k,label])=>`
-        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line);cursor:pointer">
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--border);cursor:pointer">
           <span style="font-size:13px">${label}</span>
           <input type="checkbox" data-perm="${k}" ${p[k]?'checked':''} style="width:18px;height:18px;accent-color:var(--blue)">
         </label>`).join('')}

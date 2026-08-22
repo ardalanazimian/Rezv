@@ -923,7 +923,7 @@ async function openCustomerDetail(userId){
     <div class="field-label" style="margin-top:18px">تاریخچه‌ی رزروها</div>
     <div style="max-height:240px;overflow-y:auto;margin-top:8px">
       ${tl.length?tl.map(r=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
           <div>
             <div style="font-weight:700;font-size:13px">${esc(ST_FA[r.status]||r.status)} · ${fa(r.party_size)} نفر</div>
             <div style="font-size:11px;color:var(--t2)">${dt(r.slot_start)}${r.items&&r.items.length?' · '+esc(r.items.join('، ')):''}</div>

@@ -233,6 +233,11 @@ const API = {
       return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
     }
   },
+  /**
+   * بازتولیدِ کدِ QRِ میز — استیکرِ چاپ‌شده‌ی قبلی را **باطل** می‌کند.
+   * برخلافِ `tableQrSvg` خروجی JSON است، پس از مسیرِ عادیِ `post()` می‌رود.
+   */
+  regenerateTableQr(id){ return this.post(`/restaurant/tables/${encodeURIComponent(id)}/qr`, {}); },
   // ── هوش مشتری (RFM/CLV/AI) ──
   customers(qs){ return this.get('/restaurant/customers'+(qs?'?'+qs:'')); },
   customerDetail(userId){ return this.get('/restaurant/customers/'+encodeURIComponent(userId)); },

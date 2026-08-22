@@ -2028,6 +2028,11 @@ const API = {
       return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
     }
   },
+  /**
+   * بازتولیدِ کدِ QRِ میز — استیکرِ چاپ‌شده‌ی قبلی را **باطل** می‌کند.
+   * برخلافِ `tableQrSvg` خروجی JSON است، پس از مسیرِ عادیِ `post()` می‌رود.
+   */
+  regenerateTableQr(id){ return this.post(`/restaurant/tables/${encodeURIComponent(id)}/qr`, {}); },
   // ── هوش مشتری (RFM/CLV/AI) ──
   customers(qs){ return this.get('/restaurant/customers'+(qs?'?'+qs:'')); },
   customerDetail(userId){ return this.get('/restaurant/customers/'+encodeURIComponent(userId)); },
@@ -4113,7 +4118,49 @@ async function tableLoadQr(id){
     </div>
     <div style="color:var(--t2);font-size:12px;margin-top:8px">
       SVG برایِ چاپ (هر اندازه، بدونِ افتِ کیفیت) · PNG برایِ اشتراک‌گذاری
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
+      <button class="btn btn-sm btn-ghost" style="color:var(--danger,#e5484d)"
+              onclick="tableRegenerateQr('${esc(id)}')">بازتولیدِ کد</button>
+      <div style="color:var(--t2);font-size:12px;margin-top:6px">
+        اگر استیکر گم یا کپی شده: کدِ تازه بساز. استیکرِ فعلی از همان لحظه
+        <b>باطل</b> می‌شود و باید دوباره چاپ شود.
+      </div>
     </div>`;
+}
+
+/**
+ * بازتولیدِ کدِ QRِ میز.
+ *
+ * ⚠️ برگشت‌ناپذیر است: کدِ قبلی برنمی‌گردد و هر استیکری که با آن چاپ شده از
+ * همان لحظه مرده است (مهمان با اسکنش «میز پیدا نشد» می‌گیرد). پس متنِ تأیید
+ * دقیقاً همین اثر را می‌گوید، نه یک «مطمئنی؟»ِ مبهم — رستوران‌دار باید بداند
+ * دارد چه چیزی را از بین می‌برد. سرور هم این کار را در audit ثبت می‌کند.
+ */
+async function tableRegenerateQr(id){
+  if(!window.confirm(
+    'کدِ تازه ساخته شود؟\n\n' +
+    'استیکرِ فعلیِ رویِ این میز از همین لحظه باطل می‌شود و مهمان با اسکنش به جایی نمی‌رسد. ' +
+    'باید کدِ جدید را چاپ کنی و جایگزین کنی.\n\nاین کار برگشت‌پذیر نیست.'
+  )) return;
+
+  const box = document.getElementById('tableQrBox');
+  if(box) box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال ساختِ کدِ تازه…</div>`;
+
+  const res = await API.regenerateTableQr(id);
+  if(!res.ok){
+    if(box){
+      box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+          ${esc(res.offline ? 'اتصال به سرور برقرار نیست — کد عوض نشد.' : (res.error?.message || 'بازتولیدِ کد ناموفق بود.'))}
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">نمایشِ کدِ فعلی</button>`;
+    }
+    return;
+  }
+
+  toast('', 'کدِ تازه ساخته شد — استیکرِ قبلی دیگر کار نمی‌کند');
+  // QR را از نو می‌گیریم تا کدِ جدید و تصویرش هر دو به‌روز شوند.
+  tableLoadQr(id);
 }
 
 /** دانلودِ QR. PNG در خودِ مرورگر از SVG رندر می‌شود — بدونِ رفت‌وبرگشتِ اضافه. */
@@ -5144,7 +5191,7 @@ async function openCustomerDetail(userId){
     <div class="field-label" style="margin-top:18px">تاریخچه‌ی رزروها</div>
     <div style="max-height:240px;overflow-y:auto;margin-top:8px">
       ${tl.length?tl.map(r=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
           <div>
             <div style="font-weight:700;font-size:13px">${esc(ST_FA[r.status]||r.status)} · ${fa(r.party_size)} نفر</div>
             <div style="font-size:11px;color:var(--t2)">${dt(r.slot_start)}${r.items&&r.items.length?' · '+esc(r.items.join('، ')):''}</div>
@@ -6338,7 +6385,7 @@ function openPermEditor(staffId){
     <div class="modal-sub">مشخص کن به کدام بخش‌ها دسترسی داشته باشد</div>
     <div style="margin-top:14px;max-height:340px;overflow-y:auto">
       ${PERM_DEFS.map(([k,label])=>`
-        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line);cursor:pointer">
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--border);cursor:pointer">
           <span style="font-size:13px">${label}</span>
           <input type="checkbox" data-perm="${k}" ${p[k]?'checked':''} style="width:18px;height:18px;accent-color:var(--blue)">
         </label>`).join('')}

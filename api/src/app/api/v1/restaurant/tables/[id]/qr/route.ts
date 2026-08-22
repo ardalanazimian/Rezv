@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { assignQrCode } from '@/lib/tables';
 import { tableCheckInUrl } from '@/lib/public-urls';
+import { audit } from '@/lib/audit';
+import { clientIp } from '@/lib/ratelimit';
 import { Err } from '@/lib/errors';
 import { parseParams, parseQuery, zUuid, z } from '@/lib/schemas';
 
@@ -71,5 +73,58 @@ export const GET = withRestaurantAuth(
         'X-Checkin-Url': encodeURI(url),
       },
     });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════════════
+//  POST /api/v1/restaurant/tables/:id/qr — بازتولیدِ کد (ابطالِ استیکرِ قبلی)
+//
+//  ⚠️ چرا این روت لازم بود: `assignQrCode` از روزِ اول پارامترِ `regenerate`
+//  داشت و کامنتِ خودش هم دلیلش را نوشته بود («وقتی استیکرِ قدیمی گم/کپی
+//  شده») — ولی **هیچ‌کس با `regenerate: true` صدایش نمی‌زد**. یعنی قابلیت
+//  پیاده بود و از بیرون به آن نمی‌شد رسید؛ همان الگویِ «کدِ خفته» که در
+//  خودِ check-inِ QR (PR #61) و فیچرِ بیعانه (§۲u) هم دیده شد.
+//
+//  ⚠️ این عمل **برگشت‌ناپذیر** است: کدِ قبلی برنمی‌گردد و هر استیکری که با
+//  آن چاپ شده از همان لحظه مرده است — مهمانی که آن را اسکن کند «میز پیدا
+//  نشد» می‌گیرد. پس دو محافظ دارد:
+//    • `audit` با اکشنِ `table.qr_regenerated` — تا معلوم باشد چه کسی و کِی
+//      (مثلاً وقتی مهمان می‌گوید QR کار نمی‌کند).
+//    • تأییدِ صریح در UIِ پنل، با متنی که همین اثر را می‌گوید.
+//
+//  جدا از GET نگه داشته شد، نه یک پارامترِ `?regenerate=1` رویِ همان GET:
+//  یک GET نباید حالت را عوض کند (prefetchِ مرورگر یا هر خزنده‌ای می‌توانست
+//  استیکرهایِ یک رستوران را دسته‌جمعی باطل کند).
+// ═══════════════════════════════════════════════════════════════════════
+export const POST = withRestaurantAuth(
+  { rateLimit: 'auth', permission: 'canManageTables' },
+  async (req, ctx, rawParams: { id: string }) => {
+    const { id } = parseParams(rawParams, paramsSchema);
+
+    // مالکیتِ تنانت پیش از هر کاری — با حدسِ UUID نباید بشود استیکرِ میزِ
+    // رستورانِ دیگری را باطل کرد (خرابکاریِ ساده و کاملاً نامرئی).
+    const table = await db.table.findUnique({
+      where: { id },
+      select: { restaurantId: true, number: true, qrCode: true },
+    });
+    if (!table || table.restaurantId !== ctx.restaurant.id) throw Err.notFound('میز');
+
+    const previous = table.qrCode;
+    const code = await assignQrCode(id, ctx.restaurant.id, { regenerate: true });
+
+    await audit({
+      action: 'table.qr_regenerated',
+      actorId: ctx.auth.sub,
+      actorType: 'staff',
+      targetId: id,
+      restaurantId: ctx.restaurant.id,
+      ip: clientIp(req),
+      // کدِ قبلی ثبت می‌شود تا اگر مهمانی با استیکرِ قدیمی مشکل داشت، بشود
+      // فهمید کدام کد و کِی باطل شده. کدِ جدید ثبت نمی‌شود — در DB هست و
+      // نوشتنش در لاگ فقط سطحِ حساسیتِ لاگ را بالا می‌برد.
+      detail: { table_number: table.number, previous_code: previous ?? null },
+    });
+
+    return NextResponse.json({ code, table_number: table.number });
   },
 );
