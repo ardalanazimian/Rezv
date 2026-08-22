@@ -591,6 +591,21 @@ tells you what the API *said*, not what it *wrote*.
   `docs/XSS_SINK_AUDIT.md`). The scanner is heuristic (regex, not real
   dataflow) and is **not wired into CI** — it must be re-run by hand;
   wiring it into the `security` CI job is a natural follow-up.
+  - **⚠️ به‌روزرسانیِ ۲۰۲۶-۰۸-۲۲ — ادعایِ «zero unsafe sinks» بالا دیگر
+    امروز صادق نیست.** ابزار روی `main`ِ فعلی دوباره اجرا شد و **۳۸ sinkِ
+    `unsafe`** زیرِ مسیرهایِ enforced گزارش کرد (خروجی: exit 1). دلیلِ
+    اصلی یک آسیب‌پذیریِ تازه نیست، بلکه **پوسیدگیِ خودِ overrideها**:
+    `MANUAL_REVIEW_OVERRIDES` با کلیدِ `file:line` نوشته شده، و از زمانِ
+    نوشتنش کد جابه‌جا شده — **۳۱ از ۷۳ override (۴۲٪) الان به خطی اشاره
+    می‌کنند که دیگر اصلاً sink ندارد** (مثلاً `data/booking.js:69` که حالا
+    شده `:86`). یک overrideِ پوسیده خطا نمی‌دهد، فقط بی‌صدا از کار می‌افتد و
+    همان sink دوباره `unsafe` علامت می‌خورد. پس **۳۸ عدد را نباید «۳۸
+    آسیب‌پذیریِ XSS» خواند** — نیازِ یک پاسِ triageِ دستی دارد که هر کدام
+    واقعاً خوانده و یا رفع یا با کلیدِ به‌روز دوباره override شود. تا آن
+    زمان، وضعیتِ واقعیِ این سطح **نامعلوم** است، نه «پاک».
+  - **پیشنهادِ جلوگیری از تکرار:** کلیدِ override به `file:line` وابسته
+    نباشد (مثلاً hashِ خودِ snippet)، و ابزار روی overrideِ بی‌مصرف
+    (stale) صریحاً هشدار/خطا بدهد تا این degradation دیگر بی‌صدا نباشد.
 - **Merge-occupancy concurrency race (P0-3) — proven live, residual-hardening
   PR (۲۰۲۶-۰۸-۱۴).** Two genuinely simultaneous
   (`Promise.all`, real Postgres, not sequential/mocked) `createReservation`

@@ -23,7 +23,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fg from './internal/simple-glob.mjs';
 
@@ -393,7 +393,20 @@ function main() {
     if (!existsSync(abs)) continue;
     const files = fg(abs, EXTENSIONS);
     for (const f of files) {
-      const relPath = relative(ROOT, f);
+      // ⚠️ رفعِ باگِ واقعیِ cross-platform (۲۰۲۶-۰۸-۲۲): path.relative روی
+      // ویندوز مسیر را با `\` برمی‌گرداند (`demo-mvp\customer\…`)، در حالی
+      // که هر دو مصرف‌کننده‌یِ این مقدار با `/` مقایسه می‌کنند. سه اثرِ
+      // واقعی داشت (همه رویِ ویندوز، رویِ لینوکس/CI سالم بود):
+      //   ۱) isReportOnly هیچ‌وقت match نمی‌شد → همه‌ی hitهایِ demo-mvp/ و
+      //      standalone/ به‌اشتباه «enforced» حساب می‌شدند.
+      //   ۲) کلیدِ MANUAL_REVIEW_OVERRIDES (که با `/` نوشته شده) هرگز
+      //      match نمی‌شد → هیچ overrideای اعمال نمی‌شد.
+      //   ۳) مسیرهایِ داخلِ JSONِ گزارش بینِ ویندوز و لینوکس فرق می‌کرد و
+      //      diffِ ساختگی تولید می‌کرد.
+      // در عمل: شمارشِ unsafeِ enforced از ۱۹۵ به ۳۸ اصلاح شد.
+      // (همان کلاسِ باگی که در PR #64 برایِ photo-moderation.test.mts رفع
+      // شد — hardcodeِ جداکننده‌ی مسیر.)
+      const relPath = relative(ROOT, f).split(sep).join('/');
       const hits = scanFile(f, relPath);
       allHits.push(...hits);
     }
