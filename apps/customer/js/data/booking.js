@@ -83,7 +83,7 @@ function renderDemoTimeOptions(sel,r){
   // value همان زمانِ خام می‌ماند (رفتارِ قبلی، دست‌نخورده) — «(نمونه)» فقط در
   // متنِ نمایشی اضافه می‌شود، وگرنه اگر بعداً واقعاً submit شود، رشته‌ی
   // غیرمعتبر («۱۹:۰۰ (نمونه)») به‌جایِ زمانِ خام به بک‌اند می‌رفت.
-  sel.innerHTML=(r.slots.length?r.slots:FALLBACK_TIMES).map(s=>`<option value="${s}">${s} (نمونه)</option>`).join('');
+  sel.innerHTML=(r.slots.length?r.slots:FALLBACK_TIMES).map(s=>`<option value="${esc(s)}">${esc(s)} (نمونه)</option>`).join('');
 }
 // بارگذاری ساعت‌های واقعاً موجود از /restaurants/{slug}/availability
 export async function refreshSlots(id){
@@ -106,7 +106,7 @@ export async function refreshSlots(id){
   if(res.ok && Array.isArray(res.data?.slots)){
     const open=res.data.slots.filter(s=>s.status==='open');
     if(open.length){
-      sel.innerHTML=open.map(s=>`<option value="${s.time}">${faTime(s.time)}</option>`).join('');
+      sel.innerHTML=open.map(s=>`<option value="${esc(s.time)}">${faTime(s.time)}</option>`).join('');
     }else{
       // خالیِ صادقانه: هیچ ساعتِ اختراعی جایگزینش نمی‌شه.
       sel.innerHTML='<option value="">ساعت خالی برای این روز نیست</option>';

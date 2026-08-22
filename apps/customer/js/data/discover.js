@@ -263,7 +263,7 @@ export async function renderEvents(){
 function eventsHtml(events,isDemo){
   return events.map(e=>`
     <div class="event-card" role="button" tabindex="0" onclick="openRest(${e.rid})">
-      <div class="event-emoji">${e.emoji}</div>
+      <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
         ${e.rest?`<div class="event-rest">${esc(e.rest)}</div>`:''}
