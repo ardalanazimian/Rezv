@@ -22,6 +22,7 @@
 //  کدِ خروج: 0 اگر zero «unsafe» زیرِ apps/*+shared/js باشد، وگرنه 1.
 // ═══════════════════════════════════════════════════════════════════════
 
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -249,96 +250,132 @@ function classify(expr, kind) {
 //  کدِ اطرافش.
 //
 //  هر ردیفِ این جدول با خواندنِ واقعیِ کد بررسی و توجیه شده (نه حدس) —
-//  رجوع کن به بدنه‌ی PR برایِ جزئیاتِ کاملِ ممیزی. اگر فایلی که override
-//  داره بعداً واقعاً تغییر کنه، override همچنان با شماره‌خطِ قدیمی می‌مونه؛
-//  دورِ بعدیِ ممیزی باید override‌هایی که دیگه با کدِ واقعی مچ نمی‌شن (خطِ
-//  متفاوت/محتوایِ متفاوت) رو دوباره بررسی کنه.
+//  رجوع کن به بدنه‌ی PR برایِ جزئیاتِ کاملِ ممیزی.
+//
+//  ⚠️ بازطراحیِ کلید (۲۰۲۶-۰۸-۲۳) — چرا کلید دیگر `file:line` نیست:
+//  این override وضعیت را از unsafe به dom_api_safe می‌بَرَد، یعنی یک
+//  **سرکوبِ امنیتی** است. با کلیدِ شماره‌خط، هر جابه‌جاییِ کد می‌توانست
+//  همان سرکوب را رویِ یک sinkِ کاملاً متفاوت بنشاند — خطای fail-open و
+//  کاملاً بی‌صدا. اندازه‌گیری شد: **۳۱ از ۷۳ override (۴۲٪)** به خطی
+//  اشاره می‌کردند که دیگر اصلاً sink نداشت.
+//  حالا کلید `file#hash` است (`exprHash` رویِ خودِ عبارت). نتیجه:
+//    • هر تغییر در خودِ عبارت → کلید عوض می‌شود → override خودکار بی‌اثر
+//      می‌شود و sink دوباره unsafe دیده می‌شود (fail-safe).
+//    • overrideی که دیگر هیچ sinkی را مچ نکند، به‌صراحت به‌عنوانِ «پوسیده»
+//      گزارش می‌شود و exit code را ۱ می‌کند — دیگر بی‌صدا از کار نمی‌افتد.
+//  کلیدِ هر sink در خروجیِ JSON (فیلدِ `key`) هست؛ برای افزودنِ override
+//  جدید همان را کپی کن.
+//
+//  ⚠️ مهاجرتِ ۲۰۲۶-۰۸-۲۳ **مکانیکی** بود (line → hash)، نه بازبینیِ مجددِ
+//  محتوا: ۳۷ ردیف کلیدشان عوض شد، ۳۱ ردیف (بدونِ sink) و ۴ ردیف (که خودِ
+//  classifier حالا امن می‌داندشان) حذف شدند. یعنی توجیهِ نوشته‌شده در هر
+//  ردیف هنوز همان توجیهِ نشستِ قبلی است و دورِ بعدیِ ممیزی باید محتوایشان
+//  را دوباره بخواند.
 // ═══════════════════════════════════════════════════════════════════════
+/**
+ * کلیدِ محتواییِ یک sink — sha1ِ عبارت با فاصله‌هایِ یکدست‌شده.
+ *
+ * چرا محتوا و نه شماره‌خط (بازطراحیِ ۲۰۲۶-۰۸-۲۳): کلیدِ قبلی `file:line`
+ * بود و چون override وضعیت را از unsafe به dom_api_safe می‌بَرَد (یعنی یک
+ * سرکوبِ امنیتیِ واقعی است)، هر جابه‌جاییِ کد می‌توانست همان سرکوب را رویِ
+ * یک sinkِ کاملاً متفاوت بنشاند — یعنی خطای fail-open و بی‌صدا. اندازه‌گیری
+ * شد: در همان زمانِ بازطراحی **۳۱ از ۷۳ override (۴۲٪) به خطی اشاره
+ * می‌کردند که دیگر اصلاً sink نداشت**. با کلیدِ محتوایی، کوچک‌ترین تغییر در
+ * خودِ عبارت کلید را عوض می‌کند و override خودکار بی‌اثر می‌شود (fail-safe:
+ * دوباره unsafe دیده می‌شود و باید آگاهانه بازبینی شود).
+ */
+function exprHash(expr) {
+  return createHash('sha1').update(expr.replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 12);
+}
+
+/** کلیدهایی که واقعاً در این اجرا مصرف شدند — برایِ کشفِ overrideِ پوسیده. */
+const USED_OVERRIDE_KEYS = new Set();
+
 const MANUAL_REVIEW_OVERRIDES = new Map([
   // ── الگو ۱: escِ واقعی داخلِ تابعِ کمکیِ جداگانه‌ست (cardHTML/hCardHTML/
   //    wlCard/resItemHTML/sugCard/bubble/chatEsc/itemHTML/...) — بررسی و
   //    تأیید شد که خودِ آن تابع esc()/chatEsc() رو صحیح استفاده می‌کنه. ──
-  ['apps/customer/js/data/discover.js:109', 'cardHTML() دیگه esc(r.n) داره (رفع‌شده در همین PR).'],
-  ['apps/customer/js/data/discover.js:195', 'hCardHTML() از قبل esc(r.n) داشت — بررسی شد.'],
-  ['apps/customer/js/data/discover.js:202', 'hCardHTML() از قبل esc(r.n) داشت — بررسی شد.'],
-  ['apps/customer/js/data/discover.js:220', 'hCardHTML() از قبل esc(r.n) داشت — بررسی شد.'],
-  ['apps/customer/js/features/chat.js:112', 'bubble(m) از قبل esc(m.body) داشت — بررسی شد.'],
-  ['apps/customer/js/features/economy.js:106', 'missionCard(m) دیگه esc(m.title)/esc(m.description) داره (رفع‌شده در همین PR).'],
-  ['apps/customer/js/features/palette.js:94', 'itemHTML(it,i) از قبل esc(it.t)/esc(it.sub) داشت — بررسی شد.'],
-  ['apps/customer/js/reservation.js:21', 'cardHTML() دیگه esc(r.n) داره (رفع‌شده در همین PR).'],
-  ['apps/business/js/waitlist.js:38', 'wlCard(w,i) از قبل esc(w.name) داشت — بررسی شد.'],
-  ['apps/business/js/reservations.js:75', 'resItemHTML(r,i) از قبل esc(r.name)/esc(r.phone)/esc(r.note)/esc(r.cancelReason) داشت — بررسی شد.'],
-  ['apps/business/js/staff-system.js:282', 'sugCard از PR#13 قبلاً esc(s.reason) داره؛ r.label هم در همین PR با esc() رفع شد.'],
-  ['apps/company/js/badges.js:21', 'BADGES_LIST.map از قبل esc(b.name)/esc(b.description)/... داشت — بررسی شد.'],
-  ['apps/company/js/missions.js:21', 'MISSIONS_LIST.map از قبل esc(m.title) داشت — بررسی شد.'],
-  ['apps/business/js/crm.js:891', 'کارت‌هایِ AI/تماس از قبل esc(c.title)/esc(c.detail)/esc(c.name)/esc(c.reason) داشتن — بررسی شد.'],
+  // ⛔ حذف‌شد: «apps/customer/js/data/discover.js:109» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/customer/js/data/discover.js:195» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/customer/js/data/discover.js:202» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/customer/js/data/discover.js:220» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/customer/js/features/chat.js:112» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/customer/js/features/economy.js#e5482a47def2', 'missionCard(m) دیگه esc(m.title)/esc(m.description) داره (رفع‌شده در همین PR).'],
+  ['apps/customer/js/features/palette.js#3a2708a1b553', 'itemHTML(it,i) از قبل esc(it.t)/esc(it.sub) داشت — بررسی شد.'],
+  ['apps/customer/js/reservation.js#121414a5b2a9', 'cardHTML() دیگه esc(r.n) داره (رفع‌شده در همین PR).'],
+  ['apps/business/js/waitlist.js#25f65b54b53c', 'wlCard(w,i) از قبل esc(w.name) داشت — بررسی شد.'],
+  // ⛔ حذف‌شد: «apps/business/js/reservations.js:75» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/business/js/staff-system.js#8b0ead2c9a82', 'sugCard از PR#13 قبلاً esc(s.reason) داره؛ r.label هم در همین PR با esc() رفع شد.'],
+  ['apps/company/js/badges.js#7a9462a28ba2', 'BADGES_LIST.map از قبل esc(b.name)/esc(b.description)/... داشت — بررسی شد.'],
+  ['apps/company/js/missions.js#90e02b824f6e', 'MISSIONS_LIST.map از قبل esc(m.title) داشت — بررسی شد.'],
+  // ⛔ حذف‌شد: «apps/business/js/crm.js:891» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
 
   // ── الگو ۲: متغیرِ محلی از قبل چند خط بالاتر esc() شده، اسکنر فقط
   //    استفاده‌ی نهاییش رو می‌بینه نه تعریفش. ──
-  ['apps/customer/js/features/food-dna.js:233', 'f/l در همون تابع با esc(USER.firstName/lastName) تعریف شدن — بررسی شد.'],
+  ['apps/customer/js/features/food-dna.js#2d1a14276797', 'f/l در همون تابع با esc(USER.firstName/lastName) تعریف شدن — بررسی شد.'],
 
   // ── الگو ۳: تنها interpolationِ ریسکی یک lookupِ محلیِ ثابته (نه دیتایِ
   //    کاربر/API) — کلید از یک enumِ ثابت میاد، نه ورودیِ آزاد. ──
-  ['apps/business/js/crm.js:492', 'RFM_META[s.segment] — آبجکتِ محلیِ ثابت، کلید از enumِ segment.'],
-  ['apps/business/js/crm.js:611', 'برچسب‌ها/دکمه‌هایِ ثابتِ محلی (custSort tabs) — بدونِ دیتایِ کاربر.'],
-  ['apps/business/js/crm.js:670', 'HOURS_DOW_ORDER محلیِ ثابت؛ oh[d] ساعتِ کاریِ خودِ رستوران (نه ورودیِ آزادِ مهمان).'],
-  ['apps/business/js/staff-system.js:225', 'cards آرایه‌ی literal محلیه (تعریف‌شده دو خط بالاتر در همون تابع).'],
-  ['apps/business/js/reservations.js:57', 'icon(...)/icon(...) ترنری + dateLabel از یک lookupِ محلیِ ثابت (نه ورودیِ کاربر).'],
+  // ⛔ حذف‌شد: «apps/business/js/crm.js:492» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/business/js/crm.js:611» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/business/js/crm.js:670» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/business/js/staff-system.js#51181e27725d', 'cards آرایه‌ی literal محلیه (تعریف‌شده دو خط بالاتر در همون تابع).'],
+  // ⛔ حذف‌شد: «apps/business/js/reservations.js:57» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
 
   // ── الگو ۴: فیلدهایِ صرفاً عددی/بولینِ محلی (شمارنده، درصد، طول آرایه) —
   //    حتی اگر از API بیان، نوعشون number/boolean است، نه string. ──
-  ['apps/business/js/overview.js:274', 'pct محاسبه‌ی محلیِ عددیه (Math.round).'],
-  ['apps/business/js/overview.js:153', 'liveStatusBadge()/dashboardUsingDemoData() توابعِ محلیِ trusted‌اند.'],
-  ['apps/company/js/overview.js:26', 'lowBalanceCount عددِ محلیه.'],
-  ['apps/company/js/sales.js:105', 'openInquiries عددِ محلیه.'],
-  ['apps/business/js/marketing.js:265', 'avgVisits عددِ محلیه؛ days.map رویِ Object.entries(محلی) کار می‌کنه.'],
+  ['apps/business/js/overview.js#0782b4d2d10d', 'pct محاسبه‌ی محلیِ عددیه (Math.round).'],
+  ['apps/business/js/overview.js#126f139c2a3b', 'liveStatusBadge()/dashboardUsingDemoData() توابعِ محلیِ trusted‌اند.'],
+  ['apps/company/js/overview.js#a55e2de7b8b0', 'lowBalanceCount عددِ محلیه.'],
+  ['apps/company/js/sales.js#f68ecc196f1b', 'openInquiries عددِ محلیه.'],
+  // ⛔ حذف‌شد: «apps/business/js/marketing.js:265» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
 
   // ── الگو ۵: sinkِ اسکلتونِ لودینگ (skeleton) — بدونِ دیتایِ واقعی. ──
-  ['apps/customer/js/data/discover.js:107', 'اسکلتونِ لودینگ — list.map(()=>...) هیچ فیلدی از آیتم نمی‌خونه.'],
-  ['apps/customer/js/reservation.js:70', 'skTrip.repeat(3) — رشته‌ی اسکلتونِ ثابت.'],
-  ['apps/customer/js/features/food-dna.js:59', 'Array.from محلی — نوارِ پیشرفتِ ثابت، بدونِ دیتا.'],
+  // ⛔ حذف‌شد: «apps/customer/js/data/discover.js:107» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/customer/js/reservation.js:70» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/customer/js/features/food-dna.js#a9763efb2175', 'Array.from محلی — نوارِ پیشرفتِ ثابت، بدونِ دیتا.'],
 
   // ── الگو ۶: مقایسه/ترنریِ محلی که رجکسِ ابزار نتونست parse کنه ولی
   //    دستی بررسی شد کاملاً امنه (رشته‌ی ثابت/تابعِ trusted). ──
-  ['apps/customer/js/data/discover.js:151', 'ترنریِ icon(...)+رشته یا esc(el.textContent) — هردو امن.'],
-  ['apps/customer/js/features/loyalty.js:25', 'perksBlock() از PERKS محلی (shared/js seed) می‌سازه؛ tier فقط esc(b.name) بعدِ رفعِ این PR.'],
-  ['apps/customer/js/features/loyalty.js:64', 'badges.map دیگه esc(b.name) داره (رفع‌شده در همین PR)؛ tier.emoji/tier.name از enumِ ثابتِ سطحِ باشگاهه.'],
-  ['apps/customer/js/features/notifications.js:73', 'رشته‌هایِ ثابت (concat با +) — بدونِ دیتایِ کاربر.'],
-  ['apps/customer/js/features/notifications.js:93', 'Object.entries(CATS) — آبجکتِ محلیِ ثابت.'],
-  ['apps/customer/js/features/onboarding.js:42', 'کارتِ onboarding کاملاً استاتیکه.'],
-  ['apps/customer/js/features/rewards.js:108', 'd.valid ترنری با icon(...)؛ d.balance_toman از fmtFa می‌گذره.'],
-  ['apps/customer/js/waitlist.js:55', 'isOffered ترنری رویِ HTMLِ استاتیک.'],
-  ['apps/customer/js/data/booking.js:69', 'r.slots رشته‌هایِ ساعتِ ثابت‌فرمت (HH:MM) از سرور، نه متنِ آزاد.'],
-  ['apps/customer/js/data/booking.js:82', 's.time مشابه — فرمتِ ثابتِ ساعت.'],
-  ['apps/customer/js/data/booking.js:92', 'مشابهِ L69.'],
-  ['apps/customer/js/data/booking.js:219', 'Array.from({length:PARTY_MAX}) — آرایه‌ی محلیِ عددی.'],
-  ['apps/business/js/chat.js:24', 'chatEsc در همه‌ی فیلدها استفاده شده؛ t.id ستونِ Postgres UUID (فرمت تضمین‌شده).'],
-  ['apps/business/js/chat.js:75', 'bizBubble از الگویِ chatEsc پیروی می‌کنه (مشابهِ chat.js:94).'],
-  ['apps/business/js/chat.js:94', 'chatEsc(body) مستقیم رویِ ورودی.'],
-  ['apps/business/js/crm.js:89', 'logoPhoto.url دیگه esc شده (رفع‌شده در همین PR).'],
-  ['apps/business/js/crm.js:379', 'dist فقط {star:number,count:number} — بدونِ رشته.'],
-  ['apps/business/js/crm.js:551', 'کارتِ hero — اعداد/توابعِ trusted (fnl/fa)؛ متنِ ثابت.'],
-  ['apps/business/js/crm.js:850', 'segs از RFM_META محلی می‌گذره (مشابهِ crm.js:492).'],
-  ['apps/business/js/crm.js:876', 'esc(SEG_FA[...]||...) و esc(l.message) از قبل صحیح‌اند.'],
-  ['apps/business/js/loyalty.js:22', 'Array.from({length:31}) — تقویمِ محلیِ عددی.'],
-  ['apps/business/js/marketing.js:36', 'Object.entries(COUPON_SEG_FA) — آبجکتِ محلیِ ثابت.'],
-  ['apps/business/js/marketing.js:86', 'Object.entries(AUTOMATION_TRIGGER_FA) — آبجکتِ محلیِ ثابت.'],
-  ['apps/business/js/reservations.js:65', 'demoNote + برچسب‌هایِ ثابتِ محلی؛ fa()/icon() برایِ اعداد.'],
-  ['apps/business/js/staff-system.js:35', 'isDemo ترنری + fa(STAFF_LIST.length) — عدد.'],
-  ['apps/business/js/staff-system.js:192', 'iconName?icon(...):"" — ترنریِ icon، رجکسِ ابزار پارسش نکرد ولی امنه.'],
-  ['apps/business/js/staff-system.js:399', 'devCode — کدِ OTPِ حالتِ دمو، رشته‌ی محلی (نه ورودیِ کاربر).'],
-  ['apps/business/js/waitlist.js:115', 'floorEdit ترنریِ بولینِ محلی رویِ HTMLِ استاتیک.'],
-  ['apps/business/js/waitlist.js:270', 'undoFn نامِ تابعِ ثابتیه که خودِ کدِ ما در toastUndo(msg, "fnName") پاس می‌ده، نه ورودیِ کاربر.'],
-  ['apps/company/js/intelligence.js:22', 'fa(d.guests.total_clv_toman) + rfm_distribution.map — اعداد/توابعِ trusted.'],
-  ['apps/company/js/intelligence.js:50', 'RESTAURANTS.map — فیلدهایِ نمایش‌داده‌شده اعداد/enumِ status‌اند.'],
-  ['apps/company/js/intelligence.js:183', 'متنِ ثابتِ توضیحی + fa(needsAttention.length).'],
-  ['apps/company/js/intelligence.js:212', 'healthMeta از یک لوکاپِ محلیِ ثابت؛ d.jobs.dead عدد.'],
-  ['apps/company/js/intelligence.js:252', 'متنِ ثابتِ مستندسازی + fa(...) برایِ اعداد.'],
-  ['apps/company/js/intelligence.js:442', 'moderationQueuePanelHTML/featureFlagsPanelHTML بررسی شدن — همه‌جا esc(label)/esc(key)/esc(x.ip) دارن.'],
-  ['apps/company/js/intelligence.js:573', 'renderCustomer360(res.data) بررسی شد — esc(name)/esc(u.phone)/esc(u.id)/esc(...reason) در همه‌جا هست.'],
-  ['apps/company/js/intelligence.js:730', 'devCode مشابهِ staff-system.js:399 — کدِ OTPِ دمو.'],
-  ['apps/company/js/photos.js:131', "['pending','approved','rejected','all'].map — آرایه‌ی literal محلی."],
-  ['apps/company/js/restaurant.js:62', 'Object.entries(planDist) — شمارشِ محلیِ اعداد.'],
+  // ⛔ حذف‌شد: «apps/customer/js/data/discover.js:151» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/customer/js/features/loyalty.js#1f622f4c0c0a', 'perksBlock() از PERKS محلی (shared/js seed) می‌سازه؛ tier فقط esc(b.name) بعدِ رفعِ این PR.'],
+  ['apps/customer/js/features/loyalty.js#b481bf9fee26', 'badges.map دیگه esc(b.name) داره (رفع‌شده در همین PR)؛ tier.emoji/tier.name از enumِ ثابتِ سطحِ باشگاهه.'],
+  // ⛔ حذف‌شد: «apps/customer/js/features/notifications.js:73» را خودِ classifier حالا safe_static می‌داند — override لازم نیست.
+  ['apps/customer/js/features/notifications.js#ab19ad63d5ec', 'Object.entries(CATS) — آبجکتِ محلیِ ثابت.'],
+  // ⛔ حذف‌شد: «apps/customer/js/features/onboarding.js:42» را خودِ classifier حالا safe_static می‌داند — override لازم نیست.
+  ['apps/customer/js/features/rewards.js#d949731de67e', 'd.valid ترنری با icon(...)؛ d.balance_toman از fmtFa می‌گذره.'],
+  ['apps/customer/js/waitlist.js#5a5ef1d832bf', 'isOffered ترنری رویِ HTMLِ استاتیک.'],
+  // ⛔ حذف‌شد: «apps/customer/js/data/booking.js:69» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/customer/js/data/booking.js:82» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/customer/js/data/booking.js:92» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/customer/js/data/booking.js:219» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/business/js/chat.js#1401bdf4e72e', 'chatEsc در همه‌ی فیلدها استفاده شده؛ t.id ستونِ Postgres UUID (فرمت تضمین‌شده).'],
+  // ⛔ حذف‌شد: «apps/business/js/chat.js:75» را خودِ classifier حالا safe_static می‌داند — override لازم نیست.
+  // ⛔ حذف‌شد: «apps/business/js/chat.js:94» را خودِ classifier حالا safe_static می‌داند — override لازم نیست.
+  ['apps/business/js/crm.js#26d2c9882f8b', 'logoPhoto.url دیگه esc شده (رفع‌شده در همین PR).'],
+  ['apps/business/js/crm.js#d459996da353', 'dist فقط {star:number,count:number} — بدونِ رشته.'],
+  // ⛔ حذف‌شد: «apps/business/js/crm.js:551» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/business/js/crm.js:850» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/business/js/crm.js:876» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/business/js/loyalty.js#59be0e774ff7', 'Array.from({length:31}) — تقویمِ محلیِ عددی.'],
+  // ⛔ حذف‌شد: «apps/business/js/marketing.js:36» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/business/js/marketing.js:86» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/business/js/reservations.js:65» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/business/js/staff-system.js#8da13a6228ab', 'isDemo ترنری + fa(STAFF_LIST.length) — عدد.'],
+  ['apps/business/js/staff-system.js#3a2ae36142ab', 'iconName?icon(...):"" — ترنریِ icon، رجکسِ ابزار پارسش نکرد ولی امنه.'],
+  // ⛔ حذف‌شد: «apps/business/js/staff-system.js:399» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/business/js/waitlist.js#5cb5acb17afb', 'floorEdit ترنریِ بولینِ محلی رویِ HTMLِ استاتیک.'],
+  // ⛔ حذف‌شد: «apps/business/js/waitlist.js:270» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/company/js/intelligence.js#f4f0cc93c4cb', 'fa(d.guests.total_clv_toman) + rfm_distribution.map — اعداد/توابعِ trusted.'],
+  ['apps/company/js/intelligence.js#3dd1c3e7e593', 'RESTAURANTS.map — فیلدهایِ نمایش‌داده‌شده اعداد/enumِ status‌اند.'],
+  ['apps/company/js/intelligence.js#714a85f9e868', 'متنِ ثابتِ توضیحی + fa(needsAttention.length).'],
+  ['apps/company/js/intelligence.js#42e21e50614b', 'healthMeta از یک لوکاپِ محلیِ ثابت؛ d.jobs.dead عدد.'],
+  // ⛔ حذف‌شد: «apps/company/js/intelligence.js:252» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/company/js/intelligence.js:442» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/company/js/intelligence.js:573» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  // ⛔ حذف‌شد: «apps/company/js/intelligence.js:730» دیگر هیچ sinkی ندارد (کد جابه‌جا شده).
+  ['apps/company/js/photos.js#144978537f8c', "['pending','approved','rejected','all'].map — آرایه‌ی literal محلی."],
+  ['apps/company/js/restaurant.js#c5203174f987', 'Object.entries(planDist) — شمارشِ محلیِ اعداد.'],
 
   // ── الگو ۷: محدودیتِ شناخته‌شده‌یِ ابزار — RHSِ زنجیره‌ایِ چندتابعی
   //    (`.slice(...).map(...).join(...)`) باعث می‌شه grabExpression رویِ
@@ -346,7 +383,7 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   //    رسیدن به backtickِ اصلی — یک محدودیتِ واقعیِ parserِ regex-based، نه
   //    یافته‌ی امنیتی. خطِ واقعی (بررسیِ دستی) چهار interpolation داره که
   //    هرچهارتا امن‌اند: esc(i.c)، icon(i.ic,...)، esc(i.t)، esc(i.d). ──
-  ['apps/business/js/overview.js:349', 'RHSِ زنجیره‌ای (.slice().map().join()) — بررسیِ دستی: esc(i.c)/icon(i.ic)/esc(i.t)/esc(i.d) هرچهارتا امن‌اند.'],
+  ['apps/business/js/overview.js#b164d795c4ad', 'RHSِ زنجیره‌ای (.slice().map().join()) — بررسیِ دستی: esc(i.c)/icon(i.ic)/esc(i.t)/esc(i.d) هرچهارتا امن‌اند.'],
 
   // ── الگو ۸ (review، نه unsafe): تابعِ سینکِ عمومی که یک پارامترِ html
   //    می‌گیره (openSheet/openModal) — امنیتِ واقعی به فراخوان‌ها بستگی
@@ -354,11 +391,11 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   //    بررسی شد (نمونه‌گیریِ گسترده، نه صرفاً یکی) و همه از esc()/fmtFa()/
   //    قالب‌هایِ کاملاً استاتیک استفاده می‌کردن — هیچ فراخوانِ خامِ
   //    escape‌نشده‌ای پیدا نشد. ──
-  ['apps/customer/js/auth.js:209', 'openSheet(html) — فراخوان‌ها بررسی شدن (bookStep2/3 با esc(r.n)، rewards.js/trips.js با قالبِ استاتیک) — امن.'],
-  ['apps/customer/js/features/live-strip.js:38', 'out فقط از pill(fmtFa(عدد)) ساخته می‌شه — بدونِ متنِ کاربر/API.'],
-  ['apps/business/js/overview.js:315', 'heatmapِ html فقط از slots/days (محلیِ ثابت) + fa(v) (عدد) ساخته می‌شه.'],
-  ['apps/business/js/staff-system.js:91', 'openModal(html) — فراخوان‌هایِ نمونه‌گیری‌شده (data.js changeStatus با esc(r.name)) امن بودن.'],
-  ['apps/company/js/overview.js:129', 'openModal(html) — همون الگویِ staff-system.js:91؛ فراخوان‌هایِ نمونه‌گیری‌شده امن بودن.'],
+  ['apps/customer/js/auth.js#ecb1f6abcac3', 'openSheet(html) — فراخوان‌ها بررسی شدن (bookStep2/3 با esc(r.n)، rewards.js/trips.js با قالبِ استاتیک) — امن.'],
+  ['apps/customer/js/features/live-strip.js#b1dfdec7d130', 'out فقط از pill(fmtFa(عدد)) ساخته می‌شه — بدونِ متنِ کاربر/API.'],
+  ['apps/business/js/overview.js#ecb1f6abcac3', 'heatmapِ html فقط از slots/days (محلیِ ثابت) + fa(v) (عدد) ساخته می‌شه.'],
+  ['apps/business/js/staff-system.js#6070b1ce706b', 'openModal(html) — فراخوان‌هایِ نمونه‌گیری‌شده (data.js changeStatus با esc(r.name)) امن بودن.'],
+  ['apps/company/js/overview.js#ecb1f6abcac3', 'openModal(html) — همون الگویِ staff-system.js:91؛ فراخوان‌هایِ نمونه‌گیری‌شده امن بودن.'],
 ]);
 
 function scanFile(absPath, relPath) {
@@ -372,10 +409,18 @@ function scanFile(absPath, relPath) {
       let classification = classify(expr, kind);
       const lineNum = text.slice(0, m.index).split('\n').length;
       const snippet = text.split('\n')[lineNum - 1].trim().slice(0, 160);
-      const overrideKey = `${relPath}:${lineNum}`;
-      const overrideNote = (classification === 'unsafe' || classification === 'review') ? MANUAL_REVIEW_OVERRIDES.get(overrideKey) : undefined;
-      if (overrideNote) classification = 'dom_api_safe';
-      hits.push({ file: relPath, line: lineNum, kind, snippet, classification, ...(overrideNote ? { manual_review_note: overrideNote } : {}) });
+      // ⚠️ کلیدِ override از *محتوایِ* عبارت ساخته می‌شود، نه شماره‌خط
+      // (بازطراحیِ ۲۰۲۶-۰۸-۲۳ — دلیلِ کامل در کامنتِ بالایِ
+      // MANUAL_REVIEW_OVERRIDES). خلاصه: override وضعیت را از unsafe به
+      // dom_api_safe تغییر می‌دهد، یعنی یک سرکوبِ امنیتی است؛ با کلیدِ
+      // شماره‌خط، جابه‌جاییِ کد باعث می‌شد این سرکوب رویِ یک sinkِ *دیگر*
+      // بنشیند (fail-open). با کلیدِ محتوایی، هر تغییرِ خودِ عبارت کلید را
+      // عوض می‌کند و override به‌صورتِ خودکار بی‌اثر می‌شود (fail-safe).
+      const overrideKey = `${relPath}#${exprHash(expr)}`;
+      const overridable = classification === 'unsafe' || classification === 'review';
+      const overrideNote = overridable ? MANUAL_REVIEW_OVERRIDES.get(overrideKey) : undefined;
+      if (overrideNote) { classification = 'dom_api_safe'; USED_OVERRIDE_KEYS.add(overrideKey); }
+      hits.push({ file: relPath, line: lineNum, kind, snippet, key: overrideKey, classification, ...(overrideNote ? { manual_review_note: overrideNote } : {}) });
     }
   }
   return hits;
@@ -437,12 +482,24 @@ function main() {
 
   console.log(JSON.stringify({ total: enforced.length, by_classification: byClass, unsafe_or_review: unsafe.length }, null, 2));
 
+  // ── overrideهایِ پوسیده ──
+  // یک overrideی که هیچ sinkی را مچ نکرده یعنی کدِ زیرش عوض شده. این را
+  // نباید بی‌صدا رد کرد: تا وقتی در فهرست بماند، خواننده فکر می‌کند آن sink
+  // بررسی و تأیید شده، در حالی که دیگر اصلاً به چیزی وصل نیست. (این دقیقاً
+  // همان degradationِ بی‌صدایی است که کلیدِ شماره‌خطیِ قبلی تولید می‌کرد.)
+  const staleOverrides = [...MANUAL_REVIEW_OVERRIDES.keys()].filter((k) => !USED_OVERRIDE_KEYS.has(k));
+  if (staleOverrides.length > 0) {
+    console.error(`\n✗ ${staleOverrides.length} override پوسیده (هیچ sinkی را مچ نکرد — کدشان تغییر کرده):`);
+    for (const k of staleOverrides) console.error(`   ${k}`);
+    console.error('  هرکدام را دوباره بخوان: یا کدش امن شده (override را حذف کن) یا هنوز نیاز به بررسی دارد (کلید را با hashِ جدید به‌روز کن).');
+  }
+
   const stillUnsafe = enforced.filter((h) => h.classification === 'unsafe');
   if (stillUnsafe.length > 0) {
     console.error(`\n✗ ${stillUnsafe.length} sinkِ unsafe زیرِ apps/*+shared/js باقی مانده — رجوع کن به docs/XSS_SINK_AUDIT.md`);
-    process.exit(1);
   }
-  console.log('\n✓ صفر sinkِ unsafe زیرِ apps/*+shared/js');
+  if (stillUnsafe.length > 0 || staleOverrides.length > 0) process.exit(1);
+  console.log('\n✓ صفر sinkِ unsafe زیرِ apps/*+shared/js · صفر overrideِ پوسیده');
   process.exit(0);
 }
 
