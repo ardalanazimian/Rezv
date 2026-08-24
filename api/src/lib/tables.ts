@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto';
 import { db } from './db';
 import { transitionReservation } from './lifecycle';
 import { Err } from './errors';
+import { invalidateAllAvailability } from './availability-cache';
 
 // ═══════════════════════════════════════════════════════════
 //  سرویس مدیریت میز رزرونو — وضعیت، QR، تخصیص
@@ -49,6 +50,12 @@ export async function setTableState(
     data: { state: next },
     select: { id: true, number: true, state: true },
   });
+  // maintenance تنها stateای است که availability آن را فیلتر می‌کند — ورود/خروج
+  // از آن باید کش را باطل کند، وگرنه میزِ ازکارافتاده تا TTL برای مشتری «آزاد»
+  // می‌ماند (ممیزیِ ۲۰۲۶-۰۸-۲۴). بقیه‌ی انتقال‌ها اثری در محاسبه ندارند.
+  if (next === 'maintenance' || current === 'maintenance') {
+    await invalidateAllAvailability(restaurantId).catch(() => {});
+  }
   return updated as { id: string; number: number; state: TableState };
 }
 

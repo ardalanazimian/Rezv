@@ -24,6 +24,20 @@
   CI uses the same script.
 - **Manual migrations are forward-only** and must be committed the instant they
   are applied (past DB↔schema drift required the `022` reconciliation).
+- **FK ON DELETE/UPDATE rules diverge between the two schema paths (found
+  2026-08-24, partially fixed).** Beyond column drift, dozens of foreign keys
+  have *different referential actions* depending on how the schema was built:
+  `db push` (CI) applies Prisma's defaults (RESTRICT/SET NULL + `ON UPDATE
+  CASCADE`), while the hand-written `prisma/sql` migrations (production) encode
+  their own mix — in both directions (e.g. `campaign_logs.restaurant_id` is
+  CASCADE in production but RESTRICT under db push). `check-schema-drift.sh`
+  only compares *columns*, so this class is invisible to the gate. The one case
+  that demonstrably breaks behaviour — `restaurant_closures.restaurant_id` was
+  plain NO ACTION in production while `schema.prisma` explicitly declares
+  `onDelete: Cascade`, so deleting a restaurant with closures failed — was
+  fixed by migration `059`. The full FK diff and the reconciliation follow-up
+  are recorded in `docs/PRODUCT-EXPERIENCE-AUDIT-2026-08-24.md` §27/§29.
+  **(open — reconcile case-by-case; extend the drift gate to FK rules)**
 
 ## 2. Frontend
 

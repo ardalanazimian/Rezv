@@ -701,9 +701,15 @@ let CLUB=[
   {fn:'امیر',ln:'حسینی',phone:'۰۹۱۲۲۲۲۳۳۴۴',code:'VIS-1004',tier:'bronze',points:210,bMonth:'دی',joined:'هفته پیش'},
   {fn:'سامان',ln:'عباسی',phone:'۰۹۱۲۴۴۴۵۵۶۶',code:'VIS-1005',tier:'bronze',points:150,bMonth:'خرداد',joined:'۲ هفته پیش'},
 ];
-const CUR_MONTH='خرداد';
 // نگاشت شماره ماه (۱-۱۲) به نام ماه فارسی
 const FA_MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): CUR_MONTH قبلاً ثابتِ 'خرداد' بود — یعنی
+// «تولد این ماه» و کمپینِ تولد برای همیشه خرداد را هدف می‌گرفتند. حالا از
+// تقویمِ واقعیِ شمسی (Intl، بدونِ کتابخانه) محاسبه می‌شود.
+const CUR_MONTH=(()=>{try{
+  const m=parseInt(new Intl.DateTimeFormat('fa-IR-u-nu-latn',{month:'numeric'}).format(new Date()),10);
+  return FA_MONTHS[m-1]||FA_MONTHS[0];
+}catch(e){ return FA_MONTHS[0]; }})();
 // بارگذاری اعضای باشگاه از API (با fallback به CLUB نمونه)
 async function loadClubMembers(){
   const res=await API.get('/restaurant/members?limit=100');

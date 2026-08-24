@@ -19,13 +19,15 @@ async function rLoyalty(){
   const birthdays=CLUB.filter(m=>m.bMonth===CUR_MONTH);
   const tiers=[['طلایی',gold,'#F59E0B'],['نقره‌ای',silver,'#94A3B8'],['برنزی',bronze,'#D97706']];
   const tierName={gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'};
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): دو KPIِ ثابتِ «۲.۱× خرید بیشتر» و «۸٪
+  // میانگین کش‌بک» حذف شدند — هیچ‌جا اندازه‌گیری نمی‌شدند و کنارِ اعدادِ
+  // واقعیِ باشگاه، ادعای اندازه‌گیری‌نشده بودند (قاعده‌ی ML_CONTRACT).
   document.getElementById('v-loyalty').innerHTML=`
     <div class="pg-head"><div class="pg-title">باشگاه مشتریان</div><div class="pg-sub">اعضای وفادار، امتیازها و سطح‌بندی مشتری‌ها</div></div>
     <div class="kpi-grid">
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('ticket',{size:16})}</div></div><div class="kpi-val">${fa(total)}</div><div class="kpi-label">عضو باشگاه</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('trending',{size:16})}</div><span class="kpi-delta up">۲.۱×</span></div><div class="kpi-val">۲.۱×</div><div class="kpi-label">خرید بیشتر اعضا</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon amber">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(birthdays.length)}</div><div class="kpi-label">تولد این ماه</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('wallet',{size:16})}</div></div><div class="kpi-val">۸٪</div><div class="kpi-label">میانگین کش‌بک</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('trending',{size:16})}</div></div><div class="kpi-val">${fa(gold+silver)}</div><div class="kpi-label">عضو نقره‌ای به بالا</div></div>
     </div>
 
     <!-- توضیح اتصال خودکار -->

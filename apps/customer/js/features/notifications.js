@@ -21,10 +21,16 @@ function saveRead(set){ try{ localStorage.setItem(READ_KEY, JSON.stringify([...s
 const CATS = { all:'همه', reservation:'رزرو', ai:'پیشنهاد' };
 let _filter = 'all';
 
-// منبعِ رزروها: در صورتِ ورودِ کاربر، رزروهای واقعیِ سرور (کش‌شده)؛ در غیرِ این‌صورت
-// دادهٔ نمونهٔ محلی (demo-safe). _live با refresh() از /me/reservations پر می‌شود.
-let _live = null; // null = هنوز از سرور خوانده نشده → fallback به TRIPS
-function tripsSource(){ return Array.isArray(_live) ? _live : (Array.isArray(TRIPS)?TRIPS:[]); }
+// منبعِ رزروها: کاربرِ واردشده → رزروهای واقعیِ سرور (کش‌شده). مهمان → هیچ.
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): قبلاً مهمانِ آنلاین هم fallback به TRIPSِ
+// نمونه می‌گرفت — یعنی «یادآورِ رزرو»ِ ساختگی + badgeِ قرمزِ خوانده‌نشده برای
+// کسی که هیچ رزروی ندارد. نمونه فقط در حالتِ کاملاً آفلاین (دمو) می‌ماند.
+let _live = null; // null = هنوز از سرور خوانده نشده
+function tripsSource(){
+  if (Array.isArray(_live)) return _live;
+  if (isLoggedIn()) return [];                    // منتظرِ سرور — چیزی جعل نمی‌کنیم
+  return API.online ? [] : (Array.isArray(TRIPS)?TRIPS:[]);   // فقط دموی آفلاین
+}
 
 // خواندنِ رزروهای واقعی از سرور (همان endpointِ صفحهٔ سفرها) و به‌روزرسانیِ badge.
 // آفلاین/خطا/مهمان → _live دست‌نخورده و اعلان‌ها روی دادهٔ محلی می‌مانند (بدونِ جعل).
@@ -43,7 +49,7 @@ export async function refreshNotif(){
 function build(){
   const out = [];
   tripsSource().filter(t=>t.status==='up').forEach(t=>{
-    const r = (Array.isArray(R)?R:[]).find(x=>x.id===t.rid);
+    const r = (Array.isArray(R)?R:[]).find(x=>String(x.id)===String(t.rid));
     const name = (r&&r.n) || t._name || 'رستوران';
     out.push({ id:'resv-'+t.code, cat:'reservation', pri:'high', ic:'calendar',
       title:'یادآورِ رزرو', body:`${name} — ${t.date} ساعت ${t.time}`,

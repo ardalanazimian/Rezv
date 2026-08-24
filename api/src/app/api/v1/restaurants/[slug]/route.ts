@@ -42,9 +42,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
           // — پس همین یک فیلتر، مرزِ «منتشرشده» است.
           // لوگو («category=logo») عمداً از این آرایه بیرون است — قاطیِ
           // گالریِ غذا/فضا/نوشیدنی نمی‌شود، جدا زیرِ logo_url برمی‌گردد.
+          // هیچ کلاینتی هنوز sort_order نمی‌فرستد، پس همه‌ی ردیف‌ها ۰ هستند و
+          // ترتیبِ تک‌ستونی عملاً غیرقطعی بود — createdAt به‌عنوانِ tiebreaker
+          // ترتیبِ گالریِ عمومی را پایدار می‌کند (ممیزیِ ۲۰۲۶-۰۸-۲۴).
           photos: {
             where: { status: PUBLIC_STATUS, category: { not: 'logo' } },
-            orderBy: { sortOrder: 'asc' },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
             select: { url: true, caption: true, category: true },
           },
         },

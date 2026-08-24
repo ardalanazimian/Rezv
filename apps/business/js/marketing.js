@@ -200,14 +200,13 @@ function buildHeatmap(rows){
   // بازچینش به ترتیب هفته‌ی ایرانی: شنبه(6)..جمعه(5)
   const order=[6,0,1,2,3,4,5]; const orderLbl=['ش','ی','د','س','چ','پ','ج'];
   const grid={}; let mx=0;
-  if(rows&&rows.length){
-    rows.forEach(r=>{ grid[`${r.dow}-${r.hour}`]=r.count; if(r.count>mx)mx=r.count; });
-  } else {
-    order.forEach((d,di)=>hours.forEach(h=>{
-      const wknd=(d===4||d===5)?1.8:1; const night=(h>=19&&h<=21)?2.2:(h>=18?1.4:0.6);
-      const v=Math.round(Math.random()*4*wknd*night); grid[`${d}-${h}`]=v; if(v>mx)mx=v;
-    }));
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): حالتِ بدونِ داده قبلاً با Math.random یک
+  // نقشه‌ی «واقع‌گرایانه» می‌ساخت و tooltipِ هر خانه می‌گفت «۳ رزرو» — نویزِ
+  // تصادفی در لباسِ تاریخچه‌ی رزرو. نبودِ داده یعنی نبودِ ادعا.
+  if(!(rows&&rows.length)){
+    return `<div class="pr-empty">هنوز داده‌ی کافی برای نقشه‌ی حرارتی نیست — با ثبتِ رزروهای بیشتر ساخته می‌شود.</div>`;
   }
+  rows.forEach(r=>{ grid[`${r.dow}-${r.hour}`]=r.count; if(r.count>mx)mx=r.count; });
   mx=mx||1;
   const cell=(d,h)=>{
     const v=grid[`${d}-${h}`]||0; const t=v/mx;
@@ -235,6 +234,10 @@ async function rAnalytics(){
     weekly:[14,18,24,31],
   };
   // بارگذاری از API اگر توکن staff داریم
+  // بدونِ توکنِ staff هم باید صادق باشیم: API.online پیش‌فرض true است و
+  // بدونِ این خط، dataSourceNote() هیچ هشداری نشان نمی‌داد و بلوکِ نمونه
+  // (۱۳۶ رزرو، ۶۶٪ بازگشت...) کاملاً واقعی به نظر می‌رسید (ممیزیِ ۲۰۲۶-۰۸-۲۴).
+  if(!API.getToken()) API.online=false;
   if(API.getToken()){
     const res=await API.get('/restaurant/analytics');
     if(res.ok && res.data){
@@ -286,8 +289,8 @@ async function rAnalytics(){
     <div class="pg-head"><div class="pg-title">تحلیل‌ها</div><div class="pg-sub">روند رزرو، نرخ بازگشت و رفتار مشتری‌ها</div></div>
     ${dataSourceNote()}
     <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('calendar',{size:16})}</div><span class="kpi-delta up">${icon('trending',{size:11})} ۱۸٪</span></div><div class="kpi-val">${fa(A.weekThisWeek)}</div><div class="kpi-label">رزرو این هفته</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('refresh',{size:16})}</div><span class="kpi-delta up">${icon('trending',{size:11})} ۵٪</span></div><div class="kpi-val">${fa(returnRate)}٪</div><div class="kpi-label">نرخ بازگشت مشتری</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(A.weekThisWeek)}</div><div class="kpi-label">رزرو این هفته</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('refresh',{size:16})}</div></div><div class="kpi-val">${fa(returnRate)}٪</div><div class="kpi-label">نرخ بازگشت مشتری</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon amber">${icon('users',{size:16})}</div></div><div class="kpi-val">${avgVisits}</div><div class="kpi-label">میانگین دفعات مراجعه</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(A.avgInterval)}</div><div class="kpi-label">میانگین فاصله (روز)</div></div>
     </div>

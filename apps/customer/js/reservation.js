@@ -8,14 +8,14 @@ import { API, isLoggedIn } from './api.js';
 import { esc, faNum } from './auth.js';
 import { openRest } from './data/detail.js';
 import { cardHTML, fmtFa, go } from './data/discover.js';
-import { GRAD, TRIPS, favs } from './data/seed.js';
+import { TRIPS, favHas, gradFor } from './data/seed.js';
 import { addToCalendar, addToWallet, cancelTrip, repeatReservation, showCheckInQR } from './features/trips.js';
-import { R } from './init.js';
+import { R, findR } from './init.js';
 import { armReveals, buzz } from './theme-pwa.js';
 import { icon } from './icons.js';
 
 export function renderFavs(){
-  const list=R.filter(r=>favs.has(r.id));const grid=document.getElementById('favGrid'),empty=document.getElementById('favEmpty');
+  const list=R.filter(r=>favHas(r.id));const grid=document.getElementById('favGrid'),empty=document.getElementById('favEmpty');
   document.getElementById('favSub').textContent=list.length?`${fmtFa(list.length)} رستوران ذخیره‌شده`:'';
   if(!list.length){grid.innerHTML='';empty.style.display='block';return}
   empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.querySelectorAll('.rc').forEach(c=>c.classList.add('in'));
@@ -32,7 +32,7 @@ export function mapTripStatus(apiStatus){
   return TRIP_STATUS_MAP[apiStatus] || 'up';
 }
 export function mapApiTrip(apiR){
-  const rest=R.find(x=>x.id===apiR.restaurantId) || (apiR.restaurant?.slug ? R.find(x=>x.slug===apiR.restaurant.slug) : null);
+  const rest=findR(apiR.restaurantId) || (apiR.restaurant?.slug ? R.find(x=>x.slug===apiR.restaurant.slug) : null);
   let dateStr='',timeStr='';
   if(apiR.slotStart){
     const d=new Date(apiR.slotStart);
@@ -64,6 +64,16 @@ function tripTimeline(status){
 export async function renderTrips(){
   const listEl=document.getElementById('tripsList');
   let trips=TRIPS;
+  let isDemo=true;   // TRIPS نمونه است تا وقتی داده‌ی واقعیِ سرور جایگزینش شود
+
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): بازدیدکننده‌ی واردنشده ۳ رزروِ ساختگیِ
+  // TRIPS را بدونِ هیچ برچسبی می‌دید («۳ کل رزرو · ۱ پیش‌رو»...). حالا اگر
+  // سرور در دسترس است و کاربر وارد نشده → دعوت به ورود، نه رزروِ جعلی.
+  // نمونه‌ها فقط در حالتِ کاملاً آفلاین/دمو می‌مانند، آن هم با برچسبِ «نمونه».
+  if(!isLoggedIn() && API.online){
+    listEl.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('calendar',{size:44})}</div><div class="empty-state-title">رزروهات اینجا نشون داده می‌شن</div><div class="empty-state-desc">برای دیدنِ رزروهای واقعی‌ت اول وارد شو</div><button class="btn btn-primary" style="margin-top:16px" onclick="openLogin&&openLogin()">ورود</button></div>`;
+    return;
+  }
 
   if(isLoggedIn()){
     listEl.setAttribute('aria-busy','true');
@@ -74,6 +84,7 @@ export async function renderTrips(){
     if(res.ok && Array.isArray(res.data)){
       trips=res.data.map(mapApiTrip);
       window.__lastTrips=trips;
+      isDemo=false;
     }
   }
 
@@ -83,10 +94,11 @@ export async function renderTrips(){
   }
   const done=trips.filter(t=>t.status==='done').length;
   const up=trips.filter(t=>t.status==='up').length;
-  const summary=`<div class="trips-summary reveal"><div class="ts-stat"><div class="ts-v">${fmtFa(trips.length)}</div><div class="ts-l">کل رزرو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(up)}</div><div class="ts-l">پیش‌رو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(done)}</div><div class="ts-l">تجربه‌شده</div></div></div>`;
+  const demoNote=isDemo?`<div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:12.5px;line-height:1.7;text-align:center;margin-bottom:10px">⚠️ این‌ها رزروِ نمونه‌اند — رزروِ واقعیِ تو نیستند (اتصال به سرور برقرار نیست).</div>`:'';
+  const summary=`${demoNote}<div class="trips-summary reveal"><div class="ts-stat"><div class="ts-v">${fmtFa(trips.length)}</div><div class="ts-l">کل رزرو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(up)}</div><div class="ts-l">پیش‌رو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(done)}</div><div class="ts-l">تجربه‌شده</div></div></div>`;
 
   listEl.innerHTML=summary+trips.map(t=>{
-    const r=t.rid?R.find(x=>x.id===t.rid):null;
+    const r=t.rid?findR(t.rid):null;
     const emoji=t._emoji||r?.e||'🍽️';
     const name=t._name||r?.n||'رستوران';
     const gradId=t._grad||t.rid||1;
@@ -96,11 +108,11 @@ export async function renderTrips(){
     const acts=t.status==='up'
       ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR('${esc(t.code)}','${esc(name)}')">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','${esc(t.slotStartIso||'')}')">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip('${esc(t.code)}',this)">لغو</button>`
       : t.status==='cancelled' ? ''
-      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation(${t.rid})">رزرو مجدد</button><button class="btn btn-sm btn-ghost" onclick="openReviewSheetFromTrip('${esc(t.code)}')">ثبت نظر</button>`:''}`;
+      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation('${t.rid}')">رزرو مجدد</button><button class="btn btn-sm btn-ghost" onclick="openReviewSheetFromTrip('${esc(t.code)}')">ثبت نظر</button>`:''}`;
     return `<div class="trip-card reveal ${t.status}${swipe?' has-swipe':''}">
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
       <div class="trip-card-inner">
-        <div class="trip-card-hero" style="background:${GRAD[gradId]||GRAD[1]}">
+        <div class="trip-card-hero" style="background:${gradFor(gradId)}">
           <div class="trip-card-mesh"></div>
           <span class="trip-card-emoji">${emoji}</span>
           <span class="trip-card-status ${t.status}">${statusLabel}</span>

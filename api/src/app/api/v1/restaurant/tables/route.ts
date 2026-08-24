@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
+import { invalidateAllAvailability } from '@/lib/availability-cache';
 import { parseBody, z } from '@/lib/schemas';
 import { assignQrCode } from '@/lib/tables';
 
@@ -75,6 +76,9 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
   } catch {
     qrCode = null;
   }
+
+  // میزِ تازه ظرفیتِ تازه است — کشِ availability باید باطل شود (ممیزیِ ۲۰۲۶-۰۸-۲۴)
+  await invalidateAllAvailability(ctx.restaurant.id);
 
   return NextResponse.json({ id: table.id, number: table.number, qr_code: qrCode }, { status: 201 });
 });
