@@ -44,18 +44,33 @@ export async function getAvailability(restaurantId: string, date: string, party:
       const wrapped = JSON.parse(cached) as { payload: any; computedAt: number };
       const ageSec = (Date.now() - wrapped.computedAt) / 1000;
       if (ageSec < FRESH_SEC) {
-        return wrapped.payload; // تازه — مستقیم
+        return withoutPastSlots(wrapped.payload); // تازه — مستقیم
       }
       // stale — refresh پس‌زمینه با single-flight lock، ولی stale را الان برگردان
       void refreshAvailabilityInBackground(restaurantId, date, party, cacheKey);
-      return wrapped.payload;
+      return withoutPastSlots(wrapped.payload);
     } catch {
       // فرمت قدیمی/خراب — از نو محاسبه کن
     }
   }
 
   // cache miss کامل — محاسبه و ذخیره (با قفل تا فقط یکی محاسبه کند)
-  return computeAndCacheAvailability(restaurantId, date, party, cacheKey, STALE_SEC);
+  return withoutPastSlots(await computeAndCacheAvailability(restaurantId, date, party, cacheKey, STALE_SEC));
+}
+
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): موتور هیچ‌وقت «الان» را چک نمی‌کرد — سانس‌های
+// گذشته‌ی امروز open برمی‌گشتند و کاربر بعد از انتخاب، در submit با
+// Err.pastTime رد می‌شد. فیلتر عمداً *بیرونِ* cache انجام می‌شود (نه داخلِ
+// compute) تا «الان» در payloadِ کش‌شده نخ نشود؛ tz برای همین داخلِ payload
+// ذخیره می‌شود. payloadِ کهنه‌ی بدونِ tz دست‌نخورده عبور می‌کند و ظرفِ TTL
+// خودش (حداکثر ۳۰۰ ثانیه) منقضی می‌شود.
+function withoutPastSlots(payload: any) {
+  if (!payload?.tz || !Array.isArray(payload.slots)) return payload;
+  const now = Date.now();
+  return {
+    ...payload,
+    slots: payload.slots.filter((s: any) => +zonedTimeToUtc(payload.date, s.time, payload.tz) > now),
+  };
 }
 
 /** refresh پس‌زمینه با قفل single-flight — فقط یک request همزمان محاسبه می‌کند. */
@@ -108,8 +123,16 @@ export async function computeAndCacheAvailability(restaurantId: string, date: st
     r.timezone ?? 'Asia/Tehran',
     closureSet,
   );
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): maxPartySize اینجا هم اعمال می‌شود — موتورِ
+  // رزرو (reservations.ts) آن را چک می‌کند ولی availability نمی‌کرد، پس میزی که
+  // اپراتور سقفِ گروهش را پایین آورده بود سانس را open نشان می‌داد و رزروش در
+  // submit شکست می‌خورد. قاعده همان reservations است: null یعنی سقف = capacity.
   const tables = await db.table.findMany({
-    where: { restaurantId, isActive: true, state: { not: 'maintenance' }, capacity: { gte: party }, minPartySize: { lte: party } },
+    where: {
+      restaurantId, isActive: true, state: { not: 'maintenance' },
+      capacity: { gte: party }, minPartySize: { lte: party },
+      OR: [{ maxPartySize: null }, { maxPartySize: { gte: party } }],
+    },
     select: { id: true, number: true },
   });
 
@@ -143,7 +166,7 @@ export async function computeAndCacheAvailability(restaurantId: string, date: st
     return { time, free_tables: freeTables, status: freeTables.length ? 'open' : 'full' };
   });
 
-  const payload = { date, party, slots };
+  const payload = { date, party, slots, tz };
   // wrap با مهر زمان برای SWR
   await redis.set(cacheKey, JSON.stringify({ payload, computedAt: Date.now() }), 'EX', ttlSec);
   return payload;

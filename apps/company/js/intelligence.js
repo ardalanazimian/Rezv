@@ -45,12 +45,19 @@ function renderCustomers(){
 function rBilling(){
   const totalSms=RESTAURANTS.reduce((s,r)=>s+r.sms,0);
   const activeSubsc=RESTAURANTS.filter(r=>r.status==='active').length;
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): MRR قبلاً همیشه از یک ثابتِ کلاینتیِ
+  // ناقص و کهنه (PRICE={free,pro,enterprise} — بدونِ basic/trial و ناسازگار
+  // با قیمت‌های واقعیِ CMS) جمع زده می‌شد — حتی وقتی داده‌ی رستوران‌ها واقعی
+  // بود. یک رقمِ درآمدِ اشتباه بدترین نوعِ KPI است. حالا: چون بک‌اند قیمتِ
+  // پلن را برنمی‌گرداند، در حالتِ آنلاین «—» نشان می‌دهیم (اندازه‌گیری‌نشده،
+  // نه صفر — همان قاعده‌ی ML_CONTRACT)؛ عددِ نمونه فقط در دموی آفلاین با
+  // داده‌ی [DEMO] می‌ماند.
   const PRICE={free:0,pro:890,enterprise:2400};
-  const mrr=RESTAURANTS.filter(r=>r.status==='active'||r.status==='expiring').reduce((s,r)=>s+(PRICE[r.plan]||0),0);
+  const mrr=API.online?null:RESTAURANTS.filter(r=>r.status==='active'||r.status==='expiring').reduce((s,r)=>s+(PRICE[r.plan]||0),0);
   document.getElementById('v-billing').innerHTML=`
     <div class="bill-summary">
       <div class="bill-stat"><div class="bs-val" style="color:var(--ink)">${fa(activeSubsc)}</div><div class="bs-label">اشتراک فعال</div></div>
-      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${fa(mrr)}<span style="font-size:14px"> هزارتومان</span></div><div class="bs-label">درآمد ماهانه (تخمینی از پلن‌ها)</div></div>
+      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${mrr==null?'—':fa(mrr)+'<span style="font-size:14px"> هزارتومان</span>'}</div><div class="bs-label">${mrr==null?'درآمد ماهانه — اندازه‌گیری‌نشده (قیمتِ پلن در API نیست)':'درآمد ماهانه (نمونه‌ی دمو)'}</div></div>
       <div class="bill-stat"><div class="bs-val" style="color:var(--amber-600)">${fa(totalSms)}</div><div class="bs-label">کل پیامک ارسالی</div></div>
     </div>
     <div class="panel">

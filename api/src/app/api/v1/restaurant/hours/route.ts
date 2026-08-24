@@ -5,6 +5,7 @@ import { Err } from '@/lib/errors';
 import { safeJson } from '@/lib/schemas';
 import { audit } from '@/lib/audit';
 import { clientIp } from '@/lib/ratelimit';
+import { invalidateAllAvailability } from '@/lib/availability-cache';
 
 // ═══════════════════════════════════════════════════════════
 //  GET  /restaurant/hours — خواندن ساعتِ کاری + تعطیلاتِ خاص
@@ -108,6 +109,11 @@ export const PUT = withRestaurantAuth({ permission: 'canManageSettings', rateLim
         ON CONFLICT (restaurant_id, closure_date) DO UPDATE SET reason = EXCLUDED.reason
       `;
     }
+    // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): closures زنده نوشته می‌شوند ولی کشِ
+    // availability باطل نمی‌شد — یک تعطیلیِ اضطراریِ امروز تا ۳۰۰ ثانیه برای
+    // مشتری سانسِ باز نشان می‌داد. تغییرِ closure روی همه‌ی تاریخ‌های حذف/
+    // اضافه‌شده اثر دارد (جایگزینیِ کامل است)، پس کلِ کش پاک می‌شود.
+    await invalidateAllAvailability(ctx.restaurant.id);
   }
 
   return NextResponse.json({ ok: true, hours_change_status: 'pending' });

@@ -11,6 +11,11 @@ import { runPendingCheckIn } from './features/checkin.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
 export let R = R_SAMPLE;
 
+// پیداکردنِ رستوران با id — همیشه با مقایسه‌ی String، چون idِ نمونه عدد است و
+// idِ واقعیِ بک‌اند UUID (string). مقایسه‌ی === مستقیم بین این دو، برای هر
+// رستورانِ واقعی شکست می‌خورد (باگی که همه‌ی CTAهای کارت را می‌شکست).
+export const findR = id => R.find(x => String(x.id) === String(id));
+
 // ── startup: بعد از آماده‌شدنِ DOM اجرا شو (چرخه‌ی load-time را می‌شکند) ──
 function boot(){
   Actions.init();                    // فعال‌سازی event delegation

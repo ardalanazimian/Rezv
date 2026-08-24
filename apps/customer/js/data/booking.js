@@ -7,7 +7,7 @@ import { API, USER, isLoggedIn, syncNavPoints, userName } from '../api.js';
 import { closeSheet, esc, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
 import { doSearch, fmtFa } from './discover.js';
 import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js';
-import { R } from '../init.js';
+import { findR } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
 import { genIdempotencyKey } from '../api-core.js';
 import { haptic } from '../theme-pwa.js';
@@ -41,7 +41,7 @@ const PARTY_MAX = 12;
 
 // شیت رزرو که با دکمه‌ی پایین باز می‌شود (تاریخ/ساعت/نفر)
 export function openBookSheet(id){
-  const r=R.find(x=>x.id===id);
+  const r=findR(id);
   // پیش‌فرض‌ها از زمینه‌ی مشترک می‌آیند، نه از صفر — اگر کاربر قبلاً گفته
   // «پنجشنبه، ۴ نفر»، همان‌جا می‌ماند و لازم نیست دوباره واردش کند.
   const dates = dateOptions();
@@ -49,14 +49,14 @@ export function openBookSheet(id){
   openSheet(`
     <div class="bs-head"><div class="bs-title">رزرو میز</div><div class="bs-rest">${esc(r.n)}</div></div>
     <div id="bwDemoBanner"></div>
-    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${id})">${
+    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots('${id}')">${
       dates.map(d=>`<option value="${d.iso}"${d.iso===dateSel?' selected':''}>${esc(d.label)}</option>`).join('')
     }</select></div>
-    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots(${id})">${
+    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots('${id}')">${
       Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
     }</select></div>
     <div class="bw-field"><label>ساعت</label><select id="bwTime"><option>در حال بررسی...</option></select></div>
-    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook(${id})">بررسی میزهای موجود</button>
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook('${id}')">بررسی میزهای موجود</button>
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">هنوز پولی پرداخت نمی‌کنی</div>
   `);
   refreshSlots(id);
@@ -87,7 +87,7 @@ function renderDemoTimeOptions(sel,r){
 }
 // بارگذاری ساعت‌های واقعاً موجود از /restaurants/{slug}/availability
 export async function refreshSlots(id){
-  const r=R.find(x=>x.id===id);
+  const r=findR(id);
   const sel=document.getElementById('bwTime');
   if(!sel)return;
   // اگر slug نداریم (حالت آفلاین/نمونه)، از همون slots نمونه استفاده کن
@@ -135,7 +135,7 @@ export function quickBook(id,slot){
   setBk({id,date:labelForISO(bookingCtx.date),dateVal:bookingCtx.date,time:slot,
          timeRaw:String(slot).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
          party:`${fmtFa(bookingCtx.party)} نفر`,partyN:bookingCtx.party});
-  openSheet(bookStep2(R.find(x=>x.id===id)));
+  openSheet(bookStep2(findR(id)));
 }
 export function startBook(id){
   const t=document.getElementById('bwTime').value;
@@ -144,7 +144,7 @@ export function startBook(id){
   const partyN=parseInt(document.getElementById('bwParty').value,10)||2;
   setBookingCtx({ date: iso, party: partyN });
   setBk({id,date:labelForISO(iso),dateVal:iso,time:faTime(t),timeRaw:t,party:`${fmtFa(partyN)} نفر`,partyN});
-  openSheet(bookStep2(R.find(x=>x.id===id)));
+  openSheet(bookStep2(findR(id)));
 }
 export function bookStep2(r){
   // ⚠️ رفع‌شده (R1): وقتی رستوران منویی ثبت نکرده (r.menu=[])، قبلاً این
@@ -153,16 +153,16 @@ export function bookStep2(r){
   // منویِ خالی اصلاً نشان داده نمی‌شود.
   const preorderBlock = r.menu.length
     ? `<div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
-    <div class="opt-row">${r.menu.map(m=>`<div class="opt" onclick="this.classList.toggle('sel')">${m[0]} ${m[1]}</div>`).join('')}</div>`
+    <div class="opt-row">${r.menu.map(m=>`<div class="opt" onclick="this.classList.toggle('sel')">${esc(m[0])} ${esc(m[1])}</div>`).join('')}</div>`
     : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
     ${preorderBlock}
-    <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3(${r.id})">ادامه</button>`;
+    <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3('${r.id}')">ادامه</button>`;
 }
 // wrapperِ سراسری: onclick در scope سراسری اجرا می‌شود و به R (ماژولی) دسترسی ندارد،
 // پس lookup را اینجا (با دسترسی به R) انجام می‌دهیم.
-export function toBookStep3(id){ openSheet(bookStep3(R.find(x=>x.id===id))); }
+export function toBookStep3(id){ openSheet(bookStep3(findR(id))); }
 export function bookStep3(r){
   // نام/موبایل از حسابِ کاربر (اگر وارد شده) — نه مقدارِ ساختگی
   const name = isLoggedIn() ? userName() : '';
@@ -174,13 +174,13 @@ export function bookStep3(r){
     <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${esc(r.n)}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
     ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${r.id})">تأیید رزرو</button>`;
+    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook('${r.id}')">تأیید رزرو</button>`;
 }
 export async function confirmBook(id){
-  const r=R.find(x=>x.id===id);
+  const r=findR(id);
   // رزرو نیاز به ورود دارد — بعد از ورود، همین مرحله‌ی تأیید از سر گرفته می‌شود
   if(!isLoggedIn()){
-    setAfterLogin(()=>{ const rr=R.find(x=>x.id===id); if(rr && bk.id===id) openSheet(bookStep3(rr)); });
+    setAfterLogin(()=>{ const rr=findR(id); if(rr && String(bk.id)===String(id)) openSheet(bookStep3(rr)); });
     toast('','برای رزرو اول وارد شو — بعدش ادامه می‌دیم');
     setTimeout(()=>openLogin(),400);
     return;

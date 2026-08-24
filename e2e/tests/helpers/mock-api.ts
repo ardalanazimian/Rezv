@@ -29,10 +29,15 @@ export interface MockOptions {
 // (رفعِ باگِ صداقت) — پس کارتِ اول با CTAِ خالیِ «ببین سانس‌ها» رندر می‌شد،
 // نه چیپِ ساعتِ واقعی؛ تستِ دسترس‌پذیریِ چیپِ ساعت را همین‌جا با یک مقدارِ
 // واقع‌گرایانه (نه فیک) پوشش می‌دهیم.
-const DEMO_RESTAURANTS = [
-  { id: 1, slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸', available_slots: ['19:00', '20:00'] },
-  { id: 2, slug: 'demo-sushi-bar', name: '[DEMO] سوشی بار', cuisine: 'ژاپنی', rating: 4.5, price: '$$$', cashback: 8, cover_emoji: '🍣' },
-  { id: 3, slug: 'demo-burger-lab', name: '[DEMO] برگر لب', cuisine: 'فست‌فود', rating: 4.6, price: '$$', cashback: 12, cover_emoji: '🍔' },
+// ⚠️ idها عمداً UUID هستند (ممیزیِ ۲۰۲۶-۰۸-۲۴): بک‌اندِ واقعی همیشه UUID
+// برمی‌گرداند، ولی این mock تا امروز idِ عددیِ ۱..۳ می‌داد — به همین دلیل
+// باگِ واقعیِ «UUIDِ بدونِ کوتیشن در onclick که همه‌ی CTAهای کارت را
+// می‌شکست» هرگز در CI دیده نشد (کلاسیکِ «CI سبز، تولید خراب»). mock باید
+// همان شکلی را تولید کند که تولید واقعاً می‌سازد.
+export const DEMO_RESTAURANTS = [
+  { id: 'a1b2c3d4-0000-4000-8000-000000000001', slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸', available_slots: ['19:00', '20:00'] },
+  { id: 'a1b2c3d4-0000-4000-8000-000000000002', slug: 'demo-sushi-bar', name: '[DEMO] سوشی بار', cuisine: 'ژاپنی', rating: 4.5, price: '$$$', cashback: 8, cover_emoji: '🍣' },
+  { id: 'a1b2c3d4-0000-4000-8000-000000000003', slug: 'demo-burger-lab', name: '[DEMO] برگر لب', cuisine: 'فست‌فود', rating: 4.6, price: '$$', cashback: 12, cover_emoji: '🍔' },
 ];
 
 function openSlots() {
