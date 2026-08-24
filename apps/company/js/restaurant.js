@@ -64,7 +64,7 @@ function rAnalytics(){
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic ink">${icon('users',{size:17})}</div></div><div class="kpi-val">${fa(totalMembers)}</div><div class="kpi-label">کل اعضای باشگاه</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic violet">${icon('calendar',{size:17})}</div></div><div class="kpi-val">${fa(totalRes)}</div><div class="kpi-label">کل رزروها</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-ic amber">${icon('phone',{size:17})}</div></div><div class="kpi-val">${fa(totalSmsBalance)}</div><div class="kpi-label">موجودی پیامک کل</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('store',{size:17})}</div></div><div class="kpi-val">${fa(RESTAURANTS.length)}</div><div class="kpi-label">رستوران فعال در پلتفرم</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-ic green">${icon('store',{size:17})}</div></div><div class="kpi-val">${fa(PLATFORM_STATS?.subscription_breakdown?.active ?? RESTAURANTS.filter(r=>r.status==='active').length)}</div><div class="kpi-label">رستوران فعال در پلتفرم</div></div>
     </div>
     <div class="panel" style="margin-bottom:20px">
       <div class="panel-head"><div><div class="panel-title">توزیع پلن‌ها</div><div class="panel-sub">چند رستوران روی هر پلن هستن</div></div></div>

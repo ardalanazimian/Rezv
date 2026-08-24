@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { sep } from 'node:path';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -93,7 +94,10 @@ describe('resolveKey — دفاعِ دوم در برابرِ path traversal', ()
   test('کلیدِ معتبر زیرِ ریشه می‌نشیند', () => {
     const full = resolveKey(`2026/08/${UUID}.jpg`);
     assert.ok(full);
-    assert.ok(full!.startsWith(uploadRoot() + '/'));
+    // باگِ رفع‌شده: قبلاً همیشه '/' هاردکد بود، ولی resolveKey (media-store.ts)
+    // خودش با sepِ بومیِ سیستم‌عامل مقایسه می‌کند — روی ویندوز full با
+    // uploadRoot()+'\\' شروع می‌شود نه '/'، پس این تست همیشه false می‌داد.
+    assert.ok(full!.startsWith(uploadRoot() + sep));
   });
 
   // حتی اگر روزی الگوی کلید شل شود، این لایه باید جلوی خروج از ریشه را بگیرد.

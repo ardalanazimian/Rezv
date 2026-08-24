@@ -5,17 +5,18 @@
 //  رفتار دقیقاً همان قبل است.
 // ═══════════════════════════════════════════════════════════
 import { API, isLoggedIn } from './api.js';
+import { isOfflineDemo } from './api-core.js';
 import { esc, faNum } from './auth.js';
 import { openRest } from './data/detail.js';
 import { cardHTML, fmtFa, go } from './data/discover.js';
-import { GRAD, TRIPS, favs } from './data/seed.js';
-import { addToCalendar, addToWallet, cancelTrip, repeatReservation, showCheckInQR } from './features/trips.js';
+import { GRAD, TRIPS, favs, setMyTrips } from './data/seed.js';
+import { addToCalendar, addToWallet, cancelTrip, openReviewSheet, repeatReservation, showCheckInQR } from './features/trips.js';
 import { R } from './init.js';
 import { armReveals, buzz } from './theme-pwa.js';
 import { icon } from './icons.js';
 
 export function renderFavs(){
-  const list=R.filter(r=>favs.has(r.id));const grid=document.getElementById('favGrid'),empty=document.getElementById('favEmpty');
+  const list=R.filter(r=>favs.has(String(r.id)));const grid=document.getElementById('favGrid'),empty=document.getElementById('favEmpty');
   document.getElementById('favSub').textContent=list.length?`${fmtFa(list.length)} رستوران ذخیره‌شده`:'';
   if(!list.length){grid.innerHTML='';empty.style.display='block';return}
   empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.querySelectorAll('.rc').forEach(c=>c.classList.add('in'));
@@ -52,7 +53,7 @@ export function mapApiTrip(apiR){
   // (کلیدِ اصلی) را همیشه برمی‌گرداند (Prisma بدونِ select صریح همه‌ی
   // اسکالرها را می‌دهد) — همان را اول امتحان می‌کنیم؛ فقط اگر R هنوز از
   // نمونه پر بود (id عددی، UUID مچ نمی‌شود) به slug برمی‌گردیم.
-  const rest=R.find(x=>x.id===apiR.restaurantId) || (apiR.restaurant?.slug ? R.find(x=>x.slug===apiR.restaurant.slug) : null);
+  const rest=R.find(x=>String(x.id)===String(apiR.restaurantId)) || (apiR.restaurant?.slug ? R.find(x=>x.slug===apiR.restaurant.slug) : null);
   // تبدیل تاریخ ISO به نمایش فارسی ساده
   let dateStr='',timeStr='';
   if(apiR.slotStart){
@@ -74,6 +75,16 @@ export function mapApiTrip(apiR){
     party:faNum((apiR.partySize||2))+' نفر',
     code:apiR.code||'—',
     status:mapTripStatus(apiR.status),
+    // ── شناسه‌هایِ واقعیِ سرور (رفعِ P1-4) ──
+    // `rid` بالا شناسه‌ی محلیِ R است و ممکن است از دادهٔ نمونه بیاید؛ برایِ
+    // ثبتِ نظر باید UUIDِ واقعیِ سرور برود، نه شناسه‌ی محلی. این دو فیلد
+    // تنها منبعِ مجازِ آن‌اند و اگر سرور ندهد null می‌مانند (دکمه غیرفعال).
+    serverRestaurantId: apiR.restaurantId || null,
+    serverReservationId: apiR.id || null,
+    // ⚠️ رزروی که منتظرِ تأییدِ رستوران است (رستوران `auto_confirm` را خاموش
+    // کرده). قبلاً `pending` هم مثلِ `confirmed` فقط «پیش‌رو» نشان داده می‌شد،
+    // یعنی مشتری فکر می‌کرد میزش قطعی است در حالی که رستوران هنوز تأیید نکرده.
+    awaitingApproval: apiR.status === 'pending',
   };
 }
 
@@ -86,7 +97,16 @@ function tripTimeline(status){
 }
 export async function renderTrips(){
   const listEl=document.getElementById('tripsList');
-  let trips=TRIPS; // پیش‌فرض: داده‌ی محلی
+  // ⚠️ رفعِ جعلِ رزرو (پروتکل §۱۰) — همان کلاسِ IS-1 در مرکزِ اعلان، ولی
+  // به‌مراتب آشکارتر: پیش‌فرض `TRIPS` (دادهٔ seed) بود، پس یک بازدیدکننده‌ی
+  // **واردنشده** روی سایتِ واقعی سه رزروِ ساختگی می‌دید (RZ8K2M پیش‌رو،
+  // RZ4A1C و RZ9X3F تجربه‌شده) با خلاصه‌ی «۳ کل رزرو · ۱ پیش‌رو» و دکمه‌هایِ
+  // فعالِ «QR ورود»، «تقویم»، «کیف پول» و «لغو» — یعنی می‌شد رزروی را که
+  // هرگز وجود نداشت «لغو» کرد. همین برایِ کاربرِ واردشده‌ای که fetchش شکست
+  // می‌خورد هم رخ می‌داد.
+  // حالا: نمی‌دانیم ⇒ حالتِ خالیِ صادق («هنوز رزروی نداری») که از قبل ساخته
+  // شده بود. تنها استثنا بسته‌ی آفلاینِ تک‌فایلی که خودش دموست.
+  let trips = isOfflineDemo() ? TRIPS : [];
 
   // اگر کاربر وارد شده، از API بخوان
   if(isLoggedIn()){
@@ -100,7 +120,11 @@ export async function renderTrips(){
       // داده‌ی واقعی از سرور
       trips=res.data.map(mapApiTrip);
     }
-    // اگر آفلاین یا خطا → همان TRIPS محلی (fallback)
+    // اگر آفلاین یا خطا → trips دست‌نخورده می‌ماند (خالی روی استقرارِ
+    // واقعی، دادهٔ دمو فقط در بسته‌ی تک‌فایلی) — بدونِ جعلِ رزرو.
+    if(res.ok && Array.isArray(res.data)) setMyTrips(trips);
+  } else if(isOfflineDemo()){
+    setMyTrips(trips);   // بسته‌ی دمو: همان چیزی که نشان داده می‌شود
   }
 
   if(!trips.length){
@@ -113,11 +137,14 @@ export async function renderTrips(){
   const summary=`<div class="trips-summary reveal"><div class="ts-stat"><div class="ts-v">${fmtFa(trips.length)}</div><div class="ts-l">کل رزرو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(up)}</div><div class="ts-l">پیش‌رو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(done)}</div><div class="ts-l">تجربه‌شده</div></div></div>`;
 
   listEl.innerHTML=summary+trips.map(t=>{
-    const r=t.rid?R.find(x=>x.id===t.rid):null;
+    const r=t.rid?R.find(x=>String(x.id)===String(t.rid)):null;
     const emoji=t._emoji||r?.e||'🍽️';
     const name=t._name||r?.n||'رستوران';
     const gradId=t._grad||t.rid||1;
-    const statusLabel=t.status==='up'?`<span class="live-dot" aria-hidden="true"></span> پیش‌رو`:t.status==='cancelled'?`${icon('close',{size:12})} لغوشده`:`${icon('check',{size:12})} تجربه‌شده`;
+    const statusLabel=t.awaitingApproval?`${icon('clock',{size:12})} در انتظارِ تأییدِ رستوران`
+      :t.status==='up'?`<span class="live-dot" aria-hidden="true"></span> پیش‌رو`
+      :t.status==='cancelled'?`${icon('close',{size:12})} لغوشده`
+      :`${icon('check',{size:12})} تجربه‌شده`;
     // اکشنِ swipe (C16): کارتِ «پیش‌رو» → لغو، کارتِ «تجربه‌شده» با rid → رزرو مجدد.
     // دکمه‌ی متناظر با data-swipe-action علامت می‌خورد تا ژستِ swipe همان هندلرِ سیم‌کشی‌شده را کلیک کند.
     const swipe=t.status==='up'?{cls:'cancel',ic:'close',label:'لغو رزرو'}
@@ -125,7 +152,7 @@ export async function renderTrips(){
     const acts=t.status==='up'
       ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR('${esc(t.code)}','${esc(name)}')">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','${esc(t.slotStartIso||'')}')">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip('${esc(t.code)}',this)">لغو</button>`
       : t.status==='cancelled' ? ''
-      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation(${t.rid})">رزرو مجدد</button><button class="btn btn-sm btn-ghost" onclick="openRest(${t.rid})">ثبت نظر</button>`:''}`;
+      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation('${esc(String(t.rid))}')">رزرو مجدد</button>${(t.serverRestaurantId&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="buzz&&buzz();openReviewSheet('${esc(t.serverRestaurantId)}','${esc(t.serverReservationId)}','${esc(name)}')">ثبت نظر</button>`:''}`:''}`;
     return `<div class="trip-card reveal ${t.status}${swipe?' has-swipe':''}">
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
       <div class="trip-card-inner">

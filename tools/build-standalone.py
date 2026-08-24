@@ -14,7 +14,16 @@
 اجرا:  python3 tools/build-standalone.py
 خروجی: standalone/{customer,business,company}.html
 """
-import re, os, sys
+import re, os, sys, base64
+
+# رفعِ واقعی (۲۰۲۶-۰۸-۲۳): این اسکریپت روی ویندوز کرش می‌کرد — نه موقعِ ساخت،
+# بلکه دقیقاً موقعِ چاپِ نتیجه (کنسولِ پیش‌فرض cp1252 است و نمی‌تواند '\u2705'
+# را encode کند). بدتر: crash *بعد از* نوشتنِ فایلِ اول رخ می‌داد، پس
+# customer.html ساخته می‌شد و دوتایِ دیگر نه — یک بسته‌ی نیمه‌کاره بدونِ هشدارِ
+# روشن. عملاً هیچ توسعه‌دهنده‌ی ویندوزی نمی‌توانست این تحویل را بازتولید کند.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT  = os.path.join(ROOT, 'standalone')
@@ -81,6 +90,38 @@ def strip_module(code, path):
         code = '(function(){\n' + code + '\n})();'
     return code
 
+def find_top_level_clashes(parts):
+    """اعلان‌هایِ هم‌نامِ سطحِ‌بالا بینِ ماژول‌هایِ IIFE-نشده را پیدا می‌کند.
+
+    چرا این گارد لازم شد (باگِ واقعیِ کشف‌شده ۲۰۲۶-۰۸-۲۳): strip_module فقط
+    ماژول‌هایی را در IIFE می‌پیچد که **هیچ export ندارند**. ماژول‌هایی که export
+    دارند در scopeِ مشترکِ باندل باز می‌مانند — و `palette.js` و
+    `notifications.js` هر دو `function ensureEl()` و `function render()` داشتند.
+    اعلانِ دوباره‌ی `function` خطا نمی‌دهد؛ آخری بی‌صدا برنده می‌شود. نتیجه در
+    بسته‌ی آفلاینِ تحویل‌شده: بازکردنِ «پالتِ فرمان» به‌جایِ پالت، **مرکزِ اعلان**
+    را می‌ساخت و رندر می‌کرد. هیچ تست/لینتی این را نمی‌دید چون منبعِ ESM کاملاً
+    سالم است و فقط باندل خراب می‌شود.
+
+    فقط قطعه‌هایی بررسی می‌شوند که در IIFE نپیچیده‌اند (یعنی با `(function(){`
+    شروع نمی‌شوند) — بقیه scopeِ خودشان را دارند و تصادم ندارند.
+    """
+    seen, clashes = {}, []
+    for part in parts:
+        m = re.match(r'\s*/\* ═══ (\S+) ═══ \*/\n(.*)', part, re.S)
+        if not m:
+            continue
+        mod, code = m.group(1), m.group(2)
+        if code.lstrip().startswith('(function(){'):
+            continue                                   # scopeِ خودش را دارد
+        for name in re.findall(r'^(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)',
+                               code, re.M):
+            if name in seen and seen[name] != mod:
+                clashes.append((name, [seen[name], mod]))
+            else:
+                seen[name] = mod
+    return clashes
+
+
 def inline_assets(html, base):
     """CSS و JS خارجی را داخلِ HTML می‌آورد."""
     def css_repl(m):
@@ -88,7 +129,8 @@ def inline_assets(html, base):
         p = os.path.join(base, href.lstrip('/'))
         if not os.path.exists(p):
             print(f'   ⚠️  CSS پیدا نشد: {href}'); return m.group(0)
-        return '<style data-src="' + href + '">\n' + open(p, encoding='utf-8').read() + '\n</style>'
+        css = embed_fonts(open(p, encoding='utf-8').read(), base, href)
+        return '<style data-src="' + href + '">\n' + css + '\n</style>'
     html = re.sub(r'<link\s+rel="stylesheet"\s+href="([^"]+\.css)"\s*/?>', css_repl, html)
 
     def js_repl(m):
@@ -100,16 +142,102 @@ def inline_assets(html, base):
         return '<script data-src="' + src + '">\n' + js + '\n</script>'
     return re.sub(r'<script\s+src="([^"]+\.js)"\s*></script>', js_repl, html)
 
+# نکته‌ی ظریف: مسیر داخلِ url() معمولاً در کوتیشن است — `url('../fonts/x.woff2')`.
+# نسخه‌ی اولِ این regex کوتیشنِ پایانی را مصرف نمی‌کرد و هیچ‌وقت مچ نمی‌شد
+# (ساخت بی‌صدا موفق می‌شد ولی فونت جاسازی **نمی‌شد**). کوتیشن حالا اختیاری است.
+FONT_URL_RE = re.compile(r'''url\(\s*['"]?([^)'"]+?\.(?:woff2|woff|ttf|otf))['"]?\s*\)''', re.I)
+FONT_MIME = {'.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf'}
+
+
+def embed_fonts(css, base, css_href):
+    """`url(...)`هایِ فونت را به data: URI تبدیل می‌کند.
+
+    ⚠️ چرا لازم است (یافته‌ی P0، ممیزیِ UI/UX ۲۰۲۶-۰۸-۲۴): بسته‌ی تک‌فایلی با
+    دابل‌کلیک روی `file://` باز می‌شود. تا پیش از این فونت با یک <link> از
+    `fonts.googleapis.com` می‌آمد که روی `file://` **همیشه** شکست می‌خورد، پس
+    کلِ UIِ فارسی با فونتِ پیش‌فرضِ سیستم رندر می‌شد — همان بسته‌ای که README
+    به کاربر می‌گوید بازش کند.
+
+    حالا فونت self-host است، ولی یک `url('../fonts/x.woff2')`ِ **نسبی** هم در
+    حالتِ inline معنا ندارد (CSS دیگر فایلِ جدا نیست). پس بایت‌هایِ فونت را
+    base64 می‌کنیم.
+
+    هزینه: woff2ِ ۱۰۸KB → ~۱۴۵KB base64، یک‌بار در هر HTML. در برابرِ «هیچ
+    فونتی» معامله‌ی درستی است.
+    """
+    css_dir = os.path.dirname(os.path.join(base, css_href.lstrip('/')))
+
+    def repl(m):
+        raw = m.group(1).strip().strip('\'"')
+        if raw.startswith('data:') or raw.startswith('http'):
+            return m.group(0)
+        fp = os.path.normpath(os.path.join(css_dir, raw))
+        mime = FONT_MIME.get(os.path.splitext(fp)[1].lower())
+        if not mime:
+            return m.group(0)
+        if not os.path.exists(fp):
+            print(f'   ⚠️  فونت پیدا نشد: {raw}')
+            return m.group(0)
+        b64 = base64.b64encode(open(fp, 'rb').read()).decode('ascii')
+        return "url('data:" + mime + ";base64," + b64 + "')"
+
+    return FONT_URL_RE.sub(repl, css)
+
+
 def drop_dead_refs(html):
     """ارجاعاتی که در حالتِ تک‌فایلی فقط ۴۰۴ می‌دهند."""
     for pat in (r'\s*<link rel="icon"[^>]*>', r'\s*<link rel="manifest"[^>]*>',
-                r'\s*<link rel="apple-touch-icon"[^>]*>'):
+                r'\s*<link rel="apple-touch-icon"[^>]*>',
+                # preloadِ فونت: فونت به‌صورتِ data: در CSS جاسازی شده، پس این
+                # فقط یک درخواستِ ۴۰۴ روی file:// است.
+                r'\s*<link rel="preload"[^>]*as="font"[^>]*>'):
         html = re.sub(pat, '', html)
     return html
 
-def build(app):
+def check_panel_scope(app, base, raw_html):
+    """همان گاردِ تصادمِ نام، برایِ پنل‌هایِ اسکریپت-کلاسیک.
+
+    business/company باندل نمی‌شوند — هر فایل `<script>` خودش را دارد. ولی
+    اسکریپت‌هایِ کلاسیک **یک scopeِ سراسریِ مشترک** دارند: دو `function` هم‌نام
+    در دو فایل خطا نمی‌دهند، آخری بی‌صدا برنده می‌شود (دقیقاً همان کلاسی که در
+    باندلِ customer پالتِ فرمان را شکسته بود). دو `const/let` هم‌نام هم
+    SyntaxErrorِ زمانِ پارس می‌دهد و کلِ فایلِ دوم را از کار می‌اندازد.
+    """
+    srcs = re.findall(r'<script\s+src="([^"]+\.js)"\s*></script>', raw_html)
+    seen, clashes = {}, []
+    for rel in srcs:
+        p = os.path.join(base, rel.lstrip('/'))
+        if not os.path.exists(p):
+            continue
+        code = open(p, encoding='utf-8').read()
+        code = re.sub(r'/\*.*?\*/', '', code, flags=re.S)          # کامنتِ بلوکی
+        code = re.sub(r'^\s*//.*$', '', code, flags=re.M)          # کامنتِ خطی
+        for m in re.finditer(
+                r'^(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)', code, re.M):
+            name = m.group(1)
+            if name in seen and seen[name] != rel:
+                clashes.append((name, [seen[name], rel]))
+            else:
+                seen[name] = rel
+    return clashes
+
+
+def build(app, write=True):
     base = os.path.join(ROOT, 'apps', app)
     html = open(os.path.join(base, 'index.html'), encoding='utf-8').read()
+
+    if app != 'customer':
+        panel_clashes = check_panel_scope(app, base, html)
+        if panel_clashes:
+            for name, files in panel_clashes:
+                print(f'   ❌ نامِ تکراریِ سطحِ‌بالا: {name} در {" و ".join(files)}')
+            raise SystemExit(
+                f'\nساخت متوقف شد ({app}): اسکریپت‌هایِ کلاسیک یک scopeِ سراسری '
+                'مشترک دارند — تابعِ هم‌نامِ فایلِ بعدی بی‌صدا قبلی را بازنویسی '
+                'می‌کند و const/let هم‌نام کلِ فایل را با SyntaxError می‌اندازد.\n'
+                'یکی از دو نام را در منبع اختصاصی کن.'
+            )
+
     html = inline_assets(html, base)
 
     if app == 'customer':
@@ -122,12 +250,24 @@ def build(app):
         bundle = '\n'.join(parts)
         left = len(re.findall(r'^\s*(import|export)\s', bundle, re.M))
         if left:
-            print(f'   ⚠️  {left} import/export باقی ماند'); 
+            print(f'   ⚠️  {left} import/export باقی ماند');
+        clashes = find_top_level_clashes(parts)
+        if clashes:
+            for name, mods in clashes:
+                print(f'   ❌ نامِ تکراریِ سطحِ‌بالا: {name} در {" و ".join(mods)}')
+            raise SystemExit(
+                '\nساخت متوقف شد: در باندلِ تک‌اسکریپتی، اعلانِ هم‌نامِ دو ماژول '
+                'در یک scope می‌نشیند و آخری بی‌صدا اولی را بازنویسی می‌کند.\n'
+                'یکی از دو تابع/متغیر را در **منبع** به نامی اختصاصی تغییر بده '
+                '(مثلاً renderPalette به‌جای render).'
+            )
         bundle = bundle.replace('</script>', '<\\/script>')
         html = re.sub(r'<script\s+type="module"\s+src="[^"]+"\s*></script>',
                       lambda m: '<script data-bundle="customer">\n' + bundle + '\n</script>', html)
 
     html = drop_dead_refs(html)
+    if not write:
+        return html
     os.makedirs(OUT, exist_ok=True)
     out = os.path.join(OUT, f'{app}.html')
     open(out, 'w', encoding='utf-8').write(html)
@@ -138,7 +278,40 @@ def build(app):
     print(f'{status} {app}.html — {os.path.getsize(out)//1024}KB · ارجاعِ خارجی: js={ext_js} css={ext_css}')
     return ext_js == 0 and ext_css == 0
 
+APPS = ('customer', 'business', 'company')
+
+
+def check():
+    """مقایسه‌ی خروجیِ commit‌شده با ساختِ تازه — بدونِ نوشتن.
+
+    چرا لازم شد (یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۳): standalone/*.html خروجیِ تولیدشده‌ی
+    commit‌شده است و از ۲۰۲۶-۰۸-۱۸ بازتولید نشده بود. یعنی بسته‌ی آفلاین — همان
+    چیزی که README به کاربر می‌گوید بازش کند — هنوز همه‌ی باگ‌هایی را داشت که در
+    منبع رفع شده بودند، از جمله یک P0 که کلِ مسیرِ رزرو را با بک‌اندِ واقعی
+    می‌شکست. آرتیفکتی که بی‌صدا کهنه شود از نبودش بدتر است: ظاهرِ به‌روز دارد
+    ولی کدِ قدیمی تحویل می‌دهد.
+    """
+    stale = []
+    for app in APPS:
+        out = os.path.join(OUT, f'{app}.html')
+        if not os.path.exists(out):
+            stale.append(f'{app}.html وجود ندارد')
+            continue
+        if open(out, encoding='utf-8').read() != build(app, write=False):
+            stale.append(f'{app}.html با منبع هم‌خوان نیست')
+    if stale:
+        print('✗ بسته‌ی standalone کهنه است:')
+        for x in stale:
+            print('   - ' + x)
+        print('\n  اجرا کن: python tools/build-standalone.py')
+        return 1
+    print('✓ بسته‌ی standalone با منبع هم‌خوان است')
+    return 0
+
+
 if __name__ == '__main__':
-    ok = all([build(a) for a in ('customer', 'business', 'company')])
+    if '--check' in sys.argv:
+        sys.exit(check())
+    ok = all([build(a) for a in APPS])
     print('\nخروجی در standalone/. برای استفاده روی گوشی، کلِ پوشه را منتقل کن و index.html را باز کن.')
     sys.exit(0 if ok else 1)

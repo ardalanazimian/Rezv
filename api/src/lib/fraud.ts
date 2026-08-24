@@ -181,16 +181,31 @@ export async function runFraudScan(restaurantId: string): Promise<FraudSignal[]>
     detectRapidBookCancel(restaurantId).catch(() => []),
   ]);
   const all = [...multiAccount, ...noShow, ...velocity, ...rapidCancel];
-  // ثبت سیگنال‌های high در audit برای بررسی
-  for (const sig of all.filter((s) => s.severity === 'high')) {
-    await audit({
-      action: 'security.idor_attempt', // نزدیک‌ترین action موجود؛ یا 'admin.action'
-      actorType: 'anonymous',
-      restaurantId,
-      detail: { fraud: sig.kind, subject: sig.subject, ...sig.metrics },
-      success: false,
-    }).catch(() => {});
-  }
+  // ثبت سیگنال‌های high در audit برای بررسی.
+  //
+  // ⚠️ فازِ ۲ (§۲۵): این حلقه قبلاً **ترتیبی** بود. هر آشکارساز تا ۵۰ سیگنال
+  // برمی‌گرداند (چهار آشکارساز → تا ۲۰۰)، و این یک مسیرِ **خواندن** است
+  // (GET /restaurant/fraud-signals) — یعنی تا ۲۰۰ درجِ پشتِ‌سرِ هم در
+  // audit_logs پیش از پاسخ‌دادن. حالا هم‌زمان اجرا می‌شوند، پس هزینه به
+  // کندترینشان می‌رسد نه جمعشان.
+  //
+  // ⚠️ آنچه این تغییر رفع **نمی‌کند** (ثبت‌شده در OPEN-FINDINGS.md): هیچ dedupی
+  // در کار نیست، پس هر بار که پرسنل این صفحه را باز می‌کند همان سیگنال‌ها
+  // دوباره درج می‌شوند. رفعِ درستش یک تصمیمِ محصولی است («آیا این اصلاً باید
+  // audit شود؟»)، نه یک بهینه‌سازی.
+  await Promise.all(
+    all
+      .filter((sig) => sig.severity === 'high')
+      .map((sig) =>
+        audit({
+          action: 'security.idor_attempt', // نزدیک‌ترین action موجود؛ یا 'admin.action'
+          actorType: 'anonymous',
+          restaurantId,
+          detail: { fraud: sig.kind, subject: sig.subject, ...sig.metrics },
+          success: false,
+        }).catch(() => {}),
+      ),
+  );
   if (all.length > 0) log.warn('سیگنال تقلب', { restaurantId, count: all.length });
   return all;
 }

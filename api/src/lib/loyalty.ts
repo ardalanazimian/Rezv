@@ -54,6 +54,54 @@ export async function getPointsHistory(userId: string, limit = 50) {
   return db.pointsLedger.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: limit });
 }
 
+// ── امتیازِ باشگاهِ یک رستوران ──
+//
+// ⚠️ رفعِ P1-6 (فازِ ۲، پروتکل §۱۳ — «دفترِ امتیاز تنها مرجعِ سروری»).
+//
+// باگ: تنها جایی که امتیازِ باشگاه داده می‌شد (markArrival) مستقیماً
+// `club_members.points` را increment می‌کرد و **هیچ ردیفی در دفتر نمی‌ساخت**.
+// نتیجه دو عدد بود که هیچ‌وقت با هم نمی‌خواندند: SMSِ خوش‌آمد عددِ ستونی را
+// می‌گفت، در حالی که هم اپِ مشتری (getPointsBalance) و هم فهرستِ اعضایِ پنل از
+// دفتر می‌خواندند — یعنی آن ۵۰ امتیاز برایِ خودِ مشتری نامرئی بود و هیچ رکوردِ
+// حسابرسی‌پذیری (چرا، کِی، بابتِ کدام رزرو) نداشت.
+//
+// از این‌جا به بعد: **دفتر مرجع است**، و `club_members.points` فقط یک کشِ
+// مشتق‌شده است که در *همان تراکنش* به‌روز می‌شود تا از دفتر واگرا نشود.
+// هیچ مسیرِ خواندنی دیگر به آن ستون تکیه نمی‌کند.
+export async function addClubPoints(opts: {
+  userId: string; restaurantId: string; delta: number; reason: string; note?: string;
+}): Promise<number> {
+  return db.$transaction(async (tx) => {
+    await tx.pointsLedger.create({
+      data: {
+        userId: opts.userId, restaurantId: opts.restaurantId,
+        delta: opts.delta, reason: opts.reason as any, note: opts.note ?? null,
+      },
+    });
+    // کشِ مشتق‌شده — نه مرجع. اگر عضویتی وجود نداشته باشد updateMany صفر ردیف
+    // می‌زند و این درست است: دفتر همچنان رکوردِ حقیقت را دارد.
+    await tx.clubMember.updateMany({
+      where: { restaurantId: opts.restaurantId, userId: opts.userId },
+      data: { points: { increment: opts.delta } },
+    });
+    const agg = await tx.pointsLedger.aggregate({
+      where: { userId: opts.userId, restaurantId: opts.restaurantId },
+      _sum: { delta: true },
+    });
+    return agg._sum.delta ?? 0;
+  });
+}
+
+// ── موجودیِ امتیازِ کاربر در باشگاهِ یک رستوران ──
+// از دفتر خوانده می‌شود، نه از ستونِ کش. تفاوتش با getPointsBalance اسکوپ است:
+// آن‌یکی کلِ پلتفرم را جمع می‌زند، این‌یکی فقط همان رستوران را.
+export async function getClubPointsBalance(userId: string, restaurantId: string): Promise<number> {
+  const agg = await db.pointsLedger.aggregate({
+    where: { userId, restaurantId }, _sum: { delta: true },
+  });
+  return agg._sum.delta ?? 0;
+}
+
 // ═══════════ دعوت دوستان (Referral) ═══════════
 
 // کد دعوت یکتای کاربر را بساز یا برگردان
@@ -189,17 +237,34 @@ export async function redeemGiftCard(code: string, amountToman: number) {
   });
 }
 
-/** نسخه‌ی tx-aware کارت هدیه (برای فراخوانی داخل تراکنش رزرو). با قفل FOR UPDATE. */
-export async function redeemGiftCardTx(tx: any, code: string, amountToman: number) {
+/**
+ * نسخه‌ی tx-aware کارت هدیه (برای فراخوانی داخل تراکنش رزرو). با قفل FOR UPDATE.
+ *
+ * ⚠️ رفعِ نشتِ ارزش بینِ رستوران‌ها (فازِ ۲، پروتکل §۷): این تابع کارت را فقط با
+ * `code` پیدا می‌کرد و `GiftCard.restaurantId` را **هرگز** با رستورانِ صورت‌حساب
+ * مقایسه نمی‌کرد — در حالی که اسکیما عمداً آن ستون را دارد و هم مسیرِ خرید و هم
+ * `lib/rewards.ts` مقداردهی‌اش می‌کنند. نتیجه: کارتی که به نامِ رستورانِ A صادر و
+ * تأمینِ مالی شده بود، صورت‌حسابِ رستورانِ B را تخفیف می‌داد — یعنی جابه‌جاییِ
+ * ارزشِ واقعی بینِ تنانت‌ها.
+ *
+ * `restaurantId = null` عمداً به‌معنایِ «همه‌جا معتبر» باقی می‌ماند، پس هیچ
+ * کارتِ صادرشده‌ای باطل نمی‌شود (تغییر کاملاً افزایشی است).
+ * منطقِ قفل/انقضا/موجودی دست‌نخورده است — فقط یک شرطِ دامنه اضافه شده.
+ */
+export async function redeemGiftCardTx(tx: any, code: string, amountToman: number, restaurantId?: string) {
   if (!Number.isInteger(amountToman) || amountToman <= 0) {
     throw Err.validation('مبلغ استفاده باید عددی مثبت باشد');
   }
   // قفل ردیف کارت (FOR UPDATE) — ضد double-spend همزمان
-  const locked = await tx.$queryRaw<{ id: string; balance_toman: number; status: string; expires_at: Date | null }[]>`
-    SELECT id, balance_toman, status, expires_at FROM gift_cards WHERE code = ${normalizeGiftCode(code)} FOR UPDATE
+  const locked = await tx.$queryRaw<{ id: string; balance_toman: number; status: string; expires_at: Date | null; restaurant_id: string | null }[]>`
+    SELECT id, balance_toman, status, expires_at, restaurant_id FROM gift_cards WHERE code = ${normalizeGiftCode(code)} FOR UPDATE
   `;
   const card = locked[0];
   if (!card) throw Err.notFound('کارت هدیه');
+  // کارتِ مقیدشده به یک رستوران فقط همان‌جا خرج می‌شود.
+  if (card.restaurant_id && restaurantId && card.restaurant_id !== restaurantId) {
+    throw Err.validation('این کارت هدیه برای رستوران دیگری صادر شده است');
+  }
   if (card.status !== 'active') throw Err.validation('کارت هدیه فعال نیست');
   if (card.expires_at && card.expires_at < new Date()) throw Err.validation('کارت هدیه منقضی شده است');
   if (amountToman > card.balance_toman) throw Err.validation('موجودی کارت کافی نیست');
@@ -211,13 +276,55 @@ export async function redeemGiftCardTx(tx: any, code: string, amountToman: numbe
   return { applied: amountToman, remaining: newBalance };
 }
 
+/**
+ * ماه و روزِ **شمسیِ** یک لحظه، به‌صورتِ عددِ ۱..۱۲ و ۱..۳۱.
+ *
+ * چرا لازم است: ستونِ users.birth_date در عمل «ماه/روزِ شمسی در قالبِ یک
+ * تاریخِ میلادیِ ساختگی (سالِ ۱۹۹۰)» را نگه می‌دارد — رجوع کن به توضیحِ کاملِ
+ * grantBirthdayRewards. برایِ مقایسه‌ی درست باید امروز را هم شمسی خواند.
+ *
+ * از `en-US-u-ca-persian` استفاده می‌شود (نه `fa-IR`) تا ارقام لاتین برگردند
+ * و parse کردنشان به numberConversion نیاز نداشته باشد.
+ */
+export function jalaliMonthDayToday(d: Date): { mm: number; dd: number } {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US-u-ca-persian', {
+      timeZone: 'Asia/Tehran', month: 'numeric', day: 'numeric',
+    }).formatToParts(d);
+    const mm = Number(parts.find((p) => p.type === 'month')?.value);
+    const dd = Number(parts.find((p) => p.type === 'day')?.value);
+    if (Number.isInteger(mm) && Number.isInteger(dd) && mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+      return { mm, dd };
+    }
+  } catch { /* محیطِ بدونِ تقویمِ persian — به میلادی برگرد (رفتارِ قبلی) */ }
+  return { mm: d.getMonth() + 1, dd: d.getDate() };
+}
+
 // ═══════════ پاداش تولد و سالگرد ═══════════
 
 // بررسی و اعطای پاداش تولد/سالگرد (توسط cron روزانه)
 export async function grantBirthdayRewards(): Promise<{ birthday: number; anniversary: number }> {
   const today = new Date();
-  const mm = today.getMonth() + 1;
-  const dd = today.getDate();
+
+  // ⚠️ رفعِ باگِ «تولد در روزِ اشتباه» (فازِ ۲، پروتکل §۱۱).
+  //
+  // زنجیره‌ی واقعیِ داده (ردیابی‌شده، نه فرض):
+  //  ۱. تنها فرمی که ماهِ تولد را می‌نویسد، واک‌ینِ پنلِ رستوران است
+  //     (apps/business/js/reservations.js) و کشویی‌اش ماه‌هایِ **شمسی** را با
+  //     value=1..12 می‌فرستد (فروردین=۱ … اسفند=۱۲).
+  //  ۲. createWalkinTx آن را با `new Date(Date.UTC(1990, birthMonth - 1, birthDay))`
+  //     ذخیره می‌کند — یعنی عددِ ماهِ **شمسی** را در جایگاهِ ماهِ **میلادی** می‌نشاند.
+  //     پس ستون یک تاریخِ میلادیِ واقعی نیست؛ یک ظرفِ (ماهِ شمسی، روزِ شمسی) است.
+  //  ۳. این تابع قبلاً `today.getMonth() + 1` (ماهِ **میلادیِ** امروز) را با همان
+  //     ستون مقایسه می‌کرد — دو مقیاسِ متفاوت.
+  //
+  // نتیجه: مهمانِ متولدِ ۱ فروردین (شمسی) هدیه‌اش را اولِ **ژانویه** می‌گرفت،
+  // حدودِ ۸۰ روز زودتر. هیچ‌کس متوجه نمی‌شد چون هدیه واقعاً ارسال می‌شد.
+  //
+  // رفع بدونِ تغییرِ اسکیما و بدونِ مهاجرتِ داده: امروز را هم با همان مقیاسی
+  // بخوان که داده در آن ذخیره شده — یعنی ماه/روزِ **شمسیِ** امروز.
+  // Intl با fa-IR خودش تقویمِ شمسی می‌دهد؛ نیازی به کتابخانه‌ی تبدیل نیست.
+  const { mm, dd } = jalaliMonthDayToday(today);
 
   // کاربرانی که امروز تولدشان است — نام و تلفن را یک‌جا می‌گیریم (بدون N+1)
   const birthdayUsers = await db.$queryRaw<{ id: string; phone: string | null; first_name: string | null }[]>`

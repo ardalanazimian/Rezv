@@ -61,6 +61,14 @@ export async function redeemRewardItem(userId: string, itemId: string) {
 
     let resultCouponId: string | null = null;
     let resultGiftCardId: string | null = null;
+    // ⚠️ رفعِ ارزشِ گم‌شده (پروتکل §۱۰/§۱۶): قبلاً فقط **شناسه‌ی داخلی** برگردانده
+    // می‌شد. هیچ endpointی کوپن/کارتِ هدیه را با id برنمی‌گرداند — کارتِ هدیه فقط
+    // با `GET /gift-cards?code=…` و کوپن فقط با کد قابلِ استفاده است، و هیچ فهرستِ
+    // «کارت‌های من» وجود ندارد. یعنی کاربر سکه‌ی واقعی خرج می‌کرد و دارایی‌ای
+    // می‌گرفت که **کدش را هیچ‌جا نمی‌توانست ببیند**. کد افزوده شد (افزایشی، بدونِ
+    // شکستنِ مصرف‌کننده‌ی فعلی).
+    let resultCouponCode: string | null = null;
+    let resultGiftCardCode: string | null = null;
 
     if (item.kind === 'coupon_grant' && item.restaurantId) {
       const coupon = await tx.coupon.create({
@@ -73,6 +81,7 @@ export async function redeemRewardItem(userId: string, itemId: string) {
         },
       });
       resultCouponId = coupon.id;
+      resultCouponCode = coupon.code;
     } else if (item.kind === 'gift_card_credit') {
       const code = `RWDGC${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       const gc = await tx.giftCard.create({
@@ -82,6 +91,7 @@ export async function redeemRewardItem(userId: string, itemId: string) {
         },
       });
       resultGiftCardId = gc.id;
+      resultGiftCardCode = gc.code;
     }
     // priority_boost / free_item / event_access: V1 فقط ردِ redemption رو ثبت می‌کنه
     // (اعمالِ واقعی‌شون — مثلاً boost موقتِ waitlist priority — فازِ بعدیه).
@@ -95,7 +105,10 @@ export async function redeemRewardItem(userId: string, itemId: string) {
 
     return {
       redemption_id: redemption.id, coins_spent: item.costCoins,
+      kind: item.kind, title: item.title,
       result_coupon_id: resultCouponId, result_gift_card_id: resultGiftCardId,
+      // کدهایِ قابلِ‌استفاده — تنها راهی که کاربر می‌تواند چیزی را که خریده خرج کند.
+      result_coupon_code: resultCouponCode, result_gift_card_code: resultGiftCardCode,
     };
   });
 }

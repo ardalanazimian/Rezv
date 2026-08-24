@@ -63,7 +63,7 @@ function wlCard(w,i){
       ${isOffered?'<div class="wl-card-offered">میز آفر شد — منتظر پاسخ</div>':''}
     </div>
     <div class="wl-card-actions">
-      ${!isOffered?`<button class="btn btn-teal btn-sm" onclick="offerWLSeat('${w.id}')">آفر میز</button>`:''}
+      ${(!isOffered && i===0)?`<button class="btn btn-teal btn-sm" onclick="promoteNextWL()">آفر میز</button>`:''}
       <button class="btn btn-ghost btn-sm" onclick="removeWL('${w.id}')">حذف</button>
     </div>
   </div>`;
@@ -85,31 +85,61 @@ async function promoteNextWL(){
   }
   offerWLSeat(next.id);
 }
+// ⚠️ رفعِ «آفر به نفرِ اشتباه» (فازِ ۲، §۲۶–۲۹).
+//
+// باگ: این تابع `id` را فقط برایِ تغییرِ محلی و متنِ toast استفاده می‌کرد.
+// درخواستِ واقعی `POST /restaurant/waitlist` **بدونِ بدنه** بود و بک‌اند
+// (promoteNext) همیشه خودش سرِ صف را انتخاب می‌کند. یعنی وقتی میزبان رویِ
+// نفرِ سوم کلیک می‌کرد، پیام می‌گفت «میز به {نفرِ سوم} آفر شد» ولی سرور میز
+// را به نفرِ اول می‌داد — و یک رندر بعد، UI بی‌صدا جایشان را عوض می‌کرد.
+//
+// راهِ حل بدونِ endpointِ جدید: دکمه فقط رویِ نفرِ اولِ صف رندر می‌شود و همان
+// promoteNextWL را صدا می‌زند (واژگانِ درست + بازخوانیِ حقیقتِ سرور). این تابع
+// فقط برایِ مسیرِ آفلاین می‌ماند، جایی که هیچ ادعایِ سروری در کار نیست.
 async function offerWLSeat(id){
   const w=WAITLIST.find(x=>x.id===id);if(!w)return;
+  if(!isOffline() && API.getToken()){ return promoteNextWL(); }
   w.status='offered';
   rWaitlist();
   // اگر داشبورد فعال است، ستون لیست انتظار زنده را هم تازه کن
   if(document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard();
-  toast('',`میز به ${w.name} آفر شد`);
-  // آفلاین → صف کن؛ آنلاین → مستقیم به بک‌اند و بازخوانی صف واقعی
   if(isOffline() && API.getToken()){
     Outbox.enqueue({ type:'waitlist_offer', path:'/restaurant/waitlist', method:'POST', body:{ action:'offer', entry_id:id }, label:`آفر میز به ${w.name}` });
+    toast('','آفلاین — آفر در صفِ ارسال قرار گرفت');
     return;
   }
-  if(API.getToken()){ await API.waitlistPromoteNext().catch(()=>{}); await loadWaitlist(); rWaitlist(); }
+  toast('',`میز به ${w.name} آفر شد`);
 }
+// ⚠️ رفعِ جعلِ موفقیت (فازِ ۲، §۳).
+//
+// باگ: این تابع فقط آرایه‌ی محلی را فیلتر می‌کرد و «از صف حذف شد» می‌گفت —
+// هیچ درخواستی به سرور نمی‌رفت و هیچ مسیرِ سروری‌ای هم وجود نداشت. ورودی روی
+// سرور waiting می‌ماند، در بازخوانیِ بعدی برمی‌گشت، و promoteNext می‌توانست
+// برایِ مهمانی که رفته بود میز نگه دارد.
+//
+// حالا به DELETE /restaurant/waitlist وصل است — که خودش leaveWaitlistِ
+// *موجود* را صدا می‌زند (آزادکردنِ میزِ آفرشده + ترفیعِ نفرِ بعدی). قابلیت
+// ساخته نشد، فقط وصل شد.
 async function removeWL(id){
-  WAITLIST=WAITLIST.filter(w=>w.id!==id);
-  rWaitlist();
+  const w=WAITLIST.find(x=>x.id===id);
+  if(!confirm(`«${w?w.name:'این مهمان'}» از صف حذف بشه؟`)) return;
+  if(!API.getToken()){
+    WAITLIST=WAITLIST.filter(x=>x.id!==id); rWaitlist(); toast('','از صفِ نمونه حذف شد'); return;
+  }
+  const res=await API.waitlistRemove(id);
+  if(!res.ok){ toast('',res.error?.message||'حذف از صف انجام نشد'); return; }
+  await loadWaitlist(); rWaitlist();
+  if(document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard();
   toast('','از صف حذف شد');
 }
 let _tablesLoaded=false;
 async function rFloor(){
   if(!_tablesLoaded && API.getToken()){ await loadTables(); _tablesLoaded=true; }
   syncTablesFromReservations();
-  const occ={free:0,reserved:0,seated:0};
-  TABLES.forEach(t=>occ[t.s]++);
+  // ⚠️ فازِ ۲ (§۶): cleaning/maintenance به شمارنده اضافه شدند. پیش از این
+  // `occ[t.s]++` رویِ کلیدِ ناموجود NaN تولید می‌کرد و نرخِ اشغال را خراب می‌کرد.
+  const occ={free:0,reserved:0,seated:0,cleaning:0,maintenance:0};
+  TABLES.forEach(t=>{ if(occ[t.s]!==undefined) occ[t.s]++; });
   const total=TABLES.length||1;
   const occRate=Math.round(((occ.reserved+occ.seated)/total)*100);
   document.getElementById('v-floor').innerHTML=`
@@ -130,7 +160,7 @@ async function rFloor(){
       </div>
       <div class="floor ${floorEdit?'edit-mode':''}">
         <div class="tables-area">
-          ${TABLES.map((t,i)=>`<div class="table-el ${t.s}" onclick="${floorEdit?'':`openTableSheet(${i})`}">
+          ${TABLES.map((t,i)=>`<div class="table-el ${t.s}" ${floorEdit?'':'role="button" tabindex="0"'} onclick="${floorEdit?'':`openTableSheet(${i})`}">
             <button class="t-remove" onclick="event.stopPropagation();removeTable(${i})">×</button>
             <span class="t-icon">${icon('utensils',{size:15})}</span><span class="t-num">${esc(tableLabel(t))}</span>
             ${t._guest?`<span class="t-guest">${esc(t._guest.length>10?t._guest.slice(0,9)+'…':t._guest)}</span><span class="t-time">${t._time}</span>`:`<span class="t-cap">${fa(t.c)} نفره</span>`}
@@ -213,10 +243,17 @@ let pendingTable=null;
 function openTableSheet(i){
   pendingTable=i;
   const t=TABLES[i];
+  // ⚠️ فازِ ۲ (§۶/§۲۸): «در حالِ نظافت» و «تعمیرات» اضافه شدند. پیش از این
+  // پنل این دو وضعیت را اصلاً نمی‌شناخت و هر دو را «آزاد» نشان می‌داد — یعنی
+  // میزی که برایِ مشتری اصلاً قابلِ رزرو نبود (availability آن را فیلتر
+  // می‌کند) برایِ کارکنان «آزاد» بود، و کلیک روی آن بی‌صدا از تعمیرات درش
+  // می‌آورد. حالا هر پنج وضعیتِ بک‌اند در پنل قابلِ دیدن و انتخاب‌اند.
   const opts=[
     ['free','var(--green)','آزاد','میز خالی و آماده‌ی پذیرش'],
     ['reserved','var(--blue)','رزروشده','میز رزرو شده، مهمان نیومده'],
-    ['seated','var(--amber)','نشسته','مهمان سر میز نشسته']
+    ['seated','var(--amber)','نشسته','مهمان سر میز نشسته'],
+    ['cleaning','var(--t3)','در حالِ نظافت','بعد از رفتنِ مهمان، تا آماده‌سازی'],
+    ['maintenance','var(--red)','تعمیرات','خارج از سرویس — برایِ مشتری قابلِ رزرو نیست']
   ];
   openModal(`
     <div class="modal-title">${esc(tableLabel(t))} <span style="font-weight:400;color:var(--t2);font-size:14px">· ${fa(t.c)} نفره</span></div>
@@ -260,7 +297,9 @@ async function confirmTableStatus(){
   closeModal();
   if(document.getElementById('v-overview').classList.contains('active'))rOverview();
   else rFloor();
-  const names={free:'آزاد',reserved:'رزروشده',seated:'نشسته'};
+  // منبعِ واحدِ برچسب‌ها در data.js (شاملِ cleaning/maintenance که قبلاً
+  // اینجا نبودند و توست برایشان «undefined» نشان می‌داد).
+  const names=TABLE_STATE_LABELS;
   if(newS!==old) toast('',`${tableLabel(t)} → ${names[newS]}`);
   else toast('',`اسم میز به «${esc(newName||tableLabel(t))}» تغییر کرد`);
 }

@@ -2,10 +2,19 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover: بدونِ آن iOS کلِ صفحه را letterbox می‌کند (نوارِ سیاه
+     بالا/پایینِ آیفونِ ناچ‌دار) و مهم‌تر، `env(safe-area-inset-*)` همیشه صفر
+     برمی‌گردد — یعنی افزودنِ env() بدونِ این خط یک رفعِ قلابیِ بی‌اثر است.
+     این دو با هم معنا دارند: cover صفحه را تا لبه می‌برد، env() عناصرِ ثابت
+     را از ناچ/نوارِ خانه دور نگه می‌دارد. (ممیزیِ UI/UX ۲۰۲۶-۰۸-۲۴) -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>رزرونو | پنل کسب‌وکار</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- فونتِ self-host — دیگر هیچ وابستگیِ زمانِ اجرا به fonts.googleapis.com نیست.
+     چرا عوض شد: بسته‌ی آفلاینِ تک‌فایلی روی file:// به CDN نمی‌رسید و کلِ UI
+     بدونِ فونتِ فارسی رندر می‌شد. جزئیات: shared/fonts/README.md -->
+<link rel="preload" href="fonts/vazirmatn-variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/foundation.css">
@@ -105,10 +114,10 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
         </button>
         <div class="tb-title" id="tbTitle">داشبورد</div>
-        <div class="tb-date" id="tbDate">پنجشنبه ۱۵ خرداد ۱۴۰۴</div>
+        <div class="tb-date" id="tbDate"></div>
       </div>
       <div class="tb-right">
-        <button class="tb-status open" id="tbStatus" onclick="toggleStatus()"><span class="dot"></span><span id="tbStatusText">باز</span></button>
+        <div class="tb-status open" id="tbStatus" role="status"><span class="dot"></span><span id="tbStatusText">باز</span></div>
         <button class="tb-icon" onclick="toggleNotif(event)" aria-label="اعلان‌ها" aria-haspopup="true" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="ping" id="notifPing"></span></button>
         <div class="notif-pop" id="notifPop" onclick="event.stopPropagation()">
           <div class="notif-head"><span>اعلان‌ها</span><button class="notif-clear" onclick="clearNotif()">خواندن همه</button></div>
@@ -139,7 +148,7 @@
 <div class="popup-card" id="popup">
   <div class="popup-ic" id="popupIc">🔔</div>
   <div class="popup-body"><div class="popup-title" id="popupTitle"></div><div class="popup-text" id="popupText"></div></div>
-  <button class="popup-close" onclick="document.getElementById('popup').classList.remove('show')">×</button>
+  <button class="popup-close" aria-label="بستن" onclick="document.getElementById('popup').classList.remove('show')">×</button>
 </div>
 
 <!-- ── پنل business: ماژول‌های Vanilla JS (بدون build، ترتیب مهم) ── -->

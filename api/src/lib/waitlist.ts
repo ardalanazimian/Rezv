@@ -6,6 +6,8 @@ import { Err } from './errors';
 import { enqueueSms } from './sms';
 import { queuePush, queueEmail } from './notify';
 import { cached, cacheKey } from './cache';
+import { activeStatusList } from './reservation-status';
+import { dateKeyInTz } from './hours';
 
 // ═══════════════════════════════════════════════════════════
 //  سیستم لیست انتظار رزرونو (مدل OpenTable)
@@ -319,7 +321,10 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
       const conflict = await tx.reservation.count({
         where: {
           tableId: t.id,
-          status: { in: ['pending', 'confirmed', 'auto_confirmed', 'preparing', 'checked_in', 'running_late', 'arrived', 'seated', 'dining'] },
+          // از منبعِ واحد می‌خواند (lib/reservation-status.ts). محتوایِ این لیست
+          // پیش از این درست بود ولی یک **کپی** بود — یعنی با تغییرِ enum بی‌صدا
+          // drift می‌کرد. همان باگِ C1 که در گاردِ حذفِ میز واقعاً رخ داده بود.
+          status: { in: activeStatusList() as any },
           slotStart: { lt: horizon }, slotEnd: { gt: now },
         },
       });
@@ -405,8 +410,54 @@ export async function acceptOffer(entryId: string, _actor = 'customer', auth: { 
   // ساخت رزرو از آفر (تخصیص خودکار میز)
   const { createReservation } = await import('./reservations');
   const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10);
-  const timeStr = now.toTimeString().slice(0, 5);
+
+  // ⚠️ رفعِ P0 (فازِ ۲، پروتکل §۴/§۵) — «ترکیبِ دو ساعتِ متفاوت».
+  //
+  // این دو خط قبلاً چنین بودند:
+  //     const dateStr = now.toISOString().slice(0, 10);   // ← تاریخِ UTC
+  //     const timeStr = now.toTimeString().slice(0, 5);   // ← ساعتِ محلیِ *پروسه*
+  //
+  // یعنی تاریخ از یک ساعت و زمان از ساعتِ دیگری می‌آمد. بعد createReservation
+  // این جفت را (از طریقِ computeRanges/zonedTimeToUtc) به‌عنوانِ **ساعتِ دیواریِ
+  // محلیِ رستوران** تفسیر می‌کند (پیش‌فرض Asia/Tehran، +۳:۳۰).
+  //
+  // کانتینرِ تولید TZ ست‌شده ندارد (نه در api/Dockerfile نه در docker-compose)،
+  // پس Node رویِ UTC اجرا می‌شود. نتیجه‌ی حسابی: پذیرشِ آفر در ساعتِ ۱۸:۰۰ UTC
+  // جفتِ (امروز، «۱۸:۰۰») می‌سازد، zonedTimeToUtc آن را ۱۴:۳۰ UTC می‌فهمد —
+  // یعنی ۳.۵ ساعت **قبل از** اکنون — و گاردِ بی‌قیدوشرطِ گذشته در
+  // reservations.ts:129 (`if (+start < now - 60_000) throw Err.pastTime()`)
+  // ردش می‌کند. چون اختلافِ تهران همیشه مثبت است، این یک حالتِ لبه‌ی نیمه‌شب
+  // نیست: **هر** پذیرشِ آفر، تمامِ ساعاتِ شبانه‌روز، برایِ هر دو مسیرِ
+  // واردشده و مهمان، شکست می‌خورد.
+  //
+  // رفع: هر دو جزء از **یک** تایم‌زون — همان تایم‌زونِ رستوران — ساخته شوند،
+  // با همان helperهایی که بقیه‌ی کدبیس از قبل استفاده می‌کند (§۲۲).
+  // computeRanges/zonedTimeToUtc/گاردِ گذشته دست‌نخورده می‌مانند؛ آن‌ها درست‌اند.
+  const rest = await db.restaurant.findUnique({
+    where: { id: e.restaurantId }, select: { timezone: true },
+  });
+  const tz = rest?.timezone ?? 'Asia/Tehran';
+  const dateStr = dateKeyInTz(now, tz);
+  const timeStr = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit',
+  }).format(now);
+
+  // ⚠️ رفعِ ریسِ «دو رزرو از یک آفر» (فازِ ۲، پروتکل §۴ idempotency).
+  //
+  // چکِ `e.status !== 'offered'` بالا **خارج از هر تراکنشی** انجام می‌شود، پس
+  // دو درخواستِ هم‌زمان (دابل‌تپ یا retryِ شبکه) هر دو از آن رد می‌شدند و هر دو
+  // createReservation را صدا می‌زدند. برادرانِ همین تابع — declineOffer و
+  // leaveWaitlist — از اول درست بودند: وضعیت را داخلِ یک `updateMany`ِ گاردشده
+  // دوباره ادعا می‌کنند و اگر count===0 بود متوقف می‌شوند. acceptOffer تنها
+  // نویسنده‌ی این فایل بود که این گارد را نداشت.
+  //
+  // همان الگو (بدونِ افزودنِ مقدارِ تازه به enum): ادعایِ اتمیکِ ورودی **پیش
+  // از** ساختِ رزرو. برنده‌ی ریس ادامه می‌دهد، بازنده تمیز رد می‌شود.
+  const claimed = await db.waitlistEntry.updateMany({
+    where: { id: entryId, status: 'offered' },
+    data: { status: 'accepted', respondedAt: now, seatedAt: now },
+  });
+  if (claimed.count === 0) throw Err.validation('آفری برای پذیرش وجود ندارد');
 
   const resv = await createReservation({
     restaurantId: e.restaurantId,
@@ -417,8 +468,14 @@ export async function acceptOffer(entryId: string, _actor = 'customer', auth: { 
     source: e.userId ? 'app' : 'manual',
     notifySms: false, // اعلان waitlist جداست
   }).catch(async (err) => {
-    // اگر رزرو نشد، میز را آزاد کن
+    // اگر رزرو نشد، هم میز را آزاد کن و هم ادعایِ بالا را برگردان — وگرنه
+    // ورودی در وضعیتِ 'accepted' بدونِ هیچ رزروی گیر می‌کرد و مهمان نه در صف
+    // می‌ماند و نه رزرو داشت.
     if (e.offeredTableId) await db.table.update({ where: { id: e.offeredTableId }, data: { state: 'free' } }).catch(() => {});
+    await db.waitlistEntry.updateMany({
+      where: { id: entryId, status: 'accepted', reservationCode: null },
+      data: { status: 'offered', respondedAt: null, seatedAt: null },
+    }).catch(() => {});
     throw err;
   });
 
@@ -461,10 +518,31 @@ export async function declineOffer(entryId: string, _actor = 'customer', auth: {
 }
 
 // ── خروج از صف ──
-export async function leaveWaitlist(entryId: string, auth: { callerUserId?: string; guestToken?: string } = {}) {
+/**
+ * لغوِ ورودیِ لیستِ انتظار.
+ *
+ * دو نوع صداکننده دارد و **هرگز** نباید یکی به‌جایِ دیگری اعتبارسنجی شود:
+ *  • مشتری/مهمان → مالکیت با `assertCanActOnEntry` (userId یا توکنِ مهمان).
+ *  • پرسنلِ رستوران → `staffRestaurantId`؛ مالکیتِ مشتری بی‌ربط است، ولی
+ *    ورودی حتماً باید مالِ همان رستوران باشد، وگرنه یک شعبه می‌توانست صفِ
+ *    شعبه‌ی دیگر را دست‌کاری کند.
+ *
+ * ⚠️ فازِ ۲: این مسیرِ پرسنلی قبلاً وجود نداشت. دکمه‌ی «حذف» در پنلِ رستوران
+ * فقط آرایه‌ی محلی را فیلتر می‌کرد و «از صف حذف شد» toast می‌داد — بدونِ هیچ
+ * درخواستی. ورودی روی سرور `waiting` می‌ماند، در بازخوانیِ بعدی برمی‌گشت، و
+ * `promoteNext` می‌توانست برایِ مهمانی که رفته بود میز نگه دارد.
+ */
+export async function leaveWaitlist(
+  entryId: string,
+  auth: { callerUserId?: string; guestToken?: string; staffRestaurantId?: string } = {},
+) {
   const e = await db.waitlistEntry.findUnique({ where: { id: entryId } });
   if (!e) throw Err.notFound('ورودی لیست انتظار');
-  assertCanActOnEntry(e, auth);
+  if (auth.staffRestaurantId) {
+    if (e.restaurantId !== auth.staffRestaurantId) throw Err.notFound('ورودی لیست انتظار');
+  } else {
+    assertCanActOnEntry(e, auth);
+  }
   if (!['waiting', 'offered'].includes(e.status)) throw Err.validation('این ورودی قابل لغو نیست');
   const updated = await db.$transaction(async (tx) => {
     const res = await tx.waitlistEntry.updateMany({
@@ -560,19 +638,40 @@ type SmsTpl = 'otp' | 'booking_confirm' | 'reminder' | 'welcome_visit' | 'campai
 // ═══════════════════════════════════════════════════════════
 export async function getWaitlistAnalytics(restaurantId: string, days = 30) {
   const since = new Date(Date.now() - days * 86_400_000);
-  const all = await db.waitlistEntry.findMany({
-    where: { restaurantId, createdAt: { gte: since } },
-  });
-  const total = all.length;
-  const seated = all.filter(e => e.status === 'accepted' || e.status === 'seated').length;
-  const abandoned = all.filter(e => ['cancelled', 'declined', 'no_response'].includes(e.status)).length;
+  // ⚠️ فازِ ۲ (§۲۵ + کمینه‌سازیِ داده): این تابع قبلاً **همه‌ی ردیف‌هایِ کاملِ**
+  // بازه را می‌خواند — با ?days=365 یعنی یک سال ورودی، شاملِ نام، تلفن، ایمیل و
+  // هشِ توکنِ مهمان — فقط برایِ اینکه در جاوااسکریپت بشمارد. شمارش کارِ
+  // دیتابیس است، و هیچ‌کدام از آن ستون‌هایِ شخصی برایِ خروجی لازم نبود.
+  const [byStatus, waitAgg, vipEntries] = await Promise.all([
+    db.waitlistEntry.groupBy({
+      by: ['status'],
+      where: { restaurantId, createdAt: { gte: since } },
+      _count: { _all: true },
+    }),
+    // میانگینِ انتظارِ واقعی فقط برایِ کسانی که نشستند — در خودِ Postgres.
+    // ⚠️ EXTRACT(EPOCH ...) عددِ double برمی‌گرداند و COUNT مقدارِ bigint —
+    // طبقِ قاعده‌ی صریحِ CLAUDE.md هردو در SQL کست و در JS با Number() پوشش
+    // داده می‌شوند، نه فقط یکی از دو لایه.
+    db.$queryRaw<Array<{ avg_minutes: number | null; n: bigint }>>`
+      SELECT AVG(EXTRACT(EPOCH FROM (seated_at - joined_at)) / 60)::float8 AS avg_minutes,
+             COUNT(*)::bigint AS n
+      FROM waitlist_entries
+      WHERE restaurant_id = ${restaurantId}::uuid
+        AND created_at >= ${since}
+        AND seated_at IS NOT NULL
+    `,
+    db.waitlistEntry.count({ where: { restaurantId, createdAt: { gte: since }, isVip: true } }),
+  ]);
+
+  const countOf = (...statuses: string[]) =>
+    byStatus.filter(r => statuses.includes(r.status)).reduce((sum, r) => sum + Number(r._count._all), 0);
+
+  const total = byStatus.reduce((sum, r) => sum + Number(r._count._all), 0);
+  const seated = countOf('accepted', 'seated');
+  const abandoned = countOf('cancelled', 'declined', 'no_response');
   const conversionRate = total ? Math.round((seated / total) * 100) : 0;
 
-  // میانگین زمان انتظار واقعی (برای آن‌هایی که نشستند)
-  const seatedEntries = all.filter(e => e.seatedAt);
-  const avgWait = seatedEntries.length
-    ? Math.round(seatedEntries.reduce((s, e) => s + (+e.seatedAt! - +e.joinedAt) / 60_000, 0) / seatedEntries.length)
-    : 0;
+  const avgWait = Number(waitAgg[0]?.n ?? 0) > 0 ? Math.round(Number(waitAgg[0]?.avg_minutes ?? 0)) : 0;
 
   const currentQueue = await db.waitlistEntry.count({ where: { restaurantId, status: 'waiting' } });
 
@@ -591,6 +690,6 @@ export async function getWaitlistAnalytics(restaurantId: string, days = 30) {
     avg_dining_minutes: avgDining.minutes,
     avg_dining_minutes_source: avgDining.source,
     current_queue_size: currentQueue,
-    vip_entries: all.filter(e => e.isVip).length,
+    vip_entries: vipEntries,
   };
 }

@@ -7,7 +7,7 @@
 import { API, isLoggedIn } from '../api.js';
 import { fmtFa } from '../data/discover.js';
 import { armReveals, buzz } from '../theme-pwa.js';
-import { esc, toast } from '../auth.js';
+import { esc, openSheet, toast } from '../auth.js';
 import { icon } from '../icons.js';
 
 // نمادِ اعتبار — عمداً آیکونِ SVG (نه ایموجی) و اسمِ متفاوت از tierهایِ وفاداری.
@@ -134,9 +134,31 @@ window.claimMission = async function(id){
   else toast('', res.error?.message || 'دریافتِ جایزه ناموفق بود');
 };
 
+// ⚠️ رفعِ ارزشِ گم‌شده (پروتکل §۱۰/§۱۶): قبلاً پاسخِ سرور کاملاً دور ریخته
+// می‌شد و فقط «✅ خریداری شد» نشان داده می‌شد. برایِ جوایزی که کوپن یا کارتِ
+// هدیه تولید می‌کنند، **کد** تنها راهِ خرج‌کردن است و هیچ فهرستِ «کارت‌های من»
+// در اپ وجود ندارد؛ یعنی سکه‌ی واقعی خرج می‌شد و دارایی عملاً دست‌نیافتنی
+// می‌ماند. حالا کد بلافاصله نمایش داده و در کلیپ‌بورد کپی می‌شود.
 window.redeemReward = async function(id){
   buzz&&buzz();
   const res = await API.post(`/me/rewards/${id}/redeem`, {});
-  if(res.ok){ toast('✅','خریداری شد'); renderEconomy(); }
-  else toast('', res.error?.message || 'خرید ناموفق بود');
+  if(!res.ok){ toast('', res.error?.message || 'خرید ناموفق بود'); return; }
+  const d = res.data || {};
+  const code = d.result_gift_card_code || d.result_coupon_code || null;
+  if(code) showRedeemedCode(code, d.result_gift_card_code ? 'کارتِ هدیه' : 'کدِ تخفیف');
+  else toast('✅','خریداری شد');
+  renderEconomy();
 };
+
+/** نمایشِ کدِ به‌دست‌آمده — همان کارتِ کد و همان `copyCode` که شیتِ کارتِ هدیه
+ *  از قبل استفاده می‌کند (بدونِ کامپوننتِ تازه — §۲۲ «اول استفاده‌ی دوباره»). */
+function showRedeemedCode(code, label){
+  openSheet(`<div style="text-align:center;padding:8px 0">
+    <div style="margin-bottom:var(--sp-2);color:var(--success)">${icon('check',{size:40})}</div>
+    <div class="sheet-title" style="text-align:center">${esc(label)} آماده‌ست</div>
+    <div class="gift-success-card"><div class="gsc-code">${esc(code)}</div></div>
+    <div class="sheet-sub" style="text-align:center;margin-top:12px">این کد را نگه دار — هنگامِ پرداخت واردش کن</div>
+    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode('${esc(code)}')">کپی کد</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
+  </div>`);
+}

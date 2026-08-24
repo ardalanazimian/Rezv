@@ -4,15 +4,15 @@
 // ═══════════════════════════════════════════════════════════
 
 import { Actions } from './actions.js';
-import { API, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
-import { renderDiscoverSections, renderFeed } from './data/discover.js';
+import { API, loadMoreRestaurants, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
+import { renderDiscoverSections, renderFeed, renderRestaurantSections } from './data/discover.js';
 import { R_SAMPLE } from './data/seed.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
 export let R = R_SAMPLE;
 
 // ── startup: بعد از آماده‌شدنِ DOM اجرا شو (چرخه‌ی load-time را می‌شکند) ──
 function boot(){
-  Actions.init();                    // فعال‌سازی event delegation
+  Actions.init();                    // رفتارهایِ کیبوردِ سراسری (Escape / Enter-Space)
   updateThemeIcon();                 // آیکونِ تم (حالا DOM آماده است)
   renderFeed(R);                     // نمایش فوری با داده‌ی نمونه
   renderDiscoverSections();          // نزدیک تو، ترند، رویدادها
@@ -36,14 +36,41 @@ async function restoreSession(){
 }
 
 // تلاش برای دریافت داده‌ی واقعی از بک‌اند
-async function syncRestaurants(){
+// export شده تا pull-to-refresh واقعاً دادهٔ تازه بگیرد (نه فقط همان داده را
+// دوباره رندر کند) — رجوع کن به توضیحِ features/pull-refresh.js.
+export async function syncRestaurants(){
   const fresh = await loadRestaurants();
   R = fresh;
   if (document.getElementById('page-discover')?.classList.contains('active')) {
     renderFeed(R);
-    renderDiscoverSections();
+    // فقط بخش‌هایِ وابسته به R — عمداً renderDiscoverSections نه، چون آن
+    // `GET /events` و خواندنِ موقعیت را دوباره می‌فرستد و boot از قبل انجامشان
+    // داده. (توضیحِ کامل روی renderDiscoverSections در data/discover.js.)
+    renderRestaurantSections();
   }
 }
+
+// صفحه‌ی بعدیِ رستوران‌ها (دکمه‌ی «رستوران‌های بیشتر» در فیدِ کشف).
+// فقط لیست و بخش‌هایِ وابسته به R را نو می‌کند — عمداً renderDiscoverSections
+// صدا زده نمی‌شود تا `GET /events` بی‌دلیل تکرار نشود.
+window.loadMoreFeed = async function(){
+  const btn = document.getElementById('feedMore');
+  if (btn) { btn.disabled = true; btn.textContent = 'در حال بارگذاری…'; }
+  try {
+    const more = await loadMoreRestaurants();
+    if (more.length) {
+      R = R.concat(more);
+      renderFeed(R);
+      renderRestaurantSections();
+      return;
+    }
+    // سرور چیزی نداد: یا واقعاً تمام شده یا درخواست شکست خورده — در هر دو حالت
+    // دکمه‌ی «بیشتر»ی که کاری نمی‌کند باقی نمی‌ماند.
+    if (btn) btn.remove();
+  } catch {
+    if (btn) { btn.disabled = false; btn.textContent = 'دوباره تلاش کن'; }
+  }
+};
 
 // اجرای startup پس از آماده‌شدنِ DOM
 if (document.readyState === 'loading') {

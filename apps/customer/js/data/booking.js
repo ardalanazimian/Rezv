@@ -11,6 +11,7 @@ import { R } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
 import { genIdempotencyKey } from '../api-core.js';
 import { haptic } from '../theme-pwa.js';
+import { icon } from '../icons.js';
 
 // ═══════════════════════════════════════════════════════════
 //  تاریخ‌های قابلِ رزرو
@@ -39,9 +40,38 @@ export function dateOptions(){
 }
 const PARTY_MAX = 12;
 
+// ═══════════════════════════════════════════════════════════
+//  برچسبِ پیش‌پرداخت — رفعِ P1-3 (پروتکل §۲۰ و §۳)
+//
+//  اپ در دو جا هاردکد ادعا می‌کرد «رزرو رایگان · بدون پیش‌پرداخت» و
+//  «هنوز پولی پرداخت نمی‌کنی» — در حالی که `depositRequired` یک سیاستِ
+//  واقعی و قابلِ‌تنظیمِ رستوران است که پنلِ business می‌نویسدش. رستورانی
+//  که بیعانه را روشن می‌کرد، همچنان به مشتری «رایگان» نشان داده می‌شد.
+//
+//  سه حالت، و هیچ‌کدام حدس نمی‌زند:
+//    null  → سرور چیزی نگفته (رستورانِ نمونه/آفلاین) → **هیچ ادعایی نکن**
+//    false → واقعاً بدونِ پیش‌پرداخت → همان متنِ قبلی
+//    true  → بیعانه لازم است → صریح بگو
+//
+//  ⚠️ این تابع تنها منبعِ متنِ پیش‌پرداخت در کلِ اپ است (§۲۲: یک پیاده‌سازی).
+// ═══════════════════════════════════════════════════════════
+//  ⚠️ به‌روزرسانیِ صداقت (۲۰۲۶-۰۸-۲۴): متنِ حالتِ `true` قبلاً می‌گفت
+//  «این رستوران برایِ رزرو بیعانه می‌گیرد» — که به مشتری می‌فهماند الان پولی
+//  گرفته می‌شود. ولی اپِ مشتری **هیچ‌وقت** مسیرِ پرداخت را صدا نمی‌زند
+//  (تأییدشده با grep: صفر فراخوان به `/reservations/:code/pay`) و درگاه هم پشتِ
+//  فلگِ خاموش است. پس رزرو بدونِ هیچ پرداختی تمام می‌شد و مشتری منتظرِ
+//  درخواستی می‌ماند که نمی‌آمد.
+//  حالا همان اطلاعِ واقعی داده می‌شود (رستوران سیاستِ بیعانه دارد) بدونِ ادعای
+//  دریافتِ آنلاین.
+export function depositLabel(r){
+  if(r?.depositRequired === true) return 'این رستوران سیاستِ بیعانه دارد — آنلاین دریافت نمی‌شود، هنگامِ حضور هماهنگ کن';
+  if(r?.depositRequired === false) return 'رزرو رایگان · بدون پیش‌پرداخت';
+  return '';   // نامعلوم → سکوت، نه ادعا
+}
+
 // شیت رزرو که با دکمه‌ی پایین باز می‌شود (تاریخ/ساعت/نفر)
 export function openBookSheet(id){
-  const r=R.find(x=>x.id===id);
+  const r=R.find(x=>String(x.id)===String(id));
   // پیش‌فرض‌ها از زمینه‌ی مشترک می‌آیند، نه از صفر — اگر کاربر قبلاً گفته
   // «پنجشنبه، ۴ نفر»، همان‌جا می‌ماند و لازم نیست دوباره واردش کند.
   const dates = dateOptions();
@@ -49,15 +79,15 @@ export function openBookSheet(id){
   openSheet(`
     <div class="bs-head"><div class="bs-title">رزرو میز</div><div class="bs-rest">${esc(r.n)}</div></div>
     <div id="bwDemoBanner"></div>
-    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${id})">${
+    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots('${esc(String(id))}')">${
       dates.map(d=>`<option value="${d.iso}"${d.iso===dateSel?' selected':''}>${esc(d.label)}</option>`).join('')
     }</select></div>
-    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots(${id})">${
+    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots('${esc(String(id))}')">${
       Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
     }</select></div>
     <div class="bw-field"><label>ساعت</label><select id="bwTime"><option>در حال بررسی...</option></select></div>
-    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook(${id})">بررسی میزهای موجود</button>
-    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">هنوز پولی پرداخت نمی‌کنی</div>
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook('${esc(String(id))}')">بررسی میزهای موجود</button>
+    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">${depositLabel(r)}</div>
   `);
   refreshSlots(id);
 }
@@ -65,7 +95,7 @@ export function openBookSheet(id){
 // availabilityِ واقعی در دسترس نبود (آفلاین، بدونِ slug، یا شکستِ درخواست)،
 // این سه ساعتِ ثابت («۱۹:۰۰»، «۲۰:۰۰»، «۲۱:۰۰») بدونِ هیچ نشانه‌ای دقیقاً
 // عینِ سانس‌هایِ واقعی رندر می‌شدند — یعنی «صداقتِ آفلاین/دمو» که در بقیه‌ی
-// اپ رعایت می‌شه (مثلاً پیامِ صریحِ isOfflineDemo در تأییدِ رزرو) اینجا
+// اپ رعایت می‌شه (مثلاً حالتِ صریحِ «رزرو ثبت نشد» در تأییدِ رزرو) اینجا
 // نقض می‌شد. حالا هم متنِ گزینه‌ها صریحاً «(نمونه)» می‌گیرند، هم یک بنرِ
 // هشدارِ قابل‌دیدن (همون زبانِ بصریِ warning-soft که بقیه‌ی اپ استفاده
 // می‌کنه) بالایِ شیت ظاهر می‌شه.
@@ -87,7 +117,7 @@ function renderDemoTimeOptions(sel,r){
 }
 // بارگذاری ساعت‌های واقعاً موجود از /restaurants/{slug}/availability
 export async function refreshSlots(id){
-  const r=R.find(x=>x.id===id);
+  const r=R.find(x=>String(x.id)===String(id));
   const sel=document.getElementById('bwTime');
   if(!sel)return;
   // اگر slug نداریم (حالت آفلاین/نمونه)، از همون slots نمونه استفاده کن
@@ -135,7 +165,7 @@ export function quickBook(id,slot){
   setBk({id,date:labelForISO(bookingCtx.date),dateVal:bookingCtx.date,time:slot,
          timeRaw:String(slot).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
          party:`${fmtFa(bookingCtx.party)} نفر`,partyN:bookingCtx.party});
-  openSheet(bookStep2(R.find(x=>x.id===id)));
+  openSheet(bookStep2(R.find(x=>String(x.id)===String(id))));
 }
 export function startBook(id){
   const t=document.getElementById('bwTime').value;
@@ -144,7 +174,7 @@ export function startBook(id){
   const partyN=parseInt(document.getElementById('bwParty').value,10)||2;
   setBookingCtx({ date: iso, party: partyN });
   setBk({id,date:labelForISO(iso),dateVal:iso,time:faTime(t),timeRaw:t,party:`${fmtFa(partyN)} نفر`,partyN});
-  openSheet(bookStep2(R.find(x=>x.id===id)));
+  openSheet(bookStep2(R.find(x=>String(x.id)===String(id))));
 }
 export function bookStep2(r){
   // ⚠️ رفع‌شده (R1): وقتی رستوران منویی ثبت نکرده (r.menu=[])، قبلاً این
@@ -153,16 +183,16 @@ export function bookStep2(r){
   // منویِ خالی اصلاً نشان داده نمی‌شود.
   const preorderBlock = r.menu.length
     ? `<div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
-    <div class="opt-row">${r.menu.map(m=>`<div class="opt" onclick="this.classList.toggle('sel')">${m[0]} ${m[1]}</div>`).join('')}</div>`
+    <div class="opt-row">${r.menu.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${m[0]} ${m[1]}</div>`).join('')}</div>`
     : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
     ${preorderBlock}
-    <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3(${r.id})">ادامه</button>`;
+    <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3('${esc(String(r.id))}')">ادامه</button>`;
 }
 // wrapperِ سراسری: onclick در scope سراسری اجرا می‌شود و به R (ماژولی) دسترسی ندارد،
 // پس lookup را اینجا (با دسترسی به R) انجام می‌دهیم.
-export function toBookStep3(id){ openSheet(bookStep3(R.find(x=>x.id===id))); }
+export function toBookStep3(id){ openSheet(bookStep3(R.find(x=>String(x.id)===String(id)))); }
 export function bookStep3(r){
   // نام/موبایل از حسابِ کاربر (اگر وارد شده) — نه مقدارِ ساختگی
   const name = isLoggedIn() ? userName() : '';
@@ -171,16 +201,37 @@ export function bookStep3(r){
     <div class="steps"><div class="step-bar done"></div><div class="step-bar done"></div><div class="step-bar now"></div></div>
     <div class="field-label">نام</div><input class="inp" id="bkName" value="${esc(name)}" placeholder="نامت رو بنویس">
     <div class="field-label">موبایل</div><input class="inp" id="bkPhone" inputmode="tel" value="${esc(phone)}" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
+    <!-- ⚠️ اضافه‌شده (فازِ ۲، پروتکل §۹/§۱۰ — جریانِ ایمنیِ غذایی).
+         ستونِ Reservation.preferences و کلِ مسیرش از قبل کامل بود:
+         اعتبارسنجی در reservations/route.ts:24، ذخیره در reservations.ts:389،
+         و **نمایش به کارکنان** در restaurant/reservations/route.ts:69
+         (note = r.preferences.join). تنها حلقه‌ی گمشده همین‌جا بود —
+         شیتِ رزرو هیچ‌وقت این فیلد را نمی‌فرستاد، پس ستون همیشه {} می‌ماند و
+         سطرِ یادداشتِ پنلِ رستوران هرگز پر نمی‌شد. یعنی قابلیت غایب نبود،
+         وصل‌نشده بود (همان کلاسِ P1-3/P1-4).
+
+         §۱۰ صریح: «Do NOT imply medical verification» — پس متن عمداً
+         «به رستوران اطلاع می‌دهیم» است، نه هیچ تضمینِ ایمنی. -->
+    <div class="field-label" style="margin-top:2px">
+      ${icon('info',{size:13})} آلرژی یا نیازِ غذایی خاص <span style="color:var(--t3);font-weight:400">(اختیاری)</span>
+    </div>
+    <textarea class="inp" id="bkPrefs" rows="2" maxlength="200"
+      placeholder="مثلاً: آلرژی به بادام‌زمینی · بدونِ گلوتن · صندلی چرخ‌دار"
+      style="font-family:inherit;resize:vertical"></textarea>
+    <div style="font-size:11.5px;color:var(--t3);margin:4px 2px 10px;line-height:1.7">
+      این یادداشت به رستوران نشان داده می‌شود تا در آماده‌سازی لحاظ کند. تأییدِ پزشکی نیست —
+      اگر آلرژیِ شدید داری، حتماً موقعِ حضور هم شفاهی به کارکنان بگو.
+    </div>
     <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${esc(r.n)}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
     ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${r.id})">تأیید رزرو</button>`;
+    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook('${esc(String(r.id))}')">تأیید رزرو</button>`;
 }
 export async function confirmBook(id){
-  const r=R.find(x=>x.id===id);
+  const r=R.find(x=>String(x.id)===String(id));
   // رزرو نیاز به ورود دارد — بعد از ورود، همین مرحله‌ی تأیید از سر گرفته می‌شود
   if(!isLoggedIn()){
-    setAfterLogin(()=>{ const rr=R.find(x=>x.id===id); if(rr && bk.id===id) openSheet(bookStep3(rr)); });
+    setAfterLogin(()=>{ const rr=R.find(x=>String(x.id)===String(id)); if(rr && String(bk.id)===String(id)) openSheet(bookStep3(rr)); });
     toast('','برای رزرو اول وارد شو — بعدش ادامه می‌دیم');
     setTimeout(()=>openLogin(),400);
     return;
@@ -209,15 +260,26 @@ export async function confirmBook(id){
   // تاریخ دیگر حدس زده نمی‌شود: bk.dateVal همان ISO است که کاربر انتخاب کرده.
   // Idempotency-Key: یک‌بار برای همین submit ساخته می‌شود — اگر کاربر دوبار
   // دکمه را بزند یا شبکه retry کند، سرور رزروِ دوم نمی‌سازد، پاسخِ اول برمی‌گردد.
+  // یادداشتِ آلرژی/نیازِ غذایی → همان ستونِ preferences که پنلِ رستوران
+  // به‌عنوانِ «یادداشت» نمایش می‌دهد. بک‌اند آرایه می‌خواهد
+  // (z.array(z.string().max(100)).max(20))، پس متن با «·»، ویرگولِ فارسی و
+  // خطِ جدید تکه می‌شود و هر تکه به سقفِ ۱۰۰ کاراکترِ قرارداد بریده می‌شود.
+  const prefsRaw=(document.getElementById('bkPrefs')?.value||'').trim();
+  const PREF_SEP=/[·،\r\n]+/;
+  const preferences=prefsRaw
+    ? prefsRaw.split(PREF_SEP).map(x=>x.trim()).filter(Boolean).slice(0,20).map(x=>x.slice(0,100))
+    : undefined;
+
   const res=await API.post('/reservations',{
     restaurant_id:id,
     date:bk.dateVal||todayISO(),
     time:bk.timeRaw||String(bk.time||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
     party_size:bk.partyN||2,
     notify_sms:true,
+    ...(preferences?.length ? { preferences } : {}),
   },{ 'Idempotency-Key': genIdempotencyKey() });
 
-  let code, isOfflineDemo=false;
+  let code;
   if(res.ok && res.data?.code){
     // رزرو واقعی در دیتابیس ثبت شد (بک‌اند code را در سطحِ بالا برمی‌گرداند)
     // ⚠️ هپتیکِ success فقط همین‌جا زده می‌شود — دقیقاً همون شرطی که سرور واقعاً
@@ -225,13 +287,30 @@ export async function confirmBook(id){
     code=res.data.code;
     haptic('success');
   } else if(res.offline){
-    // بک‌اند نیست → کد محلی (حالت دمو) — این رزرو هیچ‌جا روی سرور ثبت نشده،
-    // پس باید همین‌جا صریح به کاربر گفته شود (نه شبیه‌سازیِ خاموشِ موفقیت).
-    // هپتیک هم عمداً ضعیف‌تر است (light، نه success) — لمس هم نباید ادعای
-    // موفقیتِ واقعی کند.
-    isOfflineDemo=true;
-    code='RZ'+Math.random().toString(36).slice(2,7).toUpperCase();
+    // ⚠️ رفعِ P0-3 (فازِ ۲، پروتکل §۳ — «A customer must NEVER see … fake
+    // reservation code»).
+    //
+    // این مسیر قبلاً یک کدِ `RZ...`ِ تصادفی می‌ساخت و صفحه‌ی موفقیت را با تیکِ
+    // سبز و جعبه‌ی «کد رزرو» نشان می‌داد. انصافاً بهترین نسخه‌ی جعل در کلِ
+    // کدبیس بود — یک هشدارِ صریح و کاملاً درست هم کنارش می‌گذاشت و هپتیکِ
+    // success هم نمی‌زد. ولی طبقِ متنِ صریحِ پروتکل، «کدِ رزروِ ساختگی» حتی با
+    // افشا هم مجاز نیست: کاربر کدی در دست دارد که در هیچ سیستمی وجود ندارد،
+    // می‌تواند کپی/اسکرین‌شات بگیرد و بعداً آن را معتبر بداند.
+    //
+    // متنِ هشدارِ فارسیِ قبلی خوب بود و عمداً حفظ شده — فقط از «موفقیتِ محلی»
+    // به «ثبت نشد» تبدیل شد و کد/تیکِ سبز حذف شدند (پروتکل §۲۶: بازطراحیِ
+    // بی‌دلیل ممنوع؛ فقط ادعایِ نادرست برداشته می‌شود).
     haptic('light');
+    sheetBody.innerHTML=`
+      <div style="text-align:center;padding:24px 16px">
+        <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">⚠️</div>
+        <div class="sheet-title" style="text-align:center">رزرو ثبت نشد</div>
+        <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}</div>
+        <div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:14px 0">اتصال به سرورِ رزرونو برقرار نشد، پس این رزرو در سیستمِ رستوران ثبت نشده و کدِ رزروی هم صادر نشده. یادآورِ پیامکی ارسال نمی‌شود. با وصل‌شدنِ اینترنت دوباره تلاش کن.</div>
+        <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook('${esc(String(id))}')">تلاش دوباره</button>
+        <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
+      </div>`;
+    return;
   } else {
     // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
     const isFull = res.error?.code==='SLOT_FULL' || res.error?.code==='NO_TABLE_FOR_PARTY' || /پر|ظرفیت/.test(res.error?.message||'');
@@ -244,20 +323,22 @@ export async function confirmBook(id){
     return;
   }
 
-  // موفقیت (واقعی یا دمو) — دیگر امتیازِ محلی جعل نمی‌شود؛ عددِ واقعی از سرور
-  // می‌آید (اگر رزروِ واقعی بود، بعداً که «انجام‌شد» علامت بخورد XP واقعی
-  // ثبت می‌شود؛ اینجا فقط چیپِ نوارِ بالا را با مقدارِ به‌روزِ سرور همگام می‌کنیم).
-  if (res.ok) syncNavPoints();
+  // از اینجا به بعد فقط یک حالت ممکن است: رزروِ **واقعی** که سرور تأییدش کرده
+  // و کدِ واقعی برگردانده. (مسیرهایِ آفلاین/خطا بالاتر با return بسته شده‌اند —
+  // رفعِ P0-3.) پس دیگر شرطِ isOfflineDemo لازم نیست و حذف شد.
+  //
+  // امتیازِ محلی جعل نمی‌شود؛ عددِ واقعی از سرور می‌آید (وقتی رزرو «انجام‌شد»
+  // علامت بخورد XP واقعی ثبت می‌شود؛ اینجا فقط چیپِ نوارِ بالا همگام می‌شود).
+  syncNavPoints();
   TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
   sheetBody.innerHTML=`
     <div class="success">
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
-      <div class="sheet-title" style="text-align:center">${isOfflineDemo?'رزرو محلی ثبت شد':'رزرو تأیید شد!'}</div>
-      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}${isOfflineDemo?'':'<br>یادآور با پیامک می‌فرستیم'}</div>
-      ${isOfflineDemo?`<div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:10px 0">⚠️ اتصال به سرورِ رزرونو برقرار نشد؛ این رزرو فقط روی همین دستگاه (به‌صورتِ آزمایشی) ذخیره شد و در سیستمِ رستوران ثبت نشده. یادآورِ پیامکی هم ارسال نمی‌شود. با وصل‌شدنِ اینترنت، دوباره از اول رزرو کن.</div>`:''}
+      <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
+      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}<br>یادآور با پیامک می‌فرستیم</div>
       <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode('${esc(code)}')" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
-      ${(!isOfflineDemo && r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
-      ${isOfflineDemo?'':'<div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>'}
+      ${(r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
+      <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
       <button class="btn btn-primary btn-lg btn-block" onclick="closeSheet();go('trips')">رزروهای من</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
     </div>`;

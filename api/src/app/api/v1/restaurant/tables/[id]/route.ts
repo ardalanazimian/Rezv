@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
+import { activeStatusList } from '@/lib/reservation-status';
 
 const SHAPES = ['rectangle', 'round', 'booth'] as const;
 const ZONES = ['indoor', 'outdoor', 'window', 'vip', 'smoking'] as const;
@@ -56,8 +57,20 @@ export const DELETE = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMa
   const table = await db.table.findUnique({ where: { id } });
   if (!table || table.restaurantId !== ctx.restaurant.id) throw Err.notFound('میز');
 
+  // ⚠️ رفعِ باگِ واقعی (فازِ ۲ — پیداشده توسطِ گاردِ ایستایِ
+  // tests/lifecycle-exclusivity.test.mts، پروتکل §۶).
+  //
+  // این لیست دستی بود و سه وضعیتِ فعال را **جا انداخته بود**: preparing،
+  // running_late و arrived. یعنی میزی که رزروش در حالِ آماده‌سازی بود، یا
+  // مهمانش دیر کرده بود، یا رسیده بود، **قابلِ حذف** بود — و رزرو یتیم می‌شد
+  // (دقیقاً همان چیزی که کامنتِ خودِ این تابع می‌گوید می‌خواهد جلویش را بگیرد).
+  //
+  // این دقیقاً همان کلاسِ باگِ C1 است که lib/reservation-status.ts برایِ
+  // ریشه‌کن‌کردنش ساخته شد؛ هدرِ همان فایل «گاردِ حذف میز» را در فهرستِ
+  // جاهایی که اصلاح شده نام می‌برد — ولی این یکی در عمل اصلاح نشده بود.
+  // حالا از منبعِ واحد می‌خواند، پس دیگر نمی‌تواند drift کند.
   const activeReservation = await db.reservation.findFirst({
-    where: { tableId: id, status: { in: ['pending', 'confirmed', 'auto_confirmed', 'checked_in', 'seated', 'dining'] } },
+    where: { tableId: id, status: { in: activeStatusList() as any } },
   });
   if (activeReservation) throw Err.validation('این میز رزرو فعال دارد — ابتدا رزرو را لغو یا تکمیل کن');
 

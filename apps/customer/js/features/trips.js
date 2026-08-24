@@ -43,43 +43,45 @@ export function addToWallet(code,name,date,time,kind){
     <div class="wp-rest">${esc(name)}</div>
     <div class="wp-row"><div><div class="wp-lbl">تاریخ</div><div class="wp-val">${esc(date)}</div></div>
       <div><div class="wp-lbl">ساعت</div><div class="wp-val">${esc(time)}</div></div></div>
-    <div class="wp-qr">${qrSVG(code)}</div>
     <div class="wp-code">${esc(code)}</div>
   </div>
   <button class="btn btn-primary btn-lg btn-block" style="margin-top:16px" onclick="${isApple?`toast('','برای افزودن واقعی، سرور فایل pkpass امضاشده می‌سازد')`:`toast('','لینک Google Wallet در نسخه‌ی سرور فعال می‌شود')`}">${isApple?' افزودن به Apple Wallet':'افزودن به Google Wallet'}</button>
   <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>`);
 }
 // ── QR Check-in (تولید QR از کد رزرو) ──
+// ═══════════════════════════════════════════════════════════
+//  کدِ ورود — همان چیزی که واقعاً کار می‌کند
+//
+//  ⚠️ رفعِ دو نقصِ هم‌زمان (پروتکل §۹/§۱۰):
+//
+//   ۱. **QR اصلاً QR نبود.** `qrSVG` یک الگویِ شبه‌تصادفی از hashِ متن می‌کشید
+//      (کامنتِ خودش: «نمایشی») با گوشه‌هایِ finder تا شبیهِ QR به‌نظر برسد.
+//      هیچ اسکنری آن را رمزگشایی نمی‌کند.
+//
+//   ۲. **حتی QRِ درست هم به جایی نمی‌خورد.** `POST /checkin` مقدارش را با
+//      `table.qrCode` تطبیق می‌دهد (lib/tables.ts) — یعنی QR شناسه‌ی **میز**
+//      است که رویِ خودِ میز چاپ می‌شود، نه کدِ رزروِ مهمان. پس این جریان از
+//      اساس معکوس بود.
+//
+//  نتیجه‌ی قبلی: اپ به مهمان می‌گفت «میزبان با اسکن این کد ورودت رو ثبت می‌کنه»
+//  و مهمان دمِ در تصویری را نشان می‌داد که اسکن نمی‌شد.
+//
+//  مسیرِ واقعی و کارکننده: کارمند رزرو را با **کد** در پنل پیدا می‌کند و
+//  «رسید» را می‌زند (`PATCH /restaurant/reservations/{code}/status`). پس کد
+//  خودش اعتبارنامه است؛ همان را بزرگ و خوانا نشان می‌دهیم.
 export function showCheckInQR(code,name){
   openSheet(`<div style="text-align:center;padding:8px 0">
-    <div class="sheet-title" style="text-align:center">ورود با QR</div>
-    <div class="sheet-sub" style="text-align:center;margin-bottom:20px">این کد رو موقع ورود به ${esc(name)} نشون بده</div>
-    <div class="checkin-qr">${qrSVG(code,180)}</div>
-    <div class="checkin-code">${esc(code)}</div>
-    <div class="checkin-hint">میزبان با اسکن این کد، ورودت رو ثبت می‌کنه</div>
+    <div class="sheet-title" style="text-align:center">کدِ ورود</div>
+    <div class="sheet-sub" style="text-align:center;margin-bottom:20px">این کد رو موقع ورود به ${esc(name)} به میزبان بگو</div>
+    <div class="checkin-code checkin-code-lg">${esc(code)}</div>
+    <div class="checkin-hint">میزبان با همین کد، رزروت رو پیدا و ورودت رو ثبت می‌کنه</div>
   </div>
-  <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="closeSheet()">بستن</button>`);
-}
-// تولید QR ساده به‌صورت SVG (الگوی قطعی از کد — برای دمو؛ در تولید از کتابخانه‌ی QR)
-export function qrSVG(text,size){
-  size=size||140;const n=21;const cell=size/n;
-  // الگوی شبه‌تصادفی قطعی از hash متن (نمایشی)
-  let h=0;for(let i=0;i<text.length;i++)h=(h*31+text.charCodeAt(i))>>>0;
-  let rects='';const rng=(s)=>{s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff;};
-  let seed=h;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    // گوشه‌های موقعیت‌یاب (finder patterns)
-    const fp=(x<7&&y<7)||(x>=n-7&&y<7)||(x<7&&y>=n-7);
-    let on;
-    if(fp){const lx=x<7?x:x-(n-7),ly=y<7?y:y-(n-7);on=(lx===0||lx===6||ly===0||ly===6||(lx>=2&&lx<=4&&ly>=2&&ly<=4));}
-    else{seed=(seed*1103515245+12345)&0x7fffffff;on=(seed/0x7fffffff)>0.5;}
-    if(on)rects+=`<rect x="${(x*cell).toFixed(1)}" y="${(y*cell).toFixed(1)}" width="${cell.toFixed(1)}" height="${cell.toFixed(1)}"/>`;
-  }
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="background:#fff;border-radius:8px"><g fill="#0f172a">${rects}</g></svg>`;
+  <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode('${esc(code)}')">کپیِ کد</button>
+  <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>`);
 }
 // ── رزرو مجدد (پیش‌پرکردن با همان رستوران) ──
 export function repeatReservation(rid){
-  const r=R.find(x=>x.id===rid);
+  const r=R.find(x=>String(x.id)===String(rid));
   if(!r){toast('','رستوران پیدا نشد');return;}
   go('rest');openRest(rid);
   toast('','اطلاعات رزرو قبلی آماده‌ست — فقط زمان رو انتخاب کن');
@@ -92,12 +94,100 @@ export async function cancelTrip(code,btn){
   undoSnack('رزرو لغو شد',
     ()=>{ if(tripEl)tripEl.style.opacity=''; },   // Undo: هیچ APIای صدا زده نشده
     async ()=>{                                    // Commit: حالا واقعاً لغو کن
+      // ⚠️ نقضِ §۳ (جدی‌ترین موردِ این اپ): در حالتِ آفلاین این شاخه **هیچ
+      // کاری نمی‌کرد** — نه خطایی نشان می‌داد و نه محوشدگیِ ردیف را برمی‌گرداند.
+      // پس اسنکِ «رزرو لغو شد» رویِ صفحه می‌ماند، رزرو محو به نظر می‌رسید، و
+      // سرور هرگز خبردار نمی‌شد. مهمان باور می‌کرد لغو کرده، سرِ قرار نمی‌رفت،
+      // و no-show می‌خورد. قطعیِ شبکه هرگز نباید حقیقتِ کسب‌وکار بسازد.
       if(isLoggedIn()){
         const res=await API.post('/reservations/'+encodeURIComponent(code)+'/cancel',{});
         if(res.ok)return;
-        if(!res.offline){ toast('',res.error?.message||'لغو ناموفق بود'); if(tripEl)tripEl.style.opacity=''; }
+        if(tripEl)tripEl.style.opacity='';
+        toast('⚠️', res.offline
+          ? 'اتصال برقرار نیست — رزرو لغو نشد. دوباره تلاش کن'
+          : (res.error?.message||'لغو ناموفق بود'));
       }
     });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ثبتِ نظر — رفعِ P1-4 (پروتکل §۲۰ قراردادِ API، §۲۸ «no dead buttons»)
+//
+//  یافته: دکمه‌ی «ثبت نظر» رویِ رزروهایِ تجربه‌شده وجود داشت ولی
+//  `openRest(rid)` صدا می‌زد — یعنی فقط صفحه‌ی رستوران را باز می‌کرد و هیچ
+//  نظری ثبت نمی‌شد. هم‌زمان `POST /api/v1/me/reviews` در بک‌اند کامل و
+//  کارآمد بود ولی **هیچ مصرف‌کننده‌ای نداشت** (grepِ کاملِ اپ: صفر).
+//
+//  یعنی این «ویژگیِ جدید» نیست؛ وصل‌کردنِ دو سرِ یک قراردادِ از‌قبل‌موجود است
+//  و برداشتنِ یک دکمه‌ی دروغین.
+//
+//  قراردادِ بک‌اند (تأییدشده از رویِ کدِ route، نه فرض):
+//    body: { restaurant_id: uuid, reservation_id?: uuid, rating: 1..5,
+//            food_rating?, service_rating?, atmosphere_rating?, body?: <=1000 }
+//    ۲۰۱ → { ok, review }
+//    خطاها: ALREADY_REVIEWED (۴۰۹) · VALIDATION (۴۲۲، رزروِ تکمیل‌نشده)
+//           NOT_FOUND (۴۰۴) · FORBIDDEN_TENANT (۴۰۳)
+//  بک‌اند خودش نظرِ بدونِ بازدیدِ واقعی را رد می‌کند — اینجا آن قانون
+//  بازتولید نمی‌شود (§۲۲)، فقط پیامش صادقانه نمایش داده می‌شود.
+// ═══════════════════════════════════════════════════════════════════════
+let _reviewStars = 0;
+
+export function openReviewSheet(restaurantId, reservationId, name){
+  if(!isLoggedIn()){ toast('','برای ثبت نظر اول وارد شو'); return; }
+  _reviewStars = 0;
+  openSheet(`
+    <div class="bs-head"><div class="bs-title">نظرت درباره‌ی ${esc(name)}</div>
+      <div class="bs-rest">تجربه‌ت چطور بود؟</div></div>
+    <div id="rvStars" style="display:flex;justify-content:center;gap:8px;margin:18px 0" role="radiogroup" aria-label="امتیاز از ۵">
+      ${[1,2,3,4,5].map(n=>`<button type="button" class="rv-star" data-n="${n}" role="radio" aria-checked="false" aria-label="${n} ستاره"
+        onclick="setReviewStars(${n})"
+        style="background:none;border:none;cursor:pointer;padding:6px;min-width:44px;min-height:44px;opacity:.35">${icon('star',{size:30,fill:true})}</button>`).join('')}
+    </div>
+    <div class="bw-field"><label for="rvBody">توضیح (اختیاری)</label>
+      <textarea id="rvBody" maxlength="1000" rows="4" placeholder="چی خوب بود؟ چی می‌تونست بهتر باشه؟"
+        style="width:100%;border-radius:var(--radius-lg);border:1px solid var(--line);padding:10px;font-family:inherit;font-size:14px"></textarea></div>
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px"
+      onclick="submitReview('${esc(restaurantId)}','${esc(reservationId)}')">ثبت نظر</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
+  `);
+}
+
+/** انتخابِ ستاره — فقط حالتِ بصری؛ هیچ چیزی هنوز ثبت نشده. */
+export function setReviewStars(n){
+  _reviewStars = n;
+  document.querySelectorAll('#rvStars .rv-star').forEach(el=>{
+    const v = +el.dataset.n;
+    el.style.opacity = v <= n ? '1' : '.35';
+    el.setAttribute('aria-checked', v === n ? 'true' : 'false');
+  });
+}
+
+export async function submitReview(restaurantId, reservationId){
+  if(!_reviewStars){ toast('','اول ستاره‌ت رو انتخاب کن'); return; }
+  const btn = document.querySelector('#sheetBody .btn-primary');
+  if(btn){ btn.disabled = true; btn.textContent = 'در حال ثبت...'; }
+  const body = (document.getElementById('rvBody')?.value || '').trim();
+  const res = await API.post('/me/reviews', {
+    restaurant_id: restaurantId,
+    reservation_id: reservationId,
+    rating: _reviewStars,
+    ...(body ? { body } : {}),
+  });
+  if(res.ok){
+    toast('', 'نظرت ثبت شد — ممنون!');
+    closeSheet();
+    return;
+  }
+  // ⚠️ هیچ مسیرِ جعلی‌ای اینجا نیست (پروتکل §۳): آفلاین و خطایِ سرور هر دو
+  // صریح گزارش می‌شوند و شیت باز می‌ماند تا کاربر بتواند دوباره تلاش کند.
+  const msg = res.offline
+    ? 'اتصال به سرور برقرار نشد — نظرت ثبت نشد'
+    : (res.error?.code === 'ALREADY_REVIEWED'
+        ? 'برای این رزرو قبلاً نظر ثبت کردی'
+        : (res.error?.message || 'ثبتِ نظر ناموفق بود'));
+  toast('', msg);
+  if(btn){ btn.disabled = false; btn.textContent = 'ثبت نظر'; }
 }
 
 
@@ -107,3 +197,6 @@ window.addToWallet = addToWallet;
 window.showCheckInQR = showCheckInQR;
 window.repeatReservation = repeatReservation;
 window.cancelTrip = cancelTrip;
+window.openReviewSheet = openReviewSheet;
+window.setReviewStars = setReviewStars;
+window.submitReview = submitReview;

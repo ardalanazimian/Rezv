@@ -4,6 +4,7 @@ import { enqueueSms } from '@/lib/sms';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, zPhone, z } from '@/lib/schemas';
+import { allowsCategory } from '@/lib/notification-prefs';
 
 const smsSchema = z.object({
   kind: z.enum(['winback', 'campaign']).default('campaign'),
@@ -26,22 +27,51 @@ export const POST = withRestaurantAuth(
     const kind = b.kind;
     const template = kind === 'winback' ? 'winback_offer' : 'campaign';
 
+    // ⚠️ رعایتِ انصراف (پروتکل §۱۳/§۱۷) — این مسیر قبلاً **هیچ** فیلترِ رضایتی
+    // نداشت: هر عضوِ باشگاه پیامکِ تبلیغاتی می‌گرفت، حتی اگر در اپ «تخفیف و
+    // کش‌بک ویژه» را خاموش کرده بود. (آن کلید هم فقط در localStorage می‌نشست،
+    // پس سرور اصلاً خبر نداشت — migration 050 آن را پایدار کرد.)
+    //
+    // `winback` و `campaign` هر دو تبلیغاتی‌اند ⇒ دسته‌ی `offers`.
+    // فقط `false`ِ صریح مانع می‌شود؛ کاربری که نظری نداده مثلِ قبل دریافت می‌کند.
     let targets: { phone: string; name: string }[] = [];
+    let optedOut = 0;
     if (b.phones && b.phones.length) {
-      targets = b.phones.map((p) => ({ phone: p, name: '' }));
+      // فهرستِ صریحِ شماره‌ها (مثلاً تبریکِ تولد): انصرافِ کاربرانِ شناخته‌شده
+      // همچنان رعایت می‌شود — شماره‌ای که به کاربرِ منصرف تعلق دارد حذف می‌شود.
+      const optedOutPhones = new Set(
+        (await db.user.findMany({
+          where: { phone: { in: b.phones } },
+          select: { phone: true, notificationPrefs: true },
+        }))
+          .filter((u) => !allowsCategory(u.notificationPrefs, 'offers'))
+          .map((u) => u.phone),
+      );
+      targets = b.phones
+        .filter((p) => { const keep = !optedOutPhones.has(p); if (!keep) optedOut++; return keep; })
+        .map((p) => ({ phone: p, name: '' }));
     } else {
       const tierFilter = b.segment ? { tier: b.segment } : {};
       const members = await db.clubMember.findMany({
         where: { restaurantId: restaurant.id, ...tierFilter },
-        include: { user: { select: { phone: true, firstName: true } } },
+        include: { user: { select: { phone: true, firstName: true, notificationPrefs: true } } },
         take: 500,
       });
       targets = members
         .filter(m => m.user?.phone)
+        .filter(m => {
+          const keep = allowsCategory(m.user.notificationPrefs, 'offers');
+          if (!keep) optedOut++;
+          return keep;
+        })
         .map(m => ({ phone: m.user.phone, name: m.user.firstName || '' }));
     }
 
-    if (!targets.length) throw Err.validation('هیچ مخاطبی برای ارسال یافت نشد');
+    if (!targets.length) {
+      throw Err.validation(optedOut > 0
+        ? `هیچ مخاطبی برای ارسال نماند — ${optedOut} نفر از پیام‌های تبلیغاتی انصراف داده‌اند`
+        : 'هیچ مخاطبی برای ارسال یافت نشد');
+    }
 
     const discount = (b.discount_code || '').slice(0, 20);
     let queued = 0;
@@ -65,6 +95,8 @@ export const POST = withRestaurantAuth(
       });
     } catch { /* لاگ‌نشدن تاریخچه نباید جلوی ارسال را بگیرد */ }
 
-    return NextResponse.json({ queued, kind });
+    // `opted_out` صریح برگردانده می‌شود تا پنل بتواند تفاوتِ «کسی نبود» و
+    // «بودند ولی انصراف داده‌اند» را به رستوران‌دار نشان بدهد.
+    return NextResponse.json({ queued, kind, opted_out: optedOut });
   },
 );

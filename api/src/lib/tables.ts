@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import { db } from './db';
 import { Err } from './errors';
+import { invalidateAllAvailability } from './availability-cache';
 
 // ═══════════════════════════════════════════════════════════
 //  سرویس مدیریت میز رزرونو — وضعیت، QR، تخصیص
@@ -46,8 +47,24 @@ export async function setTableState(
   const updated = await db.table.update({
     where: { id: tableId },
     data: { state: next },
-    select: { id: true, number: true, state: true },
+    select: { id: true, number: true, state: true, restaurantId: true },
   });
+
+  // ⚠️ رفعِ فراموشیِ باطل‌سازیِ کش (فازِ ۲، پروتکل §۶).
+  //
+  // availability.ts محاسبه‌ی میزهایِ آزاد را با فیلترِ `state` انجام می‌دهد
+  // (`state: { not: 'maintenance' }`), پس این ستون یکی از **ورودی‌هایِ**
+  // payloadِ کش‌شده است. ولی تنها فراخوانانِ invalidate مسیرهایِ رزرو بودند —
+  // نویسندگانِ میز هیچ‌کدام صدایش نمی‌زدند. با سیاستِ SWR (۳۰ثانیه تازه،
+  // تا ۳۰۰ثانیه stale) یعنی بردنِ یک میز به تعمیرات تا ۵ دقیقه به مشتری
+  // نمی‌رسید و همچنان قابلِ رزرو نشان داده می‌شد.
+  //
+  // خودِ docstringِ invalidateAvailability «تغییر وضعیت میز» را به‌عنوانِ
+  // trigger فهرست کرده — پس این یک call-siteِ جاافتاده بود، نه تصمیمِ طراحی.
+  //
+  // نسخه‌ی all-dates استفاده می‌شود چون وضعیتِ میز date-scoped نیست.
+  await invalidateAllAvailability(updated.restaurantId).catch(() => {});
+
   return updated as { id: string; number: number; state: TableState };
 }
 
@@ -69,14 +86,33 @@ export async function assignQrCode(tableId: string, restaurantId: string): Promi
   throw Err.validation('ساخت کد QR ناموفق بود');
 }
 
-// ── check-in با اسکن QR: مهمان سر میز با اسکن، رزرو فعلی را arrived/seated می‌کند ──
-export async function qrCheckIn(qrCode: string): Promise<{
+// ── check-in با اسکن QR: پرسنل کدِ QRِ میز را اسکن می‌کند و رزروِ فعلی را seated می‌کند ──
+//
+// ⚠️ رفعِ P0-2 (فازِ ۲، پروتکل §۴ و §۷) — دو نقصِ جدی که با هم رفع شدند:
+//
+//  ۱. **بدونِ احراز هویت.** routeِ POST /api/v1/checkin هیچ auth ای نداشت و
+//     middleware هم فقط بنِ IP/CSRF/ریت‌لیمیت می‌کند، نه احراز هویت. یعنی هرکس
+//     با دانستن یا حدس‌زدنِ یک qrCode می‌توانست رزروِ فردِ دیگری را
+//     checked_in→seated کند (دو انتقالِ واقعی، با audit و SMS و رویدادِ اقتصادی)،
+//     میز را occupied کند، و در پاسخ reservation_code را هم بگیرد. هم دستکاریِ
+//     حالتِ کسب‌وکار بود، هم DoSِ عملیاتی (اشغال‌نشان‌دادنِ همه‌ی میزها).
+//
+//  ۲. **بدونِ محدوده‌ی تنانت.** جست‌وجویِ میز سراسری بود؛ هیچ چکی نبود که این
+//     میز به رستورانِ فراخوان تعلق دارد.
+//
+// حالا restaurantId اجباری است و route از withRestaurantAuth عبور می‌کند
+// (پرسنلِ احرازشده + RBAC + محدوده‌ی شعبه). این با جریانِ واقعیِ محصول هم
+// یکی است: اپِ مشتری صریح می‌گوید «میزبان با اسکن این کد، ورودت رو ثبت می‌کنه»
+// (apps/customer/js/features/trips.js) — یعنی اسکن‌کننده پرسنل است، نه مهمان.
+export async function qrCheckIn(qrCode: string, restaurantId: string): Promise<{
   table_number: number;
   reservation_code: string | null;
   status: string;
 }> {
   const table = await db.table.findUnique({ where: { qrCode } });
-  if (!table) throw Err.notFound('میز');
+  // محدوده‌ی تنانت: میزِ رستورانِ دیگر باید دقیقاً مثلِ میزِ ناموجود دیده شود
+  // (نه پیامِ متفاوت) تا وجود/عدمِ وجودِ کدِ QRِ رستورانِ دیگر لو نرود.
+  if (!table || table.restaurantId !== restaurantId) throw Err.notFound('میز');
 
   // رزرو فعالِ اکنونِ این میز را پیدا کن (در بازه‌ی زمانی حاضر)
   const now = new Date();

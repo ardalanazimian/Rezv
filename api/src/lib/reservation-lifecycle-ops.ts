@@ -80,7 +80,7 @@ export async function markLateNoShows(restaurantId: string): Promise<number> {
   const candidates = await db.reservation.findMany({
     where: {
       restaurantId,
-      status: { in: ['confirmed', 'auto_confirmed', 'running_late'] }, // pending فقط از expireStaleHolds → expired؛ TRANSITIONS.pending شامل no_show نیست
+      status: { in: ['pending', 'confirmed', 'auto_confirmed', 'running_late'] },
       slotStart: { lt: cutoff },
     },
     select: { id: true, slotStart: true },

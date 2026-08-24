@@ -5,7 +5,7 @@
 import { API, USER, isLoggedIn, logout, userInitial, userName, setUSER, refreshAuthUI } from '../api.js';
 import { esc, faNum, openLogin, toast } from '../auth.js';
 import { fmtFa } from '../data/discover.js';
-import { TRIPS, favs, pts } from '../data/seed.js';
+import { favs, pts, tripCount, setTripCount } from '../data/seed.js';
 import { icon } from '../icons.js';
 import { armReveals, buzz } from '../theme-pwa.js';
 import { openNotifPrefs } from '../user-profile.js';
@@ -53,7 +53,11 @@ export async function openFoodDNA(){
   _dnaData = p;
   _dnaSlide = 0;
   buildDNASlides(p, visitPercentile);
+  // دیالوگِ تمام‌صفحه باید فوکوس را داخلِ خودش بیاورد وگرنه کاربرِ کیبورد/
+  // صفحه‌خوان همچنان رویِ صفحه‌ی پشتی می‌ماند و اصلاً نمی‌فهمد چیزی باز شده.
+  _dnaLastFocus = document.activeElement;
   document.getElementById('dnaOverlay').classList.add('open');
+  document.querySelector('#dnaOverlay .dna-close')?.focus();
   // ساخت نوارهای پیشرفت (یکی برای هر اسلاید + اسلاید اشتراک)
   const nSlides = document.querySelectorAll('#dnaSlides .dna-slide').length;
   document.getElementById('dnaProgress').innerHTML = Array.from({length:nSlides},()=>'<div class="dna-progress-bar"><i></i></div>').join('');
@@ -139,7 +143,10 @@ export function dnaCountUp(el){
 }
 export function dnaNext(){ showDNASlide(_dnaSlide+1); }
 export function dnaPrev(){ showDNASlide(Math.max(0,_dnaSlide-1)); }
-export function closeFoodDNA(){ clearTimeout(_dnaTimer); document.getElementById('dnaOverlay').classList.remove('open'); }
+let _dnaLastFocus = null;
+export function closeFoodDNA(){ clearTimeout(_dnaTimer); document.getElementById('dnaOverlay').classList.remove('open');
+  // فوکوس به عنصری که دیالوگ را باز کرده بود برمی‌گردد (قرینه‌ی openModal پنل‌ها).
+  if (_dnaLastFocus && document.contains(_dnaLastFocus)) _dnaLastFocus.focus?.(); _dnaLastFocus = null; }
 
 export async function shareFoodDNA(){
   const p = _dnaData || {};
@@ -193,7 +200,7 @@ export function renderProfile(){
         </div>
       </div>
       <div class="prof-card-stats">
-        <div class="pcstat"><div class="pcstat-v">${fmtFa(TRIPS.length)}</div><div class="pcstat-l">رزرو</div></div>
+        <div class="pcstat"><div class="pcstat-v" id="pcTrips">${tripCount==null?'—':fmtFa(tripCount)}</div><div class="pcstat-l">رزرو</div></div>
         <div class="pcstat-div"></div>
         <div class="pcstat"><div class="pcstat-v">${fmtFa(pts)}</div><div class="pcstat-l">امتیاز</div></div>
         <div class="pcstat-div"></div>
@@ -215,10 +222,33 @@ export function renderProfile(){
     </div>
   </div>`;
   armReveals&&armReveals();
+  syncProfileTripCount();
 }
 // ═══════════════════════════════════════════════════════════
 
 
+
+// ═══════════════════════════════════════════════════════════
+//  شمارشِ واقعیِ رزرو برایِ کارتِ پروفایل — دقیقاً همان الگویِ syncNavPoints:
+//  یک درخواستِ کوچک، محافظت‌شده با فلگِ in-flight، و اگر سرور نگفت «—».
+//  عمداً هیچ عددی حدس زده نمی‌شود (قبلاً TRIPS.length ثابتِ ۳ بود).
+// ═══════════════════════════════════════════════════════════
+let _tripCountInFlight = null;
+function syncProfileTripCount(){
+  const el = document.getElementById('pcTrips');
+  if(!el) return;
+  if(!isLoggedIn()){ el.textContent = '—'; return; }
+  if(tripCount != null){ el.textContent = fmtFa(tripCount); return; }
+  if(_tripCountInFlight) return;
+  _tripCountInFlight = API.get('/me/reservations').then(res => {
+    if(res.ok && Array.isArray(res.data)){
+      setTripCount(res.data.length);
+      const now = document.getElementById('pcTrips');
+      if(now) now.textContent = fmtFa(res.data.length);
+    }
+    // سرور نگفت → «—»ی که از قبل رندر شده دست نمی‌خورد
+  }).catch(()=>{}).finally(()=>{ _tripCountInFlight = null; });
+}
 
 // ═══════════════════════════════════════════════════════════
 //  ویرایشِ inline پروفایل (C17) — بدونِ modal، درجا در همان لیستِ تنظیمات.
@@ -249,6 +279,7 @@ export async function saveProfileInline(btn){
   if(!first){ toast('⚠️','اسمت رو وارد کن'); const el=document.getElementById('peFirst'); if(el) try{el.focus()}catch(e){} return; }
   const b = (btn && btn.tagName==='BUTTON') ? btn : document.querySelector('#profEditItem .btn-primary');
   if(b){ b.disabled = true; b.textContent = 'در حال ذخیره...'; }
+  let synced = true;   // فقط وقتی سرور واقعاً تأیید کرده باشد true می‌ماند
   if(isLoggedIn()){
     const res = await API.updateProfile({ first_name: first, last_name: last });
     if(res.ok && res.data?.user){ setUSER(res.data.user); }
@@ -256,11 +287,19 @@ export async function saveProfileInline(btn){
       toast('⚠️', res.error?.message || 'ذخیره ناموفق بود');
       if(b){ b.disabled = false; b.textContent = 'ذخیره'; }
       return;
-    } else { setUSER({ ...USER, firstName: first, lastName: last }); } // آفلاین → محلی
+    } else {
+      // ⚠️ فازِ ۲ (§۳): تغییر محلی می‌ماند ولی سرور هرگز خبردار نشد — پس نباید
+      // تیکِ سبزِ «به‌روزرسانی شد» بگیرد. کاربر باور می‌کرد نامش رویِ حسابش
+      // ذخیره شده، در حالی که با پاک‌شدنِ حافظه‌ی مرورگر از بین می‌رفت.
+      setUSER({ ...USER, firstName: first, lastName: last });
+      synced = false;
+    }
   } else {
+    // مهمانِ بدونِ حساب: اصلاً حسابی نیست که رویش ذخیره شود.
     setUSER({ ...USER, firstName: first, lastName: last });
+    synced = false;
   }
-  toast('✅','پروفایل به‌روزرسانی شد');
+  toast(synced ? '✅' : '⚠️', synced ? 'پروفایل به‌روزرسانی شد' : 'محلی ذخیره شد — روی حسابت هنوز ثبت نشده');
   try{ refreshAuthUI && refreshAuthUI(); }catch(e){}
   renderProfile();
 }

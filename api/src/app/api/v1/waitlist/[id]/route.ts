@@ -16,17 +16,29 @@ function callerId(req: Request): string | undefined {
 }
 
 /** GET /api/v1/waitlist/:id — موقعیت و وضعیت فعلی در صف (داشبورد مشتری) */
-// رفع IDOR: اگر کاربر احراز‌هویت‌شده باشد، فقط ورودی خودش را می‌بیند. برای ورودی
-// مهمان (userId=null) دسترسی باز است چون شناسه UUID و غیرقابل‌حدس است و فقط داده‌ی
-// موقعیت صف برمی‌گرداند (نه PII حساس فراتر از آنچه خودش وارد کرده).
+// ورودیِ متعلق به کاربر (userId != null): **فقط** خودِ همان کاربر، با توکنِ معتبر.
+// ورودیِ مهمان (userId = null): دسترسی باز می‌ماند — شناسه UUIDِ غیرقابلِ‌حدس است و
+// مهمان اصلاً حسابی ندارد که با آن احراز شود؛ این یک انتخابِ **صریح** است، نه
+// نتیجه‌ی جانبیِ یک شرطِ falsy (که باگِ قبلی بود).
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     const { id } = parseParams(await params, paramsSchema);
     const e = await db.waitlistEntry.findUnique({ where: { id } });
     if (!e) return NextResponse.json({ error: { code: 'NOT_FOUND', message: 'پیدا نشد' } }, { status: 404 });
+    // ⚠️ رفعِ IDORِ خواندنی (فازِ ۲، پروتکل §۷).
+    //
+    // شرطِ قبلی `if (cid && e.userId && ...)` بود — یعنی گارد فقط وقتی فعال
+    // می‌شد که توکنی **وجود داشت**. درخواستِ کاملاً بدونِ Authorization (یا با
+    // توکنِ خراب/منقضی، که callerId آن را به undefined می‌بلعد) از شرط رد می‌شد
+    // و ورودیِ متعلق به کاربرِ دیگر را کامل می‌گرفت — شاملِ شماره‌ی میزِ
+    // پیشنهادشده و **کدِ رزرو**.
+    //
+    // مسیرهایِ نوشتنیِ همین منبع از اول درست بودند: assertCanActOnEntry در
+    // lib/waitlist.ts اثباتِ مثبت می‌خواهد و نبودِ auth را شکست حساب می‌کند.
+    // مسیرِ خواندن هم‌راستا نشده بود. حالا همان قاعده اعمال می‌شود.
     const cid = callerId(req);
-    if (cid && e.userId && e.userId !== cid) {
+    if (e.userId && (!cid || e.userId !== cid)) {
       return NextResponse.json({ error: { code: 'NOT_FOUND', message: 'پیدا نشد' } }, { status: 404 });
     }
     const position = await getPosition(id);

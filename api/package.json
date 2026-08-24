@@ -17,7 +17,8 @@
     "lint": "eslint . --ext .ts,.tsx",
     "test:integration": "node --test tests/integration/*.test.mjs",
     "test:e2e": "playwright test",
-    "test:load": "k6 run tests/load/reservation.js"
+    "test:load": "k6 run ../loadtest/k6-load-test.js",
+    "test:one": "tsx --test --test-force-exit"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",

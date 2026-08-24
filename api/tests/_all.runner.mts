@@ -41,10 +41,15 @@
 //     می‌شمرد (یک‌بار مستقیم، یک‌بار از طریقِ importِ اینجا).
 // ═══════════════════════════════════════════════════════════════════════
 
+import './birthday-calendar.test.mts';
 import './ban.test.mts';
+import './branch-isolation.integration.test.mts';
 import './cancellation-policy.test.mts';
+import './booking-policy-contract.integration.test.mts';
+import './checkin-auth.integration.test.mts';
 import './crm-recommendations.test.mts';
 import './customer-intelligence.test.mts';
+import './intelligence-formula-parity.integration.test.mts';
 import './demand-forecast.test.mts';
 import './economy.test.mts';
 import './esc.test.mts';
@@ -55,12 +60,15 @@ import './hours-change-approval.integration.test.mts';
 import './incentive-engine.test.mts';
 import './jwt.test.mts';
 import './lifecycle.test.mts';
+import './lifecycle-exclusivity.test.mts';
+import './loyalty-club-points.integration.test.mts';
 import './loyalty-status.test.mts';
 import './loyalty.test.mts';
 import './media.test.mts';
 import './ml-core.test.mts';
 import './no-show-model.test.mts';
 import './notifications.test.mts';
+import './notification-consent.test.mts';
 import './otp.test.mts';
 import './permissions.test.mts';
 import './photo-moderation.test.mts';
@@ -70,10 +78,18 @@ import './redis.test.mts';
 import './reservation-helpers.test.mts';
 import './reservation-status.test.mts';
 import './restaurant-manager.test.mts';
+import './schema-drift.integration.test.mts';
+import './security-hardening.integration.test.mts';
 import './site-orders.test.mts';
 import './table-merge-occupancy-concurrency.test.mts';
+import './table-delete-guard.integration.test.mts';
+import './table-release.integration.test.mts';
 import './table-merge-occupancy.test.mts';
+import './telemetry-retention.integration.test.mts';
+import './telemetry-trust.test.mts';
+import './telemetry-dedup.integration.test.mts';
 import './validate.test.mts';
+import './waitlist-accept-clock.test.mts';
 import './waitlist.test.mts';
 
 // ═══════════════════════════════════════════════════════════════════════

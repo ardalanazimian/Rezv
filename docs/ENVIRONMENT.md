@@ -15,7 +15,7 @@ infra), `both`.
 | Name | Required | Default | Scope | Description | Example |
 |---|---|---|---|---|---|
 | `DATABASE_URL` | ✅ | — | api | Postgres connection (use a **pooled** URL in prod). | `postgresql://u:p@host:6543/db?pgbouncer=true&connection_limit=10` |
-| `DATABASE_DIRECT_URL` | ✅ (migrations) | — | api | **Direct** (non-pooled) connection for migrate/db push. | `postgresql://u:p@host:5432/db` |
+| `DATABASE_DIRECT_URL` | ⚠️ **inert — see note** | — | api | Intended as a **direct** (non-pooled) URL for migrate/db push, but **nothing reads it today**. | `postgresql://u:p@host:5432/db` |
 | `DATABASE_REPLICA_URL` | ➖ | falls back to primary | api | Read-replica for heavy reads (`dbRead`). | `postgresql://u:p@replica:6543/db?pgbouncer=true` |
 | `REDIS_URL` | ✅ | — | api | Redis connection (rate-limit, locks, cache, OTP). | `redis://:pass@redis:6379` |
 | `REDIS_PASSWORD` | ✅ (self-host) | — | compose | Redis auth (compose `--requirepass`). | random |
@@ -103,5 +103,21 @@ infra), `both`.
 >   root `.env.example` covers the compose stack (DB/Redis/backup) and a few app
 >   vars. Some names differ slightly between the two files (e.g. the direct URL
 >   is `DATABASE_DIRECT_URL`).
+> - ⚠️ **`DATABASE_DIRECT_URL` is currently inert** (verified 2026-08-24 by
+>   grep over the whole repo). `prisma/schema.prisma` declares only
+>   `url = env("DATABASE_URL")` — there is no `directUrl`, so Prisma never
+>   uses it. Setting it changes nothing; **migrations run over whatever
+>   `DATABASE_URL` points at**, pooler included.
+>
+>   This matters: with PgBouncer *transaction* pooling, `prisma migrate` /
+>   `db execute` can misbehave — the exact hazard `api/src/lib/db.ts` warns
+>   about. Today the project applies schema changes with
+>   `prisma/apply-sql.sh`, which is normally run against a direct connection
+>   by the operator, so this has not bitten anyone.
+>
+>   To actually wire it, add `directUrl = env("DATABASE_DIRECT_URL")` to the
+>   datasource — but note Prisma then **requires** the variable in every
+>   environment (local, CI, test) and fails validation when it is missing.
+>   That is why it was left unwired rather than switched on blindly.
 > - Anything not marked required has a safe default or degrades gracefully
 >   (feature disabled) when absent.

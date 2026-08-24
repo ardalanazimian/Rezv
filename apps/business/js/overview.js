@@ -125,7 +125,7 @@ function renderDashWaitlist(){
     return `<div class="dr-row">
       <div class="wl-pos">${fa(i+1)}</div>
       <div class="dr-info"><div class="dr-name">${esc(w.name)} ${vip}</div><div class="dr-meta">${fa(w.party_size)} نفر · ${waited}</div></div>
-      <div class="dr-acts"><button class="dr-act offer" onclick="offerWLSeat('${w.id}')">آفر میز</button></div>
+      <div class="dr-acts">${i===0?`<button class="dr-act offer" onclick="promoteNextWL()">آفر میز</button>`:''}</div>
     </div>`;
   }).join('');
 }
@@ -138,8 +138,11 @@ function dashCheckIn(idx){
 }
 // تماس با مهمان (نمایش شماره)
 function callGuest(idx){
+  // ⚠️ فازِ ۲: این دکمه فقط toast می‌داد. callCustomer (crm.js) از قبل وجود
+  // داشت و شماره هم در رکورد بود — فقط وصل نشده بود.
   const r = RES[idx]; if(!r) return;
-  toast('', `تماس با ${r.name}: ${r.phone||'شماره ثبت نشده'}`);
+  if(!r.phone){ toast('','شماره‌ای برایِ این مهمان ثبت نشده'); return; }
+  callCustomer(r.phone);
 }
 function renderEnterpriseDashboard(){
   const k = calcTodayKPIs();
@@ -147,6 +150,9 @@ function renderEnterpriseDashboard(){
   // (هیچ‌جا با JS آپدیت نمی‌شد — با live-testِ واقعی روی دیتای seedشده پیدا شد:
   // عددِ واقعیِ امروز ۳ بود ولی سایدبار همیشه ۱۲ نشان می‌داد). حالا از همان
   // k.todayCountِ واقعی که KPI هم استفاده می‌کند پر می‌شود؛ صفر → مخفی.
+  // تاریخِ تاپ‌بار در enterPanel ست می‌شود (یک منبعِ واحد). این‌جا فقط برایِ
+  // نشستِ طولانی که از نیمه‌شب رد می‌شود دوباره تازه می‌شود.
+  if (typeof setTopbarDate === 'function') setTopbarDate();
   const resBadge = document.getElementById('resBadge');
   if (resBadge) resBadge.textContent = k.todayCount > 0 ? fa(k.todayCount) : '';
   const elap = REVENUE_CONFIG.connected ? '' : '<span class="kpi-est" title="تخمینی تا اتصال صندوق">≈</span>';
@@ -155,11 +161,11 @@ function renderEnterpriseDashboard(){
     ${dashboardUsingDemoData()?`<div class="cash-note" style="margin-bottom:16px">${icon('info',{size:13})} این اسم‌ها و اعداد نمونه‌اند، رزروهایِ واقعیِ رستورانت نیستند — تا اتصالِ کامل به سرور جایگزین می‌شن.</div>`:''}
     <!-- کارهای سریع (بازطراحی پریمیوم) -->
     <div class="quick-grid">
-      <div class="quick-btn primary" onclick="openWalkin()"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/><path d="M12 11v6M9 14h6" stroke-width="2.4"/></svg></div><div class="quick-label">ورود بدون رزرو</div></div>
-      <div class="quick-btn" onclick="openManual()"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M12 11v6M9 14h6"/></svg></div><div class="quick-label">رزرو جدید</div></div>
-      <div class="quick-btn" onclick="nav('waitlist')"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><div class="quick-label">لیست انتظار</div></div>
-      <div class="quick-btn" onclick="nav('floor')"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div><div class="quick-label">پلان سالن</div></div>
-      <div class="quick-btn" onclick="focusSearch()"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg></div><div class="quick-label">جستجوی مهمان</div></div>
+      <div class="quick-btn primary" role="button" tabindex="0" onclick="openWalkin()"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/><path d="M12 11v6M9 14h6" stroke-width="2.4"/></svg></div><div class="quick-label">ورود بدون رزرو</div></div>
+      <div class="quick-btn" role="button" tabindex="0" onclick="openManual()"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M12 11v6M9 14h6"/></svg></div><div class="quick-label">رزرو جدید</div></div>
+      <div class="quick-btn" role="button" tabindex="0" onclick="nav('waitlist')"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><div class="quick-label">لیست انتظار</div></div>
+      <div class="quick-btn" role="button" tabindex="0" onclick="nav('floor')"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div><div class="quick-label">پلان سالن</div></div>
+      <div class="quick-btn" role="button" tabindex="0" onclick="focusSearch()"><div class="quick-ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg></div><div class="quick-label">جستجوی مهمان</div></div>
     </div>
 
     <!-- KPIهای کلیدی امروز (شبکه‌ی enterprise) -->
@@ -382,13 +388,20 @@ async function saveStaffNote(){
   const txt=document.getElementById('noteTxt')?.value.trim();
   if(!txt){toast('','یادداشت خالی است');return;}
   const pinned=document.getElementById('notePin')?.checked||false;
+  // ⚠️ رفعِ جعلِ ثبت (پروتکل §۳/§۱۰): شاخه‌ی else قبلاً بدونِ قید بود — روی
+  // استقرارِ واقعی با نشستِ منقضی، یادداشتِ شیفت فقط در آرایه‌ی محلیِ همین تب
+  // می‌نشست و «یادداشت ثبت شد» گفته می‌شد. یادداشتِ شیفت دقیقاً برای این است
+  // که **بقیه‌ی کارکنان** ببینند؛ هیچ‌کس نمی‌دید و با اولین رفرش پاک می‌شد.
   if(API.getToken()){
     const res=await API.addNote({body:txt,pinned});
     if(!res.ok){toast('',res.error?.message||'ثبت ناموفق بود');return;}
     await loadStaffNotes();
-  }else{
+  }else if(isOfflineDemo()){
     const now=new Date();
     STAFF_NOTES.unshift({who:'شما',txt,pinned,time:fa(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`)});
+  }else{
+    toast('','برای ثبتِ یادداشت باید وارد شده باشی');
+    return;
   }
   closeModal();renderStaffNotes();toast('','یادداشت ثبت شد');
 }
@@ -397,8 +410,11 @@ async function delStaffNote(id){
     const res=await API.deleteNote(id);
     if(!res.ok){toast('',res.error?.message||'حذف ناموفق بود');return;}
     await loadStaffNotes();
-  }else{
+  }else if(isOfflineDemo()){
     STAFF_NOTES=STAFF_NOTES.filter(n=>String(n.id||'')!==String(id));
+  }else{
+    toast('','برای حذفِ یادداشت باید وارد شده باشی');
+    return;
   }
   renderStaffNotes();
 }

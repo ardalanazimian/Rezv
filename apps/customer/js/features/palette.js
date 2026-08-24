@@ -9,7 +9,7 @@ import { openRest } from '../data/detail.js';
 import { go } from '../data/discover.js';
 import { icon } from '../icons.js';
 import { esc, lockAppSurfaces, unlockAppSurfaces } from '../auth.js';
-import { TRIPS } from '../data/seed.js';
+import { myTrips } from '../data/seed.js';
 
 const RECENT_KEY = 'rz_recent_search';
 let _sel = 0, _items = [];
@@ -39,7 +39,7 @@ const COMMANDS = [
   { t:'پروفایل',         ic:'user',     run:()=>go('profile') },
 ];
 
-function ensureEl(){
+function ensurePaletteEl(){
   let ov = document.getElementById('cmdk');
   if(ov) return ov;
   ov = document.createElement('div');
@@ -54,7 +54,7 @@ function ensureEl(){
     '</div>';
   document.body.appendChild(ov);
   ov.addEventListener('click', e=>{ if(e.target===ov) closePalette(); });
-  ov.querySelector('#cmdkInput').addEventListener('input', e=>render(e.target.value));
+  ov.querySelector('#cmdkInput').addEventListener('input', e=>renderPalette(e.target.value));
   ov.querySelector('#cmdkInput').addEventListener('keydown', onKey);
   return ov;
 }
@@ -67,12 +67,12 @@ function itemHTML(it, i){
   `</li>`;
 }
 
-function render(q){
+function renderPalette(q){
   q = (q||'').trim();
   const list = document.getElementById('cmdkList');
   _items = [];
   if(!q){
-    recents().forEach(r=>_items.push({ t:r, ic:'clock', run:()=>{ const inp=document.getElementById('cmdkInput'); inp.value=r; render(r); } }));
+    recents().forEach(r=>_items.push({ t:r, ic:'clock', run:()=>{ const inp=document.getElementById('cmdkInput'); inp.value=r; renderPalette(r); } }));
     COMMANDS.forEach(c=>_items.push(c));
   } else {
     // فرمان‌های ناوبری (typo-tolerant)
@@ -82,11 +82,16 @@ function render(q){
         has(r.n, q) || has(r.cuisine, q) || (Array.isArray(r.vibes)&&r.vibes.some(v=>has(v, q)))
       ).slice(0,8).forEach(r=>_items.push({ t:r.n, sub:r.cuisine, ic:'utensils', run:()=>{ pushRecent(q); openRest(r.id); } }));
     // رزروهای من (کد رزرو یا نامِ رستوران یا تاریخ) → صفحه‌ی سفرها
-    (Array.isArray(TRIPS)?TRIPS:[]).filter(t=>{
-        const r = (Array.isArray(R)?R:[]).find(x=>x.id===t.rid);
+    // ⚠️ رفعِ جعلِ رزرو (پروتکل §۱۰): این جست‌وجو قبلاً روی `TRIPS` (دادهٔ
+    // seed) بود، پس روی سایتِ واقعی تایپِ «RZ8K2M» نتیجه‌ی «رزرو RZ8K2M» را
+    // برمی‌گرداند — رزروی که کاربر هرگز نداشت. حالا فقط رزروهایِ **واقعیِ**
+    // سرور (myTrips، پرشده در renderTrips) جست‌وجو می‌شوند؛ تا وقتی نیامده‌اند
+    // این بخش چیزی برنمی‌گرداند به‌جایِ اینکه چیزی اختراع کند.
+    (Array.isArray(myTrips)?myTrips:[]).filter(t=>{
+        const r = (Array.isArray(R)?R:[]).find(x=>String(x.id)===String(t.rid));
         return has(t.code, q) || has(r&&r.n, q) || has(t.date, q);
       }).slice(0,5).forEach(t=>{
-        const r = (Array.isArray(R)?R:[]).find(x=>x.id===t.rid);
+        const r = (Array.isArray(R)?R:[]).find(x=>String(x.id)===String(t.rid));
         _items.push({ t:`رزرو ${t.code}`, sub:(r&&r.n)||'رستوران', ic:'calendar', run:()=>{ pushRecent(q); go('trips'); } });
       });
   }
@@ -119,12 +124,12 @@ function onKey(e){
 }
 
 export function openPalette(){
-  const ov = ensureEl();
+  const ov = ensurePaletteEl();
   const wasOpen = ov.classList.contains('show');
   ov.classList.add('show');
   if(!wasOpen) lockAppSurfaces();
   const inp = document.getElementById('cmdkInput');
-  if(inp){ inp.value=''; render(''); setTimeout(()=>inp.focus(),20); }
+  if(inp){ inp.value=''; renderPalette(''); setTimeout(()=>inp.focus(),20); }
 }
 export function closePalette(){
   const ov = document.getElementById('cmdk');

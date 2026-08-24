@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════
 //  رزرونو — مرکزِ اعلان (Notification Center) — C7
-//  محتوا از دادهٔ واقعیِ کلاینت مشتق می‌شود (رزروهای پیش‌رو → یادآور؛
-//  بالاترین امتیاز → پیشنهاد) — بدونِ جعلِ اعلانِ marketing/system.
+//  محتوا فقط از دادهٔ **واقعیِ سرور** مشتق می‌شود (رزروهای پیش‌روِ /me/reservations
+//  → یادآور؛ بالاترین امتیازِ رستورانِ سرور → پیشنهاد). هیچ اعلانی از دادهٔ
+//  نمونه ساخته نمی‌شود مگر در بسته‌ی آفلاینِ تک‌فایلی که خودش دموست.
 //  ویژگی‌ها: دسته‌بندی/فیلتر، خوانده‌نشده/خوانده (localStorage)، اکشن،
 //  خواندن‌همه، badge شمارنده، حالتِ خالی. a11y: dialog/list، کیبورد، Esc.
 // ═══════════════════════════════════════════════════════════
@@ -12,6 +13,7 @@ import { openRest } from '../data/detail.js';
 import { icon } from '../icons.js';
 import { esc, faNum, lockAppSurfaces, unlockAppSurfaces } from '../auth.js';
 import { API, isLoggedIn } from '../api.js';
+import { isOfflineDemo } from '../api-core.js';
 import { mapApiTrip } from '../reservation.js';
 
 const READ_KEY = 'rz_notif_read';
@@ -21,13 +23,24 @@ function saveRead(set){ try{ localStorage.setItem(READ_KEY, JSON.stringify([...s
 const CATS = { all:'همه', reservation:'رزرو', ai:'پیشنهاد' };
 let _filter = 'all';
 
-// منبعِ رزروها: در صورتِ ورودِ کاربر، رزروهای واقعیِ سرور (کش‌شده)؛ در غیرِ این‌صورت
-// دادهٔ نمونهٔ محلی (demo-safe). _live با refresh() از /me/reservations پر می‌شود.
-let _live = null; // null = هنوز از سرور خوانده نشده → fallback به TRIPS
-function tripsSource(){ return Array.isArray(_live) ? _live : (Array.isArray(TRIPS)?TRIPS:[]); }
+// منبعِ رزروها: فقط رزروهای واقعیِ سرور. _live با refreshNotif() از
+// /me/reservations پر می‌شود؛ null یعنی «هنوز چیزی نمی‌دانیم».
+//
+// ⚠️ رفعِ جعلِ رزرو (پروتکل §۱۰ — «هرگز رزروِ موفق را جعل نکن»): قبلاً هر وقت
+// _live خالی بود به TRIPS (دادهٔ نمونهٔ seed) fallback می‌شد. یعنی یک بازدیدکننده‌ی
+// **واردنشده** روی سایتِ واقعی، ۶۰۰ms بعد از لود، بِج قرمزِ اعلان و یک
+// «یادآورِ رزرو» برای رزروِ RZ8K2M می‌دید — رزروی که هیچ‌وقت وجود نداشته.
+// همان اتفاق وقتی کاربرِ واردشده fetchش شکست می‌خورد هم می‌افتاد.
+// حالا: نمی‌دانیم ⇒ چیزی نمی‌سازیم. تنها استثنا بسته‌ی آفلاینِ تک‌فایلی است که
+// خودش را صریحاً دمو معرفی می‌کند و اصلاً بک‌اند ندارد.
+let _live = null;
+function tripsSource(){
+  if (Array.isArray(_live)) return _live;
+  return (isOfflineDemo() && Array.isArray(TRIPS)) ? TRIPS : [];
+}
 
 // خواندنِ رزروهای واقعی از سرور (همان endpointِ صفحهٔ سفرها) و به‌روزرسانیِ badge.
-// آفلاین/خطا/مهمان → _live دست‌نخورده و اعلان‌ها روی دادهٔ محلی می‌مانند (بدونِ جعل).
+// آفلاین/خطا/مهمان → _live همچنان null می‌ماند و tripsSource هیچ رزروی نمی‌سازد.
 export async function refreshNotif(){
   try{
     if(!isLoggedIn()){ _live = null; updateNotifBadge(); return; }
@@ -43,14 +56,20 @@ export async function refreshNotif(){
 function build(){
   const out = [];
   tripsSource().filter(t=>t.status==='up').forEach(t=>{
-    const r = (Array.isArray(R)?R:[]).find(x=>x.id===t.rid);
+    const r = (Array.isArray(R)?R:[]).find(x=>String(x.id)===String(t.rid));
     const name = (r&&r.n) || t._name || 'رستوران';
     out.push({ id:'resv-'+t.code, cat:'reservation', pri:'high', ic:'calendar',
       title:'یادآورِ رزرو', body:`${name} — ${t.date} ساعت ${t.time}`,
       action:{ label:'مشاهده', run:()=>go('trips') } });
   });
-  const top = (Array.isArray(R)?[...R]:[]).sort((a,b)=>(b.rt||0)-(a.rt||0))[0];
-  if(top) out.push({ id:'ai-'+top.id, cat:'ai', pri:'low', ic:'sparkle',
+  // پیشنهاد فقط از رستورانِ **واقعیِ سرور** ساخته می‌شود. `slug` همان نشانه‌ای
+  // است که کارتِ فید هم با آن چیپِ «نمونه» می‌زند (data/discover.js) — بدونِ آن،
+  // اعلان یک رستورانِ seed را با امتیازِ seed پیشنهاد می‌داد و برخلافِ کارت‌ها
+  // هیچ برچسبِ «نمونه»ای هم نداشت.
+  // (در بسته‌ی آفلاینِ تک‌فایلی که کلاً دموست، دادهٔ نمونه مجاز می‌ماند.)
+  const pool = Array.isArray(R) ? (isOfflineDemo() ? R : R.filter(x=>x&&x.slug)) : [];
+  const top = [...pool].sort((a,b)=>(b.rt||0)-(a.rt||0))[0];
+  if(top && top.rt!=null) out.push({ id:'ai-'+top.id, cat:'ai', pri:'low', ic:'sparkle',
     title:'پیشنهادِ هوشمند', body:`${top.n} با امتیاز ${top.rt} — شاید دوستش داشته باشی`,
     action:{ label:'ببین', run:()=>openRest(top.id) } });
   return out;
