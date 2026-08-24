@@ -41,7 +41,7 @@ export function cardHTML(r){
   return `<article class="rc reveal">
     <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
     <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${r.id}')"></button>
-    <span class="rc-emoji">${r.e}</span>
+    <span class="rc-emoji">${esc(r.e)}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
     <button class="rc-fav" type="button" aria-pressed="${favHas(r.id)}" aria-label="${favHas(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav('${r.id}',this);haptic('like')">${icon('heart',{size:20,fill:favHas(r.id)})}</button>
     <div class="rc-panel">
@@ -269,7 +269,7 @@ export async function renderEvents(){
 function eventsHtml(events,isDemo){
   return events.map(e=>`
     <div class="event-card" role="button" tabindex="0" onclick="openRest('${e.rid}')">
-      <div class="event-emoji">${e.emoji}</div>
+      <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
         ${e.rest?`<div class="event-rest">${esc(e.rest)}</div>`:''}

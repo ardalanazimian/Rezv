@@ -114,7 +114,7 @@ export async function renderTrips(){
       <div class="trip-card-inner">
         <div class="trip-card-hero" style="background:${gradFor(gradId)}">
           <div class="trip-card-mesh"></div>
-          <span class="trip-card-emoji">${emoji}</span>
+          <span class="trip-card-emoji">${esc(emoji)}</span>
           <span class="trip-card-status ${t.status}">${statusLabel}</span>
         </div>
         <div class="trip-card-body">
