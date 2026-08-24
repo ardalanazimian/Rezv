@@ -24,7 +24,6 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 const { db } = await import('../src/lib/db.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');
 
-const ADMIN_SUB = '11111111-1111-4111-8111-111111111111';
 let adminTenantId: string;
 let tenantId: string;
 let restApproveId: string;
@@ -36,7 +35,21 @@ before(async () => {
   const adminTenant = await db.tenant.create({ data: { name: '[DEMO] platform admin tenant (hours-approval test)' } });
   adminTenantId = adminTenant.id;
   process.env.PLATFORM_ADMIN_TENANT_ID = adminTenantId;
-  adminToken = signAccess({ sub: ADMIN_SUB, kind: 'staff', role: 'owner', tenantId: adminTenantId });
+  // ⚠️ اصلاح‌شده (۲۰۲۶-۰۸-۲۱): این فیکسچر توکنی برایِ `ADMIN_SUB` می‌ساخت که
+  // **هیچ ردیفِ staffی نداشت**. گاردِ قدیمی قبولش می‌کرد چون اصلاً به دیتابیس
+  // نگاه نمی‌کرد؛ حالا که `requireAdmin` وضعیتِ واقعیِ کارمند را می‌پرسد،
+  // چنین توکنی ۴۰۳ می‌گیرد — درست هم همین است.
+  //
+  // یعنی این تست داشت مسیری را «سبز» گزارش می‌کرد که با یک ادمینِ ناموجود
+  // اجرا می‌شد. حالا مدیرِ پلتفرم واقعاً وجود دارد و فعال است.
+  const adminStaff = await db.staff.create({
+    data: {
+      tenantId: adminTenantId, role: 'owner', isActive: true,
+      phone: `+9895${Math.floor(Math.random() * 100_000_000)}`.slice(0, 13),
+    },
+    select: { id: true },
+  });
+  adminToken = signAccess({ sub: adminStaff.id, kind: 'staff', role: 'owner', tenantId: adminTenantId });
 
   const tenant = await db.tenant.create({ data: { name: '[DEMO] hours-approval tenant' } });
   tenantId = tenant.id;

@@ -51,7 +51,25 @@ export const PATCH = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMan
   return NextResponse.json({ id: updated.id, number: updated.number });
 });
 
-/** DELETE — حذف میز. اگر رزرو فعالی به این میز وصل باشد، اجازه نمی‌دهد (برای جلوگیری از یتیم‌شدن رزرو). */
+/**
+ * DELETE — حذف میز. اگر رزرو فعالی به این میز وصل باشد، اجازه نمی‌دهد
+ * (برای جلوگیری از یتیم‌شدن رزرو).
+ *
+ * ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۱، ممیزیِ ماژولِ میز): این گارد لیستِ وضعیت‌ها را
+ * دستی هاردکد کرده بود و سه وضعیتِ فعال از قلم افتاده بود — `preparing`،
+ * `running_late` و `arrived`. چون FKِ `reservations.table_id` روی
+ * `ON DELETE SET NULL` است، حذف حتی خطا هم نمی‌داد: رزروِ زنده **بی‌صدا
+ * یتیم** می‌شد. یعنی مهمانی که همین حالا دمِ در ایستاده (`arrived`) یا
+ * غذایش در حالِ آماده‌سازی است (`preparing`) میزش را از دست می‌داد و
+ * هیچ‌کس خبردار نمی‌شد. بدتر: EXCLUDE constraintِ ضدِ double-booking روی
+ * `table_id` است، پس رزروِ یتیم‌شده از حفاظتِ تداخل هم بیرون می‌افتاد.
+ *
+ * حالا از همان منبعِ یگانه‌ای می‌خواند که EXCLUDE constraint و availability
+ * و موتورِ رزرو می‌خوانند. توضیحِ خودِ `reservation-status.ts` «گاردِ حذفِ
+ * میز» را صریحاً یکی از جاهایی نام برده بود که لیستِ تکراری داشت — یعنی
+ * رفع اعلام شده بود ولی همین یک مصرف‌کننده هرگز وصل نشد. درسش: کپیِ دستیِ
+ * یک لیستِ مشترک همیشه همان‌جایی می‌ماند که یادت می‌رود.
+ */
 export const DELETE = withRestaurantAuth({ rateLimit: 'auth', permission: 'canManageTables' }, async (_req, ctx, rawParams: { id: string }) => {
   const { id } = parseParams(rawParams, idParamSchema);
   const table = await db.table.findUnique({ where: { id } });
@@ -70,7 +88,7 @@ export const DELETE = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMa
   // جاهایی که اصلاح شده نام می‌برد — ولی این یکی در عمل اصلاح نشده بود.
   // حالا از منبعِ واحد می‌خواند، پس دیگر نمی‌تواند drift کند.
   const activeReservation = await db.reservation.findFirst({
-    where: { tableId: id, status: { in: activeStatusList() as any } },
+    where: { tableId: id, status: { in: activeStatusList() as never } },
   });
   if (activeReservation) throw Err.validation('این میز رزرو فعال دارد — ابتدا رزرو را لغو یا تکمیل کن');
 

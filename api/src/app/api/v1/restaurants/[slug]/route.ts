@@ -26,9 +26,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
           id: true, slug: true, name: true, cuisine: true, vibes: true, priceBand: true,
           address: true, city: true, district: true, postalCode: true, country: true,
           latitude: true, longitude: true, openingHours: true, timezone: true,
+          // ترتیبِ نمایشِ منو = خواستِ رستوران‌دار (sortOrder)، نه آمارِ فروش.
+          // تا مهاجرتِ ۰۵۲ اینجا `soldCount: 'desc'` بود، یعنی چیدمانِ منو را
+          // پرفروش‌بودن تعیین می‌کرد؛ برایِ گزارش درست است، برایِ منو نه.
           menuItems: {
-            where: { isActive: true }, orderBy: { soldCount: 'desc' },
-            select: { name: true, emoji: true, priceToman: true },
+            where: { isActive: true },
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+            select: {
+              id: true, name: true, emoji: true, priceToman: true, category: true,
+              description: true, imageUrl: true, sortOrder: true,
+            },
           },
           // ⚠️ رفعِ P1-3 (فازِ ۲، پروتکل §۲۰ — قراردادِ frontend↔backend).
           //
@@ -86,7 +93,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
         opening_hours: r.openingHours, timezone: r.timezone,
         rating: agg._avg.rating ? Math.round(agg._avg.rating * 10) / 10 : null,
         reviews_count: agg._count,
-        menu: r.menuItems.map((m) => ({ name: m.name, emoji: m.emoji, price_toman: m.priceToman })),
+        menu: r.menuItems.map((m) => ({
+          id: m.id, name: m.name, emoji: m.emoji, price_toman: m.priceToman,
+          category: m.category, description: m.description,
+          image_url: m.imageUrl, sort_order: m.sortOrder,
+        })),
         photos: r.photos.map((p) => ({ url: p.url, caption: p.caption, category: p.category })),
         // سیاستِ رزرو (P1-3). اگر رستوران رکوردِ سیاست نداشته باشد، همان
         // پیش‌فرض‌هایِ CancellationPolicy در اسکیما استفاده می‌شود — نه حدسِ فرانت.

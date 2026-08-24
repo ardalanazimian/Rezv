@@ -112,3 +112,45 @@ generated column (`block_end`) است که برای جلوگیری از double-b
 این فایل canonical و idempotent است و توسط `../apply-sql.sh` بعد از
 `prisma migrate deploy` خودکار اعمال می‌شود (در entrypoint). پیش‌تر این تعریف در
 `0_init/EXTRA-after-prisma-migrate.sql` بود که حذف شده و جایش را 026 گرفته است.
+
+---
+
+## ⚠️ دامنه‌ی این فایل — بخوان قبل از اینکه به‌عنوانِ فهرست بهش تکیه کنی
+
+**اصلاح‌شده (۲۰۲۶-۰۸-۲۰):** این README یک **توضیح‌دهنده‌ی گزینشی** است، نه فهرستِ
+کاملِ مهاجرت‌ها. بخش‌های بالا فقط `001`–`006`، `018`–`022` و `026` را شرح می‌دهند،
+در حالی که مهاجرت‌ها تا `057` رسیده‌اند — یعنی اگر کسی این را «فهرست» فرض کند،
+۳۱ فایل را نمی‌بیند.
+
+**منبعِ حقیقت خودِ فایل‌ها هستند**، نه این سند: هر `NNN-*.sql` یک سرآیندِ فارسیِ
+مفصل دارد که می‌گوید چه می‌کند و چرا. برای دیدنِ همه:
+
+```bash
+ls api/prisma/sql/*.sql
+head -30 api/prisma/sql/057-outreach-ledger.sql   # نمونه‌ی سرآیند
+```
+
+### گروهِ هوش/سنجش (۰۳۳، ۰۳۴، ۰۴۲، ۰۴۳، ۰۵۵–۰۵۷)
+
+این‌ها یک زیرسیستمِ منسجم‌اند و **قراردادشان در `docs/ML_CONTRACT.md` است** — قبل از
+دست‌زدن به هرکدام آن را بخوان:
+
+| مهاجرت | جدول/تغییر | نقش |
+|---|---|---|
+| `033-no-show-model.sql` | `restaurant_no_show_models` | مدلِ یادگرفته‌ی per-tenant |
+| `034-demand-forecast.sql` | `restaurant_demand_forecasts` | پیش‌بینیِ تقاضا (Holt-Winters) |
+| `042-model-training-runs.sql` | `model_training_runs` | نسخه‌بندیِ فقط-افزودنیِ آموزش |
+| `043-customer-intelligence-score.sql` | ستون‌های `customer_insights` | امتیازِ ترکیبیِ مشتری |
+| `055-prediction-outcome-ledger.sql` | `model_predictions` + `model_outcomes` | «چه گفتیم، بعد چه شد» |
+| `056-model-registry-active-run.sql` | `active_run_id` | بستنِ پیش‌بینی به نسخه‌ی مدل |
+| `057-outreach-ledger.sql` | `outreach_log` | «به کی پیام/تماس رفت و بعدش چه شد» |
+
+### قواعدِ نوشتنِ مهاجرتِ جدید
+
+1. شماره‌ی **بعدی** بگیر (`058-…`)؛ **هرگز فایلِ قبلی را ویرایش نکن** — روی DBهایی
+   که آن را اجرا کرده‌اند دوباره اجرا نمی‌شود و drift می‌سازد.
+2. idempotent بنویس: `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`,
+   `DO $$ … EXCEPTION` — `apply-sql.sh` همه‌ی فایل‌ها را هر بار اجرا می‌کند.
+3. اگر `schema.prisma` را هم عوض کردی، حتماً `sh tools/check-schema-drift.sh` را
+   اجرا کن. بدونِ آن، `db push` در CI ستون را می‌سازد و همه‌ی تست‌ها سبز می‌شوند،
+   ولی تولید (که فقط `0_init` + همین SQLها را دارد) در زمانِ اجرا می‌شکند.

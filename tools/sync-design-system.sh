@@ -6,9 +6,10 @@
 # بدونِ build است؛ فایل‌ها باید فیزیکی داخلِ هر اپ باشند تا سرو شوند.
 #
 # چه چیزی sync می‌شود (از shared/):
-#   css/tokens.css      → پایه‌ی مشترکِ توکن‌ها
+#   css/tokens.css      → پایه‌ی مشترکِ توکن‌ها (شاملِ @font-face ِ Vazirmatn)
 #   css/foundation.css  → یکسان در هر سه اپ
 #   css/ds-bridge.css   → یکسان در هر سه اپ
+#   fonts/*.woff2       → فونتِ self-hosted؛ tokens.css با ../fonts/ صدایش می‌زند
 #   js/icons.js         → customer نسخه‌ی ESM (عیناً)؛ business/company نسخه‌ی
 #                         global (چون با <script> کلاسیک لود می‌شوند و export مجاز نیست)
 #

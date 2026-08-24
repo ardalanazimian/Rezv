@@ -5,6 +5,7 @@ import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, zPhone, z } from '@/lib/schemas';
 import { allowsCategory } from '@/lib/notification-prefs';
+import { recordOutreach } from '@/lib/outreach-ledger';
 
 const smsSchema = z.object({
   kind: z.enum(['winback', 'campaign']).default('campaign'),
@@ -27,34 +28,35 @@ export const POST = withRestaurantAuth(
     const kind = b.kind;
     const template = kind === 'winback' ? 'winback_offer' : 'campaign';
 
-    // ⚠️ رعایتِ انصراف (پروتکل §۱۳/§۱۷) — این مسیر قبلاً **هیچ** فیلترِ رضایتی
-    // نداشت: هر عضوِ باشگاه پیامکِ تبلیغاتی می‌گرفت، حتی اگر در اپ «تخفیف و
-    // کش‌بک ویژه» را خاموش کرده بود. (آن کلید هم فقط در localStorage می‌نشست،
-    // پس سرور اصلاً خبر نداشت — migration 050 آن را پایدار کرد.)
-    //
-    // `winback` و `campaign` هر دو تبلیغاتی‌اند ⇒ دسته‌ی `offers`.
-    // فقط `false`ِ صریح مانع می‌شود؛ کاربری که نظری نداده مثلِ قبل دریافت می‌کند.
-    let targets: { phone: string; name: string }[] = [];
+    // ⚠️ رعایتِ انصراف (پروتکل §۱۳/§۱۷): winback و campaign هر دو تبلیغاتی‌اند
+    // ⇒ دسته‌ی `offers`؛ فقط `false`ِ صریح مانع می‌شود (migration 063).
+    // ⚠️ userId عمداً بخشی از target است (دفترِ ارتباط‌گیری، migration 057):
+    // شماره‌ی خامِ بدونِ حساب → userId=null و «قابلِ‌انتساب‌نبودن» شمرده می‌شود.
+    // [merge ۰۸-۲۴] دو خطِ توسعه این مسیر را مستقل ساخته بودند — consent از خطِ
+    // ممیزی + انتسابِ ledger از main؛ اینجا هر دو با هم اعمال می‌شوند.
+    let targets: { phone: string; name: string; userId: string | null }[] = [];
     let optedOut = 0;
     if (b.phones && b.phones.length) {
       // فهرستِ صریحِ شماره‌ها (مثلاً تبریکِ تولد): انصرافِ کاربرانِ شناخته‌شده
-      // همچنان رعایت می‌شود — شماره‌ای که به کاربرِ منصرف تعلق دارد حذف می‌شود.
-      const optedOutPhones = new Set(
-        (await db.user.findMany({
-          where: { phone: { in: b.phones } },
-          select: { phone: true, notificationPrefs: true },
-        }))
-          .filter((u) => !allowsCategory(u.notificationPrefs, 'offers'))
-          .map((u) => u.phone),
-      );
+      // رعایت می‌شود و شماره‌ی متصل به حساب، userId هم می‌گیرد.
+      const known = await db.user.findMany({
+        where: { phone: { in: b.phones } },
+        select: { id: true, phone: true, notificationPrefs: true },
+      });
+      const byPhone = new Map(known.map((u) => [u.phone, u]));
       targets = b.phones
-        .filter((p) => { const keep = !optedOutPhones.has(p); if (!keep) optedOut++; return keep; })
-        .map((p) => ({ phone: p, name: '' }));
+        .filter((p) => {
+          const u = byPhone.get(p);
+          const keep = !u || allowsCategory(u.notificationPrefs, 'offers');
+          if (!keep) optedOut++;
+          return keep;
+        })
+        .map((p) => ({ phone: p, name: '', userId: byPhone.get(p)?.id ?? null }));
     } else {
       const tierFilter = b.segment ? { tier: b.segment } : {};
       const members = await db.clubMember.findMany({
         where: { restaurantId: restaurant.id, ...tierFilter },
-        include: { user: { select: { phone: true, firstName: true, notificationPrefs: true } } },
+        include: { user: { select: { id: true, phone: true, firstName: true, notificationPrefs: true } } },
         take: 500,
       });
       targets = members
@@ -64,7 +66,7 @@ export const POST = withRestaurantAuth(
           if (!keep) optedOut++;
           return keep;
         })
-        .map(m => ({ phone: m.user.phone, name: m.user.firstName || '' }));
+        .map(m => ({ phone: m.user.phone, name: m.user.firstName || '', userId: m.user.id }));
     }
 
     if (!targets.length) {
@@ -75,13 +77,26 @@ export const POST = withRestaurantAuth(
 
     const discount = (b.discount_code || '').slice(0, 20);
     let queued = 0;
+    const delivered: typeof targets = [];
     for (const t of targets) {
       const tokens = kind === 'winback'
         ? [t.name || 'مهمان', discount || 'WELCOME', restaurant.name]
         : [t.name || 'مهمان', restaurant.name];
       await enqueueSms({ to: t.phone, template: template as 'welcome_visit', tokens, restaurantId: restaurant.id });
       queued++;
+      delivered.push(t);
     }
+
+    // دفترِ ارتباط‌گیری (migration 057): یک ردیف به‌ازای *گیرنده*. CampaignLog
+    // پایین‌تر یک ردیف به‌ازای *کمپین* نگه می‌دارد — دو دانه‌بندیِ متفاوت، نه
+    // تکرار. fail-open: recordOutreach هرگز throw نمی‌کند.
+    await recordOutreach(delivered.map((t) => ({
+      restaurantId: restaurant.id,
+      userId: t.userId,
+      channel: 'sms' as const,
+      source: 'campaign' as const,
+      reason: kind,
+    })));
 
     // ثبت در تاریخچه‌ی کمپین (تا در پنل قابل‌مشاهده باشد) — شکست لاگ نباید ارسال را خراب کند
     try {

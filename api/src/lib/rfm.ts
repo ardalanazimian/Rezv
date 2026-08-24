@@ -39,7 +39,15 @@ export async function recomputeRfmForRestaurant(restaurantId: string): Promise<{
       SELECT user_id,
         ntile(5) OVER (ORDER BY last_visit_at ASC NULLS FIRST)   AS r,
         ntile(5) OVER (ORDER BY total_visits ASC)                AS f,
-        ntile(5) OVER (ORDER BY total_spend_toman ASC)           AS m,
+        -- ⚠️ صفرِ تأییدشده در برابرِ نامعلوم (ممیزیِ ۲۰۲۶-۰۸-۱۹):
+        -- total_spend_toman حالا می‌تواند NULL باشد (رستوران منویِ قیمت‌دار
+        -- ندارد، پس پیش‌سفارش و در نتیجه مبلغ اندازه‌گیری‌ناپذیر است).
+        -- ntile رویِ ستونی که همه‌اش NULL (یا همه‌اش صفر) است چارکِ بی‌معنا
+        -- تولید می‌کند و چون وزنش ۰٫۳۵ است — بزرگ‌ترین وزنِ فرمول — امتیاز را
+        -- از نویز می‌ساخت. حالا فقط ردیف‌هایِ دارایِ مبلغِ واقعی چارک می‌گیرند.
+        CASE WHEN total_spend_toman IS NULL THEN NULL
+             ELSE ntile(5) OVER (PARTITION BY (total_spend_toman IS NULL)
+                                 ORDER BY total_spend_toman ASC) END AS m,
         churn_risk_score, no_show_rate_pct
       FROM customer_insights
       WHERE restaurant_id = ${restaurantId}::uuid
@@ -47,16 +55,25 @@ export async function recomputeRfmForRestaurant(restaurantId: string): Promise<{
     ),
     combined AS (
       SELECT user_id, r, f, m,
-        LEAST(100, GREATEST(0, ROUND(
-          0.35 * (m * 20) + 0.25 * (f * 20) +
-          0.25 * (100 - churn_risk_score) + 0.15 * (100 - no_show_rate_pct)
-        )))::int AS intelligence_score
+        -- بدونِ چارکِ مبلغی، ۳۵٪ از ورودیِ فرمول غایب است. به‌جایِ جایگزینیِ
+        -- صفر (که امتیاز را مصنوعاً پایین می‌آورد) امتیاز «محاسبه‌نشده»
+        -- می‌ماند — همان کنوانسیونی که این ستون از قبل با NULL داشت.
+        CASE WHEN m IS NULL THEN NULL ELSE
+          LEAST(100, GREATEST(0, ROUND(
+            0.35 * (m * 20) + 0.25 * (f * 20) +
+            0.25 * (100 - churn_risk_score) + 0.15 * (100 - no_show_rate_pct)
+          )))::int END AS intelligence_score
       FROM scored
     )
     UPDATE customer_insights ci
     SET r_score = c.r,
         f_score = c.f,
         m_score = c.m,
+        -- وقتی m نامعلوم است، دو شاخه‌ی وابسته به مبلغ (champions/cant_lose)
+        -- به‌درستی رد می‌شوند (مقایسه با NULL نتیجه‌اش NULL است) و سگمنت فقط
+        -- از r و f — که دادهٔ مشاهده‌شده‌ی واقعی‌اند — ساخته می‌شود. یعنی
+        -- «قهرمان» بودن هرگز بدونِ شواهدِ مبلغی ادعا نمی‌شود؛ کاربر در بدترین
+        -- حالت 'loyal' می‌گیرد که با همان r/f قابلِ دفاع است.
         rfm_segment = CASE
           WHEN c.r >= 4 AND c.f >= 4 AND c.m >= 4 THEN 'champions'
           WHEN c.r >= 4 AND c.f >= 2              THEN 'loyal'
@@ -67,7 +84,11 @@ export async function recomputeRfmForRestaurant(restaurantId: string): Promise<{
           ELSE 'hibernating'
         END,
         intelligence_score = c.intelligence_score,
+        -- NULL باید NULL بماند: بدونِ این شاخه، امتیازِ محاسبه‌نشده به ELSE
+        -- می‌افتاد و ردهٔ 'low' می‌گرفت — یعنی «کم‌ارزش» به مشتری‌ای نسبت داده
+        -- می‌شد که اصلاً ارزیابی نشده بود.
         intelligence_tier = CASE
+          WHEN c.intelligence_score IS NULL THEN NULL
           WHEN c.intelligence_score >= 70 THEN 'high'
           WHEN c.intelligence_score >= 40 THEN 'medium'
           ELSE 'low'

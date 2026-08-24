@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getEconomyRuleConfig, setEconomyRule } from '@/lib/economy-rules';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse } from '@/lib/errors';
@@ -14,7 +14,7 @@ const bodySchema = z.object({
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const config = await getEconomyRuleConfig();
     return NextResponse.json({ rules: { completed_xp: config.completedXp, completed_coins: config.completedCoins } });
   } catch (e) { return errorResponse(e); }
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const b = await parseBody(req, bodySchema);
     if (b.completed_xp !== undefined) await setEconomyRule('completed_xp', b.completed_xp, admin.sub);
     if (b.completed_coins !== undefined) await setEconomyRule('completed_coins', b.completed_coins, admin.sub);

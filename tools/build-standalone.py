@@ -54,6 +54,7 @@ CUSTOMER_ORDER = [
     'js/reservation.js', 'js/features/trips.js', 'js/features/loyalty.js',
     'js/features/economy.js',
     'js/features/rewards.js', 'js/features/food-dna.js', 'js/features/chat.js',
+    'js/features/checkin.js',
     'js/features/palette.js', 'js/features/notifications.js',
     'js/features/a11y.js', 'js/features/onboarding.js',
     'js/features/pull-refresh.js', 'js/features/swipe-actions.js',
@@ -239,6 +240,10 @@ def build(app, write=True):
             )
 
     html = inline_assets(html, base)
+    # [merge ۰۸-۲۴] inline_fonts(html, base) حذف شد: جاسازیِ فونت حالا داخلِ
+    # css_repl→embed_fonts انجام می‌شود که هر الگویِ url() را می‌گیرد (با/بی
+    # کوتیشن، هر پسوندِ فونت) — نسخه‌ی قبلی فقط '../fonts/*.woff2'ِ
+    # تک‌کوتیشنی را می‌دید و بی‌صدا رد می‌شد.
 
     if app == 'customer':
         parts = []

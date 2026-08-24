@@ -1,13 +1,15 @@
 import { Prisma } from '@prisma/client';
 import { db } from './db';
+import { isTimeWithinHours } from './hours';
 import { withSlotLock } from './redis';
-import { Err } from './errors';
+import { ApiError, Err } from './errors';
 import { enqueueSms } from './sms';
 import { emit } from './events';
 import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
 import { redeemGiftCardTx, addClubPoints, getClubPointsBalance } from './loyalty';
-import { computeNoShowRisk as defaultNoShowPredictor } from './customer-insights';
+import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
+import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
 import { computeRanges, genReservationCode, isConflictError, isSerializationError } from './reservation-helpers';
 import { invalidateAvailability } from './availability-cache';
@@ -36,7 +38,7 @@ const log = createLogger('reservations');
  */
 export type NoShowPredictor = (input: {
   userId: string | null; restaurantId: string; partySize: number; slotStart: Date; createdAt: Date; source: string;
-}) => Promise<{ score: number; tier: 'low' | 'medium' | 'high'; source: 'learned' | 'heuristic' }>;
+}) => Promise<NoShowResult>;
 
 // ═══════════════════════════════════════════════════════════
 //  موتور رزرو رزرونو — نسخه‌ی production
@@ -149,7 +151,6 @@ export async function createReservation(
     const closureSet = new Set(closureRows.map(c => (c.closure_date instanceof Date
       ? c.closure_date.toISOString().slice(0, 10)
       : String(c.closure_date).slice(0, 10))));
-    const { isTimeWithinHours } = await import('./hours');
     const ok = isTimeWithinHours(
       r.openingHours as OpeningHours,
       input.date, input.time, r.timezone ?? 'Asia/Tehran', closureSet,
@@ -240,26 +241,54 @@ export async function createReservation(
   // این فشار retry را کم می‌کند ولی صحت به دیتابیس وابسته است.
   const lockKey = `resv:${r.id}:${start.toISOString()}`;
 
-  return acquireSlotLock(lockKey, 8000, async () => {
-    // ── تلاش با retry برای serialization (ترافیک بالا) ──
-    let lastErr: unknown;
-    for (let attempt = 0; attempt < TX_MAX_RETRIES; attempt++) {
-      try {
-        return await placeReservation(
-          input, r, cfg, { start, end, blockEnd, duration, blockBufferMin },
-          candidateTables, manualTableNumber, noShowRisk,
-        );
-      } catch (e) {
-        lastErr = e;
-        if (isSerializationError(e) && attempt < TX_MAX_RETRIES - 1) {
-          await sleep(20 * (attempt + 1) + Math.random() * 30); // backoff تصادفی
-          continue;
+  try {
+    return await acquireSlotLock(lockKey, 8000, async () => {
+      // ── تلاش با retry برای serialization (ترافیک بالا) ──
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < TX_MAX_RETRIES; attempt++) {
+        try {
+          return await placeReservation(
+            input, r, cfg, { start, end, blockEnd, duration, blockBufferMin },
+            candidateTables, manualTableNumber, noShowRisk,
+          );
+        } catch (e) {
+          lastErr = e;
+          if (isSerializationError(e) && attempt < TX_MAX_RETRIES - 1) {
+            await sleep(20 * (attempt + 1) + Math.random() * 30); // backoff تصادفی
+            continue;
+          }
+          throw e;
         }
-        throw e;
+      }
+      throw lastErr ?? Err.concurrencyRetry();
+    });
+  } catch (e) {
+    // ⚠️ یافته‌ی واقعیِ ممیزی (۲۰۲۶-۰۸-۱۹) — با تستِ زنده‌ی ۳۰ کاربرِ هم‌زمان
+    // روی *یک* میز پیدا شد، نه با خواندنِ کد: از ۲۹ درخواستِ ردشده، ۲۶ تا
+    // SLOT_LOCK_TIMEOUT (۴۲۳ «این بازه در حال رزرو توسط کاربر دیگری است؛
+    // دوباره تلاش کنید») گرفتند و فقط ۳ تا SLOT_FULL. صحت مشکلی نداشت —
+    // دقیقاً یک ردیف در DB ثبت شد — ولی *پیام* دروغ بود: به ۲۶ کاربر گفته
+    // می‌شد «دوباره تلاش کن» برایِ اسلاتی که دیگر هرگز آزاد نمی‌شود. نتیجه‌اش
+    // هم UXِ بد است هم موجِ retryِ بی‌فایده روی همان اسلاتِ پر.
+    //
+    // رفع: قفل همان‌طور که بود می‌ماند (منبعِ حقیقت هنوز DB است)، فقط پیش از
+    // برگرداندنِ ۴۲۳ یک‌بار وضعیتِ واقعیِ اشغال دوباره خوانده می‌شود. اگر
+    // ثابت شود همه‌ی کاندیداها پر شده‌اند، خطایِ صادق برگردانده می‌شود.
+    // محافظه‌کارانه: فقط وقتی به SLOT_FULL/TABLE_CONFLICT تبدیل می‌شود که
+    // بتوان *اثبات* کرد پر است؛ در حالتِ merge (که کاندیدایِ تکی ندارد) یا
+    // اگر خودِ این بازخوانی شکست بخورد، همان ۴۲۳ی قبلی برمی‌گردد.
+    if (e instanceof ApiError && e.code === 'SLOT_LOCK_TIMEOUT') {
+      const occupiedNow = await getOccupiedTableNumbers(db, r.id, start, blockEnd).catch(() => null);
+      if (occupiedNow) {
+        if (manualTableNumber != null) {
+          if (occupiedNow.has(manualTableNumber)) throw Err.tableConflict();
+        } else if (candidateTables.length > 0 && candidateTables.every(t => occupiedNow.has(t.number))) {
+          throw Err.slotFull(input.time);
+        }
       }
     }
-    throw lastErr ?? Err.concurrencyRetry();
-  });
+    throw e;
+  }
 }
 
 // ── هسته‌ی ثبت: transaction سریالایزبل + بازچک داخل tx + insert ──
@@ -271,7 +300,9 @@ async function placeReservation(
   ranges: { start: Date; end: Date; blockEnd: Date; duration: number; blockBufferMin: number },
   candidateTables: { id: string; number: number }[],
   manualTableNumber: number | null,
-  noShowRisk: { score: number; tier: 'low' | 'medium' | 'high' },
+  // NoShowResult کامل (نه فقط score/tier): فازِ ۵ به lineage و source نیاز
+  // دارد تا پیش‌بینی با ردِ ورودی‌اش در دفتر ثبت شود.
+  noShowRisk: NoShowResult,
 ) {
   const { start, end, blockEnd, duration, blockBufferMin } = ranges;
   const isHold = input.hold === true;
@@ -364,6 +395,38 @@ async function placeReservation(
     payload: { code: result.resv.code, party_size: input.partySize, slot_start: result.resv.slotStart, status: result.resv.status },
   });
 
+  // ── فازِ ۵: ثبتِ پیش‌بینیِ no-show در دفترِ پیش‌بینی ──
+  // اینجا و نه زودتر: شناسه‌ی رزرو تازه بعد از commit وجود دارد، و پیش‌بینی
+  // باید به همان موجودیتی بسته شود که بعداً نتیجه‌اش مشاهده می‌شود.
+  //
+  // ⚠️ void و بدونِ await عمدی است (بندِ ۴۶): رزرو از قبل commit شده و پاسخ
+  // آماده است؛ نوشتنِ دفتر نباید یک میلی‌ثانیه به مسیرِ بحرانی اضافه کند یا
+  // با خطایش آن را بشکند. خودِ recordPrediction هم fail-open است.
+  //
+  // ⚠️ importِ static (نه `await import()`) — یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۰ که فقط
+  // روی Node 20 (نسخه‌ی CI) بروز می‌کرد: زیرِ tsx این ماژول به data: URL تبدیل
+  // می‌شود و Node 20 نمی‌تواند specifierِ نسبی را از آن حل کند
+  // (ERR_UNSUPPORTED_RESOLVE_REQUEST). چون این‌جا یک voidِ بی‌catch بود، شکست
+  // کاملاً بی‌صدا بود: هیچ پیش‌بینی‌ای در دفتر ثبت نمی‌شد و هیچ‌کس نمی‌فهمید.
+  // یعنی کلِ فازِ ۵ روی Node 20 در عمل مرده بود. catchِ صریح هم اضافه شد تا
+  // خطا هرگز به unhandled rejection تبدیل نشود.
+  if (noShowRisk.lineage) {
+    const lin = noShowRisk.lineage;
+    void recordPrediction({
+      restaurantId: r.id,
+      predictionType: 'no_show',
+      entityType: 'reservation',
+      entityId: result.resv.id,
+      modelSource: noShowRisk.source,
+      modelRunId: lin.modelRunId,   // فازِ ۶ — نسبت‌دادن به نسخه‌ی مدل
+      featureVersion: NO_SHOW_FEATURE_VERSION,
+      predictedValue: lin.probability,
+      confidence: confidenceFor({ modelSource: noShowRisk.source, priorTotal: lin.features.priorTotal }),
+      features: lin.features,
+      horizonAt: result.resv.slotStart,   // نتیجه در لحظه‌ی برگزاری معلوم می‌شود
+    }).catch(() => { /* recordPrediction خودش fail-open است؛ این فقط تورِ ایمنی */ });
+  }
+
   return {
     code: result.resv.code,
     status: result.resv.status,
@@ -387,7 +450,7 @@ async function insertReservation(
     holdExpiresAt: Date | null;
     start: Date; end: Date; duration: number; blockBufferMin: number;
     tableId: string; mergedNumbers: number[]; tableNumber: number;
-    noShowRisk: { score: number; tier: 'low' | 'medium' | 'high' };
+    noShowRisk: NoShowResult;
   },
 ) {
   const { input, r } = p;
@@ -589,7 +652,10 @@ async function tryMergeTables(
 // ═══════════════════════════════════════════════════════════
 // ── عملیاتِ cronِ چرخه‌ی حیات به ماژول جدا منتقل شد (reservation-lifecycle-ops.ts) ──
 // re-export برای سازگاری با گذشته.
-export { expireStaleHolds, markLateNoShows } from './reservation-lifecycle-ops';
+// ⚠️ markLateNoShows از این خط حذف شد (۲۰۲۶-۰۸-۲۰) — صفر صداکننده داشت و
+// رفتارش با مسیرِ واقعیِ تولید (autoMarkNoShow) فرق داشت. دلیلِ کامل در
+// reservation-lifecycle-ops.ts.
+export { expireStaleHolds } from './reservation-lifecycle-ops';
 
 
 // ═══════════════════════════════════════════════════════════

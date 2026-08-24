@@ -86,7 +86,7 @@ if (devMode && process.env.NODE_ENV === 'production') {
 | پرداختِ زرین‌پال | ✅ | ✅ | ❌ | ❌ **UI پنلِ شرکت برای merchant_id هنوز ساخته نشده** — بلاکرِ شناخته‌شده |
 | QR چک‌این میز | ✅ | ✅ | ❌ | ❌ هر دو سمتِ فرانت cosmetic‌اند (نه QR واقعی، نه اسکنر) |
 | عکسِ واقعیِ discovery | — | — | ❌ | ❌ هنوز emoji/gradient، نه `<img>` |
-| `RestaurantIntelligenceDashboard.jsx` | — | — | — | 🗑️ dead code، تصمیم‌گیری‌نشده |
+| `RestaurantIntelligenceDashboard.jsx` | — | — | — | ✅ حذف شد (۲۰۲۶-۰۸-۲۱) |
 
 ## ۵. دیتابیس (فاز ۵) — خلاصه، جزئیاتِ کامل در `PROJECT-AUDIT-HANDOFF-DATABASE.md`
 

@@ -4,6 +4,9 @@ import { Err } from './errors';
 
 const log = createLogger('sms-balance');
 
+/** Starter SMS balance for new restaurants. */
+export const STARTER_SMS_BALANCE = 50;
+
 // ═══════════════════════════════════════════════════════════════════════
 //  مدیریت موجودی SMS
 //
@@ -53,6 +56,20 @@ export async function topupSms(
 export async function consumeSms(
   restaurantId: string, count = 1, reason = 'reservation_notify',
 ): Promise<boolean> {
+  // ⚠️ افزوده‌شده (۲۰۲۶-۰۸-۲۰) — رفعِ یک عدمِ تقارن، نه یک باگِ زنده.
+  //
+  // `topupSms` ورودی‌اش را اعتبارسنجی می‌کرد ولی این تابع نه، با اینکه هر دو
+  // مسیرِ پول‌اند. اگر روزی `count` منفی برسد، `sms_balance - (-5)` موجودی را
+  // *افزایش* می‌دهد و شرطِ `sms_balance >= -5` هم همیشه درست است — یعنی هم
+  // گارد بی‌اثر می‌شود هم اعتبارِ رایگان ساخته می‌شود.
+  //
+  // ⚠️ صداقت: امروز قابلِ‌دسترس **نیست** — تنها صداکننده (worker.ts:27) عددِ
+  // ثابتِ ۱ می‌فرستد. این دفاعِ در عمق است برای صداکننده‌ی بعدی، نه رفعِ نشتی
+  // که در حالِ رخ‌دادن باشد. throw می‌کند و false برنمی‌گرداند چون «۱ـ منفی»
+  // یک شرطِ کسب‌وکار نیست، یک خطای برنامه‌نویسی است — همان رفتارِ topupSms.
+  if (!Number.isInteger(count) || count <= 0) {
+    throw Err.validation('تعداد پیامک باید عددی صحیح و مثبت باشد');
+  }
   return db.$transaction(async (tx) => {
     // کاهش اتمیک فقط اگر موجودی کافی است
     const rows = await tx.$queryRaw<{ sms_balance: number }[]>`

@@ -43,41 +43,68 @@ export function addToWallet(code,name,date,time,kind){
     <div class="wp-rest">${esc(name)}</div>
     <div class="wp-row"><div><div class="wp-lbl">تاریخ</div><div class="wp-val">${esc(date)}</div></div>
       <div><div class="wp-lbl">ساعت</div><div class="wp-val">${esc(time)}</div></div></div>
+    <div class="wp-qr" id="walletQrBox">${qrPlaceholder()}</div>
     <div class="wp-code">${esc(code)}</div>
   </div>
   <button class="btn btn-primary btn-lg btn-block" style="margin-top:16px" onclick="${isApple?`toast('','برای افزودن واقعی، سرور فایل pkpass امضاشده می‌سازد')`:`toast('','لینک Google Wallet در نسخه‌ی سرور فعال می‌شود')`}">${isApple?' افزودن به Apple Wallet':'افزودن به Google Wallet'}</button>
   <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>`);
+  loadReservationQr('walletQrBox', code, 360);
 }
-// ── QR Check-in (تولید QR از کد رزرو) ──
-// ═══════════════════════════════════════════════════════════
-//  کدِ ورود — همان چیزی که واقعاً کار می‌کند
-//
-//  ⚠️ رفعِ دو نقصِ هم‌زمان (پروتکل §۹/§۱۰):
-//
-//   ۱. **QR اصلاً QR نبود.** `qrSVG` یک الگویِ شبه‌تصادفی از hashِ متن می‌کشید
-//      (کامنتِ خودش: «نمایشی») با گوشه‌هایِ finder تا شبیهِ QR به‌نظر برسد.
-//      هیچ اسکنری آن را رمزگشایی نمی‌کند.
-//
-//   ۲. **حتی QRِ درست هم به جایی نمی‌خورد.** `POST /checkin` مقدارش را با
-//      `table.qrCode` تطبیق می‌دهد (lib/tables.ts) — یعنی QR شناسه‌ی **میز**
-//      است که رویِ خودِ میز چاپ می‌شود، نه کدِ رزروِ مهمان. پس این جریان از
-//      اساس معکوس بود.
-//
-//  نتیجه‌ی قبلی: اپ به مهمان می‌گفت «میزبان با اسکن این کد ورودت رو ثبت می‌کنه»
-//  و مهمان دمِ در تصویری را نشان می‌داد که اسکن نمی‌شد.
-//
-//  مسیرِ واقعی و کارکننده: کارمند رزرو را با **کد** در پنل پیدا می‌کند و
-//  «رسید» را می‌زند (`PATCH /restaurant/reservations/{code}/status`). پس کد
-//  خودش اعتبارنامه است؛ همان را بزرگ و خوانا نشان می‌دهیم.
+// ── QR Check-in: کدِ رزرو را به میزبان نشان بده ──
 export function showCheckInQR(code,name){
   openSheet(`<div style="text-align:center;padding:8px 0">
-    <div class="sheet-title" style="text-align:center">کدِ ورود</div>
-    <div class="sheet-sub" style="text-align:center;margin-bottom:20px">این کد رو موقع ورود به ${esc(name)} به میزبان بگو</div>
-    <div class="checkin-code checkin-code-lg">${esc(code)}</div>
-    <div class="checkin-hint">میزبان با همین کد، رزروت رو پیدا و ورودت رو ثبت می‌کنه</div>
+    <div class="sheet-title" style="text-align:center">ورود با QR</div>
+    <div class="sheet-sub" style="text-align:center;margin-bottom:20px">این کد رو موقع ورود به ${esc(name)} نشون بده</div>
+    <div class="checkin-qr" id="checkinQrBox">${qrPlaceholder()}</div>
+    <div class="checkin-code">${esc(code)}</div>
+    <div class="checkin-hint">میزبان با اسکن این کد، ورودت رو ثبت می‌کنه</div>
   </div>
-  <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode('${esc(code)}')">کپیِ کد</button>
-  <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>`);
+  <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="closeSheet()">بستن</button>`);
+  loadReservationQr('checkinQrBox', code, 360);
+}
+// ═══════════════════════════════════════════════════════════════════════
+//  QRِ کدِ رزرو — از سرور، واقعی و قابلِ‌اسکن
+//
+//  ⚠️ اینجا قبلاً تابعی به نامِ `qrSVG` بود که **QR نبود**: یک الگویِ
+//  شبه‌تصادفی از hashِ متن، با سه مربعِ گوشه که شبیهِ finder pattern دیده
+//  می‌شد. کامنتِ خودش هم می‌گفت «نمایشی؛ در تولید از کتابخانه‌ی QR».
+//
+//  یعنی دکمه‌ی «QR ورود» و کارتِ کیفِ پول تصویری نشان می‌دادند که هیچ
+//  اسکنری نمی‌خواند. مهمان آن را جلویِ میزبان می‌گرفت و هیچ اتفاقی
+//  نمی‌افتاد — دقیقاً همان «دادهٔ جعلی که باید واقعی باشد».
+//
+//  حالا از `GET /reservations/:code/qr` می‌آید که با کتابخانه‌ی جاافتاده
+//  ساخته می‌شود. اپِ مشتری build ندارد و نمی‌تواند کتابخانه را import کند،
+//  پس تولید سمتِ سرور است — همان تصمیمی که برایِ QRِ منو و QRِ میز گرفته شد.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** جاینگه‌دار تا وقتی SVGِ واقعی از سرور برسد. */
+export function qrPlaceholder(){
+  return `<div class="qr-loading" style="display:flex;align-items:center;justify-content:center;min-height:120px;color:var(--t3);font-size:12px">در حال ساختِ کد…</div>`;
+}
+
+/**
+ * QRِ واقعی را می‌گیرد و در `boxId` می‌نشاند.
+ *
+ * شکست هیچ‌وقت شیت را نمی‌شکند: کدِ رزرو به‌صورتِ متن هم زیرِ QR هست، پس
+ * مهمان همیشه چیزی برایِ نشان‌دادن دارد حتی وقتی شبکه قطع است.
+ */
+export async function loadReservationQr(boxId, code, size){
+  const box = document.getElementById(boxId);
+  if(!box) return;
+  const res = await API.reservationQrSvg(code, size || 360);
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t3);font-size:12px;text-align:center;padding:16px 8px">
+      ${esc(res.offline ? 'برای ساختِ کد به اینترنت نیاز است — کدِ زیر را نشان بده' : 'کد ساخته نشد — کدِ زیر را نشان بده')}
+    </div>`;
+    return;
+  }
+  // SVG از APIِ خودمان می‌آید و محتوایش کدِ رزروی است که سرور تأیید کرده
+  // متعلق به همین کاربر است — ورودیِ کاربر داخلش نیست.
+  box.innerHTML = `<div style="background:#fff;border-radius:8px;padding:8px;display:inline-block">
+    <style>#${boxId} svg{width:100%;height:auto;max-width:200px;display:block}</style>
+    ${res.data.svg}
+  </div>`;
 }
 // ── رزرو مجدد (پیش‌پرکردن با همان رستوران) ──
 export function repeatReservation(rid){

@@ -79,6 +79,24 @@
    هر اپ تمِ خودش را با override کردنِ لایه‌ی Semantic می‌سازد.
    ═══════════════════════════════════════════════════════════ */
 
+/* ── فونتِ Vazirmatn — self-hosted، نه از Google Fonts ──────────────────
+   چرا: مخاطبِ رزرونو در ایران است و fonts.googleapis.com آن‌جا معمولاً در
+   دسترس نیست. تا پیش از این، فونت فقط از Google لود می‌شد و هیچ نسخه‌ی
+   محلی وجود نداشت؛ یعنی برای بخشِ بزرگی از کاربرانِ واقعی UI بی‌صدا روی
+   sans-serifِ سیستم می‌افتاد (متنِ فارسی با متریک و شکلِ نادرست).
+
+   یک فایلِ variable (۱۱۲KB) کلِ بازه‌ی وزنِ ۱۰۰..۹۰۰ را می‌دهد — جایگزینِ
+   ۷ فایلِ استاتیکی که قبلاً از Google خواسته می‌شد.
+
+   font-display: swap → متن بلافاصله با فونتِ جایگزین دیده می‌شود و بعد
+   عوض می‌شود؛ هیچ‌وقت صفحه‌ی خالیِ منتظرِ فونت نداریم.
+   ──────────────────────────────────────────────────────────────────── */
+/* [merge ۰۸-۲۴] بلوکِ @font-face که اینجا بود به css/fonts.css منتقل شد —
+   هر دو خطِ توسعه فونت را مستقل self-host کرده بودند (فایلِ باینری بایت‌به‌بایت
+   یکی بود!) و دو اعلانِ هم‌زمان یعنی دوبار جاسازیِ ~۱۴۵KB در بسته‌ی آفلاین.
+   fonts.css ماند چون توکن‌های --font-ui/--font-mono (پشته‌ی آماده‌ی Piyade)
+   هم آنجاست و body همه‌ی اپ‌ها از var(--font-ui) می‌خواند. */
+
 :root {
   /* ── لایه ۱: Primitive — مقیاسِ تایپوگرافی (۴px-baseline، پرش‌های واضح) ── */
   --fs-2xs: 11px;
@@ -1672,6 +1690,10 @@ img{display:block;max-width:100%}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
         پروفایل و نظرات
       </button>
+      <button class="sb-item" data-v="menu" onclick="nav('menu')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/></svg>
+        منو
+      </button>
       <div class="sb-nav-label">مشتریان</div>
       <button class="sb-item" data-v="customers" onclick="nav('customers')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -1736,6 +1758,7 @@ img{display:block;max-width:100%}
       <div id="v-waitlist" class="view"></div>
       <div id="v-floor" class="view"></div>
       <div id="v-profile" class="view"></div>
+      <div id="v-menu" class="view"></div>
       <div id="v-customers" class="view"></div>
       <div id="v-loyalty" class="view"></div>
       <div id="v-marketing" class="view"></div>
@@ -2172,7 +2195,12 @@ const API = {
   async request(path, opts = {}, _retried = false){
     // transportِ خام به httpJsonِ مشترک (window.httpJson از api-core.js) واگذار می‌شود؛
     // منطقِ auth (Authorization، X-Restaurant-Id، ۴۰۱→refresh→retry) اینجا و بدونِ تغییر می‌ماند.
-    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    // ⚠️ برایِ FormData هدرِ Content-Type **نباید** ست شود: مرورگر باید خودش
+    // `multipart/form-data; boundary=…` را بسازد. اگر ما 'application/json'
+    // بگذاریم، boundary گم می‌شود و سرور بدنه را نمی‌تواند پارس کند — یعنی
+    // هر آپلودِ فایلی بی‌صدا با «بدنه‌ی درخواست خوانده نشد» رد می‌شود.
+    const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData;
+    const headers = { ...(isForm ? {} : { 'Content-Type': 'application/json' }), ...(opts.headers || {}) };
     if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
     if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
     const r = await httpJson(this.base + '/api/v1' + path, { ...opts, headers }, this.timeout);
@@ -2266,14 +2294,42 @@ const API = {
   updateTable(id, body){ return this.patch(`/restaurant/tables/${id}`, body); },
   deleteTable(id){ return this.delete(`/restaurant/tables/${id}`); },
   setTableState(id, state){ return this.patch(`/restaurant/tables/${id}/state`, { state }); },
+  /**
+   * QRِ check-inِ یک میز — خروجی SVG است نه JSON، پس مثلِ `menuQrSvg` نمی‌تواند
+   * از `request()` (که همیشه `res.json()` می‌زند) عبور کند. شکلِ خروجی عمداً
+   * همان قراردادِ بقیه است تا فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
+   */
+  async tableQrSvg(id, size){
+    if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
+    try{
+      const res = await fetch(this.base + `/api/v1/restaurant/tables/${encodeURIComponent(id)}/qr?size=` + encodeURIComponent(size||512), {
+        headers: { Authorization: 'Bearer ' + this._token },
+      });
+      if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{
+        svg: await res.text(),
+        code: decodeURIComponent(res.headers.get('X-Table-Code') || ''),
+        url: decodeURI(res.headers.get('X-Checkin-Url') || ''),
+      } };
+    }catch{
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
+  /**
+   * بازتولیدِ کدِ QRِ میز — استیکرِ چاپ‌شده‌ی قبلی را **باطل** می‌کند.
+   * برخلافِ `tableQrSvg` خروجی JSON است، پس از مسیرِ عادیِ `post()` می‌رود.
+   */
+  regenerateTableQr(id){ return this.post(`/restaurant/tables/${encodeURIComponent(id)}/qr`, {}); },
   // ── هوش مشتری (RFM/CLV/AI) ──
   customers(qs){ return this.get('/restaurant/customers'+(qs?'?'+qs:'')); },
   customerDetail(userId){ return this.get('/restaurant/customers/'+encodeURIComponent(userId)); },
   rfm(){ return this.get('/restaurant/rfm'); },
   aiRecommendations(){ return this.get('/restaurant/ai'); },
   crmRecommendations(){ return this.get('/restaurant/crm/recommendations'); },
+  // فازِ ۸ — ثبتِ «با این مشتری تماس گرفتم» تا اثربخشیِ توصیه‌ها سنجیدنی شود
+  crmRecommendationContacted(userId){ return this.post('/restaurant/crm/recommendations/contacted',{user_id:userId}); },
   // ── ورود بدون رزرو (walk-in واقعی، با عضویت خودکار باشگاه) ──
-  walkin(body){ return this.post('/restaurant/walkin', body); },
+  walkin(body, headers){ return this.post('/restaurant/walkin', body, headers); },
   // ── نظرات، گالری، یادداشت پرسنل، رویداد، تاریخچه‌ی کمپین (همه واقعی) ──
   reviews(qs){ return this.get('/restaurant/reviews'+(qs?'?'+qs:'')); },
   replyReview(id, reply){ return this.patch('/restaurant/reviews', { id, reply }); },
@@ -2292,6 +2348,49 @@ const API = {
   },
   deletePhoto(id){ return this.delete('/restaurant/photos?id='+encodeURIComponent(id)); },
   notes(){ return this.get('/restaurant/notes'); },
+  // ── منو (CRUDِ واقعی؛ پیش از این هیچ روتی برایِ ساختِ آیتمِ منو نبود) ──
+  // ── دستیارِ هوشمندِ آفلاین: چت آزادمتن + حلقه‌ی خودآموزی (وصل به /restaurant/assistant واقعی) ──
+  assistantAsk(message){ return this.post('/restaurant/assistant', { message }); },
+  assistantFeedback(logId, intent){ return this.post('/restaurant/assistant/feedback', { log_id: logId, correct_intent: intent }); },
+  assistantStats(){ return this.get('/restaurant/assistant'); },
+  menuList(){ return this.get('/restaurant/menu'); },
+  menuCreate(body){ return this.post('/restaurant/menu', body); },
+  menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  /**
+   * آپلود/جایگزینیِ عکسِ آیتمِ منو.
+   * multipart است، پس نمی‌تواند از `post()` (که JSON می‌فرستد) عبور کند.
+   * ⚠️ عمداً هدرِ Content-Type ست نمی‌شود: مرورگر باید خودش boundary را
+   * تولید کند و ست‌کردنِ دستی‌اش بدنه را برایِ سرور غیرقابلِ‌پارس می‌کند.
+   */
+  menuItemPhotoUpload(id, file){
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'POST', body: fd });
+  },
+  menuItemPhotoDelete(id){
+    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'DELETE' });
+  },
+  menuBranding(){ return this.get('/restaurant/menu/branding'); },
+  menuBrandingSave(body){ return this.request('/restaurant/menu/branding', { method: 'PATCH', body: JSON.stringify(body) }); },
+  /**
+   * QRِ منویِ عمومی — خروجی SVG است، نه JSON، پس نمی‌تواند از `request()`
+   * (که همیشه `res.json()` می‌زند) عبور کند و fetchِ مستقیم لازم دارد.
+   * شکلِ خروجی عمداً همان قراردادِ بقیه است ({ok,data}/{ok:false,...}) تا
+   * فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
+   */
+  async menuQrSvg(size){
+    if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
+    try{
+      const res = await fetch(this.base + '/api/v1/restaurant/menu/qr?size=' + encodeURIComponent(size||512), {
+        headers: { Authorization: 'Bearer ' + this._token },
+      });
+      if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{ svg: await res.text(), url: decodeURI(res.headers.get('X-Menu-Url') || '') } };
+    }catch{
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
   addNote(body){ return this.post('/restaurant/notes', body); },
   pinNote(id, pinned){ return this.patch('/restaurant/notes', { id, pinned }); },
   deleteNote(id){ return this.delete('/restaurant/notes?id='+encodeURIComponent(id)); },
@@ -2360,7 +2459,11 @@ const Outbox = {
   },
   count(){ return this.load().length; },
 
-  // افزودن عملیات به صف. op = { type, path, method, body, label, localRef }
+  // افزودن عملیات به صف. op = { type, path, method, body, label, localRef, headers }
+  // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ): headers اختیاری — برای Idempotency-Key، تا
+  // وقتی این عملیات با برگشتِ اینترنت sync می‌شود همان کلیدی که موقعِ تلاشِ
+  // آنلاینِ اولیه ساخته شد استفاده شود (نه کلیدی تازه، که یعنی سرور دوباره
+  // اجرا می‌کند و رزروِ دوم می‌سازد). رجوع کن به walkinCheckinReal.
   enqueue(op){
     this.load();
     op.id = 'op_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
@@ -2387,7 +2490,7 @@ const Outbox = {
       op.attempts = (op.attempts||0) + 1;
       let res;
       try {
-        res = await API.request(op.path, { method: op.method || 'POST', body: op.body ? JSON.stringify(op.body) : undefined });
+        res = await API.request(op.path, { method: op.method || 'POST', body: op.body ? JSON.stringify(op.body) : undefined, headers: op.headers });
       } catch { res = { ok:false, offline:true }; }
 
       if(res.offline){
@@ -2845,7 +2948,7 @@ function normalizePhone(p){return (p||'').replace(/\s/g,'').replace(/[0-9]/g,d=>
 //   دو فراخوانِ قبلی (loyalty.js addMember و reservations.js مسیرِ آفلاین)
 //   در همین batch حذف/جایگزین شدند.
 
-const TITLES={overview:'داشبورد',reservations:'مدیریت رزروها',waitlist:'لیست انتظار',floor:'پلان سالن',profile:'پروفایل و نظرات',customers:'مشتریان',loyalty:'باشگاه مشتریان',marketing:'بازاریابی',analytics:'آنالیتیکس',cashback:'تنظیم کش‌بک',staff:'کارکنان',pricing:'قیمت‌گذاری',chat:'پیام‌ها'};
+const TITLES={menu:'منو',overview:'داشبورد',reservations:'مدیریت رزروها',waitlist:'لیست انتظار',floor:'پلان سالن',profile:'پروفایل و نظرات',customers:'مشتریان',loyalty:'باشگاه مشتریان',marketing:'بازاریابی',analytics:'آنالیتیکس',cashback:'تنظیم کش‌بک',staff:'کارکنان',pricing:'قیمت‌گذاری',chat:'پیام‌ها'};
 
 // ═══════════ ROUTING ═══════════
 
@@ -2949,6 +3052,7 @@ const VIEW_PERMISSION = {
   waitlist:     'canManageWaitlist',
   floor:        'canManageTables',
   profile:      'canManageSettings',
+  menu:         'canManageSettings',
   cashback:     'canManageSettings',
   pricing:      'canManageSettings',
   marketing:    'canManageCampaigns',
@@ -2984,7 +3088,7 @@ function nav(v){
   document.getElementById('v-'+v).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.toggle('active',i.dataset.v===v));
   document.getElementById('tbTitle').textContent=TITLES[v];
-  ({overview:rOverview,reservations:rReservations,waitlist:rWaitlist,floor:rFloor,profile:rProfile,customers:rCustomers,loyalty:rLoyalty,marketing:rMarketing,analytics:rAnalytics,cashback:rCashback,staff:rStaff,pricing:rPricing,chat:rChat})[v]();
+  ({overview:rOverview,reservations:rReservations,waitlist:rWaitlist,floor:rFloor,profile:rProfile,menu:rMenu,customers:rCustomers,loyalty:rLoyalty,marketing:rMarketing,analytics:rAnalytics,cashback:rCashback,staff:rStaff,pricing:rPricing,chat:rChat})[v]();
   if(window.innerWidth<=768)closeSidebar();
   document.querySelector('.content').scrollTop=0;
 }
@@ -3960,7 +4064,12 @@ async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
   const body={phone,party_size:party,table_id:tableId||undefined};
   if(firstName){body.first_name=firstName;body.last_name=lastName||'';}
   if(birthDayMonth){body.birth_day=birthDayMonth[0];body.birth_month=birthDayMonth[1];}
-  const res=await API.walkin(body);
+  // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): قبلاً این مسیر هیچ Idempotency-Key
+  // نمی‌فرستاد — دابل‌تپِ «ثبت ورود» (یا حتی retryِ خودکارِ شبکه) می‌توانست دو
+  // رزروِ seated + دو عضویتِ باشگاه برایِ همون مهمان بسازد. یک کلید برایِ کلِ
+  // تلاش (آنلاین یا صف‌شده‌ی آفلاین) ساخته می‌شود تا sync بعدی هم همون کلید را بفرسته.
+  const idemHeaders={ 'Idempotency-Key': genIdempotencyKey() };
+  const res=await API.walkin(body, idemHeaders);
   if(!res.ok){
     // آفلاین → محلی ثبت کن و برای همگام‌سازی صف کن (واک‌این نباید در قطعی اینترنت بخوابد)
     if(res.offline){
@@ -3968,7 +4077,7 @@ async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
       const localRec={t:new Date().toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'}),name:nm,party,table:tableId||null,status:'arrived',seg:'new',pre:false,note:'واک‌این (آفلاین)',phone,date:'today',dLabel:'امروز'};
       RES.push(localRec);
       if(API.getToken()){
-        Outbox.enqueue({ type:'walkin', path:'/restaurant/walkin', method:'POST', body, label:`واک‌این ${nm}${tableId?' · میز':''}`, localRef:localRec });
+        Outbox.enqueue({ type:'walkin', path:'/restaurant/walkin', method:'POST', body, headers:idemHeaders, label:`واک‌این ${nm}${tableId?' · میز':''}`, localRef:localRec });
       }
       closeModal();
       if(document.getElementById('v-overview').classList.contains('active'))rOverview();
@@ -4010,17 +4119,20 @@ async function saveManual(){
   const timeVal=document.getElementById('mTime').value;
   const partyVal=+document.getElementById('mParty').value.replace(/[^\d]/g,'')||2;
   const tableVal=+document.getElementById('mTable').value.replace(/[^\d]/g,'')||1;
+  // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): یک کلید برایِ کلِ تلاش (چه
+  // درخواستِ آنلاینِ زیر موفق شود چه به مسیرِ آفلاینِ Outbox بیفتد) — تا اگر
+  // درخواستِ اول واقعاً به سرور رسیده باشد ولی پاسخش گم شده، retry/صف‌شدنِ
+  // بعدی با همون کلید replay شود، نه رزروِ دومی بسازد.
+  const manualIdemKey=genIdempotencyKey();
 
   // اگر توکن staff داریم، رزرو واقعی در دیتابیس ثبت کن
   if(API.getToken()){
     const dt=manualDateToISO(dateVal,timeVal);
-    // Idempotency-Key: یک‌بار برای همین submit — دوبار کلیک/retry شبکه رزروِ
-    // دستیِ دوم نمی‌سازد.
     const res=await API.post('/reservations',{
       restaurant_id:STAFF_INFO?.restaurant_id||undefined,
       date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
       guest:{name:n,phone:phone,table_number:tableVal,note:'رزرو دستی'},
-    },{ 'Idempotency-Key': genIdempotencyKey() });
+    },{ 'Idempotency-Key': manualIdemKey });
     if(res.ok){
       // موفق در سرور — به‌علاوه‌ی نمایش محلی
       RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.reservation?.code});
@@ -4045,6 +4157,7 @@ async function saveManual(){
     Outbox.enqueue({
       type:'reservation', path:'/reservations', method:'POST',
       body:{ restaurant_id:'self', date:dateKey, time:timeVal, party_size:partyVal, guest:{name:n,phone:phone.replace(/\s/g,'')} },
+      headers:{ 'Idempotency-Key': manualIdemKey },
       label:`رزرو ${n} · ${dLabel} ${timeVal}`, localRef:localRec,
     });
   }
@@ -4369,8 +4482,180 @@ function openTableSheet(i){
     <div class="field-label" style="margin-top:14px">اسم میز <span style="color:var(--t3);font-weight:400">(اختیاری)</span></div>
     <input class="inp" id="tblRename" value="${esc(t.name||'')}" placeholder="میز ${fa(t.n)}" style="width:100%">
     <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="confirmTableStatus()">تأیید تغییر</button>
+    ${t.id ? `<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="openTableQr(${i})">${icon('qr',{size:14})} QRِ ورودِ مهمان</button>` : ''}
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
   `);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  QRِ check-inِ میز — استیکری که رویِ میز چسبانده می‌شود
+//
+//  مهمان سرِ میز اسکن می‌کند → اپِ مشتری باز می‌شود → رزروِ همان بازه‌ی
+//  زمانی به `seated` می‌رود و میز `occupied` می‌شود، بدونِ اینکه کارکنان
+//  کاری کنند.
+//
+//  ⚠️ تا ۲۰۲۶-۰۸-۲۱ این قابلیت شیپ شده بود ولی برایِ هیچ رستورانِ واقعی کار
+//  نمی‌کرد: هیچ روتی `qr_code` را ست نمی‌کرد و تنها میزهایِ دارایِ کد،
+//  داده‌ی `[DEMO]`ِ seed بودند. حالا هر میز کد دارد و این دکمه نشانش می‌دهد.
+//
+//  خودِ SVG از APIِ خودمان می‌آید (نه ورودیِ کاربر) و متنِ داخلش را هم سرور
+//  از دیتابیس می‌سازد — پنل فقط شناسه‌ی میز را می‌فرستد.
+// ═══════════════════════════════════════════════════════════════════════
+let _tableQrSvg = null;
+let _tableQrLabel = '';
+
+function openTableQr(i){
+  const t = TABLES[i];
+  if(!t || !t.id){ toast('','این میز هنوز روی سرور ساخته نشده'); return; }
+  _tableQrLabel = tableLabel(t);
+  openModal(`
+    <div class="modal-title">QRِ ورودِ مهمان · ${esc(_tableQrLabel)}</div>
+    <div class="modal-sub">این کد را چاپ کن و رویِ میز بگذار. مهمان با اسکنش، ورودش خودکار ثبت می‌شود.</div>
+    <div id="tableQrBox" style="text-align:center;padding:12px 0"></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">بستن</button>
+  `);
+  tableLoadQr(t.id);
+}
+
+/** SVGِ QR را از سرور می‌گیرد و همراهِ دکمه‌های دانلود/چاپ نشان می‌دهد. */
+async function tableLoadQr(id){
+  const box = document.getElementById('tableQrBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال ساختِ QR…</div>`;
+
+  const res = await API.tableQrSvg(id, 512);
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+        ${esc(res.offline ? 'اتصال به سرور برقرار نیست.' : (res.error?.message || 'ساختِ QR ناموفق بود.'))}
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">تلاش دوباره</button>`;
+    return;
+  }
+
+  _tableQrSvg = res.data.svg;
+  // SVG با عرضِ ثابتِ ۵۱۲ می‌آید (اندازه‌ای که برایِ دانلود می‌خواهیم) ولی در
+  // پنلِ موبایل باید کوچک شود، وگرنه از کارت بیرون می‌زند و صفحه را افقی
+  // اسکرول می‌کند — همان چیزی که در QRِ منو هم رخ داده بود.
+  box.innerHTML = `
+    <div style="background:#fff;display:inline-block;padding:12px;border-radius:12px;max-width:100%">
+      <div style="max-width:240px;margin:0 auto">
+        <style>#tableQrBox svg{width:100%;height:auto;display:block}</style>
+        ${_tableQrSvg}
+      </div>
+    </div>
+    <div style="font-family:monospace;font-size:12px;color:var(--t2);margin-top:8px;direction:ltr">${esc(res.data.code)}</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-ghost" onclick="tableDownloadQr('svg')">دانلودِ SVG</button>
+      <button class="btn btn-sm btn-ghost" onclick="tableDownloadQr('png')">دانلودِ PNG</button>
+      <button class="btn btn-sm btn-ghost" onclick="tablePrintQr()">چاپ</button>
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:8px">
+      SVG برایِ چاپ (هر اندازه، بدونِ افتِ کیفیت) · PNG برایِ اشتراک‌گذاری
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
+      <button class="btn btn-sm btn-ghost" style="color:var(--danger,#e5484d)"
+              onclick="tableRegenerateQr('${esc(id)}')">بازتولیدِ کد</button>
+      <div style="color:var(--t2);font-size:12px;margin-top:6px">
+        اگر استیکر گم یا کپی شده: کدِ تازه بساز. استیکرِ فعلی از همان لحظه
+        <b>باطل</b> می‌شود و باید دوباره چاپ شود.
+      </div>
+    </div>`;
+}
+
+/**
+ * بازتولیدِ کدِ QRِ میز.
+ *
+ * ⚠️ برگشت‌ناپذیر است: کدِ قبلی برنمی‌گردد و هر استیکری که با آن چاپ شده از
+ * همان لحظه مرده است (مهمان با اسکنش «میز پیدا نشد» می‌گیرد). پس متنِ تأیید
+ * دقیقاً همین اثر را می‌گوید، نه یک «مطمئنی؟»ِ مبهم — رستوران‌دار باید بداند
+ * دارد چه چیزی را از بین می‌برد. سرور هم این کار را در audit ثبت می‌کند.
+ */
+async function tableRegenerateQr(id){
+  if(!window.confirm(
+    'کدِ تازه ساخته شود؟\n\n' +
+    'استیکرِ فعلیِ رویِ این میز از همین لحظه باطل می‌شود و مهمان با اسکنش به جایی نمی‌رسد. ' +
+    'باید کدِ جدید را چاپ کنی و جایگزین کنی.\n\nاین کار برگشت‌پذیر نیست.'
+  )) return;
+
+  const box = document.getElementById('tableQrBox');
+  if(box) box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال ساختِ کدِ تازه…</div>`;
+
+  const res = await API.regenerateTableQr(id);
+  if(!res.ok){
+    if(box){
+      box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+          ${esc(res.offline ? 'اتصال به سرور برقرار نیست — کد عوض نشد.' : (res.error?.message || 'بازتولیدِ کد ناموفق بود.'))}
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">نمایشِ کدِ فعلی</button>`;
+    }
+    return;
+  }
+
+  toast('', 'کدِ تازه ساخته شد — استیکرِ قبلی دیگر کار نمی‌کند');
+  // QR را از نو می‌گیریم تا کدِ جدید و تصویرش هر دو به‌روز شوند.
+  tableLoadQr(id);
+}
+
+/** دانلودِ QR. PNG در خودِ مرورگر از SVG رندر می‌شود — بدونِ رفت‌وبرگشتِ اضافه. */
+function tableDownloadQr(fmt){
+  if(!_tableQrSvg) return;
+  const name = 'rezervno-table-qr';
+  if(fmt === 'svg'){
+    tableTriggerDownload(new Blob([_tableQrSvg], { type:'image/svg+xml' }), name + '.svg');
+    return;
+  }
+  // SVG → canvas → PNG. اندازه‌ی ۱۰۲۴ عمدی است: QR در چاپ اغلب بزرگ‌تر از
+  // نمایشِ صفحه لازم می‌شود و بزرگ‌کردنِ PNGِ کوچک ناخوانایش می‌کند.
+  const SIZE = 1024;
+  const img = new Image();
+  const svgUrl = URL.createObjectURL(new Blob([_tableQrSvg], { type:'image/svg+xml' }));
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = c.height = SIZE;
+    const ctx = c.getContext('2d');
+    // پس‌زمینه‌ی سفیدِ صریح: PNGِ شفاف رویِ تمِ تیره سیاه‌روی‌سیاه می‌شود و
+    // اسکنر نمی‌خواندش.
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    ctx.drawImage(img, 0, 0, SIZE, SIZE);
+    URL.revokeObjectURL(svgUrl);
+    c.toBlob(b => { if(b) tableTriggerDownload(b, name + '.png'); });
+  };
+  img.onerror = () => { URL.revokeObjectURL(svgUrl); toast('','ساختِ PNG ناموفق بود — SVG را دانلود کن'); };
+  img.src = svgUrl;
+}
+
+/** چاپِ مستقیم: یک پنجره‌ی کوچک با همان SVG و نامِ میز بالایش. */
+function tablePrintQr(){
+  if(!_tableQrSvg) return;
+  const w = window.open('', '_blank', 'width=420,height=560');
+  if(!w){ toast('','مرورگر پنجره‌ی چاپ را بست — دانلودِ SVG را امتحان کن'); return; }
+  // `esc` رویِ برچسب اعمال می‌شود چون اسمِ میز را رستوران‌دار تایپ کرده.
+  // SVG از APIِ خودمان می‌آید و ورودیِ کاربر داخلش نیست.
+  w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8">
+    <title>QR ${esc(_tableQrLabel)}</title>
+    <style>
+      body{font-family:system-ui,sans-serif;text-align:center;padding:24px;margin:0}
+      h1{font-size:20px;margin:0 0 16px}
+      svg{width:280px;height:280px}
+      p{color:#555;font-size:13px;margin-top:12px}
+      @media print{ body{padding:0} }
+    </style></head><body>
+    <h1>${esc(_tableQrLabel)}</h1>
+    ${_tableQrSvg}
+    <p>برای ثبتِ ورود، این کد را اسکن کنید</p>
+    </body></html>`);
+  w.document.close();
+  // چاپ بعد از لودِ کاملِ سند؛ بدونِ این، بعضی مرورگرها صفحه‌ی خالی چاپ می‌کنند.
+  w.onload = () => { w.focus(); w.print(); };
+}
+
+function tableTriggerDownload(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 async function confirmTableStatus(){
   if(pendingTable===null)return;
@@ -4913,6 +5198,26 @@ const RFM_META={
   lost:{fa:'از دست‌رفته',c:'#6B7280',d:'احتمالاً رفته'},
   unknown:{fa:'نامشخص',c:'#CBD5E1',d:''},
 };
+/**
+ * آیا برایِ این مشتری اصلاً دادهٔ مبلغی وجود دارد؟
+ *
+ * ⚠️ افزوده در ممیزیِ ۲۰۲۶-۰۸-۱۹. رزرونو عمداً POS-agnostic است و هرگز مبلغِ
+ * فاکتور را نمی‌بیند؛ تنها منبعِ مبلغ، `reservation_items` (پیش‌سفارش از منو)
+ * است — دقیقاً همان چیزی که کامنتِ خودِ schema رویِ `total_spend_toman`
+ * می‌گوید: «جمعِ پیش‌سفارش‌ها». چون این ستون‌ها در دیتابیس `Int @default(0)`
+ * (غیرِ nullable) هستند، «دادهٔ نداریم» و «خرجش صفر بود» هردو صفر ذخیره
+ * می‌شوند و از هم قابلِ تفکیک نیستند. نمایشِ خامِ آن صفر به رستوران‌دار یعنی
+ * ادعایِ اندازه‌گیری‌شده‌ای که هرگز اندازه‌گیری نشده. اینجا صفر را «بدونِ داده»
+ * می‌خوانیم و خانه را خالی نشان می‌دهیم، نه «۰ تومان».
+ */
+function clvHasSpend(clv){
+  // دقیقاً null/undefined را چک می‌کنیم، نه falsy: بعد از migration ۰۴۶ عددِ ۰
+  // یک واقعیتِ تأییدشده است («منو داشت، پیش‌سفارش نداد») و باید «۰» نشان داده
+  // شود؛ فقط null یعنی «نمی‌دانیم» و باید «—» شود. اگر اینجا `!value` بنویسیم،
+  // همان دو حالتی که در دیتابیس تفکیک کردیم دوباره در UI یکی می‌شوند.
+  return !!clv && clv.total_spend_toman != null;
+}
+
 // رندر دمو داشبورد هوش مشتری (از GUESTS نمونه) — برای دمو و آفلاین
 function custRenderOverviewDemo(el){
   const total=GUESTS.length*32+1216; // عدد نمونه‌ی واقع‌گرایانه
@@ -4974,7 +5279,23 @@ async function custRenderOverview(){
   // حالت دمو/آفلاین: با داده‌ی نمونه رندر کن تا فیچر همیشه قابل‌نمایش باشد (برای دمو به رستوران‌دار)
   if(!API.getToken()){ return custRenderOverviewDemo(el); }
   const [rfmRes,aiRes,vipRes]=await Promise.all([API.rfm(),API.aiRecommendations(),API.customers('segment=vip&limit=50')]);
-  if(!rfmRes.ok){ return custRenderOverviewDemo(el); }
+  // ⚠️ رفعِ باگِ صداقت (ممیزیِ ۲۰۲۶-۰۸-۱۹): قبلاً اینجا هم `custRenderOverviewDemo`
+  // صدا زده می‌شد. یعنی رستوران‌دارِ **واردشده** که فقط APIاش خطا داده بود
+  // (۵۰۰، قطعیِ شبکه، rate-limit) اعدادِ ساخته‌شده‌ی دمو را به‌جایِ دادهٔ خودش
+  // می‌دید — با برچسبِ «[نمونه]» ولی بدونِ هیچ نشانه‌ای که «بارگیری شکست خورد».
+  // دمو فقط برایِ حالتِ بدونِ توکن مجاز است؛ خطای واقعی باید دیده شود، نه پنهان.
+  if(!rfmRes.ok){
+    const msg = rfmRes.offline
+      ? 'اتصال به سرور برقرار نیست.'
+      : (rfmRes.error?.message || 'بارگیریِ هوشِ مشتری ناموفق بود.');
+    el.innerHTML=`<div class="panel" style="text-align:center;padding:40px">
+      <div style="margin-bottom:8px">${icon('alert',{size:28})}</div>
+      <div style="font-weight:700;margin-bottom:6px">دادهٔ هوشِ مشتری بارگیری نشد</div>
+      <div style="color:var(--t2);font-size:13px;margin-bottom:16px">${esc(msg)}</div>
+      <button class="btn btn-primary" onclick="custRenderOverview()">تلاش دوباره</button>
+    </div>`;
+    return;
+  }
   const total=rfmRes.data.total||0;
   const segs=(rfmRes.data.segments||[]).slice().sort((a,b)=>b.count-a.count);
   const vipCount=vipRes.ok?(vipRes.data.items?.length||0):0;
@@ -5063,7 +5384,7 @@ async function custRenderProfiles(){
       return `<div class="smart-card ${urg}">
         <div class="smart-top">
           <div class="smart-ava">${c.is_vip?icon('crown',{size:18,fill:true}):icon('user',{size:18})}</div>
-          <div style="flex:1"><div class="smart-name">${esc(c.name)}</div><div style="font-size:12px;color:var(--t2)">${esc(SEG_FA[c.segment]||c.segment||'')} · ${fa(c.total_visits)} بازدید · ${fnl(c.predicted_clv_toman)} تومان CLV</div></div>
+          <div style="flex:1"><div class="smart-name">${esc(c.name)}</div><div style="font-size:12px;color:var(--t2)">${esc(SEG_FA[c.segment]||c.segment||'')} · ${fa(c.total_visits)} بازدید${c.predicted_clv_toman!=null?` · ${fnl(c.predicted_clv_toman)} تومان CLV`:''}</div></div>
           <span style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:50px;background:${urg==='high'?'var(--red-50)':urg==='med'?'var(--amber-50)':'var(--green-50)'};color:${urgClr[urg]}">${urg==='high'?'پرریسک':urg==='med'?'بررسی کن':'پایدار'}</span>
         </div>
         ${c.intelligence_score!=null?`<div style="display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:11.5px;color:var(--t2)">${icon('sparkle',{size:12,fill:true})} امتیازِ هوشِ مشتری: <b style="color:${iqClr[c.intelligence_tier]||'var(--t2)'}">${fa(c.intelligence_score)}</b> · ${iqFa[c.intelligence_tier]||''}</div>`:''}
@@ -5080,6 +5401,21 @@ async function custRenderProfiles(){
     }).join(''):'<div style="text-align:center;color:var(--t2);padding:40px">هنوز مشتری تحلیل‌شده‌ای نیست</div>'}`;
 }
 function callCustomer(phone){ if(phone) window.location.href='tel:'+phone; }
+
+// ⚠️ فازِ ۸ — نیمه‌ی گم‌شده‌ی حلقه‌ی بازخوردِ CRM: تا امروز این دکمه فقط `tel:`
+// را باز می‌کرد و هیچ ردی نمی‌گذاشت، پس هیچ‌وقت نمی‌شد فهمید توصیه‌های CRM
+// اثری داشته‌اند یا نه. حالا تماس در دفترِ ارتباط‌گیری ثبت می‌شود.
+//
+// ⚠️ ترتیب عمدی است: اول ثبت (await)، بعد `tel:`. برعکسش روی موبایل یعنی
+// مرورگر بلافاصله به اپِ تلفن سوییچ می‌کند و fetchِ نیمه‌کاره لغو می‌شود —
+// یعنی تماس‌های واقعی بی‌صدا ثبت نمی‌شدند. شکستِ ثبت هرگز جلوی خودِ تماس را
+// نمی‌گیرد: تماس گرفتن مهم‌تر از آمارش است.
+async function callRecommendedCustomer(phone,userId){
+  if(userId && API.getToken()){
+    try{ await API.crmRecommendationContacted(userId); }catch(_e){}
+  }
+  callCustomer(phone);
+}
 
 // ─── تب ساعات کاری + تعطیلات (وصل به GET/PUT /restaurant/hours واقعی) ───
 // کلید هر روز مطابق قرارداد بک‌اند: getDay() جاوااسکریپت (۰=یکشنبه ... ۶=شنبه).
@@ -5325,9 +5661,10 @@ async function openCustomerDetail(userId){
     <div class="modal-sub">${esc(SEG_FA[d.segment]||d.segment||'')}${u.phone?' · '+esc(u.phone):''}</div>
     <div class="sig-row" style="margin-top:14px">
       <div class="sig"><div class="sig-val">${fa(clv.total_visits||0)}</div><div class="sig-label">بازدید</div></div>
-      <div class="sig"><div class="sig-val">${fnl(clv.total_spend_toman)}</div><div class="sig-label">کل خرج (ت)</div></div>
-      <div class="sig"><div class="sig-val">${fnl(clv.predicted_clv_toman)}</div><div class="sig-label">CLV (ت)</div></div>
+      <div class="sig"><div class="sig-val">${clvHasSpend(clv)?fnl(clv.total_spend_toman):'—'}</div><div class="sig-label">پیش‌سفارش (ت)</div></div>
+      <div class="sig"><div class="sig-val">${clvHasSpend(clv)?fnl(clv.predicted_clv_toman):'—'}</div><div class="sig-label">CLV (ت)</div></div>
     </div>
+    ${clvHasSpend(clv)?'':`<div style="margin-top:8px;font-size:11.5px;color:var(--t2);line-height:1.7">${icon('info',{size:12})} مبلغ برایِ این مشتری <b>اندازه‌گیری‌ناپذیر</b> است، پس CLV محاسبه نمی‌شود. رزرونو به صندوق وصل نیست و مبلغِ فاکتور را نمی‌بیند؛ تنها منبعِ مبلغ، <b>پیش‌سفارش از منو</b> است و این رستوران هنوز منویِ قیمت‌داری ثبت نکرده. «—» یعنی نامعلوم؛ اگر منو داشته باشید و مهمان چیزی پیش‌سفارش ندهد، به‌جایش «۰» می‌بینید که یک واقعیتِ تأییدشده است.</div>`}
     <div class="sig-row" style="margin-top:10px">
       <div class="sig"><div class="sig-val" style="color:var(--red)">${fa(risk.churn_risk_score||0)}٪</div><div class="sig-label">ریسک ریزش</div></div>
       <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(risk.no_show_rate_pct||0)}٪</div><div class="sig-label">عدم‌حضور</div></div>
@@ -5336,7 +5673,7 @@ async function openCustomerDetail(userId){
     <div class="field-label" style="margin-top:18px">تاریخچه‌ی رزروها</div>
     <div style="max-height:240px;overflow-y:auto;margin-top:8px">
       ${tl.length?tl.map(r=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
           <div>
             <div style="font-weight:700;font-size:13px">${esc(ST_FA[r.status]||r.status)} · ${fa(r.party_size)} نفر</div>
             <div style="font-size:11px;color:var(--t2)">${dt(r.slot_start)}${r.items&&r.items.length?' · '+esc(r.items.join('، ')):''}</div>
@@ -5394,17 +5731,45 @@ async function loadCampaignHistory(){
   </tbody></table>`:'<div style="padding:8px">هنوز کمپینی ارسال نشده</div>';
 }
 
-// ─── تب ۴: دستیار AI (واقعی — کارت‌های پیشنهاد قانون‌محور از /restaurant/ai، نه چت ساختگی) ───
+// ⚠️ فازِ ۸ — چیزی که این خط جایگزینش شد یک توضیحِ ثابت بود
+// («توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری»). حالا به‌جای توصیفِ
+// خودش، *نتیجه‌ی سنجیده‌شده‌اش* را می‌گوید — یا صریحاً می‌گوید هنوز سنجیدنی
+// نیست. هرگز عددی که اندازه نگرفته‌ایم نشان نمی‌دهد (بندِ ۲۰).
+function crmEffectivenessFa(e){
+  const base='توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری';
+  if(!e) return base;
+  if(e.conversion_status==='measured' && e.conversion_rate_pct!==null && e.conversion_rate_pct!==undefined){
+    return `${base} · ${fa(e.conversion_rate_pct)}٪ از تماس‌ها به رزرو رسید (از ${fa(e.resolved_count)} موردِ قطعی‌شده، پنجره‌ی ${fa(e.window_days)} روزه)`;
+  }
+  if(e.contacted_count>0){
+    return `${base} · ${fa(e.contacted_count)} تماس ثبت شده — نرخِ تبدیل هنوز اندازه‌پذیر نیست (${fa(e.resolved_count)} از ${fa(e.min_resolved)})`;
+  }
+  return `${base} · هنوز تماسی ثبت نشده`;
+}
+
+// ─── تب ۴: دستیار AI — چت‌باکسِ آزادمتنِ آفلاین (assistant.js) + کارت‌های پیشنهادِ قانون‌محور از /restaurant/ai ───
 async function custRenderAI(){
   const el=document.getElementById('ct-ai');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
+
+  // ⚠️ چت‌باکسِ دستیار عمداً *پیش از* fetchِ کارت‌ها و بیرونِ گاردِ آن رندر
+  // می‌شود. این دو قابلیتِ مستقل‌اند (چت از /restaurant/assistant می‌آید،
+  // کارت‌ها از /restaurant/ai) و اگر داخلِ یک قالب بمانند، خطای یکی دیگری را
+  // هم از بین می‌برد — در تستِ مرورگر دقیقاً همین دیده شد: با ۴۰۱ شدنِ
+  // کارت‌ها، چت‌باکس اصلاً در DOM نبود.
+  const chatHtml = (typeof assistantChatHtml==='function') ? assistantChatHtml() : '';
+  if(chatHtml){ el.innerHTML=chatHtml+`<div id="aiCards"><div style="text-align:center;padding:30px;color:var(--t2)">در حال بارگذاری پیشنهادها...</div></div>`; }
+  if(typeof initAssistantChat==='function') initAssistantChat();
+  const cardsEl = document.getElementById('aiCards') || el;
+
   const [res,crmRes]=await Promise.all([API.aiRecommendations(),API.crmRecommendations()]);
-  if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
+  if(!res.ok){ cardsEl.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} پیشنهادها بارگیری نشد — دستیار همچنان در دسترس است.</div>`; return; }
   const cards=res.data.cards||[];
   const contacts=crmRes.ok?(crmRes.data.items||[]):[];
+  const crmEff=crmRes.ok?(crmRes.data.effectiveness||null):null;
   const URG_FA={high:'فوری',medium:'این هفته',low:'وقتِ آزاد'};
-  el.innerHTML=`
+  cardsEl.innerHTML=`
     <div class="ai-box" style="margin-bottom:18px">
       <div class="ai-box-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">پیشنهادهای هوشمند</div><span class="tag">قانون‌محور · شفاف</span></div>
       <div style="font-size:13px;color:var(--t1);line-height:1.6">این پیشنهادها از تحلیل واقعی داده‌های رستوران شما تولید می‌شن (نه چت‌بات) — هر کارت دلیل و عدد پشتش رو نشون می‌ده.</div>
@@ -5421,7 +5786,7 @@ async function custRenderAI(){
         </div>
       </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}
     <div class="panel" style="margin-top:20px">
-      <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری</div></div></div>
+      <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">${crmEffectivenessFa(crmEff)}</div></div></div>
       ${contacts.length?contacts.map(c=>`
         <div class="mini-row">
           <div class="mini-info">
@@ -5429,7 +5794,7 @@ async function custRenderAI(){
             <div class="mini-sub">${esc(c.reason)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callCustomer('${esc(c.phone||'')}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
+            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer('${esc(c.phone||'')}','${esc(c.user_id)}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
     </div>`;
@@ -5449,6 +5814,565 @@ function handleAiAction(id){
 // بود که کدِ عضویتِ ساختگیِ VIS-xxx می‌ساخت؛ آن تابع در همین batch حذف شد.
 // اثبات: grep -rn "memCounter" apps/business/ → پس از حذف هیچ ارجاعی نمی‌ماند.
 // ═══════════ MARKETING ═══════════
+
+</script>
+  <script data-src="js/menu.js">
+// ═══ رزرونو — پنل business: مدیریتِ منو (Vanilla JS، بدون build، scope مشترک) ═══
+//
+// چرا این صفحه ساخته شد (ممیزیِ ۲۰۲۶-۰۸-۱۹): مدلِ MenuItem از ابتدا وجود داشت
+// و در صفحه‌ی عمومیِ رستوران، پیش‌سفارشِ رزرو و گزارشِ پرفروش‌ها *خوانده*
+// می‌شد، ولی هیچ راهی برایِ ساختنش نبود جز seedِ توسعه. یعنی رستورانِ واقعی
+// برایِ همیشه منوی خالی داشت و چون تنها منبعِ مبلغ در رزرونو پیش‌سفارش از
+// منوست، زنجیره‌ی پیش‌سفارش→مبلغ→CLV هرگز داده‌ای نمی‌گرفت.
+//
+// حالتِ خالی در برابرِ خطا عمداً از هم جدا نگه داشته می‌شوند: «منو خالی است»
+// یک واقعیت است، «بارگیری نشد» یک شکست — هرگز دومی به‌شکلِ اولی نشان داده
+// نمی‌شود.
+
+let MENU_ITEMS = [];
+let _menuLoaded = false;
+/** آدرسِ عمومیِ منو — از سرور می‌آید، نه ساختِ رشته اینجا. null = رستوران slug ندارد. */
+let MENU_PUBLIC_URL = null;
+
+/** دسته‌هایِ پیشنهادی. متنِ آزاد است — رستوران می‌تواند دسته‌ی دلخواه بنویسد. */
+const MENU_CATEGORY_SUGGESTIONS = ['پیش‌غذا', 'غذای اصلی', 'دسر', 'نوشیدنی', 'صبحانه'];
+
+async function rMenu(){
+  const el = document.getElementById('v-menu');
+  if(!API.getToken()){
+    el.innerHTML = `<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">
+      ${icon('info',{size:24})}
+      <div style="margin-top:8px">مدیریتِ منو به اتصالِ بک‌اند نیاز دارد — در حالتِ دمو در دسترس نیست.</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">در حال بارگیریِ منو…</div>`;
+
+  const res = await API.menuList();
+  if(!res.ok){
+    // شکستِ واقعی — نه «منو خالی است». پیامِ سرور عیناً نشان داده می‌شود.
+    const msg = res.offline ? 'اتصال به سرور برقرار نیست.' : (res.error?.message || 'بارگیریِ منو ناموفق بود.');
+    el.innerHTML = `<div class="panel" style="text-align:center;padding:40px">
+      <div style="margin-bottom:8px">${icon('alert',{size:28})}</div>
+      <div style="font-weight:700;margin-bottom:6px">منو بارگیری نشد</div>
+      <div style="color:var(--t2);font-size:13px;margin-bottom:16px">${esc(msg)}</div>
+      <button class="btn btn-primary" onclick="rMenu()">تلاش دوباره</button>
+    </div>`;
+    return;
+  }
+  MENU_ITEMS = res.data.items || [];
+  MENU_PUBLIC_URL = res.data.public_menu_url || null;
+  _menuLoaded = true;
+  menuRender();
+}
+
+function menuRender(){
+  const el = document.getElementById('v-menu');
+  const active = MENU_ITEMS.filter(i=>i.is_active).length;
+
+  // گروه‌بندی بر اساسِ دسته، با «دسته‌بندی‌نشده» در انتها
+  const groups = {};
+  MENU_ITEMS.forEach(i=>{ const k = i.category || ''; (groups[k] = groups[k] || []).push(i); });
+  const keys = Object.keys(groups).filter(k=>k).sort((a,b)=>a.localeCompare(b,'fa'));
+  if(groups['']) keys.push('');
+
+  el.innerHTML = `
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">منویِ رستوران</div>
+          <div class="panel-sub">${fa(MENU_ITEMS.length)} آیتم · ${fa(active)} فعال</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="menuOpenForm()">${icon('plus',{size:15})} آیتمِ جدید</button>
+      </div>
+      <div class="cash-note" style="margin-top:4px">${icon('info',{size:13})}
+        منو تنها منبعِ مبلغ در رزرونوست: مهمان از همین فهرست پیش‌سفارش می‌دهد و
+        گزارشِ «خرج» و CLV از روی همان ساخته می‌شود. تا وقتی منو خالی باشد، مبلغ
+        برایِ مشتریانِ شما «نامعلوم» می‌ماند.
+      </div>
+    </div>
+
+    ${menuPublicCardHTML(active)}
+
+    ${MENU_ITEMS.length === 0 ? `
+      <div class="panel" style="text-align:center;padding:40px">
+        <div style="margin-bottom:10px">${icon('menu',{size:30})}</div>
+        <div style="font-weight:700;margin-bottom:6px">هنوز آیتمی در منو نیست</div>
+        <div style="color:var(--t2);font-size:13px;margin-bottom:16px">اولین آیتم را اضافه کن تا مهمان‌ها بتوانند پیش‌سفارش بدهند.</div>
+        <button class="btn btn-primary" onclick="menuOpenForm()">افزودنِ اولین آیتم</button>
+      </div>` :
+      keys.map(k=>`
+        <div class="panel" style="margin-bottom:14px">
+          <div class="panel-head"><div class="panel-title" style="font-size:15px">${k ? esc(k) : 'دسته‌بندی‌نشده'}</div></div>
+          ${groups[k].map(menuRowHTML).join('')}
+        </div>`).join('')
+    }`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  کارتِ «منویِ عمومی / QR»
+//
+//  همان آدرسی که اینجا کپی می‌شود، داخلِ QR هم هست — چون هر دو از سرور
+//  می‌آیند (`public_menu_url` و `X-Menu-Url`)، نه از رشته‌سازیِ اینجا.
+// ═══════════════════════════════════════════════════════════════════════
+function menuPublicCardHTML(activeCount){
+  if(!MENU_PUBLIC_URL){
+    // رستوران بدونِ slug صفحه‌ی عمومی ندارد. صریح گفته می‌شود، نه اینکه
+    // کارت بی‌صدا غیب شود و رستوران‌دار فکر کند فیچر وجود ندارد.
+    return `<div class="panel" style="margin-bottom:16px">
+      <div class="panel-head"><div class="panel-title">منویِ عمومی و QR</div></div>
+      <div style="color:var(--t2);font-size:13px">
+        برای این رستوران هنوز نشانیِ عمومی (slug) ثبت نشده، پس صفحه‌ی منو و QR ساخته نمی‌شود.
+        با پشتیبانی تماس بگیر تا نشانی را فعال کنیم.
+      </div>
+    </div>`;
+  }
+
+  return `<div class="panel" style="margin-bottom:16px">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">منویِ عمومی و QR</div>
+        <div class="panel-sub">مهمان با اسکنِ این کد، منو را روی موبایلش می‌بیند — بدونِ نصبِ اپ و بدونِ ورود.</div>
+      </div>
+    </div>
+
+    ${activeCount === 0 ? `
+      <div class="cash-note" style="margin-bottom:10px;border-color:var(--amber,#d97706)">
+        ${icon('alert',{size:13})}
+        هیچ آیتمِ <b>فعالی</b> در منو نیست، پس صفحه‌ی عمومی فعلاً خالی نشان داده می‌شود.
+        قبل از چاپِ QR دستِ‌کم یک آیتم را فعال کن.
+      </div>` : ''}
+
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <input class="inp" id="menuPubUrl" readonly value="${esc(MENU_PUBLIC_URL)}" style="flex:1;min-width:200px;direction:ltr;text-align:left">
+      <button class="btn btn-sm btn-ghost" onclick="menuCopyUrl()">${icon('copy',{size:14})} کپی</button>
+      <a class="btn btn-sm btn-ghost" href="${esc(MENU_PUBLIC_URL)}" target="_blank" rel="noopener">پیش‌نمایش</a>
+    </div>
+
+    <div id="menuQrBox" style="text-align:center;padding:12px 0">
+      <button class="btn btn-primary btn-sm" onclick="menuLoadQr()">ساختنِ QR</button>
+    </div>
+
+    <div style="border-top:1px solid var(--line,#e6e8ec);margin-top:12px;padding-top:12px">
+      <div class="panel-title" style="font-size:14px;margin-bottom:2px">ظاهرِ صفحه‌ی منو</div>
+      <div class="panel-sub" style="margin-bottom:10px">
+        این تنظیمات مالِ خودِ شماست و بدونِ تأییدِ رزرونو اعمال می‌شود.
+      </div>
+      <div id="menuBrandBox">
+        <button class="btn btn-sm btn-ghost" onclick="menuLoadBranding()">تنظیمِ رنگ و ظاهر</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  شخصی‌سازیِ صفحه‌ی منو — رنگِ برند، روشن/تیره، خطِ معرفی، چیدمان.
+//  مقادیرِ مجاز از خودِ سرور می‌آیند (`options`)، نه فهرستِ هاردکد اینجا،
+//  تا با تغییرِ سرور از هم نیفتند.
+// ═══════════════════════════════════════════════════════════════════════
+let MENU_BRAND = null;
+
+const BRAND_THEME_LABEL = { light: 'روشن', dark: 'تیره', auto: 'خودکار (ترجیحِ مهمان)' };
+const BRAND_LAYOUT_LABEL = { list: 'فهرستی', grid: 'شبکه‌ای (عکس‌محور)' };
+
+async function menuLoadBranding(){
+  const box = document.getElementById('menuBrandBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال بارگیری…</div>`;
+  const res = await API.menuBranding();
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">${esc(res.offline?'اتصال به سرور برقرار نیست.':(res.error?.message||'بارگیری نشد.'))}</div>
+      <button class="btn btn-sm btn-ghost" onclick="menuLoadBranding()">تلاش دوباره</button>`;
+    return;
+  }
+  MENU_BRAND = res.data;
+  menuBrandRender();
+}
+
+function menuBrandRender(){
+  const box = document.getElementById('menuBrandBox');
+  if(!box || !MENU_BRAND) return;
+  const b = MENU_BRAND;
+  const themes = (b.options?.themes) || ['light','dark','auto'];
+  const layouts = (b.options?.layouts) || ['list','grid'];
+  box.innerHTML = `
+    <div class="field-label">رنگِ برند</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="color" id="mbAccent" value="${esc(b.menu_accent || '#2563EB')}" style="width:48px;height:36px;padding:0;border:none;background:none">
+      <button class="btn btn-sm btn-ghost" onclick="menuBrandSave({menu_accent:null})">حذفِ رنگ (پیش‌فرض)</button>
+    </div>
+    <div class="field-label">حالتِ نمایش</div>
+    <select class="inp" id="mbTheme">
+      <option value="">پیش‌فرضِ رزرونو</option>
+      ${themes.map(t=>`<option value="${esc(t)}"${b.menu_theme===t?' selected':''}>${esc(BRAND_THEME_LABEL[t]||t)}</option>`).join('')}
+    </select>
+    <div class="field-label">چیدمان</div>
+    <select class="inp" id="mbLayout">
+      <option value="">پیش‌فرضِ رزرونو</option>
+      ${layouts.map(l=>`<option value="${esc(l)}"${b.menu_layout===l?' selected':''}>${esc(BRAND_LAYOUT_LABEL[l]||l)}</option>`).join('')}
+    </select>
+    <div class="field-label">خطِ معرفی</div>
+    <input class="inp" id="mbTagline" maxlength="160" value="${esc(b.menu_tagline||'')}" placeholder="اختیاری — زیرِ نامِ رستوران دیده می‌شود">
+    <button class="btn btn-primary btn-sm btn-block" style="margin-top:12px" onclick="menuBrandSaveForm()">ذخیره‌ی ظاهر</button>`;
+}
+
+function menuBrandSaveForm(){
+  menuBrandSave({
+    menu_accent: (document.getElementById('mbAccent').value || '').toUpperCase() || null,
+    // رشته‌ی خالی = «برگرد به پیش‌فرض»؛ سرور آن را null می‌فهمد.
+    menu_theme: document.getElementById('mbTheme').value || null,
+    menu_layout: document.getElementById('mbLayout').value || null,
+    menu_tagline: (document.getElementById('mbTagline').value || '').trim() || null,
+  });
+}
+
+async function menuBrandSave(patch){
+  const res = await API.menuBrandingSave(patch);
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ذخیره نشد'));
+    return;
+  }
+  MENU_BRAND = res.data;
+  menuBrandRender();
+  toast('✓','ظاهرِ منو ذخیره شد و همین حالا روی صفحه‌ی عمومی است');
+}
+
+async function menuCopyUrl(){
+  const el = document.getElementById('menuPubUrl');
+  if(!el) return;
+  try{
+    await navigator.clipboard.writeText(el.value);
+    toast('✓','آدرس کپی شد');
+  }catch{
+    // clipboard API روی http یا مرورگرِ قدیمی کار نمی‌کند — انتخابِ متن
+    // دستِ‌کم کپیِ دستی را یک کلیدِ ترکیبی می‌کند.
+    el.select();
+    toast('','کپیِ خودکار ممکن نشد — با Ctrl+C کپی کن');
+  }
+}
+
+/** SVGِ QR را از سرور می‌گیرد و همراهِ دکمه‌های دانلود نشان می‌دهد. */
+async function menuLoadQr(){
+  const box = document.getElementById('menuQrBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال ساختِ QR…</div>`;
+
+  const res = await API.menuQrSvg(512);
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+        ${esc(res.offline ? 'اتصال به سرور برقرار نیست.' : (res.error?.message || 'ساختِ QR ناموفق بود.'))}
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="menuLoadQr()">تلاش دوباره</button>`;
+    return;
+  }
+
+  // SVG از APIِ خودمان می‌آید (نه ورودیِ کاربر) و متنِ داخلش را هم سرور از
+  // slug ساخته، نه از چیزی که کلاینت فرستاده باشد.
+  _menuQrSvg = res.data.svg;
+  // SVG با عرضِ ثابتِ ۵۱۲ می‌آید (همان اندازه‌ای که برایِ دانلود می‌خواهیم)، ولی
+  // در پنلِ موبایل باید کوچک شود وگرنه از کارت بیرون می‌زند و صفحه را افقی
+  // اسکرول می‌کند — در تستِ مرورگر روی ۴۲۰px دقیقاً همین رخ داد.
+  // `max-width` روی خودِ svg اعمال می‌شود، نه فقط قاب.
+  box.innerHTML = `
+    <div style="background:#fff;display:inline-block;padding:12px;border-radius:12px;max-width:100%">
+      <div style="max-width:260px;margin:0 auto">
+        <style>#menuQrBox svg{width:100%;height:auto;display:block}</style>
+        ${_menuQrSvg}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-ghost" onclick="menuDownloadQr('svg')">دانلودِ SVG</button>
+      <button class="btn btn-sm btn-ghost" onclick="menuDownloadQr('png')">دانلودِ PNG</button>
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:8px">
+      SVG برایِ چاپ (هر اندازه، بدونِ افتِ کیفیت) · PNG برایِ شبکه‌های اجتماعی
+    </div>`;
+}
+
+let _menuQrSvg = null;
+
+/** دانلودِ QR. PNG در خودِ مرورگر از SVG رندر می‌شود — بدونِ رفت‌وبرگشتِ اضافه. */
+function menuDownloadQr(fmt){
+  if(!_menuQrSvg) return;
+  const name = 'rezervno-menu-qr';
+  if(fmt === 'svg'){
+    menuTriggerDownload(new Blob([_menuQrSvg], { type:'image/svg+xml' }), name + '.svg');
+    return;
+  }
+  // SVG → canvas → PNG. اندازه‌ی ۱۰۲۴ عمدی است: QR در چاپ اغلب بزرگ‌تر از
+  // نمایشِ صفحه لازم می‌شود و بزرگ‌کردنِ PNGِ کوچک آن را ناخوانا می‌کند.
+  const SIZE = 1024;
+  const img = new Image();
+  const svgUrl = URL.createObjectURL(new Blob([_menuQrSvg], { type:'image/svg+xml' }));
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = c.height = SIZE;
+    const ctx = c.getContext('2d');
+    // پس‌زمینه‌ی سفیدِ صریح: PNGِ شفاف روی تمِ تیره‌ی نمایشگر/چاپ سیاه‌روی‌سیاه
+    // می‌شود و اسکنر نمی‌خواندش.
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    ctx.drawImage(img, 0, 0, SIZE, SIZE);
+    URL.revokeObjectURL(svgUrl);
+    c.toBlob(b => { if(b) menuTriggerDownload(b, name + '.png'); });
+  };
+  img.onerror = () => { URL.revokeObjectURL(svgUrl); toast('','ساختِ PNG ناموفق بود — SVG را دانلود کن'); };
+  img.src = svgUrl;
+}
+
+function menuTriggerDownload(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function menuRowHTML(i){
+  // عکسِ آیتم اگر هست جایِ ایموجی می‌نشیند — همان چیزی که مهمان در منویِ
+  // عمومی می‌بیند، تا رستوران‌دار پیش‌نمایشِ واقعی داشته باشد نه تقریبی.
+  const thumb = i.image_url
+    ? `<img src="${esc(i.image_url)}" alt="" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex:0 0 auto">`
+    : `<span class="top-ava">${i.emoji ? esc(i.emoji) : icon('menu',{size:16})}</span>`;
+  return `<div class="top-cust" style="cursor:default;${i.is_active?'':'opacity:.55'}">
+    ${thumb}
+    <div class="top-body">
+      <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}</div>
+      <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}${i.image_url?'':' · بدونِ عکس'}</div>
+    </div>
+    <button class="btn btn-sm btn-ghost" onclick="menuOpenForm('${esc(i.id)}')">ویرایش</button>
+    <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuDelete('${esc(i.id)}')">حذف</button>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  عکسِ آیتم — آپلودِ واقعیِ فایل، نه آدرسِ دلخواه.
+//
+//  فایل از همان خطِ لوله‌ای می‌گذرد که گالریِ رستوران دارد: تشخیصِ فرمت از
+//  رویِ بایت‌ها (نه پسوند یا content-type)، سقفِ حجم و ابعاد، و ذخیره روی
+//  فضایِ خودمان. برخلافِ گالری، عکسِ منو بی‌درنگ منتشر می‌شود چون منو مالِ
+//  خودِ رستوران است.
+// ═══════════════════════════════════════════════════════════════════════
+/** جعبه‌ی عکسِ آیتم در فرم: پیش‌نمایش (اگر هست) + انتخابِ فایل + حذف. */
+function menuPhotoBoxHTML(it){
+  const has = !!(it && it.image_url);
+  return `
+    ${has ? `<div style="margin-bottom:8px">
+      <img src="${esc(it.image_url)}" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px">
+    </div>` : `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+      این آیتم عکس ندارد. عکسِ غذا مهم‌ترین چیزی است که مهمان سرِ میز می‌بیند.
+    </div>`}
+    <input type="file" id="miPhotoFile" accept="image/jpeg,image/png,image/webp"
+           onchange="menuPickPhoto('${esc(it.id)}')" style="width:100%;font-size:13px">
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      ${has ? `<button type="button" class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuRemovePhoto('${esc(it.id)}')">حذفِ عکس</button>` : ''}
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:6px">
+      JPEG / PNG / WebP · حداکثر ۸ مگابایت · بی‌درنگ در منویِ عمومی دیده می‌شود.
+    </div>`;
+}
+
+async function menuPickPhoto(id){
+  const input = document.getElementById('miPhotoFile');
+  if(!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const box = document.getElementById('miPhotoBox');
+  if(box) box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال آپلود…</div>`;
+
+  const res = await API.menuItemPhotoUpload(id, file);
+  if(!res.ok){
+    // پیامِ سرور عیناً نشان داده می‌شود — «عکس خیلی بزرگ است» یا «فایل تصویر
+    // نیست» را خودِ سرور دقیق‌تر از ما می‌داند.
+    if(box) box.innerHTML = `<div style="color:var(--red);font-size:13px">${esc(res.offline?'اتصال به سرور برقرار نیست':(res.error?.message||'آپلود ناموفق بود'))}</div>`;
+    return;
+  }
+  toast('✓','عکس آپلود شد و همین حالا در منویِ عمومی دیده می‌شود');
+  // فهرست تازه می‌شود تا بندانگشتیِ ردیف هم به‌روز شود.
+  await rMenu();
+  menuOpenForm(id);
+}
+
+async function menuRemovePhoto(id){
+  if(!confirm('عکسِ این آیتم برداشته شود؟')) return;
+  const res = await API.menuItemPhotoDelete(id);
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message||'حذف نشد'));
+    return;
+  }
+  toast(res.data?.removed?'✓':'', res.data?.message || 'انجام شد');
+  await rMenu();
+  menuOpenForm(id);
+}
+
+function fnMoney(n){ return fa((n||0).toLocaleString('en-US')); }
+
+/** فرمِ ساخت/ویرایش. بدونِ id یعنی ساختِ آیتمِ تازه. */
+function menuOpenForm(id){
+  const it = id ? MENU_ITEMS.find(x=>x.id===id) : null;
+  openModal(`
+    <div class="modal-title">${it ? 'ویرایشِ آیتم' : 'آیتمِ جدیدِ منو'}</div>
+    <div class="field-label" style="margin-top:12px">نام</div>
+    <input class="inp" id="miName" maxlength="120" value="${it?esc(it.name):''}" placeholder="مثلاً پاستا کربونارا">
+    <div class="field-label">قیمت (تومان)</div>
+    <input class="inp" id="miPrice" type="number" min="0" value="${it?it.price_toman:''}" placeholder="۱۸۵۰۰۰">
+    <div class="field-label">دسته</div>
+    <input class="inp" id="miCat" maxlength="60" list="miCatList" value="${it&&it.category?esc(it.category):''}" placeholder="اختیاری">
+    <datalist id="miCatList">${MENU_CATEGORY_SUGGESTIONS.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+    <div class="field-label">ایموجی</div>
+    <input class="inp" id="miEmoji" maxlength="16" value="${it&&it.emoji?esc(it.emoji):''}" placeholder="اختیاری — مثلاً 🍝">
+    <div class="field-label">توضیح</div>
+    <input class="inp" id="miDesc" maxlength="300" value="${it&&it.description?esc(it.description):''}" placeholder="اختیاری — مثلاً «با سسِ قارچ و پنیرِ پارمزان»">
+    ${it ? `
+    <div class="field-label">عکسِ آیتم</div>
+    <div id="miPhotoBox">${menuPhotoBoxHTML(it)}</div>
+    ` : `
+    <div class="cash-note" style="margin-top:12px">${icon('info',{size:13})}
+      اول آیتم را ذخیره کن، بعد می‌توانی برایش عکس آپلود کنی.
+    </div>`}
+    <div class="field-label">ترتیبِ نمایش</div>
+    <input class="inp" id="miSort" type="number" min="0" value="${it&&it.sort_order!=null?it.sort_order:0}" placeholder="۰">
+    <div style="color:var(--t2);font-size:12px;margin-top:4px">
+      عددِ کوچک‌تر بالاتر نشان داده می‌شود. آیتم‌هایِ هم‌عدد بر اساسِ نام مرتب می‌شوند.
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin:12px 0">
+      <input type="checkbox" id="miActive" ${!it || it.is_active ? 'checked' : ''}>
+      <span>در منو نمایش داده شود</span>
+    </label>
+    <button class="btn btn-primary btn-block" onclick="menuSave(${id?`'${esc(id)}'`:'null'})">${it?'ذخیره':'افزودن'}</button>`);
+}
+
+async function menuSave(id){
+  const name = (document.getElementById('miName').value||'').trim();
+  const price = parseInt(document.getElementById('miPrice').value, 10);
+  if(!name){ toast('','نامِ آیتم لازم است'); return; }
+  if(!Number.isFinite(price) || price < 0){ toast('','قیمت را درست وارد کن'); return; }
+
+  const sort = parseInt(document.getElementById('miSort').value, 10);
+
+  const body = {
+    name,
+    price_toman: price,
+    category: (document.getElementById('miCat').value||'').trim() || null,
+    emoji: (document.getElementById('miEmoji').value||'').trim() || null,
+    is_active: document.getElementById('miActive').checked,
+    description: (document.getElementById('miDesc').value||'').trim() || null,
+    // image_url اینجا نیست: عکس فقط با آپلودِ فایل عوض می‌شود (menuPickPhoto).
+    sort_order: Number.isFinite(sort) && sort >= 0 ? sort : 0,
+  };
+  const res = id ? await API.menuUpdate(id, body) : await API.menuCreate(body);
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ذخیره نشد'));
+    return;
+  }
+  closeModal();
+  toast('✓', id ? 'آیتم به‌روزرسانی شد' : 'آیتم به منو اضافه شد');
+  rMenu();
+}
+
+async function menuDelete(id){
+  const it = MENU_ITEMS.find(x=>x.id===id);
+  if(!confirm(`«${it?it.name:'این آیتم'}» از منو حذف شود؟`)) return;
+  const res = await API.menuDelete(id);
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'حذف نشد'));
+    return;
+  }
+  // سرور ممکن است به‌جایِ حذف، بایگانی کرده باشد (آیتمی که در پیش‌سفارشِ
+  // ثبت‌شده به‌کار رفته حذف نمی‌شود تا سابقه‌ی مبلغ سالم بماند). پیامِ خودِ
+  // سرور نشان داده می‌شود تا رستوران‌دار دقیقاً بداند چه شد.
+  toast(res.data?.archived ? '' : '✓', res.data?.message || 'آیتم حذف شد');
+  rMenu();
+}
+
+</script>
+  <script data-src="js/assistant.js">
+// ═══════ رزرونو — پنل business: چت‌باکسِ دستیارِ هوشمندِ آفلاین ═══════
+// آزادمتن، وصل به /restaurant/assistant واقعی. بدونِ AI بیرونی — طبقه‌بندِ
+// نیت کاملاً روی سرور و آفلاین انجام می‌شود (lib/assistant-nlu.ts). این
+// فایل فقط UI است: نمایشِ حباب‌های گفتگو + چیپ‌های پیشنهاد وقتی دستیار
+// مطمئن نیست، که کلیک‌کردنشان همان حلقه‌ی خودآموزی را تغذیه می‌کند.
+// scope مشترک (بدون import، مثل بقیه‌ی فایل‌ها).
+
+let _assistantBusy = false;
+
+function assistantChatHtml(){
+  return `
+    <div class="panel" style="margin-bottom:18px">
+      <div class="panel-head">
+        <div class="panel-title">دستیارِ هوشمند</div>
+        <div class="panel-sub">آفلاین و بدونِ AIِ بیرونی — از داده‌ی واقعیِ همین رستوران جواب می‌ده و هرچی بیشتر باهاش حرف بزنی بهتر یاد می‌گیره</div>
+      </div>
+      <div id="assistantBody" class="chat-modal-body" style="height:260px;min-height:260px"></div>
+      <div class="chat-modal-input">
+        <input id="assistantInput" placeholder="مثلاً: امروز چند رزرو داریم؟" maxlength="500" autocomplete="off">
+        <button id="assistantSend" class="btn btn-primary">پرسیدن</button>
+      </div>
+    </div>`;
+}
+
+/** بعدِ اینکه custRenderAI محتوایِ تب را ساخت، این را صدا بزن تا چت را فعال کند. */
+function initAssistantChat(){
+  const body = document.getElementById('assistantBody');
+  const input = document.getElementById('assistantInput');
+  const send = document.getElementById('assistantSend');
+  if (!body || !input || !send) return;
+
+  body.innerHTML = `<div class="chat-b them">سلام! یه سؤال درباره‌ی رزروها، مشتری‌ها یا میزهاتون بپرس — مثلاً «امروز چند رزرو داریم؟» یا «کدوم روز شلوغ‌تره؟».</div>`;
+
+  send.onclick = sendAssistantMessage;
+  input.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); sendAssistantMessage(); } });
+}
+
+function assistantAppend(html){
+  const body = document.getElementById('assistantBody');
+  if (!body) return;
+  body.insertAdjacentHTML('beforeend', html);
+  body.scrollTop = body.scrollHeight;
+}
+
+async function sendAssistantMessage(){
+  if (_assistantBusy) return;
+  const input = document.getElementById('assistantInput');
+  const message = (input?.value || '').trim();
+  if (!message) return;
+  input.value = '';
+  assistantAppend(`<div class="chat-b me">${esc(message)}</div>`);
+
+  _assistantBusy = true;
+  const send = document.getElementById('assistantSend');
+  if (send) send.disabled = true;
+  const pendingId = 'ap' + Date.now();
+  assistantAppend(`<div class="chat-b them" id="${pendingId}">…</div>`);
+
+  const res = await API.assistantAsk(message);
+  document.getElementById(pendingId)?.remove();
+  _assistantBusy = false;
+  if (send) send.disabled = false;
+
+  if (!res.ok){
+    assistantAppend(`<div class="chat-b them">اتصال به سرور برقرار نشد — دوباره امتحان کن.</div>`);
+    return;
+  }
+  const d = res.data;
+  assistantAppend(`<div class="chat-b them">${esc(d.answer)}</div>`);
+  if (!d.understood && Array.isArray(d.suggestions) && d.suggestions.length){
+    const chips = d.suggestions.map(s =>
+      `<button class="btn btn-sm btn-ghost" style="margin:2px" onclick="assistantTeach('${d.log_id}','${s.intent}',this)">${esc(s.label)}</button>`
+    ).join('');
+    assistantAppend(`<div class="chat-b them" style="background:transparent;padding:2px 0">${chips}</div>`);
+  }
+}
+
+/** کلیکِ کارمند رویِ چیپِ پیشنهاد = تعلیمِ دستیار (خودآموزیِ آنلاین). */
+async function assistantTeach(logId, intent, btnEl){
+  const wrap = btnEl?.closest('.chat-b');
+  if (wrap) wrap.innerHTML = '<span style="opacity:.6">در حال یادگیری…</span>';
+  const res = await API.assistantFeedback(logId, intent);
+  if (wrap) wrap.remove();
+  if (!res.ok){ toast('', 'یادگیری انجام نشد'); return; }
+  assistantAppend(`<div class="chat-b them">${esc(res.data.answer)}</div>`);
+  toast('', 'یاد گرفتم — دفعه‌ی بعد بهتر تشخیص می‌دم');
+}
 
 </script>
 <script data-src="js/loyalty.js">
@@ -5588,12 +6512,32 @@ let COUPONS=[], AUTOMATIONS=[], _mktLoaded=false;
 const COUPON_KIND_FA={percent:'درصدی',fixed:'مبلغ ثابت',free_item:'آیتم رایگان'};
 const COUPON_SEG_FA={new_customer:'مشتری جدید',active:'فعال',at_risk:'در خطر ریزش',churned:'ازدست‌رفته',vip:'VIP'};
 const AUTOMATION_TRIGGER_FA={birthday:'تولد مشتری',winback:'بازگرداندنِ مشتریِ غایب',post_visit:'بعد از بازدید',vip_milestone:'رسیدن به سطح VIP',no_show_followup:'پیگیریِ عدم‌حضور'};
+let AUTOMATION_ATTRIBUTION=null; // {window_days, min_resolved} — از همان پاسخِ API
+
+// ⚠️ این تابع از یک باگِ زنده زاده شد (ممیزیِ ۲۰۲۶-۰۸-۲۰): اینجا قبلاً
+// `${fa(a.conversion_rate_pct||0)}٪ تبدیل` بود، و بک‌اند آن عدد را از
+// marketing_automations.converted_count می‌ساخت — ستونی که در کلِ ریپو هیچ‌جا
+// افزایش نمی‌یافت. یعنی رستوران‌دار همیشه «۱۲۰ ارسال · ۰٪ تبدیل» می‌دید و
+// نتیجه می‌گرفت کمپین‌هایش بی‌اثرند، در حالی که عدد اصلاً اندازه‌گیری نشده بود.
+//
+// حالا بک‌اند وقتی شواهد کافی نیست null می‌فرستد، نه صفر. `||0` اینجا همان
+// null را دوباره به «۰٪» تبدیل می‌کرد، پس عمداً حذف شد: «هنوز کافی نیست»
+// باید نوشته شود، نه به عددی که ادعای اندازه‌گیری دارد ترجمه شود.
+function automationConversionFa(a){
+  if(a.conversion_status==='measured' && a.conversion_rate_pct!==null && a.conversion_rate_pct!==undefined){
+    return `${fa(a.conversion_rate_pct)}٪ تبدیل (از ${fa(a.resolved_count||0)} موردِ قطعی‌شده)`;
+  }
+  const need=AUTOMATION_ATTRIBUTION&&AUTOMATION_ATTRIBUTION.min_resolved;
+  const have=a.resolved_count||0;
+  return need?`نرخِ تبدیل هنوز اندازه‌پذیر نیست (${fa(have)} از ${fa(need)})`
+             :'نرخِ تبدیل هنوز اندازه‌پذیر نیست';
+}
 
 async function loadMarketing(){
   if(!API.getToken()) return;
   const [c,a]=await Promise.all([API.couponsList(),API.automationsList()]);
   if(c.ok) COUPONS=c.data?.items||[];
-  if(a.ok) AUTOMATIONS=a.data?.items||[];
+  if(a.ok){ AUTOMATIONS=a.data?.items||[]; AUTOMATION_ATTRIBUTION=a.data?.attribution||null; }
   _mktLoaded=true;
 }
 function rMarketing(){
@@ -5683,7 +6627,7 @@ function renderAutomations(){
         <div class="staff-row">
           <div style="flex:1">
             <div style="font-size:14px;font-weight:700">${esc(a.name)}</div>
-            <div style="font-size:12px;color:var(--t2)">${AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger} · ${fa(a.sent_count||0)} ارسال · ${fa(a.conversion_rate_pct||0)}٪ تبدیل</div>
+            <div style="font-size:12px;color:var(--t2)">${AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger} · ${fa(a.sent_count||0)} ارسال · ${automationConversionFa(a)}</div>
           </div>
           <span class="chip-status ${a.is_active?'arrived':''}" style="${a.is_active?'':'background:var(--s-100);color:var(--t3)'}">${a.is_active?'فعال':'غیرفعال'}</span>
         </div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:30px">هنوز قانونی ساخته نشده</div>'}
@@ -5998,7 +6942,7 @@ function openPermEditor(staffId){
     <div class="modal-sub">مشخص کن به کدام بخش‌ها دسترسی داشته باشد</div>
     <div style="margin-top:14px;max-height:340px;overflow-y:auto">
       ${PERM_DEFS.map(([k,label])=>`
-        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line);cursor:pointer">
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--border);cursor:pointer">
           <span style="font-size:13px">${label}</span>
           <input type="checkbox" data-perm="${k}" ${p[k]?'checked':''} style="width:18px;height:18px;accent-color:var(--blue)">
         </label>`).join('')}
@@ -6220,7 +7164,7 @@ async function rPricing(){
     return `<div class="pr-sug">${tag}
       <div class="pr-sug-top"><div><div class="pr-sug-label">${esc(s.label)}</div><div class="pr-sug-days">${daysTxt}</div></div>
         <div class="pr-sug-amt"><div class="pr-sug-amt-v">${toman(s.min_toman)}</div><div class="pr-sug-amt-l">حداقل مبلغ ${dir}</div></div></div>
-      <div class="pr-occ"><span style="font-size:11px;color:var(--t3);font-weight:700">اشغال</span><div class="pr-occ-track"><div class="pr-occ-fill" style="width:${s.occupancy_pct}%;background:${occColor(s.occupancy_pct)}"></div></div><span class="pr-occ-pct">${fa(s.occupancy_pct)}٪</span></div>
+      <div class="pr-occ"><span style="font-size:11px;color:var(--t3);font-weight:700;white-space:nowrap" title="میانگینِ رزروِ این بازه نسبت به شلوغ‌ترین ساعتِ رستوران — نه درصدِ اشغالِ ظرفیت">شلوغیِ نسبی</span><div class="pr-occ-track"><div class="pr-occ-fill" style="width:${s.occupancy_pct}%;background:${occColor(s.occupancy_pct)}"></div></div><span class="pr-occ-pct">${fa(s.occupancy_pct)}٪</span></div>
       <div class="pr-reason">${icon('message',{size:13})} ${esc(s.reason)}</div>
       <div class="pr-actions"><button class="btn btn-primary" style="flex:1" id="prAcc-${i}" onclick="pricingAccept(${i})">${icon('check',{size:14})} قبول این پیشنهاد</button></div>
     </div>`;
@@ -6228,7 +7172,18 @@ async function rPricing(){
   document.getElementById('v-pricing').innerHTML=`
     <div class="section-head"><div><div class="section-title">قیمت‌گذاری هوشمند</div><div class="section-sub">پیشنهادِ حداقل مبلغِ رزرو بر اساس شلوغیِ واقعیِ رستورانت</div></div></div>
     ${dataSourceNote()}
-    <div class="pr-banner"><h3>${icon('sparkle',{size:16,fill:true})} پیشنهاد بر اساس داده‌ی شما</h3><p>${P.hasData?'این پیشنهادها از الگوی شلوغیِ ۹۰ روز اخیرِ خودت ساخته شدن — نه حدس.':'هنوز داده‌ی کافی نداری؛ این‌ها پیشنهادِ اولیه‌ست. با ثبت رزروها دقیق‌تر می‌شن.'} هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.</p></div>
+    <div class="pr-banner"><h3>${icon('sparkle',{size:16,fill:true})} پیشنهاد بر اساس داده‌ی شما</h3><p>${
+      // ⚠️ سه حالتِ جدا (۲۰۲۶-۰۸-۲۰): قبلاً فقط دو حالت بود و شرطش `P.hasData`
+      // بود، یعنی رستورانی با چند رزروِ معدود جمله‌ی «این پیشنهادها از الگویِ
+      // خودت ساخته شدن» را می‌دید در حالی که بک‌اند (زیرِ MIN_OBSERVATIONS)
+      // اصلاً پیشنهادی نساخته بود — و دنباله‌ی «هر کدوم رو می‌تونی قبول کنی»
+      // به چیزی اشاره می‌کرد که وجود نداشت.
+      !P.suggestions.length
+        ? 'هنوز داده‌ی کافی برای الگوگیری نیست. با ثبتِ رزروِ بیشتر، پیشنهادها از شلوغیِ واقعیِ خودت ساخته می‌شن.'
+        : (P.hasData
+            ? 'این پیشنهادها از الگوی شلوغیِ ۹۰ روز اخیرِ خودت ساخته شدن — نه حدس. هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.'
+            : 'این‌ها پیشنهادِ نمونه‌ست (بک‌اند متصل نیست). هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.')
+    }</p></div>
     <div id="prSugs">${(P.suggestions.length?P.suggestions:[]).map(sugCard).join('')||'<div class="pr-empty">فعلاً پیشنهادی نیست. با ثبت رزروِ بیشتر، سیستم الگوها رو پیدا می‌کنه.</div>'}</div>
     ${P.rules.length?`<div class="pr-active"><div class="pr-active-h">${icon('check',{size:13})} قواعدِ فعالِ فعلی</div>${P.rules.map(r=>`<div class="pr-active-row"><span>${esc(r.label||((r.dows||[]).map(d=>dowLbl[d]).join('،')))}</span><b>${toman(r.min_toman)} تومان</b></div>`).join('')}</div>`:''}
     <div class="pr-note">${icon('info',{size:13})} رقبا مثل SevenRooms این رو «قیمت‌گذاری پویا» می‌گن و بابتش پول می‌گیرن. با یه نگاه می‌بینی کجا پول از دست می‌دی (میز خالی) و کجا می‌تونی بیشتر دربیاری (شب شلوغ).</div>`;

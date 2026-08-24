@@ -32,7 +32,7 @@
 | `TABLE_CONFLICT` / `SLOT_FULL` | 409 | Slot/table already taken. |
 | `CONCURRENCY_RETRY` | 409 | Serialization retry exhausted; retry request. |
 | `RESERVATION_EXPIRED` | 410 | Hold expired. |
-| `SLOT_LOCK_TIMEOUT` | 423 | Slot being booked by someone else. |
+| `SLOT_LOCK_TIMEOUT` | 423 | Slot genuinely contended — another request holds the lock and the slot is **not** provably full, so retrying can still succeed. Since 2026-08-19 the engine re-checks real occupancy before returning this: if every candidate table has meanwhile been taken it returns `SLOT_FULL`/`TABLE_CONFLICT` (409) instead, so a 423 is never a dead-end "try again". |
 | `RESTAURANT_CLOSED` / `RESTAURANT_OFFLINE` / `OUTSIDE_HOURS` / `PAST_TIME` / `TOO_FAR_AHEAD` / `PARTY_TOO_LARGE` / `NO_TABLE_FOR_PARTY` / `TABLE_TOO_SMALL` / `INVALID_STATUS_TRANSITION` | 422/404/409 | Reservation-engine domain errors. |
 | `RATE_LIMITED` | 429 | Per-route rate limit; `details.retryAfterSec`. |
 | `INTERNAL` | 500 | Unexpected error (details never leaked). |
@@ -186,34 +186,61 @@ shown where relevant. Owners/managers bypass permission checks.
 
 | Route | Method(s) | Permission | Purpose |
 |---|---|---|---|
-| `/reservations` | GET | canManageReservations* | List reservations (dashboard). |
+| `/reservations` | GET | — | List reservations (dashboard). |
 | `/reservations/[code]/status` | PATCH | canManageReservations | Change reservation status (lifecycle). |
+| `/reservations/[code]/events` | GET | — | Reservation event timeline. |
+| `/walkin` | POST | canManageReservations | Seat a walk-in. |
 | `/tables` | GET, POST | canManageTables | List / create tables. |
 | `/tables/[id]` | PATCH, DELETE | canManageTables | Update / delete table. |
 | `/tables/[id]/state` | PATCH | canManageTables | Real-time table state. |
 | `/waitlist` | GET, POST | canManageWaitlist | Manage waitlist. |
-| `/walkin` | POST | canManageReservations | Seat a walk-in. |
-| `/hours` | GET, PUT | canManageSettings | Opening hours + closures. |
-| `/pricing` | GET, PUT | canManageSettings | AI min-spend pricing rules. |
+| `/waitlist/analytics` | GET | canViewAnalytics | Waitlist stats. |
+| `/hours` | GET, PUT | canManageSettings | Opening hours + closures (approval flow). |
+| `/profile` | GET, PUT | canManageSettings | Restaurant profile. |
+| `/pricing` | GET, PUT | canManageSettings | AI min-spend pricing rules. GET returns `suggestions[]` derived from the last 90 days of the restaurant's own reservations; it is **empty** below `MIN_OBSERVATIONS` (20) rather than guessing. `occupancy_pct` is relative busyness (window average ÷ busiest hour), **not** capacity occupancy — see `KNOWN_LIMITATIONS.md` §2h. |
 | `/cashback` | GET, PATCH | canManageSettings | Cashback percentages. |
+| `/cancellation-policy` | GET, PUT | canManageSettings | Cancellation/no-show policy. |
 | `/heartbeat` | POST | — | Online presence (`lastSeenAt`). |
-| `/analytics` · `/reports` · `/ai` | GET | canViewAnalytics | Analytics / reports / AI insights. |
-| `/rfm` · `/customers` · `/customers/[userId]` · `/fraud-signals` | GET | canViewAnalytics | CRM / RFM / fraud. |
+| `/analytics` · `/ai` | GET | canViewAnalytics | Analytics / rule-based AI insight cards. |
+| `/manager-insights` | GET | canViewAnalytics | Daily performance digest (no LLM). |
+| `/notifications` | GET | canViewAnalytics | Panel notifications. |
+| `/reports` · `/fraud-signals` | GET | canViewRevenue | Revenue reports / fraud signals. |
+| `/rfm` · `/customers` | GET | canViewAnalytics | CRM / RFM. |
+| `/customers/[userId]` | GET, PATCH | canViewAnalytics | Customer 360 + edit. |
+| `/crm/recommendations` | GET | canViewAnalytics | Who to contact, why, on which channel — plus **measured effectiveness** and a recontact cooldown. |
+| `/crm/recommendations/contacted` | POST | canViewAnalytics | Record that a recommended customer was called. Body `{user_id}`. Writes to `outreach_log`; suppresses that customer for `cooldown_days`. |
 | `/campaigns` | GET | canManageCampaigns | Campaign history. |
-| `/sms` | POST | canManageCampaigns | Send SMS campaign. |
-| `/automations` | GET, POST | canManageCampaigns | Marketing automations. |
+| `/sms` | POST | canManageCampaigns | Send SMS campaign (records recipients in `outreach_log`). |
+| `/automations` | GET, POST | canManageCampaigns | Marketing automations. GET returns `conversion_rate_pct` (**nullable**) + `conversion_status`. |
 | `/coupons` | GET, POST | canManageCoupons | Coupons. |
-| `/members` | GET | canViewAnalytics* | Club members. |
-| `/reviews` | GET, PATCH | — | Reviews + replies. |
-| `/photos` | GET, POST, DELETE | canManageSettings* | Photo gallery. **POST is `multipart/form-data`** (field `file`), not JSON. Uploads land as `pending` and are invisible publicly until the company panel approves them. See below. |
+| `/members` | GET | canViewAnalytics | Club members. |
+| `/reviews` | GET, PATCH | canManageSettings | Reviews + replies. |
+| `/menu` | GET, POST | canManageSettings | Menu items. |
+| `/menu/[id]` | PATCH, DELETE | canManageSettings | Update / delete item. |
+| `/menu/[id]/photo` | POST, DELETE | canManageSettings | Item photo (`multipart/form-data`). |
+| `/menu/branding` · `/menu/qr` | GET, PATCH / GET | canManageSettings | Public-menu branding + QR. |
+| `/photos` | GET, POST, DELETE | canManageSettings | Photo gallery. **POST is `multipart/form-data`** (field `file`), not JSON. Uploads land as `pending` and are invisible publicly until the company panel approves them. See below. |
 | `/notes` | GET, POST, PATCH, DELETE | — | Internal staff notes. |
-| `/events` | GET, POST, PATCH, DELETE | — | Special events. |
-| `/branches` | GET, POST | canManageSettings* | Multi-branch management. |
-| `/chats` · `/chats/[id]` | GET, POST | — | Restaurant-side chat. |
+| `/events` | GET, POST, PATCH, DELETE | canManageSettings | Special events. |
+| `/branches` | GET, POST | canManageSettings | Multi-branch management. |
+| `/chats` | GET | — | Chat threads. |
+| `/chats/[id]` | GET, POST | canManageReservations | Restaurant-side chat. |
+| `/assistant` | GET, POST | canViewAnalytics | Offline free-text assistant (rule/NLU based, no LLM). |
+| `/assistant/feedback` | POST | canViewAnalytics | Assistant answer feedback. |
 | `/staff` | GET, POST, PATCH | `withStaffAuth` (owner/manager) | Staff management (tenant-level). See below. |
 
-\* permission mapping is **(uncertain)** for a few routes — confirm in the route
-file; the table reflects the most likely key based on the resource.
+> ⚠️ **Rewritten 2026-08-20 from the routes themselves, not from memory.** The previous
+> table was ~13 routes short (`crm/*`, `menu/*`, `assistant/*`, `manager-insights`,
+> `profile`, `cancellation-policy`, `notifications`, `waitlist/analytics`,
+> `reservations/[code]/events`) and carried a `*` disclaimer that several permission
+> mappings were **guesses**. Every row above was read out of the corresponding
+> `route.ts` (`permission:` argument to `withRestaurantAuth`), so the guesses are gone.
+> A `—` means the route has no `permission:` key — it relies on restaurant auth alone.
+>
+> Regenerate this table after adding routes:
+> ```bash
+> cd api/src/app/api/v1/restaurant && find . -name route.ts | sed 's|^\./||; s|/route.ts||' | sort
+> ```
 
 ### `/v1/restaurant/staff` — staff management (auth: `withStaffAuth`, owner/manager only)
 
@@ -314,7 +341,7 @@ the migration backfills them so no live gallery went dark on deploy.
 | Route | Method | Auth | Purpose |
 |---|---|---|---|
 | `/v1/reservations/[code]/pay` | POST | customer | Create a Zarinpal payment; returns gateway URL. |
-| `/v1/payments/callback` | GET | public | Zarinpal return URL. Validates `authority` + `code` + amount, verifies with Zarinpal, updates `payment` + `reservation.depositStatus`, redirects to `${CUSTOMER_APP_URL}/reservations/{code}?payment=paid|failed`. |
+| `/v1/payments/callback` | GET | public | Zarinpal return URL. Validates `authority` + `code` + amount, verifies with Zarinpal, updates `payment` + `reservation.depositStatus`, redirects to `${appBase()}/reservations/{code}?payment=paid|failed` (`NEXT_PUBLIC_APP_URL`, same variable the check-in QR uses). |
 
 The callback is intentionally **unauthenticated** (the browser returns from the
 gateway without the API token); security comes from matching

@@ -5,6 +5,16 @@
 
 > ⚠️ نکته‌ی حیاتی برای تیمِ تست: **DB زنده جلوتر از این ریپوـه.** جزئیات در بخش ۹/۱۰.
 
+> 🔴 **اصلاحِ ۲۰۲۶-۰۸-۲۲ — ادعایِ «پرداخت: کد کامل، فقط merchant_id لازم است» غلط است.**
+> این سند (و ردیفِ پرداخت در جدولِ زیر، و بندهای ۱۰۲/۱۴۵/۱۸۵/۱۸۹) فرض می‌کنند
+> با واردکردنِ merchant_id مسیرِ پرداخت کار می‌کند. ممیزیِ ۲۰۲۶-۰۸-۲۲ نشان داد
+> **کارِ نمی‌کند و ربطی هم به merchant_id ندارد**: دو دروازه‌ی بالادستی
+> (`Restaurant.paymentEnabled` و `Reservation.depositRequested`) در کلِ کدبیس
+> **هیچ نویسنده‌ای ندارند**، پس `POST /reservations/:code/pay` برایِ هر رزروی
+> که تا امروز ساخته شده ۴۲۲ می‌دهد. شرحِ کامل با شواهد:
+> `docs/KNOWN_LIMITATIONS.md` §۲u. ردیف‌های زیر عکسِ‌لحظه‌ی ۲۰۲۶-۰۷-۱۹ هستند،
+> نه وضعیتِ فعلی.
+
 ---
 
 ## ۱. فیچرهای پیاده‌سازی‌شده
@@ -14,7 +24,7 @@
 | احراز هویت مشتری/staff (OTP پیامکی) | ✅ کامل | بدون پسورد/ایمیل؛ JWT access+refresh با rotation |
 | موتور رزرو (ساخت/لغو/رسید/چرخه‌ی حیات) | ✅ کامل | state machine در `lib/lifecycle.ts`، تایم‌زون per-restaurant |
 | چندشعبه‌ای (Multi-branch) | ✅ کامل (امروز وصل شد) | `staff.restaurant_id` + هدر `X-Restaurant-Id` + `/restaurant/branches` |
-| پرداخت آنلاین (Zarinpal، بیعانه) | ⚠️ کد کامل، پیکربندی ناقص | نیاز به merchant_id واقعی از `/admin/settings` |
+| پرداخت آنلاین (Zarinpal، بیعانه) | 🔴 **کد کامل ولی از جریان قطع** (اصلاحِ ۲۰۲۶-۰۸-۲۲) | merchant_id مشکلِ اصلی نیست؛ `paymentEnabled` و `depositRequested` هیچ نویسنده‌ای ندارند → `/pay` همیشه ۴۲۲. رجوع: `KNOWN_LIMITATIONS.md` §۲u |
 | لیست انتظار (Waitlist) با اولویتِ VIP | ✅ کامل | |
 | باشگاه مشتریان (امتیاز/دعوت/کارت هدیه) | ✅ کامل | |
 | کوپن، اتوماسیونِ مارکتینگ، کمپین SMS | ✅ کامل | |
@@ -84,7 +94,7 @@
 | اپ | صفحات (screen/view) | فایل‌های JS کلیدی |
 |---|---|---|
 | **customer** (`apps/customer`) | discover، rest (جزئیات رستوران)، favorites، loyalty، trips، profile | `main.js`, `reservation.js`, `store.js`, `features/{food-dna,loyalty,rewards,trips}.js` |
-| **business** (`apps/business`) | overview، reservations، floor (میزها)، waitlist، customers، loyalty، cashback، pricing، analytics، staff، profile | `overview.js`, `reservations.js`, `crm.js`, `marketing.js`, `staff-system.js`, `waitlist.js`, `routing.js` + `src-v2/RestaurantIntelligenceDashboard.jsx` (در حالِ مهاجرت به React) |
+| **business** (`apps/business`) | overview، reservations، floor (میزها)، waitlist، customers، loyalty، cashback، pricing، analytics، staff، profile | `overview.js`, `reservations.js`, `crm.js`, `marketing.js`, `staff-system.js`, `waitlist.js`, `routing.js` |
 | **company** (`apps/company`) | overview، restaurants، detail (جزئیاتِ یک رستوران)، customers، analytics، billing، security، system-health، support | `overview.js`, `restaurant.js`, `intelligence.js`, `api.js` |
 
 ⚠️ **نکته‌ی مهم:** هیچ‌کدام از سه اپ هنوز از endpointهای امروز (`/restaurant/branches`, `/reservations/:code/pay`, `/admin/settings`) استفاده نمی‌کنند — UI برای این فیچرها ساخته نشده.
@@ -142,7 +152,7 @@
 
 | مورد | وضعیت |
 |---|---|
-| **Zarinpal** | کدِ کامل، نیازِ merchant_id واقعی از `/admin/settings` |
+| **Zarinpal** | 🔴 اصلاحِ ۲۰۲۶-۰۸-۲۲: merchant_id تنها چیزِ لازم نیست — کلِ زنجیره از بالادست قطع است (فهرستِ ۶ پیش‌نیازِ وصل‌کردن در `KNOWN_LIMITATIONS.md` §۲u) |
 | **Kavenegar SMS** | fetch واقعی پیاده‌سازی شده، نیازِ `KAVENEGAR_API_KEY` واقعی + ثبتِ قالب‌های پیامکی در پنلِ کاوه‌نگار |
 | **ایمیل** | عمداً پیاده‌سازی نشده (auth فقط پیامکی، بدونِ ایمیل) |
 | **تستِ خودکار end-to-end / E2E (Playwright)** | اسکریپت `test:e2e` هست، هیچ تستی نوشته نشده |
@@ -169,7 +179,7 @@
 | `GRAFANA_PASSWORD` | ✅ (اگر observability) | پیش‌فرض `admin` عوض شود |
 | `LOG_LEVEL` | اختیاری | |
 | **`ZARINPAL_MERCHANT_ID`, `ZARINPAL_SANDBOX`** 🆕 | fallback | مقدارِ اصلی از `platform_settings` (پنل ادمین) خوانده می‌شود |
-| **`CUSTOMER_APP_URL`** 🆕 | ✅ (اگر پرداخت فعال) | مقصدِ ریدایرکتِ بعدِ بازگشت از درگاه |
+| **`NEXT_PUBLIC_APP_URL`** (جایگزینِ `CUSTOMER_APP_URL` از ۲۰۲۶-۰۸-۲۲) | ✅ (اگر پرداخت فعال) | مقصدِ ریدایرکتِ بعدِ بازگشت از درگاه — همان متغیرِ QRِ چک-اینِ میز |
 | `ALLOWED_ORIGINS` | ✅ در production | CORS + چکِ CSRF؛ خالی = بلاکِ کامل cross-origin |
 
 ---

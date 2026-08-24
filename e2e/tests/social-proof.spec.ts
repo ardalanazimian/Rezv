@@ -89,3 +89,18 @@ test('«نزدیک تو» بدونِ اجازه‌ی موقعیت، فاصله �
   await expect(nearby).not.toContainText('متر');
   await expect(page.locator('#nearbyTitle')).toHaveText('پیشنهاد برای تو');
 });
+
+test('وقتی سرور رویدادی ندارد، رویدادِ نمونه جا نمی‌زند', async ({ page }) => {
+  // ریشه‌ی باگ (ممیزیِ زنده‌ی اپِ مشتری، ۲۰۲۶-۰۸-۱۹): renderEvents وقتی لیستِ
+  // سرور خالی بود به SAMPLE_EVENTS برمی‌گشت. جدولِ special_events در هر
+  // استقرارِ تازه خالی است، پس در عمل *همه‌ی* کاربرانِ واقعی سه رویدادِ
+  // ساختگی می‌دیدند («شب موسیقی جاز زنده» و…) با نامِ رستوران‌های واقعیِ
+  // فهرست. حالا فقط در حالتِ آفلاین نمونه نشان داده می‌شود.
+  await mockApi(page);              // /events → { events: [] }
+  await gotoApp(page);
+
+  const events = page.locator('#eventsList');
+  await expect(events).toContainText('فعلاً رویدادِ ویژه‌ای نیست');
+  await expect(events.locator('.event-card')).toHaveCount(0);
+  await expect(events).not.toContainText('شب موسیقی جاز زنده');
+});

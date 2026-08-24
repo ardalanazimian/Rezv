@@ -495,6 +495,26 @@ const RFM_META={
   lost:{fa:'از دست‌رفته',c:'#6B7280',d:'احتمالاً رفته'},
   unknown:{fa:'نامشخص',c:'#CBD5E1',d:''},
 };
+/**
+ * آیا برایِ این مشتری اصلاً دادهٔ مبلغی وجود دارد؟
+ *
+ * ⚠️ افزوده در ممیزیِ ۲۰۲۶-۰۸-۱۹. رزرونو عمداً POS-agnostic است و هرگز مبلغِ
+ * فاکتور را نمی‌بیند؛ تنها منبعِ مبلغ، `reservation_items` (پیش‌سفارش از منو)
+ * است — دقیقاً همان چیزی که کامنتِ خودِ schema رویِ `total_spend_toman`
+ * می‌گوید: «جمعِ پیش‌سفارش‌ها». چون این ستون‌ها در دیتابیس `Int @default(0)`
+ * (غیرِ nullable) هستند، «دادهٔ نداریم» و «خرجش صفر بود» هردو صفر ذخیره
+ * می‌شوند و از هم قابلِ تفکیک نیستند. نمایشِ خامِ آن صفر به رستوران‌دار یعنی
+ * ادعایِ اندازه‌گیری‌شده‌ای که هرگز اندازه‌گیری نشده. اینجا صفر را «بدونِ داده»
+ * می‌خوانیم و خانه را خالی نشان می‌دهیم، نه «۰ تومان».
+ */
+function clvHasSpend(clv){
+  // دقیقاً null/undefined را چک می‌کنیم، نه falsy: بعد از migration ۰۴۶ عددِ ۰
+  // یک واقعیتِ تأییدشده است («منو داشت، پیش‌سفارش نداد») و باید «۰» نشان داده
+  // شود؛ فقط null یعنی «نمی‌دانیم» و باید «—» شود. اگر اینجا `!value` بنویسیم،
+  // همان دو حالتی که در دیتابیس تفکیک کردیم دوباره در UI یکی می‌شوند.
+  return !!clv && clv.total_spend_toman != null;
+}
+
 // رندر دمو داشبورد هوش مشتری (از GUESTS نمونه) — برای دمو و آفلاین
 function custRenderOverviewDemo(el){
   const total=GUESTS.length*32+1216; // عدد نمونه‌ی واقع‌گرایانه
@@ -556,7 +576,23 @@ async function custRenderOverview(){
   // حالت دمو/آفلاین: با داده‌ی نمونه رندر کن تا فیچر همیشه قابل‌نمایش باشد (برای دمو به رستوران‌دار)
   if(!API.getToken()){ return custRenderOverviewDemo(el); }
   const [rfmRes,aiRes,vipRes]=await Promise.all([API.rfm(),API.aiRecommendations(),API.customers('segment=vip&limit=50')]);
-  if(!rfmRes.ok){ return custRenderOverviewDemo(el); }
+  // ⚠️ رفعِ باگِ صداقت (ممیزیِ ۲۰۲۶-۰۸-۱۹): قبلاً اینجا هم `custRenderOverviewDemo`
+  // صدا زده می‌شد. یعنی رستوران‌دارِ **واردشده** که فقط APIاش خطا داده بود
+  // (۵۰۰، قطعیِ شبکه، rate-limit) اعدادِ ساخته‌شده‌ی دمو را به‌جایِ دادهٔ خودش
+  // می‌دید — با برچسبِ «[نمونه]» ولی بدونِ هیچ نشانه‌ای که «بارگیری شکست خورد».
+  // دمو فقط برایِ حالتِ بدونِ توکن مجاز است؛ خطای واقعی باید دیده شود، نه پنهان.
+  if(!rfmRes.ok){
+    const msg = rfmRes.offline
+      ? 'اتصال به سرور برقرار نیست.'
+      : (rfmRes.error?.message || 'بارگیریِ هوشِ مشتری ناموفق بود.');
+    el.innerHTML=`<div class="panel" style="text-align:center;padding:40px">
+      <div style="margin-bottom:8px">${icon('alert',{size:28})}</div>
+      <div style="font-weight:700;margin-bottom:6px">دادهٔ هوشِ مشتری بارگیری نشد</div>
+      <div style="color:var(--t2);font-size:13px;margin-bottom:16px">${esc(msg)}</div>
+      <button class="btn btn-primary" onclick="custRenderOverview()">تلاش دوباره</button>
+    </div>`;
+    return;
+  }
   const total=rfmRes.data.total||0;
   const segs=(rfmRes.data.segments||[]).slice().sort((a,b)=>b.count-a.count);
   const vipCount=vipRes.ok?(vipRes.data.items?.length||0):0;
@@ -645,7 +681,7 @@ async function custRenderProfiles(){
       return `<div class="smart-card ${urg}">
         <div class="smart-top">
           <div class="smart-ava">${c.is_vip?icon('crown',{size:18,fill:true}):icon('user',{size:18})}</div>
-          <div style="flex:1"><div class="smart-name">${esc(c.name)}</div><div style="font-size:12px;color:var(--t2)">${esc(SEG_FA[c.segment]||c.segment||'')} · ${fa(c.total_visits)} بازدید · ${fnl(c.predicted_clv_toman)} تومان CLV</div></div>
+          <div style="flex:1"><div class="smart-name">${esc(c.name)}</div><div style="font-size:12px;color:var(--t2)">${esc(SEG_FA[c.segment]||c.segment||'')} · ${fa(c.total_visits)} بازدید${c.predicted_clv_toman!=null?` · ${fnl(c.predicted_clv_toman)} تومان CLV`:''}</div></div>
           <span style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:50px;background:${urg==='high'?'var(--red-50)':urg==='med'?'var(--amber-50)':'var(--green-50)'};color:${urgClr[urg]}">${urg==='high'?'پرریسک':urg==='med'?'بررسی کن':'پایدار'}</span>
         </div>
         ${c.intelligence_score!=null?`<div style="display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:11.5px;color:var(--t2)">${icon('sparkle',{size:12,fill:true})} امتیازِ هوشِ مشتری: <b style="color:${iqClr[c.intelligence_tier]||'var(--t2)'}">${fa(c.intelligence_score)}</b> · ${iqFa[c.intelligence_tier]||''}</div>`:''}
@@ -662,6 +698,21 @@ async function custRenderProfiles(){
     }).join(''):'<div style="text-align:center;color:var(--t2);padding:40px">هنوز مشتری تحلیل‌شده‌ای نیست</div>'}`;
 }
 function callCustomer(phone){ if(phone) window.location.href='tel:'+phone; }
+
+// ⚠️ فازِ ۸ — نیمه‌ی گم‌شده‌ی حلقه‌ی بازخوردِ CRM: تا امروز این دکمه فقط `tel:`
+// را باز می‌کرد و هیچ ردی نمی‌گذاشت، پس هیچ‌وقت نمی‌شد فهمید توصیه‌های CRM
+// اثری داشته‌اند یا نه. حالا تماس در دفترِ ارتباط‌گیری ثبت می‌شود.
+//
+// ⚠️ ترتیب عمدی است: اول ثبت (await)، بعد `tel:`. برعکسش روی موبایل یعنی
+// مرورگر بلافاصله به اپِ تلفن سوییچ می‌کند و fetchِ نیمه‌کاره لغو می‌شود —
+// یعنی تماس‌های واقعی بی‌صدا ثبت نمی‌شدند. شکستِ ثبت هرگز جلوی خودِ تماس را
+// نمی‌گیرد: تماس گرفتن مهم‌تر از آمارش است.
+async function callRecommendedCustomer(phone,userId){
+  if(userId && API.getToken()){
+    try{ await API.crmRecommendationContacted(userId); }catch(_e){}
+  }
+  callCustomer(phone);
+}
 
 // ─── تب ساعات کاری + تعطیلات (وصل به GET/PUT /restaurant/hours واقعی) ───
 // کلید هر روز مطابق قرارداد بک‌اند: getDay() جاوااسکریپت (۰=یکشنبه ... ۶=شنبه).
@@ -907,9 +958,10 @@ async function openCustomerDetail(userId){
     <div class="modal-sub">${esc(SEG_FA[d.segment]||d.segment||'')}${u.phone?' · '+esc(u.phone):''}</div>
     <div class="sig-row" style="margin-top:14px">
       <div class="sig"><div class="sig-val">${fa(clv.total_visits||0)}</div><div class="sig-label">بازدید</div></div>
-      <div class="sig"><div class="sig-val">${fnl(clv.total_spend_toman)}</div><div class="sig-label">کل خرج (ت)</div></div>
-      <div class="sig"><div class="sig-val">${fnl(clv.predicted_clv_toman)}</div><div class="sig-label">CLV (ت)</div></div>
+      <div class="sig"><div class="sig-val">${clvHasSpend(clv)?fnl(clv.total_spend_toman):'—'}</div><div class="sig-label">پیش‌سفارش (ت)</div></div>
+      <div class="sig"><div class="sig-val">${clvHasSpend(clv)?fnl(clv.predicted_clv_toman):'—'}</div><div class="sig-label">CLV (ت)</div></div>
     </div>
+    ${clvHasSpend(clv)?'':`<div style="margin-top:8px;font-size:11.5px;color:var(--t2);line-height:1.7">${icon('info',{size:12})} مبلغ برایِ این مشتری <b>اندازه‌گیری‌ناپذیر</b> است، پس CLV محاسبه نمی‌شود. رزرونو به صندوق وصل نیست و مبلغِ فاکتور را نمی‌بیند؛ تنها منبعِ مبلغ، <b>پیش‌سفارش از منو</b> است و این رستوران هنوز منویِ قیمت‌داری ثبت نکرده. «—» یعنی نامعلوم؛ اگر منو داشته باشید و مهمان چیزی پیش‌سفارش ندهد، به‌جایش «۰» می‌بینید که یک واقعیتِ تأییدشده است.</div>`}
     <div class="sig-row" style="margin-top:10px">
       <div class="sig"><div class="sig-val" style="color:var(--red)">${fa(risk.churn_risk_score||0)}٪</div><div class="sig-label">ریسک ریزش</div></div>
       <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(risk.no_show_rate_pct||0)}٪</div><div class="sig-label">عدم‌حضور</div></div>
@@ -918,7 +970,7 @@ async function openCustomerDetail(userId){
     <div class="field-label" style="margin-top:18px">تاریخچه‌ی رزروها</div>
     <div style="max-height:240px;overflow-y:auto;margin-top:8px">
       ${tl.length?tl.map(r=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
           <div>
             <div style="font-weight:700;font-size:13px">${esc(ST_FA[r.status]||r.status)} · ${fa(r.party_size)} نفر</div>
             <div style="font-size:11px;color:var(--t2)">${dt(r.slot_start)}${r.items&&r.items.length?' · '+esc(r.items.join('، ')):''}</div>
@@ -976,17 +1028,45 @@ async function loadCampaignHistory(){
   </tbody></table>`:'<div style="padding:8px">هنوز کمپینی ارسال نشده</div>';
 }
 
-// ─── تب ۴: دستیار AI (واقعی — کارت‌های پیشنهاد قانون‌محور از /restaurant/ai، نه چت ساختگی) ───
+// ⚠️ فازِ ۸ — چیزی که این خط جایگزینش شد یک توضیحِ ثابت بود
+// («توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری»). حالا به‌جای توصیفِ
+// خودش، *نتیجه‌ی سنجیده‌شده‌اش* را می‌گوید — یا صریحاً می‌گوید هنوز سنجیدنی
+// نیست. هرگز عددی که اندازه نگرفته‌ایم نشان نمی‌دهد (بندِ ۲۰).
+function crmEffectivenessFa(e){
+  const base='توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری';
+  if(!e) return base;
+  if(e.conversion_status==='measured' && e.conversion_rate_pct!==null && e.conversion_rate_pct!==undefined){
+    return `${base} · ${fa(e.conversion_rate_pct)}٪ از تماس‌ها به رزرو رسید (از ${fa(e.resolved_count)} موردِ قطعی‌شده، پنجره‌ی ${fa(e.window_days)} روزه)`;
+  }
+  if(e.contacted_count>0){
+    return `${base} · ${fa(e.contacted_count)} تماس ثبت شده — نرخِ تبدیل هنوز اندازه‌پذیر نیست (${fa(e.resolved_count)} از ${fa(e.min_resolved)})`;
+  }
+  return `${base} · هنوز تماسی ثبت نشده`;
+}
+
+// ─── تب ۴: دستیار AI — چت‌باکسِ آزادمتنِ آفلاین (assistant.js) + کارت‌های پیشنهادِ قانون‌محور از /restaurant/ai ───
 async function custRenderAI(){
   const el=document.getElementById('ct-ai');
   el.innerHTML=`<div style="text-align:center;padding:50px;color:var(--t2)">در حال بارگذاری...</div>`;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
+
+  // ⚠️ چت‌باکسِ دستیار عمداً *پیش از* fetchِ کارت‌ها و بیرونِ گاردِ آن رندر
+  // می‌شود. این دو قابلیتِ مستقل‌اند (چت از /restaurant/assistant می‌آید،
+  // کارت‌ها از /restaurant/ai) و اگر داخلِ یک قالب بمانند، خطای یکی دیگری را
+  // هم از بین می‌برد — در تستِ مرورگر دقیقاً همین دیده شد: با ۴۰۱ شدنِ
+  // کارت‌ها، چت‌باکس اصلاً در DOM نبود.
+  const chatHtml = (typeof assistantChatHtml==='function') ? assistantChatHtml() : '';
+  if(chatHtml){ el.innerHTML=chatHtml+`<div id="aiCards"><div style="text-align:center;padding:30px;color:var(--t2)">در حال بارگذاری پیشنهادها...</div></div>`; }
+  if(typeof initAssistantChat==='function') initAssistantChat();
+  const cardsEl = document.getElementById('aiCards') || el;
+
   const [res,crmRes]=await Promise.all([API.aiRecommendations(),API.crmRecommendations()]);
-  if(!res.ok){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`; return; }
+  if(!res.ok){ cardsEl.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} پیشنهادها بارگیری نشد — دستیار همچنان در دسترس است.</div>`; return; }
   const cards=res.data.cards||[];
   const contacts=crmRes.ok?(crmRes.data.items||[]):[];
+  const crmEff=crmRes.ok?(crmRes.data.effectiveness||null):null;
   const URG_FA={high:'فوری',medium:'این هفته',low:'وقتِ آزاد'};
-  el.innerHTML=`
+  cardsEl.innerHTML=`
     <div class="ai-box" style="margin-bottom:18px">
       <div class="ai-box-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">پیشنهادهای هوشمند</div><span class="tag">قانون‌محور · شفاف</span></div>
       <div style="font-size:13px;color:var(--t1);line-height:1.6">این پیشنهادها از تحلیل واقعی داده‌های رستوران شما تولید می‌شن (نه چت‌بات) — هر کارت دلیل و عدد پشتش رو نشون می‌ده.</div>
@@ -1003,7 +1083,7 @@ async function custRenderAI(){
         </div>
       </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}
     <div class="panel" style="margin-top:20px">
-      <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری</div></div></div>
+      <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">${crmEffectivenessFa(crmEff)}</div></div></div>
       ${contacts.length?contacts.map(c=>`
         <div class="mini-row">
           <div class="mini-info">
@@ -1011,7 +1091,7 @@ async function custRenderAI(){
             <div class="mini-sub">${esc(c.reason)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callCustomer('${esc(c.phone||'')}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
+            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer('${esc(c.phone||'')}','${esc(c.user_id)}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
     </div>`;

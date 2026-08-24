@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbRead as db } from '@/lib/db';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { buildCustomer360 } from '@/lib/admin-customer-360';
 import { normalizePhone } from '@/lib/otp';
@@ -16,7 +16,7 @@ const querySchema = z.object({ phone: zPhone });
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const { phone } = parseQuery(req, querySchema);
     const normalized = normalizePhone(phone);
     const user = await db.user.findUnique({ where: { phone: normalized }, select: { id: true } });

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { audit } from '@/lib/audit';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
@@ -27,7 +27,7 @@ const bodySchema = z.object({
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const { id } = parseParams(await params, paramsSchema);
     const b = await parseBody(req, bodySchema);
 

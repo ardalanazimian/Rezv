@@ -41,7 +41,10 @@ const RFM_SRC = readFileSync(new URL('../src/lib/rfm.ts', import.meta.url), 'utf
 /** عبارتِ امتیاز و آستانه‌هایِ tier را از متنِ واقعیِ rfm.ts بیرون می‌کشد. */
 function extractSqlFromRfm() {
   const score = RFM_SRC.match(
-    /LEAST\(100, GREATEST\(0, ROUND\(\s*([\s\S]*?)\s*\)\)\)::int AS intelligence_score/,
+    /LEAST\(100, GREATEST\(0, ROUND\(\s*([\s\S]*?)\s*\)\)\)::int(?: END)? AS intelligence_score/
+    // [merge ۰۸-۲۴] «(?: END)?»: مهاجرتِ #26 (تفکیکِ صفرِ تأییدشده از نامعلوم)
+    // عبارت را در CASE WHEN m IS NULL پیچید؛ خودِ فرمول عوض نشده و ۱۰۸ ترکیبِ
+    // parity پایین همچنان همان عدد را از TS و SQL می‌گیرند.,
   );
   assert.ok(
     score,

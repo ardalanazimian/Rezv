@@ -96,7 +96,9 @@ describe('resolveKey — دفاعِ دوم در برابرِ path traversal', ()
     assert.ok(full);
     // باگِ رفع‌شده: قبلاً همیشه '/' هاردکد بود، ولی resolveKey (media-store.ts)
     // خودش با sepِ بومیِ سیستم‌عامل مقایسه می‌کند — روی ویندوز full با
-    // uploadRoot()+'\\' شروع می‌شود نه '/'، پس این تست همیشه false می‌داد.
+    // uploadRoot()+'\\' شروع می‌شود نه '/'، پس این تست رویِ ویندوز همیشه
+    // false می‌داد (کدِ منبع همیشه درست بود؛ لینوکس/CI چون sep==='/' است
+    // این باگ را هیچ‌وقت نشان نمی‌داد).
     assert.ok(full!.startsWith(uploadRoot() + sep));
   });
 

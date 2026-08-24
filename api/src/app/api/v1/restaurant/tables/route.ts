@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
+import { assignQrCode } from '@/lib/tables';
 
 const SHAPES = ['rectangle', 'round', 'booth'] as const;
 const ZONES = ['indoor', 'outdoor', 'window', 'vip', 'smoking'] as const;
@@ -56,5 +57,24 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
       minPartySize: b.min_party_size || 1, maxPartySize: b.max_party_size || capacity,
     },
   });
-  return NextResponse.json({ id: table.id, number: table.number }, { status: 201 });
+
+  // هر میزِ جدید همان لحظه کدِ QR می‌گیرد.
+  //
+  // ⚠️ چرا اینجا و نه یک قدمِ دستیِ جدا: تا ۲۰۲۶-۰۸-۲۱ `assignQrCode` صفر
+  // فراخوان داشت و هیچ روتی `qrCode` را ست نمی‌کرد، پس تنها میزهایِ دارایِ QR
+  // داده‌ی `[DEMO]`ِ seed بودند. نتیجه این بود که `POST /api/v1/checkin` —
+  // که عمومی سرو می‌شود — برای هر رستورانِ واقعی هیچ‌وقت موفق نمی‌شد.
+  // ساختِ خودکار یعنی رستوران‌دار هیچ قدمِ اضافه‌ای لازم ندارد.
+  //
+  // شکستِ ساختِ QR عمداً کلِ ساختِ میز را برنمی‌گرداند: میز موجودیتِ اصلی است
+  // و QR یک افزوده؛ اگر اینجا throw می‌کرد، یک خطایِ گذرا میزِ ساخته‌شده را
+  // پشتِ یک ۵۰۰ پنهان می‌کرد. کدِ نداشته بعداً با روتِ `…/qr` ساخته می‌شود.
+  let qrCode: string | null = null;
+  try {
+    qrCode = await assignQrCode(table.id, ctx.restaurant.id);
+  } catch {
+    qrCode = null;
+  }
+
+  return NextResponse.json({ id: table.id, number: table.number, qr_code: qrCode }, { status: 201 });
 });

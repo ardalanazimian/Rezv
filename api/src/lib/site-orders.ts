@@ -301,6 +301,11 @@ export async function createTrialAccount(input: LeadInput, ctx: RequestContext):
         name: input.businessName,
         city: input.city || null,
         clubPrefix: clubPrefixFrom(input.businessName),
+        // اعتبارِ شروعِ پیامک: بدونش هر پیامکِ تأییدِ رزرو از همان دقیقه‌ی اول
+        // با «موجودی کافی نیست» به DLQ می‌رود و حسابِ دمو عملاً بی‌صداست.
+        // همان عددِ STARTER_SMS_BALANCE در lib/sms-balance.ts (و مسیرهای
+        // branches/seed) — اینجا literal نگه داشته شده تا دیف یک‌خطی بماند.
+        smsBalance: 50,
         // چیدمانِ شروع: بدونِ میز، پنل خالی و غیرقابل‌استفاده است. این میزها
         // مالِ خودِ کسب‌وکارند و از همان پنل قابلِ ویرایش/حذف‌اند.
         tables: {

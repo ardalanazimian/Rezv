@@ -339,7 +339,12 @@ async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
   const body={phone,party_size:party,table_id:tableId||undefined};
   if(firstName){body.first_name=firstName;body.last_name=lastName||'';}
   if(birthDayMonth){body.birth_day=birthDayMonth[0];body.birth_month=birthDayMonth[1];}
-  const res=await API.walkin(body);
+  // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): قبلاً این مسیر هیچ Idempotency-Key
+  // نمی‌فرستاد — دابل‌تپِ «ثبت ورود» (یا حتی retryِ خودکارِ شبکه) می‌توانست دو
+  // رزروِ seated + دو عضویتِ باشگاه برایِ همون مهمان بسازد. یک کلید برایِ کلِ
+  // تلاش (آنلاین یا صف‌شده‌ی آفلاین) ساخته می‌شود تا sync بعدی هم همون کلید را بفرسته.
+  const idemHeaders={ 'Idempotency-Key': genIdempotencyKey() };
+  const res=await API.walkin(body, idemHeaders);
   if(!res.ok){
     // آفلاین → محلی ثبت کن و برای همگام‌سازی صف کن (واک‌این نباید در قطعی اینترنت بخوابد)
     if(res.offline){
@@ -347,7 +352,7 @@ async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
       const localRec={t:new Date().toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'}),name:nm,party,table:tableId||null,status:'arrived',seg:'new',pre:false,note:'واک‌این (آفلاین)',phone,date:'today',dLabel:'امروز'};
       RES.push(localRec);
       if(API.getToken()){
-        Outbox.enqueue({ type:'walkin', path:'/restaurant/walkin', method:'POST', body, label:`واک‌این ${nm}${tableId?' · میز':''}`, localRef:localRec });
+        Outbox.enqueue({ type:'walkin', path:'/restaurant/walkin', method:'POST', body, headers:idemHeaders, label:`واک‌این ${nm}${tableId?' · میز':''}`, localRef:localRec });
       }
       closeModal();
       if(document.getElementById('v-overview').classList.contains('active'))rOverview();
@@ -389,17 +394,20 @@ async function saveManual(){
   const timeVal=document.getElementById('mTime').value;
   const partyVal=+document.getElementById('mParty').value.replace(/[^\d]/g,'')||2;
   const tableVal=+document.getElementById('mTable').value.replace(/[^\d]/g,'')||1;
+  // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): یک کلید برایِ کلِ تلاش (چه
+  // درخواستِ آنلاینِ زیر موفق شود چه به مسیرِ آفلاینِ Outbox بیفتد) — تا اگر
+  // درخواستِ اول واقعاً به سرور رسیده باشد ولی پاسخش گم شده، retry/صف‌شدنِ
+  // بعدی با همون کلید replay شود، نه رزروِ دومی بسازد.
+  const manualIdemKey=genIdempotencyKey();
 
   // اگر توکن staff داریم، رزرو واقعی در دیتابیس ثبت کن
   if(API.getToken()){
     const dt=manualDateToISO(dateVal,timeVal);
-    // Idempotency-Key: یک‌بار برای همین submit — دوبار کلیک/retry شبکه رزروِ
-    // دستیِ دوم نمی‌سازد.
     const res=await API.post('/reservations',{
       restaurant_id:STAFF_INFO?.restaurant_id||undefined,
       date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
       guest:{name:n,phone:phone,table_number:tableVal,note:'رزرو دستی'},
-    },{ 'Idempotency-Key': genIdempotencyKey() });
+    },{ 'Idempotency-Key': manualIdemKey });
     if(res.ok){
       // موفق در سرور — به‌علاوه‌ی نمایش محلی
       RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.reservation?.code});
@@ -424,6 +432,7 @@ async function saveManual(){
     Outbox.enqueue({
       type:'reservation', path:'/reservations', method:'POST',
       body:{ restaurant_id:'self', date:dateKey, time:timeVal, party_size:partyVal, guest:{name:n,phone:phone.replace(/\s/g,'')} },
+      headers:{ 'Idempotency-Key': manualIdemKey },
       label:`رزرو ${n} · ${dLabel} ${timeVal}`, localRef:localRec,
     });
   }

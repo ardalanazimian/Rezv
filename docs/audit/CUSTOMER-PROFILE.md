@@ -52,7 +52,7 @@ setNotifPref(id, on) → localStorage.setItem(...)   ← و تمام
 
 | لایه | تغییر |
 |---|---|
-| DB | migration `050-notification-consent.sql` — ستونِ `users.notification_prefs jsonb NOT NULL DEFAULT '{}'` |
+| DB | migration `063-notification-consent.sql` — ستونِ `users.notification_prefs jsonb NOT NULL DEFAULT '{}'` |
 | Prisma | `User.notificationPrefs Json @default("{}")` (گاردِ schema-drift سبز) |
 | منطق | `lib/notification-prefs.ts` — دسته‌ها، `readNotificationPrefs`، `allowsCategory` |
 | API | `GET/PATCH /me/notification-prefs` — merge، نه جایگزینی |

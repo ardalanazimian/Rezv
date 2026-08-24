@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { topupSms, getSmsBalance } from '@/lib/sms-balance';
 import { audit } from '@/lib/audit';
 import { errorResponse } from '@/lib/errors';
@@ -18,7 +18,7 @@ const topupSchema = z.object({ amount: z.number().int().min(1).max(1_000_000), n
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const { id } = parseParams(await params, paramsSchema);
     const balance = await getSmsBalance(id);
     return NextResponse.json(balance);
@@ -28,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const { id } = parseParams(await params, paramsSchema);
     const body = await parseBody(req, topupSchema);
     const amount = body.amount;

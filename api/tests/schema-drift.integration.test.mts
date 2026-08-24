@@ -35,7 +35,14 @@ const { db } = await import('../src/lib/db.ts');
 // رد می‌کند («cannot drop column ... constraint no_table_overlap depends on
 // it») — تأییدشده با اجرایِ واقعی. یعنی `prisma db push` رویِ یک DBِ
 // migrate‌شده شکست می‌خورد؛ این یک ویژگیِ محافظ است، نه یک باگِ قابلِ رفع.
-const ACCEPTED_DRIFT = /ALTER TABLE "reservations" DROP COLUMN "block_end"/;
+// [merge ۰۸-۲۴] پذیرفته‌ی دوم: prisma/test-schema-fixups.sql (قدمِ سومِ bootstrapِ
+// CI) به PKهایِ uuid پیش‌فرضِ gen_random_uuid می‌دهد تا INSERTهایِ خامِ تست مثلِ
+// تولید (که جدول‌ها را SQL می‌سازد و پیش‌فرض دارند) رفتار کنند. schema.prisma
+// عمداً @default ندارد (کلاینت خودش uuid می‌سازد)، پس db push می‌خواهد این
+// پیش‌فرض‌ها را DROP کند — انحرافِ آگاهانه‌ی محیطِ تست است، نه رانشِ واقعی.
+// (شکلِ چندخطی هم می‌آید: statementِ جدولِ پارتیشن‌بندی‌شده‌ی reservations خطِ
+//  «ALTER COLUMN …» را جدا از «ALTER TABLE …» گزارش می‌کند.)
+const ACCEPTED_DRIFT = /ALTER TABLE "reservations" DROP COLUMN "block_end"|(ALTER TABLE "[a-z_]+" )?ALTER COLUMN "id" DROP DEFAULT/;
 
 describe('انحرافِ اسکیما بینِ schema.prisma و DBِ اعمال‌شده (§۲۴)', () => {
   test('هیچ دو ایندکسی با تعریفِ یکسان وجود ندارد', async () => {

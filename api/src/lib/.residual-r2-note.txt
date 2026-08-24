@@ -1,0 +1,1 @@
+R2 residual: smsBalance 50 applied in site-orders trial create + schema default 50. See artifacts/site-orders-sms50.ts

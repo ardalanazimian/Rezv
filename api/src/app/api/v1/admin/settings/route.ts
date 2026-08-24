@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { setPlatformSetting } from '@/lib/platform-settings';
 import { audit } from '@/lib/audit';
 import { errorResponse } from '@/lib/errors';
@@ -27,7 +27,7 @@ const patchSchema = z.object({
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const rows = await db.platformSettings.findMany({ where: { key: { in: [...ALLOWED_KEYS] } } });
     const settings: Record<string, string> = {};
     for (const k of ALLOWED_KEYS) settings[k] = '';
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const { settings } = await parseBody(req, patchSchema);
 
     for (const s of settings) {

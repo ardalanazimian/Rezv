@@ -173,7 +173,12 @@ const API = {
   async request(path, opts = {}, _retried = false){
     // transportِ خام به httpJsonِ مشترک (window.httpJson از api-core.js) واگذار می‌شود؛
     // منطقِ auth (Authorization، X-Restaurant-Id، ۴۰۱→refresh→retry) اینجا و بدونِ تغییر می‌ماند.
-    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    // ⚠️ برایِ FormData هدرِ Content-Type **نباید** ست شود: مرورگر باید خودش
+    // `multipart/form-data; boundary=…` را بسازد. اگر ما 'application/json'
+    // بگذاریم، boundary گم می‌شود و سرور بدنه را نمی‌تواند پارس کند — یعنی
+    // هر آپلودِ فایلی بی‌صدا با «بدنه‌ی درخواست خوانده نشد» رد می‌شود.
+    const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData;
+    const headers = { ...(isForm ? {} : { 'Content-Type': 'application/json' }), ...(opts.headers || {}) };
     if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
     if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
     const r = await httpJson(this.base + '/api/v1' + path, { ...opts, headers }, this.timeout);
@@ -267,14 +272,42 @@ const API = {
   updateTable(id, body){ return this.patch(`/restaurant/tables/${id}`, body); },
   deleteTable(id){ return this.delete(`/restaurant/tables/${id}`); },
   setTableState(id, state){ return this.patch(`/restaurant/tables/${id}/state`, { state }); },
+  /**
+   * QRِ check-inِ یک میز — خروجی SVG است نه JSON، پس مثلِ `menuQrSvg` نمی‌تواند
+   * از `request()` (که همیشه `res.json()` می‌زند) عبور کند. شکلِ خروجی عمداً
+   * همان قراردادِ بقیه است تا فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
+   */
+  async tableQrSvg(id, size){
+    if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
+    try{
+      const res = await fetch(this.base + `/api/v1/restaurant/tables/${encodeURIComponent(id)}/qr?size=` + encodeURIComponent(size||512), {
+        headers: { Authorization: 'Bearer ' + this._token },
+      });
+      if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{
+        svg: await res.text(),
+        code: decodeURIComponent(res.headers.get('X-Table-Code') || ''),
+        url: decodeURI(res.headers.get('X-Checkin-Url') || ''),
+      } };
+    }catch{
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
+  /**
+   * بازتولیدِ کدِ QRِ میز — استیکرِ چاپ‌شده‌ی قبلی را **باطل** می‌کند.
+   * برخلافِ `tableQrSvg` خروجی JSON است، پس از مسیرِ عادیِ `post()` می‌رود.
+   */
+  regenerateTableQr(id){ return this.post(`/restaurant/tables/${encodeURIComponent(id)}/qr`, {}); },
   // ── هوش مشتری (RFM/CLV/AI) ──
   customers(qs){ return this.get('/restaurant/customers'+(qs?'?'+qs:'')); },
   customerDetail(userId){ return this.get('/restaurant/customers/'+encodeURIComponent(userId)); },
   rfm(){ return this.get('/restaurant/rfm'); },
   aiRecommendations(){ return this.get('/restaurant/ai'); },
   crmRecommendations(){ return this.get('/restaurant/crm/recommendations'); },
+  // فازِ ۸ — ثبتِ «با این مشتری تماس گرفتم» تا اثربخشیِ توصیه‌ها سنجیدنی شود
+  crmRecommendationContacted(userId){ return this.post('/restaurant/crm/recommendations/contacted',{user_id:userId}); },
   // ── ورود بدون رزرو (walk-in واقعی، با عضویت خودکار باشگاه) ──
-  walkin(body){ return this.post('/restaurant/walkin', body); },
+  walkin(body, headers){ return this.post('/restaurant/walkin', body, headers); },
   // ── نظرات، گالری، یادداشت پرسنل، رویداد، تاریخچه‌ی کمپین (همه واقعی) ──
   reviews(qs){ return this.get('/restaurant/reviews'+(qs?'?'+qs:'')); },
   replyReview(id, reply){ return this.patch('/restaurant/reviews', { id, reply }); },
@@ -293,6 +326,49 @@ const API = {
   },
   deletePhoto(id){ return this.delete('/restaurant/photos?id='+encodeURIComponent(id)); },
   notes(){ return this.get('/restaurant/notes'); },
+  // ── منو (CRUDِ واقعی؛ پیش از این هیچ روتی برایِ ساختِ آیتمِ منو نبود) ──
+  // ── دستیارِ هوشمندِ آفلاین: چت آزادمتن + حلقه‌ی خودآموزی (وصل به /restaurant/assistant واقعی) ──
+  assistantAsk(message){ return this.post('/restaurant/assistant', { message }); },
+  assistantFeedback(logId, intent){ return this.post('/restaurant/assistant/feedback', { log_id: logId, correct_intent: intent }); },
+  assistantStats(){ return this.get('/restaurant/assistant'); },
+  menuList(){ return this.get('/restaurant/menu'); },
+  menuCreate(body){ return this.post('/restaurant/menu', body); },
+  menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  /**
+   * آپلود/جایگزینیِ عکسِ آیتمِ منو.
+   * multipart است، پس نمی‌تواند از `post()` (که JSON می‌فرستد) عبور کند.
+   * ⚠️ عمداً هدرِ Content-Type ست نمی‌شود: مرورگر باید خودش boundary را
+   * تولید کند و ست‌کردنِ دستی‌اش بدنه را برایِ سرور غیرقابلِ‌پارس می‌کند.
+   */
+  menuItemPhotoUpload(id, file){
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'POST', body: fd });
+  },
+  menuItemPhotoDelete(id){
+    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'DELETE' });
+  },
+  menuBranding(){ return this.get('/restaurant/menu/branding'); },
+  menuBrandingSave(body){ return this.request('/restaurant/menu/branding', { method: 'PATCH', body: JSON.stringify(body) }); },
+  /**
+   * QRِ منویِ عمومی — خروجی SVG است، نه JSON، پس نمی‌تواند از `request()`
+   * (که همیشه `res.json()` می‌زند) عبور کند و fetchِ مستقیم لازم دارد.
+   * شکلِ خروجی عمداً همان قراردادِ بقیه است ({ok,data}/{ok:false,...}) تا
+   * فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
+   */
+  async menuQrSvg(size){
+    if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
+    try{
+      const res = await fetch(this.base + '/api/v1/restaurant/menu/qr?size=' + encodeURIComponent(size||512), {
+        headers: { Authorization: 'Bearer ' + this._token },
+      });
+      if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{ svg: await res.text(), url: decodeURI(res.headers.get('X-Menu-Url') || '') } };
+    }catch{
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
   addNote(body){ return this.post('/restaurant/notes', body); },
   pinNote(id, pinned){ return this.patch('/restaurant/notes', { id, pinned }); },
   deleteNote(id){ return this.delete('/restaurant/notes?id='+encodeURIComponent(id)); },
@@ -361,7 +437,11 @@ const Outbox = {
   },
   count(){ return this.load().length; },
 
-  // افزودن عملیات به صف. op = { type, path, method, body, label, localRef }
+  // افزودن عملیات به صف. op = { type, path, method, body, label, localRef, headers }
+  // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ): headers اختیاری — برای Idempotency-Key، تا
+  // وقتی این عملیات با برگشتِ اینترنت sync می‌شود همان کلیدی که موقعِ تلاشِ
+  // آنلاینِ اولیه ساخته شد استفاده شود (نه کلیدی تازه، که یعنی سرور دوباره
+  // اجرا می‌کند و رزروِ دوم می‌سازد). رجوع کن به walkinCheckinReal.
   enqueue(op){
     this.load();
     op.id = 'op_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
@@ -388,7 +468,7 @@ const Outbox = {
       op.attempts = (op.attempts||0) + 1;
       let res;
       try {
-        res = await API.request(op.path, { method: op.method || 'POST', body: op.body ? JSON.stringify(op.body) : undefined });
+        res = await API.request(op.path, { method: op.method || 'POST', body: op.body ? JSON.stringify(op.body) : undefined, headers: op.headers });
       } catch { res = { ok:false, offline:true }; }
 
       if(res.offline){
@@ -846,6 +926,6 @@ function normalizePhone(p){return (p||'').replace(/\s/g,'').replace(/[0-9]/g,d=>
 //   دو فراخوانِ قبلی (loyalty.js addMember و reservations.js مسیرِ آفلاین)
 //   در همین batch حذف/جایگزین شدند.
 
-const TITLES={overview:'داشبورد',reservations:'مدیریت رزروها',waitlist:'لیست انتظار',floor:'پلان سالن',profile:'پروفایل و نظرات',customers:'مشتریان',loyalty:'باشگاه مشتریان',marketing:'بازاریابی',analytics:'آنالیتیکس',cashback:'تنظیم کش‌بک',staff:'کارکنان',pricing:'قیمت‌گذاری',chat:'پیام‌ها'};
+const TITLES={menu:'منو',overview:'داشبورد',reservations:'مدیریت رزروها',waitlist:'لیست انتظار',floor:'پلان سالن',profile:'پروفایل و نظرات',customers:'مشتریان',loyalty:'باشگاه مشتریان',marketing:'بازاریابی',analytics:'آنالیتیکس',cashback:'تنظیم کش‌بک',staff:'کارکنان',pricing:'قیمت‌گذاری',chat:'پیام‌ها'};
 
 // ═══════════ ROUTING ═══════════

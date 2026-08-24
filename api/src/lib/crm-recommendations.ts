@@ -27,7 +27,10 @@ export interface CrmCustomerSignal {
   churnRiskScore: number;      // 0..100
   noShowRatePct: number;       // 0..100
   totalVisits: number;
-  predictedClvToman: number;
+  // NULL = مبلغ اندازه‌گیری‌ناپذیر است (رستوران منویِ قیمت‌دار ندارد)، نه «صفر».
+  // مقایسه‌هایِ عددی رویِ null در JS false می‌دهند، پس توصیه‌ای که به آستانه‌ی
+  // مبلغی وابسته است روی دادهٔ نامعلوم فعال نمی‌شود — همان رفتارِ درست.
+  predictedClvToman: number | null;
   intelligenceTier: 'low' | 'medium' | 'high' | null;
   daysSinceLastVisit: number | null;
 }
@@ -67,7 +70,11 @@ export function recommendContact(c: CrmCustomerSignal): CrmRecommendation | null
     };
   }
 
-  if (c.segment === 'churned' && (c.intelligenceTier === 'high' || c.predictedClvToman >= 500_000)) {
+  // CLVِ نامعلوم (null) نباید آستانه را فعال کند: «نمی‌دانیم چقدر ارزش داشت»
+  // دلیلِ ادعایِ «قبلاً مشتریِ باارزشی بود» نیست. صریح نوشته شده تا آینده
+  // به‌اشتباه با `?? 0` پر نشود (که همان جعلِ صفر را برمی‌گرداند).
+  const clvAboveThreshold = c.predictedClvToman !== null && c.predictedClvToman >= 500_000;
+  if (c.segment === 'churned' && (c.intelligenceTier === 'high' || clvAboveThreshold)) {
     return {
       user_id: c.userId, name: c.name, phone: c.phone,
       reason: 'قبلاً مشتریِ باارزشی بود، الان از دست رفته — یه کدِ تخفیفِ بازگشتی می‌تونه برش گردونه.',

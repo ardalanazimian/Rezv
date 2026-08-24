@@ -139,10 +139,16 @@ export const PATCH = withStaffAuth({ rateLimit: 'auth' }, async (req, auth) => {
   if (b.name !== undefined) data.name = b.name?.trim() || null;
 
   if (b.is_active !== undefined) {
-    if (b.is_active === false) {
-      // جلوگیری از قفل‌شدنِ خودِ کاربر و از غیرفعال‌سازیِ مدیر توسطِ مدیرِ دیگر.
-      if (target.id === auth.sub) throw Err.forbidden('نمی‌توانید خودتان را غیرفعال کنید');
-      if (target.role === 'manager' && auth.role !== 'owner') throw Err.forbidden('فقط مالک می‌تواند مدیر را غیرفعال کند');
+    // ⚠️ سخت‌شده (۲۰۲۶-۰۸-۲۲): این شرط قبلاً فقط `=== false` را می‌گرفت، یعنی
+    // تغییرِ وضعیتِ فعال‌بودنِ **خودِ** کاربر در جهتِ `true` هیچ گاردی نداشت.
+    // درکنارِ باگِ گاردِ `withStaffAuth` (که هیچ کوئریِ DB نمی‌زد و کارمندِ
+    // غیرفعال را تا ۱۵ دقیقه راه می‌داد)، این یعنی مدیرِ تازه‌اخراج‌شده
+    // می‌توانست خودش را دوباره فعال کند و پنجره‌ی موقت را دائمی کند.
+    // گاردِ اصلی یک لایه بالاتر بسته شد؛ این لایه‌ی دوم است: هیچ‌کس وضعیتِ
+    // فعال‌بودنِ خودش را عوض نمی‌کند، در هیچ جهتی.
+    if (target.id === auth.sub) throw Err.forbidden('نمی‌توانید وضعیتِ فعال‌بودنِ حسابِ خودتان را تغییر دهید');
+    if (b.is_active === false && target.role === 'manager' && auth.role !== 'owner') {
+      throw Err.forbidden('فقط مالک می‌تواند مدیر را غیرفعال کند');
     }
     data.isActive = b.is_active;
   }

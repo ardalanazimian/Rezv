@@ -252,14 +252,36 @@ export const SAMPLE_EVENTS=[
 // ندارد — هر فراخوان یعنی «کاربر واقعاً تازه‌سازی خواست» یا «لودِ سرد».
 export async function renderEvents(){
   const el=document.getElementById('eventsList');if(!el)return;
-  let events=SAMPLE_EVENTS, isDemo=true;
-  // اگر آنلاین، از API بخوان
   const res=await API.get('/events');
-  if(res.ok&&Array.isArray(res.data?.events)&&res.data.events.length){
-    events=res.data.events.map(e=>({rid:e.restaurantId,emoji:e.emoji||'🎉',title:e.title,rest:'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
-    isDemo=false;
+
+  // سه حالتِ متفاوت، سه رفتارِ متفاوت — همان انضباطی که booking.js دارد:
+  //  • سرور جواب داد و رویدادی نیست → حالتِ خالیِ صادق. رویدادِ نمونه نشان
+  //    نمی‌دهیم؛ جدولِ special_events در هر استقرارِ تازه خالی است، پس در
+  //    عمل *همه‌ی* کاربرانِ واقعی سه رویدادِ ساختگی می‌دیدند. همان اصلِ
+  //    «بدونِ دادهٔ واقعی، هیچ ادعایی» که در social-proof هم قفل شده.
+  //  • سرور در دسترس نیست (offline) → نمونه‌ها فقط برایِ نمایشِ آفلاین، با
+  //    برچسبِ «نمونه» تا با واقعیت اشتباه نشود.
+  //  • خطای واقعیِ سرور → صریح بگو، نه اینکه با نمونه پنهانش کنی.
+  if(res.ok){
+    const list=Array.isArray(res.data?.events)?res.data.events:[];
+    if(!list.length){
+      el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('calendar',{size:40})}</div><div class="empty-state-title">فعلاً رویدادِ ویژه‌ای نیست</div><div class="empty-state-desc">به‌محضِ اعلامِ رستوران‌ها همین‌جا می‌بینی‌اش</div></div>`;
+      return;
+    }
+    const events=list.map(e=>({rid:e.restaurantId,emoji:e.emoji||'🎉',title:e.title,rest:'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
+    el.innerHTML=eventsHtml(events,false);
+    return;
   }
-  el.innerHTML=events.map(e=>`
+  if(!res.offline){
+    el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('alert',{size:40})}</div><div class="empty-state-title">رویدادها بارگذاری نشد</div><div class="empty-state-desc">${res.status?`خطای ${res.status}`:'دوباره تلاش کن'}</div></div>`;
+    return;
+  }
+  el.innerHTML=eventsHtml(SAMPLE_EVENTS,true);
+}
+
+/** مارکاپِ کارت‌های رویداد. isDemo=true چیپِ «نمونه» را اضافه می‌کند. */
+function eventsHtml(events,isDemo){
+  return events.map(e=>`
     <div class="event-card" role="button" tabindex="0" onclick="openRest('${esc(String(e.rid))}')">
       <div class="event-emoji">${e.emoji}</div>
       <div class="event-body">

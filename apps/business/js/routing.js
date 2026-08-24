@@ -9,6 +9,7 @@ const VIEW_PERMISSION = {
   waitlist:     'canManageWaitlist',
   floor:        'canManageTables',
   profile:      'canManageSettings',
+  menu:         'canManageSettings',
   cashback:     'canManageSettings',
   pricing:      'canManageSettings',
   marketing:    'canManageCampaigns',
@@ -44,7 +45,7 @@ function nav(v){
   document.getElementById('v-'+v).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.toggle('active',i.dataset.v===v));
   document.getElementById('tbTitle').textContent=TITLES[v];
-  ({overview:rOverview,reservations:rReservations,waitlist:rWaitlist,floor:rFloor,profile:rProfile,customers:rCustomers,loyalty:rLoyalty,marketing:rMarketing,analytics:rAnalytics,cashback:rCashback,staff:rStaff,pricing:rPricing,chat:rChat})[v]();
+  ({overview:rOverview,reservations:rReservations,waitlist:rWaitlist,floor:rFloor,profile:rProfile,menu:rMenu,customers:rCustomers,loyalty:rLoyalty,marketing:rMarketing,analytics:rAnalytics,cashback:rCashback,staff:rStaff,pricing:rPricing,chat:rChat})[v]();
   if(window.innerWidth<=768)closeSidebar();
   document.querySelector('.content').scrollTop=0;
 }

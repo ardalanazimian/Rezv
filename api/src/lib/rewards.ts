@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { db } from './db';
 import { Err } from './errors';
 
@@ -70,11 +71,31 @@ export async function redeemRewardItem(userId: string, itemId: string) {
     let resultCouponCode: string | null = null;
     let resultGiftCardCode: string | null = null;
 
-    if (item.kind === 'coupon_grant' && item.restaurantId) {
+    if (item.kind === 'coupon_grant') {
+      // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰، با اجرای زنده اثبات شد): شرط قبلاً
+      // `item.kind === 'coupon_grant' && item.restaurantId` بود — یعنی آیتمِ
+      // coupon_grantِ بدونِ رستوران بی‌صدا از کنارِ ساختِ کوپن رد می‌شد، در
+      // حالی که سکه‌ی کاربر **قبلاً کسر شده بود**. مشاهده‌ی واقعی: ۵۰ سکه کم
+      // شد و `result_coupon_id` برابرِ null برگشت — کاربر پول داد و چیزی
+      // نگرفت، بدونِ هیچ خطایی.
+      //
+      // برخلافِ priority_boost/free_item/event_access (که پایین‌تر عمداً فقط
+      // ردِ redemption ثبت می‌کنند و این در V1 مستند است)، coupon_grant طبقِ
+      // تعریفش باید کوپن بسازد. پس نبودِ رستوران یک دیتایِ خراب است، نه یک
+      // حالتِ مجاز — و باید صریح رد شود تا تراکنش برگردد و سکه کسر نشود.
+      if (!item.restaurantId) {
+        throw Err.validation('این آیتمِ فروشگاه پیکربندیِ نادرست دارد (کوپن بدونِ رستوران)');
+      }
       const coupon = await tx.coupon.create({
         data: {
           restaurantId: item.restaurantId,
-          code: `RWD-${itemId.slice(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`,
+          // ⚠️ باگِ رفع‌شده (همان‌جا): کد قبلاً `Date.now().toString(36)` بود.
+          // دو ردیمِ همزمان در یک میلی‌ثانیه کدِ یکسان می‌ساختند و قیدِ
+          // @@unique([restaurantId, code]) یکی را می‌شکست. اثباتِ زنده: از ۵
+          // ردیمِ موازیِ یک آیتم، ۱ تا با خطای `tx.coupon.create()` افتاد.
+          // کاربر پولش را از دست نمی‌داد (تراکنش برمی‌گشت) ولی به‌جای جایزه
+          // یک خطای نامفهوم می‌گرفت. حالا آنتروپی از randomUUID می‌آید.
+          code: `RWD-${itemId.slice(0, 8).toUpperCase()}-${randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`,
           kind: 'fixed', value: item.costCoins, // ⚠️ ساده‌سازیِ V1: مقدارِ کوپن = costCoins (تومان)؛
           // مپینگِ دقیق‌ترِ coins↔toman فازِ بعدیه، خارج از دامنه‌یِ این commit.
           maxRedemptions: 1, perUserLimit: 1,
@@ -83,7 +104,9 @@ export async function redeemRewardItem(userId: string, itemId: string) {
       resultCouponId = coupon.id;
       resultCouponCode = coupon.code;
     } else if (item.kind === 'gift_card_credit') {
-      const code = `RWDGC${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      // همان دلیلِ بالا: `GiftCard.code` هم `@unique` است و ۴ کاراکترِ
+      // تصادفیِ قبلی (≈۱٫۷ میلیون حالت) در مقیاس برخوردِ تولد می‌داد.
+      const code = `RWDGC${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
       const gc = await tx.giftCard.create({
         data: {
           code, buyerId: userId, restaurantId: item.restaurantId,

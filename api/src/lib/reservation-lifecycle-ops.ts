@@ -65,39 +65,25 @@ export async function expireStaleHolds(): Promise<number> {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  علامت‌زدن مهمانان دیرکرده به‌عنوان no_show (نیاز ۱۰)
-//  رزروهایی که زمان شروع + مهلت تأخیر گذشته و هنوز نرسیده‌اند.
+//  ⚠️ `markLateNoShows` در ۲۰۲۶-۰۸-۲۰ **حذف شد** — تله بود، نه کدِ مرده‌ی
+//  بی‌ضرر.
 //
-//  به‌جای updateMany مستقیم (که audit/notification را دور می‌زد)، هر رزرو
-//  از طریق state machine چرخه‌ی حیات منتقل می‌شود تا رویداد audit ثبت و در صورت
-//  لزوم اعلان ارسال شود. انتقال‌های نامعتبر امن نادیده گرفته می‌شوند.
+//  یافته: صفر صداکننده داشت (grep در کلِ ریپو: فقط تعریفِ خودش، یک
+//  re-export در reservations.ts، و بандلـهای build). مسیرِ واقعیِ تولید
+//  `/api/v1/maintenance/lifecycle` است که `autoMarkNoShow` از `lifecycle.ts`
+//  را صدا می‌زند، نه این را.
+//
+//  چرا حذف بهتر از نگه‌داشتن بود: این تابع همان کار را **متفاوت** انجام
+//  می‌داد. `autoMarkNoShow` فقط `running_late` را no_show می‌کند، ولی این
+//  یکی `confirmed`/`auto_confirmed` را هم مستقیم no_show می‌کرد. هر دو
+//  انتقال طبقِ TRANSITIONS مجازند، پس اگر کسی روزی این را — به‌گمانِ
+//  هم‌ارزی — به cron وصل می‌کرد، مهمان **بدونِ عبور از `running_late`**
+//  غایب ثبت می‌شد: یعنی بدونِ هیچ اعلانِ «شما دیر کرده‌اید»، و با دور زدنِ
+//  طراحیِ دومرحله‌ایِ مهلتِ تأخیر. یک باگِ خاموش که فقط با خواندنِ دقیقِ هر
+//  دو تابع دیده می‌شد.
+//
+//  همان الگویِ `redeemCouponAtomic`/`redeemCoupon` (PR #46): تابعی که
+//  زنده به‌نظر می‌رسد ولی صداکننده ندارد و رفتارش با مسیرِ واقعی فرق دارد.
+//  مسیرِ دومرحله‌ای (running_late → no_show) حالا در
+//  `tests/lifecycle-cron.integration.test.mts` قفل شده است.
 // ═══════════════════════════════════════════════════════════
-export async function markLateNoShows(restaurantId: string): Promise<number> {
-  const r = await db.restaurant.findUnique({ where: { id: restaurantId }, select: { lateGraceMinutes: true, timezone: true } });
-  const grace = r?.lateGraceMinutes ?? 15;
-  const timezone = r?.timezone ?? 'Asia/Tehran';
-  const cutoff = new Date(Date.now() - grace * 60_000);
-  const candidates = await db.reservation.findMany({
-    where: {
-      restaurantId,
-      status: { in: ['pending', 'confirmed', 'auto_confirmed', 'running_late'] },
-      slotStart: { lt: cutoff },
-    },
-    select: { id: true, slotStart: true },
-  });
-  if (candidates.length === 0) return 0;
-  let count = 0;
-  const seenDates = new Set<string>();
-  for (const c of candidates) {
-    try {
-      await transitionReservation({ reservationId: c.id, to: 'no_show', actor: 'cron', isAutomatic: true });
-      count++;
-      // کلیدِ تاریخِ محلیِ رستوران (نه UTC) — همون رفعِ باگی که در lifecycle.ts انجام شد.
-      const date = dateKeyInTz(c.slotStart, timezone);
-      if (!seenDates.has(date)) { seenDates.add(date); await invalidateAvailability(restaurantId, date); }
-    } catch {
-      // انتقال نامعتبر (مثلاً قبلاً seated/completed شده) — امن رد شو.
-    }
-  }
-  return count;
-}

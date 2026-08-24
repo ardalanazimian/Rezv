@@ -281,7 +281,24 @@ Details + rollback: [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ## 11. CI/CD Explanation
 
-`.github/workflows/ci.yml` runs 4 jobs on push/PR to `main`/`develop`:
+`.github/workflows/ci.yml` runs **8 jobs** on push/PR to `main`/`develop`:
+
+> ⚠️ **Corrected 2026-08-20:** this section said "4 jobs" and listed only
+> build/test/security/e2e. Four more have been added since, and the four described
+> below have themselves changed. Also worth knowing: the workflow's trigger still
+> lists `develop`, but **that branch does not exist** — every branch goes straight
+> off `main` (verified with `git ls-remote --heads`). The `develop` entry is a
+> harmless leftover, not a workflow anyone uses.
+
+| Job | What it does |
+|-----|--------------|
+| **schema-drift** | Builds the schema two ways — Prisma `db push` vs production's `migrate deploy` + `apply-sql.sh` — and fails if any column Prisma needs is missing from the production path. Catches the "CI green, production broken" class that no test can. See `tools/check-schema-drift.sh`. |
+| **design-system** | `sh tools/sync-design-system.sh --check` — zero diff between `shared/` and `apps/*`. |
+| **landing** | typecheck / lint / test for `apps/landing` (its own package.json). |
+| **seo** | same for `apps/seo`. |
+
+The four original jobs (still present, descriptions updated):
+
 
 | Job | What it does |
 |-----|--------------|

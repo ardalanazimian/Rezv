@@ -1,5 +1,6 @@
 import { db } from './db';
 import { enqueueSms } from './sms';
+import { recordOutreach } from './outreach-ledger';
 
 // ═══════════════════════════════════════════════════════════
 //  Marketing Automation — اجراکننده‌ی trigger ها (توسط cron صدا زده می‌شود)
@@ -97,6 +98,7 @@ export async function runAutomation(automation: {
   const template = templateFor(automation.trigger);
 
   let sent = 0;
+  const delivered: typeof targets = [];
   for (const t of targets) {
     // قالب campaign: [نام, نام رستوران] · قالب winback_offer: [نام, کد تخفیف, نام رستوران]
     const tokens = template === 'winback_offer'
@@ -104,11 +106,28 @@ export async function runAutomation(automation: {
       : [t.firstName || 'مهمان', restaurant?.name || ''];
     await enqueueSms({ to: t.phone, template, tokens, restaurantId: automation.restaurantId });
     sent++;
+    delivered.push(t);
   }
   await db.marketingAutomation.update({
     where: { id: automation.id },
     data: { lastRunAt: new Date(), sentCount: { increment: sent } },
   });
+
+  // ثبتِ گیرنده‌ها در دفترِ ارتباط‌گیری (migration 057) — بدونِ این، نرخِ
+  // تبدیل نه محاسبه‌شدنی است و نه بازسازی‌شدنی: تا پیش از این، همین حلقه
+  // لیستِ گیرنده‌ها را دور می‌ریخت و فقط یک عددِ sentCount می‌ماند.
+  //
+  // ⚠️ عمداً *پس از* ارسال است و fail-open: recordOutreach هرگز throw
+  // نمی‌کند. شکستِ ثبتِ آمار نباید ارسالی را که واقعاً انجام شده وارونه کند.
+  await recordOutreach(delivered.map((t) => ({
+    restaurantId: automation.restaurantId,
+    userId: t.id,
+    channel: 'sms' as const,
+    source: 'automation' as const,
+    sourceId: automation.id,
+    reason: automation.trigger,
+  })));
+
   return { sent };
 }
 
