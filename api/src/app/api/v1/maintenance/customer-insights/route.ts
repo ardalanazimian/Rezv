@@ -7,7 +7,7 @@ import { runAllDueAutomations } from '@/lib/automation';
 import { resolveOutreachConversions } from '@/lib/outreach-ledger';
 import { applyAbuseFlags, applyPlatformAbuseFlags } from '@/lib/fraud';
 import { trainAndCalibrateNoShowModel, trainAndCalibratePlatformNoShowModel } from '@/lib/no-show-model';
-import { rollbackDriftedModel } from '@/lib/model-drift';
+import { rollbackDriftedModel, rollbackDriftedPlatformModel } from '@/lib/model-drift';
 import { trainAndCalibrateDemandForecast } from '@/lib/demand-forecast';
 import { invalidatePattern } from '@/lib/cache';
 import { guardMaintenance } from '@/lib/maintenance-auth';
@@ -121,6 +121,12 @@ async function POST_impl(req: Request) {
     // ── مدلِ سراسری: **یک بار** برای کلِ پلتفرم، نه به‌ازای هر رستوران ──
     // بعد از حلقه اجرا می‌شود تا از تازه‌ترین دادهٔ همین شب استفاده کند.
     // شکستش نباید بقیه‌ی نتایج را باطل کند — مثلِ بقیه‌ی کارهای اختیاری.
+    // ⚠️ ترتیب عمدی: **اول** بازگردانی، بعد بازآموزی.
+    // اگر نسخه‌ی فعالِ فعلی در تولید رانش کرده، باید همین حالا از سرو خارج
+    // شود — حتی اگر بازآموزیِ امشب به هر دلیلی جایگزینی نسازد (دادهٔ کم،
+    // ردِ گیتِ AUC، بایاس). عکسش یعنی یک شب دیگر سرو شدنِ مدلِ خراب به
+    // **همه‌ی** رستوران‌های بدونِ مدلِ اختصاصی.
+    const platformRollback = await rollbackDriftedPlatformModel().catch(() => null);
     const platform = await trainAndCalibratePlatformNoShowModel().catch(() => null);
 
     return NextResponse.json({
@@ -137,6 +143,11 @@ async function POST_impl(req: Request) {
       // مدلِ سراسری — رفعِ سرمای شروع. `trained:false` با دلیلِ صریح
       // برمی‌گردد (مثلاً تنوعِ رستورانِ ناکافی)، نه سکوت.
       platform_model: platform === null ? { trained: false, reason: 'اجرا نشد' } : platform,
+      // بازگردانیِ مدلِ سراسری — تا امروز **هیچ مسیری** نداشت، یعنی یک مدلِ
+      // سراسریِ خراب تا ابد به همه‌ی رستوران‌های تازه سرو می‌شد (مهاجرتِ ۰۷۱).
+      platform_model_rollback: platformRollback === null
+        ? { rolledBack: false, reason: 'اجرا نشد' }
+        : platformRollback,
       demand_forecasts_trained: demandForecastsTrained,
       demand_forecasts_count_active: demandForecastsCountActive,
       demand_forecasts_covers_active: demandForecastsCoversActive,

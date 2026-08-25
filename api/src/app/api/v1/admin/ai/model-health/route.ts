@@ -4,7 +4,7 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { getLedgerHealth, MIN_RESOLVED_FOR_ACCURACY } from '@/lib/prediction-ledger';
-import { getPlatformPerformanceDrift, PERFORMANCE_DRIFT_THRESHOLD } from '@/lib/model-drift';
+import { getPlatformPerformanceDrift, detectPlatformPerformanceDrift, PERFORMANCE_DRIFT_THRESHOLD } from '@/lib/model-drift';
 
 import { withApiMetrics } from '@/lib/api-metrics';
 
@@ -28,7 +28,8 @@ async function GET_impl(req: Request) {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
 
-    const [noShowRows, demandRows, recentRuns, noShowActiveCount, ledgerHealth, drift] = await Promise.all([
+    const [noShowRows, demandRows, recentRuns, noShowActiveCount, ledgerHealth, drift,
+           platformModel, platformDrift] = await Promise.all([
       db.restaurantNoShowModel.findMany({
         select: {
           restaurantId: true, isActive: true, sampleSize: true, positiveCount: true,
@@ -58,6 +59,18 @@ async function GET_impl(req: Request) {
       getLedgerHealth({ sinceDays: 90 }),
       // فازِ ۷ — رانشِ کارایی. یک کوئریِ گروهی برای کلِ پلتفرم، نه حلقه.
       getPlatformPerformanceDrift({ windowDays: 30 }),
+      // ⚠️ مدلِ **سراسری** تا امروز در این داشبورد اصلاً دیده نمی‌شد
+      // (ممیزیِ نهاییِ ۲۰۲۶-۰۸-۲۵): مدیرِ پلتفرم «۰ مدلِ فعال» می‌دید در حالی
+      // که ممکن بود همه‌ی رستوران‌های بدونِ مدلِ اختصاصی با آن سرو شوند.
+      db.platformNoShowModel.findFirst({
+        where: { isActive: true }, orderBy: { trainedAt: 'desc' },
+        select: {
+          sampleSize: true, positiveCount: true, restaurantCount: true,
+          learnedBrier: true, staticBrier: true, learnedAuc: true,
+          featureVersion: true, activationReason: true, trainedAt: true,
+        },
+      }),
+      detectPlatformPerformanceDrift({ windowDays: 30 }),
     ]);
 
     const demandActiveCounts = demandRows.reduce(
@@ -74,6 +87,28 @@ async function GET_impl(req: Request) {
     return NextResponse.json({
       summary: {
         no_show: { restaurants_trained: noShowRows.length, restaurants_active: noShowActiveCount },
+        // مدلِ سراسری — `null` یعنی هیچ مدلِ سراسریِ فعالی نیست (نه «صفر
+        // کارایی»). رستورانِ بدونِ مدلِ اختصاصی در آن حالت روی heuristic است.
+        platform_no_show: platformModel === null ? null : {
+          sample_size: platformModel.sampleSize,
+          positive_count: platformModel.positiveCount,
+          restaurant_count: platformModel.restaurantCount,
+          learned_brier: platformModel.learnedBrier,
+          static_brier: platformModel.staticBrier,
+          learned_auc: platformModel.learnedAuc,
+          feature_version: platformModel.featureVersion,
+          activation_reason: platformModel.activationReason,
+          trained_at: platformModel.trainedAt,
+          // دقتِ **تولید**، جدا از هولدآوتِ زمانِ آموزش. تا مهاجرتِ ۰۷۱ اصلاً
+          // قابلِ محاسبه نبود چون پیش‌بینی‌های سراسری قابلِ شناسایی نبودند.
+          production_drift: {
+            verdict: platformDrift.verdict,
+            production_brier: platformDrift.productionBrier,
+            relative_change: platformDrift.relativeChange,
+            resolved_count: platformDrift.resolvedCount,
+            reason: platformDrift.reason,
+          },
+        },
         demand_forecast: {
           restaurants_trained: demandRows.length,
           restaurants_count_active: demandActiveCounts.count,

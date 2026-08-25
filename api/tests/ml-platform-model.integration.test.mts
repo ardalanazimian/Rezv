@@ -24,6 +24,9 @@ const {
   invalidateNoShowModelCache, invalidatePlatformNoShowModelCache,
   NO_SHOW_FEATURE_VERSION, fetchPlatformTrainingRows, fetchTrainingRows,
 } = await import('../src/lib/no-show-model');
+const { detectPlatformPerformanceDrift, rollbackDriftedPlatformModel } =
+  await import('../src/lib/model-drift');
+const { MIN_RESOLVED_FOR_ACCURACY } = await import('../src/lib/prediction-ledger');
 
 // ⚠️ کشِ مدل را عمداً با همان توابعِ خودِ کد پاک می‌کنیم، نه با ساختنِ دستیِ
 // کلید. نسخه‌ی اولِ همین فایل کلید را دستی می‌ساخت و چون نامِ کلید در کد
@@ -262,5 +265,198 @@ describe('ترتیبِ زمانیِ دادهٔ آموزش — پیش‌شرطِ 
       'آخرین عنصر باید تازه‌ترین باشد (بر مبنای created_at، کلیدِ واقعیِ مرتب‌سازی)');
 
     await db.reservation.deleteMany({ where: { restaurantId } });
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────
+describe('سنجش و بازگردانیِ مدلِ سراسری در تولید', () => {
+  let seq = 0;
+  /** n پیش‌بینیِ حل‌شده‌ی **سراسری** با خطای مربعیِ مشخص. */
+  async function platformPredictions(n: number, squaredError: number) {
+    for (let i = 0; i < n; i++) {
+      const p = await db.modelPrediction.create({
+        data: {
+          restaurantId, predictionType: 'no_show', entityType: 'reservation',
+          entityId: `${TAG}-P${++seq}`,
+          modelSource: 'learned', modelScope: 'platform', featureVersion: NO_SHOW_FEATURE_VERSION,
+          predictedValue: 0.5, confidence: 'medium',
+          generatedAt: new Date(Date.now() - 3_600_000),
+        },
+        select: { id: true },
+      });
+      await db.modelOutcome.create({
+        data: {
+          predictionId: p.id, observedValue: 0, squaredError,
+          absoluteError: Math.sqrt(squaredError), source: 'test',
+        },
+      });
+    }
+  }
+
+  async function activePlatform(learnedBrier: number) {
+    await db.platformNoShowModel.create({
+      data: {
+        weights: W, sampleSize: 500, positiveCount: 60, restaurantCount: 8,
+        learnedBrier, staticBrier: learnedBrier * 1.5, learnedAuc: 0.72,
+        isActive: true, activationReason: 'تست', featureVersion: NO_SHOW_FEATURE_VERSION,
+        // زمانِ آموزش عمداً در گذشته تا پیش‌بینی‌های تست بعد از آن بیفتند.
+        trainedAt: new Date(Date.now() - 7 * 86_400_000),
+      },
+    });
+    await invalidatePlatformNoShowModelCache();
+  }
+
+  async function cleanup() {
+    await db.modelOutcome.deleteMany({ where: { prediction: { restaurantId } } });
+    await db.modelPrediction.deleteMany({ where: { restaurantId } });
+    await db.platformNoShowModel.deleteMany({});
+    await invalidatePlatformNoShowModelCache();
+  }
+
+  test('🔴 مدلِ سراسریِ رانش‌کرده پس گرفته می‌شود — تا امروز هیچ مسیری نداشت', async () => {
+    // ⚠️ این مرکزی‌ترین تستِ این بلاک است. مدلِ سراسری به **هر** رستورانِ
+    // بدونِ مدلِ اختصاصی سرو می‌شود، و تا مهاجرتِ ۰۷۱ نه قابلِ سنجش بود
+    // (پیش‌بینی‌هایش از heuristic تفکیک‌ناپذیر بودند) نه قابلِ بازگردانی
+    // (`rollbackDriftedModel` فقط جدولِ per-restaurant را می‌نوشت).
+    await cleanup();
+    await activePlatform(0.10);
+    await platformPredictions(MIN_RESOLVED_FOR_ACCURACY + 5, 0.30);  // ۲۰۰٪ بدتر
+
+    const drift = await detectPlatformPerformanceDrift({});
+    assert.equal(drift.verdict, 'drifted', drift.reason);
+
+    const out = await rollbackDriftedPlatformModel({});
+    assert.equal(out.rolledBack, true, out.reason);
+    assert.equal(await getPlatformNoShowModel(), null, 'باید فوراً از مسیرِ سرو خارج شود');
+    await cleanup();
+  });
+
+  test('🔴 کنترلِ منفی: مدلِ سراسریِ سالم دست نمی‌خورد', async () => {
+    // بدونِ این، «همیشه غیرفعال کن» هم سبز می‌شد و رفعِ سرمای شروع می‌مرد.
+    await cleanup();
+    await activePlatform(0.20);
+    await platformPredictions(MIN_RESOLVED_FOR_ACCURACY + 5, 0.20);  // بدونِ افت
+
+    const out = await rollbackDriftedPlatformModel({});
+    assert.equal(out.rolledBack, false, out.reason);
+    assert.deepEqual(await getPlatformNoShowModel(), W, 'مدلِ سالم باید سرو بماند');
+    await cleanup();
+  });
+
+  test('🔴 با دادهٔ ناکافی هرگز اقدام نمی‌شود', async () => {
+    // غیرفعال‌کردن بر پایه‌ی چند نمونه، خودش همان «ادعای اندازه‌گیری‌نشده»
+    // است که ML_CONTRACT ممنوع کرده.
+    await cleanup();
+    await activePlatform(0.10);
+    await platformPredictions(Math.max(1, MIN_RESOLVED_FOR_ACCURACY - 3), 0.90);  // فاجعه‌بار ولی کم
+
+    const out = await rollbackDriftedPlatformModel({});
+    assert.equal(out.verdict, 'insufficient_data', out.reason);
+    assert.equal(out.rolledBack, false);
+    await cleanup();
+  });
+
+  test('⚠️ پیش‌بینیِ نسخه‌ی **قبلیِ** سراسری شمرده نمی‌شود', async () => {
+    // ⚠️ مدلِ سراسری شناسه‌ی اجرا ندارد، پس تنها کلیدِ تفکیک `scope` است.
+    // بدونِ کفِ زمانیِ `trainedAt`، پیش‌بینی‌های نسخه‌های قبلی هم شمرده
+    // می‌شدند و «بدترشدن» می‌توانست صرفاً اثرِ عوض‌شدنِ مدل باشد، نه رانشِ
+    // دنیا — همان اشتباهی که مسیرِ per-restaurant با model_run_id از آن
+    // پرهیز می‌کند.
+    await cleanup();
+    // ⚠️ ۵ روز قبل، نه ۳۰ روز: باید **داخلِ** پنجره‌ی ۳۰ روزه بیفتند تا این
+    // تست واقعاً کفِ `trainedAt` را بسنجد و نه پنجره‌ی زمانی را. نسخه‌ی اولِ
+    // همین تست آن‌ها را ۳۰ روز عقب می‌برد و در نتیجه خودِ پنجره حذفشان
+    // می‌کرد — پس برداشتنِ کفِ trainedAt هیچ تستی را قرمز نمی‌کرد
+    // (جهش‌آزمایی ثابتش کرد: ۰ قرمز).
+    await platformPredictions(MIN_RESOLVED_FOR_ACCURACY + 5, 0.90);
+    await db.modelPrediction.updateMany({
+      where: { restaurantId },
+      data: { generatedAt: new Date(Date.now() - 5 * 86_400_000) },
+    });
+    // نسخه‌ی تازه، آموزش‌دیده بعد از آن‌ها
+    await db.platformNoShowModel.create({
+      data: {
+        weights: W, sampleSize: 500, positiveCount: 60, restaurantCount: 8,
+        learnedBrier: 0.10, staticBrier: 0.20, learnedAuc: 0.72,
+        isActive: true, activationReason: 'تست', featureVersion: NO_SHOW_FEATURE_VERSION,
+        // آموزش‌دیده **بعد از** آن پیش‌بینی‌ها، ولی هر دو داخلِ پنجره‌ی ۳۰ روزه.
+        trainedAt: new Date(Date.now() - 86_400_000),
+      },
+    });
+    await invalidatePlatformNoShowModelCache();
+
+    const drift = await detectPlatformPerformanceDrift({});
+    assert.equal(drift.resolvedCount, 0,
+      'هیچ نتیجه‌ای از زمانِ آموزشِ این نسخه نیست — قدیمی‌ها نباید شمرده شوند');
+    assert.equal(drift.verdict, 'insufficient_data',
+      'خطای نسخه‌ی قبلی نباید به نسخه‌ی تازه نسبت داده شود');
+    await cleanup();
+  });
+
+  test('🔴 پیش‌بینیِ رستورانی (scope دیگر) در سنجشِ سراسری نمی‌آید', async () => {
+    // بدونِ فیلترِ scope، دقتِ دو دامنه‌ی کاملاً متفاوت با هم قاطی می‌شد.
+    await cleanup();
+    await activePlatform(0.10);
+    await platformPredictions(MIN_RESOLVED_FOR_ACCURACY + 5, 0.30);
+    await db.modelPrediction.updateMany({ where: { restaurantId }, data: { modelScope: 'restaurant' } });
+
+    const drift = await detectPlatformPerformanceDrift({});
+    assert.equal(drift.verdict, 'insufficient_data',
+      'ردیف‌های scope=restaurant نباید در سنجشِ سراسری شمرده شوند');
+    await cleanup();
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────
+describe('نسب‌نامه‌ی دامنه در دفترِ پیش‌بینی', () => {
+
+  test('🔴 پیش‌بینیِ ساخته‌شده با مدلِ سراسری با scope=platform ثبت می‌شود', async () => {
+    // ⚠️ این تست حلقه‌ی **نوشتن** را می‌بندد، و بدونش کلِ زنجیره بی‌اثر بود:
+    // اگر `modelScope` به دفتر نرسد، `detectPlatformPerformanceDrift` هرگز
+    // ردیفی پیدا نمی‌کند و بازگردانیِ سراسری — با همه‌ی تست‌های سبزش — یک
+    // مکانیزمِ مرده است.
+    // جهش‌آزمایی این را ثابت کرد: برداشتنِ `modelScope` از نقطه‌ی ثبت
+    // **صفر** تست را قرمز می‌کرد.
+    const { recordPrediction } = await import('../src/lib/prediction-ledger');
+
+    await db.modelOutcome.deleteMany({ where: { prediction: { restaurantId } } });
+    await db.modelPrediction.deleteMany({ where: { restaurantId } });
+
+    const id = await recordPrediction({
+      restaurantId, predictionType: 'no_show', entityType: 'reservation',
+      entityId: `${TAG}-scope-1`,
+      modelSource: 'learned',
+      modelRunId: null,           // مدلِ سراسری اجرایِ per-restaurant ندارد
+      modelScope: 'platform',
+      featureVersion: NO_SHOW_FEATURE_VERSION,
+      predictedValue: 0.4, confidence: 'medium',
+    });
+    assert.ok(id, 'ثبت باید موفق باشد');
+
+    const row = await db.modelPrediction.findUniqueOrThrow({
+      where: { id: id! }, select: { modelScope: true, modelRunId: true },
+    });
+    assert.equal(row.modelScope, 'platform',
+      'بدونِ این ستون، پیش‌بینیِ سراسری از heuristic و از مدل‌های بی‌نسب تفکیک‌ناپذیر است');
+    assert.equal(row.modelRunId, null, 'و صادقانه نسب‌نامه‌ی جعلی نمی‌گیرد');
+
+    await db.modelPrediction.deleteMany({ where: { restaurantId } });
+  });
+
+  test('⚠️ نبودِ دامنه NULL می‌ماند، نه یک مقدارِ حدسی', async () => {
+    // ردیف‌های پیش از مهاجرتِ ۰۷۱ واقعاً نامعلوم‌اند. جعلِ 'restaurant'
+    // برایشان همان «صفر به‌جای نامعلوم» است که ML_CONTRACT ممنوع کرده.
+    const { recordPrediction } = await import('../src/lib/prediction-ledger');
+    const id = await recordPrediction({
+      restaurantId, predictionType: 'no_show', entityType: 'reservation',
+      entityId: `${TAG}-scope-2`,
+      modelSource: 'heuristic', featureVersion: NO_SHOW_FEATURE_VERSION,
+      predictedValue: 0.2, confidence: 'low',
+    });
+    const row = await db.modelPrediction.findUniqueOrThrow({
+      where: { id: id! }, select: { modelScope: true },
+    });
+    assert.equal(row.modelScope, null);
+    await db.modelPrediction.deleteMany({ where: { restaurantId } });
   });
 });

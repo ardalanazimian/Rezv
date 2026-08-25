@@ -444,6 +444,10 @@ async function placeReservation(
       entityId: result.resv.id,
       modelSource: noShowRisk.source,
       modelRunId: lin.modelRunId,   // فازِ ۶ — نسبت‌دادن به نسخه‌ی مدل
+      // ⚠️ دامنه هم ثبت می‌شود، وگرنه پیش‌بینیِ مدلِ سراسری (که modelRunId
+      // ندارد) از پیش‌بینیِ heuristic و از مدل‌های بدونِ نسب‌نامه قابلِ
+      // تفکیک نیست — و دقتِ تولیدش هرگز اندازه‌گیری نمی‌شود (مهاجرتِ ۰۷۱).
+      modelScope: lin.modelScope ?? (noShowRisk.source === 'heuristic' ? 'heuristic' : null),
       featureVersion: NO_SHOW_FEATURE_VERSION,
       predictedValue: lin.probability,
       confidence: confidenceFor({ modelSource: noShowRisk.source, priorTotal: lin.features.priorTotal }),

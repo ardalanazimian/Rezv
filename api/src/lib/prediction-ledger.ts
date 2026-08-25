@@ -69,6 +69,15 @@ export interface RecordPredictionInput {
   entityId: string;
   modelSource: 'learned' | 'heuristic';
   modelRunId?: string | null;
+  /**
+   * دامنه‌ی مدل: `restaurant` | `platform` | `heuristic`.
+   *
+   * ⚠️ بدونِ این، دقتِ تولیدِ مدلِ **سراسری** اصلاً قابلِ نسبت‌دادن نبود:
+   * مدلِ سراسری اجرایِ per-restaurant ندارد پس `modelRunId` آن null است،
+   * و پیش‌بینی‌هایش با ردیف‌های بدونِ نسب‌نامه (پیش از مهاجرتِ ۰۵۶) در یک
+   * سطل می‌افتادند. مهاجرتِ ۰۷۱.
+   */
+  modelScope?: 'restaurant' | 'platform' | 'heuristic' | null;
   featureVersion: string;
   /** احتمالِ ۰..۱ برای طبقه‌بندی، یا مقدارِ عددی برای رگرسیون. */
   predictedValue: number;
@@ -94,6 +103,7 @@ export async function recordPrediction(input: RecordPredictionInput): Promise<st
         entityId: input.entityId,
         modelSource: input.modelSource,
         modelRunId: input.modelRunId ?? null,
+        modelScope: input.modelScope ?? null,
         featureVersion: input.featureVersion,
         predictedValue: input.predictedValue,
         confidence: input.confidence,

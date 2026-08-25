@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { populationStabilityIndex, psiBand, type PsiBand } from './ml-core';
 import { MIN_RESOLVED_FOR_ACCURACY } from './prediction-ledger';
-import { invalidateNoShowModelCache } from './no-show-model';
+import { invalidateNoShowModelCache, invalidatePlatformNoShowModelCache } from './no-show-model';
 import { createLogger } from './logger';
 import { metrics } from './metrics';
 
@@ -381,4 +381,132 @@ export async function rollbackDriftedModel(params: {
     verdict: drift.verdict, relativeChange: drift.relativeChange,
     reason: drift.reason,
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  رانش و بازگردانیِ مدلِ **سراسری**
+//
+//  ⚠️ شکافی که می‌بندد (ممیزیِ نهاییِ ۲۰۲۶-۰۸-۲۵): مدلِ سراسری به **هر**
+//  رستورانی که مدلِ اختصاصی ندارد سرو می‌شود — یعنی همه‌ی رستوران‌های تازه،
+//  دقیقاً همان‌هایی که برایشان ساخته شد. ولی هیچ سنجشِ تولید، هیچ تشخیصِ
+//  رانش و **هیچ مسیرِ بازگردانی** نداشت:
+//    • `detectPerformanceDrift` روی `model_run_id` فیلتر می‌کند و مدلِ
+//      سراسری اجرایِ per-restaurant ندارد ⇒ هرگز شمرده نمی‌شد.
+//    • `rollbackDriftedModel` فقط `restaurant_no_show_models` را می‌نویسد.
+//  یعنی یک مدلِ سراسریِ خراب تا ابد به همه‌ی رستوران‌های تازه سرو می‌شد.
+//
+//  حالا با ستونِ `model_scope` (مهاجرتِ ۰۷۱) پیش‌بینی‌هایش قابلِ شناسایی‌اند
+//  و همان منطقِ per-restaurant رویشان اعمال می‌شود.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** رانشِ کاراییِ مدلِ سراسریِ فعال. همان آستانه‌ها و همان معناها. */
+export async function detectPlatformPerformanceDrift(params: {
+  windowDays?: number;
+} = {}): Promise<PerformanceDrift> {
+  const windowDays = params.windowDays ?? 30;
+  const since = new Date(Date.now() - windowDays * 86_400_000);
+
+  const model = await db.platformNoShowModel.findFirst({
+    where: { isActive: true },
+    orderBy: { trainedAt: 'desc' },
+    select: { id: true, learnedBrier: true, trainedAt: true },
+  });
+
+  if (!model) {
+    return {
+      verdict: 'insufficient_data', modelRunId: null, holdoutBrier: null,
+      productionBrier: null, relativeChange: null, resolvedCount: 0,
+      reason: 'مدلِ سراسریِ فعالی وجود ندارد',
+    };
+  }
+
+  // ⚠️ فیلترِ `generated_at >= trainedAt` حیاتی است: مدلِ سراسری «نسخه»ی
+  // قابلِ ارجاع در خودِ پیش‌بینی ندارد (کلید فقط scope است)، پس بدونِ این
+  // شرط، پیش‌بینی‌های نسخه‌های **قبلیِ** سراسری هم شمرده می‌شدند و بدترشدنِ
+  // ظاهری می‌توانست صرفاً اثرِ عوض‌شدنِ مدل باشد، نه رانشِ دنیا — همان
+  // اشتباهی که مسیرِ per-restaurant با model_run_id از آن پرهیز می‌کند.
+  const floor = model.trainedAt > since ? model.trainedAt : since;
+
+  const rows = await db.$queryRaw<{ n: number; brier: number | null }[]>(Prisma.sql`
+    SELECT COUNT(o.id)::int AS n, AVG(o.squared_error)::float8 AS brier
+    FROM model_predictions p
+    JOIN model_outcomes o ON o.prediction_id = p.id
+    WHERE p.prediction_type = 'no_show'
+      AND p.model_scope = 'platform'
+      AND p.generated_at >= ${floor}
+  `);
+  const resolvedCount = Number(rows[0]?.n ?? 0);
+  const productionBrier = rows[0]?.brier == null ? null : Number(rows[0].brier);
+
+  if (resolvedCount < MIN_RESOLVED_FOR_ACCURACY || productionBrier === null) {
+    return {
+      verdict: 'insufficient_data', modelRunId: null, holdoutBrier: model.learnedBrier,
+      productionBrier: null, relativeChange: null, resolvedCount,
+      reason: `نتیجه‌ی کافی از زمانِ آموزشِ این نسخه نیست (${resolvedCount} < ${MIN_RESOLVED_FOR_ACCURACY})`,
+    };
+  }
+
+  const holdoutBrier = model.learnedBrier;
+  if (!(holdoutBrier > 0)) {
+    return {
+      verdict: 'insufficient_data', modelRunId: null, holdoutBrier,
+      productionBrier, relativeChange: null, resolvedCount,
+      reason: 'Brierِ هولدآوت معتبر نیست، مقایسه ممکن نیست',
+    };
+  }
+
+  const relativeChange = (productionBrier - holdoutBrier) / holdoutBrier;
+  const verdict: DriftVerdict =
+    relativeChange >= PERFORMANCE_DRIFT_THRESHOLD ? 'drifted'
+    : relativeChange >= PERFORMANCE_DRIFT_THRESHOLD / 2 ? 'watch'
+    : 'stable';
+  const pct = (relativeChange * 100).toFixed(1);
+
+  return {
+    verdict, modelRunId: null, holdoutBrier, productionBrier, relativeChange, resolvedCount,
+    reason: verdict === 'drifted'
+      ? `مدلِ سراسری در تولید ${pct}٪ بدتر از هولدآوت — بازآموزی لازم است`
+      : verdict === 'watch'
+        ? `مدلِ سراسری در تولید ${pct}٪ بدتر از هولدآوت — زیرِ آستانه، ولی زیرِ نظر`
+        : `کاراییِ تولیدِ مدلِ سراسری با زمانِ آموزش هم‌خوان است (${pct}٪)`,
+  };
+}
+
+/**
+ * پس‌گرفتنِ خودکارِ مدلِ سراسریِ رانش‌کرده.
+ *
+ * دقیقاً همان قواعدِ نسخه‌ی per-restaurant: فقط روی حکمِ `drifted` اقدام
+ * می‌کند (نه `watch`، نه `insufficient_data`)، شرطِ `isActive: true` را
+ * اتمیک در `updateMany` می‌گذارد، و دلیل را ثبت می‌کند تا «هرگز فعال نشد»
+ * از «فعال بود و پس گرفته شد» قابلِ تفکیک بماند.
+ */
+export async function rollbackDriftedPlatformModel(params: {
+  windowDays?: number;
+} = {}): Promise<{ rolledBack: boolean; verdict: DriftVerdict; relativeChange: number | null; reason: string }> {
+  const drift = await detectPlatformPerformanceDrift(params);
+  if (drift.verdict !== 'drifted') {
+    return { rolledBack: false, verdict: drift.verdict, relativeChange: drift.relativeChange, reason: drift.reason };
+  }
+
+  const updated = await db.platformNoShowModel.updateMany({
+    where: { isActive: true },
+    data: { isActive: false, activationReason: `غیرفعالِ خودکار: ${drift.reason}` },
+  });
+  if (updated.count === 0) {
+    return {
+      rolledBack: false, verdict: drift.verdict, relativeChange: drift.relativeChange,
+      reason: 'مدلِ سراسری پیش از این غیرفعال شده بود',
+    };
+  }
+
+  await invalidatePlatformNoShowModelCache();
+
+  log.warn('مدلِ سراسریِ no-show به‌خاطرِ افتِ کارایی در تولید غیرفعال شد', {
+    holdoutBrier: drift.holdoutBrier,
+    productionBrier: drift.productionBrier,
+    relativeChange: drift.relativeChange,
+  });
+  metrics.modelRolledBack.inc({ reason: 'platform_performance_drift' });
+
+  return { rolledBack: true, verdict: drift.verdict, relativeChange: drift.relativeChange, reason: drift.reason };
 }

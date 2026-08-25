@@ -822,6 +822,10 @@ model ModelPrediction {
   modelRunId      String?           @map("model_run_id") @db.Uuid
   modelRun        ModelTrainingRun? @relation(fields: [modelRunId], references: [id], onDelete: SetNull)
   featureVersion  String            @map("feature_version")
+  /// دامنه‌ی مدلی که این پیش‌بینی را ساخت: 'restaurant' | 'platform' | 'heuristic'.
+  /// NULL = ردیف‌های پیش از مهاجرتِ ۰۷۱ (واقعاً نامعلوم — جعل نمی‌شود).
+  /// بدونِ این، دقتِ مدلِ سراسری در تولید اصلاً قابلِ نسبت‌دادن نبود.
+  modelScope      String?           @map("model_scope")
   predictedValue  Float             @map("predicted_value")   // احتمالِ ۰..۱ یا مقدارِ عددی
   confidence      String                                      // high|medium|low|insufficient_data
   features        Json?                                       // ردِ ورودی (lineage)
@@ -831,6 +835,7 @@ model ModelPrediction {
   // [merge ۰۸-۲۴] map: تا نامِ Prisma = نامِ SQL — وگرنه bootstrapِ db push یک ایندکسِ دومِ هم‌تعریف می‌سازد (نوشتنِ دوبرابر). گاردش: schema-drift.integration.test.mts
   @@index([restaurantId, predictionType, generatedAt(sort: Desc)], map: "model_predictions_lookup_idx")
   @@index([entityType, entityId], map: "model_predictions_entity_idx")
+  @@index([modelScope, generatedAt(sort: Desc)], map: "model_predictions_scope_generated_idx")
   @@map("model_predictions")
 }
 

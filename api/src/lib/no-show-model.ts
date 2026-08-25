@@ -418,6 +418,21 @@ export async function fetchTrainingRows(restaurantId: string): Promise<TrainingR
     ) p
     WHERE r.restaurant_id = ${restaurantId}::uuid
       AND r.status IN ('completed', 'no_show', 'arrived', 'seated', 'dining')
+      -- ⚠️ walk-inها عمداً از **هدفِ آموزش** بیرون‌اند (رفعِ ۲۰۲۶-۰۸-۲۵):
+      -- walk-in با slot_start = now و created_at = now ساخته می‌شود
+      -- (lib/reservations.ts) ⇒ lead_minutes ≈ 0 — و چون وضعیتش 'seated'
+      -- است، برچسبش **همیشه** ۰ می‌شود. walk-in ذاتاً نمی‌تواند no-show
+      -- باشد؛ مهمان فیزیکاً آن‌جاست.
+      -- نتیجه: مدل یاد می‌گرفت «فاصله‌ی نزدیکِ صفر ⇒ امن»، دقیقاً وارونه‌ی
+      -- سیگنالِ واقعی برای رزروِ آنلاینِ last-minute. ویژگیِ پیوسته‌ی leadLog
+      -- این را بدتر می‌کرد چون کانالِ دقیق‌تری برای فیت‌کردنِ رابطه‌ی وارونه
+      -- می‌داد.
+      -- ضمناً یک عدمِ تطابقِ جمعیتیِ train/serve بود: walk-in هرگز از
+      -- predictNoShowRisk رد نمی‌شود، پس مدل روی جمعیتی آموزش می‌دید که
+      -- هرگز قرار نبود امتیازش بدهد.
+      -- ⚠️ ولی در **سابقه**‌ی مهمان (زیرکوئریِ LATERAL) می‌مانند — حضورِ
+      -- واقعی بوده و پاک‌کردنش تاریخچه‌ی او را تحریف می‌کند.
+      AND r.source <> 'walkin'
     -- ⚠️ DESC + LIMIT، بعد در JS برعکس — همان الگویِ مسیرِ سراسری، و به
     -- دلیلِ دیگری هم لازم (رفعِ ۲۰۲۶-۰۸-۲۵): با ASC + LIMIT 500، به‌محضِ
     -- اینکه یک رستوران از ۵۰۰ رزروِ حل‌شده رد شود، بازآموزیِ شبانه تا ابد
@@ -716,6 +731,9 @@ export async function fetchPlatformTrainingRows(): Promise<TrainingRow[]> {
         AND h.slot_start < r.created_at
     ) p
     WHERE r.status IN ('completed', 'no_show', 'arrived', 'seated', 'dining')
+      -- همان دلیلِ کوئریِ per-restaurant بالا: walk-in برچسبِ همیشه-صفر با
+      -- فاصله‌ی صفر است و مدل را وارونه آموزش می‌دهد.
+      AND r.source <> 'walkin'
     ORDER BY r.created_at DESC
     LIMIT ${PLATFORM_MAX_ROWS}
   `;
