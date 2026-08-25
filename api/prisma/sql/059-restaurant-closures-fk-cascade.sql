@@ -17,9 +17,16 @@
 -- را می‌دهد (اجرای مجدد بی‌ضرر است).
 -- ═══════════════════════════════════════════════════════════════════════
 
+-- ⚠️ `ON UPDATE CASCADE` اجباری است و تزئینی نیست: پیش‌فرضِ `onUpdate` در Prisma
+-- برای یک relationِ الزامی «Cascade» است، پس `db push` این FK را
+-- `ON DELETE CASCADE ON UPDATE CASCADE` می‌سازد. اگر اینجا فقط ON DELETE بنویسیم،
+-- این مهاجرت رویِ مسیرِ CI همان FKِ درست را با یکی که ON UPDATE ندارد جایگزین
+-- می‌کند و گاردِ schema-drift.integration قرمز می‌شود (اندازه‌گیری‌شده روی
+-- Postgres واقعی، نه حدس).
+
 ALTER TABLE restaurant_closures
   DROP CONSTRAINT IF EXISTS restaurant_closures_restaurant_id_fkey;
 
 ALTER TABLE restaurant_closures
   ADD CONSTRAINT restaurant_closures_restaurant_id_fkey
-  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE;
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE ON UPDATE CASCADE;
