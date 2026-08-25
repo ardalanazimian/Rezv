@@ -1590,7 +1590,13 @@ async function loadAdminRestaurants(){
     API.online = true;
     updateOfflineBanner();
     return res.data.restaurants.map(apiR => {
-      const fb = RESTAURANTS_SAMPLE.find(s => s.id === apiR.id) || RESTAURANTS_SAMPLE[0];
+      // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): apiR.id همیشه UUID است و idِ نمونه عددِ
+      // ۱..۸ — پس find همیشه شکست می‌خورد و *همه‌ی* رستوران‌های واقعی دقیقاً
+      // لوگو/گرادیانِ نمونه‌ی شماره‌ی ۱ (🌿 سبز) را می‌گرفتند. حالا انتخابِ
+      // تزئینی، قطعی و متنوع بر اساسِ هَشِ id است (همان الگویِ اپ مشتری).
+      const key = String(apiR.id || '');
+      let h = 0; for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+      const fb = RESTAURANTS_SAMPLE[h % RESTAURANTS_SAMPLE.length];
       return mapAdminRestaurant(apiR, fb);
     });
   }
@@ -1713,15 +1719,19 @@ document.addEventListener('keydown', (e) => {
 </script>
 <script data-src="js/data.js">
 // ═══ رزرونو — پنل company: داده‌ی نمونه + برچسب‌ها + مسیریابی (Vanilla JS، scope مشترک) ═══
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): نام‌های نمونه پیشوندِ [DEMO] گرفتند — قانونِ
+// شماره‌ی ۶ی CLAUDE.md، که photos.js و hours.js همین پنل از قبل رعایت می‌کردند
+// ولی این فایل نه. بدونِ برچسب، KPIهای مالیِ داشبورد (MRR، موجودیِ پیامک،
+// «پرکارترین رستوران‌ها») از دلِ رستوران‌های خیالی جمع زده می‌شد و واقعی می‌نمود.
 const RESTAURANTS_SAMPLE=[
-  {id:1,smsBalance:2400,name:'کافه‌رستوران ویستا',logo:'🌿',grad:'linear-gradient(135deg,#34D399,#059669)',city:'تهران، ولنجک',plan:'pro',status:'active',isOpen:true,daysLeft:218,members:1240,reservations:3420,sms:8600,rating:4.8,joined:'۱۴۰۳/۰۸'},
-  {id:2,smsBalance:1150,name:'سفره‌خانه سنتی گرام',logo:'🍵',grad:'linear-gradient(135deg,#F59E0B,#D97706)',city:'اصفهان، چهارباغ',plan:'pro',status:'active',isOpen:true,daysLeft:142,members:890,reservations:2180,sms:5400,rating:4.6,joined:'۱۴۰۳/۰۹'},
-  {id:3,smsBalance:60,name:'رستوران دریایی سارا',logo:'🦞',grad:'linear-gradient(135deg,#0EA5E9,#0369A1)',city:'بندرعباس، ساحل',plan:'basic',status:'expiring',isOpen:true,daysLeft:8,members:430,reservations:920,sms:1900,rating:4.4,joined:'۱۴۰۴/۰۱'},
-  {id:4,smsBalance:820,name:'کافه هانا',logo:'☕',grad:'linear-gradient(135deg,#8B5CF6,#6D28D9)',city:'تهران، فرشته',plan:'pro',status:'active',isOpen:true,daysLeft:95,members:670,reservations:1540,sms:3200,rating:4.7,joined:'۱۴۰۳/۱۱'},
-  {id:5,smsBalance:0,name:'پیتزا ایتالیا',logo:'🍕',grad:'linear-gradient(135deg,#EF4444,#B91C1C)',city:'شیراز، معالی‌آباد',plan:'basic',status:'expired',isOpen:false,daysLeft:-12,members:310,reservations:760,sms:1200,rating:4.2,joined:'۱۴۰۳/۱۲'},
-  {id:6,smsBalance:140,name:'رستوران آوا',logo:'🍽️',grad:'linear-gradient(135deg,#EC4899,#BE185D)',city:'تهران، سعادت‌آباد',plan:'trial',status:'trial',isOpen:true,daysLeft:5,members:48,reservations:62,sms:140,rating:4.5,joined:'۱۴۰۴/۰۳'},
-  {id:7,smsBalance:1900,name:'کبابسرای البرز',logo:'🔥',grad:'linear-gradient(135deg,#F97316,#C2410C)',city:'کرج، گوهردشت',plan:'pro',status:'active',isOpen:true,daysLeft:174,members:1020,reservations:2650,sms:6100,rating:4.5,joined:'۱۴۰۳/۰۷'},
-  {id:8,smsBalance:75,name:'سوشی توکیو',logo:'🍣',grad:'linear-gradient(135deg,#14B8A6,#0F766E)',city:'تهران، زعفرانیه',plan:'basic',status:'active',isOpen:true,daysLeft:56,members:520,reservations:1180,sms:2400,rating:4.6,joined:'۱۴۰۳/۱۰'},
+  {id:1,smsBalance:2400,name:'[DEMO] کافه‌رستوران ویستا',logo:'🌿',grad:'linear-gradient(135deg,#34D399,#059669)',city:'تهران، ولنجک',plan:'pro',status:'active',isOpen:true,daysLeft:218,members:1240,reservations:3420,sms:8600,rating:4.8,joined:'۱۴۰۳/۰۸'},
+  {id:2,smsBalance:1150,name:'[DEMO] سفره‌خانه سنتی گرام',logo:'🍵',grad:'linear-gradient(135deg,#F59E0B,#D97706)',city:'اصفهان، چهارباغ',plan:'pro',status:'active',isOpen:true,daysLeft:142,members:890,reservations:2180,sms:5400,rating:4.6,joined:'۱۴۰۳/۰۹'},
+  {id:3,smsBalance:60,name:'[DEMO] رستوران دریایی سارا',logo:'🦞',grad:'linear-gradient(135deg,#0EA5E9,#0369A1)',city:'بندرعباس، ساحل',plan:'basic',status:'expiring',isOpen:true,daysLeft:8,members:430,reservations:920,sms:1900,rating:4.4,joined:'۱۴۰۴/۰۱'},
+  {id:4,smsBalance:820,name:'[DEMO] کافه هانا',logo:'☕',grad:'linear-gradient(135deg,#8B5CF6,#6D28D9)',city:'تهران، فرشته',plan:'pro',status:'active',isOpen:true,daysLeft:95,members:670,reservations:1540,sms:3200,rating:4.7,joined:'۱۴۰۳/۱۱'},
+  {id:5,smsBalance:0,name:'[DEMO] پیتزا ایتالیا',logo:'🍕',grad:'linear-gradient(135deg,#EF4444,#B91C1C)',city:'شیراز، معالی‌آباد',plan:'basic',status:'expired',isOpen:false,daysLeft:-12,members:310,reservations:760,sms:1200,rating:4.2,joined:'۱۴۰۳/۱۲'},
+  {id:6,smsBalance:140,name:'[DEMO] رستوران آوا',logo:'🍽️',grad:'linear-gradient(135deg,#EC4899,#BE185D)',city:'تهران، سعادت‌آباد',plan:'trial',status:'trial',isOpen:true,daysLeft:5,members:48,reservations:62,sms:140,rating:4.5,joined:'۱۴۰۴/۰۳'},
+  {id:7,smsBalance:1900,name:'[DEMO] کبابسرای البرز',logo:'🔥',grad:'linear-gradient(135deg,#F97316,#C2410C)',city:'کرج، گوهردشت',plan:'pro',status:'active',isOpen:true,daysLeft:174,members:1020,reservations:2650,sms:6100,rating:4.5,joined:'۱۴۰۳/۰۷'},
+  {id:8,smsBalance:75,name:'[DEMO] سوشی توکیو',logo:'🍣',grad:'linear-gradient(135deg,#14B8A6,#0F766E)',city:'تهران، زعفرانیه',plan:'basic',status:'active',isOpen:true,daysLeft:56,members:520,reservations:1180,sms:2400,rating:4.6,joined:'۱۴۰۳/۱۰'},
 ];
 // RESTAURANTS متغیر زنده: اول نمونه (فقط تا قبل از بارگذاری اول)، بعد همیشه از API
 let RESTAURANTS = RESTAURANTS_SAMPLE;
@@ -2074,16 +2084,19 @@ function renderCustomers(){
 function rBilling(){
   const totalSms=RESTAURANTS.reduce((s,r)=>s+r.sms,0);
   const activeSubsc=RESTAURANTS.filter(r=>r.status==='active').length;
-  // ⚠️ فازِ ۲: `starter` — پلنی که خودِ همین پنل از صفِ فروش اختصاص می‌دهد —
-// در این نگاشت نبود، پس `PRICE[r.plan]||0` بی‌صدا صفر می‌داد و هر تنانتِ
-// starter عملاً «مشتریِ رایگان» شمرده می‌شد. برچسبِ تایل از قبل «تخمینی از
-// پلن‌ها» می‌گوید، پس ایرادِ واقعی همین صفرِ خاموش بود، نه ادعایِ دقت.
-const PRICE={free:0,starter:390,pro:890,enterprise:2400};
-  const mrr=RESTAURANTS.filter(r=>r.status==='active'||r.status==='expiring').reduce((s,r)=>s+(PRICE[r.plan]||0),0);
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): MRR قبلاً همیشه از یک ثابتِ کلاینتیِ
+  // ناقص و کهنه (PRICE={free,pro,enterprise} — بدونِ basic/trial و ناسازگار
+  // با قیمت‌های واقعیِ CMS) جمع زده می‌شد — حتی وقتی داده‌ی رستوران‌ها واقعی
+  // بود. یک رقمِ درآمدِ اشتباه بدترین نوعِ KPI است. حالا: چون بک‌اند قیمتِ
+  // پلن را برنمی‌گرداند، در حالتِ آنلاین «—» نشان می‌دهیم (اندازه‌گیری‌نشده،
+  // نه صفر — همان قاعده‌ی ML_CONTRACT)؛ عددِ نمونه فقط در دموی آفلاین با
+  // داده‌ی [DEMO] می‌ماند.
+  const PRICE={free:0,pro:890,enterprise:2400};
+  const mrr=API.online?null:RESTAURANTS.filter(r=>r.status==='active'||r.status==='expiring').reduce((s,r)=>s+(PRICE[r.plan]||0),0);
   document.getElementById('v-billing').innerHTML=`
     <div class="bill-summary">
       <div class="bill-stat"><div class="bs-val" style="color:var(--ink)">${fa(activeSubsc)}</div><div class="bs-label">اشتراک فعال</div></div>
-      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${fa(mrr)}<span style="font-size:14px"> هزارتومان</span></div><div class="bs-label">درآمد ماهانه (تخمینی از پلن‌ها)</div></div>
+      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${mrr==null?'—':fa(mrr)+'<span style="font-size:14px"> هزارتومان</span>'}</div><div class="bs-label">${mrr==null?'درآمد ماهانه — اندازه‌گیری‌نشده (قیمتِ پلن در API نیست)':'درآمد ماهانه (نمونه‌ی دمو)'}</div></div>
       <div class="bill-stat"><div class="bs-val" style="color:var(--amber-600)">${fa(totalSms)}</div><div class="bs-label">کل پیامک ارسالی</div></div>
     </div>
     <div class="panel">

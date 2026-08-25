@@ -4931,7 +4931,9 @@ function saveLogoFallback(){
   RESTAURANT.logoGradient=logoChoice.gradient;
   refreshLogoDisplay();
   closeModal();profRenderGallery();
-  toast('','ذخیره شد');
+  // صداقت: این انتخاب فقط در حافظه‌ی همین صفحه است و به سرور نمی‌رود —
+  // toastِ قبلی («ذخیره شد») ادعای ماندگاری می‌کرد (ممیزیِ ۲۰۲۶-۰۸-۲۴).
+  toast('','فقط برای نمایشِ همین جلسه اعمال شد — برای لوگویِ دائمی، عکس آپلود کن');
 }
 // ─── ویرایش نام ───
 function openNameEditor(){
@@ -6407,6 +6409,9 @@ async function rLoyalty(){
   const cbLoaded = typeof _cbLoaded !== 'undefined' && _cbLoaded && typeof CB !== 'undefined';
   const tiers=[['طلایی',gold,'#F59E0B'],['نقره‌ای',silver,'#94A3B8'],['برنزی',bronze,'#D97706']];
   const tierName={gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'};
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): دو KPIِ ثابتِ «۲.۱× خرید بیشتر» و «۸٪
+  // میانگین کش‌بک» حذف شدند — هیچ‌جا اندازه‌گیری نمی‌شدند و کنارِ اعدادِ
+  // واقعیِ باشگاه، ادعای اندازه‌گیری‌نشده بودند (قاعده‌ی ML_CONTRACT).
   document.getElementById('v-loyalty').innerHTML=`
     <div class="pg-head"><div class="pg-title">باشگاه مشتریان</div><div class="pg-sub">اعضای وفادار، امتیازها و سطح‌بندی مشتری‌ها</div></div>
     <div class="kpi-grid">
@@ -6714,14 +6719,13 @@ function buildHeatmap(rows){
   // بازچینش به ترتیب هفته‌ی ایرانی: شنبه(6)..جمعه(5)
   const order=[6,0,1,2,3,4,5]; const orderLbl=['ش','ی','د','س','چ','پ','ج'];
   const grid={}; let mx=0;
-  if(rows&&rows.length){
-    rows.forEach(r=>{ grid[`${r.dow}-${r.hour}`]=r.count; if(r.count>mx)mx=r.count; });
-  } else {
-    order.forEach((d,di)=>hours.forEach(h=>{
-      const wknd=(d===4||d===5)?1.8:1; const night=(h>=19&&h<=21)?2.2:(h>=18?1.4:0.6);
-      const v=Math.round(Math.random()*4*wknd*night); grid[`${d}-${h}`]=v; if(v>mx)mx=v;
-    }));
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): حالتِ بدونِ داده قبلاً با Math.random یک
+  // نقشه‌ی «واقع‌گرایانه» می‌ساخت و tooltipِ هر خانه می‌گفت «۳ رزرو» — نویزِ
+  // تصادفی در لباسِ تاریخچه‌ی رزرو. نبودِ داده یعنی نبودِ ادعا.
+  if(!(rows&&rows.length)){
+    return `<div class="pr-empty">هنوز داده‌ی کافی برای نقشه‌ی حرارتی نیست — با ثبتِ رزروهای بیشتر ساخته می‌شود.</div>`;
   }
+  rows.forEach(r=>{ grid[`${r.dow}-${r.hour}`]=r.count; if(r.count>mx)mx=r.count; });
   mx=mx||1;
   const cell=(d,h)=>{
     const v=grid[`${d}-${h}`]||0; const t=v/mx;
@@ -6749,6 +6753,10 @@ async function rAnalytics(){
     weekly:[14,18,24,31],
   };
   // بارگذاری از API اگر توکن staff داریم
+  // بدونِ توکنِ staff هم باید صادق باشیم: API.online پیش‌فرض true است و
+  // بدونِ این خط، dataSourceNote() هیچ هشداری نشان نمی‌داد و بلوکِ نمونه
+  // (۱۳۶ رزرو، ۶۶٪ بازگشت...) کاملاً واقعی به نظر می‌رسید (ممیزیِ ۲۰۲۶-۰۸-۲۴).
+  if(!API.getToken()) API.online=false;
   if(API.getToken()){
     const res=await API.get('/restaurant/analytics');
     if(res.ok && res.data){

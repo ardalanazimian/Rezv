@@ -1719,6 +1719,16 @@ button,[role="button"],.botnav-item,a{min-height:0}
 .econ-balances > .loy-action-card{margin-top:0}
 @media (min-width:560px){.econ-balances{grid-template-columns:1fr 1fr}}
 
+/* ═══ مدیای واقعیِ رستوران (ممیزیِ ۲۰۲۶-۰۸-۲۴) — عکسِ تأییدشده، لوگو، گالری ═══ */
+.rp-hero--photo{background-size:cover;background-position:center}
+.rp-hero-logo{position:absolute;top:44%;left:50%;transform:translate(-50%,-58%);width:96px;height:96px;border-radius:24px;object-fit:cover;box-shadow:0 10px 30px rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.35);z-index:1}
+.rp-gallery{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+.rp-gallery-item{flex:0 0 auto;margin:0;scroll-snap-align:start}
+.rp-gallery-item img{width:210px;height:140px;object-fit:cover;border-radius:var(--radius-lg,14px);display:block;background:var(--s-100,#222)}
+.rp-gallery-item figcaption{font-size:11.5px;color:var(--t3);margin-top:4px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-address{font-size:13px;color:var(--t2);display:flex;align-items:center;gap:6px;margin-top:8px}
+.menu-thumb{width:44px;height:44px;border-radius:11px;object-fit:cover;display:block}
+
 </style>
 <style data-src="css/ds-bridge.css">
 /* ═══════════════════════════════════════════════════════════
@@ -2249,6 +2259,17 @@ const GRAD = {
   3:'linear-gradient(135deg,#FBBF24,#D97706)', 4:'linear-gradient(135deg,#22D3EE,#0891B2)',
   5:'linear-gradient(135deg,#F87171,#DC2626)', 6:'linear-gradient(160deg,#818CF8,#4F46E5 60%,#1E1B4B)'
 };
+// گرادیانِ پس‌زمینه برای هر رستوران — GRAD با کلیدِ عددیِ ۱..۶ ساخته شده بود،
+// ولی idِ رستورانِ واقعی UUID است؛ GRAD[uuid] همیشه undefined می‌شد و کارت/هیرو
+// عملاً بدونِ پس‌زمینه رندر می‌شد (style="background:undefined"). این تابع برای
+// هر id (عددی یا UUID) یک گرادیانِ ثابت و قطعی برمی‌گرداند — صرفاً تزئینی است،
+// هیچ ادعای داده‌ای ندارد.
+function gradFor(id){
+  if (GRAD[id]) return GRAD[id];
+  const k = String(id ?? '');
+  let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+  return GRAD[(h % 6) + 1];
+}
 const R_SAMPLE = [
   {id:1,e:'🌿',n:'[DEMO] کافه‌رستوران ویستا',cuisine:'ایتالیایی · فیوژن',price:'$$',rt:4.8,reviews:128,vibes:['رمانتیک','آروم'],cb:8,
    slots:['۱۹:۰۰','۱۹:۳۰','۲۰:۰۰'],badge:'پرطرفدار',ai:false,
@@ -2297,9 +2318,10 @@ const PERKS=[['🎁','کش‌بک','تا ۱۵٪ برگشت پول'],['⚡','رز
 const BADGES=[['🍽️','اولین رزرو',1],['🔥','۵ هفته پیاپی',1],['⭐','گورمه',1],['🌙','شب‌نشین',1],['👑','VIP',0],['🗺️','کاشف',0]];
 let pts=0, favs=new Set(), curRest=null, bk={};
 // علاقه‌مندی‌ها را بین رفرش‌ها نگه دار (localStorage — الگوی rz_* مثل بقیهٔ اپ)
-// شناسه‌ها همیشه رشته نگه داشته می‌شوند: با دادهٔ نمونه عددی‌اند و با بک‌اندِ
-// واقعی UUID. مقادیرِ عددیِ ذخیره‌شده‌ی قدیمی همین‌جا مهاجرت می‌کنند.
+// کلیدها همیشه String می‌شوند: idِ نمونه عدد است و idِ واقعی UUID؛ بدونِ
+// یکسان‌سازی، favs.has(id) بینِ این دو نوع شکست می‌خورد.
 try{ const saved=JSON.parse(localStorage.getItem('rz_favs')||'[]'); if(Array.isArray(saved)) favs=new Set(saved.map(String)); }catch{}
+const favHas=id=>favs.has(String(id));
 function saveFavs(){ try{ localStorage.setItem('rz_favs', JSON.stringify([...favs])); }catch{} }
 function setPts(v){ pts=v; }
 // ═══════════════════════════════════════════════════════════
@@ -2414,7 +2436,7 @@ function wlError(msg, retryCall){
     </div>`;
 }
 async function joinWaitlist(id){
-  const r=R.find(x=>String(x.id)===String(id));
+  const r=findR(id);
   const sheetBody=document.getElementById('sheetBody');
   sheetBody.innerHTML=`<div style="text-align:center;padding:40px"><div class="spin" style="margin:0 auto 16px"></div>در حال پیوستن به صف...</div>`;
   const party=parseInt(String(bk.party).replace(/[^\d۰-۹]/g,'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))||2;
@@ -2636,7 +2658,7 @@ function depositLabel(r){
 
 // شیت رزرو که با دکمه‌ی پایین باز می‌شود (تاریخ/ساعت/نفر)
 function openBookSheet(id){
-  const r=R.find(x=>String(x.id)===String(id));
+  const r=findR(id);
   // پیش‌فرض‌ها از زمینه‌ی مشترک می‌آیند، نه از صفر — اگر کاربر قبلاً گفته
   // «پنجشنبه، ۴ نفر»، همان‌جا می‌ماند و لازم نیست دوباره واردش کند.
   const dates = dateOptions();
@@ -2682,7 +2704,7 @@ function renderDemoTimeOptions(sel,r){
 }
 // بارگذاری ساعت‌های واقعاً موجود از /restaurants/{slug}/availability
 async function refreshSlots(id){
-  const r=R.find(x=>String(x.id)===String(id));
+  const r=findR(id);
   const sel=document.getElementById('bwTime');
   if(!sel)return;
   // اگر slug نداریم (حالت آفلاین/نمونه)، از همون slots نمونه استفاده کن
@@ -2730,7 +2752,7 @@ function quickBook(id,slot){
   setBk({id,date:labelForISO(bookingCtx.date),dateVal:bookingCtx.date,time:slot,
          timeRaw:String(slot).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
          party:`${fmtFa(bookingCtx.party)} نفر`,partyN:bookingCtx.party});
-  openSheet(bookStep2(R.find(x=>String(x.id)===String(id))));
+  openSheet(bookStep2(findR(id)));
 }
 function startBook(id){
   const t=document.getElementById('bwTime').value;
@@ -2739,7 +2761,7 @@ function startBook(id){
   const partyN=parseInt(document.getElementById('bwParty').value,10)||2;
   setBookingCtx({ date: iso, party: partyN });
   setBk({id,date:labelForISO(iso),dateVal:iso,time:faTime(t),timeRaw:t,party:`${fmtFa(partyN)} نفر`,partyN});
-  openSheet(bookStep2(R.find(x=>String(x.id)===String(id))));
+  openSheet(bookStep2(findR(id)));
 }
 function bookStep2(r){
   // ⚠️ رفع‌شده (R1): وقتی رستوران منویی ثبت نکرده (r.menu=[])، قبلاً این
@@ -2748,7 +2770,7 @@ function bookStep2(r){
   // منویِ خالی اصلاً نشان داده نمی‌شود.
   const preorderBlock = r.menu.length
     ? `<div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
-    <div class="opt-row">${r.menu.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${m[0]} ${m[1]}</div>`).join('')}</div>`
+    <div class="opt-row">${r.menu.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m[0])} ${esc(m[1])}</div>`).join('')}</div>`
     : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
@@ -2757,7 +2779,7 @@ function bookStep2(r){
 }
 // wrapperِ سراسری: onclick در scope سراسری اجرا می‌شود و به R (ماژولی) دسترسی ندارد،
 // پس lookup را اینجا (با دسترسی به R) انجام می‌دهیم.
-function toBookStep3(id){ openSheet(bookStep3(R.find(x=>String(x.id)===String(id)))); }
+function toBookStep3(id){ openSheet(bookStep3(findR(id))); }
 function bookStep3(r){
   // نام/موبایل از حسابِ کاربر (اگر وارد شده) — نه مقدارِ ساختگی
   const name = isLoggedIn() ? userName() : '';
@@ -2793,10 +2815,10 @@ function bookStep3(r){
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook('${esc(String(r.id))}')">تأیید رزرو</button>`;
 }
 async function confirmBook(id){
-  const r=R.find(x=>String(x.id)===String(id));
+  const r=findR(id);
   // رزرو نیاز به ورود دارد — بعد از ورود، همین مرحله‌ی تأیید از سر گرفته می‌شود
   if(!isLoggedIn()){
-    setAfterLogin(()=>{ const rr=R.find(x=>String(x.id)===String(id)); if(rr && String(bk.id)===String(id)) openSheet(bookStep3(rr)); });
+    setAfterLogin(()=>{ const rr=findR(id); if(rr && String(bk.id)===String(id)) openSheet(bookStep3(rr)); });
     toast('','برای رزرو اول وارد شو — بعدش ادامه می‌دیم');
     setTimeout(()=>openLogin(),400);
     return;
@@ -3269,6 +3291,18 @@ function syncNavPoints(){
 // فقط در مسیرِ کاملاً آفلاین/بدونِ‌slug استفاده می‌شود.
 const EMPTY_RB = { food: 0, service: 0, atmo: 0, value: 0 };
 
+/** بازه‌ی قیمت به شکلِ نمایشی — priceBandِ بک‌اند عددِ ۱..۴ است. */
+function priceBandStr(band){
+  return (Number.isInteger(band) && band >= 1) ? '$'.repeat(Math.min(4, band)) : null;
+}
+
+/** URLِ مدیا: بک‌اند مسیرِ نسبی (/api/v1/media/...) می‌دهد؛ اگر فرانت روی
+ *  دامنه‌ی جدا باشد باید با API.base مطلق شود. URLِ مطلق دست‌نخورده می‌ماند. */
+function resolveMediaUrl(u){
+  if (!u) return null;
+  return u.startsWith('/') ? API.base + u : u;
+}
+
 // نگاشت داده‌ی API به ساختار فرانت‌اند (R)
 // بک‌اند فاز ۱ این فیلدها را می‌دهد: id, slug, name, cuisine, ...
 // فیلدهای غنی (منو، نظرات، تفکیک امتیاز) که هنوز در API نیستند، برایِ
@@ -3283,14 +3317,21 @@ function mapApiRestaurant(apiR, sampleFallback){
   return {
     id: apiR.id,
     slug: apiR.slug || sampleFallback?.slug || null,
-    e: apiR.emoji || sampleFallback?.e || '🍽️',
+    // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): e/price/rt/reviews/cb/badge برای رستورانِ
+    // زنده دیگر از sampleFallback قرض گرفته نمی‌شوند — همان قاعده‌ی isLive که
+    // قبلاً برای slots/menu/revs/about اعمال شده بود ولی این شش فیلد جا مانده
+    // بودند. پیامدِ قبلی: چون بک‌اند emoji/price_range/badge اصلاً برنمی‌گرداند
+    // و rating می‌تواند null باشد، هر رستورانِ واقعی ایموجی، بازه‌ی قیمت،
+    // امتیازِ ۴٫۸، تعدادِ نظر و نشانِ «پرطرفدار»ِ یک رکوردِ [DEMO] را به
+    // اسمِ خودش نشان می‌داد — از جمله درصدِ کش‌بک که یک وعده‌ی مالی است.
+    e: apiR.emoji || (isLive ? '🍽️' : (sampleFallback?.e || '🍽️')),
     n: apiR.name,
     cuisine: apiR.cuisine || sampleFallback?.cuisine || '',
     // ⚠️ قراردادِ شکسته (F1): کلاینت `price_range` می‌خواند ولی بک‌اند
     // `priceBand` (یک عددِ ۱..۴ — schema.prisma:105) می‌فرستد. یعنی مقدار
     // همیشه undefined می‌شد و به بازه‌ی قیمتِ یک رستورانِ **نمونه‌ی بی‌ربط**
     // می‌افتاد. حالا عددِ واقعیِ سرور به همان شکلِ $ نگاشت می‌شود.
-    price: bandToPrice(apiR.priceBand) || apiR.price_range || (isLive ? '' : sampleFallback?.price || '$$'),
+    price: bandToPrice(apiR.priceBand ?? apiR.price_band) || apiR.price_range || (isLive ? '' : sampleFallback?.price || '$$'),
 
     // ⚠️ جعلِ اعتبارِ اجتماعی (F2): بک‌اند عمداً `rating: null` می‌فرستد وقتی
     // هیچ نظری ثبت نشده — کامنتِ خودِ route می‌گوید «null یعنی هنوز نمی‌دانیم،
@@ -3319,7 +3360,8 @@ function mapApiRestaurant(apiR, sampleFallback){
     lat: apiR.latitude ?? null,
     lng: apiR.longitude ?? null,
     vibes: apiR.vibes || sampleFallback?.vibes || [],
-    cb: (apiR.cbBasePct ?? apiR.cashback_percent) ?? sampleFallback?.cb ?? 0,
+    // کش‌بک یک وعده‌ی مالی به مهمان است — برای رستورانِ زنده فقط از API، هرگز از نمونه.
+    cb: (apiR.cbBasePct ?? apiR.cashback_percent) ?? (isLive ? 0 : (sampleFallback?.cb ?? 0)),
     // ⚠️ رفع‌شده (Part 1 — حسابرسیِ صداقتِ سانس، ۲۰۲۶-۰۸-۱۴): sampleFallback
     // اینجا عمداً حذف شد، هم‌ردیفِ visits7d/recommendPct بالا — به همون دلیل:
     // این «شکلِ صفحه» نیست، ادعایِ ساعتِ رزروِ واقعی است. backend فعلاً
@@ -3337,7 +3379,7 @@ function mapApiRestaurant(apiR, sampleFallback){
     // توجه: همین باگِ id-mismatch رویِ فیلدهایِ دیگه (menu/rb/feats/about/...)
     // هم هست — خارج از دامنه‌ی این ماموریت (فقط سانس)؛ در KNOWN_LIMITATIONS ثبت شد.
     slots: apiR.available_slots || (isLive ? [] : sampleFallback?.slots) || [],
-    badge: apiR.badge ?? sampleFallback?.badge ?? null,
+    badge: apiR.badge ?? (isLive ? null : (sampleFallback?.badge ?? null)),
     // ai/good/bad قبلاً بدونِ هیچ‌شرطی از sampleFallback می‌آمدند — یعنی حتی
     // برایِ رستورانِ واقعی هم «مهمان‌ها تعریف می‌کنن از...» با جمله‌هایِ
     // رستورانِ نمونه پر می‌شد. حالا برایِ رستورانِ زنده همیشه خالی/false‌اند.
@@ -3394,6 +3436,46 @@ async function loadMoreRestaurants(){
   const list = res.ok ? (res.data?.items || []) : [];
   NEXT_CURSOR = res.data?.next_cursor || null;
   return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
+}
+
+// ═══════════ جزئیاتِ رستوران — GET /restaurants/{slug} ═══════════
+// این endpoint (همانی که صفحه‌ی SEO مصرف می‌کند) عکس‌های تأییدشده، لوگو،
+// منویِ واقعی، امتیازِ تجمیعی و آدرس را برمی‌گرداند. تا پیش از این، اپ مشتری
+// هرگز صدایش نمی‌زد — یعنی کلِ زنجیره‌ی «آپلودِ عکس در پنلِ بیزنس ← تأییدِ
+// پلتفرم» به هیچ مشتری‌ای نمی‌رسید. کش کوچک در حافظه تا بازکردنِ دوباره‌ی
+// همان رستوران درخواستِ تازه نزند (خودِ سرور هم ۶۰ ثانیه cache دارد).
+const _detailCache = new Map();
+async function loadRestaurantDetail(slug){
+  if (!slug) return null;
+  if (_detailCache.has(slug)) return _detailCache.get(slug);
+  const res = await API.get(`/restaurants/${encodeURIComponent(slug)}`);
+  if (!res.ok) return null;   // شکست کش نمی‌شود — دفعه‌ی بعد دوباره تلاش می‌کنیم
+  _detailCache.set(slug, res.data);
+  return res.data;
+}
+
+/** ادغامِ پاسخِ جزئیات در رکوردِ فرانت — فقط فیلدهایی که سرور واقعاً داده. */
+function applyRestaurantDetail(r, d){
+  if (!r || !d) return r;
+  r.detailLoaded = true;
+  r.photos = Array.isArray(d.photos) ? d.photos.filter(p => p && p.url) : [];
+  r.logo = d.logo_url || null;
+  if (typeof d.rating === 'number') r.rt = d.rating;
+  if (typeof d.reviews_count === 'number') r.reviews = d.reviews_count;
+  if (d.location?.address) r.address = d.location.address;
+  if (Array.isArray(d.vibes) && d.vibes.length) r.vibes = d.vibes;
+  const band = priceBandStr(d.price_band);
+  if (band) r.price = band;
+  if (Array.isArray(d.menu) && d.menu.length) {
+    // به همان شکلِ tuple که رندررِ فعلی می‌فهمد + عکسِ آیتم به‌عنوانِ عضوِ چهارم
+    r.menu = d.menu.map(m => [
+      m.emoji || '🍽️',
+      m.name,
+      Number(m.price_toman || 0).toLocaleString('fa-IR'),
+      m.image_url || null,
+    ]);
+  }
+  return r;
 }
 
 // ═══════════ DATA ═══════════
@@ -3521,10 +3603,14 @@ function cardHTML(r){
   // دکمه‌ی واقعیِ کشیده روی کلِ کارت می‌نشیند و z-indexِ ۱ می‌گیرد — یعنی زیرِ
   // دکمه‌ی علاقه‌مندی (۳) و چیپ‌های ساعت (پنل، ۲). این تنها راهی است که هم با
   // کیبورد قابلِ فوکوس باشد، هم ترتیبِ فوکوس منطقی بماند.
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): idها همیشه کوتیشن‌دار تزریق می‌شوند —
+  // idِ واقعی UUID است و بدونِ کوتیشن، onclick خطای syntax می‌داد و کلِ
+  // CTAهای کارت برای رستورانِ واقعی مرده بودند (mockِ E2E با idِ عددی این
+  // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
   return `<article class="rc reveal">
-    <div class="rc-bg" style="background:${GRAD[r.id]||GRAD[1]}"></div>
+    <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
     <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${esc(String(r.id))}')"></button>
-    <span class="rc-emoji">${r.e}</span>
+    <span class="rc-emoji">${esc(r.e)}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
     <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav('${esc(String(r.id))}',this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
@@ -3652,10 +3738,12 @@ function filterVibe(v,el){
 }
 // ── نزدیک تو (کارت افقی کوچک) ──
 function hCardHTML(r,extra){
+  // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
+  const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest('${esc(String(r.id))}')">
-    <div class="hcard-img" style="background:${GRAD[r.id]||GRAD[1]}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
+    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
-    <div class="hcard-meta">${r.rt!=null?`${icon('star',{size:12,fill:true})} ${fmtFa(r.rt)} · `:''}${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
+    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
 }
 // ═══════════════════════════════════════════════════════════
@@ -3766,7 +3854,7 @@ async function renderEvents(){
 function eventsHtml(events,isDemo){
   return events.map(e=>`
     <div class="event-card" role="button" tabindex="0" onclick="openRest('${esc(String(e.rid))}')">
-      <div class="event-emoji">${e.emoji}</div>
+      <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
         ${e.rest?`<div class="event-rest">${esc(e.rest)}</div>`:''}
@@ -3840,9 +3928,9 @@ function clearSearch(){
   doSearch();
 }
 function toggleFav(id,el){
-  const key=String(id);
-  const on=!favs.has(key);
-  on?favs.add(key):favs.delete(key);
+  id=String(id);   // favs همیشه کلیدِ String نگه می‌دارد (id نمونه عدد، id واقعی UUID)
+  const on=!favs.has(id);
+  on?favs.add(id):favs.delete(id);
   saveFavs();
   if(el){
     el.innerHTML=icon('heart',{size:20,fill:on});
@@ -3863,6 +3951,7 @@ function toggleFav(id,el){
 }
 // نسخه‌ی hero صفحه رستوران — با انیمیشن تپش
 function toggleRestFav(id){
+  id=String(id);
   const btn=document.getElementById('rpFav');
   const key=String(id);
   const on=!favs.has(key);
@@ -3901,8 +3990,9 @@ window.toggleRestFav = toggleRestFav;
 
 
 
-// depositLabel: تنها منبعِ متنِ پیش‌پرداخت (رفعِ P1-3) — در booking.js تعریف شده.
 
+
+// depositLabel: تنها منبعِ متنِ پیش‌پرداخت (P1-3، خطِ ممیزی) — در نوارِ رزرو مصرف می‌شود.
 
 
 
@@ -3935,18 +4025,61 @@ async function shareRestaurant(name){
   }
   toast('⚠️', 'مرورگرت اشتراک‌گذاری یا کپی رو پشتیبانی نمی‌کنه');
 }
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴) — دو باگِ واقعی و یک اتصالِ گم‌شده:
+//  ۱. idِ رستورانِ واقعی UUID است؛ اینجا بدونِ کوتیشن داخلِ onclick تزریق
+//     می‌شد (openBookSheet(${id})) که برای UUID خطای syntaxِ JS می‌دهد —
+//     یعنی دکمه‌ی «رزرو میز» برای هر رستورانِ واقعی مرده بود. CIِ فعلی این
+//     را نمی‌گرفت چون mockِ E2E با idِ عددی کار می‌کند. حالا همه‌ی idها
+//     کوتیشن‌دار تزریق و با String مقایسه می‌شوند (findR).
+//  ۲. GRAD[uuid] همیشه undefined بود → hero بدونِ پس‌زمینه. حالا gradFor.
+//  ۳. اپ مشتری هرگز GET /restaurants/{slug} را صدا نمی‌زد — عکس‌هایی که
+//     رستوران در پنلِ بیزنس آپلود و پلتفرم تأیید کرده بود، هیچ‌وقت به
+//     مشتری نمی‌رسید. حالا صفحه اول فوری رندر می‌شود و بعد با داده‌ی
+//     واقعیِ سرور (عکس، لوگو، منو، امتیازِ تجمیعی) کامل می‌شود.
 function openRest(id){
-  setCurRest(id);const r=R.find(x=>String(x.id)===String(id));
+  const r=findR(id); if(!r) return;
+  setCurRest(r.id);
+  renderRestPage(r);
+  go('rest');
+  finishRestRender();
+  enrichRestPage(r);
+}
+/** بعد از رندرِ اولیه، جزئیاتِ واقعی را از سرور بگیر و صفحه را کامل کن. */
+async function enrichRestPage(r){
+  // حداکثر یک درخواست به‌ازای هر بازشدنِ صفحه؛ بعد از موفقیت (detailLoaded +
+  // کشِ loadRestaurantDetail) دیگر درخواستی نمی‌رود. شکستِ گذرا کش نمی‌شود —
+  // بازشدنِ بعدیِ همین رستوران دوباره تلاش می‌کند.
+  if(!r.slug || r.detailLoaded || !API.online) return;
+  const d = await loadRestaurantDetail(r.slug);
+  if(!d) return;
+  applyRestaurantDetail(r, d);
+  // فقط اگر کاربر هنوز روی همین رستوران است، دوباره رندر کن (بدونِ go/scroll)
+  if(String(curRest)===String(r.id) && document.getElementById('page-rest')?.classList.contains('active')){
+    renderRestPage(r);
+    finishRestRender();
+  }
+}
+function finishRestRender(){
+  setTimeout(()=>document.querySelectorAll('.rb-fill').forEach(f=>f.style.width=f.dataset.w+'%'),300);
+  armReveals&&armReveals();
+}
+function renderRestPage(r){
+  const id=r.id;
   const stars=n=>Array.from({length:5},(_,i)=>icon('star',{size:13,fill:i<Math.round(n)})).join('');
+  // عکسِ واقعیِ تأییدشده اگر هست، پس‌زمینه‌ی hero می‌شود؛ وگرنه گرادیانِ تزئینی.
+  const heroPhoto=r.photos?.length?resolveMediaUrl(r.photos[0].url):null;
+  const heroBg=heroPhoto
+    ?`background-image:linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.55)),url('${esc(heroPhoto)}');background-size:cover;background-position:center`
+    :`background:${gradFor(id)}`;
   document.getElementById('page-rest').innerHTML=`
-    <div class="rp-hero" style="background:${GRAD[id]||GRAD[1]}">
-      <div class="rp-hero-mesh"></div>
+    <div class="rp-hero${heroPhoto?' rp-hero--photo':''}" style="${heroBg}">
+      <div class="rp-hero-mesh"${heroPhoto?' style="display:none"':''}></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
         <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant('${esc(r.n)}')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
-        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav('${esc(String(id))}')" aria-pressed="${favs.has(String(id))}" aria-label="${favs.has(String(id))?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favs.has(String(id))})}</button>
+        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav('${esc(String(r.id))}')" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
       </div>
-      <div class="rp-hero-emoji">${esc(r.e)}</div>
+      ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-emoji">${esc(r.e)}</div>`}
       <div class="rp-hero-overlay">
         <div class="rp-hero-badges">
           ${r.now?`<span class="rp-hero-badge live"><span class="live-dot" aria-hidden="true"></span> الان باز</span>`:''}
@@ -3960,17 +4093,20 @@ function openRest(id){
           <span>${fmtFa(r.reviews)} نظر</span>
           <span class="rp-hero-dot">·</span>
           <span>${esc(r.cuisine)}</span>
-          <span class="rp-hero-dot">·</span>
-          <span>${esc(r.price)}</span>
+          ${r.price?`<span class="rp-hero-dot">·</span>
+          <span>${esc(r.price)}</span>`:''}
         </div>
       </div>
     </div>
     <div class="wrap rp-body">
       ${detailSocialProof(r)}
+      ${r.photos?.length?`<div class="rp-section reveal"><h3>عکس‌ها</h3>
+        <div class="rp-gallery" role="list">${r.photos.map(p=>`<figure class="rp-gallery-item" role="listitem"><img src="${esc(resolveMediaUrl(p.url))}" alt="${esc(p.caption||('عکسِ '+r.n))}" loading="lazy">${p.caption?`<figcaption>${esc(p.caption)}</figcaption>`:''}</figure>`).join('')}</div>
+      </div>`:''}
 
-      <div class="rp-section reveal"><h3>درباره</h3>${r.about?`<p class="rp-about">${esc(r.about)}</p>`:`<p class="rp-empty">این رستوران هنوز توضیحی ثبت نکرده.</p>`}${r.feats.length?`<div class="feat-row">${r.feats.map(f=>`<span class="feat">${icon('check',{size:13})} ${esc(f)}</span>`).join('')}</div>`:''}</div>
+      <div class="rp-section reveal"><h3>درباره</h3>${r.about?`<p class="rp-about">${esc(r.about)}</p>`:`<p class="rp-empty">این رستوران هنوز توضیحی ثبت نکرده.</p>`}${r.address?`<p class="rp-address">${icon('mapPin',{size:14})} ${esc(r.address)}</p>`:''}${r.feats.length?`<div class="feat-row">${r.feats.map(f=>`<span class="feat">${icon('check',{size:13})} ${esc(f)}</span>`).join('')}</div>`:''}</div>
 
-      <div class="rp-section reveal"><h3>منو</h3>${r.menu.length?`<div class="menu-list">${r.menu.map(m=>`<div class="menu-item glass"><div class="menu-emoji">${m[0]}</div><div class="menu-info"><div class="menu-name">${esc(m[1])}</div><div class="menu-price">${m[2]} تومان</div></div></div>`).join('')}</div>`:`<p class="rp-empty">این رستوران هنوز منویی ثبت نکرده.</p>`}</div>
+      <div class="rp-section reveal"><h3>منو</h3>${r.menu.length?`<div class="menu-list">${r.menu.map(m=>`<div class="menu-item glass"><div class="menu-emoji">${m[3]?`<img class="menu-thumb" src="${esc(resolveMediaUrl(m[3]))}" alt="" loading="lazy">`:esc(m[0])}</div><div class="menu-info"><div class="menu-name">${esc(m[1])}</div><div class="menu-price">${m[2]} تومان</div></div></div>`).join('')}</div>`:`<p class="rp-empty">این رستوران هنوز منویی ثبت نکرده.</p>`}</div>
 
       <div class="rp-section reveal">
         <h3>امتیازها و نظرها</h3>
@@ -4006,9 +4142,6 @@ function openRest(id){
       <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openChat('${esc(r.slug||'')}')" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
       <button class="btn btn-primary rp-bookbar-btn" onclick="buzz&&buzz();openBookSheet('${esc(String(id))}')">رزرو میز</button>
     </div>`;
-  go('rest');
-  setTimeout(()=>document.querySelectorAll('.rb-fill').forEach(f=>f.style.width=f.dataset.w+'%'),300);
-  armReveals&&armReveals();
 }
 
 // ── نمایشِ تابعِ onclick روی window ──
@@ -4024,7 +4157,7 @@ window.shareRestaurant = shareRestaurant;
 //  رفتار دقیقاً همان قبل است.
 // ═══════════════════════════════════════════════════════════
 function renderFavs(){
-  const list=R.filter(r=>favs.has(String(r.id)));const grid=document.getElementById('favGrid'),empty=document.getElementById('favEmpty');
+  const list=R.filter(r=>favHas(r.id));const grid=document.getElementById('favGrid'),empty=document.getElementById('favEmpty');
   document.getElementById('favSub').textContent=list.length?`${fmtFa(list.length)} رستوران ذخیره‌شده`:'';
   if(!list.length){grid.innerHTML='';empty.style.display='block';return}
   empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.querySelectorAll('.rc').forEach(c=>c.classList.add('in'));
@@ -4048,7 +4181,7 @@ function mapApiTrip(apiR){
   // (کلیدِ اصلی) را همیشه برمی‌گرداند (Prisma بدونِ select صریح همه‌ی
   // اسکالرها را می‌دهد) — همان را اول امتحان می‌کنیم؛ فقط اگر R هنوز از
   // نمونه پر بود (id عددی، UUID مچ نمی‌شود) به slug برمی‌گردیم.
-  const rest=R.find(x=>String(x.id)===String(apiR.restaurantId)) || (apiR.restaurant?.slug ? R.find(x=>x.slug===apiR.restaurant.slug) : null);
+  const rest=findR(apiR.restaurantId) || (apiR.restaurant?.slug ? R.find(x=>x.slug===apiR.restaurant.slug) : null);
   // تبدیل تاریخ ISO به نمایش فارسی ساده
   let dateStr='',timeStr='';
   if(apiR.slotStart){
@@ -4110,6 +4243,7 @@ async function renderTrips(){
     if(res.ok && Array.isArray(res.data)){
       trips=res.data.map(mapApiTrip);
       window.__lastTrips=trips;
+      isDemo=false;
     }
     // اگر آفلاین یا خطا → trips دست‌نخورده می‌ماند (خالی روی استقرارِ
     // واقعی، دادهٔ دمو فقط در بسته‌ی تک‌فایلی) — بدونِ جعلِ رزرو.
@@ -4124,10 +4258,11 @@ async function renderTrips(){
   }
   const done=trips.filter(t=>t.status==='done').length;
   const up=trips.filter(t=>t.status==='up').length;
-  const summary=`<div class="trips-summary reveal"><div class="ts-stat"><div class="ts-v">${fmtFa(trips.length)}</div><div class="ts-l">کل رزرو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(up)}</div><div class="ts-l">پیش‌رو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(done)}</div><div class="ts-l">تجربه‌شده</div></div></div>`;
+  const demoNote=isDemo?`<div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:12.5px;line-height:1.7;text-align:center;margin-bottom:10px">⚠️ این‌ها رزروِ نمونه‌اند — رزروِ واقعیِ تو نیستند (اتصال به سرور برقرار نیست).</div>`:'';
+  const summary=`${demoNote}<div class="trips-summary reveal"><div class="ts-stat"><div class="ts-v">${fmtFa(trips.length)}</div><div class="ts-l">کل رزرو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(up)}</div><div class="ts-l">پیش‌رو</div></div><div class="ts-div"></div><div class="ts-stat"><div class="ts-v">${fmtFa(done)}</div><div class="ts-l">تجربه‌شده</div></div></div>`;
 
   listEl.innerHTML=summary+trips.map(t=>{
-    const r=t.rid?R.find(x=>String(x.id)===String(t.rid)):null;
+    const r=t.rid?findR(t.rid):null;
     const emoji=t._emoji||r?.e||'🍽️';
     const name=t._name||r?.n||'رستوران';
     const gradId=t._grad||t.rid||1;
@@ -4146,9 +4281,9 @@ async function renderTrips(){
     return `<div class="trip-card reveal ${t.status}${swipe?' has-swipe':''}">
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
       <div class="trip-card-inner">
-        <div class="trip-card-hero" style="background:${GRAD[gradId]||GRAD[1]}">
+        <div class="trip-card-hero" style="background:${gradFor(gradId)}">
           <div class="trip-card-mesh"></div>
-          <span class="trip-card-emoji">${emoji}</span>
+          <span class="trip-card-emoji">${esc(emoji)}</span>
           <span class="trip-card-status ${t.status}">${statusLabel}</span>
         </div>
         <div class="trip-card-body">
@@ -6708,6 +6843,11 @@ window.dismissInstall = dismissInstall;
 //  R متغیر زنده‌ی رستوران‌هاست: اول از نمونه (نمایش فوری)، بعد از API به‌روز می‌شود.
 // ═══════════════════════════════════════════════════════════
 let R = R_SAMPLE;
+
+// پیداکردنِ رستوران با id — همیشه با مقایسه‌ی String، چون idِ نمونه عدد است و
+// idِ واقعیِ بک‌اند UUID (string). مقایسه‌ی === مستقیم بین این دو، برای هر
+// رستورانِ واقعی شکست می‌خورد (باگی که همه‌ی CTAهای کارت را می‌شکست).
+const findR = id => R.find(x => String(x.id) === String(id));
 
 // ── startup: بعد از آماده‌شدنِ DOM اجرا شو (چرخه‌ی load-time را می‌شکند) ──
 function boot(){
