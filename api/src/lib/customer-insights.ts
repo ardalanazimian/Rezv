@@ -128,6 +128,30 @@ export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResul
 //  CLV + سگمنت‌بندی — محاسبه‌ی per (رستوران × کاربر)
 // ───────────────────────────────────────────────────────────
 
+/**
+ * وضعیت‌هایی که در **آمارِ مشتری** (CLV، سگمنت، DNA) «بازدید» حساب می‌شوند.
+ *
+ * ⚠️ عمداً export شده و عمداً اینجاست، نه در reservation-status.ts: این
+ * مجموعه با `VISITED_RESERVATION_STATUSES` یکی **نیست** و نباید باشد —
+ * آن یکی برای سیگنالِ اجتماعی («این هفته چند نفر اینجا بودند») است و
+ * `arrived` را عمداً بیرون گذاشته؛ این یکی تاریخچه‌ی خودِ مهمان است و
+ * رزروِ قدیمیِ `arrived` (معادلِ حذف‌شده‌ی `checked_in`) واقعاً بازدیدِ او
+ * بوده و نباید از پروفایلش پاک شود.
+ *
+ * ⚠️ نکته‌ی ثبت‌شده (یافته‌ی ۲۰۲۶-۰۸-۲۵، رفع‌نشده): `checked_in` اینجا
+ * نیست. مهمانی که QR را زده ولی پرسنل هرگز «نشست» نزده، در آمارش بازدید
+ * حساب نمی‌شود. رجوع کن به docs/recovery/OPEN-FINDINGS.md.
+ *
+ * دلیلِ export: خلاصه‌ی ماهانه‌ی DNA (lib/dna-summary.ts) باید **دقیقاً**
+ * همین تعریف را داشته باشد، وگرنه عددِ ماهانه و عددِ کل روی یک صفحه با هم
+ * نمی‌خوانند. کپیِ سومِ این فهرست ممنوع.
+ */
+export const INSIGHT_VISIT_STATUSES = ['completed', 'arrived', 'seated', 'dining'] as const;
+
+export function isInsightVisit(status: string): boolean {
+  return (INSIGHT_VISIT_STATUSES as readonly string[]).includes(status);
+}
+
 export async function recomputeCustomerInsight(restaurantId: string, userId: string) {
   const reservations = await db.reservation.findMany({
     where: { restaurantId, userId },
@@ -136,8 +160,7 @@ export async function recomputeCustomerInsight(restaurantId: string, userId: str
   });
   if (reservations.length === 0) return null;
 
-  const isVisit = (s: string) => ['completed', 'arrived', 'seated', 'dining'].includes(s);
-  const visits = reservations.filter(r => isVisit(r.status));
+  const visits = reservations.filter(r => isInsightVisit(r.status));
   const noShows = reservations.filter(r => r.status === 'no_show').length;
   const cancels = reservations.filter(r => ['cancelled', 'cancelled_by_user', 'cancelled_by_restaurant', 'auto_cancelled'].includes(r.status)).length;
 

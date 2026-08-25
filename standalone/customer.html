@@ -6023,11 +6023,12 @@ try{ window.openPalette = openPalette; window.closePalette = closePalette; }catc
 
 
 
+
 const READ_KEY = 'rz_notif_read';
 function readSet(){ try{ return new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')); }catch{ return new Set(); } }
 function saveRead(set){ try{ localStorage.setItem(READ_KEY, JSON.stringify([...set])); }catch{} }
 
-const CATS = { all:'همه', reservation:'رزرو', ai:'پیشنهاد' };
+const CATS = { all:'همه', reservation:'رزرو', dna:'خلاصه‌ی ماه', ai:'پیشنهاد' };
 let _filter = 'all';
 
 // منبعِ رزروها: فقط رزروهای واقعیِ سرور. _live با refreshNotif() از
@@ -6048,11 +6049,23 @@ function tripsSource(){
 
 // خواندنِ رزروهای واقعی از سرور (همان endpointِ صفحهٔ سفرها) و به‌روزرسانیِ badge.
 // آفلاین/خطا/مهمان → _live همچنان null می‌ماند و tripsSource هیچ رزروی نمی‌سازد.
+// خلاصه‌ی ماهانه‌ی DNA — از سرور، هرگز محلی ساخته نمی‌شود.
+// null یعنی «هنوز نپرسیده‌ایم یا نشد»؛ {available:false} یعنی سرور صریحاً
+// گفته خلاصه‌ای نیست (ماهِ بدونِ بازدید، یا انصرافِ خودِ کاربر از دسته‌ی dna).
+// هیچ‌کدام از این دو حالت نباید به ساختنِ یک خلاصه‌ی محلی منجر شود — اعدادِ
+// این کارت فقط با مقایسه‌ی ماه‌به‌ماهِ سمتِ سرور معنا دارند.
+let _dna = null;
 async function refreshNotif(){
   try{
-    if(!isLoggedIn()){ _live = null; updateNotifBadge(); return; }
+    if(!isLoggedIn()){ _live = null; _dna = null; updateNotifBadge(); return; }
     const res = await API.get('/me/reservations');
     if(res && res.ok && Array.isArray(res.data)) _live = res.data.map(mapApiTrip);
+  }catch(e){}
+  try{
+    if(isLoggedIn()){
+      const d = await API.get('/me/dna-summary');
+      if(d && d.ok && d.data && typeof d.data.available === 'boolean') _dna = d.data;
+    }
   }catch(e){}
   updateNotifBadge();
   const ov = document.getElementById('notif');
@@ -6079,6 +6092,30 @@ function build(){
   if(top && top.rt!=null) out.push({ id:'ai-'+top.id, cat:'ai', pri:'low', ic:'sparkle',
     title:'پیشنهادِ هوشمند', body:`${top.n} با امتیاز ${top.rt} — شاید دوستش داشته باشی`,
     action:{ label:'ببین', run:()=>openRest(top.id) } });
+  // ── خلاصه‌ی ماهانه‌ی DNA ────────────────────────────────────────────
+  // فقط وقتی سرور صریحاً available:true داده. برچسبِ ماه و همه‌ی اعداد از
+  // خودِ پاسخ می‌آیند — اینجا هیچ عددی محاسبه یا حدس زده نمی‌شود.
+  if(_dna && _dna.available){
+    const d = _dna;
+    const bits = [`${faNum(d.visits)} بار بیرون رفتی`];
+    if(d.restaurants_visited) bits.push(`${faNum(d.restaurants_visited)} رستوران`);
+    if(d.new_restaurants > 0) bits.push(`${faNum(d.new_restaurants)} تای جدید`);
+    // مقایسه فقط وقتی ماهِ قبل واقعاً داده داشته (null = کاربرِ تازه، نه صفر)
+    if(typeof d.previous_visits === 'number'){
+      const diff = d.visits - d.previous_visits;
+      if(diff > 0) bits.push(`${faNum(diff)} بار بیشتر از ماه قبل`);
+      else if(diff < 0) bits.push(`${faNum(-diff)} بار کمتر از ماه قبل`);
+      else bits.push('مثل ماه قبل');
+    }
+    out.push({
+      // کلیدِ ماه در id است تا خلاصه‌ی ماهِ بعد دوباره خوانده‌نشده شود و
+      // خلاصه‌ی همین ماه بعد از خواندن دوباره برنگردد.
+      id:'dna-'+d.period_key, cat:'dna', pri:'high', ic:'chart',
+      title:`خلاصه‌ی ${faNum(d.period_label)}`,
+      body: bits.join(' · '),
+      action:{ label:'ببین', run:()=>openFoodDNA() },
+    });
+  }
   return out;
 }
 function notifUnreadCount(){ const read=readSet(); return build().filter(n=>!read.has(n.id)).length; }

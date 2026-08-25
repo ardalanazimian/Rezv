@@ -50,6 +50,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 // ⚠️ باید اولین import بماند — رجوع به توضیحِ hoisting داخلِ خودِ فایل.
+import './dna-summary.integration.test.mts';
 import './helpers/test-env.mts';
 import './birthday-calendar.test.mts';
 import './allowed-origins.test.mts';

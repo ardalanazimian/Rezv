@@ -125,6 +125,28 @@ export function smsAllowedForCategory(
   return false;
 }
 
+/**
+ * همان تصمیم، برای اعلانِ **درون‌اپ**.
+ *
+ * ⚠️ چرا تابعِ جدا و متریکِ جدا و نه استفاده از `smsAllowedForCategory`:
+ * تصمیم یکی است ولی برچسبِ متریک نه. اگر یک اعلانِ درون‌اپ
+ * `rezervno_sms_suppressed_total` را زیاد کند، هر داشبورد و هشداری که روی
+ * «چند پیامک به‌خاطرِ انصراف نرفت» بنا شده بی‌صدا غلط می‌شود — و هیچ‌کس
+ * نمی‌فهمد، چون عدد قابلِ‌باور است. اسمِ متریک هم بخشی از صداقتِ گزارش است.
+ */
+export function inAppAllowedForCategory(
+  raw: unknown,
+  category: NotificationCategory,
+  ctx: ConsentContext,
+): boolean {
+  if (allowsCategory(raw, category)) return true;
+  metrics.inAppSuppressed.inc({ category, site: ctx.site });
+  log.info('اعلانِ درون‌اپ نمایش داده نشد — انصرافِ صریحِ کاربر', {
+    category, site: ctx.site, userId: ctx.userId ?? null,
+  });
+  return false;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  یافتنِ کاربرِ پشتِ یک شماره — فقط برای تصمیمِ رضایت
 //
