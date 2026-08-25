@@ -2288,6 +2288,8 @@ const API = {
   },
   // ارسال پیامک کمپین یا winback
   async sendSms(payload){ return this.post('/restaurant/sms', payload); },
+  // ثبتِ مستقیمِ عضوِ باشگاه (بدونِ رزرو) — endpointِ واقعی، عضویتِ پایدار
+  async createMember(payload){ return this.post('/restaurant/members', payload); },
   // ── مدیریت میز (وصل به /restaurant/tables واقعی) ──
   listTables(){ return this.get('/restaurant/tables'); },
   createTable(body){ return this.post('/restaurant/tables', body); },
@@ -2856,23 +2858,42 @@ function faRelative(iso){
 }
 // نگاشت وضعیت enum واقعی بک‌اند → وضعیت فرانت پنل
 // بک‌اند: pending/confirmed/arrived/no_show/cancelled_by_user/cancelled_by_restaurant
-// ⚠️ رفعِ پنهان‌شدنِ «در انتظارِ تأیید» (پروتکل §۳/§۱۰):
-// این تابع `pending` را به `confirmed` تبدیل می‌کرد، پس رزروی که منتظرِ **تأییدِ
-// خودِ رستوران‌دار** بود در فهرست «تأییدشده» نشان داده می‌شد — یعنی صاحبِ
-// رستوران هیچ‌وقت نمی‌فهمید کاری برایِ انجام دارد. با اجرایِ واقعیِ
-// `auto_confirm` در بک‌اند این دیگر فقط یک نقصِ نمایشی نیست، بلکه کلِ آن
-// قابلیت را بی‌اثر می‌کرد.
-// STATUS_META از قبل `pending` را می‌شناسد (برچسبِ «در انتظار») و
-// STATUS_TRANSITIONS هم `pending:['confirmed','rejected','cancelled']` دارد،
-// پس رستوران‌دار از همان منویِ موجود می‌تواند تأیید/رد کند.
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): این تابع قبلاً فقط ۵ وضعیت را می‌شناخت و
+// *هر چیز دیگری* را به 'confirmed' فرومی‌کاست (خطِ آخر `return 'confirmed'`).
+// یعنی رزروِ `cancelled` (وضعیتِ canonicalِ فعلی)، `completed`، `expired`،
+// `rejected`، `auto_cancelled`، `seated`، `dining`، `waitlisted` و... همه در
+// پنلِ رستوران «تأییدشده» دیده می‌شدند — رزروِ لغوشده میز را رزرو نگه می‌داشت و
+// staff هرگز نمی‌فهمید. STATUS_META (بالای همین فایل) از قبل هر ۱۷ وضعیت را با
+// برچسب/رنگ دارد، پس فقط لازم است وضعیتِ واقعی عبور کند. دقیقاً همان کلاسِ
+// باگی که برای اپ مشتری (mapTripStatus) قبلاً رفع شده بود، ولی این‌جا جا مانده.
+//
+// ⚠️ رفعِ پنهان‌شدنِ «در انتظارِ تأیید» (پروتکل §۳/§۱۰ — از PR #68):
+// زیرمجموعه‌ی همین باگ و مهم‌ترین نمونه‌اش: `pending` هم به `confirmed` تبدیل
+// می‌شد، پس رزروی که منتظرِ **تأییدِ خودِ رستوران‌دار** بود در فهرست «تأییدشده»
+// دیده می‌شد و صاحبِ رستوران هیچ‌وقت نمی‌فهمید کاری برایِ انجام دارد. با اجرایِ
+// واقعیِ `auto_confirm` در بک‌اند این دیگر فقط نقصِ نمایشی نبود، کلِ آن قابلیت
+// را بی‌اثر می‌کرد. عبورِ کاملِ وضعیت هر دو را با هم رفع می‌کند: `pending`
+// برچسبِ «در انتظار» می‌گیرد و STATUS_TRANSITIONS
+// (`pending:['confirmed','rejected','cancelled']`) منویِ تأیید/رد را می‌دهد.
+//
+// [merge ۰۸-۲۵] #68 دو نگاشتِ صریح هم داشت که این‌جا حذف *نشده*، بلکه به
+// رفتارِ دقیق‌تری ارتقا یافته‌اند و مصرف‌کننده‌ها در reservations.js با آن هماهنگ شدند:
+//   • `rejected` → قبلاً به 'cancelled' فرومی‌کاست؛ حالا خودش عبور می‌کند و
+//     برچسبِ اختصاصیِ «ردشده» را می‌گیرد (STATUS_META.rejected). شمارنده‌یِ
+//     «لغوشده» در گزارشِ گذشته هم rejected/auto_cancelled را می‌شمارد.
+//   • `auto_confirmed` → قبلاً به 'confirmed' فرومی‌کاست؛ حالا برچسبِ «تأیید
+//     خودکار» و انتقال‌هایِ خودش را دارد (STATUS_TRANSITIONS.auto_confirmed)،
+//     و نقشه‌یِ سالن/شمارنده‌هایِ «امشب» هم آن را مثلِ confirmed حساب می‌کنند.
 function mapResStatus(apiStatus){
-  if(apiStatus==='arrived')return'arrived';
-  if(apiStatus==='no_show')return'noshow';
+  // aliasهای قدیمی → نامِ canonicalِ پنل (STATUS_META هم no_show و هم noshow را دارد؛
+  // شمارنده‌های reservations.js با 'noshow' فیلتر می‌کنند، پس همین را نگه می‌داریم).
   if(apiStatus==='cancelled_by_user'||apiStatus==='cancelled_by_restaurant')return'cancelled';
-  if(apiStatus==='pending')return'pending';        // ← دیگر پنهان نمی‌شود
-  if(apiStatus==='rejected')return'cancelled';
-  if(apiStatus==='confirmed'||apiStatus==='auto_confirmed')return'confirmed';
-  return'confirmed';
+  if(apiStatus==='no_show')return'noshow';
+  // هر وضعیتِ واقعیِ شناخته‌شده مستقیم عبور می‌کند (شاملِ pending، rejected و
+  // auto_confirmed — هر سه در STATUS_META برچسبِ اختصاصیِ خودشان را دارند).
+  if(STATUS_META[apiStatus])return apiStatus;
+  // وضعیتِ واقعاً ناشناخته → همان رشته‌ی خام (بی‌چیپ، نه جعلِ «تأییدشده»).
+  return apiStatus||'confirmed';
 }
 // تشخیص دسته‌ی تاریخ از زمان رزرو (برای سازگاری با فیلتر محلی)
 function dateCategoryOf(slotStart){
@@ -3818,9 +3839,16 @@ async function renderResList(){
   }
   // گزارش گذشته: خلاصه‌ی آماری بالا
   if(resDate==='past'){
-    const done=list.filter(x=>x.r.status==='completed'||x.r.status==='arrived').length;
-    const noshow=list.filter(x=>x.r.status==='noshow').length;
-    const cancelled=list.filter(x=>x.r.status==='cancelled').length;
+    // [merge ۰۸-۲۵] این سه شمارنده هم باید با عبورِ کاملِ وضعیت (mapResStatus)
+    // هماهنگ شوند، وگرنه رزروِ `rejected`/`auto_cancelled` در هیچ ستونی شمرده
+    // نمی‌شد (#68 آن‌ها را به 'cancelled' نگاشت می‌کرد و در ستونِ لغوشده می‌آمد)
+    // و مهمانِ `checked_in`/`seated`/`dining` از «انجام‌شده» جا می‌ماند.
+    // مجموعِ سه ستون دیگر از تعدادِ کلِ ردیف‌ها کمتر نمی‌شود.
+    const DONE_SET=['completed',...TONIGHT_ARRIVED];
+    const CANCELLED_SET=['cancelled','auto_cancelled','rejected'];
+    const done=list.filter(x=>DONE_SET.includes(x.r.status)).length;
+    const noshow=list.filter(x=>x.r.status==='noshow'||x.r.status==='no_show').length;
+    const cancelled=list.filter(x=>CANCELLED_SET.includes(x.r.status)).length;
     el.innerHTML=demoNote+`
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px">
         <div style="background:var(--green-50);border:1px solid #BBF7D0;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#15803D">${fa(done)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('check',{size:12})} انجام‌شده</div></div>
@@ -3830,7 +3858,11 @@ async function renderResList(){
       list.map(x=>resItemHTML(x.r,x.i)).join('');
     return;
   }
-  const seated=list.filter(x=>x.r.status==='arrived').length;
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): قبلاً فقط 'arrived' شمرده می‌شد؛ حالا که
+  // mapResStatus وضعیتِ واقعی را عبور می‌دهد، مهمانِ حاضر می‌تواند
+  // checked_in/arrived/seated/dining باشد — همه «رسیده» حساب می‌شوند.
+  const ARRIVED_SET=['arrived','checked_in','seated','dining'];
+  const seated=list.filter(x=>ARRIVED_SET.includes(x.r.status)).length;
   el.innerHTML=demoNote+`<div style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQuery?` · نتایج «${esc(resQuery)}»`:''}</div>`+
     list.map(x=>resItemHTML(x.r,x.i)).join('');
 }
@@ -4056,6 +4088,21 @@ async function walkinLookup(){
 }
 function walkinCheckinMember(){if(window._walkinMember){walkinCheckinReal(window._walkinMember.phone,null,null,null)}}
 // ثبت واقعی ورود — وصل به POST /restaurant/walkin (پیدا/ساخت کاربر + عضویت باشگاه + رزرو seated + اشغال میز)
+// تبدیلِ (ماه، روزِ) شمسی به (ماه، روزِ) میلادی — بدونِ کتابخانه، با Intlِ
+// تقویمِ persian. رخدادِ بعدیِ همان روزِ شمسی را پیدا می‌کند (دقتِ ±۱ روز بینِ
+// سال‌ها به‌خاطرِ کبیسه، در برابرِ ۲-۳ ماه خطای قبلی ناچیز است).
+function jalaliMdToGregMd(jm, jd){
+  if(!(jm>=1&&jm<=12&&jd>=1&&jd<=31)) return null;
+  const fmt=new Intl.DateTimeFormat('en-US-u-ca-persian',{month:'numeric',day:'numeric'});
+  const start=new Date(); start.setHours(12,0,0,0); start.setDate(start.getDate()-1);
+  for(let i=0;i<400;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const p=fmt.formatToParts(d);
+    const m=+p.find(x=>x.type==='month').value, day=+p.find(x=>x.type==='day').value;
+    if(m===jm&&day===jd) return {gMonth:d.getMonth()+1, gDay:d.getDate()};
+  }
+  return null;
+}
 async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
   const party=+(document.querySelector('.wparty-group .opt.sel')?.dataset.p||2);
   const tableId=document.getElementById('wTable')?.value||null;
@@ -4063,7 +4110,15 @@ async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
   if(btn){btn.disabled=true;btn.textContent='در حال ثبت...';}
   const body={phone,party_size:party,table_id:tableId||undefined};
   if(firstName){body.first_name=firstName;body.last_name=lastName||'';}
-  if(birthDayMonth){body.birth_day=birthDayMonth[0];body.birth_month=birthDayMonth[1];}
+  if(birthDayMonth){
+    // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): سلکتِ ماهِ تولد عددِ ماهِ *شمسی* می‌دهد
+    // (فروردین=۱)، ولی بک‌اند (createWalkin) آن را new Date(Date.UTC(1990,
+    // m-1, d)) — یعنی *میلادی* — می‌سازد و grantBirthdayRewards با ماهِ میلادیِ
+    // امروز مقایسه می‌کند. نتیجه: پیامکِ تولد ۲ تا ۳ ماه جابه‌جا. این‌جا در مرزِ
+    // تقویم به میلادی تبدیل می‌کنیم تا ذخیره و مقایسه‌ی بک‌اند هم‌راستا شوند.
+    const g=jalaliMdToGregMd(+birthDayMonth[1],+birthDayMonth[0]);
+    if(g){body.birth_day=g.gDay;body.birth_month=g.gMonth;}
+  }
   // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): قبلاً این مسیر هیچ Idempotency-Key
   // نمی‌فرستاد — دابل‌تپِ «ثبت ورود» (یا حتی retryِ خودکارِ شبکه) می‌توانست دو
   // رزروِ seated + دو عضویتِ باشگاه برایِ همون مهمان بسازد. یک کلید برایِ کلِ
@@ -4179,8 +4234,14 @@ async function saveManual(){
 // هماهنگ‌سازی وضعیت میزها با رزروهای فعال امروز
 // میزی که رزرو «تأییدشده»ی امروز داره → reserved (اگه دستی seated نشده باشه)
 // میزی که مهمانش «رسیده» → seated
+// [merge ۰۸-۲۵] از وقتی mapResStatus وضعیتِ واقعی را عبور می‌دهد (به‌جایِ فروکاستنِ
+// همه‌چیز به 'confirmed')، این فیلتر دیگر نمی‌تواند فقط دو رشته را چک کند:
+// رزروِ `auto_confirmed` (که #68 به 'confirmed' نگاشت می‌کرد) و مهمانِ
+// `checked_in`/`seated`/`dining` وگرنه از نقشه‌ی سالن غیب می‌شدند و میز
+// «خالی» نشان داده می‌شد در حالی که مهمان سرِ آن نشسته بود.
 function syncTablesFromReservations(){
-  const todayRes=RES.filter(r=>r.date==='today'&&r.table>0&&(r.status==='confirmed'||r.status==='arrived'));
+  const HOLDS_TABLE=[...TONIGHT_NOT_ARRIVED.filter(s=>s!=='pending'),...TONIGHT_ARRIVED];
+  const todayRes=RES.filter(r=>r.date==='today'&&r.table>0&&HOLDS_TABLE.includes(r.status));
   TABLES.forEach(t=>{
     // ⚠️ فازِ ۲ (§۶): وضعیت‌هایِ عملیاتیِ صریح («تعمیرات» و «در حالِ نظافت»)
     // نباید با وضعیتِ مشتق‌شده از رزرو بازنویسی شوند. این‌ها را انسان یا
@@ -4195,7 +4256,7 @@ function syncTablesFromReservations(){
     const res=todayRes.find(r=>r.table===t.n);
     if(res){
       // رزرو فعال داره
-      if(res.status==='arrived')t.s='seated';
+      if(TONIGHT_ARRIVED.includes(res.status))t.s='seated';
       else if(t.s!=='seated')t.s='reserved'; // اگه قبلاً نشسته نشده، رزرو
       t._guest=res.name; // نام مهمان برای نمایش
       t._time=res.t;
@@ -5690,18 +5751,18 @@ async function openCustomerDetail(userId){
 }
 
 // ─── تب ۳: کمپین پیامکی (مارکتینگ) ───
-let _segCounts=null;
 async function custRenderCampaign(){
-  if(!_segCounts && API.getToken()){
-    const [atRisk,vip]=await Promise.all([API.customers('segment=at_risk&limit=50'),API.customers('segment=vip&limit=50')]);
-    _segCounts={
-      at_risk: atRisk.ok?(atRisk.data.items?.length||0):null,
-      vip: vip.ok?(vip.data.items?.length||0):null,
-    };
-  }
-  const sc=_segCounts||{};
-  const cnt=(v,suffix)=>v==null?'—':fa(v)+(v>=50?'+':'')+' '+suffix;
-  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید','همه'],['calendar','تولد این ماه',fa(CLUB.filter(m=>m.bMonth===currentMonthFa()).length)+' نفر']];
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵؛ حفظ‌شده در ادغام با خطِ ممیزیِ #68):
+  // کارت‌های سگمنت رفتاری بودند (در خطر ریزش/VIP/جدید/تولد) ولی endpointِ SMS
+  // فقط بر اساسِ tierِ باشگاه (gold/silver/bronze) یا حذفِ segment («همه»)
+  // فیلتر می‌کند — پس ۳ از ۴ گزینه ۴۲۲ می‌گرفتند یا (بدتر، مثلِ «تولد») به
+  // «همه» ارسال می‌شدند: مخاطبِ اشتباه. زنده تأیید شد: at_risk → HTTP 422.
+  // حالا کارت‌ها دقیقاً همان چیزی‌اند که بک‌اند می‌تواند هدف بگیرد و شمارش از
+  // اعضای واقعیِ باشگاه می‌آید. هدف‌گیریِ رفتاری (at_risk/تولد) نیازمندِ تغییرِ
+  // بک‌اند است و در KNOWN_LIMITATIONS ثبت شد. (currentMonthFa از #68 همچنان
+  // برای «تولد این ماه» در صفحه‌ی باشگاه استفاده می‌شود.)
+  const tierCount=t=>fa((CLUB||[]).filter(m=>m.tier===t).length)+' نفر';
+  const segs=[['crown','اعضای طلایی',tierCount('gold')],['sparkle','اعضای نقره‌ای',tierCount('silver')],['ticket','اعضای برنزی',tierCount('bronze')],['users','همه اعضا',fa((CLUB||[]).length)+' نفر']];
   document.getElementById('ct-campaign').innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کمپین پیامکی هوشمند</div><div class="panel-sub">سگمنت انتخاب کن، پیام بنویس، پیش‌نمایش بگیر</div></div></div>
@@ -6432,11 +6493,17 @@ async function rLoyalty(){
         <!-- ⚠️ رفعِ جعلِ موفقیت (فازِ ۲، پروتکل §۳ و §۲۸).
              این پنل قبلاً فرمِ «ثبت دستی عضو» بود که کاملاً محلی کار می‌کرد:
              یک کدِ ساختگیِ VIS-xxx می‌ساخت، «عضو جدید ثبت شد» می‌گفت، و با
-             اولین رفرش ناپدید می‌شد — چون هیچ endpointِ ساختِ عضو وجود ندارد
-             (/restaurant/members فقط GET دارد؛ تأییدشده).
-             سه selectِ تاریخِ تولد هم دادهٔ حساس جمع می‌کردند و بی‌صدا دور
-             می‌ریختند. عضویت در واقعیت **اتمیک** هنگامِ واک‌این/رزرو ساخته
-             می‌شود (createWalkinTx). پس به‌جایِ فرمِ دروغین، همان مسیرِ واقعی. -->
+             اولین رفرش ناپدید می‌شد. سه selectِ تاریخِ تولد هم دادهٔ حساس جمع
+             می‌کردند و بی‌صدا دور می‌ریختند. عضویت در واقعیت **اتمیک** هنگامِ
+             واک‌این/رزرو ساخته می‌شود (createWalkinTx). پس به‌جایِ فرمِ دروغین،
+             همان مسیرِ واقعی. (تستِ رگرسیون: panels-batch8-regression.spec.ts)
+             [merge ۰۸-۲۵] این تصمیم عمداً دست‌نخورده ماند. از کامیتِ aa5e0e7 یک
+             مسیرِ واقعیِ POST /restaurant/members وجود دارد، پس ایرادِ «کدِ
+             ساختگی» دیگر تکنیکاً برقرار نیست — ولی برگرداندنِ فرم یک تصمیمِ
+             **محصولی** است («عضوی که هیچ‌وقت مهمانِ شما نبوده در سیستم معنا
+             ندارد»)، نه یک رفعِ باگ، و کامیتِ merge جایِ بازکردنِ دوباره‌ی آن
+             نیست. اگر لازم شد، PRِ جداگانه با بازبینی. جزئیات در
+             docs/KNOWN_LIMITATIONS.md. -->
         <div style="background:var(--blue-50);border:1px solid #BFDBFE;border-radius:var(--r);padding:14px;font-size:13px;line-height:1.9;color:var(--t2)">
           ${icon('info',{size:14})} عضویتِ باشگاه هنگامِ <b>ثبتِ ورود (واک‌این)</b> یا <b>رزرو</b> به‌صورت خودکار و با کدِ واقعی ساخته می‌شود.
           <div style="margin-top:6px">ثبتِ دستیِ جدا وجود ندارد، چون عضوی که هیچ‌وقت مهمانِ شما نبوده در سیستم معنا ندارد.</div>
@@ -6474,6 +6541,10 @@ async function rLoyalty(){
 }
 // ⚠️ addMember حذف شد (فازِ ۲، §۳): کاملاً محلی بود و کدِ عضویتِ ساختگی
 // نشان می‌داد. مسیرِ واقعیِ ساختِ عضو، واک‌این/رزرو است (createWalkinTx).
+// [merge ۰۸-۲۵] این برنچ نسخه‌ای از آن را وصل به POST /restaurant/members
+// واقعی برگردانده بود؛ در ادغام کنار گذاشته شد تا تصمیمِ محصولیِ #68 در یک
+// کامیتِ merge بازنشود. خودِ endpoint و تست‌هایش می‌مانند (بدونِ مصرف‌کننده در
+// پنل — در docs/KNOWN_LIMITATIONS.md ثبت شد).
 
 // ═══════════════════════════════════════════════════════════
 //  ارسالِ پیامکِ تبریکِ تولد — وصل به `POST /restaurant/sms` واقعی
@@ -6661,7 +6732,9 @@ function previewCamp(){
   if(selSeg===null){toast('','سگمنت رو انتخاب کن');return}
   // ذخیره برای ارسال واقعی (نگاشت index سگمنت به segment بک‌اند)
   window._campMessage=txt;
-  window._campSegment=({0:'at_risk',1:'gold',2:'all',3:'all'})[selSeg]||'all';
+  // نگاشتِ کارت‌ها به سگمنت‌های واقعیِ بک‌اند (crm.js): طلایی/نقره‌ای/برنزی/همه.
+  // ۳ (همه) → undefined یعنی «بدونِ فیلترِ tier» که بک‌اند را به همه‌ی اعضا هدف می‌گیرد.
+  window._campSegment=({0:'gold',1:'silver',2:'bronze',3:undefined})[selSeg];
   const rendered=txt.replace(/\{نام\}/g,'کیان');
   openModal(`<div class="modal-title">پیش‌نمایش پیام</div><div class="modal-sub">دقیقاً همینطوری برای مشتری ارسال می‌شه</div>
     <div style="background:#0c0c14;border-radius:var(--r-lg);padding:16px;margin-bottom:18px">
@@ -6686,10 +6759,11 @@ function confirmCamp(){
 async function doSendCampaign(){
   const btn=document.getElementById('campSendBtn');
   if(btn){btn.disabled=true;btn.textContent='در حال ارسال...';}
-  // segment انتخاب‌شده (اگر در فرم کمپین بود) — پیش‌فرض همه
-  const seg=window._campSegment||'all';
+  // segment انتخاب‌شده؛ undefined یعنی «همه اعضا» → فیلدِ segment اصلاً فرستاده
+  // نمی‌شود تا بک‌اند بدونِ فیلترِ tier همه را هدف بگیرد (سگمنتِ نامعتبر ۴۰۰ می‌داد).
+  const seg=window._campSegment;
   if(API.getToken()){
-    const res=await API.sendSms({kind:'campaign',segment:seg,message:window._campMessage||''});
+    const res=await API.sendSms({kind:'campaign',...(seg?{segment:seg}:{}),message:window._campMessage||''});
     if(res.ok){
       closeModal();
       toast('',`کمپین به ${fa(res.data?.queued||0)} نفر ارسال شد`);
@@ -6763,16 +6837,27 @@ async function rAnalytics(){
       API.online=true;
       const d=res.data;
       const totalVisits=(d.visit_distribution?.once||0)+(d.visit_distribution?.few||0)*3+(d.visit_distribution?.loyal||0)*6;
+      // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): weekly_reservations آرایه‌ی *۴ هفته‌ی
+      // اخیر* است (بک‌اند از ۲۸ روز پیش group by week می‌کند و اندیسِ ۳ هفته‌ی
+      // جاری است). reduce قبلی جمعِ هر ۴ هفته را با برچسبِ «رزرو این هفته»
+      // نشان می‌داد — ۴ برابرِ واقعیت. حالا فقط هفته‌ی جاری (آخرین عضو).
+      const wk=Array.isArray(d.weekly_reservations)?d.weekly_reservations:[];
       A={
         // ⚠️ رفعِ برچسبِ غلط: این فیلد زیرِ لیبلِ «رزرو این هفته» نمایش داده
         // می‌شود ولی **جمعِ هر چهار هفته** بود — یعنی صاحبِ رستوران عددی
         // تقریباً چهاربرابرِ واقعیت را به‌عنوانِ آمارِ این هفته می‌خواند.
-        // بک‌اند آرایه را از قدیم به جدید می‌دهد (weekly[3] = هفت روزِ اخیر؛
+        // بک‌اند آرایه را از قدیم به جدید می‌دهد (آخرین عضو = هفت روزِ اخیر؛
         // رجوع کن به `weekly[3 - w]` در restaurant/analytics/route.ts).
-        weekThisWeek:(d.weekly_reservations||[])[3]||0,
+        // [merge ۰۸-۲۵] #68 همین باگ را با `[3]` رفع کرده بود. اندیسِ آخر را
+        // نگه داشتیم چون امروز هم‌ارزِ آن است (بک‌اند همیشه ۴ عضو می‌دهد) ولی
+        // اگر طولِ آرایه عوض شود هم درست می‌ماند؛ `[3]` در آن حالت یا صفرِ
+        // جعلی می‌داد یا هفته‌ای از وسطِ تاریخچه.
+        weekThisWeek:wk.length?wk[wk.length-1]:0,
         returnRate:d.return_rate_pct||0,
         avgVisits:d.total_customers?fa(Math.round(totalVisits/d.total_customers*10)/10):'۰',
-        avgInterval:d.avg_interval_days||0,
+        // avg_interval_days را بک‌اند برنمی‌گرداند؛ نمایشِ «۰» یعنی «۰ روز فاصله»
+        // که غلط است. null → در KPI به «—» می‌افتد (اندازه‌گیری‌نشده، نه صفر).
+        avgInterval:(typeof d.avg_interval_days==='number')?d.avg_interval_days:null,
         totalCustomers:d.total_customers||0,
         newPct:d.total_customers?Math.round(d.new_customers/d.total_customers*100):0,
         visitDist:[
@@ -6842,7 +6927,7 @@ async function rAnalytics(){
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('calendar',{size:16})}</div>${trendChip}</div><div class="kpi-val">${fa(A.weekThisWeek)}</div><div class="kpi-label">رزرو هفت روزِ اخیر</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('refresh',{size:16})}</div></div><div class="kpi-val">${fa(returnRate)}٪</div><div class="kpi-label">نرخ بازگشت مشتری</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon amber">${icon('users',{size:16})}</div></div><div class="kpi-val">${avgVisits}</div><div class="kpi-label">میانگین دفعات مراجعه</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(A.avgInterval)}</div><div class="kpi-label">میانگین فاصله (روز)</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${A.avgInterval==null?'—':fa(A.avgInterval)}</div><div class="kpi-label">میانگین فاصله (روز)</div></div>
     </div>
 
     <div class="row-2-1">
