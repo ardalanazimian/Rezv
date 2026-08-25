@@ -213,7 +213,7 @@ describe('checkChannelBias — تستِ سادهِ بایاسِ کانالی (ن
     const r = checkChannelBias(w0());
     assert.equal(r.biased, false);
     assert.equal(r.knownUserGap, 0);
-    assert.equal(r.phoneSourceGap, 0);
+    assert.equal(r.staffEnteredGap, 0);
   });
 
   test('وزنِ بزرگِ منفی روی knownUser (یعنی «مهمان = خیلی پرریسک») → بایاس شناسایی می‌شود', () => {
@@ -226,11 +226,14 @@ describe('checkChannelBias — تستِ سادهِ بایاسِ کانالی (ن
     assert.match(r.reason, /کانالِ رزرو/);
   });
 
-  test('وزنِ بزرگ روی phoneSource (یعنی «رزروِ تلفنی = پرریسک») → بایاس شناسایی می‌شود', () => {
-    const w = at('phoneSource', 4);
+  test('وزنِ بزرگ روی staffEntered (یعنی «رزروِ ثبت‌شده توسطِ پرسنل = پرریسک») → بایاس شناسایی می‌شود', () => {
+    // ⚠️ تا v3 این تست *ساختاراً* بی‌اثر بود: ویژگی به `source==='phone'` گره
+    // خورده بود و هیچ‌جا چنین مقداری نوشته نمی‌شد. با بازتعریف به `'manual'`
+    // (v4) این نیمه‌ی گیت واقعاً چیزی را می‌سنجد.
+    const w = at('staffEntered', 4);
     const r = checkChannelBias(w);
     assert.equal(r.biased, true);
-    assert.ok(Math.abs(r.phoneSourceGap) > 0.2);
+    assert.ok(Math.abs(r.staffEnteredGap) > 0.2);
   });
 
   test('وزنِ کوچکِ منطقی (تفاوتِ کم بینِ کانال‌ها) → بدونِ بایاس', () => {
@@ -238,7 +241,7 @@ describe('checkChannelBias — تستِ سادهِ بایاسِ کانالی (ن
     // کمی قابل‌اعتمادترند) — تا وقتی گپ کوچک بماند، این تبعیضِ ناسالم نیست.
     const w = w0();
     w[NO_SHOW_FEATURE_NAMES.indexOf('knownUser')] = -0.3;
-    w[NO_SHOW_FEATURE_NAMES.indexOf('phoneSource')] = 0.2;
+    w[NO_SHOW_FEATURE_NAMES.indexOf('staffEntered')] = 0.2;
     const r = checkChannelBias(w);
     assert.equal(r.biased, false);
   });

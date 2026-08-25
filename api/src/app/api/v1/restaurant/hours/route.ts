@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
-import { safeJson } from '@/lib/schemas';
+import { parseBody, zDateStr, z } from '@/lib/schemas';
 import { audit } from '@/lib/audit';
 import { clientIp } from '@/lib/ratelimit';
 import { invalidateAllAvailability } from '@/lib/availability-cache';
@@ -14,6 +15,62 @@ import { invalidateAllAvailability } from '@/lib/availability-cache';
 // ═══════════════════════════════════════════════════════════
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ⚠️ رفعِ یافته‌ی ۱۸ (فازِ ۲) — این PUT تنها مصرف‌کننده‌ی `safeJson` در کلِ
+//  درختِ routeها بود که **`.parse()` نداشت**؛ یعنی بدنه‌اش هیچ شِیمایی
+//  نداشت. سه پیامدِ تأییدشده با اجرای واقعی روی Postgres:
+//
+//   ۱. **DoSِ داخلی.** `closures` هیچ سقفِ طولی نداشت و مستقیم یک حلقه‌ی
+//      **ترتیبیِ** `$executeRaw` را می‌راند (یک رفت‌وبرگشتِ DB به‌ازای هر
+//      عضو). تنها مرز `MAX_BODY_BYTES` = ۱۰۰KB بود ⇒ با کوچک‌ترین عضوِ
+//      ممکن (`{"date":"2026-01-01"},` = ۲۲ بایت) **۴۶۵۴** رفت‌وبرگشتِ
+//      ترتیبی در یک درخواست (اندازه‌گیریِ واقعی، نه تخمین).
+//
+//   ۲. **۵۰۰ + از دست رفتنِ داده.** رجکسِ `^\d{4}-\d{2}-\d{2}$` تاریخِ
+//      **تقویمیِ ناموجود** را می‌پذیرد. اجرای واقعی: `2026-02-30` و
+//      `9999-99-99` هر دو از رجکس رد می‌شوند و بعد در `::date` با
+//      `PrismaClientKnownRequestError P2010` می‌شکنند. آن خطا
+//      `instanceof ApiError` نیست ⇒ `errorResponse` ۵۰۰ می‌دهد. بدتر:
+//      `DELETE` قبلاً اجرا شده و هیچ transactionی دورِ حلقه نیست، پس
+//      **همه‌ی تعطیلاتِ قبلی پاک می‌شوند و چیزی جایشان نمی‌نشیند** — از
+//      دست رفتنِ داده با یک غلطِ تایپیِ ساده.
+//
+//   ۳. **دیتای بدنوعِ خاموش.** `reason` هیچ چکِ نوعی نداشت؛ اجرای واقعی
+//      نشان داد Prisma بی‌صدا سریالایزش می‌کند: `{evil:true}` به
+//      `{"evil": true}` و `['a','b']` به `{a,b}` (سینتکسِ آرایه‌ی Postgres)
+//      تبدیل و در ستونِ `text`ِ بی‌سقف ذخیره می‌شد. (این SQL injection
+//      **نبود** — تگ‌تمپلیت‌های Prisma پارامتری‌اند.)
+//
+//  رفع: شِیمای صریح + چکِ تقویمیِ واقعی. حالا هر بدنه‌ی نامعتبر **قبل از**
+//  `DELETE` رد می‌شود، پس مسیرِ از دست رفتنِ داده هم بسته می‌شود.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** سقفِ تعدادِ تعطیلات در یک درخواست — حلقه‌ی ترتیبیِ DB را کران‌دار می‌کند.
+ *  ۳۶۶ = «بیشتر از یک سالِ کامل روزِ تعطیل» یعنی معناً غیرممکن، ولی به‌قدرِ
+ *  کافی بالا که هیچ لیستِ دستیِ واقعی (پنل یکی‌یکی اضافه می‌کند) را نشکند. */
+const MAX_CLOSURES = 366;
+/** «دلیلِ تعطیلی» یک یادداشتِ کوتاه است؛ ستونِ DB نوعِ `text`ِ بی‌سقف است. */
+const MAX_REASON_LEN = 200;
+
+/** تاریخِ تقویمیِ واقعی — `zDateStr` فقط رجکسِ قالب است و `2026-02-30` را می‌پذیرد. */
+function isRealDate(s: string): boolean {
+  const [y, m, d] = s.split('-').map(Number);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+const bodySchema = z.object({
+  // ساختارِ داخلی را همچنان validateHours چک می‌کند (غنی‌تر از چیزی که شیم
+  // می‌تواند بیان کند). این‌جا فقط «آبجکت یا null، و حتماً حاضر» — دقیقاً
+  // همان قراردادِ قبلی: کلیدِ غایب قبلاً هم از validateHours رد می‌شد.
+  opening_hours: z.record().nullable(),
+  closures: z.array(z.object({
+    date: zDateStr,
+    reason: z.string().trim().max(MAX_REASON_LEN).nullable().optional(),
+  })).max(MAX_CLOSURES).optional(),
+});
 
 /** اعتبارسنجی ساختار openingHours قبل از ذخیره. */
 function validateHours(oh: unknown): boolean {
@@ -74,13 +131,23 @@ export const GET = withRestaurantAuth({ permission: 'canManageSettings', rateLim
 // known-facts و اسکیمِ پیشنهادیِ ماموریت هم فقط opening_hours را هدف گرفته
 // بودند — پس همچنان مستقیم می‌نویسند تا اسکوپ از ماموریت فراتر نرود.
 export const PUT = withRestaurantAuth({ permission: 'canManageSettings', rateLimit: 'auth' }, async (req, ctx) => {
-  const b = await safeJson(req);
+  const b = await parseBody(req, bodySchema);
   if (!validateHours(b.opening_hours)) throw Err.validation('ساختار ساعتِ کاری نامعتبر است');
+  // چکِ تقویمی جدا از شِیماست چون شیم `.refine()` ندارد — ولی حتماً **قبل از**
+  // هر نوشتنی اجرا می‌شود تا DELETE با بدنه‌ی نامعتبر شلیک نشود.
+  const badDate = b.closures?.find(c => !isRealDate(c.date));
+  if (badDate) throw Err.validation(`تاریخِ تعطیلی معتبر نیست: ${badDate.date}`);
 
   await db.restaurant.update({
     where: { id: ctx.restaurant.id },
     data: {
-      pendingOpeningHours: b.opening_hours ?? null,
+      // ⚠️ `Prisma.JsonNull` و نه `null` خام: تا قبل از افزودنِ شِیما، `b`
+      // نوعِ `any` داشت و `null` خام از تایپ‌چک رد می‌شد. رفتارِ زمانِ اجرا
+      // عوض **نشده** — با اجرای واقعی سنجیده شد که `null` خام همان
+      // `'null'::jsonb` می‌نویسد (نه SQL NULL)، یعنی دقیقاً کاری که
+      // `Prisma.JsonNull` می‌کند. همان sentinelی که روتِ خواهر
+      // (admin/hours-changes/[id]/route.ts:۶۶-۶۷) استفاده می‌کند.
+      pendingOpeningHours: b.opening_hours ? (b.opening_hours as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
       hoursChangeStatus: 'pending',
       hoursChangeReason: null,       // پیشنهادِ تازه = دلیلِ ردِ قبلی دیگر مصداق ندارد
       hoursChangeRequestedAt: new Date(),
@@ -99,10 +166,9 @@ export const PUT = withRestaurantAuth({ permission: 'canManageSettings', rateLim
   });
 
   // به‌روزرسانیِ تعطیلاتِ خاص (اگر ارسال شده): جایگزینیِ کامل — زنده، بدونِ تأییدِ شرکت (رجوع به توضیحِ بالا)
-  if (Array.isArray(b.closures)) {
+  if (b.closures) {
     await db.$executeRaw`DELETE FROM restaurant_closures WHERE restaurant_id = ${ctx.restaurant.id}::uuid`;
     for (const c of b.closures) {
-      if (typeof c?.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(c.date)) continue;
       await db.$executeRaw`
         INSERT INTO restaurant_closures (restaurant_id, closure_date, reason)
         VALUES (${ctx.restaurant.id}::uuid, ${c.date}::date, ${c.reason ?? null})

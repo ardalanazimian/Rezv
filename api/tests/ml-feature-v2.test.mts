@@ -109,8 +109,11 @@ describe('بردارِ ویژگیِ v2', () => {
     // نامِ اشتباه روی وزنِ اشتباه در داشبورد، یا وزنِ ذخیره‌شده با طولِ غلط.
     // v3 و نه v2: دفترِ پیش‌بینی از قبل برچسبِ no_show/v2 را برای معنیِ
     // دیگری مصرف کرده بود (فازِ ۴)، و حالا هر دو از همین یک ثابت مشتق
-    // می‌شوند — پس شماره‌ی بعدیِ صادقانه v3 است، نه v2ی دوم.
-    assert.equal(NO_SHOW_FEATURE_VERSION, 'v3');
+    // می‌شوند — پس شماره‌ی بعدیِ صادقانه v3 بود، نه v2ی دوم.
+    // v4 (۲۰۲۶-۰۸-۲۵): `phoneSource` به `staffEntered` بازتعریف شد چون
+    // مقدارِ `source='phone'` را هیچ نویسنده‌ای تولید نمی‌کرد — یعنی آن
+    // ویژگی یک ستونِ ثابتِ صفر بود. معنیِ درایه عوض شد ⇒ نسخه باید بالا برود.
+    assert.equal(NO_SHOW_FEATURE_VERSION, 'v4');
     const v = buildFeatureVector({
       hasUserId: true, priorTotal: 3, priorNoShowRate: 0.33,
       leadMinutes: 120, partySize: 4, source: 'app', slotStart: new Date('2026-05-10T18:00:00Z'),

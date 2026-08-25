@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { enqueueSms } from '@/lib/sms';
+import { enqueueSms, toLocalNumber } from '@/lib/sms';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, zPhone, z } from '@/lib/schemas';
-import { smsAllowedForCategory, findUsersByPhonesForConsent } from '@/lib/notification-prefs';
+import { smsAllowedForCategory, findUsersByPhonesForConsent, phoneLookupVariants } from '@/lib/notification-prefs';
 import { recordOutreach } from '@/lib/outreach-ledger';
 import { getClubPointsBalance, ARRIVAL_POINTS } from '@/lib/loyalty';
 import { createLogger } from '@/lib/logger';
@@ -59,6 +59,81 @@ function resolveKind(kind: Kind, message: string | undefined, restaurantId: stri
   return kind;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  «تراکنشی» یک واقعیتِ سمتِ سرور است، نه ادعای کلاینت
+//
+//  ⚠️ یافته‌ی ۲۰۲۶-۰۸-۲۵ (دور زدنِ کاملِ گاردِ رضایت با یک فیلدِ بدنه):
+//  `kind` مستقیم از بدنه‌ی درخواست می‌آمد و `kind === 'welcome'` یعنی
+//  `isTransactional = true` ⇒ فیلترِ رضایت عملاً `return true` می‌شد. چون
+//  `phones` هم هیچ‌وقت با این رستوران تطبیق داده نمی‌شد، یک کارمندِ دارای
+//  `canManageCampaigns` با
+//     {kind:'welcome', phones:[۵۰۰ شماره‌ی دلخواه]}
+//  انصرافِ **همه‌ی** گیرنده‌ها را نادیده می‌گرفت — و چون مسیرِ تراکنشی عمداً
+//  در دفترِ ارتباط‌گیری/تاریخچه‌ی کمپین ثبت نمی‌شود، هیچ ردی هم نمی‌ماند.
+//
+//  رفع (کمینه و قابلِ‌اثبات): معافیتِ تراکنشی فقط به شماره‌ای می‌رسد که
+//  **سرور** می‌تواند بگوید به‌تازگی در همین رستوران رسیده است. رسیدِ ورود
+//  برای کسی که نیامده اصلاً «رسید» نیست؛ پس شماره‌های تأییدنشده حذف
+//  می‌شوند و در پاسخ صریحاً شمرده می‌شوند (`unverified`) — نه سکوت، نه
+//  موفقیتِ جعلی. کسی که واقعاً می‌خواهد به فهرستِ دلخواه پیام بدهد همان
+//  مسیرِ `campaign` را دارد که رضایت را رعایت و در دفتر ثبت می‌کند.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** وضعیت‌هایی که یعنی «مهمان واقعاً رسید». */
+const ARRIVED_STATUSES = ['checked_in', 'seated', 'dining', 'completed'] as const;
+
+/**
+ * پنجره‌ی «به‌تازگی». پنل بلافاصله بعد از چک‌ین پیامک می‌فرستد
+ * (`apps/business/js/reservations.js` → markArrived)، پس ۲۴ ساعت بسیار
+ * سخاوتمندانه است و در عین حال یک رزروِ ماه‌ها پیش را مجوزِ دائمیِ ارسال
+ * نمی‌کند.
+ */
+const ARRIVAL_WINDOW_MS = 24 * 3600_000;
+
+/**
+ * از میانِ شماره‌های درخواست‌شده، کدام‌ها به یک ورودِ واقعیِ اخیر در **همین**
+ * رستوران وصل‌اند؟
+ *
+ * ⚠️ تطبیق در هر دو جهت نرمال‌سازی می‌شود: پنل شماره را از
+ * `user.phone` (`+989…`) یا `guest_phone` (خام، `09…`) پس می‌دهد و این دو
+ * برای یک نفر متفاوت‌اند (شرحِ کامل در lib/notification-prefs.ts). تطبیقِ
+ * دقیقِ تک‌فرمتی یعنی مهمانِ واقعی «تأییدنشده» شود و رسیدش نرود.
+ */
+async function recentArrivalPhones(restaurantId: string, phones: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!phones.length) return out;
+
+  const variantsOf = new Map<string, string[]>();
+  const all = new Set<string>();
+  for (const p of phones) {
+    const v = [...new Set([...phoneLookupVariants(p), toLocalNumber(p)])];
+    variantsOf.set(p, v);
+    for (const x of v) all.add(x);
+  }
+
+  const now = Date.now();
+  const rows = await db.reservation.findMany({
+    where: {
+      restaurantId,
+      status: { in: [...ARRIVED_STATUSES] },
+      slotStart: { gte: new Date(now - ARRIVAL_WINDOW_MS), lte: new Date(now + ARRIVAL_WINDOW_MS) },
+      OR: [{ guestPhone: { in: [...all] } }, { user: { phone: { in: [...all] } } }],
+    },
+    select: { guestPhone: true, user: { select: { phone: true } } },
+    take: 2000,
+  });
+
+  const arrived = new Set<string>();
+  for (const r of rows) {
+    if (r.guestPhone) arrived.add(r.guestPhone);
+    if (r.user?.phone) arrived.add(r.user.phone);
+  }
+  for (const p of phones) {
+    if ((variantsOf.get(p) ?? []).some((v) => arrived.has(v))) out.add(p);
+  }
+  return out;
+}
+
 /**
  * POST /api/v1/restaurant/sms — پیامک کمپین/winback/خوش‌آمد.
  * مهاجرت‌شده به wrapper. نیاز به دسترسی مدیریت کمپین (canManageCampaigns).
@@ -70,12 +145,36 @@ export const POST = withRestaurantAuth(
     const b = await parseBody(req, smsSchema);
 
     const kind = resolveKind(b.kind, b.message, restaurant.id);
+    // ⚠️ این پرچم به‌تنهایی دیگر «ادعای کلاینت» نیست: پایین‌تر، فهرستِ
+    // گیرنده‌های `welcome` به شماره‌هایی محدود می‌شود که سرور ورودِ اخیرشان
+    // را در همین رستوران تأیید کرده. یعنی وقتی به فیلترِ رضایت می‌رسیم، هر
+    // شماره‌ی باقی‌مانده واقعاً تراکنشی است.
     const isTransactional = kind === 'welcome';
     const template: 'winback_offer' | 'campaign' | 'welcome_visit' =
       kind === 'winback' ? 'winback_offer' : kind === 'welcome' ? 'welcome_visit' : 'campaign';
 
     if (kind === 'welcome' && !b.phones?.length) {
       throw Err.validation('پیامکِ خوش‌آمد به شماره‌ی مشخصِ مهمان نیاز دارد');
+    }
+
+    // ── معافیتِ تراکنشی فقط برای ورودِ تأییدشده‌ی سمتِ سرور (بالا) ──
+    let phones = b.phones;
+    let unverified = 0;
+    if (kind === 'welcome') {
+      const arrived = await recentArrivalPhones(restaurant.id, b.phones!);
+      phones = b.phones!.filter((p) => arrived.has(p));
+      unverified = b.phones!.length - phones.length;
+      if (unverified > 0) {
+        log.warn('پیامکِ خوش‌آمد برای شماره‌های بدونِ ورودِ اخیر رد شد', {
+          restaurantId: restaurant.id, requested: b.phones!.length, unverified,
+        });
+      }
+      if (!phones.length) {
+        throw Err.validation(
+          'پیامکِ خوش‌آمد فقط برای مهمانی که در ۲۴ ساعتِ گذشته در همین رستوران چک‌این شده ارسال می‌شود؛ برای پیامِ گروهی از کمپین استفاده کن',
+          { unverified },
+        );
+      }
     }
 
     // ⚠️ رعایتِ انصراف (پروتکل §۱۳/§۱۷): winback و campaign هر دو تبلیغاتی‌اند
@@ -87,7 +186,7 @@ export const POST = withRestaurantAuth(
     // ممیزی + انتسابِ ledger از main؛ اینجا هر دو با هم اعمال می‌شوند.
     let targets: { phone: string; name: string; userId: string | null }[] = [];
     let optedOut = 0;
-    if (b.phones && b.phones.length) {
+    if (phones && phones.length) {
       // فهرستِ صریحِ شماره‌ها (خوش‌آمدِ چک‌ین، تبریکِ تولد): انصرافِ کاربرانِ
       // شناخته‌شده رعایت می‌شود و شماره‌ی متصل به حساب، userId هم می‌گیرد.
       // ⚠️ جست‌وجو با `findUsersByPhonesForConsent` (یک کوئری برای کلِ فهرست)
@@ -95,8 +194,8 @@ export const POST = withRestaurantAuth(
       // که در رزرو ذخیره شده پس می‌دهد (`09…` خام) در حالی که `users.phone`
       // همیشه نرمال است (`+989…`) — تطبیقِ دقیقِ قبلی برایِ همان کاربران هیچ
       // ردیفی برنمی‌گرداند و انصرافشان بی‌صدا نادیده گرفته می‌شد.
-      const byPhone = await findUsersByPhonesForConsent(b.phones);
-      targets = b.phones
+      const byPhone = await findUsersByPhonesForConsent(phones);
+      targets = phones
         .filter((p) => {
           if (isTransactional) return true;
           const u = byPhone.get(p);
@@ -193,6 +292,9 @@ export const POST = withRestaurantAuth(
 
     // `opted_out` صریح برگردانده می‌شود تا پنل بتواند تفاوتِ «کسی نبود» و
     // «بودند ولی انصراف داده‌اند» را به رستوران‌دار نشان بدهد.
-    return NextResponse.json({ queued, kind, opted_out: optedOut });
+    // `unverified` همان صداقت را برای حالتِ سوم می‌دهد: «این شماره‌ها اینجا
+    // ورودِ اخیری نداشتند، پس رسیدِ خوش‌آمد برایشان معنا ندارد» — بی‌صدا
+    // حذف‌شدن بدترین حالت بود.
+    return NextResponse.json({ queued, kind, opted_out: optedOut, unverified });
   },
 );

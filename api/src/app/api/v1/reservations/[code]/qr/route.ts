@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { authFromRequest } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
+import { resolveStaffRestaurant } from '@/lib/staff-helpers';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, parseQuery, zReservationCode, z } from '@/lib/schemas';
 
@@ -49,13 +50,29 @@ async function GET_impl(req: Request, { params }: { params: Promise<{ code: stri
 
     const r = await db.reservation.findUnique({
       where: { code },
-      select: { userId: true, restaurant: { select: { tenantId: true } } },
+      select: { userId: true, restaurantId: true },
     });
     if (!r) throw Err.notFound('رزرو');
 
     // ۴۰۴ نه ۴۰۳ — تا وجود/عدم‌وجودِ کد لو نرود.
     if (auth.kind === 'staff') {
-      if (r.restaurant.tenantId !== auth.tenantId) throw Err.notFound('رزرو');
+      // ⚠️ رفعِ نشتِ شعبه (فازِ ۲، پروتکل §۷). چکِ قبلی فقط
+      // `r.restaurant.tenantId !== auth.tenantId` بود — یعنی خام از توکن، بدونِ
+      // صدا زدنِ resolveStaffRestaurant. هر دو روتِ خواهر این را از قبل بسته
+      // بودند (reservations/[code]/route.ts و .../cancel/route.ts) و این یکی
+      // جا مانده بود؛ همان کلاسِ حفره‌ای که P0-1 داخلِ resolveStaffRestaurant بست.
+      //
+      // اثرِ واقعی (تأییدشده با تستِ زنده قبل از رفع): کارمندِ قفل‌شده به
+      // شعبه‌ی A برایِ کدِ رزروِ شعبه‌ی B پاسخِ ۲۰۰ می‌گرفت و برایِ کدِ ناموجود
+      // ۴۰۴ ⇒ یک oracleِ وجود/عدمِ وجود در کلِ تنانت. و چون auth خام بود،
+      // کارمندِ **اخراج‌شده** هم تا ۱۵ دقیقه (عمرِ access token) همچنان ۲۰۰
+      // می‌گرفت. خودِ SVG حساس نیست (فقط همان کدی را رمز می‌کند که فرستاده)،
+      // ولی تفاوتِ پاسخ خودش نشت است.
+      //
+      // resolveStaffRestaurant هر سه را با هم می‌بندد: عضویتِ واقعیِ تنانت،
+      // isActive، و قفلِ شعبه. ۴۰۴ (نه ۴۰۳) عمداً حفظ شد — همان رفتارِ قبلی.
+      const branch = await resolveStaffRestaurant(auth, req);
+      if (r.restaurantId !== branch.id) throw Err.notFound('رزرو');
     } else if (r.userId !== auth.sub) {
       throw Err.notFound('رزرو');
     }

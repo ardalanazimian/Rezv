@@ -76,6 +76,29 @@ async function makeUser(prefs: Record<string, boolean> = {}, phone = newPhone())
   return u;
 }
 
+/**
+ * یک ورودِ واقعیِ اخیر در همین رستوران برای این شماره می‌سازد.
+ *
+ * ⚠️ چرا لازم شد: معافیتِ تراکنشیِ `welcome` دیگر از روی فیلدِ `kind`ِ
+ * کلاینت گرفته نمی‌شود، بلکه از این واقعیتِ سمتِ سرور (رفعِ دور زدنِ گاردِ
+ * رضایت، ۲۰۲۶-۰۸-۲۵). کدِ رزرو باید یکتا باشد چون همین فایل چند رزرو
+ * می‌سازد.
+ */
+let arrivedSeq = 0;
+async function makeArrived(phone: string) {
+  const now = Date.now();
+  return db.reservation.create({
+    data: {
+      restaurantId,
+      code: `NCEA${TAG.slice(-3).toUpperCase()}${String(++arrivedSeq).padStart(2, '0')}`,
+      guestName: '[DEMO] مهمانِ رسیده', guestPhone: phone, partySize: 2,
+      slotStart: new Date(now - 15 * 60_000), slotEnd: new Date(now + 45 * 60_000),
+      status: 'checked_in',
+    },
+    select: { id: true },
+  });
+}
+
 /** همه‌ی قالب‌های پیامکِ صف‌شده برای یک شماره — از جدولِ واقعیِ `jobs`. */
 async function smsTemplatesFor(phone: string): Promise<string[]> {
   const rows = await db.$queryRaw<{ template: string }[]>`
@@ -232,6 +255,12 @@ describe('🔴 کنترلِ منفی — پیامکِ تراکنشی هرگز پ
 
   test('پیامکِ خوش‌آمدِ چک‌ین با `offers:false` هنوز می‌رود (باگی که رفع شد)', async () => {
     const u = await makeUser({ ...ALL_OFF });
+    // ⚠️ از ۲۰۲۶-۰۸-۲۵ سناریو باید **کامل** باشد: معافیتِ تراکنشی فقط به
+    // شماره‌ای می‌رسد که سرور ورودِ اخیرش را در همین رستوران می‌بیند
+    // (پیش از این، صرفِ `kind:'welcome'`ِ کلاینت کافی بود و همان یک فیلد
+    // انصرافِ هر شماره‌ی دلخواهی را دور می‌زد). این دقیقاً همان حالتی است
+    // که پنل می‌سازد: اول چک‌ین، بعد پیامک.
+    await makeArrived(u.phone);
     const before = suppressed();
     const res = await smsRoute.POST(jsonReq(ownerToken, { kind: 'welcome', phones: [u.phone] }));
     const body = await res.json();
@@ -245,8 +274,11 @@ describe('🔴 کنترلِ منفی — پیامکِ تراکنشی هرگز پ
   });
 
   test('نامِ مستعارِ کهنه‌ی پنل (kind=campaign + message=welcome) هم تراکنشی حساب می‌شود', async () => {
-    // apps/business/js/reservations.js:190 هنوز همین را می‌فرستد.
+    // apps/business/js/reservations.js:190 هنوز همین را می‌فرستد — و همان‌جا
+    // هم اول `changeStatus('checked_in')` را await می‌کند، پس ورودِ واقعی
+    // در DB هست.
     const u = await makeUser({ ...ALL_OFF });
+    await makeArrived(u.phone);
     const res = await smsRoute.POST(jsonReq(ownerToken, {
       kind: 'campaign', phones: [u.phone], message: 'welcome',
     }));
@@ -256,8 +288,23 @@ describe('🔴 کنترلِ منفی — پیامکِ تراکنشی هرگز پ
     assert.deepEqual(await smsTemplatesFor(u.phone), ['welcome_visit']);
   });
 
+  test('🔴 ادعای `welcome` برای شماره‌ی بدونِ ورودِ اخیر، انصراف را دور نمی‌زند', async () => {
+    // همان حمله‌ی واقعی: کارمندِ دارای canManageCampaigns با یک فیلدِ بدنه
+    // (`kind:'welcome'`) گاردِ رضایتِ **هر** شماره‌ای را خاموش می‌کرد.
+    // حالا «تراکنشی‌بودن» را سرور تصمیم می‌گیرد، نه کلاینت.
+    const u = await makeUser({ ...ALL_OFF });   // عمداً هیچ رزرو/ورودی ندارد
+    const res = await smsRoute.POST(jsonReq(ownerToken, { kind: 'welcome', phones: [u.phone] }));
+    const body = await res.json();
+
+    assert.equal(res.status, 422, JSON.stringify(body));
+    assert.equal(body.error?.code, 'VALIDATION');
+    assert.deepEqual(await smsTemplatesFor(u.phone), [],
+      'هیچ پیامکی نباید صف شده باشد — این همان دور زدنِ انصراف بود');
+  });
+
   test('خوش‌آمد دفترِ بازاریابی و تاریخچه‌ی کمپین را آلوده نمی‌کند', async () => {
     const u = await makeUser();
+    await makeArrived(u.phone);
     const outreachBefore = await db.outreachLog.count({ where: { restaurantId } });
     const campaignBefore = await db.campaignLog.count({ where: { restaurantId } });
 

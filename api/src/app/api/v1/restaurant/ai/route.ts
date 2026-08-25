@@ -5,6 +5,10 @@ import { sinceDays } from '@/lib/staff-helpers';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { NO_SHOW_FEATURE_NAMES } from '@/lib/no-show-model';
 import { getDemandForecast } from '@/lib/demand-forecast';
+// ⚠️ «روزِ هفته» باید روزِ **تهران** باشد، نه UTC — تعریف و دلیلش یک‌جا در
+// lib/restaurant-manager.ts. نامِ روزها هم از همان‌جا می‌آید تا اندیسِ DOW و
+// نام هرگز از هم جدا نیفتند.
+import { TEHRAN_SLOT_DOW, DAY_NAMES_FA } from '@/lib/restaurant-manager';
 
 // ═══════════════════════════════════════════════════════════
 //  GET /restaurant/ai/recommendations
@@ -63,16 +67,15 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
 
       // ── ۴) درآمد روزهای کم‌تردد هفته (برای پیشنهاد تخفیف هدفمند روز) ──
       const dowRows = await db.$queryRaw<{ dow: number; cnt: bigint }[]>`
-        SELECT EXTRACT(DOW FROM slot_start)::int AS dow, COUNT(*)::bigint AS cnt
+        SELECT ${TEHRAN_SLOT_DOW} AS dow, COUNT(*)::bigint AS cnt
         FROM reservations WHERE restaurant_id = ${restaurant.id}::uuid
           AND status IN ('completed','confirmed','seated') AND slot_start >= ${sinceDays(60)}
         GROUP BY dow ORDER BY cnt ASC LIMIT 1
       `;
-      const dayNames = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
       if (dowRows[0] && Number(dowRows[0].cnt) > 0) {
         out.push({
           id: 'slow_day', severity: 'low',
-          title: `${dayNames[dowRows[0].dow]}‌ها کم‌تردد‌ترین روز شماست`,
+          title: `${DAY_NAMES_FA[dowRows[0].dow]}‌ها کم‌تردد‌ترین روز شماست`,
           detail: 'یک کوپن تخفیف مخصوص همین روز می‌تواند ترافیک را از روزهای پرتقاضا به این روز منتقل کند و ظرفیت خالی را پر کند.',
           action_label: 'ساخت کوپن روز کم‌تردد',
           action: { type: 'create_coupon', suggested_day: dowRows[0].dow },

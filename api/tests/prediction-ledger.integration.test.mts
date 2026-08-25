@@ -104,17 +104,18 @@ describe('نسخه‌ی قراردادِ ویژگی', () => {
     // می‌شوند و مقایسه‌ی تاریخی بی‌معنا می‌شود.
     assert.deepEqual([...NO_SHOW_FEATURE_NAMES], [
       'bias', 'knownUser', 'shrunkNoShowRate', 'priorEvidence', 'leadLog',
-      'lastMinute', 'largeParty', 'partySizeNorm', 'phoneSource',
+      'lastMinute', 'largeParty', 'partySizeNorm', 'staffEntered',
       'hourSin', 'hourCos', 'isWeekend',
     ], 'ترکیبِ ویژگی عوض شده — NO_SHOW_FEATURE_VERSION را هم بالا ببر و این تست را به‌روز کن');
     // تاریخچه: v1 بردارِ ۷تاییِ اولیه · v2 همان ترکیب با معنیِ تازه‌ی
     // priorTotal (فازِ ۴) · v3 بردارِ ۱۲تایی (جمع‌شدگیِ نرخِ سابقه، فاصله‌ی
-    // پیوسته، ویژگی‌های زمانیِ تهران).
+    // پیوسته، ویژگی‌های زمانیِ تهران) · v4 `phoneSource` → `staffEntered`
+    // (ویژگی‌ای که هیچ نویسنده‌ای مقدارش را تولید نمی‌کرد و ساختاراً صفر بود).
     //
     // ⚠️ این تست همان کاری را کرد که برایش ساخته شده بود: با تغییرِ بردار
     // قرمز شد و نشان داد برچسبِ دفتر عقب مانده — چون دفتر یک ثابتِ **موازی**
     // داشت. حالا برچسب از همان یک منبع مشتق می‌شود، پس عقب‌ماندن ممکن نیست.
-    assert.equal(NO_SHOW_FEATURE_VERSION, 'no_show/v3');
+    assert.equal(NO_SHOW_FEATURE_VERSION, 'no_show/v4');
   });
 });
 

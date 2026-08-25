@@ -1,6 +1,7 @@
 import { createLogger } from './logger';
 import { enqueue } from './queue';
 import { metrics } from './metrics';
+import { consumeSms } from './sms-balance';
 const log = createLogger('sms');
 
 export type SmsJob = {
@@ -42,10 +43,75 @@ const TEMPLATE_MAP: Record<SmsJob['template'], string> = {
 /** سقفِ توکنِ lookupِ کاوه‌نگار (token, token2, token3). */
 export const MAX_SMS_TOKENS = 3;
 
-function toLocalNumber(phone: string): string {
+/**
+ * شکلِ محلیِ شماره (`+989…`/`98…` → `09…`). فرمتِ گیرنده‌ی کاوه‌نگار است.
+ *
+ * export شده چون تنها تعریفِ این تبدیل در کدبیس همین است و مسیرهایی که باید
+ * یک شماره‌ی ورودی را با شماره‌ی ذخیره‌شده تطبیق دهند (مثلِ گاردِ «این شماره
+ * واقعاً امروز اینجا چک‌این کرده؟» در `restaurant/sms`) به همین تبدیل نیاز
+ * دارند. تعریفِ دومِ موازی = دو رفتارِ متفاوت در دو مسیر.
+ */
+export function toLocalNumber(phone: string): string {
   if (phone.startsWith('+98')) return '0' + phone.slice(3);
   if (phone.startsWith('98')) return '0' + phone.slice(2);
   return phone;
+}
+
+/**
+ * مسیرِ اضطراری وقتی صف (`jobs`) در دسترس نیست.
+ *
+ * ⚠️ یافته‌ی ۲۰۲۶-۰۸-۲۵ — یک نشتیِ مستقیمِ **پول**: تنها جایی که موجودیِ
+ * پیامکِ رستوران کسر می‌شود `worker.ts` است (`consumeSms` پیش از
+ * `sendSmsNow`). این fallback هرگز از worker رد نمی‌شود، پس تا امروز:
+ *  • هر پیامکی که در قطعیِ صف از این‌جا می‌رفت **بدونِ کسرِ اعتبار** می‌رفت
+ *    (سقفِ موجودی کاملاً دور زده می‌شد و در `sms_transactions` هم ردی
+ *    نمی‌ماند — یعنی نه گزارشِ مصرف درست بود نه صورت‌حساب)،
+ *  • و `.catch(() => {})` خطای خودِ ارسال را هم می‌بلعید: هیچ لاگ، هیچ
+ *    متریک، هیچ نشانه‌ای. یک قطعیِ کاملِ ارسال از بیرون دقیقاً شبیهِ کارکردِ
+ *    عادی بود.
+ *
+ * قاعده‌ی این‌جا عیناً همان قاعده‌ی worker است (پیاده‌سازیِ دوم نیست — همان
+ * `consumeSms`): اول کسر، بعد ارسال؛ اگر کسر ممکن نبود **ارسال نمی‌شود**.
+ * fail-closed عمدی است (CLAUDE.md §۹): علتِ شکستِ `enqueue` معمولاً خودِ
+ * دیتابیس است، و اگر نتوانیم موجودی را کم کنیم یعنی نمی‌دانیم اجازه‌ی ارسال
+ * داریم یا نه — «نمی‌دانم» باید بسته باشد، نه باز.
+ *
+ * تابع عمداً throw نمی‌کند: `enqueueSms` از روزِ اول void و بی‌استثنا بوده و
+ * چند صداکننده‌اش (مثلاً `createReservation` بعد از commit) خطا را
+ * نمی‌گیرند — throwِ تازه یعنی رزروِ ثبت‌شده با ۵۰۰ به کاربر گزارش شود.
+ * به‌جایش هر شکست **صریحاً** لاگ و متریک می‌شود.
+ */
+async function sendDirectFallback(job: SmsJob): Promise<void> {
+  if (job.restaurantId) {
+    let charged = false;
+    try {
+      charged = await consumeSms(job.restaurantId, 1, 'queue_fallback');
+    } catch (e) {
+      log.error('کسرِ موجودیِ پیامک در مسیرِ اضطراری ناموفق — ارسال انجام نشد', {
+        template: job.template, restaurantId: job.restaurantId, error: (e as Error).message,
+      });
+      metrics.smsFailed.inc({ template: job.template, reason: 'balance_check_failed' });
+      return;
+    }
+    if (!charged) {
+      log.error('موجودیِ پیامکِ رستوران کافی نیست — مسیرِ اضطراری ارسال نکرد', {
+        template: job.template, restaurantId: job.restaurantId,
+      });
+      metrics.smsFailed.inc({ template: job.template, reason: 'insufficient_balance' });
+      return;
+    }
+  }
+  try {
+    await sendSmsNow(job);
+  } catch (e) {
+    // ⚠️ اینجا عمداً «بی‌صدا» نیست. متریکِ جدا از `network` است چون معنایش
+    // فرق دارد: در مسیرِ عادی، شکستِ ارسال را worker با retry جبران می‌کند؛
+    // اینجا هیچ retryای وجود ندارد و پیام **قطعاً** از دست رفته است.
+    log.error('ارسالِ مستقیمِ پیامک در مسیرِ اضطراری شکست خورد — پیام از دست رفت', {
+      template: job.template, restaurantId: job.restaurantId ?? null, error: (e as Error).message,
+    });
+    metrics.smsFailed.inc({ template: job.template, reason: 'fallback_failed' });
+  }
 }
 
 export async function enqueueSms(job: SmsJob): Promise<void> {
@@ -62,11 +128,14 @@ export async function enqueueSms(job: SmsJob): Promise<void> {
       payload: job as unknown as Record<string, unknown>,
       ...(job.idempotencyKey ? { idempotencyKey: job.idempotencyKey } : {}),
     });
+    return;
   } catch (e) {
     // اگر صف در دسترس نبود، به ارسال مستقیم fallback کن (بهتر از گم‌شدن پیام)
+    // — ولی با همان قاعده‌ی موجودیِ worker و بدونِ بلعیدنِ خطا (توضیحِ کامل
+    // روی `sendDirectFallback`).
     log.warn('صف در دسترس نیست، ارسال مستقیم SMS', { error: (e as Error).message });
-    await sendSmsNow(job).catch(() => {});
   }
+  await sendDirectFallback(job);
 }
 
 /** ارسال واقعی یک SMS از طریق کاوه‌نگار (توسط worker صف یا مسیر OTP صدا زده می‌شود). */

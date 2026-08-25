@@ -6,7 +6,7 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { ApiError, Err, errorResponse } from '@/lib/errors';
 import { parseBody, zPhone, zOtpCode, z } from '@/lib/schemas';
 import { getEffectivePermissions } from '@/lib/permissions';
-import { resolveStaffRestaurant } from '@/lib/staff-helpers';
+import { findStaffForLogin, resolveStaffRestaurant } from '@/lib/staff-helpers';
 import { audit, maskPhone } from '@/lib/audit';
 
 import { withApiMetrics } from '@/lib/api-metrics';
@@ -22,7 +22,24 @@ async function POST_impl(req: Request) {
     const { phone, code } = await parseBody(req, schema);
     phoneMasked = maskPhone(phone);
     const normalized = normalizePhone(phone);
-    const staff = await db.staff.findFirst({ where: { phone: normalized } });
+    // ⚠️ یافته‌ی بازِ ثبت‌شده — عمداً در این دسته‌کار رفع نشد (ارجاع به معمار).
+    //
+    // `@@unique([tenantId, phone])` یعنی یک شماره می‌تواند در **چند** تنانت
+    // کارمند باشد، ولی این `findFirst` نه تنانت می‌گیرد و نه `orderBy` دارد —
+    // پس Postgres هیچ ترتیبی تضمین نمی‌کند و «هویتِ» صاحبِ شماره عملاً به
+    // ترتیبِ فیزیکیِ ردیف‌ها در heap گره خورده است. با یک UPDATE معمولی روی
+    // ردیفِ قربانی (مثلاً ویرایشِ نام از پنل) آن ردیف به انتهای heap می‌رود و
+    // ردیفِ دیگری برنده می‌شود؛ این با اجرای واقعی روی همین دیتابیس بازتولید
+    // شد. نتیجه: توکن با `tenantId` و `role`ِ ردیفِ اشتباه صادر می‌شود.
+    //
+    // چرا اینجا رفع نشد: رفعِ درست «قدیمی‌ترین ردیف برنده است» می‌خواهد و
+    // جدولِ `staff` **ستونِ `created_at` ندارد** (نه در schema.prisma و نه در
+    // DBِ زنده — هر دو بررسی شد). یعنی هر رفعِ امروزی یا تغییرِ اسکیماست
+    // (نیازِ تأییدِ معمار طبقِ پروتکل) یا یک ترتیبِ دلخواه که همان اشکال را
+    // با ظاهرِ قطعی حفظ می‌کند، یا fail-closed که خودش یک DoSِ
+    // بی‌سروصدا می‌سازد (هر مالکی می‌تواند هر کارمندی را قفل کند).
+    // حدس‌زدن بدتر از ثبت‌کردن است — رجوع کن به گزارشِ همین دسته‌کار.
+    const staff = await findStaffForLogin(normalized);
     if (!staff) throw Err.forbidden('این شماره دسترسی پنل رستوران ندارد');
     if (!staff.isActive) throw Err.forbidden('این حساب غیرفعال شده است');
     await verifyOtp(normalized, code);

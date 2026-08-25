@@ -12,6 +12,65 @@ import { DEMAND_STATUSES_SQL } from './reservation-status';
 const DEMAND_STATUSES_RAW = Prisma.raw(DEMAND_STATUSES_SQL);
 
 // ═══════════════════════════════════════════════════════════════════════
+//  «روز» یعنی روزِ **تهران** — تنها تعریفِ مجاز در گزارش‌های رستوران
+//
+//  ⚠️ باگی که این بلوک از آن زاده شد (۲۰۲۶-۰۸-۲۵، تأییدشده با کوئریِ واقعی
+//  روی Postgres): `reservations.slot_start` از نوعِ
+//  `timestamp WITHOUT time zone` است و سرورِ Postgres روی UTC اجرا می‌شود
+//  (`SHOW TimeZone` → `Etc/UTC`). پس `slot_start::date`،
+//  `EXTRACT(DOW FROM slot_start)` و `EXTRACT(HOUR FROM slot_start)` همگی
+//  **روز/روزِ‌هفته/ساعتِ UTC** می‌دهند، نه تهران.
+//
+//  تهران UTC+3:30 است، پس هر اسلاتِ ۰۰:۰۰ تا ۰۳:۲۹ به وقتِ تهران در UTC
+//  هنوز روزِ *قبل* است. اندازه‌گیریِ واقعی:
+//    2026-03-10 20:45 UTC  →  روزِ UTC = 03-10، روزِ تهران = 03-11
+//                             DOW: ۲ در برابرِ ۳، ساعت: ۲۰ در برابرِ ۰۰
+//  یعنی شامِ دیرِ سه‌شنبه‌شب در آمار به چهارشنبه منتقل می‌شد (و برعکس)،
+//  و «ساعتِ اوج» ۳:۳۰ جابه‌جا گزارش می‌شد.
+//
+//  چرا مهم است و نه یک جزئیاتِ زیبایی‌شناختی: مدلِ پیش‌بینیِ تقاضا
+//  (lib/demand-forecast.ts) فصلیِ **هفتگی** یاد می‌گیرد. اگر بخشی از هر
+//  شب به روزِ قبل بیفتد، سیگنالِ فصلی با نویزِ سیستماتیک آلوده می‌شود.
+//  `buildFeatureVector` در lib/no-show-model.ts از همان اول این را با
+//  `tehranHourWeekday()` درست انجام می‌داد — یعنی دو تعریفِ متناقض از «روز»
+//  در یک کدبیس زنده بود.
+//
+//  ⚠️ اینها عمداً `Prisma.raw` هستند و از یک ثابتِ کاملاً کدی ساخته می‌شوند
+//  (نه ورودیِ کاربر) — همان الگو و همان دلیلِ DEMAND_STATUSES_RAW بالا.
+//  ⚠️ و عمداً اینجا یک‌جا تعریف شده‌اند، نه پنج کپی در پنج فایل: پنج کپی
+//  دقیقاً همان چیزی است که اجازه داد این تعریف از `no-show-model.ts` واگرا شود.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** منطقه‌ی زمانیِ کسب‌وکار. هم‌ارزِ SQLیِ `tehranHourWeekday()` در `no-show-model.ts`. */
+export const BUSINESS_TZ = 'Asia/Tehran';
+
+/** روزِ تقویمیِ تهرانِ یک اسلات. */
+export const TEHRAN_SLOT_DAY = Prisma.raw(`(slot_start AT TIME ZONE 'UTC' AT TIME ZONE '${BUSINESS_TZ}')::date`);
+/** روزِ هفته به وقتِ تهران (۰=یکشنبه، هم‌قرارداد با DAY_NAMES_FA). */
+export const TEHRAN_SLOT_DOW = Prisma.raw(`EXTRACT(DOW FROM (slot_start AT TIME ZONE 'UTC' AT TIME ZONE '${BUSINESS_TZ}'))::int`);
+/** ساعتِ روز (۰..۲۳) به وقتِ تهران. */
+export const TEHRAN_SLOT_HOUR = Prisma.raw(`EXTRACT(HOUR FROM (slot_start AT TIME ZONE 'UTC' AT TIME ZONE '${BUSINESS_TZ}'))::int`);
+/** «امروز» به وقتِ تهران — جایگزینِ `CURRENT_DATE` که روزِ UTC می‌دهد. */
+export const TEHRAN_TODAY = Prisma.raw(`(now() AT TIME ZONE '${BUSINESS_TZ}')::date`);
+
+/**
+ * لحظه‌ی شروعِ یک روزِ تقویمیِ تهران، به‌صورتِ `timestamp`ِ UTC — یعنی چیزی
+ * که مستقیماً با `slot_start` قابلِ مقایسه است و ایندکس را هم می‌سوزاند.
+ * `daysAgo` از «امروزِ تهران» شمرده می‌شود.
+ *
+ * چرا لازم است: `slot_start >= CURRENT_DATE - 60` مرزِ پنجره را روی نیمه‌شبِ
+ * **UTC** می‌گذارد، یعنی ۳ ساعت‌ونیم از نیمه‌شبِ تهران جلوتر — و در بازه‌ی
+ * ۲۰:۳۰ تا ۲۴:۰۰ UTC حتی یک روزِ کامل جابه‌جا می‌شود.
+ */
+export function tehranDayStart(daysAgo: number): Prisma.Sql {
+  // daysAgo از کد می‌آید (نه کاربر)، ولی برای اطمینان به عددِ صحیح مهار می‌شود.
+  const d = Math.max(0, Math.trunc(daysAgo));
+  return Prisma.raw(
+    `((((now() AT TIME ZONE '${BUSINESS_TZ}')::date - ${d})::timestamp AT TIME ZONE '${BUSINESS_TZ}') AT TIME ZONE 'UTC')`,
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  AI Restaurant Manager — پاسخ‌هایِ ساختارمند و مستند به سؤالاتِ مدیریتیِ
 //  رایج، نه یک چت‌بات با NLU. دقیقاً همون فلسفه‌ی restaurant/ai/route.ts:
 //  «موتورِ قانون‌محورِ شفاف، نه black-box» — هر پاسخ عددِ پشتِ خودش را نشان
@@ -75,7 +134,8 @@ export function rankUtilization(tables: readonly TableActivity[]): TableUtilizat
     .sort((a, b) => a.relative_to_avg_pct - b.relative_to_avg_pct);
 }
 
-const DAY_NAMES_FA = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
+/** ۰=یکشنبه، هم‌قرارداد با `EXTRACT(DOW ...)` در Postgres و با TEHRAN_SLOT_DOW. */
+export const DAY_NAMES_FA = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
 
 // ── از اینجا به بعد: DB واقعی. در تستِ واحد صدا زده نمی‌شود. ──
 
@@ -89,16 +149,16 @@ const DAY_NAMES_FA = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چها
 async function buildYesterdayAnswer(restaurantId: string): Promise<ManagerAnswer | null> {
   const rows = await db.$queryRaw<{ day: Date; cnt: bigint }[]>`
     WITH same_weekday AS (
-      SELECT generate_series(CURRENT_DATE - 28, CURRENT_DATE - 1, interval '1 day')::date AS day
+      SELECT generate_series(${TEHRAN_TODAY} - 28, ${TEHRAN_TODAY} - 1, interval '1 day')::date AS day
     )
     SELECT sw.day,
       (SELECT COUNT(*) FROM reservations
         WHERE restaurant_id = ${restaurantId}::uuid
           AND status IN (${DEMAND_STATUSES_RAW})
-          AND slot_start::date = sw.day
+          AND ${TEHRAN_SLOT_DAY} = sw.day
       )::bigint AS cnt
     FROM same_weekday sw
-    WHERE EXTRACT(DOW FROM sw.day) = EXTRACT(DOW FROM CURRENT_DATE - 1)
+    WHERE EXTRACT(DOW FROM sw.day) = EXTRACT(DOW FROM ${TEHRAN_TODAY} - 1)
     ORDER BY sw.day ASC
   `;
   if (rows.length < 3) return null; // کمتر از ۳ نمونه‌ی مقایسه‌ای → سیگنالِ قابلِ‌اتکا نیست
@@ -133,11 +193,11 @@ export interface DowRankingRow { dow: number; count: number }
  */
 export async function getWeekdayRanking(restaurantId: string): Promise<DowRankingRow[] | null> {
   const rows = await db.$queryRaw<{ dow: number; cnt: bigint }[]>`
-    SELECT EXTRACT(DOW FROM slot_start)::int AS dow, COUNT(*)::bigint AS cnt
+    SELECT ${TEHRAN_SLOT_DOW} AS dow, COUNT(*)::bigint AS cnt
     FROM reservations
     WHERE restaurant_id = ${restaurantId}::uuid
       AND status IN (${DEMAND_STATUSES_RAW})
-      AND slot_start >= CURRENT_DATE - 60
+      AND slot_start >= ${tehranDayStart(60)}
     GROUP BY dow
   `;
   const totalDays = rows.reduce((s, r) => s + Number(r.cnt), 0);
@@ -192,7 +252,7 @@ async function buildTableUtilizationAnswer(restaurantId: string): Promise<Manage
     FROM tables t
     LEFT JOIN reservations r ON r.table_id = t.id
       AND r.status IN (${DEMAND_STATUSES_RAW})
-      AND r.slot_start >= CURRENT_DATE - 30
+      AND r.slot_start >= ${tehranDayStart(30)}
     WHERE t.restaurant_id = ${restaurantId}::uuid AND t.is_active = true
     GROUP BY t.number, t.name
   `;

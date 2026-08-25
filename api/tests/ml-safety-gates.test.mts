@@ -54,7 +54,7 @@ describe('گیتِ بایاسِ کانالی — واقعاً می‌گزد', ()
     // knownUserGap = NaN ⇒ biased همیشه false ⇒ گیت یک no-opِ دائمی.
     const r = checkChannelBias(zeros());
     assert.ok(Number.isFinite(r.knownUserGap), `knownUserGap باید عدد باشد، شد ${r.knownUserGap}`);
-    assert.ok(Number.isFinite(r.phoneSourceGap), `phoneSourceGap باید عدد باشد، شد ${r.phoneSourceGap}`);
+    assert.ok(Number.isFinite(r.staffEnteredGap), `staffEnteredGap باید عدد باشد، شد ${r.staffEnteredGap}`);
     assert.equal(r.knownUserGap, 0, 'مدلِ خنثی گپِ صفر دارد');
     assert.equal(r.biased, false);
   });
@@ -68,9 +68,9 @@ describe('گیتِ بایاسِ کانالی — واقعاً می‌گزد', ()
     assert.ok(Math.abs(r.knownUserGap) > 0.2);
   });
 
-  test('🔴 بایاسِ کانالِ تلفن هم گرفته می‌شود', async () => {
+  test('🔴 بایاسِ کانالِ «ثبت توسطِ پرسنل» هم گرفته می‌شود', async () => {
     const w = zeros();
-    w[NO_SHOW_FEATURE_NAMES.indexOf('phoneSource')] = 4;
+    w[NO_SHOW_FEATURE_NAMES.indexOf('staffEntered')] = 4;
     assert.equal(checkChannelBias(w).biased, true);
   });
 

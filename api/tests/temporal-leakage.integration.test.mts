@@ -31,7 +31,18 @@ import { fixturePhone } from './_phone.helper.mts';
 const TAG = `leak-${randomUUID().slice(0, 8)}`;
 let tenantId: string, restaurantId: string, tableId: string, userId: string;
 
-/** دقیقاً همان کوئریِ نقطه-در-زمانِ fetchTrainingRows در lib/no-show-model.ts. */
+/**
+ * کپیِ **منجمدِ** نیمه‌ی اولِ گاردِ نقطه-در-زمان (`h.slot_start < r.created_at`).
+ *
+ * ⚠️ به‌روزرسانیِ ۲۰۲۶-۰۸-۲۵ — این کوئری دیگر «دقیقاً همان» کوئریِ
+ * `fetchTrainingRows` نیست و نباید طوری خوانده شود: کوئریِ زنده حالا یک
+ * گاردِ دوم هم دارد (`COALESCE(settled_at, slot_end) < r.created_at`) که
+ * ثابت می‌کند نتیجه‌ی سابقه واقعاً **ثبت** شده بود، نه فقط اینکه اسلاتش
+ * شروع شده. این فایل عمداً همان نسخه‌ی قدیمی را نگه می‌دارد چون سناریوی
+ * «ثبتِ زودتر، برگزاریِ دیرتر» را می‌سنجد و آن گارد باید مستقل بماند؛
+ * گاردِ دوم در tests/no-show-outcome-settled.integration.test.mts روی
+ * **خودِ** `fetchTrainingRows` سنجیده می‌شود.
+ */
 async function priorCounts(): Promise<Record<string, { noShows: number; completions: number }>> {
   const rows = await db.$queryRawUnsafe<{ code: string; prior_no_shows: number; prior_completions: number }[]>(`
     SELECT r.code,

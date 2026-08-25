@@ -48,7 +48,7 @@ export const NO_SHOW_FEATURE_NAMES = [
   'lastMinute',       // < 30 دقیقه تا شروعِ اسلات (اثرِ آستانه‌ای، جدا از پیوسته)
   'largeParty',       // >= 6 نفر
   'partySizeNorm',    // اندازه‌ی گروه، پیوسته
-  'phoneSource',
+  'staffEntered',     // رزرو را پرسنل ثبت کرده (source='manual')، نه خودِ مهمان از اپ
   'hourSin',          // ساعتِ روز به وقتِ تهران، دایره‌ای
   'hourCos',
   'isWeekend',        // پنجشنبه/جمعه — آخرِ هفته‌ی ایران، نه شنبه/یکشنبه
@@ -75,9 +75,26 @@ export const NO_SHOW_FEATURE_NAMES = [
  *
  * تاریخچه: v1 بردارِ ۷تاییِ اولیه · v2 همان ترکیب با معنیِ تازه‌ی
  * priorTotal (فازِ ۴) · v3 بردارِ ۱۲تایی با جمع‌شدگی، فاصله‌ی پیوسته و
- * ویژگی‌های زمانیِ تهران.
+ * ویژگی‌های زمانیِ تهران · v4 `phoneSource` → `staffEntered`.
+ *
+ * ⚠️ چرا v4 (یافته‌ی ۲۰۲۶-۰۸-۲۵، با grep روی کلِ src اثبات شد): ویژگیِ
+ * `phoneSource` مقدارش `input.source === 'phone'` بود، ولی **هیچ نویسنده‌ای
+ * در کلِ کدبیس مقدارِ `'phone'` تولید نمی‌کرد** —
+ *   • `app/api/v1/reservations/route.ts` می‌نویسد `'app'` یا `'manual'`
+ *   • `lib/reservations.ts` (walk-in) می‌نویسد `'walkin'`
+ *   • و خودِ تایپِ ورودی `CreateReservationInput.source` فقط `'app' | 'manual'` است
+ * یعنی یکی از ۱۱ ویژگیِ غیرِبایاس یک **ستونِ ثابتِ صفر** بود: گرادیانش همیشه
+ * صفر، پس وزنش هرگز از مقدارِ اولیه تکان نمی‌خورد. بدتر: نیمی از گیتِ بایاسِ
+ * کانالی (`checkChannelBias`) هم روی همان ستون بنا شده بود، پس آن نیمه
+ * **ساختاراً** همیشه گپِ صفر می‌داد — یک گاردِ ایمنیِ ظاهری.
+ *
+ * دو راه بود: یا نوشتنِ `'phone'` در مسیرِ رزروِ پرسنل، یا بازتعریفِ ویژگی
+ * روی چیزی که واقعاً نوشته می‌شود. دومی انتخاب شد چون `'manual'` دقیقاً
+ * همان چیزی را می‌گوید که این ویژگی می‌خواست بداند (رزرو را پرسنل ثبت کرده،
+ * نه خودِ مهمان)، و اضافه‌کردنِ یک مقدارِ تازه به ستونِ `source` یک تغییرِ
+ * دامنه‌ی دیتا در مسیرِ رزرو بود — کاری بزرگ‌تر و پرریسک‌تر برای همان سیگنال.
  */
-export const NO_SHOW_FEATURE_VERSION = 'v3';
+export const NO_SHOW_FEATURE_VERSION = 'v4';
 
 const MIN_LEAD_MINUTES_RISKY = 30;
 const MAX_LEAD_MINUTES_SAFE = 7 * 24 * 60;
@@ -180,7 +197,11 @@ export function buildFeatureVector(input: RawFeatureInput): number[] {
     input.leadMinutes < MIN_LEAD_MINUTES_RISKY ? 1 : 0,
     input.partySize >= LARGE_PARTY_SIZE ? 1 : 0,
     Math.min(input.partySize, PARTY_SIZE_SATURATION) / PARTY_SIZE_SATURATION,
-    input.source === 'phone' ? 1 : 0,
+    // ⚠️ `'manual'` و نه `'phone'`: هیچ‌جا در کدبیس `'phone'` نوشته نمی‌شود
+    // (رجوع کن به NO_SHOW_FEATURE_VERSION، توضیحِ v4). مقدارهایِ واقعیِ ستون
+    // `source` فقط `app` / `manual` / `walkin` هستند و walk-in از هدفِ آموزش
+    // بیرون است — پس این ویژگی عملاً «اپ در برابرِ ثبتِ پرسنل» است.
+    input.source === 'manual' ? 1 : 0,
     hourSin,
     hourCos,
     isWeekend,
@@ -267,16 +288,25 @@ export interface BiasCheckResult {
   biased: boolean;
   /** احتمال(مهمان) − احتمال(کاربرِ ثبت‌نامی)، با همه‌ی عواملِ رفتاریِ دیگر یکسان و در حالتِ ریسکِ صفر. */
   knownUserGap: number;
-  /** احتمال(رزروِ تلفنی) − احتمال(رزروِ غیرتلفنی)، همان شرایط. */
-  phoneSourceGap: number;
+  /** احتمال(رزروِ ثبت‌شده توسطِ پرسنل) − احتمال(رزروِ اپ)، همان شرایط.
+   *  ⚠️ نامش تا v3 `phoneSourceGap` بود و روی ویژگی‌ای بنا شده بود که هیچ
+   *  نویسنده‌ای تولیدش نمی‌کرد — یعنی این نیمه‌ی گیت همیشه صفر بود. */
+  staffEnteredGap: number;
   reason: string;
 }
 
 /**
  * تستِ سادهِ بایاسِ کانالی (نقشه‌راهِ AI، فازِ ۱) — آیا مدلِ یادگرفته صرفاً
- * به‌خاطرِ اینکه رزرو مهمان است یا از طریقِ تلفن ثبت شده (نه به‌خاطرِ
+ * به‌خاطرِ اینکه رزرو مهمان است یا توسطِ پرسنل ثبت شده (نه به‌خاطرِ
  * رفتارِ واقعیِ ریسک‌زا: last-minute، سابقه‌ی no-show، گروهِ بزرگ) امتیازِ
  * ریسک را به‌طرزِ نامتناسبی بالا/پایین می‌برد؟
+ *
+ * ⚠️ تا v3 نیمه‌ی دومِ این گیت بی‌اثر بود: روی ویژگیِ `phoneSource` بنا شده
+ * بود که مقدارش هرگز ۱ نمی‌شد (هیچ نویسنده‌ای `source='phone'` تولید
+ * نمی‌کرد)، پس `pPhone` همیشه دقیقاً برابرِ `pRegistered` و گپ همیشه صفر
+ * بود — یعنی مدلی که «رزروِ پرسنل = پرریسک» یاد گرفته باشد بی‌مانع رد
+ * می‌شد. با v4 ویژگی به `staffEntered` (`source='manual'`) بازتعریف شد و
+ * این نیمه واقعاً چیزی را می‌سنجد.
  *
  * روش: یک بردارِ «ریسکِ صفر» می‌سازیم (بدونِ last-minute/very-early/
  * large-party/سابقه‌ی بد) و فقط یک ویژگیِ هویتی/کانالی را در هر بار
@@ -304,23 +334,23 @@ export function checkChannelBias(weights: number[]): BiasCheckResult {
     return v;
   };
   const iKnown = NO_SHOW_FEATURE_NAMES.indexOf('knownUser');
-  const iPhone = NO_SHOW_FEATURE_NAMES.indexOf('phoneSource');
+  const iStaff = NO_SHOW_FEATURE_NAMES.indexOf('staffEntered');
 
   const registeredZeroRisk = zeroRisk(); registeredZeroRisk[iKnown] = 1;
   const guestZeroRisk = zeroRisk();
-  const phoneZeroRisk = zeroRisk(); phoneZeroRisk[iKnown] = 1; phoneZeroRisk[iPhone] = 1;
+  const staffZeroRisk = zeroRisk(); staffZeroRisk[iKnown] = 1; staffZeroRisk[iStaff] = 1;
 
   const pRegistered = predictProba(weights, registeredZeroRisk);
   const pGuest = predictProba(weights, guestZeroRisk);
-  const pPhone = predictProba(weights, phoneZeroRisk);
+  const pStaff = predictProba(weights, staffZeroRisk);
 
   const knownUserGap = pGuest - pRegistered;
-  const phoneSourceGap = pPhone - pRegistered;
-  const biased = Math.abs(knownUserGap) > MAX_CHANNEL_BIAS_GAP || Math.abs(phoneSourceGap) > MAX_CHANNEL_BIAS_GAP;
+  const staffEnteredGap = pStaff - pRegistered;
+  const biased = Math.abs(knownUserGap) > MAX_CHANNEL_BIAS_GAP || Math.abs(staffEnteredGap) > MAX_CHANNEL_BIAS_GAP;
   const reason = biased
-    ? `مدل صرفاً بر اساسِ کانالِ رزرو (نه رفتار) تفاوتِ زیادی در امتیاز می‌دهد — گپِ مهمان: ${(knownUserGap * 100).toFixed(1)}٪، گپِ تلفنی: ${(phoneSourceGap * 100).toFixed(1)}٪`
+    ? `مدل صرفاً بر اساسِ کانالِ رزرو (نه رفتار) تفاوتِ زیادی در امتیاز می‌دهد — گپِ مهمان: ${(knownUserGap * 100).toFixed(1)}٪، گپِ رزروِ پرسنل: ${(staffEnteredGap * 100).toFixed(1)}٪`
     : 'بدون بایاسِ کانالیِ قابل‌توجه';
-  return { biased, knownUserGap, phoneSourceGap, reason };
+  return { biased, knownUserGap, staffEnteredGap, reason };
 }
 
 /** ساختِ X,y از فهرستی از مثال‌ها — کمکیِ خالص برای تست و برای trainAndCalibrate. */
@@ -349,12 +379,25 @@ export interface TrainingRow {
  * تاریخچه‌ی رزروهای این رستوران را با ویژگیِ «سابقه‌ی مشتری در لحظه‌ی ثبت»
  * برمی‌گرداند — با window function، نه N کوئریِ جدا.
  *
- * نکته‌ی حیاتی برای جلوگیری از نشتِ زمانی: ROWS BETWEEN UNBOUNDED PRECEDING
- * ⚠️ این توضیح در ۲۰۲۶-۰۸-۲۰ بازنویسی شد: پیاده‌سازیِ قبلی window function
- * با `ORDER BY created_at ... 1 PRECEDING` بود و همین‌جا ادعا می‌کرد «دقیقاً
- * همان چیزی که در لحظه‌ی رزرو معلوم بوده». آن ادعا غلط بود — جزئیات و
- * سناریویِ اثبات در خودِ کوئریِ پایین. حالا شرطِ نقطه-در-زمان صریح است:
- * `h.slot_start < r.created_at`.
+ * ⚠️ این توضیح دو بار بازنویسی شده، و هر دو بار چون **کامنت بیش از کوئری
+ * ادعا می‌کرد**. تاریخچه‌اش عمداً اینجا مانده تا دوباره تکرار نشود:
+ *
+ *  • ۲۰۲۶-۰۸-۲۰ — پیاده‌سازیِ window function با
+ *    `ORDER BY created_at ... 1 PRECEDING` بود و اینجا نوشته بود «دقیقاً
+ *    همان چیزی که در لحظه‌ی رزرو معلوم بوده». غلط بود؛ با
+ *    `h.slot_start < r.created_at` جایگزین شد.
+ *  • ۲۰۲۶-۰۸-۲۵ — همان جمله دوباره بیش از کوئری ادعا می‌کرد: `slot_start`
+ *    فقط ثابت می‌کند اسلات **شروع شده** بود، نه اینکه نتیجه‌اش ثبت شده بود
+ *    (`no_show` را cron در slot_start+grace می‌نویسد و `completed` را
+ *    autoComplete در slot_end). حالا شرطِ دوم صریح است و از
+ *    `reservation_events` می‌آید.
+ *
+ * **دقیقاً چه چیزی تضمین می‌شود** (نه بیشتر): یک رزروِ سابقه فقط وقتی شمرده
+ * می‌شود که هم اسلاتش پیش از `r.created_at` شروع شده باشد، **و هم** لحظه‌ی
+ * رسیدنش به وضعیتِ فعلی — از رویِ `reservation_events`، یا اگر رویدادی ثبت
+ * نشده از رویِ `slot_end` به‌عنوانِ کرانِ بالا — پیش از `r.created_at` باشد.
+ * برای ردیف‌های بدونِ رویداد این یک **تقریبِ محافظه‌کارانه** است، نه یک
+ * اندازه‌گیری: ممکن است سابقه‌ی واقعی را کم بشمارد، ولی هرگز زیاد نمی‌شمارد.
  *
  * COALESCE(user_id::text, id::text): برای رزروهای مهمان (بدون حساب کاربری)
  * user_id همه NULL است و NULL = NULL هرگز true نمی‌شود؛ بدونِ این fallback
@@ -391,6 +434,14 @@ export async function fetchTrainingRows(restaurantId: string): Promise<TrainingR
         COUNT(*) FILTER (WHERE h.status = 'no_show') AS prior_no_shows,
         COUNT(*) FILTER (WHERE h.status IN ('completed','arrived','seated','dining')) AS prior_completions
       FROM reservations h
+      LEFT JOIN LATERAL (
+        -- لحظه‌ای که این رزرو به وضعیتِ فعلی‌اش رسید. reservation_events تنها
+        -- نویسنده‌ی وضعیت است (transitionReservation در lib/lifecycle.ts) و
+        -- ایندکسِ (reservation_id, created_at) دارد، پس این زیرکوئری ارزان است.
+        SELECT MIN(e.created_at) AS settled_at
+        FROM reservation_events e
+        WHERE e.reservation_id = h.id AND e.to_status = h.status
+      ) s ON TRUE
       WHERE h.restaurant_id = r.restaurant_id
         AND COALESCE(h.user_id::text, h.id::text) = COALESCE(r.user_id::text, r.id::text)
         AND h.id <> r.id
@@ -411,10 +462,24 @@ export async function fetchTrainingRows(restaurantId: string): Promise<TrainingR
         -- نسخه‌ی قبلی برای B مقدارِ prior_no_shows = 1 می‌داد — یعنی مدل از
         -- اتفاقی که یک ماه بعد می‌افتاد «یاد می‌گرفت». این دقیقاً همان چیزی
         -- است که مدل را در ارزیابی خوب و در تولید بی‌ارزش می‌کند.
-        --
-        -- حالا فقط سابقه‌ای شمرده می‌شود که نتیجه‌اش پیش از *ثبتِ* رزروِ
-        -- هدف قطعی شده بود.
         AND h.slot_start < r.created_at
+        -- ⚠️ نشتِ باقی‌مانده (رفعِ ۲۰۲۶-۰۸-۲۵). شرطِ بالا فقط ثابت می‌کند
+        -- اسلات **شروع شده** بود — نه اینکه نتیجه‌اش ثبت شده بود. در واقعیت:
+        --   • no_show را cron حوالیِ slot_start + lateGraceMinutes می‌نویسد
+        --   • completed را autoComplete در slot_end می‌نویسد
+        -- یعنی پنجره‌ای به اندازه‌ی یک سرویس (~۱٫۵ تا ۳ ساعت) وجود داشت که
+        -- رزروی «حل‌شده» شمرده می‌شد در حالی که در لحظه‌ی created_atِ هدف
+        -- هنوز نتیجه‌اش معلوم نبود. جهتِ خطا همیشه خوش‌بینانه بود (سابقه‌ی
+        -- بیشتر از آنچه واقعاً در دسترس بود) و مسیرِ سرو چنین چیزی ندارد —
+        -- یعنی یک اختلافِ آموزش/سرو، دقیقاً از همان خانواده‌ی فازِ ۴.
+        --
+        -- حالا لحظه‌ی واقعیِ ثبتِ نتیجه از reservation_events خوانده می‌شود.
+        -- fallback عمداً slot_end است و نه slot_start: رزروهایی که رویدادِ
+        -- متناظر ندارند (walk-inهایِ قدیمی که مستقیماً با وضعیتِ seated
+        -- ساخته شده‌اند، یا دادهٔ پیش از راه‌اندازیِ رویدادها) با یک کرانِ
+        -- **دیرتر** حساب می‌شوند، یعنی در بدترین حالت کم‌شمرده می‌شوند نه
+        -- زیاد. کم‌شمردن ایمن است؛ زیادشمردن همان نشتی است که رفع می‌شود.
+        AND COALESCE(s.settled_at, h.slot_end) < r.created_at
     ) p
     WHERE r.restaurant_id = ${restaurantId}::uuid
       AND r.status IN ('completed', 'no_show', 'arrived', 'seated', 'dining')
@@ -561,7 +626,7 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
       restaurantId, kind: 'no_show', sampleSize: examples.length,
       metrics: {
         learnedBrier, staticBrier,
-        knownUserGap: biasCheck.knownUserGap, phoneSourceGap: biasCheck.phoneSourceGap,
+        knownUserGap: biasCheck.knownUserGap, staffEnteredGap: biasCheck.staffEnteredGap,
       } as unknown as Prisma.InputJsonValue,
       isActive, reason,
     },
@@ -720,6 +785,11 @@ export async function fetchPlatformTrainingRows(): Promise<TrainingRow[]> {
         COUNT(*) FILTER (WHERE h.status = 'no_show') AS prior_no_shows,
         COUNT(*) FILTER (WHERE h.status IN ('completed','arrived','seated','dining')) AS prior_completions
       FROM reservations h
+      LEFT JOIN LATERAL (
+        SELECT MIN(e.created_at) AS settled_at
+        FROM reservation_events e
+        WHERE e.reservation_id = h.id AND e.to_status = h.status
+      ) s ON TRUE
       -- سابقه عمداً **درونِ همان رستوران** می‌ماند، حتی در مدلِ سراسری:
       -- مسیرِ سرو هم دقیقاً همین را می‌سازد. اگر اینجا سابقه‌ی بین‌رستورانی
       -- می‌شد، ویژگیِ آموزش با ویژگیِ سرو فرق می‌کرد — همان کلاسِ خطایی که
@@ -729,6 +799,10 @@ export async function fetchPlatformTrainingRows(): Promise<TrainingRow[]> {
         AND h.id <> r.id
         AND h.status IN ('completed','no_show','arrived','seated','dining')
         AND h.slot_start < r.created_at
+        -- همان گاردِ «نتیجه واقعاً ثبت شده بود» که در fetchTrainingRows
+        -- توضیح داده شده. این دو کوئری باید بند‌به‌بند یکی بمانند، وگرنه
+        -- مدلِ سراسری روی ویژگیِ دیگری آموزش می‌بیند.
+        AND COALESCE(s.settled_at, h.slot_end) < r.created_at
     ) p
     WHERE r.status IN ('completed', 'no_show', 'arrived', 'seated', 'dining')
       -- همان دلیلِ کوئریِ per-restaurant بالا: walk-in برچسبِ همیشه-صفر با
