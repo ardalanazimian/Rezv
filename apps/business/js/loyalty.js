@@ -49,37 +49,25 @@ async function rLoyalty(){
     <div class="row2">
       <div class="panel">
         <div class="panel-head"><div class="panel-title">عضویت در باشگاه</div></div>
-        <!-- ⚠️ تاریخچه‌ی این پنل (مهم است، چون دو بار در دو جهت عوض شده):
-             ۱) در ابتدا فرمِ «ثبت دستی عضو» بود که **کاملاً محلی** کار می‌کرد:
-                کدِ ساختگیِ VIS-xxx می‌ساخت، «عضو جدید ثبت شد» می‌گفت و با اولین
-                رفرش ناپدید می‌شد — چون endpointِ ساختِ عضو وجود نداشت
-                (/restaurant/members فقط GET بود). درست بود که حذف شود (فازِ ۲، §۳/§۲۸).
-             ۲) [merge ۰۸-۲۵] حالا آن پیش‌فرض دیگر برقرار نیست: POST /restaurant/members
-                واقعاً وجود دارد (کامیتِ aa5e0e7، با تستِ یکپارچه) و عضویت را اتمیک
-                (⚠️ در این کامنت backtick ننویس — داخلِ template literal است.)
-                روی سرور می‌سازد. پس فرم برگشت — این‌بار وصل به مسیرِ واقعی، با
-                کدِ برگشتی از سرور. متنِ جایگزینِ #68 («ثبتِ دستیِ جدا وجود ندارد»)
-                از لحظه‌ی وجودِ آن endpoint یک ادعایِ نادرست در UI بود.
-             نکته‌ای که از #68 **حفظ شد**: selectِ سالِ تولد برنگشت. بک‌اند فقط
-             birth_day/birth_month دارد؛ گرفتنِ سال یعنی جمع‌کردنِ دادهٔ حساس و
-             بی‌صدا دور ریختنش — همان ایرادِ درستِ #68.
-             توضیحِ ثبتِ خودکار هم (که #68 اضافه کرده بود) نگه داشته شد. -->
-        <div style="background:var(--blue-50);border:1px solid #BFDBFE;border-radius:var(--r);padding:12px;font-size:12.5px;line-height:1.8;color:var(--t2);margin-bottom:14px">
-          ${icon('info',{size:14})} معمولاً نیازی به این فرم نیست: عضویت هنگامِ <b>ثبتِ ورود (واک‌این)</b> یا <b>رزرو</b> خودکار ساخته می‌شود. این فرم برای عضوگیریِ حضوری در محل است.
+        <!-- ⚠️ رفعِ جعلِ موفقیت (فازِ ۲، پروتکل §۳ و §۲۸).
+             این پنل قبلاً فرمِ «ثبت دستی عضو» بود که کاملاً محلی کار می‌کرد:
+             یک کدِ ساختگیِ VIS-xxx می‌ساخت، «عضو جدید ثبت شد» می‌گفت، و با
+             اولین رفرش ناپدید می‌شد. سه selectِ تاریخِ تولد هم دادهٔ حساس جمع
+             می‌کردند و بی‌صدا دور می‌ریختند. عضویت در واقعیت **اتمیک** هنگامِ
+             واک‌این/رزرو ساخته می‌شود (createWalkinTx). پس به‌جایِ فرمِ دروغین،
+             همان مسیرِ واقعی. (تستِ رگرسیون: panels-batch8-regression.spec.ts)
+             [merge ۰۸-۲۵] این تصمیم عمداً دست‌نخورده ماند. از کامیتِ aa5e0e7 یک
+             مسیرِ واقعیِ POST /restaurant/members وجود دارد، پس ایرادِ «کدِ
+             ساختگی» دیگر تکنیکاً برقرار نیست — ولی برگرداندنِ فرم یک تصمیمِ
+             **محصولی** است («عضوی که هیچ‌وقت مهمانِ شما نبوده در سیستم معنا
+             ندارد»)، نه یک رفعِ باگ، و کامیتِ merge جایِ بازکردنِ دوباره‌ی آن
+             نیست. اگر لازم شد، PRِ جداگانه با بازبینی. جزئیات در
+             docs/KNOWN_LIMITATIONS.md. -->
+        <div style="background:var(--blue-50);border:1px solid #BFDBFE;border-radius:var(--r);padding:14px;font-size:13px;line-height:1.9;color:var(--t2)">
+          ${icon('info',{size:14})} عضویتِ باشگاه هنگامِ <b>ثبتِ ورود (واک‌این)</b> یا <b>رزرو</b> به‌صورت خودکار و با کدِ واقعی ساخته می‌شود.
+          <div style="margin-top:6px">ثبتِ دستیِ جدا وجود ندارد، چون عضوی که هیچ‌وقت مهمانِ شما نبوده در سیستم معنا ندارد.</div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div><div class="field-label">نام</div><input class="inp" id="cFn" placeholder="نام"></div>
-          <div><div class="field-label">نام خانوادگی</div><input class="inp" id="cLn" placeholder="فامیل"></div>
-        </div>
-        <div class="field-label">موبایل</div><input class="inp" id="cPh" placeholder="۰۹...">
-        <div class="field-label">تاریخ تولد <span style="font-weight:400;color:var(--t2)">(اختیاری — برای پیامکِ تبریک)</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <select class="inp" id="cD" aria-label="روزِ تولد"><option>روز</option>${Array.from({length:31},(_,i)=>`<option>${fa(i+1)}</option>`).join('')}</select>
-          <select class="inp" id="cM" aria-label="ماهِ تولد"><option>ماه</option>${_CLUB_FA_MONTHS.map(m=>`<option>${m}</option>`).join('')}</select>
-        </div>
-        <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="addMember()">ثبت + ساخت کد عضویت</button>
-        <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="openWalkin()">${icon('users',{size:15})} یا ثبتِ ورودِ مهمان (واک‌این)</button>
-        <div id="memberResult"></div>
+        <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="openWalkin()">${icon('users',{size:15})} رفتن به ثبتِ ورود</button>
       </div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title">توزیع سطوح</div></div>
@@ -110,53 +98,12 @@ async function rLoyalty(){
       </div>
     </div>`;
 }
-const _CLUB_FA_MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
-// [merge ۰۸-۲۵] در PR #68 این تابع **حذف** شده بود، با این استدلالِ درست:
-// «کاملاً محلی بود و کدِ عضویتِ ساختگی نشان می‌داد؛ مسیرِ واقعیِ ساختِ عضو
-// واک‌این/رزرو است». آن ایراد این‌جا با حذف رفع نشده، بلکه **برطرف** شده:
-// حالا endpointِ واقعیِ `POST /restaurant/members` وجود دارد (کامیتِ aa5e0e7)
-// و این فرم به آن وصل است، پس دیگر نه محلی است و نه کدِ ساختگی می‌سازد.
-// (فرمِ متناظر بالا در rLoyalty بازگردانده شد — بدونِ selectِ سال، طبقِ ایرادِ
-// درستِ #68 که بک‌اند فقط birth_day/birth_month دارد.)
-// ⚠️ ارتقا (ممیزیِ آمادگیِ لانچ، ۲۰۲۶-۰۸-۲۵): «ثبتِ دستیِ عضو» حالا به
-// endpointِ واقعیِ POST /restaurant/members وصل است — عضویت روی سرور پایدار
-// می‌شود و کدِ *واقعیِ* برگشتی از سرور نشان داده می‌شود (نه کدِ VIS-ِ جعلیِ
-// حافظه‌ای که با رفرش محو می‌شد). تولد از شمسی به میلادی تبدیل می‌شود
-// (jalaliMdToGregMd از reservations.js، scope مشترکِ پنل) تا پیامکِ تولدِ
-// بک‌اند در روزِ درست ارسال شود. فقط در حالتِ کاملاً آفلاین به پیامِ صادقِ
-// «اتصال برقرار نشد» می‌افتد.
-async function addMember(){
-  const fn=document.getElementById('cFn').value.trim(),ln=document.getElementById('cLn').value.trim(),ph=document.getElementById('cPh').value.trim();
-  if(!fn||!ln){toast('','نام و فامیل رو وارد کن');return}
-  if(!/^۰۹|^09/.test(ph.replace(/\s/g,''))){toast('','موبایل معتبر وارد کن');return}
-  const phoneLatin=ph.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\s/g,'');
-  const dRaw=(document.getElementById('cD')?.value||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
-  const jDay=parseInt(dRaw,10);
-  const jMonth=_CLUB_FA_MONTHS.indexOf(document.getElementById('cM')?.value||'')+1;
-  let birth={};
-  if(jDay>=1&&jDay<=31&&jMonth>=1&&typeof jalaliMdToGregMd==='function'){
-    const g=jalaliMdToGregMd(jMonth,jDay);
-    if(g) birth={birth_day:g.gDay,birth_month:g.gMonth};
-  }
-  const btn=document.querySelector('#v-loyalty [onclick="addMember()"]');
-  if(btn) btn.disabled=true;
-  const res=await API.createMember({phone:phoneLatin,first_name:fn,last_name:ln,...birth});
-  if(btn) btn.disabled=false;
-  if(res.ok && res.data?.code){
-    const code=res.data.code, already=res.data.enrolled_now===false;
-    document.getElementById('memberResult').innerHTML=`<div style="background:var(--teal-50);border:1px solid #99F6E4;border-radius:var(--r);padding:14px;margin-top:14px;text-align:center"><div style="font-size:11px;color:var(--teal-600);font-weight:700">${already?'این شماره از قبل عضو است':'عضو در باشگاه ثبت شد'}</div><div style="font-size:24px;font-weight:800;letter-spacing:.1em;color:var(--teal-600);margin-top:4px">${esc(code)}</div><div style="font-size:12px;color:var(--t2);margin-top:4px">${esc(fn)} ${esc(ln)}</div></div>`;
-    document.getElementById('cFn').value='';document.getElementById('cLn').value='';document.getElementById('cPh').value='';
-    toast('',already?`از قبل عضو بود (${code})`:'عضو در باشگاه ثبت شد');
-    // rLoyalty خودش هر بار از سرور تازه می‌کند؛ عضو جدید واقعاً در لیست می‌آید
-    setTimeout(()=>{if(document.getElementById('v-loyalty')?.classList.contains('active'))rLoyalty()},900);
-    return;
-  }
-  if(res.offline){
-    document.getElementById('memberResult').innerHTML=`<div style="background:var(--amber-50);border:1px solid #FDE68A;border-radius:var(--r);padding:14px;margin-top:14px;line-height:1.7;font-size:12.5px;color:var(--t1)">${icon('info',{size:14})} اتصال به سرور برقرار نشد. «${esc(fn)} ${esc(ln)}» ثبت نشد — با وصل‌شدنِ اینترنت دوباره تلاش کن.</div>`;
-    return;
-  }
-  toast('', res.error?.message || 'ثبتِ عضو ناموفق بود، دوباره تلاش کن');
-}
+// ⚠️ addMember حذف شد (فازِ ۲، §۳): کاملاً محلی بود و کدِ عضویتِ ساختگی
+// نشان می‌داد. مسیرِ واقعیِ ساختِ عضو، واک‌این/رزرو است (createWalkinTx).
+// [merge ۰۸-۲۵] این برنچ نسخه‌ای از آن را وصل به POST /restaurant/members
+// واقعی برگردانده بود؛ در ادغام کنار گذاشته شد تا تصمیمِ محصولیِ #68 در یک
+// کامیتِ merge بازنشود. خودِ endpoint و تست‌هایش می‌مانند (بدونِ مصرف‌کننده در
+// پنل — در docs/KNOWN_LIMITATIONS.md ثبت شد).
 
 // ═══════════════════════════════════════════════════════════
 //  ارسالِ پیامکِ تبریکِ تولد — وصل به `POST /restaurant/sms` واقعی

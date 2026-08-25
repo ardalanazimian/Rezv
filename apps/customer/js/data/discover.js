@@ -121,10 +121,31 @@ function moreBtnHTML(list){
   if(list !== R || !NEXT_CURSOR) return '';
   return `<button type="button" class="btn btn-ghost btn-block feed-more" id="feedMore" onclick="loadMoreFeed()">رستوران‌های بیشتر</button>`;
 }
+// ⚠️ باگِ واقعیِ رقابتِ رندر (پیدا شده با E2E در ۲۰۲۶-۰۸-۲۵، بازتولید ~۱ از ۳
+// اجرا حتی با --workers=1 — پس ناپایداریِ تست نبود، باگِ واقعیِ کاربر بود):
+//
+// renderFeed اول اسکلت را همگام می‌کشد و کارت‌هایِ واقعی را ۲۸۰ms بعد در یک
+// setTimeout می‌نویسد. تا پیش از این، هیچ‌چیز جلویِ نوشتنِ یک رندرِ **کهنه**
+// روی نتیجه‌ی یک رندرِ **تازه‌تر** را نمی‌گرفت. سناریویِ واقعی:
+//   ۱. boot → renderFeed(R) با دادهٔ نمونه (setTimeout در راه است)
+//   ۲. کاربر سریع جست‌وجو می‌کند → doSearch حالتِ «پیدا نشد» را می‌نویسد
+//   ۳. setTimeoutِ مرحله‌ی ۱ می‌رسد و #feed را با **همه‌ی** رستوران‌ها بازنویسی
+//      می‌کند — کاربر نتیجه‌ی جست‌وجویش را از دست می‌دهد و فهرستِ کامل را
+//      «نتیجه‌ی جست‌وجو» فرض می‌کند. دقیقاً همان رگرسیونی که تستِ
+//      social-proof «جست‌وجوی بی‌نتیجه» می‌خواست بگیرد.
+// همین اتفاق برای syncRestaurants (دادهٔ واقعیِ سرور که دیرتر می‌رسد) هم می‌افتاد.
+//
+// رفع: یک ژتونِ صعودی. هر نوشتنی روی #feed ژتون را جلو می‌برد؛ setTimeout فقط
+// وقتی رنگ می‌زند که ژتونش هنوز جاری باشد. رندرِ کهنه بی‌صدا کنار می‌رود.
+let FEED_TOKEN = 0;
+/** ابطالِ هر رندرِ در جریانِ فید — هر کسی که مستقیم #feed را می‌نویسد باید صدایش بزند. */
+export function invalidateFeed(){ return ++FEED_TOKEN; }
 export function renderFeed(list){
   const f=document.getElementById('feed');
+  const token=invalidateFeed();
   f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
   setTimeout(()=>{
+    if(token!==FEED_TOKEN) return;   // رندرِ تازه‌تری از راه رسیده — این یکی کهنه است
     f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);
     const io=new IntersectionObserver(es=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);io.unobserve(e.target)}}),{threshold:.05});
     f.querySelectorAll('.rc').forEach(c=>io.observe(c));
@@ -354,6 +375,7 @@ export function doSearch(){
   if(list.length){ renderFeed(list); return; }
   // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
   // می‌داد — کاربر شش کارت می‌دید و گمان می‌کرد این‌ها نتیجه‌ی جست‌وجویش‌اند.
+  invalidateFeed();   // هر renderFeedِ در جریان را باطل کن، وگرنه ۲۸۰ms بعد این حالتِ خالی را می‌پوشاند
   document.getElementById('feed').innerHTML=`
     <div class="empty" style="grid-column:1/-1">
       <div class="empty-emoji" aria-hidden="true">🔍</div>
