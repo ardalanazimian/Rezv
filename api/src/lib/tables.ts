@@ -22,7 +22,18 @@ const ALLOWED_TRANSITIONS: Record<TableState, TableState[]> = {
 
 // ── تولید کد QR یکتا برای میز ──
 const B32 = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-function genQrToken(): string {
+/**
+ * تولیدِ کدِ QRِ میز — ۵۰ بیت آنتروپیِ رمزنگارانه.
+ *
+ * ⚠️ export شد چون `prisma/seed.ts` هم باید از همین منبع استفاده کند، نه از
+ * الگویِ خودش. تا امروز seed کدهای `T-DEMO<PREFIX><NN>` می‌ساخت که کاملاً
+ * قابلِ پیش‌بینی‌اند. تا وقتی `/api/v1/checkin` احرازِ کارمند می‌خواست بی‌خطر
+ * بود؛ حالا که آن مسیر با اعتبارنامه‌ی QR عمومی شده، اجرای `npm run db:seed`
+ * روی هر محیطِ در دسترسِ اینترنت یعنی میزهایی با کدِ حدس‌زدنی.
+ *
+ * `256 % 32 === 0` پس هیچ modulo bias ندارد (هر نویسه دقیقاً ۸ بایتِ ممکن).
+ */
+export function genQrToken(): string {
   const b = randomBytes(10);
   let out = 'T-';
   for (let i = 0; i < 10; i++) out += B32[b[i] % 32];
@@ -191,7 +202,15 @@ export async function qrCheckIn(
   const resv = await db.reservation.findFirst({
     where: {
       tableId: table.id,
-      status: { in: ['confirmed', 'auto_confirmed', 'checked_in', 'running_late', 'arrived'] },
+      // ⚠️ `seated` و `dining` عمداً اینجا هستند، هرچند check-inِ تازه‌ای
+      // لازم ندارند. بدونشان اسکنِ **دومِ همان مهمان** یک «جعلِ شکست» تولید
+      // می‌کرد: پس از اسکنِ اول رزرو `seated` می‌شود، از این فیلتر می‌افتد،
+      // و تابع شاخه‌ی «میز بدونِ رزرو» را برمی‌گرداند — یعنی به کسی که
+      // همان لحظه نشسته بود گفته می‌شد «رزروی رویِ این میز پیدا نشد».
+      // با حضورشان، انتقالِ چرخه‌ی حیات بی‌اثر می‌ماند (تلاشِ `seated`→`seated`
+      // نامعتبر است و همان catchِ پایین‌تر می‌گیردش) ولی پاسخ **صادق** است:
+      // `checked_in: true` با وضعیتِ واقعی.
+      status: { in: ['confirmed', 'auto_confirmed', 'checked_in', 'running_late', 'arrived', 'seated', 'dining'] },
       slotStart: { lte: new Date(+now + 30 * 60_000) }, // تا ۳۰ دقیقه قبل از شروع
       slotEnd: { gte: now },
     },

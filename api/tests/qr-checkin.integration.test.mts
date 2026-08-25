@@ -344,38 +344,40 @@ describe('۴) میزِ بدونِ رزروِ فعال و idempotency', () => {
     assert.equal(seatedEvents, 1, 'انتقالِ seated نباید دوبار ثبت شود');
   });
 
-  test('🚩 یافته‌ی بازِ ثبت‌شده — اسکنِ دومِ همان مهمان «رزروی نیست» گزارش می‌شود', async () => {
-    // 🚩 این تست رفتارِ **فعلی** را پین می‌کند، نه رفتارِ مطلوب. عمداً.
+  test('🔴 اسکنِ دومِ همان مهمان دیگر «رزروی نیست» نمی‌گوید (جعلِ شکست بسته شد)', async () => {
+    // ⚠️ این تست قبلاً رفتارِ **باگ‌دار** را پین می‌کرد، عمداً، تا رفعش
+    // آگاهانه باشد. حالا رفع شده و ادعا برعکس شد.
     //
-    // چه اتفاقی می‌افتد: فیلترِ جست‌وجویِ رزروِ فعال در `qrCheckIn` فقط
-    // ['confirmed','auto_confirmed','checked_in','running_late','arrived'] را
-    // می‌بیند. بعد از اولین اسکن رزرو `seated` است، پس در اسکنِ دوم اصلاً
-    // پیدا **نمی‌شود** و شاخه‌ی «میز بدونِ رزرو» برمی‌گردد:
-    //     checked_in: false · reservation_code: null · status: 'occupied'
-    // (`status` اینجا وضعیتِ *میز* است، نه رزرو — همان دوگانگیِ معنایی که
-    // خودش یک یافته است.)
+    // باگ: فیلترِ جست‌وجویِ رزروِ فعال در `qrCheckIn` فقط
+    // ['confirmed','auto_confirmed','checked_in','running_late','arrived']
+    // را می‌دید. بعد از اسکنِ اول رزرو `seated` می‌شد، از فیلتر می‌افتاد، و
+    // شاخه‌ی «میز بدونِ رزرو» برمی‌گشت — یعنی به مهمانی که همان لحظه نشسته
+    // بود گفته می‌شد «رزروی رویِ این میز پیدا نشد». **جعلِ شکست.**
     //
-    // اثرِ کاربری: مهمانی که همین حالا نشسته، اگر لینک را دوباره باز کند
-    // پیامِ «رزروی رویِ این میز پیدا نشد» می‌بیند. **جعلِ شکست** است.
-    //
-    // چرا همینجا رفع نشد: این تغییرِ فیلترِ انتخابِ رزرو در مسیرِ چرخه‌ی
-    // حیات است و طبقِ پروتکل بدونِ تأییدِ طرحِ معمار انجام نمی‌شود. ضمناً
-    // **رگرسیون نیست**: پیش از این batch هم دقیقاً همین پیام نشان داده
-    // می‌شد (آن‌موقع از راهِ `reservation_code === null`).
-    //
-    // این تست وقتی کسی آن را رفع کند قرمز می‌شود — که هدف است: رفع باید
-    // آگاهانه و با به‌روزکردنِ همین یادداشت انجام شود، نه بی‌صدا.
+    // رفع: `seated` و `dining` به فیلتر اضافه شدند. انتقالِ چرخه‌ی حیات
+    // بی‌اثر می‌ماند (تلاشِ seated→seated نامعتبر است و همان catch می‌گیردش)
+    // ولی پاسخ صادق است.
     await clearRateLimit();
     const t = await makeTable(A);
-    await makeLiveReservation(A, t.id, ownerId);
+    const resv = await makeLiveReservation(A, t.id, ownerId);
 
-    await scan(t.qr, ownerToken);
+    const first = await (await scan(t.qr, ownerToken)).json() as
+      { status: string; checked_in: boolean; reservation_code: string | null };
+    assert.equal(first.checked_in, true, 'اسکنِ اول باید بنشاند');
+    assert.equal(first.status, 'seated');
+
     const out = await (await scan(t.qr, ownerToken)).json() as
       { status: string; checked_in: boolean; reservation_code: string | null };
 
-    assert.equal(out.checked_in, false, 'رفتارِ فعلی (یافته‌ی باز): اسکنِ دوم رزرو را نمی‌بیند');
-    assert.equal(out.reservation_code, null);
-    assert.equal(out.status, 'occupied', 'رفتارِ فعلی: وضعیتِ میز برمی‌گردد، نه وضعیتِ رزرو');
+    assert.equal(out.checked_in, true, 'اسکنِ دوم باید همان رزرو را ببیند، نه «رزروی نیست»');
+    assert.equal(out.status, 'seated', 'وضعیتِ رزرو باید برگردد، نه وضعیتِ میز (occupied)');
+    assert.equal(out.reservation_code, resv.code, 'صاحبِ رزرو باید کدش را در اسکنِ دوم هم ببیند');
+
+    // کنترلِ مثبت: وضعیتِ DB نباید با اسکنِ دوم خراب شده باشد.
+    const row = await db.reservation.findUniqueOrThrow({
+      where: { id: resv.id }, select: { status: true },
+    });
+    assert.equal(row.status, 'seated', 'اسکنِ دوم نباید وضعیتِ رزرو را جهش بدهد');
   });
 });
 
