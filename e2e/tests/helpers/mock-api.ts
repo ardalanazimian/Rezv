@@ -22,20 +22,26 @@ export interface MockOptions {
   loggedIn?: boolean;
 }
 
-// ⚠️ available_slots روی آیتمِ اول (Part 1 — صداقتِ سانس، ۲۰۲۶-۰۸-۱۴): بک‌اندِ
-// واقعی هنوز این فیلد را برنمی‌گرداند (رجوع کن به توضیحِ apps/customer/js/api.js)،
-// ولی وقتی اضافه شود همین شکل را خواهد داشت. بدونِ آن، mapApiRestaurant دیگر
-// (به‌درستی) از دادهٔ نمونه‌یِ محلی برای پرکردنِ سانسِ کارت استفاده نمی‌کند
-// (رفعِ باگِ صداقت) — پس کارتِ اول با CTAِ خالیِ «ببین سانس‌ها» رندر می‌شد،
-// نه چیپِ ساعتِ واقعی؛ تستِ دسترس‌پذیریِ چیپِ ساعت را همین‌جا با یک مقدارِ
-// واقع‌گرایانه (نه فیک) پوشش می‌دهیم.
+// ⚠️ به‌روزشده (۲۰۲۶-۰۸-۲۵): پیش از این، `available_slots` روی آیتمِ *اولِ*
+// همین آرایه گذاشته می‌شد تا کارتِ اول چیپِ ساعت داشته باشد — با این توضیح که
+// «بک‌اندِ واقعی هنوز این فیلد را برنمی‌گرداند، ولی وقتی اضافه شود همین شکل را
+// خواهد داشت». آن پیش‌بینی درست از آب درنیامد و نگه‌داشتنش خطرناک بود:
+// `GET /restaurants` این فیلد را **نمی‌دهد و نخواهد داد** (لیست ۶۰ ثانیه کش
+// می‌شود و به تاریخ/تعدادِ نفر وابسته نیست). سانس‌ها حالا از روتِ گروهیِ
+// `GET /restaurants/availability` می‌آیند که پایین mock شده است.
+//
+// چرا این اصلاح مهم است: mockی که فیلدی را می‌سازد که تولید نمی‌سازد، دقیقاً
+// همان «CI سبز، تولید خراب» است که کامنتِ زیر درباره‌ی idهای عددی هشدار
+// می‌دهد. حالا تست‌ها همان مسیری را می‌پیمایند که کاربرِ واقعی می‌پیماید:
+// لیست بدونِ سانس → واکشیِ گروهی → نشستنِ چیپ‌ها.
+//
 // ⚠️ idها عمداً UUID هستند (ممیزیِ ۲۰۲۶-۰۸-۲۴): بک‌اندِ واقعی همیشه UUID
-// برمی‌گرداند، ولی این mock تا امروز idِ عددیِ ۱..۳ می‌داد — به همین دلیل
+// برمی‌گرداند، ولی این mock تا آن روز idِ عددیِ ۱..۳ می‌داد — به همین دلیل
 // باگِ واقعیِ «UUIDِ بدونِ کوتیشن در onclick که همه‌ی CTAهای کارت را
-// می‌شکست» هرگز در CI دیده نشد (کلاسیکِ «CI سبز، تولید خراب»). mock باید
-// همان شکلی را تولید کند که تولید واقعاً می‌سازد.
+// می‌شکست» هرگز در CI دیده نشد. mock باید همان شکلی را تولید کند که تولید
+// واقعاً می‌سازد.
 export const DEMO_RESTAURANTS = [
-  { id: 'a1b2c3d4-0000-4000-8000-000000000001', slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸', available_slots: ['19:00', '20:00'] },
+  { id: 'a1b2c3d4-0000-4000-8000-000000000001', slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸' },
   { id: 'a1b2c3d4-0000-4000-8000-000000000002', slug: 'demo-sushi-bar', name: '[DEMO] سوشی بار', cuisine: 'ژاپنی', rating: 4.5, price: '$$$', cashback: 8, cover_emoji: '🍣' },
   { id: 'a1b2c3d4-0000-4000-8000-000000000003', slug: 'demo-burger-lab', name: '[DEMO] برگر لب', cuisine: 'فست‌فود', rating: 4.6, price: '$$', cashback: 12, cover_emoji: '🍔' },
 ];
@@ -77,7 +83,31 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
       return json({ restaurants: DEMO_RESTAURANTS, next_cursor: null });
     }
 
-    // ── availability ──
+    // ── availabilityِ گروهی (چیپِ ساعتِ کارت‌ها) ──
+    // باید *پیش از* الگویِ تکی چک شود: `/restaurants/availability` با
+    // `/restaurants/{slug}/availability` هم‌شکل نیست، ولی ترتیب را صریح
+    // نگه می‌داریم تا اضافه‌شدنِ الگویِ بازتری در آینده این را ندزدد.
+    if (path === '/restaurants/availability' && method === 'GET') {
+      const ids = (url.searchParams.get('ids') || '').split(',').filter(Boolean);
+      const open = opts.slotsFull ? [] : ['19:00', '20:00'];
+      const restaurants: Record<string, { available_slots: string[]; has_schedule: boolean }> = {};
+      // فقط رستورانِ اول سانس می‌گیرد — تا تستِ «کارتِ بدونِ سانس به CTAِ آرام
+      // می‌افتد» هم پوشش واقعی داشته باشد، نه فرض.
+      for (const id of ids) {
+        restaurants[id] = id === DEMO_RESTAURANTS[0].id
+          ? { available_slots: open, has_schedule: true }
+          : { available_slots: [], has_schedule: !opts.slotsFull };
+      }
+      return json({
+        date: url.searchParams.get('date'),
+        party: Number(url.searchParams.get('party') || 2),
+        restaurants,
+        requested: ids.length,
+        max_per_request: 24,
+      });
+    }
+
+    // ── availabilityِ یک رستوران (شیتِ رزرو) ──
     if (/^\/restaurants\/[^/]+\/availability/.test(path) && method === 'GET') {
       return json(opts.slotsFull ? fullSlots() : openSlots());
     }

@@ -50,6 +50,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import './allowed-origins.test.mts';
+import './availability-bulk.integration.test.mts';
 import './ban.test.mts';
 import './cancellation-policy.test.mts';
 import './coupons.integration.test.mts';

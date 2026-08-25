@@ -7,7 +7,7 @@ import { API, USER, isLoggedIn, syncNavPoints, userName } from '../api.js';
 import { closeSheet, esc, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
 import { doSearch, fmtFa } from './discover.js';
 import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js';
-import { findR } from '../init.js';
+import { findR, invalidateCardSlots } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
 import { genIdempotencyKey } from '../api-core.js';
 import { haptic } from '../theme-pwa.js';
@@ -290,6 +290,10 @@ export function syncSearchCtx(){
   // بی‌خطر روی عنصرهایِ نامعتبر no-op می‌شود (querySelector آن‌ها را پیدا
   // نمی‌کند)، پس نیازی به چک‌کردنِ صفحه‌ی فعلی نیست.
   if(document.getElementById('sQ')) doSearch();
+  // چیپ‌هایِ ساعتِ کارت‌ها برایِ تاریخ/تعدادِ نفرِ *قبلی* حساب شده‌اند — باطل
+  // و دوباره واکشی می‌شوند. بدونِ این، انتخابِ «فردا، ۶ نفر» ساعت‌هایِ «امروز،
+  // ۲ نفر» را زیرِ برچسبِ جدید نشان می‌داد.
+  invalidateCardSlots();
 }
 
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──

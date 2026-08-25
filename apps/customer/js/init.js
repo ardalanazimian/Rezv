@@ -4,9 +4,9 @@
 // ═══════════════════════════════════════════════════════════
 
 import { Actions } from './actions.js';
-import { API, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
-import { renderDiscoverSections, renderFeed } from './data/discover.js';
-import { R_SAMPLE } from './data/seed.js';
+import { API, hydrateSlots, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
+import { paintSlots, renderDiscoverSections, renderFeed } from './data/discover.js';
+import { R_SAMPLE, bookingCtx } from './data/seed.js';
 import { runPendingCheckIn } from './features/checkin.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
 export let R = R_SAMPLE;
@@ -53,6 +53,46 @@ async function syncRestaurants(){
     renderFeed(R);
     renderDiscoverSections();
   }
+  refreshCardSlots();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  چیپ‌هایِ ساعتِ کارت — از availabilityِ واقعی، نه حدس
+//
+//  تا پیش از این `mapApiRestaurant` فیلدِ `available_slots` را می‌خواند که هیچ
+//  روتی برنمی‌گرداند، پس کارتِ هر رستورانِ زنده همیشه بدونِ ساعت بود. حالا روتِ
+//  گروهیِ `/restaurants/availability` همان موتورِ شیتِ رزرو را صدا می‌زند.
+//
+//  ⚠️ محافظِ ترتیب: کاربر می‌تواند تاریخ را سریع عوض کند. بدونِ این توکن،
+//  پاسخِ کندترِ انتخابِ *قبلی* می‌توانست بعد از پاسخِ انتخابِ جدید بنشیند و
+//  ساعت‌هایِ یک روزِ دیگر را زیرِ برچسبِ روزِ فعلی نشان بدهد.
+// ═══════════════════════════════════════════════════════════
+let slotsToken = 0;
+
+export async function refreshCardSlots(){
+  const token = ++slotsToken;
+  const { date, party } = bookingCtx;
+  const target = R;
+  const changed = await hydrateSlots(target, date, party);
+  // انتخابِ کاربر (یا خودِ فهرست) عوض شده — این پاسخ دیگر معتبر نیست.
+  if (token !== slotsToken || target !== R) return;
+  if (changed) paintSlots(R);
+}
+
+/**
+ * انتخابِ تاریخ/تعدادِ نفر عوض شد: ساعت‌هایِ قبلی دیگر معتبر نیستند.
+ *
+ * اول پاکشان می‌کنیم و کارت به CTAِ «ببین سانس‌ها» برمی‌گردد، بعد تازه‌اش را
+ * می‌گیریم. نگه‌داشتنِ ساعتِ قبلی تا رسیدنِ پاسخ یعنی چیپِ «۲۰:۰۰» زیرِ
+ * برچسبِ «فردا، ۶ نفر» دیده شود در حالی که برایِ «امروز، ۲ نفر» حساب شده بود.
+ */
+export function invalidateCardSlots(){
+  let had = false;
+  for (const r of R) {
+    if (r && Array.isArray(r.slots) && r.slots.length && r.slug) { r.slots = []; had = true; }
+  }
+  if (had) paintSlots(R);
+  refreshCardSlots();
 }
 
 // اجرای startup پس از آماده‌شدنِ DOM
