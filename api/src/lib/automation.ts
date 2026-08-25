@@ -45,20 +45,58 @@ async function targetsForSegment(restaurantId: string, segment: 'at_risk' | 'chu
   return rows.map(r => ({ id: r.userId, phone: r.user.phone, firstName: r.user.firstName }));
 }
 
-async function targetsForPostVisit(restaurantId: string, hoursAfter: number) {
-  const since = new Date(Date.now() - (hoursAfter + 1) * 3600_000);
-  const until = new Date(Date.now() - hoursAfter * 3600_000);
+/**
+ * سقفِ عقب‌گردِ پنجره‌ی هدف‌گیری وقتی `lastRunAt` نداریم (اولین اجرا) یا آن‌قدر
+ * قدیمی است که پنجره غیرمنطقی بزرگ می‌شود (automation ای که مدت‌ها خاموش بوده
+ * و تازه فعال شده).
+ *
+ * ⚠️ چرا سقف لازم است: بدونِ آن، فعال‌کردنِ دوباره‌ی یک automationِ قدیمی به
+ * *همه‌ی* مهمان‌های ماه‌های گذشته پیامک می‌فرستد. جهتِ خطایِ امن اینجا
+ * «نفرستادن» است، نه «فرستادنِ انبوه».
+ */
+const MAX_LOOKBACK_MS = 25 * 3600_000;
+
+/**
+ * ابتدایِ پنجره‌ی این اجرا: از آخرین اجرا تا الان — ولی هرگز عقب‌تر از سقف.
+ *
+ * ⚠️ چرا از `lastRunAt` مشتق می‌شود و نه از یک ثابت: این توابع قبلاً پنجره‌ی
+ * ثابتِ «۱ ساعت» و «۶ ساعت» داشتند که فرض می‌کرد cron هر چند دقیقه اجرا
+ * می‌شود. واقعیت (api/vercel.json + cron/crontab): تنها فراخوانِ
+ * runAllDueAutomations یعنی /v1/maintenance/customer-insights **روزی یک‌بار**
+ * (۰۳:۰۰) اجرا می‌شود — پس آن پنجره‌ها تقریباً همیشه خالی بودند. مشتق‌کردن
+ * از lastRunAt پنجره را مستقل از آهنگِ cron درست می‌کند: نه شکاف، نه تکرار.
+ */
+function windowStart(lastRunAt: Date | null | undefined, now: number): Date {
+  const floor = now - MAX_LOOKBACK_MS;
+  return new Date(lastRunAt ? Math.max(lastRunAt.getTime(), floor) : floor);
+}
+
+async function targetsForPostVisit(restaurantId: string, hoursAfter: number, lastRunAt: Date | null | undefined) {
+  const now = Date.now();
+  const offset = hoursAfter * 3600_000;
+  // مهمانی واجدِ پیگیری است که دستِ‌کم `hoursAfter` از پایانِ حضورش گذشته
+  // باشد؛ و در اجرای قبلی هنوز واجد نبوده (تا دوبار پیام نگیرد).
+  const since = new Date(windowStart(lastRunAt, now).getTime() - offset);
+  const until = new Date(now - offset);
   const rows = await db.reservation.findMany({
-    where: { restaurantId, status: 'completed', slotEnd: { gte: since, lt: until }, userId: { not: null } },
+    where: { restaurantId, status: 'completed', slotEnd: { gt: since, lte: until }, userId: { not: null } },
     select: { userId: true, user: { select: { phone: true, firstName: true } }, code: true },
   });
   return rows.filter(r => r.user).map(r => ({ id: r.userId as string, phone: r.user!.phone, firstName: r.user!.firstName, reservationCode: r.code }));
 }
 
-async function targetsForNoShow(restaurantId: string) {
-  const since = new Date(Date.now() - 6 * 3600_000);
+async function targetsForNoShow(restaurantId: string, lastRunAt: Date | null | undefined) {
+  const since = windowStart(lastRunAt, Date.now());
+  // ⚠️ مبنا زمانِ *ثبتِ عدم‌حضور* است (reservation_events.created_at با
+  // to_status='no_show')، نه reservations.created_at. رزرو معمولاً روزها
+  // پیش از سانس ثبت می‌شود، پس فیلترِ قبلی روی created_at عملاً هیچ عدمِ
+  // حضورِ واقعی‌ای را نمی‌گرفت. lifecycle.transitionReservation تضمین
+  // می‌کند هر انتقالِ وضعیت یک ردیفِ event دارد.
   const rows = await db.reservation.findMany({
-    where: { restaurantId, status: 'no_show', createdAt: { gte: since }, userId: { not: null } },
+    where: {
+      restaurantId, status: 'no_show', userId: { not: null },
+      events: { some: { toStatus: 'no_show', createdAt: { gt: since } } },
+    },
     select: { userId: true, user: { select: { phone: true, firstName: true } } },
   });
   return rows.filter(r => r.user).map(r => ({ id: r.userId as string, phone: r.user!.phone, firstName: r.user!.firstName }));
@@ -68,6 +106,8 @@ async function targetsForNoShow(restaurantId: string) {
 export async function runAutomation(automation: {
   id: string; restaurantId: string; trigger: string; triggerConfig: any;
   messageTemplate: string; couponId: string | null;
+  /** آخرین اجرا — مبنایِ پنجره‌ی هدف‌گیریِ post_visit/no_show_followup. */
+  lastRunAt?: Date | null;
 }) {
   let targets: { id: string; phone: string; firstName: string | null; reservationCode?: string }[] = [];
 
@@ -82,10 +122,12 @@ export async function runAutomation(automation: {
       targets = await targetsForSegment(automation.restaurantId, 'vip');
       break;
     case 'post_visit':
-      targets = await targetsForPostVisit(automation.restaurantId, automation.triggerConfig?.hoursAfter ?? 2);
+      targets = await targetsForPostVisit(
+        automation.restaurantId, automation.triggerConfig?.hoursAfter ?? 2, automation.lastRunAt,
+      );
       break;
     case 'no_show_followup':
-      targets = await targetsForNoShow(automation.restaurantId);
+      targets = await targetsForNoShow(automation.restaurantId, automation.lastRunAt);
       break;
   }
   if (targets.length === 0) return { sent: 0 };
@@ -136,7 +178,13 @@ export async function runAllDueAutomations() {
   const automations = await db.marketingAutomation.findMany({ where: { isActive: true } });
   let totalSent = 0;
   for (const a of automations) {
-    // post_visit/no_show_followup هر اجرا (هر چند دقیقه) چک می‌شوند؛ birthday/winback روزی یک‌بار کافی‌ست
+    // ⚠️ اصلاحِ کامنتِ کهنه: اینجا قبلاً نوشته بود «post_visit/no_show_followup
+    // هر اجرا (هر چند دقیقه) چک می‌شوند». تنها فراخوانِ این تابع
+    // /v1/maintenance/customer-insights است که طبقِ api/vercel.json و
+    // cron/crontab **روزی یک‌بار** اجرا می‌شود. این دو trigger هر اجرا چک
+    // می‌شوند، ولی «هر چند دقیقه» نیست — و پنجره‌ی هدف‌گیری‌شان از همین‌جا
+    // (lastRunAt) مشتق می‌شود تا به آهنگِ cron وابسته نباشد.
+    // birthday/winback/vip_milestone روزی یک‌بار کافی‌ست.
     const dailyOnly = a.trigger === 'birthday' || a.trigger === 'winback' || a.trigger === 'vip_milestone';
     if (dailyOnly && a.lastRunAt && Date.now() - a.lastRunAt.getTime() < 20 * 3600_000) continue;
     const r = await runAutomation(a);
