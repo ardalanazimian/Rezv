@@ -9,8 +9,8 @@ import { API } from './api.js';
 import { genIdempotencyKey } from './api-core.js';
 import { closeSheet, esc, faNum, toast } from './auth.js';
 import { go } from './data/discover.js';
-import { bk } from './data/seed.js';
-import { R } from './init.js';
+import { TRIPS, bk } from './data/seed.js';
+import { findR } from './init.js';
 import { icon } from './icons.js';
 
 export let WL=null; // ورودی فعلی لیست انتظار کاربر { id, position, ... }
@@ -69,7 +69,7 @@ function wlError(msg, retryCall){
 }
 
 export async function joinWaitlist(id){
-  const r=R.find(x=>String(x.id)===String(id));
+  const r=findR(id);
   const sheetBody=document.getElementById('sheetBody');
   sheetBody.innerHTML=`<div style="text-align:center;padding:40px"><div class="spin" style="margin:0 auto 16px"></div>در حال پیوستن به صف...</div>`;
   const party=parseInt(String(bk.party).replace(/[^\d۰-۹]/g,'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))||2;

@@ -228,7 +228,9 @@ function saveLogoFallback(){
   RESTAURANT.logoGradient=logoChoice.gradient;
   refreshLogoDisplay();
   closeModal();profRenderGallery();
-  toast('','ذخیره شد');
+  // صداقت: این انتخاب فقط در حافظه‌ی همین صفحه است و به سرور نمی‌رود —
+  // toastِ قبلی («ذخیره شد») ادعای ماندگاری می‌کرد (ممیزیِ ۲۰۲۶-۰۸-۲۴).
+  toast('','فقط برای نمایشِ همین جلسه اعمال شد — برای لوگویِ دائمی، عکس آپلود کن');
 }
 // ─── ویرایش نام ───
 function openNameEditor(){

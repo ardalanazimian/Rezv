@@ -1222,6 +1222,7 @@
   position: fixed; inset-block-end: 78px; inset-inline-start: 20px; z-index: 901;
   inline-size: min(390px, calc(100vw - 32px));
   max-block-size: min(560px, calc(100vh - 130px));
+  max-block-size: min(560px, calc(100svh - 130px));
   display: flex; flex-direction: column;
   border: 1px solid var(--border-strong); border-radius: var(--r-xl);
   background: var(--surface); box-shadow: var(--sh-xl); overflow: hidden;
@@ -1399,7 +1400,9 @@
 .pin__stage {
   position: sticky;
   inset-block-start: 0;
+  /* svh: با جمع‌شدنِ نوارِ آدرسِ موبایل نمی‌پرد (100vh روی iOS/Android کلیپ/جهش می‌داد) */
   block-size: 100vh;
+  block-size: 100svh;
   display: flex; align-items: center;
   overflow: hidden;
 }

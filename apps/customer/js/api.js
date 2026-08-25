@@ -200,6 +200,18 @@ export function syncNavPoints(){
 // فقط در مسیرِ کاملاً آفلاین/بدونِ‌slug استفاده می‌شود.
 const EMPTY_RB = { food: 0, service: 0, atmo: 0, value: 0 };
 
+/** بازه‌ی قیمت به شکلِ نمایشی — priceBandِ بک‌اند عددِ ۱..۴ است. */
+function priceBandStr(band){
+  return (Number.isInteger(band) && band >= 1) ? '$'.repeat(Math.min(4, band)) : null;
+}
+
+/** URLِ مدیا: بک‌اند مسیرِ نسبی (/api/v1/media/...) می‌دهد؛ اگر فرانت روی
+ *  دامنه‌ی جدا باشد باید با API.base مطلق شود. URLِ مطلق دست‌نخورده می‌ماند. */
+export function resolveMediaUrl(u){
+  if (!u) return null;
+  return u.startsWith('/') ? API.base + u : u;
+}
+
 // نگاشت داده‌ی API به ساختار فرانت‌اند (R)
 // بک‌اند فاز ۱ این فیلدها را می‌دهد: id, slug, name, cuisine, ...
 // فیلدهای غنی (منو، نظرات، تفکیک امتیاز) که هنوز در API نیستند، برایِ
@@ -215,14 +227,21 @@ export function mapApiRestaurant(apiR, sampleFallback){
   return {
     id: apiR.id,
     slug: apiR.slug || sampleFallback?.slug || null,
-    e: apiR.emoji || sampleFallback?.e || '🍽️',
+    // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): e/price/rt/reviews/cb/badge برای رستورانِ
+    // زنده دیگر از sampleFallback قرض گرفته نمی‌شوند — همان قاعده‌ی isLive که
+    // قبلاً برای slots/menu/revs/about اعمال شده بود ولی این شش فیلد جا مانده
+    // بودند. پیامدِ قبلی: چون بک‌اند emoji/price_range/badge اصلاً برنمی‌گرداند
+    // و rating می‌تواند null باشد، هر رستورانِ واقعی ایموجی، بازه‌ی قیمت،
+    // امتیازِ ۴٫۸، تعدادِ نظر و نشانِ «پرطرفدار»ِ یک رکوردِ [DEMO] را به
+    // اسمِ خودش نشان می‌داد — از جمله درصدِ کش‌بک که یک وعده‌ی مالی است.
+    e: apiR.emoji || (isLive ? '🍽️' : (sampleFallback?.e || '🍽️')),
     n: apiR.name,
     cuisine: apiR.cuisine || sampleFallback?.cuisine || '',
     // ⚠️ قراردادِ شکسته (F1): کلاینت `price_range` می‌خواند ولی بک‌اند
     // `priceBand` (یک عددِ ۱..۴ — schema.prisma:105) می‌فرستد. یعنی مقدار
     // همیشه undefined می‌شد و به بازه‌ی قیمتِ یک رستورانِ **نمونه‌ی بی‌ربط**
     // می‌افتاد. حالا عددِ واقعیِ سرور به همان شکلِ $ نگاشت می‌شود.
-    price: bandToPrice(apiR.priceBand) || apiR.price_range || (isLive ? '' : sampleFallback?.price || '$$'),
+    price: bandToPrice(apiR.priceBand ?? apiR.price_band) || apiR.price_range || (isLive ? '' : sampleFallback?.price || '$$'),
 
     // ⚠️ جعلِ اعتبارِ اجتماعی (F2): بک‌اند عمداً `rating: null` می‌فرستد وقتی
     // هیچ نظری ثبت نشده — کامنتِ خودِ route می‌گوید «null یعنی هنوز نمی‌دانیم،
@@ -251,7 +270,8 @@ export function mapApiRestaurant(apiR, sampleFallback){
     lat: apiR.latitude ?? null,
     lng: apiR.longitude ?? null,
     vibes: apiR.vibes || sampleFallback?.vibes || [],
-    cb: (apiR.cbBasePct ?? apiR.cashback_percent) ?? sampleFallback?.cb ?? 0,
+    // کش‌بک یک وعده‌ی مالی به مهمان است — برای رستورانِ زنده فقط از API، هرگز از نمونه.
+    cb: (apiR.cbBasePct ?? apiR.cashback_percent) ?? (isLive ? 0 : (sampleFallback?.cb ?? 0)),
     // ⚠️ رفع‌شده (Part 1 — حسابرسیِ صداقتِ سانس، ۲۰۲۶-۰۸-۱۴): sampleFallback
     // اینجا عمداً حذف شد، هم‌ردیفِ visits7d/recommendPct بالا — به همون دلیل:
     // این «شکلِ صفحه» نیست، ادعایِ ساعتِ رزروِ واقعی است. backend فعلاً
@@ -269,7 +289,7 @@ export function mapApiRestaurant(apiR, sampleFallback){
     // توجه: همین باگِ id-mismatch رویِ فیلدهایِ دیگه (menu/rb/feats/about/...)
     // هم هست — خارج از دامنه‌ی این ماموریت (فقط سانس)؛ در KNOWN_LIMITATIONS ثبت شد.
     slots: apiR.available_slots || (isLive ? [] : sampleFallback?.slots) || [],
-    badge: apiR.badge ?? sampleFallback?.badge ?? null,
+    badge: apiR.badge ?? (isLive ? null : (sampleFallback?.badge ?? null)),
     // ai/good/bad قبلاً بدونِ هیچ‌شرطی از sampleFallback می‌آمدند — یعنی حتی
     // برایِ رستورانِ واقعی هم «مهمان‌ها تعریف می‌کنن از...» با جمله‌هایِ
     // رستورانِ نمونه پر می‌شد. حالا برایِ رستورانِ زنده همیشه خالی/false‌اند.
@@ -326,6 +346,46 @@ export async function loadMoreRestaurants(){
   const list = res.ok ? (res.data?.items || []) : [];
   NEXT_CURSOR = res.data?.next_cursor || null;
   return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
+}
+
+// ═══════════ جزئیاتِ رستوران — GET /restaurants/{slug} ═══════════
+// این endpoint (همانی که صفحه‌ی SEO مصرف می‌کند) عکس‌های تأییدشده، لوگو،
+// منویِ واقعی، امتیازِ تجمیعی و آدرس را برمی‌گرداند. تا پیش از این، اپ مشتری
+// هرگز صدایش نمی‌زد — یعنی کلِ زنجیره‌ی «آپلودِ عکس در پنلِ بیزنس ← تأییدِ
+// پلتفرم» به هیچ مشتری‌ای نمی‌رسید. کش کوچک در حافظه تا بازکردنِ دوباره‌ی
+// همان رستوران درخواستِ تازه نزند (خودِ سرور هم ۶۰ ثانیه cache دارد).
+const _detailCache = new Map();
+export async function loadRestaurantDetail(slug){
+  if (!slug) return null;
+  if (_detailCache.has(slug)) return _detailCache.get(slug);
+  const res = await API.get(`/restaurants/${encodeURIComponent(slug)}`);
+  if (!res.ok) return null;   // شکست کش نمی‌شود — دفعه‌ی بعد دوباره تلاش می‌کنیم
+  _detailCache.set(slug, res.data);
+  return res.data;
+}
+
+/** ادغامِ پاسخِ جزئیات در رکوردِ فرانت — فقط فیلدهایی که سرور واقعاً داده. */
+export function applyRestaurantDetail(r, d){
+  if (!r || !d) return r;
+  r.detailLoaded = true;
+  r.photos = Array.isArray(d.photos) ? d.photos.filter(p => p && p.url) : [];
+  r.logo = d.logo_url || null;
+  if (typeof d.rating === 'number') r.rt = d.rating;
+  if (typeof d.reviews_count === 'number') r.reviews = d.reviews_count;
+  if (d.location?.address) r.address = d.location.address;
+  if (Array.isArray(d.vibes) && d.vibes.length) r.vibes = d.vibes;
+  const band = priceBandStr(d.price_band);
+  if (band) r.price = band;
+  if (Array.isArray(d.menu) && d.menu.length) {
+    // به همان شکلِ tuple که رندررِ فعلی می‌فهمد + عکسِ آیتم به‌عنوانِ عضوِ چهارم
+    r.menu = d.menu.map(m => [
+      m.emoji || '🍽️',
+      m.name,
+      Number(m.price_toman || 0).toLocaleString('fa-IR'),
+      m.image_url || null,
+    ]);
+  }
+  return r;
 }
 
 // ═══════════ DATA ═══════════

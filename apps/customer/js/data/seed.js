@@ -4,6 +4,17 @@ export const GRAD = {
   3:'linear-gradient(135deg,#FBBF24,#D97706)', 4:'linear-gradient(135deg,#22D3EE,#0891B2)',
   5:'linear-gradient(135deg,#F87171,#DC2626)', 6:'linear-gradient(160deg,#818CF8,#4F46E5 60%,#1E1B4B)'
 };
+// گرادیانِ پس‌زمینه برای هر رستوران — GRAD با کلیدِ عددیِ ۱..۶ ساخته شده بود،
+// ولی idِ رستورانِ واقعی UUID است؛ GRAD[uuid] همیشه undefined می‌شد و کارت/هیرو
+// عملاً بدونِ پس‌زمینه رندر می‌شد (style="background:undefined"). این تابع برای
+// هر id (عددی یا UUID) یک گرادیانِ ثابت و قطعی برمی‌گرداند — صرفاً تزئینی است،
+// هیچ ادعای داده‌ای ندارد.
+export function gradFor(id){
+  if (GRAD[id]) return GRAD[id];
+  const k = String(id ?? '');
+  let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+  return GRAD[(h % 6) + 1];
+}
 export const R_SAMPLE = [
   {id:1,e:'🌿',n:'[DEMO] کافه‌رستوران ویستا',cuisine:'ایتالیایی · فیوژن',price:'$$',rt:4.8,reviews:128,vibes:['رمانتیک','آروم'],cb:8,
    slots:['۱۹:۰۰','۱۹:۳۰','۲۰:۰۰'],badge:'پرطرفدار',ai:false,
@@ -53,9 +64,10 @@ export const BADGES=[['🍽️','اولین رزرو',1],['🔥','۵ هفته پ
 
 export let pts=0, favs=new Set(), curRest=null, bk={};
 // علاقه‌مندی‌ها را بین رفرش‌ها نگه دار (localStorage — الگوی rz_* مثل بقیهٔ اپ)
-// شناسه‌ها همیشه رشته نگه داشته می‌شوند: با دادهٔ نمونه عددی‌اند و با بک‌اندِ
-// واقعی UUID. مقادیرِ عددیِ ذخیره‌شده‌ی قدیمی همین‌جا مهاجرت می‌کنند.
+// کلیدها همیشه String می‌شوند: idِ نمونه عدد است و idِ واقعی UUID؛ بدونِ
+// یکسان‌سازی، favs.has(id) بینِ این دو نوع شکست می‌خورد.
 try{ const saved=JSON.parse(localStorage.getItem('rz_favs')||'[]'); if(Array.isArray(saved)) favs=new Set(saved.map(String)); }catch{}
+export const favHas=id=>favs.has(String(id));
 export function saveFavs(){ try{ localStorage.setItem('rz_favs', JSON.stringify([...favs])); }catch{} }
 export function setPts(v){ pts=v; }
 // ═══════════════════════════════════════════════════════════

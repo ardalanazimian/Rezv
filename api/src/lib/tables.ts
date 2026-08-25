@@ -50,22 +50,12 @@ export async function setTableState(
     data: { state: next },
     select: { id: true, number: true, state: true, restaurantId: true },
   });
-
-  // ⚠️ رفعِ فراموشیِ باطل‌سازیِ کش (فازِ ۲، پروتکل §۶).
-  //
-  // availability.ts محاسبه‌ی میزهایِ آزاد را با فیلترِ `state` انجام می‌دهد
-  // (`state: { not: 'maintenance' }`), پس این ستون یکی از **ورودی‌هایِ**
-  // payloadِ کش‌شده است. ولی تنها فراخوانانِ invalidate مسیرهایِ رزرو بودند —
-  // نویسندگانِ میز هیچ‌کدام صدایش نمی‌زدند. با سیاستِ SWR (۳۰ثانیه تازه،
-  // تا ۳۰۰ثانیه stale) یعنی بردنِ یک میز به تعمیرات تا ۵ دقیقه به مشتری
-  // نمی‌رسید و همچنان قابلِ رزرو نشان داده می‌شد.
-  //
-  // خودِ docstringِ invalidateAvailability «تغییر وضعیت میز» را به‌عنوانِ
-  // trigger فهرست کرده — پس این یک call-siteِ جاافتاده بود، نه تصمیمِ طراحی.
-  //
-  // نسخه‌ی all-dates استفاده می‌شود چون وضعیتِ میز date-scoped نیست.
-  await invalidateAllAvailability(updated.restaurantId).catch(() => {});
-
+  // maintenance تنها stateای است که availability آن را فیلتر می‌کند — ورود/خروج
+  // از آن باید کش را باطل کند، وگرنه میزِ ازکارافتاده تا TTL برای مشتری «آزاد»
+  // می‌ماند (ممیزیِ ۲۰۲۶-۰۸-۲۴). بقیه‌ی انتقال‌ها اثری در محاسبه ندارند.
+  if (next === 'maintenance' || current === 'maintenance') {
+    await invalidateAllAvailability(restaurantId).catch(() => {});
+  }
   return updated as { id: string; number: number; state: TableState };
 }
 

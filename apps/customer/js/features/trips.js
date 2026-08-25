@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 import { closeSheet, esc, openSheet, toast, undoSnack } from '../auth.js';
 import { openRest } from '../data/detail.js';
 import { go } from '../data/discover.js';
-import { R } from '../init.js';
+import { findR } from '../init.js';
 // ⚠️ رفع‌شده (R2 — حسابرسیِ تقویم، ۲۰۲۶-۰۸-۱۴): این تابع همیشه «فردا» فرض
 // می‌کرد (setDate(+1))، بدونِ توجه به اینکه پارامترِ date واقعاً چه بود —
 // یعنی رزروِ ۱۵ خرداد یا ماهِ بعد، همیشه با تاریخِ «فردا» به تقویمِ کاربر

@@ -29,6 +29,9 @@ async function rLoyalty(){
   const cbLoaded = typeof _cbLoaded !== 'undefined' && _cbLoaded && typeof CB !== 'undefined';
   const tiers=[['طلایی',gold,'#F59E0B'],['نقره‌ای',silver,'#94A3B8'],['برنزی',bronze,'#D97706']];
   const tierName={gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'};
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): دو KPIِ ثابتِ «۲.۱× خرید بیشتر» و «۸٪
+  // میانگین کش‌بک» حذف شدند — هیچ‌جا اندازه‌گیری نمی‌شدند و کنارِ اعدادِ
+  // واقعیِ باشگاه، ادعای اندازه‌گیری‌نشده بودند (قاعده‌ی ML_CONTRACT).
   document.getElementById('v-loyalty').innerHTML=`
     <div class="pg-head"><div class="pg-title">باشگاه مشتریان</div><div class="pg-sub">اعضای وفادار، امتیازها و سطح‌بندی مشتری‌ها</div></div>
     <div class="kpi-grid">

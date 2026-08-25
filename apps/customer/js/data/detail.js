@@ -2,10 +2,11 @@
 //  توجه: جریانِ رزرو به data/booking.js منتقل شد (جداسازیِ مسئولیت).
 import { esc, toast } from '../auth.js';
 import { detailSocialProof, fmtFa, go, toggleRestFav } from './discover.js';
-import { GRAD, favs, setCurRest } from './seed.js';
-// depositLabel: تنها منبعِ متنِ پیش‌پرداخت (رفعِ P1-3) — در booking.js تعریف شده.
+import { curRest, favHas, gradFor, setCurRest } from './seed.js';
+import { API, applyRestaurantDetail, loadRestaurantDetail, resolveMediaUrl } from '../api.js';
+import { findR } from '../init.js';
+// depositLabel: تنها منبعِ متنِ پیش‌پرداخت (P1-3، خطِ ممیزی) — در نوارِ رزرو مصرف می‌شود.
 import { depositLabel } from './booking.js';
-import { R } from '../init.js';
 import { armReveals, buzz, haptic } from '../theme-pwa.js';
 import { icon } from '../icons.js';
 
@@ -38,18 +39,61 @@ export async function shareRestaurant(name){
   }
   toast('⚠️', 'مرورگرت اشتراک‌گذاری یا کپی رو پشتیبانی نمی‌کنه');
 }
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴) — دو باگِ واقعی و یک اتصالِ گم‌شده:
+//  ۱. idِ رستورانِ واقعی UUID است؛ اینجا بدونِ کوتیشن داخلِ onclick تزریق
+//     می‌شد (openBookSheet(${id})) که برای UUID خطای syntaxِ JS می‌دهد —
+//     یعنی دکمه‌ی «رزرو میز» برای هر رستورانِ واقعی مرده بود. CIِ فعلی این
+//     را نمی‌گرفت چون mockِ E2E با idِ عددی کار می‌کند. حالا همه‌ی idها
+//     کوتیشن‌دار تزریق و با String مقایسه می‌شوند (findR).
+//  ۲. GRAD[uuid] همیشه undefined بود → hero بدونِ پس‌زمینه. حالا gradFor.
+//  ۳. اپ مشتری هرگز GET /restaurants/{slug} را صدا نمی‌زد — عکس‌هایی که
+//     رستوران در پنلِ بیزنس آپلود و پلتفرم تأیید کرده بود، هیچ‌وقت به
+//     مشتری نمی‌رسید. حالا صفحه اول فوری رندر می‌شود و بعد با داده‌ی
+//     واقعیِ سرور (عکس، لوگو، منو، امتیازِ تجمیعی) کامل می‌شود.
 export function openRest(id){
-  setCurRest(id);const r=R.find(x=>String(x.id)===String(id));
+  const r=findR(id); if(!r) return;
+  setCurRest(r.id);
+  renderRestPage(r);
+  go('rest');
+  finishRestRender();
+  enrichRestPage(r);
+}
+/** بعد از رندرِ اولیه، جزئیاتِ واقعی را از سرور بگیر و صفحه را کامل کن. */
+async function enrichRestPage(r){
+  // حداکثر یک درخواست به‌ازای هر بازشدنِ صفحه؛ بعد از موفقیت (detailLoaded +
+  // کشِ loadRestaurantDetail) دیگر درخواستی نمی‌رود. شکستِ گذرا کش نمی‌شود —
+  // بازشدنِ بعدیِ همین رستوران دوباره تلاش می‌کند.
+  if(!r.slug || r.detailLoaded || !API.online) return;
+  const d = await loadRestaurantDetail(r.slug);
+  if(!d) return;
+  applyRestaurantDetail(r, d);
+  // فقط اگر کاربر هنوز روی همین رستوران است، دوباره رندر کن (بدونِ go/scroll)
+  if(String(curRest)===String(r.id) && document.getElementById('page-rest')?.classList.contains('active')){
+    renderRestPage(r);
+    finishRestRender();
+  }
+}
+function finishRestRender(){
+  setTimeout(()=>document.querySelectorAll('.rb-fill').forEach(f=>f.style.width=f.dataset.w+'%'),300);
+  armReveals&&armReveals();
+}
+function renderRestPage(r){
+  const id=r.id;
   const stars=n=>Array.from({length:5},(_,i)=>icon('star',{size:13,fill:i<Math.round(n)})).join('');
+  // عکسِ واقعیِ تأییدشده اگر هست، پس‌زمینه‌ی hero می‌شود؛ وگرنه گرادیانِ تزئینی.
+  const heroPhoto=r.photos?.length?resolveMediaUrl(r.photos[0].url):null;
+  const heroBg=heroPhoto
+    ?`background-image:linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.55)),url('${esc(heroPhoto)}');background-size:cover;background-position:center`
+    :`background:${gradFor(id)}`;
   document.getElementById('page-rest').innerHTML=`
-    <div class="rp-hero" style="background:${GRAD[id]||GRAD[1]}">
-      <div class="rp-hero-mesh"></div>
+    <div class="rp-hero${heroPhoto?' rp-hero--photo':''}" style="${heroBg}">
+      <div class="rp-hero-mesh"${heroPhoto?' style="display:none"':''}></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
         <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant('${esc(r.n)}')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
-        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav('${esc(String(id))}')" aria-pressed="${favs.has(String(id))}" aria-label="${favs.has(String(id))?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favs.has(String(id))})}</button>
+        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav('${esc(String(r.id))}')" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
       </div>
-      <div class="rp-hero-emoji">${esc(r.e)}</div>
+      ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-emoji">${esc(r.e)}</div>`}
       <div class="rp-hero-overlay">
         <div class="rp-hero-badges">
           ${r.now?`<span class="rp-hero-badge live"><span class="live-dot" aria-hidden="true"></span> الان باز</span>`:''}
@@ -63,17 +107,20 @@ export function openRest(id){
           <span>${fmtFa(r.reviews)} نظر</span>
           <span class="rp-hero-dot">·</span>
           <span>${esc(r.cuisine)}</span>
-          <span class="rp-hero-dot">·</span>
-          <span>${esc(r.price)}</span>
+          ${r.price?`<span class="rp-hero-dot">·</span>
+          <span>${esc(r.price)}</span>`:''}
         </div>
       </div>
     </div>
     <div class="wrap rp-body">
       ${detailSocialProof(r)}
+      ${r.photos?.length?`<div class="rp-section reveal"><h3>عکس‌ها</h3>
+        <div class="rp-gallery" role="list">${r.photos.map(p=>`<figure class="rp-gallery-item" role="listitem"><img src="${esc(resolveMediaUrl(p.url))}" alt="${esc(p.caption||('عکسِ '+r.n))}" loading="lazy">${p.caption?`<figcaption>${esc(p.caption)}</figcaption>`:''}</figure>`).join('')}</div>
+      </div>`:''}
 
-      <div class="rp-section reveal"><h3>درباره</h3>${r.about?`<p class="rp-about">${esc(r.about)}</p>`:`<p class="rp-empty">این رستوران هنوز توضیحی ثبت نکرده.</p>`}${r.feats.length?`<div class="feat-row">${r.feats.map(f=>`<span class="feat">${icon('check',{size:13})} ${esc(f)}</span>`).join('')}</div>`:''}</div>
+      <div class="rp-section reveal"><h3>درباره</h3>${r.about?`<p class="rp-about">${esc(r.about)}</p>`:`<p class="rp-empty">این رستوران هنوز توضیحی ثبت نکرده.</p>`}${r.address?`<p class="rp-address">${icon('mapPin',{size:14})} ${esc(r.address)}</p>`:''}${r.feats.length?`<div class="feat-row">${r.feats.map(f=>`<span class="feat">${icon('check',{size:13})} ${esc(f)}</span>`).join('')}</div>`:''}</div>
 
-      <div class="rp-section reveal"><h3>منو</h3>${r.menu.length?`<div class="menu-list">${r.menu.map(m=>`<div class="menu-item glass"><div class="menu-emoji">${m[0]}</div><div class="menu-info"><div class="menu-name">${esc(m[1])}</div><div class="menu-price">${m[2]} تومان</div></div></div>`).join('')}</div>`:`<p class="rp-empty">این رستوران هنوز منویی ثبت نکرده.</p>`}</div>
+      <div class="rp-section reveal"><h3>منو</h3>${r.menu.length?`<div class="menu-list">${r.menu.map(m=>`<div class="menu-item glass"><div class="menu-emoji">${m[3]?`<img class="menu-thumb" src="${esc(resolveMediaUrl(m[3]))}" alt="" loading="lazy">`:esc(m[0])}</div><div class="menu-info"><div class="menu-name">${esc(m[1])}</div><div class="menu-price">${m[2]} تومان</div></div></div>`).join('')}</div>`:`<p class="rp-empty">این رستوران هنوز منویی ثبت نکرده.</p>`}</div>
 
       <div class="rp-section reveal">
         <h3>امتیازها و نظرها</h3>
@@ -109,9 +156,6 @@ export function openRest(id){
       <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openChat('${esc(r.slug||'')}')" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
       <button class="btn btn-primary rp-bookbar-btn" onclick="buzz&&buzz();openBookSheet('${esc(String(id))}')">رزرو میز</button>
     </div>`;
-  go('rest');
-  setTimeout(()=>document.querySelectorAll('.rb-fill').forEach(f=>f.style.width=f.dataset.w+'%'),300);
-  armReveals&&armReveals();
 }
 
 // ── نمایشِ تابعِ onclick روی window ──

@@ -3,7 +3,7 @@ import { API } from '../api.js';
 import { esc, toast, undoSnack } from '../auth.js';
 import { openRest } from './detail.js';
 import { labelForISO, quickBook } from './booking.js';
-import { GRAD, bookingCtx, favs, saveFavs, pts } from './seed.js';
+import { bookingCtx, favHas, favs, gradFor, saveFavs, pts } from './seed.js';
 import { renderProfile } from '../features/food-dna.js';
 import { renderLoyalty } from '../features/loyalty.js';
 import { renderEconomy } from '../features/economy.js';
@@ -35,10 +35,14 @@ export function cardHTML(r){
   // دکمه‌ی واقعیِ کشیده روی کلِ کارت می‌نشیند و z-indexِ ۱ می‌گیرد — یعنی زیرِ
   // دکمه‌ی علاقه‌مندی (۳) و چیپ‌های ساعت (پنل، ۲). این تنها راهی است که هم با
   // کیبورد قابلِ فوکوس باشد، هم ترتیبِ فوکوس منطقی بماند.
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): idها همیشه کوتیشن‌دار تزریق می‌شوند —
+  // idِ واقعی UUID است و بدونِ کوتیشن، onclick خطای syntax می‌داد و کلِ
+  // CTAهای کارت برای رستورانِ واقعی مرده بودند (mockِ E2E با idِ عددی این
+  // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
   return `<article class="rc reveal">
-    <div class="rc-bg" style="background:${GRAD[r.id]||GRAD[1]}"></div>
+    <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
     <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${esc(String(r.id))}')"></button>
-    <span class="rc-emoji">${r.e}</span>
+    <span class="rc-emoji">${esc(r.e)}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
     <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav('${esc(String(r.id))}',this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
@@ -168,10 +172,12 @@ export function filterVibe(v,el){
 }
 // ── نزدیک تو (کارت افقی کوچک) ──
 export function hCardHTML(r,extra){
+  // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
+  const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest('${esc(String(r.id))}')">
-    <div class="hcard-img" style="background:${GRAD[r.id]||GRAD[1]}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
+    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
-    <div class="hcard-meta">${r.rt!=null?`${icon('star',{size:12,fill:true})} ${fmtFa(r.rt)} · `:''}${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
+    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
 }
 // ═══════════════════════════════════════════════════════════
@@ -283,7 +289,7 @@ export async function renderEvents(){
 function eventsHtml(events,isDemo){
   return events.map(e=>`
     <div class="event-card" role="button" tabindex="0" onclick="openRest('${esc(String(e.rid))}')">
-      <div class="event-emoji">${e.emoji}</div>
+      <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
         ${e.rest?`<div class="event-rest">${esc(e.rest)}</div>`:''}
@@ -357,9 +363,9 @@ export function clearSearch(){
   doSearch();
 }
 export function toggleFav(id,el){
-  const key=String(id);
-  const on=!favs.has(key);
-  on?favs.add(key):favs.delete(key);
+  id=String(id);   // favs همیشه کلیدِ String نگه می‌دارد (id نمونه عدد، id واقعی UUID)
+  const on=!favs.has(id);
+  on?favs.add(id):favs.delete(id);
   saveFavs();
   if(el){
     el.innerHTML=icon('heart',{size:20,fill:on});
@@ -380,6 +386,7 @@ export function toggleFav(id,el){
 }
 // نسخه‌ی hero صفحه رستوران — با انیمیشن تپش
 export function toggleRestFav(id){
+  id=String(id);
   const btn=document.getElementById('rpFav');
   const key=String(id);
   const on=!favs.has(key);

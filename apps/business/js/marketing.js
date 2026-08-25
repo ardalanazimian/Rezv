@@ -208,14 +208,13 @@ function buildHeatmap(rows){
   // بازچینش به ترتیب هفته‌ی ایرانی: شنبه(6)..جمعه(5)
   const order=[6,0,1,2,3,4,5]; const orderLbl=['ش','ی','د','س','چ','پ','ج'];
   const grid={}; let mx=0;
-  if(rows&&rows.length){
-    rows.forEach(r=>{ grid[`${r.dow}-${r.hour}`]=r.count; if(r.count>mx)mx=r.count; });
-  } else {
-    order.forEach((d,di)=>hours.forEach(h=>{
-      const wknd=(d===4||d===5)?1.8:1; const night=(h>=19&&h<=21)?2.2:(h>=18?1.4:0.6);
-      const v=Math.round(Math.random()*4*wknd*night); grid[`${d}-${h}`]=v; if(v>mx)mx=v;
-    }));
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): حالتِ بدونِ داده قبلاً با Math.random یک
+  // نقشه‌ی «واقع‌گرایانه» می‌ساخت و tooltipِ هر خانه می‌گفت «۳ رزرو» — نویزِ
+  // تصادفی در لباسِ تاریخچه‌ی رزرو. نبودِ داده یعنی نبودِ ادعا.
+  if(!(rows&&rows.length)){
+    return `<div class="pr-empty">هنوز داده‌ی کافی برای نقشه‌ی حرارتی نیست — با ثبتِ رزروهای بیشتر ساخته می‌شود.</div>`;
   }
+  rows.forEach(r=>{ grid[`${r.dow}-${r.hour}`]=r.count; if(r.count>mx)mx=r.count; });
   mx=mx||1;
   const cell=(d,h)=>{
     const v=grid[`${d}-${h}`]||0; const t=v/mx;
@@ -243,6 +242,10 @@ async function rAnalytics(){
     weekly:[14,18,24,31],
   };
   // بارگذاری از API اگر توکن staff داریم
+  // بدونِ توکنِ staff هم باید صادق باشیم: API.online پیش‌فرض true است و
+  // بدونِ این خط، dataSourceNote() هیچ هشداری نشان نمی‌داد و بلوکِ نمونه
+  // (۱۳۶ رزرو، ۶۶٪ بازگشت...) کاملاً واقعی به نظر می‌رسید (ممیزیِ ۲۰۲۶-۰۸-۲۴).
+  if(!API.getToken()) API.online=false;
   if(API.getToken()){
     const res=await API.get('/restaurant/analytics');
     if(res.ok && res.data){

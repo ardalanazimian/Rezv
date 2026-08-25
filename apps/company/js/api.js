@@ -132,7 +132,13 @@ async function loadAdminRestaurants(){
     API.online = true;
     updateOfflineBanner();
     return res.data.restaurants.map(apiR => {
-      const fb = RESTAURANTS_SAMPLE.find(s => s.id === apiR.id) || RESTAURANTS_SAMPLE[0];
+      // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): apiR.id همیشه UUID است و idِ نمونه عددِ
+      // ۱..۸ — پس find همیشه شکست می‌خورد و *همه‌ی* رستوران‌های واقعی دقیقاً
+      // لوگو/گرادیانِ نمونه‌ی شماره‌ی ۱ (🌿 سبز) را می‌گرفتند. حالا انتخابِ
+      // تزئینی، قطعی و متنوع بر اساسِ هَشِ id است (همان الگویِ اپ مشتری).
+      const key = String(apiR.id || '');
+      let h = 0; for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+      const fb = RESTAURANTS_SAMPLE[h % RESTAURANTS_SAMPLE.length];
       return mapAdminRestaurant(apiR, fb);
     });
   }
