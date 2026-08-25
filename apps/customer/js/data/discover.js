@@ -1,6 +1,6 @@
 // ═══ رزرونو — ناوبری + رندرِ کشف: فید، وایب، مناسبت، رویداد (بخشی از اپ کاستومر) ═══
 import { API } from '../api.js';
-import { esc, toast, undoSnack } from '../auth.js';
+import { esc, jsq, toast, undoSnack } from '../auth.js';
 import { openRest } from './detail.js';
 import { labelForISO, quickBook } from './booking.js';
 import { bookingCtx, favHas, favs, gradFor, saveFavs, pts } from './seed.js';
@@ -41,9 +41,9 @@ export function fmtFa(n){return n.toLocaleString('fa-IR')}
 export function slotsHTML(r){
   const slots = Array.isArray(r.slots) ? r.slots : [];
   if (slots.length) {
-    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook('${esc(String(r.id))}','${s}');haptic('select')">${s}</button>`).join('');
+    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${jsq(String(r.id))},${jsq(s)});haptic('select')">${s}</button>`).join('');
   }
-  return `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet('${esc(String(r.id))}');haptic('select')">ببین سانس‌ها</button>`;
+  return `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet(${jsq(String(r.id))});haptic('select')">ببین سانس‌ها</button>`;
 }
 
 /**
@@ -74,10 +74,10 @@ export function cardHTML(r){
   // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
   return `<article class="rc reveal" data-rid="${esc(String(r.id))}">
     <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
-    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${esc(String(r.id))}')"></button>
+    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${jsq(String(r.id))})"></button>
     <span class="rc-emoji">${esc(r.e)}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
-    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav('${esc(String(r.id))}',this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
+    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
       <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div>${Number.isFinite(r.rt)&&r.rt>0?`<div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div>`:'<div class="rc-rating rc-rating-new">تازه‌وارد</div>'}</div>
       <div class="rc-meta">${r.cuisine}${r.price?` · ${r.price}`:''} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
@@ -222,7 +222,7 @@ export function filterVibe(v,el){
 export function hCardHTML(r,extra){
   // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
   const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
-  return `<div class="hcard" role="button" tabindex="0" onclick="openRest('${esc(String(r.id))}')">
+  return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${jsq(String(r.id))})">
     <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
@@ -341,7 +341,7 @@ export async function renderEvents(){
 /** مارکاپِ کارت‌های رویداد. isDemo=true چیپِ «نمونه» را اضافه می‌کند. */
 function eventsHtml(events,isDemo){
   return events.map(e=>`
-    <div class="event-card" role="button" tabindex="0" onclick="openRestBySlug('${esc(String(e.rid))}','${esc(String(e.slug||''))}')">
+    <div class="event-card" role="button" tabindex="0" onclick="openRestBySlug(${jsq(String(e.rid))},${jsq(String(e.slug||''))})">
       <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>

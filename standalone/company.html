@@ -1454,6 +1454,26 @@ if (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveA
 function fa(n){return (n==null||Number.isNaN(n))?'۰':n.toLocaleString('fa-IR')}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
+/* ───────────────────────────────────────────────────────────
+   jsq : یک literalِ **کاملِ** رشته‌ی JS که داخلِ attributeِ HTML هم امن است.
+
+   ⚠️ چرا esc() برای این بافت کافی نیست (آسیب‌پذیریِ واقعیِ ۲۰۲۶-۰۸-۲۵):
+   در `onclick="f('${esc(x)}')"` پارسرِ HTML مقدارِ attribute را **پیش از**
+   پارسرِ JS decode می‌کند. esc آپاستروف را به `&#39;` می‌برد، ولی مرورگر
+   همان را دوباره به `'` برمی‌گرداند و آن آپاستروف رشته‌ی JS را می‌بندد:
+       نامِ مهمان = x');alert(1)//   →   f('x');alert(1)//')
+   یعنی هر متنی که کاربر کنترل می‌کند (نامِ مهمان، یادداشت، نامِ آیتمِ منو)
+   در مرورگرِ کارکنان کد اجرا می‌کند → سرقتِ توکن → تصرفِ تنانت.
+
+   ترتیبِ jsq حیاتی است: **اول** JSON.stringify (escapeِ رشته‌ی JS)،
+   **بعد** esc (escapeِ HTML). پس از decodeِ مرورگر، آنچه به پارسرِ JS
+   می‌رسد یک literalِ درست‌escape‌شده است.
+
+   استفاده: onclick="f(${jsq(x)})"   — نه   onclick="f('${esc(x)}')"
+   خودِ jsq کوتیشن‌ها را می‌گذارد؛ دورش کوتیشن نگذار.
+   ─────────────────────────────────────────────────────────── */
+export function jsq(v){return esc(JSON.stringify(String(v==null?'':v)))}
+
 </script>
 <script data-src="js/api.js">
 // ═══ رزرونو — پنل company: ابزارها + لایه‌ی اتصال API admin (Vanilla JS، scope مشترک) ═══
@@ -1833,7 +1853,7 @@ function rOverview(){
           const isExpired=r.status==='expired'||r.status==='trial_expired';const isTrial=r.status==='trial';
           return `<div class="alert-item">
             <div class="alert-ic ${isExpired?'danger':isTrial?'info':'warn'}">${isExpired?icon('close',{size:15}):isTrial?icon('gift',{size:15}):icon('clock',{size:15})}</div>
-            <div><b>${esc(r.name)}</b> ${isExpired?(r.daysLeft!=null?`اشتراکش ${fa(Math.abs(r.daysLeft))} روزه منقضی شده`:'اشتراکش منقضی شده'):isTrial?`${fa(r.daysLeft)} روز تا پایان دوره آزمایشی`:`${fa(r.daysLeft)} روز تا انقضای اشتراک`}<div style="margin-top:6px"><button class="btn btn-sm ${isExpired?'btn-primary':'btn-ghost'}" onclick="event.stopPropagation();openRenew('${r.id}')">${isExpired?'تمدید فوری':isTrial?'تبدیل به اشتراک':'تمدید'}</button></div></div>
+            <div><b>${esc(r.name)}</b> ${isExpired?(r.daysLeft!=null?`اشتراکش ${fa(Math.abs(r.daysLeft))} روزه منقضی شده`:'اشتراکش منقضی شده'):isTrial?`${fa(r.daysLeft)} روز تا پایان دوره آزمایشی`:`${fa(r.daysLeft)} روز تا انقضای اشتراک`}<div style="margin-top:6px"><button class="btn btn-sm ${isExpired?'btn-primary':'btn-ghost'}" onclick="event.stopPropagation();openRenew(${jsq(r.id)})">${isExpired?'تمدید فوری':isTrial?'تبدیل به اشتراک':'تمدید'}</button></div></div>
           </div>`;
         }).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:34})}</div><div class="empty-state-desc">همه‌ی اشتراک‌ها فعالن</div></div>`}
       </div>
@@ -1883,7 +1903,7 @@ function renderRestList(){
     else if(r.status==='expiring')statusText=`${fa(r.daysLeft)} روز مونده`;
     else if(r.status==='expired'||r.status==='trial_expired')statusText=r.daysLeft!=null?`${fa(Math.abs(r.daysLeft))} روز منقضی`:'منقضی';
     else if(r.status==='trial')statusText=`آزمایشی · ${fa(r.daysLeft)} روز`;
-    return `<div class="rest-row" role="button" tabindex="0" onclick="openRest('${r.id}')">
+    return `<div class="rest-row" role="button" tabindex="0" onclick="openRest(${jsq(r.id)})">
       <div class="rest-name-cell">
         <div class="rest-logo" style="background:${r.grad}">${r.logo}</div>
         <div style="min-width:0"><div class="rest-name">${esc(r.name)}</div><div class="rest-loc">پلن ${planBadge}</div></div>
@@ -1967,8 +1987,8 @@ function rDetail(){
       </div>
       <div class="detail-actions">
         <span class="badge ${badgeCls}" style="align-self:center"><span class="bdot"></span>${statusText}</span>
-        <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen('${r.id}')">${r.isOpen?`${icon('lock',{size:14})} غیرفعال کردن`:`${icon('check',{size:14})} فعال کردن`}</button>
-        <button class="btn btn-primary btn-sm" onclick="openRenew('${r.id}')">${icon('refresh',{size:14})} مدیریت اشتراک</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen(${jsq(r.id)})">${r.isOpen?`${icon('lock',{size:14})} غیرفعال کردن`:`${icon('check',{size:14})} فعال کردن`}</button>
+        <button class="btn btn-primary btn-sm" onclick="openRenew(${jsq(r.id)})">${icon('refresh',{size:14})} مدیریت اشتراک</button>
       </div>
     </div>
     <div class="kpi-grid">
@@ -2024,11 +2044,11 @@ function rAnalytics(){
     <div class="row-2">
       <div class="panel">
         <div class="panel-head"><div class="panel-title">برترین بر اساس باشگاه</div></div>
-        ${topByMembers.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest('${r.id}')"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.reservations)} رزرو</div></div><div class="ls-val">${fa(r.members)}</div></div>`).join('')}
+        ${topByMembers.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest(${jsq(r.id)})"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.reservations)} رزرو</div></div><div class="ls-val">${fa(r.members)}</div></div>`).join('')}
       </div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title">برترین بر اساس رزرو</div></div>
-        ${topByRes.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest('${r.id}')"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.members)} عضو</div></div><div class="ls-val">${fa(r.reservations)}</div></div>`).join('')}
+        ${topByRes.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest(${jsq(r.id)})"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.members)} عضو</div></div><div class="ls-val">${fa(r.reservations)}</div></div>`).join('')}
       </div>
     </div>`;
 }
@@ -2115,8 +2135,8 @@ function rBilling(){
             </div>
             <span class="badge ${badgeCls}" style="align-self:flex-start"><span class="bdot"></span>${st}</span>
             <div style="display:flex;gap:6px">
-              <button class="btn btn-primary btn-sm" onclick="openSmsTopup('${r.id}')">${icon('phone',{size:13})} شارژ پیامک</button>
-              <button class="btn btn-ghost btn-sm" onclick="openRenew('${r.id}')">مدیریت</button>
+              <button class="btn btn-primary btn-sm" onclick="openSmsTopup(${jsq(r.id)})">${icon('phone',{size:13})} شارژ پیامک</button>
+              <button class="btn btn-ghost btn-sm" onclick="openRenew(${jsq(r.id)})">مدیریت</button>
             </div>
           </div>`;
         }).join('')}
@@ -2175,7 +2195,7 @@ function openRenew(id){
     <div class="modal-sub">${esc(r.name)} · وضعیت فعلی: ${STATUS_LABEL[r.status]}</div>
     <div class="field-label">پلن</div>
     <div class="opt-row" id="planOpts">
-      ${[['pro','حرفه‌ای'],['enterprise','سازمانی']].map(([v,l])=>`<div role="button" tabindex="0" class="opt ${v===renewPlan?'sel':''}" data-plan="${v}" onclick="pickPlan('${v}',this)">${l}</div>`).join('')}
+      ${[['pro','حرفه‌ای'],['enterprise','سازمانی']].map(([v,l])=>`<div role="button" tabindex="0" class="opt ${v===renewPlan?'sel':''}" data-plan="${v}" onclick="pickPlan(${jsq(v)},this)">${l}</div>`).join('')}
     </div>
     <div class="field-label">مدت تمدید</div>
     <div class="opt-row" id="monthOpts">
@@ -2186,8 +2206,8 @@ function openRenew(id){
       <div class="sum-row"><span class="k">پلن جدید</span><span class="v" id="sumPlan">${PLAN_LABEL[renewPlan]}</span></div>
       <div class="sum-row"><span class="k">مدت</span><span class="v" id="sumMonths">۱ سال</span></div>
     </div>
-    <button class="btn btn-primary btn-block btn-lg" onclick="doRenew('${id}',this)">${icon('check',{size:15})} تمدید اشتراک</button>
-    <button class="btn btn-danger btn-block" style="margin-top:8px" onclick="confirmCancel('${id}')">لغو اشتراک</button>
+    <button class="btn btn-primary btn-block btn-lg" onclick="doRenew(${jsq(id)},this)">${icon('check',{size:15})} تمدید اشتراک</button>
+    <button class="btn btn-danger btn-block" style="margin-top:8px" onclick="confirmCancel(${jsq(id)})">لغو اشتراک</button>
   `);
 }
 let renewPlan='pro',renewMonths=12;
@@ -2218,7 +2238,7 @@ function confirmCancel(id){
       <div style="width:54px;height:54px;border-radius:14px;background:var(--red-50);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;color:var(--warning)">${icon('alert',{size:26})}</div>
       <div class="modal-title" style="text-align:center">لغو اشتراک ${esc(r.name)}؟</div>
       <div class="modal-sub" style="text-align:center">اشتراک فوراً منقضی می‌شه. این کار قابل بازگشته (با تمدید مجدد).</div>
-      <button class="btn btn-danger btn-block btn-lg" onclick="doCancel('${id}')">بله، لغو کن</button>
+      <button class="btn btn-danger btn-block btn-lg" onclick="doCancel(${jsq(id)})">بله، لغو کن</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
     </div>`);
 }
@@ -2254,8 +2274,8 @@ function rSupport(){
           <div class="rest-logo" style="background:${r.grad};width:36px;height:36px;font-size:15px">${r.logo}</div>
           <div class="mini-info"><div class="mini-name">${esc(r.name)}</div><div class="mini-sub">${!r.isOpen?`<span class="dot-closed" aria-hidden="true"></span> غیرفعال · `:''}${STATUS_LABEL[r.status]||''}</div></div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen('${r.id}')">${r.isOpen?'غیرفعال کن':'فعال کن'}</button>
-            <button class="btn btn-primary btn-sm" onclick="openRenew('${r.id}')">مدیریت اشتراک</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen(${jsq(r.id)})">${r.isOpen?'غیرفعال کن':'فعال کن'}</button>
+            <button class="btn btn-primary btn-sm" onclick="openRenew(${jsq(r.id)})">مدیریت اشتراک</button>
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:34})}</div><div class="empty-state-desc">همه‌چیز مرتبه</div></div>`}
       </div>
@@ -2769,11 +2789,11 @@ function renderCustomer360(d){
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${m.is_banned
-            ? `<button class="btn btn-primary btn-sm" onclick="openUnbanModal('${esc(u.id)}','${esc(name)}')">رفعِ بن</button>`
-            : `<button class="btn btn-danger btn-sm" onclick="openBanModal('${esc(u.id)}','${esc(name)}')">بن‌کردن</button>`}
+            ? `<button class="btn btn-primary btn-sm" onclick="openUnbanModal(${jsq(u.id)},${jsq(name)})">رفعِ بن</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="openBanModal(${jsq(u.id)},${jsq(name)})">بن‌کردن</button>`}
           ${m.has_active_abuse_flag
-            ? `<button class="btn btn-sm" onclick="clearAbuseFlag360('${esc(u.id)}')">برداشتنِ نشان</button>`
-            : `<button class="btn btn-sm" onclick="flagAbuse360('${esc(u.id)}')">نشان‌گذاری</button>`}
+            ? `<button class="btn btn-sm" onclick="clearAbuseFlag360(${jsq(u.id)})">برداشتنِ نشان</button>`
+            : `<button class="btn btn-sm" onclick="flagAbuse360(${jsq(u.id)})">نشان‌گذاری</button>`}
         </div>
       </div>
       ${m.is_banned?`<div style="margin-top:10px;font-size:12.5px;color:var(--red-600);line-height:1.7">${icon('alert',{size:13})} بن‌شده در ${new Date(m.banned_at).toLocaleString('fa-IR')}${m.banned_reason?` — دلیل: ${esc(m.banned_reason)}`:''}</div>`:''}
@@ -2815,7 +2835,7 @@ function openBanModal(userId,name){
     <div class="modal-sub">این حساب دیگه نمی‌تونه وارد بشه یا رزروِ آنلاین ثبت کنه.</div>
     <div class="field-label">دلیل (الزامی)</div>
     <textarea class="inp" id="banReason" rows="3" placeholder="مثلاً: تخلفِ تکراری، شکایتِ رسمیِ رستوران، ..."></textarea>
-    <button class="btn btn-danger btn-block btn-lg" style="margin-top:14px" onclick="submitBan('${esc(userId)}')">تأییدِ بن</button>
+    <button class="btn btn-danger btn-block btn-lg" style="margin-top:14px" onclick="submitBan(${jsq(userId)})">تأییدِ بن</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
   `);
 }
@@ -2834,7 +2854,7 @@ function openUnbanModal(userId,name){
     <div class="modal-title">${icon('checkCircle',{size:18})} رفعِ بنِ ${esc(name)}</div>
     <div class="field-label">دلیل (اختیاری)</div>
     <textarea class="inp" id="unbanReason" rows="3" placeholder="مثلاً: بررسی شد، تصمیمِ اشتباه بود"></textarea>
-    <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" onclick="submitUnban('${esc(userId)}')">تأییدِ رفعِ بن</button>
+    <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" onclick="submitUnban(${jsq(userId)})">تأییدِ رفعِ بن</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
   `);
 }
@@ -3411,8 +3431,8 @@ function renderSalesOrders() {
       <div style="min-width:120px;font-size:13px;font-weight:700">${salesToman(o.amount_toman)}</div>
       <span class="badge ${st.cls}" style="align-self:flex-start"><span class="bdot"></span>${st.label}</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="openSalesOrder('${esc(o.id)}')">جزئیات</button>
-        ${canAct ? `<button class="btn btn-primary btn-sm" onclick="activateSalesOrder('${esc(o.id)}')">فعال‌سازی</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="openSalesOrder(${jsq(o.id)})">جزئیات</button>
+        ${canAct ? `<button class="btn btn-primary btn-sm" onclick="activateSalesOrder(${jsq(o.id)})">فعال‌سازی</button>` : ''}
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -3433,8 +3453,8 @@ function renderSalesInquiries() {
       </div>
       <span class="badge ${st.cls}" style="align-self:flex-start"><span class="bdot"></span>${st.label}</span>
       <div style="display:flex;gap:6px">
-        ${q.status === 'open' ? `<button class="btn btn-ghost btn-sm" onclick="setInquiryStatus('${esc(q.id)}','in_progress')">در حالِ پیگیری</button>` : ''}
-        ${q.status !== 'closed' ? `<button class="btn btn-primary btn-sm" onclick="setInquiryStatus('${esc(q.id)}','closed')">بستن</button>` : ''}
+        ${q.status === 'open' ? `<button class="btn btn-ghost btn-sm" onclick="setInquiryStatus(${jsq(q.id)},'in_progress')">در حالِ پیگیری</button>` : ''}
+        ${q.status !== 'closed' ? `<button class="btn btn-primary btn-sm" onclick="setInquiryStatus(${jsq(q.id)},'closed')">بستن</button>` : ''}
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -3476,9 +3496,9 @@ function openSalesOrder(id) {
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">بستن</button>
       ${o.status !== 'activated' && o.status !== 'rejected' ? `
-        <button class="btn btn-ghost" onclick="rejectSalesOrder('${esc(o.id)}')">رد کردن</button>
-        ${o.status === 'pending' ? `<button class="btn btn-ghost" onclick="contactSalesOrder('${esc(o.id)}')">تماس گرفتم</button>` : ''}
-        ${o.kind === 'purchase' ? `<button class="btn btn-primary" onclick="activateSalesOrder('${esc(o.id)}')">فعال‌سازیِ اشتراک</button>` : ''}
+        <button class="btn btn-ghost" onclick="rejectSalesOrder(${jsq(o.id)})">رد کردن</button>
+        ${o.status === 'pending' ? `<button class="btn btn-ghost" onclick="contactSalesOrder(${jsq(o.id)})">تماس گرفتم</button>` : ''}
+        ${o.kind === 'purchase' ? `<button class="btn btn-primary" onclick="activateSalesOrder(${jsq(o.id)})">فعال‌سازیِ اشتراک</button>` : ''}
       ` : ''}
     </div>`);
 }
@@ -3691,7 +3711,7 @@ function rPhotos() {
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${['pending', 'approved', 'rejected', 'all'].map((f) => `
-            <button class="btn btn-sm ${PHOTO_FILTER === f ? 'btn-primary' : 'btn-ghost'}" onclick="photoFilter('${f}')">
+            <button class="btn btn-sm ${PHOTO_FILTER === f ? 'btn-primary' : 'btn-ghost'}" onclick="photoFilter(${jsq(f)})">
               ${f === 'pending' ? 'در انتظار' : f === 'approved' ? 'تأییدشده' : f === 'rejected' ? 'ردشده' : 'همه'}
             </button>`).join('')}
           <button class="btn btn-ghost btn-sm" onclick="loadPhotos()">${PHOTO_LOADING ? 'در حال بارگذاری…' : 'تازه‌سازی'}</button>
@@ -3735,9 +3755,9 @@ function renderPhotoQueue() {
           ${p.caption ? `<div class="photo-card__cap">${esc(p.caption)}</div>` : ''}
           ${p.rejection_reason ? `<div class="photo-card__reason">دلیلِ رد: ${esc(p.rejection_reason)}</div>` : ''}
           <div class="photo-card__actions">
-            ${p.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="approvePhoto('${p.id}')">تأیید و انتشار</button>` : ''}
-            ${p.status !== 'rejected' ? `<button class="btn btn-ghost btn-sm" onclick="rejectPhoto('${p.id}')">رد</button>` : ''}
-            <button class="btn btn-ghost btn-sm" style="color:var(--red-600)" onclick="deletePhotoHard('${p.id}')">حذفِ کامل</button>
+            ${p.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="approvePhoto(${jsq(p.id)})">تأیید و انتشار</button>` : ''}
+            ${p.status !== 'rejected' ? `<button class="btn btn-ghost btn-sm" onclick="rejectPhoto(${jsq(p.id)})">رد</button>` : ''}
+            <button class="btn btn-ghost btn-sm" style="color:var(--red-600)" onclick="deletePhotoHard(${jsq(p.id)})">حذفِ کامل</button>
           </div>
         </div>
       </div>`;
@@ -3920,7 +3940,7 @@ function rHoursChanges() {
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${['pending', 'rejected', 'all'].map((f) => `
-            <button class="btn btn-sm ${HCHANGE_FILTER === f ? 'btn-primary' : 'btn-ghost'}" onclick="hchangeFilter('${f}')">
+            <button class="btn btn-sm ${HCHANGE_FILTER === f ? 'btn-primary' : 'btn-ghost'}" onclick="hchangeFilter(${jsq(f)})">
               ${f === 'pending' ? 'در انتظار' : f === 'rejected' ? 'ردشده' : 'همه'}
             </button>`).join('')}
           <button class="btn btn-ghost btn-sm" onclick="loadHoursChanges()">${HCHANGE_LOADING ? 'در حال بارگذاری…' : 'تازه‌سازی'}</button>
@@ -3966,8 +3986,8 @@ function renderHoursChangeQueue() {
         </div>
         ${h.rejection_reason ? `<div class="hchange-reason">دلیلِ رد: ${esc(h.rejection_reason)}</div>` : ''}
         <div class="hchange-actions">
-          ${h.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="approveHoursChange('${h.id}')">تأیید و زنده‌سازی</button>
-          <button class="btn btn-ghost btn-sm" onclick="rejectHoursChange('${h.id}')">رد</button>` : ''}
+          ${h.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="approveHoursChange(${jsq(h.id)})">تأیید و زنده‌سازی</button>
+          <button class="btn btn-ghost btn-sm" onclick="rejectHoursChange(${jsq(h.id)})">رد</button>` : ''}
         </div>
       </div>`;
     }).join('')}

@@ -41,7 +41,7 @@ function rReservations(){
       <button class="date-tab ${resDate==='past'?'active':''}" onclick="setResDate('past')">${icon('inbox',{size:14})} گزارش گذشته</button>
       <button class="date-tab ${resDate==='all'?'active':''}" onclick="setResDate('all')">همه</button>
     </div>
-    ${resDate==='today'?`<div class="tonight-filters">${TONIGHT_FILTERS.map(f=>`<button class="chip ${tonightFilter===f.v?'is-active':''}" aria-pressed="${tonightFilter===f.v}" onclick="tonightFilterSet('${f.v}')">${f.l}</button>`).join('')}</div>`:''}
+    ${resDate==='today'?`<div class="tonight-filters">${TONIGHT_FILTERS.map(f=>`<button class="chip ${tonightFilter===f.v?'is-active':''}" aria-pressed="${tonightFilter===f.v}" onclick="tonightFilterSet(${jsq(f.v)})">${f.l}</button>`).join('')}</div>`:''}
     <div class="panel">
       <div id="resTL"></div>
     </div>`;
@@ -163,9 +163,9 @@ function resItemHTML(r,i){
         ${allowed.includes('seated')?`<button class="btn btn-primary ${actBtn}" onclick="markSeated(${i})">${icon('utensils',{size:14})} نشاند</button>`:''}
         ${allowed.includes('no_show')?`<button class="btn btn-ghost ${actBtn}" onclick="markNoShow(${i})">${icon('alert',{size:14})} نیومد</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="openStatusMenu(${i})">${icon('refresh',{size:14})} وضعیت</button>
-        <button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer('${esc(r.phone)}')"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>
+        <button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer(${jsq(r.phone)})"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>
         ${allowed.includes('cancelled')?`<button class="btn btn-danger ${actBtn}" onclick="cancelRes(${i})">لغو</button>`:''}
-      </div>`:`<div class="tl-actions"><button class="btn btn-ghost btn-sm" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه</button><button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer('${esc(r.phone)}')"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>${r.status==='completed'?`<button class="btn btn-ghost btn-sm" onclick="openManual()">رزرو مجدد</button>`:''}</div>`}
+      </div>`:`<div class="tl-actions"><button class="btn btn-ghost btn-sm" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه</button><button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer(${jsq(r.phone)})"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>${r.status==='completed'?`<button class="btn btn-ghost btn-sm" onclick="openManual()">رزرو مجدد</button>`:''}</div>`}
     </div></div>`;
 }
 // ⚠️ رفعِ باگِ زنده (Tonight Board، ۲۰۲۶-۰۸-۱۴): این تابع قبلاً وقتی آنلاین
@@ -336,7 +336,7 @@ async function walkinLookup(){
       </div>
       <div class="field-label">میز (اختیاری)</div>
       ${tableSelectHtml}
-      <button class="btn btn-primary btn-lg btn-block" id="wConfirmBtn" style="margin-top:16px" onclick="walkinNewSave('${esc(raw)}')">${icon('check',{size:16})} ثبت ورود + عضویت باشگاه</button>
+      <button class="btn btn-primary btn-lg btn-block" id="wConfirmBtn" style="margin-top:16px" onclick="walkinNewSave(${jsq(raw)})">${icon('check',{size:16})} ثبت ورود + عضویت باشگاه</button>
     `);
   }
 }

@@ -2,7 +2,7 @@
 // ── Calendar Sync: تولید فایل .ics واقعی ──
 import { API, isLoggedIn } from '../api.js';
 import { icon } from '../icons.js';
-import { closeSheet, esc, openSheet, toast, undoSnack } from '../auth.js';
+import { closeSheet, esc, jsq, openSheet, toast, undoSnack } from '../auth.js';
 import { openRest } from '../data/detail.js';
 import { go } from '../data/discover.js';
 import { findR } from '../init.js';
@@ -175,7 +175,7 @@ export function openReviewSheet(restaurantId, reservationId, name){
       <textarea id="rvBody" maxlength="1000" rows="4" placeholder="چی خوب بود؟ چی می‌تونست بهتر باشه؟"
         style="width:100%;border-radius:var(--radius-lg);border:1px solid var(--line);padding:10px;font-family:inherit;font-size:14px"></textarea></div>
     <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px"
-      onclick="submitReview('${esc(restaurantId)}','${esc(reservationId)}')">ثبت نظر</button>
+      onclick="submitReview(${jsq(restaurantId)},${jsq(reservationId)})">ثبت نظر</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
   `);
 }

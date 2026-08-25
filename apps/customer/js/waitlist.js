@@ -7,7 +7,7 @@
 // ═══════════════════════════════════════════════════════════
 import { API } from './api.js';
 import { genIdempotencyKey } from './api-core.js';
-import { closeSheet, esc, faNum, toast } from './auth.js';
+import { closeSheet, esc, faNum, jsq, toast } from './auth.js';
 import { go } from './data/discover.js';
 import { TRIPS, bk } from './data/seed.js';
 import { findR } from './init.js';
@@ -31,7 +31,7 @@ export function offerWaitlist(id, r){
         <div class="wl-benefit"><span class="wl-bene-ic">⏱️</span><div><b>تخمین زمان</b><small>می‌دونی چقدر باید صبر کنی</small></div></div>
         <div class="wl-benefit"><span class="wl-bene-ic">${icon('check',{size:18})}</span><div><b>کنترلِ کامل</b><small>آفر رو راحت قبول یا رد کن</small></div></div>
       </div>
-      <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="buzz&&buzz();joinWaitlist('${esc(String(id))}')">پیوستن به لیست انتظار</button>
+      <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="buzz&&buzz();joinWaitlist(${jsq(String(id))})">پیوستن به لیست انتظار</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
     </div>`;
 }

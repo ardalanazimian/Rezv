@@ -39,7 +39,7 @@ function rStaff(){
         <div class="staff-ava">${esc(avatar(s))}</div>
         <div style="flex:1"><div style="font-size:14px;font-weight:700">${esc(s.name||toFaDigits(s.phone||''))}</div><div style="font-size:12px;color:var(--t2)">${esc(toFaDigits(s.phone||''))}</div></div>
         <span class="role-tag ${esc(s.role)}">${esc(ROLE_FA[s.role]||s.role)}</span>
-        ${s.role==='owner'?'<span style="font-size:11px;color:var(--t3);padding:6px 10px">دسترسی کامل</span>':`<button class="btn btn-ghost btn-sm" onclick="openPermEditor('${esc(s.id)}')">دسترسی</button>`}
+        ${s.role==='owner'?'<span style="font-size:11px;color:var(--t3);padding:6px 10px">دسترسی کامل</span>':`<button class="btn btn-ghost btn-sm" onclick="openPermEditor(${jsq(s.id)})">دسترسی</button>`}
       </div>`).join('')}
     </div>
     <div class="panel" style="font-size:12px;color:var(--t2);line-height:1.7">
@@ -62,7 +62,7 @@ function openPermEditor(staffId){
         </label>`).join('')}
     </div>
     <div style="margin-top:16px;display:flex;gap:8px">
-      <button class="btn btn-primary" style="flex:1" onclick="savePermEditor('${esc(staffId)}')">ذخیره</button>
+      <button class="btn btn-primary" style="flex:1" onclick="savePermEditor(${jsq(staffId)})">ذخیره</button>
       <button class="btn btn-ghost" onclick="closeModal()">انصراف</button>
     </div>`);
 }
@@ -230,7 +230,7 @@ async function rCashback(){
     <div class="section-head"><div><div class="section-title">تنظیم درصد کش‌بک</div><div class="section-sub">درصدها بعد از تأیید برای همه‌ی مشتریان اعمال می‌شن</div></div></div>
     <div class="cb-dirty" id="cbDirty">${icon('alert',{size:13})} تغییرات هنوز ذخیره نشده — برای اعمال، تأیید کن</div>
     <div class="cb-sliders">
-      ${cards.map(([k,n,d,mx])=>`<div class="cb-slider-card"><div class="cb-slider-top"><div class="cb-slider-name">${n}</div><div class="cb-slider-pct" id="cbVal-${k}">${fa(CB[k])}٪</div></div><div class="cb-slider-desc">${d}</div><input type="range" class="cb-range" min="0" max="${mx}" value="${CB[k]}" oninput="cbChange('${k}',this.value)"></div>`).join('')}
+      ${cards.map(([k,n,d,mx])=>`<div class="cb-slider-card"><div class="cb-slider-top"><div class="cb-slider-name">${n}</div><div class="cb-slider-pct" id="cbVal-${k}">${fa(CB[k])}٪</div></div><div class="cb-slider-desc">${d}</div><input type="range" class="cb-range" min="0" max="${mx}" value="${CB[k]}" oninput="cbChange(${jsq(k)},this.value)"></div>`).join('')}
     </div>
     <div class="cb-preview">
       <div class="cb-prev-label">پیش‌نمایش از دید مشتری</div>

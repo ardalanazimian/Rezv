@@ -1,6 +1,6 @@
 // ═══ رزرونو — جزئیاتِ رستوران (صفحه‌ی rest) · بخشی از اپ کاستومر ═══
 //  توجه: جریانِ رزرو به data/booking.js منتقل شد (جداسازیِ مسئولیت).
-import { esc, toast } from '../auth.js';
+import { esc, jsq, toast } from '../auth.js';
 import { detailSocialProof, fmtFa, go, toggleRestFav } from './discover.js';
 import { curRest, favHas, gradFor, setCurRest } from './seed.js';
 import { API, applyRestaurantDetail, loadRestaurantDetail, mapApiRestaurant, resolveMediaUrl } from '../api.js';
@@ -122,8 +122,8 @@ function renderRestPage(r){
       <div class="rp-hero-mesh"${heroPhoto?' style="display:none"':''}></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
-        <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant('${esc(String(r.id))}')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
-        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav('${esc(String(r.id))}')" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
+        <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant(${jsq(String(r.id))})" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
+        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav(${jsq(String(r.id))})" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
       </div>
       ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-emoji">${esc(r.e)}</div>`}
       <div class="rp-hero-overlay">
@@ -198,8 +198,8 @@ function renderRestPage(r){
         <div class="rp-bookbar-cb">${icon('wallet',{size:13})} ${fmtFa(r.cb)}٪ کش‌بک</div>
         <div class="rp-bookbar-sub">${depositLabel(r)}</div>
       </div>
-      <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openRestChat('${esc(String(r.id))}')" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
-      <button class="btn btn-primary rp-bookbar-btn" onclick="buzz&&buzz();openBookSheet('${esc(String(r.id))}')">رزرو میز</button>
+      <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openRestChat(${jsq(String(r.id))})" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
+      <button class="btn btn-primary rp-bookbar-btn" onclick="buzz&&buzz();openBookSheet(${jsq(String(r.id))})">رزرو میز</button>
     </div>`;
 }
 

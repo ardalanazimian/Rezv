@@ -2018,6 +2018,26 @@ if (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveA
 function fa(n){return (n==null||Number.isNaN(n))?'۰':n.toLocaleString('fa-IR')}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
+/* ───────────────────────────────────────────────────────────
+   jsq : یک literalِ **کاملِ** رشته‌ی JS که داخلِ attributeِ HTML هم امن است.
+
+   ⚠️ چرا esc() برای این بافت کافی نیست (آسیب‌پذیریِ واقعیِ ۲۰۲۶-۰۸-۲۵):
+   در `onclick="f('${esc(x)}')"` پارسرِ HTML مقدارِ attribute را **پیش از**
+   پارسرِ JS decode می‌کند. esc آپاستروف را به `&#39;` می‌برد، ولی مرورگر
+   همان را دوباره به `'` برمی‌گرداند و آن آپاستروف رشته‌ی JS را می‌بندد:
+       نامِ مهمان = x');alert(1)//   →   f('x');alert(1)//')
+   یعنی هر متنی که کاربر کنترل می‌کند (نامِ مهمان، یادداشت، نامِ آیتمِ منو)
+   در مرورگرِ کارکنان کد اجرا می‌کند → سرقتِ توکن → تصرفِ تنانت.
+
+   ترتیبِ jsq حیاتی است: **اول** JSON.stringify (escapeِ رشته‌ی JS)،
+   **بعد** esc (escapeِ HTML). پس از decodeِ مرورگر، آنچه به پارسرِ JS
+   می‌رسد یک literalِ درست‌escape‌شده است.
+
+   استفاده: onclick="f(${jsq(x)})"   — نه   onclick="f('${esc(x)}')"
+   خودِ jsq کوتیشن‌ها را می‌گذارد؛ دورش کوتیشن نگذار.
+   ─────────────────────────────────────────────────────────── */
+export function jsq(v){return esc(JSON.stringify(String(v==null?'':v)))}
+
 </script>
 <script data-src="js/data.js">
 // ═══ رزرونو — پنل business: داده و پیکربندی (Vanilla JS، بدون build، scope مشترک) ═══
@@ -3169,7 +3189,7 @@ function openBranchSwitcher(){
   const curId=API.getActiveRestaurant();
   openModal(`<div class="modal-title">انتخاب شعبه</div><div class="modal-sub">داده‌های پنل بر اساس شعبه‌ی انتخابی نمایش داده می‌شود</div>
     <div style="margin-top:14px">${BRANCHES.map(b=>`
-      <div class="staff-row" style="cursor:pointer;${b.id===curId?'background:var(--blue-50);border-radius:12px':''}" onclick="selectBranch('${esc(b.id)}')">
+      <div class="staff-row" style="cursor:pointer;${b.id===curId?'background:var(--blue-50);border-radius:12px':''}" onclick="selectBranch(${jsq(b.id)})">
         <div class="staff-ava">${esc((b.name||'?').charAt(0))}</div>
         <div style="flex:1"><div style="font-size:14px;font-weight:700">${esc(b.name)}</div><div style="font-size:12px;color:var(--t2)">${b.is_open?`<span class="live-dot" aria-hidden="true"></span> باز`:`<span class="dot-closed" aria-hidden="true"></span> بسته`}</div></div>
         ${b.id===curId?`<span class="badge badge-brand">${icon('check',{size:12})} فعال</span>`:''}
@@ -3568,7 +3588,7 @@ function renderHeatmap(){
 function renderTopCustomers(){
   const top=[...GUESTS].sort((a,b)=>b.visits-a.visits).slice(0,5);
   document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`
-    <div class="top-cust" onclick="viewCustomerHistory('${esc(c.name)}')">
+    <div class="top-cust" onclick="viewCustomerHistory(${jsq(c.name)})">
       <span class="top-rank">${fa(i+1)}</span>
       <span class="top-ava">${c.ava}</span>
       <div class="top-body"><div class="top-name">${esc(c.name)} ${c.seg==='vip'?'<span class="seg-vip">VIP</span>':''}</div>
@@ -3619,7 +3639,7 @@ function renderStaffNotes(){
   el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`
     <div class="snote"${n.pinned?' style="border-color:var(--amber);background:var(--amber-50)"':''}><div class="snote-body"><div class="snote-txt">${n.pinned?icon('pin',{size:13})+' ':''}${esc(n.txt)}</div>
       <div class="snote-meta">${esc(n.who)} · ${n.time}</div></div>
-      <button class="snote-del" onclick="delStaffNote('${n.id||''}')">×</button></div>`).join(''):'<div class="snote-empty">یادداشتی ثبت نشده</div>';
+      <button class="snote-del" onclick="delStaffNote(${jsq(n.id||'')})">×</button></div>`).join(''):'<div class="snote-empty">یادداشتی ثبت نشده</div>';
 }
 function addStaffNote(){
   openModal(`<div class="modal-title">یادداشت جدید</div>
@@ -3787,7 +3807,7 @@ function rReservations(){
       <button class="date-tab ${resDate==='past'?'active':''}" onclick="setResDate('past')">${icon('inbox',{size:14})} گزارش گذشته</button>
       <button class="date-tab ${resDate==='all'?'active':''}" onclick="setResDate('all')">همه</button>
     </div>
-    ${resDate==='today'?`<div class="tonight-filters">${TONIGHT_FILTERS.map(f=>`<button class="chip ${tonightFilter===f.v?'is-active':''}" aria-pressed="${tonightFilter===f.v}" onclick="tonightFilterSet('${f.v}')">${f.l}</button>`).join('')}</div>`:''}
+    ${resDate==='today'?`<div class="tonight-filters">${TONIGHT_FILTERS.map(f=>`<button class="chip ${tonightFilter===f.v?'is-active':''}" aria-pressed="${tonightFilter===f.v}" onclick="tonightFilterSet(${jsq(f.v)})">${f.l}</button>`).join('')}</div>`:''}
     <div class="panel">
       <div id="resTL"></div>
     </div>`;
@@ -3909,9 +3929,9 @@ function resItemHTML(r,i){
         ${allowed.includes('seated')?`<button class="btn btn-primary ${actBtn}" onclick="markSeated(${i})">${icon('utensils',{size:14})} نشاند</button>`:''}
         ${allowed.includes('no_show')?`<button class="btn btn-ghost ${actBtn}" onclick="markNoShow(${i})">${icon('alert',{size:14})} نیومد</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="openStatusMenu(${i})">${icon('refresh',{size:14})} وضعیت</button>
-        <button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer('${esc(r.phone)}')"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>
+        <button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer(${jsq(r.phone)})"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>
         ${allowed.includes('cancelled')?`<button class="btn btn-danger ${actBtn}" onclick="cancelRes(${i})">لغو</button>`:''}
-      </div>`:`<div class="tl-actions"><button class="btn btn-ghost btn-sm" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه</button><button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer('${esc(r.phone)}')"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>${r.status==='completed'?`<button class="btn btn-ghost btn-sm" onclick="openManual()">رزرو مجدد</button>`:''}</div>`}
+      </div>`:`<div class="tl-actions"><button class="btn btn-ghost btn-sm" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه</button><button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer(${jsq(r.phone)})"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>${r.status==='completed'?`<button class="btn btn-ghost btn-sm" onclick="openManual()">رزرو مجدد</button>`:''}</div>`}
     </div></div>`;
 }
 // ⚠️ رفعِ باگِ زنده (Tonight Board، ۲۰۲۶-۰۸-۱۴): این تابع قبلاً وقتی آنلاین
@@ -4082,7 +4102,7 @@ async function walkinLookup(){
       </div>
       <div class="field-label">میز (اختیاری)</div>
       ${tableSelectHtml}
-      <button class="btn btn-primary btn-lg btn-block" id="wConfirmBtn" style="margin-top:16px" onclick="walkinNewSave('${esc(raw)}')">${icon('check',{size:16})} ثبت ورود + عضویت باشگاه</button>
+      <button class="btn btn-primary btn-lg btn-block" id="wConfirmBtn" style="margin-top:16px" onclick="walkinNewSave(${jsq(raw)})">${icon('check',{size:16})} ثبت ورود + عضویت باشگاه</button>
     `);
   }
 }
@@ -4338,7 +4358,7 @@ function wlCard(w,i){
     </div>
     <div class="wl-card-actions">
       ${(!isOffered && i===0)?`<button class="btn btn-teal btn-sm" onclick="promoteNextWL()">آفر میز</button>`:''}
-      <button class="btn btn-ghost btn-sm" onclick="removeWL('${w.id}')">حذف</button>
+      <button class="btn btn-ghost btn-sm" onclick="removeWL(${jsq(w.id)})">حذف</button>
     </div>
   </div>`;
 }
@@ -4589,7 +4609,7 @@ async function tableLoadQr(id){
     box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
         ${esc(res.offline ? 'اتصال به سرور برقرار نیست.' : (res.error?.message || 'ساختِ QR ناموفق بود.'))}
       </div>
-      <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">تلاش دوباره</button>`;
+      <button class="btn btn-sm btn-ghost" onclick="tableLoadQr(${jsq(id)})">تلاش دوباره</button>`;
     return;
   }
 
@@ -4615,7 +4635,7 @@ async function tableLoadQr(id){
     </div>
     <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
       <button class="btn btn-sm btn-ghost" style="color:var(--danger,#e5484d)"
-              onclick="tableRegenerateQr('${esc(id)}')">بازتولیدِ کد</button>
+              onclick="tableRegenerateQr(${jsq(id)})">بازتولیدِ کد</button>
       <div style="color:var(--t2);font-size:12px;margin-top:6px">
         اگر استیکر گم یا کپی شده: کدِ تازه بساز. استیکرِ فعلی از همان لحظه
         <b>باطل</b> می‌شود و باید دوباره چاپ شود.
@@ -4647,7 +4667,7 @@ async function tableRegenerateQr(id){
       box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
           ${esc(res.offline ? 'اتصال به سرور برقرار نیست — کد عوض نشد.' : (res.error?.message || 'بازتولیدِ کد ناموفق بود.'))}
         </div>
-        <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">نمایشِ کدِ فعلی</button>`;
+        <button class="btn btn-sm btn-ghost" onclick="tableLoadQr(${jsq(id)})">نمایشِ کدِ فعلی</button>`;
     }
     return;
   }
@@ -4941,11 +4961,11 @@ function openLogoEditor(){
     <input type="file" id="logoInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleLogoUpload(this)">
     <div class="field-label" style="margin-top:18px">تا وقتی عکس تأیید بشه، این ایموجی/رنگ به‌جاش نشون داده می‌شه</div>
     <div class="logo-pick-grid" id="logoEmojiGrid">
-      ${emojis.map(e=>`<div class="logo-emoji-opt ${e===logoChoice.emoji?'sel':''}" onclick="pickLogoEmoji('${e}')">${e}</div>`).join('')}
+      ${emojis.map(e=>`<div class="logo-emoji-opt ${e===logoChoice.emoji?'sel':''}" onclick="pickLogoEmoji(${jsq(e)})">${e}</div>`).join('')}
     </div>
     <div class="field-label">رنگ پس‌زمینه</div>
     <div class="logo-grad-grid" id="logoGradGrid">
-      ${grads.map((g,gi)=>`<div class="logo-grad-opt ${g===logoChoice.gradient?'sel':''}" data-gi="${gi}" style="background:${g}" onclick="pickLogoGrad(${gi},'${g}')"></div>`).join('')}
+      ${grads.map((g,gi)=>`<div class="logo-grad-opt ${g===logoChoice.gradient?'sel':''}" data-gi="${gi}" style="background:${g}" onclick="pickLogoGrad(${gi},${jsq(g)})"></div>`).join('')}
     </div>
     <button class="btn btn-primary btn-lg btn-block" onclick="saveLogoFallback()">ذخیره</button>
   `);
@@ -5456,8 +5476,8 @@ async function custRenderProfiles(){
           <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(c.no_show_rate_pct)}٪</div><div class="sig-label">عدم‌حضور</div><div class="sig-track"><div class="sig-fill" style="width:${c.no_show_rate_pct}%;background:var(--amber)"></div></div></div>
         </div>
         <div class="smart-actions">
-          <button class="btn btn-sm btn-ghost" onclick="callCustomer('${esc(c.phone||'')}')">${icon('phone',{size:13})} ${esc(c.phone||'بدون شماره')}</button>
-          ${c.user_id?`<button class="btn btn-sm btn-ghost" onclick="openCustomerDetail('${esc(c.user_id)}')">${icon('eye',{size:13})} جزئیات</button>`:''}
+          <button class="btn btn-sm btn-ghost" onclick="callCustomer(${jsq(c.phone||'')})">${icon('phone',{size:13})} ${esc(c.phone||'بدون شماره')}</button>
+          ${c.user_id?`<button class="btn btn-sm btn-ghost" onclick="openCustomerDetail(${jsq(c.user_id)})">${icon('eye',{size:13})} جزئیات</button>`:''}
           <button class="btn btn-sm btn-ghost" onclick="setCustTab('campaign')">${icon('message',{size:13})} ارسال پیام</button>
         </div>
       </div>`;
@@ -5745,7 +5765,7 @@ async function openCustomerDetail(userId){
         </div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:20px">هنوز رزروی ثبت نشده</div>'}
     </div>
     <div style="margin-top:16px;display:flex;gap:8px">
-      ${u.phone?`<button class="btn btn-ghost btn-sm" onclick="callCustomer('${esc(u.phone)}')">${icon('phone',{size:13})} تماس</button>`:''}
+      ${u.phone?`<button class="btn btn-ghost btn-sm" onclick="callCustomer(${jsq(u.phone)})">${icon('phone',{size:13})} تماس</button>`:''}
       <button class="btn btn-primary btn-sm" onclick="closeModal()">بستن</button>
     </div>`);
 }
@@ -5845,7 +5865,7 @@ async function custRenderAI(){
         </div>
         <div class="smart-rec"><div class="smart-rec-label">${icon('sparkle',{size:12,fill:true})} تحلیل</div>${esc(c.detail)}</div>
         <div class="smart-actions">
-          <button class="btn btn-sm ${c.severity==='high'?'btn-primary':'btn-ghost'}" onclick="handleAiAction('${c.id}')">${esc(c.action_label)}</button>
+          <button class="btn btn-sm ${c.severity==='high'?'btn-primary':'btn-ghost'}" onclick="handleAiAction(${jsq(c.id)})">${esc(c.action_label)}</button>
         </div>
       </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}
     <div class="panel" style="margin-top:20px">
@@ -5857,7 +5877,7 @@ async function custRenderAI(){
             <div class="mini-sub">${esc(c.reason)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer('${esc(c.phone||'')}','${esc(c.user_id)}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
+            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer(${jsq(c.phone||'')},${jsq(c.user_id)})">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
     </div>`;
@@ -6203,8 +6223,8 @@ function menuRowHTML(i){
       <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}</div>
       <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}${i.image_url?'':' · بدونِ عکس'}</div>
     </div>
-    <button class="btn btn-sm btn-ghost" onclick="menuOpenForm('${esc(i.id)}')">ویرایش</button>
-    <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuDelete('${esc(i.id)}')">حذف</button>
+    <button class="btn btn-sm btn-ghost" onclick="menuOpenForm(${jsq(i.id)})">ویرایش</button>
+    <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuDelete(${jsq(i.id)})">حذف</button>
   </div>`;
 }
 
@@ -6226,9 +6246,9 @@ function menuPhotoBoxHTML(it){
       این آیتم عکس ندارد. عکسِ غذا مهم‌ترین چیزی است که مهمان سرِ میز می‌بیند.
     </div>`}
     <input type="file" id="miPhotoFile" accept="image/jpeg,image/png,image/webp"
-           onchange="menuPickPhoto('${esc(it.id)}')" style="width:100%;font-size:13px">
+           onchange="menuPickPhoto(${jsq(it.id)})" style="width:100%;font-size:13px">
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-      ${has ? `<button type="button" class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuRemovePhoto('${esc(it.id)}')">حذفِ عکس</button>` : ''}
+      ${has ? `<button type="button" class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuRemovePhoto(${jsq(it.id)})">حذفِ عکس</button>` : ''}
     </div>
     <div style="color:var(--t2);font-size:12px;margin-top:6px">
       JPEG / PNG / WebP · حداکثر ۸ مگابایت · بی‌درنگ در منویِ عمومی دیده می‌شود.
@@ -6301,7 +6321,7 @@ function menuOpenForm(id){
       <input type="checkbox" id="miActive" ${!it || it.is_active ? 'checked' : ''}>
       <span>در منو نمایش داده شود</span>
     </label>
-    <button class="btn btn-primary btn-block" onclick="menuSave(${id?`'${esc(id)}'`:'null'})">${it?'ذخیره':'افزودن'}</button>`);
+    <button class="btn btn-primary btn-block" onclick="menuSave(${id?`${jsq(id)}`:'null'})">${it?'ذخیره':'افزودن'}</button>`);
 }
 
 async function menuSave(id){
@@ -6420,7 +6440,7 @@ async function sendAssistantMessage(){
   assistantAppend(`<div class="chat-b them">${esc(d.answer)}</div>`);
   if (!d.understood && Array.isArray(d.suggestions) && d.suggestions.length){
     const chips = d.suggestions.map(s =>
-      `<button class="btn btn-sm btn-ghost" style="margin:2px" onclick="assistantTeach('${d.log_id}','${s.intent}',this)">${esc(s.label)}</button>`
+      `<button class="btn btn-sm btn-ghost" style="margin:2px" onclick="assistantTeach(${jsq(d.log_id)},${jsq(s.intent)},this)">${esc(s.label)}</button>`
     ).join('');
     assistantAppend(`<div class="chat-b them" style="background:transparent;padding:2px 0">${chips}</div>`);
   }
@@ -7018,7 +7038,7 @@ function rStaff(){
         <div class="staff-ava">${esc(avatar(s))}</div>
         <div style="flex:1"><div style="font-size:14px;font-weight:700">${esc(s.name||toFaDigits(s.phone||''))}</div><div style="font-size:12px;color:var(--t2)">${esc(toFaDigits(s.phone||''))}</div></div>
         <span class="role-tag ${esc(s.role)}">${esc(ROLE_FA[s.role]||s.role)}</span>
-        ${s.role==='owner'?'<span style="font-size:11px;color:var(--t3);padding:6px 10px">دسترسی کامل</span>':`<button class="btn btn-ghost btn-sm" onclick="openPermEditor('${esc(s.id)}')">دسترسی</button>`}
+        ${s.role==='owner'?'<span style="font-size:11px;color:var(--t3);padding:6px 10px">دسترسی کامل</span>':`<button class="btn btn-ghost btn-sm" onclick="openPermEditor(${jsq(s.id)})">دسترسی</button>`}
       </div>`).join('')}
     </div>
     <div class="panel" style="font-size:12px;color:var(--t2);line-height:1.7">
@@ -7041,7 +7061,7 @@ function openPermEditor(staffId){
         </label>`).join('')}
     </div>
     <div style="margin-top:16px;display:flex;gap:8px">
-      <button class="btn btn-primary" style="flex:1" onclick="savePermEditor('${esc(staffId)}')">ذخیره</button>
+      <button class="btn btn-primary" style="flex:1" onclick="savePermEditor(${jsq(staffId)})">ذخیره</button>
       <button class="btn btn-ghost" onclick="closeModal()">انصراف</button>
     </div>`);
 }
@@ -7209,7 +7229,7 @@ async function rCashback(){
     <div class="section-head"><div><div class="section-title">تنظیم درصد کش‌بک</div><div class="section-sub">درصدها بعد از تأیید برای همه‌ی مشتریان اعمال می‌شن</div></div></div>
     <div class="cb-dirty" id="cbDirty">${icon('alert',{size:13})} تغییرات هنوز ذخیره نشده — برای اعمال، تأیید کن</div>
     <div class="cb-sliders">
-      ${cards.map(([k,n,d,mx])=>`<div class="cb-slider-card"><div class="cb-slider-top"><div class="cb-slider-name">${n}</div><div class="cb-slider-pct" id="cbVal-${k}">${fa(CB[k])}٪</div></div><div class="cb-slider-desc">${d}</div><input type="range" class="cb-range" min="0" max="${mx}" value="${CB[k]}" oninput="cbChange('${k}',this.value)"></div>`).join('')}
+      ${cards.map(([k,n,d,mx])=>`<div class="cb-slider-card"><div class="cb-slider-top"><div class="cb-slider-name">${n}</div><div class="cb-slider-pct" id="cbVal-${k}">${fa(CB[k])}٪</div></div><div class="cb-slider-desc">${d}</div><input type="range" class="cb-range" min="0" max="${mx}" value="${CB[k]}" oninput="cbChange(${jsq(k)},this.value)"></div>`).join('')}
     </div>
     <div class="cb-preview">
       <div class="cb-prev-label">پیش‌نمایش از دید مشتری</div>
@@ -7557,7 +7577,7 @@ async function rChat(){
   sub.textContent = res.data.unread_threads > 0 ? `${res.data.unread_threads} گفتگوی خوانده‌نشده` : 'همه خوانده شد';
   if (!items.length) { box.innerHTML = `<div class="chat-empty">هنوز پیامی از مشتری نیومده.</div>`; return; }
   box.innerHTML = items.map(t => `
-    <div class="chat-inbox-row" role="button" tabindex="0" onclick="openBizChat('${t.id}','${chatEsc(t.customer.name)}','${chatEsc(t.customer.phone||'')}')">
+    <div class="chat-inbox-row" role="button" tabindex="0" onclick="openBizChat(${jsq(t.id)},${jsq(chatEsc(t.customer.name))},${jsq(chatEsc(t.customer.phone||''))})">
       <div class="chat-inbox-ava">${chatEsc(t.customer.name.charAt(0))}</div>
       <div class="chat-inbox-main">
         <div class="chat-inbox-top"><span class="chat-inbox-name">${chatEsc(t.customer.name)}</span>${t.reservation_code?`<span class="chat-inbox-tag">#${chatEsc(t.reservation_code)}</span>`:''}</div>
