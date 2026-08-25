@@ -416,10 +416,46 @@ function main() {
     report_only_hits: reportOnly,
   };
 
-  writeFileSync(join(ROOT, 'tools/xss-sink-audit-report.json'), JSON.stringify(report, null, 2) + '\n');
-
   const unsafe = enforced.filter((h) => h.classification === 'unsafe' || h.classification === 'review');
+  const jsonOut = JSON.stringify(report, null, 2) + '\n';
   const md = renderMarkdown(report, unsafe);
+
+  // ── حالتِ `--check` (برای CI) ──
+  // ⚠️ چرا اضافه شد (یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۵): `docs/XSS_SINK_AUDIT.md`
+  // یک آرتیفکتِ **تولیدشده‌ی commit‌شده** است و از ۲۰۲۶-۰۸-۱۴ بازتولید نشده
+  // بود. در آن فاصله محتوایش می‌گفت «None — zero `unsafe` sinks» در حالی که
+  // واقعیت ۶۳ مورد بود. یعنی سندِ امنیتی چیزی را تضمین می‌کرد که وجود نداشت
+  // — دقیقاً همان الگویِ کهنه‌شدنِ بی‌صدای `standalone/*.html` که برای آن هم
+  // گیتِ CI گذاشتیم. آرتیفکتی که بی‌صدا کهنه شود از نبودش بدتر است.
+  //
+  // این حالت **تعدادِ** unsafe را قضاوت نمی‌کند (آن کارِ خطِ آخرِ همین تابع
+  // است)؛ فقط می‌پرسد «آیا فایلِ commit‌شده همان چیزی است که امروز تولید
+  // می‌شود؟». مهرِ زمان از مقایسه کنار گذاشته می‌شود چون هر اجرا عوضش می‌کند.
+  const stripStamp = (t) => t
+    .replace(/"generated_at":\s*"[^"]*"/g, '"generated_at":"—"')
+    .replace(/ on \d{4}-\d{2}-\d{2}T[^.]*\.\d+Z\./g, ' on —.');
+
+  if (args.includes('--check')) {
+    const targets = [
+      ['tools/xss-sink-audit-report.json', jsonOut],
+      ['docs/XSS_SINK_AUDIT.md', md],
+    ];
+    const stale = [];
+    for (const [rel, fresh] of targets) {
+      const abs = join(ROOT, rel);
+      const onDisk = existsSync(abs) ? readFileSync(abs, 'utf8') : '';
+      if (stripStamp(onDisk) !== stripStamp(fresh)) stale.push(rel);
+    }
+    if (stale.length) {
+      console.error(`✗ آرتیفکتِ ممیزیِ XSS کهنه است: ${stale.join('، ')}`);
+      console.error('  بازتولید: node tools/xss-sink-audit.mjs  (و خروجی‌اش را کامیت کن)');
+      process.exit(1);
+    }
+    console.log('✓ آرتیفکتِ ممیزیِ XSS با کد هماهنگ است');
+    process.exit(0);
+  }
+
+  writeFileSync(join(ROOT, 'tools/xss-sink-audit-report.json'), jsonOut);
   writeFileSync(join(ROOT, 'docs/XSS_SINK_AUDIT.md'), md);
 
   console.log(JSON.stringify({ total: enforced.length, by_classification: byClass, unsafe_or_review: unsafe.length }, null, 2));

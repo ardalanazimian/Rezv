@@ -260,6 +260,21 @@ jobs:
       # پوششِ E2Eِ رفتاری ندارند. این قدم همان شکاف را می‌بندد.
       - name: Check classic panel scripts parse (business/company)
         run: sh tools/check-classic-scripts.sh
+      # ⚠️ XSSِ ذخیره‌شده‌ی واقعی (۲۰۲۶-۰۸-۲۵): `cardHTML` در فیدِ مشتری فیلدِ
+      # `cuisine` را بدونِ esc داخلِ innerHTML می‌گذاشت. آن فیلد را صاحبِ رستوران
+      # می‌نویسد (فقط `max(50)`، بدونِ پاک‌سازیِ HTML) و از APIِ عمومی به فیدِ
+      # همه‌ی مشتری‌ها می‌رسد. این گارد تابعِ واقعی را با بارِ حمله صدا می‌زند و
+      # به خروجی نگاه می‌کند — برخلافِ اسکنِ regexِ زیر که فقط **محلِ انتساب**
+      # (`el.innerHTML=X`) را می‌بیند و اصلاً نمی‌تواند بفهمد `X` چطور ساخته شده.
+      - name: XSS escaping regression (customer render paths)
+        run: node tools/xss-escaping-regression.mjs
+      # ⚠️ docs/XSS_SINK_AUDIT.md هم آرتیفکتِ تولیدشده‌ی commit‌شده است و از
+      # ۲۰۲۶-۰۸-۱۴ بازتولید نشده بود: محتوایش «zero unsafe sinks» می‌گفت در حالی
+      # که واقعیت ۶۳ مورد بود — یک سندِ امنیتی که چیزی را تضمین می‌کرد که وجود
+      # نداشت. این قدم فقط **تازگی** را چک می‌کند (نه تعداد را) تا دوباره بی‌صدا
+      # کهنه نشود؛ کاهشِ آن ۶۳ کارِ جداگانه‌ای است.
+      - name: Check XSS sink audit artifact is fresh
+        run: node tools/xss-sink-audit.mjs --check
 
   # ── اپِ SEO (apps/seo · Next.js SSR/ISR، ADR 0001) — build + typecheck + lint ──
   # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند. build خودِ Next تایپ‌چک/لینت می‌کند.

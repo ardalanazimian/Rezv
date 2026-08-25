@@ -41,7 +41,10 @@ export function fmtFa(n){return n.toLocaleString('fa-IR')}
 export function slotsHTML(r){
   const slots = Array.isArray(r.slots) ? r.slots : [];
   if (slots.length) {
-    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${jsq(String(r.id))},${jsq(s)});haptic('select')">${s}</button>`).join('');
+    // `s` از APIِ availability می‌آید و انتظار می‌رود «HH:MM» باشد، ولی هم در
+    // متنِ دکمه و هم در `aria-label` بدونِ esc می‌نشست. مسیرِ `onclick` از قبل
+    // `jsq` داشت — یعنی خطر اینجا شناخته شده بود و فقط دو جای دیگرش جا مانده بود.
+    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${esc(s)} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${jsq(String(r.id))},${jsq(s)});haptic('select')">${esc(s)}</button>`).join('');
   }
   return `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet(${jsq(String(r.id))});haptic('select')">ببین سانس‌ها</button>`;
 }
@@ -72,6 +75,19 @@ export function cardHTML(r){
   // idِ واقعی UUID است و بدونِ کوتیشن، onclick خطای syntax می‌داد و کلِ
   // CTAهای کارت برای رستورانِ واقعی مرده بودند (mockِ E2E با idِ عددی این
   // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
+  //
+  // ⚠️ XSSِ ذخیره‌شده — رفع‌شده در ممیزیِ ۲۰۲۶-۰۸-۲۵ (خطِ rc-meta پایین‌تر):
+  // فیلدِ cuisine تا امروز اینجا بدونِ esc تزریق می‌شد. آن فیلد را **صاحبِ
+  // رستوران** از پنلِ خودش می‌نویسد (route: restaurant/branches — فقط
+  // z.string().max(50)، بدونِ هیچ پاک‌سازیِ HTML) و از APIِ عمومیِ
+  // /v1/restaurants به فیدِ همه‌ی مشتری‌ها می‌رسد؛ یعنی مسیرِ «یک رستوران →
+  // هر بازدیدکننده». ۵۰ کاراکتر برای یک تگِ img با onerror (۲۸ کاراکتر)
+  // کافی است. شاهدِ اینکه اشتباه بوده نه تصمیم: همین فیلد در detail.js:146
+  // و در hCardHTML از قبل esc می‌شد — فقط این یک خط جا مانده بود.
+  //
+  // ⚠️ و یادداشتِ خودِ همین رفع: نسخه‌ی اولِ این توضیح یک کامنتِ HTML **داخلِ**
+  // همین template literal بود؛ بک‌تیک‌های داخلش رشته را وسط راه بستند و فایل
+  // اصلاً پارس نشد. توضیح در تمپلیت ننویس.
   return `<article class="rc reveal" data-rid="${esc(String(r.id))}">
     <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
     <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${jsq(String(r.id))})"></button>
@@ -80,7 +96,7 @@ export function cardHTML(r){
     <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
       <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div>${Number.isFinite(r.rt)&&r.rt>0?`<div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div>`:'<div class="rc-rating rc-rating-new">تازه‌وارد</div>'}</div>
-      <div class="rc-meta">${r.cuisine}${r.price?` · ${r.price}`:''} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
+      <div class="rc-meta">${esc(r.cuisine)}${r.price?` · ${esc(r.price)}`:''} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
       <div class="rc-slots">${slotsHTML(r)}</div>
     </div>
@@ -237,7 +253,7 @@ export function hCardHTML(r,extra){
   // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
   const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${jsq(String(r.id))})">
-    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
+    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e?esc(r.e):icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
