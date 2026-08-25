@@ -5,7 +5,7 @@
 
 import { Actions } from './actions.js';
 import { API, hydrateSlots, loadMoreRestaurants, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
-import { paintSlots, renderDiscoverSections, renderFeed, renderRestaurantSections } from './data/discover.js';
+import { doSearch, paintSlots, renderDiscoverSections, renderFeed, renderRestaurantSections } from './data/discover.js';
 import { R_SAMPLE, bookingCtx } from './data/seed.js';
 import { runPendingCheckIn } from './features/checkin.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
@@ -52,7 +52,13 @@ export async function syncRestaurants(){
   const fresh = await loadRestaurants();
   R = fresh;
   if (document.getElementById('page-discover')?.classList.contains('active')) {
-    renderFeed(R);
+    // ⚠️ اگر کاربر در این فاصله جست‌وجو کرده، renderFeed(R) نتیجه‌اش را با
+    // فهرستِ کامل بازنویسی می‌کرد (همان باگِ رقابتِ رندر؛ توضیحِ کامل روی
+    // renderFeed در data/discover.js). doSearch هم فیلتر را با دادهٔ تازه‌ی
+    // سرور دوباره اعمال می‌کند، هم وقتی جست‌وجو خالی است خودش renderFeed(R)
+    // را صدا می‌زند — پس هر دو حالت درست می‌ماند.
+    if (document.getElementById('sQ')?.value.trim()) doSearch();
+    else renderFeed(R);
     // فقط بخش‌هایِ وابسته به R — عمداً renderDiscoverSections نه، چون آن
     // `GET /events` و خواندنِ موقعیت را دوباره می‌فرستد و boot از قبل انجامشان
     // داده. (توضیحِ کامل روی renderDiscoverSections در data/discover.js.)

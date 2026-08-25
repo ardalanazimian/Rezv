@@ -266,6 +266,8 @@ const API = {
   },
   // ارسال پیامک کمپین یا winback
   async sendSms(payload){ return this.post('/restaurant/sms', payload); },
+  // ثبتِ مستقیمِ عضوِ باشگاه (بدونِ رزرو) — endpointِ واقعی، عضویتِ پایدار
+  async createMember(payload){ return this.post('/restaurant/members', payload); },
   // ── مدیریت میز (وصل به /restaurant/tables واقعی) ──
   listTables(){ return this.get('/restaurant/tables'); },
   createTable(body){ return this.post('/restaurant/tables', body); },
@@ -834,23 +836,42 @@ function faRelative(iso){
 }
 // نگاشت وضعیت enum واقعی بک‌اند → وضعیت فرانت پنل
 // بک‌اند: pending/confirmed/arrived/no_show/cancelled_by_user/cancelled_by_restaurant
-// ⚠️ رفعِ پنهان‌شدنِ «در انتظارِ تأیید» (پروتکل §۳/§۱۰):
-// این تابع `pending` را به `confirmed` تبدیل می‌کرد، پس رزروی که منتظرِ **تأییدِ
-// خودِ رستوران‌دار** بود در فهرست «تأییدشده» نشان داده می‌شد — یعنی صاحبِ
-// رستوران هیچ‌وقت نمی‌فهمید کاری برایِ انجام دارد. با اجرایِ واقعیِ
-// `auto_confirm` در بک‌اند این دیگر فقط یک نقصِ نمایشی نیست، بلکه کلِ آن
-// قابلیت را بی‌اثر می‌کرد.
-// STATUS_META از قبل `pending` را می‌شناسد (برچسبِ «در انتظار») و
-// STATUS_TRANSITIONS هم `pending:['confirmed','rejected','cancelled']` دارد،
-// پس رستوران‌دار از همان منویِ موجود می‌تواند تأیید/رد کند.
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): این تابع قبلاً فقط ۵ وضعیت را می‌شناخت و
+// *هر چیز دیگری* را به 'confirmed' فرومی‌کاست (خطِ آخر `return 'confirmed'`).
+// یعنی رزروِ `cancelled` (وضعیتِ canonicalِ فعلی)، `completed`، `expired`،
+// `rejected`، `auto_cancelled`، `seated`، `dining`، `waitlisted` و... همه در
+// پنلِ رستوران «تأییدشده» دیده می‌شدند — رزروِ لغوشده میز را رزرو نگه می‌داشت و
+// staff هرگز نمی‌فهمید. STATUS_META (بالای همین فایل) از قبل هر ۱۷ وضعیت را با
+// برچسب/رنگ دارد، پس فقط لازم است وضعیتِ واقعی عبور کند. دقیقاً همان کلاسِ
+// باگی که برای اپ مشتری (mapTripStatus) قبلاً رفع شده بود، ولی این‌جا جا مانده.
+//
+// ⚠️ رفعِ پنهان‌شدنِ «در انتظارِ تأیید» (پروتکل §۳/§۱۰ — از PR #68):
+// زیرمجموعه‌ی همین باگ و مهم‌ترین نمونه‌اش: `pending` هم به `confirmed` تبدیل
+// می‌شد، پس رزروی که منتظرِ **تأییدِ خودِ رستوران‌دار** بود در فهرست «تأییدشده»
+// دیده می‌شد و صاحبِ رستوران هیچ‌وقت نمی‌فهمید کاری برایِ انجام دارد. با اجرایِ
+// واقعیِ `auto_confirm` در بک‌اند این دیگر فقط نقصِ نمایشی نبود، کلِ آن قابلیت
+// را بی‌اثر می‌کرد. عبورِ کاملِ وضعیت هر دو را با هم رفع می‌کند: `pending`
+// برچسبِ «در انتظار» می‌گیرد و STATUS_TRANSITIONS
+// (`pending:['confirmed','rejected','cancelled']`) منویِ تأیید/رد را می‌دهد.
+//
+// [merge ۰۸-۲۵] #68 دو نگاشتِ صریح هم داشت که این‌جا حذف *نشده*، بلکه به
+// رفتارِ دقیق‌تری ارتقا یافته‌اند و مصرف‌کننده‌ها در reservations.js با آن هماهنگ شدند:
+//   • `rejected` → قبلاً به 'cancelled' فرومی‌کاست؛ حالا خودش عبور می‌کند و
+//     برچسبِ اختصاصیِ «ردشده» را می‌گیرد (STATUS_META.rejected). شمارنده‌یِ
+//     «لغوشده» در گزارشِ گذشته هم rejected/auto_cancelled را می‌شمارد.
+//   • `auto_confirmed` → قبلاً به 'confirmed' فرومی‌کاست؛ حالا برچسبِ «تأیید
+//     خودکار» و انتقال‌هایِ خودش را دارد (STATUS_TRANSITIONS.auto_confirmed)،
+//     و نقشه‌یِ سالن/شمارنده‌هایِ «امشب» هم آن را مثلِ confirmed حساب می‌کنند.
 function mapResStatus(apiStatus){
-  if(apiStatus==='arrived')return'arrived';
-  if(apiStatus==='no_show')return'noshow';
+  // aliasهای قدیمی → نامِ canonicalِ پنل (STATUS_META هم no_show و هم noshow را دارد؛
+  // شمارنده‌های reservations.js با 'noshow' فیلتر می‌کنند، پس همین را نگه می‌داریم).
   if(apiStatus==='cancelled_by_user'||apiStatus==='cancelled_by_restaurant')return'cancelled';
-  if(apiStatus==='pending')return'pending';        // ← دیگر پنهان نمی‌شود
-  if(apiStatus==='rejected')return'cancelled';
-  if(apiStatus==='confirmed'||apiStatus==='auto_confirmed')return'confirmed';
-  return'confirmed';
+  if(apiStatus==='no_show')return'noshow';
+  // هر وضعیتِ واقعیِ شناخته‌شده مستقیم عبور می‌کند (شاملِ pending، rejected و
+  // auto_confirmed — هر سه در STATUS_META برچسبِ اختصاصیِ خودشان را دارند).
+  if(STATUS_META[apiStatus])return apiStatus;
+  // وضعیتِ واقعاً ناشناخته → همان رشته‌ی خام (بی‌چیپ، نه جعلِ «تأییدشده»).
+  return apiStatus||'confirmed';
 }
 // تشخیص دسته‌ی تاریخ از زمان رزرو (برای سازگاری با فیلتر محلی)
 function dateCategoryOf(slotStart){
