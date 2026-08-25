@@ -59,7 +59,15 @@ async function sendToSentry(level: LogLevel, scope: string, msg: string, meta?: 
 }
 
 // کلیدهای حساس که هرگز نباید در لاگ ظاهر شوند (CWE-532 — نشت داده در لاگ).
-const SENSITIVE_KEYS = /^(password|pass|secret|token|access|refresh|jwt|authorization|auth|otp|code|apikey|api_key|cookie|session|creditcard|cvv)$/i;
+//
+// ⚠️ گروهِ دومی که ۲۰۲۶-۰۸-۲۴ اضافه شد (پروتکل §۱۴ و §۳۴): پروتکل صریحاً
+// می‌گوید اطلاعاتِ آلرژی/حساسیتِ غذایی نباید لاگ شود. آلرژی در این سیستم در
+// `Reservation.preferences` (و در آینده `User.dietaryTags`) زندگی می‌کند و
+// هیچ‌کدام در فهرستِ قبلی نبودند. امروز هیچ لاگی این‌ها را پاس نمی‌داد
+// (تأییدشده با grep رویِ کلِ src) — پس این دفاعِ پیشگیرانه است، نه رفعِ نشت.
+// همراهش شناسه‌هایِ مستقیمِ فرد (تلفن/ایمیل/تاریخِ تولد) هم اضافه شد: در
+// لاگ‌های عملیاتی هرگز لازم نیستند و `sub`/`traceId` برایِ ردیابی کافی‌اند.
+const SENSITIVE_KEYS = /^(password|pass|secret|token|access|refresh|jwt|authorization|auth|otp|code|apikey|api_key|cookie|session|creditcard|cvv|preferences|dietary|dietary_tags|dietaryTags|allergies|allergy|phone|guest_phone|guestPhone|email|birth_date|birthDate|national_id|nationalId)$/i;
 
 function safeMeta(meta: unknown, depth = 0): unknown {
   if (meta instanceof Error) return { name: meta.name, message: meta.message, stack: meta.stack };

@@ -121,7 +121,7 @@ function profRenderGallery(){
       <div class="panel-head"><div><div class="panel-title">گالری (${fa(GALLERY_COUNTS.approved||0)} عکس منتشرشده)</div><div class="panel-sub">برای افزودن روی + بزن — عکس بعد از تأیید منتشر می‌شه</div></div></div>
       <div class="gallery-grid" id="galGrid">
         ${GALLERY.map((g,i)=>`<div class="gal-item${g.status&&g.status!=='approved'?' gal-item--'+g.status:''}">
-          ${(g.url||g.dataUrl)?`<img src="${g.url||g.dataUrl}" alt="${esc(g.label)}">`:`<span class="gal-emoji">${g.emoji}</span>`}
+          ${(g.url||g.dataUrl)?`<img src="${esc(g.url||g.dataUrl)}" alt="${esc(g.label)}">`:`<span class="gal-emoji">${g.emoji}</span>`}
           <button class="gal-del" onclick="removeGalleryImg(${i})">×</button>
           <span class="gal-tag">${g.type==='food'?'غذا':g.type==='interior'?'فضا':g.type==='drink'?'نوشیدنی':g.type==='event'?'رویداد':'عکس'}</span>
           ${g.status==='pending'?`<span class="gal-status gal-status--pending">${icon('clock',{size:11})} در انتظار تأیید</span>`:''}
@@ -352,14 +352,23 @@ function removeGalleryImg(i){
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
     </div>`);
 }
+// ⚠️ رفعِ «حذفِ محلیِ وانمودشده به‌عنوانِ حذفِ واقعی» (پروتکل §۳/§۹):
+// شاخه‌ی else قبلاً بدونِ قید اجرا می‌شد — یعنی روی استقرارِ واقعی، اگر نشستِ
+// کاربر منقضی شده بود (یا عکس هنوز id نداشت)، فقط از آرایه‌ی محلی پاک می‌شد و
+// «عکس حذف شد» گفته می‌شد. عکس روی سرور دست‌نخورده می‌ماند و با اولین رفرش
+// برمی‌گردد؛ صاحبِ رستوران باور می‌کرد عکسی که نمی‌خواست دیگر عمومی نیست.
 async function doRemoveGallery(i){
   const g=GALLERY[i];
   if(g.id && API.getToken()){
     const res=await API.deletePhoto(g.id);
     if(!res.ok){closeModal();toast('',res.error?.message||'حذف ناموفق بود');return;}
     await loadGallery();
+  }else if(isOfflineDemo()){
+    GALLERY.splice(i,1);           // بسته‌ی دمو: بک‌اندی وجود ندارد
   }else{
-    GALLERY.splice(i,1);
+    closeModal();
+    toast('', g.id ? 'برای حذفِ عکس باید وارد شده باشی' : 'این عکس هنوز روی سرور ثبت نشده');
+    return;
   }
   closeModal();profRenderGallery();
   toast('','عکس حذف شد');
@@ -426,6 +435,11 @@ function openReplyModal(i){
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>`);
   setTimeout(()=>document.getElementById('replyText')?.focus(),150);
 }
+// ⚠️ رفعِ جعلِ موفقیت (پروتکل §۳/§۱۰): شاخه‌ی else قبلاً بدونِ قید بود — روی
+// استقرارِ واقعی با نشستِ منقضی، پاسخ فقط در آرایه‌ی محلی می‌نشست و
+// «پاسخت ثبت شد» گفته می‌شد. این از حذفِ عکس هم بدتر است: صاحبِ رستوران باور
+// می‌کرد **علنی** به نظرِ یک مشتری جواب داده، در حالی که مشتری هیچ‌وقت چیزی
+// نمی‌دید و متنِ پاسخ با اولین رفرش برای همیشه از بین می‌رفت.
 async function saveReply(i){
   const txt=document.getElementById('replyText').value.trim();
   if(!txt){toast('','متن پاسخ رو بنویس');return}
@@ -434,8 +448,11 @@ async function saveReply(i){
     const res=await API.replyReview(r.id,txt);
     if(!res.ok){toast('',res.error?.message||'ثبت پاسخ ناموفق بود');return;}
     await loadReviews();
+  }else if(isOfflineDemo()){
+    REVIEWS[i].replied=true;REVIEWS[i].reply=txt;   // بسته‌ی دمو
   }else{
-    REVIEWS[i].replied=true;REVIEWS[i].reply=txt;
+    toast('', r.id ? 'برای ثبتِ پاسخ باید وارد شده باشی' : 'این نظر روی سرور یافت نشد');
+    return;
   }
   closeModal();profRenderReviews();
   toast('','پاسخت ثبت شد');
@@ -852,30 +869,60 @@ function profRenderCancellationPolicy(){
   const el=document.getElementById('pt-cancellation'); if(!el) return;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایشِ سیاستِ کنسلی به اتصالِ بک‌اند نیاز دارد — در حالتِ دمو در دسترس نیست.</div>`; return; }
   const s=CANCEL_POLICY_STATE;
+  // ═══════════════════════════════════════════════════════════
+  //  ⚠️ صداقتِ اجرا (پروتکل §۳/§۹/§۱۰)
+  //
+  //  این تب پنج تنظیم داشت و توضیحِ همه‌شان می‌گفت «اعمال می‌شه» — ولی فقط دو
+  //  تا واقعاً اعمال می‌شدند. بدتر: توضیحِ «بیعانه» ادعا می‌کرد «در تقاضایِ
+  //  بالا/مشتریِ پرریسک خودکار فعال می‌شه» که کارِ `resolvePolicy()` است و آن
+  //  تابع **هیچ صداکننده‌ای در تولید ندارد**.
+  //
+  //  ضبطِ پرداخت فعلاً وجود ندارد و قرار هم نیست به‌زودی بیاید، پس هرچه پایه‌ی
+  //  پولی دارد اجرانشدنی است. راهِ درست، حذفِ تنظیم نیست (رستوران‌دار باید
+  //  بتواند از قبل پیکربندی کند) بلکه **گفتنِ حقیقت به ازای هر ردیف** است.
+  //
+  //  دو ستونِ وضعیت:
+  //    ✅ اعمال می‌شود  — همین حالا اثر واقعی دارد
+  //    ⏸ ذخیره می‌شود  — تا وصل‌شدنِ درگاهِ پرداخت اثری ندارد
+  // ═══════════════════════════════════════════════════════════
+  const okBadge   = `<span class="chip-status" style="background:var(--green-50);color:#0E7A3C;white-space:nowrap">${icon('check',{size:11})} اعمال می‌شود</span>`;
+  const waitBadge = `<span class="chip-status" style="background:var(--amber-50);color:#92400E;white-space:nowrap">${icon('clock',{size:11})} تا اتصالِ پرداخت اعمال نمی‌شود</span>`;
   el.innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">سیاستِ کنسلی</div><div class="panel-sub">${s.is_customized?'پیکربندیِ اختصاصیِ این رستوران':'در حالِ استفاده از پیش‌فرضِ پلتفرم'}</div></div>
         <button class="btn btn-primary btn-sm" onclick="saveCancellationPolicy()">ذخیره</button></div>
 
+      <div style="font-size:12px;color:var(--t2);background:var(--blue-50);border:1px solid #BFDBFE;border-radius:var(--r);padding:12px;line-height:1.9;margin-bottom:14px">
+        ${icon('info',{size:14})} <b>درگاهِ پرداخت هنوز وصل نیست.</b> تنظیم‌هایی که پایه‌ی پولی دارند
+        ذخیره می‌شوند ولی <b>هیچ مبلغی کسر نمی‌شود</b> — نه بیعانه، نه جریمه.
+        <div style="margin-top:6px">آنچه <b>امروز</b> واقعاً اثر دارد: پنجره‌ی کنسلیِ آزاد (رویِ
+        <b>امتیازِ اعتبارِ مشتری</b>) و تأییدِ خودکارِ رزرو.</div>
+      </div>
+
       <div class="staff-row">
-        <div style="flex:1"><div style="font-size:13px;font-weight:700">پنجره‌ی کنسلیِ آزاد (ساعت)</div><div style="font-size:12px;color:var(--t2)">تا این‌قدر ساعت قبل از رزرو، کنسلی بدونِ جریمه‌ست</div></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">پنجره‌ی کنسلیِ آزاد (ساعت)</div><div style="font-size:12px;color:var(--t2)">کنسلیِ دیرتر از این، <b>امتیازِ اعتبارِ مشتری</b> را کم می‌کند (بدونِ کسرِ پول)</div></div>
+        ${okBadge}
         <input class="inp" style="width:80px" type="number" min="0" max="720" value="${esc(s.free_cancel_hours)}" onchange="updateCancelPolicyField('free_cancel_hours',this.value)">
       </div>
       <div class="staff-row">
-        <div style="flex:1"><div style="font-size:13px;font-weight:700">آستانه‌ی جریمه‌یِ جزئی (ساعت)</div><div style="font-size:12px;color:var(--t2)">بینِ این و پنجره‌ی آزاد، جریمه‌ی جزئی اعمال می‌شه</div></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">تأییدِ خودکارِ رزرو</div><div style="font-size:12px;color:var(--t2)">خاموش یعنی هر رزرو «در انتظار» می‌مانَد تا تو تأیید کنی</div></div>
+        ${okBadge}
+        <button class="toggle ${s.auto_confirm?'on':'off'}" onclick="toggleCancelPolicyField('auto_confirm')"></button>
+      </div>
+      <div class="staff-row">
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">آستانه‌ی جریمه‌یِ جزئی (ساعت)</div><div style="font-size:12px;color:var(--t2)">برایِ زمانی که پرداخت وصل شد — الان فقط ذخیره می‌شود</div></div>
+        ${waitBadge}
         <input class="inp" style="width:80px" type="number" min="0" max="720" value="${esc(s.partial_penalty_hours)}" onchange="updateCancelPolicyField('partial_penalty_hours',this.value)">
       </div>
       <div class="staff-row">
-        <div style="flex:1"><div style="font-size:13px;font-weight:700">درصدِ جریمه‌یِ جزئی</div><div style="font-size:12px;color:var(--t2)">درصدی از بیعانه که در این بازه کسر می‌شه</div></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">درصدِ جریمه‌یِ جزئی</div><div style="font-size:12px;color:var(--t2)">برایِ زمانی که پرداخت وصل شد — الان هیچ مبلغی کسر نمی‌شود</div></div>
+        ${waitBadge}
         <input class="inp" style="width:80px" type="number" min="0" max="100" value="${esc(s.partial_penalty_pct)}" onchange="updateCancelPolicyField('partial_penalty_pct',this.value)">
       </div>
       <div class="staff-row">
-        <div style="flex:1"><div style="font-size:13px;font-weight:700">بیعانه اجباری باشه</div><div style="font-size:12px;color:var(--t2)">مستقل از این، در تقاضایِ بالا/مشتریِ پرریسک خودکار فعال می‌شه</div></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">بیعانه اجباری باشه</div><div style="font-size:12px;color:var(--t2)">به مشتری نشان داده می‌شود، ولی تا اتصالِ پرداخت مبلغی گرفته نمی‌شود</div></div>
+        ${waitBadge}
         <button class="toggle ${s.deposit_required?'on':'off'}" onclick="toggleCancelPolicyField('deposit_required')"></button>
-      </div>
-      <div class="staff-row">
-        <div style="flex:1"><div style="font-size:13px;font-weight:700">تأییدِ خودکارِ رزرو</div><div style="font-size:12px;color:var(--t2)">خاموش یعنی همه‌ی رزروها منتظرِ تأییدِ دستیِ تو می‌مونن</div></div>
-        <button class="toggle ${s.auto_confirm?'on':'off'}" onclick="toggleCancelPolicyField('auto_confirm')"></button>
       </div>
     </div>`;
 }
@@ -951,7 +998,7 @@ async function custRenderCampaign(){
   }
   const sc=_segCounts||{};
   const cnt=(v,suffix)=>v==null?'—':fa(v)+(v>=50?'+':'')+' '+suffix;
-  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید','همه'],['calendar','تولد این ماه',fa(CLUB.filter(m=>m.bMonth===CUR_MONTH).length)+' نفر']];
+  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید','همه'],['calendar','تولد این ماه',fa(CLUB.filter(m=>m.bMonth===currentMonthFa()).length)+' نفر']];
   document.getElementById('ct-campaign').innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کمپین پیامکی هوشمند</div><div class="panel-sub">سگمنت انتخاب کن، پیام بنویس، پیش‌نمایش بگیر</div></div></div>
@@ -1051,12 +1098,18 @@ async function custRenderAI(){
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
     </div>`;
 }
+// ⚠️ فازِ ۲ (§۲۶–۲۹): بک‌اند هفت نوع کارت می‌فرستد ولی این تابع فقط سه‌تا را
+// می‌شناخت؛ چهارتایِ دیگر — با برچسبِ دکمه‌ی مشخص مثلِ «مشاهده‌ی رزروها» —
+// به toastِ «به‌زودی» می‌افتادند. مقصدشان از قبل در پنل وجود دارد؛ فقط وصل
+// نشده بود. fallback برایِ idهایِ آینده عمداً می‌ماند.
 function handleAiAction(id){
   if(id==='winback'||id==='vip_retention'){ setCustTab('campaign'); }
-  else if(id==='noshow_upcoming'){ nav('reservations'); }
+  else if(id==='noshow_upcoming'||id==='revenue_drop'){ nav('reservations'); }
+  else if(id==='slow_day'||id==='occupancy_drop'||id==='no_automation'){ nav('marketing'); }
   else { toast('','این اقدام به‌زودی به‌صورت خودکار قابل‌اجراست'); }
 }
 // ═══════════ LOYALTY → منتقل شد به loyalty.js (rLoyalty + addMember) ═══════════
-// memCounter اینجا می‌ماند چون data.js آن را mutate می‌کند (VIS-code counter).
-let memCounter=1006;
+// ⚠️ memCounter حذف شد (فازِ ۲، §۲۱): تنها مصرف‌کننده‌اش enrollClub در data.js
+// بود که کدِ عضویتِ ساختگیِ VIS-xxx می‌ساخت؛ آن تابع در همین batch حذف شد.
+// اثبات: grep -rn "memCounter" apps/business/ → پس از حذف هیچ ارجاعی نمی‌ماند.
 // ═══════════ MARKETING ═══════════

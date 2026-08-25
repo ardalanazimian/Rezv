@@ -17,7 +17,7 @@ import { toast } from './auth.js';
 import { go } from './data/discover.js';
 import { R_SAMPLE } from './data/seed.js';
 import { R } from './init.js';
-import { httpJson, resolveApiBase } from './api-core.js';
+import { httpJson, refreshAccessToken, resolveApiBase } from './api-core.js';
 // آدرسِ پایه‌ی API — قابلِ تنظیم بدونِ build:
 //   ۱) window.RZ_API_BASE (اگر پیش از main.js ست شود)، یا
 //   ۲) <meta name="rz-api-base" content="https://..."> در index.html
@@ -68,27 +68,8 @@ export const API = {
     return { ok: false, status: r.status, error: r.error || { message: msg } };
   },
 
-  // تمدید توکن — چند فراخوان همزمان یک Promise مشترک می‌گیرند (بدون رقابت)
-  async _doRefresh(){
-    if (this._refreshing) return this._refreshing;
-    this._refreshing = (async () => {
-      try {
-        const res = await fetch(this.base + '/api/v1/auth/refresh', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh: this._refresh }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.access) {
-          this.setToken(data.access);
-          this.setRefresh(data.refresh);   // rotation: refresh هم نو می‌شود
-          return true;
-        }
-        return false;
-      } catch { return false; }
-      finally { this._refreshing = null; }
-    })();
-    return this._refreshing;
-  },
+  // منطقِ تمدید حالا در shared/js/api-core.js است (§۶ — سه کپیِ یکسان یکی شد).
+  async _doRefresh(){ return refreshAccessToken(this); },
 
   // نشست منقضی شد (refresh هم جواب نداد) → پاکسازی + اعلام
   _onSessionExpired(){
@@ -99,6 +80,9 @@ export const API = {
   get(path){ return this.request(path); },
   // headers اختیاری: برای عملیاتِ حساس (مثلاً رزرو) که به Idempotency-Key نیاز دارند.
   post(path, body, headers){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}), headers }); },
+  // PATCH — برایِ به‌روزرسانیِ جزئی (مثلاً ترجیحاتِ اعلان). قبلاً فقط
+  // updateProfile به‌صورتِ دستی PATCH می‌زد؛ حالا فعلِ عمومی هم هست.
+  patch(path, body, headers){ return this.request(path, { method: 'PATCH', body: JSON.stringify(body || {}), headers }); },
 
   /**
    * QRِ کدِ رزرو — خروجی SVG است نه JSON، پس نمی‌تواند از `request()`
@@ -235,6 +219,12 @@ export function resolveMediaUrl(u){
 // بک‌اند فاز ۱ این فیلدها را می‌دهد: id, slug, name, cuisine, ...
 // فیلدهای غنی (منو، نظرات، تفکیک امتیاز) که هنوز در API نیستند، برایِ
 // رستورانِ واقعی خالی می‌مانند (نه از نمونه) — رجوع به توضیحِ بالا.
+/** priceBand عددیِ بک‌اند (۱..۴) → همان شکلِ $ که UI انتظار دارد. */
+function bandToPrice(band){
+  const n = Number(band);
+  return Number.isInteger(n) && n >= 1 && n <= 4 ? '$'.repeat(n) : '';
+}
+
 export function mapApiRestaurant(apiR, sampleFallback){
   const isLive = !!apiR.slug; // رستورانِ واقعی/زنده — نه مسیرِ کاملاً آفلاین
   return {
@@ -250,17 +240,36 @@ export function mapApiRestaurant(apiR, sampleFallback){
     e: apiR.emoji || (isLive ? '🍽️' : (sampleFallback?.e || '🍽️')),
     n: apiR.name,
     cuisine: apiR.cuisine || sampleFallback?.cuisine || '',
-    // priceBand در بک‌اند Int (۱..۴) است؛ لیستْ camelCase و جزئیاتْ snake_case
-    // برمی‌گرداند. به «$..$» تبدیل می‌شود — مقدارِ واقعیِ رکوردِ خودِ رستوران.
-    price: priceBandStr(apiR.priceBand ?? apiR.price_band) || apiR.price_range || (isLive ? '' : (sampleFallback?.price || '$$')),
-    rt: apiR.rating ?? (isLive ? 0 : (sampleFallback?.rt ?? 0)),
-    reviews: apiR.reviews_count ?? apiR.review_count ?? (isLive ? 0 : (sampleFallback?.reviews ?? 0)),
+    // ⚠️ قراردادِ شکسته (F1): کلاینت `price_range` می‌خواند ولی بک‌اند
+    // `priceBand` (یک عددِ ۱..۴ — schema.prisma:105) می‌فرستد. یعنی مقدار
+    // همیشه undefined می‌شد و به بازه‌ی قیمتِ یک رستورانِ **نمونه‌ی بی‌ربط**
+    // می‌افتاد. حالا عددِ واقعیِ سرور به همان شکلِ $ نگاشت می‌شود.
+    price: bandToPrice(apiR.priceBand ?? apiR.price_band) || apiR.price_range || (isLive ? '' : sampleFallback?.price || '$$'),
+
+    // ⚠️ جعلِ اعتبارِ اجتماعی (F2): بک‌اند عمداً `rating: null` می‌فرستد وقتی
+    // هیچ نظری ثبت نشده — کامنتِ خودِ route می‌گوید «null یعنی هنوز نمی‌دانیم،
+    // نه صفر و نه عددِ ساختگی». ولی `?? sampleFallback?.rt` دقیقاً همان عددِ
+    // ساختگی را می‌گذاشت: یک رستورانِ بدونِ نظر با ۴.۸ ستاره نمایش داده می‌شد.
+    // برایِ رستورانِ زنده هرگز از نمونه پر نمی‌شود؛ null می‌ماند و UI ادعایی
+    // نمی‌کند (همان قاعده‌ای که چند خط پایین‌تر برایِ سیگنال‌هایِ اجتماعی نوشته شده).
+    rt: isLive ? (typeof apiR.rating === 'number' ? apiR.rating : null) : (sampleFallback?.rt ?? 0),
+    reviews: isLive ? (apiR.reviews_count ?? apiR.review_count ?? 0) : (sampleFallback?.reviews ?? 0),
     // ── سیگنال‌های اجتماعی: فقط از API، بدونِ fallbackِ نمونه ──
     // اگر بک‌اند نگفته، null می‌ماند و UI هیچ ادعایی نشان نمی‌دهد. عمداً از
     // sampleFallback پر نمی‌شوند: دادهٔ نمونه برای «شکلِ صفحه» است، نه برای
     // ادعای آماری درباره‌ی یک کسب‌وکارِ واقعی.
     visits7d: apiR.visits_7d ?? null,
     recommendPct: apiR.recommend_pct ?? null,
+    // ── سیاستِ رزرو (رفعِ P1-3، پروتکل §۲۰) ──
+    // دقیقاً همان قاعده‌ی بالا: فقط از API، بدونِ fallbackِ نمونه.
+    // null = «سرور نگفته» → UI هیچ ادعایی درباره‌ی پیش‌پرداخت نمی‌کند.
+    // true/false = حقیقتِ واقعیِ همان رستوران.
+    //
+    // چرا لازم شد: اپ در دو جا هاردکد می‌گفت «بدون پیش‌پرداخت»، در حالی که
+    // depositRequired یک سیاستِ واقعیِ قابلِ‌تنظیمِ رستوران است. رستورانی که
+    // بیعانه را روشن می‌کرد، همچنان به مشتری «رایگان» نشان داده می‌شد.
+    depositRequired: apiR.booking_policy?.deposit_required ?? null,
+    freeCancelHours: apiR.booking_policy?.free_cancel_hours ?? null,
     lat: apiR.latitude ?? null,
     lng: apiR.longitude ?? null,
     vibes: apiR.vibes || sampleFallback?.vibes || [],

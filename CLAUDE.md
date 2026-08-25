@@ -54,6 +54,15 @@
    (همین سه دستور را برای `apps/landing/` و `apps/seo/` هم اگر آن‌ها را تغییر دادی جداگانه اجرا کن — هرکدام package.json و تست‌های خودشان را دارند.)
 3. **تست E2E Playwright**: حتماً برای بخش‌هایی که تغییر دادی، تست‌های E2E باید موبایل + دسکتاپ سبز بشن. (CI دقیقاً روی iPhone 13 / Pixel 5 / Desktop Chrome اجرا می‌شه. تستی که فقط روی دسکتاپ پاس بشه قبول نیست.)
 4. **بررسی فایل‌های مرجع**: تمامِ ارجاع‌های script و css در فایل‌های HTML و همچنین تمامِ importهای ماژول‌های ES باید به یک فایلِ واقعی و موجود اشاره کنن (هیچ مسیر شکسته‌ای نباشه).
+4b. **تازگیِ بسته‌ی آفلاین**: اگر چیزی در `apps/customer`, `apps/business` یا
+   `apps/company` عوض کردی، از ریشه اجرا کن `python tools/build-standalone.py --check`.
+   ⚠️ **چرا این یک گیتِ اجباری است** (یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۳): `standalone/*.html`
+   خروجیِ **تولیدشده‌ی commit‌شده** است، نه منبع. از ۲۰۲۶-۰۸-۱۸ بازتولید نشده بود
+   و در نتیجه بسته‌ی آفلاین — همان چیزی که `standalone/README-website.md` به
+   کاربر می‌گوید بازش کند — هنوز **همه‌ی** باگ‌هایی را تحویل می‌داد که در منبع رفع
+   شده بودند، از جمله یک P0 که کلِ مسیرِ رزرو را با بک‌اندِ واقعی می‌شکست.
+   آرتیفکتی که بی‌صدا کهنه شود از نبودش بدتر است: ظاهرِ به‌روز دارد ولی کدِ
+   قدیمی می‌دهد. اگر check قرمز شد، `python tools/build-standalone.py` را اجرا کن.
 5. **حریمِ امنیتی**: هرگز secret، key یا فایلِ `.env` واقعی رو کامیت نکن.
 6. **دیتای دمو**: اگر داده‌ی آزمایشی اضافه می‌کنی، حتماً برچسبِ `[DEMO]` روش بذار. هرگز اسمِ رستوران‌های واقعی رو جعل نکن.
 7. **دروازه‌ی انحرافِ اسکیما** (اگر `schema.prisma` یا `prisma/sql/` را دست زدی): از ریشه اجرا کن
@@ -87,13 +96,57 @@
 ## دستورات پرکاربرد
 ⚠️ **ریشه‌یِ ریپو `package.json` ندارد** — بجز دو شل‌اسکریپتِ سراسری (`tools/sync-design-system.sh` و `tools/check-schema-drift.sh`) و دستوراتِ `docker compose`، همه‌یِ دستورهایِ npm باید **داخلِ `api/`** (یا `apps/landing/`, `apps/seo/` برایِ همان اپ‌ها) اجرا شوند، نه از ریشه.
 
+🚨 **`npm install` را با `NODE_ENV=production` اجرا نکن** (یافته‌ی واقعیِ
+۲۰۲۶-۰۸-۲۳، تأییدشده با `--dry-run`): وقتی `NODE_ENV=production` در محیط ست
+باشد، npm خودکار `omit=dev` می‌گیرد و یک `npm install`ِ ساده **کلِ زنجیره‌ی
+ابزار را پاک می‌کند** — `typescript`، `tsx`، `eslint`، `@typescript-eslint/*`،
+`esbuild` و در `e2e/` خودِ Playwright. اندازه‌ی خسارت در همین مخزن:
+`api` −۱۲۳ بسته · `apps/landing` −۳۲۷ · `apps/seo` −۳۲۷ · `e2e` −۸۹.
+نتیجه: هر چهار گیتِ اجباریِ بالا (typecheck/lint/test/E2E) می‌شکنند و پیامِ
+خطا هیچ ربطی به علت ندارد.
+
+- برایِ توسعه همیشه: `NODE_ENV=development npm install --include=dev`
+  (یا اول `unset NODE_ENV`). چک: `npm config get omit` باید خالی باشد، نه `dev`.
+- برایِ ایمیجِ تولید **چیزی عوض نکن**: `api/Dockerfile` خودش در مرحله‌ی runtime
+  صریحاً `npm ci --omit=dev` می‌زند و مرحله‌ی build جدا و کامل نصب می‌کند.
+- ⚠️ به همین دلیل **`.npmrc`ِ پروژه با `include=dev` نساز**: در npm اگر یک نوع
+  هم در `include` و هم در `omit` بیاید، `include` برنده می‌شود — یعنی همان فایل
+  `--omit=dev`ِ Dockerfile را هم بی‌اثر می‌کند و ایمیجِ تولید را باد می‌کند.
+
 - **همگام‌سازیِ طراحی** (از ریشه): `sh tools/sync-design-system.sh` (بعد از هر تغییر در `shared/`)
+- **بازتولیدِ بسته‌ی آفلاین** (از ریشه): `python tools/build-standalone.py` — بعد از
+  هر تغییر در `apps/{customer,business,company}`. برایِ فقط بررسی: `--check`.
+  (خروجی: `standalone/{customer,business,company}.html` — تولیدشده، نه منبع.)
 - **اجرایِ migration دیتابیس** (توی `api/`): `npm run db:migrate`
 - **seed دیتابیس** (توی `api/`): `npm run db:seed`
-- **اجرایِ SQLِ دستی/همه‌یِ migrationها روی یک DBِ خالی** (توی `api/`): `prisma/apply-sql.sh`
+- **اجرایِ SQLِ دستی/همه‌یِ migrationها** (توی `api/`): `prisma/apply-sql.sh`
+  ⚠️ **اصلاح‌شده (۲۰۲۶-۰۸-۲۳، تأییدشده با اجرایِ واقعی):** این خط قبلاً می‌گفت
+  «روی یک DBِ خالی» — که **غلط است**. `prisma/sql/001-*` یک migrationِ *افزایشی*
+  (ایندکس رویِ جدولِ موجود) است، نه سازنده‌ی اسکیما؛ رویِ DBِ کاملاً خالی با
+  `P1014 The underlying table for model 'reservations' does not exist` شکست می‌خورد.
+  ترتیبِ درست برایِ یک DBِ خالی: اول `npx prisma db push` (ساختِ اسکیمایِ پایه از
+  `schema.prisma`)، **بعد** `prisma/apply-sql.sh` (ایندکس‌ها/کانسترینت‌ها/پارتیشن‌ها).
+
+  🚫 **`prisma db push` فقط برایِ همان بوت‌استرَپِ اولیه است — هرگز رویِ یک DBِ
+  migrate‌شده اجرایش نکن** (تأییدشده با اجرایِ واقعی، ۲۰۲۶-۰۸-۲۳): `block_end`
+  یک ستونِ `GENERATED ALWAYS … STORED` است که Prisma نمی‌تواند بیانش کند، پس
+  `db push` همیشه قصدِ DROPش را دارد و Postgres ردش می‌کند
+  («constraint no_table_overlap depends on it»). یعنی دستور شکست می‌خورد —
+  ولی *بعد از* اینکه هر ایندکسی را که در `schema.prisma` اعلام نشده DROP کرده.
+  هر تغییرِ اسکیما باید یک migrationِ شماره‌دار در `prisma/sql/` باشد.
+
+  ⚠️ **هر ایندکسِ جدید باید در هر دو جا باشد** — `@@index` در `schema.prisma`
+  (با `map:` اگر نامِ SQL دلخواه است) **و** migrationِ SQL. فقط یکی از دو تا
+  یعنی یا `db push` حذفش می‌کند یا یک ایندکسِ تکراری با نامِ دیگر ساخته می‌شود.
+  گاردِ خودکار: `api/tests/schema-drift.integration.test.mts`.
 - **اجرایِ محلی با داکر**: `docker compose --profile http up -d --build`
 - **اجرایِ تولید با HTTPS**: `docker compose -f docker-compose.prod.yml up -d --build` (قبلش `DOMAIN=...` رو در `.env` ست کن)
 - **تستِ واحدِ بک‌اند**: `cd api && npm test`
+- **اجرایِ یک فایلِ تست به‌تنهایی**: `cd api && npm run test:one -- tests/<file>.test.mts`
+  ⚠️ `npx tsx --test tests/<file>` **خام** را اجرا نکن: به‌خاطرِ هندلِ بازِ Redis
+  پروسه هرگز exit نمی‌کند و پروسه‌یِ یتیم جا می‌گذارد — که بعداً باعثِ کندیِ E2E و
+  قفلِ `EPERM` رویِ DLLِ Prisma می‌شود. `test:one` همان دستور با
+  `--test-force-exit` است.
 - **تایپ‌چکِ بک‌اند**: `cd api && npm run typecheck`
 - **لینتِ بک‌اند**: `cd api && npm run lint`
 - **تستِ E2E با Playwright** (توی `e2e/`): `npm test`

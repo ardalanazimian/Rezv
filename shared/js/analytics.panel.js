@@ -52,9 +52,21 @@
     } catch (e) { /* no-op */ }
   }
 
+  /** شناسه‌ی تصادفیِ ۳۲ کاراکتری — فقط برایِ یکتاییِ محلی، نه امنیت. */
+  function newEventId() {
+    try {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '');
+    } catch (e) { /* no-op */ }
+    return (Date.now().toString(36) + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12)).slice(0, 32);
+  }
+
   function track(type, payload) {
     try {
-      queue.push({ type: String(type), occurredAt: new Date().toISOString(), source: SOURCE, sessionId: sessionId(), payload: payload || {} });
+      // eventId: شناسه‌ی یکتا per «قصد» برایِ dedupِ سمتِ سرور (پروتکل §۱۴).
+      // تحویلِ کلاینت ذاتاً at-least-once است (صفِ localStorage + sendBeacon
+      // + retryِ بارگذاریِ بعدی)، پس idempotency باید سمتِ سرور باشد — و
+      // سرور برایِ آن به یک شناسه‌ی پایدار per رویداد نیاز دارد.
+      queue.push({ type: String(type), eventId: newEventId(), occurredAt: new Date().toISOString(), source: SOURCE, sessionId: sessionId(), payload: payload || {} });
       persist();
       if (queue.length >= FLUSH_AT) flush(false);
     } catch (e) { /* no-op */ }

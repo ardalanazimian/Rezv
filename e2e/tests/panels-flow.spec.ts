@@ -64,7 +64,20 @@ test('پنلِ کسب‌وکار: ورودِ staff (شماره → کد) پنل 
   // نتیجه: overlayِ ورود مخفی و داشبورد فعال
   await expect(page.locator('#loginOverlay')).toHaveClass(/hidden/);
   await expect(page.locator('#v-overview')).toHaveClass(/active/);
-  await expect(page.locator('.sb-brand').first()).toBeVisible();
+  // رویِ موبایل کشو بسته است (و از ممیزیِ ۲۰۲۶-۰۸-۲۴ دیگر visibility:hidden
+  // است تا Tab نگیرد) — کاربرِ واقعی برایِ دیدنِ برند منو را باز می‌کند.
+  // نسخه‌ی قبلی بدونِ بازکردن پاس می‌شد چون عنصرِ translateX شده هنوز
+  // «visible» حساب می‌شد؛ یعنی تست به خودِ باگ تکیه داشت.
+  {
+    const burger = page.locator('.tb-burger');
+    const drawer = await burger.isVisible();
+    if (drawer) await burger.click();
+    await expect(page.locator('.sb-brand').first()).toBeVisible();
+    // نقطه‌ی کلیکِ پیش‌فرض (وسطِ صفحه) زیرِ خودِ کشویِ بازِ ۲۴۸px است و کشو
+  // pointer-event را می‌گیرد؛ کاربرِ واقعی هم رویِ ناحیه‌ی آزادِ کنارِ کشو
+  // می‌زند (در RTL یعنی لبه‌ی چپ).
+  if (drawer) await page.locator('#sbOverlay').click({ position: { x: 10, y: 300 } });
+  }
 
   // بدونِ خطای اجرا-نشده‌ی JS در کلِ جریان
   expect(errors, `خطاهای JS: ${errors.join(' | ')}`).toEqual([]);
@@ -92,7 +105,20 @@ test('پنلِ شرکت: ورودِ مدیرِ پلتفرم (شماره → کد
   // نتیجه: overlayِ ورود مخفی و داشبورد فعال
   await expect(page.locator('#loginOverlay')).toHaveClass(/hidden/);
   await expect(page.locator('#v-overview')).toHaveClass(/active/);
-  await expect(page.locator('.sb-brand').first()).toBeVisible();
+  // رویِ موبایل کشو بسته است (و از ممیزیِ ۲۰۲۶-۰۸-۲۴ دیگر visibility:hidden
+  // است تا Tab نگیرد) — کاربرِ واقعی برایِ دیدنِ برند منو را باز می‌کند.
+  // نسخه‌ی قبلی بدونِ بازکردن پاس می‌شد چون عنصرِ translateX شده هنوز
+  // «visible» حساب می‌شد؛ یعنی تست به خودِ باگ تکیه داشت.
+  {
+    const burger = page.locator('.tb-burger');
+    const drawer = await burger.isVisible();
+    if (drawer) await burger.click();
+    await expect(page.locator('.sb-brand').first()).toBeVisible();
+    // نقطه‌ی کلیکِ پیش‌فرض (وسطِ صفحه) زیرِ خودِ کشویِ بازِ ۲۴۸px است و کشو
+  // pointer-event را می‌گیرد؛ کاربرِ واقعی هم رویِ ناحیه‌ی آزادِ کنارِ کشو
+  // می‌زند (در RTL یعنی لبه‌ی چپ).
+  if (drawer) await page.locator('#sbOverlay').click({ position: { x: 10, y: 300 } });
+  }
 
   expect(errors, `خطاهای JS: ${errors.join(' | ')}`).toEqual([]);
 });
@@ -191,7 +217,20 @@ test('پنلِ شرکت: صفِ «تأییدِ ساعتِ کاری» پیشنه�
   await expect(page.locator('#v-overview')).toHaveClass(/active/);
 
   // بجِ سایدبار باید از همان لحظه‌ی ورود عددِ صف را نشان بدهد (refreshHoursChangeBadge)
+  // ⚠️ رویِ موبایل کشو بسته است و کاربرِ واقعی برایِ دیدنِ بج اول منو را باز
+  // می‌کند. نسخه‌ی قبلیِ این تست بدونِ بازکردنِ منو پاس می‌شد چون کشویِ بسته
+  // فقط translateX شده بود و Playwright عنصرِ بیرونِ صفحه را هم «visible»
+  // حساب می‌کرد — یعنی تست ناخواسته به همان باگِ دسترسی‌پذیری تکیه داشت که
+  // در ممیزیِ ۲۰۲۶-۰۸-۲۴ رفع شد (کشویِ بسته حالا visibility:hidden است تا
+  // Tab نگیرد). این، اصلاحِ تست به رفتارِ واقعیِ کاربر است، نه ضعیف‌کردنش.
+  const burger = page.locator('.tb-burger');
+  const isMobileDrawer = await burger.isVisible();
+  if (isMobileDrawer) await burger.click();
   await expect(page.locator('#hoursBadge')).toBeVisible();
+  // نقطه‌ی کلیکِ پیش‌فرض (وسطِ صفحه) زیرِ خودِ کشویِ بازِ ۲۴۸px است و کشو
+  // pointer-event را می‌گیرد؛ کاربرِ واقعی هم رویِ ناحیه‌ی آزادِ کنارِ کشو
+  // می‌زند (در RTL یعنی لبه‌ی چپ).
+  if (isMobileDrawer) await page.locator('#sbOverlay').click({ position: { x: 10, y: 300 } });
 
   await page.evaluate(() => (window as unknown as { nav: (v: string) => void }).nav('hours'));
 

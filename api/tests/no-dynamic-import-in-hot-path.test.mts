@@ -1,4 +1,5 @@
 import { test, describe } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -36,7 +37,10 @@ import { join } from 'node:path';
 //  قفل می‌تواند همه‌ی lib/ را بپوشاند.
 // ═══════════════════════════════════════════════════════════════════════
 
-const LIB_DIR = new URL('../src/lib/', import.meta.url).pathname;
+// [merge ۰۸-۲۴] fileURLToPath و نه .pathname: رویِ ویندوز pathname «/C:/…» می‌دهد
+// و fs آن را «C:\C:\…» می‌فهمد (ENOENT) — همان کلاسِ باگِ cross-platform که
+// photo-moderation قبلاً برایِ sep داشت. رویِ لینوکسِ CI هر دو یکی‌اند.
+const LIB_DIR = fileURLToPath(new URL('../src/lib/', import.meta.url));
 
 /** `import(` که بلافاصله بعدش یک specifierِ نسبی ('./x' یا '../x') بیاید. */
 const DYNAMIC_RELATIVE_IMPORT = /\bimport\s*\(\s*['"`]\.{1,2}\//;

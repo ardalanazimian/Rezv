@@ -152,7 +152,13 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
   // می‌دهد که آیا پیش‌بینیِ no-showِ همین رستوران از تاریخچه‌ی خودش کالیبره
   // شده یا هنوز از فرمولِ عمومی استفاده می‌شود — تا صاحبِ کسب‌وکار بداند
   // پشتِ عددهایی که می‌بیند چیست.
-  const noShowModel = await db.restaurantNoShowModel.findUnique({ where: { restaurantId: restaurant.id } });
+  // ⚠️ فازِ ۲ (§۲۵): این دو خواندن کاملاً مستقل‌اند ولی پشتِ‌سرِ هم اجرا می‌شدند —
+  // و برخلافِ `cards` هیچ‌کدام کش نمی‌شوند، پس هزینه‌شان رویِ **هر** درخواست است.
+  // زمانِ پاسخ حالا بیشینه‌ی این دو است، نه جمعشان.
+  const [noShowModel, demandForecast] = await Promise.all([
+    db.restaurantNoShowModel.findUnique({ where: { restaurantId: restaurant.id } }),
+    getDemandForecast(restaurant.id, 14),
+  ]);
   const noShowModelStatus = noShowModel
     ? {
         active: noShowModel.isActive,
@@ -174,7 +180,6 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
   // تازه). وگرنه همیشه یک پیش‌بینی برمی‌گردد — یا از مدلِ یادگرفته
   // (source:'learned'، وقتی واقعاً از baseline بهتر بوده) یا از پیش‌بینیِ
   // فصلیِ ساده (source:'naive'، شفاف برچسب‌خورده، نه ادعای کاذبِ AI).
-  const demandForecast = await getDemandForecast(restaurant.id, 14);
 
   return NextResponse.json({ cards, no_show_model: noShowModelStatus, demand_forecast: demandForecast });
 });

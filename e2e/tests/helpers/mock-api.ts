@@ -28,21 +28,26 @@ export interface MockOptions {
 // خواهد داشت». آن پیش‌بینی درست از آب درنیامد و نگه‌داشتنش خطرناک بود:
 // `GET /restaurants` این فیلد را **نمی‌دهد و نخواهد داد** (لیست ۶۰ ثانیه کش
 // می‌شود و به تاریخ/تعدادِ نفر وابسته نیست). سانس‌ها حالا از روتِ گروهیِ
-// `GET /restaurants/availability` می‌آیند که پایین mock شده است.
+// `GET /restaurants/availability` می‌آیند که پایین mock شده است — و همان
+// «۱۹:۰۰/۲۰:۰۰» را به رستورانِ اول می‌دهد، پس تست‌هایی که به چیپِ ساعتِ کارتِ
+// اول تکیه دارند دست‌نخورده کار می‌کنند، فقط از مسیرِ واقعی.
 //
 // چرا این اصلاح مهم است: mockی که فیلدی را می‌سازد که تولید نمی‌سازد، دقیقاً
 // همان «CI سبز، تولید خراب» است که کامنتِ زیر درباره‌ی idهای عددی هشدار
 // می‌دهد. حالا تست‌ها همان مسیری را می‌پیمایند که کاربرِ واقعی می‌پیماید:
 // لیست بدونِ سانس → واکشیِ گروهی → نشستنِ چیپ‌ها.
 //
+// [merge ۰۸-۲۵] `booking_policy` از خطِ ممیزی (PR #68) دست‌نخورده می‌ماند:
+// تست‌های صداقتِ بیعانه/لغو رویِ رکوردهای ۱و۲ به آن تکیه دارند؛ رستورانِ ۳
+// عمداً بدونِ policy می‌ماند تا حالتِ null هم پوشش داشته باشد.
 // ⚠️ idها عمداً UUID هستند (ممیزیِ ۲۰۲۶-۰۸-۲۴): بک‌اندِ واقعی همیشه UUID
 // برمی‌گرداند، ولی این mock تا آن روز idِ عددیِ ۱..۳ می‌داد — به همین دلیل
 // باگِ واقعیِ «UUIDِ بدونِ کوتیشن در onclick که همه‌ی CTAهای کارت را
 // می‌شکست» هرگز در CI دیده نشد. mock باید همان شکلی را تولید کند که تولید
 // واقعاً می‌سازد.
 export const DEMO_RESTAURANTS = [
-  { id: 'a1b2c3d4-0000-4000-8000-000000000001', slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸' },
-  { id: 'a1b2c3d4-0000-4000-8000-000000000002', slug: 'demo-sushi-bar', name: '[DEMO] سوشی بار', cuisine: 'ژاپنی', rating: 4.5, price: '$$$', cashback: 8, cover_emoji: '🍣' },
+  { id: 'a1b2c3d4-0000-4000-8000-000000000001', slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸', booking_policy: { deposit_required: false, free_cancel_hours: 24, auto_confirm: true } },
+  { id: 'a1b2c3d4-0000-4000-8000-000000000002', slug: 'demo-sushi-bar', name: '[DEMO] سوشی بار', cuisine: 'ژاپنی', rating: 4.5, price: '$$$', cashback: 8, cover_emoji: '🍣', booking_policy: { deposit_required: true, free_cancel_hours: 48, auto_confirm: false } },
   { id: 'a1b2c3d4-0000-4000-8000-000000000003', slug: 'demo-burger-lab', name: '[DEMO] برگر لب', cuisine: 'فست‌فود', rating: 4.6, price: '$$', cashback: 12, cover_emoji: '🍔' },
 ];
 
@@ -161,7 +166,12 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
         : json({ error: 'unauthorized' }, 401);
     }
     if (path === '/me/points' && method === 'GET') return json({ balance: 340, history: [] });
-    if (path === '/me/reservations' && method === 'GET') return json({ reservations: [] });
+    // ⚠️ شکلِ واقعیِ قرارداد: `/me/reservations` یک **آرایه‌ی خام** برمی‌گرداند
+    // (`NextResponse.json(list)` در api/src/app/api/v1/me/reservations/route.ts)،
+    // نه `{reservations:[…]}`. ماکِ اشتباه یک تستِ کاملِ «صداقتِ لغو» را بی‌صدا
+    // بی‌اثر کرده بود: کلاینت `Array.isArray` را رد می‌کرد، به دادهٔ seed
+    // برمی‌گشت، و تست ناخواسته رویِ رزروِ ساختگی اجرا می‌شد نه رزروِ تزریق‌شده.
+    if (path === '/me/reservations' && method === 'GET') return json([]);
     if (path === '/me/profile' && method === 'GET') return json({ profile: {} });
     if (path === '/me/referral' && method === 'GET') return json({ code: 'REFDEMO', invited: 0 });
     if (path === '/events' && method === 'GET') return json({ events: [] });

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- رزرونو یک SPA تک‌URL است (بدون client-side routing واقعی) — فقط همین یک
-     URL crawlable است. per-restaurant URL نیاز به router واقعی + SPA fallback
-     در nginx دارد که یک پروژه‌ی جداست. -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://rezervno.ir/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
-</urlset>

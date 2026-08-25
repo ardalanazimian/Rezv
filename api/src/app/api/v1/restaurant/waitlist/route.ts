@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getQueue, promoteNext } from '@/lib/waitlist';
+import { getQueue, promoteNext, leaveWaitlist } from '@/lib/waitlist';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
+import { parseQuery, z } from '@/lib/schemas';
 
 /** GET /api/v1/restaurant/waitlist — صف لیست انتظار (داشبورد). مهاجرت‌شده: حالا rate-limit هم دارد. */
 export const GET = withRestaurantAuth(
@@ -16,6 +17,24 @@ export const POST = withRestaurantAuth(
   { permission: 'canManageWaitlist', rateLimit: 'auth' },
   async (_req, ctx) => {
     const result = await promoteNext(ctx.restaurant.id);
+    return NextResponse.json(result);
+  },
+);
+
+/**
+ * DELETE /api/v1/restaurant/waitlist?entry_id=... — حذفِ یک ورودی از صف توسطِ پرسنل
+ * (مهمان رفته، اشتباه ثبت شده، …).
+ *
+ * ⚠️ فازِ ۲ (§۳): دکمه‌ی «حذف» در پنل از قبل وجود داشت ولی هیچ مسیرِ سروری
+ * نداشت — فقط آرایه‌ی محلی را فیلتر می‌کرد و موفقیت اعلام می‌کرد. منطقِ واقعی
+ * (`leaveWaitlist`) از قبل در lib بود و فقط به پرسنل وصل نشده بود؛ این‌جا
+ * وصل می‌شود، نه اینکه سیستمِ تازه‌ای ساخته شود.
+ */
+export const DELETE = withRestaurantAuth(
+  { permission: 'canManageWaitlist', rateLimit: 'auth' },
+  async (req, ctx) => {
+    const { entry_id } = parseQuery(req, z.object({ entry_id: z.string().uuid() }));
+    const result = await leaveWaitlist(entry_id, { staffRestaurantId: ctx.restaurant.id });
     return NextResponse.json(result);
   },
 );

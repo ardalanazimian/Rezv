@@ -7,6 +7,7 @@ import { bookingCtx, favHas, favs, gradFor, saveFavs, pts } from './seed.js';
 import { renderProfile } from '../features/food-dna.js';
 import { renderLoyalty } from '../features/loyalty.js';
 import { renderEconomy } from '../features/economy.js';
+import { NEXT_CURSOR } from '../api.js';
 import { R } from '../init.js';
 import { renderFavs, renderTrips } from '../reservation.js';
 import { icon } from '../icons.js';
@@ -40,9 +41,9 @@ export function fmtFa(n){return n.toLocaleString('fa-IR')}
 export function slotsHTML(r){
   const slots = Array.isArray(r.slots) ? r.slots : [];
   if (slots.length) {
-    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook('${r.id}','${s}');haptic('select')">${s}</button>`).join('');
+    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook('${esc(String(r.id))}','${s}');haptic('select')">${s}</button>`).join('');
   }
-  return `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet('${r.id}');haptic('select')">ببین سانس‌ها</button>`;
+  return `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet('${esc(String(r.id))}');haptic('select')">ببین سانس‌ها</button>`;
 }
 
 /**
@@ -73,13 +74,13 @@ export function cardHTML(r){
   // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
   return `<article class="rc reveal" data-rid="${esc(String(r.id))}">
     <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
-    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${r.id}')"></button>
+    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${esc(String(r.id))}')"></button>
     <span class="rc-emoji">${esc(r.e)}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
-    <button class="rc-fav" type="button" aria-pressed="${favHas(r.id)}" aria-label="${favHas(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav('${r.id}',this);haptic('like')">${icon('heart',{size:20,fill:favHas(r.id)})}</button>
+    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav('${esc(String(r.id))}',this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
-      <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
-      <div class="rc-meta">${r.cuisine}${r.price?` · ${r.price}`:''} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
+      <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div>${r.rt!=null?`<div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div>`:'<div class="rc-rating rc-rating-new">تازه‌وارد</div>'}</div>
+      <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
       <div class="rc-slots">${slotsHTML(r)}</div>
     </div>
@@ -138,11 +139,20 @@ export function socialProofHTML(r){
 export function isHot(r){
   return r.rt >= 4.7 && (r.reviews||0) >= 80 && Number.isFinite(r.visits7d) && r.visits7d >= 10;
 }
+// ⚠️ رفعِ قابلیتِ دست‌نیافتنی (پروتکل §۸/§۹): بک‌اند از قبل صفحه‌بندیِ cursor-based
+// دارد و `loadMoreRestaurants()` در api.js هم نوشته شده بود — ولی **هیچ صداکننده‌ای
+// نداشت**. نتیجه: اپِ مشتری هرگز از صفحه‌ی اولِ رستوران‌ها فراتر نمی‌رفت و بقیه‌ی
+// رستوران‌های ثبت‌شده برای کاربر نامرئی بودند. دکمه فقط روی فیدِ فیلترنشده
+// (`list === R`) و فقط وقتی سرور واقعاً cursorِ بعدی داده ظاهر می‌شود.
+function moreBtnHTML(list){
+  if(list !== R || !NEXT_CURSOR) return '';
+  return `<button type="button" class="btn btn-ghost btn-block feed-more" id="feedMore" onclick="loadMoreFeed()">رستوران‌های بیشتر</button>`;
+}
 export function renderFeed(list){
   const f=document.getElementById('feed');
   f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
   setTimeout(()=>{
-    f.innerHTML=list.map(cardHTML).join('');
+    f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);
     const io=new IntersectionObserver(es=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);io.unobserve(e.target)}}),{threshold:.05});
     f.querySelectorAll('.rc').forEach(c=>io.observe(c));
   },280);
@@ -191,7 +201,7 @@ export function filterVibe(v,el){
 export function hCardHTML(r,extra){
   // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
   const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
-  return `<div class="hcard" role="button" tabindex="0" onclick="openRest('${r.id}')">
+  return `<div class="hcard" role="button" tabindex="0" onclick="openRest('${esc(String(r.id))}')">
     <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
@@ -241,8 +251,16 @@ export function renderNearby(){
 }
 
 /** اگر اجازه‌ی موقعیت از قبل داده شده، بگیر و «نزدیک تو» را دوباره بساز.
- *  عمداً prompt نمی‌زند: پرسیدنِ اجازه در لحظه‌ی ورود، رفتارِ مزاحمی است. */
+ *  عمداً prompt نمی‌زند: پرسیدنِ اجازه در لحظه‌ی ورود، رفتارِ مزاحمی است.
+ *  ⚠️ فقط یک‌بار در هر نشست: خواندنِ موقعیت هزینه‌ی باتری/زمان دارد و
+ *  renderDiscoverSections در بوت **دوبار** صدا زده می‌شود (یک‌بار با دادهٔ نمونه،
+ *  یک‌بار بعد از رسیدنِ دادهٔ سرور) — قبلاً یعنی دو بار permission-query و دو بار
+ *  getCurrentPosition روی هر لودِ سرد. مختصات در userPos می‌ماند و renderNearby
+ *  خودش از آن استفاده می‌کند، پس بارِ دوم چیزی به دست نمی‌آورد. */
+let _nearbyInit = false;
 export function initNearby(){
+  if(_nearbyInit) return;
+  _nearbyInit = true;
   if(!navigator.geolocation||!navigator.permissions?.query)return;
   navigator.permissions.query({name:'geolocation'}).then(p=>{
     if(p.state!=='granted')return;
@@ -263,6 +281,8 @@ export const SAMPLE_EVENTS=[
   {rid:1,emoji:'🍷',title:'شب طعم و شراب‌نمایی',rest:'کافه‌رستوران ویستا',when:'پنجشنبه ۲۱ خرداد · ۲۰:۰۰',price:'۳۲۰ک',desc:'چشیدن منوی فصلی با همراهی سامان'},
   {rid:3,emoji:'👨‍🍳',title:'میز سرآشپز',rest:'بیسترو لانه',when:'شنبه ۲۳ خرداد · ۱۹:۳۰',price:'۵۸۰ک',desc:'منوی ۷ مرحله‌ای با حضور سرآشپز'},
 ];
+// صداکننده‌ها: بوت (یک‌بار) و pull-to-refresh (هر ژست). عمداً هیچ کشِ پنهانی
+// ندارد — هر فراخوان یعنی «کاربر واقعاً تازه‌سازی خواست» یا «لودِ سرد».
 export async function renderEvents(){
   const el=document.getElementById('eventsList');if(!el)return;
   const res=await API.get('/events');
@@ -295,7 +315,7 @@ export async function renderEvents(){
 /** مارکاپِ کارت‌های رویداد. isDemo=true چیپِ «نمونه» را اضافه می‌کند. */
 function eventsHtml(events,isDemo){
   return events.map(e=>`
-    <div class="event-card" role="button" tabindex="0" onclick="openRest('${e.rid}')">
+    <div class="event-card" role="button" tabindex="0" onclick="openRest('${esc(String(e.rid))}')">
       <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
@@ -306,12 +326,11 @@ function eventsHtml(events,isDemo){
       ${e.price?`<div class="event-price">${esc(e.price)}<span>تومان</span></div>`:''}
     </div>`).join('');
 }
-// رندر همه‌ی بخش‌های کشف
-export function renderDiscoverSections(){
+// بخش‌هایی که فقط به `R`ِ فعلی وابسته‌اند — هیچ درخواستِ شبکه‌ای نمی‌زنند، پس
+// هر بار که لیستِ رستوران‌ها عوض شد (sync، صفحه‌ی بعدی) می‌شود ارزان صدایشان زد.
+export function renderRestaurantSections(){
   renderNearby();
-  initNearby();     // اگر اجازه‌ی موقعیت از قبل هست، «نزدیک تو» را واقعی می‌کند
   renderTrending();
-  renderEvents();
   // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
   const sub=document.querySelector('#page-discover .section-sub');
   if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال · ${searchCtxLabel()}`;
@@ -319,6 +338,20 @@ export function renderDiscoverSections(){
   // api.js است که مقدار را از /me/loyalty می‌گیرد. نوشتنِ ptsِ محلی اینجا
   // باعث می‌شد مهمانِ ناشناس عددِ ساختگی ببیند (باگِ ۳۴۰).
   if (pts > 0) { const np=document.getElementById('navPts'); if(np) np.textContent=fmtFa(pts); }
+}
+// رندرِ کاملِ صفحه‌ی کشف — شاملِ بخش‌هایی که خودشان I/O دارند.
+//
+// ⚠️ فقط دو صداکننده دارد و باید همین بماند: `boot()` (لودِ سرد) و
+// pull-to-refresh (خواستِ صریحِ کاربر). قبلاً `syncRestaurants` هم آن را صدا
+// می‌زد، پس هر لودِ سرد **دو** `GET /events` و **دو** خواندنِ موقعیت می‌فرستاد
+// (بار اول با دادهٔ نمونه، بار دوم بعد از رسیدنِ /restaurants). حالا
+// syncRestaurants فقط `renderRestaurantSections()` را صدا می‌زند که هیچ I/O
+// ندارد. اگر جای دیگری این تابع را صدا زدی، یعنی داری یک درخواستِ شبکه‌ی
+// اضافه اضافه می‌کنی — عمدی باشد، نه اتفاقی.
+export function renderDiscoverSections(){
+  renderRestaurantSections();
+  initNearby();     // اگر اجازه‌ی موقعیت از قبل هست، «نزدیک تو» را واقعی می‌کند (یک‌بار)
+  renderEvents();
 }
 // ⚠️ اضافه‌شده (R4 — حسابرسیِ جست‌وجو، ۲۰۲۶-۰۸-۱۴): انتخاب‌هایِ «کِی»/«چند
 // نفر» در نوارِ جست‌وجو قبلاً bookingCtx را می‌نوشتند ولی هیچ‌جای نتایج
@@ -370,7 +403,7 @@ export function toggleFav(id,el){
   else {
     // Undo روی حذفِ علاقه (کاملاً client-side)
     undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
-      favs.add(id);
+      favs.add(String(id));
       saveFavs();
       if(el){ el.innerHTML=icon('heart',{size:20,fill:true}); el.setAttribute('aria-pressed','true'); el.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
       if(document.getElementById('page-favorites')?.classList.contains('active')) renderFavs();
@@ -382,8 +415,9 @@ export function toggleFav(id,el){
 export function toggleRestFav(id){
   id=String(id);
   const btn=document.getElementById('rpFav');
-  const on=!favs.has(id);
-  on?favs.add(id):favs.delete(id);
+  const key=String(id);
+  const on=!favs.has(key);
+  on?favs.add(key):favs.delete(key);
   saveFavs();
   if(btn){
     btn.innerHTML=icon('heart',{size:22,fill:on});
@@ -393,7 +427,7 @@ export function toggleRestFav(id){
   if(on){ toast('','به علاقه‌مندی‌ها اضافه شد'); }
   else {
     undoSnack('از علاقه‌مندی‌ها حذف شد', ()=>{
-      favs.add(id);
+      favs.add(String(id));
       saveFavs();
       if(btn){ btn.innerHTML=icon('heart',{size:22,fill:true}); btn.setAttribute('aria-pressed','true'); btn.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }
     });

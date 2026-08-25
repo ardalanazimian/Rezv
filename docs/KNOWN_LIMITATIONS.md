@@ -1,3 +1,16 @@
+<!-- ARCHIVED-SNAPSHOT -->
+> ## ⚠️ عکسِ لحظه‌ایِ بایگانی‌شده — عدد‌هایش دیگر درست نیستند
+>
+> این سند گزارشِ یک ممیزیِ **نقطه‌ای** است، نه مرجعِ زنده. با اندازه‌گیریِ
+> واقعیِ ۲۰۲۶-۰۸-۲۴ ادعایِ «۵۹ route» با شمارشِ واقعیِ **۱۳۵ route** نمی‌خواند.
+>
+> **برایِ وضعیتِ فعلی این‌ها را بخوان:**
+> `docs/audit/CLEANUP-REPORT-2026-08-23.md` · `docs/audit/DEAD-CODE.md` ·
+> `docs/audit/CUSTOMER-PROFILE.md` · `docs/recovery/OPEN-FINDINGS.md`
+>
+> نگه داشته شد چون **دلیلِ** تصمیم‌هایِ آن زمان را ثبت می‌کند (پروتکل §۲: حذف
+> بدونِ شواهد ممنوع). هرجا با اسنادِ بالا تعارض داشت، آن‌ها برنده‌اند.
+
 # KNOWN_LIMITATIONS.md — RezervoNo
 
 > Honest inventory of technical debt, known issues, and scalability concerns

@@ -39,6 +39,9 @@ export async function renderChats(){
 
   const res = await API.get('/me/chats');
   const body = document.getElementById('chatListBody');
+  // ⚠️ aria-busy="true" رویِ خودِ ظرف است و innerHTML آن را پاک نمی‌کند —
+  // بدونِ این خط، صفحه‌خوان تا ابد لیست را «در حالِ بارگذاری» اعلام می‌کرد.
+  body.removeAttribute('aria-busy');
   // سه حالتِ متفاوت، سه پیامِ متفاوت — تبدیلِ همه به «اتصال برقرار نشد»
   // کاربر را دنبالِ عیب‌یابیِ اینترنتش می‌فرستاد در حالی که مشکل چیزِ دیگری بود.
   if (!res.ok) {
@@ -53,7 +56,7 @@ export async function renderChats(){
   if (!items.length) { body.innerHTML = `<div class="chat-empty">هنوز گفتگویی نداری.<br>از صفحه‌ی هر رستوران می‌تونی پیام بدی.</div>`; return; }
 
   body.innerHTML = items.map(t => `
-    <div class="chat-row" onclick="openChatThread('${t.id}','${esc(t.restaurant.name)}')">
+    <div class="chat-row" role="button" tabindex="0" onclick="openChatThread('${t.id}','${esc(t.restaurant.name)}')">
       <div class="chat-row-avatar">${esc(t.restaurant.name.charAt(0))}</div>
       <div class="chat-row-main">
         <div class="chat-row-top"><span class="chat-row-name">${esc(t.restaurant.name)}</span>${t.reservation_code ? `<span class="chat-row-tag">#${esc(t.reservation_code)}</span>` : ''}</div>

@@ -81,7 +81,14 @@
   transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
   width: 100%;
 }
-.field-input:focus { outline: none; border-color: var(--brand-500); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-500) 15%, transparent); }
+/* ⚠️ الگویِ عمدی — دو بار نوشتنِ یک ویژگی، اشتباه نیست (۲۰۲۶-۰۸-۲۴):
+   خطِ اول مقدارِ ثابتِ rgba است، خطِ دوم همان با `color-mix()`.
+   `color-mix` از Chrome 111 / Safari 16.2 / Firefox 113 پشتیبانی می‌شود؛
+   مرورگرِ قدیمی‌تر آن اعلانِ نامعتبر را **کلاً دور می‌ریزد**. بدونِ خطِ اول،
+   نتیجه «رنگِ کمی متفاوت» نبود بلکه نبودِ کاملِ آن ویژگی می‌شد: حلقه‌ی فوکوس
+   ناپدید (افتِ دسترسی‌پذیری) و پس‌زمینه‌ی پدِ کشیدنی نامرئی (خرابیِ عملکردی).
+   پس این دو خط را «تمیز» نکنید — ترتیبشان هم مهم است. */
+.field-input:focus { outline: none; border-color: var(--brand-500); box-shadow:0 0 0 3px rgba(79,70,229,0.15); box-shadow:0 0 0 3px color-mix(in srgb, var(--brand-500) 15%, transparent); }
 .field-input[aria-invalid="true"] { border-color: var(--danger); }
 .field-error { font-size: var(--fs-xs); color: var(--danger-ink); }
 .field-help  { font-size: var(--fs-xs); color: var(--text-3, #999); }
@@ -167,7 +174,7 @@
   border-radius: var(--radius-full); white-space: nowrap;
 }
 .badge-neutral { background: var(--surface-2, #f0f0f4); color: var(--text-2, #555); }
-.badge-brand   { background: color-mix(in srgb, var(--brand-500) 12%, transparent); color: var(--brand-600); }
+.badge-brand   { background:rgba(79,70,229,0.12); background:color-mix(in srgb, var(--brand-500) 12%, transparent); color: var(--brand-600); }
 .badge-success { background: var(--success-soft); color: var(--success-ink); }
 .badge-warning { background: var(--warning-soft); color: var(--warning-ink); }
 .badge-danger  { background: var(--danger-soft);  color: var(--danger-ink); }
@@ -183,7 +190,10 @@
 /* ═══════════ Chip (فیلتر/انتخاب) ═══════════ */
 .chip {
   display: inline-flex; align-items: center; gap: var(--sp-1);
-  height: 34px; min-height: 34px; padding: 0 var(--sp-3);
+  /* ۳۴px زیرِ حداقلِ لمسیِ ۴۴px بود (WCAG 2.5.5) — همان ایرادی که برایِ .btn
+     در ds-bridge.css رفع شده بود ولی .chip از قلم افتاده بود. ارتفاعِ ثابت به
+     min-height تبدیل شد تا محتوا هم بتواند رشد کند. */
+  min-height: var(--touch-min); padding: 0 var(--sp-3);
   font-size: var(--fs-sm); font-weight: var(--fw-semibold);
   background: var(--surface-2, #f4f4f8); color: var(--text-2, #555);
   border: 1px solid transparent; border-radius: var(--radius-full);
@@ -192,8 +202,9 @@
 }
 .chip:hover { background: var(--surface-hover, rgba(0,0,0,.05)); }
 .chip[aria-pressed="true"], .chip.is-active {
-  background: color-mix(in srgb, var(--brand-500) 12%, transparent);
-  color: var(--brand-600); border-color: color-mix(in srgb, var(--brand-500) 30%, transparent);
+  background:rgba(79,70,229,0.12);
+  background:color-mix(in srgb, var(--brand-500) 12%, transparent);
+  color: var(--brand-600); border-color:rgba(79,70,229,0.30); border-color:color-mix(in srgb, var(--brand-500) 30%, transparent);
 }
 
 /* ═══════════ Avatar ═══════════ */

@@ -16,6 +16,9 @@ const PANELS = [
 
 for (const p of PANELS) {
   test(`${p.name} بدونِ خطا لود می‌شود و اسکلتِ اصلی رندر می‌شود`, async ({ page }) => {
+    // P2-6: این spec هیچ مهلتِ اضافه‌ای نداشت و زیرِ بارِ کلِ سوئیت روی
+    // `page.goto` تایم‌اوت می‌کرد (نه شکستِ assertion — تأییدشده در error-context).
+    test.slow();
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
 

@@ -1,4 +1,5 @@
 import { test, describe } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -24,7 +25,10 @@ import { join } from 'node:path';
 //  دیگری اضافه کند، باز هم گرفته می‌شود.
 // ═══════════════════════════════════════════════════════════════════════
 
-const REPO_ROOT = new URL('../../', import.meta.url).pathname;
+// [merge ۰۸-۲۴] fileURLToPath و نه .pathname: رویِ ویندوز pathname «/C:/…» می‌دهد
+// و fs آن را «C:\C:\…» می‌فهمد (ENOENT) — همان کلاسِ باگِ cross-platform که
+// photo-moderation قبلاً برایِ sep داشت. رویِ لینوکسِ CI هر دو یکی‌اند.
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'playwright-report', 'test-results']);
 
 function findShellScripts(dir: string, out: string[] = []): string[] {
