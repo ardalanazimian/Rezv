@@ -47,7 +47,9 @@ const getReq = (token: string, qs = '') =>
 
 /** سهمیه‌ی rate-limit بینِ فایل‌هایِ رانر مشترک است (کلید بر پایه‌ی IP). */
 async function clearRateLimit() {
-  for (const p of ['rl:auth:*', 'rl:srch:*']) {
+  // `rl:chkin:*` = سطلِ اختصاصیِ /checkin (RULES.qrCheckin) — بدونِ پاک‌کردنش
+  // اسکن‌هایِ این فایل سهمیه‌ی فایلِ بعدیِ رانر را می‌سوزانند.
+  for (const p of ['rl:auth:*', 'rl:srch:*', 'rl:chkin:*']) {
     const keys = await redis.keys(p);
     if (keys.length) await redis.del(...keys);
   }
@@ -94,14 +96,14 @@ async function makeLiveReservation(ctx: Ctx, tableId: string) {
   });
 }
 
-// [merge ۰۸-۲۴] توکنِ کارمند اجباری شد: /checkin در سخت‌سازیِ P0-2 (خطِ ممیزی)
-// دیگر عمومی نیست — اسکن‌کننده‌ی واقعی دستگاهِ میزبان است، نه اینترنتِ باز.
-// (گاردِ قراردادش: checkin-auth.integration.test.mts). ادعاهای این فایل —
-// ابطالِ واقعیِ کدِ قدیمی و کارکردنِ کدِ نو — دست‌نخورده می‌مانند.
-const scan = (qrCode: string, token: string) =>
+// اسکن دقیقاً همان‌طور که مهمان انجام می‌دهد: بدونِ هیچ توکنی. خودِ کدِ QR
+// اعتبارنامه است (۵۰ بیت آنتروپی) — قراردادِ کاملش در
+// `qr-checkin.integration.test.mts`. ادعاهای این فایل — ابطالِ واقعیِ کدِ
+// قدیمی و کارکردنِ کدِ نو — از این تغییر مستقل‌اند.
+const scan = (qrCode: string) =>
   checkinRoute.POST(new Request('http://x/api/v1/checkin', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ qr_code: qrCode }),
   }));
 
@@ -155,12 +157,12 @@ describe('بازتولیدِ کد', () => {
     await makeLiveReservation(A, table.id);
 
     // پیش از بازتولید، کدِ قدیمی کار می‌کند (کنترلِ مثبت — وگرنه تستِ بعدی بی‌معناست)
-    const before = await scan(oldCode, A.token);
+    const before = await scan(oldCode);
     assert.equal(before.status, 200, 'کدِ اولیه باید قبل از بازتولید کار کند');
 
     await regenerate(A, table.id);
 
-    const after = await scan(oldCode, A.token);
+    const after = await scan(oldCode);
     assert.equal(after.status, 404, 'استیکرِ قدیمی باید از کار افتاده باشد');
   });
 
@@ -171,11 +173,15 @@ describe('بازتولیدِ کد', () => {
     const res = await regenerate(A, table.id);
     const { code } = await res.json() as { code: string };
 
-    const out = await scan(code, A.token);
+    const out = await scan(code);
     assert.equal(out.status, 200);
-    const body = await out.json() as { reservation_code: string | null; status: string };
-    assert.equal(body.reservation_code, resv.code);
+    const body = await out.json() as { reservation_code: string | null; status: string; checked_in: boolean };
+    // موفقیت از `checked_in` + وضعیتِ واقعیِ DB خوانده می‌شود، نه از
+    // `reservation_code` (که فقط به صاحبِ رزرو داده می‌شود).
+    assert.equal(body.checked_in, true);
     assert.equal(body.status, 'seated');
+    const row = await db.reservation.findUnique({ where: { id: resv.id }, select: { status: true } });
+    assert.equal(row?.status, 'seated', 'رزرو واقعاً باید seated شده باشد');
   });
 
   test('بازتولیدِ دوباره کدِ دیگری می‌دهد (هر بار تازه، نه یک‌بار)', async () => {

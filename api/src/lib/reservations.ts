@@ -7,7 +7,7 @@ import { enqueueSms } from './sms';
 import { emit } from './events';
 import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
-import { redeemGiftCardTx, addClubPoints, getClubPointsBalance } from './loyalty';
+import { redeemGiftCardTx, getClubPointsBalance, ARRIVAL_POINTS } from './loyalty';
 import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
 import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
@@ -15,9 +15,6 @@ import { computeRanges, genReservationCode, isConflictError, isSerializationErro
 import { invalidateAvailability } from './availability-cache';
 import { transitionReservation } from './lifecycle';
 import { getOccupiedTableNumbers } from './table-occupancy';
-import { createLogger } from './logger';
-
-const log = createLogger('reservations');
 
 // ⚠️ درسِ تاریخی (باگِ واقعیِ P0 که با تستِ زنده پیدا شد، نه فرض): مقایسه‌ی
 // خامِ `status IN (...)` در $queryRaw بدونِ کستِ صریح با enumِ Postgres شکست
@@ -813,8 +810,6 @@ export interface ArrivalInput {
   actorStaffId: string;
 }
 
-const ARRIVAL_POINTS = 50;
-
 export async function markArrival(input: ArrivalInput) {
   const resv = await db.reservation.findUnique({ where: { code: input.code } });
   if (!resv || resv.restaurantId !== input.restaurantId) throw Err.notFound('رزرو');
@@ -834,24 +829,16 @@ export async function markArrival(input: ArrivalInput) {
   // تنها منبعِ اتمیک، نتیجه‌ی خودِ تراکنشِ انتقال است.
   const firstArrival = updated.changed;
 
-  // امتیازِ باشگاهِ رستوران — از این‌جا به بعد از مسیرِ دفتر (PointsLedger) که
-  // مرجعِ سروری است؛ `club_members.points` فقط کشِ هم‌تراکنش است.
-  if (firstArrival && resv.userId) {
-    // اگر ثبتِ امتیاز شکست بخورد نباید خودِ چک‌این را بشکند (رزرو از قبل commit
-    // شده) — همان قاعده‌ای که transitionReservation برایِ اعلان/اقتصاد دارد.
-    // دفتر append-only است، پس نبودِ ردیف بعداً قابلِ تشخیص و جبران است.
-    await addClubPoints({
-      userId: resv.userId,
-      restaurantId: resv.restaurantId,
-      delta: ARRIVAL_POINTS,
-      reason: 'reservation',
-      note: `حضور در رزرو ${resv.code}`,
-    }).catch((e) => {
-      log.error('ثبتِ امتیازِ حضور در دفتر ناموفق (چک‌این خودش commit شد)', {
-        reservationId: resv.id, code: resv.code, error: (e as Error).message,
-      });
-    });
-  }
+  // ⚠️ امتیازِ باشگاه دیگر این‌جا داده نمی‌شود.
+  //
+  // این بلوک به `transitionReservation` (تنها نویسنده‌ی مجازِ وضعیت) منتقل شد،
+  // چون این تابع فقط از `POST /reservations/:code/arrive` صدا زده می‌شود و
+  // **هیچ‌کدام از سه پنل آن endpoint را صدا نمی‌زنند** — مسیرِ واقعیِ چک‌ینِ
+  // پنل `PATCH /restaurant/reservations/:code/status` است. یعنی تنها
+  // نویسنده‌ی دفترِ امتیاز از رابطِ کاربری دسترس‌ناپذیر بود. توضیحِ کاملِ
+  // تصمیم و دلیلِ ردِ دو راهِ دیگر در `lib/lifecycle.ts` است.
+  //
+  // این‌جا **تکرار نمی‌شود** وگرنه هر چک‌ین از این مسیر دو بار امتیاز می‌گرفت.
 
   // SMS خوش‌آمد — فقط بارِ اول (نه در تکرار/retry)
   if (firstArrival && resv.guestPhone) {

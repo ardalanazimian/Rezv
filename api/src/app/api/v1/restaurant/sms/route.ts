@@ -10,7 +10,12 @@ import { recordOutreach } from '@/lib/outreach-ledger';
 const smsSchema = z.object({
   kind: z.enum(['winback', 'campaign']).default('campaign'),
   phones: z.array(zPhone).max(500).optional(),
-  segment: z.enum(['gold', 'silver', 'bronze']).optional(),
+  // ⚠️ `platinum` اضافه شد: از فازِ ۲ ستونِ `club_members.tier` واقعاً نوشته
+  // می‌شود و `LOYALTY_TIERS` چهار سطح دارد. بدونِ این مقدار، وفادارترین
+  // اعضا با **هیچ** سگمنتی قابلِ هدف‌گیری نبودند (و در «همه» هم که سگمنت
+  // فرستاده نمی‌شود می‌افتادند، پس نشتِ آماری نبود — ولی کمپینِ سطح‌محور
+  // بی‌صدا از دستشان می‌داد). افزودنی و بدونِ شکستنِ کلاینتِ فعلی.
+  segment: z.enum(['gold', 'silver', 'bronze', 'platinum']).optional(),
   discount_code: z.string().max(20).optional(),
   message: z.string().max(500).optional(),
 });

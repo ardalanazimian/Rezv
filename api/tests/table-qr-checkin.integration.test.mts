@@ -61,6 +61,10 @@ async function clearRateLimit() {
   if (stale.length) await redis.del(...stale);
   const search = await redis.keys('*search*');
   if (search.length) await redis.del(...search);
+  // سطلِ اختصاصیِ /checkin (RULES.qrCheckin, prefix `chkin`). بدونِ این،
+  // اسکن‌هایِ این فایل سهمیه‌ی فایلِ بعدی را می‌سوزانند و ۴۲۹ می‌گیرد.
+  const chk = await redis.keys('*chkin*');
+  if (chk.length) await redis.del(...chk);
 }
 
 async function makeTenant(label: string): Promise<Ctx> {
@@ -183,18 +187,22 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
     const { body } = await createTableViaRoute(A);
     const resv = await makeLiveReservation(A, body.id);
 
-    // [merge ۰۸-۲۴] هدرِ احراز: /checkin در سخت‌سازیِ P0-2 staff-scoped شد (پایین).
+    // بدونِ هیچ هدرِ احرازی — دقیقاً همان کاری که اپِ مشتریِ مهمان می‌کند.
     const res = await checkinRoute.POST(
       new Request('http://x/api/v1/checkin', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${A.token}` },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ qr_code: body.qr_code }),
       }),
     );
 
     assert.equal(res.status, 200);
-    const out = await res.json() as { reservation_code: string | null; status: string; table_number: number };
-    assert.equal(out.reservation_code, resv.code, 'باید همان رزرو را پیدا کند');
+    const out = await res.json() as { reservation_code: string | null; status: string; table_number: number; checked_in: boolean };
+    // ⚠️ موفقیت از `checked_in` خوانده می‌شود، نه از `reservation_code`:
+    // کدِ رزرو فقط به صاحبِ همان رزرو داده می‌شود (ضدِ نشت)، پس برای
+    // فراخوانِ ناشناس همیشه null است حتی وقتی check-in واقعاً انجام شده.
+    assert.equal(out.checked_in, true, 'باید همان رزرو را پیدا کند و بنشاند');
+    assert.equal(out.reservation_code, null, 'فراخوانِ ناشناس نباید کدِ رزرو بگیرد');
     assert.equal(out.status, 'seated');
     assert.equal(out.table_number, body.number);
 
@@ -205,40 +213,23 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
     assert.equal(tbl?.state, 'occupied', 'میز باید اشغال شده باشد');
   });
 
-  test('اسکنِ بدونِ احرازِ کارمند رد می‌شود (قفلِ P0-2)', async () => {
-    // [merge ۰۸-۲۴ — تغییرِ آگاهانه‌ی قرارداد] نسخه‌ی قبلیِ این تست عکسش را
-    // می‌خواست: «خودِ کدِ QR اعتبارنامه است، لاگین لازم نیست». خطِ ممیزی همان
-    // route را P0-2 کرد: mutationِ وضعیتِ رزرو/میز از اینترنتِ باز، فقط با
-    // رشته‌ای که رویِ استیکرِ فیزیکی چاپ شده، یعنی هر عکسِ اشتراکی/enumeration
-    // می‌تواند از راهِ دور میزها را occupied کند. اسکن‌کننده‌ی واقعی دستگاهِ
-    // میزبان است (همان که «رسید» را می‌زند)؛ منویِ عمومیِ مهمان (#32) هم مستقل
-    // از این route و بدونِ لاگین سالم است. گاردِ ساختاری: checkin-auth.integration.
+  test('میزِ بدونِ رزروِ فعال: صادقانه می‌گوید رزروی نیست، ادعای ثبت نمی‌کند', async () => {
     const { body } = await createTableViaRoute(A);
-    await makeLiveReservation(A, body.id);
     const res = await checkinRoute.POST(new Request('http://x/api/v1/checkin', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ qr_code: body.qr_code }),
     }));
-    assert.equal(res.status, 401, 'بدونِ توکنِ کارمند نباید هیچ وضعیتی جهش کند');
-  });
-
-  test('میزِ بدونِ رزروِ فعال: صادقانه می‌گوید رزروی نیست، ادعای ثبت نمی‌کند', async () => {
-    const { body } = await createTableViaRoute(A);
-    const res = await checkinRoute.POST(new Request('http://x/api/v1/checkin', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${A.token}` },
-      body: JSON.stringify({ qr_code: body.qr_code }),
-    }));
     assert.equal(res.status, 200);
-    const out = await res.json() as { reservation_code: string | null };
+    const out = await res.json() as { reservation_code: string | null; checked_in: boolean };
+    assert.equal(out.checked_in, false, 'نباید ادعای ثبتِ ورود کند');
     assert.equal(out.reservation_code, null, 'نباید رزروی از خودش بسازد');
   });
 
   test('کدِ ناشناس رد می‌شود', async () => {
     const res = await checkinRoute.POST(new Request('http://x/api/v1/checkin', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${A.token}` },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ qr_code: 'T-ZZZZZZZZZZ' }),
     }));
     assert.equal(res.status, 404);

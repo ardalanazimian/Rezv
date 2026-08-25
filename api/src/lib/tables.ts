@@ -106,29 +106,81 @@ export async function assignQrCode(
   throw lastErr ?? Err.validation('ساخت کد QR ناموفق بود');
 }
 
-// ── check-in با اسکن QR: پرسنل کدِ QRِ میز را اسکن می‌کند و رزروِ فعلی را seated می‌کند ──
-//
-// ⚠️ رفعِ P0-2 (فازِ ۲، پروتکل §۴ و §۷) — دو نقصِ جدی که با هم رفع شدند:
-//
-//  ۱. **بدونِ احراز هویت.** routeِ POST /api/v1/checkin هیچ auth ای نداشت و
-//     middleware هم فقط بنِ IP/CSRF/ریت‌لیمیت می‌کند، نه احراز هویت. یعنی هرکس
-//     با دانستن یا حدس‌زدنِ یک qrCode می‌توانست رزروِ فردِ دیگری را
-//     checked_in→seated کند (دو انتقالِ واقعی، با audit و SMS و رویدادِ اقتصادی)،
-//     میز را occupied کند، و در پاسخ reservation_code را هم بگیرد. هم دستکاریِ
-//     حالتِ کسب‌وکار بود، هم DoSِ عملیاتی (اشغال‌نشان‌دادنِ همه‌ی میزها).
-//
-//  ۲. **بدونِ محدوده‌ی تنانت.** جست‌وجویِ میز سراسری بود؛ هیچ چکی نبود که این
-//     میز به رستورانِ فراخوان تعلق دارد.
-//
-// حالا restaurantId اجباری است و route از withRestaurantAuth عبور می‌کند
-// (پرسنلِ احرازشده + RBAC + محدوده‌ی شعبه). این با جریانِ واقعیِ محصول هم
-// یکی است: اپِ مشتری صریح می‌گوید «میزبان با اسکن این کد، ورودت رو ثبت می‌کنه»
-// (apps/customer/js/features/trips.js) — یعنی اسکن‌کننده پرسنل است، نه مهمان.
-export async function qrCheckIn(qrCode: string, restaurantId: string): Promise<{
+/**
+ * میزِ متناظرِ یک کدِ QR — **بدونِ هیچ زمینه‌ی تنانتی**.
+ *
+ * چرا لازم شد: در `POST /api/v1/checkin` خودِ کدِ QR اعتبارنامه است، پس
+ * رستوران باید از *همان کد* مشتق شود، نه از توکنِ فراخوان. فراخوان اصلاً
+ * شعبه‌ای انتخاب نمی‌کند ⇒ شکافِ «انتخابِ تنانت توسطِ مهاجم» ساختاراً بسته
+ * است (پروتکل §۷)، نه با یک `if`.
+ *
+ * ⚠️ این تابع خودش هیچ مجوزی نمی‌دهد. تنها مصرف‌کننده‌ی مجازش مسیری است که
+ * کدِ QR را به‌عنوانِ اعتبارنامه می‌پذیرد؛ برای هر مسیرِ دیگری از
+ * `qrCheckIn(code, restaurantId)` استفاده کن که محدوده‌ی تنانت را اجبار
+ * می‌کند. `qr_code` در دیتابیس `@unique` است، پس نتیجه یکتاست.
+ */
+export async function resolveQrTable(
+  qrCode: string,
+): Promise<{ id: string; restaurantId: string; number: number } | null> {
+  if (!qrCode) return null;
+  return db.table.findUnique({
+    where: { qrCode },
+    select: { id: true, restaurantId: true, number: true },
+  });
+}
+
+/**
+ * وضعیت‌هایی که یعنی «مهمان واقعاً ثبتِ حضور شده».
+ *
+ * ⚠️ چرا یک فیلدِ صریح لازم شد (نه استنتاج از `reservation_code`): از وقتی
+ * کدِ رزرو برای فراخوانِ غیرِ صاحبِ رزرو `null` می‌شود، کلاینت دیگر نمی‌تواند
+ * از `null` بودنِ آن نتیجه بگیرد «رزروی نبود». اپِ مشتری دقیقاً همین کار را
+ * می‌کرد (`features/checkin.js`) و بدونِ این فیلد به مهمانی که واقعاً نشسته
+ * بود می‌گفت «رزروی پیدا نشد» — یعنی **جعلِ شکست**، آینه‌ی همان بندِ ۳ که
+ * جعلِ موفقیت را ممنوع می‌کند.
+ */
+const PRESENT_STATUSES = new Set(['checked_in', 'arrived', 'seated', 'dining', 'completed']);
+
+export type QrCheckInResult = {
   table_number: number;
+  /** کدِ رزرو — فقط برای صاحبِ همان رزرو؛ برای بقیه همیشه `null`. */
   reservation_code: string | null;
   status: string;
-}> {
+  /** آیا رزروی روی این میز پیدا شد و حضورِ مهمان ثبت شد؟ (مستقل از دیدنِ کد) */
+  checked_in: boolean;
+};
+
+// ── check-in با اسکن QR: کدِ QRِ میز اسکن می‌شود و رزروِ فعلیِ آن میز seated می‌شود ──
+//
+// ⚠️ تاریخچه‌ی این تابع را قبل از تغییر بخوان — دو بار جهت عوض کرده:
+//
+//  ۱. **تا ۲۰۲۶-۰۸-۲۱ بدونِ محدوده‌ی تنانت بود.** جست‌وجویِ میز سراسری بود و
+//     هیچ چکی نبود که میز به رستورانِ فراخوان تعلق دارد. `restaurantId`
+//     اجباری شد و همان‌جا ماند: هر فراخوانی که *زمینه‌ی رستوران دارد* باید
+//     آن را بدهد. میزِ رستورانِ دیگر عمداً دقیقاً مثلِ میزِ ناموجود دیده
+//     می‌شود (همان `Err.notFound('میز')`) تا وجود/عدمِ وجودِ کد لو نرود.
+//
+//  ۲. **در ۲۰۲۶-۰۸-۲۴ کلِ route زیرِ احراز هویتِ کارمند رفت** — و آن
+//     اصلاحِ بیش‌ازحد، قابلیت را برای کاربرِ واقعی **مرده** کرد. با تستِ
+//     زنده روی همین درخت: بدونِ توکن ⇒ `401 UNAUTHORIZED`، با توکنِ مشتری ⇒
+//     `403 FORBIDDEN_TENANT`. تنها فراخوانِ این endpoint در کلِ سه اپ
+//     `apps/customer/js/features/checkin.js:79` است (اپِ **مشتری**)؛ پنلِ
+//     رستوران اصلاً صدایش نمی‌زند (برای ثبتِ ورود از
+//     `PATCH /restaurant/reservations/{code}/status` می‌رود) و **هیچ
+//     اسکنرِ QRی هم ندارد** — فقط QR را تولید و چاپ می‌کند. یعنی مسیر
+//     برای هیچ‌کس قابلِ استفاده نبود.
+//
+// امروز: خودِ لایه‌ی سرویس دست‌نخورده و tenant-scoped مانده؛ *route* است که
+// `restaurantId` را از خودِ کدِ QR مشتق می‌کند (`resolveQrTable` بالا).
+//
+// `viewer` فقط تعیین می‌کند چه کسی حق دارد `reservation_code` را ببیند —
+// هیچ اثری بر انجام‌شدن یا نشدنِ check-in ندارد (پارامترِ پیش‌فرض‌دار است تا
+// امضایِ اجباریِ دوپارامتریِ تابع، که گاردِ تنانت را قفل می‌کند، نشکند).
+export async function qrCheckIn(
+  qrCode: string,
+  restaurantId: string,
+  viewer: { userId?: string | null } = {},
+): Promise<QrCheckInResult> {
   const table = await db.table.findUnique({ where: { qrCode } });
   // محدوده‌ی تنانت: میزِ رستورانِ دیگر باید دقیقاً مثلِ میزِ ناموجود دیده شود
   // (نه پیامِ متفاوت) تا وجود/عدمِ وجودِ کدِ QRِ رستورانِ دیگر لو نرود.
@@ -148,8 +200,22 @@ export async function qrCheckIn(qrCode: string, restaurantId: string): Promise<{
 
   if (!resv) {
     // میز بدون رزرو فعال → فقط وضعیت میز را برگردان
-    return { table_number: table.number, reservation_code: null, status: table.state };
+    return { table_number: table.number, reservation_code: null, status: table.state, checked_in: false };
   }
+
+  // ── نشتِ اطلاعات: کدِ رزرو فقط برای صاحبِ همان رزرو (P0-2، لایه‌ی ۳) ──
+  //
+  // کدِ رزرو یک شناسه‌ی نیمه‌محرمانه است (کلیدِ `GET/PATCH /reservations/:code`).
+  // چون این مسیر با اعتبارنامه‌ی QR و بدونِ توکنِ کاربر هم سرو می‌شود، تحویلِ
+  // خام‌ش یعنی هرکس استیکر را ببیند کدِ رزروِ فردِ دیگری را هم می‌گیرد.
+  //
+  // شرط عمداً سخت‌گیرانه است: هم `viewer.userId` و هم `resv.userId` باید
+  // وجود داشته باشند و برابر باشند. یعنی رزروِ مهمانِ بدونِ حساب
+  // (`userId === null`) به **هیچ‌کس** کد نمی‌دهد — نه به فراخوانِ ناشناس و نه
+  // به یک کاربرِ لاگین‌کرده‌ی بی‌ربط (بدونِ این سخت‌گیری،
+  // `null === undefined`ِ سهوی یا مقایسه‌ی نال با نال درِ نشت را باز می‌کرد).
+  const ownsReservation = Boolean(viewer.userId) && resv.userId === viewer.userId;
+  const visibleCode = ownsReservation ? resv.code : null;
 
   // ⚠️ باگ M4: قبلاً وضعیت رزرو مستقیم seated نوشته می‌شد و state machine را دور
   // می‌زد (نه audit، نه اعلان، و پرش confirmed→seated بدون checked_in). حالا از
@@ -165,8 +231,16 @@ export async function qrCheckIn(qrCode: string, restaurantId: string): Promise<{
     await transitionReservation({ reservationId: resv.id, to: 'seated', actor: 'system', isAutomatic: true });
   } catch {
     // انتقال نامعتبر (مثلاً قبلاً seated/dining شده) — وضعیت فعلی را برگردان.
+    // این همان مسیرِ idempotency است: اسکنِ دوباره‌ی همان استیکر وضعیت را
+    // خراب نمی‌کند، فقط همان چیزی را که هست گزارش می‌کند.
     const fresh = await db.reservation.findUnique({ where: { id: resv.id }, select: { status: true } });
-    return { table_number: table.number, reservation_code: resv.code, status: fresh?.status ?? resv.status };
+    const status = fresh?.status ?? resv.status;
+    return {
+      table_number: table.number,
+      reservation_code: visibleCode,
+      status,
+      checked_in: PRESENT_STATUSES.has(status),
+    };
   }
   // میز را occupied کن (بعد از seated موفق).
   //
@@ -184,5 +258,5 @@ export async function qrCheckIn(qrCode: string, restaurantId: string): Promise<{
   // است و وضعیتِ فیزیکیِ میز نباید جلوی ثبتِ آن را بگیرد.
   await setTableState(table.id, table.restaurantId, 'occupied').catch(() => {});
 
-  return { table_number: table.number, reservation_code: resv.code, status: 'seated' };
+  return { table_number: table.number, reservation_code: visibleCode, status: 'seated', checked_in: true };
 }

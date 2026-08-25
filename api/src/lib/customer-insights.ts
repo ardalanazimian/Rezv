@@ -208,17 +208,88 @@ export async function recomputeCustomerInsight(restaurantId: string, userId: str
  *  (حتی اگر churned/at_risk بودند) و برای مشتریانی که از دهک برتر خارج می‌شدند فقط
  *  isVip را false می‌کرد ولی segment='vip' باقی می‌ماند → drift دائمی. حالا VIP فقط
  *  یک flag بولی است و segment (که از churn/recency محاسبه می‌شود) دست‌نخورده می‌ماند. */
-export async function refreshVipFlags(restaurantId: string) {
-  const count = await db.customerInsight.count({ where: { restaurantId } });
-  if (count < 10) return; // برای رستوران‌های کوچک، VIP-بندی دهکی بی‌معنی است
-  const vipCutoffIndex = Math.max(0, Math.floor(count * 0.1) - 1);
-  const cutoffRow = await db.customerInsight.findMany({
-    where: { restaurantId }, orderBy: { predictedClvToman: 'desc' }, skip: vipCutoffIndex, take: 1, select: { predictedClvToman: true },
+export const MIN_MEASURED_FOR_VIP = 10;
+/** سقفِ سهمِ VIP. دهکِ برتر ۱۰٪ است؛ اگر تساوی‌ها انتخاب را از این سقف رد کنند،
+ *  یعنی مرزِ دهک اصلاً تفکیک نمی‌کند و ادعایِ «برتر» بی‌پشتوانه است. */
+export const MAX_VIP_SHARE = 0.25;
+
+export type VipRefreshStatus = 'ok' | 'insufficient_data' | 'no_discrimination';
+
+/**
+ * پس از تعیین سگمنت‌ها، VIP = ۱۰٪ بالای CLV این رستوران (دهک برتر).
+ *
+ *  ⚠️ باگ M11 (قبلی): برای مشتریان بالای cutoff، segment را هم به 'vip' تغییر
+ *  می‌داد (حتی اگر churned/at_risk بودند) و برای مشتریانی که از دهک برتر خارج
+ *  می‌شدند فقط isVip را false می‌کرد ولی segment='vip' باقی می‌ماند → drift دائمی.
+ *  حالا VIP فقط یک flag بولی است و segment دست‌نخورده می‌ماند.
+ *
+ *  ⚠️ رفعِ «تساویِ CLV همه را VIP می‌کند» (فازِ ۲، پروتکل §۲۰ / `ML_CONTRACT.md`).
+ *
+ *  چه بود: cutoff از ردیفِ دهکِ برتر خوانده می‌شد و بعد `gte: cutoff` اعمال
+ *  می‌شد. وقتی همه‌ی CLVها برابرند — که در عملِ عادیِ این پلتفرم یعنی همه صفر،
+ *  چون هیچ رستورانی منویِ قیمت‌دار ندارد — خودِ cutoff هم همان مقدار می‌شود و
+ *  `gte` **کلِ جمعیت** را می‌گیرد. اندازه‌گیریِ زنده بعد از اجرای واقعیِ cron:
+ *  `is_vip=t → ۳۰ نفر` با `max(predicted_clv_toman)=0`. یعنی سی نفر با ارزشِ
+ *  پیش‌بینی‌شده‌ی صفر «مهمانِ VIP» اعلام شدند — دقیقاً همان «گزارشِ عملکردی که
+ *  اندازه نگرفته‌ای» که `docs/ML_CONTRACT.md` ممنوع می‌کند.
+ *  عکسِ آن هم غلط است: «هیچ‌کس VIP نیست» به‌عنوانِ رفتارِ همیشگی، قابلیت را
+ *  خاموش می‌کند. پس سه شرطِ **صریح** گذاشته شد:
+ *
+ *   ۱. فقط ردیف‌هایی که CLVِ **اندازه‌گیری‌شده و مثبت** دارند کاندیدند.
+ *      `null` یعنی «مبلغی نداشتیم» و `0` یعنی «ارزشِ پیش‌بینی‌شده هیچ» — هیچ‌کدام
+ *      نمی‌تواند «برترین» باشد. (پیش از این `null`ها هم واردِ ترتیب می‌شدند و در
+ *      Postgres با `DESC` اول می‌آمدند، یعنی cutoff می‌توانست از یک ردیفِ
+ *      اندازه‌گیری‌نشده بیاید.)
+ *   ۲. زیرِ `MIN_MEASURED_FOR_VIP` کاندیدِ سنجیده‌شده → هیچ‌کس VIP نیست.
+ *   ۳. گاردِ تساوی: اگر انتخاب بیش از `MAX_VIP_SHARE` از کاندیدها را بگیرد
+ *      (یعنی توده‌ای از مقادیرِ مساوی روی مرز نشسته)، دهک تفکیک نکرده و
+ *      هیچ‌کس VIP نمی‌شود.
+ *
+ *  در هر سه حالتِ «نمی‌دانیم»، پرچم‌ها **صریحاً پاک** می‌شوند — تا VIPِ کهنه‌ی
+ *  یک اجرایِ قبلی به‌صورتِ خاموش باقی نماند.
+ */
+export async function refreshVipFlags(restaurantId: string): Promise<VipRefreshStatus> {
+  // فقط ردیف‌هایی با CLVِ واقعاً اندازه‌گیری‌شده و مثبت کاندیدند.
+  const measured = await db.customerInsight.findMany({
+    where: { restaurantId, predictedClvToman: { gt: 0 } },
+    orderBy: { predictedClvToman: 'desc' },
+    select: { predictedClvToman: true },
   });
-  const cutoff = cutoffRow[0]?.predictedClvToman ?? Infinity;
+
+  const clearAll = async () => {
+    await db.customerInsight.updateMany({
+      where: { restaurantId, isVip: true }, data: { isVip: false },
+    });
+  };
+
+  if (measured.length < MIN_MEASURED_FOR_VIP) {
+    // برای رستوران‌های کوچک (یا بدونِ مبلغِ اندازه‌گیری‌شده) VIP-بندیِ دهکی بی‌معنی است.
+    await clearAll();
+    return 'insufficient_data';
+  }
+
+  const cutoffIndex = Math.max(0, Math.floor(measured.length * 0.1) - 1);
+  const cutoff = measured[cutoffIndex].predictedClvToman as number;
+
+  // گاردِ تساوی: چند کاندید واقعاً روی/بالایِ مرز می‌افتند؟
+  const selected = measured.filter((m) => (m.predictedClvToman as number) >= cutoff).length;
+  if (selected > measured.length * MAX_VIP_SHARE) {
+    await clearAll();
+    return 'no_discrimination';
+  }
+
   // فقط flag بولی isVip را ست/ریست کن — segment را تغییر نده (drift رفع شد).
-  await db.customerInsight.updateMany({ where: { restaurantId, predictedClvToman: { gte: cutoff } }, data: { isVip: true } });
-  await db.customerInsight.updateMany({ where: { restaurantId, predictedClvToman: { lt: cutoff } }, data: { isVip: false } });
+  await db.customerInsight.updateMany({
+    where: { restaurantId, predictedClvToman: { gte: cutoff } }, data: { isVip: true },
+  });
+  await db.customerInsight.updateMany({
+    where: {
+      restaurantId,
+      OR: [{ predictedClvToman: { lt: cutoff } }, { predictedClvToman: null }],
+    },
+    data: { isVip: false },
+  });
+  return 'ok';
 }
 
 /** برای cron شبانه: همه‌ی کاربران فعال یک رستوران در ۱۸۰ روز اخیر را بازمحاسبه می‌کند. */

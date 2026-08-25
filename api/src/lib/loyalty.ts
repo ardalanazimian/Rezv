@@ -15,6 +15,41 @@ const POINTS = {
   anniversary: 1000,     // هدیه‌ی سالگرد
 };
 
+/** امتیازی که بابتِ حضورِ واقعی (چک‌این) به باشگاهِ همان رستوران داده می‌شود. */
+export const ARRIVAL_POINTS = 50;
+
+// ═══════════════════════════════════════════════════════════
+//  سطوحِ باشگاه (tier)
+//
+//  ⚠️ این تعریف‌ها از `loyalty-status.ts` به این‌جا **منتقل** شدند، نه کپی —
+//  `loyalty-status.ts` همان‌ها را دوباره export می‌کند تا هیچ صداکننده‌ای
+//  نشکند. دلیلِ جابه‌جایی یک وابستگیِ دوری بود: `loyalty-status.ts` از قبل
+//  `getPointsBalance` را از همین فایل import می‌کرد، پس اگر `loyalty.ts` هم
+//  `tierFromPoints` را از آن‌جا می‌گرفت یک چرخه‌ی import ساخته می‌شد. در این
+//  کدبیس هزینه‌ی importهای شکننده قبلاً پرداخت شده (رجوع کن به توضیحِ
+//  `ERR_UNSUPPORTED_RESOLVE_REQUEST` در `lifecycle.ts`)، پس چرخه ساخته نشد.
+// ═══════════════════════════════════════════════════════════
+
+export interface LoyaltyTier {
+  key: 'bronze' | 'silver' | 'gold' | 'platinum';
+  name: string;
+  emoji: string;
+  min: number;
+}
+
+export const LOYALTY_TIERS: readonly LoyaltyTier[] = [
+  { key: 'bronze', name: 'برنزی', emoji: '🥉', min: 0 },
+  { key: 'silver', name: 'نقره‌ای', emoji: '🥈', min: 300 },
+  { key: 'gold', name: 'طلایی', emoji: '🥇', min: 800 },
+  { key: 'platinum', name: 'پلاتینیوم', emoji: '💎', min: 2000 },
+];
+
+export function tierFromPoints(points: number): LoyaltyTier {
+  let current = LOYALTY_TIERS[0];
+  for (const t of LOYALTY_TIERS) if (points >= t.min) current = t;
+  return current;
+}
+
 const B32 = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function genCode(prefix: string, len = 8): string {
   const b = randomBytes(len);
@@ -78,17 +113,35 @@ export async function addClubPoints(opts: {
         delta: opts.delta, reason: opts.reason as any, note: opts.note ?? null,
       },
     });
-    // کشِ مشتق‌شده — نه مرجع. اگر عضویتی وجود نداشته باشد updateMany صفر ردیف
-    // می‌زند و این درست است: دفتر همچنان رکوردِ حقیقت را دارد.
-    await tx.clubMember.updateMany({
-      where: { restaurantId: opts.restaurantId, userId: opts.userId },
-      data: { points: { increment: opts.delta } },
-    });
     const agg = await tx.pointsLedger.aggregate({
       where: { userId: opts.userId, restaurantId: opts.restaurantId },
       _sum: { delta: true },
     });
-    return agg._sum.delta ?? 0;
+    const balance = agg._sum.delta ?? 0;
+    // کشِ مشتق‌شده — نه مرجع. اگر عضویتی وجود نداشته باشد updateMany صفر ردیف
+    // می‌زند و این درست است: دفتر همچنان رکوردِ حقیقت را دارد.
+    //
+    // ⚠️ رفعِ «سطحِ باشگاه هرگز به‌روز نمی‌شود» (فازِ ۲):
+    // `club_members.tier` با `@default("bronze")` ساخته می‌شد و **هیچ کدی در
+    // کلِ src/ آن را نمی‌نوشت** — یعنی عضوی با ۲۰۰۰ امتیازِ واقعی در دفتر هم
+    // برای همیشه `bronze` می‌ماند. این فقط یک برچسبِ نمایشی نبود:
+    //  • `waitlist.ts` (tierToPriority/isVipTier) اولویتِ صف را از همین ستون
+    //    می‌خواند ⇒ اولویتِ طلایی/پلاتینیوم عملاً وجود نداشت.
+    //  • `restaurant/sms` سگمنتِ کمپین را از همین ستون فیلتر می‌کند ⇒ سگمنتِ
+    //    gold/silver همیشه خالی بود.
+    //  • توکنِ سطح در پیامکِ خوش‌آمد همیشه «bronze» می‌گفت.
+    // سطح از **همان موجودیِ دفتر** مشتق می‌شود (نه از ستونِ کش) و با همان
+    // `tierFromPoints()` که مسیرِ نمایشِ مشتری استفاده می‌کند — یک تعریف، نه دو.
+    //
+    // نکته‌ی صداقت درباره‌ی همزمانی: `points` عمداً `increment` می‌ماند (اتمیک،
+    // بدونِ lost-update)، ولی `tier` از aggregateِ داخلِ همین تراکنش می‌آید و
+    // اگر دقیقاً هم‌زمان یک grantِ دیگر commit نشده باشد می‌تواند یک پله عقب
+    // بماند — که با اولین grantِ بعدی خودش را اصلاح می‌کند. دفتر همچنان مرجع است.
+    await tx.clubMember.updateMany({
+      where: { restaurantId: opts.restaurantId, userId: opts.userId },
+      data: { points: { increment: opts.delta }, tier: tierFromPoints(balance).key },
+    });
+    return balance;
   });
 }
 
