@@ -88,10 +88,16 @@ function addMember(){
     toast('',`این شماره قبلاً عضوه (${res.member.code})`);
     return;
   }
-  const code=res.member.code;
-  document.getElementById('memberResult').innerHTML=`<div style="background:var(--teal-50);border:1px solid #99F6E4;border-radius:var(--r);padding:14px;margin-top:14px;text-align:center;animation:pop .4s var(--spring)"><div style="font-size:11px;color:var(--teal-600);font-weight:700">کد عضویت ساخته شد</div><div style="font-size:24px;font-weight:800;letter-spacing:.1em;color:var(--teal-600);margin-top:4px">${code}</div><div style="font-size:12px;color:var(--t2);margin-top:4px">${esc(fn)} ${esc(ln)}</div></div>`;
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): بک‌اند endpointی برای ساختِ مستقیمِ عضو
+  // ندارد (فقط auto-enroll هنگامِ رزرو/walk-in). قبلاً این‌جا یک کدِ VIS-ِ
+  // کلاینتی به‌عنوانِ «کد عضویت ساخته شد» + توستِ «عضو جدید ثبت شد» نشان داده
+  // می‌شد — ادعای عضویتِ دائمِ سروری، در حالی که با رفرش (loadClubMembers از
+  // سرور) محو می‌شد. حالا صادقانه می‌گوییم فقط در این جلسه اضافه شده و عضویتِ
+  // دائم خودکار با اولین رزروِ همین شماره ساخته می‌شود (همان‌طور که بالای فرم
+  // نوشته). پیامدِ باز: نیازِ به endpointِ ساختِ عضو در KNOWN_LIMITATIONS ثبت شد.
+  document.getElementById('memberResult').innerHTML=`<div style="background:var(--amber-50);border:1px solid #FDE68A;border-radius:var(--r);padding:14px;margin-top:14px;line-height:1.7;font-size:12.5px;color:var(--t1)">${icon('info',{size:14})} «${esc(fn)} ${esc(ln)}» فعلاً فقط در همین جلسه اضافه شد. عضویتِ دائم و کدِ رسمی، خودکار وقتی این شماره اولین رزرو را ثبت کند ساخته می‌شود.</div>`;
   document.getElementById('cFn').value='';document.getElementById('cLn').value='';document.getElementById('cPh').value='';
-  toast('','عضو جدید ثبت شد');
-  // رفرش آمار بعد از ۱.۵ ثانیه تا کاربر کد رو ببینه
-  setTimeout(()=>{if(document.getElementById('v-loyalty').classList.contains('active'))rLoyalty()},1800);
+  toast('','در این جلسه اضافه شد — عضویتِ دائم با اولین رزرو');
+  // عمداً rLoyalty را دوباره صدا نمی‌زنیم: چون عضو فقط محلی است، رفرشِ آمار از
+  // سرور آن را حذف می‌کند و کاربر گیج می‌شود. پیامِ صادق بالا کافی است.
 }

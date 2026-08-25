@@ -105,7 +105,11 @@ async function renderResList(){
       list.map(x=>resItemHTML(x.r,x.i)).join('');
     return;
   }
-  const seated=list.filter(x=>x.r.status==='arrived').length;
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): قبلاً فقط 'arrived' شمرده می‌شد؛ حالا که
+  // mapResStatus وضعیتِ واقعی را عبور می‌دهد، مهمانِ حاضر می‌تواند
+  // checked_in/arrived/seated/dining باشد — همه «رسیده» حساب می‌شوند.
+  const ARRIVED_SET=['arrived','checked_in','seated','dining'];
+  const seated=list.filter(x=>ARRIVED_SET.includes(x.r.status)).length;
   el.innerHTML=demoNote+`<div style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQuery?` · نتایج «${esc(resQuery)}»`:''}</div>`+
     list.map(x=>resItemHTML(x.r,x.i)).join('');
 }
@@ -331,6 +335,21 @@ async function walkinLookup(){
 }
 function walkinCheckinMember(){if(window._walkinMember){walkinCheckinReal(window._walkinMember.phone,null,null,null)}}
 // ثبت واقعی ورود — وصل به POST /restaurant/walkin (پیدا/ساخت کاربر + عضویت باشگاه + رزرو seated + اشغال میز)
+// تبدیلِ (ماه، روزِ) شمسی به (ماه، روزِ) میلادی — بدونِ کتابخانه، با Intlِ
+// تقویمِ persian. رخدادِ بعدیِ همان روزِ شمسی را پیدا می‌کند (دقتِ ±۱ روز بینِ
+// سال‌ها به‌خاطرِ کبیسه، در برابرِ ۲-۳ ماه خطای قبلی ناچیز است).
+function jalaliMdToGregMd(jm, jd){
+  if(!(jm>=1&&jm<=12&&jd>=1&&jd<=31)) return null;
+  const fmt=new Intl.DateTimeFormat('en-US-u-ca-persian',{month:'numeric',day:'numeric'});
+  const start=new Date(); start.setHours(12,0,0,0); start.setDate(start.getDate()-1);
+  for(let i=0;i<400;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const p=fmt.formatToParts(d);
+    const m=+p.find(x=>x.type==='month').value, day=+p.find(x=>x.type==='day').value;
+    if(m===jm&&day===jd) return {gMonth:d.getMonth()+1, gDay:d.getDate()};
+  }
+  return null;
+}
 async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
   const party=+(document.querySelector('.wparty-group .opt.sel')?.dataset.p||2);
   const tableId=document.getElementById('wTable')?.value||null;
@@ -338,7 +357,15 @@ async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
   if(btn){btn.disabled=true;btn.textContent='در حال ثبت...';}
   const body={phone,party_size:party,table_id:tableId||undefined};
   if(firstName){body.first_name=firstName;body.last_name=lastName||'';}
-  if(birthDayMonth){body.birth_day=birthDayMonth[0];body.birth_month=birthDayMonth[1];}
+  if(birthDayMonth){
+    // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): سلکتِ ماهِ تولد عددِ ماهِ *شمسی* می‌دهد
+    // (فروردین=۱)، ولی بک‌اند (createWalkin) آن را new Date(Date.UTC(1990,
+    // m-1, d)) — یعنی *میلادی* — می‌سازد و grantBirthdayRewards با ماهِ میلادیِ
+    // امروز مقایسه می‌کند. نتیجه: پیامکِ تولد ۲ تا ۳ ماه جابه‌جا. این‌جا در مرزِ
+    // تقویم به میلادی تبدیل می‌کنیم تا ذخیره و مقایسه‌ی بک‌اند هم‌راستا شوند.
+    const g=jalaliMdToGregMd(+birthDayMonth[1],+birthDayMonth[0]);
+    if(g){body.birth_day=g.gDay;body.birth_month=g.gMonth;}
+  }
   // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): قبلاً این مسیر هیچ Idempotency-Key
   // نمی‌فرستاد — دابل‌تپِ «ثبت ورود» (یا حتی retryِ خودکارِ شبکه) می‌توانست دو
   // رزروِ seated + دو عضویتِ باشگاه برایِ همون مهمان بسازد. یک کلید برایِ کلِ

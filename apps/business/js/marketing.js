@@ -150,7 +150,9 @@ function previewCamp(){
   if(selSeg===null){toast('','سگمنت رو انتخاب کن');return}
   // ذخیره برای ارسال واقعی (نگاشت index سگمنت به segment بک‌اند)
   window._campMessage=txt;
-  window._campSegment=({0:'at_risk',1:'gold',2:'all',3:'all'})[selSeg]||'all';
+  // نگاشتِ کارت‌ها به سگمنت‌های واقعیِ بک‌اند (crm.js): طلایی/نقره‌ای/برنزی/همه.
+  // ۳ (همه) → undefined یعنی «بدونِ فیلترِ tier» که بک‌اند را به همه‌ی اعضا هدف می‌گیرد.
+  window._campSegment=({0:'gold',1:'silver',2:'bronze',3:undefined})[selSeg];
   const rendered=txt.replace(/\{نام\}/g,'کیان');
   openModal(`<div class="modal-title">پیش‌نمایش پیام</div><div class="modal-sub">دقیقاً همینطوری برای مشتری ارسال می‌شه</div>
     <div style="background:#0c0c14;border-radius:var(--r-lg);padding:16px;margin-bottom:18px">
@@ -176,10 +178,11 @@ function confirmCamp(){
 async function doSendCampaign(){
   const btn=document.getElementById('campSendBtn');
   if(btn){btn.disabled=true;btn.textContent='در حال ارسال...';}
-  // segment انتخاب‌شده (اگر در فرم کمپین بود) — پیش‌فرض همه
-  const seg=window._campSegment||'all';
+  // segment انتخاب‌شده؛ undefined یعنی «همه اعضا» → فیلدِ segment اصلاً فرستاده
+  // نمی‌شود تا بک‌اند بدونِ فیلترِ tier همه را هدف بگیرد (سگمنتِ نامعتبر ۴۰۰ می‌داد).
+  const seg=window._campSegment;
   if(API.getToken()){
-    const res=await API.sendSms({kind:'campaign',segment:seg,message:window._campMessage||''});
+    const res=await API.sendSms({kind:'campaign',...(seg?{segment:seg}:{}),message:window._campMessage||''});
     if(res.ok){
       closeModal();
       toast('',`کمپین به ${fa(res.data?.queued||0)} نفر ارسال شد`);
@@ -244,11 +247,18 @@ async function rAnalytics(){
       API.online=true;
       const d=res.data;
       const totalVisits=(d.visit_distribution?.once||0)+(d.visit_distribution?.few||0)*3+(d.visit_distribution?.loyal||0)*6;
+      // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): weekly_reservations آرایه‌ی *۴ هفته‌ی
+      // اخیر* است (بک‌اند از ۲۸ روز پیش group by week می‌کند و اندیسِ ۳ هفته‌ی
+      // جاری است). reduce قبلی جمعِ هر ۴ هفته را با برچسبِ «رزرو این هفته»
+      // نشان می‌داد — ۴ برابرِ واقعیت. حالا فقط هفته‌ی جاری (آخرین عضو).
+      const wk=Array.isArray(d.weekly_reservations)?d.weekly_reservations:[];
       A={
-        weekThisWeek:(d.weekly_reservations||[]).reduce((s,x)=>s+x,0),
+        weekThisWeek:wk.length?wk[wk.length-1]:0,
         returnRate:d.return_rate_pct||0,
         avgVisits:d.total_customers?fa(Math.round(totalVisits/d.total_customers*10)/10):'۰',
-        avgInterval:d.avg_interval_days||0,
+        // avg_interval_days را بک‌اند برنمی‌گرداند؛ نمایشِ «۰» یعنی «۰ روز فاصله»
+        // که غلط است. null → در KPI به «—» می‌افتد (اندازه‌گیری‌نشده، نه صفر).
+        avgInterval:(typeof d.avg_interval_days==='number')?d.avg_interval_days:null,
         totalCustomers:d.total_customers||0,
         newPct:d.total_customers?Math.round(d.new_customers/d.total_customers*100):0,
         visitDist:[
@@ -292,7 +302,7 @@ async function rAnalytics(){
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(A.weekThisWeek)}</div><div class="kpi-label">رزرو این هفته</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('refresh',{size:16})}</div></div><div class="kpi-val">${fa(returnRate)}٪</div><div class="kpi-label">نرخ بازگشت مشتری</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon amber">${icon('users',{size:16})}</div></div><div class="kpi-val">${avgVisits}</div><div class="kpi-label">میانگین دفعات مراجعه</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(A.avgInterval)}</div><div class="kpi-label">میانگین فاصله (روز)</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${A.avgInterval==null?'—':fa(A.avgInterval)}</div><div class="kpi-label">میانگین فاصله (روز)</div></div>
     </div>
 
     <div class="row-2-1">

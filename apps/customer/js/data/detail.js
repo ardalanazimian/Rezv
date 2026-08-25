@@ -17,7 +17,16 @@ import { icon } from '../icons.js';
 // کند؛ برای همین متنِ toast صریحاً «لینکِ رزرونو» می‌گوید، نه «لینکِ این رستوران».
 // ساختنِ deep-link واقعی (routing بر اساسِ query/hash) خارج از دامنه‌ی این
 // رفعِ نقطه‌ای است — به KNOWN_LIMITATIONS اضافه شده.
-export async function shareRestaurant(name){
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): این تابع قبلاً نامِ رستوران را مستقیم از
+// داخلِ onclickِ اینلاین می‌گرفت — `shareRestaurant('${esc(r.n)}')`. برای
+// رستورانِ زنده، r.n نامِ owner-controlledِ سرور است و esc فقط برای متنِ HTML
+// امن است، نه برای رشته‌ی JS داخلِ attribute: پارسرِ HTML مقدارِ attribute را
+// *قبل* از پارسرِ JS decode می‌کند، پس `&#39;` به `'` برمی‌گردد و یک نامِ حاویِ
+// آپاستروف (مثلِ کافه‌ای با نامِ انگلیسیِ دارای ') هم دکمه را می‌شکست و هم
+// بردارِ تزریقِ JS باز می‌کرد. حالا فقط idِ UUID (فرمتِ امن) پاس می‌شود و نام
+// این‌جا از state حل می‌شود — هیچ متنِ سرور واردِ رشته‌ی HTML/JS نمی‌شود.
+export async function shareRestaurant(id){
+  const name = findR(id)?.n || 'رزرونو';
   const url = location.href;
   if (navigator.share) {
     try { await navigator.share({ title: name, url }); } catch { /* کاربر لغو کرد یا مرورگر رد کرد — چیزی نگو */ }
@@ -39,7 +48,11 @@ export async function shareRestaurant(name){
 //     مشتری نمی‌رسید. حالا صفحه اول فوری رندر می‌شود و بعد با داده‌ی
 //     واقعیِ سرور (عکس، لوگو، منو، امتیازِ تجمیعی) کامل می‌شود.
 export function openRest(id){
-  const r=findR(id); if(!r) return;
+  const r=findR(id);
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): قبلاً روی نبودِ رستوران بی‌صدا return می‌کرد
+  // — کارتِ رویداد/سفر که به رستورانِ خارج از فیدِ بارگذاری‌شده اشاره می‌کند،
+  // کلیکِ مرده می‌شد بدونِ هیچ بازخوردی. حالا حداقل صادقانه اطلاع می‌دهد.
+  if(!r){ toast('','این رستوران فعلاً در دسترس نیست'); return; }
   setCurRest(r.id);
   renderRestPage(r);
   go('rest');
@@ -78,7 +91,7 @@ function renderRestPage(r){
       <div class="rp-hero-mesh"${heroPhoto?' style="display:none"':''}></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
-        <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant('${esc(r.n)}')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
+        <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant('${r.id}')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
         <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav('${r.id}')" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
       </div>
       ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-emoji">${esc(r.e)}</div>`}
@@ -89,15 +102,18 @@ function renderRestPage(r){
           ${r.slug?'':'<span class="rp-hero-badge demo">نمونه — دادهٔ آزمایشی</span>'}
         </div>
         <div class="rp-hero-name">${esc(r.n)}</div>
-        <div class="rp-hero-meta">
-          <span class="rp-hero-rate"><span style="color:#FBBF24;display:inline-flex">${icon('star',{size:14,fill:true})}</span> ${fmtFa(r.rt)}</span>
-          <span class="rp-hero-dot">·</span>
-          <span>${fmtFa(r.reviews)} نظر</span>
-          <span class="rp-hero-dot">·</span>
-          <span>${esc(r.cuisine)}</span>
-          ${r.price?`<span class="rp-hero-dot">·</span>
-          <span>${esc(r.price)}</span>`:''}
-        </div>
+        <div class="rp-hero-meta">${(() => {
+          // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): قبلاً «★ ۰» و «۰ نظر» بدونِ قید
+          // نشان داده می‌شد — رستورانِ زنده‌ی بدونِ امتیاز، «امتیازِ ۰ از ۵»
+          // می‌نمود، نه «هنوز امتیازی ندارد». حالا امتیاز/تعدادِ نظر فقط وقتی
+          // واقعاً > ۰ باشند رندر می‌شوند و جداکننده‌ی معلق هم نمی‌ماند.
+          const parts = [];
+          if (Number.isFinite(r.rt) && r.rt > 0) parts.push(`<span class="rp-hero-rate"><span style="color:#FBBF24;display:inline-flex">${icon('star',{size:14,fill:true})}</span> ${fmtFa(r.rt)}</span>`);
+          if (Number.isFinite(r.reviews) && r.reviews > 0) parts.push(`<span>${fmtFa(r.reviews)} نظر</span>`);
+          if (r.cuisine) parts.push(`<span>${esc(r.cuisine)}</span>`);
+          if (r.price) parts.push(`<span>${esc(r.price)}</span>`);
+          return parts.join('<span class="rp-hero-dot">·</span>');
+        })()}</div>
       </div>
     </div>
     <div class="wrap rp-body">
@@ -120,6 +136,14 @@ function renderRestPage(r){
           const hasRatingBars = r.rb.food || r.rb.service || r.rb.atmo || r.rb.value;
           const hasAiSummary = r.good.length || r.bad.length;
           if (!hasRatingBars && !hasAiSummary && !r.revs.length) {
+            // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): endpointِ جزئیات فقط میانگین و
+            // تعدادِ نظر را می‌دهد، نه متنِ تک‌تکِ نظرها — پس r.revs خالی می‌ماند
+            // حتی وقتی رستوران واقعاً نظر دارد. قبلاً این‌جا «هنوز نظری ثبت نشده»
+            // می‌گفت در حالی که hero «۵ نظر» نشان می‌داد؛ تناقضِ داده. حالا اگر
+            // امتیازِ تجمیعیِ واقعی هست، همان را صادقانه خلاصه می‌کنیم.
+            if (Number.isFinite(r.reviews) && r.reviews > 0) {
+              return `<div class="rb-overall glass" style="text-align:center"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">میانگینِ ${fmtFa(r.reviews)} نظر — متنِ نظرها به‌زودی این‌جا</div></div>`;
+            }
             return `<p class="rp-empty">هنوز نظری برای این رستوران ثبت نشده.</p>`;
           }
           return `
@@ -141,11 +165,19 @@ function renderRestPage(r){
         <div class="rp-bookbar-cb">${icon('wallet',{size:13})} ${fmtFa(r.cb)}٪ کش‌بک</div>
         <div class="rp-bookbar-sub">رزرو رایگان · بدون پیش‌پرداخت</div>
       </div>
-      <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openChat('${esc(r.slug||'')}')" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
+      <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openRestChat('${r.id}')" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
       <button class="btn btn-primary rp-bookbar-btn" onclick="buzz&&buzz();openBookSheet('${r.id}')">رزرو میز</button>
     </div>`;
+}
+
+// پیامِ رستوران: id (امن) می‌گیرد و slug را از state حل می‌کند — slug هرگز
+// واردِ رشته‌ی onclick نمی‌شود (هم‌الگوی رفعِ shareRestaurant).
+export function openRestChat(id){
+  const r = findR(id);
+  if (r?.slug && typeof window.openChat === 'function') window.openChat(r.slug);
 }
 
 // ── نمایشِ تابعِ onclick روی window ──
 window.openRest = openRest;
 window.shareRestaurant = shareRestaurant;
+window.openRestChat = openRestChat;

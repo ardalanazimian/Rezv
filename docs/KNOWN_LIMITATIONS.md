@@ -41,6 +41,62 @@
 
 ## 2. Frontend
 
+- **Launch-readiness sweep — real bugs fixed, two residuals documented
+  (2026-08-25).** A multi-agent bug hunt (customer/business/company panels)
+  surfaced a batch of confirmed defects; each was verified by direct code read
+  before fixing:
+  - **Stored-XSS via restaurant name in an inline `onclick` (customer app) —
+    fixed.** `shareRestaurant('${esc(r.n)}')` and the message button passed a
+    server-controlled name/slug through a *JS-string-inside-HTML-attribute*
+    context. `esc()` is HTML-safe, not JS-string-safe: the HTML parser decodes
+    `&#39;`→`'` *before* the JS parser runs, so a restaurant named with an
+    apostrophe both broke the button and opened a JS-injection vector
+    (`');alert(1)//`). Fixed by passing only the UUID id through the handler and
+    resolving name/slug from client state (`shareRestaurant(id)` /
+    `openRestChat(id)`). The earlier menu-name/emoji XSS (commit `7ecd0d6`) was
+    the same class in a different spot.
+  - **Business panel showed cancelled/completed/expired reservations as
+    "confirmed" — fixed.** `mapResStatus` (`apps/business/js/data.js`) knew only
+    5 statuses and defaulted *everything else* to `'confirmed'` — so a
+    `cancelled` (the current canonical status), `completed`, `expired`,
+    `rejected`, `auto_cancelled`, `seated`, `dining`… all rendered as confirmed,
+    keeping a cancelled reservation's table held with staff none the wiser. The
+    panel's `STATUS_META` already had all 17 statuses; the fix is a pass-through
+    (normalising only the legacy `cancelled_by_*`/`no_show` aliases). Same class
+    the customer app's `mapTripStatus` was fixed for earlier.
+  - **SMS campaign: 3 of 4 segment choices always 400 — fixed.** The endpoint
+    (`restaurant/sms`) accepts `segment ∈ {gold,silver,bronze}` or none (= all);
+    the panel sent behavioural values `at_risk`/`all`. The segment cards are now
+    the loyalty tiers the backend can actually target (+ all → omit `segment`).
+  - **Walk-in birthday off by 2-3 months — fixed.** The panel's month select
+    emits a *Jalali* month index, but `createWalkin` built
+    `new Date(Date.UTC(1990, m-1, d))` (Gregorian) and `grantBirthdayRewards`
+    compares against the Gregorian current month — so a Farvardin birthday fired
+    in January. Now converted Jalali→Gregorian at the panel boundary via an
+    `Intl` persian-calendar helper (±1-day across leap years, vs. months off).
+  - **Analytics KPIs (business) — fixed.** "رزرو این هفته" summed all 4 weeks of
+    `weekly_reservations` (a 28-day total); now takes the current week. "میانگین
+    فاصله (روز)" read `avg_interval_days`, which the backend never returns, so it
+    always showed ۰; now shows «—» (unmeasured, not a false zero).
+  - **Customer honesty fixes.** Card/hero no longer show "★ ۰" for an unrated
+    live restaurant (show «جدید» / omit); the detail hero's review count no
+    longer contradicts the "no reviews yet" section (when the aggregate count is
+    real but review bodies aren't returned, it now shows an honest aggregate
+    summary); `openRest` on a missing restaurant gives a toast instead of a
+    silent dead click.
+  - **Residual — no member-create endpoint (open).** The loyalty panel's "manual
+    add member" (`enrollClub`) is client-memory only — the `restaurant/members`
+    route has only `GET`, and server-side enrollment happens *automatically on a
+    reservation/walk-in*. The UI no longer fabricates a permanent "membership
+    code created" claim (it states the member is local this session and enrolled
+    for real on their first booking), but a true standalone create-member
+    endpoint is not built.
+  - **Residual — event cards can't deep-open a restaurant outside the feed
+    (open).** `special_events` is empty in every deployment (honest empty
+    state), but if events existed and referenced a restaurant not on the loaded
+    discover page, the card could not open it (events carry `restaurantId`, not
+    `slug`, and there is no public by-id detail endpoint). The click now gives
+    honest feedback; a real fix needs event→slug plumbing in the API.
 - **JSON-LD published every menu price at one-tenth its real value — fixed
   2026-08-19.** `apps/seo/lib/schema.ts` emitted `price_toman` directly with
   `priceCurrency: 'IRR'`. Toman is not an ISO 4217 currency; IRR is the rial,

@@ -51,8 +51,13 @@ test('کارت رستوران و چیپ‌های ساعت با کیبورد قا
 
   const open = page.locator('.rc .rc-open').first();
   await expect(open).toBeVisible();
-  await open.focus();
-  await expect(open).toBeFocused();
+  // ⚠️ مقاوم در برابرِ ری‌رندرِ فید (۲۰۲۶-۰۸-۲۵): فید پس از رسیدنِ دادهٔ API
+  // دوباره رندر می‌شود و می‌تواند عنصرِ فوکوس‌شده را جایگزین کند (فوکوس می‌پرد)؛
+  // زیرِ بارِ چند-worker فلیک می‌داد. اگر پرید، دوباره فوکوس می‌کنیم.
+  await expect(async () => {
+    await open.focus();
+    await expect(open).toBeFocused({ timeout: 1000 });
+  }).toPass({ timeout: 10000 });
   // نامِ رستوران باید در نامِ دسترس‌پذیر باشد، وگرنه صفحه‌خوان فقط «دکمه» می‌گوید
   await expect(open).toHaveAttribute('aria-label', /\S/);
 

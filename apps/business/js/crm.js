@@ -940,18 +940,16 @@ async function openCustomerDetail(userId){
 }
 
 // ─── تب ۳: کمپین پیامکی (مارکتینگ) ───
-let _segCounts=null;
 async function custRenderCampaign(){
-  if(!_segCounts && API.getToken()){
-    const [atRisk,vip]=await Promise.all([API.customers('segment=at_risk&limit=50'),API.customers('segment=vip&limit=50')]);
-    _segCounts={
-      at_risk: atRisk.ok?(atRisk.data.items?.length||0):null,
-      vip: vip.ok?(vip.data.items?.length||0):null,
-    };
-  }
-  const sc=_segCounts||{};
-  const cnt=(v,suffix)=>v==null?'—':fa(v)+(v>=50?'+':'')+' '+suffix;
-  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید','همه'],['calendar','تولد این ماه',fa(CLUB.filter(m=>m.bMonth===CUR_MONTH).length)+' نفر']];
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): کارت‌های سگمنت قبلاً رفتاری بودند (در خطر
+  // ریزش/VIP/جدید/تولد) ولی endpointِ SMS فقط بر اساسِ tierِ باشگاه
+  // (gold/silver/bronze) یا «همه» فیلتر می‌کند — پس ۳ از ۴ گزینه یا ۴۰۰
+  // می‌گرفتند یا (بدتر، مثلِ «تولد») به «همه» ارسال می‌شدند: مخاطبِ اشتباه.
+  // حالا کارت‌ها دقیقاً همان چیزی‌اند که بک‌اند می‌تواند هدف بگیرد، و شمارش از
+  // اعضای واقعیِ باشگاه (CLUB) می‌آید. هدف‌گیریِ رفتاری (at_risk/تولد) نیازمندِ
+  // تغییرِ بک‌اند است و در KNOWN_LIMITATIONS ثبت شد.
+  const tierCount=t=>fa((CLUB||[]).filter(m=>m.tier===t).length)+' نفر';
+  const segs=[['crown','اعضای طلایی',tierCount('gold')],['sparkle','اعضای نقره‌ای',tierCount('silver')],['ticket','اعضای برنزی',tierCount('bronze')],['users','همه اعضا',fa((CLUB||[]).length)+' نفر']];
   document.getElementById('ct-campaign').innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کمپین پیامکی هوشمند</div><div class="panel-sub">سگمنت انتخاب کن، پیام بنویس، پیش‌نمایش بگیر</div></div></div>

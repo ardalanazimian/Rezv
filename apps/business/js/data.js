@@ -740,12 +740,23 @@ function faRelative(iso){
 }
 // نگاشت وضعیت enum واقعی بک‌اند → وضعیت فرانت پنل
 // بک‌اند: pending/confirmed/arrived/no_show/cancelled_by_user/cancelled_by_restaurant
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): این تابع قبلاً فقط ۵ وضعیت را می‌شناخت و
+// *هر چیز دیگری* را به 'confirmed' فرومی‌کاست (خطِ آخر `return 'confirmed'`).
+// یعنی رزروِ `cancelled` (وضعیتِ canonicalِ فعلی)، `completed`، `expired`،
+// `rejected`، `auto_cancelled`، `seated`، `dining`، `waitlisted` و... همه در
+// پنلِ رستوران «تأییدشده» دیده می‌شدند — رزروِ لغوشده میز را رزرو نگه می‌داشت و
+// staff هرگز نمی‌فهمید. STATUS_META (بالای همین فایل) از قبل هر ۱۷ وضعیت را با
+// برچسب/رنگ دارد، پس فقط لازم است وضعیتِ واقعی عبور کند. دقیقاً همان کلاسِ
+// باگی که برای اپ مشتری (mapTripStatus) قبلاً رفع شده بود، ولی این‌جا جا مانده.
 function mapResStatus(apiStatus){
-  if(apiStatus==='arrived')return'arrived';
-  if(apiStatus==='no_show')return'noshow';
+  // aliasهای قدیمی → نامِ canonicalِ پنل (STATUS_META هم no_show و هم noshow را دارد؛
+  // شمارنده‌های reservations.js با 'noshow' فیلتر می‌کنند، پس همین را نگه می‌داریم).
   if(apiStatus==='cancelled_by_user'||apiStatus==='cancelled_by_restaurant')return'cancelled';
-  if(apiStatus==='confirmed'||apiStatus==='pending')return'confirmed';
-  return'confirmed';
+  if(apiStatus==='no_show')return'noshow';
+  // هر وضعیتِ واقعیِ شناخته‌شده مستقیم عبور می‌کند.
+  if(STATUS_META[apiStatus])return apiStatus;
+  // وضعیتِ واقعاً ناشناخته → همان رشته‌ی خام (بی‌چیپ، نه جعلِ «تأییدشده»).
+  return apiStatus||'confirmed';
 }
 // تشخیص دسته‌ی تاریخ از زمان رزرو (برای سازگاری با فیلتر محلی)
 function dateCategoryOf(slotStart){
