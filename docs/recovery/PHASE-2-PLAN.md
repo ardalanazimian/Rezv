@@ -124,6 +124,8 @@ constraintِ GiST) مهار شده نه در فرانت، تله‌متری فی
 | P2-9 | `setTableState` کشِ availability را باطل نمی‌کرد (تا ۵ دقیقه تأخیر) | متوسط | یکپارچگی | §۶ | ✅ رفع شد |
 | P2-10 | پلانِ سالن `cleaning`/`maintenance` را به «آزاد» تا می‌کرد (و کلیک، تعمیرات را بی‌صدا لغو می‌کرد) | متوسط | UX/یکپارچگی | §۶، §۲۸ | ✅ رفع شد |
 | P1-1 | تله‌متری: dedup، کلمپِ زمان، سقفِ payload، allowlistِ نوع، سطحِ اعتماد | بالا | AI/تله‌متری | §۱۴، §۱۵ | ✅ **رفع شد** |
+| **P1-23** | **ترجیحاتِ اعلان بی‌اثر بودند: `allowsCategory` فقط ۲ فراخوان داشت (هر دو `offers`)** | بالا | رضایت/حریمِ خصوصی | §۱۳، §۱۷ | ✅ **رفع شد** |
+| **P1-24** | **پیامکِ تراکنشیِ خوش‌آمدِ چک‌ین پشتِ رضایتِ *تبلیغاتی* گیت می‌شد** | بالا | رضایت/قرارداد | §۱۳، §۱۷، §۲۰ | ✅ **رفع شد** |
 | P2-6 | ناپایداریِ وابسته به بارِ سوئیتِ E2E | متوسط | تست | §۳۰ | ✅ **کاملاً رفع شد** |
 
 ---
@@ -512,6 +514,43 @@ pending, confirmed, auto_confirmed, preparing, checked_in, running_late, arrived
 ادعا رویِ **بدنه‌ی واقعیِ `POST /reservations`** سنجیده می‌شود (با
 `page.waitForRequest`)، نه صرفاً وجودِ یک ورودی در DOM — چون خودِ باگ همین بود
 که ورودی وجود داشت ولی چیزی نمی‌فرستاد.
+
+---
+
+### P1-23 / P1-24 · ترجیحاتِ اعلان: ذخیره می‌شد، اجرا نمی‌شد (§۱۳، §۱۷)
+
+- **فایل‌ها:** `api/src/lib/notification-prefs.ts` · `api/src/lib/automation.ts` ·
+  `api/src/lib/loyalty.ts` · `api/src/lib/waitlist.ts` ·
+  `api/src/app/api/v1/restaurant/sms/route.ts` · `api/src/lib/metrics.ts`
+- **یافته (اندازه‌گیری‌شده با grep روی `api/src`، ۲۰۲۶-۰۸-۲۵):** ماژولِ
+  `notification-prefs.ts` پنج دسته و تفکیکِ `MARKETING_CATEGORIES` داشت و
+  `PATCH/GET /me/notification-prefs` واقعاً کار می‌کرد — ولی `allowsCategory`
+  در کلِ کدبیس فقط **دو** فراخوان داشت، هر دو در `restaurant/sms/route.ts` و
+  هر دو فقط برایِ `offers`. یعنی کاربر پنج کلید را تنظیم می‌کرد، سرور صادقانه
+  ذخیره و بازگردانی‌شان می‌کرد، و بیشترشان **هیچ اثری** نداشتند.
+- **یافته‌ی وارونه و خطرناک‌ترِ همان (P1-24):** پنلِ رستوران پیامکِ **تراکنشیِ**
+  خوش‌آمدِ چک‌ین را با `kind:'campaign'` می‌فرستاد
+  (`apps/business/js/reservations.js:190`) ⇒ (۱) پشتِ رضایتِ *تبلیغاتیِ*
+  `offers` گیت می‌شد، (۲) دفترِ ارتباط‌گیری را با `source:'campaign'` آلوده
+  می‌کرد، (۳) با قالبِ `campaign` و توکنِ ناقص می‌رفت.
+- **علتِ ریشه‌ای:** لایه‌ی رضایت در «مرزِ ورودی» (route) نوشته شده بود، نه در
+  «نقطه‌ی صدور». هر نقطه‌ی جدیدِ `enqueueSms` بی‌صدا از کنارش رد می‌شد.
+- **رفع:** یک تابعِ نازکِ `smsAllowedForCategory()` روی همان `allowsCategory`
+  (تصمیم یکی می‌ماند، فقط لاگِ ساختاریافته + متریکِ `rezervno_sms_suppressed_total`
+  اضافه می‌شود) و اعمالش در چهار نقطه‌ی غیرِتراکنشی. `kind:'welcome'` به
+  `POST /restaurant/sms` اضافه شد (بدونِ گارد، قالبِ `welcome_visit`، بدونِ ثبت
+  در ledgerِ بازاریابی) با یک نامِ مستعارِ موقت برایِ کلاینتِ فعلی.
+- **نگاشتِ نهایی:** `availability` → فقط آفرِ میزِ صف · `offers` → کمپین/winback/
+  automation/دعوتِ دوست · `loyalty` → امتیازِ تولد · `reminder` → یادآوریِ رزرو
+  (در `lib/reminders.ts`) · `dna` → **بدونِ نقطه‌ی صدور** (ثبت‌شده در
+  `OPEN-FINDINGS.md`). بدونِ گارد: OTP، `booking_confirm`، همه‌ی قالب‌های چرخه‌ی
+  حیات، `welcome_visit`، `waitlist_joined`، `waitlist accepted`، کارتِ هدیه.
+- **ریسک:** گیت‌کردنِ اشتباهِ یک پیامکِ حیاتی. مهار: فهرستِ صریحِ
+  `UNGATED_SMS_TEMPLATES` + گاردِ ساختاری که ثابت می‌کند `otp.ts`/`lifecycle.ts`/
+  `reservations.ts` اصلاً ماژولِ رضایت را import نمی‌کنند.
+- **تست:** `api/tests/notification-consent-enforcement.test.mts` (۲۴ تست، ثبت‌شده
+  در `_all.runner.mts`) — با جهش‌آزماییِ ۸ گاردِ جداگانه.
+- **برگشت:** فقط کد؛ **هیچ تغییرِ اسکیمایی ندارد** و هیچ migrationی اضافه نشد.
 
 ---
 
