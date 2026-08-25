@@ -76,7 +76,12 @@ async function loadHoursChanges() {
       HCHANGE_DEMO = true;
       HCHANGE_ERROR = null;
       HCHANGE_ITEMS = HCHANGE_FILTER === 'pending' || HCHANGE_FILTER === 'all' ? HCHANGE_SAMPLE : [];
-      HCHANGE_BADGE = HCHANGE_SAMPLE.length;
+      // ⚠️ فازِ ۲ (§۳): نشانِ سایدبار عمداً از دادهٔ نمونه پر **نمی‌شود**.
+      // ردیف‌هایِ نمونه فقط داخلِ همان ویوِ صف می‌مانند، جایی که بنرِ دمو
+      // توضیحشان می‌دهد. نشان اما رویِ **همه‌ی** صفحاتِ پنل دیده می‌شود و
+      // هیچ زمینه‌ای همراهش نیست — پس عددِ ساختگی آن‌جا از بکلاگِ واقعی
+      // قابلِ تشخیص نبود. بدونِ پاسخِ سرور، شمارش نامعلوم است، نه صفر و نه سه.
+      HCHANGE_BADGE = 0;
     } else {
       HCHANGE_DEMO = false;
       HCHANGE_ERROR = (res.error && res.error.message) || 'دریافتِ صفِ تأییدِ ساعتِ کاری ناموفق بود.';

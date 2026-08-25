@@ -169,8 +169,7 @@ function confirmCamp(){
   openModal(`<div style="text-align:center;padding:6px 0">
     <div style="margin-bottom:14px;color:var(--warning)">${icon('alert',{size:40})}</div>
     <div class="modal-title" style="text-align:center">تأیید نهایی ارسال</div>
-    <div class="modal-sub" style="text-align:center;direction:ltr;font-family:sans-serif">By confirming, your SMS campaign will be executed. Are you sure?</div>
-    <div style="font-size:13px;color:var(--t2);margin-bottom:20px">با تأیید، کمپین اجرا و ارسال می‌شه.</div>
+    <div class="modal-sub" style="text-align:center;margin-bottom:20px">با تأیید، کمپین اجرا و برای همه‌ی گیرنده‌ها ارسال می‌شود. این کار برگشت‌پذیر نیست.</div>
     <button class="btn btn-primary btn-lg btn-block" id="campSendBtn" onclick="doSendCampaign()">بله، ارسال کن</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
   </div>`);
@@ -190,9 +189,18 @@ async function doSendCampaign(){
       return;
     }
     if(!res.offline){closeModal();toast('',res.error?.message||'ارسال ناموفق بود');return;}
-  }  // fallback (آفلاین یا بدون توکن)
-  closeModal();
-  toast('','کمپین ارسال شد');
+    // ⚠️ رفعِ جعلِ موفقیت (پروتکل §۳/§۱۰): این‌جا (آفلاین) و شاخه‌ی «بدونِ
+    // توکن» پایین، هر دو قبلاً مودال را می‌بستند و «کمپین ارسال شد» می‌گفتند —
+    // برای کمپینی که هیچ‌وقت به سرور نرسیده بود. رستوران‌دار باور می‌کرد صدها
+    // پیامک رفته (هزینه‌ی واقعی، انتظارِ واقعیِ مشتری) در حالی که هیچ‌چیز نرفته
+    // بود، و هیچ راهی هم نداشت بفهمد. حالا هر دو مسیر صادقانه شکست را می‌گویند
+    // و دکمه دوباره فعال می‌شود تا کاربر بتواند تلاش کند.
+    if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';}
+    toast('','اتصال برقرار نشد — کمپین ارسال نشد. دوباره تلاش کن');
+    return;
+  }
+  if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';}
+  toast('','برای ارسالِ کمپین باید وارد شده باشی');
 }
 // ═══════════ ANALYTICS + RESTAURANT AI ═══════════
 // نقشه‌ی حرارتیِ اشغال: روز هفته × ساعت. ورودی: [{dow,hour,count}] (dow 0=یکشنبه)
@@ -253,6 +261,15 @@ async function rAnalytics(){
       // نشان می‌داد — ۴ برابرِ واقعیت. حالا فقط هفته‌ی جاری (آخرین عضو).
       const wk=Array.isArray(d.weekly_reservations)?d.weekly_reservations:[];
       A={
+        // ⚠️ رفعِ برچسبِ غلط: این فیلد زیرِ لیبلِ «رزرو این هفته» نمایش داده
+        // می‌شود ولی **جمعِ هر چهار هفته** بود — یعنی صاحبِ رستوران عددی
+        // تقریباً چهاربرابرِ واقعیت را به‌عنوانِ آمارِ این هفته می‌خواند.
+        // بک‌اند آرایه را از قدیم به جدید می‌دهد (آخرین عضو = هفت روزِ اخیر؛
+        // رجوع کن به `weekly[3 - w]` در restaurant/analytics/route.ts).
+        // [merge ۰۸-۲۵] #68 همین باگ را با `[3]` رفع کرده بود. اندیسِ آخر را
+        // نگه داشتیم چون امروز هم‌ارزِ آن است (بک‌اند همیشه ۴ عضو می‌دهد) ولی
+        // اگر طولِ آرایه عوض شود هم درست می‌ماند؛ `[3]` در آن حالت یا صفرِ
+        // جعلی می‌داد یا هفته‌ای از وسطِ تاریخچه.
         weekThisWeek:wk.length?wk[wk.length-1]:0,
         returnRate:d.return_rate_pct||0,
         avgVisits:d.total_customers?fa(Math.round(totalVisits/d.total_customers*10)/10):'۰',
@@ -295,11 +312,37 @@ async function rAnalytics(){
   const totalGuests=A.totalCustomers;
   const returnRate=A.returnRate;
   const avgVisits=A.avgVisits;
+
+  // ═══════════════════════════════════════════════════════════
+  //  روندِ هفته‌به‌هفته — از دادهٔ **واقعی**، نه عددِ ثابت
+  //
+  //  ⚠️ رفعِ ادعایِ ساختگی (پروتکل §۱۰): این دو چیپ قبلاً `↗ ۱۸٪` و `↗ ۵٪`ِ
+  //  هاردکد بودند، با کلاسِ `up` (سبز و رو‌به‌بالا). یعنی رستورانی که رزروش
+  //  **نصف** شده بود هم «۱۸٪ رشد» می‌دید — یک ادعایِ جهت‌دار که می‌تواند دقیقاً
+  //  برعکسِ واقعیت باشد و مبنایِ تصمیمِ کسب‌وکاری قرار بگیرد.
+  //
+  //  دادهٔ لازم از قبل موجود بود: `weekly_reservations` (چهار هفته، قدیم→جدید).
+  //  چیپ فقط وقتی نشان داده می‌شود که هفته‌ی مبنا واقعاً رزرو داشته باشد؛
+  //  وگرنه درصدِ رشد بی‌معناست (تقسیم بر صفر) و چیزی ادعا نمی‌شود.
+  //  برایِ «نرخِ بازگشت» هیچ سابقه‌ی تاریخی‌ای وجود ندارد ⇒ چیپش حذف شد.
+  //  گاردِ منبعِ داده: `API.online` همان سیگنالی است که dataSourceNote بالای
+  //  همین صفحه با آن بنرِ «دادهٔ نمونه» را نشان می‌دهد — پس چیپِ روند دقیقاً
+  //  وقتی ظاهر می‌شود که بقیه‌ی صفحه هم ادعا می‌کند دادهٔ واقعی است.
+  //  (عمداً isSampleChart نیست: آن فقط دربارهٔ heatmap است و می‌تواند در حالی
+  //  خالی باشد که weekly_reservations کاملاً واقعی است.)
+  const wk=Array.isArray(A.weekly)?A.weekly:[];
+  const wkNow=wk[3]||0, wkPrev=wk[2]||0;
+  const wkTrend = (API.online && wkPrev>0)
+    ? Math.round(((wkNow-wkPrev)/wkPrev)*100)
+    : null;
+  const trendChip = wkTrend===null ? ''
+    : `<span class="kpi-delta ${wkTrend>=0?'up':'dn'}" title="نسبت به هفته‌ی قبل">`
+      + `${icon('trending',{size:11})} ${wkTrend>=0?'':'−'}${fa(Math.abs(wkTrend))}٪</span>`;
   document.getElementById('v-analytics').innerHTML=`
     <div class="pg-head"><div class="pg-title">تحلیل‌ها</div><div class="pg-sub">روند رزرو، نرخ بازگشت و رفتار مشتری‌ها</div></div>
     ${dataSourceNote()}
     <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(A.weekThisWeek)}</div><div class="kpi-label">رزرو این هفته</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('calendar',{size:16})}</div>${trendChip}</div><div class="kpi-val">${fa(A.weekThisWeek)}</div><div class="kpi-label">رزرو هفت روزِ اخیر</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('refresh',{size:16})}</div></div><div class="kpi-val">${fa(returnRate)}٪</div><div class="kpi-label">نرخ بازگشت مشتری</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon amber">${icon('users',{size:16})}</div></div><div class="kpi-val">${avgVisits}</div><div class="kpi-label">میانگین دفعات مراجعه</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${A.avgInterval==null?'—':fa(A.avgInterval)}</div><div class="kpi-label">میانگین فاصله (روز)</div></div>

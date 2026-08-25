@@ -56,8 +56,14 @@ export const GET = withRestaurantAuth(
     const userIds = members.map(m => m.user.id);
     const pointsByUser = new Map<string, number>();
     if (userIds.length > 0) {
+      // ⚠️ رفعِ P1-6 (فازِ ۲، §۱۳): این جمع قبلاً به رستوران اسکوپ نمی‌شد، پس
+      // موجودیِ **کلِ پلتفرمِ** کاربر به‌عنوانِ «امتیازِ او در باشگاهِ این رستوران»
+      // به پرسنل نشان داده می‌شد — عددی که با هیچ سطحِ دیگری نمی‌خواند. دفتر ستونِ
+      // restaurant_id را دارد، پس عددِ درست همیشه قابلِ محاسبه بوده.
       const ledger = await db.pointsLedger.groupBy({
-        by: ['userId'], where: { userId: { in: userIds } }, _sum: { delta: true },
+        by: ['userId'],
+        where: { userId: { in: userIds }, restaurantId: restaurant.id },
+        _sum: { delta: true },
       });
       ledger.forEach(l => pointsByUser.set(l.userId, l._sum.delta ?? 0));
     }

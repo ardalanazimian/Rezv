@@ -108,7 +108,7 @@ export async function loadReservationQr(boxId, code, size){
 }
 // ── رزرو مجدد (پیش‌پرکردن با همان رستوران) ──
 export function repeatReservation(rid){
-  const r=findR(rid);
+  const r=R.find(x=>String(x.id)===String(rid));
   if(!r){toast('','رستوران پیدا نشد');return;}
   go('rest');openRest(rid);
   toast('','اطلاعات رزرو قبلی آماده‌ست — فقط زمان رو انتخاب کن');
@@ -121,12 +121,100 @@ export async function cancelTrip(code,btn){
   undoSnack('رزرو لغو شد',
     ()=>{ if(tripEl)tripEl.style.opacity=''; },   // Undo: هیچ APIای صدا زده نشده
     async ()=>{                                    // Commit: حالا واقعاً لغو کن
+      // ⚠️ نقضِ §۳ (جدی‌ترین موردِ این اپ): در حالتِ آفلاین این شاخه **هیچ
+      // کاری نمی‌کرد** — نه خطایی نشان می‌داد و نه محوشدگیِ ردیف را برمی‌گرداند.
+      // پس اسنکِ «رزرو لغو شد» رویِ صفحه می‌ماند، رزرو محو به نظر می‌رسید، و
+      // سرور هرگز خبردار نمی‌شد. مهمان باور می‌کرد لغو کرده، سرِ قرار نمی‌رفت،
+      // و no-show می‌خورد. قطعیِ شبکه هرگز نباید حقیقتِ کسب‌وکار بسازد.
       if(isLoggedIn()){
         const res=await API.post('/reservations/'+encodeURIComponent(code)+'/cancel',{});
         if(res.ok)return;
-        if(!res.offline){ toast('',res.error?.message||'لغو ناموفق بود'); if(tripEl)tripEl.style.opacity=''; }
+        if(tripEl)tripEl.style.opacity='';
+        toast('⚠️', res.offline
+          ? 'اتصال برقرار نیست — رزرو لغو نشد. دوباره تلاش کن'
+          : (res.error?.message||'لغو ناموفق بود'));
       }
     });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ثبتِ نظر — رفعِ P1-4 (پروتکل §۲۰ قراردادِ API، §۲۸ «no dead buttons»)
+//
+//  یافته: دکمه‌ی «ثبت نظر» رویِ رزروهایِ تجربه‌شده وجود داشت ولی
+//  `openRest(rid)` صدا می‌زد — یعنی فقط صفحه‌ی رستوران را باز می‌کرد و هیچ
+//  نظری ثبت نمی‌شد. هم‌زمان `POST /api/v1/me/reviews` در بک‌اند کامل و
+//  کارآمد بود ولی **هیچ مصرف‌کننده‌ای نداشت** (grepِ کاملِ اپ: صفر).
+//
+//  یعنی این «ویژگیِ جدید» نیست؛ وصل‌کردنِ دو سرِ یک قراردادِ از‌قبل‌موجود است
+//  و برداشتنِ یک دکمه‌ی دروغین.
+//
+//  قراردادِ بک‌اند (تأییدشده از رویِ کدِ route، نه فرض):
+//    body: { restaurant_id: uuid, reservation_id?: uuid, rating: 1..5,
+//            food_rating?, service_rating?, atmosphere_rating?, body?: <=1000 }
+//    ۲۰۱ → { ok, review }
+//    خطاها: ALREADY_REVIEWED (۴۰۹) · VALIDATION (۴۲۲، رزروِ تکمیل‌نشده)
+//           NOT_FOUND (۴۰۴) · FORBIDDEN_TENANT (۴۰۳)
+//  بک‌اند خودش نظرِ بدونِ بازدیدِ واقعی را رد می‌کند — اینجا آن قانون
+//  بازتولید نمی‌شود (§۲۲)، فقط پیامش صادقانه نمایش داده می‌شود.
+// ═══════════════════════════════════════════════════════════════════════
+let _reviewStars = 0;
+
+export function openReviewSheet(restaurantId, reservationId, name){
+  if(!isLoggedIn()){ toast('','برای ثبت نظر اول وارد شو'); return; }
+  _reviewStars = 0;
+  openSheet(`
+    <div class="bs-head"><div class="bs-title">نظرت درباره‌ی ${esc(name)}</div>
+      <div class="bs-rest">تجربه‌ت چطور بود؟</div></div>
+    <div id="rvStars" style="display:flex;justify-content:center;gap:8px;margin:18px 0" role="radiogroup" aria-label="امتیاز از ۵">
+      ${[1,2,3,4,5].map(n=>`<button type="button" class="rv-star" data-n="${n}" role="radio" aria-checked="false" aria-label="${n} ستاره"
+        onclick="setReviewStars(${n})"
+        style="background:none;border:none;cursor:pointer;padding:6px;min-width:44px;min-height:44px;opacity:.35">${icon('star',{size:30,fill:true})}</button>`).join('')}
+    </div>
+    <div class="bw-field"><label for="rvBody">توضیح (اختیاری)</label>
+      <textarea id="rvBody" maxlength="1000" rows="4" placeholder="چی خوب بود؟ چی می‌تونست بهتر باشه؟"
+        style="width:100%;border-radius:var(--radius-lg);border:1px solid var(--line);padding:10px;font-family:inherit;font-size:14px"></textarea></div>
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px"
+      onclick="submitReview('${esc(restaurantId)}','${esc(reservationId)}')">ثبت نظر</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
+  `);
+}
+
+/** انتخابِ ستاره — فقط حالتِ بصری؛ هیچ چیزی هنوز ثبت نشده. */
+export function setReviewStars(n){
+  _reviewStars = n;
+  document.querySelectorAll('#rvStars .rv-star').forEach(el=>{
+    const v = +el.dataset.n;
+    el.style.opacity = v <= n ? '1' : '.35';
+    el.setAttribute('aria-checked', v === n ? 'true' : 'false');
+  });
+}
+
+export async function submitReview(restaurantId, reservationId){
+  if(!_reviewStars){ toast('','اول ستاره‌ت رو انتخاب کن'); return; }
+  const btn = document.querySelector('#sheetBody .btn-primary');
+  if(btn){ btn.disabled = true; btn.textContent = 'در حال ثبت...'; }
+  const body = (document.getElementById('rvBody')?.value || '').trim();
+  const res = await API.post('/me/reviews', {
+    restaurant_id: restaurantId,
+    reservation_id: reservationId,
+    rating: _reviewStars,
+    ...(body ? { body } : {}),
+  });
+  if(res.ok){
+    toast('', 'نظرت ثبت شد — ممنون!');
+    closeSheet();
+    return;
+  }
+  // ⚠️ هیچ مسیرِ جعلی‌ای اینجا نیست (پروتکل §۳): آفلاین و خطایِ سرور هر دو
+  // صریح گزارش می‌شوند و شیت باز می‌ماند تا کاربر بتواند دوباره تلاش کند.
+  const msg = res.offline
+    ? 'اتصال به سرور برقرار نشد — نظرت ثبت نشد'
+    : (res.error?.code === 'ALREADY_REVIEWED'
+        ? 'برای این رزرو قبلاً نظر ثبت کردی'
+        : (res.error?.message || 'ثبتِ نظر ناموفق بود'));
+  toast('', msg);
+  if(btn){ btn.disabled = false; btn.textContent = 'ثبت نظر'; }
 }
 
 
@@ -136,3 +224,6 @@ window.addToWallet = addToWallet;
 window.showCheckInQR = showCheckInQR;
 window.repeatReservation = repeatReservation;
 window.cancelTrip = cancelTrip;
+window.openReviewSheet = openReviewSheet;
+window.setReviewStars = setReviewStars;
+window.submitReview = submitReview;

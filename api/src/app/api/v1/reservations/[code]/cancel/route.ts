@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authFromRequest } from '@/lib/jwt';
+import { requirePermission } from '@/lib/permissions';
+import { resolveStaffRestaurant } from '@/lib/staff-helpers';
 import { db } from '@/lib/db';
 import { transitionReservation } from '@/lib/lifecycle';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
@@ -36,7 +38,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     // مجوز: staff باید هم‌تنانت باشد و دلیل بدهد؛ مشتری باید صاحب رزرو باشد.
     let actor: string;
     if (auth.kind === 'staff') {
-      if ((resv as any).restaurant.tenantId !== auth.tenantId) throw Err.forbidden();
+      // ⚠️ رفعِ P1 (فازِ ۲، پروتکل §۷) — دو حفره‌ی هم‌زمان که این مسیر داشت،
+      // در حالی که مسیرِ خواهرش (.../restaurant/reservations/[code]/status)
+      // هر دو را از قبل بسته بود:
+      //
+      //  ۱. **RBAC دور می‌خورد.** هیچ requirePermission ای نبود. مالکی که
+      //     عمداً canManageReservations را برایِ یک کارمند خاموش کرده بود،
+      //     همچنان نمی‌توانست جلویش را بگیرد — کارمند به‌جایِ status از
+      //     cancel استفاده می‌کرد و همان انتقالِ پایانی را انجام می‌داد.
+      //
+      //  ۲. **قفلِ شعبه دور می‌خورد.** چک فقط tenant-level بود
+      //     (`restaurant.tenantId === auth.tenantId`) و staff.restaurantId را
+      //     کاملاً نادیده می‌گرفت — یعنی کارمندِ قفل‌شده به شعبه‌ی A می‌توانست
+      //     رزروِ شعبه‌ی B را لغو کند. دقیقاً همان کلاسِ حفره‌ای که P0-1 داخلِ
+      //     resolveStaffRestaurant بست، این‌جا با **صدا نزدنش** دوباره باز بود.
+      //
+      // رفع با همان دو helperِ موجود (§۲۲ reuse before abstraction)؛ مسیرِ
+      // مشتری و قاعده‌ی «دلیل اجباری» عیناً دست‌نخورده می‌مانند.
+      await requirePermission(auth, 'canManageReservations');
+      const branch = await resolveStaffRestaurant(auth, req);
+      if (resv.restaurantId !== branch.id) throw Err.notFound('رزرو');
       if (!reason?.trim()) throw Err.validation('دلیل لغو برای رستوران الزامی است');
       actor = `staff:${auth.sub}`;
     } else {

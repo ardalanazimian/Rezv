@@ -33,8 +33,7 @@ CHECK=0
 
 ESM_APPS="customer"
 GLOBAL_APPS="business company"
-CSS_FILES="tokens.css foundation.css ds-bridge.css"
-FONT_FILES="vazirmatn-var.woff2"
+CSS_FILES="tokens.css foundation.css ds-bridge.css fonts.css"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -58,8 +57,10 @@ make_global_apicore() {
     -e 's/^export async function httpJson(/async function httpJson(/' \
     -e 's/^export function resolveApiBase(/function resolveApiBase(/' \
     -e 's/^export function genIdempotencyKey(/function genIdempotencyKey(/' \
+    -e 's/^export function isOfflineDemo(/function isOfflineDemo(/' \
+    -e 's/^export function refreshAccessToken(/function refreshAccessToken(/' \
     "$SRC/js/api-core.js"
-  printf '\nif (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveApiBase = resolveApiBase; window.genIdempotencyKey = genIdempotencyKey; }\n'
+  printf '\nif (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveApiBase = resolveApiBase; window.genIdempotencyKey = genIdempotencyKey; window.isOfflineDemo = isOfflineDemo; window.refreshAccessToken = refreshAccessToken; }\n'
 }
 
 # نسخه‌ی global از format.js (export را برمی‌دارد؛ برای <script> کلاسیک — توابعِ
@@ -102,13 +103,15 @@ for app in $ESM_APPS $GLOBAL_APPS; do
   done
 done
 
-# فونتِ Vazirmatn — self-hosted (نه Google Fonts؛ در ایران در دسترس نیست).
-# tokens.css با مسیرِ نسبیِ ../fonts/ به آن ارجاع می‌دهد، پس فایل باید فیزیکی
-# داخلِ هر اپ باشد — دقیقاً همان دلیلی که بقیه‌ی دیزاین‌سیستم هم کپی می‌شود.
+# ── فایلِ فونت (self-host) ──
+# ⚠️ چرا: پیش از این هر سه پنل فونت را از fonts.googleapis.com می‌گرفتند، پس
+# بسته‌ی آفلاین (file://) **هیچ فونتِ فارسی نداشت**. حالا فایلِ variable در
+# مخزن است و به هر اپ کپی می‌شود. مجوز: SIL OFL 1.1.
 for app in $ESM_APPS $GLOBAL_APPS; do
-  [ "$CHECK" = "1" ] || mkdir -p "$ROOT/apps/$app/fonts"
-  for f in $FONT_FILES; do
-    place "$SRC/fonts/$f" "$ROOT/apps/$app/fonts/$f"
+  mkdir -p "$ROOT/apps/$app/fonts"
+  for f in "$SRC"/fonts/*.woff2 "$SRC"/fonts/*.txt; do
+    [ -e "$f" ] || continue
+    place "$f" "$ROOT/apps/$app/fonts/$(basename "$f")"
   done
 done
 

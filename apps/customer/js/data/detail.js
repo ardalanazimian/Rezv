@@ -5,6 +5,8 @@ import { detailSocialProof, fmtFa, go, toggleRestFav } from './discover.js';
 import { curRest, favHas, gradFor, setCurRest } from './seed.js';
 import { API, applyRestaurantDetail, loadRestaurantDetail, mapApiRestaurant, resolveMediaUrl } from '../api.js';
 import { R, findR } from '../init.js';
+// depositLabel: تنها منبعِ متنِ پیش‌پرداخت (P1-3، خطِ ممیزی) — در نوارِ رزرو مصرف می‌شود.
+import { depositLabel } from './booking.js';
 import { armReveals, buzz, haptic } from '../theme-pwa.js';
 import { icon } from '../icons.js';
 
@@ -32,9 +34,19 @@ export async function shareRestaurant(id){
     try { await navigator.share({ title: name, url }); } catch { /* کاربر لغو کرد یا مرورگر رد کرد — چیزی نگو */ }
     return;
   }
+  // ⚠️ فازِ ۲ (§۲۶–۲۹): این تابع دو مسیرِ خروجِ کاملاً بی‌صدا داشت — اگر
+  // `navigator.clipboard` وجود نداشت (زمینه‌ی غیرِ امن، مرورگرِ قدیمی) یا نوشتن
+  // rejct می‌شد (اجازه‌ی رد شده)، کاربر دکمه را می‌زد و **هیچ اتفاقی نمی‌افتاد**:
+  // نه توست، نه خطا، نه راهِ جایگزین. دکمه از نظرِ کاربر مرده به نظر می‌رسید.
+  //
+  // حالا هر سه حالت پاسخ دارند و در هیچ‌کدام موفقیتِ دروغین ادعا نمی‌شود.
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(url).then(() => toast('', 'لینکِ رزرونو کپی شد')).catch(() => {});
+    navigator.clipboard.writeText(url)
+      .then(() => toast('', 'لینکِ رزرونو کپی شد'))
+      .catch(() => toast('⚠️', 'کپی نشد — می‌تونی آدرس رو از نوارِ مرورگر برداری'));
+    return;
   }
+  toast('⚠️', 'مرورگرت اشتراک‌گذاری یا کپی رو پشتیبانی نمی‌کنه');
 }
 // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴) — دو باگِ واقعی و یک اتصالِ گم‌شده:
 //  ۱. idِ رستورانِ واقعی UUID است؛ اینجا بدونِ کوتیشن داخلِ onclick تزریق
@@ -110,8 +122,8 @@ function renderRestPage(r){
       <div class="rp-hero-mesh"${heroPhoto?' style="display:none"':''}></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
-        <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant('${r.id}')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
-        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav('${r.id}')" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
+        <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant('${esc(String(r.id))}')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
+        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav('${esc(String(r.id))}')" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
       </div>
       ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-emoji">${esc(r.e)}</div>`}
       <div class="rp-hero-overlay">
@@ -122,12 +134,14 @@ function renderRestPage(r){
         </div>
         <div class="rp-hero-name">${esc(r.n)}</div>
         <div class="rp-hero-meta">${(() => {
-          // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): قبلاً «★ ۰» و «۰ نظر» بدونِ قید
-          // نشان داده می‌شد — رستورانِ زنده‌ی بدونِ امتیاز، «امتیازِ ۰ از ۵»
-          // می‌نمود، نه «هنوز امتیازی ندارد». حالا امتیاز/تعدادِ نظر فقط وقتی
-          // واقعاً > ۰ باشند رندر می‌شوند و جداکننده‌ی معلق هم نمی‌ماند.
+          // ⚠️ ادغامِ دو رفع (۲۰۲۶-۰۸-۲۵): ساختارِ آرایه‌ای یعنی نه «۰ نظر»ِ
+          // گمراه‌کننده رندر می‌شود و نه جداکننده‌ی معلق می‌ماند؛ و وقتی
+          // امتیازی نیست، به‌جای سکوت همان برچسبِ گویای «هنوز نظری ثبت نشده»
+          // نشان داده می‌شود. rt برای رستورانِ زنده‌ی بی‌امتیاز null است
+          // (api.js)، ولی گاردِ >۰ صفرِ احتمالی را هم پوشش می‌دهد.
           const parts = [];
           if (Number.isFinite(r.rt) && r.rt > 0) parts.push(`<span class="rp-hero-rate"><span style="color:#FBBF24;display:inline-flex">${icon('star',{size:14,fill:true})}</span> ${fmtFa(r.rt)}</span>`);
+          else parts.push('<span class="rp-hero-rate">هنوز نظری ثبت نشده</span>');
           if (Number.isFinite(r.reviews) && r.reviews > 0) parts.push(`<span>${fmtFa(r.reviews)} نظر</span>`);
           if (r.cuisine) parts.push(`<span>${esc(r.cuisine)}</span>`);
           if (r.price) parts.push(`<span>${esc(r.price)}</span>`);
@@ -167,7 +181,7 @@ function renderRestPage(r){
           }
           return `
         ${hasRatingBars?`<div class="rb-grid glass">
-          <div class="rb-overall"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">${fmtFa(r.reviews)} نظر</div></div>
+          <div class="rb-overall">${r.rt!=null?`<div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">${fmtFa(r.reviews)} نظر</div>`:'<div class="rb-count">هنوز نظری ثبت نشده</div>'}</div>
           <div class="rb-bars">${[['غذا',r.rb.food],['سرویس',r.rb.service],['فضا',r.rb.atmo],['ارزش',r.rb.value]].map(([l,v])=>`<div class="rb-bar-row"><span class="rl">${l}</span><div class="rb-track"><div class="rb-fill" style="width:0" data-w="${v/5*100}"></div></div><span class="rv">${fmtFa(v)}</span></div>`).join('')}</div>
         </div>`:''}
         ${hasAiSummary?`<div class="ai-review glass">
@@ -182,10 +196,10 @@ function renderRestPage(r){
     <div class="rp-bookbar glass">
       <div class="rp-bookbar-info">
         <div class="rp-bookbar-cb">${icon('wallet',{size:13})} ${fmtFa(r.cb)}٪ کش‌بک</div>
-        <div class="rp-bookbar-sub">رزرو رایگان · بدون پیش‌پرداخت</div>
+        <div class="rp-bookbar-sub">${depositLabel(r)}</div>
       </div>
-      <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openRestChat('${r.id}')" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
-      <button class="btn btn-primary rp-bookbar-btn" onclick="buzz&&buzz();openBookSheet('${r.id}')">رزرو میز</button>
+      <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openRestChat('${esc(String(r.id))}')" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
+      <button class="btn btn-primary rp-bookbar-btn" onclick="buzz&&buzz();openBookSheet('${esc(String(r.id))}')">رزرو میز</button>
     </div>`;
 }
 

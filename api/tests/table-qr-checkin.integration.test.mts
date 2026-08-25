@@ -183,10 +183,11 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
     const { body } = await createTableViaRoute(A);
     const resv = await makeLiveReservation(A, body.id);
 
+    // [merge ۰۸-۲۴] هدرِ احراز: /checkin در سخت‌سازیِ P0-2 staff-scoped شد (پایین).
     const res = await checkinRoute.POST(
       new Request('http://x/api/v1/checkin', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${A.token}` },
         body: JSON.stringify({ qr_code: body.qr_code }),
       }),
     );
@@ -204,8 +205,14 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
     assert.equal(tbl?.state, 'occupied', 'میز باید اشغال شده باشد');
   });
 
-  test('اسکن بدونِ ورود کار می‌کند (مهمانِ بدونِ حساب هم باید بنشیند)', async () => {
-    // درخواست هیچ هدرِ Authorization ندارد — عمداً.
+  test('اسکنِ بدونِ احرازِ کارمند رد می‌شود (قفلِ P0-2)', async () => {
+    // [merge ۰۸-۲۴ — تغییرِ آگاهانه‌ی قرارداد] نسخه‌ی قبلیِ این تست عکسش را
+    // می‌خواست: «خودِ کدِ QR اعتبارنامه است، لاگین لازم نیست». خطِ ممیزی همان
+    // route را P0-2 کرد: mutationِ وضعیتِ رزرو/میز از اینترنتِ باز، فقط با
+    // رشته‌ای که رویِ استیکرِ فیزیکی چاپ شده، یعنی هر عکسِ اشتراکی/enumeration
+    // می‌تواند از راهِ دور میزها را occupied کند. اسکن‌کننده‌ی واقعی دستگاهِ
+    // میزبان است (همان که «رسید» را می‌زند)؛ منویِ عمومیِ مهمان (#32) هم مستقل
+    // از این route و بدونِ لاگین سالم است. گاردِ ساختاری: checkin-auth.integration.
     const { body } = await createTableViaRoute(A);
     await makeLiveReservation(A, body.id);
     const res = await checkinRoute.POST(new Request('http://x/api/v1/checkin', {
@@ -213,14 +220,14 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ qr_code: body.qr_code }),
     }));
-    assert.equal(res.status, 200, 'خودِ کدِ QR اعتبارنامه است، لاگین لازم نیست');
+    assert.equal(res.status, 401, 'بدونِ توکنِ کارمند نباید هیچ وضعیتی جهش کند');
   });
 
   test('میزِ بدونِ رزروِ فعال: صادقانه می‌گوید رزروی نیست، ادعای ثبت نمی‌کند', async () => {
     const { body } = await createTableViaRoute(A);
     const res = await checkinRoute.POST(new Request('http://x/api/v1/checkin', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${A.token}` },
       body: JSON.stringify({ qr_code: body.qr_code }),
     }));
     assert.equal(res.status, 200);
@@ -231,7 +238,7 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
   test('کدِ ناشناس رد می‌شود', async () => {
     const res = await checkinRoute.POST(new Request('http://x/api/v1/checkin', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${A.token}` },
       body: JSON.stringify({ qr_code: 'T-ZZZZZZZZZZ' }),
     }));
     assert.equal(res.status, 404);

@@ -15,6 +15,7 @@ export const FEATURE_FLAG_KEYS = [
   'reward_marketplace_enabled',
   'missions_claim_enabled',
   'ai_recommendations_enabled',
+  'gift_card_purchase_enabled',
 ] as const;
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];
 
@@ -24,13 +25,33 @@ const FLAG_LABEL: Record<FeatureFlagKey, string> = {
   reward_marketplace_enabled: 'خرجِ سکه در فروشگاهِ جایزه',
   missions_claim_enabled: 'دریافتِ جایزه‌یِ ماموریت',
   ai_recommendations_enabled: 'پیشنهادهایِ هوشمند',
+  gift_card_purchase_enabled: 'خریدِ کارتِ هدیه',
 };
+
+// ═══════════════════════════════════════════════════════════════════════
+//  فلگ‌هایی که پیش‌فرضشان **خاموش** است (fail-closed) — استثنایِ آگاهانه
+//
+//  قاعده‌ی کلیِ این ماژول fail-open است (نبودِ کلید = فعال) تا نصبِ تازه
+//  بدونِ تنظیمِ دستی کار کند. ولی یک قابلیت که در وضعیتِ فعلی‌اش **ارزشِ
+//  پولیِ واقعی و خرج‌شدنی تولید می‌کند بدونِ هیچ مرحله‌ی پرداخت**، نباید
+//  به‌صورتِ پیش‌فرض روشن باشد — آن‌جا fail-open یعنی «پیش‌فرض: پولِ رایگان».
+//
+//  gift_card_purchase_enabled (فازِ ۲): مسیرِ POST /api/v1/gift-cards یک
+//  GiftCard با balanceToman برابرِ مبلغِ درخواستی و وضعیتِ active می‌سازد،
+//  و آن کارت در reservations.ts از طریقِ redeemGiftCardTx رویِ صورت‌حسابِ
+//  واقعیِ رستوران خرج می‌شود. هیچ درگاهِ پرداختی در این مسیر نیست.
+//  تا وقتی پرداخت (zarinpal، که برایِ بیعانه از قبل هست) به این جریان وصل
+//  نشده، پیش‌فرض باید خاموش بماند.
+// ═══════════════════════════════════════════════════════════════════════
+const DEFAULT_OFF: ReadonlySet<string> = new Set<FeatureFlagKey>([
+  'gift_card_purchase_enabled',
+]);
 export function featureFlagLabel(key: FeatureFlagKey): string { return FLAG_LABEL[key]; }
 
 /** آیا این قابلیت الان فعال است؟ پیش‌فرضِ نبودِ کلید = فعال (fail-open، نه fail-closed). */
 export async function isFeatureEnabled(key: FeatureFlagKey): Promise<boolean> {
   const raw = await getPlatformSetting(`feature_flag:${key}`);
-  if (raw === undefined) return true;
+  if (raw === undefined) return !DEFAULT_OFF.has(key);
   return raw !== 'false';
 }
 
