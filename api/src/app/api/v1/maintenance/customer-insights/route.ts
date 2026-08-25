@@ -9,6 +9,7 @@ import { applyAbuseFlags, applyPlatformAbuseFlags } from '@/lib/fraud';
 import { trainAndCalibrateNoShowModel, trainAndCalibratePlatformNoShowModel } from '@/lib/no-show-model';
 import { rollbackDriftedModel, rollbackDriftedPlatformModel } from '@/lib/model-drift';
 import { trainAndCalibrateDemandForecast } from '@/lib/demand-forecast';
+import { recomputeRestaurantPopularity } from '@/lib/restaurant-popularity';
 import { invalidatePattern } from '@/lib/cache';
 import { guardMaintenance } from '@/lib/maintenance-auth';
 import { errorResponse } from '@/lib/errors';
@@ -129,7 +130,23 @@ async function POST_impl(req: Request) {
     const platformRollback = await rollbackDriftedPlatformModel().catch(() => null);
     const platform = await trainAndCalibratePlatformNoShowModel().catch(() => null);
 
+    // ⚠️ رتبه‌بندیِ فیدِ عمومی (مهاجرتِ ۰۷۳): `restaurants.visits_7d` مبنایِ
+    // ترتیبِ `GET /v1/restaurants` است — همان فیدی که اپِ مشتری «محبوب
+    // امشب» صدایش می‌زند. پیش از این ترتیب `id DESC` (یک UUID) بود، یعنی
+    // عملاً تصادفی در حالی که عنوان ادعایِ محبوبیت داشت.
+    //
+    // جدا catch می‌شود، مثلِ بقیه‌ی گام‌های این job: شکستِ رتبه‌بندی نباید
+    // بازآموزیِ مدل‌ها را که تازه تمام شده بی‌اثر کند. شکست یعنی ترتیب یک
+    // شب کهنه می‌ماند، نه اینکه غلط شود.
+    const popularityUpdated = await recomputeRestaurantPopularity().catch((e) => {
+      log.error('بازمحاسبه‌ی محبوبیت شکست خورد — ترتیبِ فید یک شب کهنه می‌ماند', {
+        error: (e as Error).message,
+      });
+      return -1;
+    });
+
     return NextResponse.json({
+      popularity_rows_updated: popularityUpdated,
       // ok فقط وقتی true است که واقعاً همه‌چیز انجام شده باشد.
       ok: guestProfilesError === null,
       restaurants: restaurants.length, users_recomputed: totalUsers,

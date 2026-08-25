@@ -116,6 +116,11 @@ model Restaurant {
   vibes         String[]         @default([])
   priceBand     Int              @default(2) @map("price_band") @db.SmallInt
   isOpen        Boolean          @default(true) @map("is_open")
+  // مهاجرتِ ۰۷۳ — شمارشِ حضورِ ۷ روزِ گذشته، denormalized تا فهرستِ عمومی
+  // بتواند بر اساسش مرتب شود. Prisma نمی‌تواند بر اساسِ شمارشِ **فیلترشده‌ی**
+  // یک رابطه مرتب کند و صفحه‌بندیِ cursor به ترتیبِ قطعیِ ایندکس‌دار نیاز دارد.
+  // در جابِ شبانه‌ی customer-insights بازمحاسبه می‌شود (تا ۲۴ ساعت کهنه).
+  visits7d      Int              @default(0) @map("visits_7d")
   openingHours  Json?            @map("opening_hours")  // ساعت کاری هفتگی؛ null=همیشه باز طبق isOpen (سازگاری با گذشته)
   // ── تأییدِ ساعتِ کاری (Part 3، migration 045) — دقیقاً مثلِ RestaurantPhoto.status
   //    ولی روی خودِ رستوران چون هر رستوران حداکثر یک پیشنهادِ درِ دستِ بررسی دارد.
@@ -204,6 +209,8 @@ model Restaurant {
 
   @@index([tenantId])
   @@index([city], map: "idx_restaurants_city")
+  // ترتیبِ دقیقِ کوئریِ فهرستِ عمومی — بدونِ اعلامِ اینجا، `db push` حذفش می‌کند.
+  @@index([isOpen, visits7d(sort: Desc), id(sort: Desc)], map: "restaurants_open_visits_idx")
   chatThreads  ChatThread[]
   @@map("restaurants")
   modelPredictions ModelPrediction[]

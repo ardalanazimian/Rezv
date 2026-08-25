@@ -64,7 +64,14 @@ async function GET_impl(req: Request) {
           priceBand: true, cbBasePct: true, latitude: true, longitude: true,
           cancellationPolicy: { select: { depositRequired: true, freeCancelHours: true, autoConfirm: true } },
         },
-        orderBy: { id: 'desc' },           // ترتیب پایدار برای cursor
+        // ⚠️ رتبه‌بندیِ واقعی (مهاجرتِ ۰۷۳). تا امروز اینجا `{ id: 'desc' }`
+        // بود — پایدار (که برایِ cursor لازم است) ولی `id` یک UUID است، پس
+        // ترتیبِ فیدی که اپِ مشتری «🔥 محبوب امشب» صدایش می‌زند عملاً تصادفی
+        // بود. سیگنالِ واقعی از قبل پایین‌تر در همین route حساب می‌شد و روی
+        // هر کارت هم نشان داده می‌شد (`visits7d`)، فقط **بعد از** صفحه‌بندی —
+        // پس نمی‌توانست مبنایِ مرتب‌سازی باشد.
+        // `id` به‌عنوانِ شکنندهٔ تساوی می‌ماند تا ترتیب قطعی و cursor سالم بماند.
+        orderBy: [{ visits7d: 'desc' }, { id: 'desc' }],
         take: PAGE_SIZE + 1,                // یکی بیشتر بگیر تا بفهمی صفحه‌ی بعد هست
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });

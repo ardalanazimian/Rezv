@@ -148,6 +148,7 @@ import './rbac-permission-coverage.test.mts';
 import './rbac-role-from-db.integration.test.mts';
 import './staff-tenant-hijack.integration.test.mts';
 import './incentive-low-demand-date.integration.test.mts';
+import './restaurant-popularity-ranking.integration.test.mts';
 import './rewards.integration.test.mts';
 import './redis.test.mts';
 import './reminder-sms.integration.test.mts';
