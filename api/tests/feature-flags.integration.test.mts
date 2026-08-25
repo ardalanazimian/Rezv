@@ -9,6 +9,22 @@ import { db } from '../src/lib/db.ts';
 const {
   FEATURE_FLAG_KEYS, featureFlagLabel, isFeatureEnabled, getAllFeatureFlags, setFeatureFlag,
 } = await import('../src/lib/feature-flags.ts');
+
+/**
+ * کلیدهایی که پیش‌فرضشان عمداً **خاموش** است (استثنایِ آگاهانه‌ی fail-open).
+ *
+ * ⚠️ این فهرست عمداً اینجا دستی تکرار شده و از `DEFAULT_OFF`ِ خودِ ماژول
+ * import نشده: اگر همان مجموعه را import کنیم، تست هر تغییری در آن را
+ * خودکار می‌پذیرد و دیگر چیزی را قفل نمی‌کند. با فهرستِ مستقل، افزودن یا
+ * برداشتنِ یک استثنا **باید** آگاهانه اینجا هم ثبت شود — که دقیقاً همان
+ * تصمیمِ امنیتی‌ای است که باید ردِ انسانی داشته باشد.
+ *
+ * `gift_card_purchase_enabled` (PR #68): مسیرِ POST /api/v1/gift-cards کارتی
+ * با موجودیِ واقعیِ خرج‌شدنی می‌سازد بدونِ هیچ درگاهِ پرداختی — پیش‌فرضِ
+ * روشن آنجا یعنی «پولِ رایگان».
+ */
+const DEFAULT_OFF_KEYS: readonly string[] = ['gift_card_purchase_enabled'];
+const isDefaultOff = (k: string) => DEFAULT_OFF_KEYS.includes(k);
 const { getPlatformSetting, setPlatformSetting } = await import('../src/lib/platform-settings.ts');
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -58,10 +74,27 @@ after(async () => {
 });
 
 describe('feature-flags · پیش‌فرضِ fail-open', () => {
-  test('کلیدی که در DB نیست یعنی «فعال»', async () => {
+  test('کلیدی که در DB نیست یعنی «فعال» — جز استثناهای آگاهانه', async () => {
     for (const key of FEATURE_FLAG_KEYS) {
+      if (isDefaultOff(key)) continue;
       assert.equal(await isFeatureEnabled(key), true,
         `${key} بدونِ ردیف در DB باید فعال باشد — fail-closed یعنی نصبِ تازه بی‌صدا بسته است`);
+    }
+  });
+
+  test('کلیدهای استثنا واقعاً پیش‌فرض **خاموش**‌اند (گاردِ «پولِ رایگان»)', async () => {
+    // قرینه‌ی تستِ بالا و به همان اندازه مهم: اگر روزی کسی یک کلید را از
+    // DEFAULT_OFF بردارد، قابلیتی که ارزشِ پولیِ خرج‌شدنی بدونِ پرداخت تولید
+    // می‌کند بی‌صدا روی هر نصبِ تازه روشن می‌شود. این تست همان لحظه قرمز
+    // می‌شود. (فهرستِ خالی نباید بی‌صدا از تست رد شود — پس اول خودِ فهرست.)
+    assert.ok(DEFAULT_OFF_KEYS.length > 0, 'فهرستِ استثناها نباید خالی باشد');
+    for (const key of DEFAULT_OFF_KEYS) {
+      assert.ok(
+        (FEATURE_FLAG_KEYS as readonly string[]).includes(key),
+        `${key} دیگر جزوِ کلیدهای شناخته‌شده نیست — این فهرست باید به‌روز شود`,
+      );
+      assert.equal(await isFeatureEnabled(key as never), false,
+        `${key} باید پیش‌فرض خاموش بماند تا وقتی مسیرِ پرداختش وصل نشده`);
     }
   });
 
@@ -69,7 +102,10 @@ describe('feature-flags · پیش‌فرضِ fail-open', () => {
     const flags = await getAllFeatureFlags();
     assert.deepEqual(Object.keys(flags).sort(), [...FEATURE_FLAG_KEYS].sort(),
       'پنلِ شرکت روی همین فهرست سوییچ می‌سازد — کلیدِ جاافتاده یعنی سوییچِ نامرئی');
-    assert.ok(Object.values(flags).every(v => v === true), 'همه باید پیش‌فرض فعال باشند');
+    for (const [key, value] of Object.entries(flags)) {
+      assert.equal(value, !isDefaultOff(key),
+        `پیش‌فرضِ ${key} با قاعده‌ی fail-open/استثناهایش نمی‌خواند`);
+    }
   });
 
   test('هر کلید برچسبِ فارسیِ غیرخالی دارد', async () => {
