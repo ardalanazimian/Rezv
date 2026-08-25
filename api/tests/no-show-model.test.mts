@@ -43,31 +43,40 @@ describe('buildFeatureVector', () => {
     const v = buildFeatureVector({ hasUserId: false, priorTotal: 0, priorNoShowRate: 0, leadMinutes: 60, partySize: 2, source: 'app' });
     assert.equal(v[0], 1);
   });
-  test('بدونِ سابقه، priorNoShowRate در بردار صفر می‌شود حتی اگر عدد دیگری داده شود', () => {
-    // priorTotal=0 یعنی «سابقه ندارد» — حتی اگر ورودی اشتباهاً rate بدهد، نباید استفاده شود
+  test('بدونِ سابقه، نرخِ no-show در بردار صفر می‌شود حتی اگر عدد دیگری داده شود', () => {
+    // priorTotal=0 یعنی «سابقه ندارد» — حتی اگر ورودی اشتباهاً rate بدهد، نباید استفاده شود.
+    // (نامِ ویژگی در v3 به shrunkNoShowRate تغییر کرد؛ این قاعده همان است.)
     const v = buildFeatureVector({ hasUserId: true, priorTotal: 0, priorNoShowRate: 0.9, leadMinutes: 60, partySize: 2, source: 'app' });
-    const idx = NO_SHOW_FEATURE_NAMES.indexOf('priorNoShowRate');
-    assert.equal(v[idx], 0);
+    assert.equal(v[NO_SHOW_FEATURE_NAMES.indexOf('shrunkNoShowRate')], 0);
+    assert.equal(v[NO_SHOW_FEATURE_NAMES.indexOf('priorEvidence')], 0, 'شواهد هم صفر است، نه یک عددِ ساختگی');
   });
 });
 
 describe('trainLogisticRegression — یادگیریِ واقعی از دادهٔ مصنوعی', () => {
   test('روی یک ویژگیِ کاملاً جداکننده، وزنِ همان ویژگی مثبت و بزرگ می‌شود', () => {
     // دادهٔ مصنوعی: last-minute تقریباً همیشه no-show است، بقیه تقریباً هیچ‌وقت
+    // بردار از روی طولِ **واقعیِ** فهرستِ ویژگی‌ها ساخته می‌شود، نه با طولِ
+    // هاردکد — نسخه‌ی قبلیِ این تست ۷ درایه‌ی ثابت داشت و با گسترشِ بردار
+    // بی‌صدا به ایندکسِ اشتباه اشاره می‌کرد.
+    const idx = NO_SHOW_FEATURE_NAMES.indexOf('lastMinute');
+    const vec = (on: boolean) => {
+      const v = new Array(NO_SHOW_FEATURE_NAMES.length).fill(0);
+      v[0] = 1; v[idx] = on ? 1 : 0;
+      return v;
+    };
     const X: number[][] = [];
     const y: number[] = [];
     for (let i = 0; i < 60; i++) {
       const lastMinute = i % 2 === 0;
-      X.push([1, 0, 0, lastMinute ? 1 : 0, 0, 0, 0]);
+      X.push(vec(lastMinute));
       y.push(lastMinute ? 1 : 0);
     }
     const w = trainLogisticRegression(X, y, { iterations: 1000, learningRate: 0.5, l2: 0.001 });
-    const idx = NO_SHOW_FEATURE_NAMES.indexOf('lastMinute');
     assert.ok(w[idx] > 2, `انتظار وزنِ بزرگِ مثبت برای lastMinute داشتیم، گرفتیم ${w[idx]}`);
 
     // و باید واقعاً به‌درستی طبقه‌بندی کند
-    const predLastMinute = predictProba(w, [1, 0, 0, 1, 0, 0, 0]);
-    const predNormal = predictProba(w, [1, 0, 0, 0, 0, 0, 0]);
+    const predLastMinute = predictProba(w, vec(true));
+    const predNormal = predictProba(w, vec(false));
     assert.ok(predLastMinute > 0.8, `پیش‌بینیِ last-minute باید بالا باشد، شد ${predLastMinute}`);
     assert.ok(predNormal < 0.2, `پیش‌بینیِ حالتِ عادی باید پایین باشد، شد ${predNormal}`);
   });

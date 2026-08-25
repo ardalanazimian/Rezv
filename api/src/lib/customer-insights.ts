@@ -94,6 +94,10 @@ export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResul
     leadMinutes: (input.slotStart.getTime() - input.createdAt.getTime()) / 60000,
     partySize: input.partySize,
     source: input.source,
+    // ویژگی‌های زمانیِ v2 (ساعتِ تهران، آخرِ هفته). مسیرِ آموزش هم دقیقاً
+    // همین را می‌دهد و هر دو از یک `buildFeatureVector` رد می‌شوند —
+    // برابری ساختاری است، نه چیزی که با تست نگه داشته شود.
+    slotStart: input.slotStart,
   };
 
   // ⚠️ ترتیب: مدلِ **اختصاصیِ** رستوران، بعد مدلِ **سراسریِ** پلتفرم، بعد

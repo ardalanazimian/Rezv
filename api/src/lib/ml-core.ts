@@ -37,7 +37,10 @@ export function dot(a: readonly number[], b: readonly number[]): number {
 
 export interface TrainOptions {
   learningRate?: number;
+  /** **سقفِ** تکرار، نه تعدادِ ثابت — با رسیدن به همگرایی زودتر می‌ایستد. */
   iterations?: number;
+  /** بزرگ‌ترین گامِ مجازِ پارامتر برای اعلامِ همگرایی. */
+  tolerance?: number;
   l2?: number; // regularization — بایاس (اندیسِ ۰) هرگز regularize نمی‌شود
 }
 
@@ -51,12 +54,27 @@ export function trainLogisticRegression(
   y: readonly number[],
   opts: TrainOptions = {},
 ): number[] {
-  const { learningRate = 0.3, iterations = 800, l2 = 0.02 } = opts;
+  const { learningRate = 0.3, iterations = 20_000, l2 = 0.02, tolerance = 1e-7 } = opts;
   const n = X.length;
   if (n === 0) throw new Error('trainLogisticRegression: دیتاست خالی است');
   const d = X[0].length;
   const w = new Array(d).fill(0);
 
+  // ⚠️ همگرایی حالا **تشخیص داده می‌شود**، نه اینکه به یک تعدادِ ثابت تکرار
+  // اعتماد شود. یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۵ که این را لازم کرد:
+  //
+  // سقفِ قبلی ۸۰۰ تکرارِ ثابت بود و برای بردارِ ۷تاییِ اولیه (که تقریباً
+  // همه‌اش دودویی بود) کافی بود. با گسترشِ بردار به ۱۲ ویژگیِ پیوسته، همان
+  // ۸۰۰ تکرار **زیرآموزش** می‌داد و مدلِ غنی‌تر روی هولدآوت از مدلِ فقیرتر
+  // بدتر می‌شد. اندازه‌گیریِ واقعی روی همان دادهٔ کنترل‌شده:
+  //   ۸۰۰ تکرار  → AUC ۰٫۶۶۴۲  (بدتر از v1 با ۰٫۶۶۶۱)
+  //   ۳۰۰۰ تکرار → AUC ۰٫۶۷۶۸  (بهتر از v1)
+  // یعنی نتیجه‌ی «ویژگیِ جدید کمکی نکرد» کاملاً غلط ولی کاملاً قابلِ‌باور
+  // بود. هیچ خطایی هم تولید نمی‌شد.
+  //
+  // با توقفِ مبتنی بر همگرایی، دفعه‌ی بعد که کسی ویژگی اضافه کند این تله
+  // دوباره سراغش نمی‌آید؛ و چون زودتر می‌ایستد، بردارِ سبک هزینه‌ی بیشتری
+  // هم نمی‌دهد (v1 هنوز حدودِ همان ۸۰۰ تکرار تمام می‌شود).
   for (let it = 0; it < iterations; it++) {
     const grad = new Array(d).fill(0);
     for (let i = 0; i < n; i++) {
@@ -64,10 +82,15 @@ export function trainLogisticRegression(
       const err = p - y[i];
       for (let j = 0; j < d; j++) grad[j] += err * X[i][j];
     }
+    let maxStep = 0;
     for (let j = 0; j < d; j++) {
       const reg = j === 0 ? 0 : l2 * w[j];
-      w[j] -= (learningRate / n) * (grad[j] + reg);
+      const step = (learningRate / n) * (grad[j] + reg);
+      w[j] -= step;
+      const abs = Math.abs(step);
+      if (abs > maxStep) maxStep = abs;
     }
+    if (maxStep < tolerance) break;
   }
   return w;
 }
@@ -292,6 +315,17 @@ export type RawFeatureInput = {
   leadMinutes: number;
   partySize: number;
   source: string;
+  /**
+   * لحظه‌ی شروعِ اسلات — برای ویژگی‌های زمانی (ساعتِ روز، آخرِ هفته) در
+   * بردارِ v2.
+   *
+   * ⚠️ اختیاری است و این عمدی‌ست: `computeStaticScoreFromFeatures`
+   * (heuristic) هرگز از آن استفاده نمی‌کند و امضایش نباید بشکند. مسیرهایی
+   * که به مدلِ یادگرفته می‌رسند همیشه پُرش می‌کنند؛ نبودش در
+   * `buildFeatureVector` به‌صورتِ «سیگنالِ زمانی نداریم» رفتار می‌شود، نه
+   * یک ساعتِ ساختگی.
+   */
+  slotStart?: Date;
 };
 
 /**

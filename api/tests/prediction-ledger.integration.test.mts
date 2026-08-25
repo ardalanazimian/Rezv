@@ -103,14 +103,18 @@ describe('نسخه‌ی قراردادِ ویژگی', () => {
     // دست‌نخورده بگذارد، پیش‌بینی‌هایی با معنایِ متفاوت زیرِ یک نسخه قاطی
     // می‌شوند و مقایسه‌ی تاریخی بی‌معنا می‌شود.
     assert.deepEqual([...NO_SHOW_FEATURE_NAMES], [
-      'bias', 'knownUser', 'priorNoShowRate', 'lastMinute',
-      'veryEarlyBooking', 'largeParty', 'phoneSource',
+      'bias', 'knownUser', 'shrunkNoShowRate', 'priorEvidence', 'leadLog',
+      'lastMinute', 'largeParty', 'partySizeNorm', 'phoneSource',
+      'hourSin', 'hourCos', 'isWeekend',
     ], 'ترکیبِ ویژگی عوض شده — NO_SHOW_FEATURE_VERSION را هم بالا ببر و این تست را به‌روز کن');
-    // v2 از فازِ ۴: ترکیبِ ویژگی‌ها همان است، ولی *معنایِ* priorTotal عوض شد
-    // (از «کلِ پلتفرم بدونِ dining» به «همین رستوران شاملِ dining») تا با
-    // کوئریِ آموزش یکی شود. تغییرِ معنا هم باید نسخه را بالا ببرد، وگرنه دو
-    // معنایِ متفاوت زیرِ یک برچسب در آمار قاطی می‌شوند.
-    assert.equal(NO_SHOW_FEATURE_VERSION, 'no_show/v2');
+    // تاریخچه: v1 بردارِ ۷تاییِ اولیه · v2 همان ترکیب با معنیِ تازه‌ی
+    // priorTotal (فازِ ۴) · v3 بردارِ ۱۲تایی (جمع‌شدگیِ نرخِ سابقه، فاصله‌ی
+    // پیوسته، ویژگی‌های زمانیِ تهران).
+    //
+    // ⚠️ این تست همان کاری را کرد که برایش ساخته شده بود: با تغییرِ بردار
+    // قرمز شد و نشان داد برچسبِ دفتر عقب مانده — چون دفتر یک ثابتِ **موازی**
+    // داشت. حالا برچسب از همان یک منبع مشتق می‌شود، پس عقب‌ماندن ممکن نیست.
+    assert.equal(NO_SHOW_FEATURE_VERSION, 'no_show/v3');
   });
 });
 

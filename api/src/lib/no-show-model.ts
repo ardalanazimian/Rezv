@@ -42,11 +42,16 @@ const log = createLogger('no-show-model');
 export const NO_SHOW_FEATURE_NAMES = [
   'bias',
   'knownUser',        // کاربر دارای حساب (نه رزروِ مهمان)
-  'priorNoShowRate',
-  'lastMinute',       // < 30 دقیقه تا شروعِ اسلات
-  'veryEarlyBooking', // > 7 روز تا شروعِ اسلات
+  'shrunkNoShowRate', // نرخِ no-showِ قبلی، **جمع‌شده به سمتِ میانگین** — پایین را بخوان
+  'priorEvidence',    // چقدر از آن نرخ مطمئنیم (لگاریتمِ تعدادِ سابقه)
+  'leadLog',          // فاصله‌ی ثبت تا اسلات، پیوسته و لگاریتمی
+  'lastMinute',       // < 30 دقیقه تا شروعِ اسلات (اثرِ آستانه‌ای، جدا از پیوسته)
   'largeParty',       // >= 6 نفر
+  'partySizeNorm',    // اندازه‌ی گروه، پیوسته
   'phoneSource',
+  'hourSin',          // ساعتِ روز به وقتِ تهران، دایره‌ای
+  'hourCos',
+  'isWeekend',        // پنجشنبه/جمعه — آخرِ هفته‌ی ایران، نه شنبه/یکشنبه
 ] as const;
 
 /**
@@ -61,12 +66,54 @@ export const NO_SHOW_FEATURE_NAMES = [
  *
  * پس مدلی که نسخه‌اش با این ثابت نمی‌خواند سرو **نمی‌شود** و سیستم صادقانه
  * یک پله عقب می‌رود (سراسری، یا heuristic) تا آموزشِ شبانه نسخه‌ی تازه بسازد.
+ *
+ * ⚠️ **تنها** منبعِ نسخه‌ی ویژگیِ no-show در کلِ سیستم. دفترِ پیش‌بینی
+ * (`prediction-ledger.ts`) برچسبِ خودش را از همین می‌سازد و ثابتِ موازی
+ * ندارد — یک بار داشت و همان باعث شد بردار در v2 عوض شود ولی برچسبِ
+ * دفتر دست‌نخورده بماند، یعنی دقیقاً همان «دو معنا زیرِ یک برچسب» که
+ * خودِ آن ثابت قرار بود جلویش را بگیرد.
+ *
+ * تاریخچه: v1 بردارِ ۷تاییِ اولیه · v2 همان ترکیب با معنیِ تازه‌ی
+ * priorTotal (فازِ ۴) · v3 بردارِ ۱۲تایی با جمع‌شدگی، فاصله‌ی پیوسته و
+ * ویژگی‌های زمانیِ تهران.
  */
-export const NO_SHOW_FEATURE_VERSION = 'v1';
+export const NO_SHOW_FEATURE_VERSION = 'v3';
 
 const MIN_LEAD_MINUTES_RISKY = 30;
 const MAX_LEAD_MINUTES_SAFE = 7 * 24 * 60;
 const LARGE_PARTY_SIZE = 6;
+
+/** تعدادِ مشاهده‌ی مجازی در هموارسازیِ نرخِ سابقه. بزرگ‌تر = محافظه‌کارتر. */
+const PRIOR_PSEUDO_COUNT = 5;
+/**
+ * نرخِ پایه‌ای که نرخِ کم‌شواهد به سمتش جمع می‌شود.
+ * ⚠️ یک عددِ پیشینِ محافظه‌کارانه است، نه یک اندازه‌گیری. تأثیرش فقط روی
+ * کاربرانِ کم‌سابقه است و با زیادشدنِ سابقه به‌سرعت محو می‌شود؛ خودِ مدل هم
+ * وزنِ این ویژگی را از داده یاد می‌گیرد.
+ */
+const BASE_NO_SHOW_RATE = 0.10;
+/** تعدادِ سابقه‌ای که «شواهد» را عملاً اشباع می‌کند. */
+const EVIDENCE_SATURATION = 20;
+/** سقفِ نرمال‌سازیِ اندازه‌ی گروه. */
+const PARTY_SIZE_SATURATION = 12;
+/** آخرِ هفته‌ی ایران: پنجشنبه(۴) و جمعه(۵) در نگاشتِ ۰=یکشنبه. */
+const IRAN_WEEKEND_DAYS = new Set([4, 5]);
+
+const tehranPartsFmt = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Tehran', hour12: false, hour: '2-digit', weekday: 'short',
+});
+const WEEKDAY_INDEX: Record<string, number> = {
+  Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+};
+
+/** ساعت (۰..۲۳) و روزِ هفته (۰=یکشنبه) به وقتِ تهران. */
+export function tehranHourWeekday(d: Date): { hour: number; weekday: number } {
+  const parts = tehranPartsFmt.formatToParts(d);
+  const hourRaw = Number(parts.find((p) => p.type === 'hour')?.value);
+  const wd = parts.find((p) => p.type === 'weekday')?.value ?? '';
+  // `hour12:false` در بعضی نسخه‌های ICU برای نیمه‌شب «24» می‌دهد نه «0».
+  return { hour: (Number.isFinite(hourRaw) ? hourRaw : 0) % 24, weekday: WEEKDAY_INDEX[wd] ?? 0 };
+}
 
 /**
  * بردارِ ویژگی برای مدلِ یادگرفته — از همان RawFeatureInputِ تعریف‌شده در
@@ -77,14 +124,66 @@ const LARGE_PARTY_SIZE = 6;
  */
 export function buildFeatureVector(input: RawFeatureInput): number[] {
   const hasHistory = input.hasUserId && input.priorTotal > 0;
+
+  // ── ۱) نرخِ سابقه با جمع‌شدگی (shrinkage) ─────────────────────────────
+  // ⚠️ نقصِ v1: `priorNoShowRate` خام بود. کاربری با **یک** رزروِ قبلی که
+  // no-show شده نرخِ ۱٫۰ می‌گرفت — دقیقاً همان عددی که کاربری با ۵۰ رزرو و
+  // ۵۰ no-show می‌گیرد. مدل این دو را یکسان می‌دید، در حالی که اولی تقریباً
+  // هیچ شواهدی ندارد. چون اکثرِ کاربران سابقه‌ی خیلی کوتاهی دارند، این
+  // پرنویزترین ویژگیِ بردار بود.
+  //
+  // اینجا نرخ به سمتِ نرخِ پایه‌ی پلتفرم جمع می‌شود، به اندازه‌ی
+  // PRIOR_PSEUDO_COUNT مشاهده‌ی مجازی (هموارسازیِ لاپلاس/بیزِ تجربی):
+  //   (noShows + α·base) / (total + α)
+  // با α=۵: یک no-show از یک رزرو ⇒ ۰٫۲۹ (نه ۱٫۰)؛ ۵۰ از ۵۰ ⇒ ۰٫۹۲.
+  const observedNoShows = hasHistory ? input.priorNoShowRate * input.priorTotal : 0;
+  const shrunkNoShowRate = hasHistory
+    ? (observedNoShows + PRIOR_PSEUDO_COUNT * BASE_NO_SHOW_RATE) / (input.priorTotal + PRIOR_PSEUDO_COUNT)
+    : 0;
+
+  // ── ۲) «چقدر می‌دانیم» به‌عنوانِ ویژگیِ مستقل ─────────────────────────
+  // بدونِ این، مدل نمی‌تواند یاد بگیرد که به نرخِ کم‌شواهد کمتر تکیه کند.
+  const priorEvidence = hasHistory
+    ? Math.min(1, Math.log1p(input.priorTotal) / Math.log1p(EVIDENCE_SATURATION))
+    : 0;
+
+  // ── ۳) فاصله‌ی زمانی، پیوسته ────────────────────────────────────────
+  // ⚠️ نقصِ v1: فقط دو پرچمِ دودویی (<۳۰دقیقه، >۷روز). یعنی رزروِ ۳۵ دقیقه
+  // مانده و رزروِ ۶ روز مانده **بردارِ کاملاً یکسانی** داشتند [۰,۰] — کلِ
+  // طیفِ میانی، که اکثریتِ رزروهاست، برای مدل نامرئی بود.
+  // لگاریتم عمدی است: تفاوتِ ۱۰ دقیقه با ۱ ساعت مهم‌تر از تفاوتِ ۳۰ روز با
+  // ۳۱ روز است.
+  const leadClamped = Math.max(1, Math.min(input.leadMinutes, MAX_LEAD_MINUTES_SAFE * 2));
+  const leadLog = Math.log1p(leadClamped) / Math.log1p(MAX_LEAD_MINUTES_SAFE * 2);
+
+  // ── ۴) ویژگی‌های زمانی، به وقتِ **تهران** ─────────────────────────────
+  // ⚠️ چرا تهران و نه UTC: رزروِ ۰۱:۰۰ بامدادِ تهران در UTC روزِ **قبل** و
+  // ساعتِ ۲۱:۳۰ است. با UTC، هم ساعت غلط می‌شد هم روزِ هفته — و مدل یک
+  // الگویِ شیفت‌خورده یاد می‌گرفت که با هیچ واقعیتی نمی‌خواند.
+  // ⚠️ و آخرِ هفته در ایران **پنجشنبه/جمعه** است، نه شنبه/یکشنبه.
+  // sin/cos چون ساعت دایره‌ای است: ۲۳ و ۰ همسایه‌اند، نه دورترین نقطه.
+  let hourSin = 0, hourCos = 0, isWeekend = 0;
+  if (input.slotStart) {
+    const { hour, weekday } = tehranHourWeekday(input.slotStart);
+    const theta = (2 * Math.PI * hour) / 24;
+    hourSin = Math.sin(theta);
+    hourCos = Math.cos(theta);
+    isWeekend = IRAN_WEEKEND_DAYS.has(weekday) ? 1 : 0;
+  }
+
   return [
     1, // بایاس
     input.hasUserId ? 1 : 0,
-    hasHistory ? input.priorNoShowRate : 0,
+    shrunkNoShowRate,
+    priorEvidence,
+    leadLog,
     input.leadMinutes < MIN_LEAD_MINUTES_RISKY ? 1 : 0,
-    input.leadMinutes > MAX_LEAD_MINUTES_SAFE ? 1 : 0,
     input.partySize >= LARGE_PARTY_SIZE ? 1 : 0,
+    Math.min(input.partySize, PARTY_SIZE_SATURATION) / PARTY_SIZE_SATURATION,
     input.source === 'phone' ? 1 : 0,
+    hourSin,
+    hourCos,
+    isWeekend,
   ];
 }
 
@@ -100,8 +199,22 @@ export interface TrainingExample {
 
 export type { ActivationDecision };
 
-const MIN_SAMPLE_SIZE = 40;
-const MIN_POSITIVE_COUNT = 5;
+// ⚠️ این دو عدد هم‌زمان با v2 بالا رفتند (بود: ۴۰ و ۵) و دلیلش آماری است:
+// بردار از ۶ ویژگیِ غیرِبایاس به ۱۱ تا رسید. تخمینِ ۱۲ پارامتر از ۵ رویدادِ
+// مثبت، «یادگیری» نیست — حفظ‌کردنِ نویز است.
+//
+// چرا **الان** بی‌هزینه است: بالابردنِ آستانه معمولاً یعنی «مدل‌های فعالِ
+// موجود خاموش می‌شوند». ولی جهشِ نسخه‌ی ویژگی به v2 به‌هرحال همه‌ی مدل‌های
+// ذخیره‌شده را (که همه v1 هستند) تا بازآموزیِ شبانه کنار می‌گذارد. پس این
+// تغییر هیچ اختلالِ اضافه‌ای نمی‌سازد — و رستورانی که هنوز به حدِ نصاب
+// نرسیده حالا مدلِ **سراسری** را می‌گیرد، نه heuristic؛ چیزی که پیش از
+// ساختِ مدلِ سراسری وجود نداشت و همین بالابردن را ممکن کرده است.
+//
+// ⚠️ و صادقانه: گاردِ واقعی همچنان هولدآوت + AUC + بهبودِ نسبی است، نه این
+// دو عدد. اینها فقط جلوی «اصلاً تلاش‌کردن» روی دادهٔ آشکارا ناکافی را
+// می‌گیرند.
+const MIN_SAMPLE_SIZE = 80;
+const MIN_POSITIVE_COUNT = 12;
 /** بهبودِ نسبیِ حداقلی برای فعال‌کردنِ مدلِ یادگرفته — نوسانِ آماریِ کوچک
  *  نباید هر شب heuristic را با یک مدلِ تصادفاً کمی بهتر عوض کند. */
 const MIN_RELATIVE_IMPROVEMENT = 0.05;
@@ -209,6 +322,8 @@ export interface TrainingRow {
   has_user_id: boolean;
   prior_no_shows: number;
   prior_completions: number;
+  /** برای ویژگی‌های زمانیِ v2. Prisma ستونِ timestamp را Date می‌دهد. */
+  slot_start: Date;
 }
 
 /**
@@ -239,7 +354,7 @@ export interface TrainingRow {
  */
 export async function fetchTrainingRows(restaurantId: string): Promise<TrainingRow[]> {
   return db.$queryRaw<TrainingRow[]>`
-    SELECT r.status, r.party_size, r.source,
+    SELECT r.status, r.party_size, r.source, r.slot_start,
            EXTRACT(EPOCH FROM (r.slot_start - r.created_at)) / 60.0 AS lead_minutes,
            (r.user_id IS NOT NULL) AS has_user_id,
            -- ⚠️ ::int صریح لازم است: COUNT/SUM در Postgres نوعِ bigint
@@ -306,6 +421,7 @@ function rowToExample(row: TrainingRow): TrainingExample {
       leadMinutes: row.lead_minutes,
       partySize: row.party_size,
       source: row.source,
+      slotStart: row.slot_start,
     },
     label: row.status === 'no_show' ? 1 : 0,
   };
@@ -537,7 +653,7 @@ const PLATFORM_MIN_RESTAURANTS = 3;
  *  نمی‌سازد و در تولید بی‌ارزش می‌شود. */
 export async function fetchPlatformTrainingRows(): Promise<TrainingRow[]> {
   return db.$queryRaw<TrainingRow[]>`
-    SELECT r.status, r.party_size, r.source,
+    SELECT r.status, r.party_size, r.source, r.slot_start,
            EXTRACT(EPOCH FROM (r.slot_start - r.created_at)) / 60.0 AS lead_minutes,
            (r.user_id IS NOT NULL) AS has_user_id,
            p.prior_no_shows::int   AS prior_no_shows,
