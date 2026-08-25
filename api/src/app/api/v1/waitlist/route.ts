@@ -6,6 +6,8 @@ import { isFeatureEnabled, featureFlagLabel } from '@/lib/feature-flags';
 import { errorResponse, Err } from '@/lib/errors';
 import { parseBody, zUuid, zPartySize, zPhone, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const schema = z.object({
   restaurant_id: zUuid,
   party_size: zPartySize,
@@ -21,7 +23,7 @@ const schema = z.object({
 });
 
 /** POST /api/v1/waitlist — پیوستن به لیست انتظار. بدنه: { restaurant_id, party_size, guest?, notify_* } */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     let userId: string | undefined;
     let isStaff = false;
@@ -50,3 +52,7 @@ export async function POST(req: Request) {
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/waitlist', POST_impl);

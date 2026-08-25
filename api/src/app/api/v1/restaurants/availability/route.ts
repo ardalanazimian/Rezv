@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { cached, cacheKey } from '@/lib/cache';
 import { errorResponse } from '@/lib/errors';
 import { parseQuery, zDateStr, z } from '@/lib/schemas';
+import { withApiMetrics } from '@/lib/api-metrics';
+
 import {
   BULK_AVAILABILITY_MAX,
   bulkEntriesFromRaw,
@@ -46,7 +48,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /** همان پنجره‌ی «تازه»یِ مسیرِ تکی (FRESH_SEC در getAvailability) — یک قرارداد، نه دو. */
 const FRESH_SEC = 30;
 
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const { ids, date, party } = parseQuery(req, querySchema);
     // شناسه‌یِ بدشکل بی‌صدا کنار گذاشته می‌شود (نه ۴۲۲): یک idِ خراب در یک
@@ -83,3 +85,7 @@ export async function GET(req: Request) {
     });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/restaurants/availability', GET_impl);

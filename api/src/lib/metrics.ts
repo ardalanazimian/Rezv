@@ -146,8 +146,40 @@ export function normalizeRoute(pathname: string): string {
   return parts.join('/') || '/';
 }
 
+/**
+ * سقفِ سختِ کاردینالیتیِ برچسبِ `route`.
+ *
+ * چرا لازم است حتی با وجودِ `normalizeRoute`: نرمال‌سازیِ regex-محور فقط
+ * الگوهایی را می‌شناسد که برایشان قاعده نوشته شده (UUID، عدد، کدِ رزروِ
+ * بزرگ‌حروف). یک بخشِ پویا با شکلِ دیگر — مثلاً **اسلاگِ رستوران** در
+ * `/api/v1/restaurants/<slug>/availability` — از همه‌ی این قاعده‌ها رد می‌شود
+ * و به‌ازای هر رستوران یک label-set تازه می‌سازد که هرگز پاک نمی‌شود.
+ *
+ * از این پس مسیرِ اصلی این ریسک را ندارد، چون `withApiMetrics` **الگویِ
+ * ثابتِ فایل‌سیستمی** (`/api/v1/restaurants/[slug]/availability`) را پاس
+ * می‌دهد، نه pathnameِ خام. ولی `withRestaurantAuth` هنوز از pathname
+ * استفاده می‌کند و هر تماسِ آینده هم ممکن است مسیرِ خام بدهد؛ پس این سقف
+ * به‌عنوانِ آخرین خطِ دفاع می‌ماند: بعد از MAX_ROUTE_LABELS الگوی متمایز،
+ * هر مسیرِ تازه در یک سطلِ واحد `__other__` جمع می‌شود. متریک از دست می‌رود،
+ * ولی حافظه رشدِ بی‌حد نمی‌کند.
+ */
+const MAX_ROUTE_LABELS = 300;
+const seenRouteLabels = new Set<string>();
+
+export function capRouteLabel(route: string): string {
+  if (seenRouteLabels.has(route)) return route;
+  if (seenRouteLabels.size >= MAX_ROUTE_LABELS) return '__other__';
+  seenRouteLabels.add(route);
+  return route;
+}
+
+/** تعدادِ الگوهای مسیرِ دیده‌شده — فقط برای تست/تشخیص. */
+export function routeLabelCount(): number {
+  return seenRouteLabels.size;
+}
+
 export function recordHttp(method: string, route: string, status: number, durationSec: number) {
-  const normalized = normalizeRoute(route);
+  const normalized = capRouteLabel(normalizeRoute(route));
   const labels = { method, route: normalized, status: String(status) };
   metrics.httpRequests.inc(labels);
   metrics.httpDuration.observe(durationSec, { method, route: normalized });

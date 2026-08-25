@@ -9,8 +9,17 @@ const createSchema = z.object({ body: z.string().min(1).max(2000).trim(), pinned
 const patchSchema = z.object({ id: zUuid, pinned: z.boolean() });
 const deleteQuerySchema = z.object({ id: zUuid });
 
+// ⚠️ رفعِ ممیزیِ RBAC: هر چهار متدِ این فایل بدونِ `permission:` بودند — یعنی
+// کارمندی که هر ۹ مجوزش `false` بود هم یادداشت‌های داخلیِ تیم را می‌خواند و هم
+// می‌توانست یادداشتِ تازه بسازد/سنجاق کند/حذف کند (تأییدشده با درخواستِ زنده:
+// `POST` یک یادداشتِ واقعی ساخت). این یادداشتِ سرویسِ شب است و دقیقاً کنارِ
+// همان داده‌ای می‌نشیند که تبِ رزروها نشان می‌دهد، پس `canManageReservations`
+// کلیدِ درست است — نه `canManageSettings` (این تنظیماتِ رستوران نیست) و نه یک
+// کلیدِ تازه (§۲۲). خواندن و نوشتن عمداً یک کلید دارند: کسی که حق دیدنِ
+// یادداشتِ سرویس را ندارد، حقِ نوشتن در همان دفتر را هم ندارد.
+
 /** GET — یادداشت‌های داخلی تیم (سنجاق‌شده‌ها اول) */
-export const GET = withRestaurantAuth({ rateLimit: 'search' }, async (_req, ctx) => {
+export const GET = withRestaurantAuth({ permission: 'canManageReservations', rateLimit: 'search' }, async (_req, ctx) => {
   const notes = await db.staffNote.findMany({
     where: { restaurantId: ctx.restaurant.id },
     orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
@@ -25,7 +34,7 @@ export const GET = withRestaurantAuth({ rateLimit: 'search' }, async (_req, ctx)
 });
 
 /** POST — افزودن یادداشت. بدنه: { body, pinned? } */
-export const POST = withRestaurantAuth({ rateLimit: 'auth' }, async (req, ctx) => {
+export const POST = withRestaurantAuth({ permission: 'canManageReservations', rateLimit: 'auth' }, async (req, ctx) => {
   const b = await parseBody(req, createSchema);
 
   // نام نویسنده از روی staff (اگر در دسترس باشد)
@@ -43,7 +52,7 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth' }, async (req, ctx) =
 });
 
 /** PATCH — سنجاق/برداشتن سنجاق. بدنه: { id, pinned } */
-export const PATCH = withRestaurantAuth({ rateLimit: 'auth' }, async (req, ctx) => {
+export const PATCH = withRestaurantAuth({ permission: 'canManageReservations', rateLimit: 'auth' }, async (req, ctx) => {
   const b = await parseBody(req, patchSchema);
   const note = await db.staffNote.findUnique({ where: { id: b.id }, select: { restaurantId: true } });
   if (!note || note.restaurantId !== ctx.restaurant.id) throw Err.notFound('یادداشت');
@@ -52,7 +61,7 @@ export const PATCH = withRestaurantAuth({ rateLimit: 'auth' }, async (req, ctx) 
 });
 
 /** DELETE ?id= — حذف یادداشت */
-export const DELETE = withRestaurantAuth({ rateLimit: 'auth' }, async (req, ctx) => {
+export const DELETE = withRestaurantAuth({ permission: 'canManageReservations', rateLimit: 'auth' }, async (req, ctx) => {
   const { id } = parseQuery(req, deleteQuerySchema);
   const note = await db.staffNote.findUnique({ where: { id }, select: { restaurantId: true } });
   if (!note || note.restaurantId !== ctx.restaurant.id) throw Err.notFound('یادداشت');

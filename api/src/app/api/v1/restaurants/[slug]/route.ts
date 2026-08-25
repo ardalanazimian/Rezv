@@ -5,6 +5,8 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, z } from '@/lib/schemas';
 import { PUBLIC_STATUS } from '@/lib/photo-moderation';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════
 //  GET /api/v1/restaurants/{slug} — جزئیاتِ عمومیِ یک رستوران
 //  منبعِ دادهٔ صفحه‌ی SEO (apps/seo · /r/{slug}) و کارتِ جزئیاتِ مشتری.
@@ -14,7 +16,7 @@ import { PUBLIC_STATUS } from '@/lib/photo-moderation';
 
 const paramsSchema = z.object({ slug: z.string().min(1).max(150) });
 
-export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
+async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = parseParams(await params, paramsSchema);
     const key = cacheKey('restaurant-detail', slug);
@@ -122,3 +124,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
     return NextResponse.json(data);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/restaurants/[slug]', GET_impl);

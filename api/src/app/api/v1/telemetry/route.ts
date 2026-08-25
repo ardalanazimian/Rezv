@@ -7,6 +7,8 @@ import { clientIp, enforceRateLimit } from '@/lib/ratelimit';
 import { createHash } from 'crypto';
 import { recordEvents, type PlatformEventInput, type TrustLevel } from '@/lib/platform-events';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  POST /api/v1/telemetry — درگاهِ ingestِ رویدادِ رفتاری (Data Platform · فاز ۱)
 //
@@ -113,7 +115,7 @@ const bodySchema = z.object({
   events: z.array(eventSchema).min(1).max(MAX_BATCH),
 });
 
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     // rate-limit بر پایه‌ی IP (ضدِ سیلِ رویداد). سطلِ اختصاصیِ ingest.
     await enforceRateLimit(clientIp(req), { prefix: 'events', max: 120, windowMs: 60_000 });
@@ -187,3 +189,7 @@ export async function POST(req: Request) {
     return errorResponse(e);
   }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/telemetry', POST_impl);

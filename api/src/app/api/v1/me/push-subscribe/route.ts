@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ⚠️ گسترش‌یافته (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): تا اینجا این route هیچ‌جا
 // چیزی ذخیره نمی‌کرد (فقط رفعِ باگِ صداقتی که ادعایِ enabled:true دروغ
 // می‌داد). حالا با جدولِ push_subscriptions واقعاً upsert می‌شود — یعنی
@@ -21,7 +23,7 @@ const subscribeSchema = z.object({
 });
 
 /** POST /api/v1/me/push-subscribe — ثبت/به‌روزرسانیِ اشتراکِ push (ذخیره‌سازیِ واقعی؛ ارسالِ واقعی هنوز نه) */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
 }
 
 /** GET /api/v1/me/push-subscribe — وضعیتِ فعلیِ اشتراکِ push */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -58,3 +60,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ enabled: row?.enabled ?? false, ready: false });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/me/push-subscribe', POST_impl);
+export const GET = withApiMetrics('/api/v1/me/push-subscribe', GET_impl);

@@ -4,6 +4,8 @@ import { getAvailability } from '@/lib/reservations';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, parseQuery, zDateStr, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ slug: z.string().min(1).max(150) });
 const querySchema = z.object({
   date: zDateStr,
@@ -15,7 +17,7 @@ const querySchema = z.object({
 const ONLINE_WINDOW_MS = 90_000;
 
 /** GET /api/v1/restaurants/{slug}/availability?date=2026-06-12&party=2 */
-export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = parseParams(await params, paramsSchema);
     const { date, party } = parseQuery(req, querySchema);
@@ -56,3 +58,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   } catch (e) { return errorResponse(e); }
 }
 
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/restaurants/[slug]/availability', GET_impl);

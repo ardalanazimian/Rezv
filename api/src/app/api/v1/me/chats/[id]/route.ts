@@ -6,6 +6,8 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseQuery, z } from '@/lib/schemas';
 import { postMessage, markRead, serializeMessage } from '@/lib/chat';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // اطمینان از اینکه این thread متعلق به همین کاربر است.
 async function ownedThread(threadId: string, userId: string) {
   const t = await db.chatThread.findUnique({ where: { id: threadId }, select: { id: true, userId: true } });
@@ -20,7 +22,7 @@ const getQuery = z.object({ after: z.string().max(40).optional() });
  * پارامترِ after برای polling: فقط پیام‌های جدیدتر از آن زمان (کارآمد).
  * همچنین پیام‌های staff را خوانده‌شده علامت می‌زند.
  */
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -50,7 +52,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 const postSchema = z.object({ body: z.string().min(1).max(2000).trim() });
 
 /** POST /api/v1/me/chats/:id — ارسال پیام مشتری در یک گفتگوی موجود */
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function POST_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -62,3 +64,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json(serializeMessage(msg), { status: 201 });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/me/chats/[id]', GET_impl);
+export const POST = withApiMetrics('/api/v1/me/chats/[id]', POST_impl);

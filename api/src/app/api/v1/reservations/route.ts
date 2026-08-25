@@ -12,6 +12,8 @@ import { requirePermission } from '@/lib/permissions';
 import { resolveStaffRestaurant } from '@/lib/staff-helpers';
 import { parseBody, z, zUuid, zDateStr, zTimeStr, zPartySize, zPhone } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // Schema ورودیِ رزرو — یک‌جا تعریف، خطاهای یکدست، type inference.
 // نکته‌ی امنیتی: قبلاً preorder/guest/coupon_code/gift_card_* اصلاً اعتبارسنجی
 // نمی‌شدند و مستقیم (فقط با ?? پیش‌فرض) به createReservation می‌رفتند — یعنی
@@ -43,7 +45,7 @@ const reservationSchema = z.object({
 });
 
 /** POST /api/v1/reservations — مشتری (app) یا staff (manual) */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     // بن سختِ پلتفرم: قبل از هر پردازشِ دیگری (حتی claimِ idempotency) رد می‌شود
@@ -133,3 +135,7 @@ export async function POST(req: Request) {
     return NextResponse.json(result, { status: 201 });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/reservations', POST_impl);

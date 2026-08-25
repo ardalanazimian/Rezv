@@ -4,6 +4,8 @@ import { cached } from '@/lib/cache';
 import { errorResponse } from '@/lib/errors';
 import { ACTIVE_RESERVATION_STATUSES } from '@/lib/reservation-status';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════
 //  GET /api/v1/restaurants/live-stats — آمارِ زنده‌ی سراسری (عمومی)
 //
@@ -21,7 +23,7 @@ import { ACTIVE_RESERVATION_STATUSES } from '@/lib/reservation-status';
 //  پس این با GET /restaurants/[slug] تداخل ندارد.
 // ═══════════════════════════════════════════════════════════
 
-export async function GET() {
+async function GET_impl() {
   try {
     const stats = await cached('live-stats:global', 30, async () => {
       const now = new Date();
@@ -50,3 +52,7 @@ export async function GET() {
     return errorResponse(e);
   }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/restaurants/live-stats', GET_impl);

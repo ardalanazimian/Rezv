@@ -5,6 +5,8 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ userId: zUuid });
 const bodySchema = z.object({ reason: z.string().min(1).max(500).trim() });
 
@@ -13,7 +15,7 @@ const bodySchema = z.object({ reason: z.string().min(1).max(500).trim() });
  * idempotent: اگر کاربر الان بن است، خطا نمی‌دهد؛ همان وضعیت را تأیید می‌کند.
  * کاملاً جدا از فلگِ نرمِ abuse (رجوع کن به admin/abuse-flags/[userId]).
  */
-export async function POST(req: Request, { params }: { params: Promise<{ userId: string }> }) {
+async function POST_impl(req: Request, { params }: { params: Promise<{ userId: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -24,3 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ userId:
     return NextResponse.json({ ok: true, user_id: userId, already_banned: result.alreadyBanned });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/admin/users/[userId]/ban', POST_impl);

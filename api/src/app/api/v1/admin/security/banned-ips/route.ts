@@ -5,10 +5,12 @@ import { audit } from '@/lib/audit';
 import { errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const bodySchema = z.object({ ip: z.string().min(1).max(64) });
 
 /** GET /api/v1/admin/security/banned-ips — IPهایِ الان‌بن‌شده (بنِ خودکارِ ریت‌لیمیت) */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -18,7 +20,7 @@ export async function GET(req: Request) {
 }
 
 /** POST /api/v1/admin/security/banned-ips — لغوِ دستیِ بنِ یک IP · بدنه: { ip } */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -28,3 +30,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, removed });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/security/banned-ips', GET_impl);
+export const POST = withApiMetrics('/api/v1/admin/security/banned-ips', POST_impl);

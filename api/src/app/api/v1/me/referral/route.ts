@@ -4,10 +4,12 @@ import { getReferralStats, createReferral } from '@/lib/loyalty';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, zPhone, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const inviteSchema = z.object({ phone: zPhone });
 
 /** GET — آمار و کد دعوت کاربر */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -16,7 +18,7 @@ export async function GET(req: Request) {
 }
 
 /** POST — دعوت دوست با شماره. بدنه: { phone } */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -24,3 +26,8 @@ export async function POST(req: Request) {
     return NextResponse.json(await createReferral(auth.sub, phone));
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/me/referral', GET_impl);
+export const POST = withApiMetrics('/api/v1/me/referral', POST_impl);

@@ -5,6 +5,8 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse, Err } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ userId: zUuid });
 const bodySchema = z.object({
   action: z.enum(['clear', 'flag']),
@@ -17,7 +19,7 @@ const bodySchema = z.object({
  *  { action: 'clear' } — پاک‌کردنِ فلگ (appeal/false-positive).
  *  { action: 'flag', reason } — فلگِ دستی وقتی تیمِ پلتفرم مستقیم یه الگو دید.
  */
-export async function PATCH(req: Request, { params }: { params: Promise<{ userId: string }> }) {
+async function PATCH_impl(req: Request, { params }: { params: Promise<{ userId: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -37,3 +39,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ userId
     return NextResponse.json({ ok: true, user_id: userId, action: body.action });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const PATCH = withApiMetrics('/api/v1/admin/abuse-flags/[userId]', PATCH_impl);

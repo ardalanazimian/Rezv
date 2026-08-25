@@ -7,6 +7,8 @@ import { errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 import { mapPrismaError } from '@/lib/site-content';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  PATCH /api/v1/admin/site/inquiries/{id} — رسیدگی به پیامِ سایت
 //  تغییرِ وضعیت + یادداشتِ داخلی. «چه‌کسی و چه‌زمانی رسیدگی کرد» ثبت می‌شود.
@@ -18,7 +20,7 @@ const bodySchema = z.object({
   admin_note: z.string().max(2000).trim().optional(),
 });
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PATCH_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -50,3 +52,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const PATCH = withApiMetrics('/api/v1/admin/site/inquiries/[id]', PATCH_impl);

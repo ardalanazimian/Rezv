@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { redis } from '@/lib/redis';
 import { createLogger } from '@/lib/logger';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const log = createLogger('health');
 export const runtime = 'nodejs';
 
@@ -16,7 +18,7 @@ export const runtime = 'nodejs';
  * - 200: همه‌ی وابستگی‌ها سالم
  * - 503: حداقل یک وابستگی قطع (ارکستریتور pod را از rotation خارج می‌کند)
  */
-export async function GET() {
+async function GET_impl() {
   const checks: Record<string, 'ok' | 'down'> = { db: 'down', redis: 'down' };
 
   // بررسی موازی DB و Redis با timeout کوتاه (برای جلوگیری از معلق‌ماندن)
@@ -43,6 +45,11 @@ export async function GET() {
 }
 
 // liveness ساده (برای k8s liveness probe — فقط چک می‌کند پروسه زنده است)
-export async function HEAD() {
+async function HEAD_impl() {
   return new NextResponse(null, { status: 200 });
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/health', GET_impl);
+export const HEAD = withApiMetrics('/api/health', HEAD_impl);

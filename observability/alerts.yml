@@ -4,6 +4,18 @@
 #    rule_files:
 #      - /etc/prometheus/alerts.yml
 # ═══════════════════════════════════════════════════════════
+#
+# ⚠️ یادداشتِ ۲۰۲۶-۰۸-۲۵ — چرا این فایل تا امروز کمتر از آنچه به‌نظر می‌رسید
+#    پوشش می‌داد:
+#    `rezervno_http_*` فقط از یک نقطه پر می‌شد (`lib/with-restaurant-auth.ts`)،
+#    یعنی فقط routeهای پنلِ رستوران. کاتالوگِ عمومی، جست‌وجو، احراز هویت،
+#    رزروِ مشتری، پرداخت و پنلِ شرکت **هیچ sampleی تولید نمی‌کردند** — پس دو
+#    قاعده‌ی زیر روی زیرمجموعه‌ای از ترافیک حساب می‌شدند و یک قطعیِ کاملِ مسیرِ
+#    رزروِ مشتری هیچ آلارمی نمی‌داد. همچنین `rezervno_auth_failures_total`
+#    هیچ نویسنده‌ای نداشت، پس `AuthFailureSpike` عملاً مرده بود.
+#    هر دو در همان تاریخ رفع شدند (lib/api-metrics.ts + رویدادهای audit در
+#    مسیرهای auth). قواعدِ زیر بدونِ تغییرِ عبارت، حالا واقعاً کلِ API را می‌بینند.
+#
 groups:
   - name: rezervno_availability
     rules:
@@ -16,6 +28,21 @@ groups:
         annotations:
           summary: "نرخ خطای HTTP بالای ۱٪"
           description: "بیش از ۱٪ درخواست‌ها در ۵ دقیقه‌ی گذشته خطا داده‌اند."
+
+      # ⚠️ گاردِ «سکوتِ متریک»: خودِ نبودِ داده یک خرابی است.
+      # اگر رصدپذیری دوباره خاموش شود (مثلاً کسی wrapper را از routeها بردارد،
+      # یا سرویس اصلاً بالا نیاید)، همه‌ی قواعدِ بالا بی‌صدا «سالم» می‌مانند —
+      # دقیقاً همان حالتی که ۹ ماه ادامه داشت. `absent()` این حالت را می‌گیرد.
+      - alert: HttpMetricsMissing
+        expr: absent(rezervno_http_requests_total)
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "هیچ متریکِ HTTPی گزارش نمی‌شود"
+          description: >-
+            ده دقیقه است هیچ sampleی از rezervno_http_requests_total نمی‌رسد.
+            یا API بالا نیست، یا لایه‌ی شمارش (lib/api-metrics.ts) از مسیر خارج
+            شده. تا وقتی این آلارم بازست، HighErrorRate و HighLatencyP95 بی‌معنا هستند.
 
       - alert: HighLatencyP95
         expr: |
@@ -35,6 +62,18 @@ groups:
         annotations:
           summary: "جهش شکست احراز هویت (brute-force احتمالی)"
           description: "بیش از ۱۰۰ شکست احراز هویت در دقیقه — احتمال حمله‌ی brute-force."
+
+      # تفکیکِ سطحِ حمله: پنلِ کارکنان و ادمینِ پلتفرم حجمِ ورودِ بسیار کمتری
+      # دارند، پس آستانه‌ی سراسریِ ۱۰۰/دقیقه هرگز برایشان فعال نمی‌شود — در
+      # حالی که ۱۰ تلاشِ ناموفق در دقیقه روی درِ ادمینِ پلتفرم قطعاً غیرعادی است.
+      # برچسبِ actor_type از lib/audit.ts می‌آید (customer|staff|admin|anonymous).
+      - alert: StaffAuthFailureSpike
+        expr: sum(rate(rezervno_auth_failures_total{actor_type=~"staff|admin"}[5m])) * 60 > 10
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "تلاشِ ناموفقِ ورود به پنلِ کارکنان/ادمین"
+          description: "بیش از ۱۰ شکستِ ورودِ کارمند یا ادمینِ پلتفرم در دقیقه — سطحِ دسترسیِ بالا، آستانه‌ی پایین."
 
       - alert: RateLimitSpike
         expr: sum(rate(rezervno_rate_limit_hits_total[5m])) * 60 > 500
@@ -60,6 +99,62 @@ groups:
         annotations:
           summary: "رشد صف dead-letter"
           description: "بیش از ۵۰ job در ساعت گذشته به DLQ رفته‌اند — مشکل سیستمی محتمل."
+
+  # ── کانالِ ابلاغ به مهمان ─────────────────────────────────────────────
+  # `rezervno_sms_failed_total` از ۲۰۲۶-۰۸-۱۴ واقعاً inc می‌شود
+  # (lib/sms.ts، با برچسب‌های template/reason) ولی **هیچ قاعده‌ای نمی‌خواندش**.
+  # پیامک تنها کانالِ واقعیِ ابلاغ است (push/email هنوز اسکلت‌اند و فقط لاگ
+  # می‌کنند)، پس شکستِ خاموشِ SMS یعنی مهمان تأییدِ رزروش را هرگز نمی‌گیرد و
+  # هیچ‌کس خبردار نمی‌شود.
+  - name: rezervno_notifications
+    rules:
+      - alert: SmsFailureRate
+        expr: |
+          sum(rate(rezervno_sms_failed_total[10m]))
+          / clamp_min(sum(rate(rezervno_sms_sent_total[10m])) + sum(rate(rezervno_sms_failed_total[10m])), 0.001) > 0.1
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "بیش از ۱۰٪ پیامک‌ها به مقصد نمی‌رسند"
+          description: >-
+            نسبتِ rezervno_sms_failed_total به کلِ تلاش‌ها از ۱۰٪ گذشته.
+            برچسبِ reason را ببین: `network` یعنی مشکلِ اتصال/درگاهِ کاوه‌نگار،
+            `rejected` یعنی خودِ سرویس پیام را رد کرده (اعتبار، الگو، شماره).
+
+      - alert: SmsAllFailing
+        expr: sum(rate(rezervno_sms_sent_total[15m])) == 0 and sum(rate(rezervno_sms_failed_total[15m])) > 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "هیچ پیامکی ارسال نمی‌شود (همه ناموفق)"
+          description: "در ۱۵ دقیقه‌ی گذشته هیچ ارسالِ موفقی نبوده ولی شکست داشته‌ایم — کانالِ ابلاغ کاملاً قطع است."
+
+  # ── پرداختِ آنلاین (زرین‌پال) ─────────────────────────────────────────
+  # هیچ شمارنده‌ی اختصاصیِ پرداختی وجود ندارد و عمداً هم اضافه نشد (مسیرِ پول
+  # مالکِ دیگری دارد). ولی از وقتی متریکِ HTTP سراسری شد، همین دو مسیر با
+  # برچسبِ `route` قابلِ آلارم‌گذاری‌اند — بدونِ هیچ تغییری در کدِ پرداخت.
+  - name: rezervno_payments
+    rules:
+      - alert: PaymentEndpointErrors
+        expr: |
+          sum(rate(rezervno_http_errors_total{route=~"/api/v1/payments/.*|/api/v1/reservations/\\[code\\]/pay"}[10m]))
+          / clamp_min(sum(rate(rezervno_http_requests_total{route=~"/api/v1/payments/.*|/api/v1/reservations/\\[code\\]/pay"}[10m])), 0.001) > 0.05
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "نرخ خطای مسیرِ پرداخت بالای ۵٪"
+          description: >-
+            بیش از ۵٪ درخواست‌های شروعِ پرداخت یا بازگشت از درگاه خطا می‌دهند.
+            کاربر پول داده و رزروش تأیید نشده — بالاترین اولویتِ رسیدگی.
+
+      - alert: PaymentCallbackLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(rezervno_http_request_duration_seconds_bucket{route="/api/v1/payments/callback"}[10m])) by (le)) > 3
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "بازگشت از درگاهِ پرداخت کند شده"
+          description: "P95 مسیرِ callback بالای ۳ ثانیه — ریسکِ تایم‌اوتِ درگاه و پرداختِ بی‌رزرو."
 
   - name: rezervno_business
     rules:

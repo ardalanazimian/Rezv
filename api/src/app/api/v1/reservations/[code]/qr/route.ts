@@ -6,6 +6,8 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, parseQuery, zReservationCode, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  GET /api/v1/reservations/:code/qr — QRِ کدِ رزرو (SVG)
 //
@@ -38,7 +40,7 @@ const querySchema = z.object({
   size: z.number().int().min(128).max(2048).default(360),
 });
 
-export async function GET(req: Request, { params }: { params: Promise<{ code: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     const auth = authFromRequest(req);
@@ -73,3 +75,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ code: st
     });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/reservations/[code]/qr', GET_impl);

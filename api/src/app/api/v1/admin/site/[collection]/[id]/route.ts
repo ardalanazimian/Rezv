@@ -6,6 +6,8 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 import { REGISTRY, isCollection, invalidateCollection, mapPrismaError } from '@/lib/site-content';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  /api/v1/admin/site/{collection}/{id} — یک ردیفِ محتوایی (استودیو)
 //
@@ -22,7 +24,7 @@ const paramsSchema = z.object({
   id: zUuid,
 });
 
-export async function GET(req: Request, { params }: { params: Promise<{ collection: string; id: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ collection: string; id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -36,7 +38,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
   } catch (e) { return errorResponse(e); }
 }
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ collection: string; id: string }> }) {
+async function PATCH_impl(req: Request, { params }: { params: Promise<{ collection: string; id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -76,7 +78,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ collec
   } catch (e) { return errorResponse(e); }
 }
 
-export async function DELETE(req: Request, { params }: { params: Promise<{ collection: string; id: string }> }) {
+async function DELETE_impl(req: Request, { params }: { params: Promise<{ collection: string; id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -97,3 +99,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ colle
     return NextResponse.json({ ok: true, deleted: id });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/site/[collection]/[id]', GET_impl);
+export const PATCH = withApiMetrics('/api/v1/admin/site/[collection]/[id]', PATCH_impl);
+export const DELETE = withApiMetrics('/api/v1/admin/site/[collection]/[id]', DELETE_impl);

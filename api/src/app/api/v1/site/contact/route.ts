@@ -4,6 +4,8 @@ import { errorResponse } from '@/lib/errors';
 import { parseBody, zPhone, z } from '@/lib/schemas';
 import { createInquiry, contextFromRequest, SITE_RULES } from '@/lib/site-orders';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  POST /api/v1/site/contact — تماس با فروش / پرسشِ عمومیِ سایت
 //
@@ -23,7 +25,7 @@ const bodySchema = z.object({
   landing_path: z.string().max(300).optional(),
 });
 
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), SITE_RULES.contact);
     const body = await parseBody(req, bodySchema);
@@ -43,3 +45,7 @@ export async function POST(req: Request) {
     return NextResponse.json(result, { status: 201 });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/site/contact', POST_impl);

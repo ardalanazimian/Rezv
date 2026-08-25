@@ -7,6 +7,8 @@ import { audit } from '@/lib/audit';
 import { errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ⚠️ همگام‌سازی‌شده با DB زنده (migration 020_platform_settings_payment_toggle).
 // این روت قبلاً اصلاً وجود نداشت — جدول platform_settings روی DB بود ولی هیچ
 // endpointـی برای «تنظیمات پلتفرم» در پنل شرکت نبود.
@@ -24,7 +26,7 @@ const patchSchema = z.object({
 });
 
 /** GET — همه‌ی تنظیماتِ پلتفرمِ فعلی */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -37,7 +39,7 @@ export async function GET(req: Request) {
 }
 
 /** PATCH — به‌روزرسانیِ یک یا چند تنظیم · بدنه: { settings: [{ key, value }] } */
-export async function PATCH(req: Request) {
+async function PATCH_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -55,3 +57,8 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/settings', GET_impl);
+export const PATCH = withApiMetrics('/api/v1/admin/settings', PATCH_impl);

@@ -6,6 +6,8 @@ import { clientIp, enforceRateLimit, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseQuery, zPhone, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const querySchema = z.object({ code: z.string().min(1).max(50) });
 const bodySchema = z.object({
   amount_toman: z.number().int().min(1).max(1_000_000_000),
@@ -16,7 +18,7 @@ const bodySchema = z.object({
 });
 
 /** GET /api/v1/gift-cards?code=GIFT... — بررسی موجودی کارت هدیه */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const { code } = parseQuery(req, querySchema);
     return NextResponse.json(await checkGiftCard(code));
@@ -47,7 +49,7 @@ export async function GET(req: Request) {
  * مسیرِ مشروعِ صدورِ کارت (خرجِ سکه‌ی به‌دست‌آمده در `lib/rewards.ts`) اصلاً
  * از این تابع رد نمی‌شود و دست‌نخورده است — تأییدشده با grep.
  */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
 
@@ -68,3 +70,8 @@ export async function POST(req: Request) {
     return NextResponse.json(card);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/gift-cards', GET_impl);
+export const POST = withApiMetrics('/api/v1/gift-cards', POST_impl);

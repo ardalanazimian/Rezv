@@ -5,6 +5,8 @@ import { parseParams, z } from '@/lib/schemas';
 import { isCollection, readPublicDetail } from '@/lib/site-content';
 import { SITE_RULES } from '@/lib/site-orders';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  GET /api/v1/site/{collection}/{slug} — یک ردیفِ محتوایی بر اساسِ اسلاگ
 //
@@ -18,7 +20,7 @@ const paramsSchema = z.object({
   slug: z.string().min(1).max(150),
 });
 
-export async function GET(
+async function GET_impl(
   req: Request,
   { params }: { params: Promise<{ collection: string; slug: string }> },
 ) {
@@ -32,3 +34,7 @@ export async function GET(
     return NextResponse.json(item);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/site/[collection]/[slug]', GET_impl);

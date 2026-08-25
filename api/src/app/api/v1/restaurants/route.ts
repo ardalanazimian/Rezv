@@ -5,6 +5,8 @@ import { errorResponse } from '@/lib/errors';
 import { parseQuery, zUuid, z } from '@/lib/schemas';
 import { visitedStatusList } from '@/lib/reservation-status';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════
 //  GET /api/v1/restaurants — لیست رستوران‌ها
 //  بهینه‌شده برای ۱۰۰هزار رستوران و ۵۰۰ req/s:
@@ -22,7 +24,7 @@ const querySchema = z.object({
   cursor: zUuid.optional(),
 });
 
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const { vibe, city, cuisine, cursor } = parseQuery(req, querySchema);
 
@@ -137,3 +139,7 @@ export async function GET(req: Request) {
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/restaurants', GET_impl);

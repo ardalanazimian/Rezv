@@ -29,7 +29,11 @@ const patchSchema = z.object({
 const deleteQuerySchema = z.object({ id: zUuid });
 
 /** GET — رویدادهای ویژه‌ی این رستوران (شامل گذشته و آینده، برای مدیریت در پنل) */
-export const GET = withRestaurantAuth({ rateLimit: 'search' }, async (_req, ctx) => {
+// ⚠️ رفعِ ممیزیِ RBAC: هر سه نوشتنِ این فایل `canManageSettings` داشتند و فقط
+// `GET` جا مانده بود. `API.events()` در `apps/business/js/data.js:377` تعریف
+// شده ولی هیچ فراخوانی‌ای ندارد (grepِ کاملِ apps/: صفر)، پس بستنش هیچ
+// مسیرِ زنده‌ای را نمی‌شکند.
+export const GET = withRestaurantAuth({ permission: 'canManageSettings', rateLimit: 'search' }, async (_req, ctx) => {
   const events = await db.specialEvent.findMany({
     where: { restaurantId: ctx.restaurant.id },
     orderBy: { startsAt: 'desc' }, take: 100,

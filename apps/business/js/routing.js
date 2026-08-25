@@ -16,11 +16,32 @@ const VIEW_PERMISSION = {
   customers:    'canViewAnalytics',
   loyalty:      'canViewAnalytics',
   analytics:    'canViewAnalytics',
-  staff:        'canManageStaff',
+  // ⚠️ `staff` عمداً اینجا **نیست** — پایین‌تر با نقش گیت می‌شود، نه با مجوز.
   // overview همیشه در دسترس است (داشبوردِ پایه).
 };
 
+// ═══ صفحاتی که با **نقش** گیت می‌شوند، نه با کلیدِ مجوز ═══
+// چرا جدا: `canManageStaff` یک کلیدِ **قابلِ‌دادن ولی هرگز اجرا نشده** است —
+// شمارشِ واقعی روی api/src/app/api صفر گارد نشان می‌دهد. مدیریتِ کارکنان با
+// `assertManagerOrOwner` محافظت می‌شود (api/src/app/api/v1/restaurant/staff/route.ts:79)
+// که نقش را می‌خواهد، نه مجوز را — و این عمدی است: کلیدی که بشود آن را به یک
+// staff داد، هم‌ارزِ owner می‌شود (گاردِ PATCH فقط `target.role === 'owner'` را
+// می‌گیرد، پس دارنده‌ی کلید می‌توانست خودش را با یک درخواست همه‌مجوز کند).
+//
+// بن‌بستی که این رفع می‌کند: تا پیش از این `staff: 'canManageStaff'` بود، پس
+// کارمندی که آن کلید را گرفته بود تبِ «کارکنان» را **می‌دید** و هر کلیک ۴۰۳
+// می‌گرفت. حالا UI دقیقاً همان چیزی را می‌گوید که سرور اجرا می‌کند.
+const VIEW_ROLE = {
+  staff: ['owner', 'manager'],
+};
+
 function canAccessView(v){
+  const roles = VIEW_ROLE[v];
+  if (roles) {
+    // بدونِ اطلاعِ نقش (آفلاین/دمو) پنهان نمی‌کنیم — همان قاعده‌ی API.can.
+    const role = (typeof STAFF_INFO !== 'undefined' && STAFF_INFO) ? STAFF_INFO.role : null;
+    return !role || roles.indexOf(role) !== -1;
+  }
   const key = VIEW_PERMISSION[v];
   return !key || (typeof API !== 'undefined' && API.can ? API.can(key) : true);
 }

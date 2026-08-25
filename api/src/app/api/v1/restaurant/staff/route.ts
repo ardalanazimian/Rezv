@@ -50,6 +50,31 @@ type StaffPayload = Extract<AccessPayload, { kind: 'staff' }>;
 // کارکنان یک عملیات سطح‌بالای owner/manager است، نه ماژولی قابل‌تفویض به staff عادی
 // (وگرنه یک manager می‌تواند به یک staff اجازه‌ی «مدیریت کارکنان» بدهد که شامل خودِ
 // owner هم می‌شود — ریسک privilege-escalation).
+//
+// ═══ یافته‌ی بازِ ثبت‌شده: `canManageStaff` هیچ اجراکننده‌ای ندارد ═══
+//
+// شمارشِ واقعی رویِ `src/app/api`: تنها ظهورِ `canManageStaff` در کلِ درختِ
+// route، همان فیلدِ `permissionsSchema` بالاست — یعنی این کلید **قابلِ‌دادن
+// هست ولی هیچ‌جا اجرا نمی‌شود**. پیامدِ زنده: `apps/business/js/routing.js`
+// (`VIEW_PERMISSION.staff = 'canManageStaff'`) تبِ «کارکنان» را برایِ کارمندی
+// که این کلید را گرفته **باز می‌کند**، ولی هر درخواست اینجا ۴۰۳ می‌گیرد —
+// بن‌بستِ UI، دقیقاً همان چیزی که کامنتِ خودِ routing.js می‌گوید نباید بشود.
+//
+// ⚠️ رفعِ ساده‌ی وسوسه‌انگیز (اضافه‌کردنِ `requirePermission(auth,
+//    'canManageStaff')` در کنارِ چکِ نقش) **عمداً انجام نشد**، چون امنیت را
+//    کم می‌کند نه زیاد. یک `staff` با `canManageStaff` می‌توانست:
+//      • `PATCH` بزند با `staff_id` **خودش** و `permissions: {همه true}` —
+//        گاردِ خطِ «owner قابلِ‌تغییر نیست» فقط هدفِ owner را می‌گیرد، نه
+//        خودارتقاییِ یک staff → دسترسیِ هم‌ترازِ owner در یک درخواست؛
+//      • `POST` بزند و کارمندِ تازه‌ای با شماره‌ی موبایلِ خودش بسازد → درِ
+//        پشتیِ ماندگار (همان کلاسِ باگی که در تستِ staff-auth-guard قفل شده).
+//    یعنی این کلید ذاتاً هم‌ارزِ owner است و «تفویضِ محدود» نیست.
+//
+// تصمیم: رفتارِ سرور دست‌نخورده می‌ماند (سخت‌گیرانه‌تر از کلید). هم‌راستاسازی
+// باید سمتِ پنل انجام شود — تبِ «کارکنان» باید به نقشِ owner/manager گره
+// بخورد، نه به `canManageStaff`. این خارج از مالکیتِ `api/` است و به معمار
+// ارجاع شده. تا آن زمان، `tests/rbac-permission-coverage.test.mts` رفتارِ
+// فعلی را قفل می‌کند تا کسی سهواً درِ خودارتقایی را باز نکند.
 
 function assertManagerOrOwner(auth: AccessPayload): asserts auth is StaffPayload {
   if (auth.kind !== 'staff') throw Err.unauthorized();

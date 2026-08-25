@@ -15,7 +15,10 @@ async function ownedThread(threadId: string, restaurantId: string) {
 const getQuery = z.object({ after: z.string().max(40).optional() });
 
 /** GET /api/v1/restaurant/chats/:id?after=<iso> — پیام‌های یک گفتگو (polling) */
-export const GET = withRestaurantAuth({ rateLimit: 'search' }, async (req, ctx, params: { id: string }) => {
+// ⚠️ رفعِ ممیزیِ RBAC: `POST` (فرستادنِ پیام) از قبل `canManageReservations`
+// داشت ولی همین `GET` (خواندنِ کلِ تاریخچه‌ی گفتگو با مشتری) نداشت — یعنی
+// گاردِ نوشتن بسته بود و گاردِ خواندن باز. هم‌راستا با `VIEW_PERMISSION.chat`.
+export const GET = withRestaurantAuth({ permission: 'canManageReservations', rateLimit: 'search' }, async (req, ctx, params: { id: string }) => {
   await ownedThread(params.id, ctx.restaurant.id);
   const { after } = parseQuery(req, getQuery);
 

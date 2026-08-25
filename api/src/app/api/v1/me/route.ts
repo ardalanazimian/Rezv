@@ -5,6 +5,8 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const patchSchema = z.object({
   first_name: z.string().min(1).max(50).trim(),
   last_name: z.string().max(50).trim().optional(),
@@ -12,7 +14,7 @@ const patchSchema = z.object({
 });
 
 /** GET /api/v1/me — اطلاعات کاربر فعلی */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -29,7 +31,7 @@ export async function GET(req: Request) {
  * PATCH /api/v1/me — به‌روزرسانی پروفایل (ثبت‌نام)
  * بدنه: { first_name, last_name?, birth_date? }
  */
-export async function PATCH(req: Request) {
+async function PATCH_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const auth = authFromRequest(req);
@@ -52,3 +54,8 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ user });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/me', GET_impl);
+export const PATCH = withApiMetrics('/api/v1/me', PATCH_impl);

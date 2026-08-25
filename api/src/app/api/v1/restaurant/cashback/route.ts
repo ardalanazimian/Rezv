@@ -10,8 +10,13 @@ const cashbackSchema = z.object({
 });
 
 /** GET — درصدهای فعلی کش‌بک (مهاجرت‌شده به wrapper: rate-limit/auth/metric/trace خودکار) */
+// ⚠️ رفعِ ممیزیِ RBAC: `PATCH` از قبل `canManageSettings` داشت ولی `GET` نه —
+// یعنی درصدهایِ کش‌بک (پیکربندیِ مالی) برایِ هر کارمندی خواندنی بود.
+// مصرف‌کننده: `rCashback()` در `apps/business/js/staff-system.js:211`، داخلِ
+// تبِ «کش‌بک» که با همین کلید گیت شده — و همان‌جا ۴۰۳ را صادقانه به
+// «تنظیمات بارگذاری نشد» تبدیل می‌کند، نه به عددِ پیش‌فرضِ ساختگی.
 export const GET = withRestaurantAuth(
-  { rateLimit: 'search' },
+  { permission: 'canManageSettings', rateLimit: 'search' },
   async (_req, ctx) => {
     const r = await db.restaurant.findUnique({
       where: { id: ctx.restaurant.id },

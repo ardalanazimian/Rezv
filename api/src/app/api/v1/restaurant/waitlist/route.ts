@@ -3,9 +3,16 @@ import { getQueue, promoteNext, leaveWaitlist } from '@/lib/waitlist';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { parseQuery, z } from '@/lib/schemas';
 
-/** GET /api/v1/restaurant/waitlist — صف لیست انتظار (داشبورد). مهاجرت‌شده: حالا rate-limit هم دارد. */
+/**
+ * GET /api/v1/restaurant/waitlist — صف لیست انتظار (داشبورد).
+ *
+ * ⚠️ رفعِ ناهم‌خوانیِ مجوز (ممیزیِ RBAC): `POST` و `DELETE` همین فایل از قبل
+ * `canManageWaitlist` داشتند ولی `GET` نداشت — یعنی خواندنِ صف (که نام و
+ * شماره‌ی هر نفرِ در انتظار را دارد) برایِ هر کارمندی باز بود، در حالی که
+ * نوشتنش بسته بود. دری که فقط از یک طرف قفل است.
+ */
 export const GET = withRestaurantAuth(
-  { rateLimit: 'search' },
+  { permission: 'canManageWaitlist', rateLimit: 'search' },
   async (_req, ctx) => {
     const queue = await getQueue(ctx.restaurant.id);
     return NextResponse.json({ queue, size: queue.filter(q => q.status === 'waiting').length });

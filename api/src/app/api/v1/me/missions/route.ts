@@ -4,10 +4,12 @@ import { listMissionsForUser } from '@/lib/missions';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseQuery, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const querySchema = z.object({ restaurant_id: zUuid.optional() });
 
 /** GET /api/v1/me/missions?restaurant_id=... — ماموریت‌هایِ فعال + پیشرفتِ همین کاربر */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -16,3 +18,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ missions });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/me/missions', GET_impl);

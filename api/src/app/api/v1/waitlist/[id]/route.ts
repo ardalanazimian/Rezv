@@ -6,6 +6,8 @@ import { db } from '@/lib/db';
 import { errorResponse } from '@/lib/errors';
 import { parseParams, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ id: zUuid });
 
 function callerId(req: Request): string | undefined {
@@ -20,7 +22,7 @@ function callerId(req: Request): string | undefined {
 // ورودیِ مهمان (userId = null): دسترسی باز می‌ماند — شناسه UUIDِ غیرقابلِ‌حدس است و
 // مهمان اصلاً حسابی ندارد که با آن احراز شود؛ این یک انتخابِ **صریح** است، نه
 // نتیجه‌ی جانبیِ یک شرطِ falsy (که باگِ قبلی بود).
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     const { id } = parseParams(await params, paramsSchema);
@@ -56,7 +58,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 /** DELETE /api/v1/waitlist/:id — خروج از صف. ورودیِ متعلق‌به‌کاربر: نیازِ
  *  احرازِ هویتِ مشتری. ورودیِ مهمان: نیازِ ?token=... (guest_token همان که
  *  هنگامِ join برگردانده شد). */
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const { id } = parseParams(await params, paramsSchema);
@@ -65,3 +67,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/waitlist/[id]', GET_impl);
+export const DELETE = withApiMetrics('/api/v1/waitlist/[id]', DELETE_impl);
