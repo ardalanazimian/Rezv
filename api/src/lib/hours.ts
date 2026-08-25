@@ -84,6 +84,26 @@ export function dateKeyInTz(d: Date, timezone: string): string {
 }
 
 /**
+ * ساعتِ دیواریِ محلی («HH:MM») یک لحظه‌ی UTC در تایم‌زونِ داده‌شده — جفتِ
+ * `dateKeyInTz` بالا. با هم دقیقاً همان ورودی‌ای را می‌سازند که
+ * `zonedTimeToUtc` انتظار دارد (تاریخ و ساعت، هر دو در تایم‌زونِ رستوران).
+ *
+ * ⚠️ چرا لازم شد (۲۰۲۶-۰۸-۲۰): `hourInTz` فقط ساعت را می‌داد بدونِ دقیقه، پس
+ * صداکننده‌ها به `toTimeString()` (ساعتِ محلیِ *سرور*) می‌افتادند و آن را با
+ * تاریخِ UTC جفت می‌کردند — سه تایم‌زونِ متفاوت در یک جفت. شرحِ باگی که از
+ * این ساخته می‌شد در KNOWN_LIMITATIONS §2p.
+ */
+export function timeKeyInTz(d: Date, timezone: string): string {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const parts: Record<string, string> = {};
+  for (const p of dtf.formatToParts(d)) parts[p.type] = p.value;
+  const hour = parts.hour === '24' ? 0 : Number(parts.hour);
+  return `${String(hour).padStart(2, '0')}:${parts.minute}`;
+}
+
+/**
  * آیا رستوران در این تاریخ اصلاً باز است؟ (نه تعطیلِ هفتگی، نه تعطیلِ خاص)
  * @param closureDates مجموعه‌ی تاریخ‌های تعطیلِ خاص ("YYYY-MM-DD")
  */
@@ -184,7 +204,29 @@ export function generateTimesFromHours(
     const o = toMin(openStr);
     let c = toMin(closeStr);
     if (c <= o) c += 24 * 60; // شیفتِ بعد از نیمه‌شب
-    for (let t = o; t < c; t += stepMinutes) out.add(fromMin(t));
+    for (let t = o; t < c; t += stepMinutes) {
+      // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰): اینجا قبلاً بی‌قیدوشرط `out.add(fromMin(t))`
+      // بود. برای شیفتِ شبانه (مثلاً ۲۰:۰۰–۰۱:۰۰) حلقه تا t=1470 می‌رفت و
+      // `fromMin` با `% 24` آن را به «۰۰:۰۰» و «۰۰:۳۰» تا می‌کرد — بدونِ هیچ
+      // نشانه‌ای از اینکه به *روزِ بعد* تعلق دارند.
+      //
+      // چرا این فاجعه بود و نه یک ناهماهنگیِ کوچک: کلِ قرارداد این API
+      // date-keyed است — مصرف‌کننده `zonedTimeToUtc(date, time)` صدا می‌زند.
+      // پس «۰۰:۰۰» به نیمه‌شبِ *ابتدای* همان روز ترجمه می‌شد، یعنی ~۲۰ ساعت
+      // *پیش از* بازشدنِ رستوران. و چون مرتب‌سازی رشته‌ای است، «۰۰:۰۰» اولین
+      // چیزی بود که مشتری می‌دید. نتیجه: یا خطای «زمانِ گذشته» روی سانسی که
+      // خودِ اپ پیشنهاد داده بود، یا رزروی ۲۴ ساعت زودتر از آنچه مهمان فکر
+      // می‌کرد.
+      //
+      // رفع: سانسی که به روزِ تقویمیِ دیگری می‌افتد اصلاً پیشنهاد نمی‌شود.
+      // پیشنهادنکردنِ یک سانس بهتر از پیشنهادِ سانسی است که زمانِ اشتباه رزرو
+      // می‌کند. ⚠️ محدودیتِ باقی‌مانده (مستند، نه پنهان): سانس‌های پس از
+      // نیمه‌شبِ رستوران‌های شبانه فعلاً آنلاین رزرو نمی‌شوند — پشتیبانیِ
+      // درستشان نیازمندِ حملِ «روز» در خودِ قراردادِ سانس است، نه فقط "HH:mm".
+      // رجوع کن به docs/KNOWN_LIMITATIONS.md.
+      if (t >= 24 * 60) break;
+      out.add(fromMin(t));
+    }
   }
   return [...out].sort();
 }

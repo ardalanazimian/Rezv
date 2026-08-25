@@ -43,6 +43,15 @@ infra), `both`.
 
 ---
 
+## Public URLs
+
+| Name | Required | Default | Scope | Description |
+|---|---|---|---|---|
+| `NEXT_PUBLIC_SITE_URL` | ➖ | `https://rezervno.ir` | api | Base for the public marketing/menu domain (`lib/public-urls.ts` `siteBase()`); also what gets printed inside menu QR codes. Set in staging or the QR points at production. |
+| `NEXT_PUBLIC_APP_URL` | ➖ | derived from `NEXT_PUBLIC_SITE_URL` with an `app.` prefix | api | Base for the **customer app** (`lib/public-urls.ts` `appBase()`). Used server-side for two redirect targets that must agree with wherever the customer app is actually deployed: the table check-in QR (`?checkin=CODE`) and the Zarinpal payment-callback redirect (`/reservations/{code}?payment=paid\|failed`). If your app subdomain doesn't follow the `app.` convention, set this explicitly. |
+
+---
+
 ## Database pool tuning
 
 | Name | Required | Default | Scope | Description |
@@ -69,7 +78,11 @@ infra), `both`.
 |---|---|---|---|---|
 | `ZARINPAL_MERCHANT_ID` | ➖ (fallback) | from `platform_settings` | api | Merchant id; the DB `platform_settings` value takes precedence. |
 | `ZARINPAL_SANDBOX` | ➖ | `true` (fallback) | api | Sandbox toggle (DB setting wins). |
-| `CUSTOMER_APP_URL` | ➖ | `https://app.rezervno.ir` | api | Redirect target after payment: `${CUSTOMER_APP_URL}/reservations/{code}?payment=paid\|failed`. |
+
+> Payment-callback redirect target is `NEXT_PUBLIC_APP_URL`, documented under
+> [Public URLs](#public-urls) — it shares that variable with the check-in QR
+> instead of its own (`CUSTOMER_APP_URL` was removed 2026-08-22: same purpose,
+> different name, easy to set one and forget the other).
 
 ---
 

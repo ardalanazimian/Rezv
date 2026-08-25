@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { mockApi } from './helpers/mock-api';
+import { mockApi, DEMO_RESTAURANTS } from './helpers/mock-api';
 import { gotoApp, openFirstRestaurant, login } from './helpers/actions';
 
 // ═══ جریانِ لیست انتظار ═══
@@ -42,8 +42,11 @@ test('کاربر می‌تواند به لیست انتظار بپیوندد و 
   await advanceToConfirm(page);
 
   // پیوستن به صف
-  await page.evaluate(() =>
-    (window as Window & { joinWaitlist: (id: number) => Promise<void> }).joinWaitlist(1)
+  // id همان UUIDِ mock است — قبلاً عددِ ۱ بود که با شکلِ واقعیِ بک‌اند (UUID)
+  // نمی‌خواند و باگِ کلاسِ id-mismatch را از دیدِ CI پنهان می‌کرد.
+  await page.evaluate(
+    (rid) => (window as Window & { joinWaitlist: (id: string) => Promise<void> }).joinWaitlist(rid),
+    DEMO_RESTAURANTS[0].id,
   );
   // بعد از پیوستن، موقعیت در صف باید نمایش داده شود (position=2 از mock)
   await expect(page.locator('#sheetBody')).toContainText(/موقعیت|صف|۲|2|انتظار/, { timeout: 8000 });

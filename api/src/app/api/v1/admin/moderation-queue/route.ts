@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getModerationQueueSummary } from '@/lib/moderation-queue';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse } from '@/lib/errors';
@@ -12,7 +12,7 @@ import { errorResponse } from '@/lib/errors';
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const summary = await getModerationQueueSummary();
     return NextResponse.json(summary);
   } catch (e) { return errorResponse(e); }

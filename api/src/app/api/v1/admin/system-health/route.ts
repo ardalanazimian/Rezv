@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbRead as db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 
 /**
@@ -12,7 +12,7 @@ import { errorResponse } from '@/lib/errors';
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
 
     const [jobsByStatus, activeWebhooks, failedActions24h, deadJobs, oldestPending] = await Promise.all([
       // وضعیت صف Job بر اساس status

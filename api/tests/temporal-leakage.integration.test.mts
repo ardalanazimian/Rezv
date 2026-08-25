@@ -2,6 +2,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
+import { fixturePhone } from './_phone.helper.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  نشتِ زمانی در ویژگی‌هایِ مدلِ no-show — قفلِ رگرسیونِ P0
@@ -73,7 +74,10 @@ before(async () => {
   const tb = await db.table.create({ data: { restaurantId, number: 1, capacity: 4, isActive: true }, select: { id: true } });
   tableId = tb.id;
   const u = await db.user.create({
-    data: { phone: `0938${String(Date.now()).slice(-7)}`.slice(0, 11), firstName: '[DEMO]', lastName: 'نشتِ زمانی' },
+    // ⚠️ پیشوندِ ۰۹۳۶ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش
+    // نکن. این فایل و feature-parity قبلاً هر دو ۰۹۳۸ بودند و همان برخورد
+    // کلِ سوئیت را در CI می‌انداخت (شرح در tests/_phone.helper.mts).
+    data: { phone: fixturePhone('0936'), firstName: '[DEMO]', lastName: 'نشتِ زمانی' },
     select: { id: true },
   });
   userId = u.id;

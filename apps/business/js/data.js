@@ -212,12 +212,40 @@ const API = {
   updateTable(id, body){ return this.patch(`/restaurant/tables/${id}`, body); },
   deleteTable(id){ return this.delete(`/restaurant/tables/${id}`); },
   setTableState(id, state){ return this.patch(`/restaurant/tables/${id}/state`, { state }); },
+  /**
+   * QRِ check-inِ یک میز — خروجی SVG است نه JSON، پس مثلِ `menuQrSvg` نمی‌تواند
+   * از `request()` (که همیشه `res.json()` می‌زند) عبور کند. شکلِ خروجی عمداً
+   * همان قراردادِ بقیه است تا فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
+   */
+  async tableQrSvg(id, size){
+    if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
+    try{
+      const res = await fetch(this.base + `/api/v1/restaurant/tables/${encodeURIComponent(id)}/qr?size=` + encodeURIComponent(size||512), {
+        headers: { Authorization: 'Bearer ' + this._token },
+      });
+      if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{
+        svg: await res.text(),
+        code: decodeURIComponent(res.headers.get('X-Table-Code') || ''),
+        url: decodeURI(res.headers.get('X-Checkin-Url') || ''),
+      } };
+    }catch{
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
+  /**
+   * بازتولیدِ کدِ QRِ میز — استیکرِ چاپ‌شده‌ی قبلی را **باطل** می‌کند.
+   * برخلافِ `tableQrSvg` خروجی JSON است، پس از مسیرِ عادیِ `post()` می‌رود.
+   */
+  regenerateTableQr(id){ return this.post(`/restaurant/tables/${encodeURIComponent(id)}/qr`, {}); },
   // ── هوش مشتری (RFM/CLV/AI) ──
   customers(qs){ return this.get('/restaurant/customers'+(qs?'?'+qs:'')); },
   customerDetail(userId){ return this.get('/restaurant/customers/'+encodeURIComponent(userId)); },
   rfm(){ return this.get('/restaurant/rfm'); },
   aiRecommendations(){ return this.get('/restaurant/ai'); },
   crmRecommendations(){ return this.get('/restaurant/crm/recommendations'); },
+  // فازِ ۸ — ثبتِ «با این مشتری تماس گرفتم» تا اثربخشیِ توصیه‌ها سنجیدنی شود
+  crmRecommendationContacted(userId){ return this.post('/restaurant/crm/recommendations/contacted',{user_id:userId}); },
   // ── ورود بدون رزرو (walk-in واقعی، با عضویت خودکار باشگاه) ──
   walkin(body, headers){ return this.post('/restaurant/walkin', body, headers); },
   // ── نظرات، گالری، یادداشت پرسنل، رویداد، تاریخچه‌ی کمپین (همه واقعی) ──
@@ -673,9 +701,15 @@ let CLUB=[
   {fn:'امیر',ln:'حسینی',phone:'۰۹۱۲۲۲۲۳۳۴۴',code:'VIS-1004',tier:'bronze',points:210,bMonth:'دی',joined:'هفته پیش'},
   {fn:'سامان',ln:'عباسی',phone:'۰۹۱۲۴۴۴۵۵۶۶',code:'VIS-1005',tier:'bronze',points:150,bMonth:'خرداد',joined:'۲ هفته پیش'},
 ];
-const CUR_MONTH='خرداد';
 // نگاشت شماره ماه (۱-۱۲) به نام ماه فارسی
 const FA_MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): CUR_MONTH قبلاً ثابتِ 'خرداد' بود — یعنی
+// «تولد این ماه» و کمپینِ تولد برای همیشه خرداد را هدف می‌گرفتند. حالا از
+// تقویمِ واقعیِ شمسی (Intl، بدونِ کتابخانه) محاسبه می‌شود.
+const CUR_MONTH=(()=>{try{
+  const m=parseInt(new Intl.DateTimeFormat('fa-IR-u-nu-latn',{month:'numeric'}).format(new Date()),10);
+  return FA_MONTHS[m-1]||FA_MONTHS[0];
+}catch(e){ return FA_MONTHS[0]; }})();
 // بارگذاری اعضای باشگاه از API (با fallback به CLUB نمونه)
 async function loadClubMembers(){
   const res=await API.get('/restaurant/members?limit=100');

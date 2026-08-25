@@ -221,7 +221,7 @@ in place as reported, not yet wired or removed.
    "done" to "not started (backend only)" until frontend work is actually done and verified — this
    audit found them unwired, not merely partially wired.
 3. Fix the one-line `pricing` title bug in `data.js`.
-4. Decide the fate of `RestaurantIntelligenceDashboard.jsx` — implement or delete.
+4. ~~Decide the fate of `RestaurantIntelligenceDashboard.jsx`~~ — **deleted 2026-08-21.**
 5. Prioritize the company-panel Zarinpal settings screen, since it directly blocks the already-known
    payments launch blocker.
 

@@ -1,9 +1,9 @@
 import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { cached, cacheKey, invalidate } from './cache';
-import { computeStaticScoreFromFeatures, type RawFeatureInput } from './customer-insights';
 import {
   sigmoid, trainLogisticRegression, predictProba, brierScore, decideModelActivation,
+  computeStaticScoreFromFeatures, type RawFeatureInput,
   type ActivationDecision,
 } from './ml-core';
 
@@ -167,7 +167,7 @@ export function toMatrix(examples: readonly TrainingExample[]): { X: number[][];
 
 // ── از اینجا به بعد: DB واقعی. در تستِ واحد صدا زده نمی‌شود (نیاز به Postgres دارد). ──
 
-interface TrainingRow {
+export interface TrainingRow {
   status: string;
   party_size: number;
   source: string;
@@ -197,7 +197,13 @@ interface TrainingRow {
  * دامنه‌ی برچسب همان چیزی‌ست که recomputeCustomerInsight استفاده می‌کند:
  * completed/arrived/seated/dining = «آمد» (۰)، no_show = «نیامد» (۱).
  */
-async function fetchTrainingRows(restaurantId: string): Promise<TrainingRow[]> {
+/**
+ * ⚠️ export عمدی و فقط برای تست (فازِ ۴): تستِ برابریِ ویژگی باید بتواند
+ * همین کوئریِ *واقعیِ* آموزش را اجرا کند و با مسیرِ سرو مقایسه‌اش کند.
+ * اگر به‌جایش کوئری در تست بازنویسی می‌شد، تست فقط خودش را می‌سنجید — و
+ * دقیقاً همان اختلافی که این فاز رفعش کرد، دوباره نامرئی می‌ماند.
+ */
+export async function fetchTrainingRows(restaurantId: string): Promise<TrainingRow[]> {
   return db.$queryRaw<TrainingRow[]>`
     SELECT r.status, r.party_size, r.source,
            EXTRACT(EPOCH FROM (r.slot_start - r.created_at)) / 60.0 AS lead_minutes,
@@ -324,22 +330,16 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
   const isActive = decision.isActive && !biasCheck.biased;
   const reason = biasCheck.biased ? biasCheck.reason : decision.reason;
 
-  await db.restaurantNoShowModel.upsert({
-    where: { restaurantId },
-    create: {
-      restaurantId, weights, sampleSize: examples.length, positiveCount,
-      learnedBrier, staticBrier, isActive,
-    },
-    update: {
-      weights, sampleSize: examples.length, positiveCount,
-      learnedBrier, staticBrier, isActive, trainedAt: new Date(),
-    },
-  });
-  // تاریخچه‌ی append-only (migration 042) — هیچ‌وقت overwrite نمی‌شود، کنارِ
-  // upsert بالا نوشته می‌شود تا داشبوردِ سلامتِ مدل بتواند «امتحان‌شد ولی
-  // فعال نشد» را هم ببیند، نه فقط آخرین وضعیت. شکستِ این نوشتن نباید
-  // آموزشِ اصلی را خراب کند — فقط تاریخچه/دیباگ است.
-  await db.modelTrainingRun.create({
+  // تاریخچه‌ی append-only (migration 042) — هیچ‌وقت overwrite نمی‌شود تا
+  // داشبوردِ سلامتِ مدل بتواند «امتحان‌شد ولی فعال نشد» را هم ببیند، نه فقط
+  // آخرین وضعیت. شکستِ این نوشتن نباید آموزشِ اصلی را خراب کند.
+  //
+  // ⚠️ ترتیب عمداً عوض شد (فازِ ۶): این create حالا *پیش از* upsert است، چون
+  // شناسه‌اش باید در ردیفِ مدلِ فعال ذخیره شود تا پیش‌بینی‌هایِ تولید به همین
+  // نسخه بسته شوند. اگر create شکست بخورد، runId می‌ماند null و مدل مثلِ قبل
+  // ذخیره می‌شود — یعنی نسب‌نامه از دست می‌رود ولی آموزش سالم می‌ماند. همان
+  // مصالحه‌ی قبلی، فقط جابه‌جا شده.
+  const run = await db.modelTrainingRun.create({
     data: {
       restaurantId, kind: 'no_show', sampleSize: examples.length,
       metrics: {
@@ -348,7 +348,27 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
       } as unknown as Prisma.InputJsonValue,
       isActive, reason,
     },
+    select: { id: true },
   }).catch(() => null);
+
+  // activeRunId فقط وقتی به این اجرا اشاره می‌کند که همین اجرا واقعاً فعال
+  // شده باشد. اگر گیتِ ایمنی ردش کرده، مدلِ فعالِ قبلی (اگر بود) سرِ جایش
+  // می‌ماند و نسب‌نامه‌اش هم نباید به اجرایِ ردشده منتقل شود.
+  const runIdIfActive = isActive ? (run?.id ?? null) : undefined;
+
+  await db.restaurantNoShowModel.upsert({
+    where: { restaurantId },
+    create: {
+      restaurantId, weights, sampleSize: examples.length, positiveCount,
+      learnedBrier, staticBrier, isActive,
+      activeRunId: isActive ? (run?.id ?? null) : null,
+    },
+    update: {
+      weights, sampleSize: examples.length, positiveCount,
+      learnedBrier, staticBrier, isActive, trainedAt: new Date(),
+      ...(runIdIfActive !== undefined ? { activeRunId: runIdIfActive } : {}),
+    },
+  });
   await invalidate(cacheKey('noshow-model', restaurantId));
 
   return {
@@ -360,9 +380,30 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
 /** خواندنِ مدلِ فعالِ یک رستوران (کش‌شده — این تابع در مسیرِ داغِ ثبتِ رزرو
  *  صدا زده می‌شود). null یعنی «چیزی فعال نیست، از heuristic استفاده کن». */
 export async function getLearnedNoShowModel(restaurantId: string): Promise<number[] | null> {
-  const cacheVal = await cached(cacheKey('noshow-model', restaurantId), 3600, async () => {
-    const row = await db.restaurantNoShowModel.findUnique({ where: { restaurantId } });
-    return row?.isActive ? row.weights : null;
+  const m = await getLearnedNoShowModelWithRun(restaurantId);
+  return m ? m.weights : null;
+}
+
+/**
+ * همان مدلِ فعال، به‌علاوه‌ی شناسه‌ی اجرایِ آموزشی که ساختش (فازِ ۶).
+ *
+ * ⚠️ چرا دو تابع و نه تغییرِ امضایِ قبلی: getLearnedNoShowModel جای دیگری هم
+ * صدا زده می‌شود و قراردادش «وزن‌ها یا null» است. شکستنِ آن برایِ یک فیلدِ
+ * اضافه، تغییرِ بی‌دلیل در مسیرهایی است که به نسب‌نامه کاری ندارند.
+ *
+ * runId می‌تواند null باشد و این حالتِ صادقانه‌ای است: مدل‌هایی که پیش از
+ * مهاجرتِ ۰۵۶ آموزش دیده‌اند نسب‌نامه ندارند و نباید برایشان یکی جعل شود.
+ */
+export async function getLearnedNoShowModelWithRun(
+  restaurantId: string,
+): Promise<{ weights: number[]; runId: string | null } | null> {
+  // شکلِ کش عمداً عوض شد؛ کلید هم باید عوض می‌شد وگرنه یک کشِ گرمِ قدیمی
+  // (آرایه‌ی خام) به‌عنوانِ آبجکت خوانده می‌شد و بی‌صدا undefined می‌داد.
+  return cached(cacheKey('noshow-model-v2', restaurantId), 3600, async () => {
+    const row = await db.restaurantNoShowModel.findUnique({
+      where: { restaurantId },
+      select: { isActive: true, weights: true, activeRunId: true },
+    });
+    return row?.isActive ? { weights: row.weights, runId: row.activeRunId } : null;
   });
-  return cacheVal;
 }

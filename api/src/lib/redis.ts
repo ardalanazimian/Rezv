@@ -1,5 +1,6 @@
 import Redis, { Cluster } from 'ioredis';
 import { createLogger } from './logger';
+import { Err } from './errors';
 import { metrics } from './metrics';
 
 const log = createLogger('security');
@@ -165,7 +166,7 @@ export async function withSlotLock<T>(
     metrics.slotLockFallback.inc();
     return fn();
   }
-  if (!ok) throw (await import('./errors')).Err.lockTimeout();
+  if (!ok) throw Err.lockTimeout();
   try { return await fn(); }
   finally {
     // فقط اگر هنوز مال خودمان است آزاد کن — اگر همین‌جا هم Redis قطع شود،

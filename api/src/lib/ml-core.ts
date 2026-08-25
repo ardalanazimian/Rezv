@@ -156,3 +156,133 @@ export function decideModelActivation(params: ActivationParams): ActivationDecis
   }
   return { isActive: true, reason: `${(improvement * 100).toFixed(1)}٪ دقیق‌تر از ${baselineLabel} روی هولدآوت` };
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ویژگی‌هایِ خامِ رفتارِ مهمان + فرمولِ heuristic
+//
+//  ⚠️ چرا این دو از customer-insights.ts به این‌جا منتقل شدند (۲۰۲۶-۰۸-۲۰):
+//  یک چرخه‌ی واقعیِ import وجود داشت — customer-insights به no-show-model
+//  نیاز داشت (مدلِ یادگرفته) و no-show-model به customer-insights
+//  (computeStaticScoreFromFeatures به‌عنوانِ baseline). راهِ‌حلِ قبلی یک
+//  `await import()`ِ پویا در مسیرِ داغِ رزرو بود.
+//
+//  آن راهِ‌حل روی Node 20 می‌شکند: زیرِ tsx ماژول به یک data: URL تبدیل
+//  می‌شود و Node 20 نمی‌تواند specifierِ نسبی را از داخلِ data: URL حل کند
+//  (ERR_UNSUPPORTED_RESOLVE_REQUEST). چون importهایِ پویا در آن مسیر داخلِ
+//  یک fire-and-forgetِ بی‌catch بودند، شکست بی‌صدا بود.
+//
+//  ml-core عمداً هیچ importی ندارد، پس میزبانِ درستِ این دو است: چرخه
+//  می‌شکند و هر دو طرف می‌توانند static import کنند — بدونِ هیچ importِ
+//  پویایی در مسیرِ داغ.
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * ویژگی‌های خامی که هم فرمولِ heuristic و هم مدلِ یادگرفته از رویشان ساخته
+ * می‌شوند — تنها جایی که «سابقه‌ی مشتری» و «زمان‌بندیِ رزرو» به عدد تبدیل
+ * می‌شوند.
+ */
+export type RawFeatureInput = {
+  hasUserId: boolean;
+  priorTotal: number;        // تعداد رزروهای حل‌شده‌ی قبلیِ همین کاربر (تکمیل‌شده + no-show)
+  priorNoShowRate: number;   // noShows / priorTotal — فقط اگر priorTotal > 0 معنا دارد
+  leadMinutes: number;
+  partySize: number;
+  source: string;
+};
+
+/**
+ * فرمولِ heuristicِ دستی — بدونِ هیچ دسترسیِ DB، فقط از رویِ ویژگی‌های خام.
+ * هم مسیرِ زنده‌ی fallback را تغذیه می‌کند و هم baselineِ مقایسه در آموزشِ
+ * مدلِ یادگرفته را — منبعِ واحد، تا این دو مسیر روزی از هم جدا نیفتند.
+ */
+export function computeStaticScoreFromFeatures(f: RawFeatureInput): number {
+  let score = 15; // پایه‌ی ریسک برای مهمان ناشناس (بدون سابقه)
+
+  if (f.hasUserId) {
+    if (f.priorTotal === 0) {
+      score = 25; // کاربر شناخته‌شده ولی بدون سابقه‌ی حضور قطعی
+    } else {
+      score = Math.round(f.priorNoShowRate * 90) + 5; // نگاشت نرخ no-show به امتیاز
+      if (f.priorTotal >= 5 && f.priorNoShowRate === 0) score = Math.max(2, score - 5); // مشتری وفادار با سابقه‌ی پاک
+    }
+  }
+
+  // ── lead time: رزرو دقیقه‌ی ۹۰ام (last-minute) ریسک بیشتری دارد ──
+  if (f.leadMinutes < 30) score += 12;
+  else if (f.leadMinutes > 7 * 24 * 60) score += 6; // رزرو خیلی زودهنگام هم کمی ریسک بیشتر دارد (فراموشی)
+
+  // ── گروه بزرگ بدون پیش‌سفارش/تأیید، ریسک سازمانی بیشتر دارد ──
+  if (f.partySize >= 6) score += 8;
+
+  // ── منبع رزرو: تماس تلفنی/walk-in نسبت به اپ کمی نامطمئن‌تر ──
+  if (f.source === 'phone') score += 5;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  شاخصِ پایداریِ جمعیت (PSI) — ریاضیاتِ خالصِ تشخیصِ رانش (فازِ ۷)
+//
+//  PSI دو توزیع را مقایسه می‌کند: «مرجع» (وقتی مدل ساخته/سنجیده شد) و
+//  «فعلی» (چیزی که الان واقعاً می‌بینیم). اگر ورودی‌ها یا خروجی‌هایِ مدل
+//  جابه‌جا شده باشند، مدل ممکن است هنوز «کار کند» ولی دیگر روی همان دنیایی
+//  نباشد که برایش کالیبره شده بود.
+//
+//  آستانه‌هایِ متعارفِ صنعت (و عمداً همان‌ها، نه اعدادِ ابداعی):
+//    PSI < 0.1        → پایدار
+//    0.1 ≤ PSI < 0.25 → جابه‌جاییِ متوسط، ارزشِ نگاه‌کردن دارد
+//    PSI ≥ 0.25       → جابه‌جاییِ قابل‌توجه
+//
+//  ⚠️ PSI روی نمونه‌ی کم بی‌معناست و عددِ بزرگ می‌سازد. تصمیمِ «کافی بودنِ
+//  نمونه» عمداً بیرونِ این تابع است (صداکننده باید کف بگذارد) تا این‌جا
+//  فقط ریاضیاتِ خالص و تست‌پذیر بماند.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** تعدادِ سطل‌ها برای توزیعِ احتمال روی بازه‌ی ۰..۱. */
+export const PSI_BUCKETS = 10;
+
+/** هموارسازی: سطلِ خالی لگاریتمِ بی‌نهایت می‌سازد. */
+const PSI_EPSILON = 1e-6;
+
+/** شمارشِ نسبیِ مقادیرِ ۰..۱ در سطل‌هایِ هم‌عرض. */
+export function bucketize01(values: readonly number[], buckets = PSI_BUCKETS): number[] {
+  const counts = new Array(buckets).fill(0);
+  if (values.length === 0) return counts;
+  for (const v of values) {
+    const clamped = Math.min(1, Math.max(0, v));
+    // مقدارِ دقیقاً ۱ باید در آخرین سطل بیفتد، نه سطلِ خارج از محدوده.
+    const idx = Math.min(buckets - 1, Math.floor(clamped * buckets));
+    counts[idx] += 1;
+  }
+  return counts.map(c => c / values.length);
+}
+
+/**
+ * PSI بینِ توزیعِ مرجع و فعلی برای مقادیرِ ۰..۱ (مثلاً احتمالِ پیش‌بینی‌شده).
+ * هر دو آرایه باید ناخالی باشند؛ وگرنه NaN برمی‌گردد که صداکننده باید
+ * به‌عنوانِ «قابلِ محاسبه نیست» رفتار کند، نه صفر.
+ */
+export function populationStabilityIndex(
+  reference: readonly number[],
+  current: readonly number[],
+  buckets = PSI_BUCKETS,
+): number {
+  if (reference.length === 0 || current.length === 0) return NaN;
+  const ref = bucketize01(reference, buckets);
+  const cur = bucketize01(current, buckets);
+  let psi = 0;
+  for (let i = 0; i < buckets; i++) {
+    const r = Math.max(ref[i], PSI_EPSILON);
+    const c = Math.max(cur[i], PSI_EPSILON);
+    psi += (c - r) * Math.log(c / r);
+  }
+  return psi;
+}
+
+export type PsiBand = 'stable' | 'moderate' | 'significant';
+
+export function psiBand(psi: number): PsiBand {
+  if (psi >= 0.25) return 'significant';
+  if (psi >= 0.1) return 'moderate';
+  return 'stable';
+}

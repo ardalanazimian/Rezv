@@ -83,10 +83,10 @@ function render(q){
       ).slice(0,8).forEach(r=>_items.push({ t:r.n, sub:r.cuisine, ic:'utensils', run:()=>{ pushRecent(q); openRest(r.id); } }));
     // رزروهای من (کد رزرو یا نامِ رستوران یا تاریخ) → صفحه‌ی سفرها
     (Array.isArray(TRIPS)?TRIPS:[]).filter(t=>{
-        const r = (Array.isArray(R)?R:[]).find(x=>x.id===t.rid);
+        const r = (Array.isArray(R)?R:[]).find(x=>String(x.id)===String(t.rid));
         return has(t.code, q) || has(r&&r.n, q) || has(t.date, q);
       }).slice(0,5).forEach(t=>{
-        const r = (Array.isArray(R)?R:[]).find(x=>x.id===t.rid);
+        const r = (Array.isArray(R)?R:[]).find(x=>String(x.id)===String(t.rid));
         _items.push({ t:`رزرو ${t.code}`, sub:(r&&r.n)||'رستوران', ic:'calendar', run:()=>{ pushRecent(q); go('trips'); } });
       });
   }

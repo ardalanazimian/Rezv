@@ -35,6 +35,14 @@
 //     `comm -23 <(ls tests/*.test.mts) <(grep -oP ...)` (یا مشابه) چک کن که
 //     همه‌ی فایل‌هایِ tests/*.test.mts واقعاً اینجا import شدن.
 //
+//  ⚠️ گزارشگر عمداً `spec` است (در package.json)، نه TAPِ پیش‌فرض — یافته‌ی
+//     واقعیِ ۲۰۲۶-۰۸-۲۰: وقتی CI قرمز شد، خروجیِ TAP بیش از ۴۰۰۰ خط بود و
+//     `not ok`ها وسطِ لاگ پخش بودند، پس از رویِ tailِ لاگ اصلاً نمی‌شد فهمید
+//     *کدام* تست افتاده — تشخیص به حدس‌زدن و بازتولیدِ محلی موکول شد.
+//     گزارشگرِ spec هم شمارشِ نهایی را دارد، هم بخشِ «✖ failing tests» را با
+//     نام/پیام/خطِ فایل دقیقاً در انتها می‌گذارد، و کلِ خروجی ~۸۶۰ خط است.
+//     یعنی هر شکستِ CI از این به بعد از رویِ همان چند خطِ آخر خوانا است.
+//
 //  ⚠️ اسمِ این فایل عمداً `.runner.mts` است، نه `.test.mts` — اگر `.test.mts`
 //     بود، خودش هم با glob قدیمیِ `tests/*.test.mts` مچ می‌شد و هر کسی که
 //     دستی اون glob رو اجرا کنه (عادتِ مستندشده‌ی قبلی) هر تست رو دوبار
@@ -44,11 +52,16 @@
 import './allowed-origins.test.mts';
 import './ban.test.mts';
 import './cancellation-policy.test.mts';
+import './coupons.integration.test.mts';
 import './crm-recommendations.test.mts';
+import './crm-feedback-loop.integration.test.mts';
 import './customer-intelligence.test.mts';
 import './demand-forecast.test.mts';
+import './feature-parity.integration.test.mts';
 import './economy.test.mts';
+import './economy-ledger.integration.test.mts';
 import './esc.test.mts';
+import './fraud.integration.test.mts';
 import './guest-profile.test.mts';
 import './hours.test.mts';
 import './hours-approval.test.mts';
@@ -56,33 +69,57 @@ import './hours-change-approval.integration.test.mts';
 import './customer-insight-spend-semantics.integration.test.mts';
 import './guest-profile-rollup.integration.test.mts';
 import './menu-crud.integration.test.mts';
+import './tables.integration.test.mts';
+import './table-qr-checkin.integration.test.mts';
+import './table-qr-regenerate.integration.test.mts';
+import './auth-guards.integration.test.mts';
+import './staff-auth-guard.integration.test.mts';
+import './availability.integration.test.mts';
 import './assistant-nlu.test.mts';
+import './idempotency.integration.test.mts';
 import './incentive-engine.test.mts';
 import './jwt.test.mts';
 import './lifecycle.test.mts';
+import './lifecycle-cron.integration.test.mts';
 import './loyalty-status.test.mts';
 import './loyalty.test.mts';
 import './media.test.mts';
+import './metrics-endpoint.test.mts';
 import './ml-core.test.mts';
+import './model-drift.test.mts';
+import './model-drift.integration.test.mts';
+import './model-registry.integration.test.mts';
+import './no-dynamic-import-in-hot-path.test.mts';
 import './no-show-model.test.mts';
 import './notifications.test.mts';
 import './otp.test.mts';
+import './outreach-ledger.integration.test.mts';
+import './zarinpal.test.mts';
+import './payments.integration.test.mts';
 import './permissions.test.mts';
 import './photo-moderation.test.mts';
+import './pricing.test.mts';
 import './queue.test.mts';
 import './ratelimit-fallback.test.mts';
+import './rewards.integration.test.mts';
 import './redis.test.mts';
 import './reservation-helpers.test.mts';
 import './reservation-status.test.mts';
 import './restaurant-manager.test.mts';
+import './shell-scripts-lf.test.mts';
+import './sms-balance.integration.test.mts';
 import './site-orders.test.mts';
+import './subscription.test.mts';
 import './table-merge-occupancy-concurrency.test.mts';
 import './table-merge-occupancy.test.mts';
 import './validate.test.mts';
+import './prediction-ledger.integration.test.mts';
 import './public-menu.integration.test.mts';
 import './temporal-leakage.integration.test.mts';
+import './tenant-gate.integration.test.mts';
 import './tenant-isolation.integration.test.mts';
 import './waitlist.test.mts';
+import './waitlist-flow.integration.test.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ یافته‌ی واقعیِ دوم (۲۰۲۶-۰۸-۱۴، همون ممیزی): table-merge-occupancy.test.mts

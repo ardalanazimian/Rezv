@@ -2007,12 +2007,40 @@ const API = {
   updateTable(id, body){ return this.patch(`/restaurant/tables/${id}`, body); },
   deleteTable(id){ return this.delete(`/restaurant/tables/${id}`); },
   setTableState(id, state){ return this.patch(`/restaurant/tables/${id}/state`, { state }); },
+  /**
+   * QRِ check-inِ یک میز — خروجی SVG است نه JSON، پس مثلِ `menuQrSvg` نمی‌تواند
+   * از `request()` (که همیشه `res.json()` می‌زند) عبور کند. شکلِ خروجی عمداً
+   * همان قراردادِ بقیه است تا فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
+   */
+  async tableQrSvg(id, size){
+    if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
+    try{
+      const res = await fetch(this.base + `/api/v1/restaurant/tables/${encodeURIComponent(id)}/qr?size=` + encodeURIComponent(size||512), {
+        headers: { Authorization: 'Bearer ' + this._token },
+      });
+      if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
+      return { ok:true, data:{
+        svg: await res.text(),
+        code: decodeURIComponent(res.headers.get('X-Table-Code') || ''),
+        url: decodeURI(res.headers.get('X-Checkin-Url') || ''),
+      } };
+    }catch{
+      return { ok:false, offline:true, error:{ message:'اتصال به سرور برقرار نشد' } };
+    }
+  },
+  /**
+   * بازتولیدِ کدِ QRِ میز — استیکرِ چاپ‌شده‌ی قبلی را **باطل** می‌کند.
+   * برخلافِ `tableQrSvg` خروجی JSON است، پس از مسیرِ عادیِ `post()` می‌رود.
+   */
+  regenerateTableQr(id){ return this.post(`/restaurant/tables/${encodeURIComponent(id)}/qr`, {}); },
   // ── هوش مشتری (RFM/CLV/AI) ──
   customers(qs){ return this.get('/restaurant/customers'+(qs?'?'+qs:'')); },
   customerDetail(userId){ return this.get('/restaurant/customers/'+encodeURIComponent(userId)); },
   rfm(){ return this.get('/restaurant/rfm'); },
   aiRecommendations(){ return this.get('/restaurant/ai'); },
   crmRecommendations(){ return this.get('/restaurant/crm/recommendations'); },
+  // فازِ ۸ — ثبتِ «با این مشتری تماس گرفتم» تا اثربخشیِ توصیه‌ها سنجیدنی شود
+  crmRecommendationContacted(userId){ return this.post('/restaurant/crm/recommendations/contacted',{user_id:userId}); },
   // ── ورود بدون رزرو (walk-in واقعی، با عضویت خودکار باشگاه) ──
   walkin(body, headers){ return this.post('/restaurant/walkin', body, headers); },
   // ── نظرات، گالری، یادداشت پرسنل، رویداد، تاریخچه‌ی کمپین (همه واقعی) ──
@@ -4021,8 +4049,180 @@ function openTableSheet(i){
     <div class="field-label" style="margin-top:14px">اسم میز <span style="color:var(--t3);font-weight:400">(اختیاری)</span></div>
     <input class="inp" id="tblRename" value="${esc(t.name||'')}" placeholder="میز ${fa(t.n)}" style="width:100%">
     <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="confirmTableStatus()">تأیید تغییر</button>
+    ${t.id ? `<button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="openTableQr(${i})">${icon('qr',{size:14})} QRِ ورودِ مهمان</button>` : ''}
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
   `);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  QRِ check-inِ میز — استیکری که رویِ میز چسبانده می‌شود
+//
+//  مهمان سرِ میز اسکن می‌کند → اپِ مشتری باز می‌شود → رزروِ همان بازه‌ی
+//  زمانی به `seated` می‌رود و میز `occupied` می‌شود، بدونِ اینکه کارکنان
+//  کاری کنند.
+//
+//  ⚠️ تا ۲۰۲۶-۰۸-۲۱ این قابلیت شیپ شده بود ولی برایِ هیچ رستورانِ واقعی کار
+//  نمی‌کرد: هیچ روتی `qr_code` را ست نمی‌کرد و تنها میزهایِ دارایِ کد،
+//  داده‌ی `[DEMO]`ِ seed بودند. حالا هر میز کد دارد و این دکمه نشانش می‌دهد.
+//
+//  خودِ SVG از APIِ خودمان می‌آید (نه ورودیِ کاربر) و متنِ داخلش را هم سرور
+//  از دیتابیس می‌سازد — پنل فقط شناسه‌ی میز را می‌فرستد.
+// ═══════════════════════════════════════════════════════════════════════
+let _tableQrSvg = null;
+let _tableQrLabel = '';
+
+function openTableQr(i){
+  const t = TABLES[i];
+  if(!t || !t.id){ toast('','این میز هنوز روی سرور ساخته نشده'); return; }
+  _tableQrLabel = tableLabel(t);
+  openModal(`
+    <div class="modal-title">QRِ ورودِ مهمان · ${esc(_tableQrLabel)}</div>
+    <div class="modal-sub">این کد را چاپ کن و رویِ میز بگذار. مهمان با اسکنش، ورودش خودکار ثبت می‌شود.</div>
+    <div id="tableQrBox" style="text-align:center;padding:12px 0"></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">بستن</button>
+  `);
+  tableLoadQr(t.id);
+}
+
+/** SVGِ QR را از سرور می‌گیرد و همراهِ دکمه‌های دانلود/چاپ نشان می‌دهد. */
+async function tableLoadQr(id){
+  const box = document.getElementById('tableQrBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال ساختِ QR…</div>`;
+
+  const res = await API.tableQrSvg(id, 512);
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+        ${esc(res.offline ? 'اتصال به سرور برقرار نیست.' : (res.error?.message || 'ساختِ QR ناموفق بود.'))}
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">تلاش دوباره</button>`;
+    return;
+  }
+
+  _tableQrSvg = res.data.svg;
+  // SVG با عرضِ ثابتِ ۵۱۲ می‌آید (اندازه‌ای که برایِ دانلود می‌خواهیم) ولی در
+  // پنلِ موبایل باید کوچک شود، وگرنه از کارت بیرون می‌زند و صفحه را افقی
+  // اسکرول می‌کند — همان چیزی که در QRِ منو هم رخ داده بود.
+  box.innerHTML = `
+    <div style="background:#fff;display:inline-block;padding:12px;border-radius:12px;max-width:100%">
+      <div style="max-width:240px;margin:0 auto">
+        <style>#tableQrBox svg{width:100%;height:auto;display:block}</style>
+        ${_tableQrSvg}
+      </div>
+    </div>
+    <div style="font-family:monospace;font-size:12px;color:var(--t2);margin-top:8px;direction:ltr">${esc(res.data.code)}</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-ghost" onclick="tableDownloadQr('svg')">دانلودِ SVG</button>
+      <button class="btn btn-sm btn-ghost" onclick="tableDownloadQr('png')">دانلودِ PNG</button>
+      <button class="btn btn-sm btn-ghost" onclick="tablePrintQr()">چاپ</button>
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:8px">
+      SVG برایِ چاپ (هر اندازه، بدونِ افتِ کیفیت) · PNG برایِ اشتراک‌گذاری
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
+      <button class="btn btn-sm btn-ghost" style="color:var(--danger,#e5484d)"
+              onclick="tableRegenerateQr('${esc(id)}')">بازتولیدِ کد</button>
+      <div style="color:var(--t2);font-size:12px;margin-top:6px">
+        اگر استیکر گم یا کپی شده: کدِ تازه بساز. استیکرِ فعلی از همان لحظه
+        <b>باطل</b> می‌شود و باید دوباره چاپ شود.
+      </div>
+    </div>`;
+}
+
+/**
+ * بازتولیدِ کدِ QRِ میز.
+ *
+ * ⚠️ برگشت‌ناپذیر است: کدِ قبلی برنمی‌گردد و هر استیکری که با آن چاپ شده از
+ * همان لحظه مرده است (مهمان با اسکنش «میز پیدا نشد» می‌گیرد). پس متنِ تأیید
+ * دقیقاً همین اثر را می‌گوید، نه یک «مطمئنی؟»ِ مبهم — رستوران‌دار باید بداند
+ * دارد چه چیزی را از بین می‌برد. سرور هم این کار را در audit ثبت می‌کند.
+ */
+async function tableRegenerateQr(id){
+  if(!window.confirm(
+    'کدِ تازه ساخته شود؟\n\n' +
+    'استیکرِ فعلیِ رویِ این میز از همین لحظه باطل می‌شود و مهمان با اسکنش به جایی نمی‌رسد. ' +
+    'باید کدِ جدید را چاپ کنی و جایگزین کنی.\n\nاین کار برگشت‌پذیر نیست.'
+  )) return;
+
+  const box = document.getElementById('tableQrBox');
+  if(box) box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال ساختِ کدِ تازه…</div>`;
+
+  const res = await API.regenerateTableQr(id);
+  if(!res.ok){
+    if(box){
+      box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
+          ${esc(res.offline ? 'اتصال به سرور برقرار نیست — کد عوض نشد.' : (res.error?.message || 'بازتولیدِ کد ناموفق بود.'))}
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">نمایشِ کدِ فعلی</button>`;
+    }
+    return;
+  }
+
+  toast('', 'کدِ تازه ساخته شد — استیکرِ قبلی دیگر کار نمی‌کند');
+  // QR را از نو می‌گیریم تا کدِ جدید و تصویرش هر دو به‌روز شوند.
+  tableLoadQr(id);
+}
+
+/** دانلودِ QR. PNG در خودِ مرورگر از SVG رندر می‌شود — بدونِ رفت‌وبرگشتِ اضافه. */
+function tableDownloadQr(fmt){
+  if(!_tableQrSvg) return;
+  const name = 'rezervno-table-qr';
+  if(fmt === 'svg'){
+    tableTriggerDownload(new Blob([_tableQrSvg], { type:'image/svg+xml' }), name + '.svg');
+    return;
+  }
+  // SVG → canvas → PNG. اندازه‌ی ۱۰۲۴ عمدی است: QR در چاپ اغلب بزرگ‌تر از
+  // نمایشِ صفحه لازم می‌شود و بزرگ‌کردنِ PNGِ کوچک ناخوانایش می‌کند.
+  const SIZE = 1024;
+  const img = new Image();
+  const svgUrl = URL.createObjectURL(new Blob([_tableQrSvg], { type:'image/svg+xml' }));
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = c.height = SIZE;
+    const ctx = c.getContext('2d');
+    // پس‌زمینه‌ی سفیدِ صریح: PNGِ شفاف رویِ تمِ تیره سیاه‌روی‌سیاه می‌شود و
+    // اسکنر نمی‌خواندش.
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    ctx.drawImage(img, 0, 0, SIZE, SIZE);
+    URL.revokeObjectURL(svgUrl);
+    c.toBlob(b => { if(b) tableTriggerDownload(b, name + '.png'); });
+  };
+  img.onerror = () => { URL.revokeObjectURL(svgUrl); toast('','ساختِ PNG ناموفق بود — SVG را دانلود کن'); };
+  img.src = svgUrl;
+}
+
+/** چاپِ مستقیم: یک پنجره‌ی کوچک با همان SVG و نامِ میز بالایش. */
+function tablePrintQr(){
+  if(!_tableQrSvg) return;
+  const w = window.open('', '_blank', 'width=420,height=560');
+  if(!w){ toast('','مرورگر پنجره‌ی چاپ را بست — دانلودِ SVG را امتحان کن'); return; }
+  // `esc` رویِ برچسب اعمال می‌شود چون اسمِ میز را رستوران‌دار تایپ کرده.
+  // SVG از APIِ خودمان می‌آید و ورودیِ کاربر داخلش نیست.
+  w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8">
+    <title>QR ${esc(_tableQrLabel)}</title>
+    <style>
+      body{font-family:system-ui,sans-serif;text-align:center;padding:24px;margin:0}
+      h1{font-size:20px;margin:0 0 16px}
+      svg{width:280px;height:280px}
+      p{color:#555;font-size:13px;margin-top:12px}
+      @media print{ body{padding:0} }
+    </style></head><body>
+    <h1>${esc(_tableQrLabel)}</h1>
+    ${_tableQrSvg}
+    <p>برای ثبتِ ورود، این کد را اسکن کنید</p>
+    </body></html>`);
+  w.document.close();
+  // چاپ بعد از لودِ کاملِ سند؛ بدونِ این، بعضی مرورگرها صفحه‌ی خالی چاپ می‌کنند.
+  w.onload = () => { w.focus(); w.print(); };
+}
+
+function tableTriggerDownload(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 async function confirmTableStatus(){
   if(pendingTable===null)return;
@@ -4750,6 +4950,21 @@ async function custRenderProfiles(){
 }
 function callCustomer(phone){ if(phone) window.location.href='tel:'+phone; }
 
+// ⚠️ فازِ ۸ — نیمه‌ی گم‌شده‌ی حلقه‌ی بازخوردِ CRM: تا امروز این دکمه فقط `tel:`
+// را باز می‌کرد و هیچ ردی نمی‌گذاشت، پس هیچ‌وقت نمی‌شد فهمید توصیه‌های CRM
+// اثری داشته‌اند یا نه. حالا تماس در دفترِ ارتباط‌گیری ثبت می‌شود.
+//
+// ⚠️ ترتیب عمدی است: اول ثبت (await)، بعد `tel:`. برعکسش روی موبایل یعنی
+// مرورگر بلافاصله به اپِ تلفن سوییچ می‌کند و fetchِ نیمه‌کاره لغو می‌شود —
+// یعنی تماس‌های واقعی بی‌صدا ثبت نمی‌شدند. شکستِ ثبت هرگز جلوی خودِ تماس را
+// نمی‌گیرد: تماس گرفتن مهم‌تر از آمارش است.
+async function callRecommendedCustomer(phone,userId){
+  if(userId && API.getToken()){
+    try{ await API.crmRecommendationContacted(userId); }catch(_e){}
+  }
+  callCustomer(phone);
+}
+
 // ─── تب ساعات کاری + تعطیلات (وصل به GET/PUT /restaurant/hours واقعی) ───
 // کلید هر روز مطابق قرارداد بک‌اند: getDay() جاوااسکریپت (۰=یکشنبه ... ۶=شنبه).
 // ترتیب نمایش برای کاربر ایرانی: شنبه تا جمعه.
@@ -4976,7 +5191,7 @@ async function openCustomerDetail(userId){
     <div class="field-label" style="margin-top:18px">تاریخچه‌ی رزروها</div>
     <div style="max-height:240px;overflow-y:auto;margin-top:8px">
       ${tl.length?tl.map(r=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
           <div>
             <div style="font-weight:700;font-size:13px">${esc(ST_FA[r.status]||r.status)} · ${fa(r.party_size)} نفر</div>
             <div style="font-size:11px;color:var(--t2)">${dt(r.slot_start)}${r.items&&r.items.length?' · '+esc(r.items.join('، ')):''}</div>
@@ -5034,6 +5249,22 @@ async function loadCampaignHistory(){
   </tbody></table>`:'<div style="padding:8px">هنوز کمپینی ارسال نشده</div>';
 }
 
+// ⚠️ فازِ ۸ — چیزی که این خط جایگزینش شد یک توضیحِ ثابت بود
+// («توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری»). حالا به‌جای توصیفِ
+// خودش، *نتیجه‌ی سنجیده‌شده‌اش* را می‌گوید — یا صریحاً می‌گوید هنوز سنجیدنی
+// نیست. هرگز عددی که اندازه نگرفته‌ایم نشان نمی‌دهد (بندِ ۲۰).
+function crmEffectivenessFa(e){
+  const base='توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری';
+  if(!e) return base;
+  if(e.conversion_status==='measured' && e.conversion_rate_pct!==null && e.conversion_rate_pct!==undefined){
+    return `${base} · ${fa(e.conversion_rate_pct)}٪ از تماس‌ها به رزرو رسید (از ${fa(e.resolved_count)} موردِ قطعی‌شده، پنجره‌ی ${fa(e.window_days)} روزه)`;
+  }
+  if(e.contacted_count>0){
+    return `${base} · ${fa(e.contacted_count)} تماس ثبت شده — نرخِ تبدیل هنوز اندازه‌پذیر نیست (${fa(e.resolved_count)} از ${fa(e.min_resolved)})`;
+  }
+  return `${base} · هنوز تماسی ثبت نشده`;
+}
+
 // ─── تب ۴: دستیار AI — چت‌باکسِ آزادمتنِ آفلاین (assistant.js) + کارت‌های پیشنهادِ قانون‌محور از /restaurant/ai ───
 async function custRenderAI(){
   const el=document.getElementById('ct-ai');
@@ -5054,6 +5285,7 @@ async function custRenderAI(){
   if(!res.ok){ cardsEl.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} پیشنهادها بارگیری نشد — دستیار همچنان در دسترس است.</div>`; return; }
   const cards=res.data.cards||[];
   const contacts=crmRes.ok?(crmRes.data.items||[]):[];
+  const crmEff=crmRes.ok?(crmRes.data.effectiveness||null):null;
   const URG_FA={high:'فوری',medium:'این هفته',low:'وقتِ آزاد'};
   cardsEl.innerHTML=`
     <div class="ai-box" style="margin-bottom:18px">
@@ -5072,7 +5304,7 @@ async function custRenderAI(){
         </div>
       </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}
     <div class="panel" style="margin-top:20px">
-      <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">توصیه‌یِ تک‌به‌تک، بر اساسِ ریسک/ارزشِ همون مشتری</div></div></div>
+      <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">${crmEffectivenessFa(crmEff)}</div></div></div>
       ${contacts.length?contacts.map(c=>`
         <div class="mini-row">
           <div class="mini-info">
@@ -5080,7 +5312,7 @@ async function custRenderAI(){
             <div class="mini-sub">${esc(c.reason)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callCustomer('${esc(c.phone||'')}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
+            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer('${esc(c.phone||'')}','${esc(c.user_id)}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
     </div>`;
@@ -5762,12 +5994,32 @@ let COUPONS=[], AUTOMATIONS=[], _mktLoaded=false;
 const COUPON_KIND_FA={percent:'درصدی',fixed:'مبلغ ثابت',free_item:'آیتم رایگان'};
 const COUPON_SEG_FA={new_customer:'مشتری جدید',active:'فعال',at_risk:'در خطر ریزش',churned:'ازدست‌رفته',vip:'VIP'};
 const AUTOMATION_TRIGGER_FA={birthday:'تولد مشتری',winback:'بازگرداندنِ مشتریِ غایب',post_visit:'بعد از بازدید',vip_milestone:'رسیدن به سطح VIP',no_show_followup:'پیگیریِ عدم‌حضور'};
+let AUTOMATION_ATTRIBUTION=null; // {window_days, min_resolved} — از همان پاسخِ API
+
+// ⚠️ این تابع از یک باگِ زنده زاده شد (ممیزیِ ۲۰۲۶-۰۸-۲۰): اینجا قبلاً
+// `${fa(a.conversion_rate_pct||0)}٪ تبدیل` بود، و بک‌اند آن عدد را از
+// marketing_automations.converted_count می‌ساخت — ستونی که در کلِ ریپو هیچ‌جا
+// افزایش نمی‌یافت. یعنی رستوران‌دار همیشه «۱۲۰ ارسال · ۰٪ تبدیل» می‌دید و
+// نتیجه می‌گرفت کمپین‌هایش بی‌اثرند، در حالی که عدد اصلاً اندازه‌گیری نشده بود.
+//
+// حالا بک‌اند وقتی شواهد کافی نیست null می‌فرستد، نه صفر. `||0` اینجا همان
+// null را دوباره به «۰٪» تبدیل می‌کرد، پس عمداً حذف شد: «هنوز کافی نیست»
+// باید نوشته شود، نه به عددی که ادعای اندازه‌گیری دارد ترجمه شود.
+function automationConversionFa(a){
+  if(a.conversion_status==='measured' && a.conversion_rate_pct!==null && a.conversion_rate_pct!==undefined){
+    return `${fa(a.conversion_rate_pct)}٪ تبدیل (از ${fa(a.resolved_count||0)} موردِ قطعی‌شده)`;
+  }
+  const need=AUTOMATION_ATTRIBUTION&&AUTOMATION_ATTRIBUTION.min_resolved;
+  const have=a.resolved_count||0;
+  return need?`نرخِ تبدیل هنوز اندازه‌پذیر نیست (${fa(have)} از ${fa(need)})`
+             :'نرخِ تبدیل هنوز اندازه‌پذیر نیست';
+}
 
 async function loadMarketing(){
   if(!API.getToken()) return;
   const [c,a]=await Promise.all([API.couponsList(),API.automationsList()]);
   if(c.ok) COUPONS=c.data?.items||[];
-  if(a.ok) AUTOMATIONS=a.data?.items||[];
+  if(a.ok){ AUTOMATIONS=a.data?.items||[]; AUTOMATION_ATTRIBUTION=a.data?.attribution||null; }
   _mktLoaded=true;
 }
 function rMarketing(){
@@ -5857,7 +6109,7 @@ function renderAutomations(){
         <div class="staff-row">
           <div style="flex:1">
             <div style="font-size:14px;font-weight:700">${esc(a.name)}</div>
-            <div style="font-size:12px;color:var(--t2)">${AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger} · ${fa(a.sent_count||0)} ارسال · ${fa(a.conversion_rate_pct||0)}٪ تبدیل</div>
+            <div style="font-size:12px;color:var(--t2)">${AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger} · ${fa(a.sent_count||0)} ارسال · ${automationConversionFa(a)}</div>
           </div>
           <span class="chip-status ${a.is_active?'arrived':''}" style="${a.is_active?'':'background:var(--s-100);color:var(--t3)'}">${a.is_active?'فعال':'غیرفعال'}</span>
         </div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:30px">هنوز قانونی ساخته نشده</div>'}
@@ -6133,7 +6385,7 @@ function openPermEditor(staffId){
     <div class="modal-sub">مشخص کن به کدام بخش‌ها دسترسی داشته باشد</div>
     <div style="margin-top:14px;max-height:340px;overflow-y:auto">
       ${PERM_DEFS.map(([k,label])=>`
-        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line);cursor:pointer">
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--border);cursor:pointer">
           <span style="font-size:13px">${label}</span>
           <input type="checkbox" data-perm="${k}" ${p[k]?'checked':''} style="width:18px;height:18px;accent-color:var(--blue)">
         </label>`).join('')}
@@ -6351,7 +6603,7 @@ async function rPricing(){
     return `<div class="pr-sug">${tag}
       <div class="pr-sug-top"><div><div class="pr-sug-label">${esc(s.label)}</div><div class="pr-sug-days">${daysTxt}</div></div>
         <div class="pr-sug-amt"><div class="pr-sug-amt-v">${toman(s.min_toman)}</div><div class="pr-sug-amt-l">حداقل مبلغ ${dir}</div></div></div>
-      <div class="pr-occ"><span style="font-size:11px;color:var(--t3);font-weight:700">اشغال</span><div class="pr-occ-track"><div class="pr-occ-fill" style="width:${s.occupancy_pct}%;background:${occColor(s.occupancy_pct)}"></div></div><span class="pr-occ-pct">${fa(s.occupancy_pct)}٪</span></div>
+      <div class="pr-occ"><span style="font-size:11px;color:var(--t3);font-weight:700;white-space:nowrap" title="میانگینِ رزروِ این بازه نسبت به شلوغ‌ترین ساعتِ رستوران — نه درصدِ اشغالِ ظرفیت">شلوغیِ نسبی</span><div class="pr-occ-track"><div class="pr-occ-fill" style="width:${s.occupancy_pct}%;background:${occColor(s.occupancy_pct)}"></div></div><span class="pr-occ-pct">${fa(s.occupancy_pct)}٪</span></div>
       <div class="pr-reason">${icon('message',{size:13})} ${esc(s.reason)}</div>
       <div class="pr-actions"><button class="btn btn-primary" style="flex:1" id="prAcc-${i}" onclick="pricingAccept(${i})">${icon('check',{size:14})} قبول این پیشنهاد</button></div>
     </div>`;
@@ -6359,7 +6611,18 @@ async function rPricing(){
   document.getElementById('v-pricing').innerHTML=`
     <div class="section-head"><div><div class="section-title">قیمت‌گذاری هوشمند</div><div class="section-sub">پیشنهادِ حداقل مبلغِ رزرو بر اساس شلوغیِ واقعیِ رستورانت</div></div></div>
     ${dataSourceNote()}
-    <div class="pr-banner"><h3>${icon('sparkle',{size:16,fill:true})} پیشنهاد بر اساس داده‌ی شما</h3><p>${P.hasData?'این پیشنهادها از الگوی شلوغیِ ۹۰ روز اخیرِ خودت ساخته شدن — نه حدس.':'هنوز داده‌ی کافی نداری؛ این‌ها پیشنهادِ اولیه‌ست. با ثبت رزروها دقیق‌تر می‌شن.'} هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.</p></div>
+    <div class="pr-banner"><h3>${icon('sparkle',{size:16,fill:true})} پیشنهاد بر اساس داده‌ی شما</h3><p>${
+      // ⚠️ سه حالتِ جدا (۲۰۲۶-۰۸-۲۰): قبلاً فقط دو حالت بود و شرطش `P.hasData`
+      // بود، یعنی رستورانی با چند رزروِ معدود جمله‌ی «این پیشنهادها از الگویِ
+      // خودت ساخته شدن» را می‌دید در حالی که بک‌اند (زیرِ MIN_OBSERVATIONS)
+      // اصلاً پیشنهادی نساخته بود — و دنباله‌ی «هر کدوم رو می‌تونی قبول کنی»
+      // به چیزی اشاره می‌کرد که وجود نداشت.
+      !P.suggestions.length
+        ? 'هنوز داده‌ی کافی برای الگوگیری نیست. با ثبتِ رزروِ بیشتر، پیشنهادها از شلوغیِ واقعیِ خودت ساخته می‌شن.'
+        : (P.hasData
+            ? 'این پیشنهادها از الگوی شلوغیِ ۹۰ روز اخیرِ خودت ساخته شدن — نه حدس. هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.'
+            : 'این‌ها پیشنهادِ نمونه‌ست (بک‌اند متصل نیست). هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.')
+    }</p></div>
     <div id="prSugs">${(P.suggestions.length?P.suggestions:[]).map(sugCard).join('')||'<div class="pr-empty">فعلاً پیشنهادی نیست. با ثبت رزروِ بیشتر، سیستم الگوها رو پیدا می‌کنه.</div>'}</div>
     ${P.rules.length?`<div class="pr-active"><div class="pr-active-h">${icon('check',{size:13})} قواعدِ فعالِ فعلی</div>${P.rules.map(r=>`<div class="pr-active-row"><span>${esc(r.label||((r.dows||[]).map(d=>dowLbl[d]).join('،')))}</span><b>${toman(r.min_toman)} تومان</b></div>`).join('')}</div>`:''}
     <div class="pr-note">${icon('info',{size:13})} رقبا مثل SevenRooms این رو «قیمت‌گذاری پویا» می‌گن و بابتش پول می‌گیرن. با یه نگاه می‌بینی کجا پول از دست می‌دی (میز خالی) و کجا می‌تونی بیشتر دربیاری (شب شلوغ).</div>`;

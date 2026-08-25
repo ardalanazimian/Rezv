@@ -1,11 +1,13 @@
 import { randomBytes, timingSafeEqual, createHash } from 'crypto';
 import { db } from './db';
+import { createReservation } from './reservations';
 import { redis } from './redis';
 import { metrics } from './metrics';
 import { Err } from './errors';
 import { enqueueSms } from './sms';
 import { queuePush, queueEmail } from './notify';
 import { cached, cacheKey } from './cache';
+import { dateKeyInTz, timeKeyInTz } from './hours';
 
 // ═══════════════════════════════════════════════════════════
 //  سیستم لیست انتظار رزرونو (مدل OpenTable)
@@ -402,29 +404,82 @@ export async function acceptOffer(entryId: string, _actor = 'customer', auth: { 
   if (e.status !== 'offered') throw Err.validation('آفری برای پذیرش وجود ندارد');
   if (e.offerExpiresAt && e.offerExpiresAt < new Date()) throw Err.reservationExpired();
 
-  // ساخت رزرو از آفر (تخصیص خودکار میز)
-  const { createReservation } = await import('./reservations');
   const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10);
-  const timeStr = now.toTimeString().slice(0, 5);
 
-  const resv = await createReservation({
-    restaurantId: e.restaurantId,
-    date: dateStr, time: timeStr,
-    partySize: e.partySize,
-    userId: e.userId ?? undefined,
-    guest: e.userId ? undefined : { name: e.guestName ?? 'مهمان', phone: e.guestPhone ?? undefined, tableNumber: e.offeredTableNumber ?? undefined },
-    source: e.userId ? 'app' : 'manual',
-    notifySms: false, // اعلان waitlist جداست
-  }).catch(async (err) => {
-    // اگر رزرو نشد، میز را آزاد کن
-    if (e.offeredTableId) await db.table.update({ where: { id: e.offeredTableId }, data: { state: 'free' } }).catch(() => {});
-    throw err;
+  // ⚠️ باگِ رفع‌شده #۱ (۲۰۲۶-۰۸-۲۰): ترتیب برعکس بود — اول رزرو ساخته می‌شد
+  // (که کند است: تخصیصِ میز، قیدِ EXCLUDE، اعلان‌ها) و *بعد* وضعیتِ ورودی با
+  // یک `update`ِ بی‌قیدوشرط نوشته می‌شد. دو نقص داشت:
+  //
+  //  الف) رقابت با cron: اگر آفر در همان فاصله منقضی می‌شد، `expireOffers`
+  //       ورودی را `no_response` می‌کرد و میز را آزاد، و بعد این تابع رویش
+  //       `accepted` می‌نوشت — با رزروی که واقعاً ساخته شده بود.
+  //  ب) مسیرِ خطا میز را آزاد می‌کرد در حالی که ورودی هنوز `offered` بود —
+  //     دقیقاً همان نشتی که در expireOffers بسته شد (§2l): یک آفرِ زنده با
+  //     میزی که `free` علامت خورده، یعنی promoteNext می‌توانست همان میزِ
+  //     فیزیکی را به نفرِ دوم هم بدهد.
+  //
+  // حالا **اول** ادعای اتمیک، بعد ساختِ رزرو. از لحظه‌ی ادعا ورودی دیگر
+  // `offered` نیست، پس cron اصلاً نمی‌بیندش.
+  //
+  // ⚠️ دقتِ ادعا: چیزی که واقعاً رقابت را می‌بندد گاردِ `status` است، نه شرطِ
+  // `offerExpiresAt`. جهش‌آزمایی این را نشان داد — حذفِ شرطِ انقضا هیچ تستی
+  // را نینداخت، چون چکِ بیرونیِ بالا (خطِ ۴۰۴) همان لحظه را می‌سنجد. شرطِ
+  // انقضا اینجا فقط هم‌راستایی با آن چک است، نه محافظِ مستقل.
+  const claimed = await db.waitlistEntry.updateMany({
+    where: {
+      id: entryId,
+      status: 'offered',
+      OR: [{ offerExpiresAt: null }, { offerExpiresAt: { gt: now } }],
+    },
+    data: { status: 'accepted', respondedAt: now, seatedAt: now },
   });
+  if (claimed.count === 0) throw Err.reservationExpired();
+
+  // ⚠️ باگِ رفع‌شده #۲ (همان‌جا، با تستِ زنده پیدا شد — این تابع تا امروز هیچ
+  // پوششی نداشت): قبلاً این دو خط بودند
+  //     const dateStr = now.toISOString().slice(0, 10);   // تاریخِ UTC
+  //     const timeStr = now.toTimeString().slice(0, 5);   // ساعتِ محلیِ *سرور*
+  // و `createReservation` هر دو را به‌عنوانِ ساعتِ دیواریِ **تایم‌زونِ رستوران**
+  // تفسیر می‌کند (`computeRanges` → `zonedTimeToUtc`). سه تایم‌زونِ متفاوت در
+  // یک جفت قاطی می‌شدند.
+  //
+  // پیامدِ واقعی: روی سرورِ UTC با رستورانِ تهران (UTC+03:30) اسلات ۳٫۵ ساعت
+  // **عقب‌تر** از «الان» ساخته می‌شد و گاردِ `+start < now - 60_000` همیشه
+  // شلیک می‌کرد → هر پذیرشِ آفر با «زمان رزرو در گذشته است» شکست می‌خورد.
+  // یعنی این قابلیت در تولید عملاً کار نمی‌کرد.
+  const rest = await db.restaurant.findUnique({
+    where: { id: e.restaurantId }, select: { timezone: true },
+  });
+  const timezone = rest?.timezone ?? 'Asia/Tehran';
+  const dateStr = dateKeyInTz(now, timezone);
+  const timeStr = timeKeyInTz(now, timezone);
+
+  let resv: { code: string };
+  try {
+    resv = await createReservation({
+      restaurantId: e.restaurantId,
+      date: dateStr, time: timeStr,
+      partySize: e.partySize,
+      userId: e.userId ?? undefined,
+      guest: e.userId ? undefined : { name: e.guestName ?? 'مهمان', phone: e.guestPhone ?? undefined, tableNumber: e.offeredTableNumber ?? undefined },
+      source: e.userId ? 'app' : 'manual',
+      notifySms: false, // اعلان waitlist جداست
+    });
+  } catch (err) {
+    // بازگردانی به *دقیقاً* حالتِ قبل: ورودی دوباره `offered` و میز `reserved`
+    // می‌ماند (چون آفر دوباره زنده است). عمداً میز آزاد نمی‌شود — آزادکردنش
+    // همان نشتِ (ب) بالا را می‌ساخت. اگر ساختِ رزرو مدام شکست بخورد، آفر تا
+    // پایانِ TTL می‌ماند و بعد cron خودش تمیزش می‌کند.
+    await db.waitlistEntry.updateMany({
+      where: { id: entryId, status: 'accepted' },
+      data: { status: 'offered', respondedAt: null, seatedAt: null },
+    }).catch(() => {});
+    throw err;
+  }
 
   await db.waitlistEntry.update({
     where: { id: entryId },
-    data: { status: 'accepted', respondedAt: now, seatedAt: now, reservationCode: resv.code },
+    data: { reservationCode: resv.code },
   });
   await redis.del(`waitlist:${e.restaurantId}`).catch(() => {});
 
@@ -491,10 +546,39 @@ export async function expireOffers(): Promise<number> {
   });
   let n = 0;
   for (const e of expired) {
-    await db.$transaction(async (tx) => {
-      await tx.waitlistEntry.update({ where: { id: e.id }, data: { status: 'no_response' } });
-      if (e.offeredTableId) await tx.table.update({ where: { id: e.offeredTableId }, data: { state: 'free' } });
+    // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰، با اجرای زنده اثبات شد نه با حدس):
+    // این‌جا `update` بی‌قیدوشرط رویِ id بود، در حالی که `declineOffer` و
+    // `leaveWaitlist` در همین فایل عمداً `updateMany` با گاردِ status دارند و
+    // کامنتشان دقیقاً همین رقابت را نام می‌برد («اگر همزمان cron همین آفر را
+    // expire کند»). خودِ cron آن گارد را نداشت — یعنی نیمه‌ی دومِ همان رقابت
+    // باز مانده بود.
+    //
+    // بازتولیدِ واقعی: فهرست بالا خوانده می‌شود، مشتری وسطِ حلقه آفرش را رد
+    // می‌کند (status=declined، میز آزاد، و promoteNext همان میز را به نفرِ
+    // بعدی آفر می‌دهد)، و بعد این تراکنش بی‌قیدوشرط اجرا می‌شد:
+    //   • وضعیتِ «declined»ِ مشتری با «no_response» بازنویسی می‌شد — یعنی
+    //     تصمیمِ صریحِ مشتری بی‌صدا پاک می‌شد.
+    //   • و بدتر: میزی که همین حالا به نفرِ بعدی آفر شده بود دوباره `free`
+    //     می‌شد. مشاهده شد: یک ورودیِ با آفرِ زنده که میزش `state='free'`
+    //     بود — یعنی `promoteNext` بعدی می‌توانست همان میزِ فیزیکی را به
+    //     نفرِ دومی هم آفر بدهد. دقیقاً همان کلاسِ باگِ H8 که چند خط بالاتر
+    //     در promoteNext با ادعای اتمیک بسته شده بود.
+    //
+    // چرا گاردِ status کافی است (و چکِ جداگانه‌ی مالکیتِ میز لازم نیست):
+    // میز فقط وقتی `free` می‌شود که همین ورودی decline/leave/expire شود، و
+    // هر سه وضعیتش را عوض می‌کنند. پس «هنوز offered است» ⟹ «میز هنوز مالِ
+    // همین ورودی است».
+    const applied = await db.$transaction(async (tx) => {
+      const res = await tx.waitlistEntry.updateMany({
+        where: { id: e.id, status: 'offered' },
+        data: { status: 'no_response' },
+      });
+      if (res.count === 1 && e.offeredTableId) {
+        await tx.table.update({ where: { id: e.offeredTableId }, data: { state: 'free' } });
+      }
+      return res.count;
     });
+    if (applied === 0) continue;   // رقیب (مشتری یا اجرای موازیِ همین cron) زودتر تغییرش داد
     await notifyEntry(e.id, 'expired', {});
     // میز آزاد شد → آفر به نفر بعدی
     await promoteNext(e.restaurantId).catch(() => {});

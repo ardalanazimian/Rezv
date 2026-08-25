@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { listBannedIps, unbanIp, enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { audit } from '@/lib/audit';
 import { errorResponse } from '@/lib/errors';
@@ -11,7 +11,7 @@ const bodySchema = z.object({ ip: z.string().min(1).max(64) });
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const items = await listBannedIps();
     return NextResponse.json({ items });
   } catch (e) { return errorResponse(e); }
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const { ip } = await parseBody(req, bodySchema);
     const removed = await unbanIp(ip);
     await audit({ action: 'security.rate_limit', actorId: admin.sub, actorType: 'admin', ip: clientIp(req), detail: { operation: 'unban_ip', ip, removed } });

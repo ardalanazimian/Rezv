@@ -5,6 +5,7 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { createLogger } from '@/lib/logger';
 import { ApiError } from '@/lib/errors';
 import { parseQuery, zReservationCode, z } from '@/lib/schemas';
+import { appBase } from '@/lib/public-urls';
 
 const log = createLogger('payments-callback');
 
@@ -22,13 +23,11 @@ const querySchema = z.object({
 });
 
 function redirectToApp(code: string, payment: 'paid' | 'failed'): NextResponse {
-  const base = process.env.CUSTOMER_APP_URL || 'https://app.rezervno.ir';
-  return NextResponse.redirect(`${base}/reservations/${code}?payment=${payment}`, 302);
+  return NextResponse.redirect(`${appBase()}/reservations/${code}?payment=${payment}`, 302);
 }
 
 function redirectToError(reason: string): NextResponse {
-  const base = process.env.CUSTOMER_APP_URL || 'https://app.rezervno.ir';
-  return NextResponse.redirect(`${base}/?payment=${reason}`, 302);
+  return NextResponse.redirect(`${appBase()}/?payment=${reason}`, 302);
 }
 
 export async function GET(req: Request) {

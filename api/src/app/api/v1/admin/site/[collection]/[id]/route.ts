@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { audit } from '@/lib/audit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
@@ -25,7 +25,7 @@ const paramsSchema = z.object({
 export async function GET(req: Request, { params }: { params: Promise<{ collection: string; id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const { collection, id } = parseParams(await params, paramsSchema);
     if (!isCollection(collection)) throw Err.notFound('مجموعه');
 
@@ -39,7 +39,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
 export async function PATCH(req: Request, { params }: { params: Promise<{ collection: string; id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const { collection, id } = parseParams(await params, paramsSchema);
     if (!isCollection(collection)) throw Err.notFound('مجموعه');
 
@@ -79,7 +79,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ collec
 export async function DELETE(req: Request, { params }: { params: Promise<{ collection: string; id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const { collection, id } = parseParams(await params, paramsSchema);
     if (!isCollection(collection)) throw Err.notFound('مجموعه');
 

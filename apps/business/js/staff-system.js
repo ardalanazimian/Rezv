@@ -56,7 +56,7 @@ function openPermEditor(staffId){
     <div class="modal-sub">مشخص کن به کدام بخش‌ها دسترسی داشته باشد</div>
     <div style="margin-top:14px;max-height:340px;overflow-y:auto">
       ${PERM_DEFS.map(([k,label])=>`
-        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line);cursor:pointer">
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--border);cursor:pointer">
           <span style="font-size:13px">${label}</span>
           <input type="checkbox" data-perm="${k}" ${p[k]?'checked':''} style="width:18px;height:18px;accent-color:var(--blue)">
         </label>`).join('')}
@@ -274,7 +274,7 @@ async function rPricing(){
     return `<div class="pr-sug">${tag}
       <div class="pr-sug-top"><div><div class="pr-sug-label">${esc(s.label)}</div><div class="pr-sug-days">${daysTxt}</div></div>
         <div class="pr-sug-amt"><div class="pr-sug-amt-v">${toman(s.min_toman)}</div><div class="pr-sug-amt-l">حداقل مبلغ ${dir}</div></div></div>
-      <div class="pr-occ"><span style="font-size:11px;color:var(--t3);font-weight:700">اشغال</span><div class="pr-occ-track"><div class="pr-occ-fill" style="width:${s.occupancy_pct}%;background:${occColor(s.occupancy_pct)}"></div></div><span class="pr-occ-pct">${fa(s.occupancy_pct)}٪</span></div>
+      <div class="pr-occ"><span style="font-size:11px;color:var(--t3);font-weight:700;white-space:nowrap" title="میانگینِ رزروِ این بازه نسبت به شلوغ‌ترین ساعتِ رستوران — نه درصدِ اشغالِ ظرفیت">شلوغیِ نسبی</span><div class="pr-occ-track"><div class="pr-occ-fill" style="width:${s.occupancy_pct}%;background:${occColor(s.occupancy_pct)}"></div></div><span class="pr-occ-pct">${fa(s.occupancy_pct)}٪</span></div>
       <div class="pr-reason">${icon('message',{size:13})} ${esc(s.reason)}</div>
       <div class="pr-actions"><button class="btn btn-primary" style="flex:1" id="prAcc-${i}" onclick="pricingAccept(${i})">${icon('check',{size:14})} قبول این پیشنهاد</button></div>
     </div>`;
@@ -282,7 +282,18 @@ async function rPricing(){
   document.getElementById('v-pricing').innerHTML=`
     <div class="section-head"><div><div class="section-title">قیمت‌گذاری هوشمند</div><div class="section-sub">پیشنهادِ حداقل مبلغِ رزرو بر اساس شلوغیِ واقعیِ رستورانت</div></div></div>
     ${dataSourceNote()}
-    <div class="pr-banner"><h3>${icon('sparkle',{size:16,fill:true})} پیشنهاد بر اساس داده‌ی شما</h3><p>${P.hasData?'این پیشنهادها از الگوی شلوغیِ ۹۰ روز اخیرِ خودت ساخته شدن — نه حدس.':'هنوز داده‌ی کافی نداری؛ این‌ها پیشنهادِ اولیه‌ست. با ثبت رزروها دقیق‌تر می‌شن.'} هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.</p></div>
+    <div class="pr-banner"><h3>${icon('sparkle',{size:16,fill:true})} پیشنهاد بر اساس داده‌ی شما</h3><p>${
+      // ⚠️ سه حالتِ جدا (۲۰۲۶-۰۸-۲۰): قبلاً فقط دو حالت بود و شرطش `P.hasData`
+      // بود، یعنی رستورانی با چند رزروِ معدود جمله‌ی «این پیشنهادها از الگویِ
+      // خودت ساخته شدن» را می‌دید در حالی که بک‌اند (زیرِ MIN_OBSERVATIONS)
+      // اصلاً پیشنهادی نساخته بود — و دنباله‌ی «هر کدوم رو می‌تونی قبول کنی»
+      // به چیزی اشاره می‌کرد که وجود نداشت.
+      !P.suggestions.length
+        ? 'هنوز داده‌ی کافی برای الگوگیری نیست. با ثبتِ رزروِ بیشتر، پیشنهادها از شلوغیِ واقعیِ خودت ساخته می‌شن.'
+        : (P.hasData
+            ? 'این پیشنهادها از الگوی شلوغیِ ۹۰ روز اخیرِ خودت ساخته شدن — نه حدس. هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.'
+            : 'این‌ها پیشنهادِ نمونه‌ست (بک‌اند متصل نیست). هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.')
+    }</p></div>
     <div id="prSugs">${(P.suggestions.length?P.suggestions:[]).map(sugCard).join('')||'<div class="pr-empty">فعلاً پیشنهادی نیست. با ثبت رزروِ بیشتر، سیستم الگوها رو پیدا می‌کنه.</div>'}</div>
     ${P.rules.length?`<div class="pr-active"><div class="pr-active-h">${icon('check',{size:13})} قواعدِ فعالِ فعلی</div>${P.rules.map(r=>`<div class="pr-active-row"><span>${esc(r.label||((r.dows||[]).map(d=>dowLbl[d]).join('،')))}</span><b>${toman(r.min_toman)} تومان</b></div>`).join('')}</div>`:''}
     <div class="pr-note">${icon('info',{size:13})} رقبا مثل SevenRooms این رو «قیمت‌گذاری پویا» می‌گن و بابتش پول می‌گیرن. با یه نگاه می‌بینی کجا پول از دست می‌دی (میز خالی) و کجا می‌تونی بیشتر دربیاری (شب شلوغ).</div>`;

@@ -3,7 +3,7 @@ import { API } from '../api.js';
 import { esc, toast, undoSnack } from '../auth.js';
 import { openRest } from './detail.js';
 import { labelForISO, quickBook } from './booking.js';
-import { GRAD, bookingCtx, favs, saveFavs, pts } from './seed.js';
+import { bookingCtx, favHas, favs, gradFor, saveFavs, pts } from './seed.js';
 import { renderProfile } from '../features/food-dna.js';
 import { renderLoyalty } from '../features/loyalty.js';
 import { renderEconomy } from '../features/economy.js';
@@ -34,23 +34,27 @@ export function cardHTML(r){
   // دکمه‌ی واقعیِ کشیده روی کلِ کارت می‌نشیند و z-indexِ ۱ می‌گیرد — یعنی زیرِ
   // دکمه‌ی علاقه‌مندی (۳) و چیپ‌های ساعت (پنل، ۲). این تنها راهی است که هم با
   // کیبورد قابلِ فوکوس باشد، هم ترتیبِ فوکوس منطقی بماند.
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): idها همیشه کوتیشن‌دار تزریق می‌شوند —
+  // idِ واقعی UUID است و بدونِ کوتیشن، onclick خطای syntax می‌داد و کلِ
+  // CTAهای کارت برای رستورانِ واقعی مرده بودند (mockِ E2E با idِ عددی این
+  // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
   return `<article class="rc reveal">
-    <div class="rc-bg" style="background:${GRAD[r.id]}"></div>
-    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${r.id})"></button>
-    <span class="rc-emoji">${r.e}</span>
+    <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
+    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${r.id}')"></button>
+    <span class="rc-emoji">${esc(r.e)}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
-    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${r.id},this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
+    <button class="rc-fav" type="button" aria-pressed="${favHas(r.id)}" aria-label="${favHas(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav('${r.id}',this);haptic('like')">${icon('heart',{size:20,fill:favHas(r.id)})}</button>
     <div class="rc-panel">
       <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div><div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div></div>
-      <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
+      <div class="rc-meta">${r.cuisine}${r.price?` · ${r.price}`:''} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
-      <div class="rc-slots">${r.slots.length?r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${r.id},'${s}');haptic('select')">${s}</button>`).join(''):
+      <div class="rc-slots">${r.slots.length?r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook('${r.id}','${s}');haptic('select')">${s}</button>`).join(''):
         // ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): قبلاً وقتی r.slots
         // خالی بود، اینجا هیچ چیز رندر نمی‌شد — یعنی کارت بدونِ هیچ CTAیِ
         // اقدام می‌ماند (نه ساعتِ جعلی، نه راهِ جایگزین). حالا یک CTAِ آرام به
         // شیتِ کاملِ رزرو (که خودش availabilityِ واقعی را از API می‌خواند) باز
         // می‌شود — هیچ ساعتِ اختراعی نشان داده نمی‌شود.
-        `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet(${r.id});haptic('select')">ببین سانس‌ها</button>`}</div>
+        `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet('${r.id}');haptic('select')">ببین سانس‌ها</button>`}</div>
     </div>
   </article>`;
 }
@@ -158,10 +162,12 @@ export function filterVibe(v,el){
 }
 // ── نزدیک تو (کارت افقی کوچک) ──
 export function hCardHTML(r,extra){
-  return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${r.id})">
-    <div class="hcard-img" style="background:${GRAD[r.id]||GRAD[1]}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
+  // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
+  const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
+  return `<div class="hcard" role="button" tabindex="0" onclick="openRest('${r.id}')">
+    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
-    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${fmtFa(r.rt||r.rating||4.5)} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
+    <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
 }
 // ═══════════════════════════════════════════════════════════
@@ -262,8 +268,8 @@ export async function renderEvents(){
 /** مارکاپِ کارت‌های رویداد. isDemo=true چیپِ «نمونه» را اضافه می‌کند. */
 function eventsHtml(events,isDemo){
   return events.map(e=>`
-    <div class="event-card" role="button" tabindex="0" onclick="openRest(${e.rid})">
-      <div class="event-emoji">${e.emoji}</div>
+    <div class="event-card" role="button" tabindex="0" onclick="openRest('${e.rid}')">
+      <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
         ${e.rest?`<div class="event-rest">${esc(e.rest)}</div>`:''}
@@ -324,6 +330,7 @@ export function clearSearch(){
   doSearch();
 }
 export function toggleFav(id,el){
+  id=String(id);   // favs همیشه کلیدِ String نگه می‌دارد (id نمونه عدد، id واقعی UUID)
   const on=!favs.has(id);
   on?favs.add(id):favs.delete(id);
   saveFavs();
@@ -346,6 +353,7 @@ export function toggleFav(id,el){
 }
 // نسخه‌ی hero صفحه رستوران — با انیمیشن تپش
 export function toggleRestFav(id){
+  id=String(id);
   const btn=document.getElementById('rpFav');
   const on=!favs.has(id);
   on?favs.add(id):favs.delete(id);

@@ -102,7 +102,18 @@ export async function detectRedemptionVelocity(restaurantId: string, maxPerDay =
   `;
   return rows.map((r) => ({
     kind: 'redemption_velocity' as const,
-    severity: 'medium' as const,
+    // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰): این تنها detectorی بود که severity را
+    // **هاردکد** روی 'medium' می‌گذاشت. چون `applyAbuseFlags` فقط سیگنال‌های
+    // 'high' را فلگ می‌کند، حضورِ `redemption_velocity` در `USER_SCOPED_KINDS`
+    // عملاً یک شاخه‌ی مرده بود — هرگز اجرا نمی‌شد.
+    //
+    // این یک تصمیمِ طراحی نبود، یک ناسازگاری بود: هر چهار detectorِ دیگرِ همین
+    // فایل قاعده‌ی یکسانِ «دو برابرِ آستانه = high» را دارند
+    // (`minAccounts * 2`، `minRapidCancels * 2`، `minCompleted * 2`، و
+    // `pct >= 80` برای no-show). همان قاعده اینجا هم اعمال شد: با پیش‌فرضِ
+    // `maxPerDay = 5`، آستانه‌ی تشخیص «بیش از ۵» است و high از «۱۰ یا بیشتر»
+    // شروع می‌شود — یعنی دو برابرِ آستانه، دقیقاً مثلِ خواهرهایش.
+    severity: Number(r.cnt) >= maxPerDay * 2 ? 'high' : 'medium',
     subject: r.user_id,
     detail: `کاربر ${r.cnt} کوپن در ۲۴ ساعت استفاده کرده`,
     metrics: { redemptions: Number(r.cnt) },
@@ -218,10 +229,31 @@ export async function runFraudScan(restaurantId: string): Promise<FraudSignal[]>
 const USER_SCOPED_KINDS: FraudSignal['kind'][] = ['high_no_show', 'redemption_velocity', 'rapid_book_cancel', 'referral_farming'];
 
 async function flagUserForAbuse(userId: string, sig: FraudSignal, restaurantId: string | null): Promise<void> {
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰، با اجرای زنده اثبات شد): اینجا
+  // `lastViolationAt: new Date()` هم نوشته می‌شد. آن فیلد مالِ این ماژول
+  // نیست — `economy.ts` با آن **decayِ strike** را حساب می‌کند
+  // (`applyStrikeDecay`)، و معنایِ مستندش این است: «هر ۹۰ روزِ *بدونِ نقضِ
+  // جدید*، یک strike کم می‌شود».
+  //
+  // ولی این اسکن نقضِ جدیدی نمی‌بیند — همان رزروهای قدیمی را دوباره
+  // می‌بیند (پنجره‌ی تشخیصِ high_no_show ۹۰ روزه است). پس هر بار که cron
+  // اجرا می‌شد، مهرِ زمانی به «الان» می‌رفت و ساعتِ ریکاوریِ کاربر ریست
+  // می‌شد، بدونِ اینکه کارِ بدِ تازه‌ای کرده باشد.
+  //
+  // بازتولیدِ واقعی: کاربری با ۲ strike و آخرین نقض ۱۰۰ روز پیش → decay
+  // باید ۱ بدهد. یک اجرای اسکن → مهر به امروز رفت و strike دوباره ۲ شد.
+  // چون رزروهای قدیمی تا ۹۰ روز در پنجره می‌مانند، عملاً دوره‌ی ریکاوری تا
+  // دو برابر (۱۸۰ روز) کش می‌آمد — و چون `computeReputationTier` برایِ
+  // platinum شرطِ `strikeCount === 0` دارد، کاربر بی‌صدا از بالاترین سطح
+  // محروم می‌ماند.
+  //
+  // فلگِ سوءاستفاده مکانیزمِ ماندگاریِ خودش را دارد (`hasActiveAbuseFlag`،
+  // که عمداً هرگز خودکار پاک نمی‌شود — فقط با `clearAbuseFlag`). پس این
+  // ماژول نباید به ساعتِ strike دست بزند.
   await db.customerEconomyProfile.upsert({
     where: { userId },
-    create: { userId, hasActiveAbuseFlag: true, lastViolationAt: new Date() },
-    update: { hasActiveAbuseFlag: true, lastViolationAt: new Date() },
+    create: { userId, hasActiveAbuseFlag: true },
+    update: { hasActiveAbuseFlag: true },
   });
   await audit({
     action: 'security.abuse_flag',
@@ -298,10 +330,24 @@ export async function clearAbuseFlag(
  * انسانی بوده، نه یه سیگنالِ الگوریتمی.
  */
 export async function setAbuseFlagManually(userId: string, adminId: string, reason: string): Promise<void> {
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۱، ممیزیِ تاریخچه‌ی PRها): اینجا هم مثلِ
+  // `flagUserForAbuse` فیلدِ `lastViolationAt` نوشته می‌شد — همان اشتباهی که
+  // در PR #55 برای مسیرِ *خودکار* رفع شد ولی این خواهرِ *دستی* از قلم افتاد.
+  //
+  // چرا مهم است: آن فیلد مالِ سیستمِ strike در `economy.ts` است
+  // (`applyStrikeDecay`)، و بدتر از مسیرِ خودکار، اینجا **نامتقارن** بود:
+  // `setAbuseFlagManually` مهر می‌زد ولی `clearAbuseFlag` (مسیرِ اعتراض) آن
+  // را برنمی‌گرداند. پس یک فلگِ اشتباهیِ ادمین، حتی پس از پس‌گرفتن، تا ۹۰
+  // روزِ اضافه جلوی decayِ strikeِ مشتری را می‌گرفت — بی‌صدا، بدونِ هیچ ردی
+  // که توضیح دهد چرا، و بدونِ اینکه ادمین بداند چنین اثری گذاشته.
+  //
+  // فلگِ سوءاستفاده مکانیزمِ ماندگاریِ خودش را دارد (`hasActiveAbuseFlag`).
+  // سیستمِ strike با نتیجه‌ی واقعیِ رزروها (`computeEventScore`) کار می‌کند.
+  // این دو عمداً جدا هستند و این ماژول نباید به ساعتِ آن یکی دست بزند.
   await db.customerEconomyProfile.upsert({
     where: { userId },
-    create: { userId, hasActiveAbuseFlag: true, lastViolationAt: new Date() },
-    update: { hasActiveAbuseFlag: true, lastViolationAt: new Date() },
+    create: { userId, hasActiveAbuseFlag: true },
+    update: { hasActiveAbuseFlag: true },
   });
   await audit({
     action: 'security.abuse_flag',

@@ -105,7 +105,42 @@ erDiagram
 | `CouponRedemption` / `coupon_redemptions` | `discountToman`, `ip` | Fraud detection uses `ip`. |
 | `MarketingAutomation` / `marketing_automations` | `trigger` (AutomationTrigger), `triggerConfig` (Json), `couponId?` | Event-based campaigns. |
 | `Review` / `reviews` | `rating`, sub-ratings, `reply` | Linked to reservation. |
-| `StaffNote` / `staff_notes`, `CampaignLog` / `campaign_logs`, `SmsTransaction` / `sms_transactions` | — | Ops/marketing history + SMS balance ledger. |
+| `StaffNote` / `staff_notes`, `CampaignLog` / `campaign_logs`, `SmsTransaction` / `sms_transactions` | — | Ops/marketing history + SMS balance ledger. `campaign_logs` is one row **per campaign**; `outreach_log` (below) is one row **per recipient** — different grain, not duplication. |
+
+### ML / measurement (migrations 033, 034, 042, 055–057)
+
+> **Added 2026-08-20.** This whole section was missing: the tables existed but no
+> document outside `docs/ML_CONTRACT.md` mentioned them. **Read
+> `docs/ML_CONTRACT.md` before touching any of these** — it is the binding contract.
+
+| Model / table | Key fields | Notes |
+|---|---|---|
+| `RestaurantNoShowModel` / `restaurant_no_show_models` | `weights`, `learnedBrier`, `staticBrier`, `isActive`, `activeRunId?` | Per-tenant learned model. Stays inactive unless it beats the heuristic on a **temporal** holdout. |
+| `RestaurantDemandForecast` / `restaurant_demand_forecasts` | Holt-Winters params, holdout MAE | Same activation discipline as above. |
+| `ModelTrainingRun` / `model_training_runs` | `kind`, `sampleSize`, `metrics` (Json), `isActive`, `reason` | **Append-only** version ledger — never rewrite a historical run. |
+| `ModelPrediction` / `model_predictions` | `predictionType`, `entityType`/`entityId`, `modelSource`, `modelRunId?`, `featureVersion`, `predictedValue`, `confidence` | Immutable record of what was predicted in production. `confidence` may be `insufficient_data`. |
+| `ModelOutcome` / `model_outcomes` | `observedValue`, `squaredError` (Brier), `absoluteError` (MAE), unique `(predictionId, source)` | Observation, deliberately a separate table from the prediction. |
+| `OutreachLog` / `outreach_log` | `channel`, `source`, `sourceId?`, `sentAt`, `convertedReservationId?` (**UNIQUE**), `convertedAt?`, `resolvedAt?` | One row per contacted recipient. The UNIQUE constraint enforces last-touch attribution at the DB level: a reservation can convert **at most one** outreach. `userId` NULL = raw phone, *unattributable* (excluded from both sides of the rate). |
+
+⚠️ **`outreach_log` is NOT part of the prediction ledger chain.** It sits in this
+section because it is *measurement*, but it has **zero** foreign keys to
+`model_predictions` / `model_outcomes` / `model_training_runs` (verify:
+`grep -c model_ api/prisma/sql/057-outreach-ledger.sql` → `0`). Two independent
+feedback loops that happen to share a design philosophy:
+
+| Loop | Question it answers | Tables |
+|---|---|---|
+| Prediction ledger | "we predicted X — did X happen?" | `model_predictions` → `model_outcomes` |
+| Outreach ledger | "we contacted someone — did they book?" | `outreach_log` (self-contained; converts against `reservations`) |
+
+*(Added after an automated reviewer read this grouping and invented an
+`outreach_log ─ model_outcomes` relationship that does not exist.)*
+
+⚠️ `marketing_automations.converted_count` is a **dead column** — it was never
+incremented anywhere and the panel showed a permanently-zero "conversion rate" from
+it. Conversion is now computed from `outreach_log`. The column was deliberately
+**not dropped** (dropping breaks `0_init` and every live DB); it is simply no longer
+read. See migration `057` and `docs/ML_CONTRACT.md`.
 
 ### Platform / infra
 | Model / table | Key fields | Notes |
@@ -147,7 +182,7 @@ Two layers (both applied in CI):
 
 1. **`prisma/migrations/0_init`** — the baseline Prisma migration
    (`migration.sql`). Applied by `prisma migrate deploy`.
-2. **`prisma/sql/*.sql`** — hand-written SQL scripts (`001` … `028`) for things
+2. **`prisma/sql/*.sql`** — hand-written SQL scripts (`001` … `057`) for things
    Prisma can't express: partitioning, exclusion constraints, partial unique
    indexes, RLS, expression indexes, FK/index back-fills. These are **not**
    Prisma migrations — they live outside `migrations/` (so they never trip
@@ -169,6 +204,26 @@ Two layers (both applied in CI):
 | `021-restaurant-closures`, `024-chat`, `025-reviews-fk-indexes` | Later features + index back-fills. |
 | `021b-sms-transactions-table` | Creates `sms_transactions` — a table `schema.prisma` declares but no script built (only `db push` did). Idempotent; runs before `022`'s FK. |
 | `022-audit-fixes-2026-07-19` | Reconciled DB↔schema drift (FKs/`@map` that existed only in the live DB). |
+| `037-rls-core-tables` | Row-Level Security on the core tenant tables. |
+| `038-unified-economy` | XP/points economy ledger + customer economy profile. |
+| `044-waitlist-guest-token-hash` | Hash guest access tokens at rest. |
+| `054-index-hygiene` | Dropped redundant / added missing indexes. |
+| `055-prediction-outcome-ledger` | `model_predictions` + `model_outcomes` — "what we predicted, then what happened". |
+| `056-model-registry-active-run` | Pins each prediction to the model version that made it. |
+| `057-outreach-ledger` | `outreach_log` — per-recipient marketing/CRM contact record with measured conversion. |
+
+> ⚠️ **Corrected 2026-08-20:** this section previously said the scripts ran `001 … 028`
+> and the table above stopped at `022`. Both were ~30 migrations behind. The table is
+> deliberately a **selection of notable ones**, not a full index — the files themselves
+> (each with a detailed Persian header) are the source of truth. See
+> `api/prisma/sql/README.md`.
+
+> ⚠️ **Also corrected 2026-08-20:** the text above says these scripts "are applied by
+> `prisma/apply-sql.sh`". True, but incomplete in a way that matters: production runs
+> **both** steps — `prisma migrate deploy` (for `0_init`) *and then* `apply-sql.sh`
+> (see `api/docker-entrypoint.sh` lines 39 and 54). `apply-sql.sh` alone cannot build a
+> schema from an empty database, because migration `001` assumes the base tables exist.
+> `tools/check-schema-drift.sh` gates exactly this two-step path in CI.
 | `023-rls-new-tables` | Row-Level Security for new tables. |
 | `026-consolidate-exclusion-constraint` | Canonical `block_end` + `no_table_overlap` (idempotent); replaced `0_init/EXTRA`. |
 | `027-staff-name` | Adds `staff.name` (business-panel display name). |

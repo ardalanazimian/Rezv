@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { parseQuery, z } from '@/lib/schemas';
 import { HOURS_STATUS_LABEL, type HoursChangeStatus } from '@/lib/hours-approval';
@@ -26,7 +26,7 @@ const querySchema = z.object({
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const { status, limit, offset } = parseQuery(req, querySchema);
 
     const where = status === 'all'

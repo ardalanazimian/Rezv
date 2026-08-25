@@ -6,12 +6,32 @@ let COUPONS=[], AUTOMATIONS=[], _mktLoaded=false;
 const COUPON_KIND_FA={percent:'درصدی',fixed:'مبلغ ثابت',free_item:'آیتم رایگان'};
 const COUPON_SEG_FA={new_customer:'مشتری جدید',active:'فعال',at_risk:'در خطر ریزش',churned:'ازدست‌رفته',vip:'VIP'};
 const AUTOMATION_TRIGGER_FA={birthday:'تولد مشتری',winback:'بازگرداندنِ مشتریِ غایب',post_visit:'بعد از بازدید',vip_milestone:'رسیدن به سطح VIP',no_show_followup:'پیگیریِ عدم‌حضور'};
+let AUTOMATION_ATTRIBUTION=null; // {window_days, min_resolved} — از همان پاسخِ API
+
+// ⚠️ این تابع از یک باگِ زنده زاده شد (ممیزیِ ۲۰۲۶-۰۸-۲۰): اینجا قبلاً
+// `${fa(a.conversion_rate_pct||0)}٪ تبدیل` بود، و بک‌اند آن عدد را از
+// marketing_automations.converted_count می‌ساخت — ستونی که در کلِ ریپو هیچ‌جا
+// افزایش نمی‌یافت. یعنی رستوران‌دار همیشه «۱۲۰ ارسال · ۰٪ تبدیل» می‌دید و
+// نتیجه می‌گرفت کمپین‌هایش بی‌اثرند، در حالی که عدد اصلاً اندازه‌گیری نشده بود.
+//
+// حالا بک‌اند وقتی شواهد کافی نیست null می‌فرستد، نه صفر. `||0` اینجا همان
+// null را دوباره به «۰٪» تبدیل می‌کرد، پس عمداً حذف شد: «هنوز کافی نیست»
+// باید نوشته شود، نه به عددی که ادعای اندازه‌گیری دارد ترجمه شود.
+function automationConversionFa(a){
+  if(a.conversion_status==='measured' && a.conversion_rate_pct!==null && a.conversion_rate_pct!==undefined){
+    return `${fa(a.conversion_rate_pct)}٪ تبدیل (از ${fa(a.resolved_count||0)} موردِ قطعی‌شده)`;
+  }
+  const need=AUTOMATION_ATTRIBUTION&&AUTOMATION_ATTRIBUTION.min_resolved;
+  const have=a.resolved_count||0;
+  return need?`نرخِ تبدیل هنوز اندازه‌پذیر نیست (${fa(have)} از ${fa(need)})`
+             :'نرخِ تبدیل هنوز اندازه‌پذیر نیست';
+}
 
 async function loadMarketing(){
   if(!API.getToken()) return;
   const [c,a]=await Promise.all([API.couponsList(),API.automationsList()]);
   if(c.ok) COUPONS=c.data?.items||[];
-  if(a.ok) AUTOMATIONS=a.data?.items||[];
+  if(a.ok){ AUTOMATIONS=a.data?.items||[]; AUTOMATION_ATTRIBUTION=a.data?.attribution||null; }
   _mktLoaded=true;
 }
 function rMarketing(){
@@ -101,7 +121,7 @@ function renderAutomations(){
         <div class="staff-row">
           <div style="flex:1">
             <div style="font-size:14px;font-weight:700">${esc(a.name)}</div>
-            <div style="font-size:12px;color:var(--t2)">${AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger} · ${fa(a.sent_count||0)} ارسال · ${fa(a.conversion_rate_pct||0)}٪ تبدیل</div>
+            <div style="font-size:12px;color:var(--t2)">${AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger} · ${fa(a.sent_count||0)} ارسال · ${automationConversionFa(a)}</div>
           </div>
           <span class="chip-status ${a.is_active?'arrived':''}" style="${a.is_active?'':'background:var(--s-100);color:var(--t3)'}">${a.is_active?'فعال':'غیرفعال'}</span>
         </div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:30px">هنوز قانونی ساخته نشده</div>'}
@@ -180,14 +200,13 @@ function buildHeatmap(rows){
   // بازچینش به ترتیب هفته‌ی ایرانی: شنبه(6)..جمعه(5)
   const order=[6,0,1,2,3,4,5]; const orderLbl=['ش','ی','د','س','چ','پ','ج'];
   const grid={}; let mx=0;
-  if(rows&&rows.length){
-    rows.forEach(r=>{ grid[`${r.dow}-${r.hour}`]=r.count; if(r.count>mx)mx=r.count; });
-  } else {
-    order.forEach((d,di)=>hours.forEach(h=>{
-      const wknd=(d===4||d===5)?1.8:1; const night=(h>=19&&h<=21)?2.2:(h>=18?1.4:0.6);
-      const v=Math.round(Math.random()*4*wknd*night); grid[`${d}-${h}`]=v; if(v>mx)mx=v;
-    }));
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): حالتِ بدونِ داده قبلاً با Math.random یک
+  // نقشه‌ی «واقع‌گرایانه» می‌ساخت و tooltipِ هر خانه می‌گفت «۳ رزرو» — نویزِ
+  // تصادفی در لباسِ تاریخچه‌ی رزرو. نبودِ داده یعنی نبودِ ادعا.
+  if(!(rows&&rows.length)){
+    return `<div class="pr-empty">هنوز داده‌ی کافی برای نقشه‌ی حرارتی نیست — با ثبتِ رزروهای بیشتر ساخته می‌شود.</div>`;
   }
+  rows.forEach(r=>{ grid[`${r.dow}-${r.hour}`]=r.count; if(r.count>mx)mx=r.count; });
   mx=mx||1;
   const cell=(d,h)=>{
     const v=grid[`${d}-${h}`]||0; const t=v/mx;
@@ -215,6 +234,10 @@ async function rAnalytics(){
     weekly:[14,18,24,31],
   };
   // بارگذاری از API اگر توکن staff داریم
+  // بدونِ توکنِ staff هم باید صادق باشیم: API.online پیش‌فرض true است و
+  // بدونِ این خط، dataSourceNote() هیچ هشداری نشان نمی‌داد و بلوکِ نمونه
+  // (۱۳۶ رزرو، ۶۶٪ بازگشت...) کاملاً واقعی به نظر می‌رسید (ممیزیِ ۲۰۲۶-۰۸-۲۴).
+  if(!API.getToken()) API.online=false;
   if(API.getToken()){
     const res=await API.get('/restaurant/analytics');
     if(res.ok && res.data){
@@ -266,8 +289,8 @@ async function rAnalytics(){
     <div class="pg-head"><div class="pg-title">تحلیل‌ها</div><div class="pg-sub">روند رزرو، نرخ بازگشت و رفتار مشتری‌ها</div></div>
     ${dataSourceNote()}
     <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('calendar',{size:16})}</div><span class="kpi-delta up">${icon('trending',{size:11})} ۱۸٪</span></div><div class="kpi-val">${fa(A.weekThisWeek)}</div><div class="kpi-label">رزرو این هفته</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('refresh',{size:16})}</div><span class="kpi-delta up">${icon('trending',{size:11})} ۵٪</span></div><div class="kpi-val">${fa(returnRate)}٪</div><div class="kpi-label">نرخ بازگشت مشتری</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(A.weekThisWeek)}</div><div class="kpi-label">رزرو این هفته</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('refresh',{size:16})}</div></div><div class="kpi-val">${fa(returnRate)}٪</div><div class="kpi-label">نرخ بازگشت مشتری</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon amber">${icon('users',{size:16})}</div></div><div class="kpi-val">${avgVisits}</div><div class="kpi-label">میانگین دفعات مراجعه</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(A.avgInterval)}</div><div class="kpi-label">میانگین فاصله (روز)</div></div>
     </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { audit } from '@/lib/audit';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse } from '@/lib/errors';
@@ -32,7 +32,7 @@ const bodySchema = z.object({
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const { restaurant_id, status } = parseQuery(req, querySchema);
     const where: Record<string, unknown> = {};
     if (restaurant_id) where.restaurantId = restaurant_id;
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const b = await parseBody(req, bodySchema);
 
     const mission = await db.mission.create({

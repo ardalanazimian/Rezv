@@ -1,4 +1,5 @@
 import { createLogger } from './logger';
+import { enqueue } from './queue';
 const log = createLogger('notify');
 // ═══════════════════════════════════════════════════════════
 //  اعلان Push و Email — رزرونو
@@ -58,7 +59,6 @@ export async function sendEmail(to: string, subject: string, _body: string): Pro
 /** صف‌بندی ایمیل (غیرمسدود). idempotencyKey اختیاری برای جلوگیری از ارسال تکراری. */
 export async function queueEmail(to: string, subject: string, body: string, idempotencyKey?: string): Promise<void> {
   try {
-    const { enqueue } = await import('./queue');
     await enqueue({ kind: 'email', payload: { to, subject, body }, idempotencyKey });
   } catch {
     await sendEmail(to, subject, body).catch(() => {}); // fallback
@@ -68,7 +68,6 @@ export async function queueEmail(to: string, subject: string, body: string, idem
 /** صف‌بندی Push (غیرمسدود). */
 export async function queuePush(userId: string, title: string, body: string, idempotencyKey?: string): Promise<void> {
   try {
-    const { enqueue } = await import('./queue');
     await enqueue({ kind: 'push', payload: { userId, title, body }, idempotencyKey });
   } catch {
     await sendPush(userId, title, body).catch(() => {}); // fallback

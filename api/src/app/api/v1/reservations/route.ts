@@ -58,7 +58,10 @@ export async function POST(req: Request) {
     // ── Idempotency: اگر کلاینت هدر Idempotency-Key بفرستد، double-submit
     //    (دوبار زدن دکمه یا retry شبکه) رزرو دوم نمی‌سازد؛ پاسخ اول برمی‌گردد. ──
     const idemKey = req.headers.get('idempotency-key') || undefined;
-    const idem = await withIdempotency<any>(idemKey, 'reservation');
+    // ⚠️ هویتِ درخواست‌کننده بخشی از کلیدِ کش است (رجوع کن به lib/idempotency.ts):
+    // بدونِ آن، هر کسی که همان Idempotency-Key را بفرستد پاسخِ نفرِ قبلی را
+    // می‌گرفت — با اجرای زنده اثبات و در ۲۰۲۶-۰۸-۲۰ رفع شد.
+    const idem = await withIdempotency<any>(idemKey, 'reservation', `${auth.kind}:${auth.sub}`);
     if (idem.replayed) return NextResponse.json(idem.response, { status: 201 });
 
     const isStaff = auth.kind === 'staff';

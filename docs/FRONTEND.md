@@ -30,14 +30,16 @@ apps/
 ├── business/                 # Restaurant staff panel
 │   └── js/  routing.js · data.js · overview.js · reservations.js · waitlist.js
 │            · crm.js · marketing.js · staff-system.js · chat.js · icons.js
-│   └── src-v2/  RestaurantIntelligenceDashboard.jsx   # (React preview, see note)
 └── company/                  # Platform admin panel
     └── js/  data.js · overview.js · intelligence.js · restaurant.js · api.js · icons.js
 ```
 
-> **Note (`business/src-v2/*.jsx`)**: a React component exists as a design/preview
-> artifact. **(uncertain)** whether it is wired into a build — the shipping
-> business panel is the vanilla-JS `js/` set. Treat `src-v2` as a preview.
+> **Note — `business/src-v2/` was DELETED on 2026-08-21.** It held one orphaned
+> React file (`RestaurantIntelligenceDashboard.jsx`). The uncertainty this note
+> used to record ("**(uncertain)** whether it is wired into a build") was
+> resolved by checking rather than guessing: no build step exists in this app,
+> no HTML referenced it, and no module imported it. All three panels are
+> vanilla JS with no build — that is the architecture, not a migration step.
 
 ---
 

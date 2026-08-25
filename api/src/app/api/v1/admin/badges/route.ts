@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminAuthFromRequest } from '@/lib/admin-auth';
+import { requireAdmin } from '@/lib/admin-auth';
 import { createBadgeDefinition, listBadgeDefinitions } from '@/lib/badges';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse } from '@/lib/errors';
@@ -21,7 +21,7 @@ const querySchema = z.object({ include_inactive: z.string().optional() });
 export async function GET(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
-    adminAuthFromRequest(req);
+    await requireAdmin(req);
     const { include_inactive } = parseQuery(req, querySchema);
     const items = await listBadgeDefinitions(include_inactive === 'true');
     return NextResponse.json({ items });
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
-    const admin = adminAuthFromRequest(req);
+    const admin = await requireAdmin(req);
     const b = await parseBody(req, bodySchema);
     const badge = await createBadgeDefinition({ ...b, adminId: admin.sub });
     return NextResponse.json({ ok: true, badge }, { status: 201 });

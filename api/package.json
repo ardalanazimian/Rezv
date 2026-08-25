@@ -10,7 +10,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:site": "tsx prisma/seed-site.ts",
-    "test": "tsx --test tests/_all.runner.mts",
+    "test": "tsx --test --test-reporter=spec tests/_all.runner.mts",
     "test:watch": "tsx --test --watch tests/_all.runner.mts",
     "typecheck": "tsc --noEmit",
     "audit": "npm audit --audit-level=high",

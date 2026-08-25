@@ -1,6 +1,8 @@
 import { randomBytes } from 'crypto';
 import { db } from './db';
+import { transitionReservation } from './lifecycle';
 import { Err } from './errors';
+import { invalidateAllAvailability } from './availability-cache';
 
 // ═══════════════════════════════════════════════════════════
 //  سرویس مدیریت میز رزرونو — وضعیت، QR، تخصیص
@@ -48,25 +50,60 @@ export async function setTableState(
     data: { state: next },
     select: { id: true, number: true, state: true },
   });
+  // maintenance تنها stateای است که availability آن را فیلتر می‌کند — ورود/خروج
+  // از آن باید کش را باطل کند، وگرنه میزِ ازکارافتاده تا TTL برای مشتری «آزاد»
+  // می‌ماند (ممیزیِ ۲۰۲۶-۰۸-۲۴). بقیه‌ی انتقال‌ها اثری در محاسبه ندارند.
+  if (next === 'maintenance' || current === 'maintenance') {
+    await invalidateAllAvailability(restaurantId).catch(() => {});
+  }
   return updated as { id: string; number: number; state: TableState };
 }
 
-// ── ساخت/تخصیص کد QR به یک میز ──
-export async function assignQrCode(tableId: string, restaurantId: string): Promise<string> {
-  const t = await db.table.findUnique({ where: { id: tableId } });
+/**
+ * آیا این خطا نقضِ یکتاییِ Postgres است؟ (کدِ ۲۳۵۰۵ / P2002 در Prisma)
+ *
+ * ⚠️ چرا لازم شد: حلقه‌ی retryِ قبلی **هر** خطایی را می‌بلعید و دوباره تلاش
+ * می‌کرد — یعنی اگر میز حذف شده بود یا دیتابیس قطع بود، پنج بار بی‌فایده
+ * تلاش می‌کرد و بعد خطایی می‌داد که ربطی به علتِ واقعی نداشت. retry فقط
+ * برای تصادمِ کد معنا دارد؛ بقیه‌ی خطاها باید فوراً بالا بروند.
+ */
+function isUniqueViolation(e: unknown): boolean {
+  const code = (e as { code?: string })?.code;
+  if (code === 'P2002' || code === '23505') return true;
+  return /unique constraint|duplicate key/i.test(String((e as Error)?.message ?? ''));
+}
+
+/**
+ * ساخت/تخصیصِ کدِ QR به یک میز. اگر میز از قبل کد دارد، همان برمی‌گردد مگر
+ * `regenerate` خواسته شود (مثلاً وقتی استیکرِ قدیمی گم/کپی شده).
+ *
+ * ⚠️ تا ۲۰۲۶-۰۸-۲۱ این تابع **صفر فراخوان** داشت: هیچ روتی صدایش نمی‌زد و
+ * هیچ میزی جز داده‌ی `[DEMO]`ِ seed کدِ QR نداشت. یعنی `POST /api/v1/checkin`
+ * — که عمومی سرو می‌شود — برای هر رستورانِ واقعی همیشه «میز پیدا نشد»
+ * می‌داد. حالا به ساختِ میز و به یک روتِ صریح وصل است.
+ */
+export async function assignQrCode(
+  tableId: string,
+  restaurantId: string,
+  opts: { regenerate?: boolean } = {},
+): Promise<string> {
+  const t = await db.table.findUnique({ where: { id: tableId }, select: { restaurantId: true, qrCode: true } });
   if (!t || t.restaurantId !== restaurantId) throw Err.tableNotFound(0);
-  // تلاش برای کد یکتا
+  if (t.qrCode && !opts.regenerate) return t.qrCode;
+
+  // تصادم روی ۵۰ بیت آنتروپی عملاً محال است؛ حلقه فقط برایِ همان حالتِ نادر.
+  let lastErr: unknown;
   for (let i = 0; i < 5; i++) {
     const code = genQrToken();
     try {
       await db.table.update({ where: { id: tableId }, data: { qrCode: code } });
       return code;
     } catch (e) {
-      // تصادم یکتایی → دوباره
-      if (i === 4) throw e;
+      if (!isUniqueViolation(e)) throw e;   // خطایِ بی‌ربط → فوراً بالا برود
+      lastErr = e;
     }
   }
-  throw Err.validation('ساخت کد QR ناموفق بود');
+  throw lastErr ?? Err.validation('ساخت کد QR ناموفق بود');
 }
 
 // ── check-in با اسکن QR: مهمان سر میز با اسکن، رزرو فعلی را arrived/seated می‌کند ──
@@ -100,7 +137,6 @@ export async function qrCheckIn(qrCode: string): Promise<{
   // مسیر lifecycle عبور می‌کند: ابتدا checked_in، سپس seated (انتقال‌های معتبر)،
   // بعد میز occupied می‌شود. اگر رزرو در وضعیتی باشد که این انتقال نامعتبر است،
   // امن رد می‌شویم و فقط وضعیت فعلی را برمی‌گردانیم.
-  const { transitionReservation } = await import('./lifecycle');
   try {
     // اگر هنوز confirmed/auto_confirmed است، اول checked_in کن.
     if (resv.status === 'confirmed' || resv.status === 'auto_confirmed' || resv.status === 'running_late') {
@@ -114,7 +150,20 @@ export async function qrCheckIn(qrCode: string): Promise<{
     return { table_number: table.number, reservation_code: resv.code, status: fresh?.status ?? resv.status };
   }
   // میز را occupied کن (بعد از seated موفق).
-  await db.table.update({ where: { id: table.id }, data: { state: 'occupied' } }).catch(() => {});
+  //
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۱، ممیزیِ ماژولِ میز): اینجا مستقیم
+  // `db.table.update({ state: 'occupied' })` نوشته می‌شد و ماشینِ وضعیتِ
+  // *همین فایل* را دور می‌زد. `ALLOWED_TRANSITIONS` انتقالِ
+  // maintenance→occupied را ممنوع کرده و کامنتش دقیقاً همین مثال را می‌زند —
+  // ولی این مسیر از کنارش رد می‌شد. نتیجه: میزی که کارکنان «خارج از سرویس»
+  // علامت زده بودند، با یک اسکنِ QR بی‌صدا «اشغال» می‌شد و نشانه‌ی خرابی
+  // بدونِ هیچ ردی پاک می‌شد.
+  //
+  // حالا از `setTableState` عبور می‌کند، پس همان قواعد اعمال می‌شود. اگر
+  // انتقال نامعتبر باشد (مثلاً میز در تعمیر است) وضعیتِ میز دست‌نخورده
+  // می‌ماند — ولی خودِ رزرو همچنان seated می‌شود، چون مهمان واقعاً نشسته
+  // است و وضعیتِ فیزیکیِ میز نباید جلوی ثبتِ آن را بگیرد.
+  await setTableState(table.id, table.restaurantId, 'occupied').catch(() => {});
 
   return { table_number: table.number, reservation_code: resv.code, status: 'seated' };
 }

@@ -46,9 +46,23 @@ export async function resolveStaffRestaurant(auth: AccessPayload, req?: Request)
 
   const staff = await db.staff.findUnique({
     where: { id: auth.sub },
-    select: { restaurantId: true },
+    select: { restaurantId: true, tenantId: true, isActive: true },
   });
   if (!staff) throw Err.forbidden();
+
+  // ⚠️ افزوده‌شده (۲۰۲۶-۰۸-۲۰) — بستنِ دو وابستگیِ تک‌لایه‌ای که در §2n
+  // به‌عنوان «رفتارِ ثبت‌شده» مستند شده بودند، نه رفعِ باگِ زنده:
+  //
+  //  ۱) `auth.tenantId` مستقیم از توکن می‌آمد و هیچ‌جا چک نمی‌شد که این
+  //     کارمند واقعاً عضوِ همان تنانت است. تنها مانعِ جعل، امضایِ JWT بود.
+  //     حالا عضویت با ردیفِ واقعیِ staff تطبیق داده می‌شود — همان کوئری،
+  //     بدونِ رفت‌وبرگشتِ اضافه (فقط دو ستونِ بیشتر در select).
+  //
+  //  ۲) کارمندِ غیرفعال (اخراج‌شده): مدلِ Staff می‌گوید «توکنِ refreshش رد
+  //     می‌شود»، ولی یک accessِ منقضی‌نشده (تا ۱۵ دقیقه) هنوز کار می‌کرد.
+  //     این‌جا هم بسته شد تا اخراج بلافاصله اثر کند.
+  if (staff.tenantId !== auth.tenantId) throw Err.forbidden();
+  if (!staff.isActive) throw Err.forbidden();
 
   // قفل به یک شعبه‌ی خاص — هدر کلاینت را نادیده بگیر (امنیت: نباید بتواند override شود)
   if (staff.restaurantId) {
@@ -62,7 +76,22 @@ export async function resolveStaffRestaurant(auth: AccessPayload, req?: Request)
 
   // owner/manager: امکان انتخاب شعبه از طریق هدر (بدون نیاز به لاگین دوباره)
   const requestedId = req?.headers.get('x-restaurant-id');
-  if (requestedId) {
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰، تستِ tenant-gate در همان اولین اجرا گرفتش):
+  // این هدر کاملاً کلاینت‌کنترل است و مستقیم به یک ستونِ `uuid` داده می‌شد.
+  // مقدارِ غیرUUID (مثلاً یک slug یا مقدارِ کهنه‌ی localStorage) باعثِ
+  // `PrismaClientKnownRequestError: Error creating UUID` می‌شد؛ آن خطای خام
+  // `instanceof ApiError` نیست، پس `errorResponse` آن را به **۵۰۰** تبدیل
+  // می‌کرد — یعنی *همه‌ی* endpointهایِ رستوران برای آن کلاینت می‌مردند تا
+  // وقتی هدر را پاک کند. نه نشتِ داده، ولی یک اختلالِ کاملِ سرویس با
+  // ماشه‌ای بی‌اهمیت.
+  //
+  // این دقیقاً خلافِ نیتِ صریحِ خودِ کد بود (سه خط پایین‌تر): «هدر نامعتبر …
+  // → به fallback زیر می‌افتیم به‌جای خطا». آن نیت فقط برایِ UUIDِ ناموجود
+  // کار می‌کرد، نه برایِ رشته‌ی بدشکل. حالا شکلِ ورودی قبل از کوئری چک
+  // می‌شود و هر دو حالت یکسان رفتار می‌کنند.
+  const looksLikeUuid = !!requestedId
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedId);
+  if (looksLikeUuid) {
     const restaurant = await db.restaurant.findFirst({
       where: { id: requestedId, tenantId: auth.tenantId }, // چک تنانت: جلوگیری از IDOR
       select: RESTAURANT_SELECT,

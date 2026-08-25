@@ -43,7 +43,11 @@ export type AuditAction =
   | 'economy_rule.update'
   // ── تأییدِ ساعتِ کاری (Part 3) — رستوران پیشنهاد می‌دهد، شرکت تأیید/رد می‌کند.
   //    تغییرِ ساعتِ زنده روی برندازِ پلتفرم اثر مستقیم دارد؛ باید ردِ انسانی داشته باشد.
-  | 'hours.proposed' | 'hours.approved' | 'hours.rejected';
+  | 'hours.proposed' | 'hours.approved' | 'hours.rejected'
+  // ── بازتولیدِ کدِ QRِ میز: استیکرِ چاپ‌شده‌ی رویِ میز را **باطل** می‌کند.
+  //    اثرش فیزیکی و برگشت‌ناپذیر است (کدِ قبلی برنمی‌گردد)، پس باید معلوم
+  //    باشد چه کسی و کِی آن را زد — مثلاً وقتی مهمانی می‌گوید QR کار نمی‌کند.
+  | 'table.qr_regenerated';
 
 type AuditEntry = {
   action: AuditAction;

@@ -96,6 +96,19 @@ jobs:
           npx prisma db push --skip-generate
           # اجرای SQLهای دستی (prisma/sql) با همان مسیرِ کدِ Docker.
           sh prisma/apply-sql.sh
+          # بستنِ شکافِ اسکیمای تست با تولید (defaultِ uuid برای PKها) —
+          # دلیلِ کامل و شواهدش در خودِ فایل.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/test-schema-fixups.sql
+          # ⚠️ ساکت‌کردنِ لاگِ statementِ Postgres — یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۰:
+          # وقتی تست قرمز شد، GitHub در پایانِ job لاگِ کانتینرِ Postgres را چاپ
+          # می‌کند و هر ERROR همراهِ کلِ متنِ STATEMENT است (یک INSERTِ رزرو
+          # حدودِ ۲۵۰۰ کاراکتر). این‌ها ~۵۰ خطِ غول‌پیکرِ آخرِ لاگ را می‌گیرند و
+          # خلاصه‌ی «✖ failing tests» را از دیدِ tail بیرون می‌اندازند — دقیقاً
+          # همان چیزی که تشخیص را چند دور عقب انداخت. خطاها همچنان رخ می‌دهند و
+          # تست‌ها همچنان می‌بینندشان؛ فقط دیگر در لاگِ سرور تکرار نمی‌شوند.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "ALTER SYSTEM SET log_min_error_statement = 'panic';" \
+            -c "SELECT pg_reload_conf();"
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/rezervno_test
           DATABASE_DIRECT_URL: postgresql://test:test@localhost:5432/rezervno_test
@@ -111,6 +124,47 @@ jobs:
           # حداقل ۳۲ کاراکتر — همان قیدی که jwt.ts در زمانِ اجرا اعمال می‌کند.
           JWT_SECRET: ci-test-secret-at-least-32-chars-long
           JWT_REFRESH_SECRET: ci-test-refresh-secret-at-least-32-chars
+
+  # ── انحرافِ اسکیما: آیا تولید هرچه Prisma لازم دارد را واقعاً دارد؟ ──
+  #
+  # ⚠️ چرا این job لازم است (شکافی که هیچ تستِ دیگری نمی‌بیند):
+  # CI اسکیما را با `prisma db push` می‌سازد ولی تولید با
+  # `migrate deploy (0_init) + apply-sql.sh`. اگر کسی فیلدی به schema.prisma
+  # اضافه کند و مهاجرتِ SQL ننویسد، `db push` آن را در CI می‌سازد و همه‌ی
+  # تست‌ها سبز می‌شوند — ولی تولید آن ستون را ندارد و در زمانِ اجرا می‌شکند.
+  # «CI سبز، تولید خراب» دقیقاً همان چیزی است که این job جلویش را می‌گیرد.
+  schema-drift:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: api/package-lock.json
+      - name: Install dependencies
+        working-directory: api
+        run: npm ci || npm install
+      - name: Generate Prisma client
+        working-directory: api
+        run: npx prisma generate
+      - name: Check schema drift
+        run: sh tools/check-schema-drift.sh
+        env:
+          ADMIN_URL: postgresql://test:test@localhost:5432/postgres
 
   # ── مرحله ۳: چک امنیتی پایه ──
   security:

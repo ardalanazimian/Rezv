@@ -9,7 +9,7 @@ import { API } from './api.js';
 import { closeSheet, esc, faNum, toast } from './auth.js';
 import { go } from './data/discover.js';
 import { TRIPS, bk } from './data/seed.js';
-import { R } from './init.js';
+import { findR } from './init.js';
 import { icon } from './icons.js';
 
 export let WL=null; // ورودی فعلی لیست انتظار کاربر { id, position, ... }
@@ -30,12 +30,12 @@ export function offerWaitlist(id, r){
         <div class="wl-benefit"><span class="wl-bene-ic">⏱️</span><div><b>تخمین زمان</b><small>می‌دونی چقدر باید صبر کنی</small></div></div>
         <div class="wl-benefit"><span class="wl-bene-ic">${icon('check',{size:18})}</span><div><b>کنترلِ کامل</b><small>آفر رو راحت قبول یا رد کن</small></div></div>
       </div>
-      <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="buzz&&buzz();joinWaitlist(${id})">پیوستن به لیست انتظار</button>
+      <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="buzz&&buzz();joinWaitlist('${id}')">پیوستن به لیست انتظار</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
     </div>`;
 }
 export async function joinWaitlist(id){
-  const r=R.find(x=>x.id===id);
+  const r=findR(id);
   const sheetBody=document.getElementById('sheetBody');
   sheetBody.innerHTML=`<div style="text-align:center;padding:40px"><div class="spin" style="margin:0 auto 16px"></div>در حال پیوستن به صف...</div>`;
   const party=parseInt(String(bk.party).replace(/[^\d۰-۹]/g,'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))||2;

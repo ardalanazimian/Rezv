@@ -7,8 +7,14 @@ import { Actions } from './actions.js';
 import { API, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
 import { renderDiscoverSections, renderFeed } from './data/discover.js';
 import { R_SAMPLE } from './data/seed.js';
+import { runPendingCheckIn } from './features/checkin.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
 export let R = R_SAMPLE;
+
+// پیداکردنِ رستوران با id — همیشه با مقایسه‌ی String، چون idِ نمونه عدد است و
+// idِ واقعیِ بک‌اند UUID (string). مقایسه‌ی === مستقیم بین این دو، برای هر
+// رستورانِ واقعی شکست می‌خورد (باگی که همه‌ی CTAهای کارت را می‌شکست).
+export const findR = id => R.find(x => String(x.id) === String(id));
 
 // ── startup: بعد از آماده‌شدنِ DOM اجرا شو (چرخه‌ی load-time را می‌شکند) ──
 function boot(){
@@ -19,6 +25,10 @@ function boot(){
   armReveals();                      // انیمیشنِ اسکرول
   restoreSession();                  // بازیابی نشست
   syncRestaurants();                 // داده‌ی واقعی از بک‌اند
+  // ورود با QRِ میز — فقط وقتی لینک `?checkin=` دارد کاری می‌کند.
+  // عمداً `await` نمی‌شود و بعد از رندرِ اولیه صدا زده می‌شود: مهمانی که
+  // کدِ میز را اسکن کرده باید اپ را ببیند، نه صفحه‌ی سفیدِ منتظرِ شبکه.
+  runPendingCheckIn();
 }
 
 // بازیابی نشست از localStorage — اگر توکن داشت، کاربر را دوباره وارد نگه دار
