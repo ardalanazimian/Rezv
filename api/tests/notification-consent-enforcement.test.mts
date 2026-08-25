@@ -52,9 +52,13 @@ const smsRoute = await import('../src/app/api/v1/restaurant/sms/route.ts');
 const SRC = new URL('../src/lib/', import.meta.url).pathname;
 const TAG = `nce-${Math.random().toString(36).slice(2, 8)}`;
 // پیش‌شماره‌ی ۰۹۰۰ در ایران تخصیص داده نشده — هیچ شماره‌ی واقعی‌ای این‌جا نیست.
-const PHONE_BASE = 900_000 + Math.floor(Math.random() * 90_000);
+// شکلِ محلی عمداً دقیقاً ۱۱ رقمی است تا `normalizePhone` واقعاً قبولش کند
+// (تستِ شکافِ نرمال‌سازی به همین وابسته است).
+const PHONE_PREFIX = String(Math.floor(Math.random() * 900) + 100);
 let phoneSeq = 0;
-const newPhone = () => `+9890${String(PHONE_BASE + (++phoneSeq)).slice(-8)}`;
+const newLocal = () => `0900${PHONE_PREFIX}${String(++phoneSeq).padStart(4, '0')}`;
+const toIntl = (local: string) => '+98' + local.slice(1);
+const newPhone = () => toIntl(newLocal());
 
 const ALL_OFF = Object.fromEntries(NOTIFICATION_CATEGORIES.map((c) => [c, false]));
 
@@ -122,7 +126,7 @@ before(async () => {
   });
   restaurantId = r.id;
   const owner = await db.staff.create({
-    data: { tenantId, phone: newPhone().slice(0, 13), role: 'owner', isActive: true },
+    data: { tenantId, phone: newPhone(), role: 'owner', isActive: true },
     select: { id: true },
   });
   ownerToken = signAccess({ sub: owner.id, kind: 'staff', tenantId, role: 'owner' });
@@ -291,6 +295,17 @@ describe('🔴 کنترلِ منفی — پیامکِ تراکنشی هرگز پ
 //  ۳) دسته‌ی offers — کمپین/automation/دعوت
 // ═══════════════════════════════════════════════════════════════════════
 describe('رضایت · دسته‌ی offers در مسیرهای واقعی', () => {
+  /** ردیفِ واقعیِ automation — `runAutomation` در پایان `lastRunAt` را می‌نویسد. */
+  async function makeAutomation(trigger = 'winback') {
+    return db.marketingAutomation.create({
+      data: {
+        restaurantId, name: `[DEMO] ${TAG}`, trigger: trigger as never,
+        messageTemplate: '[DEMO] متنِ آزمایشی', isActive: false,
+      },
+      select: { id: true, restaurantId: true, trigger: true, triggerConfig: true, messageTemplate: true, couponId: true, lastRunAt: true },
+    });
+  }
+
   test('automation: `offers:false` هدف را حذف می‌کند، کلیدِ غایب نه', async () => {
     const optOut = await makeUser({ offers: false });
     const neutral = await makeUser();
@@ -299,10 +314,7 @@ describe('رضایت · دسته‌ی offers در مسیرهای واقعی', ()
         data: { restaurantId, userId: u.id, segment: 'at_risk' },
       });
     }
-    const automation = {
-      id: '00000000-0000-0000-0000-000000000000', restaurantId, trigger: 'winback',
-      triggerConfig: {}, messageTemplate: '', couponId: null, lastRunAt: null,
-    };
+    const automation = await makeAutomation();
     const before = suppressed({ category: 'offers', site: 'automation.winback' });
     const r = await runAutomation(automation as never);
 
@@ -318,10 +330,7 @@ describe('رضایت · دسته‌ی offers در مسیرهای واقعی', ()
     const optOut = await makeUser({ offers: false });
     await db.customerInsight.create({ data: { restaurantId, userId: optOut.id, segment: 'at_risk' } });
     const before = await db.outreachLog.count({ where: { restaurantId } });
-    const r = await runAutomation({
-      id: '00000000-0000-0000-0000-000000000000', restaurantId, trigger: 'winback',
-      triggerConfig: {}, messageTemplate: '', couponId: null, lastRunAt: null,
-    } as never);
+    const r = await runAutomation(await makeAutomation() as never);
     assert.equal(r.sent, 0);
     assert.equal(await db.outreachLog.count({ where: { restaurantId } }), before,
       'کسی که پیام نگرفته نباید در نرخِ تبدیل شمرده شود');
@@ -345,8 +354,8 @@ describe('رضایت · دسته‌ی offers در مسیرهای واقعی', ()
     // پنل شماره را همان‌طور که در رزرو ذخیره شده پس می‌دهد؛ `users.phone`
     // همیشه نرمال (`+98…`) است. تطبیقِ دقیقِ قبلی این کاربر را پیدا نمی‌کرد
     // و انصرافش بی‌صدا نادیده گرفته می‌شد.
-    const local = `09${String(PHONE_BASE + (++phoneSeq)).slice(-9)}`.slice(0, 11);
-    const normalized = '+98' + local.slice(1);
+    const local = newLocal();
+    const normalized = toIntl(local);
     const u = await makeUser({ offers: false }, normalized);
 
     assert.ok(phoneLookupVariants(local).includes(normalized), 'پیش‌شرطِ نرمال‌سازی');
@@ -355,7 +364,7 @@ describe('رضایت · دسته‌ی offers در مسیرهای واقعی', ()
 
     const res = await smsRoute.POST(jsonReq(ownerToken, { kind: 'campaign', phones: [local] }));
     const body = await res.json();
-    assert.equal(res.status, 400, 'همه منصرف بودند ⇒ خطای صریح، نه ارسالِ خاموش');
+    assert.equal(res.status, 422, 'همه منصرف بودند ⇒ خطای صریح، نه ارسالِ خاموش');
     assert.match(String(body.error?.message ?? ''), /انصراف/);
     assert.deepEqual(await smsTemplatesFor(local), []);
     assert.deepEqual(await smsTemplatesFor(normalized), []);

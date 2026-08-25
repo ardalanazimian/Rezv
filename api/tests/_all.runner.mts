@@ -113,6 +113,7 @@ import './no-dynamic-import-in-hot-path.test.mts';
 import './no-show-model.test.mts';
 import './notifications.test.mts';
 import './notification-consent.test.mts';
+import './notification-consent-enforcement.test.mts';
 import './observability-coverage.test.mts';
 import './otp.test.mts';
 import './otp-ratelimit-and-deadlock.integration.test.mts';
