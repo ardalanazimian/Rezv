@@ -22,7 +22,7 @@ const { db } = await import('../src/lib/db');
 const {
   getEffectiveNoShowModel, getPlatformNoShowModel, trainAndCalibratePlatformNoShowModel,
   invalidateNoShowModelCache, invalidatePlatformNoShowModelCache,
-  NO_SHOW_FEATURE_VERSION,
+  NO_SHOW_FEATURE_VERSION, fetchPlatformTrainingRows, fetchTrainingRows,
 } = await import('../src/lib/no-show-model');
 
 // ⚠️ کشِ مدل را عمداً با همان توابعِ خودِ کد پاک می‌کنیم، نه با ساختنِ دستیِ
@@ -205,5 +205,62 @@ describe('گاردِ نسخه‌ی بردارِ ویژگی', () => {
     await setRestaurantModel([3, 3, 3, 3, 3, 3, 3], true);
     const eff = await getEffectiveNoShowModel(restaurantId);
     assert.equal(eff?.source, 'restaurant');
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────
+describe('ترتیبِ زمانیِ دادهٔ آموزش — پیش‌شرطِ هولدآوتِ درست', () => {
+
+  let codeN = 0;
+  /** رزروِ حل‌شده با created_at و slot_start مشخص. */
+  async function resolved(daysAgo: number, status = 'completed') {
+    const slot = new Date(Date.now() - daysAgo * 86_400_000);
+    await db.$executeRaw`
+      INSERT INTO reservations
+        (id, code, restaurant_id, party_size, slot_start, slot_end, status, source, created_at)
+      VALUES (gen_random_uuid(), ${`${TAG}-O${++codeN}`}, ${restaurantId}::uuid, 2,
+              ${slot}, ${new Date(slot.getTime() + 5_400_000)},
+              CAST(${status}::text AS "public"."reservation_status"), 'app',
+              ${new Date(slot.getTime() - 3_600_000)})`;
+  }
+
+  test('🔴 ردیف‌های آموزش صعودی برمی‌گردند — وگرنه هولدآوت وارونه می‌شود', async () => {
+    // ⚠️ این تست یک P0ِ واقعی را قفل می‌کند (ممیزیِ نهاییِ ۲۰۲۶-۰۸-۲۵).
+    // `trainAndCalibrate*` با `slice(0, ۸۰٪)` آموزش و `slice(۸۰٪)` هولدآوت
+    // می‌سازد. اگر آرایه **نزولی** باشد، این یعنی آموزش روی تازه‌ترین ۸۰٪ و
+    // سنجش روی قدیمی‌ترین ۲۰٪ — مدل روی آینده آموزش می‌بیند و روی گذشته
+    // سنجیده می‌شود. بدتر از split تصادفی، و عددِ Brier/AUCی که گیتِ
+    // فعال‌سازی رویش تصمیم می‌گیرد هیچ تخمینی از کاراییِ آینده نیست.
+    //
+    // مسیرِ سراسری دقیقاً همین اشکال را داشت (ORDER BY ... DESC بدونِ
+    // برعکس‌کردن) در حالی که مسیرِ per-restaurant سالم بود — و هیچ تستی
+    // ترتیب را نمی‌سنجید.
+    for (const d of [30, 20, 10, 5, 1]) await resolved(d);
+
+    // ⚠️ روی **کلیدِ واقعیِ مرتب‌سازی** بسنج، نه روی یک ستونِ همبسته.
+    // نسخه‌ی اولِ این تست `slot_start` را می‌سنجید و برای فیکسچرهای خودم
+    // درست بود (چون created_at را دقیقاً یک ساعت قبلش می‌گذارم)، ولی کوئریِ
+    // سراسری **همه‌ی** رستوران‌ها را می‌خواند و در رانرِ کامل، ردیف‌های
+    // فایل‌های دیگر created_at و slot_startِ نامرتبط دارند ⇒ تست در اجرای
+    // تکی سبز و در سوئیتِ کامل قرمز می‌شد. `created_at` از
+    // `slot_start - lead_minutes` بازسازی می‌شود (همان تعریفِ خودِ کوئری).
+    const createdAt = (r: { slot_start: Date; lead_minutes: number }) =>
+      +new Date(r.slot_start) - Number(r.lead_minutes) * 60_000;
+    const asc = (rows: { slot_start: Date; lead_minutes: number }[]) =>
+      rows.every((r, i) => i === 0 || createdAt(rows[i - 1]) <= createdAt(r) + 1);
+
+    const platform = await fetchPlatformTrainingRows();
+    assert.ok(platform.length >= 5, `پیش‌شرط: باید ردیف داشته باشیم، شد ${platform.length}`);
+    assert.ok(asc(platform), 'ردیف‌های مدلِ سراسری باید صعودی باشند');
+
+    const own = await fetchTrainingRows(restaurantId);
+    assert.ok(own.length >= 5);
+    assert.ok(asc(own), 'ردیف‌های مدلِ اختصاصی هم باید صعودی باشند');
+
+    // و صریحاً: تازه‌ترین ردیف آخر است، نه اول.
+    assert.ok(createdAt(platform[platform.length - 1]) > createdAt(platform[0]),
+      'آخرین عنصر باید تازه‌ترین باشد (بر مبنای created_at، کلیدِ واقعیِ مرتب‌سازی)');
+
+    await db.reservation.deleteMany({ where: { restaurantId } });
   });
 });

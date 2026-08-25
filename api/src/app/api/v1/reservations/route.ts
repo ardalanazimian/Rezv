@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { createReservation } from '@/lib/reservations';
 import { normalizePhone } from '@/lib/otp';
 import { withIdempotency } from '@/lib/idempotency';
-import { clientIp } from '@/lib/ratelimit';
+import { clientIp, enforceRateLimit, RULES } from '@/lib/ratelimit';
 import { assertUserNotBanned } from '@/lib/ban';
 import { isFeatureEnabled, featureFlagLabel } from '@/lib/feature-flags';
 import { Err, errorResponse } from '@/lib/errors';
@@ -47,6 +47,17 @@ const reservationSchema = z.object({
 /** POST /api/v1/reservations — مشتری (app) یا staff (manual) */
 async function POST_impl(req: Request) {
   try {
+    // ⚠️ سقفِ اختصاصی — تا امروز **هیچ‌جا اعمال نمی‌شد** (ممیزیِ نهایی،
+    // ۲۰۲۶-۰۸-۲۵). `RULES.reservation` از روزِ اول تعریف شده بود و
+    // **صفر مصرف‌کننده** داشت (grep روی کلِ درخت تأیید شد).
+    //
+    // چرا نبودش مهم بود: این گران‌ترین عملیاتِ کلِ سیستم است — تراکنشِ
+    // Serializable + قفلِ Redis + برخورد با قیدِ EXCLUDE. تنها سدش
+    // `globalPerIp` (۱۲۰ در دقیقه) بود، که برای این مسیر بسیار گشاد است؛
+    // و با `hold: true` می‌شد اسلات‌ها را هم نگه داشت.
+    //
+    // اول ریت‌لیمیت، بعد پارسِ بدنه.
+    await enforceRateLimit(clientIp(req), RULES.reservation);
     const auth = authFromRequest(req);
     // بن سختِ پلتفرم: قبل از هر پردازشِ دیگری (حتی claimِ idempotency) رد می‌شود
     // — فقط برایِ مشتریِ آنلاین؛ رزروِ دستیِ staff برایِ مهمانِ حاضر مشمول نیست.

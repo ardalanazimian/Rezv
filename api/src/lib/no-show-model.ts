@@ -286,10 +286,29 @@ export interface BiasCheckResult {
  * Brier کلی از heuristic بهتر باشد.
  */
 export function checkChannelBias(weights: number[]): BiasCheckResult {
-  // ترتیب: [bias, knownUser, priorNoShowRate, lastMinute, veryEarlyBooking, largeParty, phoneSource]
-  const registeredZeroRisk = [1, 1, 0, 0, 0, 0, 0];
-  const guestZeroRisk = [1, 0, 0, 0, 0, 0, 0];
-  const phoneZeroRisk = [1, 1, 0, 0, 0, 0, 1];
+  // ⚠️ کاوش‌ها از **خودِ فهرستِ نام‌ها** ساخته می‌شوند، نه با آرایه‌ی دستی.
+  // این رفعِ یک P0ِ واقعی است (۲۰۲۶-۰۸-۲۵): نسخه‌ی قبلی سه آرایه‌ی
+  // **۷ عنصریِ هاردکد** داشت با کامنتِ ترتیبِ v1. وقتی بردار به ۱۲ ویژگی
+  // رسید، این تابع دست‌نخورده ماند ⇒ `dot(weights12, probe7)` ⇒ NaN ⇒
+  // `Math.abs(NaN) > MAX_CHANNEL_BIAS_GAP` همیشه false ⇒ **گیتِ بایاس یک
+  // no-opِ دائمی شد** و مدلی که «مهمان = پرریسک» یاد گرفته بود بی‌مانع فعال
+  // می‌شد. با اجرای واقعی تأیید شد: وزنِ ۱۲تایی با `knownUser = -5` (بایاسِ
+  // آشکار) هم `biased: false` می‌گرفت.
+  //
+  // حالا طول همیشه درست است و اندیس‌ها با نام گرفته می‌شوند، پس جابه‌جا‌شدنِ
+  // ترتیبِ ویژگی‌ها هم بی‌صدا خرابش نمی‌کند. گاردِ طولِ `dot` هم لایه‌ی دوم
+  // است: اگر باز هم از هم جدا افتادند، خطای بلند می‌دهد نه NaN.
+  const zeroRisk = () => {
+    const v = new Array(NO_SHOW_FEATURE_NAMES.length).fill(0);
+    v[NO_SHOW_FEATURE_NAMES.indexOf('bias')] = 1;
+    return v;
+  };
+  const iKnown = NO_SHOW_FEATURE_NAMES.indexOf('knownUser');
+  const iPhone = NO_SHOW_FEATURE_NAMES.indexOf('phoneSource');
+
+  const registeredZeroRisk = zeroRisk(); registeredZeroRisk[iKnown] = 1;
+  const guestZeroRisk = zeroRisk();
+  const phoneZeroRisk = zeroRisk(); phoneZeroRisk[iKnown] = 1; phoneZeroRisk[iPhone] = 1;
 
   const pRegistered = predictProba(weights, registeredZeroRisk);
   const pGuest = predictProba(weights, guestZeroRisk);
@@ -353,7 +372,7 @@ export interface TrainingRow {
  * دقیقاً همان اختلافی که این فاز رفعش کرد، دوباره نامرئی می‌ماند.
  */
 export async function fetchTrainingRows(restaurantId: string): Promise<TrainingRow[]> {
-  return db.$queryRaw<TrainingRow[]>`
+  const rows = await db.$queryRaw<TrainingRow[]>`
     SELECT r.status, r.party_size, r.source, r.slot_start,
            EXTRACT(EPOCH FROM (r.slot_start - r.created_at)) / 60.0 AS lead_minutes,
            (r.user_id IS NOT NULL) AS has_user_id,
@@ -399,9 +418,17 @@ export async function fetchTrainingRows(restaurantId: string): Promise<TrainingR
     ) p
     WHERE r.restaurant_id = ${restaurantId}::uuid
       AND r.status IN ('completed', 'no_show', 'arrived', 'seated', 'dining')
-    ORDER BY r.created_at ASC
+    -- ⚠️ DESC + LIMIT، بعد در JS برعکس — همان الگویِ مسیرِ سراسری، و به
+    -- دلیلِ دیگری هم لازم (رفعِ ۲۰۲۶-۰۸-۲۵): با ASC + LIMIT 500، به‌محضِ
+    -- اینکه یک رستوران از ۵۰۰ رزروِ حل‌شده رد شود، بازآموزیِ شبانه تا ابد
+    -- همان ۵۰۰ ردیفِ اول را می‌خواند. مدل هرگز رفتارِ اخیر را نمی‌بیند،
+    -- هولدآوت باستانی می‌ماند، و تشخیصِ رانش دقتِ تولیدِ امروز را با
+    -- هولدآوتِ آن دوره مقایسه می‌کند ⇒ رانشِ صوریِ دائمی. یعنی «یادگیری»
+    -- برای موفق‌ترین رستوران‌ها اول از همه متوقف می‌شد.
+    ORDER BY r.created_at DESC
     LIMIT 500
   `;
+  return rows.reverse();
 }
 
 function rowToExample(row: TrainingRow): TrainingExample {
@@ -652,7 +679,21 @@ const PLATFORM_MIN_RESTAURANTS = 3;
  *  جدا شوند، مدلِ سراسری روی ویژگی‌هایی آموزش می‌بیند که مسیرِ سرو
  *  نمی‌سازد و در تولید بی‌ارزش می‌شود. */
 export async function fetchPlatformTrainingRows(): Promise<TrainingRow[]> {
-  return db.$queryRaw<TrainingRow[]>`
+  // ⚠️ دو مرحله، و ترتیبش حیاتی است (رفعِ P0، ممیزیِ نهاییِ ۲۰۲۶-۰۸-۲۵):
+  //   ۱) DESC + LIMIT ⇒ **تازه‌ترین** N ردیف (نه قدیمی‌ترین)
+  //   ۲) بعد در JS برعکس ⇒ ترتیبِ **زمانیِ صعودی** برای split
+  //
+  // چرا مهم بود: `trainAndCalibratePlatformNoShowModel` با
+  // `slice(0, 80%)` آموزش و `slice(80%)` هولدآوت می‌سازد. با آرایه‌ی
+  // نزولی، این یعنی آموزش روی **تازه‌ترین** ۸۰٪ و سنجش روی **قدیمی‌ترین**
+  // ۲۰٪ — یعنی مدل روی آینده آموزش می‌دید و روی گذشته سنجیده می‌شد.
+  // بدتر از split تصادفی، و `learnedBrier`/`learnedAuc`ی که گیتِ فعال‌سازی
+  // روی آن تصمیم می‌گیرد هیچ تخمینی از کاراییِ آینده نبود.
+  //
+  // دامنه‌ی اثر بزرگ‌ترین ممکن بود: این مدل به **هر** رستورانی که مدلِ
+  // اختصاصی ندارد سرو می‌شود. مسیرِ per-restaurant از روزِ اول `ASC` بود؛
+  // فقط این یکی از آن جدا افتاده بود.
+  const rows = await db.$queryRaw<TrainingRow[]>`
     SELECT r.status, r.party_size, r.source, r.slot_start,
            EXTRACT(EPOCH FROM (r.slot_start - r.created_at)) / 60.0 AS lead_minutes,
            (r.user_id IS NOT NULL) AS has_user_id,
@@ -678,6 +719,7 @@ export async function fetchPlatformTrainingRows(): Promise<TrainingRow[]> {
     ORDER BY r.created_at DESC
     LIMIT ${PLATFORM_MAX_ROWS}
   `;
+  return rows.reverse();
 }
 
 export interface PlatformTrainResult {

@@ -198,18 +198,28 @@ describe('toMatrix', () => {
 });
 
 describe('checkChannelBias — تستِ سادهِ بایاسِ کانالی (نقشه‌راهِ AI، فازِ ۱)', () => {
+  // ⚠️ وزن‌ها از **طولِ واقعیِ بردار** ساخته می‌شوند و اندیس‌ها با نام گرفته
+  // می‌شوند. نسخه‌ی قبلی آرایه‌های ۷ عنصریِ هاردکد داشت — و دقیقاً همان
+  // باعث شد یک P0 نامرئی بماند: وقتی بردار به ۱۲ ویژگی رفت، این تست‌ها
+  // همچنان سبز بودند (چون ورودیِ خودشان را ۷تایی می‌ساختند) در حالی که
+  // گیتِ بایاس در تولید به NaN افتاده و **کاملاً خاموش** شده بود.
+  // تستی که ورودی‌اش را با عددِ ثابت می‌سازد، فقط همان عدد را می‌سنجد.
+  const w0 = () => new Array(NO_SHOW_FEATURE_NAMES.length).fill(0);
+  const at = (name: string, value: number) => {
+    const w = w0(); w[NO_SHOW_FEATURE_NAMES.indexOf(name)] = value; return w;
+  };
+
   test('وزن‌هایِ همه‌صفر → بدونِ بایاس', () => {
-    const r = checkChannelBias([0, 0, 0, 0, 0, 0, 0]);
+    const r = checkChannelBias(w0());
     assert.equal(r.biased, false);
     assert.equal(r.knownUserGap, 0);
     assert.equal(r.phoneSourceGap, 0);
   });
 
   test('وزنِ بزرگِ منفی روی knownUser (یعنی «مهمان = خیلی پرریسک») → بایاس شناسایی می‌شود', () => {
-    // ترتیب: [bias, knownUser, priorNoShowRate, lastMinute, veryEarlyBooking, largeParty, phoneSource]
     // knownUser=-5 یعنی نبودِ حساب به‌تنهایی امتیازِ ریسک را خیلی بالا می‌برد —
     // این دقیقاً همان چیزی‌ست که نباید مجاز باشد: تبعیض بر اساسِ کانال، نه رفتار.
-    const w = [0, -5, 0, 0, 0, 0, 0];
+    const w = at('knownUser', -5);
     const r = checkChannelBias(w);
     assert.equal(r.biased, true);
     assert.ok(Math.abs(r.knownUserGap) > 0.2, `انتظارِ گپِ بزرگ داشتیم، گرفتیم ${r.knownUserGap}`);
@@ -217,7 +227,7 @@ describe('checkChannelBias — تستِ سادهِ بایاسِ کانالی (ن
   });
 
   test('وزنِ بزرگ روی phoneSource (یعنی «رزروِ تلفنی = پرریسک») → بایاس شناسایی می‌شود', () => {
-    const w = [0, 0, 0, 0, 0, 0, 4];
+    const w = at('phoneSource', 4);
     const r = checkChannelBias(w);
     assert.equal(r.biased, true);
     assert.ok(Math.abs(r.phoneSourceGap) > 0.2);
@@ -226,13 +236,15 @@ describe('checkChannelBias — تستِ سادهِ بایاسِ کانالی (ن
   test('وزنِ کوچکِ منطقی (تفاوتِ کم بینِ کانال‌ها) → بدونِ بایاس', () => {
     // یک وزنِ کوچک برای knownUser واقع‌گرایانه است (مثلاً کاربرانِ ثبت‌نامی
     // کمی قابل‌اعتمادترند) — تا وقتی گپ کوچک بماند، این تبعیضِ ناسالم نیست.
-    const w = [0, -0.3, 0, 0, 0, 0, 0.2];
+    const w = w0();
+    w[NO_SHOW_FEATURE_NAMES.indexOf('knownUser')] = -0.3;
+    w[NO_SHOW_FEATURE_NAMES.indexOf('phoneSource')] = 0.2;
     const r = checkChannelBias(w);
     assert.equal(r.biased, false);
   });
 
   test('مدلی که فقط بر اساسِ رفتارِ واقعی (lastMinute) وزن دارد، نه هویت → بدونِ بایاس', () => {
-    const w = [0, 0, 0, 3, 0, 0, 0];
+    const w = at('lastMinute', 3);
     const r = checkChannelBias(w);
     assert.equal(r.biased, false);
   });

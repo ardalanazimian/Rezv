@@ -1,4 +1,6 @@
 import { db } from './db';
+import { createLogger } from './logger';
+import { metrics } from './metrics';
 import { sinceDays } from './staff-helpers';
 import { computeStaticScoreFromFeatures, type RawFeatureInput } from './ml-core';
 import { loadPriorHistory } from './no-show-features';
@@ -6,6 +8,8 @@ import { loadPriorHistory } from './no-show-features';
 // ml-core.ts از بین رفت، و importِ پویا در این مسیر روی Node 20 واقعاً
 // می‌شکست (جزئیات در ml-core.ts).
 import { getEffectiveNoShowModel, predictProba, buildFeatureVector } from './no-show-model';
+
+const log = createLogger('no-show-serving');
 
 // ═══════════════════════════════════════════════════════════
 //  موتور پیش‌بینی No-Show و محاسبه‌ی CLV — رزرونو
@@ -107,15 +111,28 @@ export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResul
   // اتفاق نمی‌افتاد، هرچقدر هم کلِ پلتفرم داده جمع می‌کرد.
   const learned = await getEffectiveNoShowModel(input.restaurantId).catch(() => null);
   if (learned) {
-    const probability = predictProba(learned.weights, buildFeatureVector(features));
-    const score = Math.round(probability * 100);
-    return {
-      score, tier: tierFromScore(score), source: 'learned',
-      // نسب‌نامه: `modelRunId` فقط برای مدلِ اختصاصی وجود دارد. مدلِ سراسری
-      // اجرایِ per-restaurant ندارد، پس null می‌ماند و `modelScope` تفاوت را
-      // نگه می‌دارد — جعلِ نسب‌نامه ممنوع (همان قاعده‌ی فازِ ۶).
-      lineage: { features, probability, modelRunId: learned.runId, modelScope: learned.source },
-    };
+    // ⚠️ امتیازدهی داخلِ try است و این عمدی‌ست (۲۰۲۶-۰۸-۲۵): `dot()` حالا
+    // روی ناهم‌طولیِ بردار **throw** می‌کند — که برای گرفتنِ باگ درست است،
+    // ولی این مسیر داخلِ ثبتِ رزرو اجرا می‌شود. یک مدلِ خرابِ ذخیره‌شده
+    // نباید رزروِ مهمان را بشکند؛ باید بی‌سروصدا نباشد ولی بی‌خطر باشد.
+    // پس: سقوطِ صادقانه به heuristic + لاگ + متریکِ قابلِ‌آلارم.
+    try {
+      const probability = predictProba(learned.weights, buildFeatureVector(features));
+      const score = Math.round(probability * 100);
+      return {
+        score, tier: tierFromScore(score), source: 'learned',
+        // نسب‌نامه: `modelRunId` فقط برای مدلِ اختصاصی وجود دارد. مدلِ سراسری
+        // اجرایِ per-restaurant ندارد، پس null می‌ماند و `modelScope` تفاوت را
+        // نگه می‌دارد — جعلِ نسب‌نامه ممنوع (همان قاعده‌ی فازِ ۶).
+        lineage: { features, probability, modelRunId: learned.runId, modelScope: learned.source },
+      };
+    } catch (e) {
+      log.error('امتیازدهیِ مدل شکست خورد — سقوط به heuristic', {
+        restaurantId: input.restaurantId, scope: learned.source, error: (e as Error).message,
+      });
+      metrics.modelScoringFailed.inc({ scope: learned.source });
+      // به heuristicِ پایین می‌افتد — عمداً return نمی‌کند.
+    }
   }
 
   const score = computeStaticScoreFromFeatures(features);

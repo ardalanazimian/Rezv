@@ -51,6 +51,7 @@
 
 // ⚠️ باید اولین import بماند — رجوع به توضیحِ hoisting داخلِ خودِ فایل.
 import './dna-summary.integration.test.mts';
+import './email-transport-honesty.test.mts';
 import './helpers/test-env.mts';
 import './birthday-calendar.test.mts';
 import './allowed-origins.test.mts';
@@ -83,6 +84,8 @@ import './events-restaurant-slug.integration.test.mts';
 import './member-create.integration.test.mts';
 import './menu-crud.integration.test.mts';
 import './ml-feature-v2.test.mts';
+import './ml-safety-gates.test.mts';
+import './ratelimit-coverage.test.mts';
 import './tables.integration.test.mts';
 import './table-qr-checkin.integration.test.mts';
 import './table-qr-regenerate.integration.test.mts';

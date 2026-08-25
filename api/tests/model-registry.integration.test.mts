@@ -5,7 +5,7 @@ import { db } from '../src/lib/db.ts';
 import { invalidate, cacheKey } from '../src/lib/cache.ts';
 import { createReservation } from '../src/lib/reservations.ts';
 import { computeNoShowRisk } from '../src/lib/customer-insights.ts';
-import { getLearnedNoShowModelWithRun, NO_SHOW_FEATURE_VERSION } from '../src/lib/no-show-model.ts';
+import { getLearnedNoShowModelWithRun, NO_SHOW_FEATURE_VERSION, NO_SHOW_FEATURE_NAMES } from '../src/lib/no-show-model.ts';
 import { getAccuracyByModelRun, recordOutcome } from '../src/lib/prediction-ledger.ts';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -29,7 +29,18 @@ let tenantId: string, restaurantId: string, runId: string;
 const SLOT_DATE = new Date(Date.now() + 45 * 86_400_000).toISOString().slice(0, 10);
 
 /** وزن‌هایی که تستِ بایاسِ کانالی را رد نمی‌کنند و احتمالِ میانه می‌دهند. */
-const NEUTRAL_WEIGHTS = [-1, 0, 1.5, 0.5, 0, 0.3, 0];
+// ⚠️ وزن‌ها از **طولِ واقعیِ بردار** ساخته می‌شوند، نه با آرایه‌ی ثابت.
+// آرایه‌ی هاردکد دقیقاً همان چیزی بود که یک P0 را نامرئی نگه داشت
+// (۲۰۲۶-۰۸-۲۵): با گسترشِ بردار، فیکسچرِ ثابت هم‌طول نمی‌ماند و مسیرِ
+// واقعی به NaN/خطا می‌افتاد در حالی که تست سبز می‌ماند.
+const NEUTRAL_WEIGHTS = (() => {
+  const w = new Array(NO_SHOW_FEATURE_NAMES.length).fill(0);
+  w[NO_SHOW_FEATURE_NAMES.indexOf('bias')] = -1;
+  w[NO_SHOW_FEATURE_NAMES.indexOf('shrunkNoShowRate')] = 1.5;
+  w[NO_SHOW_FEATURE_NAMES.indexOf('lastMinute')] = 0.5;
+  w[NO_SHOW_FEATURE_NAMES.indexOf('largeParty')] = 0.3;
+  return w;
+})();
 
 async function waitFor<T>(probe: () => Promise<T | null | undefined>, timeoutMs = 10_000): Promise<T | null> {
   const deadline = Date.now() + timeoutMs;
