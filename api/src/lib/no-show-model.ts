@@ -3,6 +3,7 @@ import { db } from './db';
 import { cached, cacheKey, invalidate } from './cache';
 import {
   sigmoid, trainLogisticRegression, predictProba, brierScore, decideModelActivation,
+  rocAuc, calibrationCurve, type CalibrationBucket,
   computeStaticScoreFromFeatures, type RawFeatureInput,
   type ActivationDecision,
 } from './ml-core';
@@ -70,7 +71,8 @@ export function buildFeatureVector(input: RawFeatureInput): number[] {
 
 // ── ریاضیاتِ خالصِ عمومی از lib/ml-core.ts — این‌جا re-export می‌شود تا
 //    importهای موجود (تست‌ها، customer-insights.ts) بدونِ تغییر کار کنند. ──
-export { sigmoid, trainLogisticRegression, predictProba, brierScore };
+export { sigmoid, trainLogisticRegression, predictProba, brierScore, rocAuc, calibrationCurve };
+export { MIN_AUC };
 
 export interface TrainingExample {
   features: RawFeatureInput;
@@ -84,6 +86,19 @@ const MIN_POSITIVE_COUNT = 5;
 /** بهبودِ نسبیِ حداقلی برای فعال‌کردنِ مدلِ یادگرفته — نوسانِ آماریِ کوچک
  *  نباید هر شب heuristic را با یک مدلِ تصادفاً کمی بهتر عوض کند. */
 const MIN_RELATIVE_IMPROVEMENT = 0.05;
+
+/**
+ * کفِ تفکیک (AUC) برای فعال‌سازی.
+ *
+ * ⚠️ چرا لازم شد: تا امروز تنها سنجه Brier بود، و Brier کالیبراسیون و تفکیک
+ * را قاطی می‌کند. مدلی که به **همه** میانگینِ نرخِ no-show را بدهد Brierِ
+ * قابلِ‌قبولی می‌گیرد و می‌توانست از گیتِ «۵٪ بهتر از heuristic» رد شود، در
+ * حالی که AUCش دقیقاً ۰٫۵ است و صفر اطلاعات به رستوران‌دار می‌دهد.
+ *
+ * عددِ ۰٫۶۰ محافظه‌کارانه است: مدلی با AUC زیرِ آن، برای سؤالِ عملیاتیِ
+ * واقعی («با کدام ۱۰ مهمان تماس بگیرم؟») بهتر از حدس نیست.
+ */
+const MIN_AUC = 0.60;
 
 /**
  * آیا مدلِ یادگرفته باید جایگزینِ heuristic شود؟ منطقِ خالص، بدونِ DB —
@@ -284,6 +299,12 @@ export interface TrainResult {
   positiveCount: number;
   learnedBrier?: number;
   staticBrier?: number;
+  /** تفکیکِ مدلِ یادگرفته روی هولدآوت. `null` = اندازه‌گیری نشد (هولدآوتِ تک‌کلاسه). */
+  learnedAuc?: number | null;
+  /** تفکیکِ heuristic روی همان هولدآوت — برای مقایسه‌ی منصفانه. */
+  staticAuc?: number | null;
+  /** منحنیِ کالیبراسیون: «وقتی مدل ۳۰٪ می‌گوید، واقعاً ۳۰٪ رخ می‌دهد؟» */
+  calibration?: CalibrationBucket[];
   isActive?: boolean;
 }
 
@@ -320,15 +341,34 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
   const staticPreds = holdout.map((e) => computeStaticScoreFromFeatures(e.features) / 100);
   const staticBrier = brierScore(staticPreds, holdoutY);
 
+  // ── تفکیک، جدا از کالیبراسیون ──────────────────────────────────────
+  // `null` یعنی هولدآوت تک‌کلاسه بود ⇒ تفکیک **اندازه‌گیری نشد**، نه اینکه
+  // بد بود. در آن حالت فعال‌سازی رد می‌شود: مدلی که نتوانستیم بسنجیمش
+  // نباید به تولید برود (همان انضباطِ «چیزی را که اثبات نکردی ادعا نکن»).
+  const learnedAuc = rocAuc(learnedPreds, holdoutY);
+  const staticAuc = rocAuc(staticPreds, holdoutY);
+  const calibration = calibrationCurve(learnedPreds, holdoutY);
+
   const decision = decideActivation({ sampleSize: examples.length, positiveCount, learnedBrier, staticBrier });
+
+  // گیتِ تفکیک — پیش از گیتِ بایاس، چون ارزان‌تر و بنیادی‌تر است.
+  const aucGate: { ok: boolean; reason: string } =
+    learnedAuc === null
+      ? { ok: false, reason: 'تفکیک اندازه‌گیری نشد (هولدآوت تک‌کلاسه) — مدلِ نسنجیده فعال نمی‌شود' }
+      : learnedAuc < MIN_AUC
+        ? { ok: false, reason: `تفکیکِ ناکافی: AUC ${learnedAuc.toFixed(3)} < ${MIN_AUC} — بهتر از حدس نیست` }
+        : { ok: true, reason: '' };
 
   // گیتِ ایمنیِ اضافی: حتی اگر مدل روی Brierِ کلی از heuristic بهتر باشد،
   // اگر صرفاً بر اساسِ کانالِ رزرو (مهمان/تلفنی) تبعیض بگذارد فعال نمی‌شود —
   // دقیقاً همان انضباطِ «مدلِ مشکوک هیچ‌وقت جایگزین نمی‌شود» که در
   // decideModelActivation هست، این‌بار برای بایاس نه فقط دقت.
   const biasCheck = checkChannelBias(weights);
-  const isActive = decision.isActive && !biasCheck.biased;
-  const reason = biasCheck.biased ? biasCheck.reason : decision.reason;
+  const isActive = decision.isActive && aucGate.ok && !biasCheck.biased;
+  const reason = !decision.isActive ? decision.reason
+    : !aucGate.ok ? aucGate.reason
+    : biasCheck.biased ? biasCheck.reason
+    : decision.reason;
 
   // تاریخچه‌ی append-only (migration 042) — هیچ‌وقت overwrite نمی‌شود تا
   // داشبوردِ سلامتِ مدل بتواند «امتحان‌شد ولی فعال نشد» را هم ببیند، نه فقط
@@ -373,7 +413,7 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
 
   return {
     trained: true, sampleSize: examples.length, positiveCount,
-    learnedBrier, staticBrier, isActive, reason,
+    learnedBrier, staticBrier, learnedAuc, staticAuc, calibration, isActive, reason,
   };
 }
 

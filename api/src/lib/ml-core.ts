@@ -97,6 +97,110 @@ export function brierScore(predictions: readonly number[], labels: readonly numb
  * مقاوم‌تر است و مستقیماً به واحدِ خودِ داده (تعداد رزرو/کاور) قابلِ‌تفسیر
  * می‌ماند — برخلافِ RMSE که خطا را به توانِ دو می‌برد.
  */
+/**
+ * AUC-ROC — قدرتِ **تفکیکِ** مدل، با روشِ رتبه‌ای (Mann–Whitney U).
+ *
+ * ⚠️ چرا Brier کافی نیست و این اضافه شد: Brier دو چیزِ متفاوت را با هم قاطی
+ * می‌کند — کالیبراسیون (آیا عددِ ۰٫۳ واقعاً یعنی ۳۰٪؟) و تفکیک (آیا
+ * پرریسک‌ها را از کم‌ریسک‌ها جدا می‌کند؟). یک مدل که به **همه** میانگینِ
+ * نرخِ no-show را بدهد، Brierِ نسبتاً خوبی می‌گیرد ولی عملاً بی‌فایده است:
+ * AUCش دقیقاً ۰٫۵ است.
+ *
+ * و سؤالِ عملیاتیِ واقعیِ رستوران‌دار همین تفکیک است: «امشب فقط وقتِ تماس با
+ * ۱۰ مهمان را دارم — آیا این ۱۰ تا درست‌اند؟» این را فقط AUC جواب می‌دهد.
+ *
+ * روشِ رتبه‌ای عمداً به‌جای شمارشِ زوجی: با n نمونه، زوجی O(n²) است و روی
+ * چند هزار رزرو کند می‌شود؛ رتبه‌ای O(n log n) است و با هم‌رتبه‌ها (ties)
+ * هم درست رفتار می‌کند (رتبه‌ی میانگین).
+ *
+ * @returns AUC در [۰،۱]، یا `null` اگر همه‌ی برچسب‌ها یک‌کلاسه باشند
+ *   (آنجا AUC **تعریف‌نشده** است، نه صفر — قاعده‌ی ML_CONTRACT).
+ */
+export function rocAuc(
+  predictions: readonly number[],
+  labels: readonly number[],
+): number | null {
+  if (predictions.length !== labels.length) {
+    throw new Error('rocAuc: طولِ پیش‌بینی و برچسب یکی نیست');
+  }
+  const n = predictions.length;
+  if (n === 0) return null;
+
+  const pos = labels.reduce((s, y) => s + (y === 1 ? 1 : 0), 0);
+  const neg = n - pos;
+  // تک‌کلاسه ⇒ تفکیک بی‌معناست. `null` یعنی «نمی‌دانیم»، نه «بد».
+  if (pos === 0 || neg === 0) return null;
+
+  const idx = Array.from({ length: n }, (_, i) => i)
+    .sort((a, b) => predictions[a] - predictions[b]);
+
+  // رتبه‌ی میانگین برای هم‌رتبه‌ها — بدونِ این، مدلی که به همه عددِ یکسان
+  // می‌دهد AUCِ ۱ یا ۰ می‌گیرد به‌جای ۰٫۵.
+  const rank = new Array<number>(n);
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    while (j + 1 < n && predictions[idx[j + 1]] === predictions[idx[i]]) j++;
+    const avg = (i + j) / 2 + 1;         // رتبه‌ها از ۱ شروع می‌شوند
+    for (let k = i; k <= j; k++) rank[idx[k]] = avg;
+    i = j + 1;
+  }
+
+  let sumRankPos = 0;
+  for (let k = 0; k < n; k++) if (labels[k] === 1) sumRankPos += rank[k];
+
+  return (sumRankPos - (pos * (pos + 1)) / 2) / (pos * neg);
+}
+
+/** یک سطلِ منحنیِ کالیبراسیون. */
+export interface CalibrationBucket {
+  /** مرزِ پایین و بالای احتمالِ پیش‌بینی‌شده. */
+  from: number;
+  to: number;
+  /** تعدادِ نمونه در این سطل. */
+  n: number;
+  /** میانگینِ احتمالِ پیش‌بینی‌شده. */
+  predicted: number;
+  /** نرخِ واقعیِ رخداد در همین سطل. */
+  observed: number;
+}
+
+/**
+ * منحنیِ کالیبراسیون — «وقتی مدل می‌گوید ۳۰٪، واقعاً ۳۰٪ رخ می‌دهد؟»
+ *
+ * چرا جدا از Brier: Brier یک عددِ خلاصه است و نمی‌گوید **کجا** خطا دارد.
+ * مدلی که ریسکِ بالا را دستِ‌بالا و ریسکِ پایین را دستِ‌پایین می‌زند
+ * می‌تواند Brierِ قابلِ‌قبولی داشته باشد، ولی همان اریبی یعنی رستوران‌دار
+ * روی «۸۰٪ خطر» بیش‌ازحد واکنش نشان می‌دهد. سطل‌بندی این را نشان می‌دهد.
+ *
+ * سطل‌های خالی حذف می‌شوند — گزارشِ `observed: 0` برای سطلی که هیچ نمونه‌ای
+ * ندارد یعنی ادعای اندازه‌گیری‌نشده (ML_CONTRACT).
+ */
+export function calibrationCurve(
+  predictions: readonly number[],
+  labels: readonly number[],
+  buckets = 10,
+): CalibrationBucket[] {
+  if (predictions.length !== labels.length) {
+    throw new Error('calibrationCurve: طولِ پیش‌بینی و برچسب یکی نیست');
+  }
+  if (buckets < 2) throw new Error('calibrationCurve: حداقل ۲ سطل لازم است');
+
+  const acc = Array.from({ length: buckets }, () => ({ n: 0, sumP: 0, sumY: 0 }));
+  for (let i = 0; i < predictions.length; i++) {
+    const p = Math.min(Math.max(predictions[i], 0), 1);
+    const b = Math.min(Math.floor(p * buckets), buckets - 1);
+    acc[b].n++; acc[b].sumP += p; acc[b].sumY += labels[i] === 1 ? 1 : 0;
+  }
+  return acc.flatMap((a, b) => a.n === 0 ? [] : [{
+    from: b / buckets,
+    to: (b + 1) / buckets,
+    n: a.n,
+    predicted: a.sumP / a.n,
+    observed: a.sumY / a.n,
+  }]);
+}
+
 export function meanAbsoluteError(predictions: readonly number[], actuals: readonly number[]): number {
   if (predictions.length === 0) return Infinity; // بدترینِ ممکن — نباید در عمل رخ دهد
   let sum = 0;
