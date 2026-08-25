@@ -13,6 +13,12 @@ async function rLoyalty(){
     CLUB=fresh;
   }
   const total=CLUB.length;
+  // ⚠️ `platinum` سطحِ چهارمِ بک‌اند است (lib/loyalty.ts، آستانه‌ی ۲۰۰۰ امتیاز).
+  // تا ۲۰۲۶-۰۸-۲۵ اینجا وجود نداشت و بی‌خطر بود، چون هیچ کدی `tier` را
+  // **نمی‌نوشت** و همه برای همیشه `bronze` می‌ماندند. حالا که سطح واقعاً
+  // به‌روز می‌شود، نبودش یعنی وفادارترین اعضا از توزیعِ سطوح می‌افتند و
+  // `tierName[m.tier]` برایشان `undefined` می‌دهد — یک دایره‌ی خالی در فهرست.
+  const platinum=CLUB.filter(m=>m.tier==='platinum').length;
   const gold=CLUB.filter(m=>m.tier==='gold').length;
   const silver=CLUB.filter(m=>m.tier==='silver').length;
   const bronze=CLUB.filter(m=>m.tier==='bronze').length;
@@ -27,8 +33,9 @@ async function rLoyalty(){
   //     literal بود، نه خوانده‌شده. حالا مقدارِ **واقعیِ** رستوران است و تا
   //     وقتی از سرور نیامده «—» نشان می‌دهد (همان انضباطی که rCashback دارد).
   const cbLoaded = typeof _cbLoaded !== 'undefined' && _cbLoaded && typeof CB !== 'undefined';
-  const tiers=[['طلایی',gold,'#F59E0B'],['نقره‌ای',silver,'#94A3B8'],['برنزی',bronze,'#D97706']];
-  const tierName={gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'};
+  const tiers=[['پلاتینیوم',platinum,'#7C93B8'],['طلایی',gold,'#F59E0B'],['نقره‌ای',silver,'#94A3B8'],['برنزی',bronze,'#D97706']];
+  // نام‌ها عمداً با LOYALTY_TIERS در api/src/lib/loyalty.ts یکی‌اند.
+  const tierName={platinum:'پلاتینیوم',gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'};
   // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): دو KPIِ ثابتِ «۲.۱× خرید بیشتر» و «۸٪
   // میانگین کش‌بک» حذف شدند — هیچ‌جا اندازه‌گیری نمی‌شدند و کنارِ اعدادِ
   // واقعیِ باشگاه، ادعای اندازه‌گیری‌نشده بودند (قاعده‌ی ML_CONTRACT).
