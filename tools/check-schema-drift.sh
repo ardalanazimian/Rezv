@@ -148,6 +148,46 @@ fi
 FK_NEW=$(LC_ALL=C comm -23 /tmp/_drift_fk_diff.txt /tmp/_drift_fk_base.txt)
 FK_GONE=$(LC_ALL=C comm -13 /tmp/_drift_fk_diff.txt /tmp/_drift_fk_base.txt)
 
+# ⚠️ لایه‌ی سوم: **ایندکس‌ها** — با baseline.
+#
+# چرا اضافه شد (اندازه‌گیریِ واقعیِ ۲۰۲۶-۰۸-۲۵ روی دو Postgresِ ساخته‌شده از
+# همین HEAD): دو لایه‌ی بالا (ستون‌ها و کنشِ FK) هر دو سبز بودند، در حالی که
+#     مسیرِ CI (db push + apply-sql) = ۱۹۸ ایندکس
+#     مسیرِ تولید (migrate deploy + apply-sql) = ۱۷۸ ایندکس
+# یعنی **۲۰ ایندکسِ اعلام‌شده در schema.prisma هرگز در تولید ساخته نمی‌شدند**،
+# چون `@@index` نوشته شده بود ولی مهاجرتِ SQLش نه. `db push` آن‌ها را در CI
+# می‌ساخت پس همه‌ی تست‌ها سبز بودند و کوئریِ تولید Seq Scan می‌زد. (مهاجرتِ
+# 066 این ۲۰ مورد را ساخت؛ اختلاف حالا ۱۹۸=۱۹۸ است.)
+#
+# مقایسه عمداً **بدونِ نامِ ایندکس** است — دو مسیر همان ایندکس را با نام‌های
+# متفاوت می‌سازند. امضا = جدول + فهرستِ ستون/عبارت + یکتایی + شرطِ partial.
+# امضا: بندِ UNIQUE نگه داشته می‌شود، نامِ ایندکس حذف.
+IDXQ="SELECT CASE WHEN indexdef LIKE 'CREATE UNIQUE%' THEN 'UNIQUE ' ELSE '' END
+             || regexp_replace(indexdef, '^CREATE (UNIQUE )?INDEX [^ ]+ ON ', '')
+      FROM pg_indexes
+      WHERE schemaname='public' AND tablename <> '_prisma_migrations'"
+
+psql "$BASE/$PRISMA_DB" -Atc "$IDXQ" | LC_ALL=C sort -u > /tmp/_drift_idx_prisma.txt
+psql "$BASE/$PROD_DB"   -Atc "$IDXQ" | LC_ALL=C sort -u > /tmp/_drift_idx_prod.txt
+
+# همان گاردِ ضدِ «سبزِ توخالی»: مخزنِ سالم ده‌ها ایندکس دارد؛ صفر یعنی خرابیِ ابزار.
+if [ ! -s /tmp/_drift_idx_prisma.txt ] || [ ! -s /tmp/_drift_idx_prod.txt ]; then
+  echo ""
+  echo "✗ کوئریِ ایندکس‌ها هیچ ردیفی برنگرداند — یعنی خودِ چک خراب است، نه اینکه انحرافی نیست."
+  echo "  prisma-db: $(wc -l < /tmp/_drift_idx_prisma.txt) ردیف · prod-db: $(wc -l < /tmp/_drift_idx_prod.txt) ردیف"
+  exit 1
+fi
+
+IDX_BASELINE="$TOOLS_DIR/schema-drift-index-baseline.txt"
+LC_ALL=C comm -23 /tmp/_drift_idx_prisma.txt /tmp/_drift_idx_prod.txt > /tmp/_drift_idx_diff.txt
+if [ -f "$IDX_BASELINE" ]; then
+  grep -v '^#' "$IDX_BASELINE" | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u > /tmp/_drift_idx_base.txt
+else
+  : > /tmp/_drift_idx_base.txt
+fi
+IDX_NEW=$(LC_ALL=C comm -23 /tmp/_drift_idx_diff.txt /tmp/_drift_idx_base.txt)
+IDX_GONE=$(LC_ALL=C comm -13 /tmp/_drift_idx_diff.txt /tmp/_drift_idx_base.txt)
+
 MISSING=$(LC_ALL=C comm -23 /tmp/_drift_prisma.txt /tmp/_drift_prod.txt)
 
 if [ -n "$MISSING" ]; then
@@ -184,6 +224,27 @@ if [ -n "$FK_NEW" ]; then
   exit 1
 fi
 
+if [ -n "$IDX_NEW" ]; then
+  echo ""
+  echo "✗ انحرافِ **تازه**ی ایندکس — این‌ها در schema.prisma اعلام شده‌اند (پس در CI با"
+  echo "  db push ساخته می‌شوند و تست‌ها سبزند) ولی هیچ مهاجرتِ SQLی نمی‌سازدشان،"
+  echo "  یعنی در تولید وجود ندارند و همان کوئری Seq Scan می‌زند:"
+  echo ""
+  echo "$IDX_NEW" | sed 's/^/    /'
+  echo ""
+  echo "  رفع: یک مهاجرتِ SQL جدید در api/prisma/sql/NNN-*.sql با **همان نامی که"
+  echo "  Prisma تولید می‌کند** بنویس (وگرنه db push نسخه‌ی دومی می‌سازد)."
+  echo "  اگر اختلاف عمدی است، خطش را با توضیح به tools/schema-drift-index-baseline.txt اضافه کن."
+  exit 1
+fi
+
+if [ -n "$IDX_GONE" ]; then
+  echo ""
+  echo "ℹ baselineِ ایندکس کهنه شده — این خطوط دیگر انحراف نیستند و باید از"
+  echo "  tools/schema-drift-index-baseline.txt حذف شوند:"
+  echo "$IDX_GONE" | sed 's/^/    /'
+fi
+
 if [ -n "$FK_GONE" ]; then
   echo ""
   echo "ℹ baseline کهنه شده — این خطوط دیگر انحراف نیستند و باید از"
@@ -191,4 +252,4 @@ if [ -n "$FK_GONE" ]; then
   echo "$FK_GONE" | sed 's/^/    /'
 fi
 
-echo "✓ بدونِ انحراف — تولید هرچه Prisma لازم دارد را دارد ($(wc -l < /tmp/_drift_prisma.txt) ستون، $(wc -l < /tmp/_drift_fk_prisma.txt) کلیدِ خارجی، $(wc -l < /tmp/_drift_fk_base.txt) موردِ baseline)"
+echo "✓ بدونِ انحراف — تولید هرچه Prisma لازم دارد را دارد ($(wc -l < /tmp/_drift_prisma.txt) ستون، $(wc -l < /tmp/_drift_fk_prisma.txt) کلیدِ خارجی، $(wc -l < /tmp/_drift_idx_prisma.txt) ایندکس · baseline: $(wc -l < /tmp/_drift_fk_base.txt) FK + $(wc -l < /tmp/_drift_idx_base.txt) ایندکس)"
