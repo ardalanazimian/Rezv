@@ -84,13 +84,20 @@
     real but review bodies aren't returned, it now shows an honest aggregate
     summary); `openRest` on a missing restaurant gives a toast instead of a
     silent dead click.
-  - **Residual — no member-create endpoint (open).** The loyalty panel's "manual
-    add member" (`enrollClub`) is client-memory only — the `restaurant/members`
-    route has only `GET`, and server-side enrollment happens *automatically on a
-    reservation/walk-in*. The UI no longer fabricates a permanent "membership
-    code created" claim (it states the member is local this session and enrolled
-    for real on their first booking), but a true standalone create-member
-    endpoint is not built.
+  - **~~Residual — no member-create endpoint~~ SHIPPED same day (2026-08-25).**
+    `POST /restaurant/members` now exists (`lib/club-enroll.ts` — the same
+    atomic user-upsert + `clubCodeCounter` logic as `createWalkin`, without
+    creating a reservation; deliberately duplicated rather than refactoring the
+    reservation engine). Permission `canManageCampaigns`; idempotent on phone
+    (repeat → 200 with the same code); birth day/month arrive *Gregorian* (the
+    panel converts from Jalali before sending). The loyalty panel's "manual add
+    member" is wired to it and shows the real server code. Locked by
+    `tests/member-create.integration.test.mts` (create/idempotent/403/401/422).
+    **Bonus root-cause fix:** the dev seed inserted club codes directly but
+    never advanced `clubCodeCounter`, so on *any seeded environment* the first
+    real enrollment (walk-in or member-create) hit
+    `unique(restaurant_id, code)` → 500. The seed now seats the counter above
+    its highest inserted code. Production (unseeded) was never affected.
   - **Residual — event cards can't deep-open a restaurant outside the feed
     (open).** `special_events` is empty in every deployment (honest empty
     state), but if events existed and referenced a restaurant not on the loaded

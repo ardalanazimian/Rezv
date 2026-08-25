@@ -1,12 +1,23 @@
 import { NextResponse } from 'next/server';
 import { dbRead as db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
-import { parseQuery, z } from '@/lib/schemas';
+import { parseQuery, parseBody, zPhone, z } from '@/lib/schemas';
+import { enrollMemberByPhone } from '@/lib/club-enroll';
 
 const querySchema = z.object({
   q: z.string().max(100).trim().optional(),
   limit: z.number().int().min(1).max(100).default(50),
   offset: z.number().int().min(0).max(100_000).default(0),
+});
+
+// birth_day/birth_month میلادی‌اند (پنل قبل از ارسال از شمسی تبدیل می‌کند —
+// همان قراردادِ walkin route پس از رفعِ تقویمِ ۲۰۲۶-۰۸-۲۵).
+const createSchema = z.object({
+  phone: zPhone,
+  first_name: z.string().max(60).trim().optional(),
+  last_name: z.string().max(60).trim().optional(),
+  birth_day: z.number().int().min(1).max(31).optional(),
+  birth_month: z.number().int().min(1).max(12).optional(),
 });
 
 /** GET — لیست اعضای باشگاه (?q= جستجو، ?limit=&offset= صفحه‌بندی). مهاجرت‌شده به wrapper. */
@@ -59,5 +70,31 @@ export const GET = withRestaurantAuth(
         birth_month: m.user.birthDate ? m.user.birthDate.getMonth() + 1 : null,
       })),
     });
+  },
+);
+
+// ⚠️ اضافه‌شده (ممیزیِ آمادگیِ لانچ، ۲۰۲۶-۰۸-۲۵): تا امروز فقط GET بود و «ثبتِ
+// دستیِ عضو» در پنلِ باشگاه هیچ‌جا روی سرور ذخیره نمی‌شد (فقط حافظه‌ی مرورگر،
+// با کدِ VIS-ِ جعلی که با رفرش محو می‌شد). این POST همان منطقِ اتمیکِ
+// عضویتِ createWalkin را دارد (بدونِ ساختِ رزرو)، پس عضویت واقعاً پایدار می‌شود.
+// permission: canManageCampaigns — نوشتنِ حوزه‌ی وفاداری/مارکتینگ (owner همیشه؛
+// staff فقط با مجوزِ صریح، طبقِ SAFE_DEFAULTS=false).
+export const POST = withRestaurantAuth(
+  { permission: 'canManageCampaigns', rateLimit: 'auth' },
+  async (req, ctx) => {
+    const b = await parseBody(req, createSchema);
+    const result = await enrollMemberByPhone({
+      restaurantId: ctx.restaurant.id,
+      clubPrefix: ctx.restaurant.clubPrefix,
+      phone: b.phone,
+      firstName: b.first_name ?? null,
+      lastName: b.last_name ?? null,
+      birthDay: b.birth_day ?? null,
+      birthMonth: b.birth_month ?? null,
+    });
+    return NextResponse.json(
+      { code: result.code, enrolled_now: result.enrolledNow },
+      { status: result.enrolledNow ? 201 : 200 },
+    );
   },
 );

@@ -68,6 +68,7 @@ import './hours-approval.test.mts';
 import './hours-change-approval.integration.test.mts';
 import './customer-insight-spend-semantics.integration.test.mts';
 import './guest-profile-rollup.integration.test.mts';
+import './member-create.integration.test.mts';
 import './menu-crud.integration.test.mts';
 import './tables.integration.test.mts';
 import './table-qr-checkin.integration.test.mts';

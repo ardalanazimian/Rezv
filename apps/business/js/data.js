@@ -206,6 +206,8 @@ const API = {
   },
   // ارسال پیامک کمپین یا winback
   async sendSms(payload){ return this.post('/restaurant/sms', payload); },
+  // ثبتِ مستقیمِ عضوِ باشگاه (بدونِ رزرو) — endpointِ واقعی، عضویتِ پایدار
+  async createMember(payload){ return this.post('/restaurant/members', payload); },
   // ── مدیریت میز (وصل به /restaurant/tables واقعی) ──
   listTables(){ return this.get('/restaurant/tables'); },
   createTable(body){ return this.post('/restaurant/tables', body); },

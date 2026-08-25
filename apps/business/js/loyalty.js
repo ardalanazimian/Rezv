@@ -79,25 +79,43 @@ async function rLoyalty(){
       </div>
     </div>`;
 }
-function addMember(){
+const _CLUB_FA_MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+// ⚠️ ارتقا (ممیزیِ آمادگیِ لانچ، ۲۰۲۶-۰۸-۲۵): «ثبتِ دستیِ عضو» حالا به
+// endpointِ واقعیِ POST /restaurant/members وصل است — عضویت روی سرور پایدار
+// می‌شود و کدِ *واقعیِ* برگشتی از سرور نشان داده می‌شود (نه کدِ VIS-ِ جعلیِ
+// حافظه‌ای که با رفرش محو می‌شد). تولد از شمسی به میلادی تبدیل می‌شود
+// (jalaliMdToGregMd از reservations.js، scope مشترکِ پنل) تا پیامکِ تولدِ
+// بک‌اند در روزِ درست ارسال شود. فقط در حالتِ کاملاً آفلاین به پیامِ صادقِ
+// «اتصال برقرار نشد» می‌افتد.
+async function addMember(){
   const fn=document.getElementById('cFn').value.trim(),ln=document.getElementById('cLn').value.trim(),ph=document.getElementById('cPh').value.trim();
   if(!fn||!ln){toast('','نام و فامیل رو وارد کن');return}
   if(!/^۰۹|^09/.test(ph.replace(/\s/g,''))){toast('','موبایل معتبر وارد کن');return}
-  const res=enrollClub(fn+' '+ln,ph);
-  if(res.reason==='exists'){
-    toast('',`این شماره قبلاً عضوه (${res.member.code})`);
+  const phoneLatin=ph.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\s/g,'');
+  const dRaw=(document.getElementById('cD')?.value||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  const jDay=parseInt(dRaw,10);
+  const jMonth=_CLUB_FA_MONTHS.indexOf(document.getElementById('cM')?.value||'')+1;
+  let birth={};
+  if(jDay>=1&&jDay<=31&&jMonth>=1&&typeof jalaliMdToGregMd==='function'){
+    const g=jalaliMdToGregMd(jMonth,jDay);
+    if(g) birth={birth_day:g.gDay,birth_month:g.gMonth};
+  }
+  const btn=document.querySelector('#v-loyalty [onclick="addMember()"]');
+  if(btn) btn.disabled=true;
+  const res=await API.createMember({phone:phoneLatin,first_name:fn,last_name:ln,...birth});
+  if(btn) btn.disabled=false;
+  if(res.ok && res.data?.code){
+    const code=res.data.code, already=res.data.enrolled_now===false;
+    document.getElementById('memberResult').innerHTML=`<div style="background:var(--teal-50);border:1px solid #99F6E4;border-radius:var(--r);padding:14px;margin-top:14px;text-align:center"><div style="font-size:11px;color:var(--teal-600);font-weight:700">${already?'این شماره از قبل عضو است':'عضو در باشگاه ثبت شد'}</div><div style="font-size:24px;font-weight:800;letter-spacing:.1em;color:var(--teal-600);margin-top:4px">${esc(code)}</div><div style="font-size:12px;color:var(--t2);margin-top:4px">${esc(fn)} ${esc(ln)}</div></div>`;
+    document.getElementById('cFn').value='';document.getElementById('cLn').value='';document.getElementById('cPh').value='';
+    toast('',already?`از قبل عضو بود (${code})`:'عضو در باشگاه ثبت شد');
+    // rLoyalty خودش هر بار از سرور تازه می‌کند؛ عضو جدید واقعاً در لیست می‌آید
+    setTimeout(()=>{if(document.getElementById('v-loyalty')?.classList.contains('active'))rLoyalty()},900);
     return;
   }
-  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): بک‌اند endpointی برای ساختِ مستقیمِ عضو
-  // ندارد (فقط auto-enroll هنگامِ رزرو/walk-in). قبلاً این‌جا یک کدِ VIS-ِ
-  // کلاینتی به‌عنوانِ «کد عضویت ساخته شد» + توستِ «عضو جدید ثبت شد» نشان داده
-  // می‌شد — ادعای عضویتِ دائمِ سروری، در حالی که با رفرش (loadClubMembers از
-  // سرور) محو می‌شد. حالا صادقانه می‌گوییم فقط در این جلسه اضافه شده و عضویتِ
-  // دائم خودکار با اولین رزروِ همین شماره ساخته می‌شود (همان‌طور که بالای فرم
-  // نوشته). پیامدِ باز: نیازِ به endpointِ ساختِ عضو در KNOWN_LIMITATIONS ثبت شد.
-  document.getElementById('memberResult').innerHTML=`<div style="background:var(--amber-50);border:1px solid #FDE68A;border-radius:var(--r);padding:14px;margin-top:14px;line-height:1.7;font-size:12.5px;color:var(--t1)">${icon('info',{size:14})} «${esc(fn)} ${esc(ln)}» فعلاً فقط در همین جلسه اضافه شد. عضویتِ دائم و کدِ رسمی، خودکار وقتی این شماره اولین رزرو را ثبت کند ساخته می‌شود.</div>`;
-  document.getElementById('cFn').value='';document.getElementById('cLn').value='';document.getElementById('cPh').value='';
-  toast('','در این جلسه اضافه شد — عضویتِ دائم با اولین رزرو');
-  // عمداً rLoyalty را دوباره صدا نمی‌زنیم: چون عضو فقط محلی است، رفرشِ آمار از
-  // سرور آن را حذف می‌کند و کاربر گیج می‌شود. پیامِ صادق بالا کافی است.
+  if(res.offline){
+    document.getElementById('memberResult').innerHTML=`<div style="background:var(--amber-50);border:1px solid #FDE68A;border-radius:var(--r);padding:14px;margin-top:14px;line-height:1.7;font-size:12.5px;color:var(--t1)">${icon('info',{size:14})} اتصال به سرور برقرار نشد. «${esc(fn)} ${esc(ln)}» ثبت نشد — با وصل‌شدنِ اینترنت دوباره تلاش کن.</div>`;
+    return;
+  }
+  toast('', res.error?.message || 'ثبتِ عضو ناموفق بود، دوباره تلاش کن');
 }

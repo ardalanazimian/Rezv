@@ -171,6 +171,22 @@ async function main() {
     console.log(`✓ ${rest.name} — ${memberCount} عضو باشگاه + رزروها`);
   }
 
+  // ⚠️ رفع‌شده (ممیزیِ آمادگیِ لانچ، ۲۰۲۶-۰۸-۲۵): seed کدهای عضویت را مستقیم
+  // درج می‌کند (randCode = PREFIX-(1000+n)) ولی clubCodeCounter را ست نمی‌کرد —
+  // پس اولین enrollِ واقعی (walk-in یا POST /restaurant/members) از nextValue
+  // پیش‌فرضِ 1002 شروع می‌شد و به unique(restaurant_id, code) می‌خورد → 500.
+  // یعنی در *هر* محیطِ dev-seedشده، walk-in و ثبتِ عضو عملاً شکسته بود (در
+  // تولیدِ بدونِ seed مشکلی نبود چون همه‌چیز از خودِ شمارنده می‌آید). شمارنده
+  // را بالاتر از بزرگ‌ترین کدِ درج‌شده می‌نشانیم.
+  const allRests = await db.restaurant.findMany({ where: { tenantId: tenant.id }, select: { id: true } });
+  for (const r of allRests) {
+    await db.clubCodeCounter.upsert({
+      where: { restaurantId: r.id },
+      create: { restaurantId: r.id, nextValue: 1000 + userCounter + 2 },
+      update: { nextValue: 1000 + userCounter + 2 },
+    });
+  }
+
   console.log('\n✅ seed کامل شد. حالا endpointهای باشگاه و آنالیز داده دارند.');
 }
 
