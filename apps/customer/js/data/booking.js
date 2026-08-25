@@ -139,7 +139,15 @@ export async function refreshSlots(id){
       sel.innerHTML=open.map(s=>`<option value="${s.time}">${faTime(s.time)}</option>`).join('');
     }else{
       // خالیِ صادقانه: هیچ ساعتِ اختراعی جایگزینش نمی‌شه.
-      sel.innerHTML='<option value="">ساعت خالی برای این روز نیست</option>';
+      // ⚠️ ولی «خالی» یک علت ندارد. تا پیش از این، رستورانی که سیستمش آفلاین
+      // بود همین پیامِ «ساعت خالی برای این روز نیست» را می‌گرفت — یعنی کاربر
+      // فکر می‌کرد امشب پر است، در حالی که واقعیت این بود که رستوران اصلاً
+      // رزروِ آنلاین نمی‌گرفت. حالا خودِ API علت را می‌گوید
+      // (restaurant_status: online|offline|closed) و ما همان را نشان می‌دهیم.
+      const why = res.data?.restaurant_status === 'offline' || res.data?.restaurant_status === 'closed'
+        ? (res.data?.reason || 'این رستوران فعلاً رزروِ آنلاین نمی‌پذیرد')
+        : 'ساعت خالی برای این روز نیست';
+      sel.innerHTML=`<option value="">${esc(why)}</option>`;
     }
     // ساعت‌های پر را هم نشان بده ولی غیرفعال
     res.data.slots.filter(s=>s.status==='full').forEach(s=>{

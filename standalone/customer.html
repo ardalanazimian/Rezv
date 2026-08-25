@@ -2726,7 +2726,15 @@ async function refreshSlots(id){
       sel.innerHTML=open.map(s=>`<option value="${s.time}">${faTime(s.time)}</option>`).join('');
     }else{
       // خالیِ صادقانه: هیچ ساعتِ اختراعی جایگزینش نمی‌شه.
-      sel.innerHTML='<option value="">ساعت خالی برای این روز نیست</option>';
+      // ⚠️ ولی «خالی» یک علت ندارد. تا پیش از این، رستورانی که سیستمش آفلاین
+      // بود همین پیامِ «ساعت خالی برای این روز نیست» را می‌گرفت — یعنی کاربر
+      // فکر می‌کرد امشب پر است، در حالی که واقعیت این بود که رستوران اصلاً
+      // رزروِ آنلاین نمی‌گرفت. حالا خودِ API علت را می‌گوید
+      // (restaurant_status: online|offline|closed) و ما همان را نشان می‌دهیم.
+      const why = res.data?.restaurant_status === 'offline' || res.data?.restaurant_status === 'closed'
+        ? (res.data?.reason || 'این رستوران فعلاً رزروِ آنلاین نمی‌پذیرد')
+        : 'ساعت خالی برای این روز نیست';
+      sel.innerHTML=`<option value="">${esc(why)}</option>`;
     }
     // ساعت‌های پر را هم نشان بده ولی غیرفعال
     res.data.slots.filter(s=>s.status==='full').forEach(s=>{
@@ -3430,7 +3438,22 @@ async function loadRestaurants(){
     NEXT_CURSOR = res.data?.next_cursor || null;  // برای بارگذاری صفحه‌ی بعد
     return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
   }
-  // fallback
+  // ⚠️ «سرور جواب داد ولی خالی بود» با «سرور در دسترس نیست» یکی نیست.
+  // نسخه‌ی قبلی هر دو را یکسان می‌گرفت (`if (list && list.length)` و بعد
+  // مستقیم R_SAMPLE) و نتیجه‌اش این بود: پاسخِ کاملاً موفقِ `200 {items:[]}`
+  // به کاربرِ **واقعی** روی سایتِ **واقعی**، شش رستورانِ `[DEMO]` را
+  // به‌عنوانِ رستورانِ واقعی نشان می‌داد. حتی پیامِ کنسول هم نمی‌آمد چون
+  // `res.offline` در این حالت false است.
+  // این حالت فرضی نیست: api/src/app/api/v1/restaurants/route.ts:44-49 هر
+  // رستورانی را که ۹۰ ثانیه heartbeat نداده از فهرست حذف می‌کند، پس کافی
+  // است اینترنتِ پنل‌ها لحظه‌ای قطع شود تا فهرست خالی برگردد.
+  if (res.ok) {
+    API.online = true;      // سرور سالم است — فقط چیزی برای نشان‌دادن نیست
+    NEXT_CURSOR = null;
+    return [];              // حالتِ خالیِ صادق، نه دادهٔ ساختگی
+  }
+  // فقط اینجا داده‌ی نمونه مجاز است: بک‌اند واقعاً در دسترس نیست
+  // (`file://`، تایم‌اوت، یا خطای شبکه) — یعنی همان تجربه‌ی دموی آفلاین.
   API.online = false;
   if (res.offline) console.info('[رزرونو] بک‌اند در دسترس نیست — نمایش داده‌ی نمونه');
   return R_SAMPLE;
@@ -3789,6 +3812,20 @@ function invalidateFeed(){ return ++FEED_TOKEN; }
 function renderFeed(list){
   const f=document.getElementById('feed');
   const token=invalidateFeed();
+  // ⚠️ فهرستِ خالی باید **حالتِ خالیِ صادق** بدهد، نه صفحه‌ی سفید.
+  // این مسیر از وقتی زنده شد که loadRestaurants دیگر روی پاسخِ موفقِ
+  // `200 {items:[]}` دادهٔ نمونه برنمی‌گرداند (توضیحِ کامل در js/api.js).
+  // آن‌جا دروغ برداشته شد؛ اینجا جایش را حقیقت پر می‌کند.
+  if(!list.length){
+    f.innerHTML=`
+    <div class="empty" style="grid-column:1/-1">
+      <div class="empty-emoji" aria-hidden="true">🕒</div>
+      <div class="empty-title">الان رستورانِ فعالی برای رزروِ آنلاین نیست</div>
+      <div class="empty-text">رستوران‌ها وقتی سیستمشان آنلاین است اینجا نشان داده می‌شوند. کمی بعد دوباره امتحان کن.</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="location.reload()">تلاشِ دوباره</button>
+    </div>`;
+    return;
+  }
   f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
   setTimeout(()=>{
     if(token!==FEED_TOKEN) return;   // رندرِ تازه‌تری از راه رسیده — این یکی کهنه است

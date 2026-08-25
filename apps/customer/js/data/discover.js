@@ -170,6 +170,20 @@ export function invalidateFeed(){ return ++FEED_TOKEN; }
 export function renderFeed(list){
   const f=document.getElementById('feed');
   const token=invalidateFeed();
+  // ⚠️ فهرستِ خالی باید **حالتِ خالیِ صادق** بدهد، نه صفحه‌ی سفید.
+  // این مسیر از وقتی زنده شد که loadRestaurants دیگر روی پاسخِ موفقِ
+  // `200 {items:[]}` دادهٔ نمونه برنمی‌گرداند (توضیحِ کامل در js/api.js).
+  // آن‌جا دروغ برداشته شد؛ اینجا جایش را حقیقت پر می‌کند.
+  if(!list.length){
+    f.innerHTML=`
+    <div class="empty" style="grid-column:1/-1">
+      <div class="empty-emoji" aria-hidden="true">🕒</div>
+      <div class="empty-title">الان رستورانِ فعالی برای رزروِ آنلاین نیست</div>
+      <div class="empty-text">رستوران‌ها وقتی سیستمشان آنلاین است اینجا نشان داده می‌شوند. کمی بعد دوباره امتحان کن.</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="location.reload()">تلاشِ دوباره</button>
+    </div>`;
+    return;
+  }
   f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
   setTimeout(()=>{
     if(token!==FEED_TOKEN) return;   // رندرِ تازه‌تری از راه رسیده — این یکی کهنه است
