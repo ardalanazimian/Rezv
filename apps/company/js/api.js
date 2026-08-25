@@ -1,7 +1,9 @@
 // ═══ رزرونو — پنل company: ابزارها + لایه‌ی اتصال API admin (Vanilla JS، scope مشترک) ═══
 let tt;
 function toast(icon,msg){const t=document.getElementById('toast');document.getElementById('toastIcon').textContent=icon;document.getElementById('toastMsg').textContent=msg;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2600)}
-function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sbOverlay').classList.toggle('show')}
+function toggleSidebar(){const open=document.getElementById('sidebar').classList.toggle('open');document.getElementById('sbOverlay').classList.toggle('show');
+  // aria-expanded باید با وضعیتِ واقعی همگام بماند وگرنه صفحه‌خوان همیشه «بسته» اعلام می‌کند (پنلِ business از قبل داشت؛ اینجا جا مانده بود).
+  document.querySelector('.tb-burger')?.setAttribute('aria-expanded',String(open))}
 
 // ═══════════════════════════════════════════════════════════
 //  لایه‌ی اتصال API (فاز ۳) — پنل شرکت به endpointهای admin
@@ -32,18 +34,8 @@ const API = {
     if (r.offline) return { ok: false, offline: true, error: r.error };
     return { ok: false, status: r.status, error: r.error || { message: `خطای ${r.status}` } };
   },
-  async _doRefresh(){
-    if (this._refreshing) return this._refreshing;
-    this._refreshing = (async () => {
-      try {
-        const res = await fetch(this.base + '/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh: this._refresh }) });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.access) { this.setToken(data.access); this.setRefresh(data.refresh); return true; }
-        return false;
-      } catch { return false; } finally { this._refreshing = null; }
-    })();
-    return this._refreshing;
-  },
+  // منطقِ تمدید حالا در shared/js/api-core.js است (§۶ — سه کپیِ یکسان یکی شد).
+  async _doRefresh(){ return refreshAccessToken(this); },
   _onSessionExpired(){ this.setToken(null); this.setRefresh(null); if (typeof onAdminSessionExpired === 'function') onAdminSessionExpired(); },
   get(path){ return this.request(path); },
   post(path, body){ return this.request(path, { method:'POST', body: JSON.stringify(body||{}) }); },
@@ -111,7 +103,13 @@ function mapAdminRestaurant(apiR, fallback){
     name: apiR.name,
     logo: fallback?.logo || '',
     grad: fallback?.grad || 'linear-gradient(135deg,#818CF8,#4F46E5)',
-    city: apiR.cuisine || fallback?.city || '—',
+    // ⚠️ رفعِ نشتِ داده‌ی نمونه به ردیفِ واقعی (فازِ ۲، §۳).
+    // قبلاً `apiR.cuisine || fallback?.city || '—'` بود: رستورانِ واقعیِ بدونِ
+    // cuisine، شهرِ یک رستورانِ **نمونه** را به‌عنوانِ شهرِ خودش نشان می‌داد
+    // (و چون fallback در نبودِ تطابقِ id به RESTAURANTS_SAMPLE[0] می‌افتاد،
+    // این برایِ هر رستورانِ واقعیِ خارج از نمونه رخ می‌داد). logo/grad عمداً
+    // fallback دارند چون واقعاً تزئینی‌اند؛ شهر یک واقعیتِ کسب‌وکار است.
+    city: apiR.cuisine || '—',
     plan: apiR.plan || 'free',
     // وضعیت واقعی اشتراک — از بک‌اند (tenant.plan_expires_at / trial_ends_at)
     status: apiR.subscription_status,
@@ -134,13 +132,27 @@ async function loadAdminRestaurants(){
     API.online = true;
     updateOfflineBanner();
     return res.data.restaurants.map(apiR => {
-      const fb = RESTAURANTS_SAMPLE.find(s => s.id === apiR.id) || RESTAURANTS_SAMPLE[0];
+      // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): apiR.id همیشه UUID است و idِ نمونه عددِ
+      // ۱..۸ — پس find همیشه شکست می‌خورد و *همه‌ی* رستوران‌های واقعی دقیقاً
+      // لوگو/گرادیانِ نمونه‌ی شماره‌ی ۱ (🌿 سبز) را می‌گرفتند. حالا انتخابِ
+      // تزئینی، قطعی و متنوع بر اساسِ هَشِ id است (همان الگویِ اپ مشتری).
+      const key = String(apiR.id || '');
+      let h = 0; for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+      const fb = RESTAURANTS_SAMPLE[h % RESTAURANTS_SAMPLE.length];
       return mapAdminRestaurant(apiR, fb);
     });
   }
   API.online = false;
   updateOfflineBanner();
-  return RESTAURANTS_SAMPLE.map(s => ({ ...s, _demo: true }));
+  // ⚠️ برچسبِ [DEMO] روی خودِ نام (فازِ ۲، §۳ + قاعده‌ی صریحِ CLAUDE.md).
+  // `_demo: true` قبلاً ست می‌شد ولی هیچ‌جا رندر نمی‌شد — تنها نشانه‌ی صداقت
+  // بنرِ آفلاین بود، نه خودِ ردیف‌ها. مدیرِ پلتفرم هشت رستورانِ ساختگی با
+  // اعدادِ کاملاً جعلی (۱۲۴۰ عضو، ۳۴۲۰ رزرو) را عینِ داده‌ی واقعی می‌دید.
+  return RESTAURANTS_SAMPLE.map(s => ({
+    ...s,
+    name: s.name.startsWith('[DEMO]') ? s.name : `[DEMO] ${s.name}`,
+    _demo: true,
+  }));
 }
 function updateOfflineBanner(){
   const el = document.getElementById('offlineBanner');
@@ -148,3 +160,13 @@ function updateOfflineBanner(){
 }
 
 // ════════ داده‌ی رستوران‌ها (شبیه‌سازی — در محصول واقعی از API) ════════
+
+
+// ── فعال‌سازیِ کیبورد برایِ عناصرِ role="button" ──
+// (یافته‌ی ممیزیِ ۲۰۲۶-۰۸-۲۴: اپِ مشتری این هندلرِ سراسری را داشت ولی پنل‌ها
+// نه — یعنی هر divِ کلیک‌پذیر، حتی با tabindex، با Enter/Space کار نمی‌کرد.)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target && e.target.closest ? e.target.closest('[role="button"]') : null;
+  if (el && el.tagName !== 'BUTTON' && el.tagName !== 'A' && el.tagName !== 'INPUT') { e.preventDefault(); el.click(); }
+});

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { Vazirmatn } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import './site.css';
 import { Header } from '@/components/site/Header';
@@ -16,12 +16,15 @@ import { getBanner } from '@/lib/site-api';
 import { alternates, SITE } from '@/lib/i18n';
 import { graph, organizationJsonLd, websiteJsonLd, BRAND_NAME } from '@/lib/site-schema';
 
-// فونتِ برند از طریقِ next/font: در زمانِ build دانلود و self-host می‌شود، پس
-// در زمانِ اجرا هیچ درخواستی به دامنه‌ی بیرونی نمی‌رود (سریع‌تر + سازگار با CSP).
-const vazirmatn = Vazirmatn({
-  subsets: ['arabic'],
+// ⚠️ اصلاح‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): next/font/google در زمانِ *build* به
+// fonts.googleapis.com وصل می‌شود — دامنه‌ای که در ایران (بازارِ واقعیِ محصول)
+// در دسترس نیست، پس هر build/CIِ داخلِ کشور یا می‌شکست یا بی‌صدا بدونِ فونت
+// می‌ماند. حالا همان فایلِ self-hostedِ shared/fonts (کپی‌شده در app/fonts)
+// استفاده می‌شود — همان تصمیمی که سه پنل و apps/seo قبلاً گرفته‌اند.
+const vazirmatn = localFont({
+  src: './fonts/vazirmatn-var.woff2',
   display: 'swap',
-  weight: ['400', '500', '600', '700', '800'],
+  weight: '100 900',
   variable: '--font-vazirmatn',
 });
 

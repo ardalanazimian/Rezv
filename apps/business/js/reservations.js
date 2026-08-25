@@ -99,7 +99,7 @@ async function renderResList(){
     el.innerHTML=demoNote+`
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px">
         <div style="background:var(--green-50);border:1px solid #BBF7D0;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#15803D">${fa(done)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('check',{size:12})} انجام‌شده</div></div>
-        <div style="background:var(--amber-50);border:1px solid #FDE68A;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#D97706">${fa(noshow)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('alert',{size:12})} نیومدن (no-show)</div></div>
+        <div style="background:var(--amber-50);border:1px solid #FDE68A;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--amber)">${fa(noshow)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('alert',{size:12})} نیومدن (no-show)</div></div>
         <div style="background:var(--red-50);border:1px solid #FECACA;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#B91C1C">${fa(cancelled)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('close',{size:12})} لغوشده</div></div>
       </div>`+
       list.map(x=>resItemHTML(x.r,x.i)).join('');
@@ -145,16 +145,16 @@ function resItemHTML(r,i){
         ${statusChip}
       </div>
       <div class="tl-meta">${dateBadge}${icon('users',{size:13})} ${fa(r.party)} نفر · میز ${fa(r.table)} · ${icon('phone',{size:13})} ${esc(r.phone)} ${r.pre?`· ${icon('utensils',{size:12})} پیش‌سفارش`:''}</div>
-      ${r.note?`<div class="tl-meta" style="color:#D97706">${icon('inbox',{size:13})} ${esc(r.note)}</div>`:''}
+      ${r.note?`<div class="tl-meta" style="color:var(--amber)">${icon('inbox',{size:13})} ${esc(r.note)}</div>`:''}
       ${r.cancelReason?`<div class="tl-meta" style="color:#B91C1C">${icon('alert',{size:13})} دلیل لغو: ${esc(r.cancelReason)}</div>`:''}
       ${!isPast?`<div class="tl-actions">
         ${allowed.includes('checked_in')?`<button class="btn btn-teal ${actBtn}" onclick="markArrived(${i})">${icon('check',{size:14})} رسید</button>`:''}
         ${allowed.includes('seated')?`<button class="btn btn-primary ${actBtn}" onclick="markSeated(${i})">${icon('utensils',{size:14})} نشاند</button>`:''}
         ${allowed.includes('no_show')?`<button class="btn btn-ghost ${actBtn}" onclick="markNoShow(${i})">${icon('alert',{size:14})} نیومد</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="openStatusMenu(${i})">${icon('refresh',{size:14})} وضعیت</button>
-        <button class="btn btn-ghost btn-sm" onclick="toast('','تماس با '+${JSON.stringify(esc(r.name))})">تماس</button>
+        <button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer('${esc(r.phone)}')"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>
         ${allowed.includes('cancelled')?`<button class="btn btn-danger ${actBtn}" onclick="cancelRes(${i})">لغو</button>`:''}
-      </div>`:`<div class="tl-actions"><button class="btn btn-ghost btn-sm" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه</button><button class="btn btn-ghost btn-sm" onclick="toast('','تماس با '+${JSON.stringify(esc(r.name))})">تماس</button>${r.status==='completed'?`<button class="btn btn-ghost btn-sm" onclick="openManual()">رزرو مجدد</button>`:''}</div>`}
+      </div>`:`<div class="tl-actions"><button class="btn btn-ghost btn-sm" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه</button><button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer('${esc(r.phone)}')"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>${r.status==='completed'?`<button class="btn btn-ghost btn-sm" onclick="openManual()">رزرو مجدد</button>`:''}</div>`}
     </div></div>`;
 }
 // ⚠️ رفعِ باگِ زنده (Tonight Board، ۲۰۲۶-۰۸-۱۴): این تابع قبلاً وقتی آنلاین
@@ -291,10 +291,10 @@ async function walkinLookup(){
       <div class="modal-title" style="text-align:center">${esc(member.fn)} ${esc(member.ln)} خوش اومدی!</div>
       <div class="modal-sub" style="text-align:center">مشتری قدیمی — قبلاً ثبت‌شده</div>
       <div class="summary" style="margin-bottom:18px">
-        <div class="sum-row"><span class="k">کد عضویت</span><span class="v">${member.code}</span></div>
+        <div class="sum-row"><span class="k">کد عضویت</span><span class="v">${esc(member.code)}</span></div>
         <div class="sum-row"><span class="k">سطح</span><span class="v">${tierName}</span></div>
         <div class="sum-row"><span class="k">امتیاز</span><span class="v">${fa(member.points)}</span></div>
-        <div class="sum-row"><span class="k">موبایل</span><span class="v">${member.phone}</span></div>
+        <div class="sum-row"><span class="k">موبایل</span><span class="v">${esc(member.phone)}</span></div>
       </div>
       <div class="field-label">تعداد نفرات</div>
       <div class="opt-row wparty-group">
@@ -436,18 +436,18 @@ async function saveManual(){
       label:`رزرو ${n} · ${dLabel} ${timeVal}`, localRef:localRec,
     });
   }
-  const res=enrollClub(n,phone);
+  // ⚠️ رفعِ جعلِ کدِ عضویت (فازِ ۲، §۳): اینجا قبلاً enrollClub محلی صدا زده
+  // می‌شد و توست یک کدِ عضویتِ ساختگی (VIS-xxx) اعلام می‌کرد — کدی که در
+  // دیتابیس وجود نداشت. عضویتِ واقعی را سرور هنگامِ همگام‌سازیِ همین رزرو
+  // به‌صورت اتمیک می‌سازد (createWalkinTx/createReservation)، با کدِ واقعی.
+  // خودِ صف‌کردنِ رزرو در Outbox (بالا) درست است و دست‌نخورده مانده.
   closeModal();
   resDate=dateKey;
   if(document.getElementById('v-reservations').classList.contains('active'))rReservations();
   else if(document.getElementById('v-overview').classList.contains('active'))rOverview();
-  if(res.enrolled){
-    toast('',`رزرو ${dLabel} ثبت شد + ${n} به باشگاه اضافه شد (${res.member.code})`);
-  }else if(res.reason==='exists'){
-    toast('',`رزرو ${dLabel} ثبت شد · ${n} قبلاً عضو باشگاهه`);
-  }else{
-    toast('',`رزرو ${dLabel} ثبت شد`);
-  }
+  toast('', isOffline()
+    ? `رزرو ${dLabel} محلی ثبت شد — با برگشت اینترنت همگام می‌شود`
+    : `رزرو ${dLabel} ثبت شد`);
 }
 
 // ═══════════ FLOOR PLAN ═══════════
@@ -457,6 +457,15 @@ async function saveManual(){
 function syncTablesFromReservations(){
   const todayRes=RES.filter(r=>r.date==='today'&&r.table>0&&(r.status==='confirmed'||r.status==='arrived'));
   TABLES.forEach(t=>{
+    // ⚠️ فازِ ۲ (§۶): وضعیت‌هایِ عملیاتیِ صریح («تعمیرات» و «در حالِ نظافت»)
+    // نباید با وضعیتِ مشتق‌شده از رزرو بازنویسی شوند. این‌ها را انسان یا
+    // بک‌اند عمداً ست کرده و بر حدسِ این تابع اولویت دارند.
+    //
+    // چرا مهم است: میزی که در تعمیرات است ولی یک رزروِ امروز به شماره‌اش
+    // اشاره دارد، پیش از این «رزروشده» نمایش داده می‌شد — یعنی همان
+    // پنهان‌شدنِ وضعیتِ تعمیرات که این batch می‌خواست رفعش کند.
+    // (با تستِ e2e پیدا شد: میزِ maintenance در DOM با کلاسِ reserved می‌آمد.)
+    if(t.s==='maintenance'||t.s==='cleaning'){ delete t._guest; delete t._time; return; }
     // اگه دستی روی این میز وضعیت seated گذاشته شده و رزروی نیست، دست نزن
     const res=todayRes.find(r=>r.table===t.n);
     if(res){

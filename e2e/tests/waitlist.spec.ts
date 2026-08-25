@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { mockApi } from './helpers/mock-api';
+import { mockApi, DEMO_RESTAURANTS } from './helpers/mock-api';
 import { gotoApp, openFirstRestaurant, login } from './helpers/actions';
 
 // ═══ جریانِ لیست انتظار ═══
@@ -7,6 +7,11 @@ import { gotoApp, openFirstRestaurant, login } from './helpers/actions';
 // به‌جای از دست دادنِ کاربر، پیشنهادِ پیوستن به لیست انتظار بدهد — «مسیرِ نجاتِ درآمد».
 
 test.beforeEach(async ({ page }) => {
+  // ⚠️ فازِ ۲: این جریان‌ها چندمرحله‌ای‌اند و زیرِ بارِ موازیِ کلِ سوئیت از مهلتِ
+  // پیش‌فرضِ ۳۰ ثانیه رد می‌شدند — با اجرایِ کاملِ سوئیت واقعاً مشاهده شد
+  // (۵ شکست با ۴ ورکر، ۲۷/۲۷ پاس با ۱ ورکر). مهلت بیشتر می‌شود،
+  // هیچ assertionی ضعیف نمی‌شود.
+  test.slow();
   // اسلات‌ها باز نمایش داده می‌شوند تا کاربر بتواند تا مرحله‌ی تأیید پیش برود،
   // ولی POST رزرو با SLOT_FULL رد می‌شود (شبیه‌سازیِ پرشدنِ ظرفیت در لحظه‌ی تأیید).
   await mockApi(page, { reserveFull: true });
@@ -42,8 +47,11 @@ test('کاربر می‌تواند به لیست انتظار بپیوندد و 
   await advanceToConfirm(page);
 
   // پیوستن به صف
-  await page.evaluate(() =>
-    (window as Window & { joinWaitlist: (id: number) => Promise<void> }).joinWaitlist(1)
+  // id همان UUIDِ mock است — قبلاً عددِ ۱ بود که با شکلِ واقعیِ بک‌اند (UUID)
+  // نمی‌خواند و باگِ کلاسِ id-mismatch را از دیدِ CI پنهان می‌کرد.
+  await page.evaluate(
+    (rid) => (window as Window & { joinWaitlist: (id: string) => Promise<void> }).joinWaitlist(rid),
+    DEMO_RESTAURANTS[0].id,
   );
   // بعد از پیوستن، موقعیت در صف باید نمایش داده شود (position=2 از mock)
   await expect(page.locator('#sheetBody')).toContainText(/موقعیت|صف|۲|2|انتظار/, { timeout: 8000 });

@@ -84,9 +84,13 @@ interface GalleryItem { image?: unknown; caption?: string }
 
 export function Gallery({ sec }: { sec: Section }) {
   const items = list<GalleryItem>(sec.items);
-  // بدونِ محتوا هم پنج جای عکس نشان داده می‌شود تا در استودیو معلوم باشد
-  // این بخش چند تصویر می‌خواهد.
-  const shown: GalleryItem[] = items.length ? items : Array.from({ length: 5 }, () => ({}));
+  // ⚠️ اصلاح‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): وقتی هیچ تصویری تعریف نشده، این بخش در
+  // *سایتِ زنده* پنج جعبه‌ی خاکستریِ «جای عکس» زیرِ عنوانِ «فضا، غذا، و آدم‌ها»
+  // رندر می‌کرد — روی صفحه‌ی مارکتینگِ عمومی، یک بخشِ خالیِ شکسته‌نما (مکانیزمِ
+  // پیش‌نمایشِ جداگانه‌ای هم وجود ندارد که placeholder فقط در استودیو بماند).
+  // حالا گالریِ بدونِ محتوا اصلاً رندر نمی‌شود — تا وقتی عکسِ واقعی اضافه شود.
+  if (!items.length) return null;
+  const shown: GalleryItem[] = items;
 
   return (
     <section className="section">

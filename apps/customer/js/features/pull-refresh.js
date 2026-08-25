@@ -8,12 +8,17 @@
 //   • listenerِ touchmove فقط «حین» یک کشیدنِ فعال اضافه و در پایان حذف می‌شود
 //     (هیچ non-passive touchmoveِ سراسری روی کلِ اسکرول نمی‌ماند).
 //   • preventDefault فقط وقتی واقعاً در حالِ کشیدنِ رو-به-پایین در بالای صفحه‌ایم.
-//   • تازه‌سازی = رندرِ دوباره‌ی همان داده (renderDiscoverSections + renderFeed) —
-//     بدونِ داده‌ی جعلی؛ صرفاً view را نو می‌کند. demo-safe و client-side.
+//   • تازه‌سازی = واقعاً از سرور می‌خواند (syncRestaurants). آفلاین/خطا → همان
+//     fallbackِ همیشگیِ loadRestaurants (بدونِ دادهٔ جعلی).
 //   • احترام به prefers-reduced-motion (بدونِ انیمیشنِ ترنسفورم).
+//
+//  ⚠️ رفع‌شده (پروتکل §۱۰/§۲۷): doRefresh قبلاً فقط `renderDiscoverSections()` و
+//  `renderFeed(R)` را با **همان دادهٔ درون‌حافظه‌ای** صدا می‌زد. یعنی ژستِ
+//  «بکش تا تازه شود» ۵۲۰ms اسپینر نشان می‌داد و هیچ درخواستی نمی‌رفت — کاربر
+//  مطمئن می‌شد داده نو شده در حالی که دقیقاً همان بایت‌های قبلی بود.
 // ═══════════════════════════════════════════════════════════
-import { R } from '../init.js';
-import { renderDiscoverSections, renderFeed } from '../data/discover.js';
+import { syncRestaurants } from '../init.js';
+import { renderEvents } from '../data/discover.js';
 
 const THRESHOLD = 64;   // px کشیدن برای فعال‌شدنِ تازه‌سازی
 const MAX_PULL  = 96;   // سقفِ جابه‌جاییِ اندیکاتور
@@ -49,16 +54,19 @@ async function doRefresh(){
   const e = el();
   e.classList.add('spinning', 'show');
   if(!reduced()) e.style.transform = `translateX(-50%) translateY(${THRESHOLD}px)`;
+  // خواندنِ واقعیِ رستوران‌ها + بخش‌هایی که خودشان I/O دارند (رویداد/موقعیت).
+  // اسپینر تا پایانِ درخواستِ واقعی می‌چرخد، نه یک مدتِ ثابت.
   try{
-    renderDiscoverSections();
-    renderFeed(Array.isArray(R) ? R : []);
+    await syncRestaurants();      // renderFeed + بخش‌هایِ وابسته به R
+    await renderEvents();         // «تازه‌سازی» یعنی رویدادها هم واقعاً دوباره خوانده شوند
   }catch(err){}
-  // نمایشِ کوتاهِ اسپینر (بازخوردِ ملموس) سپس جمع‌شدن
-  setTimeout(()=>{
+  const hide = ()=>{
     e.classList.remove('spinning', 'ready', 'show');
     e.style.transform = '';
     _busy = false;
-  }, 520);
+  };
+  // حداقلِ ۳۰۰ms دیده‌شدن تا اسپینر روی پاسخِ خیلی سریع «پرش» نکند.
+  setTimeout(hide, 300);
 }
 
 function onMove(e){

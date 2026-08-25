@@ -7,7 +7,7 @@ import { enqueueSms } from './sms';
 import { emit } from './events';
 import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
-import { redeemGiftCardTx } from './loyalty';
+import { redeemGiftCardTx, addClubPoints, getClubPointsBalance } from './loyalty';
 import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
 import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
@@ -15,6 +15,9 @@ import { computeRanges, genReservationCode, isConflictError, isSerializationErro
 import { invalidateAvailability } from './availability-cache';
 import { transitionReservation } from './lifecycle';
 import { getOccupiedTableNumbers } from './table-occupancy';
+import { createLogger } from './logger';
+
+const log = createLogger('reservations');
 
 // ⚠️ درسِ تاریخی (باگِ واقعیِ P0 که با تستِ زنده پیدا شد، نه فرض): مقایسه‌ی
 // خامِ `status IN (...)` در $queryRaw بدونِ کستِ صریح با enumِ Postgres شکست
@@ -100,7 +103,14 @@ export async function createReservation(
 ) {
   const predictNoShowRisk = deps.predictNoShowRisk ?? defaultNoShowPredictor;
   const acquireSlotLock = deps.acquireSlotLock ?? withSlotLock;
-  const r = await db.restaurant.findUnique({ where: { id: input.restaurantId } });
+  // ⚠️ include اضافه شد (§۹): `autoConfirm` یک تنظیمِ واقعیِ رستوران‌دار بود که
+  // **هرگز اجرا نمی‌شد** — پنل می‌نوشتش، `GET /restaurants` به مشتری نشانش
+  // می‌داد، ولی این‌جا خوانده نمی‌شد. یک relation-include رویِ همان findUnique
+  // است، بدونِ round-tripِ اضافه (§۲۶).
+  const r = await db.restaurant.findUnique({
+    where: { id: input.restaurantId },
+    include: { cancellationPolicy: { select: { autoConfirm: true } } },
+  });
   if (!r) throw Err.notFound('رستوران');
   if (!r.isOpen) throw Err.restaurantClosed();
 
@@ -284,7 +294,8 @@ export async function createReservation(
 // ── هسته‌ی ثبت: transaction سریالایزبل + بازچک داخل tx + insert ──
 async function placeReservation(
   input: CreateReservationInput,
-  r: { id: string; name: string; clubPrefix: string; cbBasePct: number },
+  r: { id: string; name: string; clubPrefix: string; cbBasePct: number;
+       cancellationPolicy?: { autoConfirm: boolean } | null },
   cfg: TimingConfig,
   ranges: { start: Date; end: Date; blockEnd: Date; duration: number; blockBufferMin: number },
   candidateTables: { id: string; number: number }[],
@@ -295,7 +306,28 @@ async function placeReservation(
 ) {
   const { start, end, blockEnd, duration, blockBufferMin } = ranges;
   const isHold = input.hold === true;
-  const status: 'pending' | 'confirmed' = isHold ? 'pending' : 'confirmed';
+  // ═══════════════════════════════════════════════════════════
+  //  اجرایِ `autoConfirm` — تنظیمی که رستوران‌دار می‌نوشت و هیچ‌وقت اثر نداشت
+  //
+  //  ⚠️ یافته‌ی §۹: `cancellation_policies.auto_confirm` سه جا زندگی می‌کرد —
+  //  پنلِ رستوران‌دار می‌نوشتش، `GET /restaurants` و `GET /restaurants/:slug`
+  //  به مشتری نشانش می‌دادند — ولی **هیچ‌کس نمی‌خواندش**. یعنی رستورانی که
+  //  «تأییدِ دستی» را انتخاب می‌کرد، همچنان هر رزرو مستقیم `confirmed` می‌شد و
+  //  میز بی‌اجازه‌ی او بلوکه می‌شد.
+  //
+  //  چرا این رفع **به پرداخت نیازی ندارد**: تصمیمِ «مستقیم تأیید یا در انتظارِ
+  //  تأیید» صرفاً یک وضعیتِ اولیه است، نه ضبطِ پول. برخلافِ
+  //  `partial_penalty_pct` و `deposit_required` که بدونِ درگاهِ پرداخت
+  //  اجرانشدنی‌اند (به docs/audit/CANCELLATION-POLICY.md رجوع کن).
+  //
+  //  ایمنی: `holdExpiresAt` عمداً `null` می‌ماند — این رزرو منتظرِ **اقدامِ
+  //  رستوران‌دار** است، نه منتظرِ پرداختِ مشتری. `expireStaleHolds` فقط ردیف‌هایی
+  //  را می‌گیرد که `holdExpiresAt < now` دارند، پس NULL هرگز خودکار منقضی
+  //  نمی‌شود (تأییدشده با خواندنِ کوئریِ آن تابع). انتقالِ
+  //  pending → confirmed/rejected از قبل در state machine مجاز است.
+  // ═══════════════════════════════════════════════════════════
+  const needsApproval = r.cancellationPolicy?.autoConfirm === false;
+  const status: 'pending' | 'confirmed' = (isHold || needsApproval) ? 'pending' : 'confirmed';
   const holdExpiresAt = isHold ? new Date(Date.now() + cfg.holdMinutes * 60_000) : null;
 
   let result: { resv: any; club: { enrolledNow: boolean; code: string } | null; tableNumber: number; checkout?: any };
@@ -517,7 +549,8 @@ async function insertReservation(
     // ── کارت هدیه (مبلغ دلخواه، با رفع مبلغ منفی از ممیزی دوم) ──
     else if (input.giftCardCode && input.giftCardAmount) {
       const applied = Math.min(input.giftCardAmount, subtotal); // بیش از صورت‌حساب اعمال نشود
-      await redeemGiftCardTx(tx, input.giftCardCode, applied);
+      // restaurantId پاس داده می‌شود تا کارتِ مقیدِ رستورانِ دیگر رد شود (§۷).
+      await redeemGiftCardTx(tx, input.giftCardCode, applied, input.restaurantId);
       discount = applied;
       method = 'gift_card';
     }
@@ -786,34 +819,56 @@ export async function markArrival(input: ArrivalInput) {
   const resv = await db.reservation.findUnique({ where: { code: input.code } });
   if (!resv || resv.restaurantId !== input.restaurantId) throw Err.notFound('رزرو');
 
-  // idempotency: اگر از قبل checked_in بود، این یک تکرار (retry) است — دوباره
-  // امتیاز/SMS نده. transitionReservation خودش یک no-op امن برمی‌گردونه
-  // (from===to)، ولی تصمیمِ «آیا این بارِ اوله» باید قبل از فراخوانی گرفته بشه.
-  const wasAlreadyCheckedIn = resv.status === 'checked_in';
-
   const updated = await transitionReservation({
     reservationId: resv.id,
     to: 'checked_in',
     actor: `staff:${input.actorStaffId}`,
   });
 
-  // امتیازِ باشگاهِ وفاداریِ رستوران — سیستمِ کاملاً جدا از اقتصادِ یکپارچه‌ی
-  // پلتفرم (customer_economy_profiles)؛ اینجا عمداً دست‌نخورده نگه داشته شد.
-  if (!wasAlreadyCheckedIn && resv.userId) {
-    await db.clubMember.updateMany({
-      where: { restaurantId: resv.restaurantId, userId: resv.userId },
-      data: { points: { increment: ARRIVAL_POINTS } },
+  // ⚠️ رفعِ رقابتِ «دو بار امتیاز» (فازِ ۲، پروتکل §۱۳).
+  //
+  // قبلاً این تصمیم با یک readِ *قبل از* انتقال گرفته می‌شد
+  // (`resv.status === 'checked_in'`). دو چک‌این هم‌زمان — که در ساعتِ شلوغ کاملاً
+  // عادی است (اسکنِ QR + دکمه‌ی پرسنل) — هردو وضعیتِ قبلی را می‌دیدند، هردو
+  // «بارِ اول» نتیجه می‌گرفتند، و هردو امتیاز می‌دادند و SMS می‌فرستادند.
+  // تنها منبعِ اتمیک، نتیجه‌ی خودِ تراکنشِ انتقال است.
+  const firstArrival = updated.changed;
+
+  // امتیازِ باشگاهِ رستوران — از این‌جا به بعد از مسیرِ دفتر (PointsLedger) که
+  // مرجعِ سروری است؛ `club_members.points` فقط کشِ هم‌تراکنش است.
+  if (firstArrival && resv.userId) {
+    // اگر ثبتِ امتیاز شکست بخورد نباید خودِ چک‌این را بشکند (رزرو از قبل commit
+    // شده) — همان قاعده‌ای که transitionReservation برایِ اعلان/اقتصاد دارد.
+    // دفتر append-only است، پس نبودِ ردیف بعداً قابلِ تشخیص و جبران است.
+    await addClubPoints({
+      userId: resv.userId,
+      restaurantId: resv.restaurantId,
+      delta: ARRIVAL_POINTS,
+      reason: 'reservation',
+      note: `حضور در رزرو ${resv.code}`,
+    }).catch((e) => {
+      log.error('ثبتِ امتیازِ حضور در دفتر ناموفق (چک‌این خودش commit شد)', {
+        reservationId: resv.id, code: resv.code, error: (e as Error).message,
+      });
     });
   }
 
   // SMS خوش‌آمد — فقط بارِ اول (نه در تکرار/retry)
-  if (!wasAlreadyCheckedIn && resv.guestPhone) {
-    const member = resv.userId ? await db.clubMember.findUnique({
-      where: { restaurantId_userId: { restaurantId: resv.restaurantId, userId: resv.userId } },
-    }) : null;
+  if (firstArrival && resv.guestPhone) {
+    // موجودی از **دفتر** خوانده می‌شود، نه از ستونِ کش: عددی که به مشتری
+    // پیامک می‌شود باید همان عددی باشد که در اپِ خودش و در فهرستِ اعضایِ پنل
+    // می‌بیند. اگر ثبتِ بالا شکست خورده باشد، این عدد همچنان صادق است.
+    const [member, balance] = await Promise.all([
+      resv.userId
+        ? db.clubMember.findUnique({
+            where: { restaurantId_userId: { restaurantId: resv.restaurantId, userId: resv.userId } },
+          })
+        : Promise.resolve(null),
+      resv.userId ? getClubPointsBalance(resv.userId, resv.restaurantId) : Promise.resolve(0),
+    ]);
     await enqueueSms({
       to: resv.guestPhone, template: 'welcome_visit',
-      tokens: [resv.guestName ?? 'مهمان', String(member?.points ?? 0), String(ARRIVAL_POINTS), member?.tier ?? 'bronze'],
+      tokens: [resv.guestName ?? 'مهمان', String(balance), String(ARRIVAL_POINTS), member?.tier ?? 'bronze'],
       restaurantId: resv.restaurantId,
     });
   }

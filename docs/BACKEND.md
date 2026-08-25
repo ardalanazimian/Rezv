@@ -109,6 +109,16 @@ client `dbRead` (in `db.ts`) routes heavy reads, falling back to primary.
   `zPhone`, `zOtpCode`, `zUuid`, `zDateStr`, `zTimeStr`, `zPartySize`,
   `zReservationCode`. `parseBody/Query/Params` enforce and infer types.
   (`z.enum` uses a `const` type-param so it infers literal unions.)
+  > ⚠️ **Not real Zod** — method signatures differ. Two that bite:
+  > `safeParse()` returns `{ ok, value }` / `{ ok:false, issues }`, **not**
+  > Zod's `{ success, data }`; and `.min(n)` takes no custom message.
+  > ⚠️ **`zPhone` validates format only — it does not normalise.** It trims and
+  > checks the shape (digits + conventional separators, 8–15 digits). Turning a
+  > phone into the canonical `+989XXXXXXXXX` is `normalizePhone()` in
+  > `lib/otp.ts`, which is a separate step. Never use `zPhone` output directly
+  > as a DB lookup key. (The format regex was added 2026-08-24 — before that
+  > `zPhone` accepted *any* 8–20 character string, while every client already
+  > enforced `^09\d{9}$`.)
 - `logger.ts`: `createLogger(scope)`, `withTrace`, `newTraceId`.
 - `metrics.ts`: counters/histograms + `recordHttp`.
 

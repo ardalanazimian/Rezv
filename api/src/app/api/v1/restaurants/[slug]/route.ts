@@ -37,14 +37,33 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
               description: true, imageUrl: true, sortOrder: true,
             },
           },
+          // ⚠️ رفعِ P1-3 (فازِ ۲، پروتکل §۲۰ — قراردادِ frontend↔backend).
+          //
+          // این endpoint سیاستِ رزرو را اصلاً بیرون نمی‌داد، در حالی که اپِ
+          // مشتری در دو جا **هاردکد** ادعا می‌کرد «رزرو رایگان · بدون
+          // پیش‌پرداخت» و «هنوز پولی پرداخت نمی‌کنی». چون depositRequired یک
+          // سیاستِ واقعی و قابلِ‌تنظیمِ رستوران است (پنلِ business آن را
+          // می‌نویسد)، رستورانی که بیعانه را روشن می‌کرد همچنان در اپِ مشتری
+          // «بدون پیش‌پرداخت» دیده می‌شد — یعنی یک ادعایِ نادرست به کاربر،
+          // نه صرفاً یک ویژگیِ غایب.
+          //
+          // حالا فیلد واقعاً از DB می‌آید تا فرانت بتواند حقیقت را بگوید.
+          // (افزایشی و سازگار با گذشته: مصرف‌کننده‌هایِ فعلی — از جمله
+          // صفحه‌ی SEO — این کلید را نادیده می‌گیرند و چیزی نمی‌شکند.)
+          cancellationPolicy: {
+            select: { depositRequired: true, freeCancelHours: true, autoConfirm: true },
+          },
           // فقط عکسِ تأییدشده. این تنها مسیری است که گالری را به بیرون
           // می‌دهد — هم اپ مشتری و هم صفحه‌ی سئوی /r/[slug] از همین می‌خوانند
           // — پس همین یک فیلتر، مرزِ «منتشرشده» است.
           // لوگو («category=logo») عمداً از این آرایه بیرون است — قاطیِ
           // گالریِ غذا/فضا/نوشیدنی نمی‌شود، جدا زیرِ logo_url برمی‌گردد.
+          // هیچ کلاینتی هنوز sort_order نمی‌فرستد، پس همه‌ی ردیف‌ها ۰ هستند و
+          // ترتیبِ تک‌ستونی عملاً غیرقطعی بود — createdAt به‌عنوانِ tiebreaker
+          // ترتیبِ گالریِ عمومی را پایدار می‌کند (ممیزیِ ۲۰۲۶-۰۸-۲۴).
           photos: {
             where: { status: PUBLIC_STATUS, category: { not: 'logo' } },
-            orderBy: { sortOrder: 'asc' },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
             select: { url: true, caption: true, category: true },
           },
         },
@@ -83,6 +102,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
           image_url: m.imageUrl, sort_order: m.sortOrder,
         })),
         photos: r.photos.map((p) => ({ url: p.url, caption: p.caption, category: p.category })),
+        // سیاستِ رزرو (P1-3). اگر رستوران رکوردِ سیاست نداشته باشد، همان
+        // پیش‌فرض‌هایِ CancellationPolicy در اسکیما استفاده می‌شود — نه حدسِ فرانت.
+        //
+        // ⚠️ عمداً فقط سیاستِ **پایه** است، نه خروجیِ computeResolvedPolicy:
+        // سیاستِ resolve‌شده به کمیابی/رویداد/سطحِ وفاداریِ همان کاربر وابسته
+        // است و اینجا یک پاسخِ عمومیِ کش‌شده‌ی ۶۰ثانیه‌ای است. مقدارِ قطعی در
+        // لحظه‌ی رزرو از خودِ موتورِ رزرو می‌آید؛ این فقط برایِ نمایشِ صادقانه
+        // پیش از شروع است.
+        booking_policy: {
+          deposit_required: r.cancellationPolicy?.depositRequired ?? false,
+          free_cancel_hours: r.cancellationPolicy?.freeCancelHours ?? 24,
+          auto_confirm: r.cancellationPolicy?.autoConfirm ?? true,
+        },
       };
     });
 

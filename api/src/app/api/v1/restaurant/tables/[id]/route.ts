@@ -4,6 +4,12 @@ import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 import { activeStatusList } from '@/lib/reservation-status';
+import { invalidateAllAvailability } from '@/lib/availability-cache';
+
+// فیلدهایی که در محاسبه‌ی availability اثر دارند — تغییرشان کش را باطل می‌کند.
+// (پیش از این هیچ ویرایشِ میزی کش را پاک نمی‌کرد: میزِ غیرفعال‌شده تا ۳۰۰
+// ثانیه برای مشتری «آزاد» می‌ماند — ممیزیِ ۲۰۲۶-۰۸-۲۴.)
+const AVAILABILITY_FIELDS = ['capacity', 'is_active', 'min_party_size', 'max_party_size'] as const;
 
 const SHAPES = ['rectangle', 'round', 'booth'] as const;
 const ZONES = ['indoor', 'outdoor', 'window', 'vip', 'smoking'] as const;
@@ -48,6 +54,9 @@ export const PATCH = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMan
   if (b.rotation !== undefined) data.rotation = b.rotation;
 
   const updated = await db.table.update({ where: { id }, data });
+  if (AVAILABILITY_FIELDS.some(f => b[f] !== undefined)) {
+    await invalidateAllAvailability(ctx.restaurant.id);
+  }
   return NextResponse.json({ id: updated.id, number: updated.number });
 });
 
@@ -75,11 +84,24 @@ export const DELETE = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMa
   const table = await db.table.findUnique({ where: { id } });
   if (!table || table.restaurantId !== ctx.restaurant.id) throw Err.notFound('میز');
 
+  // ⚠️ رفعِ باگِ واقعی (فازِ ۲ — پیداشده توسطِ گاردِ ایستایِ
+  // tests/lifecycle-exclusivity.test.mts، پروتکل §۶).
+  //
+  // این لیست دستی بود و سه وضعیتِ فعال را **جا انداخته بود**: preparing،
+  // running_late و arrived. یعنی میزی که رزروش در حالِ آماده‌سازی بود، یا
+  // مهمانش دیر کرده بود، یا رسیده بود، **قابلِ حذف** بود — و رزرو یتیم می‌شد
+  // (دقیقاً همان چیزی که کامنتِ خودِ این تابع می‌گوید می‌خواهد جلویش را بگیرد).
+  //
+  // این دقیقاً همان کلاسِ باگِ C1 است که lib/reservation-status.ts برایِ
+  // ریشه‌کن‌کردنش ساخته شد؛ هدرِ همان فایل «گاردِ حذف میز» را در فهرستِ
+  // جاهایی که اصلاح شده نام می‌برد — ولی این یکی در عمل اصلاح نشده بود.
+  // حالا از منبعِ واحد می‌خواند، پس دیگر نمی‌تواند drift کند.
   const activeReservation = await db.reservation.findFirst({
     where: { tableId: id, status: { in: activeStatusList() as never } },
   });
   if (activeReservation) throw Err.validation('این میز رزرو فعال دارد — ابتدا رزرو را لغو یا تکمیل کن');
 
   await db.table.delete({ where: { id } });
+  await invalidateAllAvailability(ctx.restaurant.id);
   return NextResponse.json({ ok: true });
 });

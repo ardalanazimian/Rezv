@@ -39,6 +39,17 @@ export const Err = {
 
   // ── سوییچ‌هایِ قابلیت (kill-switch سطحِ پلتفرم) ──
   featureDisabled: (label: string) => new ApiError('FEATURE_DISABLED', `«${label}» موقتاً غیرفعال است`, 503),
+
+  // ── شعبه‌ی درخواست‌شده در دسترس نیست (فازِ ۲ · P0-1، پروتکل §۷) ──
+  //
+  // چرا کدِ اختصاصی و نه notFound عمومی: کلاینت باید بتواند **دقیقاً** این حالت
+  // را تشخیص بدهد تا انتخابِ کهنه‌ی شعبه را پاک کند و لیست را از نو بگیرد.
+  // با ۴۰۴ عمومی، پنل نمی‌فهمد مشکل «شعبه» است و کاربر در یک حلقه‌ی خطا گیر می‌کند.
+  branchNotAccessible: () => new ApiError(
+    'BRANCH_NOT_ACCESSIBLE',
+    'شعبه‌ی انتخاب‌شده دیگر در دسترس نیست (حذف شده یا دسترسی‌اش گرفته شده). یک شعبه‌ی دیگر انتخاب کن.',
+    404,
+  ),
 };
 export function errorResponse(e: unknown) {
   if (e instanceof ApiError)

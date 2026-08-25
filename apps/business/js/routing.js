@@ -73,6 +73,21 @@ function renderBranchSwitcher(){
   if(metaEl) metaEl.textContent=BRANCH_LOCKED?'قفل‌شده به این شعبه':(BRANCHES.length>1?`${fa(BRANCHES.length)} شعبه`:'شعبه اصلی');
   const sw=document.querySelector('.sb-switch');
   if(sw) sw.classList.toggle('locked', BRANCH_LOCKED || BRANCHES.length<=1);
+
+  // ⚠️ رفعِ ادعایِ بی‌پشتوانه (فازِ ۲، §۳): نشانِ #tbStatus یک دکمه بود که فقط
+  // کلاسِ خودش را عوض می‌کرد و «رستوران بسته شد» toast می‌داد — سرور، اپِ
+  // مشتری و موتورِ ظرفیت هیچ‌کدام خبردار نمی‌شدند و رزرو ادامه داشت. هیچ
+  // endpointی هم برایِ نوشتنِ این حالت وجود ندارد. حالا فقط **بازتابِ**
+  // حقیقتِ سرور است (b.is_open که همین‌جا در دست داریم و در فهرستِ شعبه‌ها
+  // هم رندر می‌شود).
+  const stBtn=document.getElementById('tbStatus'), stTxt=document.getElementById('tbStatusText');
+  if(stBtn && stTxt && cur){
+    const open = cur.is_open !== false;
+    stBtn.classList.toggle('open', open);
+    stBtn.classList.toggle('closed', !open);
+    stTxt.textContent = open ? 'باز' : 'بسته';
+    stBtn.setAttribute('aria-label', open ? 'وضعیتِ شعبه: باز' : 'وضعیتِ شعبه: بسته');
+  }
   // ⚠️ رفعِ باگ: RESTAURANT.name (پیش‌فرضِ data.js) هاردکد است و هیچ‌وقت
   // به‌تنهایی از سرور خوانده نمی‌شد — تبِ «پروفایل» همیشه نامِ دموی
   // «کافه‌رستوران ویستا» را نشان می‌داد، صرف‌نظر از رستورانِ واقعیِ لاگین‌شده.
@@ -143,11 +158,19 @@ function closeSidebar(){
   document.getElementById('sbOverlay').classList.remove('show');
   document.querySelector('.tb-burger')?.setAttribute('aria-expanded','false');
 }
-function toggleStatus(){
-  const b=document.getElementById('tbStatus'),open=b.classList.contains('open');
-  b.classList.toggle('open');b.classList.toggle('closed');
-  document.getElementById('tbStatusText').textContent=open?'بسته':'باز';
-  toast('',open?'رستوران بسته شد':'رستوران باز شد');
-}
+// toggleStatus حذف شد (فازِ ۲، §۳): هیچ مسیرِ سروری‌ای برایِ نوشتنِ وضعیتِ
+// باز/بسته وجود ندارد، پس دکمه فقط یک ادعایِ محلیِ نادرست می‌ساخت. نشان حالا
+// در renderBranchSwitcher از دادهٔ سرور پر می‌شود. ساعتِ کاریِ واقعی از تبِ
+// «پروفایل» → ساعاتِ کاری مدیریت می‌شود (که مسیرِ تأییدِ سروری دارد).
 
 // ═══════════ OVERVIEW ═══════════
+
+
+// ── فعال‌سازیِ کیبورد برایِ عناصرِ role="button" ──
+// (یافته‌ی ممیزیِ ۲۰۲۶-۰۸-۲۴: اپِ مشتری این هندلرِ سراسری را داشت ولی پنل‌ها
+// نه — یعنی هر divِ کلیک‌پذیر، حتی با tabindex، با Enter/Space کار نمی‌کرد.)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target && e.target.closest ? e.target.closest('[role="button"]') : null;
+  if (el && el.tagName !== 'BUTTON' && el.tagName !== 'A' && el.tagName !== 'INPUT') { e.preventDefault(); el.click(); }
+});

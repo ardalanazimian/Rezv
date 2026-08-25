@@ -45,12 +45,19 @@ function renderCustomers(){
 function rBilling(){
   const totalSms=RESTAURANTS.reduce((s,r)=>s+r.sms,0);
   const activeSubsc=RESTAURANTS.filter(r=>r.status==='active').length;
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): MRR قبلاً همیشه از یک ثابتِ کلاینتیِ
+  // ناقص و کهنه (PRICE={free,pro,enterprise} — بدونِ basic/trial و ناسازگار
+  // با قیمت‌های واقعیِ CMS) جمع زده می‌شد — حتی وقتی داده‌ی رستوران‌ها واقعی
+  // بود. یک رقمِ درآمدِ اشتباه بدترین نوعِ KPI است. حالا: چون بک‌اند قیمتِ
+  // پلن را برنمی‌گرداند، در حالتِ آنلاین «—» نشان می‌دهیم (اندازه‌گیری‌نشده،
+  // نه صفر — همان قاعده‌ی ML_CONTRACT)؛ عددِ نمونه فقط در دموی آفلاین با
+  // داده‌ی [DEMO] می‌ماند.
   const PRICE={free:0,pro:890,enterprise:2400};
-  const mrr=RESTAURANTS.filter(r=>r.status==='active'||r.status==='expiring').reduce((s,r)=>s+(PRICE[r.plan]||0),0);
+  const mrr=API.online?null:RESTAURANTS.filter(r=>r.status==='active'||r.status==='expiring').reduce((s,r)=>s+(PRICE[r.plan]||0),0);
   document.getElementById('v-billing').innerHTML=`
     <div class="bill-summary">
       <div class="bill-stat"><div class="bs-val" style="color:var(--ink)">${fa(activeSubsc)}</div><div class="bs-label">اشتراک فعال</div></div>
-      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${fa(mrr)}<span style="font-size:14px"> هزارتومان</span></div><div class="bs-label">درآمد ماهانه (تخمینی از پلن‌ها)</div></div>
+      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${mrr==null?'—':fa(mrr)+'<span style="font-size:14px"> هزارتومان</span>'}</div><div class="bs-label">${mrr==null?'درآمد ماهانه — اندازه‌گیری‌نشده (قیمتِ پلن در API نیست)':'درآمد ماهانه (نمونه‌ی دمو)'}</div></div>
       <div class="bill-stat"><div class="bs-val" style="color:var(--amber-600)">${fa(totalSms)}</div><div class="bs-label">کل پیامک ارسالی</div></div>
     </div>
     <div class="panel">
@@ -87,20 +94,22 @@ function openSmsTopup(id){
     <div class="modal-sub">${esc(r.name)} · موجودی فعلی: ${fa(r.smsBalance||0)} پیامک</div>
     <div class="field-label">تعداد پیامک برای افزودن</div>
     <div class="opt-row" id="smsAmountOpts">
-      ${[[1000,'۱۰۰۰'],[5000,'۵۰۰۰'],[10000,'۱۰٬۰۰۰'],[50000,'۵۰٬۰۰۰']].map(([v,l],i)=>`<div class="opt ${i===0?'sel':''}" data-amt="${v}" onclick="pickSmsAmount(${v},this)">${l}</div>`).join('')}
+      ${[[1000,'۱۰۰۰'],[5000,'۵۰۰۰'],[10000,'۱۰٬۰۰۰'],[50000,'۵۰٬۰۰۰']].map(([v,l],i)=>`<div role="button" tabindex="0" class="opt ${i===0?'sel':''}" data-amt="${v}" onclick="pickSmsAmount(${v},this)">${l}</div>`).join('')}
     </div>
     <div class="field-label">یا مقدار دلخواه</div>
     <input class="inp" id="smsCustomAmount" type="number" min="1" placeholder="مثلاً ۲۵۰۰" oninput="document.querySelectorAll('#smsAmountOpts .opt').forEach(o=>o.classList.remove('sel'))">
     <div style="font-size:12px;color:var(--t2);margin:14px 0;line-height:1.6;background:var(--ink-50);padding:12px 14px;border-radius:var(--r)">${icon('info',{size:13})} رستوران پس از پرداخت به شما، موجودی‌اش را اینجا شارژ کنید. هر شارژ ثبت و قابل‌پیگیری است.</div>
-    <button class="btn btn-primary btn-block btn-lg" onclick="submitSmsTopup()">تأیید و شارژ</button>
+    <button class="btn btn-primary btn-block btn-lg" onclick="submitSmsTopup(this)">تأیید و شارژ</button>
   `);
 }
 let _topupAmount=1000;
 function pickSmsAmount(v,el){_topupAmount=v;document.querySelectorAll('#smsAmountOpts .opt').forEach(o=>o.classList.remove('sel'));el.classList.add('sel');document.getElementById('smsCustomAmount').value='';}
-async function submitSmsTopup(){
+// ⚠️ همان گاردِ ضدِ دوبارکلیک: شارژِ پیامک هم یک نوشتنِ افزایشیِ برگشت‌ناپذیر است.
+async function submitSmsTopup(btn){
   const custom=parseInt(document.getElementById('smsCustomAmount')?.value||'');
   const amount=Number.isInteger(custom)&&custom>0?custom:_topupAmount;
   if(!amount||amount<=0){toast('','تعداد نامعتبر');return;}
+  if(btn){ if(btn.disabled) return; btn.disabled=true; btn.textContent='در حال شارژ…'; }
   const res=await API.post(`/admin/restaurants/${_topupRestId}/sms`,{amount});
   if(res.ok){
     closeModal();
@@ -109,6 +118,7 @@ async function submitSmsTopup(){
     if(r)r.smsBalance=res.data.balance;
     if(typeof rBilling==='function'&&document.getElementById('v-billing'))rBilling();
   } else {
+    if(btn){ btn.disabled=false; btn.textContent='تأیید و شارژ'; }
     toast('',res.error?.message||'شارژ ناموفق بود');
   }
 }
@@ -116,34 +126,46 @@ async function submitSmsTopup(){
 // ════════ مدیریت اشتراک (تمدید واقعی / لغو واقعی) — وصل به PATCH /admin/restaurants/:id/control ════════
 function openRenew(id){
   const r=RESTAURANTS.find(x=>String(x.id)===String(id));if(!r)return;
-  renewPlan=(r.plan==='free'?'pro':r.plan);renewMonths=12;
+  // ⚠️ فازِ ۲: فهرستِ چیپ‌ها فقط pro/enterprise است، ولی renewPlan از پلنِ
+  // فعلی پر می‌شد. برایِ تنانتِ `starter` (پلنی که خودِ همین پنل از صفِ فروش
+  // اختصاص می‌دهد) هیچ چیپی انتخاب‌شده نبود و خلاصه «پلن جدید: شروع» می‌گفت،
+  // در حالی که ارسالش را بک‌اند رد می‌کرد. فقط پلن‌هایِ تمدیدشدنی مجازند.
+  renewPlan=(r.plan==='pro'||r.plan==='enterprise')?r.plan:'pro';renewMonths=12;
   openModal(`
     <div class="modal-title">مدیریت اشتراک</div>
     <div class="modal-sub">${esc(r.name)} · وضعیت فعلی: ${STATUS_LABEL[r.status]}</div>
     <div class="field-label">پلن</div>
     <div class="opt-row" id="planOpts">
-      ${[['pro','حرفه‌ای'],['enterprise','سازمانی']].map(([v,l])=>`<div class="opt ${v===renewPlan?'sel':''}" data-plan="${v}" onclick="pickPlan('${v}',this)">${l}</div>`).join('')}
+      ${[['pro','حرفه‌ای'],['enterprise','سازمانی']].map(([v,l])=>`<div role="button" tabindex="0" class="opt ${v===renewPlan?'sel':''}" data-plan="${v}" onclick="pickPlan('${v}',this)">${l}</div>`).join('')}
     </div>
     <div class="field-label">مدت تمدید</div>
     <div class="opt-row" id="monthOpts">
-      ${[[1,'۱ ماه'],[3,'۳ ماه'],[6,'۶ ماه'],[12,'۱ سال']].map(([v,l])=>`<div class="opt ${v===12?'sel':''}" data-m="${v}" onclick="pickMonths(${v},this)">${l}</div>`).join('')}
+      ${[[1,'۱ ماه'],[3,'۳ ماه'],[6,'۶ ماه'],[12,'۱ سال']].map(([v,l])=>`<div role="button" tabindex="0" class="opt ${v===12?'sel':''}" data-m="${v}" onclick="pickMonths(${v},this)">${l}</div>`).join('')}
     </div>
     <div class="summary-box">
       <div class="sum-row"><span class="k">رستوران</span><span class="v">${esc(r.name)}</span></div>
       <div class="sum-row"><span class="k">پلن جدید</span><span class="v" id="sumPlan">${PLAN_LABEL[renewPlan]}</span></div>
       <div class="sum-row"><span class="k">مدت</span><span class="v" id="sumMonths">۱ سال</span></div>
     </div>
-    <button class="btn btn-primary btn-block btn-lg" onclick="doRenew('${id}')">${icon('check',{size:15})} تمدید اشتراک</button>
+    <button class="btn btn-primary btn-block btn-lg" onclick="doRenew('${id}',this)">${icon('check',{size:15})} تمدید اشتراک</button>
     <button class="btn btn-danger btn-block" style="margin-top:8px" onclick="confirmCancel('${id}')">لغو اشتراک</button>
   `);
 }
 let renewPlan='pro',renewMonths=12;
 function pickPlan(v,el){renewPlan=v;document.querySelectorAll('#planOpts .opt').forEach(o=>o.classList.remove('sel'));el.classList.add('sel');document.getElementById('sumPlan').textContent=PLAN_LABEL[v]}
 function pickMonths(v,el){renewMonths=v;document.querySelectorAll('#monthOpts .opt').forEach(o=>o.classList.remove('sel'));el.classList.add('sel');document.getElementById('sumMonths').textContent={1:'۱ ماه',3:'۳ ماه',6:'۶ ماه',12:'۱ سال'}[v]}
-async function doRenew(id){
+// ⚠️ رفعِ «دوبار نوشتنِ افزایشی» (فازِ ۲، §۳): دکمه حینِ درخواست زنده می‌ماند،
+// پس دو کلیک اشتراکِ یک مشتریِ پولی را دو برابر تمدید می‌کرد (دو ردیفِ مجزّایِ
+// `plan.changed`) — و از این پنل برگشت‌پذیر نیست. همان گاردی که abuseFlagAct
+// از قبل دارد، این‌جا هم اعمال شد.
+async function doRenew(id,btn){
   const r=RESTAURANTS.find(x=>String(x.id)===String(id));if(!r)return;
+  if(btn){ if(btn.disabled) return; btn.disabled=true; btn.textContent='در حال تمدید…'; }
   const res=await API.control(id,{action:'extend_plan',plan:renewPlan,months:renewMonths});
-  if(!res.ok){toast('',res.error?.message||'تمدید ناموفق بود');return;}
+  if(!res.ok){
+    if(btn){ btn.disabled=false; btn.textContent='تمدید اشتراک'; }
+    toast('',res.error?.message||'تمدید ناموفق بود');return;
+  }
   r.plan=renewPlan;r.status='active';r.planExpiresAt=res.data.plan_expires_at;
   const days=Math.ceil((new Date(res.data.plan_expires_at).getTime()-Date.now())/86400000);
   r.daysLeft=days;
@@ -432,13 +454,27 @@ const FEATURE_FLAG_LABEL_FA = {
   reward_marketplace_enabled: 'خرجِ سکه در فروشگاهِ جایزه',
   missions_claim_enabled: 'دریافتِ جایزه‌یِ ماموریت',
   ai_recommendations_enabled: 'پیشنهادهایِ هوشمند',
+  // ⚠️ فازِ ۲: این کلید در بک‌اند وجود داشت ولی در پنلِ اپراتور غایب بود — یعنی
+  // تنها سوییچی که جلویِ ساختِ اعتبارِ *بدونِ پرداخت* را می‌گیرد (POST /gift-cards)
+  // از رابطِ اضطراری نه دیده می‌شد نه قابلِ تغییر بود. پیش‌فرضش در بک‌اند خاموش است.
+  gift_card_purchase_enabled: 'خریدِ کارتِ هدیه',
 };
 function featureFlagsPanelHTML(flags){
+  flags = flags || {};   // دفاعِ لایه‌دوم: ردیف‌ها «نامعلوم» می‌شوند، نه throw
   return `<div class="panel" style="margin-bottom:20px">
     <div class="panel-head"><div><div class="panel-title">${icon('alert',{size:16})} سوییچ‌هایِ اضطراری</div><div class="panel-sub">خاموش/روشن‌کردنِ سریعِ یک قابلیت برایِ کلِ پلتفرم — بدونِ دیپلوی</div></div></div>
     <div class="mini-list">
       ${Object.entries(FEATURE_FLAG_LABEL_FA).map(([key,label])=>{
-        const on = flags[key] !== false;
+        // وضعیتِ *غایب* دیگر «فعال» خوانده نمی‌شود. `raw !== false` برایِ کلیدی
+        // که اصلاً در پاسخ نیست true می‌داد — همان fail-openی که این پنل نباید داشته باشد.
+        const raw = flags[key];
+        if (raw === undefined) {
+          return `<div class="mini-row">
+            <div class="mini-info"><div class="mini-name">${esc(label)}</div><div class="mini-sub mono-ip">${esc(key)}</div></div>
+            <span class="badge">وضعیت نامعلوم</span>
+          </div>`;
+        }
+        const on = raw !== false;
         return `<div class="mini-row">
           <div class="mini-info"><div class="mini-name">${esc(label)}</div><div class="mini-sub mono-ip">${esc(key)}</div></div>
           <span class="badge ${on?'active':'expired'}"><span class="bdot"></span>${on?'فعال':'غیرفعال'}</span>
@@ -468,7 +504,7 @@ function moderationQueuePanelHTML(q){
     <div class="panel-head"><div><div class="panel-title">${icon('shield',{size:16})} صفِ یکپارچه‌ی نظارت</div><div class="panel-sub">نمایِ کلی از همه‌ی ابزارهایِ نظارتی — رویِ هرکدوم بزن تا بری همون‌جا</div></div></div>
     <div class="mini-list">
       ${stat('lock','کاربرِ بن‌شده',q.banned_users_count,"document.getElementById('c360Query')?.focus()")}
-      ${stat('alert','مشتریِ نشان‌خورده',q.flagged_abuse_users_count,"document.querySelector('#v-security')?.scrollIntoView()")}
+      ${stat('alert','مشتریِ نشان‌خورده',q.flagged_abuse_users_count,"document.getElementById('flaggedUsersPanel')?.scrollIntoView({behavior:'smooth'})")}
       ${stat('close','IPِ بن‌شده',q.banned_ips_count,"document.getElementById('bannedIpsPanel')?.scrollIntoView({behavior:'smooth'})")}
       ${stat('search','عکسِ در انتظارِ تأیید',q.pending_photos_count,"nav('photos')")}
     </div>
@@ -491,6 +527,10 @@ async function unbanIpUi(ip){
   toast('','بن لغو شد');
   rSecurity();
 }
+// پنلِ یکسانِ «وضعیت نامعلوم» — جایگزینِ صادقانه‌ی رندرِ خوش‌بینانه.
+function unavailablePanelHTML(msg){
+  return `<div class="panel" style="margin-bottom:20px;padding:20px;text-align:center;color:var(--t2)">${icon('alert',{size:16})} ${esc(msg)}<div style="margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="rSecurity()">تلاشِ دوباره</button></div></div>`;
+}
 function economyRulesPanelHTML(rules){
   return `<div class="panel" style="margin-bottom:20px">
     <div class="panel-head"><div><div class="panel-title">${icon('sparkle',{size:16,fill:true})} ویرایشگرِ قواعدِ اقتصاد</div><div class="panel-sub">پاداشِ XP/سکه‌ای که با انجام‌شدنِ هر رزرو به مشتری داده می‌شه</div></div></div>
@@ -511,16 +551,34 @@ async function saveEconomyRules(){
 
 function rSecurity(){
   document.getElementById('v-security').innerHTML=`<div style="text-align:center;padding:60px;color:var(--t2)">در حال بارگذاری...</div>`;
+  // ⚠️ فازِ ۲ (§۲۶–۲۹): این IIFE هیچ catchی نداشت. هر استثنایی داخلش — مثلاً
+  // یک فیلدِ غایب در پاسخِ /admin/security — بی‌صدا رد می‌شد و ویو **تا ابد**
+  // رویِ «در حال بارگذاری...» می‌ماند: نه خطا، نه تلاشِ دوباره، نه هیچ نشانه‌ای
+  // که چیزی شکسته. (با یک تستِ E2E پیدا شد که عمداً پاسخِ ناقص برگرداند.)
   (async()=>{
+   try {
     const [res,flagsRes,mqRes,ipsRes,ecoRes]=await Promise.all([API.security(),API.getFeatureFlags(),API.getModerationQueue(),API.getBannedIps(),API.getEconomyRules()]);
     if(!res.ok){document.getElementById('v-security').innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`;return;}
     const d=res.data;
-    const flags=flagsRes.ok?flagsRes.data.flags:{};
-    const mq=mqRes.ok?mqRes.data:{banned_users_count:0,flagged_abuse_users_count:0,banned_ips_count:0,pending_photos_count:0};
-    const bannedIps=ipsRes.ok?ipsRes.data.items:[];
-    const ecoRules=ecoRes.ok?ecoRes.data.rules:{completed_xp:100,completed_coins:20};
+    // ⚠️ رفعِ fail-open (فازِ ۲، §۲۶–۲۹): پیش از این، شکستِ این fetch به {} تبدیل
+    // می‌شد و featureFlagsPanelHTML با `flags[key] !== false` هر پنج سوییچ را «فعال»
+    // با نشانِ سبز رندر می‌کرد — یعنی مدیرِ پلتفرم باور می‌کرد قابلیت‌ها روشن‌اند در
+    // حالی که وضعیتِ واقعی *ناشناخته* بود. این پنلِ کلیدِ اضطراری است؛ گمراهیِ اینجا
+    // پرهزینه‌ترین نوعِ گمراهی است. حالا وضعیتِ ناشناخته صریحاً اعلام می‌شود.
+    // ⚠️ همان کلاسِ fail-openِ فلگ‌ها، در دو جایِ دیگر (فازِ ۲، §۳):
+    //  • صفِ نظارت: شکستِ fetch به شیءِ همه‌صفر تبدیل می‌شد و پنل چهار عددِ
+    //    صفر با نشانِ سبزِ «همه‌چیز مرتب» می‌ساخت — در حالی که سرور اصلاً چیزی
+    //    نگفته بود. بکلاگِ واقعیِ نظارت (از جمله عکسِ منتظرِ تأیید) نامرئی می‌شد.
+    //  • IPهایِ بن‌شده: آرایه‌ی خالی حالتِ «هیچ IPای بن نیست» را با تیکِ سبز
+    //    نشان می‌داد — دقیقاً موقعِ یک حمله‌ی فعال که این endpoint محتمل‌ترین
+    //    نقطه‌ی خرابی است، و کنترل‌هایِ «لغوِ بن» هم اصلاً رندر نمی‌شدند.
+    // هر دو حالا مثلِ فلگ‌ها: وضعیتِ ناشناخته صریح اعلام می‌شود.
+    // ⚠️ رفعِ «داستانِ قابلِ‌ذخیره» (فازِ ۲، §۳): این fallback اعدادِ *پیش‌فرضِ کدِ*
+    // بک‌اند بود، نه مقدارِ فعلیِ پلتفرم — و مستقیم داخلِ inputهای قابلِ ویرایش
+    // می‌نشست. یک «ذخیره»ی ساده همان اعدادِ ساختگی را رویِ اقتصادِ واقعی می‌نوشت.
+    // حالا اگر خوانده نشد، ویرایشگر اصلاً رندر نمی‌شود.
     const eo=d.economy_overview||{tier_distribution:[],total_xp_granted:0,active_abuse_flags:0,total_economy_profiles:0};
-    document.getElementById('v-security').innerHTML=moderationQueuePanelHTML(mq)+featureFlagsPanelHTML(flags)+`
+    document.getElementById('v-security').innerHTML=(mqRes.ok&&mqRes.data?moderationQueuePanelHTML(mqRes.data):unavailablePanelHTML('خلاصه‌ی صفِ نظارت خوانده نشد — شمارش‌ها نامعلوم‌اند'))+(flagsRes.ok&&flagsRes.data&&flagsRes.data.flags?featureFlagsPanelHTML(flagsRes.data.flags):unavailablePanelHTML('وضعیتِ سوییچ‌هایِ ایمنی خوانده نشد — روشن/خاموش بودنشان نامعلوم است'))+`
       <div class="panel" style="margin-bottom:20px">
         <div class="panel-head"><div><div class="panel-title">${icon('search',{size:16})} جست‌وجویِ مشتری (Customer 360)</div><div class="panel-sub">با شماره‌موبایل یا شناسه‌ی کاربر — وضعیتِ کامل، اقتصاد، تاریخچه، و کنترلِ بن</div></div></div>
         <div style="display:flex;gap:8px">
@@ -547,7 +605,7 @@ function rSecurity(){
           </div>`;
         }).join('')}</div>`:`<div class="empty-state"><div class="empty-state-icon">${icon('users',{size:32})}</div><div class="empty-state-desc">هنوز مشتری‌ای وارد این چرخه نشده</div></div>`}
       </div>
-      <div class="panel" style="margin-bottom:20px">
+      <div class="panel" id="flaggedUsersPanel" style="margin-bottom:20px">
         <div class="panel-head"><div><div class="panel-title">مشتریانِ نشان‌دارِ سوءاستفاده</div><div class="panel-sub">رزروِ این‌ها بیعانه می‌خواد و خودکار تأیید نمی‌شه — اگر اشتباه بوده، نشان رو بردار</div></div></div>
         ${d.flagged_abuse_users.length?d.flagged_abuse_users.map(u=>{
           const rep=REP_ID[u.reputation_tier]||REP_ID.bronze;
@@ -600,7 +658,11 @@ function rSecurity(){
             <div class="mini-sub">${new Date(a.at).toLocaleString('fa-IR')}</div>
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:32})}</div><div class="empty-state-desc">اقدامِ حساسی ثبت نشده</div></div>`}
-      </div>`+bannedIpsPanelHTML(bannedIps)+economyRulesPanelHTML(ecoRules);
+      </div>`+(ipsRes.ok&&Array.isArray(ipsRes.data&&ipsRes.data.items)?bannedIpsPanelHTML(ipsRes.data.items):unavailablePanelHTML('فهرستِ IPهایِ بن‌شده خوانده نشد — نمی‌دانیم بنی فعال است یا نه'))+(ecoRes.ok&&ecoRes.data&&ecoRes.data.rules?economyRulesPanelHTML(ecoRes.data.rules):unavailablePanelHTML('قواعدِ اقتصاد خوانده نشد — ویرایشگر نمایش داده نمی‌شود تا مقدارِ ساختگی ذخیره نشود'));
+   } catch (e) {
+     console.error('rSecurity', e);
+     document.getElementById('v-security').innerHTML=unavailablePanelHTML('صفحه‌ی امنیت بارگذاری نشد');
+   }
   })();
 }
 
@@ -779,7 +841,7 @@ function showAdminLoginPhone(){
     <div class="login-logo">R</div>
     <div class="login-title">پنل شرکت رزرونو</div>
     <div class="login-sub">ورود مدیر پلتفرم — شماره موبایل خود را وارد کنید</div>
-    <label class="login-field-label">شماره موبایل</label>
+    <label class="login-field-label" for="adminPhone">شماره موبایل</label>
     <input class="login-inp" id="adminPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹" onkeydown="if(event.key==='Enter')adminSendOtp()">
     <button class="login-btn" id="adminSendBtn" onclick="adminSendOtp()">ارسال کد ورود</button>
     <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
@@ -812,7 +874,7 @@ function showAdminLoginCode(devCode, offline){
     <div class="login-logo">${icon('mail',{size:34})}</div>
     <div class="login-title">کد ورود را وارد کنید</div>
     <div class="login-sub">کد ورود به شماره‌ی ${faD(_adminPhone)} ارسال شد</div>
-    <label class="login-field-label">کد ورود</label>
+    <label class="login-field-label" for="adminCode">کد ورود</label>
     <input class="login-inp code" id="adminCode" inputmode="numeric" maxlength="6" placeholder="······" onkeydown="if(event.key==='Enter')adminConfirmOtp()">
     <button class="login-btn" id="adminVerifyBtn" onclick="adminConfirmOtp()">ورود به پنل</button>
     <button class="login-back" onclick="showAdminLoginPhone()">تغییر شماره</button>
@@ -844,8 +906,33 @@ async function adminConfirmOtp(){
 async function enterAdminPanel(demo){
   document.getElementById('loginOverlay').classList.add('hidden');
   setAdminGateLocked(false);
+
+  // ⚠️ رفعِ «دادهٔ ساختگی عینِ واقعی» (فازِ ۲، §۳ + قاعده‌ی صریحِ CLAUDE.md).
+  //
+  // باگ: مسیرِ دمو (کد ۱۲۳۴ وقتی بک‌اند در دسترس نیست) از این شرط رد می‌شد،
+  // پس loadAdminRestaurants() اصلاً صدا زده نمی‌شد — و دقیقاً همان تابع است
+  // که دو سازوکارِ صداقت را اجرا می‌کند: پیشوندِ [DEMO] رویِ نامِ رستوران‌ها و
+  // updateOfflineBanner(). نتیجه: مدیرِ پلتفرم داشبوردی می‌دید با «۸ رستوران،
+  // ۵٬۱۲۸ عضو، ۱۲٬۷۱۲ رزرو» و نامِ رستوران‌هایِ ساختگی، بدونِ هیچ نشانه‌ای که
+  // هیچ‌کدام واقعی نیست. تذکرِ صفحه‌ی ورود هم با بسته‌شدنِ همان کارت می‌رفت.
+  //
+  // حالا مسیرِ دمو هم از همان تابع عبور می‌کند: بنرِ آفلاین بالا می‌ماند و
+  // هر نام برچسبِ [DEMO] می‌گیرد.
+  if (demo){
+    API.online = false;
+    updateOfflineBanner();
+    RESTAURANTS = RESTAURANTS_SAMPLE.map(x => ({
+      ...x,
+      name: String(x.name).startsWith('[DEMO]') ? x.name : `[DEMO] ${x.name}`,
+      _demo: true,
+    }));
+    rOverview();
+    toast('','حالتِ دمو — هیچ‌کدام از اعدادِ این صفحه واقعی نیست');
+    return;
+  }
+
   // اگر توکن واقعی داریم، داده‌ی واقعی بارگذاری کن
-  if (API.getToken() && !demo){
+  if (API.getToken()){
     const [fresh] = await Promise.all([loadAdminRestaurants(), loadPlatformStats()]);
     RESTAURANTS = fresh;
     // نشان‌ها باید از همان ابتدا عددِ واقعی را نشان دهند، وگرنه کارِ منتظر

@@ -96,12 +96,16 @@ function openModal(html){
   const body = document.getElementById('modalBody');
   const first = body.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
   (first || body).focus?.();
+  // صفحه‌ی پشتی نباید زیرِ مودال اسکرول بخورد (رویِ موبایل کاربر با یک
+  // کشیدنِ انگشت، زمینه را جابه‌جا می‌کرد و بعد از بستن گم می‌شد).
+  document.body.style.overflow = 'hidden';
 }
 function closeModal(){
   const bg = document.getElementById('modalBg');
   bg.classList.remove('show');
   bg.setAttribute('aria-hidden','true');
   // focus را به عنصری که مودال را باز کرده بود برگردان.
+  document.body.style.overflow = '';
   if (_modalLastFocus && document.contains(_modalLastFocus)) _modalLastFocus.focus?.();
   _modalLastFocus = null;
 }
@@ -337,26 +341,53 @@ function cbConfirm(){
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
     </div>`);
 }
+// ⚠️ رفعِ جعلِ موفقیت (فازِ ۲، پروتکل §۳).
+//
+// باگ: CB **قبل از** درخواست بازنویسی می‌شد، بنرِ dirty پاک و دکمه‌ی ذخیره
+// قفل می‌شد، و pushNotif «کش‌بک به‌روز شد» بدونِ قید اجرا می‌شد — حتی وقتی
+// سرور PATCH را رد کرده بود. چون _cbLoaded هم ریست نمی‌شد، rCashback دیگر از
+// سرور نمی‌خواند و اسلایدرها تا پایانِ نشست همان عددِ ردشده را نشان می‌دادند.
+// نتیجه: مالک باور می‌کرد کش‌بکِ جدید فعال است در حالی که سرور مقدارِ قبلی را
+// داشت — دقیقاً همان «مبنایِ تصمیمِ مالیِ غلط» که خودِ این فایل چند خط بالاتر
+// درباره‌اش هشدار می‌دهد.
+//
+// حالا: تعهد فقط پس از تأییدِ سرور. در شکست هیچ چیزی commit نمی‌شود، بنرِ
+// dirty می‌ماند، و _cbLoaded ریست می‌شود تا رندرِ بعدی حتماً حقیقتِ سرور را
+// دوباره بخواند.
 async function cbApply(){
-  CB={...CB_DRAFT};closeModal();
-  document.getElementById('cbDirty').classList.remove('show');
-  const btn=document.getElementById('cbSave');btn.style.opacity='.5';btn.style.pointerEvents='none';
-  // ارسال به API اگر توکن staff داریم
+  closeModal();
+  const btn=document.getElementById('cbSave');
+  const lock=()=>{ if(btn){btn.style.opacity='.5';btn.style.pointerEvents='none';} };
+  const unlock=()=>{ if(btn){btn.style.opacity='';btn.style.pointerEvents='';} };
+  const commit=()=>{
+    CB={...CB_DRAFT};
+    document.getElementById('cbDirty')?.classList.remove('show');
+    lock();
+    pushNotif({ic:'blue',emoji:'wallet',title:'کش‌بک به‌روز شد',text:`کش‌بک پایه به ${fa(CB.base)}٪ تغییر کرد`,time:'همین الان',unread:true});
+  };
   if(API.getToken()){
+    lock();
     const res=await API.patch('/restaurant/cashback',{
-      base_pct:CB.base, preorder_pct:CB.pre, vip_pct:CB.vip, winback_pct:CB.wb,
+      base_pct:CB_DRAFT.base, preorder_pct:CB_DRAFT.pre, vip_pct:CB_DRAFT.vip, winback_pct:CB_DRAFT.wb,
     });
     if(res.ok){
+      commit();
       toast('','کش‌بک در سرور ذخیره شد');
     } else if(res.offline){
-      toast('','کش‌بک اعمال شد (محلی)');
+      // آفلاین: تغییر محلی می‌ماند ولی صریحاً «هنوز ذخیره نشده» اعلام می‌شود.
+      commit();
+      toast('','آفلاین — کش‌بک هنوز در سرور ذخیره نشده');
     } else {
-      toast('',res.error?.message||'خطا در ذخیره‌ی کش‌بک');
+      // شکستِ واقعیِ سرور: نه commit، نه اعلانِ موفقیت.
+      _cbLoaded=false;
+      unlock();
+      toast('',res.error?.message||'ذخیره‌ی کش‌بک ناموفق بود — تغییری اعمال نشد');
+      rCashback();
     }
   } else {
+    commit();
     toast('','درصدهای کش‌بک اعمال شد');
   }
-  pushNotif({ic:'blue',emoji:'wallet',title:'کش‌بک به‌روز شد',text:`کش‌بک پایه به ${fa(CB.base)}٪ تغییر کرد`,time:'همین الان',unread:true});
 }
 
 // ═══════════ ورود کارمند (فاز ۳ تکه ۷) ═══════════
@@ -377,7 +408,7 @@ function showStaffLoginPhone(){
     <div class="login-logo">${icon('utensils',{size:34})}</div>
     <div class="login-title">پنل رستوران رزرونو</div>
     <div class="login-sub">برای ورود، شماره موبایل ثبت‌شده‌ی رستورانت رو وارد کن</div>
-    <label class="login-field-label">شماره موبایل</label>
+    <label class="login-field-label" for="staffPhone">شماره موبایل</label>
     <input class="login-inp" id="staffPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹" onkeydown="if(event.key==='Enter')staffSendOtp()">
     <button class="login-btn" id="staffSendBtn" onclick="staffSendOtp()">ارسال کد ورود</button>
     <div class="login-foot">فقط شماره‌هایی که به‌عنوان مدیر یا کارمند ثبت شده‌اند دسترسی دارند</div>`;
@@ -411,7 +442,7 @@ function showStaffLoginCode(devCode, offline){
     <div class="login-logo">${icon('mail',{size:34})}</div>
     <div class="login-title">کد ورود رو وارد کن</div>
     <div class="login-sub">کد ورود به شماره‌ی ${toFaDigits(_staffPhone)} ارسال شد</div>
-    <label class="login-field-label">کد ورود</label>
+    <label class="login-field-label" for="staffCode">کد ورود</label>
     <input class="login-inp code" id="staffCode" inputmode="numeric" maxlength="6" placeholder="······" onkeydown="if(event.key==='Enter')staffConfirmOtp()">
     <button class="login-btn" id="staffVerifyBtn" onclick="staffConfirmOtp()">ورود به پنل</button>
     <button class="login-back" onclick="showStaffLoginPhone()">تغییر شماره</button>
@@ -442,8 +473,14 @@ async function staffConfirmOtp(){
     if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; }
   }
 }
+/** تاریخِ تاپ‌بار — یک منبعِ واحد، از ساعتِ خودِ دستگاه. */
+function setTopbarDate(){
+  const el = document.getElementById('tbDate');
+  if (el) el.textContent = new Date().toLocaleDateString('fa-IR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
 function enterPanel(demo){
   document.getElementById('loginOverlay').classList.add('hidden');
+  setTopbarDate();
   setStaffGateLocked(false);
   // منو را با مجوزهای واقعیِ کاربر هم‌راستا کن — قبل از رندرِ هر صفحه.
   if (typeof applyPermissionsToNav === 'function') applyPermissionsToNav();

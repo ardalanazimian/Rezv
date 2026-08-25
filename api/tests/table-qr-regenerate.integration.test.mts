@@ -94,10 +94,14 @@ async function makeLiveReservation(ctx: Ctx, tableId: string) {
   });
 }
 
-const scan = (qrCode: string) =>
+// [merge ۰۸-۲۴] توکنِ کارمند اجباری شد: /checkin در سخت‌سازیِ P0-2 (خطِ ممیزی)
+// دیگر عمومی نیست — اسکن‌کننده‌ی واقعی دستگاهِ میزبان است، نه اینترنتِ باز.
+// (گاردِ قراردادش: checkin-auth.integration.test.mts). ادعاهای این فایل —
+// ابطالِ واقعیِ کدِ قدیمی و کارکردنِ کدِ نو — دست‌نخورده می‌مانند.
+const scan = (qrCode: string, token: string) =>
   checkinRoute.POST(new Request('http://x/api/v1/checkin', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({ qr_code: qrCode }),
   }));
 
@@ -151,12 +155,12 @@ describe('بازتولیدِ کد', () => {
     await makeLiveReservation(A, table.id);
 
     // پیش از بازتولید، کدِ قدیمی کار می‌کند (کنترلِ مثبت — وگرنه تستِ بعدی بی‌معناست)
-    const before = await scan(oldCode);
+    const before = await scan(oldCode, A.token);
     assert.equal(before.status, 200, 'کدِ اولیه باید قبل از بازتولید کار کند');
 
     await regenerate(A, table.id);
 
-    const after = await scan(oldCode);
+    const after = await scan(oldCode, A.token);
     assert.equal(after.status, 404, 'استیکرِ قدیمی باید از کار افتاده باشد');
   });
 
@@ -167,7 +171,7 @@ describe('بازتولیدِ کد', () => {
     const res = await regenerate(A, table.id);
     const { code } = await res.json() as { code: string };
 
-    const out = await scan(code);
+    const out = await scan(code, A.token);
     assert.equal(out.status, 200);
     const body = await out.json() as { reservation_code: string | null; status: string };
     assert.equal(body.reservation_code, resv.code);

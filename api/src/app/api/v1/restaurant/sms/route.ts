@@ -4,6 +4,7 @@ import { enqueueSms } from '@/lib/sms';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, zPhone, z } from '@/lib/schemas';
+import { allowsCategory } from '@/lib/notification-prefs';
 import { recordOutreach } from '@/lib/outreach-ledger';
 
 const smsSchema = z.object({
@@ -27,26 +28,52 @@ export const POST = withRestaurantAuth(
     const kind = b.kind;
     const template = kind === 'winback' ? 'winback_offer' : 'campaign';
 
-    // ⚠️ userId عمداً بخشی از target است: مسیرِ `phones` شماره‌ی خام می‌گیرد که
-    // ممکن است به هیچ حسابی وصل نباشد → userId=null. چنین گیرنده‌ای در دفترِ
-    // ارتباط‌گیری «تبدیل‌نشده» شمرده نمی‌شود، «قابلِ‌انتساب‌نبودن» است و از هر
-    // دو سویِ کسرِ نرخ بیرون می‌ماند (رجوع کن به lib/outreach-ledger.ts).
+    // ⚠️ رعایتِ انصراف (پروتکل §۱۳/§۱۷): winback و campaign هر دو تبلیغاتی‌اند
+    // ⇒ دسته‌ی `offers`؛ فقط `false`ِ صریح مانع می‌شود (migration 063).
+    // ⚠️ userId عمداً بخشی از target است (دفترِ ارتباط‌گیری، migration 057):
+    // شماره‌ی خامِ بدونِ حساب → userId=null و «قابلِ‌انتساب‌نبودن» شمرده می‌شود.
+    // [merge ۰۸-۲۴] دو خطِ توسعه این مسیر را مستقل ساخته بودند — consent از خطِ
+    // ممیزی + انتسابِ ledger از main؛ اینجا هر دو با هم اعمال می‌شوند.
     let targets: { phone: string; name: string; userId: string | null }[] = [];
+    let optedOut = 0;
     if (b.phones && b.phones.length) {
-      targets = b.phones.map((p) => ({ phone: p, name: '', userId: null }));
+      // فهرستِ صریحِ شماره‌ها (مثلاً تبریکِ تولد): انصرافِ کاربرانِ شناخته‌شده
+      // رعایت می‌شود و شماره‌ی متصل به حساب، userId هم می‌گیرد.
+      const known = await db.user.findMany({
+        where: { phone: { in: b.phones } },
+        select: { id: true, phone: true, notificationPrefs: true },
+      });
+      const byPhone = new Map(known.map((u) => [u.phone, u]));
+      targets = b.phones
+        .filter((p) => {
+          const u = byPhone.get(p);
+          const keep = !u || allowsCategory(u.notificationPrefs, 'offers');
+          if (!keep) optedOut++;
+          return keep;
+        })
+        .map((p) => ({ phone: p, name: '', userId: byPhone.get(p)?.id ?? null }));
     } else {
       const tierFilter = b.segment ? { tier: b.segment } : {};
       const members = await db.clubMember.findMany({
         where: { restaurantId: restaurant.id, ...tierFilter },
-        include: { user: { select: { id: true, phone: true, firstName: true } } },
+        include: { user: { select: { id: true, phone: true, firstName: true, notificationPrefs: true } } },
         take: 500,
       });
       targets = members
         .filter(m => m.user?.phone)
+        .filter(m => {
+          const keep = allowsCategory(m.user.notificationPrefs, 'offers');
+          if (!keep) optedOut++;
+          return keep;
+        })
         .map(m => ({ phone: m.user.phone, name: m.user.firstName || '', userId: m.user.id }));
     }
 
-    if (!targets.length) throw Err.validation('هیچ مخاطبی برای ارسال یافت نشد');
+    if (!targets.length) {
+      throw Err.validation(optedOut > 0
+        ? `هیچ مخاطبی برای ارسال نماند — ${optedOut} نفر از پیام‌های تبلیغاتی انصراف داده‌اند`
+        : 'هیچ مخاطبی برای ارسال یافت نشد');
+    }
 
     const discount = (b.discount_code || '').slice(0, 20);
     let queued = 0;
@@ -83,6 +110,8 @@ export const POST = withRestaurantAuth(
       });
     } catch { /* لاگ‌نشدن تاریخچه نباید جلوی ارسال را بگیرد */ }
 
-    return NextResponse.json({ queued, kind });
+    // `opted_out` صریح برگردانده می‌شود تا پنل بتواند تفاوتِ «کسی نبود» و
+    // «بودند ولی انصراف داده‌اند» را به رستوران‌دار نشان بدهد.
+    return NextResponse.json({ queued, kind, opted_out: optedOut });
   },
 );
