@@ -7,6 +7,7 @@ import { Err } from './errors';
 import { enqueueSms } from './sms';
 import { queuePush, queueEmail } from './notify';
 import { cached, cacheKey } from './cache';
+import { activeStatusList } from './reservation-status';
 import { dateKeyInTz, timeKeyInTz } from './hours';
 
 // ═══════════════════════════════════════════════════════════
@@ -321,7 +322,10 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
       const conflict = await tx.reservation.count({
         where: {
           tableId: t.id,
-          status: { in: ['pending', 'confirmed', 'auto_confirmed', 'preparing', 'checked_in', 'running_late', 'arrived', 'seated', 'dining'] },
+          // از منبعِ واحد می‌خواند (lib/reservation-status.ts). محتوایِ این لیست
+          // پیش از این درست بود ولی یک **کپی** بود — یعنی با تغییرِ enum بی‌صدا
+          // drift می‌کرد. همان باگِ C1 که در گاردِ حذفِ میز واقعاً رخ داده بود.
+          status: { in: activeStatusList() as any },
           slotStart: { lt: horizon }, slotEnd: { gt: now },
         },
       });
@@ -516,10 +520,31 @@ export async function declineOffer(entryId: string, _actor = 'customer', auth: {
 }
 
 // ── خروج از صف ──
-export async function leaveWaitlist(entryId: string, auth: { callerUserId?: string; guestToken?: string } = {}) {
+/**
+ * لغوِ ورودیِ لیستِ انتظار.
+ *
+ * دو نوع صداکننده دارد و **هرگز** نباید یکی به‌جایِ دیگری اعتبارسنجی شود:
+ *  • مشتری/مهمان → مالکیت با `assertCanActOnEntry` (userId یا توکنِ مهمان).
+ *  • پرسنلِ رستوران → `staffRestaurantId`؛ مالکیتِ مشتری بی‌ربط است، ولی
+ *    ورودی حتماً باید مالِ همان رستوران باشد، وگرنه یک شعبه می‌توانست صفِ
+ *    شعبه‌ی دیگر را دست‌کاری کند.
+ *
+ * ⚠️ فازِ ۲: این مسیرِ پرسنلی قبلاً وجود نداشت. دکمه‌ی «حذف» در پنلِ رستوران
+ * فقط آرایه‌ی محلی را فیلتر می‌کرد و «از صف حذف شد» toast می‌داد — بدونِ هیچ
+ * درخواستی. ورودی روی سرور `waiting` می‌ماند، در بازخوانیِ بعدی برمی‌گشت، و
+ * `promoteNext` می‌توانست برایِ مهمانی که رفته بود میز نگه دارد.
+ */
+export async function leaveWaitlist(
+  entryId: string,
+  auth: { callerUserId?: string; guestToken?: string; staffRestaurantId?: string } = {},
+) {
   const e = await db.waitlistEntry.findUnique({ where: { id: entryId } });
   if (!e) throw Err.notFound('ورودی لیست انتظار');
-  assertCanActOnEntry(e, auth);
+  if (auth.staffRestaurantId) {
+    if (e.restaurantId !== auth.staffRestaurantId) throw Err.notFound('ورودی لیست انتظار');
+  } else {
+    assertCanActOnEntry(e, auth);
+  }
   if (!['waiting', 'offered'].includes(e.status)) throw Err.validation('این ورودی قابل لغو نیست');
   const updated = await db.$transaction(async (tx) => {
     const res = await tx.waitlistEntry.updateMany({
@@ -644,19 +669,40 @@ type SmsTpl = 'otp' | 'booking_confirm' | 'reminder' | 'welcome_visit' | 'campai
 // ═══════════════════════════════════════════════════════════
 export async function getWaitlistAnalytics(restaurantId: string, days = 30) {
   const since = new Date(Date.now() - days * 86_400_000);
-  const all = await db.waitlistEntry.findMany({
-    where: { restaurantId, createdAt: { gte: since } },
-  });
-  const total = all.length;
-  const seated = all.filter(e => e.status === 'accepted' || e.status === 'seated').length;
-  const abandoned = all.filter(e => ['cancelled', 'declined', 'no_response'].includes(e.status)).length;
+  // ⚠️ فازِ ۲ (§۲۵ + کمینه‌سازیِ داده): این تابع قبلاً **همه‌ی ردیف‌هایِ کاملِ**
+  // بازه را می‌خواند — با ?days=365 یعنی یک سال ورودی، شاملِ نام، تلفن، ایمیل و
+  // هشِ توکنِ مهمان — فقط برایِ اینکه در جاوااسکریپت بشمارد. شمارش کارِ
+  // دیتابیس است، و هیچ‌کدام از آن ستون‌هایِ شخصی برایِ خروجی لازم نبود.
+  const [byStatus, waitAgg, vipEntries] = await Promise.all([
+    db.waitlistEntry.groupBy({
+      by: ['status'],
+      where: { restaurantId, createdAt: { gte: since } },
+      _count: { _all: true },
+    }),
+    // میانگینِ انتظارِ واقعی فقط برایِ کسانی که نشستند — در خودِ Postgres.
+    // ⚠️ EXTRACT(EPOCH ...) عددِ double برمی‌گرداند و COUNT مقدارِ bigint —
+    // طبقِ قاعده‌ی صریحِ CLAUDE.md هردو در SQL کست و در JS با Number() پوشش
+    // داده می‌شوند، نه فقط یکی از دو لایه.
+    db.$queryRaw<Array<{ avg_minutes: number | null; n: bigint }>>`
+      SELECT AVG(EXTRACT(EPOCH FROM (seated_at - joined_at)) / 60)::float8 AS avg_minutes,
+             COUNT(*)::bigint AS n
+      FROM waitlist_entries
+      WHERE restaurant_id = ${restaurantId}::uuid
+        AND created_at >= ${since}
+        AND seated_at IS NOT NULL
+    `,
+    db.waitlistEntry.count({ where: { restaurantId, createdAt: { gte: since }, isVip: true } }),
+  ]);
+
+  const countOf = (...statuses: string[]) =>
+    byStatus.filter(r => statuses.includes(r.status)).reduce((sum, r) => sum + Number(r._count._all), 0);
+
+  const total = byStatus.reduce((sum, r) => sum + Number(r._count._all), 0);
+  const seated = countOf('accepted', 'seated');
+  const abandoned = countOf('cancelled', 'declined', 'no_response');
   const conversionRate = total ? Math.round((seated / total) * 100) : 0;
 
-  // میانگین زمان انتظار واقعی (برای آن‌هایی که نشستند)
-  const seatedEntries = all.filter(e => e.seatedAt);
-  const avgWait = seatedEntries.length
-    ? Math.round(seatedEntries.reduce((s, e) => s + (+e.seatedAt! - +e.joinedAt) / 60_000, 0) / seatedEntries.length)
-    : 0;
+  const avgWait = Number(waitAgg[0]?.n ?? 0) > 0 ? Math.round(Number(waitAgg[0]?.avg_minutes ?? 0)) : 0;
 
   const currentQueue = await db.waitlistEntry.count({ where: { restaurantId, status: 'waiting' } });
 
@@ -675,6 +721,6 @@ export async function getWaitlistAnalytics(restaurantId: string, days = 30) {
     avg_dining_minutes: avgDining.minutes,
     avg_dining_minutes_source: avgDining.source,
     current_queue_size: currentQueue,
-    vip_entries: all.filter(e => e.isVip).length,
+    vip_entries: vipEntries,
   };
 }

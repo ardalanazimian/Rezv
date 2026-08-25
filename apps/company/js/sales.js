@@ -15,6 +15,9 @@
 
 let SALES_ORDERS = [];
 let SALES_INQUIRIES = [];
+// عددِ کلِ سرور (نه شمارشِ صفحه‌ی جاری) — null یعنی هنوز خوانده نشده.
+let SALES_PENDING = null;
+let SALES_OPEN_INQUIRIES = null;
 let SALES_TAB = 'orders';       // orders | inquiries
 let SALES_FILTER = 'pending';   // pending | all
 let SALES_LOADING = false;
@@ -78,6 +81,11 @@ async function loadSales() {
     SALES_ORDERS = orders.data.items || [];
   }
   SALES_INQUIRIES = inquiries.ok ? (inquiries.data.items || []) : [];
+  // ⚠️ فازِ ۲ (§۳): شمارنده‌هایِ خلاصه قبلاً از رویِ همین آرایه‌ی **صفحه‌ی جاری**
+  // (حداکثر ۵۰ ردیف) محاسبه می‌شدند، پس با نشانِ سایدبار در همان صفحه تناقض
+  // داشتند و بکلاگِ واقعی را کم گزارش می‌کردند. API هر دو عددِ کل را می‌فرستد.
+  SALES_PENDING = orders.ok ? (orders.data.pending_purchases ?? null) : null;
+  SALES_OPEN_INQUIRIES = inquiries.ok ? (inquiries.data.open ?? null) : null;
   rSales();
   refreshSalesBadge();
 }
@@ -99,8 +107,9 @@ function rSales() {
   const el = document.getElementById('v-sales');
   if (!el) return;
 
-  const pendingCount = SALES_ORDERS.filter((o) => o.status === 'pending' && o.kind === 'purchase').length;
-  const openInquiries = SALES_INQUIRIES.filter((q) => q.status === 'open').length;
+  // عددِ کلِ سرور مرجع است؛ شمارشِ محلی فقط وقتی که سرور عددی نداده.
+  const pendingCount = SALES_PENDING ?? SALES_ORDERS.filter((o) => o.status === 'pending' && o.kind === 'purchase').length;
+  const openInquiries = SALES_OPEN_INQUIRIES ?? SALES_INQUIRIES.filter((q) => q.status === 'open').length;
 
   el.innerHTML = `
     <div class="bill-summary">

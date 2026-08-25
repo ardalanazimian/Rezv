@@ -74,6 +74,20 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
  */
 export const PATCH = withRestaurantAuth({ permission: 'canManageSettings', rateLimit: 'auth' }, async (_req, ctx, rawParams: { userId: string }) => {
   const { userId } = parseParams(rawParams, paramsSchema);
+
+  // ⚠️ رفعِ نشتِ دامنه (فازِ ۲، پروتکل §۷/§۸): این handler شناسه‌ی خامِ مسیر را
+  // مستقیم به clearAbuseFlag می‌داد، در حالی که GETِ همین فایل اول رابطه را
+  // اثبات می‌کند. فلگِ سوءاستفاده رویِ CustomerEconomyProfile می‌نشیند که
+  // **سراسری و per-User** است (رجوع کن به توضیحِ خودِ lib/fraud.ts) — یعنی
+  // رستورانِ A می‌توانست فلگی را که اسکنِ رستورانِ B زده بود پاک کند، و از
+  // تفاوتِ ۲۰۰/۴۰۴ برایِ شمارشِ کاربرانِ پلتفرم استفاده کند.
+  // همان چکِ GET، با همان پیامِ خطا تا دو حالت از هم قابلِ‌تشخیص نباشند.
+  const rel = await db.customerInsight.findUnique({
+    where: { restaurantId_userId: { restaurantId: ctx.restaurant.id, userId } },
+    select: { userId: true },
+  });
+  if (!rel) throw Err.notFound('سابقه‌ی این مشتری برای این رستوران');
+
   try {
     await clearAbuseFlag(userId, ctx.auth.sub, ctx.restaurant.id);
   } catch (e) {

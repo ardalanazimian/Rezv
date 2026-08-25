@@ -8,6 +8,8 @@ import { clientIp } from '@/lib/ratelimit';
 import { assertUserNotBanned } from '@/lib/ban';
 import { isFeatureEnabled, featureFlagLabel } from '@/lib/feature-flags';
 import { Err, errorResponse } from '@/lib/errors';
+import { requirePermission } from '@/lib/permissions';
+import { resolveStaffRestaurant } from '@/lib/staff-helpers';
 import { parseBody, z, zUuid, zDateStr, zTimeStr, zPartySize, zPhone } from '@/lib/schemas';
 
 // Schema ورودیِ رزرو — یک‌جا تعریف، خطاهای یکدست، type inference.
@@ -67,8 +69,23 @@ export async function POST(req: Request) {
     const isStaff = auth.kind === 'staff';
     let staffGuestUserId: string | undefined;
     if (isStaff) {
-      const r = await db.restaurant.findUnique({ where: { id: b.restaurant_id }, select: { tenantId: true } });
-      if (!r || r.tenantId !== auth.tenantId) throw Err.forbidden();
+      // ⚠️ رفعِ P1 (فازِ ۲، پروتکل §۷): این شاخه فقط چک می‌کرد که
+      // `b.restaurant_id` به تنانتِ فراخوان تعلق دارد، و بعد همان idِ
+      // **آمده از بدنه** را به‌عنوانِ رستورانِ معتبر به createReservation
+      // می‌داد. یعنی نه requirePermission صدا زده می‌شد و نه
+      // resolveStaffRestaurant — پس هم canManageReservations دور می‌خورد و
+      // هم قفلِ شعبه (staff.restaurantId، migration 018 و P0-1).
+      //
+      // نکته‌ای که این را از «ناسازگاری» به «قابلِ‌سوءاستفاده» تبدیل می‌کرد:
+      // عملیاتِ عملاً یکسان رویِ /restaurant/walkin هر دو گارد را **دارد**
+      // (withRestaurantAuth + permission). کارمندِ محدودشده فقط کافی بود از
+      // این endpointِ دیگر استفاده کند.
+      //
+      // عمداً این route به withRestaurantAuth تبدیل **نشد**: همین مسیر به
+      // مشتری هم سرویس می‌دهد و آن wrapper مسیرِ مشتری را می‌شکست.
+      await requirePermission(auth, 'canManageReservations');
+      const branch = await resolveStaffRestaurant(auth, req);
+      if (branch.id !== b.restaurant_id) throw Err.forbidden('رزرو فقط برایِ شعبه‌ی فعالِ خودت مجاز است');
       if (b.guest && !b.guest.name) throw Err.validation('اسم مهمان برای رزرو دستی الزامی است');
       // اگر شماره‌ی مهمان داده شده، کاربر واقعی را پیدا/بساز تا منطق آماده‌ی
       // عضویت باشگاه + کش‌بک (که قبلاً فقط برای userId اجرا می‌شد) برای رزروهای

@@ -231,7 +231,10 @@ describe('ماشینِ وضعیتِ میز — هیچ مسیری دورش نمی
     //    رفع، یک اسکن آن را به occupied می‌برد و نشانه‌ی خرابی گم می‌شد.
     const tbl = await makeQrTableWithLiveReservation('maintenance', 'MNT');
 
-    await qrCheckIn(tbl.qrCode!);
+    // [merge ۰۸-۲۴] آرگومانِ دوم: qrCheckIn در سخت‌سازیِ P0-2 (خطِ ممیزی)
+    // tenant-scoped شد — بدونِ restaurantId کدِ میز در «هیچ» رستورانی resolve
+    // نمی‌شود (جلوگیری از اسکنِ برون‌تنانتی). گاردش: checkin-auth.integration.
+    await qrCheckIn(tbl.qrCode!, A.restaurantId);
 
     const after = await db.table.findUnique({ where: { id: tbl.id }, select: { state: true } });
     assert.equal(after?.state, 'maintenance', 'میزِ در تعمیر نباید بی‌صدا اشغال شود');
@@ -241,7 +244,7 @@ describe('ماشینِ وضعیتِ میز — هیچ مسیری دورش نمی
     // بدونِ این، رفعی که *هرگز* میز را occupied نکند هم تستِ بالا را پاس می‌کرد.
     const tbl = await makeQrTableWithLiveReservation('reserved', 'OK');
 
-    const out = await qrCheckIn(tbl.qrCode!);
+    const out = await qrCheckIn(tbl.qrCode!, A.restaurantId);
 
     assert.equal(out.status, 'seated');
     const after = await db.table.findUnique({ where: { id: tbl.id }, select: { state: true } });

@@ -15,7 +15,12 @@ const RESTAURANTS_SAMPLE=[
 ];
 // RESTAURANTS متغیر زنده: اول نمونه (فقط تا قبل از بارگذاری اول)، بعد همیشه از API
 let RESTAURANTS = RESTAURANTS_SAMPLE;
-const PLAN_LABEL={free:'رایگان',trial:'آزمایشی',basic:'پایه',pro:'حرفه‌ای',enterprise:'سازمانی'};
+// ⚠️ رفعِ «پلن undefined» (فازِ ۲، §۲۶–۲۹): این نگاشت با enumِ واقعیِ بک‌اند
+// (SubscriptionPlan = free | starter | pro | enterprise) هم‌خوان نبود — دو
+// کلیدِ ناموجود داشت (trial/basic) و کلیدِ واقعیِ starter را نداشت. هر تنانتی
+// که از مسیرِ فعال‌سازیِ همین پنل رویِ starter می‌رفت، «پلن undefined» می‌شد.
+// کلیدهایِ قدیمی برایِ داده‌ی نمونه‌ی موجود نگه داشته شدند.
+const PLAN_LABEL={free:'رایگان',starter:'شروع',pro:'حرفه‌ای',enterprise:'سازمانی',trial:'آزمایشی',basic:'پایه'};
 const STATUS_LABEL={active:'فعال',expiring:'رو به اتمام',expired:'منقضی',trial:'دوره آزمایشی',trial_expired:'آزمایشی تمام‌شده'};
 
 const TITLES={overview:'داشبورد',restaurants:'رستوران‌ها',detail:'جزئیات رستوران',analytics:'آنالیز پلتفرم',customers:'هوش تجاری مشتریان',billing:'اشتراک و پیامک',sales:'درخواست‌های سایت',photos:'بازبینی عکسِ گالری',hours:'تأییدِ ساعتِ کاری',systemhealth:'سلامت سیستم',aihealth:'سلامتِ مدل‌هایِ هوشِ مصنوعی',security:'امنیت پلتفرم',support:'مدیریت رستوران‌ها',badges:'نشان‌های پلتفرم',missions:'ماموریت‌های پلتفرم'};

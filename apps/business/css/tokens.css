@@ -18,17 +18,11 @@
    font-display: swap → متن بلافاصله با فونتِ جایگزین دیده می‌شود و بعد
    عوض می‌شود؛ هیچ‌وقت صفحه‌ی خالیِ منتظرِ فونت نداریم.
    ──────────────────────────────────────────────────────────────────── */
-@font-face {
-  font-family: 'Vazirmatn';
-  /* یک url کافی است: هر مرورگری که woff2 را می‌فهمد، فونتِ variable را هم
-     می‌خواند (Chrome 62+/Safari 11+/Firefox 62+). دو خطی‌کردنِ src با
-     woff2-variations فقط همان فایل را دوباره اعلام می‌کرد و در بандلِ
-     standalone باعثِ جاسازیِ دوباره‌ی ۱۴۴KB base64 می‌شد. */
-  src: url('../fonts/vazirmatn-var.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
+/* [merge ۰۸-۲۴] بلوکِ @font-face که اینجا بود به css/fonts.css منتقل شد —
+   هر دو خطِ توسعه فونت را مستقل self-host کرده بودند (فایلِ باینری بایت‌به‌بایت
+   یکی بود!) و دو اعلانِ هم‌زمان یعنی دوبار جاسازیِ ~۱۴۵KB در بسته‌ی آفلاین.
+   fonts.css ماند چون توکن‌های --font-ui/--font-mono (پشته‌ی آماده‌ی Piyade)
+   هم آنجاست و body همه‌ی اپ‌ها از var(--font-ui) می‌خواند. */
 
 :root {
   /* ── لایه ۱: Primitive — مقیاسِ تایپوگرافی (۴px-baseline، پرش‌های واضح) ── */

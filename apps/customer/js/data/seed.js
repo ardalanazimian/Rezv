@@ -70,6 +70,28 @@ try{ const saved=JSON.parse(localStorage.getItem('rz_favs')||'[]'); if(Array.isA
 export const favHas=id=>favs.has(String(id));
 export function saveFavs(){ try{ localStorage.setItem('rz_favs', JSON.stringify([...favs])); }catch{} }
 export function setPts(v){ pts=v; }
+// ═══════════════════════════════════════════════════════════
+//  رزروهایِ واقعیِ کاربر — منبعِ واحد برایِ هر جایی که «رزروهای من» را
+//  نشان می‌دهد. `null` یعنی «هنوز نمی‌دانیم»، نه «صفر».
+//
+//  ⚠️ چرا اضافه شد (پروتکل §۱۰): دو مصرف‌کننده مستقیماً `TRIPS` (دادهٔ seed)
+//  را می‌خواندند و روی استقرارِ واقعی رزروِ ساختگی نشان می‌دادند —
+//   • کارتِ پروفایل: `TRIPS.length` یک ثابتِ ماژول است، پس **هر** کاربری
+//     (چه صفر رزرو، چه چهل‌تا) عددِ ۳ می‌دید، کنارِ دو آمارِ واقعی.
+//   • پالتِ فرمان: جست‌وجویِ «رزروهای من» رویِ همان سه ردیفِ seed بود.
+//  همان انضباطِ `pts`: تا وقتی سرور نگفته، «—» و هیچ نتیجه‌ای.
+// ═══════════════════════════════════════════════════════════
+export let myTrips = null;
+export let tripCount = null;
+// لیستِ **نگاشت‌شده** (mapApiTrip) — فقط renderTrips این را می‌داند.
+export function setMyTrips(list){
+  myTrips = Array.isArray(list) ? list : null;
+  tripCount = Array.isArray(list) ? list.length : null;
+}
+// فقط شمارش — برایِ مسیری که پاسخِ خامِ سرور را دارد ولی نگاشتش نکرده
+// (کارتِ پروفایل). عمداً `myTrips` را با شکلِ خام آلوده نمی‌کند، چون
+// پالتِ فرمان روی شکلِ نگاشت‌شده (`code`/`rid`/`date`) کار می‌کند.
+export function setTripCount(n){ tripCount = (typeof n === 'number' ? n : null); }
 export function setCurRest(v){ curRest=v; }
 export function setBk(v){ bk=v; }
 

@@ -1,14 +1,13 @@
 # RezervnoOSv2 (رزرونو) — قوانین و راهنمای پروژه برای Claude
 
-> **آخرین بازبینیِ کامل: ۲۰۲۶-۰۸-۲۵** (روی `main` تا `0e95ae9`).
-> همه‌ی ادعاهای این فایل در آن تاریخ با خواندنِ خودِ کد راستی‌آزمایی شدند.
+> **آخرین هماهنگ‌سازی با کد: ۲۰۲۶-۰۸-۲۵** (روی `main` تا `a20a388`).
 >
-> ⚠️ **درسِ مهمِ این فایل، از تجربه‌ی خودش:** یک ادعای «چک‌شده» فقط **تا تاریخِ
-> همان چک** معتبر است. دو نمونه‌ی واقعی: ادعایِ «`apps/seo` هیچ CSSی ندارد» در
-> ۲۰۲۶-۰۸-۱۲ به‌عنوانِ «اصلاحِ چک‌شده» نوشته شد و در ۲۰۲۶-۰۸-۱۹ (PR #32) باطل
-> شد؛ و شماره‌ی «آخرین مهاجرت» در هر بازبینی عوض شده است. **قبل از تکیه به هر
-> عدد یا فهرستِ اینجا، خودت با `ls`/`grep` تأییدش کن.** بخش‌هایی که تا امروز
-> غلط بوده‌اند با ✅ **اصلاح‌شده** علامت خورده‌اند.
+> ⚠️ **قاعده‌ی حاکم بر کلِ این فایل، از تجربه‌ی خودش:** یک ادعای «چک‌شده» فقط
+> **تا تاریخِ همان چک** معتبر است. نمونه‌های واقعی: ادعایِ «`apps/seo` هیچ CSSی
+> ندارد» در ۲۰۲۶-۰۸-۱۲ به‌عنوانِ «اصلاحِ چک‌شده» نوشته شد و در PR #32 باطل شد؛
+> و شماره‌ی «آخرین مهاجرت» در هر بازبینی عوض شده (فقط در همین یک روز از ۰۵۴ به
+> ۰۵۹ و بعد ۰۶۵ رفت).
+> **قبل از تکیه به هر عدد یا فهرستِ اینجا، خودت با `ls`/`grep` تأییدش کن.**
 
 ---
 
@@ -23,7 +22,7 @@
 | پنل شرکت/پلتفرم | `apps/company/` | Vanilla JS، **اسکریپتِ کلاسیک** | همان قاعده‌ی بالا |
 | وب‌سایتِ مارکتینگ | `apps/landing/` | Next.js 16 + React (پروژه‌ی مستقل) | ADR 0002 |
 | صفحاتِ SEOِ رستوران‌ها | `apps/seo/` | Next.js 16 + React (پروژه‌ی مستقل) | ADR 0001 |
-| بک‌اند | `api/` | Next.js 16 (App Router, Turbopack) · Prisma · PostgreSQL · Redis · JWT | ~۱۴۵ فایلِ `route.ts` |
+| بک‌اند | `api/` | Next.js 16 (App Router, Turbopack) · Prisma · PostgreSQL · Redis · JWT | ~۱۴۶ فایلِ `route.ts` |
 
 هر سه پنل **بدونِ build و بدونِ فریم‌ورک**اند (نه React).
 
@@ -32,9 +31,10 @@
 import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط برای `business` و
 `company` درست است**:
 
-- `apps/customer/` یک اپِ **کاملاً ES-Module** است — ۶۴ خط `import` در `js/`،
-  ورودیِ واحدِ `js/main.js` با `type="module"`، و زیرپوشه‌های `js/data/` و
-  `js/features/`. ⇒ **با `file://` باز نمی‌شود** و حتماً وب‌سرور می‌خواهد.
+- `apps/customer/` یک اپِ **کاملاً ES-Module** است — بیش از ۱۵۰ خط `import` در
+  `js/` (شاملِ زیرپوشه‌های `js/data/` و `js/features/`)، با ورودیِ واحدِ
+  `js/main.js` و `type="module"`.
+  ⇒ **با `file://` باز نمی‌شود** و حتماً وب‌سرور می‌خواهد.
 - `apps/business/` و `apps/company/` **صفر** خط `import` دارند: هر فایل با
   `<script src>` در `index.html` می‌آید و همه در `window` مشترک‌اند.
   ⇒ فایلِ جدید = یک `<script>` در جای **درستِ ترتیب**، وگرنه تابع زمانِ
@@ -43,16 +43,17 @@ import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط 
 ### بک‌اند
 - endpointها در `api/src/app/api/` (`health`, `metrics`, و `v1/...`). پنل‌ها
   هیچ کدِ سرور-سایدی ندارند.
-- **مسیرِ اسکیما دومرحله‌ای است و هر دو مرحله لازم‌اند** (`api/docker-entrypoint.sh`):
-  1. `prisma migrate deploy` → مهاجرتِ پایه‌ی `0_init` (خطِ ۳۹؛ روی DBِ ازقبل‌موجود
-     اول `migrate resolve --applied 0_init` برای baseline).
-  2. `sh prisma/apply-sql.sh` → SQLِ خامِ افزایشی در `api/prisma/sql/NNN-*.sql` (خطِ ۵۴).
+- **مسیرِ اسکیما در تولید دومرحله‌ای است و هر دو مرحله لازم‌اند**
+  (`api/docker-entrypoint.sh`):
+  1. `prisma migrate deploy` → مهاجرتِ پایه‌ی `0_init` (خطِ ۳۹؛ روی DBِ
+     ازقبل‌موجود اول `migrate resolve --applied 0_init` برای baseline).
+  2. `sh prisma/apply-sql.sh` → SQLِ خامِ افزایشی در `api/prisma/sql/NNN-*.sql`
+     (خطِ ۵۴).
 
   ⚠️ نسخه‌های قدیمی‌ترِ این فایل می‌گفتند «اعمال با `apply-sql.sh` — **نه**
   `prisma migrate deploy`». غلط بود و بی‌اهمیت هم نبود: دروازه‌ی
   `tools/check-schema-drift.sh` دقیقاً روی همین مسیرِ دومرحله‌ای بنا شده، و
-  `apply-sql.sh` به‌تنهایی از یک DBِ خالی اسکیما نمی‌سازد (مهاجرتِ ۰۰۱ فرض
-  می‌کند جداولِ پایه هستند).
+  `apply-sql.sh` به‌تنهایی از یک DBِ خالی اسکیما نمی‌سازد.
 - **Redis**: کش + rate-limit + قفلِ اسلات + pub/sub. هر مسیرِ Redis باید سقفِ
   زمانی داشته باشد و بازیابی خودکار باشد — نه هنگ (بخشِ ۹).
 - **احراز هویت**: JWT (Bearer، بدونِ کوکی، بدونِ NextAuth) — `AccessPayload`
@@ -91,17 +92,24 @@ import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط 
 2. **بک‌اند** — داخلِ `api/` و بعد از `npx prisma generate`، به ترتیب:
    `npx tsc --noEmit` → `npm run lint` → `npm test` (هر سه پاک).
 3. **اپ‌های Next** — اگر `apps/landing/` یا `apps/seo/` را دست زدی، همان دستورها
-   را **داخلِ خودِ آن اپ** جدا اجرا کن (package.json و تستِ مستقل دارند). برای
-   `apps/seo` جابِ CI فقط `npm test` + `npm run build` است (خودِ build تایپ‌چک
-   و لینت می‌کند).
+   را **داخلِ خودِ آن اپ** جدا اجرا کن. برای `apps/seo` جابِ CI فقط `npm test` +
+   `npm run build` است (خودِ build تایپ‌چک و لینت می‌کند).
 4. **E2E Playwright** — برای بخشِ تغییرکرده، **موبایل + دسکتاپ** باید سبز باشند.
    سه پروژه: `mobile-safari` (iPhone 13)، `mobile-chrome` (Pixel 5)،
    `desktop-chrome`. تستی که فقط دسکتاپ پاس شود قبول نیست.
-5. **مسیرهای شکسته** — هر `<script>`/`<link>` در HTML و هر `import` در ES
+5. **تازگیِ بسته‌ی آفلاین** — اگر چیزی در `apps/customer`, `apps/business` یا
+   `apps/company` عوض کردی، از ریشه: `python tools/build-standalone.py --check`.
+   ⚠️ **چرا گیتِ اجباری است** (یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۳): `standalone/*.html`
+   خروجیِ **تولیدشده‌ی commit‌شده** است، نه منبع. از ۲۰۲۶-۰۸-۱۸ بازتولید نشده
+   بود، پس بسته‌ی آفلاین — همان چیزی که `standalone/README-website.md` به کاربر
+   می‌گوید بازش کند — هنوز **همه‌ی** باگ‌هایی را تحویل می‌داد که در منبع رفع شده
+   بودند، از جمله یک P0 که کلِ مسیرِ رزرو را می‌شکست. آرتیفکتی که بی‌صدا کهنه
+   شود از نبودش بدتر است. اگر check قرمز شد: `python tools/build-standalone.py`.
+6. **مسیرهای شکسته** — هر `<script>`/`<link>` در HTML و هر `import` در ES
    ماژول‌ها باید به فایلِ واقعیِ موجود اشاره کند.
-6. **امنیت** — هرگز secret/key/`.env` واقعی کامیت نکن. `api/.uploads/` هم در
+7. **امنیت** — هرگز secret/key/`.env` واقعی کامیت نکن. `api/.uploads/` هم در
    `.gitignore` است و نباید برگردد.
-7. **دروازه‌ی انحرافِ اسکیما** (اگر `schema.prisma` یا `prisma/sql/` را دست زدی) —
+8. **دروازه‌ی انحرافِ اسکیما** (اگر `schema.prisma` یا `prisma/sql/` را دست زدی) —
    از ریشه: `ADMIN_URL=postgresql://…/postgres sh tools/check-schema-drift.sh`
    → باید «بدونِ انحراف» بدهد.
    ⚠️ چرا جدا از تایپ‌چک و تست است: `db push` (مسیرِ CI) و
@@ -109,7 +117,11 @@ import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط 
    اگر فیلدی به `schema.prisma` اضافه کنی و مهاجرتِ SQL ننویسی، **همه‌ی تست‌ها
    سبز می‌شوند و تولید در زمانِ اجرا می‌شکند** — «CI سبز، تولید خراب» که هیچ
    تستی نمی‌گیردش.
-8. **دیتای دمو** — هر داده‌ی آزمایشی برچسبِ `[DEMO]` بگیرد (مثلاً
+9. **مهاجرتِ جدید** — همیشه فایلِ `api/prisma/sql/NNN-*.sql` با شماره‌ی *بعدی* و
+   idempotent (`IF NOT EXISTS`). **هرگز فایلِ مهاجرتِ قبلی را ویرایش نکن** — روی
+   DBهایی که اجرایش کرده‌اند دوباره اجرا نمی‌شود. (نمونه‌ی واقعی: رفعِ یک FK که
+   با ویرایشِ ۰۵۹ انجام شده بود، بعداً مجبور شد به مهاجرتِ تازه‌ی ۰۶۵ منتقل شود.)
+10. **دیتای دمو** — هر داده‌ی آزمایشی برچسبِ `[DEMO]` بگیرد (مثلاً
    `apps/customer/js/data/seed.js`). هرگز اسمِ رستورانِ واقعی را جعل نکن.
 
 ### جاب‌های CI (`.github/workflows/ci.yml`) — **۸ جاب**، همه باید سبز شوند
@@ -147,30 +159,71 @@ import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط 
 `docker compose`، هر دستورِ npm باید **داخلِ `api/`، `apps/landing/`،
 `apps/seo/` یا `e2e/`** اجرا شود.
 
+### 🚨 `npm install` را با `NODE_ENV=production` اجرا نکن
+یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۳ (تأییدشده با `--dry-run`): وقتی `NODE_ENV=production`
+در محیط ست باشد، npm خودکار `omit=dev` می‌گیرد و یک `npm install`ِ ساده **کلِ
+زنجیره‌ی ابزار را پاک می‌کند** — `typescript`، `tsx`، `eslint`،
+`@typescript-eslint/*`، `esbuild`، و در `e2e/` خودِ Playwright. اندازه‌ی خسارت
+در همین مخزن: `api` −۱۲۳ بسته · `apps/landing` −۳۲۷ · `apps/seo` −۳۲۷ ·
+`e2e` −۸۹. نتیجه: هر چهار گیتِ اجباریِ بالا می‌شکنند و پیامِ خطا هیچ ربطی به
+علت ندارد.
+
+- برای توسعه همیشه: `NODE_ENV=development npm install --include=dev`
+  (یا اول `unset NODE_ENV`). چک: `npm config get omit` باید خالی باشد، نه `dev`.
+- برای ایمیجِ تولید **چیزی عوض نکن**: `api/Dockerfile` خودش در مرحله‌ی runtime
+  صریحاً `npm ci --omit=dev` می‌زند و مرحله‌ی build جدا و کامل نصب می‌کند.
+- ⚠️ به همین دلیل **`.npmrc`ِ پروژه با `include=dev` نساز**: در npm اگر یک نوع
+  هم در `include` و هم در `omit` بیاید، `include` برنده می‌شود — یعنی همان
+  `--omit=dev`ِ Dockerfile را هم بی‌اثر می‌کند و ایمیجِ تولید را باد می‌کند.
+
 | کار | دستور |
 |---|---|
 | همگام‌سازی دیزاین‌سیستم | `sh tools/sync-design-system.sh` (ریشه) |
 | چکِ بدونِ نوشتن (CI) | `sh tools/sync-design-system.sh --check` |
+| بازتولیدِ بسته‌ی آفلاین | `python tools/build-standalone.py` (ریشه) · فقط بررسی: `--check` |
+| پیش‌نمایشِ تک‌فایلیِ سایت | `python tools/build-site-preview.py` |
 | چکِ انحرافِ اسکیما | `ADMIN_URL=… sh tools/check-schema-drift.sh` (ریشه) |
 | تستِ بک‌اند | `cd api && npm test` |
+| **یک فایلِ تست به‌تنهایی** | `cd api && npm run test:one -- tests/<file>.test.mts` |
 | تایپ‌چک / لینتِ بک‌اند | `cd api && npm run typecheck` · `npm run lint` |
 | اعمالِ SQLهای دستی | `cd api && sh prisma/apply-sql.sh` |
 | migrationِ Prisma (توسعه) | `cd api && npm run db:migrate` |
 | seed | `cd api && npm run db:seed` · محتوای سایت: `npm run db:seed:site` |
-| **E2E** | ✅ `cd e2e && npm test` |
+| **E2E** | `cd e2e && npm test` |
 | E2E موبایل / دسکتاپ / یک فلو | `npm run test:mobile` · `test:desktop` · `test:booking` |
 | E2E سایر | `test:ui` · `report` · `audit` (اجرایِ `ux-audit.mjs`) |
 | اجرای محلی با داکر | `docker compose --profile http up -d --build` |
 | اجرای تولید با HTTPS | `docker compose -f docker-compose.prod.yml up -d --build` (اول `DOMAIN=...` در `.env`) |
 | شلِ Postgres در داکر | `docker exec -it rezervno-postgres psql -U postgres -d rezervnodb` |
-| ساختِ نسخه‌ی آفلاینِ پنل‌ها | `python3 tools/build-standalone.py` |
-| ساختِ پیش‌نمایشِ تک‌فایلیِ سایت | `python3 tools/build-site-preview.py` |
+
+⚠️ **`npx tsx --test tests/<file>` خام را اجرا نکن.** به‌خاطرِ هندلِ بازِ Redis
+پروسه هرگز exit نمی‌کند و پروسه‌ی یتیم جا می‌گذارد — که بعداً باعثِ کندیِ E2E و
+قفلِ `EPERM` روی DLLِ Prisma می‌شود. `npm run test:one` همان دستور با
+`--test-force-exit` است.
+
+⚠️ **`prisma/apply-sql.sh` روی DBِ خالی به‌تنهایی کار نمی‌کند** (تأییدشده با
+اجرای واقعی، ۲۰۲۶-۰۸-۲۳): `prisma/sql/001-*` یک migrationِ *افزایشی* است
+(ایندکس روی جدولِ موجود)، نه سازنده‌ی اسکیما؛ روی DBِ کاملاً خالی با
+`P1014 The underlying table for model 'reservations' does not exist` می‌شکند.
+ترتیبِ درست برای یک DBِ خالیِ توسعه: اول `npx prisma db push`، **بعد**
+`prisma/apply-sql.sh`.
+
+🚫 **`prisma db push` فقط برای همان بوت‌استرَپِ اولیه است — هرگز روی DBِ
+migrate‌شده اجرایش نکن** (تأییدشده با اجرای واقعی): `block_end` یک ستونِ
+`GENERATED ALWAYS … STORED` است که Prisma نمی‌تواند بیانش کند، پس `db push`
+همیشه قصدِ DROPش را دارد و Postgres ردش می‌کند («constraint no_table_overlap
+depends on it»). یعنی دستور شکست می‌خورد — ولی *بعد از* اینکه هر ایندکسی را که
+در `schema.prisma` اعلام نشده DROP کرده.
+
+⚠️ **هر ایندکسِ جدید باید در هر دو جا باشد** — `@@index` در `schema.prisma`
+(با `map:` اگر نامِ SQL دلخواه است) **و** migrationِ SQL. فقط یکی از دو تا یعنی
+یا `db push` حذفش می‌کند یا یک ایندکسِ تکراری با نامِ دیگر ساخته می‌شود.
+گاردِ خودکار: `api/tests/schema-drift.integration.test.mts`.
 
 ✅ **اصلاح‌شده:** E2E در `e2e/` با **`npm test`** اجرا می‌شود، نه
 `npm run test:e2e` — آن اسکریپت در `e2e/package.json` وجود ندارد (مالِ `api/`
 است و چیزِ دیگری). همچنین `serviceWorkers: 'block'` از قبل در
-`e2e/playwright.config.ts` تنظیم شده — **حذفش نکن**، لازم نیست دوباره
-تنظیمش کنی (کشِ SW منبعِ flake بود).
+`e2e/playwright.config.ts` تنظیم شده — **حذفش نکن** (کشِ SW منبعِ flake بود).
 
 ---
 
@@ -184,14 +237,14 @@ import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط 
   reservations، ML، media، …)
 - `api/src/middleware.ts` → CORS/CSRF/هدرهای امنیتی + گاردهای fail-fastِ production
 - `api/prisma/sql/NNN-*.sql` → migrationهای افزایشی. **قبل از ساختنِ فایلِ جدید
-  خودت `ls api/prisma/sql/` بزن و شماره‌ی واقعیِ بعدی را بردار** (این عدد در هر
-  بازبینی عوض می‌شود؛ در ۲۰۲۶-۰۸-۲۵ آخرین شماره `059-restaurant-closures-fk-cascade.sql` بود).
+  خودت `ls api/prisma/sql/` بزن و شماره‌ی واقعیِ بعدی را بردار** (این عدد سریع
+  عوض می‌شود؛ در ۲۰۲۶-۰۸-۲۵ آخرین شماره `065-restaurant-closures-fk-onupdate.sql` بود).
 - `api/tests/` → تست‌های واحد/یکپارچه + `_all.runner.mts` (بخشِ ۷ را حتماً بخوان)
 - `shared/` → منبعِ **یکتای** دیزاین‌سیستمِ سه پنل: `shared/css/`،
   `shared/js/` (`api-core.js`، `format.js`، `icons.js`، `analytics.panel.js`)،
   `shared/content/site-content.json`، `shared/fonts/`.
   **shared/ کامپوننت/هوکِ React ندارد.**
-- `e2e/` → Playwright (۱۳ spec، موبایل‌محور)
+- `e2e/` → Playwright، موبایل‌محور
 - `tools/` → `sync-design-system.sh`, `check-schema-drift.sh`,
   `build-standalone.py`, `build-site-preview.py`, `xss-sink-audit.mjs`
 - `deploy/` → Caddy و nginx برایِ استقرارِ تولید
@@ -222,8 +275,8 @@ import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط 
 - `standalone/` → **خروجیِ تولیدشده**، نه منبع، و نه کدِ زنده.
   `customer/business/company.html` از `tools/build-standalone.py` و
   `website.html` از `tools/build-site-preview.py`. ⚠️ **دستی ویرایش نکن** —
-  باگ‌فیکسِ واقعی در `apps/` انجام می‌شود و بعد بسته دوباره ساخته می‌شود.
-  (در ممیزیِ PR #34 دقیقاً همین عقب‌ماندگی پیدا شد.)
+  باگ‌فیکسِ واقعی در `apps/` انجام می‌شود و بعد بسته دوباره ساخته می‌شود
+  (گیتِ ۵ در بخشِ ۲).
 - `demo-mvp/` → نسخه‌ی نمایشیِ ثابت با دیتای نمونه. چون اپ مشتری ES Module است،
   با وب‌سرور باز می‌شود نه `file://`.
 - `design-preview/` → HTMLهای اکتشافیِ طراحی. **منبعِ حقیقت نیستند** و از
@@ -288,7 +341,7 @@ export const GET = withRestaurantAuth({ permission: 'canManageSettings' },
   و با اجرای دوم روی Postgresِ واقعی امتحانش کن.
 - فایلی که راهنما/scaffold است نه migration، خطِ `-- @manual-only` بگیرد تا
   `apply-sql.sh` ردش کند.
-- `schema.prisma` را هماهنگ کن **و** دروازه‌ی انحرافِ اسکیما (بندِ ۷ بخشِ ۲) را بزن.
+- `schema.prisma` را هماهنگ کن **و** دروازه‌ی انحرافِ اسکیما (بندِ ۸ بخشِ ۲) را بزن.
 
 ---
 
@@ -308,8 +361,9 @@ cd api && comm -23 \
 # خروجیِ خالی = همه ثبت شده‌اند
 ```
 
-(برای دیباگِ محلی، اجرای مستقیمِ `tsx --test tests/x.test.mts` همیشه کار می‌کند.
-نامِ رانر عمداً `.runner.mts` است نه `.test.mts` تا با glob دوبار شمرده نشود.)
+(برای اجرای یک فایل به‌تنهایی از `npm run test:one -- tests/x.test.mts` استفاده
+کن، نه `npx tsx --test` خام — بخشِ ۴. نامِ رانر عمداً `.runner.mts` است نه
+`.test.mts` تا با glob دوبار شمرده نشود.)
 
 ### استانداردِ تستِ این ریپو
 - **کنترلِ مثبت**: تست باید ثابت کند اگر رفتار غلط بود، fail می‌شد.
@@ -429,9 +483,10 @@ SSE/streaming را نمی‌شکنی.
   برنچِ `develop` **وجود ندارد** (هرچند `ci.yml` هنوز اسمش را در triggerها دارد).
 - هر دسته‌کارِ جدید مستقیماً از `main` برنچ می‌گیرد
   (`claude/توضیح-کوتاه` یا `feature/توضیح-کوتاه`) و با PR به `main` برمی‌گردد.
-- ⚠️ **اول `git fetch origin main` بزن، بعد برنچ بگیر.** این ریپو سریع حرکت
-  می‌کند؛ کلونِ کهنه یعنی کارِ روی واقعیتِ منسوخ و تعارضِ merge. (در همین
-  بازبینی، برنچی از `main`ِ ۳۵ کامیت عقب گرفته شده بود.)
+- ⚠️ **اول `git fetch origin main` بزن، بعد برنچ بگیر — و در PRهای طولانی دوباره
+  fetch کن.** این ریپو خیلی سریع حرکت می‌کند؛ کلونِ کهنه یعنی کارِ روی واقعیتِ
+  منسوخ و تعارضِ merge. (در همین بازبینی، برنچی از `main`ِ ۳۵ کامیت عقب گرفته
+  شده بود و در فاصله‌ی یک ساعتِ بازِ همان PR، `main` دوباره ۱۰+ کامیت جلو رفت.)
 - **PRِ یک برنچ که مرج شد، آن برنچ تمام است.** کارِ بعدی روی همان اسم از رویِ
   `main`ِ تازه دوباره ساخته می‌شود:
   `git fetch origin main && git checkout -B <branch> origin/main`
