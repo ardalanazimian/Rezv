@@ -22,6 +22,7 @@ const { db } = await import('../src/lib/db');
 const {
   getEffectiveNoShowModel, getPlatformNoShowModel, trainAndCalibratePlatformNoShowModel,
   invalidateNoShowModelCache, invalidatePlatformNoShowModelCache,
+  NO_SHOW_FEATURE_VERSION,
 } = await import('../src/lib/no-show-model');
 
 // ⚠️ کشِ مدل را عمداً با همان توابعِ خودِ کد پاک می‌کنیم، نه با ساختنِ دستیِ
@@ -36,25 +37,25 @@ let tenantId: string;
 let restaurantId: string;
 const W = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
 
-async function setPlatformModel(weights: number[], isActive: boolean) {
+async function setPlatformModel(weights: number[], isActive: boolean, featureVersion = NO_SHOW_FEATURE_VERSION) {
   await db.platformNoShowModel.create({
     data: {
       weights, sampleSize: 500, positiveCount: 60, restaurantCount: 8,
       learnedBrier: 0.12, staticBrier: 0.20, learnedAuc: 0.72,
-      isActive, activationReason: isActive ? 'تست' : 'غیرفعالِ تست',
+      isActive, activationReason: isActive ? 'تست' : 'غیرفعالِ تست', featureVersion,
     },
   });
   await invalidatePlatformNoShowModelCache();
 }
 
-async function setRestaurantModel(weights: number[], isActive: boolean) {
+async function setRestaurantModel(weights: number[], isActive: boolean, featureVersion = NO_SHOW_FEATURE_VERSION) {
   await db.restaurantNoShowModel.upsert({
     where: { restaurantId },
     create: {
       restaurantId, weights, sampleSize: 100, positiveCount: 20,
-      learnedBrier: 0.10, staticBrier: 0.20, isActive,
+      learnedBrier: 0.10, staticBrier: 0.20, isActive, featureVersion,
     },
-    update: { weights, isActive },
+    update: { weights, isActive, featureVersion },
   });
   await invalidateNoShowModelCache(restaurantId);
 }
@@ -157,5 +158,52 @@ describe('آموزشِ مدلِ سراسری — گیتِ تنوعِ رستور�
     assert.ok(typeof out.reason === 'string' && out.reason.length > 0,
       'چه آموزش ببیند چه نه، باید بگوید چرا');
     assert.equal(typeof out.restaurantCount, 'number');
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────
+describe('گاردِ نسخه‌ی بردارِ ویژگی', () => {
+
+  test('🔴 مدلِ رستوران با نسخه‌ی ناسازگار سرو نمی‌شود', async () => {
+    // ⚠️ چرا این گارد و نه اعتماد به «یادمان می‌ماند بازآموزی کنیم»:
+    // `dot()` روی طولِ weights حلقه می‌زند، پس وزنِ نسخه‌ی قدیمی روی بردارِ
+    // جدید **هیچ خطایی نمی‌دهد** — فقط ویژگی‌های اضافه را نادیده می‌گیرد و
+    // یک امتیازِ قابلِ‌باور و غلط می‌سازد که تا UI می‌رود.
+    await setRestaurantModel([9, 9, 9, 9, 9, 9, 9], true, 'v-قدیمی');
+    assert.equal(await getEffectiveNoShowModel(restaurantId), null,
+      'مدلِ ناسازگار باید کنار برود، نه اینکه امتیازِ غلط بدهد');
+  });
+
+  test('🔴 و در آن حالت به مدلِ سراسریِ سازگار عقب می‌نشیند، نه به هیچ', async () => {
+    // صادقانه‌ترین رفتار: یک پله عقب، نه سقوطِ کامل.
+    await setPlatformModel(W, true);
+    await setRestaurantModel([9, 9, 9, 9, 9, 9, 9], true, 'v-قدیمی');
+    const eff = await getEffectiveNoShowModel(restaurantId);
+    assert.equal(eff?.source, 'platform');
+    assert.deepEqual(eff?.weights, W);
+  });
+
+  test('🔴 مدلِ سراسری با نسخه‌ی ناسازگار هم سرو نمی‌شود', async () => {
+    await setPlatformModel(W, true, 'v-قدیمی');
+    assert.equal(await getPlatformNoShowModel(), null);
+  });
+
+  test('⚠️ مدلِ ناسازگارِ **تازه‌تر** جلوی مدلِ سازگارِ قدیمی‌تر را نمی‌گیرد', async () => {
+    // باگِ ظریفی که اگر فیلترِ نسخه *بعد* از انتخابِ «آخرین فعال» اعمال شود
+    // رخ می‌دهد: مدلِ سازگار وجود دارد ولی نتیجه null می‌شود و کلِ پلتفرم
+    // بی‌دلیل به heuristic می‌افتد.
+    const good = [2, 2, 2, 2, 2, 2, 2];
+    await setPlatformModel(good, true);                 // سازگار، قدیمی‌تر
+    await new Promise((r) => setTimeout(r, 5));
+    await setPlatformModel([7, 7, 7, 7, 7, 7, 7], true, 'v-آینده');  // ناسازگار، تازه‌تر
+    assert.deepEqual(await getPlatformNoShowModel(), good,
+      'باید آخرین مدلِ فعالِ **سازگار** را بدهد');
+  });
+
+  test('🔴 کنترلِ مثبت: نسخه‌ی درست همچنان سرو می‌شود', async () => {
+    // بدونِ این، «همیشه null بده» هم همه‌ی تست‌های بالا را سبز می‌کرد.
+    await setRestaurantModel([3, 3, 3, 3, 3, 3, 3], true);
+    const eff = await getEffectiveNoShowModel(restaurantId);
+    assert.equal(eff?.source, 'restaurant');
   });
 });

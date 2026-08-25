@@ -5,7 +5,7 @@ import { db } from '../src/lib/db.ts';
 import { invalidate, cacheKey } from '../src/lib/cache.ts';
 import { createReservation } from '../src/lib/reservations.ts';
 import { computeNoShowRisk } from '../src/lib/customer-insights.ts';
-import { getLearnedNoShowModelWithRun } from '../src/lib/no-show-model.ts';
+import { getLearnedNoShowModelWithRun, NO_SHOW_FEATURE_VERSION } from '../src/lib/no-show-model.ts';
 import { getAccuracyByModelRun, recordOutcome } from '../src/lib/prediction-ledger.ts';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -67,6 +67,7 @@ before(async () => {
     data: {
       restaurantId, weights: NEUTRAL_WEIGHTS, sampleSize: 120, positiveCount: 20,
       learnedBrier: 0.14, staticBrier: 0.21, isActive: true, activeRunId: runId,
+      featureVersion: NO_SHOW_FEATURE_VERSION,
     },
   });
   // مدل کش می‌شود؛ بدونِ این، خواندنِ بعدی می‌تواند به کشِ خالیِ قبلی بخورد.

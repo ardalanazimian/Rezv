@@ -101,6 +101,10 @@ export const metrics = {
   // اتفاقِ نادری است؛ اگر برای چند رستوران پشتِ‌هم بیفتد، یعنی یا دادهٔ
   // ورودی عوض شده یا خودِ خطِ آموزش مشکل دارد — هر دو نیازِ نگاهِ انسان.
   modelRolledBack: new Counter('rezervno_model_rolled_back_total', 'تعداد غیرفعال‌سازیِ خودکارِ مدل به‌خاطرِ افتِ کارایی در تولید'),
+  // ⚠️ آلارم‌پذیر: مدلی ذخیره شده ولی به‌خاطرِ ناسازگاریِ نسخه‌ی ویژگی سرو
+  // نمی‌شود. عددِ پایدارِ غیرصفر یعنی آموزشِ شبانه کار نمی‌کند و سیستم روی
+  // heuristic گیر کرده — دقیقاً همان حالتی که بدونِ متریک ماه‌ها دیده نمی‌شد.
+  modelVersionMismatch: new Counter('rezervno_model_version_mismatch_total', 'تعداد دفعاتی که مدلِ ذخیره‌شده به‌خاطرِ ناسازگاریِ نسخه‌ی بردارِ ویژگی سرو نشد'),
   dbDuration: new Histogram('rezervno_db_query_duration_seconds', 'مدت زمان کوئری دیتابیس بر حسب ثانیه'),
   cacheHits: new Counter('rezervno_cache_hits_total', 'تعداد اصابت کش (cache hit)'),
   cacheMisses: new Counter('rezervno_cache_misses_total', 'تعداد عدم‌اصابت کش (cache miss)'),

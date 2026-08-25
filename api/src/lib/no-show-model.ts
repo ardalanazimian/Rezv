@@ -1,12 +1,16 @@
 import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { cached, cacheKey, invalidate } from './cache';
+import { createLogger } from './logger';
+import { metrics } from './metrics';
 import {
   sigmoid, trainLogisticRegression, predictProba, brierScore, decideModelActivation,
   rocAuc, calibrationCurve, type CalibrationBucket,
   computeStaticScoreFromFeatures, type RawFeatureInput,
   type ActivationDecision,
 } from './ml-core';
+
+const log = createLogger('no-show-model');
 
 // ═══════════════════════════════════════════════════════════════════════
 //  یادگیریِ ریسکِ no-show — کالیبراسیونِ واقعی، نه یک عدد ثابت برای همیشه
@@ -44,6 +48,21 @@ export const NO_SHOW_FEATURE_NAMES = [
   'largeParty',       // >= 6 نفر
   'phoneSource',
 ] as const;
+
+/**
+ * نسخه‌ی بردارِ ویژگی. **هر** تغییری در `NO_SHOW_FEATURE_NAMES` یا در معنیِ
+ * یکی از درایه‌های `buildFeatureVector` باید این را جلو ببرد.
+ *
+ * ⚠️ چرا این یک گاردِ ایمنی است و نه سلیقه: `dot()` روی طولِ **weights**
+ * حلقه می‌زند. وزنِ ۷تایی روی بردارِ ۹تایی هیچ خطایی نمی‌دهد — دو ویژگیِ
+ * آخر را نادیده می‌گیرد و امتیازی برمی‌گرداند که کاملاً قابلِ‌باور و کاملاً
+ * غلط است. برعکسش (وزنِ ۹تایی، بردارِ ۷تایی) به `undefined` می‌رسد ⇒ NaN ⇒
+ * تا خودِ UI. هیچ‌کدام لاگ یا استثنا تولید نمی‌کنند.
+ *
+ * پس مدلی که نسخه‌اش با این ثابت نمی‌خواند سرو **نمی‌شود** و سیستم صادقانه
+ * یک پله عقب می‌رود (سراسری، یا heuristic) تا آموزشِ شبانه نسخه‌ی تازه بسازد.
+ */
+export const NO_SHOW_FEATURE_VERSION = 'v1';
 
 const MIN_LEAD_MINUTES_RISKY = 30;
 const MAX_LEAD_MINUTES_SAFE = 7 * 24 * 60;
@@ -401,11 +420,13 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
     create: {
       restaurantId, weights, sampleSize: examples.length, positiveCount,
       learnedBrier, staticBrier, isActive,
+      featureVersion: NO_SHOW_FEATURE_VERSION,
       activeRunId: isActive ? (run?.id ?? null) : null,
     },
     update: {
       weights, sampleSize: examples.length, positiveCount,
       learnedBrier, staticBrier, isActive, trainedAt: new Date(),
+      featureVersion: NO_SHOW_FEATURE_VERSION,
       ...(runIdIfActive !== undefined ? { activeRunId: runIdIfActive } : {}),
     },
   });
@@ -470,9 +491,19 @@ export async function getLearnedNoShowModelWithRun(
   return cached(restaurantModelKey(restaurantId), 3600, async () => {
     const row = await db.restaurantNoShowModel.findUnique({
       where: { restaurantId },
-      select: { isActive: true, weights: true, activeRunId: true },
+      select: { isActive: true, weights: true, activeRunId: true, featureVersion: true },
     });
-    return row?.isActive ? { weights: row.weights, runId: row.activeRunId } : null;
+    if (!row?.isActive) return null;
+    // گاردِ نسخه — رجوع کن به NO_SHOW_FEATURE_VERSION. عمداً بی‌صدا نیست:
+    // اگر این هشدار زیاد دیده شود یعنی آموزشِ شبانه کار نمی‌کند.
+    if (row.featureVersion !== NO_SHOW_FEATURE_VERSION) {
+      log.warn('مدلِ رستوران با نسخه‌ی ویژگیِ ناسازگار سرو نشد', {
+        restaurantId, modelVersion: row.featureVersion, codeVersion: NO_SHOW_FEATURE_VERSION,
+      });
+      metrics.modelVersionMismatch.inc({ scope: 'restaurant' });
+      return null;
+    }
+    return { weights: row.weights, runId: row.activeRunId };
   });
 }
 
@@ -610,6 +641,7 @@ export async function trainAndCalibratePlatformNoShowModel(): Promise<PlatformTr
     data: {
       weights, sampleSize: examples.length, positiveCount, restaurantCount,
       learnedBrier, staticBrier, learnedAuc, isActive, activationReason: reason,
+      featureVersion: NO_SHOW_FEATURE_VERSION,
     },
   });
   await invalidatePlatformNoShowModelCache();
@@ -620,8 +652,12 @@ export async function trainAndCalibratePlatformNoShowModel(): Promise<PlatformTr
 /** آخرین مدلِ سراسریِ فعال، یا null. */
 export async function getPlatformNoShowModel(): Promise<number[] | null> {
   const row = await cached(platformModelKey(), 300, async () => {
+    // فیلترِ نسخه داخلِ کوئری است، نه بعدش: وگرنه یک مدلِ ناسازگارِ تازه‌تر
+    // مدلِ سازگارِ قدیمی‌تر را می‌پوشاند و نتیجه null می‌شد، در حالی که یک
+    // مدلِ کاملاً قابلِ‌استفاده وجود دارد.
     const m = await db.platformNoShowModel.findFirst({
-      where: { isActive: true }, orderBy: { trainedAt: 'desc' }, select: { weights: true },
+      where: { isActive: true, featureVersion: NO_SHOW_FEATURE_VERSION },
+      orderBy: { trainedAt: 'desc' }, select: { weights: true },
     });
     return m ? { weights: m.weights } : null;
   });

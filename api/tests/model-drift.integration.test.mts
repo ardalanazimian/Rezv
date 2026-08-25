@@ -2,6 +2,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
+import { NO_SHOW_FEATURE_VERSION } from '../src/lib/no-show-model.ts';
 import { recordPrediction, recordOutcome, MIN_RESOLVED_FOR_ACCURACY } from '../src/lib/prediction-ledger.ts';
 import {
   detectPerformanceDrift, detectOutputDrift,
@@ -54,6 +55,7 @@ async function activateModel(restaurantId: string, holdoutBrier: number): Promis
     data: {
       restaurantId, weights: [-1, 0, 1.5, 0.5, 0, 0.3, 0], sampleSize: 200, positiveCount: 40,
       learnedBrier: holdoutBrier, staticBrier: 0.2, isActive: true, activeRunId: run.id,
+      featureVersion: NO_SHOW_FEATURE_VERSION,
     },
   });
   return run.id;

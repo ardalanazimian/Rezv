@@ -21,7 +21,7 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 const { db } = await import('../src/lib/db');
 const { rollbackDriftedModel, PERFORMANCE_DRIFT_THRESHOLD } = await import('../src/lib/model-drift');
 const { MIN_RESOLVED_FOR_ACCURACY } = await import('../src/lib/prediction-ledger');
-const { getEffectiveNoShowModel, invalidateNoShowModelCache } =
+const { getEffectiveNoShowModel, invalidateNoShowModelCache, NO_SHOW_FEATURE_VERSION } =
   await import('../src/lib/no-show-model');
 
 const TAG = `roll-${randomUUID().slice(0, 8)}`;
@@ -43,7 +43,7 @@ async function activeModel(holdoutBrier: number) {
     create: {
       restaurantId, weights: [0, 0, 0, 0, 0, 0, 0], sampleSize: 100, positiveCount: 20,
       learnedBrier: holdoutBrier, staticBrier: holdoutBrier * 1.5,
-      isActive: true, activeRunId: run.id,
+      isActive: true, activeRunId: run.id, featureVersion: NO_SHOW_FEATURE_VERSION,
     },
     update: { isActive: true, activeRunId: run.id, learnedBrier: holdoutBrier, activationReason: null },
   });

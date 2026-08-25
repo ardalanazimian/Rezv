@@ -704,6 +704,10 @@ model RestaurantNoShowModel {
   // مخلوطی از نسخه‌هایِ شبانه محاسبه می‌شود و به هیچ‌کدام قابلِ نسبت‌دادن نیست.
   activeRunId   String?           @map("active_run_id") @db.Uuid
   activeRun     ModelTrainingRun? @relation(fields: [activeRunId], references: [id], onDelete: SetNull)
+  /// نسخه‌ی بردارِ ویژگی که این وزن‌ها با آن آموزش دیده‌اند. مدلی که نسخه‌اش
+  /// با کدِ فعلی نمی‌خواند **سرو نمی‌شود** — رجوع کن به NO_SHOW_FEATURE_VERSION
+  /// در lib/no-show-model.ts و به مهاجرتِ ۰۷۰ برای اینکه چرا خرابیِ بدونِ آن خاموش است.
+  featureVersion String    @map("feature_version")
   @@index([activeRunId])
   @@map("restaurant_no_show_models")
 }
@@ -766,8 +770,11 @@ model PlatformNoShowModel {
   isActive         Boolean  @default(false) @map("is_active")
   activationReason String?  @map("activation_reason")
   trainedAt        DateTime @default(now()) @map("trained_at")
+  /// همان معنایِ RestaurantNoShowModel.featureVersion.
+  featureVersion   String   @map("feature_version")
 
   @@index([isActive, trainedAt(sort: Desc)])
+  @@index([isActive, featureVersion, trainedAt(sort: Desc)], map: "platform_no_show_models_active_version_idx")
   @@map("platform_no_show_models")
 }
 
