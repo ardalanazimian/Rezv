@@ -1,6 +1,5 @@
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { db } from './db';
-import { redis } from './redis';
 import { enforceRateLimit, RULES } from './ratelimit';
 import { Err } from './errors';
 import { enqueueSms } from './sms';

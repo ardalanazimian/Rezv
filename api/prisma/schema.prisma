@@ -367,6 +367,9 @@ model Reservation {
   guestPhone   String?           @map("guest_phone")
   partySize    Int               @map("party_size") @db.SmallInt
   slotStart    DateTime          @map("slot_start")
+  /// زمانِ ارسالِ یادآوریِ پیامکی. NULL یعنی هنوز فرستاده نشده.
+  /// منبعِ حقیقتِ «آیا این رزرو یادآوری‌اش را گرفت؟» — صف پاک می‌شود، این نه.
+  reminderSentAt DateTime?       @map("reminder_sent_at")
   slotEnd      DateTime          @map("slot_end")
   status       ReservationStatus @default(confirmed)
   source       String            @default("app")
@@ -410,6 +413,8 @@ model Reservation {
   // migration 049 — فهرستِ رزروِ پنل: بازه‌ی slot_start + ترتیب رویِ همان ستون.
   // ایندکس‌هایِ دیگر یک ستونِ غیرِ بازه‌ای بینِ restaurant_id و slot_start دارند.
   @@index([restaurantId, slotStart], map: "reservations_restaurant_slot_idx")
+  // یادآوریِ پیامکیِ رزرو: کوئریِ cron روی «نزدیک و هنوز یادآوری‌نشده» است.
+  @@index([slotStart, reminderSentAt])
   chatThreads  ChatThread[]
   @@map("reservations")
 }

@@ -127,6 +127,7 @@ import './ratelimit-fallback.test.mts';
 import './rbac-permission-coverage.test.mts';
 import './rewards.integration.test.mts';
 import './redis.test.mts';
+import './reminder-sms.integration.test.mts';
 import './reservation-helpers.test.mts';
 import './reservation-status.test.mts';
 import './restaurant-manager.test.mts';

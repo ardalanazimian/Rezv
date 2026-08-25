@@ -12,6 +12,13 @@ export type SmsJob = {
     | 'waitlist_joined' | 'waitlist_offer';
   tokens: string[];
   restaurantId?: string;  // اگر مشخص باشد، از موجودی SMS رستوران کم می‌شود (OTP سطح پلتفرم آن را ندارد)
+  /**
+   * کلیدِ یکتاسازی — اگر داده شود، صف کارِ تکراری با همین کلید را نمی‌پذیرد.
+   * صف از روزِ اول این را پشتیبانی می‌کرد (`enqueue`)، ولی `enqueueSms` آن را
+   * عبور نمی‌داد؛ پس هیچ پیامکی نمی‌توانست یکتا شود. یادآوریِ رزرو اولین
+   * مصرف‌کننده است (`reminder:<reservationId>`).
+   */
+  idempotencyKey?: string;
 };
 
 const TEMPLATE_MAP: Record<SmsJob['template'], string> = {
@@ -32,6 +39,9 @@ const TEMPLATE_MAP: Record<SmsJob['template'], string> = {
   waitlist_offer: process.env.KAVENEGAR_TPL_WL_OFFER || 'rezervno-wl-offer',
 };
 
+/** سقفِ توکنِ lookupِ کاوه‌نگار (token, token2, token3). */
+export const MAX_SMS_TOKENS = 3;
+
 function toLocalNumber(phone: string): string {
   if (phone.startsWith('+98')) return '0' + phone.slice(3);
   if (phone.startsWith('98')) return '0' + phone.slice(2);
@@ -47,7 +57,11 @@ export async function enqueueSms(job: SmsJob): Promise<void> {
   // استثنا: OTP باید همزمان برود (کاربر منتظر کد است) — مسیر مستقیم.
   if (job.template === 'otp') { await sendSmsNow(job); return; }
   try {
-    await enqueue({ kind: 'sms', payload: job as unknown as Record<string, unknown> });
+    await enqueue({
+      kind: 'sms',
+      payload: job as unknown as Record<string, unknown>,
+      ...(job.idempotencyKey ? { idempotencyKey: job.idempotencyKey } : {}),
+    });
   } catch (e) {
     // اگر صف در دسترس نبود، به ارسال مستقیم fallback کن (بهتر از گم‌شدن پیام)
     log.warn('صف در دسترس نیست، ارسال مستقیم SMS', { error: (e as Error).message });
@@ -64,6 +78,23 @@ export async function sendSmsNow(job: SmsJob): Promise<void> {
   }
   const receptor = toLocalNumber(job.to);
   const template = TEMPLATE_MAP[job.template];
+
+  // ⚠️ گاردِ بریدنِ خاموش (یافته‌ی ۲۰۲۶-۰۸-۲۵): این تابع فقط سه توکن را
+  // عبور می‌دهد (`token`, `token2`, `token3` — سقفِ lookupِ کاوه‌نگار)، ولی
+  // چند فراخوان **چهار** توکن می‌فرستادند. توکنِ چهارم بی‌صدا دور ریخته
+  // می‌شد. جدی‌ترین موردش `booking_confirm` بود که توکنِ چهارمش **کدِ رزرو**
+  // است: کاربر پیامکِ تأیید می‌گرفت بدونِ کدی که برای مراجعه لازم دارد.
+  //
+  // اینجا عمداً پیام را دستکاری یا بازچینش نمی‌کنیم — ترتیبِ توکن‌ها به
+  // قالبِ تعریف‌شده در پنلِ کاوه‌نگار وابسته است و حدس‌زدنش پیام را خراب
+  // می‌کند. کاری که می‌کنیم این است که **دیگر خاموش نباشد**.
+  if (job.tokens.length > MAX_SMS_TOKENS) {
+    log.error(`قالبِ ${job.template}: ${job.tokens.length} توکن داده شد ولی فقط ${MAX_SMS_TOKENS} تا ارسال می‌شود`, {
+      template: job.template, dropped: job.tokens.slice(MAX_SMS_TOKENS),
+    });
+    metrics.smsFailed.inc({ template: job.template, reason: 'token_overflow' });
+  }
+
   const params = new URLSearchParams({ receptor, template, token: job.tokens[0] || '' });
   if (job.tokens[1]) params.set('token2', job.tokens[1]);
   if (job.tokens[2]) params.set('token3', job.tokens[2]);
