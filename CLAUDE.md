@@ -105,6 +105,8 @@ import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط 
    می‌گوید بازش کند — هنوز **همه‌ی** باگ‌هایی را تحویل می‌داد که در منبع رفع شده
    بودند، از جمله یک P0 که کلِ مسیرِ رزرو را می‌شکست. آرتیفکتی که بی‌صدا کهنه
    شود از نبودش بدتر است. اگر check قرمز شد: `python tools/build-standalone.py`.
+   ✅ **از ۲۰۲۶-۰۸-۲۵ این گیت در CI هم هست** (قدمی در جابِ `design-system`).
+   قبلاً فقط دستی بود و دقیقاً به همین دلیل دو بار (۰۸-۲۳ و ۰۸-۲۵) بی‌صدا کهنه شد.
 6. **مسیرهای شکسته** — هر `<script>`/`<link>` در HTML و هر `import` در ES
    ماژول‌ها باید به فایلِ واقعیِ موجود اشاره کند.
 7. **امنیت** — هرگز secret/key/`.env` واقعی کامیت نکن. `api/.uploads/` هم در
@@ -112,6 +114,12 @@ import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط 
 8. **دروازه‌ی انحرافِ اسکیما** (اگر `schema.prisma` یا `prisma/sql/` را دست زدی) —
    از ریشه: `ADMIN_URL=postgresql://…/postgres sh tools/check-schema-drift.sh`
    → باید «بدونِ انحراف» بدهد.
+   ✅ **از ۲۰۲۶-۰۸-۲۵ کنشِ کلیدهای خارجی (ON UPDATE/ON DELETE) را هم مقایسه
+   می‌کند**، نه فقط نامِ ستون‌ها — چون نسخه‌ی قبلی یک انحرافِ زنده روی `main` را
+   ندید (مهاجرتِ ۰۵۹ بندِ `ON UPDATE CASCADE` نداشت). چون دو مسیر امروز در ۴۴ FK
+   به‌شکلِ سیستماتیک و بی‌ضرر فرق دارند، وضعِ فعلی در
+   `tools/schema-drift-fk-baseline.txt` پین شده و چک فقط روی **انحرافِ تازه**
+   می‌شکند. کوچک‌شدنِ آن فایل پیشرفت است.
    ⚠️ چرا جدا از تایپ‌چک و تست است: `db push` (مسیرِ CI) و
    `migrate deploy + apply-sql.sh` (مسیرِ تولید) دو اسکیمای متفاوت می‌سازند.
    اگر فیلدی به `schema.prisma` اضافه کنی و مهاجرتِ SQL ننویسی، **همه‌ی تست‌ها
@@ -124,11 +132,19 @@ import/export ماژول، به‌جز `shared/js/icons.js`)». این **فقط 
 10. **دیتای دمو** — هر داده‌ی آزمایشی برچسبِ `[DEMO]` بگیرد (مثلاً
    `apps/customer/js/data/seed.js`). هرگز اسمِ رستورانِ واقعی را جعل نکن.
 
-### جاب‌های CI (`.github/workflows/ci.yml`) — **۸ جاب**، همه باید سبز شوند
+### جاب‌های CI (`.github/workflows/ci.yml`) — **۹ جاب**، همه باید سبز شوند
 `build` (tsc + **lint** + next build) · `test` (Postgres 17 + Redis 7 واقعی) ·
 `schema-drift` · `security` (`npm audit`: **critical می‌شکند، high فقط هشدار**) ·
 `e2e` (ایمیجِ `mcr.microsoft.com/playwright:v…-noble`، API کاملاً mock — بدونِ DB) ·
-`design-system` · `seo` · `landing`.
+`design-system` (sync + **تازگیِ بسته‌ی standalone**) · `seo` · `landing` ·
+`base-freshness` (فقط روی PR).
+
+**`base-freshness` چیست:** وقتی این PR و baseش هر دو یک فایل را از زمانِ
+merge-base عوض کرده باشند قرمز می‌شود. عمداً *هر* عقب‌افتادن از main را قرمز
+نمی‌کند (روی مخزنی به این سرعت فقط نویز می‌شد)، فقط همپوشانیِ واقعیِ فایل را.
+⚠️ چرا هست (۲۰۲۶-۰۸-۲۵): بعد از مرجِ یک PRِ ۲۸۶ فایلی، سه PRِ «۸/۸ سبز» با
+main تعارض پیدا کردند و یکی‌شان با وجودِ CIِ کاملاً سبز روی baseِ جدید **دو
+تستش قرمز شد**. سبزِ CI روی baseِ کهنه یک سبزِ منقضی است.
 
 ⚠️ **Node در CI نسخه‌ی ۲۰ است** (محیطِ محلی ممکن است ۲۲ باشد) — به flagهای
 مخصوصِ Node 22 تکیه نکن.
@@ -239,6 +255,8 @@ depends on it»). یعنی دستور شکست می‌خورد — ولی *بع�
 - `api/prisma/sql/NNN-*.sql` → migrationهای افزایشی. **قبل از ساختنِ فایلِ جدید
   خودت `ls api/prisma/sql/` بزن و شماره‌ی واقعیِ بعدی را بردار** (این عدد سریع
   عوض می‌شود؛ در ۲۰۲۶-۰۸-۲۵ آخرین شماره `065-restaurant-closures-fk-onupdate.sql` بود).
+  اگر لازم شد فایلی *بینِ* دو شماره اجرا شود از پسوندِ حرفی استفاده کن
+  (`021b-`, `059b-`) — ترتیبِ گلاب حفظ می‌شود و شماره تکراری نمی‌شود.
 - `api/tests/` → تست‌های واحد/یکپارچه + `_all.runner.mts` (بخشِ ۷ را حتماً بخوان)
 - `shared/` → منبعِ **یکتای** دیزاین‌سیستمِ سه پنل: `shared/css/`،
   `shared/js/` (`api-core.js`، `format.js`، `icons.js`، `analytics.panel.js`)،
@@ -246,6 +264,7 @@ depends on it»). یعنی دستور شکست می‌خورد — ولی *بع�
   **shared/ کامپوننت/هوکِ React ندارد.**
 - `e2e/` → Playwright، موبایل‌محور
 - `tools/` → `sync-design-system.sh`, `check-schema-drift.sh`,
+  `schema-drift-fk-baseline.txt`,
   `build-standalone.py`, `build-site-preview.py`, `xss-sink-audit.mjs`
 - `deploy/` → Caddy و nginx برایِ استقرارِ تولید
 - `docs/` → مستنداتِ فنی (مرجعِ به‌روزترِ ریپو)؛ `docs/adr/` تصمیم‌های معماری
