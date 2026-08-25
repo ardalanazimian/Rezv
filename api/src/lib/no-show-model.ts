@@ -409,12 +409,40 @@ export async function trainAndCalibrateNoShowModel(restaurantId: string): Promis
       ...(runIdIfActive !== undefined ? { activeRunId: runIdIfActive } : {}),
     },
   });
-  await invalidate(cacheKey('noshow-model', restaurantId));
+  await invalidateNoShowModelCache(restaurantId);
 
   return {
     trained: true, sampleSize: examples.length, positiveCount,
     learnedBrier, staticBrier, learnedAuc, staticAuc, calibration, isActive, reason,
   };
+}
+
+// ── کلیدهای کشِ مدل — **تنها** جای تعریفشان ───────────────────────────
+//
+// ⚠️ یافته‌ی ۲۰۲۶-۰۸-۲۵ (تستِ `ml-platform-model` گرفتش): این کلید یک‌بار
+// عوض شد (`noshow-model` → `noshow-model-v2`، کامیتِ 22ac0b6 در ۲۰۲۶-۰۸-۲۰)
+// چون شکلِ مقدارِ کش‌شده عوض شده بود — ولی فقط **خواننده** به‌روز شد. هر دو
+// نویسنده (پایانِ آموزشِ شبانه، و بازگردانیِ رانش در `model-drift.ts`) هنوز
+// کلیدِ قدیمی را invalidate می‌کردند، یعنی **هیچ‌کدام کاری نمی‌کردند**:
+//   • مدلِ تازه‌آموزش‌دیده تا ۱ ساعت سرو نمی‌شد؛
+//   • و بدتر: مدلی که به‌خاطرِ افتِ کارایی «پس گرفته شده» بود تا ۱ ساعت
+//     **همچنان سرو می‌شد** — یعنی خودِ سازوکارِ بازگردانی بی‌اثر بود.
+// هیچ خطایی هم تولید نمی‌شد؛ `invalidate` روی کلیدی که وجود ندارد موفق است.
+//
+// برای همین کلید حالا فقط از این دو تابع ساخته می‌شود و نویسنده‌ها
+// `invalidateNoShowModelCache` را صدا می‌زنند، نه `cacheKey` را مستقیم.
+const restaurantModelKey = (restaurantId: string) => cacheKey('noshow-model-v2', restaurantId);
+const platformModelKey = () => cacheKey('noshow-model-v2', 'platform');
+
+/** بی‌اعتبارکردنِ کشِ مدلِ یک رستوران. **هر** نویسنده‌ای که
+ *  `restaurant_no_show_models` را عوض می‌کند باید این را صدا بزند. */
+export async function invalidateNoShowModelCache(restaurantId: string): Promise<void> {
+  await invalidate(restaurantModelKey(restaurantId)).catch(() => {});
+}
+
+/** همان، برای مدلِ سراسری. */
+export async function invalidatePlatformNoShowModelCache(): Promise<void> {
+  await invalidate(platformModelKey()).catch(() => {});
 }
 
 /** خواندنِ مدلِ فعالِ یک رستوران (کش‌شده — این تابع در مسیرِ داغِ ثبتِ رزرو
@@ -439,11 +467,190 @@ export async function getLearnedNoShowModelWithRun(
 ): Promise<{ weights: number[]; runId: string | null } | null> {
   // شکلِ کش عمداً عوض شد؛ کلید هم باید عوض می‌شد وگرنه یک کشِ گرمِ قدیمی
   // (آرایه‌ی خام) به‌عنوانِ آبجکت خوانده می‌شد و بی‌صدا undefined می‌داد.
-  return cached(cacheKey('noshow-model-v2', restaurantId), 3600, async () => {
+  return cached(restaurantModelKey(restaurantId), 3600, async () => {
     const row = await db.restaurantNoShowModel.findUnique({
       where: { restaurantId },
       select: { isActive: true, weights: true, activeRunId: true },
     });
     return row?.isActive ? { weights: row.weights, runId: row.activeRunId } : null;
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  مدلِ سراسریِ پلتفرم — رفعِ سرمای شروع
+//
+//  ⚠️ مسئله‌ای که حل می‌کند: گیتِ فعال‌سازی به‌ازای **هر رستوران** ۴۰ نمونه
+//  و ۵ no-show می‌خواهد. برای پلتفرمی که تازه لانچ می‌کند یعنی تقریباً هیچ
+//  رستورانی هرگز مدل نمی‌گیرد و همه تا ماه‌ها روی heuristicِ ثابت می‌مانند —
+//  هرچقدر هم که کلِ پلتفرم داده جمع کند. یعنی «یادگیری» عملاً اتفاق نمی‌افتد.
+//
+//  با این مدل، رستورانِ تازه از روزِ اول از تجربه‌ی کلِ پلتفرم بهره می‌برد و
+//  به‌محضِ کافی‌شدنِ دادهٔ خودش، مدلِ اختصاصی‌اش جایگزین می‌شود.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** سقفِ نمونه‌ی آموزشِ سراسری — بیش از این، بازدهی نزولی و هزینه‌ی حافظه. */
+const PLATFORM_MAX_ROWS = 5000;
+
+/**
+ * حداقلِ تعدادِ رستورانِ سهیم.
+ *
+ * چرا جدا از حداقلِ نمونه: ۴۰۰ رزرو که همه از **یک** رستوران باشند، مدلِ
+ * «سراسری» نیست — مدلِ همان رستوران است با برچسبِ غلط، و روی بقیه بدتر از
+ * heuristic عمل می‌کند. این گیت جلوی آن ادعا را می‌گیرد.
+ */
+const PLATFORM_MIN_RESTAURANTS = 3;
+
+/** همان کوئریِ آموزش، بدونِ قیدِ رستوران. عمداً همان شکلِ ویژگی و همان
+ *  شرطِ نقطه-در-زمان (`h.slot_start < r.created_at`) — اگر این دو از هم
+ *  جدا شوند، مدلِ سراسری روی ویژگی‌هایی آموزش می‌بیند که مسیرِ سرو
+ *  نمی‌سازد و در تولید بی‌ارزش می‌شود. */
+export async function fetchPlatformTrainingRows(): Promise<TrainingRow[]> {
+  return db.$queryRaw<TrainingRow[]>`
+    SELECT r.status, r.party_size, r.source,
+           EXTRACT(EPOCH FROM (r.slot_start - r.created_at)) / 60.0 AS lead_minutes,
+           (r.user_id IS NOT NULL) AS has_user_id,
+           p.prior_no_shows::int   AS prior_no_shows,
+           p.prior_completions::int AS prior_completions
+    FROM reservations r
+    CROSS JOIN LATERAL (
+      SELECT
+        COUNT(*) FILTER (WHERE h.status = 'no_show') AS prior_no_shows,
+        COUNT(*) FILTER (WHERE h.status IN ('completed','arrived','seated','dining')) AS prior_completions
+      FROM reservations h
+      -- سابقه عمداً **درونِ همان رستوران** می‌ماند، حتی در مدلِ سراسری:
+      -- مسیرِ سرو هم دقیقاً همین را می‌سازد. اگر اینجا سابقه‌ی بین‌رستورانی
+      -- می‌شد، ویژگیِ آموزش با ویژگیِ سرو فرق می‌کرد — همان کلاسِ خطایی که
+      -- فازِ ۴ رفعش کرد.
+      WHERE h.restaurant_id = r.restaurant_id
+        AND COALESCE(h.user_id::text, h.id::text) = COALESCE(r.user_id::text, r.id::text)
+        AND h.id <> r.id
+        AND h.status IN ('completed','no_show','arrived','seated','dining')
+        AND h.slot_start < r.created_at
+    ) p
+    WHERE r.status IN ('completed', 'no_show', 'arrived', 'seated', 'dining')
+    ORDER BY r.created_at DESC
+    LIMIT ${PLATFORM_MAX_ROWS}
+  `;
+}
+
+export interface PlatformTrainResult {
+  trained: boolean;
+  reason?: string;
+  sampleSize: number;
+  positiveCount: number;
+  restaurantCount: number;
+  learnedBrier?: number;
+  staticBrier?: number;
+  learnedAuc?: number | null;
+  isActive?: boolean;
+}
+
+/**
+ * آموزشِ مدلِ سراسری. از همان cronِ شبانه، **یک بار** برای کلِ پلتفرم (نه
+ * به‌ازای هر رستوران).
+ *
+ * از **همان** گیت‌های مدلِ اختصاصی عبور می‌کند — Brier نسبت به heuristic،
+ * کفِ AUC، و بایاسِ کانالی. «سراسری» بودن هیچ تخفیفی در استانداردِ کیفیت
+ * نمی‌دهد؛ اگر مدلی به‌اندازه‌ی heuristic خوب نیست، سراسری‌بودنش بدترش
+ * می‌کند نه بهتر، چون به همه‌ی رستوران‌ها سرو می‌شود.
+ */
+export async function trainAndCalibratePlatformNoShowModel(): Promise<PlatformTrainResult> {
+  const rows = await fetchPlatformTrainingRows();
+  const examples = rows.map(rowToExample);
+  const positiveCount = examples.filter((e) => e.label === 1).length;
+
+  const restaurantCount = await db.reservation.findMany({
+    where: { status: { in: ['completed', 'no_show', 'arrived', 'seated', 'dining'] as never } },
+    select: { restaurantId: true }, distinct: ['restaurantId'], take: 200,
+  }).then((r) => r.length);
+
+  const base = { sampleSize: examples.length, positiveCount, restaurantCount };
+
+  if (restaurantCount < PLATFORM_MIN_RESTAURANTS) {
+    return {
+      trained: false,
+      reason: `تنوعِ رستوران کافی نیست (${restaurantCount} < ${PLATFORM_MIN_RESTAURANTS}) — مدلِ «سراسری» با دادهٔ یک‌دو رستوران، سراسری نیست`,
+      ...base,
+    };
+  }
+
+  const splitAt = Math.floor(examples.length * 0.8);
+  const trainSet = examples.slice(0, splitAt);
+  const holdout = examples.slice(splitAt);
+  if (holdout.length === 0 || trainSet.length === 0) {
+    return { trained: false, reason: 'دادهٔ کافی برای split نیست', ...base };
+  }
+
+  const { X: trainX, y: trainY } = toMatrix(trainSet);
+  const { X: holdoutX, y: holdoutY } = toMatrix(holdout);
+
+  const weights = trainLogisticRegression(trainX, trainY);
+  const learnedPreds = holdoutX.map((x) => predictProba(weights, x));
+  const learnedBrier = brierScore(learnedPreds, holdoutY);
+  const staticPreds = holdout.map((e) => computeStaticScoreFromFeatures(e.features) / 100);
+  const staticBrier = brierScore(staticPreds, holdoutY);
+  const learnedAuc = rocAuc(learnedPreds, holdoutY);
+
+  const decision = decideActivation({ sampleSize: examples.length, positiveCount, learnedBrier, staticBrier });
+  const aucOk = learnedAuc !== null && learnedAuc >= MIN_AUC;
+  const biasCheck = checkChannelBias(weights);
+  const isActive = decision.isActive && aucOk && !biasCheck.biased;
+
+  const reason = !decision.isActive ? decision.reason
+    : learnedAuc === null ? 'تفکیک اندازه‌گیری نشد (هولدآوتِ تک‌کلاسه)'
+    : !aucOk ? `تفکیکِ ناکافی: AUC ${learnedAuc.toFixed(3)} < ${MIN_AUC}`
+    : biasCheck.biased ? biasCheck.reason
+    : decision.reason;
+
+  // مدلِ فعالِ قبلی کنار می‌رود تا «آخرین فعال» همیشه یکتا باشد.
+  if (isActive) {
+    await db.platformNoShowModel.updateMany({ where: { isActive: true }, data: { isActive: false } });
+  }
+  await db.platformNoShowModel.create({
+    data: {
+      weights, sampleSize: examples.length, positiveCount, restaurantCount,
+      learnedBrier, staticBrier, learnedAuc, isActive, activationReason: reason,
+    },
+  });
+  await invalidatePlatformNoShowModelCache();
+
+  return { trained: true, ...base, learnedBrier, staticBrier, learnedAuc, isActive, reason };
+}
+
+/** آخرین مدلِ سراسریِ فعال، یا null. */
+export async function getPlatformNoShowModel(): Promise<number[] | null> {
+  const row = await cached(platformModelKey(), 300, async () => {
+    const m = await db.platformNoShowModel.findFirst({
+      where: { isActive: true }, orderBy: { trainedAt: 'desc' }, select: { weights: true },
+    });
+    return m ? { weights: m.weights } : null;
+  });
+  return row?.weights ?? null;
+}
+
+/** از کجا آمد — برای نسب‌نامه‌ی دفترِ پیش‌بینی و داشبورد.
+ *  `heuristic` حالتی است که **هیچ** مدلی نیست؛ آنجا `getEffectiveNoShowModel`
+ *  مقدارِ `null` برمی‌گرداند، نه یک شیء با این برچسب — پس نوعِ بازگشتی
+ *  عمداً باریک‌تر است و همان را می‌گوید. */
+export type NoShowModelSource = 'restaurant' | 'platform' | 'heuristic';
+export type LearnedModelSource = Exclude<NoShowModelSource, 'heuristic'>;
+
+/**
+ * مدلی که واقعاً باید برای این رستوران استفاده شود.
+ *
+ * ترتیب عمدی: مدلِ **اختصاصیِ** رستوران همیشه بر سراسری مقدم است — وقتی
+ * رستورانی دادهٔ کافیِ خودش را دارد، الگوی خودش دقیق‌تر از میانگینِ پلتفرم
+ * است. سراسری فقط شکافِ «هنوز داده ندارم» را پر می‌کند، نه اینکه جایگزینِ
+ * یادگیریِ محلی شود.
+ */
+export async function getEffectiveNoShowModel(
+  restaurantId: string,
+): Promise<{ weights: number[]; source: LearnedModelSource; runId: string | null } | null> {
+  const own = await getLearnedNoShowModelWithRun(restaurantId).catch(() => null);
+  if (own) return { weights: own.weights, source: 'restaurant', runId: own.runId };
+
+  const platform = await getPlatformNoShowModel().catch(() => null);
+  if (platform) return { weights: platform, source: 'platform', runId: null };
+
+  return null;
 }

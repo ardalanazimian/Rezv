@@ -6,7 +6,7 @@ import { rebuildGuestProfiles } from '@/lib/guest-profile';
 import { runAllDueAutomations } from '@/lib/automation';
 import { resolveOutreachConversions } from '@/lib/outreach-ledger';
 import { applyAbuseFlags, applyPlatformAbuseFlags } from '@/lib/fraud';
-import { trainAndCalibrateNoShowModel } from '@/lib/no-show-model';
+import { trainAndCalibrateNoShowModel, trainAndCalibratePlatformNoShowModel } from '@/lib/no-show-model';
 import { rollbackDriftedModel } from '@/lib/model-drift';
 import { trainAndCalibrateDemandForecast } from '@/lib/demand-forecast';
 import { invalidatePattern } from '@/lib/cache';
@@ -118,6 +118,11 @@ async function POST_impl(req: Request) {
     // اسکنِ سراسریِ فارمینگِ رفرال (restaurant-scoped نیست، یک‌بار کافی است)
     const platformAbuse = await applyPlatformAbuseFlags().catch(() => ({ signals: [], flaggedUserIds: [] }));
 
+    // ── مدلِ سراسری: **یک بار** برای کلِ پلتفرم، نه به‌ازای هر رستوران ──
+    // بعد از حلقه اجرا می‌شود تا از تازه‌ترین دادهٔ همین شب استفاده کند.
+    // شکستش نباید بقیه‌ی نتایج را باطل کند — مثلِ بقیه‌ی کارهای اختیاری.
+    const platform = await trainAndCalibratePlatformNoShowModel().catch(() => null);
+
     return NextResponse.json({
       // ok فقط وقتی true است که واقعاً همه‌چیز انجام شده باشد.
       ok: guestProfilesError === null,
@@ -129,6 +134,9 @@ async function POST_impl(req: Request) {
       // تعدادِ مدل‌هایی که به‌خاطرِ افتِ کارایی در تولید **پس گرفته** شدند.
       // عددِ غیرصفر یعنی سیستم برای آن رستوران‌ها به heuristic برگشته.
       models_rolled_back: modelsRolledBack,
+      // مدلِ سراسری — رفعِ سرمای شروع. `trained:false` با دلیلِ صریح
+      // برمی‌گردد (مثلاً تنوعِ رستورانِ ناکافی)، نه سکوت.
+      platform_model: platform === null ? { trained: false, reason: 'اجرا نشد' } : platform,
       demand_forecasts_trained: demandForecastsTrained,
       demand_forecasts_count_active: demandForecastsCountActive,
       demand_forecasts_covers_active: demandForecastsCoversActive,

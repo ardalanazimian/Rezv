@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { populationStabilityIndex, psiBand, type PsiBand } from './ml-core';
 import { MIN_RESOLVED_FOR_ACCURACY } from './prediction-ledger';
-import { invalidate, cacheKey } from './cache';
+import { invalidateNoShowModelCache } from './no-show-model';
 import { createLogger } from './logger';
 import { metrics } from './metrics';
 
@@ -361,7 +361,11 @@ export async function rollbackDriftedModel(params: {
     };
   }
 
-  await invalidate(cacheKey('noshow-model', params.restaurantId)).catch(() => {});
+  // ⚠️ کلید را اینجا نساز — نویسنده و خواننده باید همیشه یکی باشند.
+  // (تاریخچه‌ی این باگ در no-show-model.ts کنارِ تعریفِ کلید نوشته شده:
+  //  تا امروز اینجا کلیدِ **قدیمی** پاک می‌شد، پس مدلی که همین تابع تازه
+  //  غیرفعالش کرده بود تا یک ساعت همچنان سرو می‌شد.)
+  await invalidateNoShowModelCache(params.restaurantId);
 
   log.warn('مدلِ no-show به‌خاطرِ افتِ کارایی در تولید غیرفعال شد', {
     restaurantId: params.restaurantId,

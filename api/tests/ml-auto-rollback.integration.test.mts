@@ -21,6 +21,8 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 const { db } = await import('../src/lib/db');
 const { rollbackDriftedModel, PERFORMANCE_DRIFT_THRESHOLD } = await import('../src/lib/model-drift');
 const { MIN_RESOLVED_FOR_ACCURACY } = await import('../src/lib/prediction-ledger');
+const { getEffectiveNoShowModel, invalidateNoShowModelCache } =
+  await import('../src/lib/no-show-model');
 
 const TAG = `roll-${randomUUID().slice(0, 8)}`;
 let tenantId: string;
@@ -90,6 +92,8 @@ beforeEach(async () => {
   await db.modelPrediction.deleteMany({ where: { restaurantId } });
   await db.restaurantNoShowModel.deleteMany({ where: { restaurantId } });
   await db.modelTrainingRun.deleteMany({ where: { restaurantId } });
+  // ردیف‌ها مستقیم پاک می‌شوند، پس کشِ سرو هم باید پاک شود.
+  await invalidateNoShowModelCache(restaurantId);
 });
 
 after(async () => {
@@ -182,5 +186,29 @@ describe('پس‌گرفتنِ خودکارِ مدلِ خراب', () => {
     const out = await rollbackDriftedModel({ restaurantId });
     assert.equal(out.rolledBack, false);
     assert.equal(out.verdict, 'insufficient_data');
+  });
+
+  test('🔴 بعد از پس‌گرفتن، مسیرِ سرو هم دیگر مدل را نمی‌دهد (نه فقط ردیفِ DB)', async () => {
+    // ⚠️ چرا این تست جدا از بقیه‌ی فایل لازم بود — یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۵:
+    // همه‌ی تست‌های بالا `isActive()` را می‌خوانند، که مستقیم به **دیتابیس**
+    // می‌زند. ولی مسیرِ سروِ واقعی (`getEffectiveNoShowModel`) از یک کشِ
+    // یک‌ساعته می‌خواند. تا امروز `rollbackDriftedModel` کلیدِ **اشتباهی**
+    // را invalidate می‌کرد، پس:
+    //   ردیفِ DB → غیرفعال ✅ (همه‌ی تست‌ها سبز)
+    //   مسیرِ سرو → همان مدلِ خرابِ پس‌گرفته‌شده، تا یک ساعت ❌
+    // یعنی خودِ سازوکارِ پس‌گرفتن — که کلِ دلیلِ وجودِ این فایل است — بی‌اثر
+    // بود و **هیچ تستی نمی‌گرفتش**، چون هیچ‌کدام از سمتِ سرو نگاه نمی‌کردند.
+    const runId = await activeModel(0.10);
+    await resolvedPredictions(runId, MIN_RESOLVED_FOR_ACCURACY + 5, 0.30);
+
+    // کش را عمداً گرم کن — دقیقاً کاری که یک رزروِ واقعی پیش از رانش می‌کند.
+    const before = await getEffectiveNoShowModel(restaurantId);
+    assert.equal(before?.source, 'restaurant', 'پیش‌شرط: مدل باید سرو شود');
+
+    assert.equal((await rollbackDriftedModel({ restaurantId })).rolledBack, true);
+
+    const after = await getEffectiveNoShowModel(restaurantId);
+    assert.notEqual(after?.source, 'restaurant',
+      'مدلِ پس‌گرفته‌شده نباید از کش سرو شود — پس‌گرفتن باید فوری اثر کند');
   });
 });

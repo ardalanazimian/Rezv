@@ -5,7 +5,7 @@ import { loadPriorHistory } from './no-show-features';
 // ⚠️ عمداً static است، نه `await import()`: چرخه‌ی import با شکستنِ آن در
 // ml-core.ts از بین رفت، و importِ پویا در این مسیر روی Node 20 واقعاً
 // می‌شکست (جزئیات در ml-core.ts).
-import { getLearnedNoShowModelWithRun, predictProba, buildFeatureVector } from './no-show-model';
+import { getEffectiveNoShowModel, predictProba, buildFeatureVector } from './no-show-model';
 
 // ═══════════════════════════════════════════════════════════
 //  موتور پیش‌بینی No-Show و محاسبه‌ی CLV — رزرونو
@@ -41,6 +41,15 @@ export type NoShowResult = {
     probability: number;
     /** فازِ ۶ — اجرایِ آموزشی که این وزن‌ها را ساخت. heuristic ندارد → null. */
     modelRunId: string | null;
+    /**
+     * دامنه‌ی مدل: `restaurant` = مدلِ اختصاصیِ همین رستوران،
+     * `platform` = مدلِ سراسری (رستوران هنوز دادهٔ کافیِ خودش را ندارد).
+     *
+     * ⚠️ لازم است چون مدلِ سراسری `modelRunId` ندارد، و بدونِ این فیلد
+     * «null یعنی heuristic» با «null یعنی سراسری» قاطی می‌شد — و دقتِ
+     * تولید به دامنه‌ی اشتباه نسبت داده می‌شد.
+     */
+    modelScope?: 'restaurant' | 'platform';
   };
 };
 
@@ -87,16 +96,21 @@ export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResul
     source: input.source,
   };
 
-  const learned = await getLearnedNoShowModelWithRun(input.restaurantId).catch(() => null);
+  // ⚠️ ترتیب: مدلِ **اختصاصیِ** رستوران، بعد مدلِ **سراسریِ** پلتفرم، بعد
+  // heuristic. لایه‌ی وسط تازه است و سرمای شروع را رفع می‌کند: پیش از این،
+  // رستورانی که هنوز ۴۰ نمونه و ۵ no-show نداشت **هرگز** مدل نمی‌گرفت و
+  // تا ماه‌ها روی heuristicِ ثابت می‌ماند — یعنی یادگیری عملاً برایش
+  // اتفاق نمی‌افتاد، هرچقدر هم کلِ پلتفرم داده جمع می‌کرد.
+  const learned = await getEffectiveNoShowModel(input.restaurantId).catch(() => null);
   if (learned) {
     const probability = predictProba(learned.weights, buildFeatureVector(features));
     const score = Math.round(probability * 100);
     return {
       score, tier: tierFromScore(score), source: 'learned',
-      // فازِ ۶: نسخه‌ی مدل هم در ردِ ورودی می‌آید تا دفترِ پیش‌بینی بتواند
-      // نتیجه را به همان اجرایِ آموزش نسبت دهد. null یعنی مدلی است که پیش
-      // از مهاجرتِ ۰۵۶ آموزش دیده — نسب‌نامه‌اش را جعل نمی‌کنیم.
-      lineage: { features, probability, modelRunId: learned.runId },
+      // نسب‌نامه: `modelRunId` فقط برای مدلِ اختصاصی وجود دارد. مدلِ سراسری
+      // اجرایِ per-restaurant ندارد، پس null می‌ماند و `modelScope` تفاوت را
+      // نگه می‌دارد — جعلِ نسب‌نامه ممنوع (همان قاعده‌ی فازِ ۶).
+      lineage: { features, probability, modelRunId: learned.runId, modelScope: learned.source },
     };
   }
 
