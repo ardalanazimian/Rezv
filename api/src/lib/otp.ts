@@ -1,6 +1,7 @@
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { db } from './db';
 import { redis } from './redis';
+import { enforceRateLimit, RULES } from './ratelimit';
 import { Err } from './errors';
 import { enqueueSms } from './sms';
 
@@ -26,10 +27,14 @@ export function normalizePhone(raw: string): string {
 
 export async function requestOtp(rawPhone: string): Promise<{ devCode?: string }> {
   const phone = normalizePhone(rawPhone);
-  // rate limit: ۳ درخواست در ۱۰ دقیقه per phone
-  const rl = await redis.incr(`otp:rl:${phone}`);
-  if (rl === 1) await redis.expire(`otp:rl:${phone}`, 600);
-  if (rl > 3) throw Err.rateLimited();
+  // سقفِ per-phone — حالا از همان `RULES` مشترک، نه پیاده‌سازیِ دستیِ دوم.
+  // ⚠️ تا امروز اینجا یک incr/expireِ دست‌ساز بود که **دقیقاً** همان قاعده‌ی
+  // `RULES.otpPerPhone` (۳ در ۱۰ دقیقه) را تکرار می‌کرد. دو پیاده‌سازیِ موازی
+  // برای یک قاعده یعنی هر تغییرِ آینده باید در دو جا انجام شود — و یکی‌شان
+  // فراموش می‌شود. ضمناً نسخه‌ی دستی از `rateLimitWithFallback` رد نمی‌شد،
+  // پس با Redisِ خاموش بی‌صدا **باز** می‌شد (fail-open) در حالی که مسیرِ
+  // مشترک fallbackِ حافظه‌ای دارد.
+  await enforceRateLimit(phone, RULES.otpPerPhone);
 
   const code = String(randomInt(100000, 1000000)); // ۶ رقمی (۹۰۰هزار فضا — مقاوم‌تر در برابر brute-force)
   await db.otpCode.upsert({

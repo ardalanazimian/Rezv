@@ -284,6 +284,34 @@ export async function createReservation(
         }
       }
     }
+
+    // ── تداخلِ همزمانی که از retry هم رد شده ─────────────────────────────
+    // ⚠️ یافته‌ی زنده‌ی ۲۰۲۶-۰۸-۲۵: بلوکِ بالا فقط `SLOT_LOCK_TIMEOUT` را
+    // ترجمه می‌کرد. یک `40P01` (deadlock) که هر ۵ تلاشِ TX_MAX_RETRIES را
+    // مصرف کند، از همین‌جا **خام** بالا می‌رفت و `errorResponse` یک ۵۰۰ی
+    // عمومی می‌داد — برای یک تداخلِ کاملاً عادی و درست‌مدیریت‌شده‌ی DB.
+    //
+    // این فرضی نیست: در آزمایشِ ۲۰ درجِ کاملاً هم‌زمان روی یک میز، حالتِ
+    // N=2 به‌جای ۲۳P01 یک deadlock داد (Postgres وقتی چند تراکنش هم‌زمان
+    // کانستریتِ EXCLUDE را چک می‌کنند می‌تواند deadlock بسازد، نه فقط
+    // نقضِ یکتایی).
+    //
+    // همان انضباطِ بالا رعایت می‌شود: **اول ثابت کن پر است، بعد ادعا کن.**
+    // اگر بشود اثبات کرد همه‌ی کاندیداها پر شده‌اند، خطای صادقِ
+    // SLOT_FULL/TABLE_CONFLICT؛ وگرنه CONCURRENCY_RETRY (۴۰۹) که صادقانه
+    // می‌گوید «ترافیک بالا بود، دوباره تلاش کن» — نه ۵۰۰ی بی‌معنا.
+    if (isSerializationError(e)) {
+      const occupiedNow = await getOccupiedTableNumbers(db, r.id, start, blockEnd).catch(() => null);
+      if (occupiedNow) {
+        if (manualTableNumber != null) {
+          if (occupiedNow.has(manualTableNumber)) throw Err.tableConflict();
+        } else if (candidateTables.length > 0 && candidateTables.every(t => occupiedNow.has(t.number))) {
+          throw Err.slotFull(input.time);
+        }
+      }
+      throw Err.concurrencyRetry();
+    }
+
     throw e;
   }
 }
