@@ -41,6 +41,8 @@ CI با typecheck/test/audit، متریک/tracing/logger، و رفعِ باگ‌
 ## ۵) CI/CD و کیفیت
 - اسکریپت‌ها: `typecheck` (tsc)، `test` (tsx node:test)، `test:integration`، `test:e2e` (playwright)،
   `test:load` (k6)، `lint` (eslint)، `audit` (npm audit high). ✅
+  ⚠️ تصحیحِ ۲۰۲۶-۰۸-۲۴: تیکِ `test:load` نادرست بود — مسیرش
+  (`tests/load/reservation.js`) وجود نداشت و دستور اجرا نمی‌شد. اصلاح شد.
 - **پیشنهاد:** اطمینان از اجرای `typecheck+test+audit` روی هر PRِ بک‌اند در CI (اگر هنوز نیست).
 
 ## ۶) Observability عملیاتی

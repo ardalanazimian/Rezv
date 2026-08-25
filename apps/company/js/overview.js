@@ -99,11 +99,17 @@ function rRestaurants(){
   renderRestList();
 }
 function setRestFilter(f){restFilter=f;rRestaurants()}
+// ⚠️ رفعِ کنترلِ مرده (فازِ ۲، §۲۶–۲۹): #globalSearch در index.html فقط
+// onfocus="nav('restaurants')" داشت؛ تایپ‌کردن در آن هیچ اثری نداشت چون هیچ
+// هندلرِ input‌ای در کلِ ریپو وجود نداشت. مسیرِ رندر از قبل آماده بود.
+let restQuery='';
+function restSearch(q){ restQuery=(q||'').trim(); renderRestList(); }
 function renderRestList(){
   const el=document.getElementById('restList');if(!el)return;
   let list=RESTAURANTS;
   if(restFilter!=='all')list=RESTAURANTS.filter(r=>r.status===restFilter);
-  if(!list.length){el.innerHTML='<div style="text-align:center;color:var(--t2);padding:40px">رستورانی در این دسته نیست</div>';return}
+  if(restQuery)list=list.filter(r=>(r.name||'').includes(restQuery)||(r.city||'').includes(restQuery));
+  if(!list.length){el.innerHTML=`<div style="text-align:center;color:var(--t2);padding:40px">${restQuery?'رستورانی با این نام پیدا نشد':'رستورانی در این دسته نیست'}</div>`;return}
   el.innerHTML=list.map(r=>{
     const statusCls=r.status;
     const planBadge=PLAN_LABEL[r.plan];
@@ -112,7 +118,7 @@ function renderRestList(){
     else if(r.status==='expiring')statusText=`${fa(r.daysLeft)} روز مونده`;
     else if(r.status==='expired'||r.status==='trial_expired')statusText=r.daysLeft!=null?`${fa(Math.abs(r.daysLeft))} روز منقضی`:'منقضی';
     else if(r.status==='trial')statusText=`آزمایشی · ${fa(r.daysLeft)} روز`;
-    return `<div class="rest-row" onclick="openRest('${r.id}')">
+    return `<div class="rest-row" role="button" tabindex="0" onclick="openRest('${r.id}')">
       <div class="rest-name-cell">
         <div class="rest-logo" style="background:${r.grad}">${r.logo}</div>
         <div style="min-width:0"><div class="rest-name">${esc(r.name)}</div><div class="rest-loc">پلن ${planBadge}</div></div>
@@ -126,8 +132,48 @@ function renderRestList(){
 }
 
 // ════════ مودال ════════
-function openModal(html){document.getElementById('modalBody').innerHTML=html;document.getElementById('modalBg').classList.add('show')}
-function closeModal(){document.getElementById('modalBg').classList.remove('show')}
+// ⚠️ برابریِ دسترس‌پذیری با پنلِ رستوران (فازِ ۲، §۲۶–۲۹).
+//
+// این مودال فقط یک کلاس toggle می‌کرد: نه focus داخلش می‌رفت، نه Esc می‌بستش،
+// نه Tab داخلش می‌ماند، نه focus بعد از بستن برمی‌گشت. پنلِ رستوران دقیقاً
+// همین ویجت را کامل پیاده کرده بود (staff-system.js) — این‌جا همان پیاده‌سازی
+// تکرار می‌شود، نه یک طراحیِ تازه.
+let _modalLastFocus = null;
+function openModal(html){
+  _modalLastFocus = document.activeElement;
+  document.getElementById('modalBody').innerHTML = html;
+  const bg = document.getElementById('modalBg');
+  bg.classList.add('show');
+  bg.setAttribute('aria-hidden','false');
+  const body = document.getElementById('modalBody');
+  const first = body.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  (first || body).focus?.();
+  // صفحه‌ی پشتی نباید زیرِ مودال اسکرول بخورد (رویِ موبایل کاربر با یک
+  // کشیدنِ انگشت، زمینه را جابه‌جا می‌کرد و بعد از بستن گم می‌شد).
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(){
+  const bg = document.getElementById('modalBg');
+  bg.classList.remove('show');
+  bg.setAttribute('aria-hidden','true');
+  document.body.style.overflow = '';
+  if (_modalLastFocus && document.contains(_modalLastFocus)) _modalLastFocus.focus?.();
+  _modalLastFocus = null;
+}
+// Esc می‌بندد + focus-trap با Tab داخلِ مودال می‌ماند.
+document.addEventListener('keydown', e => {
+  const bg = document.getElementById('modalBg');
+  if (!bg || !bg.classList.contains('show')) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeModal(); return; }
+  if (e.key !== 'Tab') return;
+  const items = [...document.getElementById('modalBody')
+    .querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter(el => !el.disabled && el.offsetParent !== null);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
 
 // ════════ باز کردن جزئیات رستوران ════════
 function openRest(id){currentRest=RESTAURANTS.find(r=>String(r.id)===String(id));if(!currentRest)return;nav('detail')}

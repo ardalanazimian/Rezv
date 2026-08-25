@@ -2,12 +2,19 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover: بدونِ آن iOS کلِ صفحه را letterbox می‌کند (نوارِ سیاه
+     بالا/پایینِ آیفونِ ناچ‌دار) و مهم‌تر، `env(safe-area-inset-*)` همیشه صفر
+     برمی‌گردد — یعنی افزودنِ env() بدونِ این خط یک رفعِ قلابیِ بی‌اثر است.
+     این دو با هم معنا دارند: cover صفحه را تا لبه می‌برد، env() عناصرِ ثابت
+     را از ناچ/نوارِ خانه دور نگه می‌دارد. (ممیزیِ UI/UX ۲۰۲۶-۰۸-۲۴) -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>رزرونو · پنل شرکت</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<!-- فونتِ Vazirmatn به‌صورتِ self-hosted در css/tokens.css (@font-face) تعریف شده —
-     عمداً از Google Fonts نمی‌آید چون در ایران در دسترس نیست. -->
-<link rel="preload" href="fonts/vazirmatn-var.woff2" as="font" type="font/woff2" crossorigin>
+<!-- فونتِ self-host — دیگر هیچ وابستگیِ زمانِ اجرا به fonts.googleapis.com نیست.
+     چرا عوض شد: بسته‌ی آفلاینِ تک‌فایلی روی file:// به CDN نمی‌رسید و کلِ UI
+     بدونِ فونتِ فارسی رندر می‌شد. جزئیات: shared/fonts/README.md -->
+<link rel="preload" href="fonts/vazirmatn-variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/foundation.css">
@@ -95,19 +102,23 @@
     <div class="sb-foot">
       <div class="sb-foot-ava">ش</div>
       <div class="sb-foot-info"><div class="sb-foot-name">شرکت رزرونو</div><div class="sb-foot-meta">مدیر کل</div></div>
+      <!-- فازِ ۲: adminLogout() از قبل پیاده بود ولی هیچ کنترلی صدایش نمی‌زد —
+           یعنی کنسولی که می‌تواند کاربر بن کند و فلگِ سراسری بزند هیچ راهِ
+           خروجی نداشت و توکن‌ها بی‌پایان در localStorage می‌ماندند. -->
+      <button class="sb-foot-logout" onclick="adminLogout()" aria-label="خروج از حساب" title="خروج">خروج</button>
     </div>
   </aside>
 
   <div class="main">
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:14px">
-        <button class="tb-burger" onclick="toggleSidebar()">☰</button>
+        <button class="tb-burger" onclick="toggleSidebar()" aria-label="باز و بستن منو" aria-expanded="false" aria-controls="sidebar">☰</button>
         <div class="tb-title" id="pageTitle">داشبورد</div>
       </div>
       <div class="tb-right">
         <div class="tb-search">
           <span class="s-ic">🔍</span>
-          <input placeholder="جستجوی رستوران..." id="globalSearch" onfocus="nav('restaurants')">
+          <input placeholder="جستجوی رستوران..." id="globalSearch" aria-label="جست‌وجوی رستوران" onfocus="nav('restaurants')" oninput="restSearch(this.value)">
         </div>
       </div>
     </div>
@@ -136,7 +147,7 @@
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"><span id="toastIcon">✓</span><span id="toastMsg"></span></div>
-<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()"><div class="modal" id="modalBody"></div></div>
+<div class="modal-bg" id="modalBg" aria-hidden="true" onclick="if(event.target===this)closeModal()"><div class="modal" id="modalBody" role="dialog" aria-modal="true" tabindex="-1"></div></div>
 
 <!-- ── پنل company: ماژول‌های Vanilla JS (ترتیب مهم) ── -->
 <script src="js/icons.js"></script>

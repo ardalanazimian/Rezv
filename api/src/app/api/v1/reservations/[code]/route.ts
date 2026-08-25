@@ -3,6 +3,7 @@ import { authFromRequest } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
+import { resolveStaffRestaurant } from '@/lib/staff-helpers';
 import { parseParams, zReservationCode, z } from '@/lib/schemas';
 
 const paramsSchema = z.object({ code: zReservationCode });
@@ -33,7 +34,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ code: st
 
     // چک مالکیت/دسترسی
     if (auth.kind === 'staff') {
-      if (r.restaurant.tenantId !== auth.tenantId) throw Err.notFound('رزرو'); // 404 نه 403 تا وجود/عدم‌وجود لو نرود
+      // ⚠️ رفعِ نشتِ شعبه (فازِ ۲، §۷): چکِ قبلی فقط tenant-level بود، پس
+      // کارمندِ قفل‌شده به شعبه‌ی A رکوردِ کاملِ رزروِ شعبه‌ی B را می‌دید
+      // (نامِ مهمان، شماره، پیش‌سفارش). همان کلاسِ حفره‌ای که P0-1 بست، این‌جا
+      // با صدا نزدنِ resolveStaffRestaurant باز مانده بود.
+      // ۴۰۴ (نه ۴۰۳) تا وجود/عدمِ وجود لو نرود — رفتارِ قبلی حفظ شده.
+      const branch = await resolveStaffRestaurant(auth, req);
+      if (r.restaurantId !== branch.id) throw Err.notFound('رزرو');
     } else {
       if (r.userId !== auth.sub) throw Err.notFound('رزرو');
     }

@@ -34,11 +34,47 @@ The root [README.md](../README.md) is the quick-start / operator entry point.
 - Inferences that couldn't be fully verified are marked **(uncertain)**.
 - Diagrams are Mermaid (render on GitHub).
 
-## Historical / audit docs (context, not canonical)
+## Doc classification (updated 2026-08-24)
 
-`API-CONTRACT.md`, `FINAL-PRODUCTION-AUDIT.md`,
-`FRONTEND-BACKEND-SECURITY-AUDIT-2026-07-21.md`, `PROJECT-AUDIT-HANDOFF*.md`,
+This repo carries **120 markdown files**. Most are point-in-time audit outputs,
+not living references. Without a map, a new engineer cannot tell which numbers
+to trust — so here is the rule and the map.
+
+**Precedence, highest first:**
+
+1. `CLAUDE.md` (repo root) — the operating rules. Always wins.
+2. **Current state** — `docs/audit/`:
+   - `CLEANUP-REPORT-2026-08-23.md` — what was inspected, fixed, and left open
+   - `DEAD-CODE.md` — deletion decisions with evidence
+   - `CUSTOMER-PROFILE.md` — §13/§14 field-by-field status
+   - `BASELINE.md` — measured baseline
+3. **Open work** — `docs/recovery/OPEN-FINDINGS.md` (what is knowingly unfixed).
+4. **Canonical references** — the numbered list above (`ARCHITECTURE.md`,
+   `DATABASE.md`, `API_REFERENCE.md`, …) plus `docs/adr/` and
+   `docs/architecture/`.
+5. **Archived snapshots** — everything else. Kept for the *reasoning* they
+   record, not their numbers.
+
+### ⚠️ Archived snapshots — numbers are historical
+
+Ten files carry an `ARCHIVED-SNAPSHOT` banner because their route counts were
+**measured wrong** on 2026-08-24 (they claim 26 / 46 / 59 / 79 / 82 / 83 / 84
+routes; the repository actually has **135**):
+
+`DEPLOY_API_VERCEL.md` · `FRONTEND-BACKEND-SECURITY-AUDIT-2026-07-21.md` ·
+`KNOWN_LIMITATIONS.md` · `architecture-audit/API_USAGE_MATRIX.md` ·
+`architecture-audit/FINAL_VALIDATION_REPORT.md` ·
+`architecture-audit/FULLSTACK_INTEGRATION_AUDIT.md` ·
+`backend-audit/API_AUDIT_REPORT.md` ·
+`backend-audit/BACKEND_ARCHITECTURE_AUDIT.md` ·
+`backend-audit/BACKEND_FINAL_AUDIT.md` ·
+`backend-audit/TECHNICAL_DEBT_REPORT.md`
+
+Also historical (not re-measured, treat with the same caution):
+`API-CONTRACT.md`, `FINAL-PRODUCTION-AUDIT.md`, `PROJECT-AUDIT-HANDOFF*.md`,
 `AUDIT-FIXES-*.md`, `CHAT-FEATURE-2026-07-20.md`, `SUPABASE-SECURITY.md`,
-and the `design/` folder. These predate this documentation set and are kept for
-history; where they conflict with the canonical docs above, the canonical docs
-win.
+the rest of `architecture-audit/` and `backend-audit/`, and `design/`.
+
+**Nothing was deleted** — per the cleanup protocol, a doc is archived (marked),
+never removed, because it records *why* a decision was made even when its
+figures have moved on.

@@ -51,7 +51,17 @@ export async function GET(req: Request) {
         // latitude/longitude لازم‌اند تا اپ مشتری فاصله را واقعاً حساب کند؛
         // پیش از این عددِ «۰٫۷ کیلومتر» در فرانت ساخته می‌شد و هیچ ربطی به
         // موقعیتِ واقعی نداشت.
-        select: { id: true, slug: true, name: true, cuisine: true, city: true, vibes: true, priceBand: true, cbBasePct: true, latitude: true, longitude: true },
+        // ⚠️ تکمیلِ P1-3: cancellationPolicy اینجا هم لازم است، نه فقط در
+        // endpointِ جزئیات. علتش یک واقعیتِ سنجیده‌شده است: اپِ مشتری **هرگز**
+        // `/restaurants/{slug}` را صدا نمی‌زند (grepِ کاملِ apps/customer: صفر)؛
+        // کلِ آرایه‌ی R از همین لیست ساخته می‌شود. بدونِ این خط،
+        // `depositRequired` همیشه null می‌ماند و depositLabel() برایِ هر
+        // رستورانی سکوت می‌کند — یعنی دروغ برداشته می‌شد ولی حقیقت هم گفته نمی‌شد.
+        select: {
+          id: true, slug: true, name: true, cuisine: true, city: true, vibes: true,
+          priceBand: true, cbBasePct: true, latitude: true, longitude: true,
+          cancellationPolicy: { select: { depositRequired: true, freeCancelHours: true, autoConfirm: true } },
+        },
         orderBy: { id: 'desc' },           // ترتیب پایدار برای cursor
         take: PAGE_SIZE + 1,                // یکی بیشتر بگیر تا بفهمی صفحه‌ی بعد هست
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -101,8 +111,17 @@ export async function GET(req: Request) {
         const rt = ratingMap.get(p.id);
         const total = rt?.count ?? 0;
         const liked = recommendMap.get(p.id) ?? 0;
+        // cancellationPolicy یک آبجکتِ رابطه‌ای است؛ به‌جایِ نشتِ شکلِ Prisma به
+        // پاسخِ عمومی، همان قراردادِ booking_policy را می‌سازیم که endpointِ
+        // جزئیات هم می‌دهد — یک شکل، دو مسیر (§۲۰ قراردادِ واحد).
+        const { cancellationPolicy, ...rest } = p;
         return {
-          ...p,
+          ...rest,
+          booking_policy: {
+            deposit_required: cancellationPolicy?.depositRequired ?? false,
+            free_cancel_hours: cancellationPolicy?.freeCancelHours ?? 24,
+            auto_confirm: cancellationPolicy?.autoConfirm ?? true,
+          },
           rating: rt?.avg ? Math.round(rt.avg * 10) / 10 : null,
           reviews_count: total,
           // null یعنی «هنوز نمی‌دانیم» — نه صفر و نه عددِ ساختگی. اپ مشتری در

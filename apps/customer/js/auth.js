@@ -4,6 +4,7 @@
 //  ترتیبِ لود در index.html مهم است (این فایل به توابع/state قبلی وابسته است).
 // ═══════════════════════════════════════════════════════════
 import { API, USER, refreshAuthUI, setUSER } from './api.js';
+import { isOfflineDemo } from './api-core.js';
 import { icon } from './icons.js';
 import { faTime } from './data/booking.js';
 import { renderProfile } from './features/food-dna.js';
@@ -50,7 +51,7 @@ export async function sendOtp(){
   const btn = phoneEl.nextElementSibling;
   if (btn) { btn.disabled = true; btn.textContent = 'در حال ارسال...'; }
 
-  if (location.protocol === 'file:') {
+  if (isOfflineDemo()) {
     showOtpStep('۱۲۳۴', true);
     return;
   }
@@ -86,7 +87,7 @@ export async function confirmOtp(){
   const btn = codeEl.nextElementSibling;
   if (btn) { btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
 
-  if (location.protocol === 'file:') {
+  if (isOfflineDemo()) {
     if (code === '1234') {
       setUSER({ phone: _loginPhone });
       showRegisterStep(true);
@@ -152,9 +153,17 @@ export async function completeRegister(demo){
       toast('⚠️', res.error?.message || 'ثبت‌نام ناموفق بود');
       if (btn) { btn.disabled = false; btn.textContent = 'تکمیل ثبت‌نام'; }
       return;
-    } else {
-      // آفلاین → محلی نگه دار
+    } else if (isOfflineDemo()) {
+      // بسته‌ی آفلاینِ تک‌فایلی: بک‌اندی وجود ندارد و کاربر این را می‌داند.
       setUSER({ ...USER, firstName: first, lastName: last });
+    } else {
+      // ⚠️ رفعِ موفقیتِ جعلی (پروتکل §۳/§۱۰): روی استقرارِ واقعی، `offline` یعنی
+      // درخواست شکست خورد — نه اینکه ذخیره شد. قبلاً همین‌جا نام محلی ست و
+      // finishLogin با توستِ «خوش اومدی!» صدا زده می‌شد؛ کاربر ثبت‌نام را تمام‌شده
+      // می‌دید و نامش با اولین `GET /me` بی‌صدا ناپدید می‌شد.
+      toast('⚠️', 'اتصال برقرار نشد — نامت ثبت نشد. دوباره تلاش کن');
+      if (btn) { btn.disabled = false; btn.textContent = 'تکمیل ثبت‌نام'; }
+      return;
     }
   } else {
     setUSER({ ...USER, firstName: first, lastName: last });

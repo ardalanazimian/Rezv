@@ -65,13 +65,22 @@
 }
 .inp:focus {
   border-color: var(--brand-500);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-500) 15%, transparent);
+  box-shadow:0 0 0 3px rgba(79,70,229,0.15);
+/* ⚠️ الگویِ عمدی — دو بار نوشتنِ یک ویژگی، اشتباه نیست (۲۰۲۶-۰۸-۲۴):
+   خطِ اول مقدارِ ثابتِ rgba است، خطِ دوم همان با `color-mix()`.
+   `color-mix` از Chrome 111 / Safari 16.2 / Firefox 113 پشتیبانی می‌شود؛
+   مرورگرِ قدیمی‌تر آن اعلانِ نامعتبر را **کلاً دور می‌ریزد**. بدونِ خطِ اول،
+   نتیجه «رنگِ کمی متفاوت» نبود بلکه نبودِ کاملِ آن ویژگی می‌شد: حلقه‌ی فوکوس
+   ناپدید (افتِ دسترسی‌پذیری) و پس‌زمینه‌ی پدِ کشیدنی نامرئی (خرابیِ عملکردی).
+   پس این دو خط را «تمیز» نکنید — ترتیبشان هم مهم است. */
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--brand-500) 15%, transparent);
 }
 .inp[aria-invalid="true"] { border-color: var(--danger); }
 
 /* ── ۴) هم‌ترازیِ chip قدیمی (.opt) به استانداردِ .chip ── */
 .opt {
-  min-height: 34px;
+  /* هم‌تراز با .chip — هر دو زیرِ --touch-min بودند. */
+  min-height: var(--touch-min);
   border-radius: var(--radius-full);
   transition: background var(--motion-fast) var(--ease-out),
               color var(--motion-fast) var(--ease-out);

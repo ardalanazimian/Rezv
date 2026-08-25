@@ -182,7 +182,7 @@ Two layers (both applied in CI):
 
 1. **`prisma/migrations/0_init`** — the baseline Prisma migration
    (`migration.sql`). Applied by `prisma migrate deploy`.
-2. **`prisma/sql/*.sql`** — hand-written SQL scripts (`001` … `057`) for things
+2. **`prisma/sql/*.sql`** — hand-written SQL scripts (`001` … `064`) for things
    Prisma can't express: partitioning, exclusion constraints, partial unique
    indexes, RLS, expression indexes, FK/index back-fills. These are **not**
    Prisma migrations — they live outside `migrations/` (so they never trip
@@ -228,6 +228,14 @@ Two layers (both applied in CI):
 | `026-consolidate-exclusion-constraint` | Canonical `block_end` + `no_table_overlap` (idempotent); replaced `0_init/EXTRA`. |
 | `027-staff-name` | Adds `staff.name` (business-panel display name). |
 | `028-enum-columns-staff-plan` | Upgrades `staff.role` and `tenants.plan` from `TEXT` to their enums (`staff_role`, `subscription_plan`). Same schema-vs-`migrate deploy` drift family as `021b`/`sms_transactions`: `0_init` builds them as `TEXT` but `schema.prisma` declares enums. **No-op on the live DB** (already enum via `db push`); only realigns a fresh Docker install. |
+| `029-platform-events` · `059-telemetry-trust-boundary` · `060-platform-events-retention` | Behavioural-event ingest, its **trust-level CHECK** (`SERVER_VERIFIED`…`SYNTHETIC`) and retention pruning. |
+| `033-no-show-model` · `034-demand-forecast` · `042-model-training-runs` | Learned models plus the **append-only** `model_training_runs` history (metrics, sample size, activation decision). |
+| `037-rls-core-tables` | Row-Level Security on core tables (extends `023`). |
+| `038-unified-economy` · `040-user-badges` · `043-customer-intelligence-score` | Coins/XP ledger, badges, weighted customer score. |
+| `041-waitlist-guest-token` → `044-waitlist-guest-token-hash` | Guest access token for waitlist actions, later stored **hashed** (compared timing-safe). |
+| `061-drop-duplicate-indexes` · `062-hot-path-indexes` | Removed 45 duplicate index pairs (two DDL sources built the same index under different names), then added the two indexes real hot paths needed. |
+| `063-notification-consent` | `users.notification_prefs jsonb` — per-category consent. Absent key = "no opinion" (keeps existing delivery); only an explicit `false` opts out. Enforced in `POST /restaurant/sms`. |
+| `064-nonnegative-balance-checks` | `CHECK (… >= 0)` on `wallet_balance`, `gift_cards.balance_toman`, `restaurants.sms_balance`, `club_members.points`. The app already guards these with conditional `UPDATE … WHERE balance >= amount`; this is the DB-level backstop so a future code path can't silently create negative money. |
 
 > **Important operational note:** the hand-written SQL scripts were previously
 > under `prisma/migrations/manual/`, which made `prisma migrate deploy` fail with

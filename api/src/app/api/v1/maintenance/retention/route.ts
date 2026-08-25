@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { cleanupIdempotencyKeys } from '@/lib/idempotency';
+import { prunePlatformEvents } from '@/lib/platform-events';
 import { guardMaintenance } from '@/lib/maintenance-auth';
 import { createLogger } from '@/lib/logger';
 import { errorResponse } from '@/lib/errors';
@@ -16,6 +17,7 @@ const log = createLogger('retention');
  *  • jobs کامل‌شده‌ی قدیمی‌تر از ۷ روز → حذف
  *  • jobs مرده (DLQ) قدیمی‌تر از ۹۰ روز → حذف (تا آن زمان برای تحقیق می‌مانند)
  *  • audit_logs قدیمی‌تر از ۱ سال → حذف (برای compliance تا یک سال نگه می‌داریم)
+ *  • platform_events بر اساسِ سطحِ اعتماد → حذف (§۱۴؛ ۹۰/۱۸۰/۴۰۰ روز)
  */
 export async function POST(req: Request) {
   try {
@@ -34,11 +36,20 @@ export async function POST(req: Request) {
       DELETE FROM audit_logs WHERE created_at < now() - interval '1 year'
     `;
 
+    // هرسِ تله‌متری — تنها جدولی که تا فازِ ۲ هیچ سیاستِ نگه‌داری نداشت.
+    // اگر شکست بخورد نباید بقیه‌ی پاک‌سازی را باطل کند (jobِ روزانه است و
+    // خطایش در لاگ می‌ماند)، پس جدا catch می‌شود.
+    const telemetry = await prunePlatformEvents().catch((e) => {
+      log.error('هرسِ platform_events ناموفق', { error: (e as Error).message });
+      return null;
+    });
+
     const result = {
       idempotency_keys: idemDeleted,
       completed_jobs: completedJobs,
       dead_jobs: deadJobs,
       audit_logs: oldAudit,
+      platform_events: telemetry,
     };
     log.info('retention cleanup', result);
     return NextResponse.json({ ok: true, deleted: result });

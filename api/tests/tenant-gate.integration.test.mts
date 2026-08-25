@@ -95,14 +95,26 @@ describe('دروازه‌ی تنانت — عبورِ متقاطع مسدود ا
     // ⚠️ هسته‌ی کلِ جداسازی. اگر این بشکند، هر endpointِ رستوران دیتای تنانتِ
     // دیگر را سرو می‌کند — و تستِ موجودِ ایزولاسیون (که restaurantId را دستی
     // می‌دهد) هیچ‌وقت متوجه نمی‌شود.
-    const got = await resolveStaffRestaurant(staffAuth(ownerA, tenantA), reqWith(b1));
-    assert.notEqual(got.id, b1, 'رستورانِ تنانتِ دیگر هرگز نباید برگردد');
-    assert.equal(got.id, a1, 'باید بی‌صدا به شعبه‌ی پیش‌فرضِ خودش برگردد');
+    //
+    // [merge ۰۸-۲۴ — تغییرِ آگاهانه‌ی قرارداد، نه ضعیف‌کردنِ تست]
+    // این تست قبلاً «بی‌صدا به شعبه‌ی پیش‌فرضِ خودش برگردد» را می‌خواست. خطِ
+    // ممیزی (P0-1، §۷) همان مسیر را عمداً خطای صریح کرد، با آسیبِ واقعیِ
+    // مستند: خروجیِ این تابع مستقیم به **نوشتن‌ها** می‌رود (واک‌این، شارژِ SMS،
+    // وضعیتِ میز) و fallbackِ بی‌صدا یعنی ثبتِ آن‌ها رویِ شعبه‌ی اشتباه بدونِ
+    // هیچ نشانه‌ای. جداسازیِ تنانتی همچنان قفل است — حالا صریح‌تر: ۴۰۴ به‌جایِ
+    // برگشتِ بی‌صدا.
+    await assert.rejects(
+      () => resolveStaffRestaurant(staffAuth(ownerA, tenantA), reqWith(b1)),
+      (e: { code?: string }) => e.code === 'BRANCH_NOT_ACCESSIBLE',
+      'هدرِ شعبه‌ی تنانتِ دیگر باید صریح رد شود، نه fallbackِ بی‌صدا',
+    );
   });
 
   test('صاحبِ B هم نمی‌تواند شعبه‌ی A را بگیرد (تقارن)', async () => {
-    const got = await resolveStaffRestaurant(staffAuth(ownerB, tenantB), reqWith(a2));
-    assert.equal(got.id, b1);
+    await assert.rejects(
+      () => resolveStaffRestaurant(staffAuth(ownerB, tenantB), reqWith(a2)),
+      (e: { code?: string }) => e.code === 'BRANCH_NOT_ACCESSIBLE',
+    );
   });
 
   test('کنترلِ مثبت: هدرِ شعبه‌ی خودی *واقعاً* کار می‌کند', async () => {
@@ -112,10 +124,16 @@ describe('دروازه‌ی تنانت — عبورِ متقاطع مسدود ا
     assert.equal(got.id, a2, 'صاحب باید بتواند بینِ شعبه‌های خودش جابه‌جا شود');
   });
 
-  test('هدرِ شناسه‌ی ناموجود به شعبه‌ی پیش‌فرض برمی‌گردد، نه خطا', async () => {
-    // رفتارِ عمدیِ مستند (شعبه‌ی حذف‌شده یا انتخابِ کهنه‌ی کلاینت).
-    const got = await resolveStaffRestaurant(staffAuth(ownerA, tenantA), reqWith(randomUUID()));
-    assert.equal(got.id, a1);
+  test('هدرِ شناسه‌ی ناموجود صریح رد می‌شود، نه fallbackِ بی‌صدا', async () => {
+    // [merge ۰۸-۲۴] قبلاً «به شعبه‌ی پیش‌فرض برگردد» بود — همان قراردادِ
+    // fallbackِ بی‌صدا که بالا توضیح داده شد. انتخابِ *صریحی* که resolve
+    // نمی‌شود (شعبه‌ی حذف‌شده/هدرِ کهنه) حالا خطایِ روشن می‌گیرد تا کاربر
+    // بفهمد و دوباره انتخاب کند؛ ادامه‌ی بی‌صدا رویِ شعبه‌ای دیگر یعنی
+    // نوشتنِ داده در جایِ اشتباه.
+    await assert.rejects(
+      () => resolveStaffRestaurant(staffAuth(ownerA, tenantA), reqWith(randomUUID())),
+      (e: { code?: string }) => e.code === 'BRANCH_NOT_ACCESSIBLE',
+    );
   });
 
   test('هدرِ بی‌معنا (نه‌UUID) تابع را نمی‌شکند', async () => {

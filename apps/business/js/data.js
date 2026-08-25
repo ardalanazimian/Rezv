@@ -14,8 +14,10 @@ const STATUS_META={
   seated:         {label:'سر میز',        icon:'utensils', bg:'#FEF3C7', fg:'#B45309'},
   dining:         {label:'در حال صرف غذا',icon:'utensils', bg:'#FED7AA', fg:'#9A3412'},
   completed:      {label:'انجام‌شده',     icon:'check',  bg:'#DCFCE7', fg:'#15803D'},
-  no_show:        {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'#D97706'},
-  noshow:         {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'#D97706'}, // alias
+    // ⚠️ fg قبلاً #D97706 بود: رویِ همین bg فقط ۲٫۸۶:۱ — و این متنِ چیپِ وضعیتِ
+  // «نیومد» است، نه تزئین. با توکنِ --amber (#C2410C) می‌شود ۴٫۶۵:۱.
+  no_show:        {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'var(--amber)'},
+  noshow:         {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'var(--amber)'}, // alias
   cancelled:      {label:'لغوشده',        icon:'close', bg:'#FEE2E2', fg:'#B91C1C'},
   auto_cancelled: {label:'لغو خودکار',    icon:'close', bg:'#FEE2E2', fg:'#B91C1C'},
   rejected:       {label:'ردشده',         icon:'close',  bg:'#FEE2E2', fg:'#991B1B'},
@@ -60,12 +62,44 @@ async function changeStatus(i,to,reason){
   r._events=r._events||[{toStatus:old,actor:'system',createdAt:new Date(Date.now()-3600000).toISOString(),isAutomatic:false}];
   r._events.push({toStatus:to,actor:'staff',createdAt:new Date().toISOString(),isAutomatic:false,reason});
   renderResList();
-  toast('',`وضعیت به «${STATUS_META[to]?.label||to}» تغییر کرد`);
-  // ارسال به بک‌اند؛ فقط اگر سرور آنلاین بود و خطای واقعی داد، برگردان
+  // ارسال به بک‌اند
   if(r.code){
     const body={status:to}; if(reason) body.reason=reason;
     const res=await API.request(`/restaurant/reservations/${r.code}/status`,{method:'PATCH',body:JSON.stringify(body)});
-    if(!res.ok&&!res.offline){ r.status=old; r.cancelReason=oldReason; r._events.pop(); renderResList(); toast('','تغییر وضعیت ناموفق بود — دوباره تلاش کن'); }
+    if(res.ok){
+      toast('',`وضعیت به «${STATUS_META[to]?.label||to}» تغییر کرد`);
+    } else if(res.offline){
+      // ⚠️ رفعِ P0-4 (فازِ ۲، پروتکل §۳).
+      //
+      // قبلاً شرطِ برگرداندن `!res.ok && !res.offline` بود — یعنی در آفلاین
+      // تغییر **نه** برگردانده می‌شد و **نه** در Outbox صف می‌شد. نتیجه:
+      // کارکنان «رسید»/«لغو شد» را می‌دیدند در حالی که سرور هیچ خبری نداشت،
+      // و با اولین رفرش بی‌صدا برمی‌گشت. میزی که کارکنان «آزاد» می‌دانستند در
+      // سرور هنوز اشغال بود (یا برعکس) — دقیقاً «حالتِ متناقض»ِ پروتکل §۶.
+      //
+      // حالا همان الگویی که واک‌این/رزروِ دستی/آفرِ صف از قبل در همین پنل
+      // استفاده می‌کنند به‌کار می‌رود (پروتکل §۲۲: reuse before abstraction).
+      // Outbox خودش تضادِ سرور (مثلاً INVALID_STATUS_TRANSITION چون رزرو در
+      // این فاصله عوض شده) را به پرسنل گزارش می‌دهد — _reportConflicts —
+      // پس تلاشِ بی‌پایانِ خاموش هم رخ نمی‌دهد.
+      if(API.getToken()){
+        Outbox.enqueue({
+          type:'status', path:`/restaurant/reservations/${r.code}/status`, method:'PATCH',
+          body, label:`تغییر وضعیتِ ${r.name||'رزرو'} به «${STATUS_META[to]?.label||to}»`, localRef:r,
+        });
+        toast('',`وضعیت محلی تغییر کرد — با برگشت اینترنت همگام می‌شود`);
+      } else {
+        // بدونِ توکن اصلاً نمی‌شود همگام کرد؛ ادعایِ موفقیت نکن و برگردان.
+        r.status=old; r.cancelReason=oldReason; r._events.pop(); renderResList();
+        toast('','برای تغییر وضعیت اول وارد شو');
+      }
+    } else {
+      r.status=old; r.cancelReason=oldReason; r._events.pop(); renderResList();
+      toast('',res.error?.message||'تغییر وضعیت ناموفق بود — دوباره تلاش کن');
+    }
+  } else {
+    // بدونِ کدِ رزرو (ردیفِ نمونه/محلی) هیچ مسیرِ سروری وجود ندارد.
+    toast('',`وضعیت به «${STATUS_META[to]?.label||to}» تغییر کرد`);
   }
 }
 async function viewHistory(i){
@@ -82,7 +116,7 @@ async function viewHistory(i){
     const t=new Date(e.createdAt).toLocaleString('fa-IR',{hour:'2-digit',minute:'2-digit',month:'short',day:'numeric'});
     return `<div class="hist-row"><span class="hist-ic" style="color:${m.fg}">${icon(m.icon,{size:14})}</span><div class="hist-body"><div class="hist-status">${m.label}${e.isAutomatic?' <span class="hist-auto">خودکار</span>':''}</div><div class="hist-meta">${who} · ${t}</div></div></div>`;
   }).join('');
-  openModal(`<div class="bs-head"><div class="bs-title">تاریخچه‌ی رزرو</div><div class="bs-rest">${esc(r.name)} · کد ${r.code||'—'}</div></div><div class="hist-list">${rows||'<div style="color:var(--t3);text-align:center;padding:20px">رویدادی ثبت نشده</div>'}</div>`);
+  openModal(`<div class="bs-head"><div class="bs-title">تاریخچه‌ی رزرو</div><div class="bs-rest">${esc(r.name)} · کد ${esc(r.code||'—')}</div></div><div class="hist-list">${rows||'<div style="color:var(--t3);text-align:center;padding:20px">رویدادی ثبت نشده</div>'}</div>`);
 }
 // ═══════════════════════════════════════════════════════════
 //  لایه‌ی اتصال API (فاز ۳) — پنل رستوران
@@ -111,6 +145,31 @@ const API = {
   _restaurantId: null,
   setActiveRestaurant(id){ this._restaurantId = id||null; try { if(id) localStorage.setItem('rz_biz_restaurant_id', id); else localStorage.removeItem('rz_biz_restaurant_id'); } catch {} },
   getActiveRestaurant(){ return this._restaurantId; },
+  /**
+   * انتخابِ کهنه‌ی شعبه را دور بریز (فازِ ۲ · P0-1).
+   *
+   * بک‌اند حالا اگر هدرِ X-Restaurant-Id به شعبه‌ای اشاره کند که حذف شده یا
+   * دسترسی‌اش گرفته شده، به‌جایِ بازگشتِ خاموش به شعبه‌ی دیگر، خطایِ صریحِ
+   * BRANCH_NOT_ACCESSIBLE می‌دهد (رجوع کن به api/src/lib/staff-helpers.ts).
+   *
+   * ⚠️ چرا این پاک‌سازی *لازم* است و صرفاً «مدیریتِ خطا» نیست: بدونِ آن، یک
+   * idِ کهنه در localStorage باعث می‌شد **هر** درخواستِ پنل ۴۰۴ بگیرد و پنل
+   * عملاً قفل شود — یعنی رفعِ امنیتیِ بک‌اند بدونِ این تکه، خودش یک باگ بود.
+   *
+   * تفاوتِ کلیدی با باگِ قبلی: آن‌جا انتخابِ کاربر **حفظ** می‌شد و سرور بی‌صدا
+   * شعبه‌ی دیگری را سرو می‌کرد (پنل و سرور ناهماهنگ). این‌جا انتخاب **پاک**
+   * می‌شود و به کاربر گفته می‌شود — پس پنل و سرور روی یک شعبه توافق دارند.
+   */
+  _clearStaleBranch(){
+    this.setActiveRestaurant(null);
+    try { if (typeof toast === 'function') toast('','شعبه‌ی انتخاب‌شده دیگر در دسترس نیست — به شعبه‌ی پیش‌فرض برگشتی'); } catch {}
+    try { if (typeof loadBranches === 'function') loadBranches(); } catch {}
+  },
+  /** آیا پاسخ همان خطایِ «شعبه در دسترس نیست» است؟ */
+  _isStaleBranch(r){
+    return !r.ok && !r.offline && r.status === 404
+      && r.error?.code === 'BRANCH_NOT_ACCESSIBLE' && !!this._restaurantId;
+  },
   async request(path, opts = {}, _retried = false){
     // transportِ خام به httpJsonِ مشترک (window.httpJson از api-core.js) واگذار می‌شود؛
     // منطقِ auth (Authorization، X-Restaurant-Id، ۴۰۱→refresh→retry) اینجا و بدونِ تغییر می‌ماند.
@@ -127,22 +186,17 @@ const API = {
       if (await this._doRefresh()) return this.request(path, opts, true);
       this._onSessionExpired();
     }
+    // شعبه‌ی کهنه → یک‌بار پاک کن و بدونِ هدر دوباره تلاش کن (همان الگویِ ۴۰۱→refresh→retry).
+    if (this._isStaleBranch(r) && !_retried) {
+      this._clearStaleBranch();
+      return this.request(path, opts, true);
+    }
     if (r.ok) return { ok: true, status: r.status, data: r.data };
     if (r.offline) return { ok: false, offline: true, error: r.error };
     return { ok: false, status: r.status, error: r.error || { message: `خطای ${r.status}` } };
   },
-  async _doRefresh(){
-    if (this._refreshing) return this._refreshing;
-    this._refreshing = (async () => {
-      try {
-        const res = await fetch(this.base + '/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh: this._refresh }) });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.access) { this.setToken(data.access); this.setRefresh(data.refresh); return true; }
-        return false;
-      } catch { return false; } finally { this._refreshing = null; }
-    })();
-    return this._refreshing;
-  },
+  // منطقِ تمدید حالا در shared/js/api-core.js است (§۶ — سه کپیِ یکسان یکی شد).
+  async _doRefresh(){ return refreshAccessToken(this); },
   _onSessionExpired(){ this.setToken(null); this.setRefresh(null); if (typeof onStaffSessionExpired === 'function') onStaffSessionExpired(); },
   /**
    * POSTِ بدنه‌ی خام (FormData) — بدونِ Content-Type تا مرورگر خودش
@@ -158,6 +212,11 @@ const API = {
       if (await this._doRefresh()) return this.requestRaw(path, body, timeoutMs, true);
       this._onSessionExpired();
     }
+    // شعبه‌ی کهنه (P0-1) — همان رفتارِ request بالا.
+    if (this._isStaleBranch(r) && !_retried) {
+      this._clearStaleBranch();
+      return this.requestRaw(path, body, timeoutMs, true);
+    }
     if (r.ok) return { ok: true, status: r.status, data: r.data };
     if (r.offline) return { ok: false, offline: true, error: r.error };
     return { ok: false, status: r.status, error: r.error || { message: `خطای ${r.status}` } };
@@ -166,6 +225,7 @@ const API = {
   // headers اختیاری: برای عملیاتِ حساس (مثلاً رزروِ دستی) که به Idempotency-Key نیاز دارند.
   post(path, body, headers){ return this.request(path, { method: 'POST', body: JSON.stringify(body || {}), headers }); },
   patch(path, body){ return this.request(path, { method: 'PATCH', body: JSON.stringify(body || {}) }); },
+  del(path){ return this.request(path, { method: 'DELETE' }); },
   chatList(){ return this.get('/restaurant/chats'); },
   chatMessages(id, after){ return this.get('/restaurant/chats/'+id+(after?('?after='+encodeURIComponent(after)):'')); },
   chatSend(id, body){ return this.post('/restaurant/chats/'+id, { body }); },
@@ -321,6 +381,8 @@ const API = {
   waitlistQueue(){ return this.get('/restaurant/waitlist'); },
   waitlistAnalytics(days){ return this.get('/restaurant/waitlist/analytics'+(days?'?days='+days:'')); },
   waitlistPromoteNext(){ return this.post('/restaurant/waitlist'); },
+  // حذفِ ورودی از صف توسطِ پرسنل — مسیرِ سروریِ واقعی (فازِ ۲).
+  waitlistRemove(entryId){ return this.del(`/restaurant/waitlist?entry_id=${encodeURIComponent(entryId)}`); },
   // ── کارکنان و دسترسی (وصل به /restaurant/staff واقعی) ──
   staffList(){ return this.get('/restaurant/staff'); },
   staffUpdate(body){ return this.patch('/restaurant/staff', body); },
@@ -573,8 +635,22 @@ async function loadTodayReservationsForDashboard(){
 }
 // میزها — الان از API واقعی (/restaurant/tables) لود می‌شه، نه نمونه‌ی ثابت
 // نگاشت وضعیت: بک‌اند از 'occupied' استفاده می‌کنه، رابط کاربری همیشه 'seated' نشون می‌داده
-const BK2UI_STATE = { free:'free', reserved:'reserved', occupied:'seated', cleaning:'free', maintenance:'free' };
-const UI2BK_STATE = { free:'free', reserved:'reserved', seated:'occupied' };
+// ⚠️ رفعِ فروپاشیِ وضعیتِ میز (فازِ ۲، پروتکل §۶ و §۲۸).
+//
+// نگاشتِ قبلی هم 'cleaning' و هم 'maintenance' را به 'free' تا می‌کرد. دو پیامدِ
+// واقعی داشت:
+//  ۱. میزی که در **تعمیرات** است از دیدِ مشتری اصلاً قابلِ رزرو نیست
+//     (availability.ts آن را فیلتر می‌کند)، ولی کارکنان همان میز را «آزاد»
+//     می‌دیدند — پس نمی‌فهمیدند چرا یک سانس برایِ مشتری پر نشان داده می‌شود.
+//  ۲. چون UI2BK_STATE هیچ ورودیِ معکوسی برایِ maintenance نداشت، کلیک روی آن
+//     میز در پلانِ سالن بی‌صدا وضعیتش را از تعمیرات خارج می‌کرد.
+//
+// بک‌اند از اول هر پنج وضعیت را مدل می‌کرد و /restaurant/tables مقدارِ واقعی را
+// می‌فرستاد — این صرفاً یک نگاشتِ ناقصِ سمتِ پنل بود، نه کمبودِ داده.
+const BK2UI_STATE = { free:'free', reserved:'reserved', occupied:'seated', cleaning:'cleaning', maintenance:'maintenance' };
+const UI2BK_STATE = { free:'free', reserved:'reserved', seated:'occupied', cleaning:'cleaning', maintenance:'maintenance' };
+// برچسبِ فارسیِ هر وضعیت — منبعِ واحد برایِ پلانِ سالن و توست‌ها.
+const TABLE_STATE_LABELS = { free:'آزاد', reserved:'رزروشده', seated:'نشسته', cleaning:'در حالِ نظافت', maintenance:'تعمیرات' };
 let TABLES = [];
 // میزهای نمونه برای حالت دمو/آفلاین — هم‌راستا با رزروهای نمونه (میزهای ۱ تا ۹)
 const DEMO_TABLES = [
@@ -693,23 +769,38 @@ async function loadHeatmapForDashboard(){
   if(res.status===403){ _heatmapLoaded=true; return false; }
   return false;
 }
-// باشگاه مشتریان — دیتای واقعی و زنده
-let CLUB=[
-  {fn:'کیان',ln:'موسوی',phone:'۰۹۱۲۵۵۵۶۶۷۷',code:'VIS-1001',tier:'gold',points:1240,bMonth:'خرداد',joined:'۳ ماه پیش'},
-  {fn:'نیلوفر',ln:'رضایی',phone:'۰۹۱۲۱۱۱۲۲۳۳',code:'VIS-1002',tier:'silver',points:680,bMonth:'خرداد',joined:'۲ ماه پیش'},
-  {fn:'مریم',ln:'احمدی',phone:'۰۹۱۲۸۸۸۷۷۶۶',code:'VIS-1003',tier:'silver',points:540,bMonth:'مهر',joined:'۴ ماه پیش'},
-  {fn:'امیر',ln:'حسینی',phone:'۰۹۱۲۲۲۲۳۳۴۴',code:'VIS-1004',tier:'bronze',points:210,bMonth:'دی',joined:'هفته پیش'},
-  {fn:'سامان',ln:'عباسی',phone:'۰۹۱۲۴۴۴۵۵۶۶',code:'VIS-1005',tier:'bronze',points:150,bMonth:'خرداد',joined:'۲ هفته پیش'},
-];
-// نگاشت شماره ماه (۱-۱۲) به نام ماه فارسی
+// ═══════════════════════════════════════════════════════════════════════
+//  باشگاه مشتریان — سه رفعِ هم‌زمان (فازِ ۲، پروتکل §۳ و §۲۶)
+//
+//  ۱. **دیتایِ جعلی حذف شد.** این آرایه پنج مشتریِ ساختگی با نام و شماره‌ی
+//     کاملاً واقع‌نما داشت — زیرِ کامنتی که ادعا می‌کرد «دیتای واقعی و زنده».
+//     loadClubMembers در هر شکستِ API همین‌ها را برمی‌گرداند، پس پنلِ آفلاین
+//     یا ۴۰۳ فهرستِ اعضایِ جعلی را به‌عنوانِ باشگاهِ واقعیِ رستوران نشان می‌داد
+//     (با امتیاز و سطحِ ساختگی). همان کلاسِ P0-3/P0-4، در سطحی که آن پاس
+//     پوشش نداده بود. حالا خالی برمی‌گردد و صفحه حالتِ «خالی» را نشان می‌دهد.
+//
+//  ۲. **CUR_MONTH دیگر هاردکد نیست.** مقدارِ ثابتِ 'خرداد' یعنی «تولدهای این
+//     ماه» یازده ماهِ سال عددِ غلط می‌داد.
+//
+//  ۳. **ماهِ تولد همان ماهِ شمسی است و درست بود — دست نخورد.**
+//     (یادداشتِ صداقت: در جریانِ فازِ ۲ ابتدا این را «باگ» تشخیص دادم و به
+//     نام‌هایِ ماهِ میلادی تغییرش دادم؛ بازبینیِ مستقل نشان داد **اشتباه**
+//     بود و تغییر بازگردانده شد.) دلیلِ درست‌بودنِ حالتِ فعلی: تنها مسیرِ
+//     نوشتنِ ماهِ تولد، فرمِ واک‌ینِ همین پنل است
+//     (apps/business/js/reservations.js) که کشویی‌اش دقیقاً ماه‌هایِ **شمسی**
+//     را با `value="${i+1}"` می‌فرستد (فروردین=۱ … اسفند=۱۲). بک‌اند همان
+//     عدد را نگه می‌دارد و /restaurant/members همان را برمی‌گرداند. پس
+//     ایندکس‌کردنش در نام‌هایِ ماهِ شمسی round-tripِ درست است.
+// ═══════════════════════════════════════════════════════════════════════
+let CLUB=[];
+// نامِ ماه‌هایِ **شمسی** — هم‌راستا با آنچه فرمِ واک‌ین می‌فرستد (بالا را بخوان).
 const FA_MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
-// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): CUR_MONTH قبلاً ثابتِ 'خرداد' بود — یعنی
-// «تولد این ماه» و کمپینِ تولد برای همیشه خرداد را هدف می‌گرفتند. حالا از
-// تقویمِ واقعیِ شمسی (Intl، بدونِ کتابخانه) محاسبه می‌شود.
-const CUR_MONTH=(()=>{try{
-  const m=parseInt(new Intl.DateTimeFormat('fa-IR-u-nu-latn',{month:'numeric'}).format(new Date()),10);
-  return FA_MONTHS[m-1]||FA_MONTHS[0];
-}catch(e){ return FA_MONTHS[0]; }})();
+/** نامِ ماهِ **شمسیِ** جاری — مبنایِ «تولدِ این ماه». Intl با fa-IR خودش تقویمِ
+ *  شمسی می‌دهد، پس نیازی به کتابخانه‌ی تبدیلِ تاریخ نیست. */
+function currentMonthFa(){
+  try { return new Intl.DateTimeFormat('fa-IR',{month:'long'}).format(new Date()); }
+  catch { return FA_MONTHS[0]; }
+}
 // بارگذاری اعضای باشگاه از API (با fallback به CLUB نمونه)
 async function loadClubMembers(){
   const res=await API.get('/restaurant/members?limit=100');
@@ -727,7 +818,10 @@ async function loadClubMembers(){
     }));
   }
   API.online=false;
-  return CLUB; // fallback به نمونه
+  // ⚠️ رفعِ §۳: قبلاً اینجا `return CLUB` بود و آرایه‌ی جعلیِ بالا را به‌عنوانِ
+  // اعضایِ واقعیِ رستوران برمی‌گرداند. حالا خالی — صفحه حالتِ خالی/خطا را
+  // نشان می‌دهد، نه ردیف‌هایِ ساختگی.
+  return [];
 }
 // تبدیل تاریخ ISO به نمایش نسبی فارسی ساده
 function faRelative(iso){
@@ -740,11 +834,22 @@ function faRelative(iso){
 }
 // نگاشت وضعیت enum واقعی بک‌اند → وضعیت فرانت پنل
 // بک‌اند: pending/confirmed/arrived/no_show/cancelled_by_user/cancelled_by_restaurant
+// ⚠️ رفعِ پنهان‌شدنِ «در انتظارِ تأیید» (پروتکل §۳/§۱۰):
+// این تابع `pending` را به `confirmed` تبدیل می‌کرد، پس رزروی که منتظرِ **تأییدِ
+// خودِ رستوران‌دار** بود در فهرست «تأییدشده» نشان داده می‌شد — یعنی صاحبِ
+// رستوران هیچ‌وقت نمی‌فهمید کاری برایِ انجام دارد. با اجرایِ واقعیِ
+// `auto_confirm` در بک‌اند این دیگر فقط یک نقصِ نمایشی نیست، بلکه کلِ آن
+// قابلیت را بی‌اثر می‌کرد.
+// STATUS_META از قبل `pending` را می‌شناسد (برچسبِ «در انتظار») و
+// STATUS_TRANSITIONS هم `pending:['confirmed','rejected','cancelled']` دارد،
+// پس رستوران‌دار از همان منویِ موجود می‌تواند تأیید/رد کند.
 function mapResStatus(apiStatus){
   if(apiStatus==='arrived')return'arrived';
   if(apiStatus==='no_show')return'noshow';
   if(apiStatus==='cancelled_by_user'||apiStatus==='cancelled_by_restaurant')return'cancelled';
-  if(apiStatus==='confirmed'||apiStatus==='pending')return'confirmed';
+  if(apiStatus==='pending')return'pending';        // ← دیگر پنهان نمی‌شود
+  if(apiStatus==='rejected')return'cancelled';
+  if(apiStatus==='confirmed'||apiStatus==='auto_confirmed')return'confirmed';
   return'confirmed';
 }
 // تشخیص دسته‌ی تاریخ از زمان رزرو (برای سازگاری با فیلتر محلی)
@@ -809,19 +914,17 @@ let GALLERY=[];
 // RestaurantPhoto با category='logo'، در GALLERY) آپلود/تأیید شود.
 let RESTAURANT={name:'کافه‌رستوران ویستا',logoEmoji:'🌿',logoGradient:'linear-gradient(135deg,#34D399,#059669)'};
 function normalizePhone(p){return (p||'').replace(/\s/g,'').replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
-// اتصال خودکار: هر رزرو → ثبت در باشگاه (بدون تکرار، کلید: تلفن)
-function enrollClub(name,phone){
-  const ph=normalizePhone(phone);
-  if(!ph||ph.length<7)return {enrolled:false,reason:'no-phone'};
-  const existing=CLUB.find(m=>normalizePhone(m.phone)===ph);
-  if(existing)return {enrolled:false,member:existing,reason:'exists'};
-  const parts=(name||'').trim().split(' ');
-  const fn=parts[0]||'مهمان', ln=parts.slice(1).join(' ')||'';
-  const code='VIS-'+String(memCounter++).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
-  const member={fn,ln,phone:normalizePhone(phone),code,tier:'bronze',points:0,bMonth:'—',joined:'همین الان'};
-  CLUB.unshift(member);
-  return {enrolled:true,member};
-}
+// ⚠️ enrollClub حذف شد (فازِ ۲، §۳ و §۲۱).
+//
+// یک «عضویتِ باشگاه»ِ کاملاً محلی می‌ساخت با کدِ ساختگیِ VIS-xxx که در هیچ
+// دیتابیسی وجود نداشت، و آن کد به کارکنان به‌عنوانِ کدِ عضویتِ واقعی نشان
+// داده می‌شد. عضویتِ واقعی فقط سمتِ سرور و اتمیک ساخته می‌شود
+// (lib/reservations.ts → createWalkinTx / createReservation) با کدِ واقعی.
+//
+// اثباتِ بی‌مصرف‌بودن پیش از حذف (§۲۱ — «prove unreachable»):
+//   grep -rn "enrollClub" apps/business/  →  فقط خودِ تعریف + دو کامنت.
+//   دو فراخوانِ قبلی (loyalty.js addMember و reservations.js مسیرِ آفلاین)
+//   در همین batch حذف/جایگزین شدند.
 
 const TITLES={menu:'منو',overview:'داشبورد',reservations:'مدیریت رزروها',waitlist:'لیست انتظار',floor:'پلان سالن',profile:'پروفایل و نظرات',customers:'مشتریان',loyalty:'باشگاه مشتریان',marketing:'بازاریابی',analytics:'آنالیتیکس',cashback:'تنظیم کش‌بک',staff:'کارکنان',pricing:'قیمت‌گذاری',chat:'پیام‌ها'};
 

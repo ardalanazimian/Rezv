@@ -48,7 +48,7 @@ export async function setTableState(
   const updated = await db.table.update({
     where: { id: tableId },
     data: { state: next },
-    select: { id: true, number: true, state: true },
+    select: { id: true, number: true, state: true, restaurantId: true },
   });
   // maintenance تنها stateای است که availability آن را فیلتر می‌کند — ورود/خروج
   // از آن باید کش را باطل کند، وگرنه میزِ ازکارافتاده تا TTL برای مشتری «آزاد»
@@ -106,14 +106,33 @@ export async function assignQrCode(
   throw lastErr ?? Err.validation('ساخت کد QR ناموفق بود');
 }
 
-// ── check-in با اسکن QR: مهمان سر میز با اسکن، رزرو فعلی را arrived/seated می‌کند ──
-export async function qrCheckIn(qrCode: string): Promise<{
+// ── check-in با اسکن QR: پرسنل کدِ QRِ میز را اسکن می‌کند و رزروِ فعلی را seated می‌کند ──
+//
+// ⚠️ رفعِ P0-2 (فازِ ۲، پروتکل §۴ و §۷) — دو نقصِ جدی که با هم رفع شدند:
+//
+//  ۱. **بدونِ احراز هویت.** routeِ POST /api/v1/checkin هیچ auth ای نداشت و
+//     middleware هم فقط بنِ IP/CSRF/ریت‌لیمیت می‌کند، نه احراز هویت. یعنی هرکس
+//     با دانستن یا حدس‌زدنِ یک qrCode می‌توانست رزروِ فردِ دیگری را
+//     checked_in→seated کند (دو انتقالِ واقعی، با audit و SMS و رویدادِ اقتصادی)،
+//     میز را occupied کند، و در پاسخ reservation_code را هم بگیرد. هم دستکاریِ
+//     حالتِ کسب‌وکار بود، هم DoSِ عملیاتی (اشغال‌نشان‌دادنِ همه‌ی میزها).
+//
+//  ۲. **بدونِ محدوده‌ی تنانت.** جست‌وجویِ میز سراسری بود؛ هیچ چکی نبود که این
+//     میز به رستورانِ فراخوان تعلق دارد.
+//
+// حالا restaurantId اجباری است و route از withRestaurantAuth عبور می‌کند
+// (پرسنلِ احرازشده + RBAC + محدوده‌ی شعبه). این با جریانِ واقعیِ محصول هم
+// یکی است: اپِ مشتری صریح می‌گوید «میزبان با اسکن این کد، ورودت رو ثبت می‌کنه»
+// (apps/customer/js/features/trips.js) — یعنی اسکن‌کننده پرسنل است، نه مهمان.
+export async function qrCheckIn(qrCode: string, restaurantId: string): Promise<{
   table_number: number;
   reservation_code: string | null;
   status: string;
 }> {
   const table = await db.table.findUnique({ where: { qrCode } });
-  if (!table) throw Err.notFound('میز');
+  // محدوده‌ی تنانت: میزِ رستورانِ دیگر باید دقیقاً مثلِ میزِ ناموجود دیده شود
+  // (نه پیامِ متفاوت) تا وجود/عدمِ وجودِ کدِ QRِ رستورانِ دیگر لو نرود.
+  if (!table || table.restaurantId !== restaurantId) throw Err.notFound('میز');
 
   // رزرو فعالِ اکنونِ این میز را پیدا کن (در بازه‌ی زمانی حاضر)
   const now = new Date();

@@ -4,10 +4,16 @@
   --bg:#F8FAFC;--white:#FFFFFF;
   --s-50:#F8FAFC;--s-100:#F1F5F9;--s-200:#E2E8F0;--s-300:#CBD5E1;
   --s-400:#94A3B8;--s-500:#64748B;--s-600:#475569;--s-700:#334155;--s-800:#1E293B;--s-900:#0F172A;
-  --green:#22C55E;--green-50:#F0FDF4;--green-600:#16A34A;
-  --amber:#F59E0B;--amber-50:#FFFBEB;--amber-600:#D97706;
-  --red:#EF4444;--red-50:#FEF2F2;--red-600:#DC2626;
-  --t1:#0F172A;--t2:#64748B;--t3:#94A3B8;--border:#E2E8F0;--border-strong:#CBD5E1;
+  /* ⚠️ کنتراست (اندازه‌گیری‌شده ۲۰۲۶-۰۸-۲۴ در صفحه‌هایِ واردشده): نسخه‌ی ۶۰۰
+     هر رنگِ وضعیت به‌عنوانِ متنِ ۱۱٫۵ پیکسلی رویِ تینتِ ۵۰ خودش می‌نشیند
+     (نشانِ «فعال»، «۸ روز مونده»، «۱۲ روز منقضی»، چیپِ کم‌موجودی) و
+     به‌ترتیب ۳٫۱۵ / ۳٫۰۷ / ۴٫۴۱ می‌داد — هر سه زیرِ ۴٫۵.
+     فقط نسخه‌ی ۶۰۰ (که مخصوصِ متن است) عمیق‌تر شد؛ ۵۰۰ و ۵۰ دست‌نخورده‌اند تا
+     پُرکننده‌ها و تینت‌ها همان‌طور بمانند. حالا ۴٫۶۶ / ۴٫۶۶ / ۴٫۶۱. */
+  --green:#22C55E;--green-50:#F0FDF4;--green-600:#12823B;
+  --amber:#F59E0B;--amber-50:#FFFBEB;--amber-600:#AB5E05;
+  --red:#EF4444;--red-50:#FEF2F2;--red-600:#D82323;
+  --t1:#0F172A;--t2:#64748B;/* هم‌ایرادِ پنلِ رستوران — به مقدارِ --t2 همین پنل رسید (۴.۷۶:۱). */--t3:#64748B;--border:#E2E8F0;--border-strong:#CBD5E1;
   /* لهجه‌ی شرکت: ایندیگو/بنفش — سطح کنترل مرکزی، متمایز از پنل رستوران (آبی/سبز) */
   --ink:#4F46E5;--ink-600:#4338CA;--ink-700:#3730A3;--ink-50:#EEF2FF;--ink-100:#E0E7FF;
   --violet:#7C3AED;--violet-50:#F5F3FF;
@@ -22,13 +28,21 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;overflow-x:hidden}
-body{font-family:'Vazirmatn',sans-serif;background:var(--bg);color:var(--t1);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{font-family:var(--font-ui);background:var(--bg);color:var(--t1);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 button{font-family:inherit;cursor:pointer}
 ::selection{background:var(--ink-100)}
 
 /* ===== Layout ===== */
-.app{display:flex;min-height:100vh}
-.sidebar{width:248px;background:var(--white);border-left:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;right:0;height:100vh;z-index:40;transition:transform var(--t) var(--ease)}
+/* `svh` و نه `dvh`: برایِ min-height باید ارتفاعِ **کوچکِ** ویوپورت (با نوارِ
+   آدرسِ باز) ملاک باشد. با `dvh` هر بار که نوارِ مرورگر با اسکرول ظاهر/محو
+   می‌شود min-height تغییر می‌کند و کلِ صفحه می‌پرد. با `svh` صفحه ثابت است و
+   اسکرولِ الکیِ چندپیکسلی هم ایجاد نمی‌شود. خطِ `100vh` fallbackِ قدیمی است. */
+.app{display:flex;min-height:100vh;min-height:100svh}
+/* `height:100vh` رویِ موبایل ارتفاعِ صفحه را **بدونِ** نوارِ آدرس حساب می‌کند، پس
+   ته‌یِ کشو (آیتمِ خروج) زیرِ نوارِ مرورگر می‌رفت و کلیک‌ناپذیر می‌شد. `100dvh`
+   ارتفاعِ واقعیِ لحظه‌ای است؛ خطِ `100vh` قبلش برایِ مرورگرِ قدیمی می‌ماند. */
+.sidebar{width:248px;background:var(--white);border-left:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;right:0;height:100vh;height:100dvh;z-index:40;transition:transform var(--t) var(--ease);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 .main{flex:1;margin-right:248px;min-width:0}
 .sb-brand{display:flex;align-items:center;gap:11px;padding:20px;border-bottom:1px solid var(--border)}
 .sb-logo{width:36px;height:36px;border-radius:10px;background:var(--ink-grad);display:flex;align-items:center;justify-content:center;
@@ -42,6 +56,8 @@ button{font-family:inherit;cursor:pointer}
 .sb-item svg{width:19px;height:19px;flex-shrink:0}
 .sb-item:hover{background:var(--s-50);color:var(--t1)}
 .sb-item.active{background:var(--ink-50);color:var(--ink-700)}
+.sb-foot-logout{margin-inline-start:auto;min-width:var(--touch-min);min-height:var(--touch-min);display:inline-flex;align-items:center;justify-content:center;padding:0 10px;border:1px solid var(--border);background:var(--white);border-radius:var(--r-sm);color:var(--t2);font-size:12px;font-weight:700;cursor:pointer}
+.sb-foot-logout:hover{color:var(--red);border-color:#FECACA}
 .sb-foot{padding:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .sb-foot-ava{width:36px;height:36px;border-radius:50%;background:var(--ink-grad);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
 .sb-foot-info{flex:1;min-width:0}
@@ -49,7 +65,7 @@ button{font-family:inherit;cursor:pointer}
 .sb-foot-meta{font-size:11px;color:var(--t3)}
 
 /* ===== Topbar ===== */
-.topbar{height:64px;background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);
+.topbar{height:64px;background:rgba(255,255,255,.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:30}
 .tb-title{font-size:19px;font-weight:800;letter-spacing:-.03em}
 .tb-right{display:flex;align-items:center;gap:12px}
@@ -58,7 +74,7 @@ button{font-family:inherit;cursor:pointer}
   font-size:13px;background:var(--s-50);transition:all var(--t-fast)}
 .tb-search input:focus{border-color:var(--ink);background:var(--white);width:280px}
 .tb-search .s-ic{position:absolute;right:13px;color:var(--t3);pointer-events:none;font-size:14px}
-.tb-burger{display:none;width:40px;height:40px;border:1px solid var(--border);background:var(--white);border-radius:var(--r-sm);font-size:18px}
+.tb-burger{display:none;width:var(--touch-min);height:var(--touch-min);border:1px solid var(--border);background:var(--white);border-radius:var(--r-sm);font-size:18px}
 .content{padding:28px;max-width:1400px}
 
 /* ===== Components ===== */
@@ -230,7 +246,7 @@ button{font-family:inherit;cursor:pointer}
 @media(max-width:768px){.click-grid{grid-template-columns:repeat(2,1fr)}.cust-stats-mini{display:none}.cd-info-grid{grid-template-columns:1fr}}
 
 /* ── modal ── */
-.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);z-index:60;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);z-index:60;display:none;align-items:center;justify-content:center;padding:20px}
 .modal-bg.show{display:flex;animation:fadeIn .2s}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .modal{background:var(--white);border-radius:var(--r-xl);padding:26px;max-width:440px;width:100%;box-shadow:var(--sh-lg);animation:modalUp .3s var(--spring);max-height:90vh;overflow-y:auto}
@@ -276,7 +292,7 @@ button{font-family:inherit;cursor:pointer}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* ===== Toast ===== */
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--s-900);color:#fff;
+.toast{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%) translateY(100px);background:var(--s-900);color:#fff;
   padding:13px 22px;border-radius:50px;font-size:13.5px;font-weight:600;box-shadow:var(--sh-lg);z-index:100;
   display:flex;align-items:center;gap:9px;opacity:0;transition:all var(--t) var(--spring);pointer-events:none}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
@@ -287,7 +303,10 @@ button{font-family:inherit;cursor:pointer}
 /* ===== Responsive ===== */
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.row-2{grid-template-columns:1fr}}
 @media(max-width:900px){
-  .sidebar{transform:translateX(100%)}.sidebar.open{transform:translateX(0)}
+  /* رجوع به توضیحِ همین قاعده در پنلِ business: transform تنها، عنصر را از
+     ترتیبِ Tab درنمی‌آوَرَد. */
+  .sidebar{transform:translateX(100%);visibility:hidden;transition:transform var(--t) var(--ease),visibility 0s var(--t)}
+  .sidebar.open{transform:translateX(0);visibility:visible;transition:transform var(--t) var(--ease),visibility 0s 0s}
   .main{margin-right:0}.tb-burger{display:flex;align-items:center;justify-content:center}
   .tb-search input{width:160px}.tb-search input:focus{width:180px}
   .content{padding:18px}
@@ -318,8 +337,17 @@ button{font-family:inherit;cursor:pointer}
 .login-foot{font-size:11.5px;color:var(--t3);margin-top:18px;line-height:1.6}
 /* نشانگرهای وضعیت — رنگ semantic از Design System (جایگزین emoji) */
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;
+  box-shadow:0 0 0 3px rgba(18,161,80,0.22);
+/* ⚠️ الگویِ عمدی — دو بار نوشتنِ یک ویژگی، اشتباه نیست (۲۰۲۶-۰۸-۲۴):
+   خطِ اول مقدارِ ثابتِ rgba است، خطِ دوم همان با `color-mix()`.
+   `color-mix` از Chrome 111 / Safari 16.2 / Firefox 113 پشتیبانی می‌شود؛
+   مرورگرِ قدیمی‌تر آن اعلانِ نامعتبر را **کلاً دور می‌ریزد**. بدونِ خطِ اول،
+   نتیجه «رنگِ کمی متفاوت» نبود بلکه نبودِ کاملِ آن ویژگی می‌شد: حلقه‌ی فوکوس
+   ناپدید (افتِ دسترسی‌پذیری) و پس‌زمینه‌ی پدِ کشیدنی نامرئی (خرابیِ عملکردی).
+   پس این دو خط را «تمیز» نکنید — ترتیبشان هم مهم است. */
   box-shadow:0 0 0 3px color-mix(in srgb, var(--success) 22%, transparent)}
 .dot-closed{width:7px;height:7px;border-radius:50%;background:var(--danger);display:inline-block;
+  box-shadow:0 0 0 3px rgba(220,38,38,0.20);
   box-shadow:0 0 0 3px color-mix(in srgb, var(--danger) 20%, transparent)}
 
 /* ─── صفِ بازبینیِ عکسِ گالری ───

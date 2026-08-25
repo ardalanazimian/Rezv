@@ -5,6 +5,7 @@ import { enqueueSms, type SmsJob } from './sms';
 import { processReservationEconomyEvent } from './economy';
 import { createLogger } from './logger';
 import { dateKeyInTz } from './hours';
+import { activeStatusList } from './reservation-status';
 import { recordOutcome } from './prediction-ledger';
 
 const log = createLogger('lifecycle');
@@ -81,7 +82,7 @@ export async function transitionReservation(opts: {
   reason?: string;
   isAutomatic?: boolean;
   notify?: boolean; // پیش‌فرض true
-}): Promise<{ id: string; status: RStatus }> {
+}): Promise<{ id: string; status: RStatus; changed: boolean }> {
   const { reservationId, to, actor, reason, isAutomatic = false, notify = true } = opts;
 
   const result = await db.$transaction(async (tx) => {
@@ -96,10 +97,28 @@ export async function transitionReservation(opts: {
     if (from === to) return { resv, changed: false, from, timezone };
     if (!canTransition(from, to)) throw Err.invalidTransition(from, to);
 
-    const updated = await tx.reservation.update({
-      where: { id: reservationId },
+    // ⚠️ رقابتِ «دو بار انتقال» (فازِ ۲ — با تستِ واقعی پیدا شد، نه فرض).
+    //
+    // خواندنِ بالا هیچ قفلی نمی‌گیرد. زیرِ READ COMMITTED دو فراخوانیِ هم‌زمان
+    // هردو `from = 'confirmed'` می‌خواندند، هردو canTransition را رد می‌کردند،
+    // و `update` بی‌قید هردو را می‌نوشت — یعنی هردو `changed: true` برمی‌گرداندند.
+    // پیامد فقط یک ردیفِ اضافیِ audit نبود: هر عارضه‌ی «یک‌بارمصرف»ی که به
+    // `changed` گره خورده (SMS، رویدادِ اقتصاد، امتیازِ باشگاه، آزادسازیِ میز)
+    // دو بار اجرا می‌شد.
+    //
+    // راهِ حل بدونِ قفلِ صریح: compare-and-set. شرطِ `status: from` داخلِ خودِ
+    // UPDATE می‌رود؛ Postgres در READ COMMITTED پشتِ قفلِ ردیف صبر می‌کند و پس
+    // از commitِ رقیب شرط را رویِ نسخه‌ی *جدید* دوباره می‌سنجد — که دیگر
+    // نمی‌خورد، پس count صفر می‌شود. بازنده صادقانه `changed: false` می‌گیرد.
+    const claimed = await tx.reservation.updateMany({
+      where: { id: reservationId, status: from as any },
       data: { status: to as any },
     });
+    if (claimed.count === 0) {
+      const current = await tx.reservation.findUnique({ where: { id: reservationId } });
+      return { resv: current ?? resv, changed: false, from, timezone };
+    }
+    const updated = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId } });
 
     // ثبت در audit log
     await tx.reservationEvent.create({
@@ -180,16 +199,78 @@ export async function transitionReservation(opts: {
         restaurantId: result.resv.restaurantId,  // C6: کسر از موجودی SMS رستوران
       }).catch(() => { /* اعلان نباید جریان اصلی را بشکند */ });
     }
+  }
+
+  // ⚠️ اصلاحِ ساختاری (فازِ ۲): این بلوک قبلاً **داخلِ** شرطِ `notify` بود.
+  //
+  // یعنی هر فراخوانی با `notify: false` — که یک انتخابِ کاملاً مشروع برایِ
+  // مسیرهایِ خودکار است — باطل‌سازیِ کشِ availability را هم بی‌صدا رد می‌کرد.
+  // اعلان و یکپارچگیِ داده دو نگرانیِ متفاوت‌اند و نباید به یک پرچم گره بخورند.
+  //
+  // این را تستِ آزادسازیِ میز پیدا کرد: تست با `notify:false` صدا می‌زد و
+  // میز آزاد نمی‌شد، چون کلِ بلوک رد می‌شد.
+  if (result.changed) {
     // باطل‌کردن کش availability اگر وضعیت روی ظرفیت اثر دارد (H3: pattern-based)
     if (['cancelled', 'auto_cancelled', 'rejected', 'expired', 'no_show', 'completed'].includes(to)) {
       // کلیدِ کش با تاریخِ محلیِ رستوران ساخته می‌شه (نه UTC) — وگرنه نزدیکِ
       // نیمه‌شبِ تهران، باطل‌سازی روی کلیدِ اشتباه می‌زد و کش واقعی دست‌نخورده می‌موند.
       const dateKey = dateKeyInTz(result.resv.slotStart, result.timezone);
       await invalidateAvailability(result.resv.restaurantId, dateKey).catch(() => {});
+
+      // ⚠️ رفعِ «میزی که هرگز آزاد نمی‌شود» (فازِ ۲، پروتکل §۶).
+      //
+      // Table.state یک ستونِ جدا با مجموعه‌ی نویسنده‌ی بسیار کوچک‌تری از
+      // reservation.status است: فقط setTableState (دستیِ پرسنل)، واک‌ین و
+      // QR check-in آن را 'occupied' می‌کنند — و **هیچ‌کس** آن را هنگامِ
+      // پایانِ رزرو به 'free' برنمی‌گرداند. هیچ jobِ آشتی‌دهنده‌ای هم نیست.
+      //
+      // چرا این فقط یک ایرادِ نمایشی نیست: `promoteNext` در waitlist.ts
+      // میزهایِ کاندید را با `state: 'free'` فیلتر می‌کند. پس هر میزی که
+      // یک‌بار واک‌ین/چک‌این گرفته، **برایِ همیشه** از ترفیعِ لیستِ انتظار
+      // کنار می‌رود — یعنی قابلیتِ صف به‌مرور و بی‌صدا از کار می‌افتد.
+      // (مسیرِ availabilityِ مشتری متأثر نیست: آن‌جا فقط 'maintenance' فیلتر
+      //  می‌شود و تداخلِ واقعی را کانسترینتِ EXCLUDE تضمین می‌کند.)
+      //
+      // این‌جا درست‌ترین نقطه است چون transitionReservation تنها نویسنده‌ی
+      // مجازِ وضعیت است و همین بلوک از قبل «وضعیتِ پایانی» را می‌شناسد.
+      //
+      // ایمنی: آزادسازی فقط اگر **هیچ رزروِ فعالِ دیگری همین حالا** آن میز را
+      // اشغال نکرده باشد — وگرنه لغوِ یک رزروِ آینده می‌توانست میزی را که
+      // مهمانِ دیگری سرش نشسته «آزاد» علامت بزند.
+      if (result.resv.tableId) {
+        try {
+          const now = new Date();
+          const stillBusy = await db.reservation.count({
+            where: {
+              tableId: result.resv.tableId,
+              id: { not: result.resv.id },
+              status: { in: activeStatusList() as any },
+              slotStart: { lte: now },
+              slotEnd: { gte: now },
+            },
+          });
+          if (stillBusy === 0) {
+            await db.table.updateMany({
+              where: { id: result.resv.tableId, state: { in: ['occupied', 'reserved'] } },
+              data: { state: 'free' },
+            });
+          }
+        } catch (e) {
+          // آزادسازیِ میز نباید جریانِ اصلیِ تغییرِ وضعیت را بشکند — همان
+          // قاعده‌ای که برایِ اعلان/اقتصاد در همین تابع رعایت شده.
+          log.warn('آزادسازیِ میز پس از وضعیتِ پایانی ناموفق', {
+            reservationId: result.resv.id, error: (e as Error).message,
+          });
+        }
+      }
     }
   }
 
-  return { id: result.resv.id, status: result.resv.status as RStatus };
+  // `changed` بیرون داده می‌شود چون تنها منبعِ *اتمیکِ* «آیا این فراخوانی واقعاً
+  // وضعیت را جابه‌جا کرد» همین تراکنش است. صداکننده‌هایی که عارضه‌ی یک‌بارمصرف
+  // دارند (امتیاز، SMS) نباید با یک read قبل از فراخوانی تصمیم بگیرند — دو
+  // فراخوانیِ هم‌زمان هردو «هنوز نرسیده» می‌بینند و عارضه دوبار اجرا می‌شود.
+  return { id: result.resv.id, status: result.resv.status as RStatus, changed: result.changed };
 }
 
 // ═══════════════════════════════════════════════════════════

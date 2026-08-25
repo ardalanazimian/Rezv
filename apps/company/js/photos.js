@@ -86,7 +86,12 @@ async function loadPhotos() {
       PHOTO_DEMO = true;
       PHOTO_ERROR = null;
       PHOTO_ITEMS = PHOTO_FILTER === 'pending' || PHOTO_FILTER === 'all' ? PHOTO_SAMPLE : [];
-      PHOTO_BADGE = PHOTO_SAMPLE.length;
+      // ⚠️ فازِ ۲ (§۳): نشانِ سایدبار عمداً از دادهٔ نمونه پر **نمی‌شود**.
+      // ردیف‌هایِ نمونه فقط داخلِ همان ویوِ صف می‌مانند، جایی که بنرِ دمو
+      // توضیحشان می‌دهد. نشان اما رویِ **همه‌ی** صفحاتِ پنل دیده می‌شود و
+      // هیچ زمینه‌ای همراهش نیست — پس عددِ ساختگی آن‌جا از بکلاگِ واقعی
+      // قابلِ تشخیص نبود. بدونِ پاسخِ سرور، شمارش نامعلوم است، نه صفر و نه سه.
+      PHOTO_BADGE = 0;
     } else {
       PHOTO_DEMO = false;
       PHOTO_ERROR = (res.error && res.error.message) || 'دریافتِ صفِ بازبینی ناموفق بود.';
