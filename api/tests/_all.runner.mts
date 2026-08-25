@@ -75,6 +75,8 @@ import './table-qr-regenerate.integration.test.mts';
 import './auth-guards.integration.test.mts';
 import './staff-auth-guard.integration.test.mts';
 import './availability.integration.test.mts';
+import './automation.integration.test.mts';
+import './feature-flags.integration.test.mts';
 import './assistant-nlu.test.mts';
 import './idempotency.integration.test.mts';
 import './incentive-engine.test.mts';
