@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { requestOtp, normalizePhone } from '@/lib/otp';
-import { db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse } from '@/lib/errors';
 import { parseBody, zPhone, z } from '@/lib/schemas';

@@ -1,4 +1,4 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -105,6 +105,11 @@ after(async () => {
 });
 
 describe('POST /auth/admin/request — شمارش‌ناپذیریِ ابَرادمین', () => {
+  // رجوع کن به توضیحِ همین الگو در `hours-change-approval`: hookهای سطحِ فایل
+  // به سوئیتِ ROOT می‌چسبند، پس دو فایل که یک متغیرِ سراسری را ست می‌کنند
+  // همدیگر را خراب می‌کنند. هر سوئیت مقدارِ خودش را دوباره تثبیت می‌کند.
+  beforeEach(() => { process.env.PLATFORM_ADMIN_TENANT_ID = platformTenant; });
+
   test('شماره‌ی غیرادمین و شماره‌ی ناموجود پاسخِ کاملاً یکسان می‌گیرند', async () => {
     await clearLimits();
     const nonAdmin = await fingerprint(await adminReq.POST(post({ phone: PHONE_NON_ADMIN_STAFF })));
@@ -132,6 +137,11 @@ describe('POST /auth/admin/request — شمارش‌ناپذیریِ ابَرا�
 });
 
 describe('POST /auth/staff/request — شمارش‌ناپذیریِ کارکنان', () => {
+  // رجوع کن به توضیحِ همین الگو در `hours-change-approval`: hookهای سطحِ فایل
+  // به سوئیتِ ROOT می‌چسبند، پس دو فایل که یک متغیرِ سراسری را ست می‌کنند
+  // همدیگر را خراب می‌کنند. هر سوئیت مقدارِ خودش را دوباره تثبیت می‌کند.
+  beforeEach(() => { process.env.PLATFORM_ADMIN_TENANT_ID = platformTenant; });
+
   test('هر سه حالتِ نامعتبر/غیرفعال پاسخِ یکسان می‌گیرند', async () => {
     await clearLimits();
     const unknown = await fingerprint(await staffReq.POST(post({ phone: PHONE_UNKNOWN })));

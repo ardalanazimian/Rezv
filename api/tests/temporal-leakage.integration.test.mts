@@ -73,7 +73,19 @@ async function mkReservation(code: string, createdAt: string, slotStart: string,
       90,15,2,'${createdAt}'::timestamp,'app')`);
 }
 
+/** کدهای رزروِ این فیکسچر عمداً ثابت‌اند (تستِ بالا با نام صدایشان می‌زند)،
+ *  ولی `reservations.code` یکتایِ **سراسری** است. اگر یک اجرا وسطِ راه قطع
+ *  شود (مثلاً `--test-force-exit` پیش از پایانِ hookِ after)، این سه ردیف
+ *  در DB می‌مانند و اجرای بعدی با `duplicate key ... (code)=(LKA)` می‌افتد —
+ *  و چون شکست در hook است، `node:test` کلِ فایل را cancel می‌کند.
+ *  با پاک‌سازیِ پیش از ساخت، فایل خودترمیم می‌شود. (۲۰۲۶-۰۸-۲۵ — دقیقاً همین
+ *  رخ داد و با اجرای واقعی تأیید شد.) */
+const FIXTURE_CODES = ['LKA', 'LKB', 'LKC'];
+
 before(async () => {
+  await db.$executeRawUnsafe(
+    `DELETE FROM reservations WHERE code IN ('${FIXTURE_CODES.join("','")}')`,
+  ).catch(() => {});
   const t = await db.tenant.create({ data: { name: `[DEMO] ${TAG}` }, select: { id: true } });
   tenantId = t.id;
   const r = await db.restaurant.create({

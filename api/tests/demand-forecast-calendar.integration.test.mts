@@ -313,4 +313,28 @@ describe('خواندن: تاریخِ نقطه‌ها، کهنگی، و گارد�
     });
     assert.equal(await getDemandForecast(rState, 3), null);
   });
+
+  test('ردیفِ خراب (lastValues خالی) عدد نمی‌دهد — NaN به UI نمی‌رسد', async () => {
+    // بدونِ گاردِ شکل، مسیرِ naive روی آرایه‌ی خالی `[h % 0]` می‌زند و
+    // `predicted: NaN` تولید می‌کند که در JSON به `null` تبدیل می‌شود و در
+    // پنل به‌شکلِ یک عددِ خالی/صفر دیده می‌شود — یعنی شکستِ خاموش.
+    const today = tehranTodayIso();
+    const broken = {
+      model: { level: 100, trend: 0, seasonal: [0, 1, 2, 3, 4, 5, 6], period: 7, phaseOffset: 0 },
+      mae: 1, baselineMae: 2, isActive: false, reason: 'تست',
+      lastValues: [] as number[],
+      lastObservedDay: isoPlus(today, -1),
+      version: DEMAND_STATE_VERSION,
+    };
+    const json = JSON.stringify(broken);
+    await db.$executeRaw`
+      INSERT INTO restaurant_demand_forecasts (restaurant_id, history_days, count_model, covers_model, trained_at)
+      VALUES (${rState}::uuid, 180, ${json}::jsonb, ${json}::jsonb, ${new Date()})
+      ON CONFLICT (restaurant_id) DO UPDATE
+        SET count_model = EXCLUDED.count_model, covers_model = EXCLUDED.covers_model,
+            trained_at = EXCLUDED.trained_at
+    `;
+    await invalidate(cacheKey('demand-forecast', rState));
+    assert.equal(await getDemandForecast(rState, 3), null);
+  });
 });

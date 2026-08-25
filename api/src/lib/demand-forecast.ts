@@ -528,6 +528,13 @@ function buildForecastSeries(
 const STALE_AFTER_HOURS = 30;
 const MAX_AGE_HOURS = 7 * 24;
 
+/** حداقلِ شکلی که هر دو مسیرِ پیش‌بینی (یادگرفته و فصلیِ ساده) به آن نیاز دارند. */
+function isUsableState(s: SeriesModelState): boolean {
+  return Array.isArray(s.lastValues) && s.lastValues.length === DEMAND_PERIOD
+    && typeof s.lastObservedDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.lastObservedDay)
+    && !!s.model && Array.isArray(s.model.seasonal) && s.model.seasonal.length === DEMAND_PERIOD;
+}
+
 /**
  * خواندنِ پیش‌بینیِ فعلیِ یک رستوران (کش‌شده، ۱ ساعت). null یعنی «هنوز
  * تاریخچه‌ی کافی برایِ حتی یک تلاشِ آموزش وجود نداشته» — این با
@@ -549,6 +556,11 @@ export async function getDemandForecast(restaurantId: string, horizonDays = 14):
   // پس تاریخِ نقاطش قابلِ محاسبه نیست. جعلِ تاریخ ممنوع — تا بازآموزیِ
   // شبانه (حداکثر ۲۴ ساعت) این رستوران پیش‌بینی ندارد، و این را می‌گوید.
   if (countState?.version !== DEMAND_STATE_VERSION || coversState?.version !== DEMAND_STATE_VERSION) return null;
+  // گاردِ شکل: `seasonalNaiveForecast` روی آرایه‌ی خالی `[h % 0]` می‌زند ⇒
+  // NaN که بی‌سروصدا تا خودِ عددِ نمایش‌داده‌شده می‌رود. یک ردیفِ سالم همیشه
+  // دقیقاً DEMAND_PERIOD مقدار دارد؛ هرچیزِ دیگری یعنی ردیف خراب است و
+  // «نمی‌دانم» تنها جوابِ صادقانه است (نه یک عدد).
+  if (!isUsableState(countState) || !isUsableState(coversState)) return null;
 
   const ageHours = (Date.now() - row.trainedAt.getTime()) / 3_600_000;
   if (ageHours > MAX_AGE_HOURS) return null;
