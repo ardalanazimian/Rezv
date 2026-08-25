@@ -53,6 +53,7 @@
 import './helpers/test-env.mts';
 import './birthday-calendar.test.mts';
 import './allowed-origins.test.mts';
+import './availability-bulk.integration.test.mts';
 import './ban.test.mts';
 import './branch-isolation.integration.test.mts';
 import './cancellation-policy.test.mts';

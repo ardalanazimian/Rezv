@@ -29,6 +29,39 @@ export function go(p){
   if(p==='chats' && typeof renderChats==='function')renderChats();
 }
 export function fmtFa(n){return n.toLocaleString('fa-IR')}
+// ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): قبلاً وقتی r.slots خالی
+// بود اینجا هیچ چیز رندر نمی‌شد — یعنی کارت بدونِ هیچ CTAیِ اقدام می‌ماند (نه
+// ساعتِ جعلی، نه راهِ جایگزین). حالا یک CTAِ آرام به شیتِ کاملِ رزرو (که خودش
+// availabilityِ واقعی را از API می‌خواند) باز می‌شود — هیچ ساعتِ اختراعی
+// نمایش داده نمی‌شود.
+//
+// از ۲۰۲۶-۰۸-۲۵ این تکه جدا شد چون دو مصرف‌کننده دارد: رندرِ اولیه‌ی کارت، و
+// به‌روزرسانیِ درجایِ چیپ‌ها بعد از رسیدنِ availabilityِ گروهی. جدا نبودنش
+// یعنی برایِ نشان‌دادنِ ساعت‌ها باید کلِ فید دوباره رندر می‌شد (فلشِ اسکلت).
+export function slotsHTML(r){
+  const slots = Array.isArray(r.slots) ? r.slots : [];
+  if (slots.length) {
+    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook('${esc(String(r.id))}','${s}');haptic('select')">${s}</button>`).join('');
+  }
+  return `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet('${esc(String(r.id))}');haptic('select')">ببین سانس‌ها</button>`;
+}
+
+/**
+ * به‌روزرسانیِ درجایِ چیپ‌هایِ ساعت — بدونِ رندرِ دوباره‌ی فید.
+ *
+ * چرا درجا: `renderFeed` عمداً ۲۸۰ms اسکلت نشان می‌دهد. صدازدنش صرفاً برایِ
+ * رسیدنِ سانس‌ها یعنی کاربر بعد از دیدنِ کارت‌هایِ واقعی، دوباره اسکلت ببیند.
+ */
+export function paintSlots(list){
+  const byId = new Map((list||[]).map(r=>[String(r.id), r]));
+  document.querySelectorAll('#feed .rc[data-rid]').forEach(card=>{
+    const r = byId.get(card.dataset.rid);
+    if(!r) return;
+    const box = card.querySelector('.rc-slots');
+    if(box) box.innerHTML = slotsHTML(r);
+  });
+}
+
 export function cardHTML(r){
   const hot = isHot(r);
   // کارت خودش دکمه نمی‌شود چون داخلش دکمه دارد (تودرتوییِ نامعتبر). به‌جایش یک
@@ -39,7 +72,7 @@ export function cardHTML(r){
   // idِ واقعی UUID است و بدونِ کوتیشن، onclick خطای syntax می‌داد و کلِ
   // CTAهای کارت برای رستورانِ واقعی مرده بودند (mockِ E2E با idِ عددی این
   // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
-  return `<article class="rc reveal">
+  return `<article class="rc reveal" data-rid="${esc(String(r.id))}">
     <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
     <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${esc(String(r.id))}')"></button>
     <span class="rc-emoji">${esc(r.e)}</span>
@@ -49,13 +82,7 @@ export function cardHTML(r){
       <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div>${r.rt!=null?`<div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div>`:'<div class="rc-rating rc-rating-new">تازه‌وارد</div>'}</div>
       <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
-      <div class="rc-slots">${r.slots.length?r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook('${esc(String(r.id))}','${s}');haptic('select')">${s}</button>`).join(''):
-        // ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): قبلاً وقتی r.slots
-        // خالی بود، اینجا هیچ چیز رندر نمی‌شد — یعنی کارت بدونِ هیچ CTAیِ
-        // اقدام می‌ماند (نه ساعتِ جعلی، نه راهِ جایگزین). حالا یک CTAِ آرام به
-        // شیتِ کاملِ رزرو (که خودش availabilityِ واقعی را از API می‌خواند) باز
-        // می‌شود — هیچ ساعتِ اختراعی نشان داده نمی‌شود.
-        `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet('${esc(String(r.id))}');haptic('select')">ببین سانس‌ها</button>`}</div>
+      <div class="rc-slots">${slotsHTML(r)}</div>
     </div>
   </article>`;
 }
