@@ -98,12 +98,19 @@
     real enrollment (walk-in or member-create) hit
     `unique(restaurant_id, code)` → 500. The seed now seats the counter above
     its highest inserted code. Production (unseeded) was never affected.
-  - **Residual — event cards can't deep-open a restaurant outside the feed
-    (open).** `special_events` is empty in every deployment (honest empty
-    state), but if events existed and referenced a restaurant not on the loaded
-    discover page, the card could not open it (events carry `restaurantId`, not
-    `slug`, and there is no public by-id detail endpoint). The click now gives
-    honest feedback; a real fix needs event→slug plumbing in the API.
+  - **~~Residual — event cards can't deep-open a restaurant outside the feed~~
+    SHIPPED same day (2026-08-25).** `GET /events` now returns
+    `restaurant_slug` + `restaurant_name` alongside `restaurantId` (cache key
+    bumped to `events-v2` so no stale pre-change payload is served), and the
+    customer app's `openRestBySlug(id, slug)` opens a restaurant that is *not*
+    on the loaded discover page by fetching the slug-keyed detail endpoint and
+    appending a minimal live record to `R`. The card also shows the host name,
+    which was previously always blank. Locked by
+    `tests/events-restaurant-slug.integration.test.mts` (slug/name present,
+    `restaurantId` contract unbroken, raw relation not leaked, unpublished and
+    past events still excluded) and proven in a real browser: with the host
+    restaurant deliberately hidden from the feed, clicking the event card opens
+    its page with zero JS errors.
 - **JSON-LD published every menu price at one-tenth its real value — fixed
   2026-08-19.** `apps/seo/lib/schema.ts` emitted `price_toman` directly with
   `priceCurrency: 'IRR'`. Toman is not an ISO 4217 currency; IRR is the rial,

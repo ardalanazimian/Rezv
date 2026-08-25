@@ -3,8 +3,8 @@
 import { esc, toast } from '../auth.js';
 import { detailSocialProof, fmtFa, go, toggleRestFav } from './discover.js';
 import { curRest, favHas, gradFor, setCurRest } from './seed.js';
-import { API, applyRestaurantDetail, loadRestaurantDetail, resolveMediaUrl } from '../api.js';
-import { findR } from '../init.js';
+import { API, applyRestaurantDetail, loadRestaurantDetail, mapApiRestaurant, resolveMediaUrl } from '../api.js';
+import { R, findR } from '../init.js';
 import { armReveals, buzz, haptic } from '../theme-pwa.js';
 import { icon } from '../icons.js';
 
@@ -59,6 +59,25 @@ export function openRest(id){
   finishRestRender();
   enrichRestPage(r);
 }
+// ⚠️ اضافه‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): بازکردنِ رستوران از جایی که فقط slug
+// می‌دانیم — مثلِ کارتِ رویداد، که به رستورانی اشاره می‌کند که ممکن است در
+// صفحه‌ی بارگذاری‌شده‌ی فید نباشد (فید صفحه‌بندی‌شده است). اگر در R بود همان
+// مسیرِ عادی؛ وگرنه از endpointِ جزئیات یک رکوردِ کمینه می‌سازیم، به R اضافه
+// می‌کنیم و صفحه را باز می‌کنیم — به‌جای کلیکِ مرده یا توستِ «در دسترس نیست».
+export async function openRestBySlug(id, slug){
+  const existing = findR(id) || (slug ? R.find(x => x.slug === slug) : null);
+  if (existing) { openRest(existing.id); return; }
+  if (!slug || !API.online) { toast('','این رستوران فعلاً در دسترس نیست'); return; }
+  const d = await loadRestaurantDetail(slug);
+  if (!d) { toast('','این رستوران فعلاً در دسترس نیست'); return; }
+  // رکوردِ کمینه با همان شکلی که mapApiRestaurant می‌سازد (رستورانِ زنده:
+  // فیلدهای روایی خالی می‌مانند، هیچ‌چیز از نمونه قرض گرفته نمی‌شود).
+  const r = mapApiRestaurant({ id: d.id, slug: d.slug, name: d.name, cuisine: d.cuisine, vibes: d.vibes, priceBand: d.price_band });
+  applyRestaurantDetail(r, d);
+  R.push(r);
+  openRest(r.id);
+}
+
 /** بعد از رندرِ اولیه، جزئیاتِ واقعی را از سرور بگیر و صفحه را کامل کن. */
 async function enrichRestPage(r){
   // حداکثر یک درخواست به‌ازای هر بازشدنِ صفحه؛ بعد از موفقیت (detailLoaded +
@@ -181,3 +200,4 @@ export function openRestChat(id){
 window.openRest = openRest;
 window.shareRestaurant = shareRestaurant;
 window.openRestChat = openRestChat;
+window.openRestBySlug = openRestBySlug;

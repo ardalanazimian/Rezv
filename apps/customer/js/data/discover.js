@@ -254,7 +254,12 @@ export async function renderEvents(){
       el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('calendar',{size:40})}</div><div class="empty-state-title">فعلاً رویدادِ ویژه‌ای نیست</div><div class="empty-state-desc">به‌محضِ اعلامِ رستوران‌ها همین‌جا می‌بینی‌اش</div></div>`;
       return;
     }
-    const events=list.map(e=>({rid:e.restaurantId,emoji:e.emoji||'🎉',title:e.title,rest:'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
+    // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): rest همیشه خالی بود (نامِ میزبان نمایش
+    // داده نمی‌شد) و کلیک فقط با restaurantId کار می‌کرد — اگر رستوران در
+    // صفحه‌ی بارگذاری‌شده‌ی فید نبود، کارت عملاً کلیکِ مرده بود. حالا API
+    // restaurant_slug/restaurant_name می‌دهد و openRestBySlug با slug حتی
+    // رستورانِ خارج از فید را باز می‌کند.
+    const events=list.map(e=>({rid:e.restaurantId,slug:e.restaurant_slug||'',emoji:e.emoji||'🎉',title:e.title,rest:e.restaurant_name||'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
     el.innerHTML=eventsHtml(events,false);
     return;
   }
@@ -268,7 +273,7 @@ export async function renderEvents(){
 /** مارکاپِ کارت‌های رویداد. isDemo=true چیپِ «نمونه» را اضافه می‌کند. */
 function eventsHtml(events,isDemo){
   return events.map(e=>`
-    <div class="event-card" role="button" tabindex="0" onclick="openRest('${e.rid}')">
+    <div class="event-card" role="button" tabindex="0" onclick="openRestBySlug('${e.rid}','${esc(e.slug||'')}')">
       <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
