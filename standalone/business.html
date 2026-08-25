@@ -2036,7 +2036,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
    استفاده: onclick="f(${jsq(x)})"   — نه   onclick="f('${esc(x)}')"
    خودِ jsq کوتیشن‌ها را می‌گذارد؛ دورش کوتیشن نگذار.
    ─────────────────────────────────────────────────────────── */
-export function jsq(v){return esc(JSON.stringify(String(v==null?'':v)))}
+function jsq(v){return esc(JSON.stringify(String(v==null?'':v)))}
 
 </script>
 <script data-src="js/data.js">

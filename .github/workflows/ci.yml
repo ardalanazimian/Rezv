@@ -253,6 +253,13 @@ jobs:
       # است: ظاهرِ به‌روز دارد و کدِ قدیمی می‌دهد.
       - name: Check standalone bundle is regenerated from source
         run: python3 tools/build-standalone.py --check
+      # ⚠️ apps/business و apps/company اسکریپتِ **کلاسیک**‌اند: یک `export` سرگردان
+      # کلِ فایل را با SyntaxError می‌کشد و همه‌ی توابعش undefined می‌شوند. دقیقاً در
+      # PR #77 رخ داد (`export function jsq` وارد format.js شد → fa/esc/jsq مردند →
+      # هر دو پنل کاملاً از کار افتادند) و **هر ۹ جابِ CI سبز ماند**، چون پنل‌ها
+      # پوششِ E2Eِ رفتاری ندارند. این قدم همان شکاف را می‌بندد.
+      - name: Check classic panel scripts parse (business/company)
+        run: sh tools/check-classic-scripts.sh
 
   # ── اپِ SEO (apps/seo · Next.js SSR/ISR، ADR 0001) — build + typecheck + lint ──
   # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند. build خودِ Next تایپ‌چک/لینت می‌کند.

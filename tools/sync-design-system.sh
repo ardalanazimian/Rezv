@@ -39,11 +39,32 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 # نسخه‌ی global از icons.js (export را برمی‌دارد؛ برای <script> کلاسیک).
+# strip_exports <file> — کلمه‌ی کلیدیِ `export` را از اعلان‌های سطحِ بالا برمی‌دارد
+# تا فایل به‌عنوانِ <script> کلاسیک پارس شود. عمداً **عام** است، نه فهرستِ نام‌ها:
+# ⚠️ نسخه‌ی قبلی هر نام را جدا sed می‌کرد (`s/^export function esc(/.../`). وقتی
+# PR #77 تابعِ سومِ `jsq` را به shared/js/format.js اضافه کرد، هیچ الگویی با آن
+# نخواند و `export function jsq(` عیناً در apps/business|company/js/format.js کپی
+# شد → کلِ فایل با `SyntaxError: Unexpected token 'export'` می‌مرد و `fa`/`esc`/
+# `jsq` هر سه undefined می‌شدند. گارد پایین‌تر (assert_no_export) دومین لایه است.
+strip_exports() {
+  sed -E 's/^export[[:space:]]+(default[[:space:]]+)?(async[[:space:]]+)?(function|class|const|let|var)[[:space:]]/\2\3 /' "$1"
+}
+
+# assert_no_export <file> — گاردِ اجباری: هیچ خروجیِ globalی نباید `export` داشته باشد.
+assert_no_export() {
+  if grep -nE '^[[:space:]]*export[[:space:]]' "$1" >/dev/null 2>&1; then
+    echo "✗ خطای مرگبار: در خروجیِ globalِ $1 هنوز \`export\` هست — این فایل با <script> کلاسیک پارس نمی‌شود:" >&2
+    grep -nE '^[[:space:]]*export[[:space:]]' "$1" >&2
+    exit 1
+  fi
+}
+
 make_global_icons() {
+  # ICON_NAMES موردِ خاص است (به‌جای const باید روی window بنشیند)؛ باقی از
+  # strip_exports عبور می‌کند تا exportِ تازه بی‌صدا رد نشود (بخشِ strip_exports).
   sed \
-    -e 's/^export function icon(/function icon(/' \
     -e 's/^export const ICON_NAMES = Object\.keys(PATHS);/if (typeof window !== "undefined") window.ICON_NAMES = Object.keys(PATHS);/' \
-    "$SRC/js/icons.js"
+    "$SRC/js/icons.js" | strip_exports /dev/stdin
 }
 
 # analytics پنل‌ها: از shared/js/analytics.panel.js با جای‌گذاریِ ثابت‌های per-app.
@@ -53,23 +74,14 @@ make_global_icons() {
 # فعلی باشد (drift-check + cmp) تا هیچ تغییرِ رفتاری رخ ندهد.
 # نسخه‌ی global از api-core.js (export را برمی‌دارد + روی window می‌گذارد؛ برای <script> کلاسیک).
 make_global_apicore() {
-  sed \
-    -e 's/^export async function httpJson(/async function httpJson(/' \
-    -e 's/^export function resolveApiBase(/function resolveApiBase(/' \
-    -e 's/^export function genIdempotencyKey(/function genIdempotencyKey(/' \
-    -e 's/^export function isOfflineDemo(/function isOfflineDemo(/' \
-    -e 's/^export function refreshAccessToken(/function refreshAccessToken(/' \
-    "$SRC/js/api-core.js"
+  strip_exports "$SRC/js/api-core.js"
   printf '\nif (typeof window !== "undefined") { window.httpJson = httpJson; window.resolveApiBase = resolveApiBase; window.genIdempotencyKey = genIdempotencyKey; window.isOfflineDemo = isOfflineDemo; window.refreshAccessToken = refreshAccessToken; }\n'
 }
 
 # نسخه‌ی global از format.js (export را برمی‌دارد؛ برای <script> کلاسیک — توابعِ
 # سطحِ بالا خودبه‌خود global می‌شوند). فقط پنل‌ها؛ customer از این استفاده نمی‌کند.
 make_global_format() {
-  sed \
-    -e 's/^export function fa(/function fa(/' \
-    -e 's/^export function esc(/function esc(/' \
-    "$SRC/js/format.js"
+  strip_exports "$SRC/js/format.js"
 }
 
 make_panel_analytics() { # $1=label $2=load-hint $3=source $4=sid-key $5=q-key
@@ -123,16 +135,19 @@ done
 # api-core.js (هسته‌ی transport) — customer نسخه‌ی ESM؛ پنل‌ها نسخه‌ی global.
 place "$SRC/js/api-core.js" "$ROOT/apps/customer/js/api-core.js"
 make_global_apicore > "$TMP/api-core.global.js"
+assert_no_export "$TMP/api-core.global.js"
 for app in $GLOBAL_APPS; do
   place "$TMP/api-core.global.js" "$ROOT/apps/$app/js/api-core.js"
 done
 make_global_icons > "$TMP/icons.global.js"
+assert_no_export "$TMP/icons.global.js"
 for app in $GLOBAL_APPS; do
   place "$TMP/icons.global.js" "$ROOT/apps/$app/js/icons.js"
 done
 
 # format.js (fa/esc) — فقط پنل‌ها نسخه‌ی global (customer عمداً مستثنا).
 make_global_format > "$TMP/format.global.js"
+assert_no_export "$TMP/format.global.js"
 for app in $GLOBAL_APPS; do
   place "$TMP/format.global.js" "$ROOT/apps/$app/js/format.js"
 done
