@@ -4,9 +4,9 @@
 // ═══════════════════════════════════════════════════════════
 
 import { Actions } from './actions.js';
-import { API, loadMoreRestaurants, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
-import { doSearch, renderDiscoverSections, renderFeed, renderRestaurantSections } from './data/discover.js';
-import { R_SAMPLE } from './data/seed.js';
+import { API, hydrateSlots, loadMoreRestaurants, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
+import { doSearch, paintSlots, renderDiscoverSections, renderFeed, renderRestaurantSections } from './data/discover.js';
+import { R_SAMPLE, bookingCtx } from './data/seed.js';
 import { runPendingCheckIn } from './features/checkin.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
 export let R = R_SAMPLE;
@@ -64,6 +64,46 @@ export async function syncRestaurants(){
     // داده. (توضیحِ کامل روی renderDiscoverSections در data/discover.js.)
     renderRestaurantSections();
   }
+  refreshCardSlots();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  چیپ‌هایِ ساعتِ کارت — از availabilityِ واقعی، نه حدس
+//
+//  تا پیش از این `mapApiRestaurant` فیلدِ `available_slots` را می‌خواند که هیچ
+//  روتی برنمی‌گرداند، پس کارتِ هر رستورانِ زنده همیشه بدونِ ساعت بود. حالا روتِ
+//  گروهیِ `/restaurants/availability` همان موتورِ شیتِ رزرو را صدا می‌زند.
+//
+//  ⚠️ محافظِ ترتیب: کاربر می‌تواند تاریخ را سریع عوض کند. بدونِ این توکن،
+//  پاسخِ کندترِ انتخابِ *قبلی* می‌توانست بعد از پاسخِ انتخابِ جدید بنشیند و
+//  ساعت‌هایِ یک روزِ دیگر را زیرِ برچسبِ روزِ فعلی نشان بدهد.
+// ═══════════════════════════════════════════════════════════
+let slotsToken = 0;
+
+export async function refreshCardSlots(){
+  const token = ++slotsToken;
+  const { date, party } = bookingCtx;
+  const target = R;
+  const changed = await hydrateSlots(target, date, party);
+  // انتخابِ کاربر (یا خودِ فهرست) عوض شده — این پاسخ دیگر معتبر نیست.
+  if (token !== slotsToken || target !== R) return;
+  if (changed) paintSlots(R);
+}
+
+/**
+ * انتخابِ تاریخ/تعدادِ نفر عوض شد: ساعت‌هایِ قبلی دیگر معتبر نیستند.
+ *
+ * اول پاکشان می‌کنیم و کارت به CTAِ «ببین سانس‌ها» برمی‌گردد، بعد تازه‌اش را
+ * می‌گیریم. نگه‌داشتنِ ساعتِ قبلی تا رسیدنِ پاسخ یعنی چیپِ «۲۰:۰۰» زیرِ
+ * برچسبِ «فردا، ۶ نفر» دیده شود در حالی که برایِ «امروز، ۲ نفر» حساب شده بود.
+ */
+export function invalidateCardSlots(){
+  let had = false;
+  for (const r of R) {
+    if (r && Array.isArray(r.slots) && r.slots.length && r.slug) { r.slots = []; had = true; }
+  }
+  if (had) paintSlots(R);
+  refreshCardSlots();
 }
 
 // صفحه‌ی بعدیِ رستوران‌ها (دکمه‌ی «رستوران‌های بیشتر» در فیدِ کشف).
@@ -78,6 +118,9 @@ window.loadMoreFeed = async function(){
       R = R.concat(more);
       renderFeed(R);
       renderRestaurantSections();
+      // کارت‌هایِ تازه هم باید چیپِ ساعتِ واقعی بگیرند، وگرنه صفحه‌ی دومِ فید
+      // همیشه فقط CTAِ «ببین سانس‌ها» نشان می‌داد.
+      refreshCardSlots();
       return;
     }
     // سرور چیزی نداد: یا واقعاً تمام شده یا درخواست شکست خورده — در هر دو حالت

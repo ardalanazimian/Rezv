@@ -200,6 +200,9 @@ export function syncNavPoints(){
 // فقط در مسیرِ کاملاً آفلاین/بدونِ‌slug استفاده می‌شود.
 const EMPTY_RB = { food: 0, service: 0, atmo: 0, value: 0 };
 
+/** شناسه‌ی رستورانِ واقعی همیشه UUID است؛ idِ نمونه عددِ کوچک. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** بازه‌ی قیمت به شکلِ نمایشی — priceBandِ بک‌اند عددِ ۱..۴ است. */
 function priceBandStr(band){
   return (Number.isInteger(band) && band >= 1) ? '$'.repeat(Math.min(4, band)) : null;
@@ -346,6 +349,53 @@ export async function loadMoreRestaurants(){
   const list = res.ok ? (res.data?.items || []) : [];
   NEXT_CURSOR = res.data?.next_cursor || null;
   return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  سانس‌هایِ پیش‌نمایشِ کارت — GET /restaurants/availability (گروهی)
+//
+//  ⚠️ حلقه‌ی نیمه‌کاره‌ای که این می‌بندد: `mapApiRestaurant` بالا از روزِ اول
+//  `apiR.available_slots` را می‌خواند، ولی **هیچ روتی این فیلد را
+//  برنمی‌گرداند** (چک‌شده) — پس برایِ هر رستورانِ زنده همیشه `[]` می‌ماند و
+//  کارت فقط CTAِ «ببین سانس‌ها» می‌گیرد. حالا یک روتِ گروهی وجود دارد که
+//  همان موتورِ availabilityِ شیتِ رزرو را صدا می‌زند.
+//
+//  چرا گروهی و نه یکی‌یکی: ۲۴ کارت یعنی ۲۴ درخواستِ همزمان از موبایل.
+//
+//  صداقت: فقط سانسِ *واقعاً آزادِ* برگشته از سرور نوشته می‌شود. شکستِ
+//  درخواست هیچ‌چیز نمی‌نویسد — کارت به همان CTAِ آرام برمی‌گردد، نه ساعتِ
+//  حدسی. رستورانِ نمونه (بدونِ slug) اصلاً پرسیده نمی‌شود.
+// ═══════════════════════════════════════════════════════════
+
+/** سقفِ سرور در هر درخواست — با BULK_AVAILABILITY_MAX بک‌اند هماهنگ است. */
+const AVAIL_BULK_MAX = 24;
+
+/**
+ * سانس‌هایِ آزادِ فهرستی از رستوران‌هایِ زنده را می‌گیرد و روی خودشان می‌نویسد.
+ * @returns {Promise<boolean>} آیا چیزی واقعاً به‌روز شد (یعنی ارزشِ رندرِ دوباره دارد)؟
+ */
+export async function hydrateSlots(list, date, party){
+  if (!Array.isArray(list) || !API.online) return false;
+  // فقط رستورانِ زنده: idِ نمونه UUID نیست و سرور هم نمی‌شناسدش.
+  const live = list.filter(r => r && r.slug && UUID_RE.test(String(r.id)));
+  if (!live.length) return false;
+
+  let changed = false;
+  for (let i = 0; i < live.length; i += AVAIL_BULK_MAX) {
+    const chunk = live.slice(i, i + AVAIL_BULK_MAX);
+    const qs = `ids=${chunk.map(r => encodeURIComponent(r.id)).join(',')}`
+             + `&date=${encodeURIComponent(date)}&party=${encodeURIComponent(party)}`;
+    const res = await API.get(`/restaurants/availability?${qs}`);
+    if (!res.ok || !res.data?.restaurants) continue;   // شکست = سکوت، نه ساعتِ ساختگی
+    for (const r of chunk) {
+      const entry = res.data.restaurants[r.id];
+      // شناسه‌ای که سرور برنگرداند یعنی «نمی‌شناسیمش» — دست‌نخورده می‌ماند.
+      if (!entry || !Array.isArray(entry.available_slots)) continue;
+      r.slots = entry.available_slots;
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 // ═══════════ جزئیاتِ رستوران — GET /restaurants/{slug} ═══════════
