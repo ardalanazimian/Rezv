@@ -90,6 +90,12 @@ export const metrics = {
   smsQueueDepth: new Gauge('rezervno_sms_queue_depth', 'تعداد پیام‌های در صف SMS'),
   smsSent: new Counter('rezervno_sms_sent_total', 'تعداد پیامک‌های ارسال‌شده'),
   smsFailed: new Counter('rezervno_sms_failed_total', 'تعداد پیامک‌های ناموفق (به دست مشتری نرسید)'),
+  // ⚠️ «فرستاده نشد چون کاربر انصراف داده» یک حالتِ سومِ کاملاً متفاوت است و
+  // نه موفقیت است نه شکست. بدونِ این متریک، رعایتِ انصراف یک سکوتِ کامل بود
+  // (قاعده‌ی بخشِ ۹ CLAUDE.md: جایی که عمداً چیزی ارسال نمی‌شود باید لاگِ
+  // ساختاریافته + متریکِ قابلِ‌آلارم بدهد). برچسبِ `site` نقطه‌ی صدور را
+  // مشخص می‌کند تا افتِ ناگهانیِ ارسال به یک نقطه نسبت داده شود.
+  smsSuppressed: new Counter('rezervno_sms_suppressed_total', 'تعداد پیامک‌هایی که به‌خاطر انصرافِ صریحِ کاربر ارسال نشدند'),
   dbDuration: new Histogram('rezervno_db_query_duration_seconds', 'مدت زمان کوئری دیتابیس بر حسب ثانیه'),
   cacheHits: new Counter('rezervno_cache_hits_total', 'تعداد اصابت کش (cache hit)'),
   cacheMisses: new Counter('rezervno_cache_misses_total', 'تعداد عدم‌اصابت کش (cache miss)'),
