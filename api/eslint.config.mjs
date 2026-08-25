@@ -23,7 +23,7 @@ export default [
   },
   {
     // مصرف‌کننده‌های مشروعِ console: اسکریپت‌های seed (خروجیِ CLI) و خودِ ماژولِ logger.
-    files: ['prisma/seed.ts', 'prisma/seed-site.ts', 'src/lib/logger.ts'],
+    files: ['prisma/seed.ts', 'prisma/seed-site.ts', 'prisma/create-platform-admin.ts', 'src/lib/logger.ts'],
     rules: { 'no-console': 'off' },
   },
   {
