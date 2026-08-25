@@ -2,6 +2,11 @@ import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { populationStabilityIndex, psiBand, type PsiBand } from './ml-core';
 import { MIN_RESOLVED_FOR_ACCURACY } from './prediction-ledger';
+import { invalidate, cacheKey } from './cache';
+import { createLogger } from './logger';
+import { metrics } from './metrics';
+
+const log = createLogger('model-drift');
 
 // ═══════════════════════════════════════════════════════════════════════
 //  فازِ ۷ — تشخیصِ رانش (drift)
@@ -278,4 +283,98 @@ export async function getPlatformPerformanceDrift(params: {
       resolvedCount, verdict,
     };
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  اقدام روی رانش — بستنِ حلقه‌ی یادگیری
+//
+//  ⚠️ شکافی که این بخش می‌بندد: تا امروز `detectPerformanceDrift` رانش را
+//  **تشخیص** می‌داد و داشبوردِ سلامتِ مدل نشانش می‌داد، ولی **هیچ کدی هرگز
+//  مدلِ بدشده را غیرفعال نمی‌کرد** (تأیید با grep: صفر مسیرِ
+//  `isActive: false` برای مدل). یعنی مدلی که در تولید خراب شده بود همچنان
+//  به رستوران‌دار ریسکِ اشتباه می‌داد تا وقتی یک انسان داشبورد را ببیند.
+//
+//  «قدرتِ یادگیری» فقط یادگرفتن نیست — **پس‌گرفتنِ چیزی که بد از آب درآمد**
+//  هم هست. بدونِ این، حلقه یک‌طرفه است.
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface RollbackResult {
+  restaurantId: string;
+  /** آیا مدل واقعاً غیرفعال شد؟ */
+  rolledBack: boolean;
+  verdict: DriftVerdict;
+  relativeChange: number | null;
+  reason: string;
+}
+
+/**
+ * اگر مدلِ فعالِ یک رستوران در تولید به‌طورِ معنادار بدتر از زمانِ آموزش
+ * شده، غیرفعالش کن تا سیستم به heuristic برگردد.
+ *
+ * سه قیدِ عمدی:
+ *
+ *  ۱. **فقط روی `drifted`، نه `watch`.** آستانه‌ی نصف برای هشدار است نه
+ *     اقدام؛ برگرداندنِ مدل روی نوسانِ معمولی خودش بی‌ثباتی می‌سازد.
+ *
+ *  ۲. **فقط وقتی نتیجه‌ی کافی هست.** `detectPerformanceDrift` خودش روی
+ *     `resolvedCount < MIN_RESOLVED_FOR_ACCURACY` حکمِ `insufficient_data`
+ *     می‌دهد — و ما روی آن حکم **هرگز** اقدام نمی‌کنیم. غیرفعال‌کردنِ مدل
+ *     بر پایه‌ی چند نمونه، خودش همان «ادعای اندازه‌گیری‌نشده» است.
+ *
+ *  ۳. **بازگشت به heuristic، نه به مدلِ قدیمی‌تر.** heuristic رفتارِ
+ *     شناخته‌شده و آزموده دارد؛ یک مدلِ قدیمی‌ترِ بایگانی‌شده معلوم نیست
+ *     روی دادهٔ امروز چه می‌کند. ساده و قابلِ‌پیش‌بینی بهتر از هوشمندِ مبهم.
+ *
+ * بازآموزیِ شبانه بعداً می‌تواند دوباره فعالش کند — اگر از گیت‌های
+ * فعال‌سازی (Brier، AUC، بایاس) رد شود. یعنی این یک بن‌بست نیست، یک
+ * عقب‌نشینیِ موقت است.
+ */
+export async function rollbackDriftedModel(params: {
+  restaurantId: string;
+  windowDays?: number;
+}): Promise<RollbackResult> {
+  const drift = await detectPerformanceDrift(params);
+
+  if (drift.verdict !== 'drifted') {
+    return {
+      restaurantId: params.restaurantId, rolledBack: false,
+      verdict: drift.verdict, relativeChange: drift.relativeChange,
+      reason: drift.reason,
+    };
+  }
+
+  const updated = await db.restaurantNoShowModel.updateMany({
+    // شرطِ `isActive: true` اتمیک است: اگر دو اجرای هم‌زمان (cron + دستی)
+    // با هم بیایند، فقط یکی count=1 می‌گیرد و لاگِ تکراری ساخته نمی‌شود.
+    where: { restaurantId: params.restaurantId, isActive: true },
+    data: {
+      isActive: false,
+      activationReason: `غیرفعالِ خودکار: ${drift.reason}`,
+    },
+  });
+
+  if (updated.count === 0) {
+    return {
+      restaurantId: params.restaurantId, rolledBack: false,
+      verdict: drift.verdict, relativeChange: drift.relativeChange,
+      reason: 'مدل پیش از این غیرفعال شده بود',
+    };
+  }
+
+  await invalidate(cacheKey('noshow-model', params.restaurantId)).catch(() => {});
+
+  log.warn('مدلِ no-show به‌خاطرِ افتِ کارایی در تولید غیرفعال شد', {
+    restaurantId: params.restaurantId,
+    modelRunId: drift.modelRunId,
+    holdoutBrier: drift.holdoutBrier,
+    productionBrier: drift.productionBrier,
+    relativeChange: drift.relativeChange,
+  });
+  metrics.modelRolledBack.inc({ reason: 'performance_drift' });
+
+  return {
+    restaurantId: params.restaurantId, rolledBack: true,
+    verdict: drift.verdict, relativeChange: drift.relativeChange,
+    reason: drift.reason,
+  };
 }

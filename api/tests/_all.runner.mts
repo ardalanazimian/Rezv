@@ -108,6 +108,7 @@ import './metrics-endpoint.test.mts';
 import './ml-core.test.mts';
 import './ml-discrimination.test.mts';
 import './ml-activation-auc-gate.test.mts';
+import './ml-auto-rollback.integration.test.mts';
 import './model-drift.test.mts';
 import './model-drift.integration.test.mts';
 import './model-registry.integration.test.mts';

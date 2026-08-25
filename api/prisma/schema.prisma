@@ -695,6 +695,9 @@ model RestaurantNoShowModel {
   learnedBrier  Float      @map("learned_brier")         // پایین‌تر = بهتر (۰..۱)
   staticBrier   Float      @map("static_brier")          // همان معیار برای heuristicِ فعلی، روی همان holdout
   isActive      Boolean    @default(false) @map("is_active")
+  /// چرا در این وضعیت است. مهم‌ترین کاربردش تفکیکِ «هرگز فعال نشد» از
+  /// «فعال بود و به‌خاطرِ افتِ کارایی خودکار پس گرفته شد» است.
+  activationReason String? @map("activation_reason")
   trainedAt     DateTime   @default(now()) @map("trained_at")
   // فازِ ۶ — کدام اجرایِ آموزش این وزن‌ها را ساخت. بدونِ این، دفترِ پیش‌بینی
   // می‌داند «مدلِ یادگرفته» گفته ولی نمی‌داند *کدام نسخه* — و دقتِ تولید روی

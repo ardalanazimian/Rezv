@@ -96,6 +96,10 @@ export const metrics = {
   // ساختاریافته + متریکِ قابلِ‌آلارم بدهد). برچسبِ `site` نقطه‌ی صدور را
   // مشخص می‌کند تا افتِ ناگهانیِ ارسال به یک نقطه نسبت داده شود.
   smsSuppressed: new Counter('rezervno_sms_suppressed_total', 'تعداد پیامک‌هایی که به‌خاطر انصرافِ صریحِ کاربر ارسال نشدند'),
+  // ⚠️ آلارم‌پذیر: غیرفعال‌شدنِ خودکارِ مدل یعنی سیستم به heuristic برگشته.
+  // اتفاقِ نادری است؛ اگر برای چند رستوران پشتِ‌هم بیفتد، یعنی یا دادهٔ
+  // ورودی عوض شده یا خودِ خطِ آموزش مشکل دارد — هر دو نیازِ نگاهِ انسان.
+  modelRolledBack: new Counter('rezervno_model_rolled_back_total', 'تعداد غیرفعال‌سازیِ خودکارِ مدل به‌خاطرِ افتِ کارایی در تولید'),
   dbDuration: new Histogram('rezervno_db_query_duration_seconds', 'مدت زمان کوئری دیتابیس بر حسب ثانیه'),
   cacheHits: new Counter('rezervno_cache_hits_total', 'تعداد اصابت کش (cache hit)'),
   cacheMisses: new Counter('rezervno_cache_misses_total', 'تعداد عدم‌اصابت کش (cache miss)'),

@@ -7,6 +7,7 @@ import { runAllDueAutomations } from '@/lib/automation';
 import { resolveOutreachConversions } from '@/lib/outreach-ledger';
 import { applyAbuseFlags, applyPlatformAbuseFlags } from '@/lib/fraud';
 import { trainAndCalibrateNoShowModel } from '@/lib/no-show-model';
+import { rollbackDriftedModel } from '@/lib/model-drift';
 import { trainAndCalibrateDemandForecast } from '@/lib/demand-forecast';
 import { invalidatePattern } from '@/lib/cache';
 import { guardMaintenance } from '@/lib/maintenance-auth';
@@ -43,7 +44,7 @@ async function POST_impl(req: Request) {
     // ⚠️ M5: پردازش موازی محدود (concurrency=4). این job سنگین‌تر است (هر رستوران
     // خودش روی کاربران حلقه می‌زند)، پس concurrency پایین‌تر تا pool اتصال اشباع نشود.
     // چون nightly است، هدف کاهش دیوار زمانی و جلوگیری از timeout است.
-    let i = 0, totalUsers = 0, noShowModelsTrained = 0, noShowModelsActive = 0;
+    let i = 0, totalUsers = 0, noShowModelsTrained = 0, noShowModelsActive = 0, modelsRolledBack = 0;
     let demandForecastsTrained = 0, demandForecastsCountActive = 0, demandForecastsCoversActive = 0;
     let abuseSignals = 0, abuseFlagged = 0;
     async function worker() {
@@ -53,6 +54,14 @@ async function POST_impl(req: Request) {
         await recomputeRfmForRestaurant(r.id).catch(() => {});
         // شکستِ آموزشِ مدل‌های یادگرفته نباید بازمحاسبه‌ی CLV/RFM بقیه‌ی
         // رستوران‌ها را متوقف کند — این‌ها بهبودِ اختیاری‌اند، نه مسیرِ حیاتی.
+        // ⚠️ **پیش از** بازآموزی: اگر مدلِ فعالِ فعلی در تولید خراب شده،
+        // همین‌جا پس گرفته می‌شود. ترتیب مهم است — اگر بعد از آموزش می‌آمد،
+        // مدلِ تازه‌ی همین شب را بر اساسِ کاراییِ مدلِ **قبلی** قضاوت می‌کرد.
+        // بازآموزیِ همین حلقه می‌تواند دوباره فعالش کند، اگر از گیت‌های
+        // Brier/AUC/بایاس رد شود. یعنی عقب‌نشینیِ موقت، نه بن‌بست.
+        const rollback = await rollbackDriftedModel({ restaurantId: r.id }).catch(() => null);
+        if (rollback?.rolledBack) modelsRolledBack++;
+
         const trainResult = await trainAndCalibrateNoShowModel(r.id).catch(() => null);
         if (trainResult?.trained) {
           noShowModelsTrained++;
@@ -117,6 +126,9 @@ async function POST_impl(req: Request) {
       guest_profiles: guestProfilesCount,
       ...(guestProfilesError ? { guest_profiles_error: guestProfilesError } : {}),
       no_show_models_trained: noShowModelsTrained, no_show_models_active: noShowModelsActive,
+      // تعدادِ مدل‌هایی که به‌خاطرِ افتِ کارایی در تولید **پس گرفته** شدند.
+      // عددِ غیرصفر یعنی سیستم برای آن رستوران‌ها به heuristic برگشته.
+      models_rolled_back: modelsRolledBack,
       demand_forecasts_trained: demandForecastsTrained,
       demand_forecasts_count_active: demandForecastsCountActive,
       demand_forecasts_covers_active: demandForecastsCoversActive,
