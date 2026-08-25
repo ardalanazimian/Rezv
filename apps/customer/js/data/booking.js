@@ -4,7 +4,7 @@
 //  رفتار دقیقاً همان قبل است؛ فقط از یک فایلِ مجزا export می‌شود.
 // ═══════════════════════════════════════════════════════════
 import { API, USER, isLoggedIn, syncNavPoints, userName } from '../api.js';
-import { closeSheet, esc, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
+import { closeSheet, esc, jsq, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
 import { doSearch, fmtFa } from './discover.js';
 import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js';
 import { findR, invalidateCardSlots } from '../init.js';
@@ -79,14 +79,14 @@ export function openBookSheet(id){
   openSheet(`
     <div class="bs-head"><div class="bs-title">رزرو میز</div><div class="bs-rest">${esc(r.n)}</div></div>
     <div id="bwDemoBanner"></div>
-    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots('${esc(String(id))}')">${
+    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${jsq(String(id))})">${
       dates.map(d=>`<option value="${d.iso}"${d.iso===dateSel?' selected':''}>${esc(d.label)}</option>`).join('')
     }</select></div>
-    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots('${esc(String(id))}')">${
+    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots(${jsq(String(id))})">${
       Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
     }</select></div>
     <div class="bw-field"><label>ساعت</label><select id="bwTime"><option>در حال بررسی...</option></select></div>
-    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook('${esc(String(id))}')">بررسی میزهای موجود</button>
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook(${jsq(String(id))})">بررسی میزهای موجود</button>
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">${depositLabel(r)}</div>
   `);
   refreshSlots(id);
@@ -188,7 +188,7 @@ export function bookStep2(r){
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
     ${preorderBlock}
-    <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3('${esc(String(r.id))}')">ادامه</button>`;
+    <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3(${jsq(String(r.id))})">ادامه</button>`;
 }
 // wrapperِ سراسری: onclick در scope سراسری اجرا می‌شود و به R (ماژولی) دسترسی ندارد،
 // پس lookup را اینجا (با دسترسی به R) انجام می‌دهیم.
@@ -225,7 +225,7 @@ export function bookStep3(r){
     <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${esc(r.n)}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
     ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook('${esc(String(r.id))}')">تأیید رزرو</button>`;
+    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(r.id))})">تأیید رزرو</button>`;
 }
 export async function confirmBook(id){
   const r=findR(id);
@@ -307,7 +307,7 @@ export async function confirmBook(id){
         <div class="sheet-title" style="text-align:center">رزرو ثبت نشد</div>
         <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}</div>
         <div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:14px 0">اتصال به سرورِ رزرونو برقرار نشد، پس این رزرو در سیستمِ رستوران ثبت نشده و کدِ رزروی هم صادر نشده. یادآورِ پیامکی ارسال نمی‌شود. با وصل‌شدنِ اینترنت دوباره تلاش کن.</div>
-        <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook('${esc(String(id))}')">تلاش دوباره</button>
+        <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(id))})">تلاش دوباره</button>
         <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
       </div>`;
     return;
@@ -336,7 +336,7 @@ export async function confirmBook(id){
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
       <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
       <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}<br>یادآور با پیامک می‌فرستیم</div>
-      <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode('${esc(code)}')" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
+      <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode(${jsq(code)})" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
       ${(r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
       <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
       <button class="btn btn-primary btn-lg btn-block" onclick="closeSheet();go('trips')">رزروهای من</button>

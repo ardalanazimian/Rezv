@@ -177,11 +177,11 @@ function openLogoEditor(){
     <input type="file" id="logoInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleLogoUpload(this)">
     <div class="field-label" style="margin-top:18px">تا وقتی عکس تأیید بشه، این ایموجی/رنگ به‌جاش نشون داده می‌شه</div>
     <div class="logo-pick-grid" id="logoEmojiGrid">
-      ${emojis.map(e=>`<div class="logo-emoji-opt ${e===logoChoice.emoji?'sel':''}" onclick="pickLogoEmoji('${e}')">${e}</div>`).join('')}
+      ${emojis.map(e=>`<div class="logo-emoji-opt ${e===logoChoice.emoji?'sel':''}" onclick="pickLogoEmoji(${jsq(e)})">${e}</div>`).join('')}
     </div>
     <div class="field-label">رنگ پس‌زمینه</div>
     <div class="logo-grad-grid" id="logoGradGrid">
-      ${grads.map((g,gi)=>`<div class="logo-grad-opt ${g===logoChoice.gradient?'sel':''}" data-gi="${gi}" style="background:${g}" onclick="pickLogoGrad(${gi},'${g}')"></div>`).join('')}
+      ${grads.map((g,gi)=>`<div class="logo-grad-opt ${g===logoChoice.gradient?'sel':''}" data-gi="${gi}" style="background:${g}" onclick="pickLogoGrad(${gi},${jsq(g)})"></div>`).join('')}
     </div>
     <button class="btn btn-primary btn-lg btn-block" onclick="saveLogoFallback()">ذخیره</button>
   `);
@@ -692,8 +692,8 @@ async function custRenderProfiles(){
           <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(c.no_show_rate_pct)}٪</div><div class="sig-label">عدم‌حضور</div><div class="sig-track"><div class="sig-fill" style="width:${c.no_show_rate_pct}%;background:var(--amber)"></div></div></div>
         </div>
         <div class="smart-actions">
-          <button class="btn btn-sm btn-ghost" onclick="callCustomer('${esc(c.phone||'')}')">${icon('phone',{size:13})} ${esc(c.phone||'بدون شماره')}</button>
-          ${c.user_id?`<button class="btn btn-sm btn-ghost" onclick="openCustomerDetail('${esc(c.user_id)}')">${icon('eye',{size:13})} جزئیات</button>`:''}
+          <button class="btn btn-sm btn-ghost" onclick="callCustomer(${jsq(c.phone||'')})">${icon('phone',{size:13})} ${esc(c.phone||'بدون شماره')}</button>
+          ${c.user_id?`<button class="btn btn-sm btn-ghost" onclick="openCustomerDetail(${jsq(c.user_id)})">${icon('eye',{size:13})} جزئیات</button>`:''}
           <button class="btn btn-sm btn-ghost" onclick="setCustTab('campaign')">${icon('message',{size:13})} ارسال پیام</button>
         </div>
       </div>`;
@@ -981,7 +981,7 @@ async function openCustomerDetail(userId){
         </div>`).join(''):'<div style="text-align:center;color:var(--t2);padding:20px">هنوز رزروی ثبت نشده</div>'}
     </div>
     <div style="margin-top:16px;display:flex;gap:8px">
-      ${u.phone?`<button class="btn btn-ghost btn-sm" onclick="callCustomer('${esc(u.phone)}')">${icon('phone',{size:13})} تماس</button>`:''}
+      ${u.phone?`<button class="btn btn-ghost btn-sm" onclick="callCustomer(${jsq(u.phone)})">${icon('phone',{size:13})} تماس</button>`:''}
       <button class="btn btn-primary btn-sm" onclick="closeModal()">بستن</button>
     </div>`);
 }
@@ -1081,7 +1081,7 @@ async function custRenderAI(){
         </div>
         <div class="smart-rec"><div class="smart-rec-label">${icon('sparkle',{size:12,fill:true})} تحلیل</div>${esc(c.detail)}</div>
         <div class="smart-actions">
-          <button class="btn btn-sm ${c.severity==='high'?'btn-primary':'btn-ghost'}" onclick="handleAiAction('${c.id}')">${esc(c.action_label)}</button>
+          <button class="btn btn-sm ${c.severity==='high'?'btn-primary':'btn-ghost'}" onclick="handleAiAction(${jsq(c.id)})">${esc(c.action_label)}</button>
         </div>
       </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}
     <div class="panel" style="margin-top:20px">
@@ -1093,7 +1093,7 @@ async function custRenderAI(){
             <div class="mini-sub">${esc(c.reason)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer('${esc(c.phone||'')}','${esc(c.user_id)}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
+            ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer(${jsq(c.phone||'')},${jsq(c.user_id)})">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
     </div>`;

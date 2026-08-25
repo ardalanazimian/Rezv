@@ -76,8 +76,8 @@ function rBilling(){
             </div>
             <span class="badge ${badgeCls}" style="align-self:flex-start"><span class="bdot"></span>${st}</span>
             <div style="display:flex;gap:6px">
-              <button class="btn btn-primary btn-sm" onclick="openSmsTopup('${r.id}')">${icon('phone',{size:13})} شارژ پیامک</button>
-              <button class="btn btn-ghost btn-sm" onclick="openRenew('${r.id}')">مدیریت</button>
+              <button class="btn btn-primary btn-sm" onclick="openSmsTopup(${jsq(r.id)})">${icon('phone',{size:13})} شارژ پیامک</button>
+              <button class="btn btn-ghost btn-sm" onclick="openRenew(${jsq(r.id)})">مدیریت</button>
             </div>
           </div>`;
         }).join('')}
@@ -136,7 +136,7 @@ function openRenew(id){
     <div class="modal-sub">${esc(r.name)} · وضعیت فعلی: ${STATUS_LABEL[r.status]}</div>
     <div class="field-label">پلن</div>
     <div class="opt-row" id="planOpts">
-      ${[['pro','حرفه‌ای'],['enterprise','سازمانی']].map(([v,l])=>`<div role="button" tabindex="0" class="opt ${v===renewPlan?'sel':''}" data-plan="${v}" onclick="pickPlan('${v}',this)">${l}</div>`).join('')}
+      ${[['pro','حرفه‌ای'],['enterprise','سازمانی']].map(([v,l])=>`<div role="button" tabindex="0" class="opt ${v===renewPlan?'sel':''}" data-plan="${v}" onclick="pickPlan(${jsq(v)},this)">${l}</div>`).join('')}
     </div>
     <div class="field-label">مدت تمدید</div>
     <div class="opt-row" id="monthOpts">
@@ -147,8 +147,8 @@ function openRenew(id){
       <div class="sum-row"><span class="k">پلن جدید</span><span class="v" id="sumPlan">${PLAN_LABEL[renewPlan]}</span></div>
       <div class="sum-row"><span class="k">مدت</span><span class="v" id="sumMonths">۱ سال</span></div>
     </div>
-    <button class="btn btn-primary btn-block btn-lg" onclick="doRenew('${id}',this)">${icon('check',{size:15})} تمدید اشتراک</button>
-    <button class="btn btn-danger btn-block" style="margin-top:8px" onclick="confirmCancel('${id}')">لغو اشتراک</button>
+    <button class="btn btn-primary btn-block btn-lg" onclick="doRenew(${jsq(id)},this)">${icon('check',{size:15})} تمدید اشتراک</button>
+    <button class="btn btn-danger btn-block" style="margin-top:8px" onclick="confirmCancel(${jsq(id)})">لغو اشتراک</button>
   `);
 }
 let renewPlan='pro',renewMonths=12;
@@ -179,7 +179,7 @@ function confirmCancel(id){
       <div style="width:54px;height:54px;border-radius:14px;background:var(--red-50);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;color:var(--warning)">${icon('alert',{size:26})}</div>
       <div class="modal-title" style="text-align:center">لغو اشتراک ${esc(r.name)}؟</div>
       <div class="modal-sub" style="text-align:center">اشتراک فوراً منقضی می‌شه. این کار قابل بازگشته (با تمدید مجدد).</div>
-      <button class="btn btn-danger btn-block btn-lg" onclick="doCancel('${id}')">بله، لغو کن</button>
+      <button class="btn btn-danger btn-block btn-lg" onclick="doCancel(${jsq(id)})">بله، لغو کن</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
     </div>`);
 }
@@ -215,8 +215,8 @@ function rSupport(){
           <div class="rest-logo" style="background:${r.grad};width:36px;height:36px;font-size:15px">${r.logo}</div>
           <div class="mini-info"><div class="mini-name">${esc(r.name)}</div><div class="mini-sub">${!r.isOpen?`<span class="dot-closed" aria-hidden="true"></span> غیرفعال · `:''}${STATUS_LABEL[r.status]||''}</div></div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen('${r.id}')">${r.isOpen?'غیرفعال کن':'فعال کن'}</button>
-            <button class="btn btn-primary btn-sm" onclick="openRenew('${r.id}')">مدیریت اشتراک</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen(${jsq(r.id)})">${r.isOpen?'غیرفعال کن':'فعال کن'}</button>
+            <button class="btn btn-primary btn-sm" onclick="openRenew(${jsq(r.id)})">مدیریت اشتراک</button>
           </div>
         </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:34})}</div><div class="empty-state-desc">همه‌چیز مرتبه</div></div>`}
       </div>
@@ -730,11 +730,11 @@ function renderCustomer360(d){
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${m.is_banned
-            ? `<button class="btn btn-primary btn-sm" onclick="openUnbanModal('${esc(u.id)}','${esc(name)}')">رفعِ بن</button>`
-            : `<button class="btn btn-danger btn-sm" onclick="openBanModal('${esc(u.id)}','${esc(name)}')">بن‌کردن</button>`}
+            ? `<button class="btn btn-primary btn-sm" onclick="openUnbanModal(${jsq(u.id)},${jsq(name)})">رفعِ بن</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="openBanModal(${jsq(u.id)},${jsq(name)})">بن‌کردن</button>`}
           ${m.has_active_abuse_flag
-            ? `<button class="btn btn-sm" onclick="clearAbuseFlag360('${esc(u.id)}')">برداشتنِ نشان</button>`
-            : `<button class="btn btn-sm" onclick="flagAbuse360('${esc(u.id)}')">نشان‌گذاری</button>`}
+            ? `<button class="btn btn-sm" onclick="clearAbuseFlag360(${jsq(u.id)})">برداشتنِ نشان</button>`
+            : `<button class="btn btn-sm" onclick="flagAbuse360(${jsq(u.id)})">نشان‌گذاری</button>`}
         </div>
       </div>
       ${m.is_banned?`<div style="margin-top:10px;font-size:12.5px;color:var(--red-600);line-height:1.7">${icon('alert',{size:13})} بن‌شده در ${new Date(m.banned_at).toLocaleString('fa-IR')}${m.banned_reason?` — دلیل: ${esc(m.banned_reason)}`:''}</div>`:''}
@@ -776,7 +776,7 @@ function openBanModal(userId,name){
     <div class="modal-sub">این حساب دیگه نمی‌تونه وارد بشه یا رزروِ آنلاین ثبت کنه.</div>
     <div class="field-label">دلیل (الزامی)</div>
     <textarea class="inp" id="banReason" rows="3" placeholder="مثلاً: تخلفِ تکراری، شکایتِ رسمیِ رستوران، ..."></textarea>
-    <button class="btn btn-danger btn-block btn-lg" style="margin-top:14px" onclick="submitBan('${esc(userId)}')">تأییدِ بن</button>
+    <button class="btn btn-danger btn-block btn-lg" style="margin-top:14px" onclick="submitBan(${jsq(userId)})">تأییدِ بن</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
   `);
 }
@@ -795,7 +795,7 @@ function openUnbanModal(userId,name){
     <div class="modal-title">${icon('checkCircle',{size:18})} رفعِ بنِ ${esc(name)}</div>
     <div class="field-label">دلیل (اختیاری)</div>
     <textarea class="inp" id="unbanReason" rows="3" placeholder="مثلاً: بررسی شد، تصمیمِ اشتباه بود"></textarea>
-    <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" onclick="submitUnban('${esc(userId)}')">تأییدِ رفعِ بن</button>
+    <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" onclick="submitUnban(${jsq(userId)})">تأییدِ رفعِ بن</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
   `);
 }

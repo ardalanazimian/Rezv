@@ -133,7 +133,7 @@ function rHoursChanges() {
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${['pending', 'rejected', 'all'].map((f) => `
-            <button class="btn btn-sm ${HCHANGE_FILTER === f ? 'btn-primary' : 'btn-ghost'}" onclick="hchangeFilter('${f}')">
+            <button class="btn btn-sm ${HCHANGE_FILTER === f ? 'btn-primary' : 'btn-ghost'}" onclick="hchangeFilter(${jsq(f)})">
               ${f === 'pending' ? 'در انتظار' : f === 'rejected' ? 'ردشده' : 'همه'}
             </button>`).join('')}
           <button class="btn btn-ghost btn-sm" onclick="loadHoursChanges()">${HCHANGE_LOADING ? 'در حال بارگذاری…' : 'تازه‌سازی'}</button>
@@ -179,8 +179,8 @@ function renderHoursChangeQueue() {
         </div>
         ${h.rejection_reason ? `<div class="hchange-reason">دلیلِ رد: ${esc(h.rejection_reason)}</div>` : ''}
         <div class="hchange-actions">
-          ${h.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="approveHoursChange('${h.id}')">تأیید و زنده‌سازی</button>
-          <button class="btn btn-ghost btn-sm" onclick="rejectHoursChange('${h.id}')">رد</button>` : ''}
+          ${h.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="approveHoursChange(${jsq(h.id)})">تأیید و زنده‌سازی</button>
+          <button class="btn btn-ghost btn-sm" onclick="rejectHoursChange(${jsq(h.id)})">رد</button>` : ''}
         </div>
       </div>`;
     }).join('')}

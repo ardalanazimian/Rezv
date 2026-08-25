@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════════════
 import { API, isLoggedIn } from './api.js';
 import { isOfflineDemo } from './api-core.js';
-import { esc, faNum } from './auth.js';
+import { esc, faNum, jsq } from './auth.js';
 import { openRest } from './data/detail.js';
 import { cardHTML, fmtFa, go } from './data/discover.js';
 import { TRIPS, favHas, gradFor, setMyTrips } from './data/seed.js';
@@ -136,9 +136,9 @@ export async function renderTrips(){
     const swipe=t.status==='up'?{cls:'cancel',ic:'close',label:'لغو رزرو'}
       :(t.status!=='cancelled'&&t.rid)?{cls:'repeat',ic:'calendar',label:'رزرو مجدد'}:null;
     const acts=t.status==='up'
-      ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR('${esc(t.code)}','${esc(name)}')">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','${esc(t.slotStartIso||'')}')">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip('${esc(t.code)}',this)">لغو</button>`
+      ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR(${jsq(t.code)},${jsq(name)})">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},${jsq(t.slotStartIso||'')})">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},'apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip(${jsq(t.code)},this)">لغو</button>`
       : t.status==='cancelled' ? ''
-      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation('${esc(String(t.rid))}')">رزرو مجدد</button>${(t.serverRestaurantId&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="buzz&&buzz();openReviewSheet('${esc(t.serverRestaurantId)}','${esc(t.serverReservationId)}','${esc(name)}')">ثبت نظر</button>`:''}`:''}`;
+      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation(${jsq(String(t.rid))})">رزرو مجدد</button>${(t.serverRestaurantId&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="buzz&&buzz();openReviewSheet(${jsq(t.serverRestaurantId)},${jsq(t.serverReservationId)},${jsq(name)})">ثبت نظر</button>`:''}`:''}`;
     return `<div class="trip-card reveal ${t.status}${swipe?' has-swipe':''}">
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
       <div class="trip-card-inner">

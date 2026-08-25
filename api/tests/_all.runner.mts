@@ -69,6 +69,7 @@ import './feature-parity.integration.test.mts';
 import './economy.test.mts';
 import './economy-ledger.integration.test.mts';
 import './esc.test.mts';
+import './jsq-attribute-xss.test.mts';
 import './fraud.integration.test.mts';
 import './guest-profile.test.mts';
 import './hours.test.mts';

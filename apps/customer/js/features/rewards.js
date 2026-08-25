@@ -1,6 +1,6 @@
 // ═══ رزرونو — دعوت دوستان، کارت هدیه، پاداش تولد (بخشی از اپ کاستومر) ═══
 import { API, USER, isLoggedIn, setUSER } from '../api.js';
-import { closeSheet, esc, openSheet, toast } from '../auth.js';
+import { closeSheet, esc, jsq, openSheet, toast } from '../auth.js';
 import { copyCode } from '../data/booking.js';
 import { icon } from '../icons.js';
 import { fmtFa } from '../data/discover.js';
@@ -12,7 +12,7 @@ export async function openReferral(){
     <div class="sheet-title" style="text-align:center">دوستات رو دعوت کن</div>
     <div class="sheet-sub" style="text-align:center;margin-bottom:18px">برای هر دوستی که با کد تو ثبت‌نام کنه و اولین رزروش رو انجام بده، ۵۰۰ امتیاز بگیر</div>
     <div class="ref-code-box"><div class="ref-code-label">کد دعوت تو</div><div class="ref-code">${esc(stats.code)}</div>
-      <button class="ref-copy" onclick="copyCode('${esc(stats.code)}')">کپی</button></div>
+      <button class="ref-copy" onclick="copyCode(${jsq(stats.code)})">کپی</button></div>
     <div class="ref-stats">
       <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.total_invited)}</div><div class="ref-stat-l">دعوت‌شده</div></div>
       <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.completed)}</div><div class="ref-stat-l">موفق</div></div>
@@ -100,7 +100,7 @@ export function showGiftSuccess(code,amt,smsSent){
     <div class="sheet-title" style="text-align:center">کارت هدیه ساخته شد!</div>
     <div class="gift-success-card"><div class="gsc-amt">${fmtFa(Math.round(amt/1000))} هزار تومان</div><div class="gsc-code">${esc(code)}</div></div>
     <div class="sheet-sub" style="text-align:center;margin-top:12px">${smsSent?'کد برای گیرنده پیامک شد':'کد را خودت به گیرنده برسان'}</div>
-    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode('${esc(code)}')">کپی کد</button>
+    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode(${jsq(code)})">کپی کد</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
   </div>`);
 }

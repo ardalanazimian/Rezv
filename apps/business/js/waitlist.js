@@ -64,7 +64,7 @@ function wlCard(w,i){
     </div>
     <div class="wl-card-actions">
       ${(!isOffered && i===0)?`<button class="btn btn-teal btn-sm" onclick="promoteNextWL()">آفر میز</button>`:''}
-      <button class="btn btn-ghost btn-sm" onclick="removeWL('${w.id}')">حذف</button>
+      <button class="btn btn-ghost btn-sm" onclick="removeWL(${jsq(w.id)})">حذف</button>
     </div>
   </div>`;
 }
@@ -315,7 +315,7 @@ async function tableLoadQr(id){
     box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
         ${esc(res.offline ? 'اتصال به سرور برقرار نیست.' : (res.error?.message || 'ساختِ QR ناموفق بود.'))}
       </div>
-      <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">تلاش دوباره</button>`;
+      <button class="btn btn-sm btn-ghost" onclick="tableLoadQr(${jsq(id)})">تلاش دوباره</button>`;
     return;
   }
 
@@ -341,7 +341,7 @@ async function tableLoadQr(id){
     </div>
     <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
       <button class="btn btn-sm btn-ghost" style="color:var(--danger,#e5484d)"
-              onclick="tableRegenerateQr('${esc(id)}')">بازتولیدِ کد</button>
+              onclick="tableRegenerateQr(${jsq(id)})">بازتولیدِ کد</button>
       <div style="color:var(--t2);font-size:12px;margin-top:6px">
         اگر استیکر گم یا کپی شده: کدِ تازه بساز. استیکرِ فعلی از همان لحظه
         <b>باطل</b> می‌شود و باید دوباره چاپ شود.
@@ -373,7 +373,7 @@ async function tableRegenerateQr(id){
       box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">
           ${esc(res.offline ? 'اتصال به سرور برقرار نیست — کد عوض نشد.' : (res.error?.message || 'بازتولیدِ کد ناموفق بود.'))}
         </div>
-        <button class="btn btn-sm btn-ghost" onclick="tableLoadQr('${esc(id)}')">نمایشِ کدِ فعلی</button>`;
+        <button class="btn btn-sm btn-ghost" onclick="tableLoadQr(${jsq(id)})">نمایشِ کدِ فعلی</button>`;
     }
     return;
   }

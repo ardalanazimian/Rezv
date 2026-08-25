@@ -7,7 +7,7 @@
 import { API, isLoggedIn } from '../api.js';
 import { fmtFa } from '../data/discover.js';
 import { armReveals, buzz } from '../theme-pwa.js';
-import { esc, openSheet, toast } from '../auth.js';
+import { esc, jsq, openSheet, toast } from '../auth.js';
 import { icon } from '../icons.js';
 
 // نمادِ اعتبار — عمداً آیکونِ SVG (نه ایموجی) و اسمِ متفاوت از tierهایِ وفاداری.
@@ -27,7 +27,7 @@ function missionCard(m){
   const btn = m.claimed
     ? `<span class="mission-claimed">${icon('checkCircle',{size:14})} دریافت شد</span>`
     : m.completed
-      ? `<button class="btn btn-primary btn-sm" onclick="claimMission('${m.id}')">دریافتِ جایزه</button>`
+      ? `<button class="btn btn-primary btn-sm" onclick="claimMission(${jsq(m.id)})">دریافتِ جایزه</button>`
       : `<span class="mission-progress-label">${fmtFa(m.progress)}/${fmtFa(m.target_count)}</span>`;
   return `<div class="loy-action-card reveal" style="align-items:flex-start;cursor:default">
     <div class="lac-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)">${icon('sparkle',{size:20})}</div>
@@ -48,7 +48,7 @@ function rewardCard(it){
     <div class="bdg-emoji">${icon(it.kind==='gift_card_credit'?'creditCard':it.kind==='priority_boost'?'trending':'gift',{size:26})}</div>
     <div class="bdg-name">${it.title}</div>
     <div class="bdg-desc">${fmtFa(it.cost_coins)} سکه${!it.in_stock?' — موجودی تمام شد':locked?` — نیازِ ${REPUTATION_BADGE[it.min_tier]?.name || 'سطحِ بالاتر'}`:''}</div>
-    <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" ${disabled?'disabled':''} onclick="redeemReward('${it.id}')">خرج کن</button>
+    <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" ${disabled?'disabled':''} onclick="redeemReward(${jsq(it.id)})">خرج کن</button>
   </div>`;
 }
 
@@ -158,7 +158,7 @@ function showRedeemedCode(code, label){
     <div class="sheet-title" style="text-align:center">${esc(label)} آماده‌ست</div>
     <div class="gift-success-card"><div class="gsc-code">${esc(code)}</div></div>
     <div class="sheet-sub" style="text-align:center;margin-top:12px">این کد را نگه دار — هنگامِ پرداخت واردش کن</div>
-    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode('${esc(code)}')">کپی کد</button>
+    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode(${jsq(code)})">کپی کد</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
   </div>`);
 }

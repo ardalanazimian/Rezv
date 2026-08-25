@@ -164,8 +164,8 @@ function renderSalesOrders() {
       <div style="min-width:120px;font-size:13px;font-weight:700">${salesToman(o.amount_toman)}</div>
       <span class="badge ${st.cls}" style="align-self:flex-start"><span class="bdot"></span>${st.label}</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="openSalesOrder('${esc(o.id)}')">جزئیات</button>
-        ${canAct ? `<button class="btn btn-primary btn-sm" onclick="activateSalesOrder('${esc(o.id)}')">فعال‌سازی</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="openSalesOrder(${jsq(o.id)})">جزئیات</button>
+        ${canAct ? `<button class="btn btn-primary btn-sm" onclick="activateSalesOrder(${jsq(o.id)})">فعال‌سازی</button>` : ''}
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -186,8 +186,8 @@ function renderSalesInquiries() {
       </div>
       <span class="badge ${st.cls}" style="align-self:flex-start"><span class="bdot"></span>${st.label}</span>
       <div style="display:flex;gap:6px">
-        ${q.status === 'open' ? `<button class="btn btn-ghost btn-sm" onclick="setInquiryStatus('${esc(q.id)}','in_progress')">در حالِ پیگیری</button>` : ''}
-        ${q.status !== 'closed' ? `<button class="btn btn-primary btn-sm" onclick="setInquiryStatus('${esc(q.id)}','closed')">بستن</button>` : ''}
+        ${q.status === 'open' ? `<button class="btn btn-ghost btn-sm" onclick="setInquiryStatus(${jsq(q.id)},'in_progress')">در حالِ پیگیری</button>` : ''}
+        ${q.status !== 'closed' ? `<button class="btn btn-primary btn-sm" onclick="setInquiryStatus(${jsq(q.id)},'closed')">بستن</button>` : ''}
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -229,9 +229,9 @@ function openSalesOrder(id) {
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">بستن</button>
       ${o.status !== 'activated' && o.status !== 'rejected' ? `
-        <button class="btn btn-ghost" onclick="rejectSalesOrder('${esc(o.id)}')">رد کردن</button>
-        ${o.status === 'pending' ? `<button class="btn btn-ghost" onclick="contactSalesOrder('${esc(o.id)}')">تماس گرفتم</button>` : ''}
-        ${o.kind === 'purchase' ? `<button class="btn btn-primary" onclick="activateSalesOrder('${esc(o.id)}')">فعال‌سازیِ اشتراک</button>` : ''}
+        <button class="btn btn-ghost" onclick="rejectSalesOrder(${jsq(o.id)})">رد کردن</button>
+        ${o.status === 'pending' ? `<button class="btn btn-ghost" onclick="contactSalesOrder(${jsq(o.id)})">تماس گرفتم</button>` : ''}
+        ${o.kind === 'purchase' ? `<button class="btn btn-primary" onclick="activateSalesOrder(${jsq(o.id)})">فعال‌سازیِ اشتراک</button>` : ''}
       ` : ''}
     </div>`);
 }

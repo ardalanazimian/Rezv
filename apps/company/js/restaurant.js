@@ -18,8 +18,8 @@ function rDetail(){
       </div>
       <div class="detail-actions">
         <span class="badge ${badgeCls}" style="align-self:center"><span class="bdot"></span>${statusText}</span>
-        <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen('${r.id}')">${r.isOpen?`${icon('lock',{size:14})} غیرفعال کردن`:`${icon('check',{size:14})} فعال کردن`}</button>
-        <button class="btn btn-primary btn-sm" onclick="openRenew('${r.id}')">${icon('refresh',{size:14})} مدیریت اشتراک</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen(${jsq(r.id)})">${r.isOpen?`${icon('lock',{size:14})} غیرفعال کردن`:`${icon('check',{size:14})} فعال کردن`}</button>
+        <button class="btn btn-primary btn-sm" onclick="openRenew(${jsq(r.id)})">${icon('refresh',{size:14})} مدیریت اشتراک</button>
       </div>
     </div>
     <div class="kpi-grid">
@@ -75,11 +75,11 @@ function rAnalytics(){
     <div class="row-2">
       <div class="panel">
         <div class="panel-head"><div class="panel-title">برترین بر اساس باشگاه</div></div>
-        ${topByMembers.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest('${r.id}')"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.reservations)} رزرو</div></div><div class="ls-val">${fa(r.members)}</div></div>`).join('')}
+        ${topByMembers.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest(${jsq(r.id)})"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.reservations)} رزرو</div></div><div class="ls-val">${fa(r.members)}</div></div>`).join('')}
       </div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title">برترین بر اساس رزرو</div></div>
-        ${topByRes.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest('${r.id}')"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.members)} عضو</div></div><div class="ls-val">${fa(r.reservations)}</div></div>`).join('')}
+        ${topByRes.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest(${jsq(r.id)})"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.members)} عضو</div></div><div class="ls-val">${fa(r.reservations)}</div></div>`).join('')}
       </div>
     </div>`;
 }

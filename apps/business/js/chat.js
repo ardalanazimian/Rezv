@@ -22,7 +22,7 @@ async function rChat(){
   sub.textContent = res.data.unread_threads > 0 ? `${res.data.unread_threads} گفتگوی خوانده‌نشده` : 'همه خوانده شد';
   if (!items.length) { box.innerHTML = `<div class="chat-empty">هنوز پیامی از مشتری نیومده.</div>`; return; }
   box.innerHTML = items.map(t => `
-    <div class="chat-inbox-row" role="button" tabindex="0" onclick="openBizChat('${t.id}','${chatEsc(t.customer.name)}','${chatEsc(t.customer.phone||'')}')">
+    <div class="chat-inbox-row" role="button" tabindex="0" onclick="openBizChat(${jsq(t.id)},${jsq(chatEsc(t.customer.name))},${jsq(chatEsc(t.customer.phone||''))})">
       <div class="chat-inbox-ava">${chatEsc(t.customer.name.charAt(0))}</div>
       <div class="chat-inbox-main">
         <div class="chat-inbox-top"><span class="chat-inbox-name">${chatEsc(t.customer.name)}</span>${t.reservation_code?`<span class="chat-inbox-tag">#${chatEsc(t.reservation_code)}</span>`:''}</div>

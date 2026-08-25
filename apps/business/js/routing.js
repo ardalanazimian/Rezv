@@ -105,7 +105,7 @@ function openBranchSwitcher(){
   const curId=API.getActiveRestaurant();
   openModal(`<div class="modal-title">انتخاب شعبه</div><div class="modal-sub">داده‌های پنل بر اساس شعبه‌ی انتخابی نمایش داده می‌شود</div>
     <div style="margin-top:14px">${BRANCHES.map(b=>`
-      <div class="staff-row" style="cursor:pointer;${b.id===curId?'background:var(--blue-50);border-radius:12px':''}" onclick="selectBranch('${esc(b.id)}')">
+      <div class="staff-row" style="cursor:pointer;${b.id===curId?'background:var(--blue-50);border-radius:12px':''}" onclick="selectBranch(${jsq(b.id)})">
         <div class="staff-ava">${esc((b.name||'?').charAt(0))}</div>
         <div style="flex:1"><div style="font-size:14px;font-weight:700">${esc(b.name)}</div><div style="font-size:12px;color:var(--t2)">${b.is_open?`<span class="live-dot" aria-hidden="true"></span> باز`:`<span class="dot-closed" aria-hidden="true"></span> بسته`}</div></div>
         ${b.id===curId?`<span class="badge badge-brand">${icon('check',{size:12})} فعال</span>`:''}
