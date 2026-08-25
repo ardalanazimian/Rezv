@@ -482,7 +482,13 @@ function attachDates(values: readonly number[], firstDay: string): DemandForecas
  * گزارش می‌شود). نسخه‌ی قبلی به‌جای آن، عددِ روزِ دیگری را به‌نامِ فردا
  * نشان می‌داد.
  */
-function buildForecastSeries(
+/**
+ * ⚠️ export شد (۲۰۲۶-۰۸-۲۵) چون `incentive-engine.findLowDemandDay` نگاشتِ
+ * «گام → تاریخ» را برای خودش **دوباره پیاده کرده بود** و همان‌جا اشتباه شد:
+ * مبدأ را `new Date()` می‌گرفت در حالی که پیش‌بینی به `lastObservedDay`
+ * گره خورده است. یک نگاشت، یک پیاده‌سازی (§۲۲).
+ */
+export function buildForecastSeries(
   state: SeriesModelState,
   horizonDays: number,
   todayIso: string,
