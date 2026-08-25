@@ -1,4 +1,4 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -90,11 +90,24 @@ async function seedConfirmed() {
   });
 }
 
-before(async () => {
-  // شمارنده‌ی rate-limit بینِ اجراها نشت می‌کند و از اجرای دوم ۴۲۹ می‌دهد.
-  const stale = await redis.keys('*auth*');
-  if (stale.length) await redis.del(...stale);
+/**
+ * سطلِ `RULES.auth` سقفِ ۲۰ در دقیقه دارد و بینِ فایل‌ها مشترک است (همه با
+ * IPِ «unknown»). این تابع فقط سطل‌هایی را که *خودِ این فایل* مصرف می‌کند
+ * صفر می‌کند — عمداً `rl:chkin:*` را دست نمی‌زند تا تستِ ریت‌لیمیتِ چک‌ینِ QR
+ * در فایلِ دیگر خراب نشود.
+ *
+ * ⚠️ `beforeEach` عمداً **داخلِ** describe است، نه سطحِ فایل: در این رانرِ
+ * تک‌پروسه‌ای، هوکِ سطحِ فایل هوکِ ریشه می‌شود و قبل از *هر* تستِ سوئیت اجرا
+ * می‌شود — که یعنی پاک‌کردنِ سطلِ تستِ ریت‌لیمیتِ دیگران.
+ */
+async function clearOwnRateLimits() {
+  for (const p of ['rl:auth:*', 'rl:srch:*']) {
+    const keys = await redis.keys(p);
+    if (keys.length) await redis.del(...keys);
+  }
+}
 
+before(async () => {
   const t = await db.tenant.create({ data: { name: `[DEMO] tenant panel-checkin ${SFX}` } });
   tenantId = t.id;
   const r = await db.restaurant.create({
@@ -133,6 +146,8 @@ after(async () => {
 });
 
 describe('امتیازِ حضور از مسیرِ واقعیِ پنل (§۱۳)', () => {
+  beforeEach(clearOwnRateLimits);
+
   test('کنترلِ مثبت: PATCH .../status انتقال را واقعاً انجام می‌دهد', async () => {
     // بدونِ این، تستی که روتِ همیشه-۴۰۳ بگیرد هم می‌توانست «امتیاز صفر» را
     // به‌عنوانِ باگ گزارش کند. اول ثابت می‌کنیم سیمِ auth/RBAC/انتقال سالم است.
@@ -232,6 +247,8 @@ describe('امتیازِ حضور از مسیرِ واقعیِ پنل (§۱۳)',
 });
 
 describe('سطحِ باشگاه (tier) واقعاً نوشته می‌شود (§۱۳)', () => {
+  beforeEach(clearOwnRateLimits);
+
   test('کنترلِ منفی: عضوِ تازه با امتیازِ کم هنوز bronze است', async () => {
     // اگر تستِ بعدی بدونِ این بود، یک `tier='silver'`ِ هاردکد هم پاسش می‌کرد.
     const balance = await getClubPointsBalance(userId, restaurantId);

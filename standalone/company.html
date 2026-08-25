@@ -1805,8 +1805,19 @@ function rOverview(){
   const sub = PLATFORM_STATS?.subscription_breakdown || RESTAURANTS.reduce((a,r)=>{ a[r.status]=(a[r.status]||0)+1; return a; },{active:0,expiring:0,expired:0,trial:0,trial_expired:0});
   const health = PLATFORM_STATS?.system_health || (API.online ? '—' : null);
   const healthMeta = {healthy:['checkCircle','سالم','green'],warning:['alert','نیاز به بررسی','amber'],critical:['alert','بحرانی','red']}[health] || ['info','نامشخص','s-400'];
+  // ⚠️ صداقتِ CLV (فازِ ۲، docs/ML_CONTRACT.md): `platform_clv_toman` حالا وقتی
+  // هیچ مهمانی مبلغِ اندازه‌گیری‌شده ندارد `null` است (قبلاً سرور COALESCE به ۰
+  // می‌کرد و این‌جا «ارزش مهمانان پلتفرم: ۰ تومان» نوشته می‌شد — یعنی ادعایِ
+  // «اندازه گرفتیم و هیچ بود»). `platform_clv_status==='insufficient_data'`
+  // صریحاً یعنی «هنوز اندازه‌گیری‌ناپذیر»، نه صفر. صفحه‌ی «هوش تجاری» همین
+  // پنل از قبل همین رفتار را داشت؛ حالا هر دو یک چیز می‌گویند.
   const clv = PLATFORM_STATS?.platform_clv_toman;
+  const clvUnmeasured = PLATFORM_STATS && (clv==null || PLATFORM_STATS.platform_clv_status==='insufficient_data');
+  const vipCount = PLATFORM_STATS?.total_vips||0;
   const fnl=n=>n==null?'—':n>=1000000?fa(+(n/1000000).toFixed(1))+'م':n>=1000?fa(Math.round(n/1000))+'ک':fa(n);
+  const clvLine = clvUnmeasured
+    ? `ارزش مهمانان پلتفرم (CLV): اندازه‌گیری‌ناپذیر · ${fa(vipCount)} مهمان VIP`
+    : (clv!=null ? `ارزش مهمانان پلتفرم (CLV): ${fnl(clv)} تومان · ${fa(vipCount)} مهمان VIP` : 'برای جزئیات کلیک کن');
 
   document.getElementById('v-overview').innerHTML=`
     <div class="kpi-grid">
@@ -1823,7 +1834,7 @@ function rOverview(){
         <div style="display:flex;align-items:center;gap:14px;padding:8px 0">
           <div style="color:var(--${healthMeta[2]}-600,var(--t1))">${icon(healthMeta[0],{size:38})}</div>
           <div><div style="font-size:18px;font-weight:800;color:var(--${healthMeta[2]}-600,var(--t1))">${healthMeta[1]}</div>
-          <div style="font-size:12.5px;color:var(--t2);margin-top:2px">${clv!=null?`ارزش مهمانان پلتفرم (CLV): ${fnl(clv)} تومان · ${fa(PLATFORM_STATS?.total_vips||0)} مهمان VIP`:'برای جزئیات کلیک کن'}</div></div>
+          <div style="font-size:12.5px;color:var(--t2);margin-top:2px">${clvLine}</div></div>
         </div>
         <button class="btn btn-ghost btn-block" style="margin-top:8px">جزئیات سلامت سیستم ${icon('arrowL',{size:13})}</button>
       </div>
