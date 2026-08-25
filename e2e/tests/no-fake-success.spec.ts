@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { mockApi } from './helpers/mock-api';
+import { DEMO_RESTAURANTS, mockApi } from './helpers/mock-api';
 import { gotoApp, openFirstRestaurant, login } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -110,8 +110,9 @@ test.describe('P0-3 — قطعیِ شبکه هرگز به موفقیتِ جعل�
     await openFirstRestaurant(page);
 
     await goOffline(page);
-    await page.evaluate(() =>
-      (window as unknown as { joinWaitlist: (id: number) => Promise<void> }).joinWaitlist(1)
+    await page.evaluate(
+      (id) => (window as unknown as { joinWaitlist: (id: string) => Promise<void> }).joinWaitlist(id),
+      DEMO_RESTAURANTS[0].id,
     );
 
     const body = page.locator('#sheetBody');
@@ -129,8 +130,9 @@ test.describe('P0-3 — قطعیِ شبکه هرگز به موفقیتِ جعل�
     await openFirstRestaurant(page);
 
     // اول با شبکه‌ی سالم واقعاً به صف بپیوند (تا WL مقدارِ واقعی بگیرد)…
-    await page.evaluate(() =>
-      (window as unknown as { joinWaitlist: (id: number) => Promise<void> }).joinWaitlist(1)
+    await page.evaluate(
+      (id) => (window as unknown as { joinWaitlist: (id: string) => Promise<void> }).joinWaitlist(id),
+      DEMO_RESTAURANTS[0].id,
     );
     await expect(page.locator('#sheetBody')).toContainText(/صف|انتظار|نوبت/, { timeout: 8000 });
 
@@ -153,8 +155,9 @@ test.describe('P0-3 — قطعیِ شبکه هرگز به موفقیتِ جعل�
     await login(page);
     await openFirstRestaurant(page);
 
-    await page.evaluate(() =>
-      (window as unknown as { joinWaitlist: (id: number) => Promise<void> }).joinWaitlist(1)
+    await page.evaluate(
+      (id) => (window as unknown as { joinWaitlist: (id: string) => Promise<void> }).joinWaitlist(id),
+      DEMO_RESTAURANTS[0].id,
     );
     await expect(page.locator('#sheetBody')).toContainText(/صف|انتظار|نوبت/, { timeout: 8000 });
 

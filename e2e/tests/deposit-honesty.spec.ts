@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockApi } from './helpers/mock-api';
+import { DEMO_RESTAURANTS, mockApi } from './helpers/mock-api';
 import { gotoApp, openFirstRestaurant } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -28,8 +28,10 @@ test('رستورانِ بدونِ بیعانه: «رزرو رایگان» گفت
 test('رستورانِ دارایِ بیعانه: هرگز «بدون پیش‌پرداخت» ادعا نمی‌شود', async ({ page }) => {
   await gotoApp(page);
   // رستورانِ ۲ (سوشی بار) — deposit_required: true
-  await page.evaluate(() =>
-    (window as unknown as { openRest: (id: number) => void }).openRest(2)
+  // [merge ۰۸-۲۵] id از خودِ mock می‌آید نه عددِ هاردکد: mock حالا UUID می‌دهد (شکلِ واقعیِ تولید).
+  await page.evaluate(
+    (id) => (window as unknown as { openRest: (id: string) => void }).openRest(id),
+    DEMO_RESTAURANTS[1].id,
   );
   const sub = page.locator('.rp-bookbar-sub');
   await expect(sub).toBeVisible({ timeout: 8000 });
@@ -43,8 +45,10 @@ test('رستورانِ دارایِ بیعانه: هرگز «بدون پیش‌�
 
 test('شیتِ رزرو هم همان حقیقت را می‌گوید، نه متنِ ثابت', async ({ page }) => {
   await gotoApp(page);
-  await page.evaluate(() =>
-    (window as unknown as { openRest: (id: number) => void }).openRest(2)
+  // [merge ۰۸-۲۵] id از خودِ mock می‌آید نه عددِ هاردکد: mock حالا UUID می‌دهد (شکلِ واقعیِ تولید).
+  await page.evaluate(
+    (id) => (window as unknown as { openRest: (id: string) => void }).openRest(id),
+    DEMO_RESTAURANTS[1].id,
   );
   await page.getByRole('button', { name: /رزرو میز/ }).click();
   await expect(page.locator('#sheet')).toBeVisible();
@@ -57,8 +61,9 @@ test('شیتِ رزرو هم همان حقیقت را می‌گوید، نه م�
 test('رستورانِ بدونِ دادهٔ سیاست: هیچ ادعایی نمی‌کند (سکوت، نه حدس)', async ({ page }) => {
   await gotoApp(page);
   // رستورانِ ۳ در mock اصلاً booking_policy ندارد → depositRequired = null
-  await page.evaluate(() =>
-    (window as unknown as { openRest: (id: number) => void }).openRest(3)
+  await page.evaluate(
+    (id) => (window as unknown as { openRest: (id: string) => void }).openRest(id),
+    DEMO_RESTAURANTS[2].id,
   );
   // ⚠️ عمداً toBeVisible استفاده نمی‌شود: وقتی سرور چیزی نگفته، depositLabel()
   // رشته‌ی خالی برمی‌گرداند و این عنصر خالی (و از دیدِ Playwright «hidden»)

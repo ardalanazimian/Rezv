@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { mockApi } from './helpers/mock-api';
+import { DEMO_RESTAURANTS, mockApi } from './helpers/mock-api';
 import { gotoApp, login, openFirstRestaurant } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -323,7 +323,7 @@ test.describe('تبِ سفرها رزروِ ناموجود نمی‌سازد (§
         body: JSON.stringify([{
           code: 'RZREAL9', status: 'confirmed', partySize: 2,
           slotStart: new Date(Date.now() + 86_400_000).toISOString(),
-          restaurantId: 1, restaurant: { name: '[DEMO] کافه گل‌ها', slug: 'demo-cafe-golha' },
+          restaurantId: DEMO_RESTAURANTS[0].id, restaurant: { name: '[DEMO] کافه گل‌ها', slug: 'demo-cafe-golha' },
         }]),
       }));
     await gotoApp(page);

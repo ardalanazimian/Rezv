@@ -92,6 +92,8 @@ export async function renderTrips(){
   // حالا: نمی‌دانیم ⇒ حالتِ خالیِ صادق («هنوز رزروی نداری») که از قبل ساخته
   // شده بود. تنها استثنا بسته‌ی آفلاینِ تک‌فایلی که خودش دموست.
   let trips = isOfflineDemo() ? TRIPS : [];
+  // بنرِ «این‌ها نمونه‌اند» (#67): فقط وقتی واقعاً داده‌ی نمونه نشان می‌دهیم.
+  let isDemo = isOfflineDemo();
 
   if(isLoggedIn()){
     listEl.setAttribute('aria-busy','true');

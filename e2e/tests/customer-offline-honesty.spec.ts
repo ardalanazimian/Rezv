@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { mockApi } from './helpers/mock-api';
+import { DEMO_RESTAURANTS, mockApi } from './helpers/mock-api';
 import { gotoApp, login } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -119,7 +119,7 @@ test('لغوِ رزرو: قطعیِ شبکه رزرو را «لغو‌شده» �
       body: JSON.stringify([{
         code: 'RZTEST01', status: 'confirmed', partySize: 2,
         slotStart: tomorrow.toISOString(),
-        restaurantId: 1,
+        restaurantId: DEMO_RESTAURANTS[0].id,
         restaurant: { name: '[DEMO] رستورانِ تست', slug: 'demo-test' },
       }]),
     });
