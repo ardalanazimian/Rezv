@@ -70,10 +70,33 @@ export async function enqueueSms(job: SmsJob): Promise<void> {
 }
 
 /** ارسال واقعی یک SMS از طریق کاوه‌نگار (توسط worker صف یا مسیر OTP صدا زده می‌شود). */
+/**
+ * آیا پیامک واقعاً قابلِ ارسال است؟ (کلیدِ کاوه‌نگار تنظیم شده؟)
+ * مسیرهایی که **نتیجه‌شان به رسیدنِ پیامک وابسته است** — مثلِ OTP — باید
+ * پیش از ادعای موفقیت این را بپرسند.
+ */
+export function smsTransportReady(): boolean {
+  return Boolean(process.env.KAVENEGAR_API_KEY);
+}
+
 export async function sendSmsNow(job: SmsJob): Promise<void> {
   const apiKey = process.env.KAVENEGAR_API_KEY;
   if (!apiKey) {
-    log.debug(`(dev) SMS → ${job.to}`, { template: job.template });
+    // ⚠️ یافته‌ی ۲۰۲۶-۰۸-۲۵ — خطرناک‌ترین حالتِ «سکوت» در کلِ سیستم:
+    // بدونِ کلید، این تابع بی‌صدا برمی‌گشت و **هیچ متریکی** نمی‌خورد. برای
+    // پیامکِ تبلیغاتی قابلِ‌تحمل است، ولی برای OTP یعنی: کاربر شماره می‌زند،
+    // پاسخِ ۲۰۴ِ **موفق** می‌گیرد، پیامک هرگز نمی‌آید، و منتظر می‌ماند.
+    // چون OTP_DEV_MODE در production استثنا می‌دهد، هیچ راهِ دیگری هم برای
+    // گرفتنِ کد نیست ⇒ **هیچ‌کس نمی‌تواند وارد شود** — نه مشتری، نه
+    // رستوران‌دار، نه ادمین — در حالی که API بالاست و لاگ تمیز.
+    // حالا دستِ‌کم شمرده و در production با هشدار لاگ می‌شود؛ و مسیرِ OTP
+    // خودش پیش از ادعای موفقیت `smsTransportReady()` را می‌پرسد.
+    metrics.smsFailed.inc({ template: job.template, reason: 'no_api_key' });
+    if (process.env.NODE_ENV === 'production') {
+      log.error('KAVENEGAR_API_KEY تنظیم نشده — هیچ پیامکی ارسال نمی‌شود', { template: job.template });
+    } else {
+      log.debug(`(dev) SMS → ${job.to}`, { template: job.template });
+    }
     return;
   }
   const receptor = toLocalNumber(job.to);

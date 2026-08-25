@@ -117,6 +117,7 @@ import './notification-consent-enforcement.test.mts';
 import './observability-coverage.test.mts';
 import './otp.test.mts';
 import './otp-ratelimit-and-deadlock.integration.test.mts';
+import './sms-transport-failclosed.integration.test.mts';
 import './outreach-ledger.integration.test.mts';
 import './zarinpal.test.mts';
 import './payments.integration.test.mts';

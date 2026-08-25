@@ -2,7 +2,7 @@ import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { db } from './db';
 import { enforceRateLimit, RULES } from './ratelimit';
 import { Err } from './errors';
-import { enqueueSms } from './sms';
+import { enqueueSms, smsTransportReady } from './sms';
 
 const hash = (s: string) => createHash('sha256').update(s + process.env.JWT_SECRET).digest('hex');
 
@@ -44,6 +44,16 @@ export async function requestOtp(rawPhone: string): Promise<{ devCode?: string }
   // حالت dev: کد روی صفحه برمی‌گردد، پس نیازی به پیامک (و کاوه‌نگار) نیست.
   // این باعث می‌شود لاگین بدون هیچ وابستگی خارجی کار کند — برای تست قبل از راه‌اندازی SMS.
   // production حتماً پیامک می‌فرستد و کد را برنمی‌گرداند.
+  // ⚠️ گاردِ fail-closed (یافته‌ی ۲۰۲۶-۰۸-۲۵): اگر ترانسپورتِ پیامک آماده
+  // نباشد، **قبل از** ادعای موفقیت شکست بخور. بدونِ این، مسیر ۲۰۴ِ موفق
+  // برمی‌گرداند در حالی که هیچ پیامکی نرفته و — چون OTP_DEV_MODE در
+  // production استثنا می‌دهد — هیچ راهِ دیگری هم برای گرفتنِ کد نیست.
+  // نتیجه: کلِ محصول غیرقابلِ‌استفاده، بدونِ هیچ خطای قابلِ‌مشاهده‌ای.
+  // همان الگویِ ALLOWED_ORIGINS در middleware: بسته، نه بازِ خاموش.
+  if (process.env.NODE_ENV === 'production' && !smsTransportReady()) {
+    throw Err.serviceUnavailable('ارسال پیامک موقتاً در دسترس نیست؛ کمی بعد دوباره تلاش کنید');
+  }
+
   const devMode = process.env.OTP_DEV_MODE === 'true';
   // ⚠️ فیکسِ حسابرسیِ ۲۰۲۶-۰۷-۱۹ (FINAL-PRODUCTION-AUDIT.md بخشِ ۳): قبلاً اینجا فقط
   // console.warn بود و چیزی جلوی OTP_DEV_MODE=true در production را نمی‌گرفت — یعنی

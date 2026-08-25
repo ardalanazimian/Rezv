@@ -16,6 +16,9 @@ export const Err = {
   lockTimeout:  () => new ApiError('SLOT_LOCK_TIMEOUT', 'این بازه در حال رزرو توسط کاربر دیگری است؛ دوباره تلاش کنید', 423),
   validation:   (msg: string, details: object = {}) => new ApiError('VALIDATION', msg, 422, details),
   rateLimited:  (retryAfterSec?: number) => new ApiError('RATE_LIMITED', 'تعداد درخواست بیش از حد مجاز', 429, retryAfterSec ? { retryAfterSec } : {}),
+  // وابستگیِ بیرونیِ لازم در دسترس نیست. عمداً ۵۰۳ و نه ۵۰۰: این خرابیِ ما
+  // نیست، ناتوانیِ **موقتِ** سرویس است و کلاینت باید بداند دوباره تلاش کند.
+  serviceUnavailable: (message: string) => new ApiError('SERVICE_UNAVAILABLE', message, 503),
 
   // ── خطاهای مشخص موتور رزرو (نیاز ۱۵: پیام بامعنی) ──
   restaurantClosed: () => new ApiError('RESTAURANT_CLOSED', 'رستوران در این زمان بسته است', 422),
