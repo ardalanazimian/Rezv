@@ -457,6 +457,9 @@ function showStaffLogin(){
   setTimeout(()=>document.getElementById('staffUser')?.focus(),200);
 }
 
+/** اطلاعاتِ کارمند در حالتِ دمو/آفلاین — همان شکلی که مسیرِ OTP می‌سازد. */
+const DEMO_STAFF_INFO = { role:'owner', restaurant_name:'کافه‌رستوران ویستا' };
+
 async function staffPasswordLogin(){
   const u = (document.getElementById('staffUser')?.value||'').trim();
   const p = document.getElementById('staffPass')?.value||'';
@@ -465,11 +468,24 @@ async function staffPasswordLogin(){
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
   const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
 
-  if (location.protocol === 'file:') { await enterStaffPanel(true); return; }
+  // ⚠️ باگِ P0 که با اسپکِ e2eِ تازه گرفته شد (۲۰۲۶-۰۸-۲۶): این سه خط
+  // `enterStaffPanel()` را صدا می‌زدند — تابعی که **در این اپ وجود ندارد**.
+  // نامِ واقعی `enterPanel` است (پایینِ همین فایل). یعنی ورودِ رمز — که از
+  // مهاجرتِ ۰۷۴ فرمِ *پیش‌فرضِ* این پنل است — با ReferenceError می‌مرد: توکن
+  // ذخیره می‌شد ولی overlay هرگز بسته نمی‌شد و کاربر گیر می‌کرد.
+  // هر ۹ جابِ CI سبز بود چون هیچ اسپکی این مسیر را درایو نمی‌کرد.
+  if (location.protocol === 'file:') { STAFF_INFO = DEMO_STAFF_INFO; enterPanel(true); return; }
 
   const res = await API.staffLogin(u, p);
-  if (res.ok && res.data?.access){ await enterStaffPanel(); return; }
-  if (res.offline){ await enterStaffPanel(true); return; }
+  if (res.ok && res.data?.access){
+    // STAFF_INFO دقیقاً مثلِ مسیرِ OTP ست می‌شود. بدونش منو و تاپ‌بار بدونِ
+    // نقش و نامِ رستوران رندر می‌شدند — همان واگرایی‌ای که کامنتِ
+    // `API.staffLogin` در data.js صریحاً منع می‌کند.
+    STAFF_INFO = res.data.staff || STAFF_INFO;
+    enterPanel();
+    return;
+  }
+  if (res.offline){ STAFF_INFO = DEMO_STAFF_INFO; enterPanel(true); return; }
   // پیامِ سرور برای «کاربر نیست» و «رمز غلط» عمداً یکسان است؛ اینجا هم
   // نباید دقیق‌تر شود، وگرنه نشتی که سرور بست از سمتِ کلاینت باز می‌شود.
   toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');

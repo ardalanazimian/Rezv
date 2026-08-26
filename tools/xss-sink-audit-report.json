@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-26T05:17:57.587Z",
+  "generated_at": "2026-08-26T07:36:08.548Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -1147,14 +1147,14 @@
     },
     {
       "file": "apps/business/js/staff-system.js",
-      "line": 481,
+      "line": 497,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "dom_api_safe"
     },
     {
       "file": "apps/business/js/staff-system.js",
-      "line": 516,
+      "line": 532,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "unsafe"
@@ -2077,56 +2077,56 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7524,
+      "line": 7540,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7559,
+      "line": 7575,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7690,
+      "line": 7706,
       "kind": "innerHTML",
       "snippet": "view.innerHTML = `<div class=\"panel\"><div class=\"panel-head\"><div class=\"panel-title\">پیام‌های مشتریان</div><div class=\"panel-sub\" id=\"chatInboxSub\">در حال بارگ",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7694,
+      "line": 7710,
       "kind": "innerHTML",
       "snippet": "if (!res.ok) { box.innerHTML = `<div class=\"chat-empty\">اتصال برقرار نشد.</div>`; return; }",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7697,
+      "line": 7713,
       "kind": "innerHTML",
       "snippet": "if (!items.length) { box.innerHTML = `<div class=\"chat-empty\">هنوز پیامی از مشتری نیومده.</div>`; return; }",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7698,
+      "line": 7714,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = items.map(t => `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7752,
+      "line": 7768,
       "kind": "innerHTML",
       "snippet": "if (initial && !msgs.length) body.innerHTML = `<div class=\"chat-empty-thread\">هنوز پیامی نیست.</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7776,
+      "line": 7792,
       "kind": "innerHTML",
       "snippet": "if (pend) pend.querySelector('.chat-b-t').innerHTML = icon('alert',{size:14});",
       "classification": "dom_api_safe"
@@ -2140,14 +2140,14 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7749,
+      "line": 7765,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7768,
+      "line": 7784,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
       "classification": "safe_static"
