@@ -69,7 +69,7 @@ async function sendAssistantMessage(){
   assistantAppend(`<div class="chat-b them">${esc(d.answer)}</div>`);
   if (!d.understood && Array.isArray(d.suggestions) && d.suggestions.length){
     const chips = d.suggestions.map(s =>
-      `<button class="btn btn-sm btn-ghost" style="margin:2px" onclick="assistantTeach('${d.log_id}','${s.intent}',this)">${esc(s.label)}</button>`
+      `<button class="btn btn-sm btn-ghost" style="margin:2px" onclick="assistantTeach(${jsq(d.log_id)},${jsq(s.intent)},this)">${esc(s.label)}</button>`
     ).join('');
     assistantAppend(`<div class="chat-b them" style="background:transparent;padding:2px 0">${chips}</div>`);
   }

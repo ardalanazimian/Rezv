@@ -2399,7 +2399,7 @@ function offerWaitlist(id, r){
         <div class="wl-benefit"><span class="wl-bene-ic">⏱️</span><div><b>تخمین زمان</b><small>می‌دونی چقدر باید صبر کنی</small></div></div>
         <div class="wl-benefit"><span class="wl-bene-ic">${icon('check',{size:18})}</span><div><b>کنترلِ کامل</b><small>آفر رو راحت قبول یا رد کن</small></div></div>
       </div>
-      <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="buzz&&buzz();joinWaitlist('${esc(String(id))}')">پیوستن به لیست انتظار</button>
+      <button class="btn btn-primary btn-lg btn-block" style="margin-top:18px" onclick="buzz&&buzz();joinWaitlist(${jsq(String(id))})">پیوستن به لیست انتظار</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
     </div>`;
 }
@@ -2666,14 +2666,14 @@ function openBookSheet(id){
   openSheet(`
     <div class="bs-head"><div class="bs-title">رزرو میز</div><div class="bs-rest">${esc(r.n)}</div></div>
     <div id="bwDemoBanner"></div>
-    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots('${esc(String(id))}')">${
+    <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${jsq(String(id))})">${
       dates.map(d=>`<option value="${d.iso}"${d.iso===dateSel?' selected':''}>${esc(d.label)}</option>`).join('')
     }</select></div>
-    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots('${esc(String(id))}')">${
+    <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots(${jsq(String(id))})">${
       Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
     }</select></div>
     <div class="bw-field"><label>ساعت</label><select id="bwTime"><option>در حال بررسی...</option></select></div>
-    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook('${esc(String(id))}')">بررسی میزهای موجود</button>
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px" onclick="startBook(${jsq(String(id))})">بررسی میزهای موجود</button>
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">${depositLabel(r)}</div>
   `);
   refreshSlots(id);
@@ -2775,7 +2775,7 @@ function bookStep2(r){
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
     ${preorderBlock}
-    <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3('${esc(String(r.id))}')">ادامه</button>`;
+    <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3(${jsq(String(r.id))})">ادامه</button>`;
 }
 // wrapperِ سراسری: onclick در scope سراسری اجرا می‌شود و به R (ماژولی) دسترسی ندارد،
 // پس lookup را اینجا (با دسترسی به R) انجام می‌دهیم.
@@ -2812,7 +2812,7 @@ function bookStep3(r){
     <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${esc(r.n)}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
     ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook('${esc(String(r.id))}')">تأیید رزرو</button>`;
+    <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(r.id))})">تأیید رزرو</button>`;
 }
 async function confirmBook(id){
   const r=findR(id);
@@ -2894,7 +2894,7 @@ async function confirmBook(id){
         <div class="sheet-title" style="text-align:center">رزرو ثبت نشد</div>
         <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}</div>
         <div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:14px 0">اتصال به سرورِ رزرونو برقرار نشد، پس این رزرو در سیستمِ رستوران ثبت نشده و کدِ رزروی هم صادر نشده. یادآورِ پیامکی ارسال نمی‌شود. با وصل‌شدنِ اینترنت دوباره تلاش کن.</div>
-        <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook('${esc(String(id))}')">تلاش دوباره</button>
+        <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(id))})">تلاش دوباره</button>
         <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
       </div>`;
     return;
@@ -2923,7 +2923,7 @@ async function confirmBook(id){
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
       <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
       <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}<br>یادآور با پیامک می‌فرستیم</div>
-      <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode('${esc(code)}')" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
+      <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode(${jsq(code)})" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
       ${(r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
       <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
       <button class="btn btn-primary btn-lg btn-block" onclick="closeSheet();go('trips')">رزروهای من</button>
@@ -2958,6 +2958,10 @@ function syncSearchCtx(){
   // بی‌خطر روی عنصرهایِ نامعتبر no-op می‌شود (querySelector آن‌ها را پیدا
   // نمی‌کند)، پس نیازی به چک‌کردنِ صفحه‌ی فعلی نیست.
   if(document.getElementById('sQ')) doSearch();
+  // چیپ‌هایِ ساعتِ کارت‌ها برایِ تاریخ/تعدادِ نفرِ *قبلی* حساب شده‌اند — باطل
+  // و دوباره واکشی می‌شوند. بدونِ این، انتخابِ «فردا، ۶ نفر» ساعت‌هایِ «امروز،
+  // ۲ نفر» را زیرِ برچسبِ جدید نشان می‌داد.
+  invalidateCardSlots();
 }
 
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
@@ -3291,6 +3295,9 @@ function syncNavPoints(){
 // فقط در مسیرِ کاملاً آفلاین/بدونِ‌slug استفاده می‌شود.
 const EMPTY_RB = { food: 0, service: 0, atmo: 0, value: 0 };
 
+/** شناسه‌ی رستورانِ واقعی همیشه UUID است؛ idِ نمونه عددِ کوچک. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** بازه‌ی قیمت به شکلِ نمایشی — priceBandِ بک‌اند عددِ ۱..۴ است. */
 function priceBandStr(band){
   return (Number.isInteger(band) && band >= 1) ? '$'.repeat(Math.min(4, band)) : null;
@@ -3436,6 +3443,53 @@ async function loadMoreRestaurants(){
   const list = res.ok ? (res.data?.items || []) : [];
   NEXT_CURSOR = res.data?.next_cursor || null;
   return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  سانس‌هایِ پیش‌نمایشِ کارت — GET /restaurants/availability (گروهی)
+//
+//  ⚠️ حلقه‌ی نیمه‌کاره‌ای که این می‌بندد: `mapApiRestaurant` بالا از روزِ اول
+//  `apiR.available_slots` را می‌خواند، ولی **هیچ روتی این فیلد را
+//  برنمی‌گرداند** (چک‌شده) — پس برایِ هر رستورانِ زنده همیشه `[]` می‌ماند و
+//  کارت فقط CTAِ «ببین سانس‌ها» می‌گیرد. حالا یک روتِ گروهی وجود دارد که
+//  همان موتورِ availabilityِ شیتِ رزرو را صدا می‌زند.
+//
+//  چرا گروهی و نه یکی‌یکی: ۲۴ کارت یعنی ۲۴ درخواستِ همزمان از موبایل.
+//
+//  صداقت: فقط سانسِ *واقعاً آزادِ* برگشته از سرور نوشته می‌شود. شکستِ
+//  درخواست هیچ‌چیز نمی‌نویسد — کارت به همان CTAِ آرام برمی‌گردد، نه ساعتِ
+//  حدسی. رستورانِ نمونه (بدونِ slug) اصلاً پرسیده نمی‌شود.
+// ═══════════════════════════════════════════════════════════
+
+/** سقفِ سرور در هر درخواست — با BULK_AVAILABILITY_MAX بک‌اند هماهنگ است. */
+const AVAIL_BULK_MAX = 24;
+
+/**
+ * سانس‌هایِ آزادِ فهرستی از رستوران‌هایِ زنده را می‌گیرد و روی خودشان می‌نویسد.
+ * @returns {Promise<boolean>} آیا چیزی واقعاً به‌روز شد (یعنی ارزشِ رندرِ دوباره دارد)؟
+ */
+async function hydrateSlots(list, date, party){
+  if (!Array.isArray(list) || !API.online) return false;
+  // فقط رستورانِ زنده: idِ نمونه UUID نیست و سرور هم نمی‌شناسدش.
+  const live = list.filter(r => r && r.slug && UUID_RE.test(String(r.id)));
+  if (!live.length) return false;
+
+  let changed = false;
+  for (let i = 0; i < live.length; i += AVAIL_BULK_MAX) {
+    const chunk = live.slice(i, i + AVAIL_BULK_MAX);
+    const qs = `ids=${chunk.map(r => encodeURIComponent(r.id)).join(',')}`
+             + `&date=${encodeURIComponent(date)}&party=${encodeURIComponent(party)}`;
+    const res = await API.get(`/restaurants/availability?${qs}`);
+    if (!res.ok || !res.data?.restaurants) continue;   // شکست = سکوت، نه ساعتِ ساختگی
+    for (const r of chunk) {
+      const entry = res.data.restaurants[r.id];
+      // شناسه‌ای که سرور برنگرداند یعنی «نمی‌شناسیمش» — دست‌نخورده می‌ماند.
+      if (!entry || !Array.isArray(entry.available_slots)) continue;
+      r.slots = entry.available_slots;
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 // ═══════════ جزئیاتِ رستوران — GET /restaurants/{slug} ═══════════
@@ -3597,6 +3651,38 @@ function go(p){
   if(p==='chats' && typeof renderChats==='function')renderChats();
 }
 function fmtFa(n){return n.toLocaleString('fa-IR')}
+// ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): قبلاً وقتی r.slots خالی
+// بود اینجا هیچ چیز رندر نمی‌شد — یعنی کارت بدونِ هیچ CTAیِ اقدام می‌ماند (نه
+// ساعتِ جعلی، نه راهِ جایگزین). حالا یک CTAِ آرام به شیتِ کاملِ رزرو (که خودش
+// availabilityِ واقعی را از API می‌خواند) باز می‌شود — هیچ ساعتِ اختراعی
+// نمایش داده نمی‌شود.
+//
+// از ۲۰۲۶-۰۸-۲۵ این تکه جدا شد چون دو مصرف‌کننده دارد: رندرِ اولیه‌ی کارت، و
+// به‌روزرسانیِ درجایِ چیپ‌ها بعد از رسیدنِ availabilityِ گروهی. جدا نبودنش
+// یعنی برایِ نشان‌دادنِ ساعت‌ها باید کلِ فید دوباره رندر می‌شد (فلشِ اسکلت).
+function slotsHTML(r){
+  const slots = Array.isArray(r.slots) ? r.slots : [];
+  if (slots.length) {
+    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${jsq(String(r.id))},${jsq(s)});haptic('select')">${s}</button>`).join('');
+  }
+  return `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet(${jsq(String(r.id))});haptic('select')">ببین سانس‌ها</button>`;
+}
+
+/**
+ * به‌روزرسانیِ درجایِ چیپ‌هایِ ساعت — بدونِ رندرِ دوباره‌ی فید.
+ *
+ * چرا درجا: `renderFeed` عمداً ۲۸۰ms اسکلت نشان می‌دهد. صدازدنش صرفاً برایِ
+ * رسیدنِ سانس‌ها یعنی کاربر بعد از دیدنِ کارت‌هایِ واقعی، دوباره اسکلت ببیند.
+ */
+function paintSlots(list){
+  const byId = new Map((list||[]).map(r=>[String(r.id), r]));
+  document.querySelectorAll('#feed .rc[data-rid]').forEach(card=>{
+    const r = byId.get(card.dataset.rid);
+    if(!r) return;
+    const box = card.querySelector('.rc-slots');
+    if(box) box.innerHTML = slotsHTML(r);
+  });
+}
 function cardHTML(r){
   const hot = isHot(r);
   // کارت خودش دکمه نمی‌شود چون داخلش دکمه دارد (تودرتوییِ نامعتبر). به‌جایش یک
@@ -3607,23 +3693,17 @@ function cardHTML(r){
   // idِ واقعی UUID است و بدونِ کوتیشن، onclick خطای syntax می‌داد و کلِ
   // CTAهای کارت برای رستورانِ واقعی مرده بودند (mockِ E2E با idِ عددی این
   // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
-  return `<article class="rc reveal">
+  return `<article class="rc reveal" data-rid="${esc(String(r.id))}">
     <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
-    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${esc(String(r.id))}')"></button>
+    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${jsq(String(r.id))})"></button>
     <span class="rc-emoji">${esc(r.e)}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
-    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav('${esc(String(r.id))}',this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
+    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
-      <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div>${r.rt!=null?`<div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div>`:'<div class="rc-rating rc-rating-new">تازه‌وارد</div>'}</div>
-      <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
+      <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div>${Number.isFinite(r.rt)&&r.rt>0?`<div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div>`:'<div class="rc-rating rc-rating-new">تازه‌وارد</div>'}</div>
+      <div class="rc-meta">${r.cuisine}${r.price?` · ${r.price}`:''} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
-      <div class="rc-slots">${r.slots.length?r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook('${esc(String(r.id))}','${s}');haptic('select')">${s}</button>`).join(''):
-        // ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): قبلاً وقتی r.slots
-        // خالی بود، اینجا هیچ چیز رندر نمی‌شد — یعنی کارت بدونِ هیچ CTAیِ
-        // اقدام می‌ماند (نه ساعتِ جعلی، نه راهِ جایگزین). حالا یک CTAِ آرام به
-        // شیتِ کاملِ رزرو (که خودش availabilityِ واقعی را از API می‌خواند) باز
-        // می‌شود — هیچ ساعتِ اختراعی نشان داده نمی‌شود.
-        `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet('${esc(String(r.id))}');haptic('select')">ببین سانس‌ها</button>`}</div>
+      <div class="rc-slots">${slotsHTML(r)}</div>
     </div>
   </article>`;
 }
@@ -3687,10 +3767,31 @@ function moreBtnHTML(list){
   if(list !== R || !NEXT_CURSOR) return '';
   return `<button type="button" class="btn btn-ghost btn-block feed-more" id="feedMore" onclick="loadMoreFeed()">رستوران‌های بیشتر</button>`;
 }
+// ⚠️ باگِ واقعیِ رقابتِ رندر (پیدا شده با E2E در ۲۰۲۶-۰۸-۲۵، بازتولید ~۱ از ۳
+// اجرا حتی با --workers=1 — پس ناپایداریِ تست نبود، باگِ واقعیِ کاربر بود):
+//
+// renderFeed اول اسکلت را همگام می‌کشد و کارت‌هایِ واقعی را ۲۸۰ms بعد در یک
+// setTimeout می‌نویسد. تا پیش از این، هیچ‌چیز جلویِ نوشتنِ یک رندرِ **کهنه**
+// روی نتیجه‌ی یک رندرِ **تازه‌تر** را نمی‌گرفت. سناریویِ واقعی:
+//   ۱. boot → renderFeed(R) با دادهٔ نمونه (setTimeout در راه است)
+//   ۲. کاربر سریع جست‌وجو می‌کند → doSearch حالتِ «پیدا نشد» را می‌نویسد
+//   ۳. setTimeoutِ مرحله‌ی ۱ می‌رسد و #feed را با **همه‌ی** رستوران‌ها بازنویسی
+//      می‌کند — کاربر نتیجه‌ی جست‌وجویش را از دست می‌دهد و فهرستِ کامل را
+//      «نتیجه‌ی جست‌وجو» فرض می‌کند. دقیقاً همان رگرسیونی که تستِ
+//      social-proof «جست‌وجوی بی‌نتیجه» می‌خواست بگیرد.
+// همین اتفاق برای syncRestaurants (دادهٔ واقعیِ سرور که دیرتر می‌رسد) هم می‌افتاد.
+//
+// رفع: یک ژتونِ صعودی. هر نوشتنی روی #feed ژتون را جلو می‌برد؛ setTimeout فقط
+// وقتی رنگ می‌زند که ژتونش هنوز جاری باشد. رندرِ کهنه بی‌صدا کنار می‌رود.
+let FEED_TOKEN = 0;
+/** ابطالِ هر رندرِ در جریانِ فید — هر کسی که مستقیم #feed را می‌نویسد باید صدایش بزند. */
+function invalidateFeed(){ return ++FEED_TOKEN; }
 function renderFeed(list){
   const f=document.getElementById('feed');
+  const token=invalidateFeed();
   f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
   setTimeout(()=>{
+    if(token!==FEED_TOKEN) return;   // رندرِ تازه‌تری از راه رسیده — این یکی کهنه است
     f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);
     const io=new IntersectionObserver(es=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);io.unobserve(e.target)}}),{threshold:.05});
     f.querySelectorAll('.rc').forEach(c=>io.observe(c));
@@ -3740,7 +3841,7 @@ function filterVibe(v,el){
 function hCardHTML(r,extra){
   // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
   const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
-  return `<div class="hcard" role="button" tabindex="0" onclick="openRest('${esc(String(r.id))}')">
+  return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${jsq(String(r.id))})">
     <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
@@ -3839,7 +3940,12 @@ async function renderEvents(){
       el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('calendar',{size:40})}</div><div class="empty-state-title">فعلاً رویدادِ ویژه‌ای نیست</div><div class="empty-state-desc">به‌محضِ اعلامِ رستوران‌ها همین‌جا می‌بینی‌اش</div></div>`;
       return;
     }
-    const events=list.map(e=>({rid:e.restaurantId,emoji:e.emoji||'🎉',title:e.title,rest:'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
+    // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): rest همیشه خالی بود (نامِ میزبان نمایش
+    // داده نمی‌شد) و کلیک فقط با restaurantId کار می‌کرد — اگر رستوران در
+    // صفحه‌ی بارگذاری‌شده‌ی فید نبود، کارت عملاً کلیکِ مرده بود. حالا API
+    // restaurant_slug/restaurant_name می‌دهد و openRestBySlug با slug حتی
+    // رستورانِ خارج از فید را باز می‌کند.
+    const events=list.map(e=>({rid:e.restaurantId,slug:e.restaurant_slug||'',emoji:e.emoji||'🎉',title:e.title,rest:e.restaurant_name||'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
     el.innerHTML=eventsHtml(events,false);
     return;
   }
@@ -3853,7 +3959,7 @@ async function renderEvents(){
 /** مارکاپِ کارت‌های رویداد. isDemo=true چیپِ «نمونه» را اضافه می‌کند. */
 function eventsHtml(events,isDemo){
   return events.map(e=>`
-    <div class="event-card" role="button" tabindex="0" onclick="openRest('${esc(String(e.rid))}')">
+    <div class="event-card" role="button" tabindex="0" onclick="openRestBySlug(${jsq(String(e.rid))},${jsq(String(e.slug||''))})">
       <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
@@ -3914,6 +4020,7 @@ function doSearch(){
   if(list.length){ renderFeed(list); return; }
   // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
   // می‌داد — کاربر شش کارت می‌دید و گمان می‌کرد این‌ها نتیجه‌ی جست‌وجویش‌اند.
+  invalidateFeed();   // هر renderFeedِ در جریان را باطل کن، وگرنه ۲۸۰ms بعد این حالتِ خالی را می‌پوشاند
   document.getElementById('feed').innerHTML=`
     <div class="empty" style="grid-column:1/-1">
       <div class="empty-emoji" aria-hidden="true">🔍</div>
@@ -4005,7 +4112,16 @@ window.toggleRestFav = toggleRestFav;
 // کند؛ برای همین متنِ toast صریحاً «لینکِ رزرونو» می‌گوید، نه «لینکِ این رستوران».
 // ساختنِ deep-link واقعی (routing بر اساسِ query/hash) خارج از دامنه‌ی این
 // رفعِ نقطه‌ای است — به KNOWN_LIMITATIONS اضافه شده.
-async function shareRestaurant(name){
+// ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): این تابع قبلاً نامِ رستوران را مستقیم از
+// داخلِ onclickِ اینلاین می‌گرفت — `shareRestaurant('${esc(r.n)}')`. برای
+// رستورانِ زنده، r.n نامِ owner-controlledِ سرور است و esc فقط برای متنِ HTML
+// امن است، نه برای رشته‌ی JS داخلِ attribute: پارسرِ HTML مقدارِ attribute را
+// *قبل* از پارسرِ JS decode می‌کند، پس `&#39;` به `'` برمی‌گردد و یک نامِ حاویِ
+// آپاستروف (مثلِ کافه‌ای با نامِ انگلیسیِ دارای ') هم دکمه را می‌شکست و هم
+// بردارِ تزریقِ JS باز می‌کرد. حالا فقط idِ UUID (فرمتِ امن) پاس می‌شود و نام
+// این‌جا از state حل می‌شود — هیچ متنِ سرور واردِ رشته‌ی HTML/JS نمی‌شود.
+async function shareRestaurant(id){
+  const name = findR(id)?.n || 'رزرونو';
   const url = location.href;
   if (navigator.share) {
     try { await navigator.share({ title: name, url }); } catch { /* کاربر لغو کرد یا مرورگر رد کرد — چیزی نگو */ }
@@ -4037,13 +4153,36 @@ async function shareRestaurant(name){
 //     مشتری نمی‌رسید. حالا صفحه اول فوری رندر می‌شود و بعد با داده‌ی
 //     واقعیِ سرور (عکس، لوگو، منو، امتیازِ تجمیعی) کامل می‌شود.
 function openRest(id){
-  const r=findR(id); if(!r) return;
+  const r=findR(id);
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): قبلاً روی نبودِ رستوران بی‌صدا return می‌کرد
+  // — کارتِ رویداد/سفر که به رستورانِ خارج از فیدِ بارگذاری‌شده اشاره می‌کند،
+  // کلیکِ مرده می‌شد بدونِ هیچ بازخوردی. حالا حداقل صادقانه اطلاع می‌دهد.
+  if(!r){ toast('','این رستوران فعلاً در دسترس نیست'); return; }
   setCurRest(r.id);
   renderRestPage(r);
   go('rest');
   finishRestRender();
   enrichRestPage(r);
 }
+// ⚠️ اضافه‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): بازکردنِ رستوران از جایی که فقط slug
+// می‌دانیم — مثلِ کارتِ رویداد، که به رستورانی اشاره می‌کند که ممکن است در
+// صفحه‌ی بارگذاری‌شده‌ی فید نباشد (فید صفحه‌بندی‌شده است). اگر در R بود همان
+// مسیرِ عادی؛ وگرنه از endpointِ جزئیات یک رکوردِ کمینه می‌سازیم، به R اضافه
+// می‌کنیم و صفحه را باز می‌کنیم — به‌جای کلیکِ مرده یا توستِ «در دسترس نیست».
+async function openRestBySlug(id, slug){
+  const existing = findR(id) || (slug ? R.find(x => x.slug === slug) : null);
+  if (existing) { openRest(existing.id); return; }
+  if (!slug || !API.online) { toast('','این رستوران فعلاً در دسترس نیست'); return; }
+  const d = await loadRestaurantDetail(slug);
+  if (!d) { toast('','این رستوران فعلاً در دسترس نیست'); return; }
+  // رکوردِ کمینه با همان شکلی که mapApiRestaurant می‌سازد (رستورانِ زنده:
+  // فیلدهای روایی خالی می‌مانند، هیچ‌چیز از نمونه قرض گرفته نمی‌شود).
+  const r = mapApiRestaurant({ id: d.id, slug: d.slug, name: d.name, cuisine: d.cuisine, vibes: d.vibes, priceBand: d.price_band });
+  applyRestaurantDetail(r, d);
+  R.push(r);
+  openRest(r.id);
+}
+
 /** بعد از رندرِ اولیه، جزئیاتِ واقعی را از سرور بگیر و صفحه را کامل کن. */
 async function enrichRestPage(r){
   // حداکثر یک درخواست به‌ازای هر بازشدنِ صفحه؛ بعد از موفقیت (detailLoaded +
@@ -4076,8 +4215,8 @@ function renderRestPage(r){
       <div class="rp-hero-mesh"${heroPhoto?' style="display:none"':''}></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
-        <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant('${esc(r.n)}')" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
-        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav('${esc(String(r.id))}')" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
+        <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant(${jsq(String(r.id))})" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
+        <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav(${jsq(String(r.id))})" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
       </div>
       ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-emoji">${esc(r.e)}</div>`}
       <div class="rp-hero-overlay">
@@ -4087,15 +4226,20 @@ function renderRestPage(r){
           ${r.slug?'':'<span class="rp-hero-badge demo">نمونه — دادهٔ آزمایشی</span>'}
         </div>
         <div class="rp-hero-name">${esc(r.n)}</div>
-        <div class="rp-hero-meta">
-          ${r.rt!=null?`<span class="rp-hero-rate"><span style="color:#FBBF24;display:inline-flex">${icon('star',{size:14,fill:true})}</span> ${fmtFa(r.rt)}</span>`:'<span class="rp-hero-rate">هنوز نظری ثبت نشده</span>'}
-          <span class="rp-hero-dot">·</span>
-          <span>${fmtFa(r.reviews)} نظر</span>
-          <span class="rp-hero-dot">·</span>
-          <span>${esc(r.cuisine)}</span>
-          ${r.price?`<span class="rp-hero-dot">·</span>
-          <span>${esc(r.price)}</span>`:''}
-        </div>
+        <div class="rp-hero-meta">${(() => {
+          // ⚠️ ادغامِ دو رفع (۲۰۲۶-۰۸-۲۵): ساختارِ آرایه‌ای یعنی نه «۰ نظر»ِ
+          // گمراه‌کننده رندر می‌شود و نه جداکننده‌ی معلق می‌ماند؛ و وقتی
+          // امتیازی نیست، به‌جای سکوت همان برچسبِ گویای «هنوز نظری ثبت نشده»
+          // نشان داده می‌شود. rt برای رستورانِ زنده‌ی بی‌امتیاز null است
+          // (api.js)، ولی گاردِ >۰ صفرِ احتمالی را هم پوشش می‌دهد.
+          const parts = [];
+          if (Number.isFinite(r.rt) && r.rt > 0) parts.push(`<span class="rp-hero-rate"><span style="color:#FBBF24;display:inline-flex">${icon('star',{size:14,fill:true})}</span> ${fmtFa(r.rt)}</span>`);
+          else parts.push('<span class="rp-hero-rate">هنوز نظری ثبت نشده</span>');
+          if (Number.isFinite(r.reviews) && r.reviews > 0) parts.push(`<span>${fmtFa(r.reviews)} نظر</span>`);
+          if (r.cuisine) parts.push(`<span>${esc(r.cuisine)}</span>`);
+          if (r.price) parts.push(`<span>${esc(r.price)}</span>`);
+          return parts.join('<span class="rp-hero-dot">·</span>');
+        })()}</div>
       </div>
     </div>
     <div class="wrap rp-body">
@@ -4118,6 +4262,14 @@ function renderRestPage(r){
           const hasRatingBars = r.rb.food || r.rb.service || r.rb.atmo || r.rb.value;
           const hasAiSummary = r.good.length || r.bad.length;
           if (!hasRatingBars && !hasAiSummary && !r.revs.length) {
+            // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): endpointِ جزئیات فقط میانگین و
+            // تعدادِ نظر را می‌دهد، نه متنِ تک‌تکِ نظرها — پس r.revs خالی می‌ماند
+            // حتی وقتی رستوران واقعاً نظر دارد. قبلاً این‌جا «هنوز نظری ثبت نشده»
+            // می‌گفت در حالی که hero «۵ نظر» نشان می‌داد؛ تناقضِ داده. حالا اگر
+            // امتیازِ تجمیعیِ واقعی هست، همان را صادقانه خلاصه می‌کنیم.
+            if (Number.isFinite(r.reviews) && r.reviews > 0) {
+              return `<div class="rb-overall glass" style="text-align:center"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">میانگینِ ${fmtFa(r.reviews)} نظر — متنِ نظرها به‌زودی این‌جا</div></div>`;
+            }
             return `<p class="rp-empty">هنوز نظری برای این رستوران ثبت نشده.</p>`;
           }
           return `
@@ -4139,14 +4291,23 @@ function renderRestPage(r){
         <div class="rp-bookbar-cb">${icon('wallet',{size:13})} ${fmtFa(r.cb)}٪ کش‌بک</div>
         <div class="rp-bookbar-sub">${depositLabel(r)}</div>
       </div>
-      <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openChat('${esc(r.slug||'')}')" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
-      <button class="btn btn-primary rp-bookbar-btn" onclick="buzz&&buzz();openBookSheet('${esc(String(id))}')">رزرو میز</button>
+      <button class="btn btn-ghost rp-msg-btn" onclick="buzz&&buzz();openRestChat(${jsq(String(r.id))})" aria-label="پیام به رستوران" ${r.slug?'':'disabled'}>${icon('message',{size:20})}</button>
+      <button class="btn btn-primary rp-bookbar-btn" onclick="buzz&&buzz();openBookSheet(${jsq(String(r.id))})">رزرو میز</button>
     </div>`;
+}
+
+// پیامِ رستوران: id (امن) می‌گیرد و slug را از state حل می‌کند — slug هرگز
+// واردِ رشته‌ی onclick نمی‌شود (هم‌الگوی رفعِ shareRestaurant).
+function openRestChat(id){
+  const r = findR(id);
+  if (r?.slug && typeof window.openChat === 'function') window.openChat(r.slug);
 }
 
 // ── نمایشِ تابعِ onclick روی window ──
 window.openRest = openRest;
 window.shareRestaurant = shareRestaurant;
+window.openRestChat = openRestChat;
+window.openRestBySlug = openRestBySlug;
 
 
 /* ═══ js/reservation.js ═══ */
@@ -4277,9 +4438,9 @@ async function renderTrips(){
     const swipe=t.status==='up'?{cls:'cancel',ic:'close',label:'لغو رزرو'}
       :(t.status!=='cancelled'&&t.rid)?{cls:'repeat',ic:'calendar',label:'رزرو مجدد'}:null;
     const acts=t.status==='up'
-      ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR('${esc(t.code)}','${esc(name)}')">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','${esc(t.slotStartIso||'')}')">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet('${esc(t.code)}','${esc(name)}','${esc(t.date)}','${esc(t.time)}','apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip('${esc(t.code)}',this)">لغو</button>`
+      ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR(${jsq(t.code)},${jsq(name)})">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},${jsq(t.slotStartIso||'')})">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},'apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip(${jsq(t.code)},this)">لغو</button>`
       : t.status==='cancelled' ? ''
-      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation('${esc(String(t.rid))}')">رزرو مجدد</button>${(t.serverRestaurantId&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="buzz&&buzz();openReviewSheet('${esc(t.serverRestaurantId)}','${esc(t.serverReservationId)}','${esc(name)}')">ثبت نظر</button>`:''}`:''}`;
+      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation(${jsq(String(t.rid))})">رزرو مجدد</button>${(t.serverRestaurantId&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="buzz&&buzz();openReviewSheet(${jsq(t.serverRestaurantId)},${jsq(t.serverReservationId)},${jsq(name)})">ثبت نظر</button>`:''}`:''}`;
     return `<div class="trip-card reveal ${t.status}${swipe?' has-swipe':''}">
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
       <div class="trip-card-inner">
@@ -4505,7 +4666,7 @@ function openReviewSheet(restaurantId, reservationId, name){
       <textarea id="rvBody" maxlength="1000" rows="4" placeholder="چی خوب بود؟ چی می‌تونست بهتر باشه؟"
         style="width:100%;border-radius:var(--radius-lg);border:1px solid var(--line);padding:10px;font-family:inherit;font-size:14px"></textarea></div>
     <button class="btn btn-primary btn-lg btn-block" style="margin-top:14px"
-      onclick="submitReview('${esc(restaurantId)}','${esc(reservationId)}')">ثبت نظر</button>
+      onclick="submitReview(${jsq(restaurantId)},${jsq(reservationId)})">ثبت نظر</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
   `);
 }
@@ -4685,7 +4846,7 @@ function missionCard(m){
   const btn = m.claimed
     ? `<span class="mission-claimed">${icon('checkCircle',{size:14})} دریافت شد</span>`
     : m.completed
-      ? `<button class="btn btn-primary btn-sm" onclick="claimMission('${m.id}')">دریافتِ جایزه</button>`
+      ? `<button class="btn btn-primary btn-sm" onclick="claimMission(${jsq(m.id)})">دریافتِ جایزه</button>`
       : `<span class="mission-progress-label">${fmtFa(m.progress)}/${fmtFa(m.target_count)}</span>`;
   return `<div class="loy-action-card reveal" style="align-items:flex-start;cursor:default">
     <div class="lac-icon" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)">${icon('sparkle',{size:20})}</div>
@@ -4706,7 +4867,7 @@ function rewardCard(it){
     <div class="bdg-emoji">${icon(it.kind==='gift_card_credit'?'creditCard':it.kind==='priority_boost'?'trending':'gift',{size:26})}</div>
     <div class="bdg-name">${it.title}</div>
     <div class="bdg-desc">${fmtFa(it.cost_coins)} سکه${!it.in_stock?' — موجودی تمام شد':locked?` — نیازِ ${REPUTATION_BADGE[it.min_tier]?.name || 'سطحِ بالاتر'}`:''}</div>
-    <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" ${disabled?'disabled':''} onclick="redeemReward('${it.id}')">خرج کن</button>
+    <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" ${disabled?'disabled':''} onclick="redeemReward(${jsq(it.id)})">خرج کن</button>
   </div>`;
 }
 async function renderEconomy(){
@@ -4815,7 +4976,7 @@ function showRedeemedCode(code, label){
     <div class="sheet-title" style="text-align:center">${esc(label)} آماده‌ست</div>
     <div class="gift-success-card"><div class="gsc-code">${esc(code)}</div></div>
     <div class="sheet-sub" style="text-align:center;margin-top:12px">این کد را نگه دار — هنگامِ پرداخت واردش کن</div>
-    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode('${esc(code)}')">کپی کد</button>
+    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode(${jsq(code)})">کپی کد</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
   </div>`);
 }
@@ -4831,7 +4992,7 @@ async function openReferral(){
     <div class="sheet-title" style="text-align:center">دوستات رو دعوت کن</div>
     <div class="sheet-sub" style="text-align:center;margin-bottom:18px">برای هر دوستی که با کد تو ثبت‌نام کنه و اولین رزروش رو انجام بده، ۵۰۰ امتیاز بگیر</div>
     <div class="ref-code-box"><div class="ref-code-label">کد دعوت تو</div><div class="ref-code">${esc(stats.code)}</div>
-      <button class="ref-copy" onclick="copyCode('${esc(stats.code)}')">کپی</button></div>
+      <button class="ref-copy" onclick="copyCode(${jsq(stats.code)})">کپی</button></div>
     <div class="ref-stats">
       <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.total_invited)}</div><div class="ref-stat-l">دعوت‌شده</div></div>
       <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.completed)}</div><div class="ref-stat-l">موفق</div></div>
@@ -4919,7 +5080,7 @@ function showGiftSuccess(code,amt,smsSent){
     <div class="sheet-title" style="text-align:center">کارت هدیه ساخته شد!</div>
     <div class="gift-success-card"><div class="gsc-amt">${fmtFa(Math.round(amt/1000))} هزار تومان</div><div class="gsc-code">${esc(code)}</div></div>
     <div class="sheet-sub" style="text-align:center;margin-top:12px">${smsSent?'کد برای گیرنده پیامک شد':'کد را خودت به گیرنده برسان'}</div>
-    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode('${esc(code)}')">کپی کد</button>
+    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="copyCode(${jsq(code)})">کپی کد</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
   </div>`);
 }
@@ -5397,7 +5558,7 @@ async function renderChats(){
   if (!items.length) { body.innerHTML = `<div class="chat-empty">هنوز گفتگویی نداری.<br>از صفحه‌ی هر رستوران می‌تونی پیام بدی.</div>`; return; }
 
   body.innerHTML = items.map(t => `
-    <div class="chat-row" role="button" tabindex="0" onclick="openChatThread('${t.id}','${chatEsc(t.restaurant.name)}')">
+    <div class="chat-row" role="button" tabindex="0" onclick="openChatThread(${jsq(t.id)},${jsq(t.restaurant.name)})">
       <div class="chat-row-avatar">${chatEsc(t.restaurant.name.charAt(0))}</div>
       <div class="chat-row-main">
         <div class="chat-row-top"><span class="chat-row-name">${chatEsc(t.restaurant.name)}</span>${t.reservation_code ? `<span class="chat-row-tag">#${chatEsc(t.reservation_code)}</span>` : ''}</div>
@@ -6428,7 +6589,7 @@ function openNotifPrefs(){
         <div class="np-item">
           <div class="np-ic">${icon(c.icon,{size:20})}</div>
           <div class="np-txt"><div class="np-title">${c.title}${c.hi?'<span class="np-hi">پیشنهادی</span>':''}</div><div class="np-desc">${c.desc}</div></div>
-          <label class="np-toggle"><input type="checkbox" data-cat="${c.id}" ${p[c.id]?'checked':''} onchange="setNotifPref('${c.id}',this.checked)"><span class="np-slider"></span></label>
+          <label class="np-toggle"><input type="checkbox" data-cat="${c.id}" ${p[c.id]?'checked':''} onchange="setNotifPref(${jsq(c.id)},this.checked)"><span class="np-slider"></span></label>
         </div>`).join('')}
     </div>
     <div class="np-foot">${icon('shield',{size:14})} ما هیچ‌وقت اعلان تبلیغاتی اسپم نمی‌فرستیم. کنترل کاملش دست توئه.</div>`);
@@ -6461,7 +6622,7 @@ async function requestNotifPerm(){
 window.openNotifPrefs = openNotifPrefs;
 window.requestNotifPerm = requestNotifPerm;
 // ⚠️ کنترلِ مرده (فازِ ۲، Batch 17): مارک‌آپِ همین فایل
-// `onchange="setNotifPref('${c.id}',this.checked)"` دارد، ولی این اپ ES module
+// `onchange="setNotifPref(${jsq(c.id)},this.checked)"` دارد، ولی این اپ ES module
 // است — تابعِ export‌شده از دسترسِ یک هندلرِ inline خارج است مگر روی window
 // بنشیند. نتیجه: **هر** کلیدِ تنظیماتِ اعلان ReferenceError می‌داد و هیچ
 // ترجیحی ذخیره نمی‌شد؛ کاربر کلید را می‌زد، ظاهرش عوض می‌شد و با بازکردنِ
@@ -6654,6 +6815,26 @@ function finishLogin(demo){
 function faNum(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
 // امنیت: escape کردن ورودی کاربر قبل از تزریق به HTML (جلوگیری از XSS)
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ───────────────────────────────────────────────────────────
+   jsq : یک literalِ **کاملِ** رشته‌ی JS که داخلِ attributeِ HTML هم امن است.
+
+   ⚠️ چرا esc() برای این بافت کافی نیست (آسیب‌پذیریِ واقعیِ ۲۰۲۶-۰۸-۲۵):
+   در `onclick="f(${jsq(x)})"` پارسرِ HTML مقدارِ attribute را **پیش از**
+   پارسرِ JS decode می‌کند. esc آپاستروف را به `&#39;` می‌برد، ولی مرورگر
+   همان را دوباره به `'` برمی‌گرداند و آن آپاستروف رشته‌ی JS را می‌بندد:
+       نامِ مهمان = x');alert(1)//   →   f('x');alert(1)//')
+   یعنی هر متنی که کاربر کنترل می‌کند (نامِ مهمان، یادداشت، نامِ آیتمِ منو)
+   در مرورگرِ کارکنان کد اجرا می‌کند → سرقتِ توکن → تصرفِ تنانت.
+
+   ترتیبِ jsq حیاتی است: **اول** JSON.stringify (escapeِ رشته‌ی JS)،
+   **بعد** esc (escapeِ HTML). پس از decodeِ مرورگر، آنچه به پارسرِ JS
+   می‌رسد یک literalِ درست‌escape‌شده است.
+
+   استفاده: onclick="f(${jsq(x)})"   — نه   onclick="f(${jsq(x)})"
+   خودِ jsq کوتیشن‌ها را می‌گذارد؛ دورش کوتیشن نگذار.
+   ─────────────────────────────────────────────────────────── */
+function jsq(v){ return esc(JSON.stringify(String(v==null?'':v))); }
 // تبدیل تاریخ/ساعت فارسی (امروز/فردا/...، ۱۹:۰۰) به فرمت ISO که بک‌اند می‌خواهد
 // بک‌اند انتظار date='YYYY-MM-DD' و time='HH:MM' (ارقام انگلیسی) دارد.
 function toApiDateTime(faDate, faTime){
@@ -6698,7 +6879,29 @@ function openSheet(html){
     else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
   };
   sheet.addEventListener('keydown',_sheetTrap);
-  setTimeout(()=>{ const el=sheet.querySelector('input:not([type=hidden]),button,select,textarea,a[href],[tabindex]:not([tabindex="-1"])'); if(el) try{el.focus()}catch(e){} },30);
+  // ⚠️ باگِ واقعیِ دزدیدنِ فوکوس (پیدا شده با E2E در ۲۰۲۶-۰۸-۲۵؛ بازتولید ~۱ از ۳
+  // اجرا زیرِ بار، همیشه سبز در ایزوله — یعنی رقابتِ زمان‌بندی، نه ناپایداریِ تست):
+  //
+  // این تایمر ۳۰ms بعد از هر openSheet فوکوس را به **اولین** عنصرِ فوکوس‌پذیرِ شیت
+  // می‌برد. اگر کاربر در همان پنجره‌ی ۳۰ms روی عنصرِ دیگری تپ کند و شروع به تایپ
+  // کند، فوکوس وسطِ کار از زیرِ دستش کشیده می‌شود و کاراکترها به فیلدِ اول می‌روند.
+  //
+  // چطور لو رفت: در شیتِ رزرو، نوشتن در «یادداشتِ آلرژی» بی‌صدا خالی می‌ماند چون
+  // فوکوس بینِ focus و درجِ متن به `#bkName` می‌پرید — یعنی یادداشتِ آلرژیِ مهمان
+  // **بی‌هیچ خطایی حذف می‌شد** و رزرو بدونِ آن ثبت. این دقیقاً همان چیزی است که
+  // §۹/§۱۰ (جریانِ ایمنیِ غذایی) می‌خواست جلویش را بگیرد؛ روی موبایل بدتر هم
+  // هست، چون کیبورد روی فیلدِ اشتباه باز می‌شود.
+  //
+  // اثبات (نه حدس): با هوکِ `sheetBody.innerHTML` نشان داده شد در اجرایِ قرمز
+  // **هیچ** بازنویسیِ شیت رخ نمی‌دهد و با این حال مقدارِ textarea بلافاصله بعد از
+  // نوشتن خالی است — پس ری‌رندر نبود، فوکوس دزدیده شده بود.
+  //
+  // رفع: نیتِ دسترس‌پذیری (بردنِ فوکوس به داخلِ شیتِ تازه‌بازشده) حفظ می‌شود، ولی
+  // اگر فوکوس **از قبل داخلِ شیت** است دیگر جابه‌جا نمی‌شود — انتخابِ کاربر برنده است.
+  setTimeout(()=>{
+    if(sheet.contains(document.activeElement)) return;
+    const el=sheet.querySelector('input:not([type=hidden]),button,select,textarea,a[href],[tabindex]:not([tabindex="-1"])'); if(el) try{el.focus()}catch(e){}
+  },30);
 }
 function closeSheet(){
   const sheet=document.getElementById('sheet');
@@ -6887,12 +7090,57 @@ async function syncRestaurants(){
   const fresh = await loadRestaurants();
   R = fresh;
   if (document.getElementById('page-discover')?.classList.contains('active')) {
-    renderFeed(R);
+    // ⚠️ اگر کاربر در این فاصله جست‌وجو کرده، renderFeed(R) نتیجه‌اش را با
+    // فهرستِ کامل بازنویسی می‌کرد (همان باگِ رقابتِ رندر؛ توضیحِ کامل روی
+    // renderFeed در data/discover.js). doSearch هم فیلتر را با دادهٔ تازه‌ی
+    // سرور دوباره اعمال می‌کند، هم وقتی جست‌وجو خالی است خودش renderFeed(R)
+    // را صدا می‌زند — پس هر دو حالت درست می‌ماند.
+    if (document.getElementById('sQ')?.value.trim()) doSearch();
+    else renderFeed(R);
     // فقط بخش‌هایِ وابسته به R — عمداً renderDiscoverSections نه، چون آن
     // `GET /events` و خواندنِ موقعیت را دوباره می‌فرستد و boot از قبل انجامشان
     // داده. (توضیحِ کامل روی renderDiscoverSections در data/discover.js.)
     renderRestaurantSections();
   }
+  refreshCardSlots();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  چیپ‌هایِ ساعتِ کارت — از availabilityِ واقعی، نه حدس
+//
+//  تا پیش از این `mapApiRestaurant` فیلدِ `available_slots` را می‌خواند که هیچ
+//  روتی برنمی‌گرداند، پس کارتِ هر رستورانِ زنده همیشه بدونِ ساعت بود. حالا روتِ
+//  گروهیِ `/restaurants/availability` همان موتورِ شیتِ رزرو را صدا می‌زند.
+//
+//  ⚠️ محافظِ ترتیب: کاربر می‌تواند تاریخ را سریع عوض کند. بدونِ این توکن،
+//  پاسخِ کندترِ انتخابِ *قبلی* می‌توانست بعد از پاسخِ انتخابِ جدید بنشیند و
+//  ساعت‌هایِ یک روزِ دیگر را زیرِ برچسبِ روزِ فعلی نشان بدهد.
+// ═══════════════════════════════════════════════════════════
+let slotsToken = 0;
+async function refreshCardSlots(){
+  const token = ++slotsToken;
+  const { date, party } = bookingCtx;
+  const target = R;
+  const changed = await hydrateSlots(target, date, party);
+  // انتخابِ کاربر (یا خودِ فهرست) عوض شده — این پاسخ دیگر معتبر نیست.
+  if (token !== slotsToken || target !== R) return;
+  if (changed) paintSlots(R);
+}
+
+/**
+ * انتخابِ تاریخ/تعدادِ نفر عوض شد: ساعت‌هایِ قبلی دیگر معتبر نیستند.
+ *
+ * اول پاکشان می‌کنیم و کارت به CTAِ «ببین سانس‌ها» برمی‌گردد، بعد تازه‌اش را
+ * می‌گیریم. نگه‌داشتنِ ساعتِ قبلی تا رسیدنِ پاسخ یعنی چیپِ «۲۰:۰۰» زیرِ
+ * برچسبِ «فردا، ۶ نفر» دیده شود در حالی که برایِ «امروز، ۲ نفر» حساب شده بود.
+ */
+function invalidateCardSlots(){
+  let had = false;
+  for (const r of R) {
+    if (r && Array.isArray(r.slots) && r.slots.length && r.slug) { r.slots = []; had = true; }
+  }
+  if (had) paintSlots(R);
+  refreshCardSlots();
 }
 
 // صفحه‌ی بعدیِ رستوران‌ها (دکمه‌ی «رستوران‌های بیشتر» در فیدِ کشف).
@@ -6907,6 +7155,9 @@ window.loadMoreFeed = async function(){
       R = R.concat(more);
       renderFeed(R);
       renderRestaurantSections();
+      // کارت‌هایِ تازه هم باید چیپِ ساعتِ واقعی بگیرند، وگرنه صفحه‌ی دومِ فید
+      // همیشه فقط CTAِ «ببین سانس‌ها» نشان می‌داد.
+      refreshCardSlots();
       return;
     }
     // سرور چیزی نداد: یا واقعاً تمام شده یا درخواست شکست خورده — در هر دو حالت

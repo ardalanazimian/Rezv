@@ -8,7 +8,7 @@
 //  اعلان‌ها فقط وقتی «ارزش واقعی» دارن فرستاده می‌شن، نه اسپم.
 // ═══════════════════════════════════════════════════════════
 import { API, isLoggedIn } from './api.js';
-import { openSheet, toast } from './auth.js';
+import { jsq, openSheet, toast } from './auth.js';
 import { icon } from './icons.js';
 export const NOTIF_KEY = 'rz_notif_prefs';
 export const NOTIF_CATS = [
@@ -112,7 +112,7 @@ export function openNotifPrefs(){
         <div class="np-item">
           <div class="np-ic">${icon(c.icon,{size:20})}</div>
           <div class="np-txt"><div class="np-title">${c.title}${c.hi?'<span class="np-hi">پیشنهادی</span>':''}</div><div class="np-desc">${c.desc}</div></div>
-          <label class="np-toggle"><input type="checkbox" data-cat="${c.id}" ${p[c.id]?'checked':''} onchange="setNotifPref('${c.id}',this.checked)"><span class="np-slider"></span></label>
+          <label class="np-toggle"><input type="checkbox" data-cat="${c.id}" ${p[c.id]?'checked':''} onchange="setNotifPref(${jsq(c.id)},this.checked)"><span class="np-slider"></span></label>
         </div>`).join('')}
     </div>
     <div class="np-foot">${icon('shield',{size:14})} ما هیچ‌وقت اعلان تبلیغاتی اسپم نمی‌فرستیم. کنترل کاملش دست توئه.</div>`);
@@ -145,7 +145,7 @@ export async function requestNotifPerm(){
 window.openNotifPrefs = openNotifPrefs;
 window.requestNotifPerm = requestNotifPerm;
 // ⚠️ کنترلِ مرده (فازِ ۲، Batch 17): مارک‌آپِ همین فایل
-// `onchange="setNotifPref('${c.id}',this.checked)"` دارد، ولی این اپ ES module
+// `onchange="setNotifPref(${jsq(c.id)},this.checked)"` دارد، ولی این اپ ES module
 // است — تابعِ export‌شده از دسترسِ یک هندلرِ inline خارج است مگر روی window
 // بنشیند. نتیجه: **هر** کلیدِ تنظیماتِ اعلان ReferenceError می‌داد و هیچ
 // ترجیحی ذخیره نمی‌شد؛ کاربر کلید را می‌زد، ظاهرش عوض می‌شد و با بازکردنِ

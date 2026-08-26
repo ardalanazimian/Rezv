@@ -16,14 +16,17 @@ export async function gotoApp(page: Page) {
 
 /** بازکردنِ اولین رستوران از فید. */
 export async function openFirstRestaurant(page: Page) {
-  // کارتِ واقعی یک دکمه‌ی .rc-open دارد (دکمه‌ی کشیده‌ای که کلِ کارت را با
-  // کیبورد هم قابلِ فوکوس می‌کند)؛ اسکلت‌های بارگذاری ندارند — پس انتظار روی
-  // همین دکمه یعنی صبر تا آمدنِ کارتِ واقعی، نه اسکلت.
+  // ⚠️ مقاوم‌سازی در برابرِ ری‌رندرِ فید (۲۰۲۶-۰۸-۲۵): فید اول اسکلت می‌سازد و
+  // بعد (۲۸۰ms) با کارت جایگزین می‌کند و دوباره پس از رسیدنِ دادهٔ API
+  // (syncRestaurants) رندر می‌شود — پس یک .rc-openِ ظاهراً پایدار می‌تواند دقیقاً
+  // حینِ کلیک detach شود و کلیک گم شود (زیرِ بارِ چند-worker فلیک می‌داد، در
+  // ایزوله همیشه سبز). حالا اگر صفحه باز نشد، کلیک را روی کارتِ نشسته تکرار می‌کنیم.
   const firstCard = page.locator('.rc .rc-open').first();
   await expect(firstCard).toBeVisible();
-  await firstCard.click();
-  // صفحه‌ی جزئیاتِ رستوران باید باز شود
-  await expect(page.locator('#page-rest')).toBeVisible();
+  await expect(async () => {
+    await firstCard.click({ timeout: 3000 });
+    await expect(page.locator('#page-rest')).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15000 });
 }
 
 /** ورود مستقل از UI و موتورِ مرورگر.

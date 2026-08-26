@@ -68,7 +68,7 @@ function rOverview(){
           const isExpired=r.status==='expired'||r.status==='trial_expired';const isTrial=r.status==='trial';
           return `<div class="alert-item">
             <div class="alert-ic ${isExpired?'danger':isTrial?'info':'warn'}">${isExpired?icon('close',{size:15}):isTrial?icon('gift',{size:15}):icon('clock',{size:15})}</div>
-            <div><b>${esc(r.name)}</b> ${isExpired?(r.daysLeft!=null?`اشتراکش ${fa(Math.abs(r.daysLeft))} روزه منقضی شده`:'اشتراکش منقضی شده'):isTrial?`${fa(r.daysLeft)} روز تا پایان دوره آزمایشی`:`${fa(r.daysLeft)} روز تا انقضای اشتراک`}<div style="margin-top:6px"><button class="btn btn-sm ${isExpired?'btn-primary':'btn-ghost'}" onclick="event.stopPropagation();openRenew('${r.id}')">${isExpired?'تمدید فوری':isTrial?'تبدیل به اشتراک':'تمدید'}</button></div></div>
+            <div><b>${esc(r.name)}</b> ${isExpired?(r.daysLeft!=null?`اشتراکش ${fa(Math.abs(r.daysLeft))} روزه منقضی شده`:'اشتراکش منقضی شده'):isTrial?`${fa(r.daysLeft)} روز تا پایان دوره آزمایشی`:`${fa(r.daysLeft)} روز تا انقضای اشتراک`}<div style="margin-top:6px"><button class="btn btn-sm ${isExpired?'btn-primary':'btn-ghost'}" onclick="event.stopPropagation();openRenew(${jsq(r.id)})">${isExpired?'تمدید فوری':isTrial?'تبدیل به اشتراک':'تمدید'}</button></div></div>
           </div>`;
         }).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:34})}</div><div class="empty-state-desc">همه‌ی اشتراک‌ها فعالن</div></div>`}
       </div>
@@ -118,7 +118,7 @@ function renderRestList(){
     else if(r.status==='expiring')statusText=`${fa(r.daysLeft)} روز مونده`;
     else if(r.status==='expired'||r.status==='trial_expired')statusText=r.daysLeft!=null?`${fa(Math.abs(r.daysLeft))} روز منقضی`:'منقضی';
     else if(r.status==='trial')statusText=`آزمایشی · ${fa(r.daysLeft)} روز`;
-    return `<div class="rest-row" role="button" tabindex="0" onclick="openRest('${r.id}')">
+    return `<div class="rest-row" role="button" tabindex="0" onclick="openRest(${jsq(r.id)})">
       <div class="rest-name-cell">
         <div class="rest-logo" style="background:${r.grad}">${r.logo}</div>
         <div style="min-width:0"><div class="rest-name">${esc(r.name)}</div><div class="rest-loc">پلن ${planBadge}</div></div>

@@ -54,6 +54,76 @@
 
 ## 2. Frontend
 
+- **Launch-readiness sweep — real bugs fixed, two residuals documented
+  (2026-08-25).** A multi-agent bug hunt (customer/business/company panels)
+  surfaced a batch of confirmed defects; each was verified by direct code read
+  before fixing:
+  - **Stored-XSS via restaurant name in an inline `onclick` (customer app) —
+    fixed.** `shareRestaurant('${esc(r.n)}')` and the message button passed a
+    server-controlled name/slug through a *JS-string-inside-HTML-attribute*
+    context. `esc()` is HTML-safe, not JS-string-safe: the HTML parser decodes
+    `&#39;`→`'` *before* the JS parser runs, so a restaurant named with an
+    apostrophe both broke the button and opened a JS-injection vector
+    (`');alert(1)//`). Fixed by passing only the UUID id through the handler and
+    resolving name/slug from client state (`shareRestaurant(id)` /
+    `openRestChat(id)`). The earlier menu-name/emoji XSS (commit `7ecd0d6`) was
+    the same class in a different spot.
+  - **Business panel showed cancelled/completed/expired reservations as
+    "confirmed" — fixed.** `mapResStatus` (`apps/business/js/data.js`) knew only
+    5 statuses and defaulted *everything else* to `'confirmed'` — so a
+    `cancelled` (the current canonical status), `completed`, `expired`,
+    `rejected`, `auto_cancelled`, `seated`, `dining`… all rendered as confirmed,
+    keeping a cancelled reservation's table held with staff none the wiser. The
+    panel's `STATUS_META` already had all 17 statuses; the fix is a pass-through
+    (normalising only the legacy `cancelled_by_*`/`no_show` aliases). Same class
+    the customer app's `mapTripStatus` was fixed for earlier.
+  - **SMS campaign: 3 of 4 segment choices always 400 — fixed.** The endpoint
+    (`restaurant/sms`) accepts `segment ∈ {gold,silver,bronze}` or none (= all);
+    the panel sent behavioural values `at_risk`/`all`. The segment cards are now
+    the loyalty tiers the backend can actually target (+ all → omit `segment`).
+  - **Walk-in birthday off by 2-3 months — fixed.** The panel's month select
+    emits a *Jalali* month index, but `createWalkin` built
+    `new Date(Date.UTC(1990, m-1, d))` (Gregorian) and `grantBirthdayRewards`
+    compares against the Gregorian current month — so a Farvardin birthday fired
+    in January. Now converted Jalali→Gregorian at the panel boundary via an
+    `Intl` persian-calendar helper (±1-day across leap years, vs. months off).
+  - **Analytics KPIs (business) — fixed.** "رزرو این هفته" summed all 4 weeks of
+    `weekly_reservations` (a 28-day total); now takes the current week. "میانگین
+    فاصله (روز)" read `avg_interval_days`, which the backend never returns, so it
+    always showed ۰; now shows «—» (unmeasured, not a false zero).
+  - **Customer honesty fixes.** Card/hero no longer show "★ ۰" for an unrated
+    live restaurant (show «جدید» / omit); the detail hero's review count no
+    longer contradicts the "no reviews yet" section (when the aggregate count is
+    real but review bodies aren't returned, it now shows an honest aggregate
+    summary); `openRest` on a missing restaurant gives a toast instead of a
+    silent dead click.
+  - **~~Residual — no member-create endpoint~~ SHIPPED same day (2026-08-25).**
+    `POST /restaurant/members` now exists (`lib/club-enroll.ts` — the same
+    atomic user-upsert + `clubCodeCounter` logic as `createWalkin`, without
+    creating a reservation; deliberately duplicated rather than refactoring the
+    reservation engine). Permission `canManageCampaigns`; idempotent on phone
+    (repeat → 200 with the same code); birth day/month arrive *Gregorian* (the
+    panel converts from Jalali before sending). The loyalty panel's "manual add
+    member" is wired to it and shows the real server code. Locked by
+    `tests/member-create.integration.test.mts` (create/idempotent/403/401/422).
+    **Bonus root-cause fix:** the dev seed inserted club codes directly but
+    never advanced `clubCodeCounter`, so on *any seeded environment* the first
+    real enrollment (walk-in or member-create) hit
+    `unique(restaurant_id, code)` → 500. The seed now seats the counter above
+    its highest inserted code. Production (unseeded) was never affected.
+  - **~~Residual — event cards can't deep-open a restaurant outside the feed~~
+    SHIPPED same day (2026-08-25).** `GET /events` now returns
+    `restaurant_slug` + `restaurant_name` alongside `restaurantId` (cache key
+    bumped to `events-v2` so no stale pre-change payload is served), and the
+    customer app's `openRestBySlug(id, slug)` opens a restaurant that is *not*
+    on the loaded discover page by fetching the slug-keyed detail endpoint and
+    appending a minimal live record to `R`. The card also shows the host name,
+    which was previously always blank. Locked by
+    `tests/events-restaurant-slug.integration.test.mts` (slug/name present,
+    `restaurantId` contract unbroken, raw relation not leaked, unpublished and
+    past events still excluded) and proven in a real browser: with the host
+    restaurant deliberately hidden from the feed, clicking the event card opens
+    its page with zero JS errors.
 - **JSON-LD published every menu price at one-tenth its real value — fixed
   2026-08-19.** `apps/seo/lib/schema.ts` emitted `price_toman` directly with
   `priceCurrency: 'IRR'`. Toman is not an ISO 4217 currency; IRR is the rial,
@@ -696,6 +766,102 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
 - Metrics endpoint is public unless `METRICS_TOKEN` is set — set it in prod.
 
 ## 7. Testing / CI
+
+### ممیزیِ پوششِ تست — ۲۰۲۶-۰۸-۲۵ (اندازه‌گیری‌شده، نه تخمینی)
+
+پوشش با `node --experimental-test-coverage` رویِ Postgres + Redisِ **واقعی**
+اندازه گرفته شد (نه از رویِ شمردنِ فایل‌های تست). خطِ پایه پیش از این تغییر:
+۸۴۳ تست، `all files` = ۸۷.۴۲٪ خط.
+
+#### ⚠️ اول: خودِ گزارشِ پوشش در این ریپو ناقص است
+
+**اندازه‌گیریِ A/B (۲۰۲۶-۰۸-۲۵):** یک ماژول با importِ *ایستا*
+(`import { x } from '../src/lib/y.ts'`) اصلاً **در گزارشِ پوشش ظاهر نمی‌شود**؛
+همان ماژول با importِ *پویا* (`await import(...)`) ظاهر می‌شود. رویِ فایلِ
+یکسان با تست‌های یکسان: ایستا → غایب، پویا → `automation.ts | 93.30 | …`.
+
+پس «غایب از گزارش» ≠ «تست ندارد». پنج ماژولی که در نگاهِ اول صفر به‌نظر
+می‌رسیدند — `fraud.ts`, `pricing.ts`, `idempotency.ts`, `model-drift.ts`,
+`sms-balance.ts` — در واقع **تستِ کامل دارند**؛ فقط فایل‌های تستشان از importِ
+ایستا استفاده می‌کنند. (تأیید: اجرای منفردِ `pricing.test.mts` → ۱۴/۱۴ سبز، و
+`pricing.ts` همچنان غایب از جدولِ پوشش.)
+
+نتیجه‌ی عملی: عددِ `all files` کفِ واقعی است، نه سقف — و هرکس از این ابزار
+برایِ تصمیم‌گیری استفاده می‌کند باید اول این را بداند. **(پیگیری: یکدست‌کردنِ
+سبکِ import در `tests/`، یا رفتن به ابزارِ پوششی که source-map را درست دنبال
+کند.)**
+
+#### ماژول‌هایی که واقعاً هیچ تستی ندارند
+
+معیار: نه در گزارشِ پوشش هستند، نه هیچ فایلِ تستی (به هیچ سبکی) نامشان را
+می‌برد. ۱۲ ماژول، به ترتیبِ اندازه:
+
+| ماژول | خط | وضعیت |
+|---|---|---|
+| `site-content.ts` | ۵۶۹ | بدونِ تست |
+| `assistant-answers.ts` | ۱۵۹ | بدونِ تست |
+| `assistant.ts` | ۱۴۷ | بدونِ تست |
+| `automation.ts` | ۱۴۶ | **پوشش داده شد ↓ (۹۳٪)** |
+| `rfm.ts` | ۱۱۳ | بدونِ تست |
+| `chat.ts` | ۹۹ | بدونِ تست |
+| `badges.ts` | ۹۳ | بدونِ تست |
+| `worker.ts` | ۷۷ | بدونِ تست |
+| `admin-customer-360.ts` | ۷۲ | بدونِ تست |
+| `feature-flags.ts` | ۴۵ | **پوشش داده شد ↓** |
+| `moderation-queue.ts` | ۲۴ | بدونِ تست |
+| `platform-admin.ts` | ۱۵ | بدونِ تست |
+
+از این‌ها `worker.ts` پرریسک‌ترینِ باقی‌مانده است: کلِ dispatchِ صف
+(SMS/Email/Push/Webhook) و تصمیمِ retry/DLQ از آن می‌گذرد. **(پیگیری)**
+
+کم‌پوشش‌ترین ماژول‌هایی که *لود* می‌شوند: `restaurant-manager.ts` ۲۶٪،
+`security.ts` ۲۸٪، `site-orders.ts` ۳۱٪، `loyalty.ts` ۳۵٪، `waitlist.ts` ۴۵٪،
+`rewards.ts` ۴۵٪، `missions.ts` ۴۵٪. **(پیگیری)**
+
+### باگِ یافته‌شده از دلِ همین ممیزی: کمپینی که هرگز نمی‌فرستاد (رفع شد)
+
+`lib/automation.ts` صفر پوشش داشت و دو trigger از پنجش عملاً هیچ‌وقت شلیک
+نمی‌کردند:
+
+- `post_visit` پنجره‌ی ثابتِ یک‌ساعته داشت (`slotEnd ∈ [now-(h+1)h, now-h)`).
+- `no_show_followup` رویِ `reservations.created_at >= now-6h` فیلتر می‌کرد.
+
+هر دو فرض می‌کردند cron هر چند دقیقه اجرا می‌شود — همان چیزی که کامنتِ خودِ
+`runAllDueAutomations` ادعا می‌کرد. واقعیتِ `api/vercel.json` و `cron/crontab`:
+تنها فراخوانش (`/v1/maintenance/customer-insights`) **روزی یک‌بار** ساعتِ ۰۳:۰۰
+اجرا می‌شود. پس post_visit فقط یک پنجره‌ی یک‌ساعته از هر شبانه‌روز را می‌دید، و
+no_show_followup رویِ زمانِ *ثبتِ رزرو* فیلتر می‌کرد نه زمانِ ثبتِ عدم‌حضور —
+و چون رزرو معمولاً روزها زودتر ثبت می‌شود، عملاً هیچ‌کس را نمی‌گرفت.
+
+**اندازه‌گیریِ زنده (اسکریپتِ probe رویِ Postgres واقعی، نه خواندنِ کد):**
+پیش از رفع `post_visit → sent = 0` و `no_show_followup → sent = 0` در سناریویی
+که هر دو باید یک نفر را می‌گرفتند؛ پس از رفع هر دو `sent = 1`.
+
+رفع: پنجره از `marketing_automations.last_run_at` مشتق می‌شود (با سقفِ عقب‌گردِ
+۲۵ ساعت تا فعال‌کردنِ کمپینِ قدیمی کلِ تاریخچه را پیامباران نکند)، و مبنایِ
+عدم‌حضور به `reservation_events.created_at` با `to_status='no_show'` منتقل شد.
+نتیجه مستقل از آهنگِ cron درست است: نه شکاف، نه ارسالِ تکراری.
+
+**اثباتِ قرمز-سبز:** رویِ منطقِ پیش از رفع ۷ از ۱۰ تستِ
+`tests/automation.integration.test.mts` قرمز می‌شود؛ رویِ کدِ رفع‌شده ۱۰/۱۰ سبز.
+
+### یافته‌ی ثبت‌شده و رفع‌نشده: `computeIntelligenceScore` هیچ فراخوان‌کننده‌ای ندارد
+
+`lib/customer-intelligence.ts` خودش را «تنها منبعِ فرمول» می‌نامد و کامنتِ
+`lib/rfm.ts` هم به آن به‌عنوانِ قفلِ فرمول ارجاع می‌دهد. ولی
+`grep -r computeIntelligenceScore` در کلِ ریپو فقط سه چیز پیدا می‌کند: تعریفش،
+یک *کامنت* در `rfm.ts`، و فایلِ تستِ خودش. **هیچ مسیرِ تولیدی صدایش نمی‌زند** —
+تنها پیاده‌سازیِ زنده، بازنویسیِ SQLِ آن در `rfm.ts` است.
+
+بدتر: آن دو **هم‌رفتار نیستند**. وقتی `mScore` نامعلوم است، نسخه‌ی TypeScript
+مقدارِ خنثی (۳) می‌گذارد و یک امتیازِ عددی برمی‌گرداند، ولی SQL عمداً
+`intelligence_score` را `NULL` می‌گذارد (تصمیمِ درستِ ممیزیِ ۲۰۲۶-۰۸-۱۹).
+یعنی تستِ `customer-intelligence.test.mts` رفتاری را قفل کرده که در تولید
+اجرا نمی‌شود، و رفتارِ واقعیِ تولید تستِ واحد ندارد.
+
+رفع نشد چون انتخابِ اینکه کدام معنا درست است (خنثی‌گذاری یا «محاسبه‌نشده»)
+تصمیمِ محصولی است، نه پاک‌سازیِ مکانیکی. **(پیگیری)**
+
 
 - ~~`test` job depends on `--test-force-exit`~~ **Fixed (2026-08-13).** That flag
   was itself the cause of flaky `# tests`/`# suites` counts between identical
@@ -1829,3 +1995,47 @@ if (diffDays < 0) return { status: 'expired', … };
 `tests/subscription.test.mts` — ۱۴ تست. **اثباتِ قرمز-سبز:** رویِ منطقِ قبل از
 رفع ۶ تست قرمز شد (هر چهار حالتِ زیرِ ۲۴ ساعت + نرمال‌سازیِ `-0` + همان پنجره
 در دوره‌ی آزمایشی)؛ رویِ کدِ رفع‌شده ۱۴/۱۴ سبز.
+
+---
+
+## `POST /restaurant/members` بدونِ مصرف‌کننده در پنل (تصمیمِ محصولی، باز)
+
+**تاریخ:** ۲۰۲۶-۰۸-۲۵ · **وضعیت:** باز — منتظرِ تصمیمِ محصولی، نه باگ
+
+### شرح
+
+`POST /api/v1/restaurant/members` وجود دارد، تست دارد
+(`tests/member-create.integration.test.mts`، ۵ تست)، permission-gated
+(`canManageCampaigns`) و rate-limited است — ولی **هیچ دکمه‌ای در پنلِ رستوران
+آن را صدا نمی‌زند**. `API.createMember` در `apps/business/js/data.js` هم به
+همین دلیل فعلاً بدونِ فراخوان است.
+
+### چرا این‌طور شد
+
+دو تصمیمِ درست که در دو برنچِ موازی گرفته شدند و در ادغام به هم رسیدند:
+
+* **PR #68** فرمِ «ثبتِ دستیِ عضو» را حذف کرد. استدلالش در آن لحظه کاملاً درست
+  بود: فرم محلی کار می‌کرد، کدِ ساختگیِ `VIS-xxx` می‌ساخت و با رفرش محو می‌شد،
+  چون endpointِ ساختِ عضو **وجود نداشت**. یک تستِ رگرسیون هم گذاشت که فرم
+  برنگردد (`e2e/tests/panels-batch8-regression.spec.ts:109`).
+* **این برنچ** (کامیتِ `aa5e0e7`) دقیقاً همان endpointِ غایب را ساخت.
+
+یعنی ایرادِ فنیِ #68 («کدِ ساختگی») دیگر برقرار نیست، ولی استدلالِ **محصولیِ**
+دومش هنوز سرِ جایش است: «عضوی که هیچ‌وقت مهمانِ شما نبوده در سیستم معنا ندارد».
+
+### تصمیمِ ادغام
+
+فرم **برنگشت**. برگرداندنش یعنی بازکردنِ یک تصمیمِ محصولیِ بازبینی‌شده در یک
+کامیتِ merge و ضعیف‌کردنِ تستی که طرفِ دیگر عمداً نوشته — هیچ‌کدام کارِ یک
+resolution نیست. endpoint و تست‌هایش ماندند چون قابلیتِ درست و آزموده‌ای‌اند.
+
+### برایِ تصمیم‌گیرنده
+
+اگر عضوگیریِ حضوری (بدونِ رزرو/واک‌این) قابلیتِ موردِ نظر است، مسیرش یک PRِ
+جداگانه است که: فرم را برمی‌گرداند (**بدونِ** selectِ سالِ تولد — بک‌اند فقط
+`birth_day`/`birth_month` دارد و گرفتنِ سال یعنی جمع‌کردنِ دادهٔ حساس و دور
+ریختنش) و تستِ رگرسیونِ بالا را به ادعایِ واقعی‌اش به‌روز می‌کند: «کدِ عضویت
+از سرور می‌آید، نه از کلاینت» — نه «فرم وجود ندارد».
+
+اگر جوابْ «نه، عضوگیری فقط با مهمان‌شدن» است، آن‌وقت این endpoint باید حذف شود،
+نه اینکه بی‌مصرف بماند.

@@ -321,8 +321,8 @@ function menuRowHTML(i){
       <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}</div>
       <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}${i.image_url?'':' · بدونِ عکس'}</div>
     </div>
-    <button class="btn btn-sm btn-ghost" onclick="menuOpenForm('${esc(i.id)}')">ویرایش</button>
-    <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuDelete('${esc(i.id)}')">حذف</button>
+    <button class="btn btn-sm btn-ghost" onclick="menuOpenForm(${jsq(i.id)})">ویرایش</button>
+    <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuDelete(${jsq(i.id)})">حذف</button>
   </div>`;
 }
 
@@ -344,9 +344,9 @@ function menuPhotoBoxHTML(it){
       این آیتم عکس ندارد. عکسِ غذا مهم‌ترین چیزی است که مهمان سرِ میز می‌بیند.
     </div>`}
     <input type="file" id="miPhotoFile" accept="image/jpeg,image/png,image/webp"
-           onchange="menuPickPhoto('${esc(it.id)}')" style="width:100%;font-size:13px">
+           onchange="menuPickPhoto(${jsq(it.id)})" style="width:100%;font-size:13px">
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-      ${has ? `<button type="button" class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuRemovePhoto('${esc(it.id)}')">حذفِ عکس</button>` : ''}
+      ${has ? `<button type="button" class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuRemovePhoto(${jsq(it.id)})">حذفِ عکس</button>` : ''}
     </div>
     <div style="color:var(--t2);font-size:12px;margin-top:6px">
       JPEG / PNG / WebP · حداکثر ۸ مگابایت · بی‌درنگ در منویِ عمومی دیده می‌شود.
@@ -419,7 +419,7 @@ function menuOpenForm(id){
       <input type="checkbox" id="miActive" ${!it || it.is_active ? 'checked' : ''}>
       <span>در منو نمایش داده شود</span>
     </label>
-    <button class="btn btn-primary btn-block" onclick="menuSave(${id?`'${esc(id)}'`:'null'})">${it?'ذخیره':'افزودن'}</button>`);
+    <button class="btn btn-primary btn-block" onclick="menuSave(${id?`${jsq(id)}`:'null'})">${it?'ذخیره':'افزودن'}</button>`);
 }
 
 async function menuSave(id){

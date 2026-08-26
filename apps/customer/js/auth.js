@@ -186,6 +186,26 @@ export function finishLogin(demo){
 export function faNum(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
 // امنیت: escape کردن ورودی کاربر قبل از تزریق به HTML (جلوگیری از XSS)
 export function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ───────────────────────────────────────────────────────────
+   jsq : یک literalِ **کاملِ** رشته‌ی JS که داخلِ attributeِ HTML هم امن است.
+
+   ⚠️ چرا esc() برای این بافت کافی نیست (آسیب‌پذیریِ واقعیِ ۲۰۲۶-۰۸-۲۵):
+   در `onclick="f(${jsq(x)})"` پارسرِ HTML مقدارِ attribute را **پیش از**
+   پارسرِ JS decode می‌کند. esc آپاستروف را به `&#39;` می‌برد، ولی مرورگر
+   همان را دوباره به `'` برمی‌گرداند و آن آپاستروف رشته‌ی JS را می‌بندد:
+       نامِ مهمان = x');alert(1)//   →   f('x');alert(1)//')
+   یعنی هر متنی که کاربر کنترل می‌کند (نامِ مهمان، یادداشت، نامِ آیتمِ منو)
+   در مرورگرِ کارکنان کد اجرا می‌کند → سرقتِ توکن → تصرفِ تنانت.
+
+   ترتیبِ jsq حیاتی است: **اول** JSON.stringify (escapeِ رشته‌ی JS)،
+   **بعد** esc (escapeِ HTML). پس از decodeِ مرورگر، آنچه به پارسرِ JS
+   می‌رسد یک literalِ درست‌escape‌شده است.
+
+   استفاده: onclick="f(${jsq(x)})"   — نه   onclick="f(${jsq(x)})"
+   خودِ jsq کوتیشن‌ها را می‌گذارد؛ دورش کوتیشن نگذار.
+   ─────────────────────────────────────────────────────────── */
+export function jsq(v){ return esc(JSON.stringify(String(v==null?'':v))); }
 // تبدیل تاریخ/ساعت فارسی (امروز/فردا/...، ۱۹:۰۰) به فرمت ISO که بک‌اند می‌خواهد
 // بک‌اند انتظار date='YYYY-MM-DD' و time='HH:MM' (ارقام انگلیسی) دارد.
 export function toApiDateTime(faDate, faTime){
@@ -230,7 +250,29 @@ export function openSheet(html){
     else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
   };
   sheet.addEventListener('keydown',_sheetTrap);
-  setTimeout(()=>{ const el=sheet.querySelector('input:not([type=hidden]),button,select,textarea,a[href],[tabindex]:not([tabindex="-1"])'); if(el) try{el.focus()}catch(e){} },30);
+  // ⚠️ باگِ واقعیِ دزدیدنِ فوکوس (پیدا شده با E2E در ۲۰۲۶-۰۸-۲۵؛ بازتولید ~۱ از ۳
+  // اجرا زیرِ بار، همیشه سبز در ایزوله — یعنی رقابتِ زمان‌بندی، نه ناپایداریِ تست):
+  //
+  // این تایمر ۳۰ms بعد از هر openSheet فوکوس را به **اولین** عنصرِ فوکوس‌پذیرِ شیت
+  // می‌برد. اگر کاربر در همان پنجره‌ی ۳۰ms روی عنصرِ دیگری تپ کند و شروع به تایپ
+  // کند، فوکوس وسطِ کار از زیرِ دستش کشیده می‌شود و کاراکترها به فیلدِ اول می‌روند.
+  //
+  // چطور لو رفت: در شیتِ رزرو، نوشتن در «یادداشتِ آلرژی» بی‌صدا خالی می‌ماند چون
+  // فوکوس بینِ focus و درجِ متن به `#bkName` می‌پرید — یعنی یادداشتِ آلرژیِ مهمان
+  // **بی‌هیچ خطایی حذف می‌شد** و رزرو بدونِ آن ثبت. این دقیقاً همان چیزی است که
+  // §۹/§۱۰ (جریانِ ایمنیِ غذایی) می‌خواست جلویش را بگیرد؛ روی موبایل بدتر هم
+  // هست، چون کیبورد روی فیلدِ اشتباه باز می‌شود.
+  //
+  // اثبات (نه حدس): با هوکِ `sheetBody.innerHTML` نشان داده شد در اجرایِ قرمز
+  // **هیچ** بازنویسیِ شیت رخ نمی‌دهد و با این حال مقدارِ textarea بلافاصله بعد از
+  // نوشتن خالی است — پس ری‌رندر نبود، فوکوس دزدیده شده بود.
+  //
+  // رفع: نیتِ دسترس‌پذیری (بردنِ فوکوس به داخلِ شیتِ تازه‌بازشده) حفظ می‌شود، ولی
+  // اگر فوکوس **از قبل داخلِ شیت** است دیگر جابه‌جا نمی‌شود — انتخابِ کاربر برنده است.
+  setTimeout(()=>{
+    if(sheet.contains(document.activeElement)) return;
+    const el=sheet.querySelector('input:not([type=hidden]),button,select,textarea,a[href],[tabindex]:not([tabindex="-1"])'); if(el) try{el.focus()}catch(e){}
+  },30);
 }
 export function closeSheet(){
   const sheet=document.getElementById('sheet');

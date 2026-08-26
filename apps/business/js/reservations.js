@@ -41,7 +41,7 @@ function rReservations(){
       <button class="date-tab ${resDate==='past'?'active':''}" onclick="setResDate('past')">${icon('inbox',{size:14})} گزارش گذشته</button>
       <button class="date-tab ${resDate==='all'?'active':''}" onclick="setResDate('all')">همه</button>
     </div>
-    ${resDate==='today'?`<div class="tonight-filters">${TONIGHT_FILTERS.map(f=>`<button class="chip ${tonightFilter===f.v?'is-active':''}" aria-pressed="${tonightFilter===f.v}" onclick="tonightFilterSet('${f.v}')">${f.l}</button>`).join('')}</div>`:''}
+    ${resDate==='today'?`<div class="tonight-filters">${TONIGHT_FILTERS.map(f=>`<button class="chip ${tonightFilter===f.v?'is-active':''}" aria-pressed="${tonightFilter===f.v}" onclick="tonightFilterSet(${jsq(f.v)})">${f.l}</button>`).join('')}</div>`:''}
     <div class="panel">
       <div id="resTL"></div>
     </div>`;
@@ -93,9 +93,16 @@ async function renderResList(){
   }
   // گزارش گذشته: خلاصه‌ی آماری بالا
   if(resDate==='past'){
-    const done=list.filter(x=>x.r.status==='completed'||x.r.status==='arrived').length;
-    const noshow=list.filter(x=>x.r.status==='noshow').length;
-    const cancelled=list.filter(x=>x.r.status==='cancelled').length;
+    // [merge ۰۸-۲۵] این سه شمارنده هم باید با عبورِ کاملِ وضعیت (mapResStatus)
+    // هماهنگ شوند، وگرنه رزروِ `rejected`/`auto_cancelled` در هیچ ستونی شمرده
+    // نمی‌شد (#68 آن‌ها را به 'cancelled' نگاشت می‌کرد و در ستونِ لغوشده می‌آمد)
+    // و مهمانِ `checked_in`/`seated`/`dining` از «انجام‌شده» جا می‌ماند.
+    // مجموعِ سه ستون دیگر از تعدادِ کلِ ردیف‌ها کمتر نمی‌شود.
+    const DONE_SET=['completed',...TONIGHT_ARRIVED];
+    const CANCELLED_SET=['cancelled','auto_cancelled','rejected'];
+    const done=list.filter(x=>DONE_SET.includes(x.r.status)).length;
+    const noshow=list.filter(x=>x.r.status==='noshow'||x.r.status==='no_show').length;
+    const cancelled=list.filter(x=>CANCELLED_SET.includes(x.r.status)).length;
     el.innerHTML=demoNote+`
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px">
         <div style="background:var(--green-50);border:1px solid #BBF7D0;border-radius:var(--r);padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#15803D">${fa(done)}</div><div style="font-size:11px;color:var(--t2);font-weight:600">${icon('check',{size:12})} انجام‌شده</div></div>
@@ -105,7 +112,11 @@ async function renderResList(){
       list.map(x=>resItemHTML(x.r,x.i)).join('');
     return;
   }
-  const seated=list.filter(x=>x.r.status==='arrived').length;
+  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): قبلاً فقط 'arrived' شمرده می‌شد؛ حالا که
+  // mapResStatus وضعیتِ واقعی را عبور می‌دهد، مهمانِ حاضر می‌تواند
+  // checked_in/arrived/seated/dining باشد — همه «رسیده» حساب می‌شوند.
+  const ARRIVED_SET=['arrived','checked_in','seated','dining'];
+  const seated=list.filter(x=>ARRIVED_SET.includes(x.r.status)).length;
   el.innerHTML=demoNote+`<div style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQuery?` · نتایج «${esc(resQuery)}»`:''}</div>`+
     list.map(x=>resItemHTML(x.r,x.i)).join('');
 }
@@ -152,9 +163,9 @@ function resItemHTML(r,i){
         ${allowed.includes('seated')?`<button class="btn btn-primary ${actBtn}" onclick="markSeated(${i})">${icon('utensils',{size:14})} نشاند</button>`:''}
         ${allowed.includes('no_show')?`<button class="btn btn-ghost ${actBtn}" onclick="markNoShow(${i})">${icon('alert',{size:14})} نیومد</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="openStatusMenu(${i})">${icon('refresh',{size:14})} وضعیت</button>
-        <button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer('${esc(r.phone)}')"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>
+        <button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer(${jsq(r.phone)})"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>
         ${allowed.includes('cancelled')?`<button class="btn btn-danger ${actBtn}" onclick="cancelRes(${i})">لغو</button>`:''}
-      </div>`:`<div class="tl-actions"><button class="btn btn-ghost btn-sm" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه</button><button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer('${esc(r.phone)}')"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>${r.status==='completed'?`<button class="btn btn-ghost btn-sm" onclick="openManual()">رزرو مجدد</button>`:''}</div>`}
+      </div>`:`<div class="tl-actions"><button class="btn btn-ghost btn-sm" onclick="viewHistory(${i})">${icon('inbox',{size:14})} تاریخچه</button><button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer(${jsq(r.phone)})"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>${r.status==='completed'?`<button class="btn btn-ghost btn-sm" onclick="openManual()">رزرو مجدد</button>`:''}</div>`}
     </div></div>`;
 }
 // ⚠️ رفعِ باگِ زنده (Tonight Board، ۲۰۲۶-۰۸-۱۴): این تابع قبلاً وقتی آنلاین
@@ -325,12 +336,27 @@ async function walkinLookup(){
       </div>
       <div class="field-label">میز (اختیاری)</div>
       ${tableSelectHtml}
-      <button class="btn btn-primary btn-lg btn-block" id="wConfirmBtn" style="margin-top:16px" onclick="walkinNewSave('${esc(raw)}')">${icon('check',{size:16})} ثبت ورود + عضویت باشگاه</button>
+      <button class="btn btn-primary btn-lg btn-block" id="wConfirmBtn" style="margin-top:16px" onclick="walkinNewSave(${jsq(raw)})">${icon('check',{size:16})} ثبت ورود + عضویت باشگاه</button>
     `);
   }
 }
 function walkinCheckinMember(){if(window._walkinMember){walkinCheckinReal(window._walkinMember.phone,null,null,null)}}
 // ثبت واقعی ورود — وصل به POST /restaurant/walkin (پیدا/ساخت کاربر + عضویت باشگاه + رزرو seated + اشغال میز)
+// تبدیلِ (ماه، روزِ) شمسی به (ماه، روزِ) میلادی — بدونِ کتابخانه، با Intlِ
+// تقویمِ persian. رخدادِ بعدیِ همان روزِ شمسی را پیدا می‌کند (دقتِ ±۱ روز بینِ
+// سال‌ها به‌خاطرِ کبیسه، در برابرِ ۲-۳ ماه خطای قبلی ناچیز است).
+function jalaliMdToGregMd(jm, jd){
+  if(!(jm>=1&&jm<=12&&jd>=1&&jd<=31)) return null;
+  const fmt=new Intl.DateTimeFormat('en-US-u-ca-persian',{month:'numeric',day:'numeric'});
+  const start=new Date(); start.setHours(12,0,0,0); start.setDate(start.getDate()-1);
+  for(let i=0;i<400;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const p=fmt.formatToParts(d);
+    const m=+p.find(x=>x.type==='month').value, day=+p.find(x=>x.type==='day').value;
+    if(m===jm&&day===jd) return {gMonth:d.getMonth()+1, gDay:d.getDate()};
+  }
+  return null;
+}
 async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
   const party=+(document.querySelector('.wparty-group .opt.sel')?.dataset.p||2);
   const tableId=document.getElementById('wTable')?.value||null;
@@ -338,7 +364,15 @@ async function walkinCheckinReal(phone,firstName,lastName,birthDayMonth){
   if(btn){btn.disabled=true;btn.textContent='در حال ثبت...';}
   const body={phone,party_size:party,table_id:tableId||undefined};
   if(firstName){body.first_name=firstName;body.last_name=lastName||'';}
-  if(birthDayMonth){body.birth_day=birthDayMonth[0];body.birth_month=birthDayMonth[1];}
+  if(birthDayMonth){
+    // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): سلکتِ ماهِ تولد عددِ ماهِ *شمسی* می‌دهد
+    // (فروردین=۱)، ولی بک‌اند (createWalkin) آن را new Date(Date.UTC(1990,
+    // m-1, d)) — یعنی *میلادی* — می‌سازد و grantBirthdayRewards با ماهِ میلادیِ
+    // امروز مقایسه می‌کند. نتیجه: پیامکِ تولد ۲ تا ۳ ماه جابه‌جا. این‌جا در مرزِ
+    // تقویم به میلادی تبدیل می‌کنیم تا ذخیره و مقایسه‌ی بک‌اند هم‌راستا شوند.
+    const g=jalaliMdToGregMd(+birthDayMonth[1],+birthDayMonth[0]);
+    if(g){body.birth_day=g.gDay;body.birth_month=g.gMonth;}
+  }
   // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): قبلاً این مسیر هیچ Idempotency-Key
   // نمی‌فرستاد — دابل‌تپِ «ثبت ورود» (یا حتی retryِ خودکارِ شبکه) می‌توانست دو
   // رزروِ seated + دو عضویتِ باشگاه برایِ همون مهمان بسازد. یک کلید برایِ کلِ
@@ -454,8 +488,14 @@ async function saveManual(){
 // هماهنگ‌سازی وضعیت میزها با رزروهای فعال امروز
 // میزی که رزرو «تأییدشده»ی امروز داره → reserved (اگه دستی seated نشده باشه)
 // میزی که مهمانش «رسیده» → seated
+// [merge ۰۸-۲۵] از وقتی mapResStatus وضعیتِ واقعی را عبور می‌دهد (به‌جایِ فروکاستنِ
+// همه‌چیز به 'confirmed')، این فیلتر دیگر نمی‌تواند فقط دو رشته را چک کند:
+// رزروِ `auto_confirmed` (که #68 به 'confirmed' نگاشت می‌کرد) و مهمانِ
+// `checked_in`/`seated`/`dining` وگرنه از نقشه‌ی سالن غیب می‌شدند و میز
+// «خالی» نشان داده می‌شد در حالی که مهمان سرِ آن نشسته بود.
 function syncTablesFromReservations(){
-  const todayRes=RES.filter(r=>r.date==='today'&&r.table>0&&(r.status==='confirmed'||r.status==='arrived'));
+  const HOLDS_TABLE=[...TONIGHT_NOT_ARRIVED.filter(s=>s!=='pending'),...TONIGHT_ARRIVED];
+  const todayRes=RES.filter(r=>r.date==='today'&&r.table>0&&HOLDS_TABLE.includes(r.status));
   TABLES.forEach(t=>{
     // ⚠️ فازِ ۲ (§۶): وضعیت‌هایِ عملیاتیِ صریح («تعمیرات» و «در حالِ نظافت»)
     // نباید با وضعیتِ مشتق‌شده از رزرو بازنویسی شوند. این‌ها را انسان یا
@@ -470,7 +510,7 @@ function syncTablesFromReservations(){
     const res=todayRes.find(r=>r.table===t.n);
     if(res){
       // رزرو فعال داره
-      if(res.status==='arrived')t.s='seated';
+      if(TONIGHT_ARRIVED.includes(res.status))t.s='seated';
       else if(t.s!=='seated')t.s='reserved'; // اگه قبلاً نشسته نشده، رزرو
       t._guest=res.name; // نام مهمان برای نمایش
       t._time=res.t;

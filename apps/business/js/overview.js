@@ -325,7 +325,7 @@ function renderHeatmap(){
 function renderTopCustomers(){
   const top=[...GUESTS].sort((a,b)=>b.visits-a.visits).slice(0,5);
   document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`
-    <div class="top-cust" onclick="viewCustomerHistory('${esc(c.name)}')">
+    <div class="top-cust" onclick="viewCustomerHistory(${jsq(c.name)})">
       <span class="top-rank">${fa(i+1)}</span>
       <span class="top-ava">${c.ava}</span>
       <div class="top-body"><div class="top-name">${esc(c.name)} ${c.seg==='vip'?'<span class="seg-vip">VIP</span>':''}</div>
@@ -376,7 +376,7 @@ function renderStaffNotes(){
   el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`
     <div class="snote"${n.pinned?' style="border-color:var(--amber);background:var(--amber-50)"':''}><div class="snote-body"><div class="snote-txt">${n.pinned?icon('pin',{size:13})+' ':''}${esc(n.txt)}</div>
       <div class="snote-meta">${esc(n.who)} · ${n.time}</div></div>
-      <button class="snote-del" onclick="delStaffNote('${n.id||''}')">×</button></div>`).join(''):'<div class="snote-empty">یادداشتی ثبت نشده</div>';
+      <button class="snote-del" onclick="delStaffNote(${jsq(n.id||'')})">×</button></div>`).join(''):'<div class="snote-empty">یادداشتی ثبت نشده</div>';
 }
 function addStaffNote(){
   openModal(`<div class="modal-title">یادداشت جدید</div>

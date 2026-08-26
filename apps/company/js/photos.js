@@ -147,7 +147,7 @@ function rPhotos() {
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${['pending', 'approved', 'rejected', 'all'].map((f) => `
-            <button class="btn btn-sm ${PHOTO_FILTER === f ? 'btn-primary' : 'btn-ghost'}" onclick="photoFilter('${f}')">
+            <button class="btn btn-sm ${PHOTO_FILTER === f ? 'btn-primary' : 'btn-ghost'}" onclick="photoFilter(${jsq(f)})">
               ${f === 'pending' ? 'در انتظار' : f === 'approved' ? 'تأییدشده' : f === 'rejected' ? 'ردشده' : 'همه'}
             </button>`).join('')}
           <button class="btn btn-ghost btn-sm" onclick="loadPhotos()">${PHOTO_LOADING ? 'در حال بارگذاری…' : 'تازه‌سازی'}</button>
@@ -191,9 +191,9 @@ function renderPhotoQueue() {
           ${p.caption ? `<div class="photo-card__cap">${esc(p.caption)}</div>` : ''}
           ${p.rejection_reason ? `<div class="photo-card__reason">دلیلِ رد: ${esc(p.rejection_reason)}</div>` : ''}
           <div class="photo-card__actions">
-            ${p.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="approvePhoto('${p.id}')">تأیید و انتشار</button>` : ''}
-            ${p.status !== 'rejected' ? `<button class="btn btn-ghost btn-sm" onclick="rejectPhoto('${p.id}')">رد</button>` : ''}
-            <button class="btn btn-ghost btn-sm" style="color:var(--red-600)" onclick="deletePhotoHard('${p.id}')">حذفِ کامل</button>
+            ${p.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="approvePhoto(${jsq(p.id)})">تأیید و انتشار</button>` : ''}
+            ${p.status !== 'rejected' ? `<button class="btn btn-ghost btn-sm" onclick="rejectPhoto(${jsq(p.id)})">رد</button>` : ''}
+            <button class="btn btn-ghost btn-sm" style="color:var(--red-600)" onclick="deletePhotoHard(${jsq(p.id)})">حذفِ کامل</button>
           </div>
         </div>
       </div>`;

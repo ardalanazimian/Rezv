@@ -33,7 +33,7 @@
 ## ۱. پنج سطحِ اعتماد (§۱۵)
 
 ستونِ `platform_events.trust_level` — مقدارِ مجاز با CHECK constraint در
-`prisma/sql/059-telemetry-trust-boundary.sql` محدود شده.
+`prisma/sql/059b-telemetry-trust-boundary.sql` محدود شده.
 
 | سطح | معنا | چه کسی می‌تواند تولیدش کند |
 |---|---|---|

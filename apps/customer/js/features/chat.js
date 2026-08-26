@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════════════
 import { API, isLoggedIn } from '../api.js';
 import { icon } from '../icons.js';
-import { esc } from '../auth.js';
+import { esc, jsq } from '../auth.js';
 
 let _pollTimer = null;
 let _activeThreadId = null;
@@ -56,7 +56,7 @@ export async function renderChats(){
   if (!items.length) { body.innerHTML = `<div class="chat-empty">هنوز گفتگویی نداری.<br>از صفحه‌ی هر رستوران می‌تونی پیام بدی.</div>`; return; }
 
   body.innerHTML = items.map(t => `
-    <div class="chat-row" role="button" tabindex="0" onclick="openChatThread('${t.id}','${esc(t.restaurant.name)}')">
+    <div class="chat-row" role="button" tabindex="0" onclick="openChatThread(${jsq(t.id)},${jsq(t.restaurant.name)})">
       <div class="chat-row-avatar">${esc(t.restaurant.name.charAt(0))}</div>
       <div class="chat-row-main">
         <div class="chat-row-top"><span class="chat-row-name">${esc(t.restaurant.name)}</span>${t.reservation_code ? `<span class="chat-row-tag">#${esc(t.reservation_code)}</span>` : ''}</div>

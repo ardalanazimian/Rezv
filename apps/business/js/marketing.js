@@ -301,16 +301,27 @@ async function rAnalytics(){
       API.online=true;
       const d=res.data;
       const totalVisits=(d.visit_distribution?.once||0)+(d.visit_distribution?.few||0)*3+(d.visit_distribution?.loyal||0)*6;
+      // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): weekly_reservations آرایه‌ی *۴ هفته‌ی
+      // اخیر* است (بک‌اند از ۲۸ روز پیش group by week می‌کند و اندیسِ ۳ هفته‌ی
+      // جاری است). reduce قبلی جمعِ هر ۴ هفته را با برچسبِ «رزرو این هفته»
+      // نشان می‌داد — ۴ برابرِ واقعیت. حالا فقط هفته‌ی جاری (آخرین عضو).
+      const wk=Array.isArray(d.weekly_reservations)?d.weekly_reservations:[];
       A={
         // ⚠️ رفعِ برچسبِ غلط: این فیلد زیرِ لیبلِ «رزرو این هفته» نمایش داده
         // می‌شود ولی **جمعِ هر چهار هفته** بود — یعنی صاحبِ رستوران عددی
         // تقریباً چهاربرابرِ واقعیت را به‌عنوانِ آمارِ این هفته می‌خواند.
-        // بک‌اند آرایه را از قدیم به جدید می‌دهد (weekly[3] = هفت روزِ اخیر؛
+        // بک‌اند آرایه را از قدیم به جدید می‌دهد (آخرین عضو = هفت روزِ اخیر؛
         // رجوع کن به `weekly[3 - w]` در restaurant/analytics/route.ts).
-        weekThisWeek:(d.weekly_reservations||[])[3]||0,
+        // [merge ۰۸-۲۵] #68 همین باگ را با `[3]` رفع کرده بود. اندیسِ آخر را
+        // نگه داشتیم چون امروز هم‌ارزِ آن است (بک‌اند همیشه ۴ عضو می‌دهد) ولی
+        // اگر طولِ آرایه عوض شود هم درست می‌ماند؛ `[3]` در آن حالت یا صفرِ
+        // جعلی می‌داد یا هفته‌ای از وسطِ تاریخچه.
+        weekThisWeek:wk.length?wk[wk.length-1]:0,
         returnRate:d.return_rate_pct||0,
         avgVisits:d.total_customers?fa(Math.round(totalVisits/d.total_customers*10)/10):'۰',
-        avgInterval:d.avg_interval_days||0,
+        // avg_interval_days را بک‌اند برنمی‌گرداند؛ نمایشِ «۰» یعنی «۰ روز فاصله»
+        // که غلط است. null → در KPI به «—» می‌افتد (اندازه‌گیری‌نشده، نه صفر).
+        avgInterval:(typeof d.avg_interval_days==='number')?d.avg_interval_days:null,
         totalCustomers:d.total_customers||0,
         newPct:d.total_customers?Math.round(d.new_customers/d.total_customers*100):0,
         visitDist:[
@@ -380,7 +391,7 @@ async function rAnalytics(){
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon blue">${icon('calendar',{size:16})}</div>${trendChip}</div><div class="kpi-val">${fa(A.weekThisWeek)}</div><div class="kpi-label">رزرو هفت روزِ اخیر</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon teal">${icon('refresh',{size:16})}</div></div><div class="kpi-val">${fa(returnRate)}٪</div><div class="kpi-label">نرخ بازگشت مشتری</div></div>
       <div class="kpi"><div class="kpi-top"><div class="kpi-icon amber">${icon('users',{size:16})}</div></div><div class="kpi-val">${avgVisits}</div><div class="kpi-label">میانگین دفعات مراجعه</div></div>
-      <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${fa(A.avgInterval)}</div><div class="kpi-label">میانگین فاصله (روز)</div></div>
+      <div class="kpi"><div class="kpi-top"><div class="kpi-icon green">${icon('calendar',{size:16})}</div></div><div class="kpi-val">${A.avgInterval==null?'—':fa(A.avgInterval)}</div><div class="kpi-label">میانگین فاصله (روز)</div></div>
     </div>
 
     <div class="row-2-1">

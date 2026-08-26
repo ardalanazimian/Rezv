@@ -1,6 +1,6 @@
 // ═══ رزرونو — ناوبری + رندرِ کشف: فید، وایب، مناسبت، رویداد (بخشی از اپ کاستومر) ═══
 import { API } from '../api.js';
-import { esc, toast, undoSnack } from '../auth.js';
+import { esc, jsq, toast, undoSnack } from '../auth.js';
 import { openRest } from './detail.js';
 import { labelForISO, quickBook } from './booking.js';
 import { bookingCtx, favHas, favs, gradFor, saveFavs, pts } from './seed.js';
@@ -29,6 +29,39 @@ export function go(p){
   if(p==='chats' && typeof renderChats==='function')renderChats();
 }
 export function fmtFa(n){return n.toLocaleString('fa-IR')}
+// ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): قبلاً وقتی r.slots خالی
+// بود اینجا هیچ چیز رندر نمی‌شد — یعنی کارت بدونِ هیچ CTAیِ اقدام می‌ماند (نه
+// ساعتِ جعلی، نه راهِ جایگزین). حالا یک CTAِ آرام به شیتِ کاملِ رزرو (که خودش
+// availabilityِ واقعی را از API می‌خواند) باز می‌شود — هیچ ساعتِ اختراعی
+// نمایش داده نمی‌شود.
+//
+// از ۲۰۲۶-۰۸-۲۵ این تکه جدا شد چون دو مصرف‌کننده دارد: رندرِ اولیه‌ی کارت، و
+// به‌روزرسانیِ درجایِ چیپ‌ها بعد از رسیدنِ availabilityِ گروهی. جدا نبودنش
+// یعنی برایِ نشان‌دادنِ ساعت‌ها باید کلِ فید دوباره رندر می‌شد (فلشِ اسکلت).
+export function slotsHTML(r){
+  const slots = Array.isArray(r.slots) ? r.slots : [];
+  if (slots.length) {
+    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${jsq(String(r.id))},${jsq(s)});haptic('select')">${s}</button>`).join('');
+  }
+  return `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet(${jsq(String(r.id))});haptic('select')">ببین سانس‌ها</button>`;
+}
+
+/**
+ * به‌روزرسانیِ درجایِ چیپ‌هایِ ساعت — بدونِ رندرِ دوباره‌ی فید.
+ *
+ * چرا درجا: `renderFeed` عمداً ۲۸۰ms اسکلت نشان می‌دهد. صدازدنش صرفاً برایِ
+ * رسیدنِ سانس‌ها یعنی کاربر بعد از دیدنِ کارت‌هایِ واقعی، دوباره اسکلت ببیند.
+ */
+export function paintSlots(list){
+  const byId = new Map((list||[]).map(r=>[String(r.id), r]));
+  document.querySelectorAll('#feed .rc[data-rid]').forEach(card=>{
+    const r = byId.get(card.dataset.rid);
+    if(!r) return;
+    const box = card.querySelector('.rc-slots');
+    if(box) box.innerHTML = slotsHTML(r);
+  });
+}
+
 export function cardHTML(r){
   const hot = isHot(r);
   // کارت خودش دکمه نمی‌شود چون داخلش دکمه دارد (تودرتوییِ نامعتبر). به‌جایش یک
@@ -39,23 +72,17 @@ export function cardHTML(r){
   // idِ واقعی UUID است و بدونِ کوتیشن، onclick خطای syntax می‌داد و کلِ
   // CTAهای کارت برای رستورانِ واقعی مرده بودند (mockِ E2E با idِ عددی این
   // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
-  return `<article class="rc reveal">
+  return `<article class="rc reveal" data-rid="${esc(String(r.id))}">
     <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
-    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest('${esc(String(r.id))}')"></button>
+    <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${jsq(String(r.id))})"></button>
     <span class="rc-emoji">${esc(r.e)}</span>
     ${hot?`<span class="rc-hotbadge">${icon('flame',{size:13,fill:true})} داغ</span>`:r.ai?`<span class="rc-hotbadge ai">${icon('sparkle',{size:13,fill:true})} AI</span>`:''}
-    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav('${esc(String(r.id))}',this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
+    <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
-      <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div>${r.rt!=null?`<div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div>`:'<div class="rc-rating rc-rating-new">تازه‌وارد</div>'}</div>
-      <div class="rc-meta">${r.cuisine} · ${r.price} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
+      <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div>${Number.isFinite(r.rt)&&r.rt>0?`<div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div>`:'<div class="rc-rating rc-rating-new">تازه‌وارد</div>'}</div>
+      <div class="rc-meta">${r.cuisine}${r.price?` · ${r.price}`:''} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
-      <div class="rc-slots">${r.slots.length?r.slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook('${esc(String(r.id))}','${s}');haptic('select')">${s}</button>`).join(''):
-        // ⚠️ رفع‌شده (حسابرسیِ دیزاینِ Desire، ۲۰۲۶-۰۸-۱۴): قبلاً وقتی r.slots
-        // خالی بود، اینجا هیچ چیز رندر نمی‌شد — یعنی کارت بدونِ هیچ CTAیِ
-        // اقدام می‌ماند (نه ساعتِ جعلی، نه راهِ جایگزین). حالا یک CTAِ آرام به
-        // شیتِ کاملِ رزرو (که خودش availabilityِ واقعی را از API می‌خواند) باز
-        // می‌شود — هیچ ساعتِ اختراعی نشان داده نمی‌شود.
-        `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet('${esc(String(r.id))}');haptic('select')">ببین سانس‌ها</button>`}</div>
+      <div class="rc-slots">${slotsHTML(r)}</div>
     </div>
   </article>`;
 }
@@ -121,10 +148,31 @@ function moreBtnHTML(list){
   if(list !== R || !NEXT_CURSOR) return '';
   return `<button type="button" class="btn btn-ghost btn-block feed-more" id="feedMore" onclick="loadMoreFeed()">رستوران‌های بیشتر</button>`;
 }
+// ⚠️ باگِ واقعیِ رقابتِ رندر (پیدا شده با E2E در ۲۰۲۶-۰۸-۲۵، بازتولید ~۱ از ۳
+// اجرا حتی با --workers=1 — پس ناپایداریِ تست نبود، باگِ واقعیِ کاربر بود):
+//
+// renderFeed اول اسکلت را همگام می‌کشد و کارت‌هایِ واقعی را ۲۸۰ms بعد در یک
+// setTimeout می‌نویسد. تا پیش از این، هیچ‌چیز جلویِ نوشتنِ یک رندرِ **کهنه**
+// روی نتیجه‌ی یک رندرِ **تازه‌تر** را نمی‌گرفت. سناریویِ واقعی:
+//   ۱. boot → renderFeed(R) با دادهٔ نمونه (setTimeout در راه است)
+//   ۲. کاربر سریع جست‌وجو می‌کند → doSearch حالتِ «پیدا نشد» را می‌نویسد
+//   ۳. setTimeoutِ مرحله‌ی ۱ می‌رسد و #feed را با **همه‌ی** رستوران‌ها بازنویسی
+//      می‌کند — کاربر نتیجه‌ی جست‌وجویش را از دست می‌دهد و فهرستِ کامل را
+//      «نتیجه‌ی جست‌وجو» فرض می‌کند. دقیقاً همان رگرسیونی که تستِ
+//      social-proof «جست‌وجوی بی‌نتیجه» می‌خواست بگیرد.
+// همین اتفاق برای syncRestaurants (دادهٔ واقعیِ سرور که دیرتر می‌رسد) هم می‌افتاد.
+//
+// رفع: یک ژتونِ صعودی. هر نوشتنی روی #feed ژتون را جلو می‌برد؛ setTimeout فقط
+// وقتی رنگ می‌زند که ژتونش هنوز جاری باشد. رندرِ کهنه بی‌صدا کنار می‌رود.
+let FEED_TOKEN = 0;
+/** ابطالِ هر رندرِ در جریانِ فید — هر کسی که مستقیم #feed را می‌نویسد باید صدایش بزند. */
+export function invalidateFeed(){ return ++FEED_TOKEN; }
 export function renderFeed(list){
   const f=document.getElementById('feed');
+  const token=invalidateFeed();
   f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
   setTimeout(()=>{
+    if(token!==FEED_TOKEN) return;   // رندرِ تازه‌تری از راه رسیده — این یکی کهنه است
     f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);
     const io=new IntersectionObserver(es=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);io.unobserve(e.target)}}),{threshold:.05});
     f.querySelectorAll('.rc').forEach(c=>io.observe(c));
@@ -174,7 +222,7 @@ export function filterVibe(v,el){
 export function hCardHTML(r,extra){
   // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
   const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
-  return `<div class="hcard" role="button" tabindex="0" onclick="openRest('${esc(String(r.id))}')">
+  return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${jsq(String(r.id))})">
     <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
@@ -274,7 +322,12 @@ export async function renderEvents(){
       el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('calendar',{size:40})}</div><div class="empty-state-title">فعلاً رویدادِ ویژه‌ای نیست</div><div class="empty-state-desc">به‌محضِ اعلامِ رستوران‌ها همین‌جا می‌بینی‌اش</div></div>`;
       return;
     }
-    const events=list.map(e=>({rid:e.restaurantId,emoji:e.emoji||'🎉',title:e.title,rest:'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
+    // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): rest همیشه خالی بود (نامِ میزبان نمایش
+    // داده نمی‌شد) و کلیک فقط با restaurantId کار می‌کرد — اگر رستوران در
+    // صفحه‌ی بارگذاری‌شده‌ی فید نبود، کارت عملاً کلیکِ مرده بود. حالا API
+    // restaurant_slug/restaurant_name می‌دهد و openRestBySlug با slug حتی
+    // رستورانِ خارج از فید را باز می‌کند.
+    const events=list.map(e=>({rid:e.restaurantId,slug:e.restaurant_slug||'',emoji:e.emoji||'🎉',title:e.title,rest:e.restaurant_name||'',when:new Date(e.startsAt).toLocaleDateString('fa-IR'),price:e.priceToman?fmtFa(Math.round(e.priceToman/1000))+'ک':'',desc:e.description||''}));
     el.innerHTML=eventsHtml(events,false);
     return;
   }
@@ -288,7 +341,7 @@ export async function renderEvents(){
 /** مارکاپِ کارت‌های رویداد. isDemo=true چیپِ «نمونه» را اضافه می‌کند. */
 function eventsHtml(events,isDemo){
   return events.map(e=>`
-    <div class="event-card" role="button" tabindex="0" onclick="openRest('${esc(String(e.rid))}')">
+    <div class="event-card" role="button" tabindex="0" onclick="openRestBySlug(${jsq(String(e.rid))},${jsq(String(e.slug||''))})">
       <div class="event-emoji">${esc(e.emoji)}</div>
       <div class="event-body">
         <div class="event-title">${esc(e.title)}${isDemo?' <span class="demo-chip">نمونه</span>':''}</div>
@@ -349,6 +402,7 @@ export function doSearch(){
   if(list.length){ renderFeed(list); return; }
   // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
   // می‌داد — کاربر شش کارت می‌دید و گمان می‌کرد این‌ها نتیجه‌ی جست‌وجویش‌اند.
+  invalidateFeed();   // هر renderFeedِ در جریان را باطل کن، وگرنه ۲۸۰ms بعد این حالتِ خالی را می‌پوشاند
   document.getElementById('feed').innerHTML=`
     <div class="empty" style="grid-column:1/-1">
       <div class="empty-emoji" aria-hidden="true">🔍</div>
