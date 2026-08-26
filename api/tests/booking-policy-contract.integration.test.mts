@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -28,7 +29,9 @@ let slugNoPolicy: string;
 /** فراخوانیِ واقعیِ routeِ Next با یک Request واقعی. */
 async function fetchDetail(slug: string) {
   const res = await GET(
-    new Request(`https://example.test/api/v1/restaurants/${slug}`),
+    new Request(`https://example.test/api/v1/restaurants/${slug}`, {
+      headers: { 'x-real-ip': testIp() },
+    }),
     { params: Promise.resolve({ slug }) },
   );
   return { status: res.status, body: await res.json() as Record<string, unknown> };

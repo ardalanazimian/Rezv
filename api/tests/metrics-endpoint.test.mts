@@ -1,5 +1,6 @@
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  گاردِ endpointِ متریک — تستِ خالص (بدونِ DB)
@@ -31,7 +32,9 @@ function setEnv(token: string | undefined, nodeEnv: string) {
 async function callMetrics(authHeader?: string): Promise<Response> {
   const { GET } = await import('../src/app/api/metrics/route.ts');
   return GET(new Request('https://example.invalid/api/metrics', {
-    headers: authHeader ? { authorization: authHeader } : {},
+    headers: authHeader
+      ? { authorization: authHeader, 'x-real-ip': testIp() }
+      : { 'x-real-ip': testIp() },
   }));
 }
 

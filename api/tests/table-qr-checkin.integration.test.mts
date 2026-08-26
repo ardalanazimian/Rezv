@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -25,7 +26,6 @@ process.env.NEXT_PUBLIC_APP_URL = 'https://app.example.invalid';
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db');
-const { redis } = await import('../src/lib/redis');
 const { signAccess } = await import('../src/lib/jwt');
 const { tableCheckInUrl, appBase } = await import('../src/lib/public-urls');
 const tablesRoute = await import('../src/app/api/v1/restaurant/tables/route');
@@ -43,29 +43,30 @@ const routeArg = (id: string) => ({ params: Promise.resolve({ id }) });
 const jsonReq = (token: string, body?: unknown, method = 'POST') =>
   new Request('http://x/api', {
     method,
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
 const getReq = (token: string, qs = '') =>
-  new Request(`http://x/api${qs}`, { headers: { authorization: `Bearer ${token}` } });
+  new Request(`http://x/api${qs}`, {
+    headers: { authorization: `Bearer ${token}`, 'x-real-ip': testIp() },
+  });
 
-/**
- * شمارنده‌ی rate-limit را صفر می‌کند. رانر همه‌ی فایل‌ها را در یک process
- * اجرا می‌کند و کلیدِ محدودیت بر پایه‌ی IP است، پس سهمیه بینِ فایل‌ها
- * مشترک است — بدونِ این، این فایل سهمیه را می‌سوزاند و فایلِ بعدی ۴۲۹
- * می‌گیرد. سقفِ خودِ روت دست‌نخورده و واقعی می‌ماند.
+/*
+ * ⚠️ اینجا قبلاً `clearRateLimit()` بود که سطل‌های ریت‌لیمیت را **سراسری** پاک
+ * می‌کرد (`*auth*`, `*search*`, `*chkin*`) — لازم شده بود چون IPِ هر
+ * `new Request()`ِ بی‌هدر `unknown` است و سهمیه بینِ همه‌ی فایل‌های رانر مشترک
+ * می‌شد. ولی همان پاک‌سازی سطلِ فایل‌های دیگر را هم خالی می‌کرد و ریت‌لیمیتشان
+ * را از سنجش خارج. حالا هر Request با `testIp()` سطلِ جدا دارد.
+ *
+ * ⚠️ ضمناً الگویِ `*search*` هرگز چیزی را پاک نمی‌کرد: پیشوندِ `RULES.search`
+ * در `src/lib/ratelimit.ts` رشته‌ی `srch` است (کلید `rl:srch:*`)، و هیچ کلیدِ
+ * Redisِ دیگری هم در `src/` رشته‌ی `search` را در نام ندارد.
  */
-async function clearRateLimit() {
-  const stale = await redis.keys('*auth*');
-  if (stale.length) await redis.del(...stale);
-  const search = await redis.keys('*search*');
-  if (search.length) await redis.del(...search);
-  // سطلِ اختصاصیِ /checkin (RULES.qrCheckin, prefix `chkin`). بدونِ این،
-  // اسکن‌هایِ این فایل سهمیه‌ی فایلِ بعدی را می‌سوزانند و ۴۲۹ می‌گیرد.
-  const chk = await redis.keys('*chkin*');
-  if (chk.length) await redis.del(...chk);
-}
 
 async function makeTenant(label: string): Promise<Ctx> {
   const t = await db.tenant.create({ data: { name: `[DEMO] ${label}` }, select: { id: true } });
@@ -89,7 +90,6 @@ async function makeTenant(label: string): Promise<Ctx> {
 
 /** میز را از راهِ روتِ واقعی می‌سازد (نه insertِ مستقیم) و پاسخ را برمی‌گرداند. */
 async function createTableViaRoute(ctx: Ctx, capacity = 4) {
-  await clearRateLimit();
   const res = await tablesRoute.POST(jsonReq(ctx.token, { number: ++seq + 500, capacity }), { params: Promise.resolve({}) } as never);
   return { status: res.status, body: await res.json() as { id: string; number: number; qr_code: string | null } };
 }
@@ -109,14 +109,12 @@ async function makeLiveReservation(ctx: Ctx, tableId: string, status = 'confirme
 }
 
 before(async () => {
-  await clearRateLimit();
   const s = Date.now().toString(36);
   A = await makeTenant(`${TAG}-a-${s}`);
   B = await makeTenant(`${TAG}-b-${s}`);
 });
 
 after(async () => {
-  await clearRateLimit();
   const rests = [A.restaurantId, B.restaurantId];
   await db.reservation.deleteMany({ where: { restaurantId: { in: rests } } });
   await db.table.deleteMany({ where: { restaurantId: { in: rests } } });
@@ -191,7 +189,7 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
     const res = await checkinRoute.POST(
       new Request('http://x/api/v1/checkin', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
         body: JSON.stringify({ qr_code: body.qr_code }),
       }),
     );
@@ -217,7 +215,7 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
     const { body } = await createTableViaRoute(A);
     const res = await checkinRoute.POST(new Request('http://x/api/v1/checkin', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
       body: JSON.stringify({ qr_code: body.qr_code }),
     }));
     assert.equal(res.status, 200);
@@ -229,7 +227,7 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
   test('کدِ ناشناس رد می‌شود', async () => {
     const res = await checkinRoute.POST(new Request('http://x/api/v1/checkin', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
       body: JSON.stringify({ qr_code: 'T-ZZZZZZZZZZ' }),
     }));
     assert.equal(res.status, 404);

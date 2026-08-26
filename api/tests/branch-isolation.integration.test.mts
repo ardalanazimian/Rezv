@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -46,7 +47,7 @@ let lockedA: Auth;    // کارمندِ قفل‌شده به restA2
 
 /** درخواستِ ساختگی فقط با هدرِ شعبه — همان چیزی که resolveStaffRestaurant می‌خواند. */
 function reqWithBranch(id: string | null): Request {
-  const headers = new Headers();
+  const headers = new Headers({ 'x-real-ip': testIp() });
   if (id) headers.set('x-restaurant-id', id);
   return new Request('https://example.test/api/v1/restaurant/reservations', { headers });
 }

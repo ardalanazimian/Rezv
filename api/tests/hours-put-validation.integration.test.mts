@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -45,7 +46,6 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db.ts');
-const { redis } = await import('../src/lib/redis.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');
 const hoursRoute = await import('../src/app/api/v1/restaurant/hours/route.ts');
 
@@ -58,7 +58,11 @@ const VALID_HOURS = { '0': [['12:00', '23:00']] };
 function putReq(body: unknown) {
   return new Request('http://x/api/v1/restaurant/hours', {
     method: 'PUT',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     body: JSON.stringify(body),
   });
 }
@@ -72,11 +76,10 @@ async function closureCount(): Promise<number> {
 }
 
 before(async () => {
-  // شمارنده‌ی rate-limit را پاک کن: این روت `rateLimit:'auth'` (۲۰ در دقیقه) دارد
-  // و این فایل چند PUT پشت‌سرِ هم می‌زند. خودِ سقف عمداً دست‌نخورده می‌ماند.
-  const stale = await redis.keys('*auth*').catch(() => [] as string[]);
-  if (stale.length) await redis.del(...stale).catch(() => 0);
-
+  // ⚠️ اینجا قبلاً کلِ سطل‌های `*auth*` سراسری پاک می‌شد (چون IPِ همه‌ی
+  // `new Request()`های بی‌هدر `unknown` بود و سهمیه بینِ فایل‌ها مشترک). آن کار
+  // سطلِ فایل‌های دیگر را هم خالی می‌کرد. حالا `putReq()` با `testIp()` IPِ یکتا
+  // می‌گیرد؛ سقفِ ۲۰/دقیقه‌ی خودِ روت دست‌نخورده می‌ماند.
   const t = await db.tenant.create({ data: { name: '[DEMO] tenant (hours-put-validation)' }, select: { id: true } });
   tenantId = t.id;
   const r = await db.restaurant.create({

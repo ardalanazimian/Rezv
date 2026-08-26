@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { randomUUID } from 'node:crypto';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -51,7 +52,10 @@ async function makeRestaurant(suffix: string, opts: {
 /** روتِ واقعی را با همان امضایی که Next صدا می‌زند اجرا می‌کند. */
 async function callAvailability(slug: string, party = 2) {
   const url = `http://x/api/v1/restaurants/${slug}/availability?date=${DATE}&party=${party}`;
-  const res = await availRoute.GET(new Request(url), { params: Promise.resolve({ slug }) });
+  const res = await availRoute.GET(
+    new Request(url, { headers: { 'x-real-ip': testIp() } }),
+    { params: Promise.resolve({ slug }) },
+  );
   return { status: res.status, body: await res.json() as any };
 }
 

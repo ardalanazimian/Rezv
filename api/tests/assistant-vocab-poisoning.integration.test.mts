@@ -1,5 +1,6 @@
-import { test, describe, before, after, beforeEach } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { readFileSync } from 'node:fs';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -34,7 +35,6 @@ import { fixturePhone } from './_phone.helper.mts';
 const PHONE_PREFIX = '0926';
 
 const { db } = await import('../src/lib/db.ts');
-const { redis } = await import('../src/lib/redis.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');
 const {
   askAssistant, teachAssistant, MAX_VOCAB_COUNT, MAX_TAUGHT_TOKENS, MAX_LEARNED_VOCAB_ROWS,
@@ -59,24 +59,32 @@ let retentionRestaurantId = '';
 const askReq = (message: string) =>
   new Request('http://x/api/v1/restaurant/assistant', {
     method: 'POST',
-    headers: { authorization: `Bearer ${ownerToken}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     body: JSON.stringify({ message }),
   });
 
 const feedbackReq = (logId: string, intent: string) =>
   new Request('http://x/api/v1/restaurant/assistant/feedback', {
     method: 'POST',
-    headers: { authorization: `Bearer ${ownerToken}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     body: JSON.stringify({ log_id: logId, correct_intent: intent }),
   });
 
-/** سطلِ `RULES.auth` (۲۰/دقیقه) بینِ همه‌ی فایل‌ها مشترک است (IP = unknown). */
-async function clearOwnRateLimits() {
-  for (const p of ['rl:auth:*', 'rl:srch:*']) {
-    const keys = await redis.keys(p);
-    if (keys.length) await redis.del(...keys);
-  }
-}
+/*
+ * ⚠️ اینجا قبلاً `clearOwnRateLimits()` بود که `rl:auth:*` و `rl:srch:*` را
+ * **سراسری** پاک می‌کرد — لازم بود چون IPِ هر `new Request()`ِ بی‌هدر `unknown`
+ * است و سطل بینِ همه‌ی فایل‌های رانر مشترک می‌شد. ولی همان پاک‌سازی سطلِ
+ * فایل‌های دیگر را هم خالی می‌کرد و ریت‌لیمیتشان را از سنجش خارج. حالا هر
+ * Request با `testIp()` سطلِ خودش را دارد.
+ */
 
 async function vocabRows() {
   return db.restaurantAssistantVocab.findMany({
@@ -118,7 +126,6 @@ after(async () => {
 });
 
 describe('دستیار · مسمومیتِ واژگان مهار می‌شود', () => {
-  beforeEach(clearOwnRateLimits);
 
   test('کنترلِ مثبت: پیش از هر آموزشی، جواب درست و مطمئن است', async () => {
     // بدونِ این، تستِ «جواب عوض نشد» با یک دستیارِ همیشه-خراب هم سبز می‌شد.
@@ -256,7 +263,8 @@ describe('دستیار · هرسِ نگه‌داری', () => {
     });
 
     const res = await retentionRoute.POST(new Request('http://x/api/v1/maintenance/retention', {
-      method: 'POST', headers: { 'x-maintenance-key': `maint-${SFX}` },
+      method: 'POST',
+      headers: { 'x-maintenance-key': `maint-${SFX}`, 'x-real-ip': testIp() },
     }));
     const body = await res.json();
     assert.equal(res.status, 200, JSON.stringify(body));
@@ -288,7 +296,8 @@ describe('دستیار · هرسِ نگه‌داری', () => {
     );
 
     const res = await retentionRoute.POST(new Request('http://x/api/v1/maintenance/retention', {
-      method: 'POST', headers: { 'x-maintenance-key': `maint-${SFX}` },
+      method: 'POST',
+      headers: { 'x-maintenance-key': `maint-${SFX}`, 'x-real-ip': testIp() },
     }));
     assert.equal(res.status, 200);
 

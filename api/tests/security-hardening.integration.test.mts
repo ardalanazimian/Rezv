@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -101,7 +102,7 @@ describe('کارتِ هدیه — دیگر ارزشِ پولیِ ناشناس ت
     const before = await db.giftCard.count();
     const res = await giftRoute.POST(new Request('https://x.test/api/v1/gift-cards', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-real-ip': testIp() },
       body: JSON.stringify({ amount_toman: 1_000_000_000 }),
     }));
     assert.notEqual(res.status, 200, 'فراخوانِ ناشناس هرگز نباید کارت بسازد');
@@ -145,7 +146,9 @@ describe('کارتِ هدیه — دیگر ارزشِ پولیِ ناشناس ت
 describe('لیستِ انتظار — خواندنِ ناشناسِ ورودیِ کاربرِ دیگر بسته شد (§۷)', () => {
   test('بدونِ هیچ توکنی → ۴۰۴ (قبلاً کلِ ورودی را می‌داد)', async () => {
     const res = await waitlistRoute.GET(
-      new Request(`https://x.test/api/v1/waitlist/${entryOfUserA}`),
+      new Request(`https://x.test/api/v1/waitlist/${entryOfUserA}`, {
+        headers: { 'x-real-ip': testIp() },
+      }),
       { params: Promise.resolve({ id: entryOfUserA }) },
     );
     assert.equal(res.status, 404, 'درخواستِ بدونِ توکن نباید ورودیِ کاربرِ دیگر را ببیند');
@@ -154,7 +157,7 @@ describe('لیستِ انتظار — خواندنِ ناشناسِ ورودیِ
   test('با توکنِ کاربرِ دیگر → ۴۰۴', async () => {
     const res = await waitlistRoute.GET(
       new Request(`https://x.test/api/v1/waitlist/${entryOfUserA}`, {
-        headers: { Authorization: `Bearer ${tokenUserB}` },
+        headers: { Authorization: `Bearer ${tokenUserB}`, 'x-real-ip': testIp() },
       }),
       { params: Promise.resolve({ id: entryOfUserA }) },
     );
@@ -165,7 +168,7 @@ describe('لیستِ انتظار — خواندنِ ناشناسِ ورودیِ
     const tokenA = signAccess({ sub: userA, kind: 'customer' });
     const res = await waitlistRoute.GET(
       new Request(`https://x.test/api/v1/waitlist/${entryOfUserA}`, {
-        headers: { Authorization: `Bearer ${tokenA}` },
+        headers: { Authorization: `Bearer ${tokenA}`, 'x-real-ip': testIp() },
       }),
       { params: Promise.resolve({ id: entryOfUserA }) },
     );
@@ -178,7 +181,7 @@ describe('تاریخچه‌ی رزرو — محدود به شعبه، نه تن�
     const tokenStaffB = signAccess({ sub: staffB, kind: 'staff', role: 'staff', tenantId });
     const res = await eventsRoute.GET(
       new Request(`https://x.test/api/v1/restaurant/reservations/${resvCodeA}/events`, {
-        headers: { Authorization: `Bearer ${tokenStaffB}` },
+        headers: { Authorization: `Bearer ${tokenStaffB}`, 'x-real-ip': testIp() },
       }),
       { params: Promise.resolve({ code: resvCodeA }) },
     );

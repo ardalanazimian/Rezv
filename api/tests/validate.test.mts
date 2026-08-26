@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 // نکته: import پویا عمداً به‌جای import استاتیک استفاده شده — در ترکیب خاصی از
 // نسخه‌ی tsx + Node --test در این محیط، import استاتیکِ چند-نامی از فایل‌های .ts
 // گاهی نادرست resolve می‌شود (به‌ظاهر باگ در static linking، نه در خودِ سورس).
@@ -221,7 +222,9 @@ describe('پرایمیتیوهای دامنه (schemas.ts)', () => {
 
 describe('parseQuery / parseParams', () => {
   test('parseQuery مقادیر query string را طبق schema پارس می‌کند', () => {
-    const req = new Request('https://x.test/api?limit=10&active=true');
+    const req = new Request('https://x.test/api?limit=10&active=true', {
+      headers: { 'x-real-ip': testIp() },
+    });
     const schema = z.object({ limit: z.number().int(), active: z.boolean() });
     assert.deepEqual(parseQuery(req, schema), { limit: 10, active: true });
   });

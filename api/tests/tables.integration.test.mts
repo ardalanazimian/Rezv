@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -34,7 +35,6 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db');
-const { redis } = await import('../src/lib/redis');
 const { signAccess } = await import('../src/lib/jwt');
 const { ACTIVE_RESERVATION_STATUSES } = await import('../src/lib/reservation-status');
 const { setTableState, qrCheckIn } = await import('../src/lib/tables');
@@ -51,7 +51,10 @@ type Ctx = { tenantId: string; restaurantId: string; token: string };
 const routeArg = (id: string) => ({ params: Promise.resolve({ id }) });
 
 const req = (token: string, method = 'DELETE') =>
-  new Request('http://x/api', { method, headers: { authorization: `Bearer ${token}` } });
+  new Request('http://x/api', {
+    method,
+    headers: { authorization: `Bearer ${token}`, 'x-real-ip': testIp() },
+  });
 
 async function makeTenant(label: string): Promise<Ctx> {
   const t = await db.tenant.create({ data: { name: `[DEMO] ${label}` }, select: { id: true } });
@@ -114,43 +117,33 @@ async function makeQrTableWithLiveReservation(state: string, prefix: string) {
   return tbl;
 }
 
-/**
- * شمارنده‌ی rate-limit را صفر می‌کند.
+/*
+ * ⚠️ اینجا قبلاً `clearRateLimit()` بود که با `redis.keys('*auth*')` **همه‌ی**
+ * سطل‌های `rl:auth:*` را پاک می‌کرد. لازم شده بود چون کلیدِ ریت‌لیمیت بر پایه‌ی
+ * IP است و `new Request()`ِ بدونِ هدر همیشه `unknown` می‌دهد — یعنی هر ۳۱ فایلِ
+ * تست یک سطلِ مشترک داشتند و این فایل (≈۲۰ نوشتنِ `rateLimit:'auth'`) سهمیه‌ی
+ * فایلِ بعدی را می‌سوزاند.
  *
- * ⚠️ چرا این تابع لازم شد (با قرمزشدنِ گیت اثبات شد، نه با حدس): رانرِ ما
- * همه‌ی فایل‌ها را در **یک** process اجرا می‌کند و کلیدِ محدودیت بر پایه‌ی IP
- * است — یعنی سهمیه بینِ فایل‌ها **مشترک** است. این فایل حدودِ ۲۰ فراخوانِ
- * نوشتاریِ `rateLimit:'auth'` دارد (حلقه‌ی نُه‌وضعیتی به‌تنهایی ۹ تا)، و در
- * اولین اجرا سهمیه را تمام کرد و فایلِ بعدی (`crm-feedback-loop`) به‌جای
- * ۲۰۱ عددِ **۴۲۹** گرفت — پنج تستِ بی‌ربط قرمز شدند.
- *
- * پس این پاک‌سازی «دورزدنِ محدودیت» نیست؛ جلوگیری از نشتِ سهمیه به فایلِ
- * دیگر است. سقفِ خودِ روت عمداً دست‌نخورده مانده و همچنان واقعی است — این
- * فایل اصلاً ادعای تستِ rate-limit ندارد.
+ * ولی آن پاک‌سازی خودش مضر بود: سطلِ فایل‌های دیگرِ همین رانر را هم خالی می‌کرد
+ * و ریت‌لیمیت را از تستِ آن‌ها **پنهان** می‌کرد. حالا هر Request با `testIp()`
+ * IPِ یکتا می‌گیرد، پس سطل‌ها از اول جدا هستند و پاک‌سازی لازم نیست — سقفِ
+ * واقعیِ روت هم دست‌نخورده و قابلِ سنجش می‌ماند.
  */
-async function clearRateLimit() {
-  const stale = await redis.keys('*auth*');
-  if (stale.length) await redis.del(...stale);
-}
 
 /** میز را حذف کن و بگو روت چه گفت + میز واقعاً رفت یا نه. */
 async function tryDelete(ctx: Ctx, tableId: string) {
-  await clearRateLimit();
   const res = await tableIdRoute.DELETE(req(ctx.token), routeArg(tableId));
   const stillThere = await db.table.findUnique({ where: { id: tableId }, select: { id: true } });
   return { status: res.status, deleted: stillThere === null };
 }
 
 before(async () => {
-  await clearRateLimit();
-
   const s = Date.now().toString(36);
   A = await makeTenant(`${TAG}-a-${s}`);
   B = await makeTenant(`${TAG}-b-${s}`);
 });
 
 after(async () => {
-  await clearRateLimit();
   const rests = [A.restaurantId, B.restaurantId];
   await db.reservation.deleteMany({ where: { restaurantId: { in: rests } } });
   await db.table.deleteMany({ where: { restaurantId: { in: rests } } });
@@ -216,7 +209,6 @@ describe('گاردِ حذفِ میز — هیچ رزروِ زنده‌ای یت�
 
   test('جداسازیِ تنانت: رستورانِ B نمی‌تواند میزِ A را حذف کند', async () => {
     const tbl = await makeTable(A);
-    await clearRateLimit();
     const res = await tableIdRoute.DELETE(req(B.token), routeArg(tbl.id));
     assert.equal(res.status, 404, 'باید «پیدا نشد» بدهد، نه حذف کند');
     const still = await db.table.findUnique({ where: { id: tbl.id }, select: { id: true } });

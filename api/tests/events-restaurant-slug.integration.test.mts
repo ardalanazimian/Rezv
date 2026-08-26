@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -59,7 +60,9 @@ after(async () => {
 
 describe('GET /events — slug و نامِ رستوران', () => {
   test('رویدادِ منتشرشده restaurant_slug و restaurant_name واقعی دارد', async () => {
-    const res = await eventsRoute.GET(new Request(`http://x/api/v1/events?restaurant_id=${restaurantId}`));
+    const res = await eventsRoute.GET(new Request(`http://x/api/v1/events?restaurant_id=${restaurantId}`, {
+      headers: { 'x-real-ip': testIp() },
+    }));
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.events.length, 1, 'فقط رویدادِ منتشرشده‌ی پیش‌رو');
@@ -72,7 +75,9 @@ describe('GET /events — slug و نامِ رستوران', () => {
   });
 
   test('رویدادِ پیش‌نویس و رویدادِ گذشته بیرون نمی‌آیند', async () => {
-    const res = await eventsRoute.GET(new Request(`http://x/api/v1/events?restaurant_id=${restaurantId}`));
+    const res = await eventsRoute.GET(new Request(`http://x/api/v1/events?restaurant_id=${restaurantId}`, {
+      headers: { 'x-real-ip': testIp() },
+    }));
     const body = await res.json();
     const titles = body.events.map((e: { title: string }) => e.title);
     assert.ok(!titles.some((t: string) => t.includes('پیش‌نویس')), 'منتشرنشده نباید بیاید');

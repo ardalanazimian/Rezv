@@ -1,5 +1,6 @@
 import { test, describe, before, after, beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -44,6 +45,8 @@ process.env.OTP_DEV_MODE = 'true';
 
 const { db } = await import('../src/lib/db.ts');
 const { redis } = await import('../src/lib/redis.ts');
+const { RULES } = await import('../src/lib/ratelimit.ts');
+const { normalizePhone } = await import('../src/lib/otp.ts');
 const adminReq = await import('../src/app/api/v1/auth/admin/request/route.ts');
 const staffReq = await import('../src/app/api/v1/auth/staff/request/route.ts');
 
@@ -57,10 +60,14 @@ const PHONE_ACTIVE_STAFF = '09121000002';
 const PHONE_DEACTIVATED = '09121000003';
 const PHONE_UNKNOWN = '09121000004';
 const PHONE_NON_ADMIN_STAFF = '09121000005';
+const OWN_PHONES = [
+  PHONE_SUPER_ADMIN, PHONE_ACTIVE_STAFF, PHONE_DEACTIVATED,
+  PHONE_UNKNOWN, PHONE_NON_ADMIN_STAFF,
+];
 
 const post = (body: unknown) => new Request('http://x/api/v1/auth/x/request', {
   method: 'POST',
-  headers: { 'content-type': 'application/json' },
+  headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
   body: JSON.stringify(body),
 });
 
@@ -69,11 +76,20 @@ async function fingerprint(res: Response) {
   return { status: res.status, body: await res.text() };
 }
 
+/**
+ * سطلِ per-phoneِ **همین فایل** را صفر می‌کند — نه بیشتر.
+ *
+ * ⚠️ قبلاً این تابع الگوهای `*otpv*`, `*otp:phone*`, `*otp:ip*` را **سراسری**
+ * پاک می‌کرد. دو تای اول و آخر دیگر لازم نیستند: `rl:otpv:<ip>` و
+ * `rl:otp:ip:<ip>` بر پایه‌ی IP کلید می‌خورند و حالا `post()` با `testIp()`
+ * برای هر درخواست IPِ یکتا می‌سازد. ولی `RULES.otpPerPhone` (۳ در ۱۰ دقیقه)
+ * بر پایه‌ی **شماره** است و IPِ یکتا جدایش نمی‌کند — پس فقط همان، و فقط
+ * برای شماره‌های خودِ این فایل، پاک می‌شود (کلیدِ دقیق، بدونِ الگوی سراسری)
+ * تا اجرای پیاپیِ فایل روی یک Redis سبز بماند.
+ */
 async function clearLimits() {
-  for (const pat of ['*otpv*', '*otp:phone*', '*otp:ip*']) {
-    const keys = await redis.keys(pat).catch(() => [] as string[]);
-    if (keys.length) await redis.del(...keys).catch(() => 0);
-  }
+  const keys = OWN_PHONES.map(p => `rl:${RULES.otpPerPhone.prefix}:${normalizePhone(p)}`);
+  await redis.del(...keys).catch(() => 0);
 }
 
 before(async () => {

@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -114,7 +115,10 @@ describe('TRIAL_DAYS', () => {
 
 describe('contextFromRequest — انتسابِ کمپین', () => {
   const req = (headers: Record<string, string> = {}) =>
-    new Request('https://api.rezervno.ir/api/v1/site/trial', { method: 'POST', headers });
+    new Request('https://api.rezervno.ir/api/v1/site/trial', {
+      method: 'POST',
+      headers: { 'x-real-ip': testIp(), ...headers },
+    });
 
   test('UTM از بدنه خوانده و کوتاه می‌شود', () => {
     const ctx = contextFromRequest(req(), {

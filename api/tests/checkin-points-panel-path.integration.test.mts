@@ -1,5 +1,6 @@
-import { test, describe, before, beforeEach, after } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -43,7 +44,6 @@ import { fixturePhone } from './_phone.helper.mts';
 const OWNER_PHONE_PREFIX = '0921';
 
 const { db } = await import('../src/lib/db.ts');
-const { redis } = await import('../src/lib/redis.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');
 const { getClubPointsBalance } = await import('../src/lib/loyalty.ts');
 const { markArrival } = await import('../src/lib/reservations.ts');
@@ -62,7 +62,11 @@ let customerToken = '';
 const staffReq = (body: unknown) =>
   new Request('http://x/api', {
     method: 'PATCH',
-    headers: { authorization: `Bearer ${staffToken}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${staffToken}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     body: JSON.stringify(body),
   });
 
@@ -90,22 +94,13 @@ async function seedConfirmed() {
   });
 }
 
-/**
- * سطلِ `RULES.auth` سقفِ ۲۰ در دقیقه دارد و بینِ فایل‌ها مشترک است (همه با
- * IPِ «unknown»). این تابع فقط سطل‌هایی را که *خودِ این فایل* مصرف می‌کند
- * صفر می‌کند — عمداً `rl:chkin:*` را دست نمی‌زند تا تستِ ریت‌لیمیتِ چک‌ینِ QR
- * در فایلِ دیگر خراب نشود.
- *
- * ⚠️ `beforeEach` عمداً **داخلِ** describe است، نه سطحِ فایل: در این رانرِ
- * تک‌پروسه‌ای، هوکِ سطحِ فایل هوکِ ریشه می‌شود و قبل از *هر* تستِ سوئیت اجرا
- * می‌شود — که یعنی پاک‌کردنِ سطلِ تستِ ریت‌لیمیتِ دیگران.
+/*
+ * ⚠️ اینجا قبلاً `clearOwnRateLimits()` بود که `rl:auth:*` و `rl:srch:*` را
+ * سراسری پاک می‌کرد، چون سطلِ `RULES.auth` (۲۰/دقیقه) بینِ همه‌ی فایل‌ها مشترک
+ * بود (IPِ همه‌ی `new Request()`های بی‌هدر = `unknown`). آن پاک‌سازی سطلِ
+ * فایل‌های دیگرِ همین رانر را هم خالی می‌کرد. حالا هر Request با `testIp()`
+ * سطلِ خودش را دارد و سقفِ واقعیِ روت قابلِ سنجش می‌ماند.
  */
-async function clearOwnRateLimits() {
-  for (const p of ['rl:auth:*', 'rl:srch:*']) {
-    const keys = await redis.keys(p);
-    if (keys.length) await redis.del(...keys);
-  }
-}
 
 before(async () => {
   const t = await db.tenant.create({ data: { name: `[DEMO] tenant panel-checkin ${SFX}` } });
@@ -146,8 +141,6 @@ after(async () => {
 });
 
 describe('امتیازِ حضور از مسیرِ واقعیِ پنل (§۱۳)', () => {
-  beforeEach(clearOwnRateLimits);
-
   test('کنترلِ مثبت: PATCH .../status انتقال را واقعاً انجام می‌دهد', async () => {
     // بدونِ این، تستی که روتِ همیشه-۴۰۳ بگیرد هم می‌توانست «امتیاز صفر» را
     // به‌عنوانِ باگ گزارش کند. اول ثابت می‌کنیم سیمِ auth/RBAC/انتقال سالم است.
@@ -184,7 +177,9 @@ describe('امتیازِ حضور از مسیرِ واقعیِ پنل (§۱۳)',
     // این همان چیزی بود که در اندازه‌گیریِ زنده `{"balance":0,"history":[]}` بود.
     const expected = await db.pointsLedger.aggregate({ where: { userId }, _sum: { delta: true } });
     const res = await mePointsRoute.GET(
-      new Request('http://x/api', { headers: { authorization: `Bearer ${customerToken}` } }),
+      new Request('http://x/api', {
+        headers: { authorization: `Bearer ${customerToken}`, 'x-real-ip': testIp() },
+      }),
       { params: Promise.resolve({}) } as never,
     );
     assert.equal(res.status, 200);
@@ -247,8 +242,6 @@ describe('امتیازِ حضور از مسیرِ واقعیِ پنل (§۱۳)',
 });
 
 describe('سطحِ باشگاه (tier) واقعاً نوشته می‌شود (§۱۳)', () => {
-  beforeEach(clearOwnRateLimits);
-
   test('کنترلِ منفی: عضوِ تازه با امتیازِ کم هنوز bronze است', async () => {
     // اگر تستِ بعدی بدونِ این بود، یک `tier='silver'`ِ هاردکد هم پاسش می‌کرد.
     const balance = await getClubPointsBalance(userId, restaurantId);
@@ -316,7 +309,7 @@ describe('سطحِ باشگاه (tier) واقعاً نوشته می‌شود (§
     const { LOYALTY_TIERS } = await import('../src/lib/loyalty.ts');
     const res = await membersRoute.GET(
       new Request('http://x/api/v1/restaurant/members', {
-        headers: { authorization: `Bearer ${staffToken}` },
+        headers: { authorization: `Bearer ${staffToken}`, 'x-real-ip': testIp() },
       }),
       { params: Promise.resolve({}) } as never,
     );

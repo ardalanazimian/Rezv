@@ -1,5 +1,6 @@
 import { test, describe, before, after, beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -83,7 +84,11 @@ after(async () => {
 function patchReq(id: string, body: unknown) {
   return new Request(`http://x/admin/hours-changes/${id}`, {
     method: 'PATCH',
-    headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${adminToken}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     body: JSON.stringify(body),
   });
 }

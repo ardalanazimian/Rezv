@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -54,20 +55,32 @@ let ownerId: string, ownerToken: string;
 let strangerId: string, strangerToken: string;
 
 /**
- * سهمیه‌ی rate-limit بینِ همه‌ی فایل‌های رانر مشترک است (کلید = IP، و برای
- * `Request`ِ ساختگی همیشه `unknown`). این فایل عمداً سقف را می‌سوزاند، پس
- * پاک‌سازی هم قبل و هم بعد لازم است.
+ * IPِ اختصاصیِ **تستِ ریت‌لیمیت** — تنها جایی که چند درخواست باید عمداً یک
+ * سطل را پر کنند. بقیه‌ی تست‌های این فایل هرکدام IPِ یکتای خودشان را
+ * می‌گیرند، پس این سطل را نمی‌سوزانند و هیچ فایلِ دیگری هم به آن نمی‌خورد.
  */
-async function clearRateLimit() {
-  for (const p of ['rl:chkin:*', 'rl:auth:*', 'rl:srch:*']) {
-    const keys = await redis.keys(p);
-    if (keys.length) await redis.del(...keys);
-  }
+const RL_IP = testIp();
+
+/**
+ * فقط سطلِ `RULES.qrCheckin`ِ همان `RL_IP` را صفر می‌کند.
+ *
+ * ⚠️ قبلاً اینجا `clearRateLimit()` بود که `rl:chkin:*`, `rl:auth:*` و
+ * `rl:srch:*` را با `redis.keys()` **سراسری** پاک می‌کرد. لازم شده بود چون
+ * `new Request()`ِ بدونِ هدر همیشه IPِ `unknown` می‌دهد و سطل بینِ همه‌ی
+ * فایل‌های رانر مشترک بود؛ ولی همان پاک‌سازی سطلِ فایل‌های دیگر را هم خالی
+ * می‌کرد و ریت‌لیمیتشان را از سنجش خارج. حالا کلیدِ دقیق پاک می‌شود، نه الگو.
+ */
+async function clearOwnCheckinBucket() {
+  await redis.del(`rl:${RULES.qrCheckin.prefix}:${RL_IP}`);
 }
 
-/** فراخوانِ واقعیِ route. `token` اختیاری است — نبودنش یعنی مهمانِ ناشناس. */
-function scan(qrCode: string, token?: string) {
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
+/**
+ * فراخوانِ واقعیِ route. `token` اختیاری است — نبودنش یعنی مهمانِ ناشناس.
+ * `ip` پیش‌فرض یکتاست تا هر تست سطلِ ریت‌لیمیتِ خودش را داشته باشد؛ فقط تستِ
+ * خودِ ریت‌لیمیت عمداً یک IPِ ثابت می‌دهد.
+ */
+function scan(qrCode: string, token?: string, ip: string = testIp()) {
+  const headers: Record<string, string> = { 'content-type': 'application/json', 'x-real-ip': ip };
   if (token) headers.authorization = `Bearer ${token}`;
   return checkinRoute.POST(new Request('http://x/api/v1/checkin', {
     method: 'POST',
@@ -110,7 +123,6 @@ async function makeLiveReservation(ctx: Ctx, tableId: string, userId: string | n
 }
 
 before(async () => {
-  await clearRateLimit();
   A = await makeTenant(`${TAG}-a`);
   B = await makeTenant(`${TAG}-b`);
 
@@ -133,7 +145,6 @@ before(async () => {
 });
 
 after(async () => {
-  await clearRateLimit();
   const rests = [A.restaurantId, B.restaurantId];
   await db.reservationEvent.deleteMany({ where: { reservation: { restaurantId: { in: rests } } } }).catch(() => {});
   await db.reservation.deleteMany({ where: { restaurantId: { in: rests } } }).catch(() => {});
@@ -148,7 +159,6 @@ describe('۱) مهمانِ بدونِ هیچ توکنی — قابلیت واق�
   test('🔴 اسکنِ ناشناس ۲۰۰ می‌دهد و رزرو در DB واقعاً seated می‌شود', async () => {
     // 🔴 قفلِ اصلیِ این فایل. پیش از رفع، همین درخواست ۴۰۱ می‌گرفت و هیچ
     //    وضعیتی جهش نمی‌کرد — قابلیت شیپ‌شده ولی غیرقابلِ‌دسترس.
-    await clearRateLimit();
     const t = await makeTable(A);
     const resv = await makeLiveReservation(A, t.id);
 
@@ -176,7 +186,6 @@ describe('۱) مهمانِ بدونِ هیچ توکنی — قابلیت واق�
   test('چرخه‌ی حیات دور زده نمی‌شود — رویدادهای checked_in و seated ثبت شده‌اند', async () => {
     // اگر کسی روزی برای «ساده‌کردن» مستقیم `db.reservation.update` بنویسد،
     // پاسخ همچنان seated می‌شود ولی این تست قرمز می‌شود (پروتکل §۴).
-    await clearRateLimit();
     const t = await makeTable(A);
     const resv = await makeLiveReservation(A, t.id);
     await scan(t.qr);
@@ -196,7 +205,6 @@ describe('۲) نشتِ `reservation_code` بسته است', () => {
   test('🔴 بدونِ توکنِ مشتری → null، با توکنِ صاحبِ همان رزرو → کدِ واقعی', async () => {
     // 🔴 هر دو نیمه در یک تست، چون جدا از هم هرکدام با یک پیاده‌سازیِ
     //    تقلبی پاس می‌شوند (همیشه-null یا همیشه-کد).
-    await clearRateLimit();
 
     const t1 = await makeTable(A);
     const r1 = await makeLiveReservation(A, t1.id, ownerId);
@@ -214,7 +222,6 @@ describe('۲) نشتِ `reservation_code` بسته است', () => {
   });
 
   test('کاربرِ لاگین‌کرده‌ی بی‌ربط کدِ رزروِ دیگری را نمی‌بیند', async () => {
-    await clearRateLimit();
     const t = await makeTable(A);
     await makeLiveReservation(A, t.id, ownerId);
     const out = await (await scan(t.qr, strangerToken)).json() as { reservation_code: string | null; checked_in: boolean };
@@ -226,7 +233,6 @@ describe('۲) نشتِ `reservation_code` بسته است', () => {
     // گاردِ ضدِ `null === undefined`: اگر شرط فقط برابریِ ساده بود، یک
     // فراخوانِ ناشناس (userId=undefined) روی رزروِ مهمان (userId=null)
     // می‌توانست کد بگیرد.
-    await clearRateLimit();
     const t = await makeTable(A);
     await makeLiveReservation(A, t.id, null);
     const anon = await (await scan(t.qr)).json() as { reservation_code: string | null };
@@ -241,7 +247,6 @@ describe('۲) نشتِ `reservation_code` بسته است', () => {
   test('توکنِ خراب درخواست را نمی‌شکند، فقط کد را نمی‌دهد', async () => {
     // مسیر عمداً برای فراخوانِ بدونِ توکن باز است؛ توکنِ نامعتبر نباید
     // ۴۰۱ بدهد، چون اصلاً شرطِ ورود نیست.
-    await clearRateLimit();
     const t = await makeTable(A);
     await makeLiveReservation(A, t.id, ownerId);
     const res = await scan(t.qr, 'this.is.not.a.jwt');
@@ -255,7 +260,6 @@ describe('۲) نشتِ `reservation_code` بسته است', () => {
 // ─────────────────────────────────────────────────────────────────────
 describe('۳) کدِ ناموجود و کدِ رستورانِ دیگر تفکیک‌ناپذیرند', () => {
   test('🔴 دو کدِ ناشناخته‌ی متفاوت → پاسخِ بایت‌به‌بایت یکسان', async () => {
-    await clearRateLimit();
     const a = await scan('T-ZZZZZZZZZZ');
     const b = await scan('T-QQQQQQQQQQ');
     assert.equal(a.status, b.status);
@@ -288,7 +292,6 @@ describe('۳) کدِ ناموجود و کدِ رستورانِ دیگر تفکی
     // رستورانِ دیگر» در سطحِ HTTP اصلاً وجود ندارد — هر کدِ معتبر مالِ
     // رستورانِ خودش است. این عمدی است و ثبتش می‌کنیم تا با «شکافِ تنانت»
     // اشتباه گرفته نشود؛ فراخوان هیچ‌جا شعبه‌ای انتخاب نمی‌کند.
-    await clearRateLimit();
     const tB = await makeTable(B);
     const resv = await makeLiveReservation(B, tB.id);
     const res = await scan(tB.qr);
@@ -301,7 +304,6 @@ describe('۳) کدِ ناموجود و کدِ رستورانِ دیگر تفکی
 // ─────────────────────────────────────────────────────────────────────
 describe('۴) میزِ بدونِ رزروِ فعال و idempotency', () => {
   test('میزِ بدونِ رزرو → ۲۰۰ بدونِ هیچ جهشِ وضعیتی', async () => {
-    await clearRateLimit();
     const t = await makeTable(A);
     const before = await db.table.findUnique({ where: { id: t.id }, select: { state: true } });
 
@@ -317,7 +319,6 @@ describe('۴) میزِ بدونِ رزروِ فعال و idempotency', () => {
   });
 
   test('🔴 اسکنِ دوباره وضعیتِ رزرو را خراب نمی‌کند (idempotent در دیتابیس)', async () => {
-    await clearRateLimit();
     const t = await makeTable(A);
     const resv = await makeLiveReservation(A, t.id, ownerId);
 
@@ -357,7 +358,6 @@ describe('۴) میزِ بدونِ رزروِ فعال و idempotency', () => {
     // رفع: `seated` و `dining` به فیلتر اضافه شدند. انتقالِ چرخه‌ی حیات
     // بی‌اثر می‌ماند (تلاشِ seated→seated نامعتبر است و همان catch می‌گیردش)
     // ولی پاسخ صادق است.
-    await clearRateLimit();
     const t = await makeTable(A);
     const resv = await makeLiveReservation(A, t.id, ownerId);
 
@@ -386,7 +386,7 @@ describe('۵) ریت‌لیمیتِ اختصاصیِ per-IP واقعاً اعم�
   test('🔴 بعد از سقفِ RULES.qrCheckin پاسخ ۴۲۹ می‌شود', async () => {
     // ⚠️ این تنها مسیرِ جهش‌دهنده‌ی وضعیتِ رزرو است که بدونِ توکنِ کاربر سرو
     //    می‌شود؛ بدونِ سقفِ اختصاصی فقط globalPerIp (۱۲۰/دقیقه) جلویش بود.
-    await clearRateLimit();
+    await clearOwnCheckinBucket();
     const max = RULES.qrCheckin.max;
     assert.ok(max > 0 && max <= 60, `سقف باید محافظه‌کارانه بماند، دیده شد ${max}`);
 
@@ -394,7 +394,7 @@ describe('۵) ریت‌لیمیتِ اختصاصیِ per-IP واقعاً اعم�
     // پس این حلقه هیچ رزروی را جهش نمی‌دهد.
     const codes: number[] = [];
     for (let i = 0; i < max + 3; i++) {
-      const r = await scan(`T-RATELIMIT${String(i).padStart(2, '0')}`);
+      const r = await scan(`T-RATELIMIT${String(i).padStart(2, '0')}`, undefined, RL_IP);
       codes.push(r.status);
     }
 
@@ -413,11 +413,11 @@ describe('۵) ریت‌لیمیتِ اختصاصیِ per-IP واقعاً اعم�
 
     // ۳) کنترلِ مثبت: بعد از پاک‌شدنِ پنجره دوباره ۴۰۴ می‌شود — یعنی آنچه
     //    دیدیم واقعاً ریت‌لیمیت بود، نه یک حالتِ خرابِ ماندگار.
-    await clearRateLimit();
-    const afterReset = await scan('T-RATELIMITZZ');
+    await clearOwnCheckinBucket();
+    const afterReset = await scan('T-RATELIMITZZ', undefined, RL_IP);
     assert.equal(afterReset.status, 404, 'با پاک‌شدنِ پنجره مسیر باید دوباره باز شود');
 
-    await clearRateLimit();
+    await clearOwnCheckinBucket();
   });
 
   test('سقف مستقل از سطلِ auth است (سوزاندنِ یکی دیگری را نمی‌بندد)', async () => {

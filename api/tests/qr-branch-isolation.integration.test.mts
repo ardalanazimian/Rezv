@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -48,7 +49,10 @@ let tokenOwnerCustomer: string;
 let tokenOtherCustomer: string;
 
 const qrReq = (token: string, code: string, branchHeader?: string) => {
-  const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${token}`,
+    'x-real-ip': testIp(),
+  };
   if (branchHeader) headers['x-restaurant-id'] = branchHeader;
   return new Request(`http://x/api/v1/reservations/${code}/qr`, { headers });
 };

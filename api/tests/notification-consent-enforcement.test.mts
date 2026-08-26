@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { readFileSync } from 'node:fs';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -36,7 +37,6 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db.ts');
-const { redis } = await import('../src/lib/redis.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');
 const { renderMetrics } = await import('../src/lib/metrics.ts');
 const {
@@ -131,13 +131,18 @@ function suppressed(filter?: { category?: string; site?: string }): number {
 const jsonReq = (token: string, body: unknown) =>
   new Request('http://x/api/v1/restaurant/sms', {
     method: 'POST',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     body: JSON.stringify(body),
   });
 
 before(async () => {
-  const stale = await redis.keys('*auth*');
-  if (stale.length) await redis.del(...stale);
+  // ⚠️ اینجا قبلاً کلِ سطل‌های `*auth*` سراسری پاک می‌شد. با `testIp()` هر
+  // Request سطلِ خودش را دارد، پس لازم نیست — و آن پاک‌سازی ریت‌لیمیتِ
+  // فایل‌های دیگرِ همین رانر را هم بی‌اثر می‌کرد.
   const t = await db.tenant.create({ data: { name: `[DEMO] ${TAG}` }, select: { id: true } });
   tenantId = t.id;
   const r = await db.restaurant.create({

@@ -1,5 +1,6 @@
-import { test, describe, before, after, beforeEach } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -27,7 +28,6 @@ import { fixturePhone } from './_phone.helper.mts';
 const PHONE_PREFIX = '0925';
 
 const { db } = await import('../src/lib/db.ts');
-const { redis } = await import('../src/lib/redis.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');
 const { genReservationCode } = await import('../src/lib/reservation-helpers.ts');
 const smsRoute = await import('../src/app/api/v1/restaurant/sms/route.ts');
@@ -45,7 +45,11 @@ const madeUserIds: string[] = [];
 const jsonReq = (body: unknown) =>
   new Request('http://x/api/v1/restaurant/sms', {
     method: 'POST',
-    headers: { authorization: `Bearer ${ownerToken}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     body: JSON.stringify(body),
   });
 
@@ -94,11 +98,11 @@ async function makeArrival(opts: {
   });
 }
 
-/** سطلِ `RULES.auth` (۲۰/دقیقه) بینِ فایل‌ها مشترک است. */
-async function clearOwnRateLimits() {
-  const keys = await redis.keys('rl:auth:*');
-  if (keys.length) await redis.del(...keys);
-}
+/*
+ * ⚠️ اینجا قبلاً `clearOwnRateLimits()` بود که `rl:auth:*` را **سراسری** پاک
+ * می‌کرد. با `testIp()` هر Request سطلِ جدا دارد، پس دیگر لازم نیست — و آن
+ * پاک‌سازی سطلِ فایل‌های دیگرِ همین رانر را هم خالی می‌کرد.
+ */
 
 before(async () => {
   const t = await db.tenant.create({ data: { name: `[DEMO] tenant welcome-proof ${SFX}` } });
@@ -150,7 +154,6 @@ after(async () => {
 });
 
 describe('رسیدِ خوش‌آمد فقط با ورودِ تأییدشده‌ی سرور', () => {
-  beforeEach(clearOwnRateLimits);
 
   test('کنترلِ مثبت: مهمانی که واقعاً چک‌ین کرده رسیدش را می‌گیرد', async () => {
     // بدونِ این، همه‌ی تست‌های زیر با یک روتِ همیشه-۴۲۲ هم سبز می‌شدند.

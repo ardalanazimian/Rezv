@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
@@ -36,7 +37,7 @@ const ctxArg = () => ({ params: Promise.resolve({}) });
 const authedGet = () =>
   new Request('http://x/api/v1/restaurant/analytics', {
     method: 'GET',
-    headers: { authorization: `Bearer ${token}` },
+    headers: { authorization: `Bearer ${token}`, 'x-real-ip': testIp() },
   });
 
 /**

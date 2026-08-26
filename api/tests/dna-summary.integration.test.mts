@@ -1,5 +1,6 @@
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { randomUUID } from 'node:crypto';
 import { fixturePhone } from './_phone.helper.mts';
 
@@ -273,7 +274,9 @@ describe('محتوایِ خلاصه — فقط از دادهٔ واقعی', () =
 describe('endpoint و اعمالِ واقعیِ رضایت', () => {
 
   const call = () => dnaRoute.GET(
-    new Request('http://x/api/v1/me/dna-summary', { headers: { authorization: `Bearer ${token}` } }),
+    new Request('http://x/api/v1/me/dna-summary', {
+      headers: { authorization: `Bearer ${token}`, 'x-real-ip': testIp() },
+    }),
     // ctxِ Next — این route پارامترِ مسیر ندارد
     { params: Promise.resolve({}) } as never,
   );
@@ -331,7 +334,7 @@ describe('endpoint و اعمالِ واقعیِ رضایت', () => {
 
   test('بدونِ توکنِ مشتری بسته است', async () => {
     const res = await dnaRoute.GET(
-      new Request('http://x/api/v1/me/dna-summary'),
+      new Request('http://x/api/v1/me/dna-summary', { headers: { 'x-real-ip': testIp() } }),
       { params: Promise.resolve({}) } as never,
     );
     assert.equal(res.status >= 400, true, `باید رد شود، شد: ${res.status}`);

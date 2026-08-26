@@ -1,5 +1,6 @@
-import { test, describe, before, beforeEach, after } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -31,7 +32,6 @@ import { fixturePhone } from './_phone.helper.mts';
 const PHONE_PREFIX_FILE = '0922';
 
 const { db } = await import('../src/lib/db.ts');
-const { redis } = await import('../src/lib/redis.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');
 const { refreshVipFlags, MIN_MEASURED_FOR_VIP } = await import('../src/lib/customer-insights.ts');
 const overviewRoute = await import('../src/app/api/v1/admin/overview/route.ts');
@@ -82,12 +82,11 @@ async function clearInsights() {
   await db.customerInsight.deleteMany({ where: { restaurantId } });
 }
 
-/** فقط سطلِ خودِ این فایل (`RULES.search`) — رجوع کن به توضیحِ هم‌نام در
- *  tests/checkin-points-panel-path.integration.test.mts. */
-async function clearOwnRateLimits() {
-  const keys = await redis.keys('rl:srch:*');
-  if (keys.length) await redis.del(...keys);
-}
+/*
+ * ⚠️ اینجا `clearOwnRateLimits()` بود که `rl:srch:*` را **سراسری** پاک می‌کرد
+ * (و به‌عنوانِ `beforeEach` یک describe صدا زده می‌شد). حالا `adminReq()` با
+ * `testIp()` IPِ یکتا می‌گیرد، پس سطل از اول جدا است و پاک‌سازی لازم نیست.
+ */
 
 before(async () => {
   const t = await db.tenant.create({ data: { name: `[DEMO] tenant vip-clv ${SFX}` } });
@@ -210,7 +209,9 @@ describe('VIP — تساوی نباید همه را VIP کند (§۲۰)', () => 
 
 // ─────────────────────────────────────────────────────────────────────
 const adminReq = () =>
-  new Request('http://x/api', { headers: { authorization: `Bearer ${adminToken}` } });
+  new Request('http://x/api', {
+    headers: { authorization: `Bearer ${adminToken}`, 'x-real-ip': testIp() },
+  });
 const noParams = () => ({ params: Promise.resolve({}) });
 
 async function callOverview() {
@@ -231,7 +232,6 @@ async function callBi() {
 }
 
 describe('CLVِ پلتفرم — دو صفحه باید یک جواب بدهند (ML_CONTRACT)', () => {
-  beforeEach(clearOwnRateLimits);
 
   test('کنترلِ مثبت: هر دو روت با همین توکن واقعاً ۲۰۰ می‌دهند', async () => {
     await callOverview();
