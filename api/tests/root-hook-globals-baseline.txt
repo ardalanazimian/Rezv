@@ -6,12 +6,8 @@
 # ✅ کوچک‌شدنِ این فایل پیشرفت است — هر خط را با انتقالِ هوک به داخلِ
 #    describeِ همان فایل می‌توان حذف کرد.
 assistant-vocab-poisoning.integration.test.mts :: after :: del:process.env.MAINTENANCE_KEY set:process.env.MAINTENANCE_KEY
-auth-otp-enumeration.integration.test.mts :: before :: set:process.env.PLATFORM_ADMIN_TENANT_ID
-auth-otp-enumeration.integration.test.mts :: after :: del:process.env.PLATFORM_ADMIN_TENANT_ID set:process.env.PLATFORM_ADMIN_TENANT_ID
 events-restaurant-slug.integration.test.mts :: before :: redis:redis.del
 events-restaurant-slug.integration.test.mts :: after :: redis:redis.del
-hours-change-approval.integration.test.mts :: before :: set:process.env.PLATFORM_ADMIN_TENANT_ID
 sms-queue-fallback-balance.integration.test.mts :: before :: del:process.env.KAVENEGAR_API_KEY
 sms-queue-fallback-balance.integration.test.mts :: after :: del:process.env.KAVENEGAR_API_KEY set:globalThis.fetch set:process.env.KAVENEGAR_API_KEY
 sms-transport-failclosed.integration.test.mts :: after :: del:process.env.KAVENEGAR_API_KEY del:process.env.OTP_DEV_MODE set:process.env.KAVENEGAR_API_KEY set:process.env.NODE_ENV set:process.env.OTP_DEV_MODE
-telemetry-pipeline.integration.test.mts :: after :: del:process.env.PLATFORM_ADMIN_TENANT_ID set:process.env.PLATFORM_ADMIN_TENANT_ID
