@@ -2,7 +2,7 @@ import { db } from './db';
 import { getCustomerEconomyProfile } from './economy';
 import { listMissionsForUser } from './missions';
 import { listRewardItems } from './rewards';
-import { forecastHoltWinters, type SeriesModelState } from './demand-forecast';
+import { buildForecastSeries, tehranTodayIso, type SeriesModelState } from './demand-forecast';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Smart Incentive Engine
@@ -134,7 +134,11 @@ export function rankIncentives(input: RankIncentivesInput): IncentiveSuggestion[
  * یادگرفته‌شده isActive باشه (همون انضباطِ resolvePolicy/getDemandSignal:
  * هیچ‌وقت رویِ پیش‌بینیِ اثبات‌نشده تصمیم نمی‌گیریم).
  */
-async function findLowDemandDay(restaurantId: string): Promise<{ date: string; ratio: number } | null> {
+// export فقط برایِ تست: نگاشتِ «گام → تاریخ» یک‌بار اینجا اشتباه شد و هیچ
+// تستی نگرفتش، چون تنها مسیرِ عمومی (getIncentivesForUser) تاریخ را در دلِ
+// یک پیشنهادِ متنی پنهان می‌کند. این seam همان نگاشت را مستقیم قابلِ‌سنجش
+// می‌کند.
+export async function findLowDemandDay(restaurantId: string): Promise<{ date: string; ratio: number } | null> {
   const row = await db.restaurantDemandForecast.findUnique({ where: { restaurantId }, select: { coversModel: true } });
   if (!row) return null;
   const state = row.coversModel as unknown as SeriesModelState;
@@ -143,18 +147,28 @@ async function findLowDemandDay(restaurantId: string): Promise<{ date: string; r
   const recentMean = state.lastValues.reduce((a, b) => a + b, 0) / state.lastValues.length;
   if (recentMean <= 0) return null;
 
-  const forecast = forecastHoltWinters(state.model, 7);
-  const base = new Date();
-  base.setHours(0, 0, 0, 0);
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۵): این تابع تاریخ را خودش می‌ساخت —
+  // `forecastHoltWinters(state.model, 7)` و بعد برچسبِ `today + h + 1`.
+  // ولی پیش‌بینی به **`lastObservedDay`** گره خورده، نه به «امروز». چون
+  // سری تا دیروز ساخته می‌شود، اندیسِ ۰ در واقع «امروز» است و نه «فردا»
+  // ⇒ هر تاریخِ پیشنهادی یک روز جلوتر گزارش می‌شد. و اگر cron یک شب را از
+  // دست می‌داد، خطا به همان تعدادِ روز بزرگ‌تر می‌شد.
+  //
+  // پیامدِ کاربری: به مهمان تخفیفِ «روزِ خلوت» برایِ روزی پیشنهاد می‌شد که
+  // پیش‌بینیِ خلوتی مالِ روزِ **قبلش** بود — یعنی یک وعده‌ی مالی روی
+  // تاریخِ اشتباه.
+  //
+  // حالا همان `buildForecastSeries`ی صدا زده می‌شود که خودِ داشبورد و
+  // دستیار استفاده می‌کنند: نقاطش از قبل تاریخ‌دارند و از فردا شروع
+  // می‌شوند. یک نگاشت، یک پیاده‌سازی (§۲۲).
+  const series = buildForecastSeries(state, 7, tehranTodayIso());
   let best: { date: string; ratio: number } | null = null;
-  forecast.forEach((v, h) => {
-    const ratio = v / recentMean;
+  for (const p of series.points) {
+    const ratio = p.predicted / recentMean;
     if (ratio < LOW_DEMAND_THRESHOLD && (!best || ratio < best.ratio)) {
-      const d = new Date(base);
-      d.setDate(d.getDate() + h + 1);
-      best = { date: d.toISOString().slice(0, 10), ratio: Math.round(ratio * 100) / 100 };
+      best = { date: p.date, ratio: Math.round(ratio * 100) / 100 };
     }
-  });
+  }
   return best;
 }
 

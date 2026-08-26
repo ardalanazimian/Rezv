@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { getCustomerEconomyProfile } from '@/lib/economy';
 import { Err, errorResponse } from '@/lib/errors';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 /**
  * GET /api/v1/me/economy — پروفایلِ اقتصادِ یکپارچه‌ی مشتری.
  *
@@ -11,7 +13,7 @@ import { Err, errorResponse } from '@/lib/errors';
  * (تصمیم‌گیریِ الگوریتمی، مثلاً resolvePolicy). مشتری فقط reputationTierِ
  * مشتق‌شده رو می‌بینه — نشون‌دادنِ عددِ خامِ تنبیهی ضدِ تجربه‌ست.
  */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -34,3 +36,7 @@ export async function GET(req: Request) {
     });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/me/economy', GET_impl);

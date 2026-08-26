@@ -6,6 +6,8 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { ApiError, Err, errorResponse } from '@/lib/errors';
 import { parseBody, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // نمره‌ی ۱ تا ۵ — هم‌راستا با ستون‌های rating/food_rating/... در جدولِ reviews (SmallInt).
 const zStars = z.number().int().min(1).max(5);
 
@@ -33,7 +35,7 @@ const bodySchema = z.object({
  * یکتاییِ «یک نظر برای هر رزرو» در سطحِ اپلیکیشن چک می‌شود (نه constraint دیتابیس)؛
  * پنجره‌ی رقابتِ هم‌زمان برایِ این فیچرِ کم‌خطر (غیرِمالی) قابل‌قبول است.
  */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -89,3 +91,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, review }, { status: 201 });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/me/reviews', POST_impl);

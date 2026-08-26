@@ -109,22 +109,52 @@ export async function recordEvent(e: PlatformEventInput): Promise<void> {
   }
 }
 
+/** نتیجه‌ی درجِ دسته‌ای — تفکیکِ «هیچ‌کدام درج نشد» از «درج اصلاً شکست خورد». */
+export interface RecordEventsResult {
+  /** تعدادِ ردیفی که واقعاً در جدول نشست (بعد از dedup). */
+  inserted: number;
+  /** درج throw کرد (DB قطع/خطا) — یعنی رویدادها **گم شدند**، نه اینکه تکراری بودند. */
+  failed: boolean;
+}
+
 /**
- * درجِ دسته‌ایِ رویدادها (برای ingestِ batch از کلاینت). تعدادِ پذیرفته‌شده
- * را برمی‌گرداند. مثلِ recordEvent، هرگز پرتاب نمی‌کند.
+ * درجِ دسته‌ای با نتیجه‌ی کامل. مثلِ recordEvent هرگز پرتاب نمی‌کند، ولی
+ * برخلافِ `recordEvents` تفاوتِ دو حالتِ کاملاً متفاوت را **پنهان نمی‌کند**:
+ *
+ *   • `{inserted: 0, failed: false}` → همه‌ی رویدادها تکراری بودند (dedup).
+ *     تحویل انجام شده؛ فرستنده باید صف را خالی کند.
+ *   • `{inserted: 0, failed: true}`  → درج شکست خورد. رویداد **گم شده** است.
+ *     فرستنده باید دوباره تلاش کند.
+ *
+ * چرا لازم شد (§۳ — شکستِ زیرساخت ≠ موفقیت): `recordEvents` هر دو را با عددِ
+ * `0` گزارش می‌کرد و route هم روی هر دو `202` می‌داد. کلاینت (`analytics.js`)
+ * صف را فقط بر پایه‌ی `r.ok` هرس می‌کند، پس یک قطعیِ دیتابیس یعنی حذفِ
+ * **دائمیِ** بی‌صدای رویداد — نه تأخیر.
  */
-export async function recordEvents(events: PlatformEventInput[]): Promise<number> {
-  if (!events.length) return 0;
+export async function recordEventsDetailed(events: PlatformEventInput[]): Promise<RecordEventsResult> {
+  if (!events.length) return { inserted: 0, failed: false };
   try {
     // skipDuplicates → ON CONFLICT DO NOTHING، که ایندکسِ یکتایِ جزئیِ
     // event_id را رعایت می‌کند. `count` همچنان تعدادِ **واقعاً درج‌شده** است،
     // پس عددی که route به‌عنوانِ accepted برمی‌گرداند صادق می‌ماند.
     const res = await db.platformEvent.createMany({ data: events.map(toRow), skipDuplicates: true });
-    return res.count;
+    return { inserted: res.count, failed: false };
   } catch (err) {
     log.warn('درجِ دسته‌ایِ رویداد ناموفق', { count: events.length, error: (err as Error).message });
-    return 0;
+    return { inserted: 0, failed: true };
   }
+}
+
+/**
+ * درجِ دسته‌ایِ رویدادها (برای ingestِ batch از کلاینت). تعدادِ پذیرفته‌شده
+ * را برمی‌گرداند. مثلِ recordEvent، هرگز پرتاب نمی‌کند.
+ *
+ * ⚠️ این امضا عمداً دست‌نخورده مانده (تست‌های موجود رویش قفل‌اند)، ولی برایِ
+ * مسیرهایی که باید «شکست» را از «تکراری» تشخیص دهند `recordEventsDetailed`
+ * را صدا بزن، نه این را.
+ */
+export async function recordEvents(events: PlatformEventInput[]): Promise<number> {
+  return (await recordEventsDetailed(events)).inserted;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

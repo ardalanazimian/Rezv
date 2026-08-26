@@ -6,6 +6,8 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 import { NOTIFICATION_CATEGORIES, readNotificationPrefs } from '@/lib/notification-prefs';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ترجیحاتِ اعلانِ کاربر — پایدار سمتِ سرور (پروتکل §۱۳ و §۱۷)
 //
@@ -28,7 +30,7 @@ const bodySchema = z.object(
 );
 
 /** GET /api/v1/me/notification-prefs — ترجیحاتِ فعلی (کلیدهایِ غایب = پیش‌فرضِ دریافت). */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -42,7 +44,7 @@ export async function GET(req: Request) {
 }
 
 /** PATCH /api/v1/me/notification-prefs — به‌روزرسانیِ جزئی (merge، نه جایگزینی). */
-export async function PATCH(req: Request) {
+async function PATCH_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -71,3 +73,8 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ prefs: readNotificationPrefs(user.notificationPrefs) });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/me/notification-prefs', GET_impl);
+export const PATCH = withApiMetrics('/api/v1/me/notification-prefs', PATCH_impl);

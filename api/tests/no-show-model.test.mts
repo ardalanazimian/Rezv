@@ -43,31 +43,40 @@ describe('buildFeatureVector', () => {
     const v = buildFeatureVector({ hasUserId: false, priorTotal: 0, priorNoShowRate: 0, leadMinutes: 60, partySize: 2, source: 'app' });
     assert.equal(v[0], 1);
   });
-  test('بدونِ سابقه، priorNoShowRate در بردار صفر می‌شود حتی اگر عدد دیگری داده شود', () => {
-    // priorTotal=0 یعنی «سابقه ندارد» — حتی اگر ورودی اشتباهاً rate بدهد، نباید استفاده شود
+  test('بدونِ سابقه، نرخِ no-show در بردار صفر می‌شود حتی اگر عدد دیگری داده شود', () => {
+    // priorTotal=0 یعنی «سابقه ندارد» — حتی اگر ورودی اشتباهاً rate بدهد، نباید استفاده شود.
+    // (نامِ ویژگی در v3 به shrunkNoShowRate تغییر کرد؛ این قاعده همان است.)
     const v = buildFeatureVector({ hasUserId: true, priorTotal: 0, priorNoShowRate: 0.9, leadMinutes: 60, partySize: 2, source: 'app' });
-    const idx = NO_SHOW_FEATURE_NAMES.indexOf('priorNoShowRate');
-    assert.equal(v[idx], 0);
+    assert.equal(v[NO_SHOW_FEATURE_NAMES.indexOf('shrunkNoShowRate')], 0);
+    assert.equal(v[NO_SHOW_FEATURE_NAMES.indexOf('priorEvidence')], 0, 'شواهد هم صفر است، نه یک عددِ ساختگی');
   });
 });
 
 describe('trainLogisticRegression — یادگیریِ واقعی از دادهٔ مصنوعی', () => {
   test('روی یک ویژگیِ کاملاً جداکننده، وزنِ همان ویژگی مثبت و بزرگ می‌شود', () => {
     // دادهٔ مصنوعی: last-minute تقریباً همیشه no-show است، بقیه تقریباً هیچ‌وقت
+    // بردار از روی طولِ **واقعیِ** فهرستِ ویژگی‌ها ساخته می‌شود، نه با طولِ
+    // هاردکد — نسخه‌ی قبلیِ این تست ۷ درایه‌ی ثابت داشت و با گسترشِ بردار
+    // بی‌صدا به ایندکسِ اشتباه اشاره می‌کرد.
+    const idx = NO_SHOW_FEATURE_NAMES.indexOf('lastMinute');
+    const vec = (on: boolean) => {
+      const v = new Array(NO_SHOW_FEATURE_NAMES.length).fill(0);
+      v[0] = 1; v[idx] = on ? 1 : 0;
+      return v;
+    };
     const X: number[][] = [];
     const y: number[] = [];
     for (let i = 0; i < 60; i++) {
       const lastMinute = i % 2 === 0;
-      X.push([1, 0, 0, lastMinute ? 1 : 0, 0, 0, 0]);
+      X.push(vec(lastMinute));
       y.push(lastMinute ? 1 : 0);
     }
     const w = trainLogisticRegression(X, y, { iterations: 1000, learningRate: 0.5, l2: 0.001 });
-    const idx = NO_SHOW_FEATURE_NAMES.indexOf('lastMinute');
     assert.ok(w[idx] > 2, `انتظار وزنِ بزرگِ مثبت برای lastMinute داشتیم، گرفتیم ${w[idx]}`);
 
     // و باید واقعاً به‌درستی طبقه‌بندی کند
-    const predLastMinute = predictProba(w, [1, 0, 0, 1, 0, 0, 0]);
-    const predNormal = predictProba(w, [1, 0, 0, 0, 0, 0, 0]);
+    const predLastMinute = predictProba(w, vec(true));
+    const predNormal = predictProba(w, vec(false));
     assert.ok(predLastMinute > 0.8, `پیش‌بینیِ last-minute باید بالا باشد، شد ${predLastMinute}`);
     assert.ok(predNormal < 0.2, `پیش‌بینیِ حالتِ عادی باید پایین باشد، شد ${predNormal}`);
   });
@@ -189,41 +198,56 @@ describe('toMatrix', () => {
 });
 
 describe('checkChannelBias — تستِ سادهِ بایاسِ کانالی (نقشه‌راهِ AI، فازِ ۱)', () => {
+  // ⚠️ وزن‌ها از **طولِ واقعیِ بردار** ساخته می‌شوند و اندیس‌ها با نام گرفته
+  // می‌شوند. نسخه‌ی قبلی آرایه‌های ۷ عنصریِ هاردکد داشت — و دقیقاً همان
+  // باعث شد یک P0 نامرئی بماند: وقتی بردار به ۱۲ ویژگی رفت، این تست‌ها
+  // همچنان سبز بودند (چون ورودیِ خودشان را ۷تایی می‌ساختند) در حالی که
+  // گیتِ بایاس در تولید به NaN افتاده و **کاملاً خاموش** شده بود.
+  // تستی که ورودی‌اش را با عددِ ثابت می‌سازد، فقط همان عدد را می‌سنجد.
+  const w0 = () => new Array(NO_SHOW_FEATURE_NAMES.length).fill(0);
+  const at = (name: string, value: number) => {
+    const w = w0(); w[NO_SHOW_FEATURE_NAMES.indexOf(name)] = value; return w;
+  };
+
   test('وزن‌هایِ همه‌صفر → بدونِ بایاس', () => {
-    const r = checkChannelBias([0, 0, 0, 0, 0, 0, 0]);
+    const r = checkChannelBias(w0());
     assert.equal(r.biased, false);
     assert.equal(r.knownUserGap, 0);
-    assert.equal(r.phoneSourceGap, 0);
+    assert.equal(r.staffEnteredGap, 0);
   });
 
   test('وزنِ بزرگِ منفی روی knownUser (یعنی «مهمان = خیلی پرریسک») → بایاس شناسایی می‌شود', () => {
-    // ترتیب: [bias, knownUser, priorNoShowRate, lastMinute, veryEarlyBooking, largeParty, phoneSource]
     // knownUser=-5 یعنی نبودِ حساب به‌تنهایی امتیازِ ریسک را خیلی بالا می‌برد —
     // این دقیقاً همان چیزی‌ست که نباید مجاز باشد: تبعیض بر اساسِ کانال، نه رفتار.
-    const w = [0, -5, 0, 0, 0, 0, 0];
+    const w = at('knownUser', -5);
     const r = checkChannelBias(w);
     assert.equal(r.biased, true);
     assert.ok(Math.abs(r.knownUserGap) > 0.2, `انتظارِ گپِ بزرگ داشتیم، گرفتیم ${r.knownUserGap}`);
     assert.match(r.reason, /کانالِ رزرو/);
   });
 
-  test('وزنِ بزرگ روی phoneSource (یعنی «رزروِ تلفنی = پرریسک») → بایاس شناسایی می‌شود', () => {
-    const w = [0, 0, 0, 0, 0, 0, 4];
+  test('وزنِ بزرگ روی staffEntered (یعنی «رزروِ ثبت‌شده توسطِ پرسنل = پرریسک») → بایاس شناسایی می‌شود', () => {
+    // ⚠️ تا v3 این تست *ساختاراً* بی‌اثر بود: ویژگی به `source==='phone'` گره
+    // خورده بود و هیچ‌جا چنین مقداری نوشته نمی‌شد. با بازتعریف به `'manual'`
+    // (v4) این نیمه‌ی گیت واقعاً چیزی را می‌سنجد.
+    const w = at('staffEntered', 4);
     const r = checkChannelBias(w);
     assert.equal(r.biased, true);
-    assert.ok(Math.abs(r.phoneSourceGap) > 0.2);
+    assert.ok(Math.abs(r.staffEnteredGap) > 0.2);
   });
 
   test('وزنِ کوچکِ منطقی (تفاوتِ کم بینِ کانال‌ها) → بدونِ بایاس', () => {
     // یک وزنِ کوچک برای knownUser واقع‌گرایانه است (مثلاً کاربرانِ ثبت‌نامی
     // کمی قابل‌اعتمادترند) — تا وقتی گپ کوچک بماند، این تبعیضِ ناسالم نیست.
-    const w = [0, -0.3, 0, 0, 0, 0, 0.2];
+    const w = w0();
+    w[NO_SHOW_FEATURE_NAMES.indexOf('knownUser')] = -0.3;
+    w[NO_SHOW_FEATURE_NAMES.indexOf('staffEntered')] = 0.2;
     const r = checkChannelBias(w);
     assert.equal(r.biased, false);
   });
 
   test('مدلی که فقط بر اساسِ رفتارِ واقعی (lastMinute) وزن دارد، نه هویت → بدونِ بایاس', () => {
-    const w = [0, 0, 0, 3, 0, 0, 0];
+    const w = at('lastMinute', 3);
     const r = checkChannelBias(w);
     assert.equal(r.biased, false);
   });

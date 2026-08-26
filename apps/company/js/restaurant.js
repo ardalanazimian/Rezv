@@ -36,7 +36,85 @@ function rDetail(){
         خلاصه‌ی تجمیعی (RFM/CLV) همه‌ی رستوران‌ها رو می‌تونی توی صفحه‌ی «هوش تجاری مشتریان» ببینی.
       </div>
       <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="nav('customers')">رفتن به هوش تجاری مشتریان ${icon('arrowL',{size:13})}</button>
+    </div>
+    <div class="panel" id="credPanel">
+      <div class="panel-head"><div>
+        <div class="panel-title">${icon('lock',{size:16})} دسترسی پنل رستوران</div>
+        <div class="panel-sub">نام کاربری و رمز برای ورودِ این رستوران به پنلِ خودش</div>
+      </div></div>
+      <div id="credBody" style="font-size:13px;color:var(--t2)">در حال بارگذاری…</div>
     </div>`;
+  loadCredentials(r.id);
+}
+
+// ═══════════ اعتبارنامه‌ی پنلِ رستوران (مهاجرتِ ۰۷۴) ═══════════
+// ⚠️ چرا این بخش وجود دارد: تنها راهِ ورود به پنل‌ها OTPِ پیامکی بود و
+// بدونِ کلیدِ کاوه‌نگار هیچ رستورانی نمی‌توانست وارد شود. حالا شرکت برایشان
+// یوزر/پسورد می‌سازد و ورود به پیامک وابسته نیست.
+//
+// ⚠️ رمز **هرگز** از سرور خوانده نمی‌شود — سرور فقط می‌گوید «رمز دارد یا نه».
+// یعنی این صفحه نمی‌تواند رمزِ فعلی را نشان دهد، فقط رمزِ تازه ست کند.
+async function loadCredentials(restaurantId){
+  const box = document.getElementById('credBody');
+  if (!box) return;
+  const res = await API.staffCredentials(restaurantId);
+  if (!res.ok) {
+    box.innerHTML = `<div class="empty-state-title">فهرست دسترسی‌ها بارگذاری نشد</div>
+      <div style="margin-top:6px">${esc(res.error?.message || 'خطای ناشناخته')}</div>`;
+    return;
+  }
+  const rows = (res.data?.staff || []).map(sf => `
+    <tr>
+      <td>${esc(sf.name || '—')}</td>
+      <td>${sf.username ? `<code>${esc(sf.username)}</code>` : '<span style="color:var(--t3)">ندارد</span>'}</td>
+      <td>${esc(sf.role)}</td>
+      <td>${sf.has_password ? `${icon('check',{size:13})} دارد` : '<span style="color:var(--t3)">ندارد</span>'}</td>
+      <td>${sf.is_active ? 'فعال' : 'غیرفعال'}</td>
+    </tr>`).join('');
+  box.innerHTML = `
+    ${rows ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
+        <th>نام</th><th>نام کاربری</th><th>نقش</th><th>رمز</th><th>وضعیت</th>
+      </tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<div style="margin-bottom:10px">هنوز هیچ کاربری برای این رستوران ثبت نشده.</div>'}
+    <div style="margin-top:16px;display:grid;gap:10px">
+      <div class="panel-title" style="font-size:14px">ساخت / تغییر دسترسی</div>
+      <label class="login-field-label" for="credName">نام مسئول</label>
+      <input class="login-inp" id="credName" placeholder="مثلاً: علی رضایی">
+      <label class="login-field-label" for="credPhone">شماره موبایل</label>
+      <input class="login-inp" id="credPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
+      <label class="login-field-label" for="credUser">نام کاربری</label>
+      <input class="login-inp" id="credUser" spellcheck="false" placeholder="فقط حروف انگلیسی، رقم، نقطه، خط تیره">
+      <label class="login-field-label" for="credPass">رمز عبور</label>
+      <input class="login-inp" id="credPass" type="text" placeholder="حداقل ۸ کاراکتر">
+      <button class="btn btn-primary btn-block" id="credSaveBtn" onclick="saveCredentials(${jsq(String(restaurantId))})">ذخیره‌ی دسترسی</button>
+      <div style="font-size:12px;color:var(--t3);line-height:1.9">
+        اگر این شماره از قبل ثبت شده باشد، فقط نام کاربری و رمزش عوض می‌شود و کاربرِ تکراری ساخته نمی‌شود.
+        رمز را جای امنی نگه دار — بعد از ذخیره دیگر قابلِ دیدن نیست.
+      </div>
+    </div>`;
+}
+
+async function saveCredentials(restaurantId){
+  const name = (document.getElementById('credName')?.value||'').trim();
+  const phoneRaw = (document.getElementById('credPhone')?.value||'').trim();
+  const username = (document.getElementById('credUser')?.value||'').trim();
+  const password = document.getElementById('credPass')?.value||'';
+  // ارقامِ فارسی را به انگلیسی برگردان — همان کاری که فرمِ ورود می‌کند.
+  const phone = phoneRaw.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'');
+  if (!/^09\d{9}$/.test(phone)) { toast('','شماره موبایل معتبر وارد کن'); return; }
+  if (!username) { toast('','نام کاربری را وارد کن'); return; }
+  if (password.length < 8) { toast('','رمز باید حداقل ۸ کاراکتر باشد'); return; }
+
+  const btn = document.getElementById('credSaveBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'در حال ذخیره…'; }
+  const res = await API.setStaffCredentials({
+    restaurant_id: restaurantId, phone, username, password,
+    ...(name ? { name } : {}),
+  });
+  if (btn){ btn.disabled = false; btn.textContent = 'ذخیره‌ی دسترسی'; }
+  if (!res.ok) { toast('', res.error?.message || 'ذخیره نشد'); return; }
+  toast('', res.data?.created ? 'دسترسی ساخته شد' : 'دسترسی به‌روز شد');
+  await loadCredentials(restaurantId);
 }
 async function toggleRestOpen(id){
   const r=RESTAURANTS.find(x=>String(x.id)===String(id));if(!r)return;

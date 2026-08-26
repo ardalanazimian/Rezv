@@ -2,6 +2,11 @@ import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { populationStabilityIndex, psiBand, type PsiBand } from './ml-core';
 import { MIN_RESOLVED_FOR_ACCURACY } from './prediction-ledger';
+import { invalidateNoShowModelCache, invalidatePlatformNoShowModelCache } from './no-show-model';
+import { createLogger } from './logger';
+import { metrics } from './metrics';
+
+const log = createLogger('model-drift');
 
 // ═══════════════════════════════════════════════════════════════════════
 //  فازِ ۷ — تشخیصِ رانش (drift)
@@ -278,4 +283,230 @@ export async function getPlatformPerformanceDrift(params: {
       resolvedCount, verdict,
     };
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  اقدام روی رانش — بستنِ حلقه‌ی یادگیری
+//
+//  ⚠️ شکافی که این بخش می‌بندد: تا امروز `detectPerformanceDrift` رانش را
+//  **تشخیص** می‌داد و داشبوردِ سلامتِ مدل نشانش می‌داد، ولی **هیچ کدی هرگز
+//  مدلِ بدشده را غیرفعال نمی‌کرد** (تأیید با grep: صفر مسیرِ
+//  `isActive: false` برای مدل). یعنی مدلی که در تولید خراب شده بود همچنان
+//  به رستوران‌دار ریسکِ اشتباه می‌داد تا وقتی یک انسان داشبورد را ببیند.
+//
+//  «قدرتِ یادگیری» فقط یادگرفتن نیست — **پس‌گرفتنِ چیزی که بد از آب درآمد**
+//  هم هست. بدونِ این، حلقه یک‌طرفه است.
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface RollbackResult {
+  restaurantId: string;
+  /** آیا مدل واقعاً غیرفعال شد؟ */
+  rolledBack: boolean;
+  verdict: DriftVerdict;
+  relativeChange: number | null;
+  reason: string;
+}
+
+/**
+ * اگر مدلِ فعالِ یک رستوران در تولید به‌طورِ معنادار بدتر از زمانِ آموزش
+ * شده، غیرفعالش کن تا سیستم به heuristic برگردد.
+ *
+ * سه قیدِ عمدی:
+ *
+ *  ۱. **فقط روی `drifted`، نه `watch`.** آستانه‌ی نصف برای هشدار است نه
+ *     اقدام؛ برگرداندنِ مدل روی نوسانِ معمولی خودش بی‌ثباتی می‌سازد.
+ *
+ *  ۲. **فقط وقتی نتیجه‌ی کافی هست.** `detectPerformanceDrift` خودش روی
+ *     `resolvedCount < MIN_RESOLVED_FOR_ACCURACY` حکمِ `insufficient_data`
+ *     می‌دهد — و ما روی آن حکم **هرگز** اقدام نمی‌کنیم. غیرفعال‌کردنِ مدل
+ *     بر پایه‌ی چند نمونه، خودش همان «ادعای اندازه‌گیری‌نشده» است.
+ *
+ *  ۳. **بازگشت به heuristic، نه به مدلِ قدیمی‌تر.** heuristic رفتارِ
+ *     شناخته‌شده و آزموده دارد؛ یک مدلِ قدیمی‌ترِ بایگانی‌شده معلوم نیست
+ *     روی دادهٔ امروز چه می‌کند. ساده و قابلِ‌پیش‌بینی بهتر از هوشمندِ مبهم.
+ *
+ * بازآموزیِ شبانه بعداً می‌تواند دوباره فعالش کند — اگر از گیت‌های
+ * فعال‌سازی (Brier، AUC، بایاس) رد شود. یعنی این یک بن‌بست نیست، یک
+ * عقب‌نشینیِ موقت است.
+ */
+export async function rollbackDriftedModel(params: {
+  restaurantId: string;
+  windowDays?: number;
+}): Promise<RollbackResult> {
+  const drift = await detectPerformanceDrift(params);
+
+  if (drift.verdict !== 'drifted') {
+    return {
+      restaurantId: params.restaurantId, rolledBack: false,
+      verdict: drift.verdict, relativeChange: drift.relativeChange,
+      reason: drift.reason,
+    };
+  }
+
+  const updated = await db.restaurantNoShowModel.updateMany({
+    // شرطِ `isActive: true` اتمیک است: اگر دو اجرای هم‌زمان (cron + دستی)
+    // با هم بیایند، فقط یکی count=1 می‌گیرد و لاگِ تکراری ساخته نمی‌شود.
+    where: { restaurantId: params.restaurantId, isActive: true },
+    data: {
+      isActive: false,
+      activationReason: `غیرفعالِ خودکار: ${drift.reason}`,
+    },
+  });
+
+  if (updated.count === 0) {
+    return {
+      restaurantId: params.restaurantId, rolledBack: false,
+      verdict: drift.verdict, relativeChange: drift.relativeChange,
+      reason: 'مدل پیش از این غیرفعال شده بود',
+    };
+  }
+
+  // ⚠️ کلید را اینجا نساز — نویسنده و خواننده باید همیشه یکی باشند.
+  // (تاریخچه‌ی این باگ در no-show-model.ts کنارِ تعریفِ کلید نوشته شده:
+  //  تا امروز اینجا کلیدِ **قدیمی** پاک می‌شد، پس مدلی که همین تابع تازه
+  //  غیرفعالش کرده بود تا یک ساعت همچنان سرو می‌شد.)
+  await invalidateNoShowModelCache(params.restaurantId);
+
+  log.warn('مدلِ no-show به‌خاطرِ افتِ کارایی در تولید غیرفعال شد', {
+    restaurantId: params.restaurantId,
+    modelRunId: drift.modelRunId,
+    holdoutBrier: drift.holdoutBrier,
+    productionBrier: drift.productionBrier,
+    relativeChange: drift.relativeChange,
+  });
+  metrics.modelRolledBack.inc({ reason: 'performance_drift' });
+
+  return {
+    restaurantId: params.restaurantId, rolledBack: true,
+    verdict: drift.verdict, relativeChange: drift.relativeChange,
+    reason: drift.reason,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  رانش و بازگردانیِ مدلِ **سراسری**
+//
+//  ⚠️ شکافی که می‌بندد (ممیزیِ نهاییِ ۲۰۲۶-۰۸-۲۵): مدلِ سراسری به **هر**
+//  رستورانی که مدلِ اختصاصی ندارد سرو می‌شود — یعنی همه‌ی رستوران‌های تازه،
+//  دقیقاً همان‌هایی که برایشان ساخته شد. ولی هیچ سنجشِ تولید، هیچ تشخیصِ
+//  رانش و **هیچ مسیرِ بازگردانی** نداشت:
+//    • `detectPerformanceDrift` روی `model_run_id` فیلتر می‌کند و مدلِ
+//      سراسری اجرایِ per-restaurant ندارد ⇒ هرگز شمرده نمی‌شد.
+//    • `rollbackDriftedModel` فقط `restaurant_no_show_models` را می‌نویسد.
+//  یعنی یک مدلِ سراسریِ خراب تا ابد به همه‌ی رستوران‌های تازه سرو می‌شد.
+//
+//  حالا با ستونِ `model_scope` (مهاجرتِ ۰۷۱) پیش‌بینی‌هایش قابلِ شناسایی‌اند
+//  و همان منطقِ per-restaurant رویشان اعمال می‌شود.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** رانشِ کاراییِ مدلِ سراسریِ فعال. همان آستانه‌ها و همان معناها. */
+export async function detectPlatformPerformanceDrift(params: {
+  windowDays?: number;
+} = {}): Promise<PerformanceDrift> {
+  const windowDays = params.windowDays ?? 30;
+  const since = new Date(Date.now() - windowDays * 86_400_000);
+
+  const model = await db.platformNoShowModel.findFirst({
+    where: { isActive: true },
+    orderBy: { trainedAt: 'desc' },
+    select: { id: true, learnedBrier: true, trainedAt: true },
+  });
+
+  if (!model) {
+    return {
+      verdict: 'insufficient_data', modelRunId: null, holdoutBrier: null,
+      productionBrier: null, relativeChange: null, resolvedCount: 0,
+      reason: 'مدلِ سراسریِ فعالی وجود ندارد',
+    };
+  }
+
+  // ⚠️ فیلترِ `generated_at >= trainedAt` حیاتی است: مدلِ سراسری «نسخه»ی
+  // قابلِ ارجاع در خودِ پیش‌بینی ندارد (کلید فقط scope است)، پس بدونِ این
+  // شرط، پیش‌بینی‌های نسخه‌های **قبلیِ** سراسری هم شمرده می‌شدند و بدترشدنِ
+  // ظاهری می‌توانست صرفاً اثرِ عوض‌شدنِ مدل باشد، نه رانشِ دنیا — همان
+  // اشتباهی که مسیرِ per-restaurant با model_run_id از آن پرهیز می‌کند.
+  const floor = model.trainedAt > since ? model.trainedAt : since;
+
+  const rows = await db.$queryRaw<{ n: number; brier: number | null }[]>(Prisma.sql`
+    SELECT COUNT(o.id)::int AS n, AVG(o.squared_error)::float8 AS brier
+    FROM model_predictions p
+    JOIN model_outcomes o ON o.prediction_id = p.id
+    WHERE p.prediction_type = 'no_show'
+      AND p.model_scope = 'platform'
+      AND p.generated_at >= ${floor}
+  `);
+  const resolvedCount = Number(rows[0]?.n ?? 0);
+  const productionBrier = rows[0]?.brier == null ? null : Number(rows[0].brier);
+
+  if (resolvedCount < MIN_RESOLVED_FOR_ACCURACY || productionBrier === null) {
+    return {
+      verdict: 'insufficient_data', modelRunId: null, holdoutBrier: model.learnedBrier,
+      productionBrier: null, relativeChange: null, resolvedCount,
+      reason: `نتیجه‌ی کافی از زمانِ آموزشِ این نسخه نیست (${resolvedCount} < ${MIN_RESOLVED_FOR_ACCURACY})`,
+    };
+  }
+
+  const holdoutBrier = model.learnedBrier;
+  if (!(holdoutBrier > 0)) {
+    return {
+      verdict: 'insufficient_data', modelRunId: null, holdoutBrier,
+      productionBrier, relativeChange: null, resolvedCount,
+      reason: 'Brierِ هولدآوت معتبر نیست، مقایسه ممکن نیست',
+    };
+  }
+
+  const relativeChange = (productionBrier - holdoutBrier) / holdoutBrier;
+  const verdict: DriftVerdict =
+    relativeChange >= PERFORMANCE_DRIFT_THRESHOLD ? 'drifted'
+    : relativeChange >= PERFORMANCE_DRIFT_THRESHOLD / 2 ? 'watch'
+    : 'stable';
+  const pct = (relativeChange * 100).toFixed(1);
+
+  return {
+    verdict, modelRunId: null, holdoutBrier, productionBrier, relativeChange, resolvedCount,
+    reason: verdict === 'drifted'
+      ? `مدلِ سراسری در تولید ${pct}٪ بدتر از هولدآوت — بازآموزی لازم است`
+      : verdict === 'watch'
+        ? `مدلِ سراسری در تولید ${pct}٪ بدتر از هولدآوت — زیرِ آستانه، ولی زیرِ نظر`
+        : `کاراییِ تولیدِ مدلِ سراسری با زمانِ آموزش هم‌خوان است (${pct}٪)`,
+  };
+}
+
+/**
+ * پس‌گرفتنِ خودکارِ مدلِ سراسریِ رانش‌کرده.
+ *
+ * دقیقاً همان قواعدِ نسخه‌ی per-restaurant: فقط روی حکمِ `drifted` اقدام
+ * می‌کند (نه `watch`، نه `insufficient_data`)، شرطِ `isActive: true` را
+ * اتمیک در `updateMany` می‌گذارد، و دلیل را ثبت می‌کند تا «هرگز فعال نشد»
+ * از «فعال بود و پس گرفته شد» قابلِ تفکیک بماند.
+ */
+export async function rollbackDriftedPlatformModel(params: {
+  windowDays?: number;
+} = {}): Promise<{ rolledBack: boolean; verdict: DriftVerdict; relativeChange: number | null; reason: string }> {
+  const drift = await detectPlatformPerformanceDrift(params);
+  if (drift.verdict !== 'drifted') {
+    return { rolledBack: false, verdict: drift.verdict, relativeChange: drift.relativeChange, reason: drift.reason };
+  }
+
+  const updated = await db.platformNoShowModel.updateMany({
+    where: { isActive: true },
+    data: { isActive: false, activationReason: `غیرفعالِ خودکار: ${drift.reason}` },
+  });
+  if (updated.count === 0) {
+    return {
+      rolledBack: false, verdict: drift.verdict, relativeChange: drift.relativeChange,
+      reason: 'مدلِ سراسری پیش از این غیرفعال شده بود',
+    };
+  }
+
+  await invalidatePlatformNoShowModelCache();
+
+  log.warn('مدلِ سراسریِ no-show به‌خاطرِ افتِ کارایی در تولید غیرفعال شد', {
+    holdoutBrier: drift.holdoutBrier,
+    productionBrier: drift.productionBrier,
+    relativeChange: drift.relativeChange,
+  });
+  metrics.modelRolledBack.inc({ reason: 'platform_performance_drift' });
+
+  return { rolledBack: true, verdict: drift.verdict, relativeChange: drift.relativeChange, reason: drift.reason };
 }

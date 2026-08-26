@@ -7,7 +7,7 @@ import { enqueueSms } from './sms';
 import { emit } from './events';
 import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
-import { redeemGiftCardTx, addClubPoints, getClubPointsBalance } from './loyalty';
+import { redeemGiftCardTx, getClubPointsBalance, ARRIVAL_POINTS } from './loyalty';
 import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
 import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
@@ -15,9 +15,6 @@ import { computeRanges, genReservationCode, isConflictError, isSerializationErro
 import { invalidateAvailability } from './availability-cache';
 import { transitionReservation } from './lifecycle';
 import { getOccupiedTableNumbers } from './table-occupancy';
-import { createLogger } from './logger';
-
-const log = createLogger('reservations');
 
 // ⚠️ درسِ تاریخی (باگِ واقعیِ P0 که با تستِ زنده پیدا شد، نه فرض): مقایسه‌ی
 // خامِ `status IN (...)` در $queryRaw بدونِ کستِ صریح با enumِ Postgres شکست
@@ -287,6 +284,34 @@ export async function createReservation(
         }
       }
     }
+
+    // ── تداخلِ همزمانی که از retry هم رد شده ─────────────────────────────
+    // ⚠️ یافته‌ی زنده‌ی ۲۰۲۶-۰۸-۲۵: بلوکِ بالا فقط `SLOT_LOCK_TIMEOUT` را
+    // ترجمه می‌کرد. یک `40P01` (deadlock) که هر ۵ تلاشِ TX_MAX_RETRIES را
+    // مصرف کند، از همین‌جا **خام** بالا می‌رفت و `errorResponse` یک ۵۰۰ی
+    // عمومی می‌داد — برای یک تداخلِ کاملاً عادی و درست‌مدیریت‌شده‌ی DB.
+    //
+    // این فرضی نیست: در آزمایشِ ۲۰ درجِ کاملاً هم‌زمان روی یک میز، حالتِ
+    // N=2 به‌جای ۲۳P01 یک deadlock داد (Postgres وقتی چند تراکنش هم‌زمان
+    // کانستریتِ EXCLUDE را چک می‌کنند می‌تواند deadlock بسازد، نه فقط
+    // نقضِ یکتایی).
+    //
+    // همان انضباطِ بالا رعایت می‌شود: **اول ثابت کن پر است، بعد ادعا کن.**
+    // اگر بشود اثبات کرد همه‌ی کاندیداها پر شده‌اند، خطای صادقِ
+    // SLOT_FULL/TABLE_CONFLICT؛ وگرنه CONCURRENCY_RETRY (۴۰۹) که صادقانه
+    // می‌گوید «ترافیک بالا بود، دوباره تلاش کن» — نه ۵۰۰ی بی‌معنا.
+    if (isSerializationError(e)) {
+      const occupiedNow = await getOccupiedTableNumbers(db, r.id, start, blockEnd).catch(() => null);
+      if (occupiedNow) {
+        if (manualTableNumber != null) {
+          if (occupiedNow.has(manualTableNumber)) throw Err.tableConflict();
+        } else if (candidateTables.length > 0 && candidateTables.every(t => occupiedNow.has(t.number))) {
+          throw Err.slotFull(input.time);
+        }
+      }
+      throw Err.concurrencyRetry();
+    }
+
     throw e;
   }
 }
@@ -419,6 +444,10 @@ async function placeReservation(
       entityId: result.resv.id,
       modelSource: noShowRisk.source,
       modelRunId: lin.modelRunId,   // فازِ ۶ — نسبت‌دادن به نسخه‌ی مدل
+      // ⚠️ دامنه هم ثبت می‌شود، وگرنه پیش‌بینیِ مدلِ سراسری (که modelRunId
+      // ندارد) از پیش‌بینیِ heuristic و از مدل‌های بدونِ نسب‌نامه قابلِ
+      // تفکیک نیست — و دقتِ تولیدش هرگز اندازه‌گیری نمی‌شود (مهاجرتِ ۰۷۱).
+      modelScope: lin.modelScope ?? (noShowRisk.source === 'heuristic' ? 'heuristic' : null),
       featureVersion: NO_SHOW_FEATURE_VERSION,
       predictedValue: lin.probability,
       confidence: confidenceFor({ modelSource: noShowRisk.source, priorTotal: lin.features.priorTotal }),
@@ -813,8 +842,6 @@ export interface ArrivalInput {
   actorStaffId: string;
 }
 
-const ARRIVAL_POINTS = 50;
-
 export async function markArrival(input: ArrivalInput) {
   const resv = await db.reservation.findUnique({ where: { code: input.code } });
   if (!resv || resv.restaurantId !== input.restaurantId) throw Err.notFound('رزرو');
@@ -834,24 +861,16 @@ export async function markArrival(input: ArrivalInput) {
   // تنها منبعِ اتمیک، نتیجه‌ی خودِ تراکنشِ انتقال است.
   const firstArrival = updated.changed;
 
-  // امتیازِ باشگاهِ رستوران — از این‌جا به بعد از مسیرِ دفتر (PointsLedger) که
-  // مرجعِ سروری است؛ `club_members.points` فقط کشِ هم‌تراکنش است.
-  if (firstArrival && resv.userId) {
-    // اگر ثبتِ امتیاز شکست بخورد نباید خودِ چک‌این را بشکند (رزرو از قبل commit
-    // شده) — همان قاعده‌ای که transitionReservation برایِ اعلان/اقتصاد دارد.
-    // دفتر append-only است، پس نبودِ ردیف بعداً قابلِ تشخیص و جبران است.
-    await addClubPoints({
-      userId: resv.userId,
-      restaurantId: resv.restaurantId,
-      delta: ARRIVAL_POINTS,
-      reason: 'reservation',
-      note: `حضور در رزرو ${resv.code}`,
-    }).catch((e) => {
-      log.error('ثبتِ امتیازِ حضور در دفتر ناموفق (چک‌این خودش commit شد)', {
-        reservationId: resv.id, code: resv.code, error: (e as Error).message,
-      });
-    });
-  }
+  // ⚠️ امتیازِ باشگاه دیگر این‌جا داده نمی‌شود.
+  //
+  // این بلوک به `transitionReservation` (تنها نویسنده‌ی مجازِ وضعیت) منتقل شد،
+  // چون این تابع فقط از `POST /reservations/:code/arrive` صدا زده می‌شود و
+  // **هیچ‌کدام از سه پنل آن endpoint را صدا نمی‌زنند** — مسیرِ واقعیِ چک‌ینِ
+  // پنل `PATCH /restaurant/reservations/:code/status` است. یعنی تنها
+  // نویسنده‌ی دفترِ امتیاز از رابطِ کاربری دسترس‌ناپذیر بود. توضیحِ کاملِ
+  // تصمیم و دلیلِ ردِ دو راهِ دیگر در `lib/lifecycle.ts` است.
+  //
+  // این‌جا **تکرار نمی‌شود** وگرنه هر چک‌ین از این مسیر دو بار امتیاز می‌گرفت.
 
   // SMS خوش‌آمد — فقط بارِ اول (نه در تکرار/retry)
   if (firstArrival && resv.guestPhone) {

@@ -7,6 +7,8 @@ import { ApiError } from '@/lib/errors';
 import { parseQuery, zReservationCode, z } from '@/lib/schemas';
 import { appBase } from '@/lib/public-urls';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const log = createLogger('payments-callback');
 
 // ⚠️ همگام‌سازی‌شده با DB زنده (migration 019_payments_deposit).
@@ -30,7 +32,7 @@ function redirectToError(reason: string): NextResponse {
   return NextResponse.redirect(`${appBase()}/?payment=${reason}`, 302);
 }
 
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     // رفعِ باگ: قبلاً .catch(()=>{}) خطای rate-limit-exceeded را هم بی‌صدا می‌بلعید
     // (یعنی rate-limit روی این endpoint عملاً هیچ اثری نداشت).
@@ -91,3 +93,7 @@ export async function GET(req: Request) {
     return redirectToError('error');
   }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/payments/callback', GET_impl);

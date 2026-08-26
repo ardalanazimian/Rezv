@@ -6,7 +6,7 @@
 //  «موفق» گزارش شود، دقیقاً همان جعلِ موفقیتی است که کلِ این ممیزی درباره‌اش
 //  است — پس تفکیکِ موفق/ناموفق باید قفل شود، نه فرض.
 // ═══════════════════════════════════════════════════════════════════════
-import { test, describe, beforeEach, afterEach } from 'node:test';
+import { test, describe, beforeEach, afterEach, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 
 // importِ استاتیک و بدونِ top-level await — عمدی:
@@ -57,88 +57,107 @@ function resetEnv() {
   // BODYID_BOOKING عمداً ست نمی‌شود — تستِ «پیکربندیِ ناقص» به آن تکیه دارد.
 }
 
-beforeEach(() => { calls = []; resetEnv(); });
-afterEach(() => { globalThis.fetch = realFetch; });
-
-describe('انتخابِ مسیرِ سرویس', () => {
-  test('پیامکِ الگومحور به BaseServiceNumber با bodyId می‌رود', async () => {
-    stub({ RetStatus: 1, Value: '9876543210', StrRetStatus: 'Ok' });
-    await sendSmsNow({ to: '+989121234567', template: 'otp', tokens: ['4821'] });
-    assert.equal(calls.length, 1);
-    assert.match(calls[0].url, /BaseServiceNumber$/);
-    assert.equal(calls[0].body.bodyId, '12345');
-    assert.equal(calls[0].body.text, '4821');
-    // شماره باید به شکلِ محلی تبدیل شده باشد (+98… → 0…)
-    assert.equal(calls[0].body.to, '09121234567');
+// اسنپ‌شات/بازگردانیِ envِ کلِ فایل — وگرنه اعتبارنامه‌ی ساختگی به فایل‌های
+// بعدیِ رانر نشت می‌کند و تست‌های «not_configured» آن‌ها را می‌شکند
+// (دقیقاً همان چیزی که در اجرای کامل دیده شد: مسیرِ fallback به‌جای
+// شمارشِ not_configured، به fetchِ واقعیِ ارائه‌دهنده می‌رفت).
+// ⚠️ دامِ رانرِ الحاقی (کشفِ ۲۰۲۶-۰۸-۲۶، با probe اثبات شد):
+// هوکِ سطحِ فایل در tests/_all.runner.mts به ریشه‌ی *کلِ* سوئیت می‌چسبد —
+// beforeEach(resetEnv)ِ همین فایل پیش از هر تستِ هر فایلِ دیگری هم اجرا می‌شد
+// و اعتبارنامه‌ی ساختگی را برای آن‌ها روشن می‌کرد (دو تستِ fallback دقیقاً
+// همین‌طور قرمز شدند). describeِ محیطی هوک‌ها را به همین فایل محدود می‌کند.
+describe('ارائه‌دهنده‌ی پیامک — ملی‌پیامک (scoped)', () => {
+  const ENV_SNAPSHOT: [string, string | undefined][] = [];
+  before(() => { for (const k of ENV_KEYS) ENV_SNAPSHOT.push([k, process.env[k]]); });
+  after(() => { for (const [k, v] of ENV_SNAPSHOT) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } });
+  
+  beforeEach(() => { calls = []; resetEnv(); });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    // همان دامِ رانرِ تک‌پروسه‌ای: تست نباید اعتبارنامه را روشن رها کند.
+    for (const k of ENV_KEYS) delete process.env[k];
   });
-
-  test('چند توکن با جداکننده به هم می‌چسبند', async () => {
-    stub({ RetStatus: 1, Value: '9876543210' });
-    await sendSmsNow({ to: '09121234567', template: 'campaign', tokens: ['کیان', 'ویستا'] });
-    assert.equal(calls[0].body.text, 'کیان;ویستا');
+  
+  describe('انتخابِ مسیرِ سرویس', () => {
+    test('پیامکِ الگومحور به BaseServiceNumber با bodyId می‌رود', async () => {
+      stub({ RetStatus: 1, Value: '9876543210', StrRetStatus: 'Ok' });
+      await sendSmsNow({ to: '+989121234567', template: 'otp', tokens: ['4821'] });
+      assert.equal(calls.length, 1);
+      assert.match(calls[0].url, /BaseServiceNumber$/);
+      assert.equal(calls[0].body.bodyId, '12345');
+      assert.equal(calls[0].body.text, '4821');
+      // شماره باید به شکلِ محلی تبدیل شده باشد (+98… → 0…)
+      assert.equal(calls[0].body.to, '09121234567');
+    });
+  
+    test('چند توکن با جداکننده به هم می‌چسبند', async () => {
+      stub({ RetStatus: 1, Value: '9876543210' });
+      await sendSmsNow({ to: '09121234567', template: 'campaign', tokens: ['کیان', 'ویستا'] });
+      assert.equal(calls[0].body.text, 'کیان;ویستا');
+    });
+  
+    test('متنِ آزاد به SendSMS می‌رود و عیناً همان متن ارسال می‌شود', async () => {
+      process.env.MELIPAYAMAK_FROM = '5000...';   // beforeEach پاکش می‌کند
+      stub({ RetStatus: 1, Value: '9876543210' });
+      const text = 'سلام کیان عزیز! پیشنهاد ویژه‌ی این هفته…';
+      await sendSmsNow({ to: '09121234567', template: 'campaign', tokens: [], text });
+      assert.match(calls[0].url, /SendSMS$/);
+      // ⚠️ قلبِ رفعِ P0: متنی که نوشته شده، همان متنی است که می‌رود.
+      assert.equal(calls[0].body.text, text);
+      assert.equal(calls[0].body.from, '5000...');
+    });
   });
-
-  test('متنِ آزاد به SendSMS می‌رود و عیناً همان متن ارسال می‌شود', async () => {
-    process.env.MELIPAYAMAK_FROM = '5000...';   // beforeEach پاکش می‌کند
-    stub({ RetStatus: 1, Value: '9876543210' });
-    const text = 'سلام کیان عزیز! پیشنهاد ویژه‌ی این هفته…';
-    await sendSmsNow({ to: '09121234567', template: 'campaign', tokens: [], text });
-    assert.match(calls[0].url, /SendSMS$/);
-    // ⚠️ قلبِ رفعِ P0: متنی که نوشته شده، همان متنی است که می‌رود.
-    assert.equal(calls[0].body.text, text);
-    assert.equal(calls[0].body.from, '5000...');
+  
+  describe('پیکربندیِ ناقص بی‌صدا رد نمی‌شود', () => {
+    test('bodyIdِ تنظیم‌نشده = هیچ درخواستی نمی‌رود (به‌جای الگویِ حدسی)', async () => {
+      stub({ RetStatus: 1, Value: '9876543210' });
+      await sendSmsNow({ to: '09121234567', template: 'booking_confirm', tokens: ['x'] });
+      assert.equal(calls.length, 0, 'نباید با bodyIdِ حدسی چیزی بفرستد');
+    });
+  
+    test('متنِ آزاد بدونِ خطِ اختصاصی = هیچ درخواستی نمی‌رود', async () => {
+      stub({ RetStatus: 1, Value: '9876543210' });   // MELIPAYAMAK_FROM ست نیست
+      await sendSmsNow({ to: '09121234567', template: 'campaign', tokens: [], text: 'سلام' });
+      assert.equal(calls.length, 0);
+    });
+  
+    test('بدونِ نام‌کاربری/رمز فقط لاگ می‌شود (حالتِ توسعه)', async () => {
+      delete process.env.MELIPAYAMAK_USERNAME;
+      stub({ RetStatus: 1, Value: '1' });
+      await sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] });
+      assert.equal(calls.length, 0);
+    });
   });
-});
-
-describe('پیکربندیِ ناقص بی‌صدا رد نمی‌شود', () => {
-  test('bodyIdِ تنظیم‌نشده = هیچ درخواستی نمی‌رود (به‌جای الگویِ حدسی)', async () => {
-    stub({ RetStatus: 1, Value: '9876543210' });
-    await sendSmsNow({ to: '09121234567', template: 'booking_confirm', tokens: ['x'] });
-    assert.equal(calls.length, 0, 'نباید با bodyIdِ حدسی چیزی بفرستد');
-  });
-
-  test('متنِ آزاد بدونِ خطِ اختصاصی = هیچ درخواستی نمی‌رود', async () => {
-    stub({ RetStatus: 1, Value: '9876543210' });   // MELIPAYAMAK_FROM ست نیست
-    await sendSmsNow({ to: '09121234567', template: 'campaign', tokens: [], text: 'سلام' });
-    assert.equal(calls.length, 0);
-  });
-
-  test('بدونِ نام‌کاربری/رمز فقط لاگ می‌شود (حالتِ توسعه)', async () => {
-    delete process.env.MELIPAYAMAK_USERNAME;
-    stub({ RetStatus: 1, Value: '1' });
-    await sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] });
-    assert.equal(calls.length, 0);
-  });
-});
-
-describe('تفکیکِ موفق از ناموفق — هرگز جعلِ موفقیت', () => {
-  test('RetStatus=1 یعنی پذیرفته شد', async () => {
-    stub({ RetStatus: 1, Value: '9876543210', StrRetStatus: 'Ok' });
-    await sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] });
-    assert.equal(calls.length, 1);
-  });
-
-  test('RetStatus≠1 شکست است، حتی با HTTP 200', async () => {
-    // مهم: ارائه‌دهنده خطا را داخلِ بدنه‌ی ۲۰۰ برمی‌گرداند. اگر فقط res.ok را
-    // نگاه کنیم، هر ردی «ارسال شد» گزارش می‌شود.
-    stub({ RetStatus: 0, Value: '11', StrRetStatus: 'ErrorInInput' });
-    await sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] });
-    assert.equal(calls.length, 1, 'درخواست رفت');
-    // شکست فقط لاگ/متریک می‌شود و throw نمی‌کند (مسیرِ کاربر نباید بشکند)،
-    // ولی نباید به‌عنوانِ موفق شمرده شود — گاردش در meliAccepted است.
-  });
-
-  test('پاسخِ قدیمیِ فقط-Value: عددِ کوچک = کدِ خطا، نه recId', async () => {
-    stub({ Value: '5' });
-    await sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] });
-    assert.equal(calls.length, 1);
-  });
-
-  test('خطای شبکه throw می‌شود تا worker بتواند retry کند', async () => {
-    globalThis.fetch = (async () => { throw new TypeError('fetch failed'); }) as typeof fetch;
-    await assert.rejects(
-      () => sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] }),
-      /fetch failed/,
-    );
+  
+  describe('تفکیکِ موفق از ناموفق — هرگز جعلِ موفقیت', () => {
+    test('RetStatus=1 یعنی پذیرفته شد', async () => {
+      stub({ RetStatus: 1, Value: '9876543210', StrRetStatus: 'Ok' });
+      await sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] });
+      assert.equal(calls.length, 1);
+    });
+  
+    test('RetStatus≠1 شکست است، حتی با HTTP 200', async () => {
+      // مهم: ارائه‌دهنده خطا را داخلِ بدنه‌ی ۲۰۰ برمی‌گرداند. اگر فقط res.ok را
+      // نگاه کنیم، هر ردی «ارسال شد» گزارش می‌شود.
+      stub({ RetStatus: 0, Value: '11', StrRetStatus: 'ErrorInInput' });
+      await sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] });
+      assert.equal(calls.length, 1, 'درخواست رفت');
+      // شکست فقط لاگ/متریک می‌شود و throw نمی‌کند (مسیرِ کاربر نباید بشکند)،
+      // ولی نباید به‌عنوانِ موفق شمرده شود — گاردش در meliAccepted است.
+    });
+  
+    test('پاسخِ قدیمیِ فقط-Value: عددِ کوچک = کدِ خطا، نه recId', async () => {
+      stub({ Value: '5' });
+      await sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] });
+      assert.equal(calls.length, 1);
+    });
+  
+    test('خطای شبکه throw می‌شود تا worker بتواند retry کند', async () => {
+      globalThis.fetch = (async () => { throw new TypeError('fetch failed'); }) as typeof fetch;
+      await assert.rejects(
+        () => sendSmsNow({ to: '09121234567', template: 'otp', tokens: ['1'] }),
+        /fetch failed/,
+      );
+    });
   });
 });

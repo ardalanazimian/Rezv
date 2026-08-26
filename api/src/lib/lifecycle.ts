@@ -7,6 +7,7 @@ import { createLogger } from './logger';
 import { dateKeyInTz } from './hours';
 import { activeStatusList } from './reservation-status';
 import { recordOutcome } from './prediction-ledger';
+import { addClubPoints, ARRIVAL_POINTS } from './loyalty';
 
 const log = createLogger('lifecycle');
 
@@ -139,6 +140,51 @@ export async function transitionReservation(opts: {
   // enqueueSms زیر: هیچ‌وقت نباید جریانِ اصلیِ تغییرِ وضعیت رو بشکنه، پس
   // خارج از تراکنش و با catch صدا زده می‌شه.
   if (result.changed) {
+    // ── امتیازِ حضور (باشگاهِ همان رستوران) ───────────────────────────────
+    //
+    // ⚠️ رفعِ «امتیازِ باشگاه هرگز به مشتری نمی‌رسد» (فازِ ۲، پروتکل §۱۳).
+    //
+    // چه بود: تنها نویسنده‌ی دفترِ امتیاز `markArrival()` بود که فقط از
+    // `POST /reservations/:code/arrive` صدا زده می‌شد — و **هیچ‌کدام از سه
+    // پنل آن endpoint را صدا نمی‌زنند** (grep در `apps/*/js` صفر). مسیرِ
+    // واقعیِ چک‌این در پنلِ رستوران
+    // (`apps/business/js/reservations.js` → `PATCH .../status` با
+    // `{status:'checked_in'}`، و همان مسیر در صفِ آفلاینِ Outbox) مستقیم
+    // `transitionReservation` را صدا می‌زد و از کنارِ امتیاز رد می‌شد.
+    // دو مسیرِ دیگر هم همین وضع را داشتند: `lib/tables.ts` (نشاندنِ مهمان،
+    // confirmed→checked_in→seated) و هر انتقالِ دستیِ منویِ «وضعیت».
+    // نتیجه‌ی سنجیده‌شده: سه انتقالِ ۲۰۰ ولی `points_ledger` صفر ردیف.
+    //
+    // چرا این‌جا و نه در روتِ status: اگر امتیاز را به روت اضافه می‌کردیم
+    // دو پیاده‌سازیِ موازی می‌شد (روت + markArrival) و دو مسیرِ دیگر همچنان
+    // بی‌امتیاز می‌ماندند؛ و اگر پنل را به `/arrive` وصل می‌کردیم، سه مسیرِ
+    // دیگر همچنان بی‌امتیاز می‌ماندند. `transitionReservation` از قبل خودش
+    // را «تنها نقطه‌ی مجاز تغییر وضعیت» تعریف کرده — پس تنها جایی که یک
+    // پیاده‌سازیِ کانونیک ممکن است همین‌جاست. `markArrival` حالا لاغر شد.
+    //
+    // دوباره‌ندادن (idempotency) رایگان به دست می‌آید: این بلوک زیرِ
+    // `result.changed` است، و `changed` خروجیِ همان compare-and-setِ اتمیکِ
+    // بالاست. پس هم چک‌این تکراری، هم `arrive` + `status` روی یک رزرو، و هم
+    // دو درخواستِ کاملاً هم‌زمان، مجموعاً یک‌بار امتیاز می‌دهند.
+    //
+    // شکستِ ثبت هرگز نباید خودِ چک‌این را بشکند (رزرو از قبل commit شده) —
+    // همان قاعده‌ی اعلان/اقتصاد در همین تابع. ولی `await` می‌شود، نه
+    // fire-and-forget: صداکننده‌هایی که بلافاصله موجودی را می‌خوانند (مثلِ
+    // پیامکِ خوش‌آمدِ `markArrival`) باید عددِ به‌روز را ببینند.
+    if (to === 'checked_in' && result.resv.userId) {
+      await addClubPoints({
+        userId: result.resv.userId,
+        restaurantId: result.resv.restaurantId,
+        delta: ARRIVAL_POINTS,
+        reason: 'reservation',
+        note: `حضور در رزرو ${result.resv.code}`,
+      }).catch((e) => {
+        log.error('ثبتِ امتیازِ حضور در دفتر ناموفق (چک‌این خودش commit شد)', {
+          reservationId: result.resv.id, code: result.resv.code, error: (e as Error).message,
+        });
+      });
+    }
+
     await processReservationEconomyEvent({
       reservationId: result.resv.id,
       restaurantId: result.resv.restaurantId,

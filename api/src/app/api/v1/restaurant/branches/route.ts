@@ -29,8 +29,40 @@ function clubPrefixFrom(name: string): string {
   return (letters.slice(0, 3) || 'BR').padEnd(2, 'X');
 }
 
-/** GET /api/v1/restaurant/branches — همه‌ی شعبه‌های این تنانت + شعبه‌ی فعلیِ این staff */
-export const GET = withRestaurantAuth({ rateLimit: 'search' }, async (_req, ctx) => {
+/**
+ * GET /api/v1/restaurant/branches — همه‌ی شعبه‌های این تنانت + شعبه‌ی فعلیِ این staff
+ *
+ * ═══ چرا این متد عمداً `permission:` ندارد (تصمیمِ ثبت‌شده، نه فراموشی) ═══
+ *
+ * در ممیزیِ RBAC علامت خورد چون `POST` همین فایل `canManageSettings` دارد و
+ * `GET` ندارد. بررسی شد؛ برخلافِ خواهرهایش (photos/reviews/cashback/events که
+ * همه بسته شدند) این یکی **باز می‌ماند**، به دلیلِ زیر:
+ *
+ *  • این یک endpointِ *context* است، نه داده‌ی کسب‌وکار: مصرف‌کننده‌اش
+ *    `loadBranches()` در `apps/business/js/routing.js:57` است که در
+ *    `staff-system.js` (خطوطِ ۵۰۱ و ۵۴۷) و `data.js:166` برایِ **هر** کاربرِ
+ *    لاگین‌کرده و بدونِ هیچ چکِ مجوزی اجرا می‌شود — دقیقاً الگویِ heartbeat.
+ *    اگر مجوز بگذاریم، سوییچرِ شعبه و مقداردهیِ اولیه‌ی
+ *    `API.setActiveRestaurant(current_restaurant_id)` برایِ هر کارمندِ
+ *    محدودشده ۴۰۳ می‌شود؛ یعنی بستنِ یک درِ کم‌ارزش به قیمتِ شکستنِ
+ *    context در کلِ پنل.
+ *
+ *  • حساسیتِ خروجی پایین است: فقط `id/name/slug/is_open`ِ شعبه‌هایِ **تنانتِ
+ *    خودِ همان کارمند** (`ctx.auth.tenantId`) — نه رزرو، نه مشتری، نه مالی، نه
+ *    هیچ داده‌ی شخصی. مرزِ تنانت همچنان کاملاً اعمال می‌شود.
+ *
+ *  • عملیاتِ حساس (ساختِ شعبه) در `POST` است و آن `canManageSettings` دارد.
+ *
+ * ⚠️ این یک تصمیمِ محصولی است، نه یک واقعیتِ فنی — اگر مالکِ محصول بگوید
+ *    کارمندِ محدود نباید فهرستِ شعبه‌ها را ببیند، رفعِ درست سمتِ پنل است
+ *    (نخواندنِ این endpoint وقتی کاربر مجوز ندارد)، نه ۴۰۳ دادن به مسیری که
+ *    پنل بی‌قید صدایش می‌زند.
+ *    گاردِ خودکار: `tests/rbac-permission-coverage.test.mts` این فایل را در
+ *    فهرستِ صریحِ استثناها دارد.
+ */
+export const GET = withRestaurantAuth(
+  // بدونِ `permission:` — عمدی. دلیلِ کامل در بلوکِ بالا.
+  { rateLimit: 'search' }, async (_req, ctx) => {
   // نکته: withRestaurantAuth پیش از رسیدن به اینجا resolveStaffRestaurant را صدا زده
   // که برای auth.kind !== 'staff' خودش Err.forbidden پرتاب می‌کند؛ پس ctx.auth همیشه staff است.
   if (ctx.auth.kind !== 'staff') throw Err.forbidden();

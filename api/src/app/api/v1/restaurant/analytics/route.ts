@@ -3,6 +3,9 @@ import { dbRead as db } from '@/lib/db';
 import { cached, cacheKey } from '@/lib/cache';
 import { sinceDays } from '@/lib/staff-helpers';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
+// ⚠️ «ساعتِ اوج» و «نقشه‌ی حرارتیِ روز×ساعت» باید به وقتِ **تهران** باشند،
+// نه UTC. تعریف و شواهدِ اندازه‌گیری‌شده یک‌جا در lib/restaurant-manager.ts.
+import { TEHRAN_SLOT_DOW, TEHRAN_SLOT_HOUR } from '@/lib/restaurant-manager';
 
 // ═══════════════════════════════════════════════════════════
 //  GET /restaurant/analytics — آمار رفتار مشتری (مهاجرت‌شده به wrapper)
@@ -32,7 +35,7 @@ export const GET = withRestaurantAuth(
       const returnRate = totalCustomers ? Math.round((returning / totalCustomers) * 100) : 0;
 
       const hourRows = await db.$queryRaw<{ hour: number; cnt: bigint }[]>`
-        SELECT EXTRACT(HOUR FROM slot_start)::int AS hour, COUNT(*)::bigint AS cnt
+        SELECT ${TEHRAN_SLOT_HOUR} AS hour, COUNT(*)::bigint AS cnt
         FROM reservations
         WHERE restaurant_id = ${restaurant.id}::uuid
           AND status IN ('confirmed','arrived','seated','completed')
@@ -43,8 +46,8 @@ export const GET = withRestaurantAuth(
       // ── نقشه‌ی حرارتیِ اشغال: روزِ هفته × ساعت (برای دیدنِ الگوهای شلوغی) ──
       // DOW در Postgres: 0=یکشنبه..6=شنبه. ساعت‌های سرویس معمولاً ۱۲..۲۴.
       const heatRows = await db.$queryRaw<{ dow: number; hour: number; cnt: bigint }[]>`
-        SELECT EXTRACT(DOW FROM slot_start)::int AS dow,
-               EXTRACT(HOUR FROM slot_start)::int AS hour,
+        SELECT ${TEHRAN_SLOT_DOW} AS dow,
+               ${TEHRAN_SLOT_HOUR} AS hour,
                COUNT(*)::bigint AS cnt
         FROM reservations
         WHERE restaurant_id = ${restaurant.id}::uuid

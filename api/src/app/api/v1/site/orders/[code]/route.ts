@@ -5,6 +5,8 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, z } from '@/lib/schemas';
 import { publicOrderView, SITE_RULES } from '@/lib/site-orders';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  GET /api/v1/site/orders/{code} — پیگیریِ عمومیِ وضعیتِ سفارش
 //
@@ -19,7 +21,7 @@ const paramsSchema = z.object({
   code: z.string().regex(/^RZO-[A-Z2-9]{5,12}$/, 'کدِ پیگیری معتبر نیست'),
 });
 
-export async function GET(req: Request, { params }: { params: Promise<{ code: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), SITE_RULES.track);
     const { code } = parseParams(await params, paramsSchema);
@@ -37,3 +39,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ code: st
     return NextResponse.json(publicOrderView(order));
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/site/orders/[code]', GET_impl);

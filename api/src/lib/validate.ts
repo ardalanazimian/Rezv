@@ -131,7 +131,14 @@ class NumberSchema extends Schema<number> {
     const empty = this.handleEmpty(v); if (empty) { if (!empty.ok) empty.issues = empty.issues.map(i => ({ ...i, field: path })); return empty; }
     let n = v;
     if (typeof n === 'string' && n.trim() !== '') n = Number(n); // پذیرشِ نرمِ رشته‌ی عددی
-    if (typeof n !== 'number' || Number.isNaN(n)) return { ok: false, issues: [{ field: path, message: 'باید عدد باشد' }] };
+    // ⚠️ رفعِ یافته‌ی ۱۸ (فازِ ۲) — `Number.isFinite` به‌جای `!Number.isNaN`:
+    // `Infinity` هم `typeof === 'number'` است و هم NaN نیست، پس از فیلترِ قبلی
+    // رد می‌شد. راهِ ورود واقعی است، نه نظری: `JSON.parse('{"x":1e400}')`
+    // مقدارِ `Infinity` می‌دهد و مسیرِ نرمِ رشته→عدد هم `Number('1e400')` را.
+    // `.int()` فقط بخشی از فیلدها را می‌بست؛ فیلدهای `z.number()`ِ بدونِ `.int()`
+    // مقدار را تا لایه‌ی Prisma می‌بردند ⇒ خطای خامِ ۵۰۰ به‌جای ۴۲۲.
+    // `Number.isFinite` هر سه‌ی NaN، Infinity و -Infinity را با هم رد می‌کند.
+    if (typeof n !== 'number' || !Number.isFinite(n)) return { ok: false, issues: [{ field: path, message: 'باید عدد باشد' }] };
     const num = n as number;
     if (this._int && !Number.isInteger(num)) return { ok: false, issues: [{ field: path, message: 'باید عددِ صحیح باشد' }] };
     if (this._min !== undefined && num < this._min) return { ok: false, issues: [{ field: path, message: `حداقل ${this._min}` }] };

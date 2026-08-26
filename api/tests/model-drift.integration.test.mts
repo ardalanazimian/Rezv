@@ -2,6 +2,18 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
+import { NO_SHOW_FEATURE_VERSION, NO_SHOW_FEATURE_NAMES } from '../src/lib/no-show-model.ts';
+
+// ⚠️ وزن‌ها از **طولِ واقعیِ بردار** ساخته می‌شوند، نه با آرایه‌ی ثابت.
+// آرایه‌ی هاردکد دقیقاً همان چیزی بود که یک P0 را نامرئی نگه داشت
+// (۲۰۲۶-۰۸-۲۵): با گسترشِ بردار، فیکسچرِ ثابت هم‌طول نمی‌ماند و مسیرِ
+// واقعی به NaN/خطا می‌افتاد در حالی که تست سبز می‌ماند.
+const neutralWeights = () => {
+  const w = new Array(NO_SHOW_FEATURE_NAMES.length).fill(0);
+  w[NO_SHOW_FEATURE_NAMES.indexOf('bias')] = -1;
+  w[NO_SHOW_FEATURE_NAMES.indexOf('shrunkNoShowRate')] = 1.5;
+  return w;
+};
 import { recordPrediction, recordOutcome, MIN_RESOLVED_FOR_ACCURACY } from '../src/lib/prediction-ledger.ts';
 import {
   detectPerformanceDrift, detectOutputDrift,
@@ -52,8 +64,9 @@ async function activateModel(restaurantId: string, holdoutBrier: number): Promis
   });
   await db.restaurantNoShowModel.create({
     data: {
-      restaurantId, weights: [-1, 0, 1.5, 0.5, 0, 0.3, 0], sampleSize: 200, positiveCount: 40,
+      restaurantId, weights: neutralWeights(), sampleSize: 200, positiveCount: 40,
       learnedBrier: holdoutBrier, staticBrier: 0.2, isActive: true, activeRunId: run.id,
+      featureVersion: NO_SHOW_FEATURE_VERSION,
     },
   });
   return run.id;

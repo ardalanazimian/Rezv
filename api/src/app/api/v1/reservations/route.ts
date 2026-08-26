@@ -4,13 +4,15 @@ import { db } from '@/lib/db';
 import { createReservation } from '@/lib/reservations';
 import { normalizePhone } from '@/lib/otp';
 import { withIdempotency } from '@/lib/idempotency';
-import { clientIp } from '@/lib/ratelimit';
+import { clientIp, enforceRateLimit, RULES } from '@/lib/ratelimit';
 import { assertUserNotBanned } from '@/lib/ban';
 import { isFeatureEnabled, featureFlagLabel } from '@/lib/feature-flags';
 import { Err, errorResponse } from '@/lib/errors';
 import { requirePermission } from '@/lib/permissions';
 import { resolveStaffRestaurant } from '@/lib/staff-helpers';
 import { parseBody, z, zUuid, zDateStr, zTimeStr, zPartySize, zPhone } from '@/lib/schemas';
+
+import { withApiMetrics } from '@/lib/api-metrics';
 
 // Schema ورودیِ رزرو — یک‌جا تعریف، خطاهای یکدست، type inference.
 // نکته‌ی امنیتی: قبلاً preorder/guest/coupon_code/gift_card_* اصلاً اعتبارسنجی
@@ -43,8 +45,19 @@ const reservationSchema = z.object({
 });
 
 /** POST /api/v1/reservations — مشتری (app) یا staff (manual) */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
+    // ⚠️ سقفِ اختصاصی — تا امروز **هیچ‌جا اعمال نمی‌شد** (ممیزیِ نهایی،
+    // ۲۰۲۶-۰۸-۲۵). `RULES.reservation` از روزِ اول تعریف شده بود و
+    // **صفر مصرف‌کننده** داشت (grep روی کلِ درخت تأیید شد).
+    //
+    // چرا نبودش مهم بود: این گران‌ترین عملیاتِ کلِ سیستم است — تراکنشِ
+    // Serializable + قفلِ Redis + برخورد با قیدِ EXCLUDE. تنها سدش
+    // `globalPerIp` (۱۲۰ در دقیقه) بود، که برای این مسیر بسیار گشاد است؛
+    // و با `hold: true` می‌شد اسلات‌ها را هم نگه داشت.
+    //
+    // اول ریت‌لیمیت، بعد پارسِ بدنه.
+    await enforceRateLimit(clientIp(req), RULES.reservation);
     const auth = authFromRequest(req);
     // بن سختِ پلتفرم: قبل از هر پردازشِ دیگری (حتی claimِ idempotency) رد می‌شود
     // — فقط برایِ مشتریِ آنلاین؛ رزروِ دستیِ staff برایِ مهمانِ حاضر مشمول نیست.
@@ -133,3 +146,7 @@ export async function POST(req: Request) {
     return NextResponse.json(result, { status: 201 });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/reservations', POST_impl);

@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 // نکته: import پویا عمداً به‌جای import استاتیک استفاده شده — در ترکیب خاصی از
 // نسخه‌ی tsx + Node --test در این محیط، import استاتیکِ چند-نامی از فایل‌های .ts
 // گاهی نادرست resolve می‌شود (به‌ظاهر باگ در static linking، نه در خودِ سورس).
@@ -50,6 +51,43 @@ describe('z.number', () => {
   test('min/max اعمال می‌شود', () => {
     assert.throws(() => z.number().min(10).parse(5));
     assert.throws(() => z.number().max(10).parse(20));
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  رگرسیونِ Infinity (فازِ ۲ · §۲۴ — یافته‌ی ۱۸ در docs/recovery/OPEN-FINDINGS.md)
+  //
+  //  `_parse` فقط `typeof n !== 'number'` و `Number.isNaN(n)` را چک می‌کرد.
+  //  ولی `Infinity` هم typeofش `'number'` است و هم NaN نیست — پس از فیلتر
+  //  رد می‌شد. راهِ ورودش نظری نیست: `JSON.parse('{"x":1e400}')` دقیقاً
+  //  `Infinity` می‌دهد (اجرای واقعی: `1e400 -> Infinity | isFinite false`)،
+  //  و مسیرِ نرمِ رشته → عدد هم `Number('1e400')` و `Number('Infinity')` را
+  //  به `Infinity` تبدیل می‌کرد.
+  //
+  //  چرا `.int()` کافی نبود: `Number.isInteger(Infinity) === false` فقط
+  //  فیلدهایی را می‌بست که `.int()` داشتند. فیلدهای `z.number()`ِ خالی
+  //  (مثلِ pos_x/pos_y/rotation در restaurant/tables/[id]) بی‌حفاظ بودند و
+  //  مقدار تا لایه‌ی Prisma می‌رفت ⇒ خطای خامِ ۵۰۰ به‌جای ۴۲۲.
+  //
+  //  کنترلِ مثبت: هر سه assertion زیر با برداشتنِ `Number.isFinite` از
+  //  NumberSchema._parse قرمز می‌شوند (سنجشِ جهش انجام شد).
+  // ═══════════════════════════════════════════════════════════════════
+  test('Infinity رد می‌شود — حتی بدونِ .int()', () => {
+    assert.throws(() => z.number().parse(Infinity));
+    assert.throws(() => z.number().parse(-Infinity));
+  });
+  test('1e400 از JSON (که Infinity می‌شود) رد می‌شود', () => {
+    const body = JSON.parse('{"pos_x":1e400}');
+    assert.equal(body.pos_x, Infinity);            // کنترلِ مثبت: ورودی واقعاً Infinity است
+    assert.throws(() => z.object({ pos_x: z.number() }).parse(body));
+  });
+  test('رشته‌ی بی‌نهایت در مسیرِ نرمِ query string رد می‌شود', () => {
+    assert.throws(() => z.number().parse('1e400'));
+    assert.throws(() => z.number().parse('Infinity'));
+  });
+  test('عددِ متناهی همچنان می‌گذرد (کنترلِ منفی — تست بیش از حد نبسته)', () => {
+    assert.equal(z.number().parse(0), 0);
+    assert.equal(z.number().parse(-3.5), -3.5);
+    assert.equal(z.number().parse(Number.MAX_VALUE), Number.MAX_VALUE);
   });
 });
 
@@ -184,7 +222,9 @@ describe('پرایمیتیوهای دامنه (schemas.ts)', () => {
 
 describe('parseQuery / parseParams', () => {
   test('parseQuery مقادیر query string را طبق schema پارس می‌کند', () => {
-    const req = new Request('https://x.test/api?limit=10&active=true');
+    const req = new Request('https://x.test/api?limit=10&active=true', {
+      headers: { 'x-real-ip': testIp() },
+    });
     const schema = z.object({ limit: z.number().int(), active: z.boolean() });
     assert.deepEqual(parseQuery(req, schema), { limit: 10, active: true });
   });

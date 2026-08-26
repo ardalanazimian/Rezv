@@ -5,6 +5,8 @@ import { isFeatureEnabled } from '@/lib/feature-flags';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseQuery, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const querySchema = z.object({ restaurant_id: zUuid.optional() });
 
 /**
@@ -13,7 +15,7 @@ const querySchema = z.object({ restaurant_id: zUuid.optional() });
  * بر اساسِ segment/churnRiskScore، reliabilityScore/reputationTier،
  * و پیش‌بینیِ تقاضایِ رستوران (اگه restaurant_id داده بشه).
  */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -30,3 +32,7 @@ export async function GET(req: Request) {
     });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/me/incentives', GET_impl);

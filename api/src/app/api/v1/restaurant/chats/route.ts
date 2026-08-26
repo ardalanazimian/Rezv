@@ -8,8 +8,16 @@ const listQuery = z.object({
   limit: z.number().int().min(1).max(100).default(50),
 });
 
-/** GET /api/v1/restaurant/chats — لیست گفتگوهای رستوران (اینباکس) */
-export const GET = withRestaurantAuth({ rateLimit: 'search' }, async (req, ctx) => {
+/**
+ * GET /api/v1/restaurant/chats — لیست گفتگوهای رستوران (اینباکس)
+ *
+ * ⚠️ رفعِ ناهم‌خوانیِ مجوز (ممیزیِ RBAC): `chats/[id]/route.ts` (خواندن و
+ * فرستادنِ پیامِ یک گفتگو) از قبل `canManageReservations` داشت، ولی همین
+ * *فهرست* نداشت — و فهرست خودش `customer.phone` و متنِ آخرین پیامِ هر
+ * گفتگو را برمی‌گرداند. یعنی گاردِ جزئیات با یک درخواست به فهرست دور می‌خورد.
+ * حالا هر دو یک کلید دارند، هم‌راستا با `VIEW_PERMISSION.chat` در پنل.
+ */
+export const GET = withRestaurantAuth({ permission: 'canManageReservations', rateLimit: 'search' }, async (req, ctx) => {
   const { filter, limit } = parseQuery(req, listQuery);
 
   const where: Record<string, unknown> = { restaurantId: ctx.restaurant.id };

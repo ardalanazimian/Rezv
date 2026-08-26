@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -22,7 +23,6 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db');
-const { redis } = await import('../src/lib/redis');
 const { signAccess } = await import('../src/lib/jwt');
 const { invalidatePattern } = await import('../src/lib/cache');
 const recsRoute = await import('../src/app/api/v1/restaurant/crm/recommendations/route');
@@ -38,7 +38,11 @@ const PHONE_PREFIX = String(Math.floor(Math.random() * 9000) + 1000);
 const req = (token: string, body?: unknown, method = 'POST') =>
   new Request('http://x/api', {
     method,
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
@@ -95,10 +99,10 @@ async function fetchRecommendations(token: string) {
 }
 
 before(async () => {
-  // شمارنده‌ی rate-limit بینِ اجراها نشت می‌کند و از اجرای دوم ۴۲۹ می‌دهد.
-  // خودِ سقفِ روت دست‌نخورده می‌ماند — فقط حالتِ نشتی صفر می‌شود.
-  const stale = await redis.keys('*auth*');
-  if (stale.length) await redis.del(...stale);
+  // ⚠️ اینجا قبلاً کلِ سطل‌های `*auth*` سراسری پاک می‌شد، چون IPِ هر
+  // `new Request()`ِ بی‌هدر `unknown` بود و سهمیه بینِ فایل‌های رانر مشترک.
+  // آن کار سطلِ فایل‌های دیگر را هم خالی می‌کرد و ریت‌لیمیتشان را پنهان.
+  // حالا `req()` با `testIp()` IPِ یکتا می‌گیرد.
 
   const a = await makeTenantWithOwner(`a-${TAG}`);
   const b = await makeTenantWithOwner(`b-${TAG}`);

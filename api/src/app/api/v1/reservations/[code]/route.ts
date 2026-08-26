@@ -6,6 +6,8 @@ import { Err, errorResponse } from '@/lib/errors';
 import { resolveStaffRestaurant } from '@/lib/staff-helpers';
 import { parseParams, zReservationCode, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ code: zReservationCode });
 
 // GET /reservations/[code] — جزئیات یک رزرو
@@ -16,7 +18,7 @@ const paramsSchema = z.object({ code: zReservationCode });
 //  • مشتری فقط رزرو خودش را می‌بیند (userId == sub)،
 //  • staff فقط رزروهای رستوران خودش را (tenantId منطبق)،
 //  • و rate-limit برای جلوگیری از enumeration.
-export async function GET(req: Request, { params }: { params: Promise<{ code: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     const auth = authFromRequest(req);
@@ -53,3 +55,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ code: st
     });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/reservations/[code]', GET_impl);

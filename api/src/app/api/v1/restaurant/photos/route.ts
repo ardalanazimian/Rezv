@@ -14,7 +14,12 @@ import { invalidate, cacheKey } from '@/lib/cache';
 const deleteQuery = z.object({ id: zUuid });
 
 /** GET — عکس‌های گالری رستوران، همراه با وضعیتِ بازبینی. */
-export const GET = withRestaurantAuth({ rateLimit: 'search' }, async (_req, ctx) => {
+// ⚠️ رفعِ ممیزیِ RBAC: `POST`/`DELETE` از قبل `canManageSettings` داشتند ولی
+// `GET` نداشت. مصرف‌کننده‌اش `loadGallery()` در `apps/business/js/crm.js:34`
+// است که فقط داخلِ رندرِ تبِ «پروفایل» صدا زده می‌شود — و آن تب خودش با
+// همین کلید گیت شده (`VIEW_PERMISSION.profile`). پس بستنِ این GET هیچ
+// مسیرِ زنده‌ای را نمی‌شکند و فقط گاردِ موجود را کامل می‌کند.
+export const GET = withRestaurantAuth({ permission: 'canManageSettings', rateLimit: 'search' }, async (_req, ctx) => {
   const photos = await db.restaurantPhoto.findMany({
     where: { restaurantId: ctx.restaurant.id },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],

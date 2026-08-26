@@ -6,6 +6,8 @@ import { errorResponse } from '@/lib/errors';
 import { parseQuery, z } from '@/lib/schemas';
 import { STATUS_LABEL, type PhotoStatus } from '@/lib/photo-moderation';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const querySchema = z.object({
   status: z.enum(['pending', 'approved', 'rejected', 'all']).default('pending'),
   // z.number() خودش رشته‌ی عددیِ کوئری‌استرینگ را می‌پذیرد (validate.ts)
@@ -19,7 +21,7 @@ const querySchema = z.object({
  * پیش‌فرض فقط pendingها را می‌دهد و قدیمی‌ترین را اول: صف باید FIFO باشد
  * وگرنه عکسِ یک رستوران می‌تواند هفته‌ها پشتِ آپلودهای تازه بماند.
  */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -70,3 +72,7 @@ export async function GET(req: Request) {
     return errorResponse(e);
   }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/photos', GET_impl);

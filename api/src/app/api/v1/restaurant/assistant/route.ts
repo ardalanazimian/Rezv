@@ -20,7 +20,12 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
   return NextResponse.json(stats);
 });
 
-export const POST = withRestaurantAuth({ rateLimit: 'search', permission: 'canViewAnalytics' }, async (req, ctx) => {
+// ⚠️ `auth` (۲۰/دقیقه) و نه `search` (۶۰/دقیقه): این endpoint **می‌نویسد** —
+// هر سؤال یک ردیف در `restaurant_assistant_logs` می‌سازد و همان ردیف بلیتِ
+// ورودی حلقه‌ی خودآموزی است. قاعده‌ی CLAUDE.md §۶ صریح است: «GETِ سبک =
+// search؛ نوشتن‌ها باید auth بدهند». سقفِ سه‌برابرِ قبلی دقیقاً همان چیزی
+// بود که حمله‌ی مسمومیتِ واژگان را ارزان می‌کرد.
+export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canViewAnalytics' }, async (req, ctx) => {
   const b = await parseBody(req, askSchema);
   const result = await askAssistant({
     restaurantId: ctx.restaurant.id,

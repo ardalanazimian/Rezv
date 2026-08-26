@@ -1,6 +1,7 @@
 import { createLogger } from './logger';
 import { enqueue } from './queue';
 import { metrics } from './metrics';
+import { consumeSms } from './sms-balance';
 const log = createLogger('sms');
 
 export type SmsJob = {
@@ -23,6 +24,13 @@ export type SmsJob = {
    * خدماتیِ اشتراکی فقط الگو قبول می‌کند.
    */
   text?: string;
+  /**
+   * کلیدِ یکتاسازی — اگر داده شود، صف کارِ تکراری با همین کلید را نمی‌پذیرد.
+   * صف از روزِ اول این را پشتیبانی می‌کرد (`enqueue`)، ولی `enqueueSms` آن را
+   * عبور نمی‌داد؛ پس هیچ پیامکی نمی‌توانست یکتا شود. یادآوریِ رزرو اولین
+   * مصرف‌کننده است (`reminder:<reservationId>`).
+   */
+  idempotencyKey?: string;
 };
 
 /**
@@ -94,10 +102,75 @@ function meliAccepted(d: MeliResponse | null): boolean {
   return Number.isFinite(v) && v > 1000;   // recId، نه کدِ خطا
 }
 
-function toLocalNumber(phone: string): string {
+/**
+ * شکلِ محلیِ شماره (`+989…`/`98…` → `09…`). فرمتِ گیرنده‌ی کاوه‌نگار است.
+ *
+ * export شده چون تنها تعریفِ این تبدیل در کدبیس همین است و مسیرهایی که باید
+ * یک شماره‌ی ورودی را با شماره‌ی ذخیره‌شده تطبیق دهند (مثلِ گاردِ «این شماره
+ * واقعاً امروز اینجا چک‌این کرده؟» در `restaurant/sms`) به همین تبدیل نیاز
+ * دارند. تعریفِ دومِ موازی = دو رفتارِ متفاوت در دو مسیر.
+ */
+export function toLocalNumber(phone: string): string {
   if (phone.startsWith('+98')) return '0' + phone.slice(3);
   if (phone.startsWith('98')) return '0' + phone.slice(2);
   return phone;
+}
+
+/**
+ * مسیرِ اضطراری وقتی صف (`jobs`) در دسترس نیست.
+ *
+ * ⚠️ یافته‌ی ۲۰۲۶-۰۸-۲۵ — یک نشتیِ مستقیمِ **پول**: تنها جایی که موجودیِ
+ * پیامکِ رستوران کسر می‌شود `worker.ts` است (`consumeSms` پیش از
+ * `sendSmsNow`). این fallback هرگز از worker رد نمی‌شود، پس تا امروز:
+ *  • هر پیامکی که در قطعیِ صف از این‌جا می‌رفت **بدونِ کسرِ اعتبار** می‌رفت
+ *    (سقفِ موجودی کاملاً دور زده می‌شد و در `sms_transactions` هم ردی
+ *    نمی‌ماند — یعنی نه گزارشِ مصرف درست بود نه صورت‌حساب)،
+ *  • و `.catch(() => {})` خطای خودِ ارسال را هم می‌بلعید: هیچ لاگ، هیچ
+ *    متریک، هیچ نشانه‌ای. یک قطعیِ کاملِ ارسال از بیرون دقیقاً شبیهِ کارکردِ
+ *    عادی بود.
+ *
+ * قاعده‌ی این‌جا عیناً همان قاعده‌ی worker است (پیاده‌سازیِ دوم نیست — همان
+ * `consumeSms`): اول کسر، بعد ارسال؛ اگر کسر ممکن نبود **ارسال نمی‌شود**.
+ * fail-closed عمدی است (CLAUDE.md §۹): علتِ شکستِ `enqueue` معمولاً خودِ
+ * دیتابیس است، و اگر نتوانیم موجودی را کم کنیم یعنی نمی‌دانیم اجازه‌ی ارسال
+ * داریم یا نه — «نمی‌دانم» باید بسته باشد، نه باز.
+ *
+ * تابع عمداً throw نمی‌کند: `enqueueSms` از روزِ اول void و بی‌استثنا بوده و
+ * چند صداکننده‌اش (مثلاً `createReservation` بعد از commit) خطا را
+ * نمی‌گیرند — throwِ تازه یعنی رزروِ ثبت‌شده با ۵۰۰ به کاربر گزارش شود.
+ * به‌جایش هر شکست **صریحاً** لاگ و متریک می‌شود.
+ */
+async function sendDirectFallback(job: SmsJob): Promise<void> {
+  if (job.restaurantId) {
+    let charged = false;
+    try {
+      charged = await consumeSms(job.restaurantId, 1, 'queue_fallback');
+    } catch (e) {
+      log.error('کسرِ موجودیِ پیامک در مسیرِ اضطراری ناموفق — ارسال انجام نشد', {
+        template: job.template, restaurantId: job.restaurantId, error: (e as Error).message,
+      });
+      metrics.smsFailed.inc({ template: job.template, reason: 'balance_check_failed' });
+      return;
+    }
+    if (!charged) {
+      log.error('موجودیِ پیامکِ رستوران کافی نیست — مسیرِ اضطراری ارسال نکرد', {
+        template: job.template, restaurantId: job.restaurantId,
+      });
+      metrics.smsFailed.inc({ template: job.template, reason: 'insufficient_balance' });
+      return;
+    }
+  }
+  try {
+    await sendSmsNow(job);
+  } catch (e) {
+    // ⚠️ اینجا عمداً «بی‌صدا» نیست. متریکِ جدا از `network` است چون معنایش
+    // فرق دارد: در مسیرِ عادی، شکستِ ارسال را worker با retry جبران می‌کند؛
+    // اینجا هیچ retryای وجود ندارد و پیام **قطعاً** از دست رفته است.
+    log.error('ارسالِ مستقیمِ پیامک در مسیرِ اضطراری شکست خورد — پیام از دست رفت', {
+      template: job.template, restaurantId: job.restaurantId ?? null, error: (e as Error).message,
+    });
+    metrics.smsFailed.inc({ template: job.template, reason: 'fallback_failed' });
+  }
 }
 
 export async function enqueueSms(job: SmsJob): Promise<void> {
@@ -109,13 +182,49 @@ export async function enqueueSms(job: SmsJob): Promise<void> {
   // استثنا: OTP باید همزمان برود (کاربر منتظر کد است) — مسیر مستقیم.
   if (job.template === 'otp') { await sendSmsNow(job); return; }
   try {
-    await enqueue({ kind: 'sms', payload: job as unknown as Record<string, unknown> });
+    await enqueue({
+      kind: 'sms',
+      payload: job as unknown as Record<string, unknown>,
+      ...(job.idempotencyKey ? { idempotencyKey: job.idempotencyKey } : {}),
+    });
+    return;
   } catch (e) {
     // اگر صف در دسترس نبود، به ارسال مستقیم fallback کن (بهتر از گم‌شدن پیام)
+    // — ولی با همان قاعده‌ی موجودیِ worker و بدونِ بلعیدنِ خطا (توضیحِ کامل
+    // روی `sendDirectFallback`).
     log.warn('صف در دسترس نیست، ارسال مستقیم SMS', { error: (e as Error).message });
-    await sendSmsNow(job).catch(() => {});
   }
+  await sendDirectFallback(job);
 }
+
+/**
+ * آیا زیرساختِ پیامک واقعاً قابلِ استفاده است؟
+ *
+ * (میراثِ ادغام ۲۰۲۶-۰۸-۲۶: مفهوم از شاخه‌ی open-tasks-review آمد — آنجا برای
+ * کاوه‌نگار فقط وجودِ API_KEY بود. برای ملی‌پیامک «آماده» یعنی اعتبارنامه‌ها
+ * **و** bodyIdِ الگویِ OTP، چون بدونِ دومی مسیرِ ورود همچنان بی‌پیامک می‌ماند.)
+ *
+ * مسیرهایی که نتیجه‌شان به رسیدنِ پیامک وابسته است — مثلِ OTP — باید پیش از
+ * ادعای موفقیت این را بپرسند؛ وگرنه کاربر ۲۰۴ِ موفق می‌گیرد و کدی که هرگز
+ * نمی‌آید را انتظار می‌کشد (و چون OTP_DEV_MODE در production استثناست، عملاً
+ * **هیچ‌کس نمی‌تواند وارد شود** در حالی که همه‌ی لاگ‌ها تمیزند).
+ */
+export function smsTransportReady(): boolean {
+  return Boolean(
+    process.env.MELIPAYAMAK_USERNAME &&
+    process.env.MELIPAYAMAK_PASSWORD &&
+    process.env.MELIPAYAMAK_BODYID_OTP,
+  );
+}
+
+/**
+ * سقفِ توکنِ سرویسِ الگویِ کاوه‌نگار (میراث). با ملی‌پیامک سقفِ سختِ ۳تایی
+ * وجود ندارد — همه‌ی توکن‌ها join می‌شوند و «بریدنِ خاموشِ توکنِ چهارم»
+ * (باگی که در booking_confirm کدِ رزرو را می‌انداخت) از اساس منتفی است.
+ * صادر می‌ماند چون reminders.ts به مفهومش ارجاع می‌دهد؛ حدِ طراحیِ الگوهاست،
+ * نه حدِ ارسال.
+ */
+export const MAX_SMS_TOKENS = 3;
 
 /**
  * ارسالِ واقعیِ یک SMS از طریقِ **ملی‌پیامک** (توسطِ workerِ صف یا مسیرِ OTP).
@@ -132,7 +241,16 @@ export async function sendSmsNow(job: SmsJob): Promise<void> {
   const username = process.env.MELIPAYAMAK_USERNAME;
   const password = process.env.MELIPAYAMAK_PASSWORD;
   if (!username || !password) {
-    log.debug(`(dev) SMS → ${job.to}`, { template: job.template });
+    // ⚠️ بلندی این شکست میراثِ ادغام است (یافته‌ی open-tasks-review دربارهٔ
+    // «خطرناک‌ترین سکوتِ سیستم»): بدونِ اعتبارنامه در production باید صدا
+    // داشته باشد و شمرده شود — نه debugِ بی‌صدا. مسیرِ OTP جداگانه پیش از
+    // ادعای موفقیت smsTransportReady() را می‌پرسد.
+    metrics.smsFailed.inc({ template: job.template, reason: 'not_configured' });
+    if (process.env.NODE_ENV === 'production') {
+      log.error('MELIPAYAMAK_USERNAME/PASSWORD تنظیم نشده — هیچ پیامکی ارسال نمی‌شود', { template: job.template });
+    } else {
+      log.debug(`(dev) SMS → ${job.to}`, { template: job.template });
+    }
     return;
   }
   const receptor = toLocalNumber(job.to);

@@ -1,5 +1,6 @@
 import { db } from './db';
 import { enqueueSms } from './sms';
+import { smsAllowedForCategory } from './notification-prefs';
 import { recordOutreach } from './outreach-ledger';
 
 // ═══════════════════════════════════════════════════════════
@@ -28,7 +29,9 @@ async function targetsForBirthday(restaurantId: string, daysBefore: number) {
       birthDate: { not: null },
       memberships: { some: { restaurantId } },
     },
-    select: { id: true, phone: true, firstName: true, birthDate: true },
+    // `notificationPrefs` در همین select می‌آید — نه یک کوئریِ اضافه به‌ازای
+    // هر گیرنده (که در کمپینِ چندصدنفره یک N+1ِ تمام‌عیار می‌شد).
+    select: { id: true, phone: true, firstName: true, birthDate: true, notificationPrefs: true },
   }).then(rows => rows.filter(u => u.birthDate && u.birthDate.getMonth() === target.getMonth() && u.birthDate.getDate() === target.getDate()));
 }
 
@@ -40,9 +43,12 @@ async function targetsForSegment(restaurantId: string, segment: 'at_risk' | 'chu
     : { restaurantId, segment };
   const rows = await db.customerInsight.findMany({
     where,
-    select: { userId: true, user: { select: { phone: true, firstName: true } } },
+    select: { userId: true, user: { select: { phone: true, firstName: true, notificationPrefs: true } } },
   });
-  return rows.map(r => ({ id: r.userId, phone: r.user.phone, firstName: r.user.firstName }));
+  return rows.map(r => ({
+    id: r.userId, phone: r.user.phone, firstName: r.user.firstName,
+    notificationPrefs: r.user.notificationPrefs,
+  }));
 }
 
 /**
@@ -80,9 +86,12 @@ async function targetsForPostVisit(restaurantId: string, hoursAfter: number, las
   const until = new Date(now - offset);
   const rows = await db.reservation.findMany({
     where: { restaurantId, status: 'completed', slotEnd: { gt: since, lte: until }, userId: { not: null } },
-    select: { userId: true, user: { select: { phone: true, firstName: true } }, code: true },
+    select: { userId: true, user: { select: { phone: true, firstName: true, notificationPrefs: true } }, code: true },
   });
-  return rows.filter(r => r.user).map(r => ({ id: r.userId as string, phone: r.user!.phone, firstName: r.user!.firstName, reservationCode: r.code }));
+  return rows.filter(r => r.user).map(r => ({
+    id: r.userId as string, phone: r.user!.phone, firstName: r.user!.firstName,
+    notificationPrefs: r.user!.notificationPrefs, reservationCode: r.code,
+  }));
 }
 
 async function targetsForNoShow(restaurantId: string, lastRunAt: Date | null | undefined) {
@@ -97,9 +106,12 @@ async function targetsForNoShow(restaurantId: string, lastRunAt: Date | null | u
       restaurantId, status: 'no_show', userId: { not: null },
       events: { some: { toStatus: 'no_show', createdAt: { gt: since } } },
     },
-    select: { userId: true, user: { select: { phone: true, firstName: true } } },
+    select: { userId: true, user: { select: { phone: true, firstName: true, notificationPrefs: true } } },
   });
-  return rows.filter(r => r.user).map(r => ({ id: r.userId as string, phone: r.user!.phone, firstName: r.user!.firstName }));
+  return rows.filter(r => r.user).map(r => ({
+    id: r.userId as string, phone: r.user!.phone, firstName: r.user!.firstName,
+    notificationPrefs: r.user!.notificationPrefs,
+  }));
 }
 
 /** یک automation را اجرا می‌کند: گیرنده‌ها را پیدا، پیام می‌سازد، صف SMS می‌کند. */
@@ -109,7 +121,12 @@ export async function runAutomation(automation: {
   /** آخرین اجرا — مبنایِ پنجره‌ی هدف‌گیریِ post_visit/no_show_followup. */
   lastRunAt?: Date | null;
 }) {
-  let targets: { id: string; phone: string; firstName: string | null; reservationCode?: string }[] = [];
+  let targets: {
+    id: string; phone: string; firstName: string | null;
+    /** ستونِ jsonbِ ترجیحات — از همان selectِ هدف‌گیری می‌آید، نه کوئریِ جدا. */
+    notificationPrefs: unknown;
+    reservationCode?: string;
+  }[] = [];
 
   switch (automation.trigger) {
     case 'birthday':
@@ -130,7 +147,7 @@ export async function runAutomation(automation: {
       targets = await targetsForNoShow(automation.restaurantId, automation.lastRunAt);
       break;
   }
-  if (targets.length === 0) return { sent: 0 };
+  if (targets.length === 0) return { sent: 0, opted_out: 0 };
 
   let coupon: { code: string } | null = null;
   if (automation.couponId) {
@@ -140,8 +157,18 @@ export async function runAutomation(automation: {
   const template = templateFor(automation.trigger);
 
   let sent = 0;
+  let optedOut = 0;
   const delivered: typeof targets = [];
   for (const t of targets) {
+    // ── رضایت (§۱۳/§۱۷) ────────────────────────────────────────────────
+    // هر پنج trigger این فایل بازاریابی‌اند (تولد/بازگردانی/VIP/پیگیریِ
+    // بازدید/پیگیریِ عدم‌حضور) و همه با قالبِ campaign یا winback_offer
+    // می‌روند ⇒ دسته‌ی `offers` («تخفیف و کش‌بک ویژه»). فقط `false`ِ صریح
+    // مانع می‌شود.
+    if (!smsAllowedForCategory(t.notificationPrefs, 'offers', {
+      site: `automation.${automation.trigger}`, template,
+      restaurantId: automation.restaurantId, userId: t.id,
+    })) { optedOut++; continue; }
     // قالب campaign: [نام, نام رستوران] · قالب winback_offer: [نام, کد تخفیف, نام رستوران]
     const tokens = template === 'winback_offer'
       ? [t.firstName || 'مهمان', coupon?.code || 'WELCOME', restaurant?.name || '']
@@ -170,13 +197,17 @@ export async function runAutomation(automation: {
     reason: automation.trigger,
   })));
 
-  return { sent };
+  // `opted_out` صریح برگردانده می‌شود (همان قراردادِ POST /restaurant/sms):
+  // بدونِ آن، «۵۰ هدف ولی sent=۳۰» به‌نظر یک باگِ ارسال می‌آمد، نه رعایتِ
+  // رضایت. عددِ خاموش بدتر از عددِ بد است.
+  return { sent, opted_out: optedOut };
 }
 
 /** برای maintenance/automations: همه‌ی automation های فعال هر رستوران را اجرا می‌کند. */
 export async function runAllDueAutomations() {
   const automations = await db.marketingAutomation.findMany({ where: { isActive: true } });
   let totalSent = 0;
+  let totalOptedOut = 0;
   for (const a of automations) {
     // ⚠️ اصلاحِ کامنتِ کهنه: اینجا قبلاً نوشته بود «post_visit/no_show_followup
     // هر اجرا (هر چند دقیقه) چک می‌شوند». تنها فراخوانِ این تابع
@@ -189,6 +220,7 @@ export async function runAllDueAutomations() {
     if (dailyOnly && a.lastRunAt && Date.now() - a.lastRunAt.getTime() < 20 * 3600_000) continue;
     const r = await runAutomation(a);
     totalSent += r.sent;
+    totalOptedOut += r.opted_out;
   }
-  return { totalSent, ranAt: new Date().toISOString() };
+  return { totalSent, totalOptedOut, ranAt: new Date().toISOString() };
 }

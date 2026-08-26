@@ -5,6 +5,8 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, z } from '@/lib/schemas';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  GET /api/v1/restaurants/{slug}/menu — منویِ عمومیِ یک رستوران
 //
@@ -22,7 +24,7 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 
 const paramsSchema = z.object({ slug: z.string().min(1).max(150) });
 
-export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     const { slug } = parseParams(await params, paramsSchema);
@@ -70,3 +72,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     return NextResponse.json(data);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/restaurants/[slug]/menu', GET_impl);

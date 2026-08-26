@@ -20,8 +20,12 @@ const paramsSchema = z.object({ code: zReservationCode });
  * حالا از همان wrapperِ استانداردِ خواهرش (.../status) رد می‌شود:
  * withRestaurantAuth هم‌زمان auth، محدوده‌ی شعبه، ریت‌لیمیت، تریس و پوششِ خطا
  * را می‌آورد — بدونِ اختراعِ چیزِ تازه (§۲۲).
+ *
+ * ⚠️ تکمیلِ همان رفع (ممیزیِ RBAC): wrapper آمده بود ولی `permission:` جا مانده
+ * بود، پس محدوده‌ی شعبه درست شد ولی کارمندِ صریحاً محدودشده هنوز کلِ audit-logِ
+ * چرخه‌ی عمرِ هر رزرو را می‌خواند. حالا همان کلیدِ خواهرش `.../status` را دارد.
  */
-export const GET = withRestaurantAuth({ rateLimit: 'search' }, async (_req, ctx, rawParams: { code: string }) => {
+export const GET = withRestaurantAuth({ permission: 'canManageReservations', rateLimit: 'search' }, async (_req, ctx, rawParams: { code: string }) => {
   const { code } = parseParams(rawParams, paramsSchema);
   const resv = await db.reservation.findUnique({
     where: { code },

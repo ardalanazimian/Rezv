@@ -5,6 +5,8 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 import { activateOrder, rejectOrder, setOrderStatus } from '@/lib/site-orders';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  PATCH /api/v1/admin/site/orders/{id} — گردشِ کارِ فعال‌سازی (پنلِ شرکت)
 //
@@ -29,7 +31,7 @@ const bodySchema = z.object({
   admin_note: z.string().max(1000).trim().optional(),
 });
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PATCH_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -59,3 +61,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true, order });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const PATCH = withApiMetrics('/api/v1/admin/site/orders/[id]', PATCH_impl);

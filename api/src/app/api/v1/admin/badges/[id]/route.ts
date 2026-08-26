@@ -5,6 +5,8 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ id: zUuid });
 const bodySchema = z.object({
   name: z.string().min(1).max(60).trim().optional(),
@@ -15,7 +17,7 @@ const bodySchema = z.object({
 });
 
 /** PATCH /api/v1/admin/badges/:id — ویرایشِ تعریفِ نشان (فقط ادمینِ پلتفرم) */
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PATCH_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -28,3 +30,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true, badge });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const PATCH = withApiMetrics('/api/v1/admin/badges/[id]', PATCH_impl);

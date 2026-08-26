@@ -42,6 +42,14 @@ export const zOtpCode = z.string().regex(/^\d{4,6}$/, 'کد باید ۴ تا ۶ 
 
 export const zUuid = z.string().uuid();
 
+// ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
+// ⚠️ قالبِ نام کاربری در **یک** جا تعریف شده (`USERNAME_RE` در lib/password.ts)
+// و اینجا فقط بازتاب می‌شود؛ دو تعریفِ موازی یعنی یکی‌شان کهنه می‌شود.
+// طولِ رمز اینجا فقط یک سقفِ خام است تا ورودیِ غول‌پیکر به scrypt نرسد؛
+// سیاستِ واقعی در `passwordPolicyError` است (تنها منبعِ حقیقت).
+export const zUsername = z.string().trim().min(3).max(32);
+export const zPassword = z.string().min(1).max(128);
+
 export const zDateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'تاریخ باید به‌فرمت YYYY-MM-DD باشد');
 
 export const zTimeStr = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'زمان باید به‌فرمت HH:mm باشد');

@@ -6,12 +6,16 @@ import { rebuildGuestProfiles } from '@/lib/guest-profile';
 import { runAllDueAutomations } from '@/lib/automation';
 import { resolveOutreachConversions } from '@/lib/outreach-ledger';
 import { applyAbuseFlags, applyPlatformAbuseFlags } from '@/lib/fraud';
-import { trainAndCalibrateNoShowModel } from '@/lib/no-show-model';
+import { trainAndCalibrateNoShowModel, trainAndCalibratePlatformNoShowModel } from '@/lib/no-show-model';
+import { rollbackDriftedModel, rollbackDriftedPlatformModel } from '@/lib/model-drift';
 import { trainAndCalibrateDemandForecast } from '@/lib/demand-forecast';
+import { recomputeRestaurantPopularity } from '@/lib/restaurant-popularity';
 import { invalidatePattern } from '@/lib/cache';
 import { guardMaintenance } from '@/lib/maintenance-auth';
 import { errorResponse } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
+
+import { withApiMetrics } from '@/lib/api-metrics';
 
 const log = createLogger('maintenance:customer-insights');
 
@@ -31,7 +35,7 @@ const log = createLogger('maintenance:customer-insights');
  *    می‌کند؛ در پایان یک اسکنِ سراسریِ پلتفرم (فارمینگِ رفرال) هم اجرا می‌شود.
  * در crontab با فاصله‌ی روزانه (نه هر ۲-۵ دقیقه مثل بقیه‌ی maintenance) ثبت شود.
  */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     const denied = guardMaintenance(req);
     if (denied) return denied;
@@ -41,7 +45,7 @@ export async function POST(req: Request) {
     // ⚠️ M5: پردازش موازی محدود (concurrency=4). این job سنگین‌تر است (هر رستوران
     // خودش روی کاربران حلقه می‌زند)، پس concurrency پایین‌تر تا pool اتصال اشباع نشود.
     // چون nightly است، هدف کاهش دیوار زمانی و جلوگیری از timeout است.
-    let i = 0, totalUsers = 0, noShowModelsTrained = 0, noShowModelsActive = 0;
+    let i = 0, totalUsers = 0, noShowModelsTrained = 0, noShowModelsActive = 0, modelsRolledBack = 0;
     let demandForecastsTrained = 0, demandForecastsCountActive = 0, demandForecastsCoversActive = 0;
     let abuseSignals = 0, abuseFlagged = 0;
     async function worker() {
@@ -51,6 +55,14 @@ export async function POST(req: Request) {
         await recomputeRfmForRestaurant(r.id).catch(() => {});
         // شکستِ آموزشِ مدل‌های یادگرفته نباید بازمحاسبه‌ی CLV/RFM بقیه‌ی
         // رستوران‌ها را متوقف کند — این‌ها بهبودِ اختیاری‌اند، نه مسیرِ حیاتی.
+        // ⚠️ **پیش از** بازآموزی: اگر مدلِ فعالِ فعلی در تولید خراب شده،
+        // همین‌جا پس گرفته می‌شود. ترتیب مهم است — اگر بعد از آموزش می‌آمد،
+        // مدلِ تازه‌ی همین شب را بر اساسِ کاراییِ مدلِ **قبلی** قضاوت می‌کرد.
+        // بازآموزیِ همین حلقه می‌تواند دوباره فعالش کند، اگر از گیت‌های
+        // Brier/AUC/بایاس رد شود. یعنی عقب‌نشینیِ موقت، نه بن‌بست.
+        const rollback = await rollbackDriftedModel({ restaurantId: r.id }).catch(() => null);
+        if (rollback?.rolledBack) modelsRolledBack++;
+
         const trainResult = await trainAndCalibrateNoShowModel(r.id).catch(() => null);
         if (trainResult?.trained) {
           noShowModelsTrained++;
@@ -107,7 +119,34 @@ export async function POST(req: Request) {
     // اسکنِ سراسریِ فارمینگِ رفرال (restaurant-scoped نیست، یک‌بار کافی است)
     const platformAbuse = await applyPlatformAbuseFlags().catch(() => ({ signals: [], flaggedUserIds: [] }));
 
+    // ── مدلِ سراسری: **یک بار** برای کلِ پلتفرم، نه به‌ازای هر رستوران ──
+    // بعد از حلقه اجرا می‌شود تا از تازه‌ترین دادهٔ همین شب استفاده کند.
+    // شکستش نباید بقیه‌ی نتایج را باطل کند — مثلِ بقیه‌ی کارهای اختیاری.
+    // ⚠️ ترتیب عمدی: **اول** بازگردانی، بعد بازآموزی.
+    // اگر نسخه‌ی فعالِ فعلی در تولید رانش کرده، باید همین حالا از سرو خارج
+    // شود — حتی اگر بازآموزیِ امشب به هر دلیلی جایگزینی نسازد (دادهٔ کم،
+    // ردِ گیتِ AUC، بایاس). عکسش یعنی یک شب دیگر سرو شدنِ مدلِ خراب به
+    // **همه‌ی** رستوران‌های بدونِ مدلِ اختصاصی.
+    const platformRollback = await rollbackDriftedPlatformModel().catch(() => null);
+    const platform = await trainAndCalibratePlatformNoShowModel().catch(() => null);
+
+    // ⚠️ رتبه‌بندیِ فیدِ عمومی (مهاجرتِ ۰۷۳): `restaurants.visits_7d` مبنایِ
+    // ترتیبِ `GET /v1/restaurants` است — همان فیدی که اپِ مشتری «محبوب
+    // امشب» صدایش می‌زند. پیش از این ترتیب `id DESC` (یک UUID) بود، یعنی
+    // عملاً تصادفی در حالی که عنوان ادعایِ محبوبیت داشت.
+    //
+    // جدا catch می‌شود، مثلِ بقیه‌ی گام‌های این job: شکستِ رتبه‌بندی نباید
+    // بازآموزیِ مدل‌ها را که تازه تمام شده بی‌اثر کند. شکست یعنی ترتیب یک
+    // شب کهنه می‌ماند، نه اینکه غلط شود.
+    const popularityUpdated = await recomputeRestaurantPopularity().catch((e) => {
+      log.error('بازمحاسبه‌ی محبوبیت شکست خورد — ترتیبِ فید یک شب کهنه می‌ماند', {
+        error: (e as Error).message,
+      });
+      return -1;
+    });
+
     return NextResponse.json({
+      popularity_rows_updated: popularityUpdated,
       // ok فقط وقتی true است که واقعاً همه‌چیز انجام شده باشد.
       ok: guestProfilesError === null,
       restaurants: restaurants.length, users_recomputed: totalUsers,
@@ -115,6 +154,17 @@ export async function POST(req: Request) {
       guest_profiles: guestProfilesCount,
       ...(guestProfilesError ? { guest_profiles_error: guestProfilesError } : {}),
       no_show_models_trained: noShowModelsTrained, no_show_models_active: noShowModelsActive,
+      // تعدادِ مدل‌هایی که به‌خاطرِ افتِ کارایی در تولید **پس گرفته** شدند.
+      // عددِ غیرصفر یعنی سیستم برای آن رستوران‌ها به heuristic برگشته.
+      models_rolled_back: modelsRolledBack,
+      // مدلِ سراسری — رفعِ سرمای شروع. `trained:false` با دلیلِ صریح
+      // برمی‌گردد (مثلاً تنوعِ رستورانِ ناکافی)، نه سکوت.
+      platform_model: platform === null ? { trained: false, reason: 'اجرا نشد' } : platform,
+      // بازگردانیِ مدلِ سراسری — تا امروز **هیچ مسیری** نداشت، یعنی یک مدلِ
+      // سراسریِ خراب تا ابد به همه‌ی رستوران‌های تازه سرو می‌شد (مهاجرتِ ۰۷۱).
+      platform_model_rollback: platformRollback === null
+        ? { rolledBack: false, reason: 'اجرا نشد' }
+        : platformRollback,
       demand_forecasts_trained: demandForecastsTrained,
       demand_forecasts_count_active: demandForecastsCountActive,
       demand_forecasts_covers_active: demandForecastsCoversActive,
@@ -128,5 +178,9 @@ export async function POST(req: Request) {
   } catch (e) { return errorResponse(e); }
 }
 
-// Vercel Cron از GET استفاده می‌کند؛ به همان منطق POST وصلش می‌کنیم.
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/maintenance/customer-insights', POST_impl);
+// Vercel Cron از GET استفاده می‌کند؛ به همان منطقِ POSTِ شمرده‌شده وصل است.
 export const GET = POST;

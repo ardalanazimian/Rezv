@@ -95,9 +95,22 @@ model Staff {
   // NULL = دسترسی به همه‌ی شعبه‌های تنانت (owner/manager)؛ ست‌شده = قفل به یک شعبه.
   restaurantId String? @map("restaurant_id") @db.Uuid
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  // مهاجرتِ ۰۷۲ — لازم برای «قدیمی‌ترین ثبت برنده است» در مسیرِ ورودِ کارکنان.
+  // بدونِ این، `findFirst({ where: { phone } })` به ترتیبِ heap وابسته بود و
+  // یک هایجکِ تنانتِ بازتولیدشده می‌ساخت (توضیحِ کامل در خودِ فایلِ مهاجرت).
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  // مهاجرتِ ۰۷۴ — ورود با نام کاربری و رمز، مستقل از پیامک.
+  // ⚠️ `username` یکتای **سراسری** است نه per-tenant: فرمِ ورود فقط
+  // نام‌کاربری و رمز می‌گیرد، پس یکتاییِ per-tenant سرور را مجبور می‌کرد
+  // «اولین تطبیق» را بردارد — همان کلاسِ باگی که مهاجرتِ ۰۷۲ برای تلفن بست.
+  // همیشه lowercase ذخیره می‌شود (`normalizeUsername` در lib/password.ts).
+  username         String?   @unique
+  passwordHash     String?   @map("password_hash")
+  passwordUpdatedAt DateTime? @map("password_updated_at") @db.Timestamptz
   @@unique([tenantId, phone])
   // drift-fix (فازِ ۲، §۲۴): در DB وجود دارد، در schema اعلام نشده بود.
   @@index([restaurantId])
+  @@index([phone, createdAt, id], map: "staff_phone_created_idx")
   @@map("staff")
 }
 
@@ -111,6 +124,11 @@ model Restaurant {
   vibes         String[]         @default([])
   priceBand     Int              @default(2) @map("price_band") @db.SmallInt
   isOpen        Boolean          @default(true) @map("is_open")
+  // مهاجرتِ ۰۷۳ — شمارشِ حضورِ ۷ روزِ گذشته، denormalized تا فهرستِ عمومی
+  // بتواند بر اساسش مرتب شود. Prisma نمی‌تواند بر اساسِ شمارشِ **فیلترشده‌ی**
+  // یک رابطه مرتب کند و صفحه‌بندیِ cursor به ترتیبِ قطعیِ ایندکس‌دار نیاز دارد.
+  // در جابِ شبانه‌ی customer-insights بازمحاسبه می‌شود (تا ۲۴ ساعت کهنه).
+  visits7d      Int              @default(0) @map("visits_7d")
   openingHours  Json?            @map("opening_hours")  // ساعت کاری هفتگی؛ null=همیشه باز طبق isOpen (سازگاری با گذشته)
   // ── تأییدِ ساعتِ کاری (Part 3، migration 045) — دقیقاً مثلِ RestaurantPhoto.status
   //    ولی روی خودِ رستوران چون هر رستوران حداکثر یک پیشنهادِ درِ دستِ بررسی دارد.
@@ -199,6 +217,8 @@ model Restaurant {
 
   @@index([tenantId])
   @@index([city], map: "idx_restaurants_city")
+  // ترتیبِ دقیقِ کوئریِ فهرستِ عمومی — بدونِ اعلامِ اینجا، `db push` حذفش می‌کند.
+  @@index([isOpen, visits7d(sort: Desc), id(sort: Desc)], map: "restaurants_open_visits_idx")
   chatThreads  ChatThread[]
   @@map("restaurants")
   modelPredictions ModelPrediction[]
@@ -367,6 +387,9 @@ model Reservation {
   guestPhone   String?           @map("guest_phone")
   partySize    Int               @map("party_size") @db.SmallInt
   slotStart    DateTime          @map("slot_start")
+  /// زمانِ ارسالِ یادآوریِ پیامکی. NULL یعنی هنوز فرستاده نشده.
+  /// منبعِ حقیقتِ «آیا این رزرو یادآوری‌اش را گرفت؟» — صف پاک می‌شود، این نه.
+  reminderSentAt DateTime?       @map("reminder_sent_at")
   slotEnd      DateTime          @map("slot_end")
   status       ReservationStatus @default(confirmed)
   source       String            @default("app")
@@ -410,6 +433,8 @@ model Reservation {
   // migration 049 — فهرستِ رزروِ پنل: بازه‌ی slot_start + ترتیب رویِ همان ستون.
   // ایندکس‌هایِ دیگر یک ستونِ غیرِ بازه‌ای بینِ restaurant_id و slot_start دارند.
   @@index([restaurantId, slotStart], map: "reservations_restaurant_slot_idx")
+  // یادآوریِ پیامکیِ رزرو: کوئریِ cron روی «نزدیک و هنوز یادآوری‌نشده» است.
+  @@index([slotStart, reminderSentAt])
   chatThreads  ChatThread[]
   @@map("reservations")
 }
@@ -690,12 +715,19 @@ model RestaurantNoShowModel {
   learnedBrier  Float      @map("learned_brier")         // پایین‌تر = بهتر (۰..۱)
   staticBrier   Float      @map("static_brier")          // همان معیار برای heuristicِ فعلی، روی همان holdout
   isActive      Boolean    @default(false) @map("is_active")
+  /// چرا در این وضعیت است. مهم‌ترین کاربردش تفکیکِ «هرگز فعال نشد» از
+  /// «فعال بود و به‌خاطرِ افتِ کارایی خودکار پس گرفته شد» است.
+  activationReason String? @map("activation_reason")
   trainedAt     DateTime   @default(now()) @map("trained_at")
   // فازِ ۶ — کدام اجرایِ آموزش این وزن‌ها را ساخت. بدونِ این، دفترِ پیش‌بینی
   // می‌داند «مدلِ یادگرفته» گفته ولی نمی‌داند *کدام نسخه* — و دقتِ تولید روی
   // مخلوطی از نسخه‌هایِ شبانه محاسبه می‌شود و به هیچ‌کدام قابلِ نسبت‌دادن نیست.
   activeRunId   String?           @map("active_run_id") @db.Uuid
   activeRun     ModelTrainingRun? @relation(fields: [activeRunId], references: [id], onDelete: SetNull)
+  /// نسخه‌ی بردارِ ویژگی که این وزن‌ها با آن آموزش دیده‌اند. مدلی که نسخه‌اش
+  /// با کدِ فعلی نمی‌خواند **سرو نمی‌شود** — رجوع کن به NO_SHOW_FEATURE_VERSION
+  /// در lib/no-show-model.ts و به مهاجرتِ ۰۷۰ برای اینکه چرا خرابیِ بدونِ آن خاموش است.
+  featureVersion String    @map("feature_version")
   @@index([activeRunId])
   @@map("restaurant_no_show_models")
 }
@@ -735,6 +767,37 @@ model RestaurantDemandForecast {
 //  در پنلِ شرکت و برایِ تستِ بایاس در دسترس باشد. هیچ UPDATE/DELETEای رویِ
 //  این جدول انجام نمی‌شود — همان الگویِ EconomyLedgerEntry (migration 038).
 // ───────────────────────────────────────────────────────────────────────
+/// مدلِ no-showِ **سراسریِ پلتفرم** — رفعِ سرمای شروع.
+///
+/// گیتِ فعال‌سازیِ per-restaurant (۴۰ نمونه، ۵ no-show) یعنی رستورانِ تازه
+/// هرگز مدل نمی‌گیرد. این مدل روی دادهٔ همه‌ی رستوران‌ها آموزش می‌بیند و
+/// وقتی مدلِ اختصاصیِ رستوران فعال نیست، جایش را می‌گیرد.
+///
+/// تک‌ردیفی نیست؛ تاریخچه نگه می‌دارد و «آخرین فعال» خوانده می‌شود — تا
+/// بشود دید مدل در طولِ زمان بهتر شده یا نه.
+model PlatformNoShowModel {
+  id               String   @id @default(uuid()) @db.Uuid
+  /// همان ترتیبِ NO_SHOW_FEATURE_NAMES — عمداً هیچ ویژگیِ «هویتِ رستوران» ندارد.
+  weights          Float[]
+  sampleSize       Int      @map("sample_size")
+  positiveCount    Int      @map("positive_count")
+  /// چند رستوران در آموزش سهیم بودند. عددِ پایین یعنی «سراسری» ادعای بزرگی است.
+  restaurantCount  Int      @map("restaurant_count")
+  learnedBrier     Float    @map("learned_brier")
+  staticBrier      Float    @map("static_brier")
+  /// تفکیک. null = اندازه‌گیری نشد (هولدآوتِ تک‌کلاسه)، نه صفر.
+  learnedAuc       Float?   @map("learned_auc")
+  isActive         Boolean  @default(false) @map("is_active")
+  activationReason String?  @map("activation_reason")
+  trainedAt        DateTime @default(now()) @map("trained_at")
+  /// همان معنایِ RestaurantNoShowModel.featureVersion.
+  featureVersion   String   @map("feature_version")
+
+  @@index([isActive, trainedAt(sort: Desc)])
+  @@index([isActive, featureVersion, trainedAt(sort: Desc)], map: "platform_no_show_models_active_version_idx")
+  @@map("platform_no_show_models")
+}
+
 model ModelTrainingRun {
   id            String     @id @default(uuid()) @db.Uuid
   restaurantId  String     @map("restaurant_id") @db.Uuid
@@ -779,6 +842,10 @@ model ModelPrediction {
   modelRunId      String?           @map("model_run_id") @db.Uuid
   modelRun        ModelTrainingRun? @relation(fields: [modelRunId], references: [id], onDelete: SetNull)
   featureVersion  String            @map("feature_version")
+  /// دامنه‌ی مدلی که این پیش‌بینی را ساخت: 'restaurant' | 'platform' | 'heuristic'.
+  /// NULL = ردیف‌های پیش از مهاجرتِ ۰۷۱ (واقعاً نامعلوم — جعل نمی‌شود).
+  /// بدونِ این، دقتِ مدلِ سراسری در تولید اصلاً قابلِ نسبت‌دادن نبود.
+  modelScope      String?           @map("model_scope")
   predictedValue  Float             @map("predicted_value")   // احتمالِ ۰..۱ یا مقدارِ عددی
   confidence      String                                      // high|medium|low|insufficient_data
   features        Json?                                       // ردِ ورودی (lineage)
@@ -788,6 +855,7 @@ model ModelPrediction {
   // [merge ۰۸-۲۴] map: تا نامِ Prisma = نامِ SQL — وگرنه bootstrapِ db push یک ایندکسِ دومِ هم‌تعریف می‌سازد (نوشتنِ دوبرابر). گاردش: schema-drift.integration.test.mts
   @@index([restaurantId, predictionType, generatedAt(sort: Desc)], map: "model_predictions_lookup_idx")
   @@index([entityType, entityId], map: "model_predictions_entity_idx")
+  @@index([modelScope, generatedAt(sort: Desc)], map: "model_predictions_scope_generated_idx")
   @@map("model_predictions")
 }
 
@@ -1704,7 +1772,10 @@ enum EconomyLedgerKind {
 }
 
 model EconomyLedgerEntry {
-  id            String            @id @default(uuid()) @db.Uuid
+  // ⚠️ dbgenerated و نه uuid() (migration 075): uuid() پیش‌فرضِ سمتِ کلاینت
+  // است و db push ستون را بدونِ DEFAULT می‌سازد — ولی درج‌های خامِ economy.ts
+  // به DEFAULTِ دیتابیس تکیه دارند (23502 رویِ مسیرِ CI/تست).
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId        String            @map("user_id") @db.Uuid
   user          User              @relation(fields: [userId], references: [id])
   restaurantId  String?           @map("restaurant_id") @db.Uuid  // null = رویدادِ سراسری

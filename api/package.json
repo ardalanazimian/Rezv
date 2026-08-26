@@ -9,6 +9,7 @@
     "start": "next start",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "admin:create": "tsx prisma/create-platform-admin.ts",
     "db:seed:site": "tsx prisma/seed-site.ts",
     "test": "tsx --test --test-reporter=spec tests/_all.runner.mts",
     "test:watch": "tsx --test --watch tests/_all.runner.mts",

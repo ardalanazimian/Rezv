@@ -8,6 +8,8 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, safeJson, zReservationCode, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ code: zReservationCode });
 const bodySchema = z.object({ reason: z.string().max(500).optional() });
 
@@ -22,7 +24,7 @@ const bodySchema = z.object({ reason: z.string().max(500).optional() });
  * audit ثبت می‌کند، اعلان می‌فرستد و کش availability را درست (pattern-based) باطل
  * می‌کند. تمایز کاربر/رستوران در actor و دلیل حفظ می‌شود (سازگاری رفتاری).
  */
-export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
+async function POST_impl(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     const auth = authFromRequest(req);
     await enforceRateLimit(clientIp(req), RULES.auth);
@@ -79,3 +81,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ code, status: result.status });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/reservations/[code]/cancel', POST_impl);

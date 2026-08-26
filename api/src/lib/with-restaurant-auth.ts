@@ -85,6 +85,11 @@ export function withRestaurantAuth(
         return res;
       } finally {
         metrics.activeRequests.dec();
+        // ⚠️ تنها نقطه‌ی شمارشِ HTTP برای routeهایی که از این wrapper رد
+        // می‌شوند. `withApiMetrics` (lib/api-metrics.ts) مکملِ آن برای بقیه‌ی
+        // routeهاست و **هرگز** نباید روی این‌ها هم گذاشته شود، وگرنه هر
+        // درخواست دوبار شمرده می‌شود. گاردِ خودکار:
+        // tests/observability-coverage.test.mts
         recordHttp(req.method, route, status, (Date.now() - started) / 1000);
       }
     });
@@ -128,15 +133,29 @@ export function withStaffAuth(
   handler: (req: Request, auth: AccessPayload, params?: any) => Promise<NextResponse>,
 ) {
   return async (req: Request, routeArg?: { params: any }) => {
+    // ⚠️ اضافه‌شده ۲۰۲۶-۰۸-۲۵: این wrapper هم مثلِ خواهرش باید شمرده شود،
+    // وگرنه `restaurant/staff` (تنها مصرف‌کننده‌اش، و یکی از حساس‌ترین
+    // مسیرهایِ RBAC) در هیچ آلارمِ نرخِ خطا/تأخیر دیده نمی‌شد.
+    const route = new URL(req.url).pathname;
+    const started = Date.now();
+    let status = 500;
+    metrics.activeRequests.inc();
     try {
       const rule = RULES[opts.rateLimit ?? 'search'];
       await enforceRateLimit(clientIp(req), rule);
       const auth = await verifiedStaffAuth(req);
       // رجوع کن به همین باگ در withRestaurantAuth بالا — params یک Promise است.
       const params = routeArg?.params ? await routeArg.params : undefined;
-      return await handler(req, auth, params);
+      const res = await handler(req, auth, params);
+      status = res.status;
+      return res;
     } catch (e) {
-      return errorResponse(e);
+      const res = errorResponse(e);
+      status = res.status;
+      return res;
+    } finally {
+      metrics.activeRequests.dec();
+      recordHttp(req.method, route, status, (Date.now() - started) / 1000);
     }
   };
 }

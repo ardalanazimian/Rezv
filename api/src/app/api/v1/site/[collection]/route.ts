@@ -5,6 +5,8 @@ import { parseParams, parseQuery, z } from '@/lib/schemas';
 import { COLLECTIONS, isCollection, readPublicList } from '@/lib/site-content';
 import { SITE_RULES } from '@/lib/site-orders';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  GET /api/v1/site/{collection} — لیستِ عمومیِ محتوای سایت
 //
@@ -23,7 +25,7 @@ const querySchema = z.object({
   limit: z.number().int().min(1).max(100).optional(),
 });
 
-export async function GET(req: Request, { params }: { params: Promise<{ collection: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ collection: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), SITE_RULES.read);
     const { collection } = parseParams(await params, paramsSchema);
@@ -36,3 +38,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
     return NextResponse.json({ collection, count: items.length, items });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/site/[collection]', GET_impl);

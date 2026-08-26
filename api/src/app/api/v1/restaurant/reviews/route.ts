@@ -11,7 +11,10 @@ const listQuerySchema = z.object({
 const replySchema = z.object({ id: zUuid, reply: z.string().min(1).max(1000).trim() });
 
 /** GET — نظرات رستوران + آمار تجمیعی (میانگین، توزیع ستاره، تعداد بی‌پاسخ) */
-export const GET = withRestaurantAuth({ rateLimit: 'search' }, async (req, ctx) => {
+// ⚠️ رفعِ ممیزیِ RBAC: `PATCH` (پاسخ به نظر) از قبل `canManageSettings` داشت
+// ولی `GET` نداشت. مصرف‌کننده: `loadReviews()` در `crm.js:48`، فقط داخلِ تبِ
+// «پروفایل» که با همین کلید گیت شده.
+export const GET = withRestaurantAuth({ permission: 'canManageSettings', rateLimit: 'search' }, async (req, ctx) => {
   const { filter, limit } = parseQuery(req, listQuerySchema);
 
   const where: Record<string, unknown> = { restaurantId: ctx.restaurant.id };

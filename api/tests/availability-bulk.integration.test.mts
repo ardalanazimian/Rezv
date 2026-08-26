@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { randomUUID } from 'node:crypto';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -233,7 +234,9 @@ describe('قاعده‌ی «این میز به این گروه می‌خورد؟
 // ─────────────────────────────────────────────────────────────────────
 describe('روتِ HTTP', () => {
   const call = (qs: string) =>
-    bulkRoute.GET(new Request(`http://x/api/v1/restaurants/availability?${qs}`));
+    bulkRoute.GET(new Request(`http://x/api/v1/restaurants/availability?${qs}`, {
+      headers: { 'x-real-ip': testIp() },
+    }));
 
   test('پاسخ نگاشتِ id→سانس است و رستورانِ واقعی ساعت می‌گیرد', async () => {
     const r = await makeRestaurant('http-ok');

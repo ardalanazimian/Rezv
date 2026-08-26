@@ -9,6 +9,8 @@ import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 import { canReviewHoursChange } from '@/lib/hours-approval';
 import { invalidateAllAvailability } from '@/lib/availability-cache';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ id: zUuid });
 const bodySchema = z.object({
   action: z.enum(['approve', 'reject']),
@@ -33,7 +35,7 @@ const bodySchema = z.object({
  * هر دو تصمیم audit می‌شوند — دقیقاً مثلِ بازبینیِ عکس، این یک تصمیمِ
  * حاکمیتیِ پلتفرم است.
  */
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PATCH_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -125,3 +127,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return errorResponse(e);
   }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const PATCH = withApiMetrics('/api/v1/admin/hours-changes/[id]', PATCH_impl);

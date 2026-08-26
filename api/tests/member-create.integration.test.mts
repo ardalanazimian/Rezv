@@ -20,7 +20,6 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db');
-const { redis } = await import('../src/lib/redis');
 const { signAccess } = await import('../src/lib/jwt');
 const membersRoute = await import('../src/app/api/v1/restaurant/members/route');
 
@@ -28,16 +27,37 @@ let tenantA: string, restA: string, tokenA: string;
 let plainStaffToken: string;   // role='staff' بدونِ StaffPermission → canManageCampaigns=false
 const madeUsers: string[] = [];
 
+// ⚠️ هر درخواست IPِ یکتا می‌گیرد (باگِ واقعیِ CI، ۲۰۲۶-۰۸-۲۵ — اینجا
+// «۴۲۹ به‌جای ۴۲۲» شد و کلِ جابِ test را قرمز کرد).
+//
+// `POST /restaurant/members` سطحِ `auth` دارد: **۲۰ درخواست در ۶۰ ثانیه، بر
+// پایه‌ی IP**. این فایل هیچ هدرِ IPی نمی‌فرستاد، پس همه‌ی درخواست‌هایش —
+// به‌همراهِ هر فایلِ دیگری که همین کار را می‌کند — در **یک سطلِ مشترک** جمع
+// می‌شدند. تا وقتی ترافیکِ سطحِ `auth` کم بود اتفاقی نمی‌افتاد؛ به‌محضِ اینکه
+// دو روتِ دیگر از `search` به `auth` منتقل شدند، سطل سرریز کرد و آخرین تستِ
+// همین فایل ۴۲۹ گرفت. یعنی یک شکستِ **فقط-در-مجموعه** که به تغییرِ یک فایلِ
+// کاملاً دیگر وابسته بود.
+//
+// همان الگویِ مستندِ `rbac-permission-coverage`: IPِ یکتا ⇒ سطلِ جدا. سقفِ
+// واقعیِ روت دست‌نخورده می‌ماند و همچنان قابلِ سنجش است.
+let ipSeq = 0;
+const nextIp = () => { ipSeq += 1; return `10.66.${Math.floor(ipSeq / 250) % 250}.${ipSeq % 250}`; };
+
 const json = (token: string, body?: unknown, method = 'POST') =>
   new Request('http://x/api', {
     method,
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'x-real-ip': nextIp(),
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
 before(async () => {
-  const stale = await redis.keys('*auth*');
-  if (stale.length) await redis.del(...stale);
+  // ⚠️ پاک‌سازیِ سراسریِ `*auth*` عمداً برداشته شد: با IPِ یکتا دیگر لازم
+  // نیست، و مضر هم بود — سطلِ **فایل‌های دیگرِ** همین رانر را خالی می‌کرد و
+  // ریت‌لیمیت را از تستِ آن‌ها پنهان می‌کرد.
 
   const s = Date.now().toString(36);
   const t = await db.tenant.create({ data: { name: `[DEMO] memb-${s}` }, select: { id: true } });
@@ -113,7 +133,8 @@ describe('POST /restaurant/members — ثبتِ مستقیمِ عضو', () => {
 
   test('بدونِ توکن → 401', async () => {
     const res = await membersRoute.POST(new Request('http://x/api', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-real-ip': nextIp() },
       body: JSON.stringify({ phone: '09121110002' }),
     }));
     assert.equal(res.status, 401);
