@@ -12,7 +12,6 @@ import './helpers/test-env.mts';
 process.env.JWT_SECRET ??= 'a'.repeat(32);
 process.env.OTP_DEV_MODE = 'true';
 const { db } = await import('../src/lib/db');
-const { signAccess } = await import('../src/lib/jwt');
 const { provisionBusiness, resendInvite } = await import('../src/lib/provisioning');
 const { POST: claim } = await import('../src/app/api/v1/auth/invite/[token]/claim/route.ts');
 const { POST: otpRequest } = await import('../src/app/api/v1/auth/staff/request/route.ts');
@@ -65,30 +64,47 @@ after(async () => {
 });
 
 describe('claimِ دعوت (§۵-۴)', () => {
-  test('توکنِ معتبر → نامِ رستوران + ماسکِ شماره + متدها؛ بدونِ mutate', async () => {
+  test('توکنِ معتبر → state=valid + نامِ رستوران + ماسکِ شماره؛ بدونِ mutate', async () => {
     const p = await makeProvisioned('0931');
     const res = await claimReq(p.token);
     assert.equal(res.status, 200);
     const d = await res.json();
     assert.equal(d.restaurant.slug, p.restaurant.slug);
     assert.match(d.phone_mask, /\*\*\*/);
-    assert.deepEqual(d.methods, { otp: true, password: false });
+    assert.equal(d.state, 'valid');
+    // اصلاحِ scopeِ مالک: «ورودِ owner فقط OTP» — فیلدِ methods (که رمز را هم
+    // اعلام می‌کرد) از قراردادِ claim حذف شد.
+    assert.equal('methods' in d, false, 'هیچ اعلامی از روش‌های ورود — صفحه فقط OTP دارد');
     // claim چیزی را عوض نکرده
     const inv = await db.staffInvite.findFirst({ where: { token: p.token } });
     assert.equal(inv!.status, 'PENDING');
   });
 
-  test('حسابِ دارای رمز → methods.password=true', async () => {
+  test('حتی برای حسابِ دارای رمز، claim گزینه‌ی رمز اعلام نمی‌کند (OTP-only)', async () => {
     const p = await makeProvisioned('0932', { username: `inv${SFX}`, password: 'Str0ngPass!' });
     const d = await (await claimReq(p.token)).json();
-    assert.deepEqual(d.methods, { otp: true, password: true });
+    assert.equal(d.state, 'valid');
+    assert.equal('methods' in d, false);
+    assert.equal(JSON.stringify(d).includes('password'), false, 'هیچ ردی از password در پاسخ');
   });
 
-  test('توکنِ منقضی → ۴۰۴ (جدولِ §۷)؛ نامعتبر هم ۴۰۴ (بدونِ افشا)', async () => {
+  test('سه‌حالتیِ توکنِ شناخته‌شده: expired و used؛ ناشناخته → ۴۰۴', async () => {
     const p = await makeProvisioned('0933');
     await db.staffInvite.updateMany({ where: { token: p.token }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    assert.equal((await claimReq(p.token)).status, 404);
-    assert.equal((await claimReq('deadbeef'.repeat(8))).status, 404);
+    const de = await (await claimReq(p.token)).json();
+    assert.equal(de.state, 'expired');
+
+    const p2 = await makeProvisioned('0937');
+    await db.staffInvite.updateMany({ where: { token: p2.token }, data: { status: 'ACCEPTED' } });
+    const du = await (await claimReq(p2.token)).json();
+    assert.equal(du.state, 'used');
+
+    // REVOKED (ابطال با resend) هم برای دارنده‌ی لینکِ قدیمی «منقضی» است.
+    const p3 = await makeProvisioned('0938');
+    await db.staffInvite.updateMany({ where: { token: p3.token }, data: { status: 'REVOKED' } });
+    assert.equal((await (await claimReq(p3.token)).json()).state, 'expired');
+
+    assert.equal((await claimReq('deadbeef'.repeat(8))).status, 404, 'توکنِ ناشناخته افشا نمی‌شود');
   });
 });
 
@@ -130,7 +146,7 @@ describe('پذیرشِ دعوت = side-effectِ اولین ورودِ موفق (
 });
 
 describe('resend (§۸)', () => {
-  test('توکنِ نو، انقضای نو؛ PENDING قبلی REVOKED و claimش ۴۰۴', async () => {
+  test('توکنِ نو، انقضای نو؛ PENDING قبلی REVOKED و برای دارنده‌اش «منقضی»', async () => {
     const p = await makeProvisioned('0936');
     const jobsBefore = await db.job.count({ where: { kind: 'sms' } });
     const admin = { adminId: '00000000-0000-0000-0000-000000000000', ip: 'test' };
@@ -139,7 +155,7 @@ describe('resend (§۸)', () => {
 
     const old = await db.staffInvite.findFirst({ where: { token: p.token } });
     assert.equal(old!.status, 'REVOKED');
-    assert.equal((await claimReq(p.token)).status, 404, 'لینکِ لورفته‌ی قدیمی مرده');
+    assert.equal((await (await claimReq(p.token)).json()).state, 'expired', 'لینکِ قدیمی برای دارنده‌اش «منقضی» است');
 
     const fresh = await db.staffInvite.findFirst({ where: { restaurantId: p.restaurant.id, status: 'PENDING' } });
     assert.ok(fresh && fresh.token !== p.token, 'توکنِ تازه');

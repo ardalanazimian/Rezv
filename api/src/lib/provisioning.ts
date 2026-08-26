@@ -48,7 +48,15 @@ function maskPhone(p: string): string {
 
 function inviteUrl(token: string): string {
   const base = (process.env.INVITE_BASE_URL || 'https://rezervno.ir').replace(/\/$/, '');
-  return `${base}/invite/${token}`;
+  // توکن در fragment (نه query و نه /invite/{token}) — دو دلیلِ اثبات‌شده:
+  //   ۱) صفحه‌ی دعوت فایلِ استاتیکِ پنلِ بیزنس است و هاست‌های استاتیکِ
+  //      cleanUrls-دار (مثلِ `npx serve` که E2E هم با همان سرو می‌کند)
+  //      /invite.html?token=x را 301 به /invite می‌کنند و **query را می‌اندازند**
+  //      (با probe واقعاً دیده شد) — ولی fragment طبقِ استاندارد از redirect
+  //      جان به در می‌برد.
+  //   ۲) fragment هرگز به سرور نمی‌رسد، پس توکنِ دعوت واردِ access-log/proxy
+  //      نمی‌شود (بهداشتِ لاگ برای magic-link).
+  return `${base}/invite.html#token=${token}`;
 }
 
 export type ProvisionInput = {

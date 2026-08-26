@@ -13,12 +13,16 @@ const paramsSchema = z.object({ token: z.string().min(8).max(128) });
 /**
  * POST — «claim»ِ دعوت (SPEC-B §۵، §۶-۱): تبدیلِ لینکِ پیامکی به شروعِ فلوی ورود.
  *
- * ⚠️ عمداً هیچ‌چیزی mutate نمی‌کند و توکن **احرازِ هویت نیست** (§۳-۲ spec):
- * فقط اعلام می‌کند این دعوت مالِ کدام رستوران/شماره است و کدام روش‌های ورود
- * برای آن حساب فعال‌اند (C10ِ برنامه: از ۰۷۴ رمز هم داریم، نه فقط OTP).
- * پذیرشِ واقعیِ دعوت side-effectِ ورودِ موفق است (verify/login).
+ * ⚠️ عمداً هیچ‌چیزی mutate نمی‌کند و توکن **احرازِ هویت نیست** (§۳-۲ spec).
  *
- * منقضی/نامعتبر/باطل‌شده → یکسان NOT_FOUND (جدولِ §۷؛ بدونِ افشای تفکیک).
+ * ⚠️ اصلاحِ scope به دستورِ مالک (۲۰۲۶-۰۸-۲۶، taskِ صفحه‌ی دعوت):
+ * «ورودِ owner فقط OTP است» — فیلدِ `methods` (که وجودِ رمز را هم اعلام
+ * می‌کرد) از همین‌جا **حذف شد**؛ صفحه‌ی دعوت فقط دکمه‌ی OTP دارد.
+ *
+ * تفکیکِ وضعیت (خواسته‌ی صریحِ همان task): برای توکنِ *شناخته‌شده* سه حالت
+ * جدا برمی‌گردد — valid / expired (شاملِ REVOKEDِ resend) / used (ACCEPTED).
+ * افشا امن است: توکن ۶۴هگزِ تصادفی است و حدس‌زدنی نیست؛ فقط دارنده‌ی لینک
+ * حالتِ خودش را می‌فهمد. توکنِ *ناشناخته* همچنان ۴۰۴ (حالتِ empty صفحه).
  */
 async function POST_impl(req: Request, { params }: { params: Promise<{ token: string }> }) {
   try {
@@ -30,18 +34,20 @@ async function POST_impl(req: Request, { params }: { params: Promise<{ token: st
       select: {
         status: true, expiresAt: true, phone: true,
         restaurant: { select: { name: true, slug: true } },
-        staff: { select: { username: true } },
       },
     });
-    if (!invite || invite.status !== 'PENDING' || invite.expiresAt < new Date()) {
-      throw Err.notFound('دعوت');
-    }
+    if (!invite) throw Err.notFound('دعوت');
+
+    const state =
+      invite.status === 'ACCEPTED' ? 'used'
+      : (invite.status !== 'PENDING' || invite.expiresAt < new Date()) ? 'expired'
+      : 'valid';
 
     const local = invite.phone.startsWith('+98') ? '0' + invite.phone.slice(3) : invite.phone;
     return NextResponse.json({
+      state,
       restaurant: { name: invite.restaurant.name, slug: invite.restaurant.slug },
       phone_mask: local.length >= 7 ? `${local.slice(0, 4)}***${local.slice(-4)}` : '***',
-      methods: { otp: true, password: !!invite.staff.username },
       expires_at: invite.expiresAt,
     });
   } catch (e) { return errorResponse(e); }
