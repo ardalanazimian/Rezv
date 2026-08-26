@@ -51,6 +51,10 @@ test('پنلِ کسب‌وکار: ورودِ staff (شماره → کد) پنل 
   await page.goto(BIZ);
 
   // مرحله‌ی ۱: شماره‌ی موبایل
+  // از مهاجرتِ ۰۷۴ فرمِ پیش‌فرضِ ورود «کاربری/رمز» است و OTP پشتِ دکمه‌ی
+  // «ورود با پیامک» رفته — پس قبل از **هر** استفاده‌ی این locator (نه فقط
+  // قبل از fill) باید فرمِ پیامکی باز شود.
+  await openSmsLogin(page, 'staff');
   const phone = page.locator('#staffPhone');
   await expect(phone).toBeVisible();
   await phone.fill('09123456789');
@@ -91,7 +95,8 @@ test('پنلِ شرکت: ورودِ مدیرِ پلتفرم (شماره → کد
 
   await page.goto(CO);
 
-  // مرحله‌ی ۱: شماره‌ی موبایلِ مدیر
+  // مرحله‌ی ۱: شماره‌ی موبایلِ مدیر (همان قاعده‌ی بالا — فرمِ پیامکی اول باز شود)
+  await openSmsLogin(page, 'admin');
   const phone = page.locator('#adminPhone');
   await expect(phone).toBeVisible();
   await phone.fill('09123456789');

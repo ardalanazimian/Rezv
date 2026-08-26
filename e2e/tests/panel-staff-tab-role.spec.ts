@@ -37,7 +37,9 @@ async function loginAs(page: Page, role: 'owner' | 'manager' | 'staff', permissi
       : r.fulfill({ status: 200, contentType: 'application/json', body: '{"data":[],"items":[],"total":0}' }));
 
   await page.goto(BUSINESS);
-  await page.locator('#staffPhone').waitFor({ timeout: 15_000 });
+  // ⚠️ waitFor روی #staffPhone را اینجا نگذار: از مهاجرتِ ۰۷۴ آن فیلد تا وقتی
+  // «ورود با پیامک» زده نشود اصلاً در DOM نیست. خودِ openSmsLogin هم منتظرِ
+  // دکمه می‌ماند و هم منتظرِ ظاهرشدنِ فیلد.
   await openSmsLogin(page, 'staff');
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();
