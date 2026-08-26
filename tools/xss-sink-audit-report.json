@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-26T07:36:08.548Z",
+  "generated_at": "2026-08-26T08:05:21.009Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -1524,637 +1524,637 @@
   "report_only_hits": [
     {
       "file": "standalone/business.html",
-      "line": 1796,
+      "line": 1804,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = icon('search');",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 2579,
+      "line": 2587,
       "kind": "innerHTML",
       "snippet": "if(n > 0){ el.innerHTML = `${icon('clock',{size:13})} ${fa(n)} عملیات در انتظار همگام‌سازی`; el.style.display='inline-flex'; }",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 2614,
+      "line": 2622,
       "kind": "innerHTML",
       "snippet": "bar.innerHTML='<span class=\"net-dot\"></span>حالت آفلاین — کارها محلی ذخیره می‌شوند و با برگشت اینترنت همگام می‌شوند';",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 3459,
+      "line": 3467,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 3580,
+      "line": 3588,
       "kind": "innerHTML",
       "snippet": "document.getElementById('peakChart').innerHTML=slots.map(h=>{",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 3621,
+      "line": 3629,
       "kind": "innerHTML",
       "snippet": "document.getElementById('heatmap').innerHTML=html;",
       "classification": "review"
     },
     {
       "file": "standalone/business.html",
-      "line": 3627,
+      "line": 3635,
       "kind": "innerHTML",
       "snippet": "document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 3655,
+      "line": 3663,
       "kind": "innerHTML",
       "snippet": "document.getElementById('insights').innerHTML=insights.slice(0,4).map(i=>`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 3676,
+      "line": 3684,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 3828,
+      "line": 3836,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-reservations').innerHTML=`",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 3859,
+      "line": 3867,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div style=\"text-align:center;padding:30px;color:var(--t2)\">در حال بارگذاری رزروها...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 3894,
+      "line": 3902,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${resDate==='past'?icon('inbox',{size:40}):icon('search',{size:40})}</div><div style=\"font-",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 3909,
+      "line": 3917,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=demoNote+`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 3923,
+      "line": 3931,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=demoNote+`<div style=\"font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600\">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQu",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 4369,
+      "line": 4377,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-waitlist').innerHTML=wlDemoNote+`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 4476,
+      "line": 4484,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-floor').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 4642,
+      "line": 4650,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال ساختِ QR…</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 4646,
+      "line": 4654,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 4657,
+      "line": 4665,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 4699,
+      "line": 4707,
       "kind": "innerHTML",
       "snippet": "if(box) box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال ساختِ کدِ تازه…</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 4704,
+      "line": 4712,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 4811,
+      "line": 4819,
       "kind": "innerHTML",
       "snippet": "document.getElementById('toastIcon').innerHTML=icon('close',{size:16});",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 4812,
+      "line": 4820,
       "kind": "innerHTML",
       "snippet": "document.getElementById('toastMsg').innerHTML=msg+` <button class=\"undo-btn\" onclick=\"${undoFn}();document.getElementById('toast').classList.remove('show')\">باز",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 4828,
+      "line": 4836,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-profile').innerHTML=`",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 4904,
+      "line": 4912,
       "kind": "innerHTML",
       "snippet": "if(useImg){swEmoji.style.background='transparent';swEmoji.innerHTML=`<img src=\"${esc(logoPhoto.url)}\" alt=\"\" style=\"width:100%;height:100%;object-fit:cover;bord",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 4910,
+      "line": 4918,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-gallery').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5211,
+      "line": 5219,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-reviews').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5283,
+      "line": 5291,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5352,
+      "line": 5360,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5411,
+      "line": 5419,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px\">",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 5427,
+      "line": 5435,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5480,
+      "line": 5488,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div style=\"text-align:center;padding:50px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 5481,
+      "line": 5489,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در ",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 5483,
+      "line": 5491,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5487,
+      "line": 5495,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5597,
+      "line": 5605,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حا",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 5599,
+      "line": 5607,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5691,
+      "line": 5699,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">ویرایشِ سیاستِ کنسلی به اتصالِ بک‌اند نیاز دارد — د",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 5711,
+      "line": 5719,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 5823,
+      "line": 5831,
       "kind": "innerHTML",
       "snippet": "document.getElementById('ct-campaign').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5844,
+      "line": 5852,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML='تاریخچه به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست'; return; }",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 5846,
+      "line": 5854,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){ el.innerHTML=`<div class=\"error-state\"><div class=\"error-state-icon\">${icon('alert',{size:32})}</div><div>بارگذاری تاریخچه ناموفق بود</div></div>`;",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5849,
+      "line": 5857,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=logs.length?`<table class=\"tbl\"><thead><tr><th>سگمنت</th><th>تاریخ</th><th>گیرنده</th><th>پیام</th></tr></thead><tbody>",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5873,
+      "line": 5881,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div style=\"text-align:center;padding:50px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 5874,
+      "line": 5882,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در ",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 5882,
+      "line": 5890,
       "kind": "innerHTML",
       "snippet": "if(chatHtml){ el.innerHTML=chatHtml+`<div id=\"aiCards\"><div style=\"text-align:center;padding:30px;color:var(--t2)\">در حال بارگذاری پیشنهادها...</div></div>`; }",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5887,
+      "line": 5895,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){ cardsEl.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} پیشنهادها بارگیری نشد — دست",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5892,
+      "line": 5900,
       "kind": "innerHTML",
       "snippet": "cardsEl.innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5963,
+      "line": 5971,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 5969,
+      "line": 5977,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">در حال بارگیریِ منو…</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 5975,
+      "line": 5983,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `<div class=\"panel\" style=\"text-align:center;padding:40px\">",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 5999,
+      "line": 6007,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 6101,
+      "line": 6109,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال بارگیری…</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 6104,
+      "line": 6112,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">${esc(res.offline?'اتصال به سرور برقرار نیست.':(res.error?.message||'بارگیری نشد.",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 6118,
+      "line": 6126,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 6178,
+      "line": 6186,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال ساختِ QR…</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 6182,
+      "line": 6190,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 6196,
+      "line": 6204,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 6300,
+      "line": 6308,
       "kind": "innerHTML",
       "snippet": "if(box) box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال آپلود…</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 6306,
+      "line": 6314,
       "kind": "innerHTML",
       "snippet": "if(box) box.innerHTML = `<div style=\"color:var(--red);font-size:13px\">${esc(res.offline?'اتصال به سرور برقرار نیست':(res.error?.message||'آپلود ناموفق بود'))}</",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 6440,
+      "line": 6448,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = `<div class=\"chat-b them\">سلام! یه سؤال درباره‌ی رزروها، مشتری‌ها یا میزهاتون بپرس — مثلاً «امروز چند رزرو داریم؟» یا «کدوم روز شلوغ‌تره؟».</di",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 6489,
+      "line": 6497,
       "kind": "innerHTML",
       "snippet": "if (wrap) wrap.innerHTML = '<span style=\"opacity:.6\">در حال یادگیری…</span>';",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 6540,
+      "line": 6548,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-loyalty').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 6632,
+      "line": 6640,
       "kind": "innerHTML",
       "snippet": "const restore=()=>{ if(btn){ btn.disabled=false; btn.innerHTML=icon('message',{size:13})+' ارسالِ پیامکِ تبریک'; } };",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 6685,
+      "line": 6693,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-marketing').innerHTML=`",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 6701,
+      "line": 6709,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">مدیریت کوپن‌ها به اتصال بک‌اند نیاز دارد — در حالت ",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 6702,
+      "line": 6710,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 6751,
+      "line": 6759,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">اتوماسیون به اتصال بک‌اند نیاز دارد — در حالت دمو د",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 6752,
+      "line": 6760,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 6987,
+      "line": 6995,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7099,
+      "line": 7107,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-staff').innerHTML=(isDemo?`<div class=\"cash-note\">${icon('info',{size:13})} فهرستِ زیر نمونه است، کارکنانِ واقعیِ تو نیست.</div>`:'')",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7170,
+      "line": 7178,
       "kind": "innerHTML",
       "snippet": "document.getElementById('modalBody').innerHTML = html;",
       "classification": "review"
     },
     {
       "file": "standalone/business.html",
-      "line": 7249,
+      "line": 7257,
       "kind": "innerHTML",
       "snippet": "if(!NOTIFS.length){el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('bell',{size:32})}</div><div class=\"empty-state-desc\">اعلانی نیست",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7253,
+      "line": 7261,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=NOTIFS.map((n,i)=>`<div class=\"notif-item ${n.unread?'unread':''}\" onclick=\"readNotif(${i})\">",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 7275,
+      "line": 7283,
       "kind": "innerHTML",
       "snippet": "document.getElementById('popupIc').innerHTML=iconName?icon(iconName,{size:18}):'';",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7296,
+      "line": 7304,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-cashback').innerHTML=`",
       "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 7308,
+      "line": 7316,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-cashback').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7365,
+      "line": 7373,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-pricing').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7489,
+      "line": 7497,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7540,
+      "line": 7548,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7575,
+      "line": 7583,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7706,
+      "line": 7714,
       "kind": "innerHTML",
       "snippet": "view.innerHTML = `<div class=\"panel\"><div class=\"panel-head\"><div class=\"panel-title\">پیام‌های مشتریان</div><div class=\"panel-sub\" id=\"chatInboxSub\">در حال بارگ",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7710,
+      "line": 7718,
       "kind": "innerHTML",
       "snippet": "if (!res.ok) { box.innerHTML = `<div class=\"chat-empty\">اتصال برقرار نشد.</div>`; return; }",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7713,
+      "line": 7721,
       "kind": "innerHTML",
       "snippet": "if (!items.length) { box.innerHTML = `<div class=\"chat-empty\">هنوز پیامی از مشتری نیومده.</div>`; return; }",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7714,
+      "line": 7722,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = items.map(t => `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 7768,
+      "line": 7776,
       "kind": "innerHTML",
       "snippet": "if (initial && !msgs.length) body.innerHTML = `<div class=\"chat-empty-thread\">هنوز پیامی نیست.</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7792,
+      "line": 7800,
       "kind": "innerHTML",
       "snippet": "if (pend) pend.querySelector('.chat-b-t').innerHTML = icon('alert',{size:14});",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
-      "line": 6449,
+      "line": 6457,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', html);",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7765,
+      "line": 7773,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 7784,
+      "line": 7792,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 4753,
+      "line": 4761,
       "kind": "document.write",
       "snippet": "w.document.write(`<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\">",
       "classification": "escaped"

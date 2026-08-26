@@ -1662,7 +1662,15 @@ img{display:block;max-width:100%}
       <div class="sb-logo">R</div>
       <div class="sb-brand-text">رزرونو<small>پنل کسب‌وکار</small></div>
     </div>
-    <div class="sb-switch" onclick="openBranchSwitcher()">
+    <!-- ⚠️ role/tabindex/onkeydown لازم‌اند چون این یک <div> است، نه <button>:
+         بدونشان سوییچرِ شعبه با کیبورد نه قابلِ رسیدن بود و نه قابلِ فعال‌سازی
+         (یافته‌ی `branch-switcher-not-keyboard-reachable`، راستی‌آزمایی‌شده
+         ۲۰۲۶-۰۸-۲۶). ممیزیِ هدفِ لمسی هم نمی‌دیدش، چون سلکتورش فقط
+         button/a/input/[role]/[tabindex] را می‌گیرد و این هیچ‌کدام نبود.
+         aria-label جداست چون متنِ دیداری نامِ شعبه‌ی *فعلی* است، نه خودِ کنش. -->
+    <div class="sb-switch" role="button" tabindex="0" aria-label="تغییر شعبه"
+         onclick="openBranchSwitcher()"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openBranchSwitcher();}">
       <div class="sb-switch-emoji" id="swEmoji" style="background:linear-gradient(135deg,#34D399,#059669)">🌿</div>
       <div class="sb-switch-info"><div class="sb-switch-name" id="swName">کافه‌رستوران ویستا</div><div class="sb-switch-meta">شعبه اصلی</div></div>
       <span class="sb-switch-arr">⇅</span>

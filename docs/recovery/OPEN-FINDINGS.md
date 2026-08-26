@@ -146,6 +146,35 @@ workflow ثبت است.
 
 هشت موردِ **راستی‌آزمایی‌شده‌ی** a11y در Batch 14 رفع شدند؛ این‌ها موجِ بعدی‌اند.
 
+### راستی‌آزماییِ ۲۰۲۶-۰۸-۲۶ — سه مورد از هشت قضاوت شد
+
+| یافته | حکم | شواهد |
+|---|---|---|
+| `branch-switcher-not-keyboard-reachable` | 🔴 **واقعی بود — رفع شد** | `.sb-switch` یک `<div>` با `onclick` بود، بدونِ `tabindex`/`role`/هندلرِ کیبورد. `role="button" tabindex="0" aria-label` + `onkeydown` (Enter/Space) اضافه شد. گارد: `e2e/tests/panel-a11y-keyboard.spec.ts`. جهش‌آزمایی: با برگرداندنِ رفع، ۳ از ۴ تست قرمز شد. |
+| `install-banner-close-28px` | ✅ **نقض نیست** | `.ib-close` در `apps/customer/css/app.css:129` دقیقاً `width:28px;height:28px` است — **بالاتر** از حدِ ۲۴×۲۴ که خودِ گاردِ ریپو (`responsive-audit.spec.ts`) اعمال می‌کند. احتمالاً با معیارِ سخت‌گیرترِ ۴۴×۴۴ علامت خورده بود که این پروژه نپذیرفته. رفع نشد چون چیزی برای رفع نیست. |
+| `company-burger-stale-aria-expanded` | ✅ **از قبل رفع شده** | `apps/company/js/api.js:5-6` — `document.querySelector('.tb-burger')?.setAttribute('aria-expanded', String(open))` با کامنتِ صریح. |
+
+**چرا ممیزیِ خودکار این‌ها را نگرفته بود:** سلکتورِ `tinyTargets` در
+`panel-authed-audit.spec.ts` فقط
+`button, a[href], input, select, textarea, [role="button"], [role="tab"], [tabindex]:not([tabindex="-1"])`
+را می‌گیرد. یک `<div>`ِ خالی با `onclick` هیچ‌کدام نیست، پس **اصلاً وارد ممیزی
+نمی‌شد**. نامرئی برایِ ابزار ≠ سالم.
+
+**نکته‌ی معماری:** اپِ مشتری `js/features/a11y.js` دارد که divهای کلیک‌پذیر را
+به `role=button + tabindex` ارتقا می‌دهد و Enter/Space را به click نگاشت
+می‌کند. `business` و `company` چنین لایه‌ای **ندارند** — به همین دلیل رفع
+اینجا نقطه‌ای است، نه سراسری. اگر divهای کلیک‌پذیرِ بیشتری در پنل‌ها پیدا شد،
+پورت‌کردنِ همان لایه بهتر از رفعِ تک‌تک است.
+
+**پنج موردِ باقی‌مانده هنوز راستی‌آزمایی نشده‌اند** (نه رد شده‌اند، نه تأیید):
+`kpi-trend-pill-contrast` · `rtl-timeline-connector-mirrored` ·
+`gallery-delete-hover-only-24px` · `floor-plan-remove-table-20px` ·
+`btn-danger-label-contrast`.
+⚠️ دو موردِ کنتراست و `floor-plan-remove-table-20px` باید در دامنه‌ی
+`panel-authed-audit.spec.ts` باشند و آن ممیزی سبز است — یعنی یا رندر نمی‌شوند
+(مثلاً فقط روی hover یا بعد از انتخابِ میز) یا دیگر وجود ندارند. قضاوتِ قطعی
+نیازِ رندرِ همان حالت است.
+
 ---
 
 ## ۵. موارد ساختاری
