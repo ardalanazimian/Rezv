@@ -49,6 +49,20 @@ function post(body: unknown, token?: string) {
   });
 }
 
+// ⚠️ همه‌چیز عمداً داخلِ **یک** describeِ بیرونی است.
+//
+// در `node:test` هوکی که بیرونِ هر describe نوشته شود به سوئیتِ **ROOT**
+// می‌چسبد — یعنی در رانرِ مشترک یک‌بار در ابتدای **کلِ** اجرا و یک‌بار در
+// انتهایش اجرا می‌شود، نه دورِ تست‌های همین فایل. نسخه‌ی اولِ همین فایل
+// دقیقاً همین اشتباه را داشت و `process.env.PLATFORM_ADMIN_TENANT_ID` را
+// برای کلِ اجرا ست می‌کرد؛ **پنج** فایلِ دیگر به آن متغیر وابسته‌اند و در
+// CI قرمز شدند (محلی چون فایل تنها اجرا می‌شد، سبز بود).
+//
+// این دومین بارِ همین اشتباه در این مخزن است (بارِ اول:
+// `email-transport-honesty` که `globalThis.fetch` را برای ۲۹ تستِ بی‌ربط
+// خراب کرد). قاعده: **هیچ هوکی در سطحِ فایل ننویس.**
+describe('ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴)', () => {
+
 before(async () => {
   savedPlatformEnv = process.env.PLATFORM_ADMIN_TENANT_ID;
   const pt = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-plat` }, select: { id: true } });
@@ -217,4 +231,6 @@ describe('🔴 مرزها — چیزهایی که نباید کار کنند', (
     }
     await db.staff.delete({ where: { id: s.id } });
   });
+});
+
 });
