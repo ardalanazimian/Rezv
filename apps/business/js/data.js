@@ -732,7 +732,15 @@ async function loadTopGuestsForDashboard(){
       // باشد (رفعِ باگش در customer-insights.ts)، ولی این عددِ مشتق‌شده تا
       // ۶۰ ثانیه کش می‌شود؛ کلمپِ دولایه یعنی حتی یک مقدارِ کهنه/منفی هم
       // «۱۰۱٪ بازگشت» در UI نشان نمی‌دهد.
-      ret:c.churn_risk_score!=null?Math.min(100,Math.max(0,100-c.churn_risk_score)):0,
+      // ⚠️ `null` یعنی «نمی‌دانیم»، نه صفر (ML_CONTRACT: «کمبودِ شواهد یعنی
+      // insufficient_data/null، نه صفر — صفر یعنی اندازه گرفتیم و هیچ بود»).
+      // قبلاً اینجا `:0` بود و UI برایِ مشتریِ تازه‌ای که سرور هنوز
+      // churn_risk_score ندارد «۰٪ بازگشت» نشان می‌داد — یعنی «قطعاً
+      // برنمی‌گردد»، بدترین خوانشِ ممکن، در حالی که هیچ داده‌ای نبود.
+      // خطِ بالاییِ همین map از قبل درست عمل می‌کرد (`spent: … : '—'`) و
+      // `crm.js` هم همین قاعده را صریح نوشته — پس این یک جاافتادگی بود، نه
+      // تصمیم.
+      ret:c.churn_risk_score!=null?Math.min(100,Math.max(0,100-c.churn_risk_score)):null,
     }));
     _guestsLoaded=true;
     return true;

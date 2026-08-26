@@ -2785,7 +2785,15 @@ async function loadTopGuestsForDashboard(){
       // باشد (رفعِ باگش در customer-insights.ts)، ولی این عددِ مشتق‌شده تا
       // ۶۰ ثانیه کش می‌شود؛ کلمپِ دولایه یعنی حتی یک مقدارِ کهنه/منفی هم
       // «۱۰۱٪ بازگشت» در UI نشان نمی‌دهد.
-      ret:c.churn_risk_score!=null?Math.min(100,Math.max(0,100-c.churn_risk_score)):0,
+      // ⚠️ `null` یعنی «نمی‌دانیم»، نه صفر (ML_CONTRACT: «کمبودِ شواهد یعنی
+      // insufficient_data/null، نه صفر — صفر یعنی اندازه گرفتیم و هیچ بود»).
+      // قبلاً اینجا `:0` بود و UI برایِ مشتریِ تازه‌ای که سرور هنوز
+      // churn_risk_score ندارد «۰٪ بازگشت» نشان می‌داد — یعنی «قطعاً
+      // برنمی‌گردد»، بدترین خوانشِ ممکن، در حالی که هیچ داده‌ای نبود.
+      // خطِ بالاییِ همین map از قبل درست عمل می‌کرد (`spent: … : '—'`) و
+      // `crm.js` هم همین قاعده را صریح نوشته — پس این یک جاافتادگی بود، نه
+      // تصمیم.
+      ret:c.churn_risk_score!=null?Math.min(100,Math.max(0,100-c.churn_risk_score)):null,
     }));
     _guestsLoaded=true;
     return true;
@@ -3799,7 +3807,7 @@ function viewCustomerHistory(name){
     <div class="ch-stats">
       <div class="ch-stat"><div class="ch-stat-v">${fa(c.visits||0)}</div><div class="ch-stat-l">بازدید</div></div>
       <div class="ch-stat"><div class="ch-stat-v">${c.spent||'۰'}</div><div class="ch-stat-l">خرید</div></div>
-      <div class="ch-stat"><div class="ch-stat-v">${fa(c.ret||0)}٪</div><div class="ch-stat-l">بازگشت</div></div>
+      <div class="ch-stat"><div class="ch-stat-v">${c.ret==null?'—':fa(c.ret)+'٪'}</div><div class="ch-stat-l">بازگشت</div></div>
     </div>
     <div class="ch-hist-title">سابقه‌ی رزرو</div>
     <div class="ch-hist">${history.length?history.map(h=>`<div class="ch-hrow"><span>${icon(STATUS_META[h.status]?.icon||'info',{size:12})} ${h.dLabel||h.date}</span><span class="ch-hmeta">${h.t} · ${fa(h.party)} نفر</span></div>`).join(''):'<div class="snote-empty">سابقه‌ای ثبت نشده</div>'}</div>`);
