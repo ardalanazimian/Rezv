@@ -27,12 +27,54 @@ function rProfile(){
     loadCancellationPolicy().then(()=>{ if(profTab==='cancellation') profRenderCancellationPolicy(); });
   }
 }
+// ═══════════════════════════════════════════════════════════════════════
+//  «نمی‌دانیم» ≠ «نیست»  (پروتکل §۹/§۱۰ · رفعِ ۲۰۲۶-۰۸-۲۶)
+//
+//  ⚠️ الگویی که در سه اپِ مستقل تکرار شده بود: یک fetchِ شکست‌خورده به
+//  آرایه‌ی خالی می‌افتاد و UI با اطمینان می‌گفت «هنوز نظری ثبت نشده» یا
+//  ✅ سبزِ «کسی نیاز به پیگیری ندارد». رستوران‌داری که واقعاً ۴۰ نظر دارد
+//  باور می‌کرد صفر دارد — بدونِ هیچ نشانه‌ای از خطا.
+//
+//  چرا به‌صورتِ یک هِلپرِ مشترک و نه رفعِ تک‌به‌تک: خطوطِ ۵۸۶–۵۹۷ همین فایل
+//  از قبل یک رفعِ درست برای `rfmRes` داشت، **با کامنتی که صریح می‌گفت
+//  «خطای واقعی باید دیده شود، نه پنهان»** — و دو خط پایین‌تر همان اشتباه
+//  برای دو فراخوانیِ دیگر تکرار شده بود. رفعِ موردی، نمونه‌ی بعدی را
+//  نمی‌گیرد؛ یک مکانیزمِ واحد می‌گیرد.
+//
+//  قرارداد: `[]`/`0` فقط وقتی مجاز است که **واقعاً اندازه گرفته باشیم**.
+// ═══════════════════════════════════════════════════════════════════════
+const LOAD_STATE = {};
+
+/** نتیجه‌ی یک بارگیری را ثبت می‌کند. `ok=false` یعنی «نمی‌دانیم». */
+function markLoad(key, ok){ LOAD_STATE[key] = ok ? 'ok' : 'failed'; }
+/** بارگیری صریحاً شکست خورده است (با نبودِ داده فرق دارد). */
+function loadFailed(key){ return LOAD_STATE[key] === 'failed'; }
+/** هنوز اصلاً تلاشی برای بارگیری نشده. */
+function loadPending(key){ return LOAD_STATE[key] === undefined; }
+
+/**
+ * بلوکِ صادقانه‌ی «بارگیری نشد» + دکمه‌ی تلاش دوباره.
+ * `retry` یک رشته‌ی فراخوانیِ inline است (همان سبکِ این پنل).
+ */
+function loadErrorBlock(title, retry){
+  return `<div class="panel" style="text-align:center;padding:36px">
+    <div style="margin-bottom:8px">${icon('alert',{size:26})}</div>
+    <div style="font-weight:700;margin-bottom:6px">${esc(title)}</div>
+    <div style="color:var(--t2);font-size:13px;margin-bottom:14px">ارتباط با سرور برقرار نشد — این یعنی وضعیت را <b>نمی‌دانیم</b>، نه اینکه چیزی ثبت نشده.</div>
+    ${retry?`<button class="btn btn-primary" onclick="${retry}">تلاش دوباره</button>`:''}
+  </div>`;
+}
+
+/** عددی که ممکن است نامعلوم باشد: `null`/نامعلوم → «—»، نه صفرِ ساختگی. */
+function faOrDash(v){ return (v===null||v===undefined) ? '—' : fa(v); }
+
 // بارگذاری گالری واقعی از /restaurant/photos
 // وضعیتِ بازبینی هم می‌آید: عکس تا تأییدِ پنلِ شرکت روی صفحه‌ی عمومی نمی‌رود
 // و رستوران‌دار باید همین‌جا ببیند کدام عکس منتشر شده و کدام نه.
 let GALLERY_COUNTS={total:0,approved:0,pending:0,rejected:0};
 async function loadGallery(){
   const res=await API.photos();
+  markLoad('gallery', res.ok && Array.isArray(res.data?.items));
   if(res.ok && Array.isArray(res.data?.items)){
     GALLERY=res.data.items.map(p=>({
       id:p.id, url:p.url, dataUrl:p.url, label:p.caption||'', emoji:'', type:p.category,
@@ -47,6 +89,7 @@ async function loadGallery(){
 let REVIEW_STATS={avg:0,total:0,unreplied:0,distribution:{1:0,2:0,3:0,4:0,5:0}};
 async function loadReviews(){
   const res=await API.reviews();
+  markLoad('reviews', !!res.ok);
   if(res.ok){
     REVIEW_STATS={avg:res.data.avg_rating||0,total:res.data.total||0,unreplied:res.data.unanswered||0,distribution:res.data.distribution||{1:0,2:0,3:0,4:0,5:0}};
     REVIEWS=(res.data.items||[]).map(r=>({
@@ -85,6 +128,10 @@ function refreshLogoDisplay(){
   }
 }
 function profRenderGallery(){
+  if(loadFailed('gallery')){
+    document.getElementById('pt-gallery').innerHTML=loadErrorBlock('گالریِ عکس بارگیری نشد','loadGallery().then(profRenderGallery)');
+    return;
+  }
   const logoPhoto=currentLogoPhoto();
   document.getElementById('pt-gallery').innerHTML=`
     <!-- هویت رستوران: نام + لوگو -->
@@ -376,6 +423,10 @@ async function doRemoveGallery(i){
 
 // ─── تب نظرات ───
 function profRenderReviews(){
+  if(loadFailed('reviews')){
+    document.getElementById('pt-reviews').innerHTML=loadErrorBlock('نظرها بارگیری نشد','loadReviews().then(profRenderReviews)');
+    return;
+  }
   let list=REVIEWS;
   if(revFilter==='positive')list=REVIEWS.filter(r=>r.rating>=4);
   else if(revFilter==='negative')list=REVIEWS.filter(r=>r.rating<=3);
@@ -597,8 +648,11 @@ async function custRenderOverview(){
   }
   const total=rfmRes.data.total||0;
   const segs=(rfmRes.data.segments||[]).slice().sort((a,b)=>b.count-a.count);
-  const vipCount=vipRes.ok?(vipRes.data.items?.length||0):0;
-  const cards=aiRes.ok?(aiRes.data.cards||[]):[];
+  // ⚠️ null یعنی «نمی‌دانیم» (فراخوانی شکست خورد)، صفر یعنی «اندازه گرفتیم و
+  // هیچ بود». قبلاً هر دو صفر می‌شدند و از هم قابلِ تفکیک نبودند — همان چیزی
+  // که clvHasSpend در همین فایل صریح ممنوع کرده است.
+  const vipCount=vipRes.ok?(vipRes.data.items?.length||0):null;
+  const cards=aiRes.ok?(aiRes.data.cards||[]):null;
   // عدد قهرمان فروش: ارزش کل مشتریان (مجموع CLV) — تخمین اگر بک‌اند نده
   const champCount=(segs.find(s=>s.segment==='champions')?.count)||0;
   const atRiskCount=segs.filter(s=>['at_risk','cant_lose','hibernating'].includes(s.segment)).reduce((a,s)=>a+s.count,0);
@@ -609,13 +663,13 @@ async function custRenderOverview(){
       <span class="ci-hero-badge">${icon('sparkle',{size:13,fill:true})} هوش مشتری رزرونو</span>
       <div class="ci-hero-grid">
         <div class="ci-hero-stat"><div class="n">${fa(total)}</div><div class="l">مشتری تحلیل‌شده</div></div>
-        <div class="ci-hero-stat"><div class="n warm">${fa(vipCount)}${vipCount>=50?'+':''}</div><div class="l">مشتری VIP</div></div>
+        <div class="ci-hero-stat"><div class="n warm">${faOrDash(vipCount)}${(vipCount!==null&&vipCount>=50)?'+':''}</div><div class="l">مشتری VIP</div></div>
         <div class="ci-hero-stat"><div class="n grn">${fa(champCount)}</div><div class="l">قهرمان (بهترین‌ها)</div></div>
         <div class="ci-hero-stat"><div class="n" style="color:#F0A868">${fa(atRiskCount)}</div><div class="l">در خطر ریزش</div></div>
       </div>
     </div>
 
-    ${cards.length?`<div class="ai-box" style="margin-bottom:16px">
+    ${(cards&&cards.length)?`<div class="ai-box" style="margin-bottom:16px">
       <div class="ai-box-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">خلاصه‌ی هوشمند</div><span class="tag">AI</span></div>
       ${cards.slice(0,3).map(c=>`<div class="ai-insight"><span class="ic ${c.severity==='high'?'warn':c.severity==='medium'?'info':'up'}">${c.severity==='high'?icon('alert',{size:15}):c.severity==='medium'?icon('trending',{size:15}):icon('check',{size:15})}</span><div><b>${esc(c.title)}</b><div style="margin-top:2px">${esc(c.detail)}</div></div></div>`).join('')}
     </div>`:''}
@@ -728,6 +782,7 @@ const HOURS_DOW_FA={0:'یکشنبه',1:'دوشنبه',2:'سه‌شنبه',3:'چ�
 // opening_hours فقط برای نمایشِ مرجعِ «چیزی که مشتری الان می‌بیند» می‌ماند.
 let HOURS_STATE={opening_hours:null,pending_opening_hours:null,hours_change_status:null,hours_change_reason:null,timezone:'Asia/Tehran',closures:[],draft:null};
 let _hoursLoaded=false, _hoursDirty=false;
+const HOURS_SAVE_LABEL='ارسالِ پیشنهاد برای تأیید';
 
 async function loadHours(){
   if(!API.getToken()) return;
@@ -775,7 +830,18 @@ function profRenderHours(){
   const el=document.getElementById('pt-hours'); if(!el) return;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const oh=HOURS_STATE.draft||{};
+  // ⚠️ رفعِ از‌دست‌رفتنِ بی‌صدای داده (۲۰۲۶-۰۸-۲۶):
+  // `_hoursDirty` در ۶ جا **نوشته** می‌شد و در کلِ ریپو در هیچ‌جا **خوانده**
+  // نمی‌شد. یعنی رستوران‌دار یک تعطیلیِ خاص اضافه می‌کرد، آن را در لیست
+  // می‌دید (از یک ردیفِ واقعاً ذخیره‌شده قابلِ تفکیک نبود)، تب عوض می‌کرد و
+  // تغییر بی‌صدا از بین می‌رفت — و رستوران در آن روز همچنان رزرو می‌گرفت.
+  const dirtyBanner = _hoursDirty ? `<div class="panel" style="border-color:var(--amber);background:var(--amber-50);margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px">
+      <span>${icon('alert',{size:18})}</span>
+      <div style="flex:1;font-size:13px"><b>تغییرهای ذخیره‌نشده داری.</b> تا وقتی «${esc(HOURS_SAVE_LABEL)}» را نزنی، این‌ها فقط در همین مرورگرند و با خروج از صفحه از بین می‌روند.</div>
+    </div></div>` : '';
   el.innerHTML=`
+    ${dirtyBanner}
     ${hoursStatusBannerHTML()}
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">ساعات کاری هفتگی</div><div class="panel-sub">${HOURS_STATE.hours_change_status?'این فرم پیشنهادِ توئه — بعد از ارسال باید شرکت تأیید کنه تا زنده بشه':'هر روز می‌تواند چند شیفت (مثلاً ناهار/شام) داشته باشد'}</div></div>
@@ -834,7 +900,9 @@ function addClosure(){
   const reason=document.getElementById('closureReason')?.value.trim();
   if(!date){ toast('','یه تاریخ انتخاب کن'); return; }
   if(HOURS_STATE.closures.some(c=>c.date===date)){ toast('','این تاریخ قبلاً اضافه شده'); return; }
-  HOURS_STATE.closures.push({date,reason:reason||null});
+  // `_unsaved` تا اولین saveHours همراهِ ردیف می‌ماند تا در UI از ردیفِ
+  // واقعاً ذخیره‌شده قابلِ تشخیص باشد.
+  HOURS_STATE.closures.push({date,reason:reason||null,_unsaved:true});
   _hoursDirty=true; profRenderHours();
 }
 function removeClosure(i){ HOURS_STATE.closures.splice(i,1); _hoursDirty=true; profRenderHours(); }
@@ -997,8 +1065,12 @@ async function custRenderCampaign(){
     };
   }
   const sc=_segCounts||{};
+  // ⚠️ شمارِ «تولد این ماه» از آرایه‌ی محلیِ CLUB می‌آید که فقط در rLoyalty یا
+  // بعد از walk-in پر می‌شود — در مسیرِ «مشتریان ← کمپین» هرگز. قبلاً این
+  // «۰ نفر» نشان می‌داد در حالی که دو کارتِ کنارش هنگامِ نامعلوم‌بودن صادقانه
+  // «—» می‌گفتند. حالا هر سه یک قرارداد دارند: نامعلوم = «—»، نه صفر.
   const cnt=(v,suffix)=>v==null?'—':fa(v)+(v>=50?'+':'')+' '+suffix;
-  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید','همه'],['calendar','تولد این ماه',fa(CLUB.filter(m=>m.bMonth===currentMonthFa()).length)+' نفر']];
+  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید','همه'],['calendar','تولد این ماه',(typeof CLUB!=='undefined'&&CLUB.length)?fa(CLUB.filter(m=>m.bMonth===currentMonthFa()).length)+' نفر':'—']];
   document.getElementById('ct-campaign').innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کمپین پیامکی هوشمند</div><div class="panel-sub">سگمنت انتخاب کن، پیام بنویس، پیش‌نمایش بگیر</div></div></div>
@@ -1065,7 +1137,10 @@ async function custRenderAI(){
   const [res,crmRes]=await Promise.all([API.aiRecommendations(),API.crmRecommendations()]);
   if(!res.ok){ cardsEl.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} پیشنهادها بارگیری نشد — دستیار همچنان در دسترس است.</div>`; return; }
   const cards=res.data.cards||[];
-  const contacts=crmRes.ok?(crmRes.data.items||[]):[];
+  // ⚠️ null یعنی فراخوانی شکست خورد. قبلاً [] می‌شد و پنل با ✅ سبزِ «فعلاً
+  // مشتریِ نیازمندِ پیگیریِ فوری نیست» رندر می‌شد — رستوران‌دار باور می‌کرد
+  // هیچ مشتریِ در خطرِ ریزشی برای تماس نیست، در حالی که لیست اصلاً نیامده بود.
+  const contacts=crmRes.ok?(crmRes.data.items||[]):null;
   const crmEff=crmRes.ok?(crmRes.data.effectiveness||null):null;
   const URG_FA={high:'فوری',medium:'این هفته',low:'وقتِ آزاد'};
   cardsEl.innerHTML=`
@@ -1086,7 +1161,7 @@ async function custRenderAI(){
       </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}
     <div class="panel" style="margin-top:20px">
       <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">${crmEffectivenessFa(crmEff)}</div></div></div>
-      ${contacts.length?contacts.map(c=>`
+      ${(contacts&&contacts.length)?contacts.map(c=>`
         <div class="mini-row">
           <div class="mini-info">
             <div class="mini-name">${esc(c.name)} · <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:50px;background:${c.urgency==='high'?'var(--red-50)':c.urgency==='medium'?'var(--amber-50)':'var(--s-100)'};color:${c.urgency==='high'?'var(--red)':c.urgency==='medium'?'var(--amber)':'var(--t2)'}">${URG_FA[c.urgency]||''}</span></div>
@@ -1095,7 +1170,9 @@ async function custRenderAI(){
           <div style="display:flex;gap:6px;flex-shrink:0">
             ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer('${esc(c.phone||'')}','${esc(c.user_id)}')">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
           </div>
-        </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
+        </div>`).join(''):(contacts===null
+        ? `<div class="empty-state"><div class="empty-state-icon">${icon('alert',{size:30})}</div><div class="empty-state-desc">این فهرست بارگیری نشد — یعنی <b>نمی‌دانیم</b> کسی نیاز به پیگیری دارد یا نه.</div><button class="btn btn-sm btn-primary" style="margin-top:10px" onclick="custRenderAI()">تلاش دوباره</button></div>`
+        : `<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`)}
     </div>`;
 }
 // ⚠️ فازِ ۲ (§۲۶–۲۹): بک‌اند هفت نوع کارت می‌فرستد ولی این تابع فقط سه‌تا را

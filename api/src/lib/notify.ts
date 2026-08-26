@@ -1,5 +1,6 @@
 import { createLogger } from './logger';
 import { enqueue } from './queue';
+import { metrics } from './metrics';
 const log = createLogger('notify');
 // ═══════════════════════════════════════════════════════════
 //  اعلان Push و Email — رزرونو
@@ -32,22 +33,37 @@ export async function sendPush(userId: string, title: string, body: string): Pro
 
 /**
  * ارسال ایمیل.
- * Production: با SMTP یا سرویس‌هایی مثل SendGrid/Mailgun/Postmark.
+ *
+ * ⚠️ **هیچ ارائه‌دهنده‌ای هنوز وصل نیست** (۲۰۲۶-۰۸-۲۶).
+ *
+ * باگی که اینجا رفع شد، بدترین شکلِ جعلِ موفقیت در کلِ بک‌اند بود: این تابع
+ * حتی با `EMAIL_API_KEY`ِ تنظیم‌شده هم چیزی نمی‌فرستاد — تنها فراخوانِ واقعی
+ * یک خطِ **کامنت‌شده** بود — ولی `[EMAIL:ارسال]` («ارسال») لاگ می‌کرد و
+ * بدونِ throw برمی‌گشت. در نتیجه `worker.ts` جاب را `completeJob` می‌کرد و
+ * `outcome:'success'` می‌شمرد، و صف ۱۰۰٪ سبز گزارش می‌داد.
+ *
+ * شش مصرف‌کننده‌ی واقعی دارد (`site-orders.ts` ×۵ برای تأییدِ سفارش/دمو/
+ * استعلام، و `waitlist.ts` برای مهمان) — یعنی مشتری سفارش می‌داد، سیستم
+ * می‌گفت ایمیل رفت، و هیچ ایمیلی هرگز فرستاده نمی‌شد. هیچ متریکِ ایمیلی هم
+ * وجود نداشت که این را نشان دهد.
+ *
+ * حالا: تا وصل‌شدنِ ارائه‌دهنده، **صریح شکست می‌خورد**. جاب به retry/DLQِ صف
+ * می‌رود و در `rezervno_email_failed_total` شمرده می‌شود — قابلِ دیدن، نه
+ * بی‌صدا. این عمدی است: یک صفِ قرمز که حقیقت را می‌گوید از یک صفِ سبزِ
+ * دروغ‌گو بهتر است.
  */
 export async function sendEmail(to: string, subject: string, _body: string): Promise<void> {
   const apiKey = process.env.EMAIL_API_KEY;
-  const from = process.env.EMAIL_FROM || 'noreply@rezervno.ir';
   if (!apiKey) {
-    log.info(`[EMAIL] → ${to} | ${subject}`);
-    return;
+    // حالتِ توسعه: ارائه‌دهنده تنظیم نشده. لاگ صریح می‌گوید **ارسال نشد**.
+    log.warn(`[EMAIL:ارسال‌نشد] ارائه‌دهنده تنظیم نشده → ${to} | ${subject}`);
+    metrics.emailFailed.inc({ reason: 'not_configured' });
+    return;   // در توسعه مسیر را نمی‌شکنیم، ولی «ارسال شد» هم نمی‌گوییم
   }
-  try {
-    // اسکلت ارسال واقعی — با ارائه‌دهنده‌ی انتخابی تکمیل شود
-    // await fetch('https://api.sendgrid.com/v3/mail/send', { ... from, to, subject, body });
-    log.info(`[EMAIL:ارسال] ${to} | ${subject} (from ${from})`);
-  } catch (e) {
-    log.error(`[EMAIL:خطا] ${to}:`, (e as Error).message);
-  }
+  // کلید هست ولی هیچ ارائه‌دهنده‌ای پیاده‌سازی نشده — این یک شکستِ واقعی است.
+  metrics.emailFailed.inc({ reason: 'no_provider_implemented' });
+  log.error(`[EMAIL:ارسال‌نشد] EMAIL_API_KEY هست ولی ارائه‌دهنده پیاده‌سازی نشده → ${to} | ${subject}`);
+  throw new Error('ارسالِ ایمیل پیاده‌سازی نشده است — هیچ ارائه‌دهنده‌ای وصل نیست');
 }
 
 // ═══════════════════════════════════════════════════════════

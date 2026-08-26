@@ -40,6 +40,13 @@ function applyPermissionsToNav(){
 function nav(v){
   // دفاعِ لایه‌ی دوم: حتی اگر کسی دکمه را دور بزند، به صفحه‌ی بدونِ مجوز نمی‌رود.
   if (!canAccessView(v)) { if (typeof toast === 'function') toast('', 'دسترسی شما به این بخش محدود شده است'); return; }
+  // ⚠️ گاردِ تغییرِ ذخیره‌نشده (۲۰۲۶-۰۸-۲۶): تا امروز `_hoursDirty` فقط نوشته
+  // می‌شد و هیچ‌جا خوانده نمی‌شد، پس ساعتِ کاری/تعطیلیِ ذخیره‌نشده با یک
+  // کلیکِ ساده روی منو بی‌صدا از بین می‌رفت.
+  if (v !== 'profile' && typeof _hoursDirty !== 'undefined' && _hoursDirty) {
+    if (!confirm('تغییرهای ذخیره‌نشده‌ی ساعاتِ کاری از بین می‌روند. مطمئنی؟')) return;
+    _hoursDirty = false;   // کاربر آگاهانه صرف‌نظر کرد
+  }
   try{ if(window.rzTrack) window.rzTrack('page.viewed',{page:v}); }catch(e){}
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.getElementById('v-'+v).classList.add('active');
@@ -134,6 +141,10 @@ async function selectBranch(id){
   if(typeof _notifsLoaded!=='undefined') _notifsLoaded=false;
   if(typeof _weekdayInsightLoaded!=='undefined') _weekdayInsightLoaded=false;
   if(typeof _heatmapLoaded!=='undefined') _heatmapLoaded=false;
+  // ⚠️ CLUB هم به‌شعبه وابسته است ولی در این فهرست نبود: بعد از سوییچ،
+  // شمارِ «تولد این ماه» در کمپینِ پیامکی همچنان اعضای شعبه‌ی *قبلی* را
+  // می‌شمرد — یعنی کمپین برای مخاطبِ اشتباه برنامه‌ریزی می‌شد.
+  if(typeof CLUB!=='undefined') CLUB=[];
   await loadBranches();
   await loadTables();
   refreshActiveView();

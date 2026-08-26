@@ -83,9 +83,35 @@ const STATUS_LABEL: Record<OrderStatus['status'], { label: string; tone: string 
 
 export default async function OrderStatusPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const order = await getOrderStatus(decodeURIComponent(code));
+  const decoded = decodeURIComponent(code);
+  const lookup = await getOrderStatus(decoded);
 
-  if (!order) {
+  // ⚠️ «سرور جواب نداد» ≠ «سفارشت وجود ندارد» (پروتکل §۱۰).
+  // قبلاً هر دو یک صفحه بودند، پس یک قطعیِ API به کسی که واقعاً خرید کرده
+  // می‌گفت درخواستش پیدا نشد و «کد را دوباره بررسی کن» — بدترین پیامِ ممکن
+  // در بدترین لحظه. حالا حالتِ نامعلوم صریح اعلام می‌شود و کد را زیرِ سؤال
+  // نمی‌برد، چون ما هیچ چیزی درباره‌ی وجودِ سفارش نمی‌دانیم.
+  if (lookup.kind === 'unavailable') {
+    return (
+      <section className="section">
+        <div className="container-narrow stack stack-8">
+          <div className="section-head">
+            <h1 className="h1">وضعیتِ درخواست فعلاً در دسترس نیست</h1>
+            <p className="lead">
+              ارتباط با سرور برقرار نشد، پس نتوانستیم وضعیتِ کدِ <span className="code-pill">{decoded}</span> را
+              بخوانیم. این یعنی <b>وضعیت را نمی‌دانیم</b> — نه اینکه درخواستِ شما ثبت نشده باشد.
+              چند دقیقه‌ی دیگر صفحه را تازه کنید.
+            </p>
+          </div>
+          <p className="small muted">
+            اگر ادامه داشت، <Link href="/contact" className="prose">با پشتیبانی تماس بگیرید</Link> و همین کد را بدهید.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  if (lookup.kind === 'not_found') {
     return (
       <section className="section">
         <div className="container-narrow stack stack-8">
@@ -95,7 +121,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ co
               کد را دوباره بررسی کنید. اگر تازه ثبت کرده‌اید، چند لحظه صبر کنید و دوباره تلاش کنید.
             </p>
           </div>
-          <OrderLookup initial={decodeURIComponent(code)} />
+          <OrderLookup initial={decoded} />
           <p className="small muted">
             همچنان مشکل دارید؟ <Link href="/contact" className="prose">با پشتیبانی تماس بگیرید</Link>.
           </p>
@@ -103,6 +129,8 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ co
       </section>
     );
   }
+
+  const order = lookup.order;
 
   const steps = stepsFor(order);
   const status = STATUS_LABEL[order.status];

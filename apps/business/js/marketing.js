@@ -140,8 +140,21 @@ async function createAutomation(){
   if(res.ok){ toast('','قانون فعال شد'); await loadMarketing(); rMarketing(); }
   else toast('', res.error?.message||'ساخت قانون ناموفق بود');
 }
+// ⚠️ رفعِ دادهٔ جعلی (۲۰۲۶-۰۸-۲۶ · §۳/§۱۰):
+//
+// این تابع قبلاً متنِ آماده را با یک «کدِ اختصاصی» پر می‌کرد که خروجیِ
+// `Math.random()` بود و **در جدولِ کوپن‌ها وجود نداشت** — مشتری کدی
+// می‌گرفت که موقعِ استفاده معتبر نبود. بدتر: `fa()` ارقامش را فارسی
+// می‌کرد («SPECIAL۷۳۴») که اصلاً قابلِ تایپ نبود.
+// نامِ «کافه ویستا» هم هاردکد بود و در پیامکِ *هر* رستورانی همان می‌رفت.
+//
+// حالا: بدونِ کدِ ساختگی، و با نامِ واقعیِ همین رستوران. اگر کدِ تخفیف
+// می‌خواهی، از بخشِ «کوپن‌ها» یک کوپنِ واقعی بساز و کدش را در متن بگذار.
 function pickSeg(i,el){document.querySelectorAll('.seg-card').forEach(s=>s.classList.remove('sel'));el.classList.add('sel');selSeg=i;
-  const codes=['SPECIAL','VIP','WELCOME','BDAY'];document.getElementById('campText').value=`سلام {نام} عزیز! 🌿\nیه پیشنهاد ویژه از کافه ویستا داریم.\nکد اختصاصیت: ${codes[i]}${fa(Math.floor(Math.random()*900+100))}\nمنتظرتیم ❤️`;
+  const restName=(typeof RESTAURANT!=='undefined' && RESTAURANT && RESTAURANT.name) ? RESTAURANT.name : 'ما';
+  document.getElementById('campText').value=`سلام {نام} عزیز! 🌿
+یه پیشنهاد ویژه از ${restName} داریم.
+منتظرتیم ❤️`;
   document.getElementById('charCount').textContent=fa(document.getElementById('campText').value.length);
 }
 function previewCamp(){
@@ -150,7 +163,21 @@ function previewCamp(){
   if(selSeg===null){toast('','سگمنت رو انتخاب کن');return}
   // ذخیره برای ارسال واقعی (نگاشت index سگمنت به segment بک‌اند)
   window._campMessage=txt;
-  window._campSegment=({0:'at_risk',1:'gold',2:'all',3:'all'})[selSeg]||'all';
+  // ⚠️ رفعِ ۲۰۲۶-۰۸-۲۶: این نگاشت قبلاً `at_risk`/`all` می‌فرستاد، ولی
+  // `POST /restaurant/sms` فقط `z.enum(['gold','silver','bronze'])` می‌پذیرد
+  // ⇒ **۳ از ۴ کارتِ سگمنت همیشه ۴۰۰** می‌گرفتند؛ فقط VIP کار می‌کرد.
+  //
+  // این یک تصمیمِ محصولی نبود، یک اشتباهِ سیم‌کشی بود: هر چهار مخاطب از قبل
+  // در بک‌اند وجود دارند — `GET /restaurant/customers?segment=` صریحاً
+  // `new_customer|active|at_risk|churned|vip` را پشتیبانی می‌کند و `phone`
+  // هم برمی‌گرداند. پس مخاطب را همان‌جا resolve می‌کنیم و با `phones[]`
+  // می‌فرستیم — همان مسیرِ اثبات‌شده‌ای که `sendBirthdayGreetings` دارد.
+  window._campAudience=({
+    0:{kind:'segment', value:'at_risk',     label:'در خطر ریزش'},
+    1:{kind:'segment', value:'vip',         label:'VIP'},
+    2:{kind:'segment', value:'new_customer',label:'مشتری جدید'},
+    3:{kind:'birthday',                     label:'تولد این ماه'},
+  })[selSeg]||null;
   const rendered=txt.replace(/\{نام\}/g,'کیان');
   openModal(`<div class="modal-title">پیش‌نمایش پیام</div><div class="modal-sub">دقیقاً همینطوری برای مشتری ارسال می‌شه</div>
     <div style="background:#0c0c14;border-radius:var(--r-lg);padding:16px;margin-bottom:18px">
@@ -176,9 +203,31 @@ async function doSendCampaign(){
   const btn=document.getElementById('campSendBtn');
   if(btn){btn.disabled=true;btn.textContent='در حال ارسال...';}
   // segment انتخاب‌شده (اگر در فرم کمپین بود) — پیش‌فرض همه
-  const seg=window._campSegment||'all';
+  const aud=window._campAudience;
+  if(!aud){ toast('','سگمنت رو انتخاب کن'); if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';} return; }
   if(API.getToken()){
-    const res=await API.sendSms({kind:'campaign',segment:seg,message:window._campMessage||''});
+    // مخاطب را به فهرستِ شماره تبدیل کن. اگر resolve شکست بخورد، **ارسال
+    // نمی‌کنیم و صریح می‌گوییم** — نه اینکه به «همه» برگردیم (که پیامکِ پولی
+    // را به مخاطبِ اشتباه می‌فرستاد).
+    let phones=[];
+    if(aud.kind==='birthday'){
+      if(!CLUB.length){ await (typeof loadClubMembers==='function'?loadClubMembers():Promise.resolve()); }
+      phones=(CLUB||[]).filter(m=>m.bMonth===currentMonthFa()&&m.phone).map(m=>String(m.phone));
+    }else{
+      const cs=await API.customers('segment='+encodeURIComponent(aud.value)+'&limit=500');
+      if(!cs.ok){
+        toast('', (cs.error&&cs.error.message)||'فهرستِ مخاطب بارگیری نشد — کمپین ارسال نشد');
+        if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';}
+        return;
+      }
+      phones=(cs.data.items||[]).map(x=>x.phone).filter(Boolean).map(String);
+    }
+    if(!phones.length){
+      toast('','در سگمنتِ «'+aud.label+'» شماره‌ی معتبری برای ارسال نیست');
+      if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';}
+      return;
+    }
+    const res=await API.sendSms({kind:'campaign',phones,message:window._campMessage||''});
     if(res.ok){
       closeModal();
       toast('',`کمپین به ${fa(res.data?.queued||0)} نفر ارسال شد`);

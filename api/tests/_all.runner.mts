@@ -120,6 +120,7 @@ import './schema-drift.integration.test.mts';
 import './security-hardening.integration.test.mts';
 import './shell-scripts-lf.test.mts';
 import './sms-balance.integration.test.mts';
+import './sms-melipayamak.test.mts';
 import './site-orders.test.mts';
 import './subscription.test.mts';
 import './table-merge-occupancy-concurrency.test.mts';

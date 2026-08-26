@@ -90,6 +90,10 @@ export const metrics = {
   smsQueueDepth: new Gauge('rezervno_sms_queue_depth', 'تعداد پیام‌های در صف SMS'),
   smsSent: new Counter('rezervno_sms_sent_total', 'تعداد پیامک‌های ارسال‌شده'),
   smsFailed: new Counter('rezervno_sms_failed_total', 'تعداد پیامک‌های ناموفق (به دست مشتری نرسید)'),
+  // ⚠️ تا ۲۰۲۶-۰۸-۲۶ هیچ متریکِ ایمیلی وجود نداشت (برخلافِ پیامک) — یعنی
+  // نبودِ کاملِ ارسالِ ایمیل هیچ‌جا قابلِ دیدن نبود.
+  emailSent: new Counter('rezervno_email_sent_total', 'تعداد ایمیل‌های ارسال‌شده'),
+  emailFailed: new Counter('rezervno_email_failed_total', 'تعداد ایمیل‌های ناموفق (به دست مشتری نرسید)'),
   dbDuration: new Histogram('rezervno_db_query_duration_seconds', 'مدت زمان کوئری دیتابیس بر حسب ثانیه'),
   cacheHits: new Counter('rezervno_cache_hits_total', 'تعداد اصابت کش (cache hit)'),
   cacheMisses: new Counter('rezervno_cache_misses_total', 'تعداد عدم‌اصابت کش (cache miss)'),

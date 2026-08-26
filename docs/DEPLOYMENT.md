@@ -120,7 +120,7 @@ JWT_SECRET (≥32), JWT_REFRESH_SECRET (≥32, different), ALLOWED_ORIGINS, CRON
   `/api/v1/maintenance/*` endpoints on schedule, sending
   `Authorization: Bearer ${CRON_SECRET}`.
 - **Env vars**: set in the Vercel dashboard (Production + Preview) — at minimum
-  the list above, plus `KAVENEGAR_API_KEY`, `ZARINPAL_MERCHANT_ID`,
+  the list above, plus `MELIPAYAMAK_USERNAME`/`MELIPAYAMAK_PASSWORD`, `ZARINPAL_MERCHANT_ID`,
   `PLATFORM_ADMIN_TENANT_ID`, etc.
 - **Front-ends**: static. Because `apps/*` use absolute asset paths, each app is
   intended as its own Vercel project with its own Root Directory
@@ -160,7 +160,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://<domain>/api/v1/maintenance/exp
 - Generate strong secrets: `openssl rand -base64 48` for
   `JWT_SECRET` / `JWT_REFRESH_SECRET` / `CRON_SECRET` / `MAINTENANCE_KEY` /
   `REDIS_PASSWORD`.
-- Runtime provider secrets (Zarinpal merchant id, Kavenegar key) can live in
+- Runtime provider secrets (Zarinpal merchant id, Melipayamak credentials) can live in
   `platform_settings` (editable from the company panel) with env as fallback.
 - Set secrets in Vercel dashboard (managed) or `.env` on the host (self-host).
 

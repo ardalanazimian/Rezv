@@ -32,7 +32,7 @@ Auth is **Bearer JWT** (no cookies). Architecture: [`docs/ARCHITECTURE.md`](./do
 - 🪑 **Restaurant ops** — real-time table state + floor plan, smart allocation,
   priority waitlist with offers, full reservation lifecycle state machine.
 - 🎯 **CRM & marketing** — RFM/CLV segments, no-show risk, coupons, trigger-based
-  automations, SMS campaigns (Kavenegar).
+  automations, SMS campaigns (Melipayamak).
 - 🏆 **Loyalty** — points ledger, referrals, gift cards, tiered clubs, cashback.
 - 💬 **Chat** — customer ↔ restaurant messaging.
 - 🏢 **Platform console** — tenants, plans/billing, SMS balance, security audit,
@@ -93,7 +93,7 @@ npm run db:seed
 | Business panel | `09121111111` | sample restaurant manager |
 | Company panel | `09120000000` | platform admin |
 
-Set `OTP_DEV_MODE=false` and configure `KAVENEGAR_API_KEY` for real SMS in
+Set `OTP_DEV_MODE=false` and configure `MELIPAYAMAK_USERNAME`/`MELIPAYAMAK_PASSWORD` for real SMS in
 production (dev mode is rejected in production).
 
 ## Development
