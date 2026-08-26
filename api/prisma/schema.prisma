@@ -99,6 +99,14 @@ model Staff {
   // بدونِ این، `findFirst({ where: { phone } })` به ترتیبِ heap وابسته بود و
   // یک هایجکِ تنانتِ بازتولیدشده می‌ساخت (توضیحِ کامل در خودِ فایلِ مهاجرت).
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  // مهاجرتِ ۰۷۴ — ورود با نام کاربری و رمز، مستقل از پیامک.
+  // ⚠️ `username` یکتای **سراسری** است نه per-tenant: فرمِ ورود فقط
+  // نام‌کاربری و رمز می‌گیرد، پس یکتاییِ per-tenant سرور را مجبور می‌کرد
+  // «اولین تطبیق» را بردارد — همان کلاسِ باگی که مهاجرتِ ۰۷۲ برای تلفن بست.
+  // همیشه lowercase ذخیره می‌شود (`normalizeUsername` در lib/password.ts).
+  username         String?   @unique
+  passwordHash     String?   @map("password_hash")
+  passwordUpdatedAt DateTime? @map("password_updated_at") @db.Timestamptz
   @@unique([tenantId, phone])
   // drift-fix (فازِ ۲، §۲۴): در DB وجود دارد، در schema اعلام نشده بود.
   @@index([restaurantId])

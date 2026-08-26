@@ -23,6 +23,12 @@ const log = createLogger('audit');
 export type AuditAction =
   | 'auth.login' | 'auth.failure' | 'auth.logout'
   | 'staff.permission_change' | 'staff.login'
+  // ── ورود با رمز (مهاجرتِ ۰۷۴) ──
+  // ساخت/تغییرِ اعتبارنامه‌ی یک بیزنس توسطِ مدیرِ پلتفرم، و تغییرِ رمز توسطِ
+  // خودِ کارمند. هر دو مستقیماً روی «چه کسی می‌تواند وارد شود» اثر دارند و
+  // بدونِ ردِ مکتوب هیچ تحقیقِ امنیتیِ بعدی ممکن نیست.
+  // ⚠️ خودِ رمز هرگز در detail نمی‌رود — فقط نام کاربری و اینکه عوض شد.
+  | 'admin.staff_credentials_set' | 'staff.password_change'
   | 'giftcard.redeem' | 'coupon.redeem' | 'coupon.created'
   | 'reservation.cancel' | 'admin.action'
   | 'restaurant.activated' | 'restaurant.deactivated'

@@ -10,6 +10,12 @@ export class ApiError extends Error {
 export const Err = {
   otpInvalid:   () => new ApiError('OTP_INVALID', 'کد تأیید نامعتبر یا منقضی است', 401),
   unauthorized: () => new ApiError('UNAUTHORIZED', 'ابتدا وارد شوید', 401),
+  // ورودِ نام‌کاربری/رمز (مهاجرتِ ۰۷۴). کدِ تازه لازم بود چون هیچ‌کدام از
+  // موجودها این معنی را ندارند: `UNAUTHORIZED` یعنی «توکن نداری» (کلاینت
+  // باید به صفحه‌ی ورود برود) و `OTP_INVALID` مالِ کدِ یک‌بارمصرف است.
+  // ⚠️ پیام عمداً **یکسان** برای «کاربر نیست»، «رمز غلط» و «رمز ست نشده»
+  // است — تفکیکشان یک اوراکلِ شمارشِ حساب می‌سازد.
+  invalidCredentials: () => new ApiError('INVALID_CREDENTIALS', 'نام کاربری یا رمز عبور اشتباه است', 401),
   forbidden:    (msg='دسترسی به این رستوران ندارید') => new ApiError('FORBIDDEN_TENANT', msg, 403),
   notFound:     (what='منبع') => new ApiError('NOT_FOUND', `${what} پیدا نشد`, 404),
   tableConflict:() => new ApiError('TABLE_CONFLICT', 'این میز در این بازه رزرو شده است', 409),

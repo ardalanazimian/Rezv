@@ -160,6 +160,14 @@ export const RULES = {
   search:        { prefix: 'srch',      max: 60,  windowMs: 60_000 } as RateLimitRule,
   globalPerIp:   { prefix: 'glob',      max: 120, windowMs: 60_000 } as RateLimitRule,
   auth:          { prefix: 'auth',      max: 20,  windowMs: 60_000 } as RateLimitRule,
+  // ── ورود با رمزِ عبور (مهاجرتِ ۰۷۴) ──
+  // روی **دو** بُعد اعمال می‌شود و هر دو لازم‌اند:
+  //  • per-IP  — جلوی پویشِ یک مهاجم روی نام‌های کاربریِ مختلف را می‌گیرد
+  //  • per-username — جلوی پویشِ توزیع‌شده (بات‌نت، IPِ چرخان) روی **یک**
+  //    حساب را می‌گیرد؛ سقفِ per-IP به‌تنهایی این را نمی‌بندد.
+  // ۱۰ در ۱۰ دقیقه: برای آدمی که رمزش را اشتباه می‌زند دست‌ودل‌باز، برای
+  // brute-force بی‌فایده (فضای رمزِ ۸ کاراکتری در برابرِ ۱۴۴۰ حدس در روز).
+  passwordLogin: { prefix: 'pwlogin',   max: 10,  windowMs: 10 * 60_000 } as RateLimitRule,
   // ── check-inِ QRِ میز (POST /api/v1/checkin) ──
   //
   // این تنها مسیرِ جهش‌دهنده‌ی وضعیتِ رزرو است که **بدونِ توکنِ کاربر** سرو

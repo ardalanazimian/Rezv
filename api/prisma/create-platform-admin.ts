@@ -14,9 +14,21 @@
  *   cd api && npx tsx prisma/create-platform-admin.ts 09122079763 "نام مدیر"
  *
  * خروجی، مقدارِ `PLATFORM_ADMIN_TENANT_ID` را چاپ می‌کند تا در `.env` بگذارید.
+ *
+ * ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
+ * اگر `ADMIN_USERNAME` و `ADMIN_PASSWORD` در محیط باشند، همان‌جا هم ست
+ * می‌شوند و مدیر می‌تواند بدونِ پیامک وارد پنلِ شرکت شود:
+ *
+ *   ADMIN_USERNAME=ardalan ADMIN_PASSWORD='...' \
+ *     npx tsx prisma/create-platform-admin.ts 09122079763 "نام مدیر"
+ *
+ * ⚠️ عمداً از **متغیرِ محیطی** خوانده می‌شود و نه آرگومانِ خط فرمان: آرگومان
+ * در تاریخچه‌ی شل می‌ماند و در `ps` برای هر کاربرِ دیگرِ همان ماشین دیده
+ * می‌شود. رمز هرگز چاپ نمی‌شود.
  */
 import { db } from '../src/lib/db';
 import { normalizePhone } from '../src/lib/otp';
+import { hashPassword, normalizeUsername, passwordPolicyError, usernamePolicyError } from '../src/lib/password';
 
 const PLATFORM_TENANT_NAME = 'شرکت رزرونو';
 
@@ -63,15 +75,50 @@ async function main() {
   // اسکیما `@@unique([tenantId, phone])` دارد، پس upsert روی همان کلید امن است.
   // اگر ردیف از قبل بود ولی غیرفعال یا با نقشِ پایین‌تر، به owner/فعال ارتقا
   // می‌یابد — همان چیزی که `findPlatformAdmin` می‌خواهد.
+  // ── اعتبارنامه‌ی اختیاری ──
+  const rawUsername = process.env.ADMIN_USERNAME;
+  const rawPassword = process.env.ADMIN_PASSWORD;
+  let credentials: { username: string; passwordHash: string; passwordUpdatedAt: Date } | null = null;
+
+  if (rawUsername || rawPassword) {
+    // نیمه‌پیکربندی نباید نیمه‌فعال شود — همان قاعده‌ی ورودِ اضطراری.
+    if (!rawUsername || !rawPassword) {
+      console.error('✗ برای ورود با رمز، هر دو متغیرِ ADMIN_USERNAME و ADMIN_PASSWORD لازم است.');
+      process.exit(1);
+    }
+    const uErr = usernamePolicyError(rawUsername);
+    if (uErr) { console.error(`✗ ${uErr}`); process.exit(1); }
+    const pErr = passwordPolicyError(rawPassword);
+    if (pErr) { console.error(`✗ ${pErr}`); process.exit(1); }
+
+    const username = normalizeUsername(rawUsername);
+    const taken = await db.staff.findUnique({ where: { username }, select: { id: true, tenantId: true } });
+    const mine = await db.staff.findUnique({
+      where: { tenantId_phone: { tenantId: tenant.id, phone } }, select: { id: true },
+    });
+    if (taken && taken.id !== mine?.id) {
+      console.error(`✗ نام کاربری «${username}» قبلاً برای حسابِ دیگری گرفته شده است.`);
+      process.exit(1);
+    }
+    credentials = { username, passwordHash: await hashPassword(rawPassword), passwordUpdatedAt: new Date() };
+  }
+
   const staff = await db.staff.upsert({
     where: { tenantId_phone: { tenantId: tenant.id, phone } },
-    create: { tenantId: tenant.id, phone, name, role: 'owner', isActive: true },
-    update: { role: 'owner', isActive: true },
-    select: { id: true, phone: true, role: true, isActive: true },
+    create: { tenantId: tenant.id, phone, name, role: 'owner', isActive: true, ...(credentials ?? {}) },
+    update: { role: 'owner', isActive: true, ...(credentials ?? {}) },
+    select: { id: true, phone: true, role: true, isActive: true, username: true },
   });
 
   const masked = phone.slice(0, 6) + '***' + phone.slice(-2);
   console.log(`✓ مدیرِ پلتفرم آماده است: ${masked} · نقش ${staff.role} · فعال ${staff.isActive}`);
+  if (credentials) {
+    // ⚠️ فقط نام کاربری چاپ می‌شود، هرگز رمز.
+    console.log(`✓ ورود با رمز فعال شد · نام کاربری: ${staff.username}`);
+    console.log('  (رمز چاپ نمی‌شود. بعد از اولین ورود از پنل عوضش کنید.)');
+  } else {
+    console.log('ℹ ورود با رمز ست نشد. برای فعال‌کردنش دوباره با ADMIN_USERNAME و ADMIN_PASSWORD اجرا کنید.');
+  }
   console.log('');
   console.log('در `.env` این را بگذارید (اگر از قبل نیست):');
   console.log(`  PLATFORM_ADMIN_TENANT_ID=${tenant.id}`);

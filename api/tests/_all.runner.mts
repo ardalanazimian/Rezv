@@ -146,6 +146,7 @@ import './queue.test.mts';
 import './ratelimit-fallback.test.mts';
 import './rbac-permission-coverage.test.mts';
 import './rbac-role-from-db.integration.test.mts';
+import './password-login.integration.test.mts';
 import './staff-tenant-hijack.integration.test.mts';
 import './incentive-low-demand-date.integration.test.mts';
 import './restaurant-popularity-ranking.integration.test.mts';

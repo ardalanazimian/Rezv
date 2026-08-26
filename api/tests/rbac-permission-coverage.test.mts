@@ -518,6 +518,14 @@ const DELIBERATE_EXCEPTIONS: Record<string, { why: string; proof: RegExp }> = {
   },
   'staff/route.ts → POST': { why: 'همان بالا.', proof: /assertManagerOrOwner/ },
   'staff/route.ts → PATCH': { why: 'همان بالا.', proof: /assertManagerOrOwner/ },
+  'staff/password/route.ts → POST': {
+    why: 'کارمند رمزِ **خودش** را عوض می‌کند. با withStaffAuth کار می‌کند (که نقش و isActive را از DB '
+       + 'تازه می‌کند) و دامنه‌اش با `id: auth.sub` به همان یک ردیف قفل است — یعنی هیچ کلیدِ مجوزی '
+       + 'نمی‌تواند سخت‌گیرتر باشد. کلیدِ RBAC اینجا حتی مضر بود: کارمندِ محدودشده هم باید بتواند '
+       + 'رمزِ خودش را عوض کند، وگرنه اولین کاری که هر کاربرِ تازه باید بکند برایش بسته است.',
+    // مدرکِ ساختاری: دامنه واقعاً به خودِ کاربر قفل است، نه یک ادعا در کامنت.
+    proof: /where:\s*\{\s*id:\s*auth\.sub\s*\}/,
+  },
 };
 
 function routeFiles(dir: string, out: string[] = []): string[] {
