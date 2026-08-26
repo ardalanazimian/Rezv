@@ -36,6 +36,9 @@ async function loginAs(page: Page, role: 'owner' | 'manager' | 'staff', permissi
       : r.fulfill({ status: 200, contentType: 'application/json', body: '{"data":[],"items":[],"total":0}' }));
 
   await page.goto(BUSINESS);
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#staffPhone').waitFor({ timeout: 15_000 });
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();

@@ -1055,6 +1055,10 @@ async function openCustomerDetail(userId){
 }
 
 // ─── تب ۳: کمپین پیامکی (مارکتینگ) ───
+// ⚠️ بازگردانده‌شده (۲۰۲۶-۰۸-۲۶): اعلانِ این کش در حلِ تعارضِ merge گم شده
+// بود و اولین خواندنش ReferenceError می‌داد — تستِ business-assistant گرفتش.
+// null یعنی «هنوز از سرور نپرسیده‌ایم» (متمایز از {}ی خالی).
+let _segCounts=null;
 async function custRenderCampaign(){
   // ⚠️ حلِ تعارضِ ادغام (۲۰۲۶-۰۸-۲۶): main همین باگِ «۳ از ۴ کارت ۴۲۲/۴۰۰»
   // را با تقلیلِ کارت‌ها به tierهای باشگاه حل کرده بود؛ این شاخه با resolveِ

@@ -54,6 +54,7 @@ import './dna-summary.integration.test.mts';
 import './email-transport-honesty.test.mts';
 import './helpers/test-env.mts';
 import './birthday-calendar.test.mts';
+import './admin-create-business.integration.test.mts';
 import './allowed-origins.test.mts';
 import './availability-bulk.integration.test.mts';
 import './availability-offline-parity.integration.test.mts';

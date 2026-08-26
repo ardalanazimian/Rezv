@@ -59,6 +59,9 @@ async function mockPanelApi(page: Page) {
 
 async function loginBusiness(page: Page) {
   await page.goto(BIZ);
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();
   await expect(page.locator('#staffCode')).toBeVisible();

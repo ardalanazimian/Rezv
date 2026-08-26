@@ -72,6 +72,9 @@ async function mockCompanyApi(page: Page, opts: Opts = {}) {
 
 async function loginCompany(page: Page) {
   await page.goto(CO);
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await expect(page.locator('#adminCode')).toBeVisible();
@@ -97,6 +100,9 @@ test('حالتِ دمو: دادهٔ ساختگی برچسبِ [DEMO] و بنرِ
   await page.route('**/api/v1/**', (route) => route.abort());
 
   await page.goto(CO);
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await expect(page.locator('#adminCode')).toBeVisible();
@@ -241,6 +247,9 @@ test('مودالِ تمدید برایِ پلنِ تمدیدناپذیر چیپ�
   // پلنِ `basic` دارد — همان کلاسِ «تمدیدناپذیر»ی که starter در آن است.
   await page.route('**/api/v1/**', (route) => route.abort());
   await page.goto(CO);
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await expect(page.locator('#adminCode')).toBeVisible();
@@ -262,6 +271,9 @@ test('جست‌وجویِ تاپ‌بار واقعاً فهرست را فیلت�
   test.skip(!!isMobile, 'نوارِ جست‌وجویِ تاپ‌بار رویِ موبایل با CSS پنهان است (.tb-search)');
   await page.route('**/api/v1/**', (route) => route.abort());
   await page.goto(CO);
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await expect(page.locator('#adminCode')).toBeVisible();
@@ -373,6 +385,9 @@ async function mockBusinessWaitlist(page: Page, onDelete: (u: string) => void, d
 
 async function loginBusiness(page: Page) {
   await page.goto(BIZ);
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();
   await expect(page.locator('#staffCode')).toBeVisible();

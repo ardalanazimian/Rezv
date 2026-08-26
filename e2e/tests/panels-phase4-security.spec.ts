@@ -76,6 +76,9 @@ function mockPhase4SecurityApi(page: Page) {
 
 async function loginAsAdmin(page: Page) {
   await page.goto(CO);
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await page.locator('#adminCode').fill('1234');
