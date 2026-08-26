@@ -1,4 +1,4 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { testIp } from './helpers/test-ip.mts';
 import { randomInt, randomUUID } from 'node:crypto';
@@ -64,7 +64,6 @@ function stubFetch(overrides: { requestJson?: unknown; verifyJson?: unknown } = 
   }) as unknown as typeof fetch;
 }
 
-after(() => { globalThis.fetch = ORIGINAL_FETCH; });
 
 /*
  * ⚠️ اینجا قبلاً `clearRateLimit()` بود که `rl:srch:*` را **سراسری** پاک می‌کرد.
@@ -158,6 +157,14 @@ async function makeReservation(o: ResvOverrides = {}) {
 
 // ─────────────────────────────────────────────────────────────────────
 describe('POST /reservations/:code/pay', () => {
+  // ⚠️ بازیابیِ fetch تا ۲۰۲۶-۰۸-۲۶ یک `after`ِ **ریشه‌ای** بود. هوکِ ریشه به
+  // سوئیتِ ریشه می‌چسبد و رانرِ ما تک-process است، پس آن بازیابی فقط در
+  // **پایانِ کلِ رانِ ۱۳۸۷ تستی** اجرا می‌شد — یعنی از اولین تستِ این فایل به
+  // بعد، `globalThis.fetch` برایِ همه‌ی تست‌های بعدیِ سوئیت stub می‌ماند و هر
+  // درخواستِ واقعیِ آن‌ها یک ۲۰۰ِ ساختگیِ زرین‌پال‌شکل می‌گرفت (سبزِ به‌دلیلِ
+  // غلط). حالا بعد از هر تستِ همین describe بازیابی می‌شود.
+  afterEach(() => { globalThis.fetch = ORIGINAL_FETCH; });
+
   test('⚠️ رزروِ معمولی (بدونِ بیعانه‌ی درخواست‌شده — وضعیتِ هر رزروِ واقعیِ امروز) رد می‌شود', async () => {
     const resv = await makeReservation(); // depositRequested پیش‌فرض false است — دقیقاً مثلِ تولید
     stubFetch();
@@ -249,6 +256,14 @@ describe('POST /reservations/:code/pay', () => {
 
 // ─────────────────────────────────────────────────────────────────────
 describe('GET /payments/callback', () => {
+  // ⚠️ بازیابیِ fetch تا ۲۰۲۶-۰۸-۲۶ یک `after`ِ **ریشه‌ای** بود. هوکِ ریشه به
+  // سوئیتِ ریشه می‌چسبد و رانرِ ما تک-process است، پس آن بازیابی فقط در
+  // **پایانِ کلِ رانِ ۱۳۸۷ تستی** اجرا می‌شد — یعنی از اولین تستِ این فایل به
+  // بعد، `globalThis.fetch` برایِ همه‌ی تست‌های بعدیِ سوئیت stub می‌ماند و هر
+  // درخواستِ واقعیِ آن‌ها یک ۲۰۰ِ ساختگیِ زرین‌پال‌شکل می‌گرفت (سبزِ به‌دلیلِ
+  // غلط). حالا بعد از هر تستِ همین describe بازیابی می‌شود.
+  afterEach(() => { globalThis.fetch = ORIGINAL_FETCH; });
+
   test('⚠️ authorityِ ناموجود → ریدایرکتِ failed، نه کرش', async () => {
     // کدِ رزرو از query می‌آید و با zReservationCode اعتبارسنجی شده، پس حتی
     // وقتی هیچ Paymentی با این authority نیست، کاربر به صفحه‌ی همان رزرو با
@@ -358,6 +373,14 @@ describe('GET /payments/callback', () => {
 
 // ─────────────────────────────────────────────────────────────────────
 describe('اتصالِ pay → callback: مسیرِ کاملِ end-to-end', () => {
+  // ⚠️ بازیابیِ fetch تا ۲۰۲۶-۰۸-۲۶ یک `after`ِ **ریشه‌ای** بود. هوکِ ریشه به
+  // سوئیتِ ریشه می‌چسبد و رانرِ ما تک-process است، پس آن بازیابی فقط در
+  // **پایانِ کلِ رانِ ۱۳۸۷ تستی** اجرا می‌شد — یعنی از اولین تستِ این فایل به
+  // بعد، `globalThis.fetch` برایِ همه‌ی تست‌های بعدیِ سوئیت stub می‌ماند و هر
+  // درخواستِ واقعیِ آن‌ها یک ۲۰۰ِ ساختگیِ زرین‌پال‌شکل می‌گرفت (سبزِ به‌دلیلِ
+  // غلط). حالا بعد از هر تستِ همین describe بازیابی می‌شود.
+  afterEach(() => { globalThis.fetch = ORIGINAL_FETCH; });
+
   test('شروعِ پرداخت از pay/route، سپس تأییدِ موفق از callback/route', async () => {
     const resv = await makeReservation({ depositRequested: true, depositAmountToman: 65_000 });
     stubFetch({ verifyJson: { data: { code: 100, ref_id: 'REF-E2E' } } });

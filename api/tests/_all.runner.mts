@@ -174,6 +174,7 @@ import './telemetry-retention.integration.test.mts';
 import './telemetry-trust.test.mts';
 import './telemetry-dedup.integration.test.mts';
 import './validate.test.mts';
+import './root-hook-globals.test.mts';
 import './waitlist-accept-clock.test.mts';
 import './waitlist-accept-idempotency.integration.test.mts';
 import './prediction-ledger.integration.test.mts';

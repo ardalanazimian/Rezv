@@ -1,4 +1,4 @@
-import { test, describe, after } from 'node:test';
+import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 // merchant_id/sandbox از platform_settings (DB) با fallback به env خوانده
@@ -24,7 +24,6 @@ delete process.env.ZARINPAL_SANDBOX;
 const { requestPayment, verifyPayment } = await import('../src/lib/zarinpal');
 
 const ORIGINAL_FETCH = globalThis.fetch;
-after(() => { globalThis.fetch = ORIGINAL_FETCH; });
 
 type Call = { url: string; body: Record<string, unknown> };
 let calls: Call[];
@@ -47,6 +46,14 @@ function stubFetch(resp: { ok: boolean; status?: number; json: unknown }) {
 
 // ─────────────────────────────────────────────────────────────────────
 describe('zarinpal.requestPayment', () => {
+  // ⚠️ بازیابیِ fetch تا ۲۰۲۶-۰۸-۲۶ یک `after`ِ **ریشه‌ای** بود. هوکِ ریشه به
+  // سوئیتِ ریشه می‌چسبد و رانرِ ما تک-process است، پس آن بازیابی فقط در
+  // **پایانِ کلِ رانِ ۱۳۸۷ تستی** اجرا می‌شد — یعنی از اولین تستِ این فایل به
+  // بعد، `globalThis.fetch` برایِ همه‌ی تست‌های بعدیِ سوئیت stub می‌ماند و هر
+  // درخواستِ واقعیِ آن‌ها یک ۲۰۰ِ ساختگیِ زرین‌پال‌شکل می‌گرفت (سبزِ به‌دلیلِ
+  // غلط). حالا بعد از هر تستِ همین describe بازیابی می‌شود.
+  afterEach(() => { globalThis.fetch = ORIGINAL_FETCH; });
+
   test('⚠️ همیشه currency=IRT می‌فرستد (بدونش مبلغ ۱۰ برابر برداشت می‌شود)', async () => {
     stubFetch({ ok: true, json: { data: { code: 100, authority: 'A' + '0'.repeat(35) } } });
     await requestPayment({ amountToman: 50_000, description: 'تست', callbackUrl: 'https://x/callback' });
@@ -99,6 +106,14 @@ describe('zarinpal.requestPayment', () => {
 
 // ─────────────────────────────────────────────────────────────────────
 describe('zarinpal.verifyPayment', () => {
+  // ⚠️ بازیابیِ fetch تا ۲۰۲۶-۰۸-۲۶ یک `after`ِ **ریشه‌ای** بود. هوکِ ریشه به
+  // سوئیتِ ریشه می‌چسبد و رانرِ ما تک-process است، پس آن بازیابی فقط در
+  // **پایانِ کلِ رانِ ۱۳۸۷ تستی** اجرا می‌شد — یعنی از اولین تستِ این فایل به
+  // بعد، `globalThis.fetch` برایِ همه‌ی تست‌های بعدیِ سوئیت stub می‌ماند و هر
+  // درخواستِ واقعیِ آن‌ها یک ۲۰۰ِ ساختگیِ زرین‌پال‌شکل می‌گرفت (سبزِ به‌دلیلِ
+  // غلط). حالا بعد از هر تستِ همین describe بازیابی می‌شود.
+  afterEach(() => { globalThis.fetch = ORIGINAL_FETCH; });
+
   test('⚠️ همیشه currency=IRT و amount+authority درست می‌فرستد', async () => {
     stubFetch({ ok: true, json: { data: { code: 100, ref_id: 123456 } } });
     await verifyPayment({ authority: 'AUTH1', amountToman: 50_000 });
