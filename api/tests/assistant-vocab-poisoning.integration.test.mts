@@ -1,4 +1,4 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { testIp } from './helpers/test-ip.mts';
 import { readFileSync } from 'node:fs';
@@ -115,8 +115,6 @@ before(async () => {
 });
 
 after(async () => {
-  if (ORIG_MAINT === undefined) delete process.env.MAINTENANCE_KEY;
-  else process.env.MAINTENANCE_KEY = ORIG_MAINT;
   const ids = [restaurantId, retentionRestaurantId];
   await db.restaurantAssistantVocab.deleteMany({ where: { restaurantId: { in: ids } } }).catch(() => {});
   await db.restaurantAssistantLog.deleteMany({ where: { restaurantId: { in: ids } } }).catch(() => {});
@@ -248,6 +246,14 @@ describe('دستیار · مسمومیتِ واژگان مهار می‌شود',
 });
 
 describe('دستیار · هرسِ نگه‌داری', () => {
+  // ⚠️ بازیابی تا ۲۰۲۶-۰۸-۲۶ در هوکِ **ریشه‌ای** بود، یعنی فقط در پایانِ کلِ
+  // ران اجرا می‌شد و تا آن لحظه حالتِ سراسری برایِ همه‌ی فایل‌های بعدیِ
+  // رانرِ تک-process آلوده می‌ماند.
+  afterEach(() => {
+    if (ORIG_MAINT === undefined) delete process.env.MAINTENANCE_KEY;
+    else process.env.MAINTENANCE_KEY = ORIG_MAINT;
+  });
+
   test('🔴 لاگِ قدیمی‌تر از ۹۰ روز هرس می‌شود، تازه‌ها می‌مانند', async () => {
     process.env.MAINTENANCE_KEY = `maint-${SFX}`;
     const old = await db.restaurantAssistantLog.create({

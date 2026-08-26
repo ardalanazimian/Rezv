@@ -1,13 +1,17 @@
 # خط‌مبنایِ «هوکِ ریشه‌ای که حالتِ سراسری می‌نویسد»
-# ساخته‌شده ۲۰۲۶-۰۸-۲۶ · گاردش: tests/root-hook-globals.test.mts
+# گاردش: tests/root-hook-globals.test.mts
 #
-# رانرِ ما تک-process است، پس هوکِ بیرونِ describe روی کلِ سوئیت اثر می‌گذارد.
-# این فایل وضعِ **فعلی** را پین می‌کند تا گارد فقط روی موردِ تازه بشکند.
-# ✅ کوچک‌شدنِ این فایل پیشرفت است — هر خط را با انتقالِ هوک به داخلِ
-#    describeِ همان فایل می‌توان حذف کرد.
-assistant-vocab-poisoning.integration.test.mts :: after :: del:process.env.MAINTENANCE_KEY set:process.env.MAINTENANCE_KEY
-events-restaurant-slug.integration.test.mts :: before :: redis:redis.del
-events-restaurant-slug.integration.test.mts :: after :: redis:redis.del
-sms-queue-fallback-balance.integration.test.mts :: before :: del:process.env.KAVENEGAR_API_KEY
-sms-queue-fallback-balance.integration.test.mts :: after :: del:process.env.KAVENEGAR_API_KEY set:globalThis.fetch set:process.env.KAVENEGAR_API_KEY
-sms-transport-failclosed.integration.test.mts :: after :: del:process.env.KAVENEGAR_API_KEY del:process.env.OTP_DEV_MODE set:process.env.KAVENEGAR_API_KEY set:process.env.NODE_ENV set:process.env.OTP_DEV_MODE
+# رانرِ ما همه‌ی فایل‌ها را در یک process اجرا می‌کند (`_all.runner.mts`)، پس
+# هوکی که بیرونِ هر `describe` نوشته شود به سوئیتِ **ریشه** می‌چسبد و روی کلِ
+# سوئیت اثر می‌گذارد، نه فایلِ خودش.
+#
+# ✅ ۲۰۲۶-۰۸-۲۶ — این فهرست **خالی** است.
+#    از ۱۳ موردِ اولیه به صفر رسید، پس گارد حالا سخت‌گیرِ کامل است: هر هوکِ
+#    ریشه‌ای که `globalThis.*`, `process.env.*` یا `redis.del/flush` بنویسد
+#    بلافاصله قرمز می‌شود.
+#
+# ⚠️ خالی نگهش دار. اگر تستِ گارد قرمز شد، راهِ درست **بردنِ هوک به داخلِ
+#    `describe`ِ همان فایل** است، نه افزودنِ خط به اینجا.
+#
+# (خودِ هوکِ ریشه ممنوع نیست — ۱۵۸ موردش در ریپو هست و درست‌اند، چون فقط
+#  فیکسچرِ خودشان را می‌سازند/پاک می‌کنند. فقط نوشتنِ حالتِ مشترک مسئله است.)

@@ -1,4 +1,4 @@
-import { test, describe, before, after, beforeEach } from 'node:test';
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -41,17 +41,26 @@ async function freshPhone() {
 }
 
 after(async () => {
-  process.env.NODE_ENV = ORIG_ENV;
-  if (ORIG_KEY === undefined) delete process.env.KAVENEGAR_API_KEY;
-  else process.env.KAVENEGAR_API_KEY = ORIG_KEY;
-  if (ORIG_DEV === undefined) delete process.env.OTP_DEV_MODE;
-  else process.env.OTP_DEV_MODE = ORIG_DEV;
   for (const p of made) {
     await db.otpCode.deleteMany({ where: { phone: { contains: p.slice(1) } } }).catch(() => {});
   }
 });
 
 describe('ترانسپورتِ پیامک — fail-closed در تولید', () => {
+  // ⚠️ بازیابیِ محیط تا ۲۰۲۶-۰۸-۲۶ در `after`ِ **ریشه‌ای** بود، یعنی فقط در
+  // پایانِ کلِ ران. تست‌های همین describe `NODE_ENV='production'` و
+  // `OTP_DEV_MODE='true'` ست می‌کنند و `KAVENEGAR_API_KEY` را حذف؛ پس آن
+  // مقادیر تا انتهای ران برایِ **همه‌ی فایل‌های بعدی** روی جا می‌ماندند —
+  // یعنی بقیه‌ی سوئیت با OTPِ حالتِ توسعه و ترانسپورتِ پیکربندی‌نشده اجرا
+  // می‌شد. حالا بعد از هر تست بازیابی می‌شود.
+  afterEach(() => {
+    process.env.NODE_ENV = ORIG_ENV;
+    if (ORIG_KEY === undefined) delete process.env.KAVENEGAR_API_KEY;
+    else process.env.KAVENEGAR_API_KEY = ORIG_KEY;
+    if (ORIG_DEV === undefined) delete process.env.OTP_DEV_MODE;
+    else process.env.OTP_DEV_MODE = ORIG_DEV;
+  });
+
   // ⚠️ این هوک تا ۲۰۲۶-۰۸-۲۶ در **ریشه‌ی فایل** بود، نه داخلِ این describe.
   // هوکِ ریشه به سوئیتِ ریشه می‌چسبد، و رانرِ ما همه‌ی فایل‌ها را در یک
   // process اجرا می‌کند — پس این پاک‌سازی قبل از **هر تستِ کلِ سوئیت**

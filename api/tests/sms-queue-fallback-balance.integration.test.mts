@@ -1,4 +1,4 @@
-import { test, describe, before, after, beforeEach } from 'node:test';
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -87,13 +87,9 @@ before(async () => {
   // بدونِ کلیدِ کاوه‌نگار، `sendSmsNow` هیچ درخواستِ شبکه‌ای نمی‌زند ولی
   // `smsFailed{reason:"no_api_key"}` را می‌شمارد — یعنی «تلاش برای ارسال»
   // قابلِ اندازه‌گیری است بدونِ اینکه پیامکِ واقعی برود.
-  delete process.env.KAVENEGAR_API_KEY;
 });
 
 after(async () => {
-  globalThis.fetch = ORIG_FETCH;
-  if (ORIG_KEY === undefined) delete process.env.KAVENEGAR_API_KEY;
-  else process.env.KAVENEGAR_API_KEY = ORIG_KEY;
   // فقط ردیف‌های خودِ این فایل — نه `kind='sms'`ِ کلی: رانر تک‌پروسه‌ای است و
   // پاک‌کردنِ صفِ دیگران می‌تواند تستِ بعدی را بی‌صدا خراب کند.
   await db.$executeRaw`DELETE FROM jobs WHERE kind = 'sms' AND payload->>'to' = ${guestPhone}`
@@ -104,6 +100,16 @@ after(async () => {
 });
 
 describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ — پول)', () => {
+  // ⚠️ بازیابی تا ۲۰۲۶-۰۸-۲۶ در هوکِ **ریشه‌ای** بود، یعنی فقط در پایانِ کلِ
+  // ران اجرا می‌شد و تا آن لحظه حالتِ سراسری برایِ همه‌ی فایل‌های بعدیِ
+  // رانرِ تک-process آلوده می‌ماند.
+  before(() => { delete process.env.KAVENEGAR_API_KEY; });
+  afterEach(() => {
+    globalThis.fetch = ORIG_FETCH;
+    if (ORIG_KEY === undefined) delete process.env.KAVENEGAR_API_KEY;
+    else process.env.KAVENEGAR_API_KEY = ORIG_KEY;
+  });
+
   beforeEach(async () => { globalThis.fetch = ORIG_FETCH; });
 
   test('کنترلِ مثبت: مسیرِ عادی واقعاً در صف می‌نشیند و اعتبار کم نمی‌کند', async () => {
