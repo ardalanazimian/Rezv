@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openSmsLogin } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════
 //  e2e رفتاریِ پنل‌هایِ فازِ ۴ (پنلِ شرکت → تبِ امنیت):
@@ -76,6 +77,7 @@ function mockPhase4SecurityApi(page: Page) {
 
 async function loginAsAdmin(page: Page) {
   await page.goto(CO);
+  await openSmsLogin(page, 'admin');
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await page.locator('#adminCode').fill('1234');

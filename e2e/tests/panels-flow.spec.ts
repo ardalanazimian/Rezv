@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openSmsLogin } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════
 //  e2e رفتاریِ پنلِ کسب‌وکار (business) — ورودِ staff → بازِ پنل
@@ -134,6 +135,7 @@ test('پنلِ کسب‌وکار: ناوبری به «رزروها» لیستِ 
   await page.goto(BIZ);
 
   // ورودِ staff (دمو)
+  await openSmsLogin(page, 'staff');
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();
   await page.locator('#staffCode').fill('1234');
@@ -163,6 +165,7 @@ test('پنلِ شرکت: ناوبری به «رستوران‌ها» لیستِ 
   await page.goto(CO);
 
   // ورودِ مدیرِ پلتفرم (دمو)
+  await openSmsLogin(page, 'admin');
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await page.locator('#adminCode').fill('1234');
@@ -209,6 +212,7 @@ test('پنلِ شرکت: صفِ «تأییدِ ساعتِ کاری» پیشنه�
   });
 
   await page.goto(CO);
+  await openSmsLogin(page, 'admin');
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await page.locator('#adminCode').fill('1234');

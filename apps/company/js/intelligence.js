@@ -850,7 +850,7 @@ function showAdminLogin(){
     <label class="login-field-label" for="adminPass">رمز عبور</label>
     <input class="login-inp" id="adminPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')adminPasswordLogin()">
     <button class="login-btn" id="adminLoginBtn" onclick="adminPasswordLogin()">ورود به پنل</button>
-    <button class="login-back" onclick="showAdminLoginPhone()">ورود با پیامک</button>
+    <button class="login-back" id="adminSmsLoginBtn" onclick="showAdminLoginPhone()">ورود با پیامک</button>
     <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
   setTimeout(()=>document.getElementById('adminUser')?.focus(),200);
 }

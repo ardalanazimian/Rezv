@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openSmsLogin } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  رگرسیونِ Batch 18 — «موفقیتِ جعلی» در پنلِ کسب‌وکار (پروتکل §۳/§۱۰/§۲۷)
@@ -68,6 +69,7 @@ async function mockBiz(page: Page, opts: Opts = {}) {
 
 async function loginBiz(page: Page) {
   await page.goto(BIZ);
+  await openSmsLogin(page, 'staff');
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();
   await expect(page.locator('#staffCode')).toBeVisible();

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openSmsLogin } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  رگرسیونِ سطوحِ پنلِ کسب‌وکار که فازِ ۲ تغییرشان داد (§۳، §۶، §۲۸)
@@ -59,6 +60,7 @@ async function mockPanelApi(page: Page) {
 
 async function loginBusiness(page: Page) {
   await page.goto(BIZ);
+  await openSmsLogin(page, 'staff');
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();
   await expect(page.locator('#staffCode')).toBeVisible();

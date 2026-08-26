@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openSmsLogin } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  تبِ «کارکنان» با **نقش** گیت می‌شود، نه با کلیدِ مجوز
@@ -37,6 +38,7 @@ async function loginAs(page: Page, role: 'owner' | 'manager' | 'staff', permissi
 
   await page.goto(BUSINESS);
   await page.locator('#staffPhone').waitFor({ timeout: 15_000 });
+  await openSmsLogin(page, 'staff');
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();
   await page.locator('#staffCode').waitFor({ timeout: 15_000 });

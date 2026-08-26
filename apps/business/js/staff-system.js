@@ -452,7 +452,7 @@ function showStaffLogin(){
     <label class="login-field-label" for="staffPass">رمز عبور</label>
     <input class="login-inp" id="staffPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')staffPasswordLogin()">
     <button class="login-btn" id="staffLoginBtn" onclick="staffPasswordLogin()">ورود به پنل</button>
-    <button class="login-back" onclick="showStaffLoginPhone()">ورود با پیامک</button>
+    <button class="login-back" id="staffSmsLoginBtn" onclick="showStaffLoginPhone()">ورود با پیامک</button>
     <div class="login-foot">اگر نام کاربری نداری، با پشتیبانی رزرونو تماس بگیر</div>`;
   setTimeout(()=>document.getElementById('staffUser')?.focus(),200);
 }
