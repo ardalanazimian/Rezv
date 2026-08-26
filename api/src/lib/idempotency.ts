@@ -19,7 +19,16 @@ const log = createLogger('idempotency');
 
 type IdempotentResult<T> =
   | { replayed: true; response: T }
-  | { replayed: false; commit: (response: T) => Promise<void> };
+  | {
+      replayed: false;
+      commit: (response: T) => Promise<void>;
+      /** مسیرِ خطا: کلیدِ claim‌شده را آزاد کن تا retry خطایِ **واقعی** را ببیند.
+       *  بدونِ این، هر شکستِ عملیات کلید را ۶۰ ثانیه (STALE_IN_PROGRESS_MS) در
+       *  in_progress رها می‌کند و تلاشِ دوباره به‌جای علتِ واقعی
+       *  ۴۰۹ IDEMPOTENCY_CONFLICT می‌گیرد — یعنی همان «خطایِ ناصادق» که §۶
+       *  ممنوع می‌کند. فراخوانی‌اش اختیاری است؛ مصرف‌کننده‌های قدیمی دست‌نخورده‌اند. */
+      release: () => Promise<void>;
+    };
 
 // اگر یک کلید بیش از این مدت in_progress بماند (مثلاً process وسط کار مرد یا
 // commit شکست خورد)، «کهنه» تلقی و قابل‌بازپس‌گیری می‌شود تا 409 دائمی نشود.
@@ -43,8 +52,8 @@ export async function withIdempotency<T>(
   actor: string,
 ): Promise<IdempotentResult<T>> {
   if (!clientKey) {
-    // بدون کلید → بدون محافظت؛ commit کاری نمی‌کند
-    return { replayed: false, commit: async () => {} };
+    // بدون کلید → بدون محافظت؛ commit و release هر دو no-op
+    return { replayed: false, commit: async () => {}, release: async () => {} };
   }
 
   // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰) — با اجرای زنده اثبات شد، نه از رویِ کد:
@@ -84,6 +93,14 @@ export async function withIdempotency<T>(
     .update(`${scope.length}:${scope}|${actor.length}:${actor}|${clientKey}`)
     .digest('hex');
 
+  // فقط ردیفِ هنوز-in_progress حذف می‌شود: اگر رقیبی در همین فاصله commit کرده
+  // باشد، پاسخِ ذخیره‌شده‌اش نباید پاک شود.
+  const makeRelease = () => async () => {
+    await db.idempotencyKey
+      .deleteMany({ where: { key, status: 'in_progress' } })
+      .catch(() => {});
+  };
+
   const makeCommit = () => async (response: T) => {
     // اگر ذخیره‌ی پاسخ شکست خورد، کلید را به‌جای رهاکردن در in_progress، حذف کن
     // تا retry بعدی بتواند دوباره claim کند (نه اینکه 409 دائمی بگیرد).
@@ -107,7 +124,7 @@ export async function withIdempotency<T>(
   `;
 
   if (claimed.length > 0) {
-    return { replayed: false, commit: makeCommit() };
+    return { replayed: false, commit: makeCommit(), release: makeRelease() };
   }
 
   // کلید تکراری — وضعیتش را بخوان
@@ -130,7 +147,7 @@ export async function withIdempotency<T>(
       `;
       if (reclaimed.length > 0) {
         log.warn('کلید idempotency کهنه بازپس‌گرفته شد', { scope, ageMs: age });
-        return { replayed: false, commit: makeCommit() };
+        return { replayed: false, commit: makeCommit(), release: makeRelease() };
       }
       // اگر بازپس‌گیری نشد یعنی رقیب همین لحظه done کرد → دوباره بخوان.
       const after = await db.idempotencyKey.findUnique({ where: { key } });

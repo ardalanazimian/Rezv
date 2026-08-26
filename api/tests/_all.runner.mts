@@ -175,6 +175,7 @@ import './telemetry-trust.test.mts';
 import './telemetry-dedup.integration.test.mts';
 import './validate.test.mts';
 import './waitlist-accept-clock.test.mts';
+import './waitlist-accept-idempotency.integration.test.mts';
 import './prediction-ledger.integration.test.mts';
 import './public-menu.integration.test.mts';
 import './temporal-leakage.integration.test.mts';
