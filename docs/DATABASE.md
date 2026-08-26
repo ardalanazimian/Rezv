@@ -328,3 +328,15 @@ There is **no global soft-delete column**. Instead:
   a live requirement; a skipped cron run does not break inserts.
 - Keep `schema.prisma` in sync with the live DB — the `⚠️ همگام‌سازی‌شده`
   comments mark fields that previously existed only in the DB.
+
+## SPEC-B (migration 076) — provisioning و دعوتِ owner
+
+- `restaurants.provision_status` (enum `restaurant_provision_status`:
+  `PENDING_ACTIVATION|ACTIVE|SUSPENDED|OFFBOARDED`). DEFAULT عمداً `ACTIVE`
+  است تا ردیف‌های موجود «در انتظار» نشوند؛ مسیرِ provision صریح PENDING
+  می‌نویسد و اولین ورودِ موفقِ owner (هوک در verify/login) ACTIVE می‌کند.
+- `tenants.branch_limit` — سقفِ شعبه، سطحِ تنانت.
+- جدولِ **`staff_invites`** (نامِ جمع طبق قراردادِ repo): `token` یکتای ۶۴هگزی
+  (شناسه‌ی لینک، **نه** احرازِ هویت)، `status` enum، `expires_at` (۷۲h)،
+  سه FK با `ON DELETE CASCADE ON UPDATE CASCADE` (بندِ ON UPDATE عمدی است —
+  گاردِ drift بدونش قرمز می‌شود، درسِ ۰۶۵). منطق: `api/src/lib/provisioning.ts`.

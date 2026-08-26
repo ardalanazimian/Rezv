@@ -4,12 +4,10 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { computeSubscriptionStatus } from '@/lib/subscription';
-import { audit } from '@/lib/audit';
 import { Err } from '@/lib/errors';
 import { parseBody, zPhone, zUsername, zPassword, z } from '@/lib/schemas';
-import { normalizePhone } from '@/lib/otp';
-import { hashPassword, normalizeUsername, passwordPolicyError, usernamePolicyError } from '@/lib/password';
-import { clubPrefixFrom, slugSeed, uniqueRestaurantSlug } from '@/lib/site-orders';
+import { withIdempotency } from '@/lib/idempotency';
+import { provisionBusiness } from '@/lib/provisioning';
 
 import { withApiMetrics } from '@/lib/api-metrics';
 
@@ -33,6 +31,8 @@ async function GET_impl(req: Request) {
           tenant_id: r.tenant.id, plan: r.tenant.plan, is_open: r.isOpen,
           members: r._count.members, reservations: r._count.reservations,
           sms_balance: r.smsBalance, sms_total_sent: r.smsTotalSent,
+          // SPEC-B: وضعیتِ provisioning برای badge/دکمه‌ی دعوت در پنلِ شرکت
+          provision_status: r.provisionStatus,
           joined_at: r.createdAt,
           // وضعیت واقعی اشتراک — دیگر ساختگی نیست
           subscription_status: sub.status,
@@ -51,115 +51,81 @@ export const GET = withApiMetrics('/api/v1/admin/restaurants', GET_impl);
 
 
 // ═══════════════════════════════════════════════════════════════════════
-//  POST — ساختِ مستقیمِ کسب‌وکار از پنلِ شرکت (۲۰۲۶-۰۸-۲۶)
+//  POST — provisioningِ کسب‌وکار از پنلِ شرکت (SPEC-B، بازنویسیِ ۰۸-۲۶ دورِ ۲)
 //
-//  حکمِ معماری (مالکِ محصول): «پنلِ بیزنس باید از داخلِ پنلِ کمپانی ساخته
-//  بشه». تا امروز تنها مسیرِ ساخت، دموی سایت (`createTrialAccount`) یا
-//  فعال‌سازیِ سفارش (`activateOrder`) بود — یعنی ادمین بدونِ یک سفارشِ سایت
-//  نمی‌توانست مشتریِ تلفنی/حضوری را onboard کند.
+//  این نسخه لایه‌ی نازک است: کلِ منطقِ §۶ (تراکنش، slug، dup، دعوت، audit)
+//  به lib/provisioning.ts رفت — سه مصرف‌کننده دارد (create/resend/branches)
+//  و قاعده‌ی «یک پیاده‌سازی» حاکم است.
 //
-//  از قصد از همان بلوک‌های سازنده‌ی مسیرِ trial استفاده می‌شود (§۶ — یک
-//  پیاده‌سازی): slug/clubPrefix/میزهای شروع/اعتبارِ پیامکِ اولیه، و برای
-//  اعتبارنامه همان سیاست‌های lib/password (نه نسخه‌ی دوم).
-//
-//  تراکنشی: یا tenant+restaurant+staff با هم ساخته می‌شوند یا هیچ‌کدام.
+//  Idempotency-Key **اجباری** است (§۵-۱ spec): دابل‌کلیکِ ادمین/retryِ شبکه
+//  نباید دو کسب‌وکار بسازد. الگو عیناً walkin/route.ts.
 // ═══════════════════════════════════════════════════════════════════════
 const createSchema = z.object({
-  business_name: z.string().trim().min(2).max(80),
+  business_name: z.string().trim().min(2).max(120),
   city: z.string().trim().max(60).optional(),
   plan: z.enum(['free', 'pro', 'enterprise']).optional(),
+  trial_days: z.number().int().min(0).max(90).optional(),
+  slug: z.string().trim().max(40).optional(),
   owner_phone: zPhone,
-  owner_name: z.string().trim().max(80).optional(),
-  // اختیاری — با هم یا هیچ‌کدام (نیمه‌پیکربندی نیمه‌فعال نمی‌شود):
+  owner_name: z.string().trim().min(2).max(80).optional(),
   username: zUsername.optional(),
   password: zPassword.optional(),
+  seed_defaults: z.object({ tables: z.number().int().min(0).max(100).optional() }).optional(),
+  // C8ِ برنامه: پذیرفته می‌شود که پیامِ خطا دقیق باشد، ولی پشتیبانی نمی‌شود —
+  // «قدیمی‌ترین ثبتِ شماره برنده است» (مهاجرتِ ۰۷۲) ورودِ ownerِ دوم را ناممکن می‌کرد.
+  attach_existing_owner: z.boolean().optional(),
 });
 
 async function POST_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
-    const b = await parseBody(req, createSchema);
 
-    const phone = normalizePhone(b.owner_phone);
-    // شماره‌ای که از قبل مالکِ کسب‌وکار است: ساختِ دومی به‌جای ورود، خطای
-    // انسانیِ رایجِ اپراتور است — صریح رد می‌شود (همان قاعده‌ی trial).
-    const existing = await db.staff.findFirst({ where: { phone }, select: { id: true } });
-    if (existing) throw Err.validation('این شماره از قبل حسابِ کسب‌وکار دارد؛ برای شعبه‌ی جدید از branches استفاده کنید.');
-
-    // اعتبارنامه‌ی اختیاری — کاملِ کامل یا هیچ (همان قراردادِ staff-credentials).
-    let credentials: { username: string; passwordHash: string; passwordUpdatedAt: Date } | null = null;
-    if (b.username || b.password) {
-      if (!b.username || !b.password) throw Err.validation('برای ورود با رمز، هر دو فیلدِ username و password لازم است');
-      const uErr = usernamePolicyError(b.username);
-      if (uErr) throw Err.validation(uErr);
-      const pErr = passwordPolicyError(b.password);
-      if (pErr) throw Err.validation(pErr);
-      const username = normalizeUsername(b.username);
-      const taken = await db.staff.findUnique({ where: { username }, select: { id: true } });
-      if (taken) throw Err.validation(`نام کاربری «${username}» قبلاً گرفته شده است`);
-      credentials = { username, passwordHash: await hashPassword(b.password), passwordUpdatedAt: new Date() };
+    // ترتیبِ §۶ی spec: چکِ idempotency (گامِ ۲) **قبل از** اعتبارسنجیِ بدنه
+    // (گامِ ۳) — replay باید پاسخِ ذخیره‌شده را برگرداند حتی با بدنه‌ی
+    // ناقصِ retry؛ وگرنه retryِ صادقانه ۴۲۲ می‌گرفت (در دودِ زنده دیده شد).
+    const idemKey = req.headers.get('Idempotency-Key') ?? undefined;
+    if (!idemKey) throw Err.validation('هدرِ Idempotency-Key اجباری است (جلوگیری از ساختِ دوباره با دابل‌کلیک/retry)');
+    const idem = await withIdempotency<{ status: number; body: unknown }>(idemKey, 'admin-provision', `admin:${admin.sub}`);
+    if (idem.replayed) {
+      return NextResponse.json(idem.response.body, { status: idem.response.status });
     }
 
-    const slug = await uniqueRestaurantSlug(slugSeed(b.business_name, phone.slice(-6)));
+    const b = await parseBody(req, createSchema);
 
-    const created = await db.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({
-        data: { name: b.business_name, plan: b.plan ?? 'free' },
-        select: { id: true, plan: true },
-      });
-      const restaurant = await tx.restaurant.create({
-        data: {
-          tenantId: tenant.id,
-          slug,
-          name: b.business_name,
-          city: b.city || null,
-          clubPrefix: clubPrefixFrom(b.business_name),
-          // همان مقادیرِ مسیرِ trial — پنلِ خالی/بی‌اعتبار عملاً مرده است.
-          smsBalance: 50,
-          tables: {
-            create: [2, 2, 2, 4, 4, 4, 6, 8].map((capacity, i) => ({
-              number: i + 1,
-              capacity,
-              zone: i < 3 ? 'window' : i < 6 ? 'indoor' : i === 6 ? 'vip' : 'outdoor',
-              shape: capacity >= 6 ? 'booth' : i % 3 === 0 ? 'round' : 'rectangle',
-            })),
-          },
-        },
-        select: { id: true, slug: true, name: true },
-      });
-      const staff = await tx.staff.create({
-        data: {
-          tenantId: tenant.id, phone, name: b.owner_name || b.business_name,
-          role: 'owner', isActive: true, ...(credentials ?? {}),
-        },
-        select: { id: true, username: true },
-      });
-      return { tenant, restaurant, staff };
-    });
+    if (b.attach_existing_owner) {
+      throw Err.conflict(
+        'attach_existing_owner_unsupported',
+        'اتصالِ مالکِ موجود پشتیبانی نمی‌شود؛ برای شعبه‌ی جدیدِ همان مالک از POST /admin/restaurants/{id}/branches استفاده کنید.',
+      );
+    }
 
-    // ساختِ کسب‌وکار = عملِ سطحِ پلتفرم؛ حتماً ردِ audit دارد.
-    await audit({
-      action: 'admin.business_created', actorId: admin.sub, actorType: 'admin',
-      targetId: created.restaurant.id, restaurantId: created.restaurant.id, ip: clientIp(req),
-      detail: {
-        business_name: b.business_name, plan: created.tenant.plan,
-        owner_phone_suffix: phone.slice(-4), with_credentials: !!credentials,
-      },
-    });
+    const result = await provisionBusiness({
+      businessName: b.business_name,
+      city: b.city,
+      plan: b.plan,
+      trialDays: b.trial_days,
+      slug: b.slug,
+      ownerPhone: b.owner_phone,
+      ownerName: b.owner_name,
+      username: b.username,
+      password: b.password,
+      seedTables: b.seed_defaults?.tables,
+    }, { adminId: admin.sub, ip: clientIp(req) });
 
-    return NextResponse.json({
-      restaurant: created.restaurant,
-      tenant_id: created.tenant.id,
-      owner: {
-        staff_id: created.staff.id,
-        phone,
-        username: created.staff.username,   // null اگر اعتبارنامه ست نشده
-      },
-      login: credentials
+    const body = {
+      tenant_id: result.tenantId,
+      restaurant: result.restaurant,
+      owner: { staff_id: result.owner.staffId, phone: result.owner.phone, username: result.owner.username },
+      provision_status: result.provisionStatus,
+      trial_ends_at: result.trialEndsAt,
+      invite_sent_to: result.inviteSentTo,
+      login: result.owner.username
         ? { app: 'business', method: 'password' }
         : { app: 'business', method: 'otp' },
-    }, { status: 201 });
+    };
+    await idem.commit({ status: 201, body });
+    return NextResponse.json(body, { status: 201 });
   } catch (e) { return errorResponse(e); }
 }
 

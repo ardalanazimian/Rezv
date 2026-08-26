@@ -14,9 +14,13 @@ model Tenant {
   planExpiresAt DateTime?    @map("plan_expires_at")
   trialEndsAt   DateTime?    @map("trial_ends_at")
   version       Int          @default(1)   // Optimistic Lock — جلوگیری از Lost Update در ویرایشِ همزمان
+  // SPEC-B (migration 076): سقفِ شعبه‌های این تنانت. سطحِ tenant است نه
+  // رستوران — سهمیه روی کلِ زنجیره اعمال می‌شود (C4ِ برنامه).
+  branchLimit   Int          @default(1) @map("branch_limit")
   createdAt     DateTime     @default(now()) @map("created_at")
   restaurants   Restaurant[]
   staff         Staff[]
+  staffInvites  StaffInvite[]
   @@map("tenants")
 }
 
@@ -111,6 +115,7 @@ model Staff {
   // drift-fix (فازِ ۲، §۲۴): در DB وجود دارد، در schema اعلام نشده بود.
   @@index([restaurantId])
   @@index([phone, createdAt, id], map: "staff_phone_created_idx")
+  invites   StaffInvite[]
   @@map("staff")
 }
 
@@ -171,6 +176,10 @@ model Restaurant {
   // این فیلد و بقیه‌ی موارد مشابه («⚠️ همگام‌سازی‌شده») از قبل روی DB بودند ولی هرگز
   // در این schema.prisma منعکس نشده بودند (drift بین DB و ریپو — کشف‌شده و رفع‌شده).
   paymentEnabled Boolean         @default(false) @map("payment_enabled") // فعال/غیرفعال‌بودن پرداخت آنلاین این رستوران
+  // SPEC-B (migration 076): چرخه‌ی provisioning. DEFAULT عمداً ACTIVE است تا
+  // ردیف‌های موجود یک‌شبه «در انتظار» نشوند (C11)؛ مسیرِ provision صریح
+  // PENDING_ACTIVATION می‌نویسد و اولین ورودِ موفقِ owner آن را ACTIVE می‌کند.
+  provisionStatus RestaurantProvisionStatus @default(ACTIVE) @map("provision_status")
   createdAt     DateTime         @default(now()) @map("created_at")
   tables        Table[]
   menuItems     MenuItem[]
@@ -223,6 +232,7 @@ model Restaurant {
   @@map("restaurants")
   modelPredictions ModelPrediction[]
   outreachLog      OutreachLog[]
+  staffInvites     StaffInvite[]
 }
 
 // ── شکل میز (برای نقشه‌ی بصری و چیدمان) ──
@@ -1025,6 +1035,48 @@ model StaffPermission {
   canManageSettings     Boolean @default(false) @map("can_manage_settings")
   updatedAt             DateTime @updatedAt @map("updated_at")
   @@map("staff_permissions")
+}
+
+// ═══ SPEC-B (migration 076) — provisioning و دعوتِ owner ═══
+
+enum RestaurantProvisionStatus {
+  PENDING_ACTIVATION // ساخته شد، owner هنوز اولین ورود را نکرده
+  ACTIVE
+  SUSPENDED          // موقتاً معلق؛ داده حفظ می‌شود (نگاشت به isOpen=false در control)
+  OFFBOARDED         // خروجِ نهایی — بدونِ حذفِ فیزیکی
+
+  @@map("restaurant_provision_status")
+}
+
+enum StaffInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+
+  @@map("staff_invite_status")
+}
+
+/// دعوتِ اولین ورودِ owner. توکن فقط «شناسه‌ی مقصدِ لینک» است، نه احرازِ
+/// هویت — احراز همان OTP/رمزِ موجود است (§۳-۲ spec، C10ِ برنامه).
+model StaffInvite {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  restaurantId String            @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  staffId      String            @map("staff_id") @db.Uuid
+  staff        Staff             @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  phone        String
+  token        String            @unique
+  status       StaffInviteStatus @default(PENDING)
+  expiresAt    DateTime          @map("expires_at") @db.Timestamptz
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tenantId])
+  @@index([phone])
+  // نامِ جمع طبق قراردادِ repo (C13)، نه staff_invite مفردِ spec.
+  @@map("staff_invites")
 }
 
 // ── Audit Log عمومی برای رویدادهای امنیتی/حاکمیتی (observability) ──

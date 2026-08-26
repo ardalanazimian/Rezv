@@ -90,7 +90,8 @@ function rOverview(){
 function rRestaurants(){
   document.getElementById('v-restaurants').innerHTML=`
     <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">همه‌ی رستوران‌ها</div><div class="panel-sub">${fa(RESTAURANTS.length)} رستوران در پلتفرم</div></div></div>
+      <div class="panel-head"><div><div class="panel-title">همه‌ی رستوران‌ها</div><div class="panel-sub">${fa(RESTAURANTS.length)} رستوران در پلتفرم</div></div>
+        <button class="btn btn-primary" onclick="openProvisionModal()" aria-label="ساختِ رستورانِ جدید">${icon('plus',{size:14})} رستوران جدید</button></div>
       <div class="rest-controls">
         <button class="filter-chip ${restFilter==='all'?'active':''}" onclick="setRestFilter('all')">همه (${fa(RESTAURANTS.length)})</button>
         <button class="filter-chip ${restFilter==='active'?'active':''}" onclick="setRestFilter('active')">${icon('check',{size:13})} فعال (${fa(RESTAURANTS.filter(r=>r.status==='active').length)})</button>
@@ -190,3 +191,90 @@ document.addEventListener('keydown', e => {
 function openRest(id){currentRest=RESTAURANTS.find(r=>String(r.id)===String(id));if(!currentRest)return;nav('detail')}
 
 // ════════ صفحه‌ی جزئیات رستوران ════════
+
+// ═══════════ SPEC-B — مودالِ «رستوران جدید» (provisioning از پنلِ شرکت) ═══════════
+// Idempotency-Key یک‌بار هنگامِ بازشدنِ مودال ساخته می‌شود: دابل‌کلیک روی
+// «بساز» یا retryِ شبکه با همان کلید می‌رود و سرور همان پاسخ را برمی‌گرداند —
+// دو رستوران ساخته نمی‌شود. چهار حالتِ الزامی: loading/error/success/(empty
+// در خودِ لیست).
+let _provIdemKey = null;
+function _provSlugPreview(name){
+  // پیش‌نمایشِ سمتِ کلاینت — منبعِ حقیقت سرور است (uniqueRestaurantSlug).
+  const ascii = (name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+  return ascii.length >= 3 ? ascii.slice(0,40) : '(خودکار از سرور)';
+}
+function openProvisionModal(){
+  // گاردِ دابل‌تپ/دابل‌dispatch (مشاهده‌ی واقعی روی WebKitِ موبایل): بازکردنِ
+  // دوباره، فرم را با ورودی‌های خالی بازمی‌ساخت و تایپِ کاربر (و مقدارِ
+  // fillِ تست) را می‌بلعید. اگر مودالِ همین فرم باز است، فقط focus.
+  if (document.getElementById('pvName')) { document.getElementById('pvName').focus(); return; }
+  _provIdemKey = 'prov-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,10);
+  openModal(`
+    <div class="modal-title">رستورانِ جدید</div>
+    <div class="modal-sub">تنانت + رستوران + مالک یک‌جا ساخته می‌شود؛ پیامکِ دعوتِ اولین‌ورود برای مالک می‌رود</div>
+    <div style="display:grid;gap:10px;margin-top:14px;max-height:52vh;overflow-y:auto">
+      <label style="display:grid;gap:4px;font-size:13px"><span>نامِ رستوران *</span><input id="pvName" maxlength="120" class="inp" oninput="document.getElementById('pvSlugPrev').textContent=_provSlugPreview(this.value)"></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>نامِ مالک</span><input id="pvOwner" maxlength="80" class="inp"></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>موبایلِ مالک *</span><input id="pvPhone" class="inp" inputmode="tel" dir="ltr" placeholder="09xxxxxxxxx"></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>پلن</span><select id="pvPlan" class="inp"><option value="free">free</option><option value="pro">pro</option><option value="enterprise">enterprise</option></select></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>روزهای آزمایشی (۰–۹۰)</span><input id="pvTrial" class="inp" type="number" min="0" max="90" value="14" dir="ltr"></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>slug (اختیاری)</span><input id="pvSlug" class="inp" dir="ltr" placeholder="a-z0-9-"><span class="tiny" style="color:var(--muted)">پیش‌نمایش: <b id="pvSlugPrev" dir="ltr">(خودکار از سرور)</b></span></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>تعدادِ میزِ شروع</span><input id="pvTables" class="inp" type="number" min="0" max="100" value="8" dir="ltr"></label>
+      <div id="pvErr" role="alert" style="display:none;color:var(--red,#c0392b);font-size:13px"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-primary" id="pvSubmit" style="flex:1" onclick="submitProvision()">بساز و دعوت بفرست</button>
+      <button class="btn btn-ghost" onclick="closeModal()">انصراف</button>
+    </div>`);
+  // فوکوسِ deferred حذف شد (یافته‌ی probe در E2E): openModal خودش sync اولین
+  // ورودی را فوکوس می‌کند؛ نسخه‌ی setTimeoutدار ۱۵۰ms بعد فوکوس را از فیلدی
+  // که کاربر/تست همان لحظه در آن تایپ می‌کرد می‌دزدید و رویِ WebKit ورودی به
+  // فیلدِ اشتباه می‌رفت (pvPhone خالی می‌ماند).
+}
+// نگاشتِ details.reason → پیامِ فارسیِ قابلِ‌فهم (§۹ spec)
+const PROV_REASON_FA = {
+  duplicate_owner_phone: 'این شماره قبلاً مالکِ یک رستوران است — برای شعبه‌ی جدید از صفحه‌ی همان رستوران «افزودنِ شعبه» را بزن.',
+  slug_unavailable: 'این slug قبلاً گرفته شده؛ یکی دیگر انتخاب کن یا خالی بگذار تا خودکار ساخته شود.',
+  username_taken: 'این نامِ کاربری قبلاً گرفته شده است.',
+  branch_limit_reached: 'سقفِ شعبه‌های این تنانت پر است.',
+};
+async function submitProvision(){
+  const btn=document.getElementById('pvSubmit');
+  const errEl=document.getElementById('pvErr');
+  const name=(document.getElementById('pvName')?.value||'').trim();
+  const phone=(document.getElementById('pvPhone')?.value||'').trim();
+  const showErr=(m)=>{ if(errEl){ errEl.textContent=m; errEl.style.display='block'; } };
+  if(errEl) errEl.style.display='none';
+  if(name.length<2){ showErr('نامِ رستوران را بنویس (حداقل ۲ حرف).'); return; }
+  if(!/^09\d{9}$/.test(phone.replace(/[۰-۹]/g,(d)=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))){ showErr('شماره‌ی موبایلِ معتبر واردکن (09xxxxxxxxx).'); return; }
+  const body={
+    business_name:name,
+    owner_phone:phone.replace(/[۰-۹]/g,(d)=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
+    plan:document.getElementById('pvPlan')?.value||'free',
+    trial_days:Math.max(0,Math.min(90,parseInt(document.getElementById('pvTrial')?.value||'14',10)||0)),
+  };
+  const owner=(document.getElementById('pvOwner')?.value||'').trim(); if(owner) body.owner_name=owner;
+  const slug=(document.getElementById('pvSlug')?.value||'').trim(); if(slug) body.slug=slug;
+  const tables=parseInt(document.getElementById('pvTables')?.value||'8',10);
+  if(Number.isFinite(tables)) body.seed_defaults={tables:Math.max(0,Math.min(100,tables))};
+
+  // ── loading: قفلِ submit (چهار حالتِ الزامی) ──
+  if(btn){ btn.disabled=true; btn.textContent='در حالِ ساخت…'; }
+  const res=await API.adminCreateRestaurant(body,_provIdemKey);
+  if(res.ok){
+    const d=res.data||{};
+    openModal(`
+      <div style="text-align:center;padding:6px 0">
+        <div style="color:var(--green-600,#1a7f4b);margin-bottom:10px">${icon('checkCircle',{size:40})}</div>
+        <div class="modal-title" style="text-align:center">رستوران ساخته شد</div>
+        <div class="modal-sub" style="text-align:center">دعوتِ اولین‌ورود به <b dir="ltr">${esc(d.invite_sent_to||'')}</b> ارسال شد</div>
+        <div style="margin:12px 0;font-size:13px">slug: <span class="code-pill" dir="ltr">${esc(d.restaurant?.slug||'')}</span></div>
+        <button class="btn btn-primary btn-block" onclick="closeModal();loadAdminRestaurants().then(rRestaurants)">باشه</button>
+      </div>`);
+    return;
+  }
+  // ── error: پیامِ فارسی بر اساسِ details.reason — نه «خطای ناشناخته» ──
+  if(btn){ btn.disabled=false; btn.textContent='بساز و دعوت بفرست'; }
+  const reason=res.error?.details?.reason;
+  showErr(PROV_REASON_FA[reason] || res.error?.message || (res.offline?'اتصال به سرور برقرار نشد.':'ساخت ناموفق بود؛ دوباره تلاش کن.'));
+}

@@ -278,6 +278,16 @@ curl "$API/api/v1/restaurant/reservations?date=2026-07-10" \
 
 ## Platform admin — `/v1/admin/*` (auth: `platform-admin`)
 
+### SPEC-B — provisioning (۲۰۲۶-۰۸-۲۶)
+
+| endpoint | نکته |
+|---|---|
+| `POST /v1/admin/restaurants` | ساختِ اتمیکِ tenant+رستوران+مالک(+اعتبارنامه‌ی اختیاری)+دعوتِ پیامکی. **هدرِ `Idempotency-Key` اجباری** (replay = همان پاسخ). خطاها: `409 CONFLICT` با `details.reason` ∈ `duplicate_owner_phone|slug_unavailable|username_taken|attach_existing_owner_unsupported`. |
+| `POST /v1/admin/restaurants/[id]/resend-invite` | توکن/انقضای نو؛ PENDING قبلی REVOKED. |
+| `POST /v1/admin/restaurants/[id]/branches` | شعبه زیرِ **همان** tenant، بدونِ staffِ جدید؛ سقف: `tenants.branch_limit` → `409 branch_limit_reached`. |
+| `POST /v1/auth/invite/[token]/claim` (public) | اطلاعاتِ دعوت + متدهای ورودِ فعال (`{otp, password}`)؛ mutate نمی‌کند — پذیرش side-effectِ ورودِ موفق است. منقضی/نامعتبر → ۴۰۴. |
+
+
 | Route | Method(s) | Purpose |
 |---|---|---|
 | `/overview` | GET | Platform KPIs. |

@@ -10,7 +10,9 @@ export type SmsJob = {
     // ── قالب‌های چرخه‌ی حیات رزرو ──
     | 'booking_waitlist' | 'booking_preparing' | 'booking_rejected'
     | 'booking_cancelled' | 'booking_noshow' | 'booking_thanks'
-    | 'waitlist_joined' | 'waitlist_offer';
+    | 'waitlist_joined' | 'waitlist_offer'
+    // SPEC-B: دعوتِ اولین‌ورودِ owner — tokens: [ownerName, restaurantName, inviteUrl]
+    | 'staff_invite';
   tokens: string[];
   restaurantId?: string;  // اگر مشخص باشد، از موجودی SMS رستوران کم می‌شود (OTP سطح پلتفرم آن را ندارد)
   /**
@@ -64,6 +66,7 @@ function bodyIdFor(template: SmsJob['template']): string | undefined {
     booking_thanks: process.env.MELIPAYAMAK_BODYID_THANKS,
     waitlist_joined: process.env.MELIPAYAMAK_BODYID_WL_JOIN,
     waitlist_offer: process.env.MELIPAYAMAK_BODYID_WL_OFFER,
+    staff_invite: process.env.MELIPAYAMAK_BODYID_INVITE,
   };
   return map[template];
 }
