@@ -104,6 +104,19 @@ export const metrics = {
   emailSent: new Counter('rezervno_email_sent_total', 'تعداد ایمیل‌هایی که ارائه‌دهنده واقعاً پذیرفت'),
   emailFailed: new Counter('rezervno_email_failed_total', 'تعداد ایمیل‌های ناموفق (به دستِ گیرنده نرسید)'),
   pushNotSent: new Counter('rezervno_push_not_sent_total', 'تعداد اعلان‌های push که ارسال نشدند چون ترنسپورتِ push هنوز ساخته نشده'),
+  // ⚠️ همان الگویِ smsSuppressed/inAppSuppressed، و به همان دلیل: «رویداد
+  // رسید ولی درج نشد» نه موفقیت است نه خطا — و تا امروز **سکوتِ کامل** بود.
+  //
+  // یافته‌ی اندازه‌گیری‌شده‌ی ۲۰۲۶-۰۸-۲۶: هر دو نامِ رویدادی که کلاینت‌ها
+  // واقعاً می‌فرستند (`app.opened`, `page.viewed`) خارج از allowlistِ سرور
+  // بودند، پس **۱۰۰٪** تله‌متریِ کلاینت بی‌صدا دور ریخته می‌شد در حالی که
+  // پاسخِ ۲۰۲ برمی‌گشت. بدونِ این متریک هیچ سیگنالی وجود نداشت — نه لاگ،
+  // نه شمارنده — و همین باعث شد ماه‌ها دیده نشود.
+  //
+  // برچسب‌ها: `reason` = shape|prefix ، `type` = نامِ رویداد (مهارشده؛ به
+  // `capTelemetryTypeLabel` رجوع کن — ورودیِ کلاینت است و بدونِ مهار هم
+  // نشتِ حافظه می‌داد و هم می‌توانست متنِ Prometheus را خراب کند).
+  telemetryEventRejected: new Counter('rezervno_telemetry_event_rejected_total', 'تعداد رویدادهای تله‌متری که به‌خاطرِ نامِ خارج از allowlist درج نشدند'),
   // ⚠️ آلارم‌پذیر و باید همیشه صفر باشد: یعنی مدلی ذخیره شده که با بردارِ
   // ویژگیِ فعلی جور نیست و امتیازدهی throw کرده. سیستم به heuristic افتاده
   // (رزرو نمی‌شکند) ولی هوش خاموش شده — و بدونِ این متریک، بی‌صدا.
@@ -206,6 +219,41 @@ export function capRouteLabel(route: string): string {
 /** تعدادِ الگوهای مسیرِ دیده‌شده — فقط برای تست/تشخیص. */
 export function routeLabelCount(): number {
   return seenRouteLabels.size;
+}
+
+/**
+ * مهارِ برچسبِ `type` برایِ متریکِ تله‌متری — **دو** خطر، نه یکی.
+ *
+ * ۱) نشتِ حافظه/کاردینالیتی: `type` مستقیماً از بدنه‌ی درخواستِ کلاینت می‌آید و
+ *    تنها اعتبارسنجی‌اش «رشته‌ی ۱ تا ۱۲۰ کاراکتری» است. بدونِ مهار، هر مقدارِ
+ *    یکتا یک label-set تازه در مپِ in-memory می‌ساخت که هرگز پاک نمی‌شود —
+ *    یعنی یک کلاینت با ۱۲۰ درخواست در دقیقه می‌توانست تا ۶۰۰۰ برچسبِ ماندگار
+ *    در دقیقه بسازد. این دقیقاً همان باگِ H12 است که برایِ برچسبِ `route`
+ *    بالاتر رفع شد، فقط با یک ورودیِ **صریحاً غیرقابلِ‌اعتمادتر**.
+ *
+ * ۲) تزریق در متنِ خروجیِ Prometheus: `labelKey` مقدار را بدونِ escape داخلِ
+ *    `k="v"` می‌گذارد. یک `type` حاویِ `"` یا newline می‌توانست خطِ متریکِ
+ *    جعلی بسازد. پس هر مقداری که با شکلِ کانونیِ نامِ رویداد جور نباشد به
+ *    `__malformed__` تبدیل می‌شود — و شکلِ کانونی فقط `[a-z0-9_.]` است، پس
+ *    مقدارِ عبورکرده اثباتاً بی‌خطر است.
+ *
+ * سقف عمداً از سقفِ مسیرها کمتر است: فهرستِ نام‌های مشروع کوچک و شمردنی است.
+ */
+const TELEMETRY_TYPE_SAFE_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+const MAX_TELEMETRY_TYPE_LABELS = 200;
+const seenTelemetryTypes = new Set<string>();
+
+export function capTelemetryTypeLabel(type: string): string {
+  if (!TELEMETRY_TYPE_SAFE_RE.test(type) || type.length > 120) return '__malformed__';
+  if (seenTelemetryTypes.has(type)) return type;
+  if (seenTelemetryTypes.size >= MAX_TELEMETRY_TYPE_LABELS) return '__other__';
+  seenTelemetryTypes.add(type);
+  return type;
+}
+
+/** تعدادِ نام‌های رویدادِ دیده‌شده — فقط برای تست/تشخیص. */
+export function telemetryTypeLabelCount(): number {
+  return seenTelemetryTypes.size;
 }
 
 export function recordHttp(method: string, route: string, status: number, durationSec: number) {

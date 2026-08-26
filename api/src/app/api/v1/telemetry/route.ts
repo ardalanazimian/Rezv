@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
 import { authFromRequest } from '@/lib/jwt';
 import { db } from '@/lib/db';
-import { errorResponse } from '@/lib/errors';
+import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 import { clientIp, enforceRateLimit } from '@/lib/ratelimit';
 import { createHash } from 'crypto';
-import { recordEvents, type PlatformEventInput, type TrustLevel } from '@/lib/platform-events';
+import { recordEventsDetailed, type PlatformEventInput, type TrustLevel } from '@/lib/platform-events';
+import { metrics, capTelemetryTypeLabel } from '@/lib/metrics';
+import { createLogger } from '@/lib/logger';
 
 import { withApiMetrics } from '@/lib/api-metrics';
+
+const log = createLogger('telemetry-ingest');
 
 // ═══════════════════════════════════════════════════════════════════════
 //  POST /api/v1/telemetry — درگاهِ ingestِ رویدادِ رفتاری (Data Platform · فاز ۱)
@@ -21,7 +25,13 @@ import { withApiMetrics } from '@/lib/api-metrics';
 //   • userId فقط از توکن (کلاینت نمی‌تواند جعل کند)
 //   • source فقط سه مقدارِ کلاینتی (backend/cron از کلاینت پذیرفته نمی‌شود)
 //   • device از هدرِ UA (نه از بدنه)
-//  پاسخِ 202 فوری؛ درج غیرمسدودکننده است (خطا → رویداد از دست می‌رود، مسیر نمی‌شکند).
+//  پاسخِ 202 فوری. **به‌روزرسانیِ ۲۰۲۶-۰۸-۲۶:** «۲۰۲ در هر حالت» دیگر درست
+//  نیست — دو حالت از هم تفکیک شدند:
+//   • ردِ **دائمی** (نامِ خارج از allowlist) → همچنان 202، ولی بدنه شمارشِ
+//     `rejected`/`rejected_types` را می‌دهد و متریک+لاگ می‌خورد. تلاشِ دوباره
+//     بی‌فایده است، پس کلاینت باید صف را خالی کند.
+//   • شکستِ **گذرا** (درج در DB throw کرد) → 503، تا کلاینت صف را نگه دارد.
+//     پیش از این هر دو «۲۰۲ با accepted:0» بودند و از هم قابلِ تشخیص نبودند.
 //  معماری: docs/INTELLIGENCE-PLATFORM-ARCHITECTURE.md
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -40,13 +50,31 @@ const MAX_STRING_LEN = 500;
 const MAX_PAYLOAD_BYTES = 8_000;
 
 /**
+ * حذفِ بایتِ NUL از هر رشته‌ی ارسالیِ کلاینت.
+ *
+ * ⚠️ چرا لازم است (تأییدشده با اجرای واقعی روی Postgres، نه فرض): `\u0000`
+ * یک رشته‌ی کاملاً معتبرِ JSON است ولی Postgres آن را در هیچ ستونِ text/jsonb
+ * نمی‌پذیرد و کلِ `createMany` را با
+ * `22021 invalid byte sequence for encoding "UTF8": 0x00` می‌شکند.
+ *
+ * تا وقتی درجِ ناموفق «۲۰۲ با accepted:0» می‌داد این فقط یک از‌دست‌رفتنِ بی‌صدا
+ * بود. حالا که شکستِ درج صادقانه ۵۰۳ می‌دهد (پایینِ همین فایل)، همان یک بایت
+ * تبدیل می‌شد به یک **قرصِ سمی**: دسته‌ی آلوده هرگز درج نمی‌شود، پاسخ هرگز
+ * `ok` نمی‌شود، و صفِ localStorageِ کلاینت تا ابد همان دسته را دوباره
+ * می‌فرستد. پس این هرس بخشی از خودِ همان رفع است، نه یک بهبودِ جانبی.
+ */
+function stripNul(s: string): string {
+  return s.includes('\u0000') ? s.replace(/\u0000/g, '') : s;
+}
+
+/**
  * payload را به شکلِ امن می‌بَرد: عمق، تعدادِ کلید و طولِ رشته را محدود می‌کند.
  * به‌جایِ رد کردنِ کلِ رویداد، **هرس** می‌کند — چون تله‌متری نباید مسیرِ اصلی
  * را بشکند، ولی حق ندارد داده‌ی بی‌مرز هم بپذیرد.
  */
 function sanitizePayload(v: unknown, depth = 0): unknown {
   if (v === null || v === undefined) return null;
-  if (typeof v === 'string') return v.length > MAX_STRING_LEN ? v.slice(0, MAX_STRING_LEN) : v;
+  if (typeof v === 'string') return stripNul(v.length > MAX_STRING_LEN ? v.slice(0, MAX_STRING_LEN) : v);
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   if (typeof v === 'boolean') return v;
   if (depth >= MAX_PAYLOAD_DEPTH) return null;      // عمیق‌تر از حد → قطع
@@ -56,7 +84,8 @@ function sanitizePayload(v: unknown, depth = 0): unknown {
     let n = 0;
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
       if (n >= MAX_PAYLOAD_KEYS) break;
-      out[k.slice(0, 80)] = sanitizePayload(val, depth + 1);
+      // کلید هم ورودیِ کلاینت است و همان محدودیتِ NUL را دارد.
+      out[stripNul(k.slice(0, 80))] = sanitizePayload(val, depth + 1);
       n++;
     }
     return out;
@@ -90,11 +119,34 @@ function capPayloadSize(p: unknown): Record<string, unknown> {
 const ALLOWED_TYPE_PREFIXES = [
   'search.', 'discover.', 'restaurant.', 'reservation.', 'waitlist.',
   'auth.', 'profile.', 'loyalty.', 'reward.', 'chat.', 'nav.', 'ui.', 'panel.',
+  // ── دو پیشوندِ زیر در ۲۰۲۶-۰۸-۲۶ اضافه شدند و **هر دو فرستنده‌ی واقعی
+  //    دارند** (شرطِ افزودن به این فهرست: نامِ بی‌فرستنده اضافه نمی‌شود).
+  //
+  //    یافته: تا پیش از این، فهرستِ بالا **هیچ‌کدام** از نام‌هایی که کلاینت‌ها
+  //    واقعاً می‌فرستند را پوشش نمی‌داد. کلِ نام‌های ارسالی دقیقاً دو تاست
+  //    (grep روی apps/ + shared/، هر پنج نقطه رشته‌ی ثابت‌اند، صفر نامِ پویا):
+  //
+  //      app.opened  → apps/customer/js/analytics.js:88
+  //                    apps/business/js/analytics.js:82
+  //                    apps/company/js/analytics.js:82
+  //                    shared/js/analytics.panel.js:82   (منبعِ دو موردِ بالا)
+  //      page.viewed → apps/customer/js/data/discover.js:16
+  //                    apps/business/js/routing.js:64     (window.rzTrack)
+  //                    apps/company/js/data.js:31         (window.rzTrack)
+  //
+  //    یعنی ۱۰۰٪ تله‌متریِ کلاینت رد می‌شد. تأییدِ اجراییِ پیش از رفع: همان
+  //    بدنه‌ی واقعی روی روتِ واقعی + DBِ واقعی → `202 {"accepted":0}` و صفر
+  //    ردیف در `platform_events`.
+  'app.', 'page.',
 ];
 const TYPE_SHAPE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 
-function isAllowedType(t: string): boolean {
-  return TYPE_SHAPE.test(t) && ALLOWED_TYPE_PREFIXES.some((p) => t.startsWith(p));
+/** چرا رد شد — همان مقداری که برچسبِ `reason`ِ متریک می‌شود. */
+type TypeVerdict = 'ok' | 'shape' | 'prefix';
+
+function classifyType(t: string): TypeVerdict {
+  if (!TYPE_SHAPE.test(t)) return 'shape';
+  return ALLOWED_TYPE_PREFIXES.some((p) => t.startsWith(p)) ? 'ok' : 'prefix';
 }
 
 const eventSchema = z.object({
@@ -157,11 +209,35 @@ async function POST_impl(req: Request) {
       return createHash('sha256').update(`${scope}:${raw}`).digest('hex').slice(0, 40);
     };
 
-    const events: PlatformEventInput[] = body.events
-      // typeهایِ خارج از allowlist بی‌صدا کنار گذاشته می‌شوند (نه ۴۰۰): تله‌متری
-      // هرگز نباید مسیرِ کاربر را بشکند، ولی داده‌ی بی‌شکل هم نباید بپذیرد.
-      // عددِ `accepted` در پاسخ همچنان صادق است چون از تعدادِ درجِ واقعی می‌آید.
-      .filter((e) => isAllowedType(e.type))
+    // ── ردشدنِ رویداد دیگر بی‌صدا نیست (بخشِ ۹ CLAUDE.md) ──
+    // کنارگذاشتن همچنان **مسیرِ کاربر را نمی‌شکند** (کد وضعیت عوض نمی‌شود)،
+    // ولی حالا سه ردِ قابلِ‌پیگیری می‌گذارد: متریکِ قابلِ‌آلارم، یک لاگِ
+    // ساختاریافته در هر درخواست، و اعدادِ صریح در بدنه‌ی پاسخ.
+    //
+    // چرا لاگ **در هر درخواست** و نه در هر رویداد: یک دسته تا ۵۰ رویداد و
+    // سطلِ ریت‌لیمیت ۱۲۰ درخواست در دقیقه دارد؛ لاگِ per-event می‌توانست
+    // دقیقه‌ای ۶۰۰۰ خط بسازد و همان سیگنالی را که می‌خواهیم دفن کند.
+    const rejected: string[] = [];
+    const allowed = body.events.filter((e) => {
+      const verdict = classifyType(e.type);
+      if (verdict === 'ok') return true;
+      const label = capTelemetryTypeLabel(e.type);
+      metrics.telemetryEventRejected.inc({ reason: verdict, type: label });
+      rejected.push(label);
+      return false;
+    });
+    if (rejected.length) {
+      log.warn('رویدادِ تله‌متری درج نشد — نامِ خارج از allowlist', {
+        rejected: rejected.length,
+        received: body.events.length,
+        // فهرستِ **مهارشده** (به capTelemetryTypeLabel رجوع کن) و سقف‌دار، تا
+        // لاگ خودش به مسیرِ تزریق/سیل تبدیل نشود.
+        types: [...new Set(rejected)].slice(0, 10),
+        source: body.events[0]?.source ?? null,
+      });
+    }
+
+    const events: PlatformEventInput[] = allowed
       .map((e) => ({
         type: e.type,
         occurredAt: e.occurredAt,
@@ -174,17 +250,52 @@ async function POST_impl(req: Request) {
         // event را به tenant دلخواه نسبت دهد یا tenantId مستقل جعل کند.
         restaurantId: e.restaurantId && restaurantMap.has(e.restaurantId) ? e.restaurantId : null,
         tenantId: e.restaurantId ? restaurantMap.get(e.restaurantId)?.tenantId ?? null : null,
-        sessionId: e.sessionId ?? null,
-        correlationId: e.correlationId ?? null,
+        // stripNul: این دو مستقیم در ستونِ `text` می‌نشینند و همان محدودیتِ
+        // NULِ Postgres را دارند (بالا، `stripNul`).
+        sessionId: e.sessionId ? stripNul(e.sessionId) : null,
+        correlationId: e.correlationId ? stripNul(e.correlationId) : null,
         device,
         payload: capPayloadSize(sanitizePayload(e.payload ?? {})),
         schemaVersion: e.schemaVersion ?? 1,
       }));
 
-    if (!events.length) return NextResponse.json({ ok: true, accepted: 0 }, { status: 202 });
+    // ── چرا کدِ وضعیت **همچنان ۲۰۲** است، حتی وقتی همه‌چیز رد شد ──
+    // ردشدن بابتِ allowlist یک شکستِ **دائمی** است: همان بدنه هر بار دوباره
+    // رد می‌شود. کلاینت (`analytics.js:52`) صف را فقط داخلِ `if (r.ok)` هرس
+    // می‌کند، پس یک کدِ ۴xx باعث می‌شد صفِ localStorage تا سقفِ ۲۰۰ رویداد پر
+    // بماند و هر بارگذاری همان دسته‌ی محکوم‌به‌رد را دوباره بفرستد — یعنی
+    // یک حلقه‌ی بی‌پایانِ تلاش. صداقت اینجا در **بدنه** خریداری می‌شود، نه در
+    // کدِ وضعیت: فرستنده حالا می‌تواند `rejected`/`rejected_types` را ببیند.
+    if (!events.length) {
+      return NextResponse.json(
+        { ok: true, received: body.events.length, accepted: 0, duplicates: 0, rejected: rejected.length, rejected_types: [...new Set(rejected)].slice(0, 10) },
+        { status: 202 },
+      );
+    }
 
-    const accepted = await recordEvents(events);
-    return NextResponse.json({ ok: true, accepted }, { status: 202 });
+    const res = await recordEventsDetailed(events);
+
+    // ── شکستِ درج ≠ موفقیت (§۳) ──
+    // این حالت با «همه تکراری بودند» یکی نیست: رویدادها **گم شده‌اند**. با
+    // پاسخِ ۲۰۲ کلاینت صف را هرس می‌کرد و داده برای همیشه می‌رفت. ۵۰۳ یعنی
+    // صف دست‌نخورده می‌ماند و دفعه‌ی بعد دوباره تلاش می‌شود (صف خودش سقفِ
+    // ۲۰۰ ردیفی دارد، پس رشدِ بی‌مرز هم ندارد). `withApiMetrics` این را در
+    // `rezervno_http_errors_total` می‌شمارد ⇒ قابلِ آلارم.
+    if (res.failed) throw Err.serviceUnavailable('ثبتِ رویدادِ تله‌متری موقتاً ممکن نیست؛ دوباره تلاش کنید');
+
+    return NextResponse.json(
+      {
+        ok: true,
+        received: body.events.length,
+        accepted: res.inserted,
+        // تفاضلِ صریح، نه استنتاجِ خواننده: رویدادی که شکل و نامش درست بود ولی
+        // `event_id`ش قبلاً درج شده. (dedupِ عمدی — به migration 059b رجوع کن.)
+        duplicates: events.length - res.inserted,
+        rejected: rejected.length,
+        rejected_types: [...new Set(rejected)].slice(0, 10),
+      },
+      { status: 202 },
+    );
   } catch (e) {
     return errorResponse(e);
   }
