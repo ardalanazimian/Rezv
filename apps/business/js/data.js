@@ -231,6 +231,19 @@ const API = {
   chatSend(id, body){ return this.post('/restaurant/chats/'+id, { body }); },
   delete(path){ return this.request(path, { method: 'DELETE' }); },
   // ── احراز هویت کارمند ──
+  // ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
+  // مسیرِ اصلی. شکلِ پاسخ دقیقاً همانِ مسیرِ OTP است، پس مدیریتِ توکن و
+  // مجوزها هم باید **عیناً** همان باشد — هر واگرایی اینجا یعنی کاربری که
+  // با رمز وارد شده منویِ محدودنشده می‌بیند و بعد ۴۰۳ می‌گیرد.
+  async staffLogin(username, password){
+    const res = await this.post('/auth/staff/login', { username, password });
+    if (res.ok && res.data?.access) {
+      this.setToken(res.data.access); this.setRefresh(res.data.refresh);
+      this.setPermissions(res.data.staff?.permissions || null);
+    }
+    return res;
+  },
+  async changeStaffPassword(payload){ return this.post('/restaurant/staff/password', payload); },
   async requestStaffOtp(phone){ return this.post('/auth/staff/request', { phone }); },
   async verifyStaffOtp(phone, code){
     const res = await this.post('/auth/staff/verify', { phone, code });

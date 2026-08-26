@@ -835,15 +835,57 @@ function setAdminGateLocked(locked){
   if (overlay) overlay.setAttribute('aria-hidden', locked ? 'false' : 'true');
 }
 function faD(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
-function showAdminLoginPhone(){
+// ⚠️ مسیرِ اصلیِ ورود از ۲۰۲۶-۰۸-۲۶ نام کاربری و رمز است، نه OTP.
+// دلیل: تنها راهِ ورود پیامک بود و بدونِ KAVENEGAR_API_KEY هیچ‌کس —
+// حتی مدیرِ پلتفرم — نمی‌توانست وارد شود. مسیرِ OTP حذف نشد و به‌عنوانِ
+// پشتیبان می‌ماند (اگر رمز فراموش شد و پیامک راه افتاده باشد).
+function showAdminLogin(){
   setAdminGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">R</div>
     <div class="login-title">پنل شرکت رزرونو</div>
-    <div class="login-sub">ورود مدیر پلتفرم — شماره موبایل خود را وارد کنید</div>
+    <div class="login-sub">ورود مدیر پلتفرم</div>
+    <label class="login-field-label" for="adminUser">نام کاربری</label>
+    <input class="login-inp" id="adminUser" autocomplete="username" spellcheck="false" placeholder="نام کاربری" onkeydown="if(event.key==='Enter')document.getElementById('adminPass')?.focus()">
+    <label class="login-field-label" for="adminPass">رمز عبور</label>
+    <input class="login-inp" id="adminPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')adminPasswordLogin()">
+    <button class="login-btn" id="adminLoginBtn" onclick="adminPasswordLogin()">ورود به پنل</button>
+    <button class="login-back" onclick="showAdminLoginPhone()">ورود با پیامک</button>
+    <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
+  setTimeout(()=>document.getElementById('adminUser')?.focus(),200);
+}
+
+async function adminPasswordLogin(){
+  const u = (document.getElementById('adminUser')?.value||'').trim();
+  const p = document.getElementById('adminPass')?.value||'';
+  if (!u || !p) { toast('','نام کاربری و رمز را وارد کن'); return; }
+  const btn = document.getElementById('adminLoginBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+  const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
+
+  // مسیرِ دمویِ آفلاین دست‌نخورده می‌ماند (بازکردنِ فایل بدونِ بک‌اند).
+  if (location.protocol === 'file:') { await enterAdminPanel(true); return; }
+
+  const res = await API.adminLogin(u, p);
+  if (res.ok && res.data?.access){ await enterAdminPanel(); return; }
+  if (res.offline){ await enterAdminPanel(true); return; }
+  // ⚠️ پیامِ سرور عمداً برای «کاربر نیست» و «رمز غلط» یکسان است — اینجا
+  // هم نباید چیزِ دقیق‌تری ساخته شود، وگرنه همان نشتی که سرور بست از
+  // سمتِ کلاینت باز می‌شود.
+  toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');
+  reset();
+}
+
+function showAdminLoginPhone(){
+  setAdminGateLocked(true);
+  document.getElementById('loginCard').innerHTML = `
+    <div class="login-logo">R</div>
+    <div class="login-title">ورود با پیامک</div>
+    <div class="login-sub">شماره موبایل خود را وارد کنید</div>
     <label class="login-field-label" for="adminPhone">شماره موبایل</label>
     <input class="login-inp" id="adminPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹" onkeydown="if(event.key==='Enter')adminSendOtp()">
     <button class="login-btn" id="adminSendBtn" onclick="adminSendOtp()">ارسال کد ورود</button>
+    <button class="login-back" onclick="showAdminLogin()">ورود با نام کاربری و رمز</button>
     <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
   setTimeout(()=>document.getElementById('adminPhone')?.focus(),200);
 }
@@ -948,13 +990,13 @@ async function adminLogout(){
   await API.doLogout();
   document.getElementById('loginOverlay').classList.remove('hidden');
   setAdminGateLocked(true);
-  showAdminLoginPhone();
+  showAdminLogin();
   toast('','از پنل خارج شدید');
 }
 function onAdminSessionExpired(){
   document.getElementById('loginOverlay').classList.remove('hidden');
   setAdminGateLocked(true);
-  showAdminLoginPhone();
+  showAdminLogin();
   toast('','نشست منقضی شد، دوباره وارد شوید');
 }
 
@@ -978,5 +1020,5 @@ if (API.getToken()) {
   })();
 } else {
   setAdminGateLocked(true);
-  showAdminLoginPhone();
+  showAdminLogin();
 }

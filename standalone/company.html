@@ -1519,6 +1519,19 @@ const API = {
   post(path, body){ return this.request(path, { method:'POST', body: JSON.stringify(body||{}) }); },
   patch(path, body){ return this.request(path, { method:'PATCH', body: JSON.stringify(body||{}) }); },
   del(path){ return this.request(path, { method:'DELETE' }); },
+  // ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
+  // مسیرِ اصلیِ ورود به پنلِ شرکت. OTP کنارش می‌ماند چون مسیرِ پشتیبان است:
+  // اگر رمز فراموش شد و کاوه‌نگار راه افتاده باشد، راهِ برگشت وجود دارد.
+  async adminLogin(username, password){
+    const res = await this.request('/auth/admin/login', {
+      method:'POST', body: JSON.stringify({ username, password }),
+    });
+    if (res.ok && res.data?.access) { this.setToken(res.data.access); this.setRefresh(res.data.refresh); }
+    return res;
+  },
+  // ── اعتبارنامه‌ی بیزنس‌ها (پنلِ شرکت یوزر/پسورد می‌سازد) ──
+  staffCredentials(restaurantId){ return this.get(`/admin/staff-credentials?restaurant_id=${encodeURIComponent(restaurantId)}`); },
+  setStaffCredentials(payload){ return this.post('/admin/staff-credentials', payload); },
   async requestAdminOtp(phone){ return this.request('/auth/admin/request', { method:'POST', body: JSON.stringify({ phone }) }); },
   async verifyAdminOtp(phone, code){
     const res = await this.request('/auth/admin/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
@@ -2016,7 +2029,85 @@ function rDetail(){
         خلاصه‌ی تجمیعی (RFM/CLV) همه‌ی رستوران‌ها رو می‌تونی توی صفحه‌ی «هوش تجاری مشتریان» ببینی.
       </div>
       <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="nav('customers')">رفتن به هوش تجاری مشتریان ${icon('arrowL',{size:13})}</button>
+    </div>
+    <div class="panel" id="credPanel">
+      <div class="panel-head"><div>
+        <div class="panel-title">${icon('lock',{size:16})} دسترسی پنل رستوران</div>
+        <div class="panel-sub">نام کاربری و رمز برای ورودِ این رستوران به پنلِ خودش</div>
+      </div></div>
+      <div id="credBody" style="font-size:13px;color:var(--t2)">در حال بارگذاری…</div>
     </div>`;
+  loadCredentials(r.id);
+}
+
+// ═══════════ اعتبارنامه‌ی پنلِ رستوران (مهاجرتِ ۰۷۴) ═══════════
+// ⚠️ چرا این بخش وجود دارد: تنها راهِ ورود به پنل‌ها OTPِ پیامکی بود و
+// بدونِ کلیدِ کاوه‌نگار هیچ رستورانی نمی‌توانست وارد شود. حالا شرکت برایشان
+// یوزر/پسورد می‌سازد و ورود به پیامک وابسته نیست.
+//
+// ⚠️ رمز **هرگز** از سرور خوانده نمی‌شود — سرور فقط می‌گوید «رمز دارد یا نه».
+// یعنی این صفحه نمی‌تواند رمزِ فعلی را نشان دهد، فقط رمزِ تازه ست کند.
+async function loadCredentials(restaurantId){
+  const box = document.getElementById('credBody');
+  if (!box) return;
+  const res = await API.staffCredentials(restaurantId);
+  if (!res.ok) {
+    box.innerHTML = `<div class="empty-state-title">فهرست دسترسی‌ها بارگذاری نشد</div>
+      <div style="margin-top:6px">${esc(res.error?.message || 'خطای ناشناخته')}</div>`;
+    return;
+  }
+  const rows = (res.data?.staff || []).map(sf => `
+    <tr>
+      <td>${esc(sf.name || '—')}</td>
+      <td>${sf.username ? `<code>${esc(sf.username)}</code>` : '<span style="color:var(--t3)">ندارد</span>'}</td>
+      <td>${esc(sf.role)}</td>
+      <td>${sf.has_password ? `${icon('check',{size:13})} دارد` : '<span style="color:var(--t3)">ندارد</span>'}</td>
+      <td>${sf.is_active ? 'فعال' : 'غیرفعال'}</td>
+    </tr>`).join('');
+  box.innerHTML = `
+    ${rows ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
+        <th>نام</th><th>نام کاربری</th><th>نقش</th><th>رمز</th><th>وضعیت</th>
+      </tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<div style="margin-bottom:10px">هنوز هیچ کاربری برای این رستوران ثبت نشده.</div>'}
+    <div style="margin-top:16px;display:grid;gap:10px">
+      <div class="panel-title" style="font-size:14px">ساخت / تغییر دسترسی</div>
+      <label class="login-field-label" for="credName">نام مسئول</label>
+      <input class="login-inp" id="credName" placeholder="مثلاً: علی رضایی">
+      <label class="login-field-label" for="credPhone">شماره موبایل</label>
+      <input class="login-inp" id="credPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
+      <label class="login-field-label" for="credUser">نام کاربری</label>
+      <input class="login-inp" id="credUser" spellcheck="false" placeholder="فقط حروف انگلیسی، رقم، نقطه، خط تیره">
+      <label class="login-field-label" for="credPass">رمز عبور</label>
+      <input class="login-inp" id="credPass" type="text" placeholder="حداقل ۸ کاراکتر">
+      <button class="btn btn-primary btn-block" id="credSaveBtn" onclick="saveCredentials(${jsq(String(restaurantId))})">ذخیره‌ی دسترسی</button>
+      <div style="font-size:12px;color:var(--t3);line-height:1.9">
+        اگر این شماره از قبل ثبت شده باشد، فقط نام کاربری و رمزش عوض می‌شود و کاربرِ تکراری ساخته نمی‌شود.
+        رمز را جای امنی نگه دار — بعد از ذخیره دیگر قابلِ دیدن نیست.
+      </div>
+    </div>`;
+}
+
+async function saveCredentials(restaurantId){
+  const name = (document.getElementById('credName')?.value||'').trim();
+  const phoneRaw = (document.getElementById('credPhone')?.value||'').trim();
+  const username = (document.getElementById('credUser')?.value||'').trim();
+  const password = document.getElementById('credPass')?.value||'';
+  // ارقامِ فارسی را به انگلیسی برگردان — همان کاری که فرمِ ورود می‌کند.
+  const phone = phoneRaw.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'');
+  if (!/^09\d{9}$/.test(phone)) { toast('','شماره موبایل معتبر وارد کن'); return; }
+  if (!username) { toast('','نام کاربری را وارد کن'); return; }
+  if (password.length < 8) { toast('','رمز باید حداقل ۸ کاراکتر باشد'); return; }
+
+  const btn = document.getElementById('credSaveBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'در حال ذخیره…'; }
+  const res = await API.setStaffCredentials({
+    restaurant_id: restaurantId, phone, username, password,
+    ...(name ? { name } : {}),
+  });
+  if (btn){ btn.disabled = false; btn.textContent = 'ذخیره‌ی دسترسی'; }
+  if (!res.ok) { toast('', res.error?.message || 'ذخیره نشد'); return; }
+  toast('', res.data?.created ? 'دسترسی ساخته شد' : 'دسترسی به‌روز شد');
+  await loadCredentials(restaurantId);
 }
 async function toggleRestOpen(id){
   const r=RESTAURANTS.find(x=>String(x.id)===String(id));if(!r)return;
@@ -2905,15 +2996,57 @@ function setAdminGateLocked(locked){
   if (overlay) overlay.setAttribute('aria-hidden', locked ? 'false' : 'true');
 }
 function faD(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
-function showAdminLoginPhone(){
+// ⚠️ مسیرِ اصلیِ ورود از ۲۰۲۶-۰۸-۲۶ نام کاربری و رمز است، نه OTP.
+// دلیل: تنها راهِ ورود پیامک بود و بدونِ KAVENEGAR_API_KEY هیچ‌کس —
+// حتی مدیرِ پلتفرم — نمی‌توانست وارد شود. مسیرِ OTP حذف نشد و به‌عنوانِ
+// پشتیبان می‌ماند (اگر رمز فراموش شد و پیامک راه افتاده باشد).
+function showAdminLogin(){
   setAdminGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">R</div>
     <div class="login-title">پنل شرکت رزرونو</div>
-    <div class="login-sub">ورود مدیر پلتفرم — شماره موبایل خود را وارد کنید</div>
+    <div class="login-sub">ورود مدیر پلتفرم</div>
+    <label class="login-field-label" for="adminUser">نام کاربری</label>
+    <input class="login-inp" id="adminUser" autocomplete="username" spellcheck="false" placeholder="نام کاربری" onkeydown="if(event.key==='Enter')document.getElementById('adminPass')?.focus()">
+    <label class="login-field-label" for="adminPass">رمز عبور</label>
+    <input class="login-inp" id="adminPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')adminPasswordLogin()">
+    <button class="login-btn" id="adminLoginBtn" onclick="adminPasswordLogin()">ورود به پنل</button>
+    <button class="login-back" onclick="showAdminLoginPhone()">ورود با پیامک</button>
+    <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
+  setTimeout(()=>document.getElementById('adminUser')?.focus(),200);
+}
+
+async function adminPasswordLogin(){
+  const u = (document.getElementById('adminUser')?.value||'').trim();
+  const p = document.getElementById('adminPass')?.value||'';
+  if (!u || !p) { toast('','نام کاربری و رمز را وارد کن'); return; }
+  const btn = document.getElementById('adminLoginBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+  const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
+
+  // مسیرِ دمویِ آفلاین دست‌نخورده می‌ماند (بازکردنِ فایل بدونِ بک‌اند).
+  if (location.protocol === 'file:') { await enterAdminPanel(true); return; }
+
+  const res = await API.adminLogin(u, p);
+  if (res.ok && res.data?.access){ await enterAdminPanel(); return; }
+  if (res.offline){ await enterAdminPanel(true); return; }
+  // ⚠️ پیامِ سرور عمداً برای «کاربر نیست» و «رمز غلط» یکسان است — اینجا
+  // هم نباید چیزِ دقیق‌تری ساخته شود، وگرنه همان نشتی که سرور بست از
+  // سمتِ کلاینت باز می‌شود.
+  toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');
+  reset();
+}
+
+function showAdminLoginPhone(){
+  setAdminGateLocked(true);
+  document.getElementById('loginCard').innerHTML = `
+    <div class="login-logo">R</div>
+    <div class="login-title">ورود با پیامک</div>
+    <div class="login-sub">شماره موبایل خود را وارد کنید</div>
     <label class="login-field-label" for="adminPhone">شماره موبایل</label>
     <input class="login-inp" id="adminPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹" onkeydown="if(event.key==='Enter')adminSendOtp()">
     <button class="login-btn" id="adminSendBtn" onclick="adminSendOtp()">ارسال کد ورود</button>
+    <button class="login-back" onclick="showAdminLogin()">ورود با نام کاربری و رمز</button>
     <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
   setTimeout(()=>document.getElementById('adminPhone')?.focus(),200);
 }
@@ -3018,13 +3151,13 @@ async function adminLogout(){
   await API.doLogout();
   document.getElementById('loginOverlay').classList.remove('hidden');
   setAdminGateLocked(true);
-  showAdminLoginPhone();
+  showAdminLogin();
   toast('','از پنل خارج شدید');
 }
 function onAdminSessionExpired(){
   document.getElementById('loginOverlay').classList.remove('hidden');
   setAdminGateLocked(true);
-  showAdminLoginPhone();
+  showAdminLogin();
   toast('','نشست منقضی شد، دوباره وارد شوید');
 }
 
@@ -3048,7 +3181,7 @@ if (API.getToken()) {
   })();
 } else {
   setAdminGateLocked(true);
-  showAdminLoginPhone();
+  showAdminLogin();
 }
 
 </script>

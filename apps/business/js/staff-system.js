@@ -28,11 +28,47 @@ async function loadStaff(){
   _staffLoaded=true;
 }
 
+// ═══════════ تغییرِ رمزِ خود (مهاجرتِ ۰۷۴) ═══════════
+// ⚠️ چرا اینجا و نه در پنلِ شرکت: رمزِ اولیه را شرکت می‌سازد، ولی از آن
+// لحظه به بعد فقط خودِ کاربر باید بتواند عوضش کند. سرور هم همین را اعمال
+// می‌کند (دامنه با `id: auth.sub` قفل است).
+async function submitPasswordChange(){
+  const cur = document.getElementById('pwCur')?.value||'';
+  const nw  = document.getElementById('pwNew')?.value||'';
+  const rep = document.getElementById('pwNew2')?.value||'';
+  if (nw.length < 8) { toast('','رمز تازه باید حداقل ۸ کاراکتر باشد'); return; }
+  if (nw !== rep) { toast('','دو رمز یکسان نیستند'); return; }
+  const btn = document.getElementById('pwSaveBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'در حال ذخیره…'; }
+  const res = await API.changeStaffPassword({
+    new_password: nw, ...(cur ? { current_password: cur } : {}),
+  });
+  if (btn){ btn.disabled = false; btn.textContent = 'تغییر رمز'; }
+  if (!res.ok) { toast('', res.error?.message || 'رمز عوض نشد'); return; }
+  ['pwCur','pwNew','pwNew2'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  toast('','رمز عوض شد');
+}
+
 function rStaff(){
   if(!_staffLoaded && API.getToken()){ loadStaff().then(()=>rStaff()); }
   const avatar=s=>(s.name||s.phone||'?').toString().trim().charAt(0);
   const isDemo=!API.getToken()||!_staffLoaded;
   document.getElementById('v-staff').innerHTML=(isDemo?`<div class="cash-note">${icon('info',{size:13})} فهرستِ زیر نمونه است، کارکنانِ واقعیِ تو نیست.</div>`:'')+`
+    <div class="panel">
+      <div class="panel-head"><div>
+        <div class="panel-title">${icon('lock',{size:16})} رمز عبور من</div>
+        <div class="panel-sub">رمزِ ورودِ خودت به این پنل</div>
+      </div></div>
+      <div style="display:grid;gap:10px">
+        <label class="login-field-label" for="pwCur">رمز فعلی</label>
+        <input class="login-inp" id="pwCur" type="password" autocomplete="current-password" placeholder="اگر هنوز رمز نداری، خالی بگذار">
+        <label class="login-field-label" for="pwNew">رمز تازه</label>
+        <input class="login-inp" id="pwNew" type="password" autocomplete="new-password" placeholder="حداقل ۸ کاراکتر">
+        <label class="login-field-label" for="pwNew2">تکرار رمز تازه</label>
+        <input class="login-inp" id="pwNew2" type="password" autocomplete="new-password" placeholder="دوباره وارد کن">
+        <button class="btn btn-primary btn-block" id="pwSaveBtn" onclick="submitPasswordChange()">تغییر رمز</button>
+      </div>
+    </div>`+`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کارکنان</div><div class="panel-sub">${fa(STAFF_LIST.length)} نفر · مدیریت دسترسی</div></div></div>
       ${STAFF_LIST.map(s=>`<div class="staff-row">
@@ -402,15 +438,54 @@ function setStaffGateLocked(locked){
   }
   if (overlay) overlay.setAttribute('aria-hidden', locked ? 'false' : 'true');
 }
-function showStaffLoginPhone(){
+// ⚠️ مسیرِ اصلیِ ورود از ۲۰۲۶-۰۸-۲۶ نام کاربری و رمز است، نه OTP.
+// دلیل: بدونِ KAVENEGAR_API_KEY هیچ پیامکی نمی‌رفت و هیچ‌کس نمی‌توانست
+// وارد پنل شود. OTP حذف نشد و به‌عنوانِ مسیرِ پشتیبان می‌ماند.
+function showStaffLogin(){
   setStaffGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('utensils',{size:34})}</div>
     <div class="login-title">پنل رستوران رزرونو</div>
-    <div class="login-sub">برای ورود، شماره موبایل ثبت‌شده‌ی رستورانت رو وارد کن</div>
+    <div class="login-sub">با نام کاربری و رمزی که از رزرونو گرفتی وارد شو</div>
+    <label class="login-field-label" for="staffUser">نام کاربری</label>
+    <input class="login-inp" id="staffUser" autocomplete="username" spellcheck="false" placeholder="نام کاربری" onkeydown="if(event.key==='Enter')document.getElementById('staffPass')?.focus()">
+    <label class="login-field-label" for="staffPass">رمز عبور</label>
+    <input class="login-inp" id="staffPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')staffPasswordLogin()">
+    <button class="login-btn" id="staffLoginBtn" onclick="staffPasswordLogin()">ورود به پنل</button>
+    <button class="login-back" onclick="showStaffLoginPhone()">ورود با پیامک</button>
+    <div class="login-foot">اگر نام کاربری نداری، با پشتیبانی رزرونو تماس بگیر</div>`;
+  setTimeout(()=>document.getElementById('staffUser')?.focus(),200);
+}
+
+async function staffPasswordLogin(){
+  const u = (document.getElementById('staffUser')?.value||'').trim();
+  const p = document.getElementById('staffPass')?.value||'';
+  if (!u || !p) { toast('','نام کاربری و رمز را وارد کن'); return; }
+  const btn = document.getElementById('staffLoginBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+  const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
+
+  if (location.protocol === 'file:') { await enterStaffPanel(true); return; }
+
+  const res = await API.staffLogin(u, p);
+  if (res.ok && res.data?.access){ await enterStaffPanel(); return; }
+  if (res.offline){ await enterStaffPanel(true); return; }
+  // پیامِ سرور برای «کاربر نیست» و «رمز غلط» عمداً یکسان است؛ اینجا هم
+  // نباید دقیق‌تر شود، وگرنه نشتی که سرور بست از سمتِ کلاینت باز می‌شود.
+  toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');
+  reset();
+}
+
+function showStaffLoginPhone(){
+  setStaffGateLocked(true);
+  document.getElementById('loginCard').innerHTML = `
+    <div class="login-logo">${icon('utensils',{size:34})}</div>
+    <div class="login-title">ورود با پیامک</div>
+    <div class="login-sub">شماره موبایل ثبت‌شده‌ی رستورانت رو وارد کن</div>
     <label class="login-field-label" for="staffPhone">شماره موبایل</label>
     <input class="login-inp" id="staffPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹" onkeydown="if(event.key==='Enter')staffSendOtp()">
     <button class="login-btn" id="staffSendBtn" onclick="staffSendOtp()">ارسال کد ورود</button>
+    <button class="login-back" onclick="showStaffLogin()">ورود با نام کاربری و رمز</button>
     <div class="login-foot">فقط شماره‌هایی که به‌عنوان مدیر یا کارمند ثبت شده‌اند دسترسی دارند</div>`;
   setTimeout(()=>document.getElementById('staffPhone')?.focus(),200);
 }
@@ -516,7 +591,7 @@ async function staffLogout(){
   if (typeof applyPermissionsToNav === 'function') applyPermissionsToNav();  // بازگرداندنِ منو برای کاربرِ بعدی
   document.getElementById('loginOverlay').classList.remove('hidden');
   setStaffGateLocked(true);
-  showStaffLoginPhone();
+  showStaffLogin();
   toast('','از پنل خارج شدی');
 }
 // نشست منقضی و تمدید هم جواب نداد → برگشت به صفحه‌ی ورود
@@ -524,7 +599,7 @@ function onStaffSessionExpired(){
   STAFF_INFO = null;
   document.getElementById('loginOverlay').classList.remove('hidden');
   setStaffGateLocked(true);
-  showStaffLoginPhone();
+  showStaffLogin();
   toast('','نشست منقضی شد، دوباره وارد شو');
 }
 
@@ -549,5 +624,5 @@ if (API.getToken()) {
 } else {
   // نیاز به ورود
   setStaffGateLocked(true);
-  showStaffLoginPhone();
+  showStaffLogin();
 }

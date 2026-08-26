@@ -41,6 +41,19 @@ const API = {
   post(path, body){ return this.request(path, { method:'POST', body: JSON.stringify(body||{}) }); },
   patch(path, body){ return this.request(path, { method:'PATCH', body: JSON.stringify(body||{}) }); },
   del(path){ return this.request(path, { method:'DELETE' }); },
+  // ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
+  // مسیرِ اصلیِ ورود به پنلِ شرکت. OTP کنارش می‌ماند چون مسیرِ پشتیبان است:
+  // اگر رمز فراموش شد و کاوه‌نگار راه افتاده باشد، راهِ برگشت وجود دارد.
+  async adminLogin(username, password){
+    const res = await this.request('/auth/admin/login', {
+      method:'POST', body: JSON.stringify({ username, password }),
+    });
+    if (res.ok && res.data?.access) { this.setToken(res.data.access); this.setRefresh(res.data.refresh); }
+    return res;
+  },
+  // ── اعتبارنامه‌ی بیزنس‌ها (پنلِ شرکت یوزر/پسورد می‌سازد) ──
+  staffCredentials(restaurantId){ return this.get(`/admin/staff-credentials?restaurant_id=${encodeURIComponent(restaurantId)}`); },
+  setStaffCredentials(payload){ return this.post('/admin/staff-credentials', payload); },
   async requestAdminOtp(phone){ return this.request('/auth/admin/request', { method:'POST', body: JSON.stringify({ phone }) }); },
   async verifyAdminOtp(phone, code){
     const res = await this.request('/auth/admin/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
