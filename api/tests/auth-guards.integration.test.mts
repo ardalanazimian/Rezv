@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { readFileSync } from 'node:fs';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -51,7 +52,7 @@ let outsiderOwnerId: string;  // ownerِ یک تنانتِ دیگر
 const phone = () => `+9894${Math.floor(Math.random() * 100_000_000)}`.slice(0, 13);
 
 const req = (headers: Record<string, string> = {}) =>
-  new Request('http://x/api/admin', { headers });
+  new Request('http://x/api/admin', { headers: { 'x-real-ip': testIp(), ...headers } });
 
 /** توکنِ staff با ادعایِ دلخواه — تا بتوانیم «توکنِ معتبر ولی کهنه» بسازیم. */
 const staffToken = (sub: string, tenantId: string, role: 'owner' | 'manager' | 'staff' = 'owner') =>

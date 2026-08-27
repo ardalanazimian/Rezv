@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto';
 import { db } from './db';
 import { Err } from './errors';
 import { enqueueSms } from './sms';
+import { smsAllowedForCategory, findUserByPhoneForConsent } from './notification-prefs';
 
 // ═══════════════════════════════════════════════════════════
 //  سرویس وفاداری رزرونو — امتیاز، دعوت، کارت هدیه، پاداش
@@ -14,6 +15,41 @@ const POINTS = {
   birthday: 1000,        // هدیه‌ی تولد
   anniversary: 1000,     // هدیه‌ی سالگرد
 };
+
+/** امتیازی که بابتِ حضورِ واقعی (چک‌این) به باشگاهِ همان رستوران داده می‌شود. */
+export const ARRIVAL_POINTS = 50;
+
+// ═══════════════════════════════════════════════════════════
+//  سطوحِ باشگاه (tier)
+//
+//  ⚠️ این تعریف‌ها از `loyalty-status.ts` به این‌جا **منتقل** شدند، نه کپی —
+//  `loyalty-status.ts` همان‌ها را دوباره export می‌کند تا هیچ صداکننده‌ای
+//  نشکند. دلیلِ جابه‌جایی یک وابستگیِ دوری بود: `loyalty-status.ts` از قبل
+//  `getPointsBalance` را از همین فایل import می‌کرد، پس اگر `loyalty.ts` هم
+//  `tierFromPoints` را از آن‌جا می‌گرفت یک چرخه‌ی import ساخته می‌شد. در این
+//  کدبیس هزینه‌ی importهای شکننده قبلاً پرداخت شده (رجوع کن به توضیحِ
+//  `ERR_UNSUPPORTED_RESOLVE_REQUEST` در `lifecycle.ts`)، پس چرخه ساخته نشد.
+// ═══════════════════════════════════════════════════════════
+
+export interface LoyaltyTier {
+  key: 'bronze' | 'silver' | 'gold' | 'platinum';
+  name: string;
+  emoji: string;
+  min: number;
+}
+
+export const LOYALTY_TIERS: readonly LoyaltyTier[] = [
+  { key: 'bronze', name: 'برنزی', emoji: '🥉', min: 0 },
+  { key: 'silver', name: 'نقره‌ای', emoji: '🥈', min: 300 },
+  { key: 'gold', name: 'طلایی', emoji: '🥇', min: 800 },
+  { key: 'platinum', name: 'پلاتینیوم', emoji: '💎', min: 2000 },
+];
+
+export function tierFromPoints(points: number): LoyaltyTier {
+  let current = LOYALTY_TIERS[0];
+  for (const t of LOYALTY_TIERS) if (points >= t.min) current = t;
+  return current;
+}
 
 const B32 = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function genCode(prefix: string, len = 8): string {
@@ -78,17 +114,35 @@ export async function addClubPoints(opts: {
         delta: opts.delta, reason: opts.reason as any, note: opts.note ?? null,
       },
     });
-    // کشِ مشتق‌شده — نه مرجع. اگر عضویتی وجود نداشته باشد updateMany صفر ردیف
-    // می‌زند و این درست است: دفتر همچنان رکوردِ حقیقت را دارد.
-    await tx.clubMember.updateMany({
-      where: { restaurantId: opts.restaurantId, userId: opts.userId },
-      data: { points: { increment: opts.delta } },
-    });
     const agg = await tx.pointsLedger.aggregate({
       where: { userId: opts.userId, restaurantId: opts.restaurantId },
       _sum: { delta: true },
     });
-    return agg._sum.delta ?? 0;
+    const balance = agg._sum.delta ?? 0;
+    // کشِ مشتق‌شده — نه مرجع. اگر عضویتی وجود نداشته باشد updateMany صفر ردیف
+    // می‌زند و این درست است: دفتر همچنان رکوردِ حقیقت را دارد.
+    //
+    // ⚠️ رفعِ «سطحِ باشگاه هرگز به‌روز نمی‌شود» (فازِ ۲):
+    // `club_members.tier` با `@default("bronze")` ساخته می‌شد و **هیچ کدی در
+    // کلِ src/ آن را نمی‌نوشت** — یعنی عضوی با ۲۰۰۰ امتیازِ واقعی در دفتر هم
+    // برای همیشه `bronze` می‌ماند. این فقط یک برچسبِ نمایشی نبود:
+    //  • `waitlist.ts` (tierToPriority/isVipTier) اولویتِ صف را از همین ستون
+    //    می‌خواند ⇒ اولویتِ طلایی/پلاتینیوم عملاً وجود نداشت.
+    //  • `restaurant/sms` سگمنتِ کمپین را از همین ستون فیلتر می‌کند ⇒ سگمنتِ
+    //    gold/silver همیشه خالی بود.
+    //  • توکنِ سطح در پیامکِ خوش‌آمد همیشه «bronze» می‌گفت.
+    // سطح از **همان موجودیِ دفتر** مشتق می‌شود (نه از ستونِ کش) و با همان
+    // `tierFromPoints()` که مسیرِ نمایشِ مشتری استفاده می‌کند — یک تعریف، نه دو.
+    //
+    // نکته‌ی صداقت درباره‌ی همزمانی: `points` عمداً `increment` می‌ماند (اتمیک،
+    // بدونِ lost-update)، ولی `tier` از aggregateِ داخلِ همین تراکنش می‌آید و
+    // اگر دقیقاً هم‌زمان یک grantِ دیگر commit نشده باشد می‌تواند یک پله عقب
+    // بماند — که با اولین grantِ بعدی خودش را اصلاح می‌کند. دفتر همچنان مرجع است.
+    await tx.clubMember.updateMany({
+      where: { restaurantId: opts.restaurantId, userId: opts.userId },
+      data: { points: { increment: opts.delta }, tier: tierFromPoints(balance).key },
+    });
+    return balance;
   });
 }
 
@@ -129,10 +183,22 @@ export async function createReferral(referrerId: string, inviteePhone: string) {
   });
   // پیامک دعوت
   const referrer = await db.user.findUnique({ where: { id: referrerId }, select: { firstName: true, referralCode: true } });
-  await enqueueSms({
-    to: inviteePhone, template: 'campaign',
-    tokens: [referrer?.firstName ?? 'دوست شما', referrer?.referralCode ?? ''],
-  }).catch(() => {});
+  // ── رضایت (§۱۳/§۱۷) — دسته‌ی `offers` ─────────────────────────────────
+  // این پیامک به شماره‌ی یک **شخصِ ثالث** می‌رود که خودش هیچ کنشی نکرده؛
+  // یعنی از دیدِ گیرنده یک پیامِ اکتسابِ مشتری است، نه یک رسید. پس در
+  // سخت‌گیرانه‌ترین سطلِ رضایت (`MARKETING_CATEGORIES`) قرار می‌گیرد.
+  // معمولاً دعوت‌شده اصلاً حساب ندارد ⇒ ترجیحی وجود ندارد ⇒ پیام می‌رود؛
+  // گارد فقط وقتی می‌گزد که گیرنده کاربرِ ثبت‌نام‌شده‌ای باشد که صریحاً
+  // انصراف داده — دقیقاً همان حالتی که باید محترم شمرده شود.
+  const invitee = await findUserByPhoneForConsent(inviteePhone);
+  if (smsAllowedForCategory(invitee?.notificationPrefs, 'offers', {
+    site: 'loyalty.referral_invite', template: 'campaign', userId: invitee?.id ?? null,
+  })) {
+    await enqueueSms({
+      to: inviteePhone, template: 'campaign',
+      tokens: [referrer?.firstName ?? 'دوست شما', referrer?.referralCode ?? ''],
+    }).catch(() => {});
+  }
   return { id: ref.id, status: ref.status, reward_points: ref.rewardPoints };
 }
 
@@ -197,6 +263,10 @@ export async function createGiftCard(opts: {
     },
   });
   // پیامک به گیرنده
+  // ⚠️ عمداً **بدونِ گاردِ رضایت** (§۱۳/§۱۷): این پیام تحویلِ یک ارزشِ پولیِ
+  // واقعیِ خرج‌شدنی است که به نامِ خودِ گیرنده صادر شده و کدش تنها راهِ
+  // استفاده از آن است. خاموش‌کردنش یعنی گیرنده هرگز نفهمد پولی برایش خریده
+  // شده — این «رعایتِ رضایت» نیست، گم‌کردنِ دارایی است.
   if (opts.recipientPhone) {
     await enqueueSms({ to: opts.recipientPhone, template: 'campaign', tokens: [opts.recipientName ?? 'دوست عزیز', code] }).catch(() => {});
   }
@@ -327,8 +397,10 @@ export async function grantBirthdayRewards(): Promise<{ birthday: number; annive
   const { mm, dd } = jalaliMonthDayToday(today);
 
   // کاربرانی که امروز تولدشان است — نام و تلفن را یک‌جا می‌گیریم (بدون N+1)
-  const birthdayUsers = await db.$queryRaw<{ id: string; phone: string | null; first_name: string | null }[]>`
-    SELECT id, phone, first_name FROM users
+  // `notification_prefs` در همین SELECT می‌آید — گاردِ رضایتِ پایین نباید یک
+  // کوئریِ اضافه به‌ازای هر کاربرِ متولدِ امروز بزند (N+1 در یک cronِ روزانه).
+  const birthdayUsers = await db.$queryRaw<{ id: string; phone: string | null; first_name: string | null; notification_prefs: unknown }[]>`
+    SELECT id, phone, first_name, notification_prefs FROM users
     WHERE birth_date IS NOT NULL
       AND EXTRACT(MONTH FROM birth_date) = ${mm}
       AND EXTRACT(DAY FROM birth_date) = ${dd}
@@ -339,7 +411,18 @@ export async function grantBirthdayRewards(): Promise<{ birthday: number; annive
   for (const u of birthdayUsers) {
     try {
       await addPoints({ userId: u.id, delta: POINTS.birthday, reason: 'birthday', note: 'هدیه‌ی تولد 🎂' });
-      if (u.phone) await enqueueSms({ to: u.phone, template: 'campaign', tokens: [u.first_name ?? 'دوست عزیز', String(POINTS.birthday)] }).catch(() => {});
+      // ── رضایت (§۱۳/§۱۷) — دسته‌ی `loyalty` ─────────────────────────────
+      // محتوایِ پیام «فلانی جان، N امتیازِ تولد گرفتی» است و برچسبِ همین کلید
+      // در اپِ مشتری دقیقاً «امتیاز و پاداش — وقتی امتیازت به یه پاداش جدید
+      // رسید» است. کلیدِ `offers` («تخفیف و کش‌بک ویژه») هیچ تخفیف/کش‌بکی در
+      // این پیام ندارد که توصیفش کند.
+      // ⚠️ امتیاز بالاتر از قبل ثبت شده و ثبتش **هرگز** به رضایت گره نمی‌خورد:
+      // انصراف فقط جلویِ خبردادن را می‌گیرد، نه جلویِ خودِ پاداش را.
+      if (u.phone && smsAllowedForCategory(u.notification_prefs, 'loyalty', {
+        site: 'loyalty.birthday_points', template: 'campaign', userId: u.id,
+      })) {
+        await enqueueSms({ to: u.phone, template: 'campaign', tokens: [u.first_name ?? 'دوست عزیز', String(POINTS.birthday)] }).catch(() => {});
+      }
     } catch (e: any) {
       if (e?.code !== 'P2002') throw e; // فقط پاداش تکراری (unique violation) را رد کن
     }

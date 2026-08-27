@@ -41,6 +41,26 @@ const API = {
   post(path, body){ return this.request(path, { method:'POST', body: JSON.stringify(body||{}) }); },
   patch(path, body){ return this.request(path, { method:'PATCH', body: JSON.stringify(body||{}) }); },
   del(path){ return this.request(path, { method:'DELETE' }); },
+  // ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
+  // مسیرِ اصلیِ ورود به پنلِ شرکت. OTP کنارش می‌ماند چون مسیرِ پشتیبان است:
+  // اگر رمز فراموش شد و کاوه‌نگار راه افتاده باشد، راهِ برگشت وجود دارد.
+  async adminLogin(username, password){
+    const res = await this.request('/auth/admin/login', {
+      method:'POST', body: JSON.stringify({ username, password }),
+    });
+    if (res.ok && res.data?.access) { this.setToken(res.data.access); this.setRefresh(res.data.refresh); }
+    return res;
+  },
+  // ── اعتبارنامه‌ی بیزنس‌ها (پنلِ شرکت یوزر/پسورد می‌سازد) ──
+  staffCredentials(restaurantId){ return this.get(`/admin/staff-credentials?restaurant_id=${encodeURIComponent(restaurantId)}`); },
+  setStaffCredentials(payload){ return this.post('/admin/staff-credentials', payload); },
+  // ── SPEC-B: provisioningِ کسب‌وکار از پنلِ شرکت ──
+  // Idempotency-Key اجباری است (دابل‌کلیک/retry = همان یک رستوران).
+  adminCreateRestaurant(body, idemKey){
+    return this.request('/admin/restaurants', { method:'POST', body: JSON.stringify(body||{}), headers:{ 'Idempotency-Key': idemKey } });
+  },
+  adminResendInvite(id){ return this.post(`/admin/restaurants/${id}/resend-invite`, {}); },
+  adminCreateBranch(id, body){ return this.post(`/admin/restaurants/${id}/branches`, body); },
   async requestAdminOtp(phone){ return this.request('/auth/admin/request', { method:'POST', body: JSON.stringify({ phone }) }); },
   async verifyAdminOtp(phone, code){
     const res = await this.request('/auth/admin/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
@@ -121,6 +141,8 @@ function mapAdminRestaurant(apiR, fallback){
     reservations: apiR.reservations ?? 0,
     sms: apiR.sms_total_sent ?? 0,
     smsBalance: apiR.sms_balance ?? 0,
+    // SPEC-B: برای badge «در انتظارِ فعال‌سازی» و دکمه‌ی resend در پنل
+    provision_status: apiR.provision_status,
     joined: apiR.joined_at ? new Date(apiR.joined_at).toLocaleDateString('fa-IR') : '—',
   };
 }

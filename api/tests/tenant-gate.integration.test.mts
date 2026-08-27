@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
 import { resolveStaffRestaurant, defaultRestaurantForTenant } from '../src/lib/staff-helpers.ts';
@@ -43,7 +44,9 @@ const staffAuth = (sub: string, tenantId: string, role: 'owner' | 'manager' | 's
 
 const reqWith = (restaurantId?: string): Request =>
   new Request('https://example.invalid/api/v1/restaurant/x', {
-    headers: restaurantId ? { 'x-restaurant-id': restaurantId } : {},
+    headers: restaurantId
+      ? { 'x-restaurant-id': restaurantId, 'x-real-ip': testIp() }
+      : { 'x-real-ip': testIp() },
   });
 
 async function mkRestaurant(tenantId: string, suffix: string, createdAt: Date): Promise<string> {

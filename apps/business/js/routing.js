@@ -16,11 +16,32 @@ const VIEW_PERMISSION = {
   customers:    'canViewAnalytics',
   loyalty:      'canViewAnalytics',
   analytics:    'canViewAnalytics',
-  staff:        'canManageStaff',
+  // ⚠️ `staff` عمداً اینجا **نیست** — پایین‌تر با نقش گیت می‌شود، نه با مجوز.
   // overview همیشه در دسترس است (داشبوردِ پایه).
 };
 
+// ═══ صفحاتی که با **نقش** گیت می‌شوند، نه با کلیدِ مجوز ═══
+// چرا جدا: `canManageStaff` یک کلیدِ **قابلِ‌دادن ولی هرگز اجرا نشده** است —
+// شمارشِ واقعی روی api/src/app/api صفر گارد نشان می‌دهد. مدیریتِ کارکنان با
+// `assertManagerOrOwner` محافظت می‌شود (api/src/app/api/v1/restaurant/staff/route.ts:79)
+// که نقش را می‌خواهد، نه مجوز را — و این عمدی است: کلیدی که بشود آن را به یک
+// staff داد، هم‌ارزِ owner می‌شود (گاردِ PATCH فقط `target.role === 'owner'` را
+// می‌گیرد، پس دارنده‌ی کلید می‌توانست خودش را با یک درخواست همه‌مجوز کند).
+//
+// بن‌بستی که این رفع می‌کند: تا پیش از این `staff: 'canManageStaff'` بود، پس
+// کارمندی که آن کلید را گرفته بود تبِ «کارکنان» را **می‌دید** و هر کلیک ۴۰۳
+// می‌گرفت. حالا UI دقیقاً همان چیزی را می‌گوید که سرور اجرا می‌کند.
+const VIEW_ROLE = {
+  staff: ['owner', 'manager'],
+};
+
 function canAccessView(v){
+  const roles = VIEW_ROLE[v];
+  if (roles) {
+    // بدونِ اطلاعِ نقش (آفلاین/دمو) پنهان نمی‌کنیم — همان قاعده‌ی API.can.
+    const role = (typeof STAFF_INFO !== 'undefined' && STAFF_INFO) ? STAFF_INFO.role : null;
+    return !role || roles.indexOf(role) !== -1;
+  }
   const key = VIEW_PERMISSION[v];
   return !key || (typeof API !== 'undefined' && API.can ? API.can(key) : true);
 }
@@ -40,6 +61,13 @@ function applyPermissionsToNav(){
 function nav(v){
   // دفاعِ لایه‌ی دوم: حتی اگر کسی دکمه را دور بزند، به صفحه‌ی بدونِ مجوز نمی‌رود.
   if (!canAccessView(v)) { if (typeof toast === 'function') toast('', 'دسترسی شما به این بخش محدود شده است'); return; }
+  // ⚠️ گاردِ تغییرِ ذخیره‌نشده (۲۰۲۶-۰۸-۲۶): تا امروز `_hoursDirty` فقط نوشته
+  // می‌شد و هیچ‌جا خوانده نمی‌شد، پس ساعتِ کاری/تعطیلیِ ذخیره‌نشده با یک
+  // کلیکِ ساده روی منو بی‌صدا از بین می‌رفت.
+  if (v !== 'profile' && typeof _hoursDirty !== 'undefined' && _hoursDirty) {
+    if (!confirm('تغییرهای ذخیره‌نشده‌ی ساعاتِ کاری از بین می‌روند. مطمئنی؟')) return;
+    _hoursDirty = false;   // کاربر آگاهانه صرف‌نظر کرد
+  }
   try{ if(window.rzTrack) window.rzTrack('page.viewed',{page:v}); }catch(e){}
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.getElementById('v-'+v).classList.add('active');
@@ -134,6 +162,10 @@ async function selectBranch(id){
   if(typeof _notifsLoaded!=='undefined') _notifsLoaded=false;
   if(typeof _weekdayInsightLoaded!=='undefined') _weekdayInsightLoaded=false;
   if(typeof _heatmapLoaded!=='undefined') _heatmapLoaded=false;
+  // ⚠️ CLUB هم به‌شعبه وابسته است ولی در این فهرست نبود: بعد از سوییچ،
+  // شمارِ «تولد این ماه» در کمپینِ پیامکی همچنان اعضای شعبه‌ی *قبلی* را
+  // می‌شمرد — یعنی کمپین برای مخاطبِ اشتباه برنامه‌ریزی می‌شد.
+  if(typeof CLUB!=='undefined') CLUB=[];
   await loadBranches();
   await loadTables();
   refreshActiveView();

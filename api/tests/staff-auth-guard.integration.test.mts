@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { readFileSync } from 'node:fs';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -33,7 +34,6 @@ function readSource(rel: string): string {
 }
 
 const { db } = await import('../src/lib/db');
-const { redis } = await import('../src/lib/redis');
 const { signAccess } = await import('../src/lib/jwt');
 const staffRoute = await import('../src/app/api/v1/restaurant/staff/route');
 
@@ -55,20 +55,23 @@ const token = (sub: string, tid: string, role: 'owner' | 'manager' | 'staff') =>
 const req = (tok: string, body?: unknown, method = 'GET') =>
   new Request('http://x/api/v1/restaurant/staff', {
     method,
-    headers: { authorization: `Bearer ${tok}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${tok}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
-/** سهمیه‌ی rate-limit بینِ فایل‌هایِ رانر مشترک است (کلید بر پایه‌ی IP). */
-async function clearRateLimit() {
-  for (const p of ['rl:auth:*', 'rl:srch:*']) {
-    const keys = await redis.keys(p);
-    if (keys.length) await redis.del(...keys);
-  }
-}
+/*
+ * ⚠️ اینجا قبلاً `clearRateLimit()` بود که سطل‌های `rl:auth:*` و `rl:srch:*` را
+ * **سراسری** پاک می‌کرد — چون `new Request()`ِ بدونِ هدر همیشه IPِ `unknown`
+ * می‌داد و سهمیه بینِ همه‌ی فایل‌های رانر مشترک بود. آن پاک‌سازی سطلِ فایل‌های
+ * دیگر را هم خالی می‌کرد و ریت‌لیمیت را از تستِ آن‌ها پنهان می‌کرد.
+ * حالا `req()` با `testIp()` IPِ یکتا می‌گیرد، پس سطل‌ها از اول جدا هستند.
+ */
 
 before(async () => {
-  await clearRateLimit();
   const s = Date.now().toString(36);
   const t = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-${s}` }, select: { id: true } });
   const o = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-other-${s}` }, select: { id: true } });
@@ -86,7 +89,6 @@ before(async () => {
 });
 
 after(async () => {
-  await clearRateLimit();
   await db.staffPermission.deleteMany({ where: { staff: { tenantId: { in: [tenantId, otherTenantId] } } } });
   await db.staff.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
   await db.tenant.deleteMany({ where: { id: { in: [tenantId, otherTenantId] } } });
@@ -96,7 +98,6 @@ after(async () => {
 describe('withStaffAuth — کارمندِ غیرفعال‌شده', () => {
   test('کنترلِ مثبت: مدیرِ سالم فهرستِ کارکنان را می‌بیند', async () => {
     // بدونِ این، گاردی که *همیشه* رد کند هم بقیه‌ی تست‌ها را پاس می‌کرد.
-    await clearRateLimit();
     const res = await staffRoute.GET(req(token(managerId, tenantId, 'manager')));
     assert.equal(res.status, 200);
     const body = await res.json() as { items: unknown[] };
@@ -104,13 +105,11 @@ describe('withStaffAuth — کارمندِ غیرفعال‌شده', () => {
   });
 
   test('⚠️ مدیرِ اخراج‌شده دیگر فهرستِ کارکنان را نمی‌بیند (نشتِ شماره‌ی موبایل)', async () => {
-    await clearRateLimit();
     const res = await staffRoute.GET(req(token(firedManagerId, tenantId, 'manager')));
     assert.equal(res.status, 403, 'توکنِ هنوز-معتبر نباید بعد از اخراج کار کند');
   });
 
   test('⚠️ مدیرِ اخراج‌شده نمی‌تواند کارمندِ جدید بسازد (درِ پشتیِ ماندگار)', async () => {
-    await clearRateLimit();
     const res = await staffRoute.POST(
       req(token(firedManagerId, tenantId, 'manager'), { phone: '09121234567', role: 'staff' }, 'POST'),
     );
@@ -122,7 +121,6 @@ describe('withStaffAuth — کارمندِ غیرفعال‌شده', () => {
   test('🔴 مدیرِ اخراج‌شده نمی‌تواند خودش را دوباره فعال کند (تبدیلِ پنجره‌ی موقت به دسترسیِ دائمی)', async () => {
     // 🔴 هسته‌ی باگ. پیش از رفع، این درخواست ۲۰۰ می‌داد و
     //    `is_active` در دیتابیس دوباره true می‌شد — یعنی اخراج بی‌اثر می‌شد.
-    await clearRateLimit();
     const res = await staffRoute.PATCH(
       req(token(firedManagerId, tenantId, 'manager'), { staff_id: firedManagerId, is_active: true }, 'PATCH'),
     );
@@ -133,7 +131,6 @@ describe('withStaffAuth — کارمندِ غیرفعال‌شده', () => {
   });
 
   test('⚠️ مدیرِ اخراج‌شده نمی‌تواند مدیرِ سالم را غیرفعال کند (انتقام‌گیری)', async () => {
-    await clearRateLimit();
     const res = await staffRoute.PATCH(
       req(token(firedManagerId, tenantId, 'manager'), { staff_id: managerId, is_active: false }, 'PATCH'),
     );
@@ -146,7 +143,6 @@ describe('withStaffAuth — کارمندِ غیرفعال‌شده', () => {
 // ─────────────────────────────────────────────────────────────────────
 describe('withStaffAuth — سایرِ چک‌هایِ دیتابیسی', () => {
   test('⚠️ حسابِ حذف‌شده رد می‌شود، حتی با توکنِ معتبر', async () => {
-    await clearRateLimit();
     const ghost = await db.staff.create({
       data: { tenantId, role: 'manager', isActive: true, phone: phone() },
       select: { id: true },
@@ -158,7 +154,6 @@ describe('withStaffAuth — سایرِ چک‌هایِ دیتابیسی', () => 
   });
 
   test('⚠️ توکنی که tenantIdش با DB نمی‌خواند رد می‌شود (جعلِ عضویتِ تنانت)', async () => {
-    await clearRateLimit();
     // ownerِ تنانتِ دیگر، با توکنی که ادعا می‌کند عضوِ تنانتِ ماست.
     const res = await staffRoute.GET(req(token(outsiderOwnerId, tenantId, 'owner')));
     assert.equal(res.status, 403, 'عضویتِ تنانت باید با ردیفِ واقعی تطبیق داده شود، نه با ادعایِ توکن');
@@ -168,19 +163,18 @@ describe('withStaffAuth — سایرِ چک‌هایِ دیتابیسی', () => 
     // ⚠️ امروز مسیرِ APIی برایِ تغییرِ نقش وجود ندارد، پس این قابلِ سوءاستفاده
     //    نبود — ولی گارد باید از قبل درست باشد، نه بعد از اینکه چنین مسیری
     //    اضافه شد. کارمندِ عادی با توکنی که ادعایِ owner دارد نباید رد شود.
-    await clearRateLimit();
     const res = await staffRoute.GET(req(token(plainStaffId, tenantId, 'owner')));
     assert.equal(res.status, 403, 'نقشِ واقعیِ DB (staff) باید برنده باشد، نه ادعایِ توکن (owner)');
   });
 
   test('بدونِ هدرِ Authorization رد می‌شود', async () => {
-    await clearRateLimit();
-    const res = await staffRoute.GET(new Request('http://x/api/v1/restaurant/staff'));
+    const res = await staffRoute.GET(
+      new Request('http://x/api/v1/restaurant/staff', { headers: { 'x-real-ip': testIp() } }),
+    );
     assert.equal(res.status, 401);
   });
 
   test('توکنِ دست‌کاری‌شده رد می‌شود', async () => {
-    await clearRateLimit();
     const good = token(ownerId, tenantId, 'owner');
     const res = await staffRoute.GET(req(good.slice(0, -3) + 'AAA'));
     assert.equal(res.status, 401);
@@ -191,7 +185,6 @@ describe('withStaffAuth — سایرِ چک‌هایِ دیتابیسی', () => 
 describe('PATCH /restaurant/staff — گاردِ تغییرِ وضعیتِ خود', () => {
   test('⚠️ مدیرِ سالم هم نمی‌تواند وضعیتِ فعال‌بودنِ خودش را عوض کند (هیچ جهتی)', async () => {
     // ⚠️ لایه‌ی دومِ همان رفع: قبلاً فقط جهتِ `false` گارد داشت.
-    await clearRateLimit();
     const res = await staffRoute.PATCH(
       req(token(managerId, tenantId, 'manager'), { staff_id: managerId, is_active: true }, 'PATCH'),
     );
@@ -199,7 +192,6 @@ describe('PATCH /restaurant/staff — گاردِ تغییرِ وضعیتِ خو�
   });
 
   test('مدیرِ سالم می‌تواند کارمندِ عادی را غیرفعال کند (قابلیت نشکسته)', async () => {
-    await clearRateLimit();
     const victim = await db.staff.create({
       data: { tenantId, role: 'staff', isActive: true, phone: phone() },
       select: { id: true },
@@ -213,7 +205,6 @@ describe('PATCH /restaurant/staff — گاردِ تغییرِ وضعیتِ خو�
   });
 
   test('مدیر نمی‌تواند مدیرِ دیگر را غیرفعال کند — فقط مالک', async () => {
-    await clearRateLimit();
     const otherManager = await db.staff.create({
       data: { tenantId, role: 'manager', isActive: true, phone: phone() },
       select: { id: true },
@@ -225,7 +216,6 @@ describe('PATCH /restaurant/staff — گاردِ تغییرِ وضعیتِ خو�
   });
 
   test('مالک می‌تواند مدیر را غیرفعال کند', async () => {
-    await clearRateLimit();
     const victimManager = await db.staff.create({
       data: { tenantId, role: 'manager', isActive: true, phone: phone() },
       select: { id: true },

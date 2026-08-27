@@ -1,11 +1,15 @@
 import { db } from './db';
+import { createLogger } from './logger';
+import { metrics } from './metrics';
 import { sinceDays } from './staff-helpers';
 import { computeStaticScoreFromFeatures, type RawFeatureInput } from './ml-core';
 import { loadPriorHistory } from './no-show-features';
 // ⚠️ عمداً static است، نه `await import()`: چرخه‌ی import با شکستنِ آن در
 // ml-core.ts از بین رفت، و importِ پویا در این مسیر روی Node 20 واقعاً
 // می‌شکست (جزئیات در ml-core.ts).
-import { getLearnedNoShowModelWithRun, predictProba, buildFeatureVector } from './no-show-model';
+import { getEffectiveNoShowModel, predictProba, buildFeatureVector } from './no-show-model';
+
+const log = createLogger('no-show-serving');
 
 // ═══════════════════════════════════════════════════════════
 //  موتور پیش‌بینی No-Show و محاسبه‌ی CLV — رزرونو
@@ -41,6 +45,15 @@ export type NoShowResult = {
     probability: number;
     /** فازِ ۶ — اجرایِ آموزشی که این وزن‌ها را ساخت. heuristic ندارد → null. */
     modelRunId: string | null;
+    /**
+     * دامنه‌ی مدل: `restaurant` = مدلِ اختصاصیِ همین رستوران،
+     * `platform` = مدلِ سراسری (رستوران هنوز دادهٔ کافیِ خودش را ندارد).
+     *
+     * ⚠️ لازم است چون مدلِ سراسری `modelRunId` ندارد، و بدونِ این فیلد
+     * «null یعنی heuristic» با «null یعنی سراسری» قاطی می‌شد — و دقتِ
+     * تولید به دامنه‌ی اشتباه نسبت داده می‌شد.
+     */
+    modelScope?: 'restaurant' | 'platform';
   };
 };
 
@@ -85,19 +98,41 @@ export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResul
     leadMinutes: (input.slotStart.getTime() - input.createdAt.getTime()) / 60000,
     partySize: input.partySize,
     source: input.source,
+    // ویژگی‌های زمانیِ v2 (ساعتِ تهران، آخرِ هفته). مسیرِ آموزش هم دقیقاً
+    // همین را می‌دهد و هر دو از یک `buildFeatureVector` رد می‌شوند —
+    // برابری ساختاری است، نه چیزی که با تست نگه داشته شود.
+    slotStart: input.slotStart,
   };
 
-  const learned = await getLearnedNoShowModelWithRun(input.restaurantId).catch(() => null);
+  // ⚠️ ترتیب: مدلِ **اختصاصیِ** رستوران، بعد مدلِ **سراسریِ** پلتفرم، بعد
+  // heuristic. لایه‌ی وسط تازه است و سرمای شروع را رفع می‌کند: پیش از این،
+  // رستورانی که هنوز ۴۰ نمونه و ۵ no-show نداشت **هرگز** مدل نمی‌گرفت و
+  // تا ماه‌ها روی heuristicِ ثابت می‌ماند — یعنی یادگیری عملاً برایش
+  // اتفاق نمی‌افتاد، هرچقدر هم کلِ پلتفرم داده جمع می‌کرد.
+  const learned = await getEffectiveNoShowModel(input.restaurantId).catch(() => null);
   if (learned) {
-    const probability = predictProba(learned.weights, buildFeatureVector(features));
-    const score = Math.round(probability * 100);
-    return {
-      score, tier: tierFromScore(score), source: 'learned',
-      // فازِ ۶: نسخه‌ی مدل هم در ردِ ورودی می‌آید تا دفترِ پیش‌بینی بتواند
-      // نتیجه را به همان اجرایِ آموزش نسبت دهد. null یعنی مدلی است که پیش
-      // از مهاجرتِ ۰۵۶ آموزش دیده — نسب‌نامه‌اش را جعل نمی‌کنیم.
-      lineage: { features, probability, modelRunId: learned.runId },
-    };
+    // ⚠️ امتیازدهی داخلِ try است و این عمدی‌ست (۲۰۲۶-۰۸-۲۵): `dot()` حالا
+    // روی ناهم‌طولیِ بردار **throw** می‌کند — که برای گرفتنِ باگ درست است،
+    // ولی این مسیر داخلِ ثبتِ رزرو اجرا می‌شود. یک مدلِ خرابِ ذخیره‌شده
+    // نباید رزروِ مهمان را بشکند؛ باید بی‌سروصدا نباشد ولی بی‌خطر باشد.
+    // پس: سقوطِ صادقانه به heuristic + لاگ + متریکِ قابلِ‌آلارم.
+    try {
+      const probability = predictProba(learned.weights, buildFeatureVector(features));
+      const score = Math.round(probability * 100);
+      return {
+        score, tier: tierFromScore(score), source: 'learned',
+        // نسب‌نامه: `modelRunId` فقط برای مدلِ اختصاصی وجود دارد. مدلِ سراسری
+        // اجرایِ per-restaurant ندارد، پس null می‌ماند و `modelScope` تفاوت را
+        // نگه می‌دارد — جعلِ نسب‌نامه ممنوع (همان قاعده‌ی فازِ ۶).
+        lineage: { features, probability, modelRunId: learned.runId, modelScope: learned.source },
+      };
+    } catch (e) {
+      log.error('امتیازدهیِ مدل شکست خورد — سقوط به heuristic', {
+        restaurantId: input.restaurantId, scope: learned.source, error: (e as Error).message,
+      });
+      metrics.modelScoringFailed.inc({ scope: learned.source });
+      // به heuristicِ پایین می‌افتد — عمداً return نمی‌کند.
+    }
   }
 
   const score = computeStaticScoreFromFeatures(features);
@@ -114,6 +149,30 @@ export async function computeNoShowRisk(input: NoShowInput): Promise<NoShowResul
 //  CLV + سگمنت‌بندی — محاسبه‌ی per (رستوران × کاربر)
 // ───────────────────────────────────────────────────────────
 
+/**
+ * وضعیت‌هایی که در **آمارِ مشتری** (CLV، سگمنت، DNA) «بازدید» حساب می‌شوند.
+ *
+ * ⚠️ عمداً export شده و عمداً اینجاست، نه در reservation-status.ts: این
+ * مجموعه با `VISITED_RESERVATION_STATUSES` یکی **نیست** و نباید باشد —
+ * آن یکی برای سیگنالِ اجتماعی («این هفته چند نفر اینجا بودند») است و
+ * `arrived` را عمداً بیرون گذاشته؛ این یکی تاریخچه‌ی خودِ مهمان است و
+ * رزروِ قدیمیِ `arrived` (معادلِ حذف‌شده‌ی `checked_in`) واقعاً بازدیدِ او
+ * بوده و نباید از پروفایلش پاک شود.
+ *
+ * ⚠️ نکته‌ی ثبت‌شده (یافته‌ی ۲۰۲۶-۰۸-۲۵، رفع‌نشده): `checked_in` اینجا
+ * نیست. مهمانی که QR را زده ولی پرسنل هرگز «نشست» نزده، در آمارش بازدید
+ * حساب نمی‌شود. رجوع کن به docs/recovery/OPEN-FINDINGS.md.
+ *
+ * دلیلِ export: خلاصه‌ی ماهانه‌ی DNA (lib/dna-summary.ts) باید **دقیقاً**
+ * همین تعریف را داشته باشد، وگرنه عددِ ماهانه و عددِ کل روی یک صفحه با هم
+ * نمی‌خوانند. کپیِ سومِ این فهرست ممنوع.
+ */
+export const INSIGHT_VISIT_STATUSES = ['completed', 'arrived', 'seated', 'dining'] as const;
+
+export function isInsightVisit(status: string): boolean {
+  return (INSIGHT_VISIT_STATUSES as readonly string[]).includes(status);
+}
+
 export async function recomputeCustomerInsight(restaurantId: string, userId: string) {
   const reservations = await db.reservation.findMany({
     where: { restaurantId, userId },
@@ -122,8 +181,7 @@ export async function recomputeCustomerInsight(restaurantId: string, userId: str
   });
   if (reservations.length === 0) return null;
 
-  const isVisit = (s: string) => ['completed', 'arrived', 'seated', 'dining'].includes(s);
-  const visits = reservations.filter(r => isVisit(r.status));
+  const visits = reservations.filter(r => isInsightVisit(r.status));
   const noShows = reservations.filter(r => r.status === 'no_show').length;
   const cancels = reservations.filter(r => ['cancelled', 'cancelled_by_user', 'cancelled_by_restaurant', 'auto_cancelled'].includes(r.status)).length;
 
@@ -208,17 +266,88 @@ export async function recomputeCustomerInsight(restaurantId: string, userId: str
  *  (حتی اگر churned/at_risk بودند) و برای مشتریانی که از دهک برتر خارج می‌شدند فقط
  *  isVip را false می‌کرد ولی segment='vip' باقی می‌ماند → drift دائمی. حالا VIP فقط
  *  یک flag بولی است و segment (که از churn/recency محاسبه می‌شود) دست‌نخورده می‌ماند. */
-export async function refreshVipFlags(restaurantId: string) {
-  const count = await db.customerInsight.count({ where: { restaurantId } });
-  if (count < 10) return; // برای رستوران‌های کوچک، VIP-بندی دهکی بی‌معنی است
-  const vipCutoffIndex = Math.max(0, Math.floor(count * 0.1) - 1);
-  const cutoffRow = await db.customerInsight.findMany({
-    where: { restaurantId }, orderBy: { predictedClvToman: 'desc' }, skip: vipCutoffIndex, take: 1, select: { predictedClvToman: true },
+export const MIN_MEASURED_FOR_VIP = 10;
+/** سقفِ سهمِ VIP. دهکِ برتر ۱۰٪ است؛ اگر تساوی‌ها انتخاب را از این سقف رد کنند،
+ *  یعنی مرزِ دهک اصلاً تفکیک نمی‌کند و ادعایِ «برتر» بی‌پشتوانه است. */
+export const MAX_VIP_SHARE = 0.25;
+
+export type VipRefreshStatus = 'ok' | 'insufficient_data' | 'no_discrimination';
+
+/**
+ * پس از تعیین سگمنت‌ها، VIP = ۱۰٪ بالای CLV این رستوران (دهک برتر).
+ *
+ *  ⚠️ باگ M11 (قبلی): برای مشتریان بالای cutoff، segment را هم به 'vip' تغییر
+ *  می‌داد (حتی اگر churned/at_risk بودند) و برای مشتریانی که از دهک برتر خارج
+ *  می‌شدند فقط isVip را false می‌کرد ولی segment='vip' باقی می‌ماند → drift دائمی.
+ *  حالا VIP فقط یک flag بولی است و segment دست‌نخورده می‌ماند.
+ *
+ *  ⚠️ رفعِ «تساویِ CLV همه را VIP می‌کند» (فازِ ۲، پروتکل §۲۰ / `ML_CONTRACT.md`).
+ *
+ *  چه بود: cutoff از ردیفِ دهکِ برتر خوانده می‌شد و بعد `gte: cutoff` اعمال
+ *  می‌شد. وقتی همه‌ی CLVها برابرند — که در عملِ عادیِ این پلتفرم یعنی همه صفر،
+ *  چون هیچ رستورانی منویِ قیمت‌دار ندارد — خودِ cutoff هم همان مقدار می‌شود و
+ *  `gte` **کلِ جمعیت** را می‌گیرد. اندازه‌گیریِ زنده بعد از اجرای واقعیِ cron:
+ *  `is_vip=t → ۳۰ نفر` با `max(predicted_clv_toman)=0`. یعنی سی نفر با ارزشِ
+ *  پیش‌بینی‌شده‌ی صفر «مهمانِ VIP» اعلام شدند — دقیقاً همان «گزارشِ عملکردی که
+ *  اندازه نگرفته‌ای» که `docs/ML_CONTRACT.md` ممنوع می‌کند.
+ *  عکسِ آن هم غلط است: «هیچ‌کس VIP نیست» به‌عنوانِ رفتارِ همیشگی، قابلیت را
+ *  خاموش می‌کند. پس سه شرطِ **صریح** گذاشته شد:
+ *
+ *   ۱. فقط ردیف‌هایی که CLVِ **اندازه‌گیری‌شده و مثبت** دارند کاندیدند.
+ *      `null` یعنی «مبلغی نداشتیم» و `0` یعنی «ارزشِ پیش‌بینی‌شده هیچ» — هیچ‌کدام
+ *      نمی‌تواند «برترین» باشد. (پیش از این `null`ها هم واردِ ترتیب می‌شدند و در
+ *      Postgres با `DESC` اول می‌آمدند، یعنی cutoff می‌توانست از یک ردیفِ
+ *      اندازه‌گیری‌نشده بیاید.)
+ *   ۲. زیرِ `MIN_MEASURED_FOR_VIP` کاندیدِ سنجیده‌شده → هیچ‌کس VIP نیست.
+ *   ۳. گاردِ تساوی: اگر انتخاب بیش از `MAX_VIP_SHARE` از کاندیدها را بگیرد
+ *      (یعنی توده‌ای از مقادیرِ مساوی روی مرز نشسته)، دهک تفکیک نکرده و
+ *      هیچ‌کس VIP نمی‌شود.
+ *
+ *  در هر سه حالتِ «نمی‌دانیم»، پرچم‌ها **صریحاً پاک** می‌شوند — تا VIPِ کهنه‌ی
+ *  یک اجرایِ قبلی به‌صورتِ خاموش باقی نماند.
+ */
+export async function refreshVipFlags(restaurantId: string): Promise<VipRefreshStatus> {
+  // فقط ردیف‌هایی با CLVِ واقعاً اندازه‌گیری‌شده و مثبت کاندیدند.
+  const measured = await db.customerInsight.findMany({
+    where: { restaurantId, predictedClvToman: { gt: 0 } },
+    orderBy: { predictedClvToman: 'desc' },
+    select: { predictedClvToman: true },
   });
-  const cutoff = cutoffRow[0]?.predictedClvToman ?? Infinity;
+
+  const clearAll = async () => {
+    await db.customerInsight.updateMany({
+      where: { restaurantId, isVip: true }, data: { isVip: false },
+    });
+  };
+
+  if (measured.length < MIN_MEASURED_FOR_VIP) {
+    // برای رستوران‌های کوچک (یا بدونِ مبلغِ اندازه‌گیری‌شده) VIP-بندیِ دهکی بی‌معنی است.
+    await clearAll();
+    return 'insufficient_data';
+  }
+
+  const cutoffIndex = Math.max(0, Math.floor(measured.length * 0.1) - 1);
+  const cutoff = measured[cutoffIndex].predictedClvToman as number;
+
+  // گاردِ تساوی: چند کاندید واقعاً روی/بالایِ مرز می‌افتند؟
+  const selected = measured.filter((m) => (m.predictedClvToman as number) >= cutoff).length;
+  if (selected > measured.length * MAX_VIP_SHARE) {
+    await clearAll();
+    return 'no_discrimination';
+  }
+
   // فقط flag بولی isVip را ست/ریست کن — segment را تغییر نده (drift رفع شد).
-  await db.customerInsight.updateMany({ where: { restaurantId, predictedClvToman: { gte: cutoff } }, data: { isVip: true } });
-  await db.customerInsight.updateMany({ where: { restaurantId, predictedClvToman: { lt: cutoff } }, data: { isVip: false } });
+  await db.customerInsight.updateMany({
+    where: { restaurantId, predictedClvToman: { gte: cutoff } }, data: { isVip: true },
+  });
+  await db.customerInsight.updateMany({
+    where: {
+      restaurantId,
+      OR: [{ predictedClvToman: { lt: cutoff } }, { predictedClvToman: null }],
+    },
+    data: { isVip: false },
+  });
+  return 'ok';
 }
 
 /** برای cron شبانه: همه‌ی کاربران فعال یک رستوران در ۱۸۰ روز اخیر را بازمحاسبه می‌کند. */

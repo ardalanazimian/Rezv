@@ -5,6 +5,7 @@ import { redis } from './redis';
 import { metrics } from './metrics';
 import { Err } from './errors';
 import { enqueueSms } from './sms';
+import { smsAllowedForCategory } from './notification-prefs';
 import { queuePush, queueEmail } from './notify';
 import { cached, cacheKey } from './cache';
 import { activeStatusList } from './reservation-status';
@@ -618,7 +619,12 @@ export async function expireOffers(): Promise<number> {
 type NotifyKind = 'joined' | 'offered' | 'accepted' | 'expired';
 
 async function notifyEntry(entryId: string, kind: NotifyKind, data: Record<string, any>) {
-  const e = await db.waitlistEntry.findUnique({ where: { id: entryId } });
+  // ⚠️ `include` به‌جایِ کوئریِ دومِ ترجیحات: خواندنِ رضایت نباید یک رفت‌وبرگشتِ
+  // اضافه به حلقه‌هایِ cron (expireStaleOffers / promoteNext) اضافه کند.
+  const e = await db.waitlistEntry.findUnique({
+    where: { id: entryId },
+    include: { user: { select: { notificationPrefs: true } } },
+  });
   if (!e) return;
   const name = e.guestName ?? 'مهمان';
 
@@ -647,7 +653,28 @@ async function notifyEntry(entryId: string, kind: NotifyKind, data: Record<strin
   const m = messages[kind];
   // SMS
   if (e.notifySms && e.guestPhone && m.sms) {
-    await enqueueSms({ to: e.guestPhone, template: m.sms.template, tokens: m.sms.tokens, restaurantId: e.restaurantId }).catch(() => {});
+    // ── رضایت (§۱۳/§۱۷) ────────────────────────────────────────────────
+    // فقط `offered` گیت می‌شود، و دقیقاً با دسته‌ی `availability` — چون
+    // برچسبِ همان کلید در اپِ مشتری «میز خالی شد / وقتی میز رستوران موردِ
+    // علاقه‌ات آزاد شد» است و این پیام دقیقاً همان است.
+    //
+    // ⚠️ `joined` و `accepted` عمداً گیت **نمی‌شوند**:
+    //  • `joined` رسیدِ کنشِ خودِ مهمان است («نفر ۳ صف هستی»)، نه اطلاع از
+    //    آزادشدنِ میز.
+    //  • `accepted` قالبِ `booking_confirm` می‌فرستد — یعنی **تأییدِ رزرو**.
+    //    گیت‌کردنش یعنی مهمانی که فقط هشدارِ «میز خالی شد» را خاموش کرده،
+    //    تأییدیه‌ی رزروِ واقعی‌اش را هم از دست بدهد. همان اشتباهی که این کل
+    //    تغییر برای رفعش نوشته شد.
+    // `expired` اصلاً پیامک ندارد.
+    const gated = kind === 'offered';
+    if (gated && !smsAllowedForCategory(e.user?.notificationPrefs, 'availability', {
+      site: 'waitlist.offered', template: m.sms.template,
+      restaurantId: e.restaurantId, userId: e.userId,
+    })) {
+      // انصرافِ صریح — push/email زیر همچنان می‌روند (کانالِ جدا، فلگِ جدا).
+    } else {
+      await enqueueSms({ to: e.guestPhone, template: m.sms.template, tokens: m.sms.tokens, restaurantId: e.restaurantId }).catch(() => {});
+    }
   }
   // Push
   if (e.notifyPush && e.userId) {

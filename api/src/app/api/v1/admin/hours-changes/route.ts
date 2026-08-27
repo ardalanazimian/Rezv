@@ -6,6 +6,8 @@ import { errorResponse } from '@/lib/errors';
 import { parseQuery, z } from '@/lib/schemas';
 import { HOURS_STATUS_LABEL, type HoursChangeStatus } from '@/lib/hours-approval';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const querySchema = z.object({
   status: z.enum(['pending', 'rejected', 'all']).default('pending'),
   limit: z.number().int().min(1).max(100).default(50),
@@ -23,7 +25,7 @@ const querySchema = z.object({
  * کاملِ رکورد از صف (رجوع کن به hours-approval.ts). تاریخچه‌یِ تأییدها فقط
  * در audit_logs قابل‌جستجوست، نه اینجا.
  */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -72,3 +74,7 @@ export async function GET(req: Request) {
     return errorResponse(e);
   }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/hours-changes', GET_impl);

@@ -26,6 +26,21 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="رزرونو">
 <!-- ── داده‌ی ساختاریافته (Rich Results گوگل) ── -->
+<script>
+// ── آدرسِ APIِ قابلِ‌تنظیم بدونِ build (۲۰۲۶-۰۸-۲۶) ──
+// چرا: پنل استاتیک است و پیش‌فرضِ api-core «same-origin» — پشتِ nginxِ
+// استقرار درست است، ولی هر سروِ استاتیکِ دیگر (serve محلی، بسته‌ی آفلاین
+// رویِ یک بک‌اندِ واقعی) POST را با 405 برمی‌گرداند و ورود ناممکن می‌شود.
+// یک‌بار «?api=http://host:port» به URL بده تا ذخیره شود؛ «?api=» خالی
+// پاکش می‌کند. بدونِ آن هیچ رفتاری عوض نمی‌شود (localStorage خالی = همان
+// same-origin). try/catch برای حالتِ خصوصیِ مرورگر.
+(function(){try{
+  var q=new URLSearchParams(location.search);
+  if(q.has('api')){var v=q.get('api')||'';v?localStorage.setItem('rz_api_base',v):localStorage.removeItem('rz_api_base');}
+  var s=localStorage.getItem('rz_api_base');
+  if(s) window.RZ_API_BASE=s;
+}catch(e){}})();
+</script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://rezervno.ir/#org","name":"رزرونو","url":"https://rezervno.ir/","description":"پلتفرم رزرو آنلاین میز در بهترین رستوران‌های شهر","logo":"https://rezervno.ir/favicon.svg"},{"@type":"WebSite","@id":"https://rezervno.ir/#website","url":"https://rezervno.ir/","name":"رزرونو","inLanguage":"fa-IR","publisher":{"@id":"https://rezervno.ir/#org"}},{"@type":"WebApplication","name":"رزرونو","applicationCategory":"FoodEstablishmentReservation","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"IRR"}}]}
 </script>
@@ -2726,7 +2741,15 @@ async function refreshSlots(id){
       sel.innerHTML=open.map(s=>`<option value="${s.time}">${faTime(s.time)}</option>`).join('');
     }else{
       // خالیِ صادقانه: هیچ ساعتِ اختراعی جایگزینش نمی‌شه.
-      sel.innerHTML='<option value="">ساعت خالی برای این روز نیست</option>';
+      // ⚠️ ولی «خالی» یک علت ندارد. تا پیش از این، رستورانی که سیستمش آفلاین
+      // بود همین پیامِ «ساعت خالی برای این روز نیست» را می‌گرفت — یعنی کاربر
+      // فکر می‌کرد امشب پر است، در حالی که واقعیت این بود که رستوران اصلاً
+      // رزروِ آنلاین نمی‌گرفت. حالا خودِ API علت را می‌گوید
+      // (restaurant_status: online|offline|closed) و ما همان را نشان می‌دهیم.
+      const why = res.data?.restaurant_status === 'offline' || res.data?.restaurant_status === 'closed'
+        ? (res.data?.reason || 'این رستوران فعلاً رزروِ آنلاین نمی‌پذیرد')
+        : 'ساعت خالی برای این روز نیست';
+      sel.innerHTML=`<option value="">${esc(why)}</option>`;
     }
     // ساعت‌های پر را هم نشان بده ولی غیرفعال
     res.data.slots.filter(s=>s.status==='full').forEach(s=>{
@@ -2768,9 +2791,14 @@ function bookStep2(r){
   // بخش با عنوانِ «پیش‌سفارش» و یک .opt-row کاملاً خالی رندر می‌شد — یعنی
   // شبیهِ یک باگِ بارگذاری، نه «این رستوران منو ندارد». حالا کلِ بخش با
   // منویِ خالی اصلاً نشان داده نمی‌شود.
-  const preorderBlock = r.menu.length
+  // آیتمِ «ناموجود» اصلاً پیشنهاد نمی‌شود (۰۷۷) — پیشنهاددادنِ چیزی که
+  // نمی‌شود سفارش داد، همان «موفقیتِ جعلی» است. enforcementِ سروری = فاز ۲.
+  // ۰۷۸ — فقط آیتم‌های id-دار (دیتای زنده) چیپ می‌شوند: انتخابِ آیتمِ نمونه
+  // (بدونِ id) قابلِ ارسال نیست و نمایشش «موفقیتِ جعلی» می‌شد.
+  const orderable = r.menu.filter(m=>!m.out && m.id);
+  const preorderBlock = orderable.length
     ? `<div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
-    <div class="opt-row">${r.menu.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m[0])} ${esc(m[1])}</div>`).join('')}</div>`
+    <div class="opt-row">${orderable.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" data-mid="${esc(m.id)}" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m.e)} ${esc(m.n)}</div>`).join('')}</div>`
     : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
@@ -2779,7 +2807,13 @@ function bookStep2(r){
 }
 // wrapperِ سراسری: onclick در scope سراسری اجرا می‌شود و به R (ماژولی) دسترسی ندارد،
 // پس lookup را اینجا (با دسترسی به R) انجام می‌دهیم.
-function toBookStep3(id){ openSheet(bookStep3(findR(id))); }
+function toBookStep3(id){
+  // ۰۷۸ — انتخابِ چیپ‌ها همین‌جا (پیش از آنکه رندرِ گامِ ۳ DOMِ گامِ ۲ را
+  // جایگزین کند) در stateِ bk ذخیره می‌شود؛ در لحظه‌ی submit دیگر چیپی نیست.
+  bk.preorder = Array.from(document.querySelectorAll('.opt.sel[data-mid]'))
+    .map(el=>({ menu_item_id: el.getAttribute('data-mid'), qty: 1 }));
+  openSheet(bookStep3(findR(id)));
+}
 function bookStep3(r){
   // نام/موبایل از حسابِ کاربر (اگر وارد شده) — نه مقدارِ ساختگی
   const name = isLoggedIn() ? userName() : '';
@@ -2857,12 +2891,17 @@ async function confirmBook(id){
     ? prefsRaw.split(PREF_SEP).map(x=>x.trim()).filter(Boolean).slice(0,20).map(x=>x.slice(0,100))
     : undefined;
 
+  // ۰۷۸ — چیپ‌های انتخاب‌شده‌ی پیش‌سفارش واقعاً فرستاده می‌شوند (تا پیش از
+  // این فقط class می‌گرفتند و هیچ‌چیز به سرور نمی‌رسید — وعده‌ی پوچ).
+  const preorder = bk.preorder || [];
+
   const res=await API.post('/reservations',{
     restaurant_id:id,
     date:bk.dateVal||todayISO(),
     time:bk.timeRaw||String(bk.time||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
     party_size:bk.partyN||2,
     notify_sms:true,
+    ...(preorder.length ? { preorder } : {}),
     ...(preferences?.length ? { preferences } : {}),
   },{ 'Idempotency-Key': genIdempotencyKey() });
 
@@ -3394,7 +3433,7 @@ function mapApiRestaurant(apiR, sampleFallback){
     about: apiR.description || (isLive ? '' : sampleFallback?.about) || '',
     feats: apiR.features || (isLive ? [] : sampleFallback?.feats) || [],
     rb: apiR.rating_breakdown || (isLive ? EMPTY_RB : sampleFallback?.rb) || EMPTY_RB,
-    menu: apiR.menu || (isLive ? [] : sampleFallback?.menu) || [],
+    menu: (apiR.menu || (isLive ? [] : sampleFallback?.menu) || []).map(normalizeMenuEntry),
     good: isLive ? [] : (sampleFallback?.good || []),
     bad: isLive ? [] : (sampleFallback?.bad || []),
     revs: apiR.reviews || (isLive ? [] : sampleFallback?.revs) || [],
@@ -3430,7 +3469,22 @@ async function loadRestaurants(){
     NEXT_CURSOR = res.data?.next_cursor || null;  // برای بارگذاری صفحه‌ی بعد
     return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
   }
-  // fallback
+  // ⚠️ «سرور جواب داد ولی خالی بود» با «سرور در دسترس نیست» یکی نیست.
+  // نسخه‌ی قبلی هر دو را یکسان می‌گرفت (`if (list && list.length)` و بعد
+  // مستقیم R_SAMPLE) و نتیجه‌اش این بود: پاسخِ کاملاً موفقِ `200 {items:[]}`
+  // به کاربرِ **واقعی** روی سایتِ **واقعی**، شش رستورانِ `[DEMO]` را
+  // به‌عنوانِ رستورانِ واقعی نشان می‌داد. حتی پیامِ کنسول هم نمی‌آمد چون
+  // `res.offline` در این حالت false است.
+  // این حالت فرضی نیست: api/src/app/api/v1/restaurants/route.ts:44-49 هر
+  // رستورانی را که ۹۰ ثانیه heartbeat نداده از فهرست حذف می‌کند، پس کافی
+  // است اینترنتِ پنل‌ها لحظه‌ای قطع شود تا فهرست خالی برگردد.
+  if (res.ok) {
+    API.online = true;      // سرور سالم است — فقط چیزی برای نشان‌دادن نیست
+    NEXT_CURSOR = null;
+    return [];              // حالتِ خالیِ صادق، نه دادهٔ ساختگی
+  }
+  // فقط اینجا داده‌ی نمونه مجاز است: بک‌اند واقعاً در دسترس نیست
+  // (`file://`، تایم‌اوت، یا خطای شبکه) — یعنی همان تجربه‌ی دموی آفلاین.
   API.online = false;
   if (res.offline) console.info('[رزرونو] بک‌اند در دسترس نیست — نمایش داده‌ی نمونه');
   return R_SAMPLE;
@@ -3521,15 +3575,34 @@ function applyRestaurantDetail(r, d){
   const band = priceBandStr(d.price_band);
   if (band) r.price = band;
   if (Array.isArray(d.menu) && d.menu.length) {
-    // به همان شکلِ tuple که رندررِ فعلی می‌فهمد + عکسِ آیتم به‌عنوانِ عضوِ چهارم
-    r.menu = d.menu.map(m => [
-      m.emoji || '🍽️',
-      m.name,
-      Number(m.price_toman || 0).toLocaleString('fa-IR'),
-      m.image_url || null,
-    ]);
+    // شیءِ نرمال (۰۷۷): emoji/نام/قیمت/عکس + توضیح، دسته و «ناموجود» — که
+    // پیش‌تر در همین نقطه دور ریخته می‌شدند و مشتری هرگز نمی‌دیدشان.
+    r.menu = d.menu.map(m => ({
+      id: m.id || null,            // ۰۷۸ — برای ارسالِ واقعیِ pre-order لازم است
+      e: m.emoji || '🍽️',
+      n: m.name,
+      p: Number(m.price_toman || 0).toLocaleString('fa-IR'),
+      img: m.image_url || null,
+      d: m.description || null,
+      catId: m.category_id || null,
+      out: !!m.is_out_of_stock,
+      tags: Array.isArray(m.tags) ? m.tags : [],
+    }));
+    r.menuCats = Array.isArray(d.menu_categories) ? d.menu_categories : [];
   }
   return r;
+}
+
+/**
+ * منویِ نمونه (دموی آفلاین) هنوز tuple است [emoji, name, price, img?] —
+ * این نرمال‌ساز آن را به همان شیءِ بالا تبدیل می‌کند تا رندررها فقط یک شکل
+ * بشناسند. شیء را دست‌نخورده عبور می‌دهد.
+ */
+function normalizeMenuEntry(m){
+  if (Array.isArray(m)) {
+    return { id: null, e: m[0] || '🍽️', n: m[1], p: m[2], img: m[3] || null, d: null, catId: null, out: false, tags: [] };
+  }
+  return m;
 }
 
 // ═══════════ DATA ═══════════
@@ -3663,7 +3736,10 @@ function fmtFa(n){return n.toLocaleString('fa-IR')}
 function slotsHTML(r){
   const slots = Array.isArray(r.slots) ? r.slots : [];
   if (slots.length) {
-    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${s} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${jsq(String(r.id))},${jsq(s)});haptic('select')">${s}</button>`).join('');
+    // `s` از APIِ availability می‌آید و انتظار می‌رود «HH:MM» باشد، ولی هم در
+    // متنِ دکمه و هم در `aria-label` بدونِ esc می‌نشست. مسیرِ `onclick` از قبل
+    // `jsq` داشت — یعنی خطر اینجا شناخته شده بود و فقط دو جای دیگرش جا مانده بود.
+    return slots.slice(0,3).map((s,i)=>`<button type="button" class="rc-slot ${i===0?'go':''}" aria-label="رزرو ساعت ${esc(s)} در ${esc(r.n)}" onclick="event.stopPropagation();quickBook(${jsq(String(r.id))},${jsq(s)});haptic('select')">${esc(s)}</button>`).join('');
   }
   return `<button type="button" class="rc-slot go" aria-label="دیدنِ سانس‌هایِ ${esc(r.n)}" onclick="event.stopPropagation();openBookSheet(${jsq(String(r.id))});haptic('select')">ببین سانس‌ها</button>`;
 }
@@ -3693,6 +3769,19 @@ function cardHTML(r){
   // idِ واقعی UUID است و بدونِ کوتیشن، onclick خطای syntax می‌داد و کلِ
   // CTAهای کارت برای رستورانِ واقعی مرده بودند (mockِ E2E با idِ عددی این
   // را پنهان می‌کرد). GRAD[uuid] هم undefined بود → gradFor.
+  //
+  // ⚠️ XSSِ ذخیره‌شده — رفع‌شده در ممیزیِ ۲۰۲۶-۰۸-۲۵ (خطِ rc-meta پایین‌تر):
+  // فیلدِ cuisine تا امروز اینجا بدونِ esc تزریق می‌شد. آن فیلد را **صاحبِ
+  // رستوران** از پنلِ خودش می‌نویسد (route: restaurant/branches — فقط
+  // z.string().max(50)، بدونِ هیچ پاک‌سازیِ HTML) و از APIِ عمومیِ
+  // /v1/restaurants به فیدِ همه‌ی مشتری‌ها می‌رسد؛ یعنی مسیرِ «یک رستوران →
+  // هر بازدیدکننده». ۵۰ کاراکتر برای یک تگِ img با onerror (۲۸ کاراکتر)
+  // کافی است. شاهدِ اینکه اشتباه بوده نه تصمیم: همین فیلد در detail.js:146
+  // و در hCardHTML از قبل esc می‌شد — فقط این یک خط جا مانده بود.
+  //
+  // ⚠️ و یادداشتِ خودِ همین رفع: نسخه‌ی اولِ این توضیح یک کامنتِ HTML **داخلِ**
+  // همین template literal بود؛ بک‌تیک‌های داخلش رشته را وسط راه بستند و فایل
+  // اصلاً پارس نشد. توضیح در تمپلیت ننویس.
   return `<article class="rc reveal" data-rid="${esc(String(r.id))}">
     <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
     <button type="button" class="rc-open" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${jsq(String(r.id))})"></button>
@@ -3701,7 +3790,7 @@ function cardHTML(r){
     <button class="rc-fav" type="button" aria-pressed="${favs.has(r.id)}" aria-label="${favs.has(r.id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:20,fill:favs.has(r.id)})}</button>
     <div class="rc-panel">
       <div class="rc-top"><div class="rc-name" style="display:flex;align-items:center;gap:6px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.n)}</span>${r.slug?'':'<span class="demo-chip">نمونه</span>'}</div>${Number.isFinite(r.rt)&&r.rt>0?`<div class="rc-rating">${icon('star',{size:14,fill:true,class:'star'})}${fmtFa(r.rt)}</div>`:'<div class="rc-rating rc-rating-new">تازه‌وارد</div>'}</div>
-      <div class="rc-meta">${r.cuisine}${r.price?` · ${r.price}`:''} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
+      <div class="rc-meta">${esc(r.cuisine)}${r.price?` · ${esc(r.price)}`:''} · <span class="rc-cb">${icon('wallet',{size:12})} ${fmtFa(r.cb)}٪ کش‌بک</span></div>
       ${Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="rc-social">${avatarStack(r.visits7d,3)}<div class="rc-social-t"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div></div>`:''}
       <div class="rc-slots">${slotsHTML(r)}</div>
     </div>
@@ -3789,6 +3878,20 @@ function invalidateFeed(){ return ++FEED_TOKEN; }
 function renderFeed(list){
   const f=document.getElementById('feed');
   const token=invalidateFeed();
+  // ⚠️ فهرستِ خالی باید **حالتِ خالیِ صادق** بدهد، نه صفحه‌ی سفید.
+  // این مسیر از وقتی زنده شد که loadRestaurants دیگر روی پاسخِ موفقِ
+  // `200 {items:[]}` دادهٔ نمونه برنمی‌گرداند (توضیحِ کامل در js/api.js).
+  // آن‌جا دروغ برداشته شد؛ اینجا جایش را حقیقت پر می‌کند.
+  if(!list.length){
+    f.innerHTML=`
+    <div class="empty" style="grid-column:1/-1">
+      <div class="empty-emoji" aria-hidden="true">🕒</div>
+      <div class="empty-title">الان رستورانِ فعالی برای رزروِ آنلاین نیست</div>
+      <div class="empty-text">رستوران‌ها وقتی سیستمشان آنلاین است اینجا نشان داده می‌شوند. کمی بعد دوباره امتحان کن.</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="location.reload()">تلاشِ دوباره</button>
+    </div>`;
+    return;
+  }
   f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
   setTimeout(()=>{
     if(token!==FEED_TOKEN) return;   // رندرِ تازه‌تری از راه رسیده — این یکی کهنه است
@@ -3842,7 +3945,7 @@ function hCardHTML(r,extra){
   // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
   const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${jsq(String(r.id))})">
-    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e||icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
+    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e?esc(r.e):icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
@@ -4202,6 +4305,44 @@ function finishRestRender(){
   setTimeout(()=>document.querySelectorAll('.rb-fill').forEach(f=>f.style.width=f.dataset.w+'%'),300);
   armReveals&&armReveals();
 }
+
+/** برچسب‌های منو (۰۷۸) — کلید=enumِ سرور، label محلی (همتای پنل). */
+const MENU_TAG_FA = {
+  VEGETARIAN:'گیاهی', VEGAN:'وگان', SPICY:'تند', GLUTEN_FREE:'بدونِ گلوتن',
+  CONTAINS_NUTS:'حاوی آجیل', CONTAINS_DAIRY:'حاوی لبنیات', HALAL:'حلال',
+  NEW:'جدید', POPULAR:'پرفروش',
+};
+
+/** کارتِ یک آیتمِ منو — همه‌ی متن‌های سرورساخته esc می‌شوند (انضباطِ 7ecd0d6). */
+function menuItemHTML(m){
+  return `<div class="menu-item glass"${m.out?' style="opacity:.62"':''}>
+    <div class="menu-emoji">${m.img?`<img class="menu-thumb" src="${esc(resolveMediaUrl(m.img))}" alt="" loading="lazy">`:esc(m.e)}</div>
+    <div class="menu-info">
+      <div class="menu-name">${esc(m.n)}${m.out?' <span style="font-size:10px;background:var(--amber,#d97706);color:#fff;border-radius:6px;padding:1px 6px;white-space:nowrap">ناموجود</span>':''}</div>
+      ${m.d?`<div style="font-size:11px;color:var(--t2);margin:1px 0 2px;line-height:1.7">${esc(m.d)}</div>`:''}
+      ${Array.isArray(m.tags)&&m.tags.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin:2px 0">${m.tags.map(t=>`<span style="font-size:10px;border:1px solid var(--line,#e6e8ec);border-radius:8px;padding:0 6px;color:var(--t2)">${esc(MENU_TAG_FA[t]||t)}</span>`).join('')}</div>`:''}
+      <div class="menu-price">${m.p} تومان</div>
+    </div>
+  </div>`;
+}
+
+/**
+ * بخشِ منویِ صفحه‌ی رستوران (SPEC-A فاز ۱): اگر رستوران دسته‌ی فعال دارد،
+ * سکشن‌بندی با همان ترتیبِ خودش؛ وگرنه همان چیدمانِ تختِ قبلی. آیتمِ
+ * «ناموجود» حذف نمی‌شود — با برچسب می‌آید (تجربه‌ی صادق‌تر از غیب‌شدن).
+ */
+function menuSectionHTML(r){
+  if(!r.menu.length) return `<p class="rp-empty">این رستوران هنوز منویی ثبت نکرده.</p>`;
+  const byCat = {};
+  r.menu.forEach(m=>{ const k = m.catId || ''; (byCat[k] = byCat[k] || []).push(m); });
+  const secs = (r.menuCats || []).filter(c=>(byCat[c.id]||[]).length).map(c=>({ name:c.name, items: byCat[c.id] }));
+  if(!secs.length) return `<div class="menu-list">${r.menu.map(menuItemHTML).join('')}</div>`;
+  const parts = secs.map(sec=>`<div style="font-weight:800;font-size:13px;margin:12px 4px 6px">${esc(sec.name)}</div><div class="menu-list">${sec.items.map(menuItemHTML).join('')}</div>`);
+  const rest = byCat[''] || [];
+  if(rest.length) parts.push(`<div style="font-weight:800;font-size:13px;margin:12px 4px 6px">سایر</div><div class="menu-list">${rest.map(menuItemHTML).join('')}</div>`);
+  return parts.join('');
+}
+
 function renderRestPage(r){
   const id=r.id;
   const stars=n=>Array.from({length:5},(_,i)=>icon('star',{size:13,fill:i<Math.round(n)})).join('');
@@ -4250,7 +4391,7 @@ function renderRestPage(r){
 
       <div class="rp-section reveal"><h3>درباره</h3>${r.about?`<p class="rp-about">${esc(r.about)}</p>`:`<p class="rp-empty">این رستوران هنوز توضیحی ثبت نکرده.</p>`}${r.address?`<p class="rp-address">${icon('mapPin',{size:14})} ${esc(r.address)}</p>`:''}${r.feats.length?`<div class="feat-row">${r.feats.map(f=>`<span class="feat">${icon('check',{size:13})} ${esc(f)}</span>`).join('')}</div>`:''}</div>
 
-      <div class="rp-section reveal"><h3>منو</h3>${r.menu.length?`<div class="menu-list">${r.menu.map(m=>`<div class="menu-item glass"><div class="menu-emoji">${m[3]?`<img class="menu-thumb" src="${esc(resolveMediaUrl(m[3]))}" alt="" loading="lazy">`:esc(m[0])}</div><div class="menu-info"><div class="menu-name">${esc(m[1])}</div><div class="menu-price">${m[2]} تومان</div></div></div>`).join('')}</div>`:`<p class="rp-empty">این رستوران هنوز منویی ثبت نکرده.</p>`}</div>
+      <div class="rp-section reveal"><h3>منو</h3>${menuSectionHTML(r)}</div>
 
       <div class="rp-section reveal">
         <h3>امتیازها و نظرها</h3>
@@ -5698,8 +5839,16 @@ window.renderChats = renderChats;
 //  وجود داشت، اسکن‌کردنش هیچ اتفاقی نمی‌انداخت.
 //
 //  ورود لازم **نیست**: مهمانِ مهمان‌گونه (بدونِ لاگین) هم باید بتواند سرِ
-//  میز بنشیند. خودِ کدِ QR اعتبارنامه است — کسی که پشتِ میز نیست آن را
-//  ندارد. `POST /api/v1/checkin` هم عمداً بدونِ احراز هویت است.
+//  میز بنشیند. `POST /api/v1/checkin` **بدونِ احراز هویتِ کاربر** سرو می‌شود،
+//  ولی نه بدونِ اعتبارنامه: اعتبارنامه خودِ کدِ QR است (۵۰ بیت آنتروپیِ
+//  رمزنگارانه از `genQrToken` در `api/src/lib/tables.ts`) به‌علاوه‌ی
+//  ریت‌لیمیتِ اختصاصیِ per-IP روی همان مسیر.
+//
+//  ⚠️ اگر لاگین باشی، توکنت هم فرستاده می‌شود — نه برای اجازه‌ی check-in،
+//  بلکه فقط تا سرور بتواند `reservation_code` را نشان دهد. برای فراخوانِ
+//  ناشناس آن فیلد همیشه `null` است (نشتِ کدِ رزروِ فردِ دیگر). پس **هرگز**
+//  از `reservation_code` برای تشخیصِ موفقیت استفاده نکن — فیلدِ درست
+//  `checked_in` است.
 // ═══════════════════════════════════════════════════════════════════════
 
 
@@ -5779,19 +5928,32 @@ async function runPendingCheckIn() {
     ? `<div style="margin-top:10px;font-size:13px;color:var(--t2)">میز ${esc(String(tableNo))}</div>`
     : '';
 
-  // `reservation_code === null` یعنی میز پیدا شد ولی رزروِ فعالی رویش نبود.
+  // `checked_in === false` یعنی میز پیدا شد ولی رزروِ فعالی رویش نبود.
   // این خطا نیست — مثلاً مهمانِ بدونِ رزرو (walk-in) که کد را اسکن کرده.
   // صادقانه همین را می‌گوییم، نه «خوش آمدید» که یعنی ثبتی انجام شده.
-  if (!d.reservation_code) {
+  //
+  // ⚠️ اینجا قبلاً `!d.reservation_code` بود و آن شرط از وقتی سرور کدِ رزرو
+  // را فقط به صاحبِ همان رزرو می‌دهد **غلط** است: مهمانِ بدونِ لاگین
+  // `reservation_code: null` می‌گیرد حتی وقتی ورودش واقعاً ثبت شده — یعنی
+  // به کسی که نشسته می‌گفتیم «رزروی پیدا نشد». جعلِ شکست دقیقاً به‌اندازه‌ی
+  // جعلِ موفقیت مضر است؛ پس تصمیم از یک فیلدِ صریح خوانده می‌شود.
+  if (!d.checked_in) {
     resultSheet('🪑', 'رزروی رویِ این میز پیدا نشد',
       'اگر رزرو داری، شاید هنوز زمانش نرسیده باشه. برای نشستن با میزبان هماهنگ کن.',
       tableLine);
     return;
   }
 
+  // کدِ رزرو فقط وقتی نشان داده می‌شود که سرور آن را داده باشد (یعنی با
+  // حسابِ خودت وارد شده‌ای و رزرو مالِ توست). نبودنش هیچ ربطی به موفقیتِ
+  // ثبتِ ورود ندارد.
+  const codeLine = d.reservation_code
+    ? `<div style="margin-top:6px;font-family:monospace;font-size:12px;color:var(--t3);direction:ltr">${esc(d.reservation_code)}</div>`
+    : '';
+
   resultSheet('✅', 'ورودت ثبت شد',
     'خوش اومدی! میزت آماده‌ست.',
-    `${tableLine}<div style="margin-top:6px;font-family:monospace;font-size:12px;color:var(--t3);direction:ltr">${esc(d.reservation_code)}</div>`);
+    `${tableLine}${codeLine}`);
 }
 
 // پنل/اکشن‌های سراسری این اپ از `window` استفاده می‌کنند (onclickهای inline).
@@ -5965,11 +6127,12 @@ try{ window.openPalette = openPalette; window.closePalette = closePalette; }catc
 
 
 
+
 const READ_KEY = 'rz_notif_read';
 function readSet(){ try{ return new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')); }catch{ return new Set(); } }
 function saveRead(set){ try{ localStorage.setItem(READ_KEY, JSON.stringify([...set])); }catch{} }
 
-const CATS = { all:'همه', reservation:'رزرو', ai:'پیشنهاد' };
+const CATS = { all:'همه', reservation:'رزرو', dna:'خلاصه‌ی ماه', ai:'پیشنهاد' };
 let _filter = 'all';
 
 // منبعِ رزروها: فقط رزروهای واقعیِ سرور. _live با refreshNotif() از
@@ -5990,11 +6153,23 @@ function tripsSource(){
 
 // خواندنِ رزروهای واقعی از سرور (همان endpointِ صفحهٔ سفرها) و به‌روزرسانیِ badge.
 // آفلاین/خطا/مهمان → _live همچنان null می‌ماند و tripsSource هیچ رزروی نمی‌سازد.
+// خلاصه‌ی ماهانه‌ی DNA — از سرور، هرگز محلی ساخته نمی‌شود.
+// null یعنی «هنوز نپرسیده‌ایم یا نشد»؛ {available:false} یعنی سرور صریحاً
+// گفته خلاصه‌ای نیست (ماهِ بدونِ بازدید، یا انصرافِ خودِ کاربر از دسته‌ی dna).
+// هیچ‌کدام از این دو حالت نباید به ساختنِ یک خلاصه‌ی محلی منجر شود — اعدادِ
+// این کارت فقط با مقایسه‌ی ماه‌به‌ماهِ سمتِ سرور معنا دارند.
+let _dna = null;
 async function refreshNotif(){
   try{
-    if(!isLoggedIn()){ _live = null; updateNotifBadge(); return; }
+    if(!isLoggedIn()){ _live = null; _dna = null; updateNotifBadge(); return; }
     const res = await API.get('/me/reservations');
     if(res && res.ok && Array.isArray(res.data)) _live = res.data.map(mapApiTrip);
+  }catch(e){}
+  try{
+    if(isLoggedIn()){
+      const d = await API.get('/me/dna-summary');
+      if(d && d.ok && d.data && typeof d.data.available === 'boolean') _dna = d.data;
+    }
   }catch(e){}
   updateNotifBadge();
   const ov = document.getElementById('notif');
@@ -6021,6 +6196,30 @@ function build(){
   if(top && top.rt!=null) out.push({ id:'ai-'+top.id, cat:'ai', pri:'low', ic:'sparkle',
     title:'پیشنهادِ هوشمند', body:`${top.n} با امتیاز ${top.rt} — شاید دوستش داشته باشی`,
     action:{ label:'ببین', run:()=>openRest(top.id) } });
+  // ── خلاصه‌ی ماهانه‌ی DNA ────────────────────────────────────────────
+  // فقط وقتی سرور صریحاً available:true داده. برچسبِ ماه و همه‌ی اعداد از
+  // خودِ پاسخ می‌آیند — اینجا هیچ عددی محاسبه یا حدس زده نمی‌شود.
+  if(_dna && _dna.available){
+    const d = _dna;
+    const bits = [`${faNum(d.visits)} بار بیرون رفتی`];
+    if(d.restaurants_visited) bits.push(`${faNum(d.restaurants_visited)} رستوران`);
+    if(d.new_restaurants > 0) bits.push(`${faNum(d.new_restaurants)} تای جدید`);
+    // مقایسه فقط وقتی ماهِ قبل واقعاً داده داشته (null = کاربرِ تازه، نه صفر)
+    if(typeof d.previous_visits === 'number'){
+      const diff = d.visits - d.previous_visits;
+      if(diff > 0) bits.push(`${faNum(diff)} بار بیشتر از ماه قبل`);
+      else if(diff < 0) bits.push(`${faNum(-diff)} بار کمتر از ماه قبل`);
+      else bits.push('مثل ماه قبل');
+    }
+    out.push({
+      // کلیدِ ماه در id است تا خلاصه‌ی ماهِ بعد دوباره خوانده‌نشده شود و
+      // خلاصه‌ی همین ماه بعد از خواندن دوباره برنگردد.
+      id:'dna-'+d.period_key, cat:'dna', pri:'high', ic:'chart',
+      title:`خلاصه‌ی ${faNum(d.period_label)}`,
+      body: bits.join(' · '),
+      action:{ label:'ببین', run:()=>openFoodDNA() },
+    });
+  }
   return out;
 }
 function notifUnreadCount(){ const read=readSet(); return build().filter(n=>!read.has(n.id)).length; }

@@ -6,6 +6,8 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, parseQuery, z } from '@/lib/schemas';
 import { COLLECTIONS, REGISTRY, isCollection, invalidateCollection, mapPrismaError } from '@/lib/site-content';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  /api/v1/admin/site/{collection} — مدیریتِ محتوای سایت (استودیو)
 //
@@ -26,7 +28,7 @@ const querySchema = z.object({
   offset: z.number().int().min(0).max(100_000).optional(),
 });
 
-export async function GET(req: Request, { params }: { params: Promise<{ collection: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ collection: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -48,7 +50,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
   } catch (e) { return errorResponse(e); }
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ collection: string }> }) {
+async function POST_impl(req: Request, { params }: { params: Promise<{ collection: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -80,3 +82,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ collect
     return NextResponse.json(cfg.toAdmin(row), { status: 201 });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/site/[collection]', GET_impl);
+export const POST = withApiMetrics('/api/v1/admin/site/[collection]', POST_impl);

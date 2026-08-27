@@ -914,7 +914,11 @@ button{font-family:inherit;cursor:pointer}
 .login-btn{width:100%;padding:14px;border:none;border-radius:12px;background:var(--ink);color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:18px;transition:all .15s}
 .login-btn:hover{background:var(--ink-600)}
 .login-btn:disabled{opacity:.6;cursor:default}
-.login-back{background:none;border:none;color:var(--ink);font-weight:700;font-family:inherit;font-size:13px;cursor:pointer;margin-top:16px}
+/* ⚠️ رفعِ هدفِ لمسی (۲۰۲۶-۰۸-۲۶، یافته‌ی تستِ responsive-audit): این دکمه با
+   ورودِ password/پیامکی سوییچ می‌کند و ۷۰×۲۰ رندر می‌شد — زیرِ کفِ ۲۴×۲۴ی
+   WCAG 2.2 و عملاً سختِ لمس روی موبایل، آن هم رویِ حیاتی‌ترین صفحه (ورود).
+   44px همان کفِ راحتِ لمس در بقیه‌ی همین پنل‌هاست. */
+.login-back{background:none;border:none;color:var(--ink);font-weight:700;font-family:inherit;font-size:13px;cursor:pointer;margin-top:16px;min-height:44px;padding:10px 14px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px}
 .login-hint{background:var(--amber-50);border:1px solid #FDE68A;border-radius:10px;padding:10px 13px;font-size:12px;color:#92400E;margin-top:14px;line-height:1.5}
 .login-foot{font-size:11.5px;color:var(--t3);margin-top:18px;line-height:1.6}
 /* نشانگرهای وضعیت — رنگ semantic از Design System (جایگزین emoji) */
@@ -1216,6 +1220,21 @@ button{font-family:inherit;cursor:pointer}
 <div class="modal-bg" id="modalBg" aria-hidden="true" onclick="if(event.target===this)closeModal()"><div class="modal" id="modalBody" role="dialog" aria-modal="true" tabindex="-1"></div></div>
 
 <!-- ── پنل company: ماژول‌های Vanilla JS (ترتیب مهم) ── -->
+<script>
+// ── آدرسِ APIِ قابلِ‌تنظیم بدونِ build (۲۰۲۶-۰۸-۲۶) ──
+// چرا: پنل استاتیک است و پیش‌فرضِ api-core «same-origin» — پشتِ nginxِ
+// استقرار درست است، ولی هر سروِ استاتیکِ دیگر (serve محلی، بسته‌ی آفلاین
+// رویِ یک بک‌اندِ واقعی) POST را با 405 برمی‌گرداند و ورود ناممکن می‌شود.
+// یک‌بار «?api=http://host:port» به URL بده تا ذخیره شود؛ «?api=» خالی
+// پاکش می‌کند. بدونِ آن هیچ رفتاری عوض نمی‌شود (localStorage خالی = همان
+// same-origin). try/catch برای حالتِ خصوصیِ مرورگر.
+(function(){try{
+  var q=new URLSearchParams(location.search);
+  if(q.has('api')){var v=q.get('api')||'';v?localStorage.setItem('rz_api_base',v):localStorage.removeItem('rz_api_base');}
+  var s=localStorage.getItem('rz_api_base');
+  if(s) window.RZ_API_BASE=s;
+}catch(e){}})();
+</script>
 <script data-src="js/icons.js">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — سیستم آیکون (Iconography)
@@ -1519,6 +1538,26 @@ const API = {
   post(path, body){ return this.request(path, { method:'POST', body: JSON.stringify(body||{}) }); },
   patch(path, body){ return this.request(path, { method:'PATCH', body: JSON.stringify(body||{}) }); },
   del(path){ return this.request(path, { method:'DELETE' }); },
+  // ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
+  // مسیرِ اصلیِ ورود به پنلِ شرکت. OTP کنارش می‌ماند چون مسیرِ پشتیبان است:
+  // اگر رمز فراموش شد و کاوه‌نگار راه افتاده باشد، راهِ برگشت وجود دارد.
+  async adminLogin(username, password){
+    const res = await this.request('/auth/admin/login', {
+      method:'POST', body: JSON.stringify({ username, password }),
+    });
+    if (res.ok && res.data?.access) { this.setToken(res.data.access); this.setRefresh(res.data.refresh); }
+    return res;
+  },
+  // ── اعتبارنامه‌ی بیزنس‌ها (پنلِ شرکت یوزر/پسورد می‌سازد) ──
+  staffCredentials(restaurantId){ return this.get(`/admin/staff-credentials?restaurant_id=${encodeURIComponent(restaurantId)}`); },
+  setStaffCredentials(payload){ return this.post('/admin/staff-credentials', payload); },
+  // ── SPEC-B: provisioningِ کسب‌وکار از پنلِ شرکت ──
+  // Idempotency-Key اجباری است (دابل‌کلیک/retry = همان یک رستوران).
+  adminCreateRestaurant(body, idemKey){
+    return this.request('/admin/restaurants', { method:'POST', body: JSON.stringify(body||{}), headers:{ 'Idempotency-Key': idemKey } });
+  },
+  adminResendInvite(id){ return this.post(`/admin/restaurants/${id}/resend-invite`, {}); },
+  adminCreateBranch(id, body){ return this.post(`/admin/restaurants/${id}/branches`, body); },
   async requestAdminOtp(phone){ return this.request('/auth/admin/request', { method:'POST', body: JSON.stringify({ phone }) }); },
   async verifyAdminOtp(phone, code){
     const res = await this.request('/auth/admin/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
@@ -1599,6 +1638,8 @@ function mapAdminRestaurant(apiR, fallback){
     reservations: apiR.reservations ?? 0,
     sms: apiR.sms_total_sent ?? 0,
     smsBalance: apiR.sms_balance ?? 0,
+    // SPEC-B: برای badge «در انتظارِ فعال‌سازی» و دکمه‌ی resend در پنل
+    provision_status: apiR.provision_status,
     joined: apiR.joined_at ? new Date(apiR.joined_at).toLocaleDateString('fa-IR') : '—',
   };
 }
@@ -1805,8 +1846,19 @@ function rOverview(){
   const sub = PLATFORM_STATS?.subscription_breakdown || RESTAURANTS.reduce((a,r)=>{ a[r.status]=(a[r.status]||0)+1; return a; },{active:0,expiring:0,expired:0,trial:0,trial_expired:0});
   const health = PLATFORM_STATS?.system_health || (API.online ? '—' : null);
   const healthMeta = {healthy:['checkCircle','سالم','green'],warning:['alert','نیاز به بررسی','amber'],critical:['alert','بحرانی','red']}[health] || ['info','نامشخص','s-400'];
+  // ⚠️ صداقتِ CLV (فازِ ۲، docs/ML_CONTRACT.md): `platform_clv_toman` حالا وقتی
+  // هیچ مهمانی مبلغِ اندازه‌گیری‌شده ندارد `null` است (قبلاً سرور COALESCE به ۰
+  // می‌کرد و این‌جا «ارزش مهمانان پلتفرم: ۰ تومان» نوشته می‌شد — یعنی ادعایِ
+  // «اندازه گرفتیم و هیچ بود»). `platform_clv_status==='insufficient_data'`
+  // صریحاً یعنی «هنوز اندازه‌گیری‌ناپذیر»، نه صفر. صفحه‌ی «هوش تجاری» همین
+  // پنل از قبل همین رفتار را داشت؛ حالا هر دو یک چیز می‌گویند.
   const clv = PLATFORM_STATS?.platform_clv_toman;
+  const clvUnmeasured = PLATFORM_STATS && (clv==null || PLATFORM_STATS.platform_clv_status==='insufficient_data');
+  const vipCount = PLATFORM_STATS?.total_vips||0;
   const fnl=n=>n==null?'—':n>=1000000?fa(+(n/1000000).toFixed(1))+'م':n>=1000?fa(Math.round(n/1000))+'ک':fa(n);
+  const clvLine = clvUnmeasured
+    ? `ارزش مهمانان پلتفرم (CLV): اندازه‌گیری‌ناپذیر · ${fa(vipCount)} مهمان VIP`
+    : (clv!=null ? `ارزش مهمانان پلتفرم (CLV): ${fnl(clv)} تومان · ${fa(vipCount)} مهمان VIP` : 'برای جزئیات کلیک کن');
 
   document.getElementById('v-overview').innerHTML=`
     <div class="kpi-grid">
@@ -1823,7 +1875,7 @@ function rOverview(){
         <div style="display:flex;align-items:center;gap:14px;padding:8px 0">
           <div style="color:var(--${healthMeta[2]}-600,var(--t1))">${icon(healthMeta[0],{size:38})}</div>
           <div><div style="font-size:18px;font-weight:800;color:var(--${healthMeta[2]}-600,var(--t1))">${healthMeta[1]}</div>
-          <div style="font-size:12.5px;color:var(--t2);margin-top:2px">${clv!=null?`ارزش مهمانان پلتفرم (CLV): ${fnl(clv)} تومان · ${fa(PLATFORM_STATS?.total_vips||0)} مهمان VIP`:'برای جزئیات کلیک کن'}</div></div>
+          <div style="font-size:12.5px;color:var(--t2);margin-top:2px">${clvLine}</div></div>
         </div>
         <button class="btn btn-ghost btn-block" style="margin-top:8px">جزئیات سلامت سیستم ${icon('arrowL',{size:13})}</button>
       </div>
@@ -1864,7 +1916,8 @@ function rOverview(){
 function rRestaurants(){
   document.getElementById('v-restaurants').innerHTML=`
     <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">همه‌ی رستوران‌ها</div><div class="panel-sub">${fa(RESTAURANTS.length)} رستوران در پلتفرم</div></div></div>
+      <div class="panel-head"><div><div class="panel-title">همه‌ی رستوران‌ها</div><div class="panel-sub">${fa(RESTAURANTS.length)} رستوران در پلتفرم</div></div>
+        <button class="btn btn-primary" onclick="openProvisionModal()" aria-label="ساختِ رستورانِ جدید">${icon('plus',{size:14})} رستوران جدید</button></div>
       <div class="rest-controls">
         <button class="filter-chip ${restFilter==='all'?'active':''}" onclick="setRestFilter('all')">همه (${fa(RESTAURANTS.length)})</button>
         <button class="filter-chip ${restFilter==='active'?'active':''}" onclick="setRestFilter('active')">${icon('check',{size:13})} فعال (${fa(RESTAURANTS.filter(r=>r.status==='active').length)})</button>
@@ -1965,6 +2018,93 @@ function openRest(id){currentRest=RESTAURANTS.find(r=>String(r.id)===String(id))
 
 // ════════ صفحه‌ی جزئیات رستوران ════════
 
+// ═══════════ SPEC-B — مودالِ «رستوران جدید» (provisioning از پنلِ شرکت) ═══════════
+// Idempotency-Key یک‌بار هنگامِ بازشدنِ مودال ساخته می‌شود: دابل‌کلیک روی
+// «بساز» یا retryِ شبکه با همان کلید می‌رود و سرور همان پاسخ را برمی‌گرداند —
+// دو رستوران ساخته نمی‌شود. چهار حالتِ الزامی: loading/error/success/(empty
+// در خودِ لیست).
+let _provIdemKey = null;
+function _provSlugPreview(name){
+  // پیش‌نمایشِ سمتِ کلاینت — منبعِ حقیقت سرور است (uniqueRestaurantSlug).
+  const ascii = (name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+  return ascii.length >= 3 ? ascii.slice(0,40) : '(خودکار از سرور)';
+}
+function openProvisionModal(){
+  // گاردِ دابل‌تپ/دابل‌dispatch (مشاهده‌ی واقعی روی WebKitِ موبایل): بازکردنِ
+  // دوباره، فرم را با ورودی‌های خالی بازمی‌ساخت و تایپِ کاربر (و مقدارِ
+  // fillِ تست) را می‌بلعید. اگر مودالِ همین فرم باز است، فقط focus.
+  if (document.getElementById('pvName')) { document.getElementById('pvName').focus(); return; }
+  _provIdemKey = 'prov-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,10);
+  openModal(`
+    <div class="modal-title">رستورانِ جدید</div>
+    <div class="modal-sub">تنانت + رستوران + مالک یک‌جا ساخته می‌شود؛ پیامکِ دعوتِ اولین‌ورود برای مالک می‌رود</div>
+    <div style="display:grid;gap:10px;margin-top:14px;max-height:52vh;overflow-y:auto">
+      <label style="display:grid;gap:4px;font-size:13px"><span>نامِ رستوران *</span><input id="pvName" maxlength="120" class="inp" oninput="document.getElementById('pvSlugPrev').textContent=_provSlugPreview(this.value)"></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>نامِ مالک</span><input id="pvOwner" maxlength="80" class="inp"></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>موبایلِ مالک *</span><input id="pvPhone" class="inp" inputmode="tel" dir="ltr" placeholder="09xxxxxxxxx"></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>پلن</span><select id="pvPlan" class="inp"><option value="free">free</option><option value="pro">pro</option><option value="enterprise">enterprise</option></select></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>روزهای آزمایشی (۰–۹۰)</span><input id="pvTrial" class="inp" type="number" min="0" max="90" value="14" dir="ltr"></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>slug (اختیاری)</span><input id="pvSlug" class="inp" dir="ltr" placeholder="a-z0-9-"><span class="tiny" style="color:var(--muted)">پیش‌نمایش: <b id="pvSlugPrev" dir="ltr">(خودکار از سرور)</b></span></label>
+      <label style="display:grid;gap:4px;font-size:13px"><span>تعدادِ میزِ شروع</span><input id="pvTables" class="inp" type="number" min="0" max="100" value="8" dir="ltr"></label>
+      <div id="pvErr" role="alert" style="display:none;color:var(--red,#c0392b);font-size:13px"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-primary" id="pvSubmit" style="flex:1" onclick="submitProvision()">بساز و دعوت بفرست</button>
+      <button class="btn btn-ghost" onclick="closeModal()">انصراف</button>
+    </div>`);
+  // فوکوسِ deferred حذف شد (یافته‌ی probe در E2E): openModal خودش sync اولین
+  // ورودی را فوکوس می‌کند؛ نسخه‌ی setTimeoutدار ۱۵۰ms بعد فوکوس را از فیلدی
+  // که کاربر/تست همان لحظه در آن تایپ می‌کرد می‌دزدید و رویِ WebKit ورودی به
+  // فیلدِ اشتباه می‌رفت (pvPhone خالی می‌ماند).
+}
+// نگاشتِ details.reason → پیامِ فارسیِ قابلِ‌فهم (§۹ spec)
+const PROV_REASON_FA = {
+  duplicate_owner_phone: 'این شماره قبلاً مالکِ یک رستوران است — برای شعبه‌ی جدید از صفحه‌ی همان رستوران «افزودنِ شعبه» را بزن.',
+  slug_unavailable: 'این slug قبلاً گرفته شده؛ یکی دیگر انتخاب کن یا خالی بگذار تا خودکار ساخته شود.',
+  username_taken: 'این نامِ کاربری قبلاً گرفته شده است.',
+  branch_limit_reached: 'سقفِ شعبه‌های این تنانت پر است.',
+};
+async function submitProvision(){
+  const btn=document.getElementById('pvSubmit');
+  const errEl=document.getElementById('pvErr');
+  const name=(document.getElementById('pvName')?.value||'').trim();
+  const phone=(document.getElementById('pvPhone')?.value||'').trim();
+  const showErr=(m)=>{ if(errEl){ errEl.textContent=m; errEl.style.display='block'; } };
+  if(errEl) errEl.style.display='none';
+  if(name.length<2){ showErr('نامِ رستوران را بنویس (حداقل ۲ حرف).'); return; }
+  if(!/^09\d{9}$/.test(phone.replace(/[۰-۹]/g,(d)=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))){ showErr('شماره‌ی موبایلِ معتبر واردکن (09xxxxxxxxx).'); return; }
+  const body={
+    business_name:name,
+    owner_phone:phone.replace(/[۰-۹]/g,(d)=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
+    plan:document.getElementById('pvPlan')?.value||'free',
+    trial_days:Math.max(0,Math.min(90,parseInt(document.getElementById('pvTrial')?.value||'14',10)||0)),
+  };
+  const owner=(document.getElementById('pvOwner')?.value||'').trim(); if(owner) body.owner_name=owner;
+  const slug=(document.getElementById('pvSlug')?.value||'').trim(); if(slug) body.slug=slug;
+  const tables=parseInt(document.getElementById('pvTables')?.value||'8',10);
+  if(Number.isFinite(tables)) body.seed_defaults={tables:Math.max(0,Math.min(100,tables))};
+
+  // ── loading: قفلِ submit (چهار حالتِ الزامی) ──
+  if(btn){ btn.disabled=true; btn.textContent='در حالِ ساخت…'; }
+  const res=await API.adminCreateRestaurant(body,_provIdemKey);
+  if(res.ok){
+    const d=res.data||{};
+    openModal(`
+      <div style="text-align:center;padding:6px 0">
+        <div style="color:var(--green-600,#1a7f4b);margin-bottom:10px">${icon('checkCircle',{size:40})}</div>
+        <div class="modal-title" style="text-align:center">رستوران ساخته شد</div>
+        <div class="modal-sub" style="text-align:center">دعوتِ اولین‌ورود به <b dir="ltr">${esc(d.invite_sent_to||'')}</b> ارسال شد</div>
+        <div style="margin:12px 0;font-size:13px">slug: <span class="code-pill" dir="ltr">${esc(d.restaurant?.slug||'')}</span></div>
+        <button class="btn btn-primary btn-block" onclick="closeModal();loadAdminRestaurants().then(rRestaurants)">باشه</button>
+      </div>`);
+    return;
+  }
+  // ── error: پیامِ فارسی بر اساسِ details.reason — نه «خطای ناشناخته» ──
+  if(btn){ btn.disabled=false; btn.textContent='بساز و دعوت بفرست'; }
+  const reason=res.error?.details?.reason;
+  showErr(PROV_REASON_FA[reason] || res.error?.message || (res.offline?'اتصال به سرور برقرار نشد.':'ساخت ناموفق بود؛ دوباره تلاش کن.'));
+}
+
 </script>
 <script data-src="js/restaurant.js">
 // ═══ رزرونو — پنل company: جزئیات رستوران + آنالیز پلتفرم (Vanilla JS، scope مشترک) ═══
@@ -1987,6 +2127,8 @@ function rDetail(){
       </div>
       <div class="detail-actions">
         <span class="badge ${badgeCls}" style="align-self:center"><span class="bdot"></span>${statusText}</span>
+        ${r.provision_status && r.provision_status!=='ACTIVE' ? `<span class="badge ${r.provision_status==='PENDING_ACTIVATION'?'trial':'expired'}" style="align-self:center" title="وضعیتِ provisioning">${({PENDING_ACTIVATION:'در انتظارِ فعال‌سازی',SUSPENDED:'معلق',OFFBOARDED:'خارج‌شده'})[r.provision_status]||esc(r.provision_status)}</span>`:''}
+        ${r.provision_status==='PENDING_ACTIVATION' ? `<button class="btn btn-ghost btn-sm" onclick="resendProvisionInvite(${jsq(r.id)},this)" aria-label="ارسالِ مجددِ دعوتِ اولین‌ورود">${icon('mail',{size:14})} ارسالِ مجددِ دعوت</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen(${jsq(r.id)})">${r.isOpen?`${icon('lock',{size:14})} غیرفعال کردن`:`${icon('check',{size:14})} فعال کردن`}</button>
         <button class="btn btn-primary btn-sm" onclick="openRenew(${jsq(r.id)})">${icon('refresh',{size:14})} مدیریت اشتراک</button>
       </div>
@@ -2005,7 +2147,85 @@ function rDetail(){
         خلاصه‌ی تجمیعی (RFM/CLV) همه‌ی رستوران‌ها رو می‌تونی توی صفحه‌ی «هوش تجاری مشتریان» ببینی.
       </div>
       <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="nav('customers')">رفتن به هوش تجاری مشتریان ${icon('arrowL',{size:13})}</button>
+    </div>
+    <div class="panel" id="credPanel">
+      <div class="panel-head"><div>
+        <div class="panel-title">${icon('lock',{size:16})} دسترسی پنل رستوران</div>
+        <div class="panel-sub">نام کاربری و رمز برای ورودِ این رستوران به پنلِ خودش</div>
+      </div></div>
+      <div id="credBody" style="font-size:13px;color:var(--t2)">در حال بارگذاری…</div>
     </div>`;
+  loadCredentials(r.id);
+}
+
+// ═══════════ اعتبارنامه‌ی پنلِ رستوران (مهاجرتِ ۰۷۴) ═══════════
+// ⚠️ چرا این بخش وجود دارد: تنها راهِ ورود به پنل‌ها OTPِ پیامکی بود و
+// بدونِ کلیدِ کاوه‌نگار هیچ رستورانی نمی‌توانست وارد شود. حالا شرکت برایشان
+// یوزر/پسورد می‌سازد و ورود به پیامک وابسته نیست.
+//
+// ⚠️ رمز **هرگز** از سرور خوانده نمی‌شود — سرور فقط می‌گوید «رمز دارد یا نه».
+// یعنی این صفحه نمی‌تواند رمزِ فعلی را نشان دهد، فقط رمزِ تازه ست کند.
+async function loadCredentials(restaurantId){
+  const box = document.getElementById('credBody');
+  if (!box) return;
+  const res = await API.staffCredentials(restaurantId);
+  if (!res.ok) {
+    box.innerHTML = `<div class="empty-state-title">فهرست دسترسی‌ها بارگذاری نشد</div>
+      <div style="margin-top:6px">${esc(res.error?.message || 'خطای ناشناخته')}</div>`;
+    return;
+  }
+  const rows = (res.data?.staff || []).map(sf => `
+    <tr>
+      <td>${esc(sf.name || '—')}</td>
+      <td>${sf.username ? `<code>${esc(sf.username)}</code>` : '<span style="color:var(--t3)">ندارد</span>'}</td>
+      <td>${esc(sf.role)}</td>
+      <td>${sf.has_password ? `${icon('check',{size:13})} دارد` : '<span style="color:var(--t3)">ندارد</span>'}</td>
+      <td>${sf.is_active ? 'فعال' : 'غیرفعال'}</td>
+    </tr>`).join('');
+  box.innerHTML = `
+    ${rows ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
+        <th>نام</th><th>نام کاربری</th><th>نقش</th><th>رمز</th><th>وضعیت</th>
+      </tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<div style="margin-bottom:10px">هنوز هیچ کاربری برای این رستوران ثبت نشده.</div>'}
+    <div style="margin-top:16px;display:grid;gap:10px">
+      <div class="panel-title" style="font-size:14px">ساخت / تغییر دسترسی</div>
+      <label class="login-field-label" for="credName">نام مسئول</label>
+      <input class="login-inp" id="credName" placeholder="مثلاً: علی رضایی">
+      <label class="login-field-label" for="credPhone">شماره موبایل</label>
+      <input class="login-inp" id="credPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
+      <label class="login-field-label" for="credUser">نام کاربری</label>
+      <input class="login-inp" id="credUser" spellcheck="false" placeholder="فقط حروف انگلیسی، رقم، نقطه، خط تیره">
+      <label class="login-field-label" for="credPass">رمز عبور</label>
+      <input class="login-inp" id="credPass" type="text" placeholder="حداقل ۸ کاراکتر">
+      <button class="btn btn-primary btn-block" id="credSaveBtn" onclick="saveCredentials(${jsq(String(restaurantId))})">ذخیره‌ی دسترسی</button>
+      <div style="font-size:12px;color:var(--t3);line-height:1.9">
+        اگر این شماره از قبل ثبت شده باشد، فقط نام کاربری و رمزش عوض می‌شود و کاربرِ تکراری ساخته نمی‌شود.
+        رمز را جای امنی نگه دار — بعد از ذخیره دیگر قابلِ دیدن نیست.
+      </div>
+    </div>`;
+}
+
+async function saveCredentials(restaurantId){
+  const name = (document.getElementById('credName')?.value||'').trim();
+  const phoneRaw = (document.getElementById('credPhone')?.value||'').trim();
+  const username = (document.getElementById('credUser')?.value||'').trim();
+  const password = document.getElementById('credPass')?.value||'';
+  // ارقامِ فارسی را به انگلیسی برگردان — همان کاری که فرمِ ورود می‌کند.
+  const phone = phoneRaw.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'');
+  if (!/^09\d{9}$/.test(phone)) { toast('','شماره موبایل معتبر وارد کن'); return; }
+  if (!username) { toast('','نام کاربری را وارد کن'); return; }
+  if (password.length < 8) { toast('','رمز باید حداقل ۸ کاراکتر باشد'); return; }
+
+  const btn = document.getElementById('credSaveBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'در حال ذخیره…'; }
+  const res = await API.setStaffCredentials({
+    restaurant_id: restaurantId, phone, username, password,
+    ...(name ? { name } : {}),
+  });
+  if (btn){ btn.disabled = false; btn.textContent = 'ذخیره‌ی دسترسی'; }
+  if (!res.ok) { toast('', res.error?.message || 'ذخیره نشد'); return; }
+  toast('', res.data?.created ? 'دسترسی ساخته شد' : 'دسترسی به‌روز شد');
+  await loadCredentials(restaurantId);
 }
 async function toggleRestOpen(id){
   const r=RESTAURANTS.find(x=>String(x.id)===String(id));if(!r)return;
@@ -2054,6 +2274,21 @@ function rAnalytics(){
 }
 
 // ════════ هوش تجاری مشتریان — تجمیعی و واقعی، از /admin/business-intelligence ════════
+
+// ═══════════ SPEC-B — ارسالِ مجددِ دعوتِ اولین‌ورود (وضعیتِ PENDING) ═══════════
+// چهار حالت: loading (قفلِ دکمه) / error (toast با پیامِ سرور) / success
+// (toast با ماسکِ شماره). دکمه فقط برای رستورانِ PENDING_ACTIVATION رندر می‌شود.
+async function resendProvisionInvite(id, btn){
+  const label = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'در حالِ ارسال…'; }
+  const res = await API.adminResendInvite(id);
+  if(btn){ btn.disabled = false; btn.innerHTML = label; }
+  if(res.ok){
+    toast('', `دعوتِ تازه به ${res.data?.invite_sent_to || 'مالک'} ارسال شد`);
+  } else {
+    toast('', res.error?.message || (res.offline ? 'اتصال به سرور برقرار نشد' : 'ارسالِ دعوت ناموفق بود'));
+  }
+}
 
 </script>
 <script data-src="js/intelligence.js">
@@ -2894,15 +3129,57 @@ function setAdminGateLocked(locked){
   if (overlay) overlay.setAttribute('aria-hidden', locked ? 'false' : 'true');
 }
 function faD(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
-function showAdminLoginPhone(){
+// ⚠️ مسیرِ اصلیِ ورود از ۲۰۲۶-۰۸-۲۶ نام کاربری و رمز است، نه OTP.
+// دلیل: تنها راهِ ورود پیامک بود و بدونِ KAVENEGAR_API_KEY هیچ‌کس —
+// حتی مدیرِ پلتفرم — نمی‌توانست وارد شود. مسیرِ OTP حذف نشد و به‌عنوانِ
+// پشتیبان می‌ماند (اگر رمز فراموش شد و پیامک راه افتاده باشد).
+function showAdminLogin(){
   setAdminGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">R</div>
     <div class="login-title">پنل شرکت رزرونو</div>
-    <div class="login-sub">ورود مدیر پلتفرم — شماره موبایل خود را وارد کنید</div>
+    <div class="login-sub">ورود مدیر پلتفرم</div>
+    <label class="login-field-label" for="adminUser">نام کاربری</label>
+    <input class="login-inp" id="adminUser" autocomplete="username" spellcheck="false" placeholder="نام کاربری" onkeydown="if(event.key==='Enter')document.getElementById('adminPass')?.focus()">
+    <label class="login-field-label" for="adminPass">رمز عبور</label>
+    <input class="login-inp" id="adminPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')adminPasswordLogin()">
+    <button class="login-btn" id="adminLoginBtn" onclick="adminPasswordLogin()">ورود به پنل</button>
+    <button class="login-back" onclick="showAdminLoginPhone()">ورود با پیامک</button>
+    <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
+  setTimeout(()=>document.getElementById('adminUser')?.focus(),200);
+}
+
+async function adminPasswordLogin(){
+  const u = (document.getElementById('adminUser')?.value||'').trim();
+  const p = document.getElementById('adminPass')?.value||'';
+  if (!u || !p) { toast('','نام کاربری و رمز را وارد کن'); return; }
+  const btn = document.getElementById('adminLoginBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
+  const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
+
+  // مسیرِ دمویِ آفلاین دست‌نخورده می‌ماند (بازکردنِ فایل بدونِ بک‌اند).
+  if (location.protocol === 'file:') { await enterAdminPanel(true); return; }
+
+  const res = await API.adminLogin(u, p);
+  if (res.ok && res.data?.access){ await enterAdminPanel(); return; }
+  if (res.offline){ await enterAdminPanel(true); return; }
+  // ⚠️ پیامِ سرور عمداً برای «کاربر نیست» و «رمز غلط» یکسان است — اینجا
+  // هم نباید چیزِ دقیق‌تری ساخته شود، وگرنه همان نشتی که سرور بست از
+  // سمتِ کلاینت باز می‌شود.
+  toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');
+  reset();
+}
+
+function showAdminLoginPhone(){
+  setAdminGateLocked(true);
+  document.getElementById('loginCard').innerHTML = `
+    <div class="login-logo">R</div>
+    <div class="login-title">ورود با پیامک</div>
+    <div class="login-sub">شماره موبایل خود را وارد کنید</div>
     <label class="login-field-label" for="adminPhone">شماره موبایل</label>
     <input class="login-inp" id="adminPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹" onkeydown="if(event.key==='Enter')adminSendOtp()">
     <button class="login-btn" id="adminSendBtn" onclick="adminSendOtp()">ارسال کد ورود</button>
+    <button class="login-back" onclick="showAdminLogin()">ورود با نام کاربری و رمز</button>
     <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
   setTimeout(()=>document.getElementById('adminPhone')?.focus(),200);
 }
@@ -3007,13 +3284,13 @@ async function adminLogout(){
   await API.doLogout();
   document.getElementById('loginOverlay').classList.remove('hidden');
   setAdminGateLocked(true);
-  showAdminLoginPhone();
+  showAdminLogin();
   toast('','از پنل خارج شدید');
 }
 function onAdminSessionExpired(){
   document.getElementById('loginOverlay').classList.remove('hidden');
   setAdminGateLocked(true);
-  showAdminLoginPhone();
+  showAdminLogin();
   toast('','نشست منقضی شد، دوباره وارد شوید');
 }
 
@@ -3037,7 +3314,7 @@ if (API.getToken()) {
   })();
 } else {
   setAdminGateLocked(true);
-  showAdminLoginPhone();
+  showAdminLogin();
 }
 
 </script>
@@ -3289,6 +3566,7 @@ let SALES_TAB = 'orders';       // orders | inquiries
 let SALES_FILTER = 'pending';   // pending | all
 let SALES_LOADING = false;
 let SALES_ERROR = null;
+let SALES_INQ_ERROR = null;   // خطای مستقلِ «پیام‌ها» (رجوع به loadSales)
 let SALES_BADGE = 0;            // شمارشِ کارِ باقی‌مانده برای نشانِ کنارِ منو
 
 const SALES_STATUS = {
@@ -3347,6 +3625,14 @@ async function loadSales() {
   } else {
     SALES_ORDERS = orders.data.items || [];
   }
+  // ⚠️ رفعِ ۲۰۲۶-۰۸-۲۶ (§۹/§۱۰): خطای این درخواست جدا ثبت می‌شود.
+  // قبلاً SALES_ERROR فقط از `orders` پر می‌شد، پس اگر orders موفق و
+  // inquiries ناموفق بود (مثلاً هر دو روی همان سطلِ rate-limit نشسته‌اند و
+  // دومی ۴۲۹ می‌گیرد) هیچ خطایی ثبت نمی‌شد و تبِ «پیام‌ها» با اطمینان
+  // می‌گفت «صندوقِ ورودی خالی است» — پیام‌های واقعیِ فروش بی‌پاسخ می‌ماندند.
+  SALES_INQ_ERROR = inquiries.ok ? null : (inquiries.offline
+    ? 'اتصال به سرور برقرار نیست.'
+    : (inquiries.error && inquiries.error.message) || 'دریافتِ پیام‌ها ناموفق بود.');
   SALES_INQUIRIES = inquiries.ok ? (inquiries.data.items || []) : [];
   // ⚠️ فازِ ۲ (§۳): شمارنده‌هایِ خلاصه قبلاً از رویِ همین آرایه‌ی **صفحه‌ی جاری**
   // (حداکثر ۵۰ ردیف) محاسبه می‌شدند، پس با نشانِ سایدبار در همان صفحه تناقض
@@ -3376,13 +3662,15 @@ function rSales() {
 
   // عددِ کلِ سرور مرجع است؛ شمارشِ محلی فقط وقتی که سرور عددی نداده.
   const pendingCount = SALES_PENDING ?? SALES_ORDERS.filter((o) => o.status === 'pending' && o.kind === 'purchase').length;
-  const openInquiries = SALES_OPEN_INQUIRIES ?? SALES_INQUIRIES.filter((q) => q.status === 'open').length;
+  // اگر خواندنِ پیام‌ها شکست خورده، شمارشِ محلی هم بی‌معنی است ⇒ «—».
+  const openInquiries = SALES_INQ_ERROR ? null
+    : (SALES_OPEN_INQUIRIES ?? SALES_INQUIRIES.filter((q) => q.status === 'open').length);
 
   el.innerHTML = `
     <div class="bill-summary">
       <div class="bill-stat"><div class="bs-val" style="color:var(--amber-600)">${fa(pendingCount)}</div><div class="bs-label">درخواستِ خریدِ در انتظارِ فعال‌سازی</div></div>
       <div class="bill-stat"><div class="bs-val" style="color:var(--ink)">${fa(SALES_ORDERS.filter(o=>o.kind==='trial').length)}</div><div class="bs-label">حسابِ دمو در این فهرست</div></div>
-      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${fa(openInquiries)}</div><div class="bs-label">پیامِ بازنشده‌ی سایت</div></div>
+      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${openInquiries===null?'—':fa(openInquiries)}</div><div class="bs-label">پیامِ بازنشده‌ی سایت</div></div>
     </div>
 
     <div class="panel">
@@ -3439,6 +3727,14 @@ function renderSalesOrders() {
 }
 
 function renderSalesInquiries() {
+  // «نتوانستیم بخوانیم» هرگز نباید «چیزی نیست» شود.
+  if (SALES_INQ_ERROR) {
+    return `<div style="padding:28px;text-align:center;font-size:13px">
+      <div style="font-weight:700;margin-bottom:6px">پیام‌ها بارگیری نشد</div>
+      <div style="color:var(--muted);margin-bottom:12px">${esc(SALES_INQ_ERROR)} صندوق ممکن است پیامِ بازنشده داشته باشد.</div>
+      <button class="btn btn-sm btn-primary" onclick="loadSales()">تلاش دوباره</button>
+    </div>`;
+  }
   if (!SALES_INQUIRIES.length) {
     return `<div style="padding:28px;text-align:center;color:var(--muted);font-size:13px">صندوقِ ورودی خالی است.</div>`;
   }

@@ -3,6 +3,9 @@ import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
+import { invalidatePublicMenu } from '@/lib/menu-cache';
+import { resolveCategory } from '@/lib/menu-category';
+import { parseAvailability } from '@/lib/menu-availability';
 
 const idParamSchema = z.object({ id: zUuid });
 
@@ -11,6 +14,12 @@ const patchSchema = z.object({
   price_toman: z.number().int().min(0).max(1_000_000_000).optional(),
   emoji: z.string().max(16).nullable().optional(),
   category: z.string().max(60).trim().nullable().optional(),
+  // ۰۷۷ — دسته‌ی رابطه‌ای (بر رشته‌ی category برتری دارد)؛ null = برداشتنِ دسته.
+  category_id: zUuid.nullable().optional(),
+  is_out_of_stock: z.boolean().optional(),
+  // ۰۷۸ — پنجره‌ی دسترسی: شیءِ آزاد اینجا فقط شکلِ کلی، اعتبارسنجیِ واقعی
+  // در parseAvailability (روزها/بازه/ترتیب). null = «همیشه در دسترس».
+  availability: z.record().nullable().optional(),
   is_active: z.boolean().optional(),
   // فیلدهایِ منویِ عمومی/QR (مهاجرتِ ۰۵۲). nullable چون «پاک‌کردنِ توضیح/عکس»
   // باید ممکن باشد — با فرستادنِ null، نه با رشته‌ی خالی.
@@ -46,11 +55,35 @@ export const PATCH = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMan
   if (b.name !== undefined) data.name = b.name;
   if (b.price_toman !== undefined) data.priceToman = b.price_toman;
   if (b.emoji !== undefined) data.emoji = b.emoji;
-  if (b.category !== undefined) data.category = b.category;
+  // ۰۷۷ — دسته: هر دو شکلِ ورودی (رابطه‌ای/متنیِ قدیمی) به یک زوجِ همگام
+  // (categoryId + میرورِ متنی) ترجمه می‌شوند تا از هم نیفتند.
+  if (b.category_id !== undefined || b.category !== undefined) {
+    const cat = await resolveCategory(ctx.restaurant.id, b);
+    data.categoryId = cat.categoryId;
+    data.category = cat.category;
+  }
+  if (b.is_out_of_stock !== undefined) data.isOutOfStock = b.is_out_of_stock;
+  // ۰۷۸ — پنجره‌ی دسترسی: null یعنی «همیشه»؛ شکلِ بد → ۴۲۲ با پیامِ دقیق.
+  if (b.availability !== undefined) data.availability = parseAvailability(b.availability);
   if (b.is_active !== undefined) data.isActive = b.is_active;
   if (b.description !== undefined) data.description = b.description;
   if (b.sort_order !== undefined) data.sortOrder = b.sort_order;
   if (Object.keys(data).length === 0) throw Err.validation('چیزی برای تغییر فرستاده نشده');
+
+  // ۰۷۸ — گاردِ متقابلِ قیمتِ منفی: کاهشِ قیمتِ آیتم نباید گزینه‌ی تخفیف‌دارِ
+  // موجود را به «قیمتِ نهاییِ منفی» برساند (جفتِ همان چکِ سمتِ گزینه).
+  if (b.price_toman !== undefined) {
+    const deepest = await db.menuModifierOption.findFirst({
+      where: { group: { menuItemId: id } },
+      orderBy: { priceDeltaToman: 'asc' },
+      select: { name: true, priceDeltaToman: true },
+    });
+    if (deepest && b.price_toman + deepest.priceDeltaToman < 0) {
+      throw Err.validation(
+        `با این قیمت، گزینه‌ی «${deepest.name}» (${deepest.priceDeltaToman} تومان) قیمتِ نهایی را منفی می‌کند — اول آن گزینه را اصلاح یا حذف کن`,
+      );
+    }
+  }
 
   if (b.name !== undefined) {
     const dup = await db.menuItem.findFirst({
@@ -64,14 +97,18 @@ export const PATCH = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMan
     where: { id },
     data,
     select: {
-      id: true, name: true, priceToman: true, emoji: true, category: true, isActive: true,
+      id: true, name: true, priceToman: true, emoji: true, category: true,
+      categoryId: true, isOutOfStock: true, isActive: true,
       description: true, imageUrl: true, sortOrder: true,
     },
   });
 
+  await invalidatePublicMenu(ctx.restaurant.id);
   return NextResponse.json({
     id: updated.id, name: updated.name, price_toman: updated.priceToman,
-    emoji: updated.emoji, category: updated.category, is_active: updated.isActive,
+    emoji: updated.emoji, category: updated.category,
+    category_id: updated.categoryId, is_out_of_stock: updated.isOutOfStock,
+    is_active: updated.isActive,
     description: updated.description, image_url: updated.imageUrl, sort_order: updated.sortOrder,
   });
 });
@@ -98,6 +135,7 @@ export const DELETE = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMa
 
   if (usedInOrders > 0) {
     await db.menuItem.update({ where: { id }, data: { isActive: false } });
+    await invalidatePublicMenu(ctx.restaurant.id);
     return NextResponse.json({
       id, archived: true, used_in_orders: usedInOrders,
       message: `«${item.name}» در ${usedInOrders} پیش‌سفارشِ ثبت‌شده به‌کار رفته، پس برایِ حفظِ سابقه حذف نشد و فقط از منو برداشته شد (غیرفعال).`,
@@ -105,5 +143,6 @@ export const DELETE = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMa
   }
 
   await db.menuItem.delete({ where: { id } });
+  await invalidatePublicMenu(ctx.restaurant.id);
   return NextResponse.json({ id, archived: false, message: 'آیتم از منو حذف شد.' });
 });

@@ -50,6 +50,9 @@ test('پنلِ کسب‌وکار: ورودِ staff (شماره → کد) پنل 
   await page.goto(BIZ);
 
   // مرحله‌ی ۱: شماره‌ی موبایل
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   const phone = page.locator('#staffPhone');
   await expect(phone).toBeVisible();
   await phone.fill('09123456789');
@@ -91,6 +94,9 @@ test('پنلِ شرکت: ورودِ مدیرِ پلتفرم (شماره → کد
   await page.goto(CO);
 
   // مرحله‌ی ۱: شماره‌ی موبایلِ مدیر
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   const phone = page.locator('#adminPhone');
   await expect(phone).toBeVisible();
   await phone.fill('09123456789');
@@ -134,6 +140,9 @@ test('پنلِ کسب‌وکار: ناوبری به «رزروها» لیستِ 
   await page.goto(BIZ);
 
   // ورودِ staff (دمو)
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();
   await page.locator('#staffCode').fill('1234');
@@ -163,6 +172,9 @@ test('پنلِ شرکت: ناوبری به «رستوران‌ها» لیستِ 
   await page.goto(CO);
 
   // ورودِ مدیرِ پلتفرم (دمو)
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await page.locator('#adminCode').fill('1234');
@@ -209,6 +221,9 @@ test('پنلِ شرکت: صفِ «تأییدِ ساعتِ کاری» پیشنه�
   });
 
   await page.goto(CO);
+  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
+  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
+  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
   await page.locator('#adminPhone').fill('09123456789');
   await page.locator('#adminSendBtn').click();
   await page.locator('#adminCode').fill('1234');

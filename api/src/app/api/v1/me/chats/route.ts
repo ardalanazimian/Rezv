@@ -4,8 +4,10 @@ import { db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 /** GET /api/v1/me/chats — لیست گفتگوهای مشتری (برای صفحه‌ی «پیام‌ها») */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -36,3 +38,7 @@ export async function GET(req: Request) {
     });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/me/chats', GET_impl);

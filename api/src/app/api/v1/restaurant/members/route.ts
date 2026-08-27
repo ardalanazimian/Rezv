@@ -50,7 +50,11 @@ export const GET = withRestaurantAuth(
     const tierCounts = await db.clubMember.groupBy({
       by: ['tier'], where: { restaurantId: restaurant.id }, _count: true,
     });
-    const tiers: Record<string, number> = { gold: 0, silver: 0, bronze: 0 };
+    // ⚠️ `platinum` اضافه شد چون از فازِ ۲ ستونِ `club_members.tier` واقعاً
+    // نوشته می‌شود (`addClubPoints` → `tierFromPoints`) و `LOYALTY_TIERS`
+    // چهار سطح دارد. بدونِ این کلید، اعضایِ پلاتینیوم در «توزیعِ سطوح» با
+    // `undefined` ظاهر می‌شدند — یعنی جمعِ ستون‌ها با `total` نمی‌خواند.
+    const tiers: Record<string, number> = { platinum: 0, gold: 0, silver: 0, bronze: 0 };
     tierCounts.forEach(t => { tiers[t.tier] = t._count; });
 
     const userIds = members.map(m => m.user.id);

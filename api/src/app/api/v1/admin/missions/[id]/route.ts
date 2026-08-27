@@ -6,6 +6,8 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ id: zUuid });
 const bodySchema = z.object({
   title: z.string().min(1).max(100).trim().optional(),
@@ -24,7 +26,7 @@ const bodySchema = z.object({
  * بدونِ حذفِ سخت عمداً: MissionProgressِ کاربرهای موجود به این رکورد وصل است؛
  * status='archived' هم‌الگو با الگویِ isActive در RewardMarketplaceItem است.
  */
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PATCH_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -50,3 +52,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true, mission });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const PATCH = withApiMetrics('/api/v1/admin/missions/[id]', PATCH_impl);

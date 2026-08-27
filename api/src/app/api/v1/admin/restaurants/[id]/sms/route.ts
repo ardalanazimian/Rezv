@@ -6,6 +6,8 @@ import { audit } from '@/lib/audit';
 import { errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ id: zUuid });
 const topupSchema = z.object({ amount: z.number().int().min(1).max(1_000_000), note: z.string().max(500).optional() });
 
@@ -15,7 +17,7 @@ const topupSchema = z.object({ amount: z.number().int().min(1).max(1_000_000), n
  *
  * body (POST): { amount: number, note?: string }
  */
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -25,7 +27,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   } catch (e) { return errorResponse(e); }
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function POST_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -45,3 +47,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ ok: true, balance: result.balance, added: amount });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/restaurants/[id]/sms', GET_impl);
+export const POST = withApiMetrics('/api/v1/admin/restaurants/[id]/sms', POST_impl);

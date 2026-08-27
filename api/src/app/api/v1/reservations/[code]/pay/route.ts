@@ -5,6 +5,8 @@ import { requestPayment } from '@/lib/zarinpal';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, zReservationCode, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ⚠️ همگام‌سازی‌شده با DB زنده (migration 019_payments_deposit).
 // این روت قبلاً اصلاً وجود نداشت — جدول payments و فیلدهای deposit_* روی DB
 // بودند ولی هیچ endpointـی برای شروعِ واقعیِ پرداخت نبود.
@@ -12,7 +14,7 @@ import { parseParams, zReservationCode, z } from '@/lib/schemas';
 const paramsSchema = z.object({ code: zReservationCode });
 
 /** POST /api/v1/reservations/:code/pay — شروعِ پرداختِ بیعانه؛ خروجی: آدرسِ ریدایرکت به درگاه */
-export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
+async function POST_impl(req: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     const auth = authFromRequest(req);
     const { code } = parseParams(await params, paramsSchema);
@@ -66,3 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ redirect_url: redirectUrl });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/reservations/[code]/pay', POST_impl);

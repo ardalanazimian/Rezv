@@ -3,11 +3,12 @@ import { db } from './db';
 import { isTimeWithinHours } from './hours';
 import { withSlotLock } from './redis';
 import { ApiError, Err } from './errors';
+import { isAvailableAt } from './menu-availability';
 import { enqueueSms } from './sms';
 import { emit } from './events';
 import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
-import { redeemGiftCardTx, addClubPoints, getClubPointsBalance } from './loyalty';
+import { redeemGiftCardTx, getClubPointsBalance, ARRIVAL_POINTS } from './loyalty';
 import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
 import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
@@ -15,9 +16,6 @@ import { computeRanges, genReservationCode, isConflictError, isSerializationErro
 import { invalidateAvailability } from './availability-cache';
 import { transitionReservation } from './lifecycle';
 import { getOccupiedTableNumbers } from './table-occupancy';
-import { createLogger } from './logger';
-
-const log = createLogger('reservations');
 
 // ⚠️ درسِ تاریخی (باگِ واقعیِ P0 که با تستِ زنده پیدا شد، نه فرض): مقایسه‌ی
 // خامِ `status IN (...)` در $queryRaw بدونِ کستِ صریح با enumِ Postgres شکست
@@ -287,6 +285,34 @@ export async function createReservation(
         }
       }
     }
+
+    // ── تداخلِ همزمانی که از retry هم رد شده ─────────────────────────────
+    // ⚠️ یافته‌ی زنده‌ی ۲۰۲۶-۰۸-۲۵: بلوکِ بالا فقط `SLOT_LOCK_TIMEOUT` را
+    // ترجمه می‌کرد. یک `40P01` (deadlock) که هر ۵ تلاشِ TX_MAX_RETRIES را
+    // مصرف کند، از همین‌جا **خام** بالا می‌رفت و `errorResponse` یک ۵۰۰ی
+    // عمومی می‌داد — برای یک تداخلِ کاملاً عادی و درست‌مدیریت‌شده‌ی DB.
+    //
+    // این فرضی نیست: در آزمایشِ ۲۰ درجِ کاملاً هم‌زمان روی یک میز، حالتِ
+    // N=2 به‌جای ۲۳P01 یک deadlock داد (Postgres وقتی چند تراکنش هم‌زمان
+    // کانستریتِ EXCLUDE را چک می‌کنند می‌تواند deadlock بسازد، نه فقط
+    // نقضِ یکتایی).
+    //
+    // همان انضباطِ بالا رعایت می‌شود: **اول ثابت کن پر است، بعد ادعا کن.**
+    // اگر بشود اثبات کرد همه‌ی کاندیداها پر شده‌اند، خطای صادقِ
+    // SLOT_FULL/TABLE_CONFLICT؛ وگرنه CONCURRENCY_RETRY (۴۰۹) که صادقانه
+    // می‌گوید «ترافیک بالا بود، دوباره تلاش کن» — نه ۵۰۰ی بی‌معنا.
+    if (isSerializationError(e)) {
+      const occupiedNow = await getOccupiedTableNumbers(db, r.id, start, blockEnd).catch(() => null);
+      if (occupiedNow) {
+        if (manualTableNumber != null) {
+          if (occupiedNow.has(manualTableNumber)) throw Err.tableConflict();
+        } else if (candidateTables.length > 0 && candidateTables.every(t => occupiedNow.has(t.number))) {
+          throw Err.slotFull(input.time);
+        }
+      }
+      throw Err.concurrencyRetry();
+    }
+
     throw e;
   }
 }
@@ -295,6 +321,8 @@ export async function createReservation(
 async function placeReservation(
   input: CreateReservationInput,
   r: { id: string; name: string; clubPrefix: string; cbBasePct: number;
+       // ۰۷۸ — چکِ پنجره‌ی pre-order نسبت به slotStart در تایم‌زونِ رستوران
+       timezone?: string | null;
        cancellationPolicy?: { autoConfirm: boolean } | null },
   cfg: TimingConfig,
   ranges: { start: Date; end: Date; blockEnd: Date; duration: number; blockBufferMin: number },
@@ -419,6 +447,10 @@ async function placeReservation(
       entityId: result.resv.id,
       modelSource: noShowRisk.source,
       modelRunId: lin.modelRunId,   // فازِ ۶ — نسبت‌دادن به نسخه‌ی مدل
+      // ⚠️ دامنه هم ثبت می‌شود، وگرنه پیش‌بینیِ مدلِ سراسری (که modelRunId
+      // ندارد) از پیش‌بینیِ heuristic و از مدل‌های بدونِ نسب‌نامه قابلِ
+      // تفکیک نیست — و دقتِ تولیدش هرگز اندازه‌گیری نمی‌شود (مهاجرتِ ۰۷۱).
+      modelScope: lin.modelScope ?? (noShowRisk.source === 'heuristic' ? 'heuristic' : null),
       featureVersion: NO_SHOW_FEATURE_VERSION,
       predictedValue: lin.probability,
       confidence: confidenceFor({ modelSource: noShowRisk.source, priorTotal: lin.features.priorTotal }),
@@ -445,7 +477,7 @@ async function insertReservation(
   tx: Prisma.TransactionClient,
   p: {
     input: CreateReservationInput;
-    r: { id: string; clubPrefix: string; cbBasePct: number };
+    r: { id: string; clubPrefix: string; cbBasePct: number; timezone?: string | null };
     status: 'pending' | 'confirmed';
     holdExpiresAt: Date | null;
     start: Date; end: Date; duration: number; blockBufferMin: number;
@@ -497,7 +529,35 @@ async function insertReservation(
     }
   }
 
+  // [SPEC-A فاز ۲ — ۰۷۸] اعتبارسنجیِ آیتم‌های pre-order **قبل از** درج.
+  //
+  // قبلاً درج اول انجام می‌شد و اعتبارسنجی پایین‌تر در بخشِ checkout بود؛
+  // نتیجه: UUIDِ ناموجود به‌جای ۴۲۲ی تمیز، به خطای خامِ FK می‌خورد (تراکنش
+  // rollback می‌شد ولی پیام قابلِ‌فهم نبود). حالا یک fetch، همه‌ی ردها با
+  // پیامِ دامنه‌ی صریح، بعد درج؛ checkout هم از همین نتیجه قیمت می‌گیرد.
+  let preorderItems: Array<{ id: string; priceToman: number }> = [];
   if (input.preorder?.length) {
+    const itemIds = [...new Set(input.preorder.map(x => x.menuItemId))];
+    const items = await tx.menuItem.findMany({
+      // فیلترِ restaurantId (رفعِ امنیتیِ ۰۸-۱۳ — ضدِ نشتِ بین‌رستورانی) حفظ شده.
+      where: { id: { in: itemIds }, restaurantId: r.id },
+      select: { id: true, name: true, priceToman: true, isActive: true, isOutOfStock: true, availability: true },
+    });
+    if (items.length !== itemIds.length) {
+      throw Err.validation('یک یا چند آیتمِ منو نامعتبر است یا متعلق به این رستوران نیست');
+    }
+    const tz = r.timezone ?? 'Asia/Tehran';
+    for (const it of items) {
+      if (!it.isActive) throw Err.validation(`«${it.name}» از منو برداشته شده و قابلِ پیش‌سفارش نیست`);
+      if (it.isOutOfStock) throw Err.validation(`«${it.name}» فعلاً ناموجود است و قابلِ پیش‌سفارش نیست`);
+      // پنجره نسبت به **زمانِ رزرو** سنجیده می‌شود، نه لحظه‌ی ثبت (B7):
+      // آیتمِ صبحانه برای رزروِ شام بی‌معناست، حتی اگر الان صبح باشد.
+      if (!isAvailableAt(it.availability, tz, p.start)) {
+        throw Err.validation(`«${it.name}» در زمانِ این رزرو سرو نمی‌شود (پنجره‌ی سروِ محدود دارد)`);
+      }
+    }
+    preorderItems = items.map(i => ({ id: i.id, priceToman: i.priceToman }));
+
     await tx.reservationItem.createMany({
       data: input.preorder.map(x => ({ reservationId: resv!.id, menuItemId: x.menuItemId, qty: x.qty })),
     });
@@ -514,25 +574,12 @@ async function insertReservation(
       throw Err.validation('فقط یکی از کوپن یا کارت هدیه قابل استفاده است');
     }
 
-    // مبلغ پایه = جمع قیمت آیتم‌های pre-order
-    // ⚠️ رفع‌شده (بازبینیِ امنیتی، ۲۰۲۶-۰۸-۱۳): قبلاً این کوئری restaurantId
-    // نداشت — یعنی یک menuItemId از رستورانِ دیگه هم پیدا می‌شد و قیمتِ واقعیِ
-    // *همون رستورانِ دیگه* رو برمی‌گردوند (نه فقط قیمتِ اشتباه؛ نشتِ داده‌ی
-    // بین‌رستورانی). بدتر از اون، اگر id اصلاً وجود نداشت، priceMap.get()
-    // مقدارِ undefined می‌داد و `?? 0` بی‌صدا قیمت رو صفر می‌کرد — یعنی هر
-    // UUIDِ دلخواه (حتی جعلی) یک آیتمِ «رایگان» به سبد اضافه می‌کرد. حالا
-    // restaurantId فیلتر می‌شه و اگر تعدادِ برگشتی با تعدادِ درخواستی یکی
-    // نباشه (یعنی حداقل یک id گم/غلط/متعلق‌به‌رستورانِ‌دیگه بوده)، خطای
-    // اعتبارسنجی پرتاب می‌شه — هرگز price??0 خاموش.
-    const itemIds = [...new Set(input.preorder.map(x => x.menuItemId))];
-    const items = await tx.menuItem.findMany({
-      where: { id: { in: itemIds }, restaurantId: r.id },
-      select: { id: true, priceToman: true },
-    });
-    if (items.length !== itemIds.length) {
-      throw Err.validation('یک یا چند آیتمِ منو نامعتبر است یا متعلق به این رستوران نیست');
-    }
-    const priceMap = new Map(items.map(i => [i.id, i.priceToman]));
+    // مبلغ پایه = جمع قیمت آیتم‌های pre-order — **از دیتابیس، هرگز از body**.
+    // تاریخچه: رفعِ امنیتیِ ۲۰۲۶-۰۸-۱۳ فیلترِ restaurantId و تطبیقِ شمارش را
+    // آورد (ضدِ نشتِ بین‌رستورانی و آیتمِ «رایگان»ِ جعلی)؛ از ۰۷۸ همان
+    // اعتبارسنجی — کامل‌تر (isActive/ناموجود/پنجره) — به بالای همین تراکنش و
+    // قبل از درجِ ReservationItem منتقل شد؛ اینجا فقط نتیجه‌اش مصرف می‌شود.
+    const priceMap = new Map(preorderItems.map(i => [i.id, i.priceToman]));
     const subtotal = input.preorder.reduce((sum, x) => sum + (priceMap.get(x.menuItemId) ?? 0) * x.qty, 0);
 
     let discount = 0;
@@ -813,8 +860,6 @@ export interface ArrivalInput {
   actorStaffId: string;
 }
 
-const ARRIVAL_POINTS = 50;
-
 export async function markArrival(input: ArrivalInput) {
   const resv = await db.reservation.findUnique({ where: { code: input.code } });
   if (!resv || resv.restaurantId !== input.restaurantId) throw Err.notFound('رزرو');
@@ -834,24 +879,16 @@ export async function markArrival(input: ArrivalInput) {
   // تنها منبعِ اتمیک، نتیجه‌ی خودِ تراکنشِ انتقال است.
   const firstArrival = updated.changed;
 
-  // امتیازِ باشگاهِ رستوران — از این‌جا به بعد از مسیرِ دفتر (PointsLedger) که
-  // مرجعِ سروری است؛ `club_members.points` فقط کشِ هم‌تراکنش است.
-  if (firstArrival && resv.userId) {
-    // اگر ثبتِ امتیاز شکست بخورد نباید خودِ چک‌این را بشکند (رزرو از قبل commit
-    // شده) — همان قاعده‌ای که transitionReservation برایِ اعلان/اقتصاد دارد.
-    // دفتر append-only است، پس نبودِ ردیف بعداً قابلِ تشخیص و جبران است.
-    await addClubPoints({
-      userId: resv.userId,
-      restaurantId: resv.restaurantId,
-      delta: ARRIVAL_POINTS,
-      reason: 'reservation',
-      note: `حضور در رزرو ${resv.code}`,
-    }).catch((e) => {
-      log.error('ثبتِ امتیازِ حضور در دفتر ناموفق (چک‌این خودش commit شد)', {
-        reservationId: resv.id, code: resv.code, error: (e as Error).message,
-      });
-    });
-  }
+  // ⚠️ امتیازِ باشگاه دیگر این‌جا داده نمی‌شود.
+  //
+  // این بلوک به `transitionReservation` (تنها نویسنده‌ی مجازِ وضعیت) منتقل شد،
+  // چون این تابع فقط از `POST /reservations/:code/arrive` صدا زده می‌شود و
+  // **هیچ‌کدام از سه پنل آن endpoint را صدا نمی‌زنند** — مسیرِ واقعیِ چک‌ینِ
+  // پنل `PATCH /restaurant/reservations/:code/status` است. یعنی تنها
+  // نویسنده‌ی دفترِ امتیاز از رابطِ کاربری دسترس‌ناپذیر بود. توضیحِ کاملِ
+  // تصمیم و دلیلِ ردِ دو راهِ دیگر در `lib/lifecycle.ts` است.
+  //
+  // این‌جا **تکرار نمی‌شود** وگرنه هر چک‌ین از این مسیر دو بار امتیاز می‌گرفت.
 
   // SMS خوش‌آمد — فقط بارِ اول (نه در تکرار/retry)
   if (firstArrival && resv.guestPhone) {

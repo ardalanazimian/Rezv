@@ -4,12 +4,14 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 /**
  * GET /api/v1/admin/business-intelligence — هوش تجاری سطح پلتفرم (پنل شرکت).
  * RFM، CLV، GMV، و سگمنت‌ها را در کل رستوران‌ها تجمیع می‌کند.
  * این به CEO دید کلان از سلامت کسب‌وکار کل پلتفرم می‌دهد (نه یک رستوران).
  */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -74,3 +76,7 @@ export async function GET(req: Request) {
     });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/business-intelligence', GET_impl);

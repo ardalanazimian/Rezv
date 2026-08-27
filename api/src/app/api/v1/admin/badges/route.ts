@@ -5,6 +5,8 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { errorResponse } from '@/lib/errors';
 import { parseBody, parseQuery, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const KEY_RE = /^[a-z][a-z0-9_]{1,49}$/;
 const zBadgeKey = z.string().regex(KEY_RE, 'کلید باید فقط حروفِ کوچکِ لاتین/عدد/زیرخط باشد (مثلاً founding_member)');
 
@@ -18,7 +20,7 @@ const bodySchema = z.object({
 const querySchema = z.object({ include_inactive: z.string().optional() });
 
 /** GET /api/v1/admin/badges — فهرستِ همه‌ی تعریف‌هایِ نشان (پیش‌فرض فقط فعال‌ها) */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -29,7 +31,7 @@ export async function GET(req: Request) {
 }
 
 /** POST /api/v1/admin/badges — تعریفِ نشانِ جدید (فقط ادمینِ پلتفرم) */
-export async function POST(req: Request) {
+async function POST_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -38,3 +40,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, badge }, { status: 201 });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/badges', GET_impl);
+export const POST = withApiMetrics('/api/v1/admin/badges', POST_impl);

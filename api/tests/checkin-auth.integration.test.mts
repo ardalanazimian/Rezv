@@ -1,3 +1,5 @@
+// [رفعِ ویندوز ۲۰۲۶-۰۸-۲۶] fileURLToPath و نه .pathname: رویِ ویندوز pathname «/C:/…» می‌دهد
+import { fileURLToPath } from 'node:url';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -5,16 +7,20 @@ process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 
 // ═══════════════════════════════════════════════════════════════════════
-//  رگرسیونِ P0-2 — QR check-in باید احرازشده و محدود به شعبه باشد
+//  رگرسیونِ P0-2 — QR check-in باید **محدود به شعبه** باشد
 //  (فازِ ۲، پروتکل §۴ «No route … may bypass the lifecycle» و §۷ isolation)
 //
-//  باگی که پین می‌شود: POST /api/v1/checkin هیچ احراز هویتی نداشت و
-//  qrCheckIn میز را **سراسری** پیدا می‌کرد. یعنی هر ناشناسی با یک qrCode
-//  می‌توانست رزروِ دیگری را checked_in→seated کند و میز را occupied کند.
+//  باگی که پین می‌شود: qrCheckIn میز را **سراسری** پیدا می‌کرد؛ هیچ چکی نبود
+//  که میز به رستورانِ زمینه‌ی فراخوان تعلق دارد. این فایل همان گاردِ
+//  لایه‌ی سرویس را قفل می‌کند و دست‌نخورده معتبر است.
 //
-//  اینجا خودِ لایه‌ی سرویس تست می‌شود (نه routeِ HTTP): ادعایِ محدوده‌ی تنانت
-//  دقیقاً همان‌جاست، و بخشِ «auth» با عبورِ route از withRestaurantAuth تأمین
-//  می‌شود که در تستِ قراردادِ پایین (امضایِ اجباریِ restaurantId) پین شده.
+//  ⚠️ بازنگری‌شده: بخشِ «routeِ HTTP باید احرازِ کارمند بخواهد» از این فایل
+//  برداشته شد، چون آن قرارداد اشتباه بود و قابلیت را می‌کشت. اسکن‌کننده
+//  **مهمان** است، نه پرسنل (پنل اصلاً اسکنرِ QR ندارد)، و آن گارد یعنی
+//  ۴۰۱/۴۰۳ برای تنها مصرف‌کننده‌ی موجود. مدلِ درست: بدونِ احراز هویتِ کاربر،
+//  **با** اعتبارنامه‌ی ۵۰ بیتیِ QR + ریت‌لیمیتِ اختصاصی + عدمِ نشتِ کدِ رزرو.
+//  قراردادِ جدیدِ routeِ HTTP در `qr-checkin.integration.test.mts` قفل شده و
+//  همین‌جا هم یک گاردِ ساختاری برایش هست (پایین‌ترین describe).
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db.ts');
@@ -92,15 +98,25 @@ describe('QR check-in — احراز هویت و محدوده‌ی شعبه (P0-
   });
 });
 
-describe('QR check-in — routeِ HTTP دیگر عمومی نیست (P0-2)', () => {
-  test('routeِ /checkin از withRestaurantAuth عبور می‌کند', async () => {
-    // بخشِ «احراز هویت»ِ این رفع در خودِ routeِ Next است، نه در لایه‌ی سرویس.
-    // importِ ماژول و بررسیِ اینکه POST یک wrapperِ withRestaurantAuth است
-    // (نه یک handlerِ لخت) این ادعا را بدونِ بالاآوردنِ سرورِ Next پین می‌کند.
+describe('QR check-in — قراردادِ ساختاریِ routeِ HTTP', () => {
+  test('routeِ /checkin شمرده می‌شود و گاردِ کارمند ندارد', async () => {
+    // دو ادعا با هم، هر دو ساختاری و بدونِ بالاآوردنِ سرورِ Next:
+    //
+    //  ۱. POST از withApiMetrics رد می‌شود. با حذفِ گاردِ کارمند، تنها نقطه‌ی
+    //     شمارشِ HTTPِ این مسیر هم می‌رفت — و مسیر بی‌صدا از آلارم‌های
+    //     نرخِ خطا/تأخیر بیرون می‌افتاد.
+    //  ۲. هیچ wrapperِ احرازِ کارمندی در منبع نمانده. اگر کسی دوباره آن را
+    //     برگرداند، این تست می‌شکند و مجبور است تصمیم را آگاهانه بگیرد —
+    //     چون همان کار قبلاً قابلیت را برای اپِ مشتری کشت.
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(fileURLToPath(new URL('../src/app/api/v1/checkin/route.ts', import.meta.url)), 'utf8');
+
     const mod = await import('../src/app/api/v1/checkin/route.ts');
     assert.equal(typeof mod.POST, 'function', 'POST باید export شود');
-    // withRestaurantAuth یک handlerِ (req, routeArg) برمی‌گرداند — دو پارامتر.
-    // handlerِ لختِ قبلی فقط (req) بود.
-    assert.equal(mod.POST.length, 2, 'POST باید wrapperِ withRestaurantAuth باشد، نه handlerِ بدونِ auth');
+    assert.match(src, /withApiMetrics\('\/api\/v1\/checkin'/, 'باید از withApiMetrics رد شود');
+    assert.ok(
+      !/with(Restaurant|Staff)Auth\(/.test(src),
+      'گاردِ کارمند روی /checkin یعنی ۴۰۱/۴۰۳ برای مهمان — اسکن‌کننده مهمان است، نه پرسنل',
+    );
   });
 });

@@ -4,6 +4,10 @@ import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { suggestPricing, type HeatCell } from '@/lib/pricing';
 import { parseBody, zTimeStr, z } from '@/lib/schemas';
+// ⚠️ روز/ساعتِ **تهران**، نه UTC — دلیلِ کامل در lib/restaurant-manager.ts.
+// اینجا اثرش مستقیمِ پولی است: پیشنهادِ «حداقلِ خرید برای ساعتِ اوج» با
+// ساعتِ UTC ۳:۳۰ جابه‌جا می‌شد و می‌توانست قانون را روی ساعتِ اشتباه بگذارد.
+import { TEHRAN_SLOT_DOW, TEHRAN_SLOT_HOUR } from '@/lib/restaurant-manager';
 
 const rulesSchema = z.array(z.object({
   dows: z.array(z.number().int().min(0).max(6)).min(1).max(7),
@@ -24,8 +28,8 @@ export const GET = withRestaurantAuth({ permission: 'canManageSettings', rateLim
 
   // داده‌ی شلوغیِ ۹۰ روز اخیر برای تولیدِ پیشنهاد
   const heat = await db.$queryRaw<HeatCell[]>`
-    SELECT EXTRACT(DOW FROM slot_start)::int AS dow,
-           EXTRACT(HOUR FROM slot_start)::int AS hour,
+    SELECT ${TEHRAN_SLOT_DOW} AS dow,
+           ${TEHRAN_SLOT_HOUR} AS hour,
            COUNT(*)::int AS count
     FROM reservations
     WHERE restaurant_id = ${ctx.restaurant.id}::uuid

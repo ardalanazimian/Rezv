@@ -4,10 +4,12 @@ import { cached } from '@/lib/cache';
 import { errorResponse } from '@/lib/errors';
 import { parseQuery, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const querySchema = z.object({ restaurant_id: zUuid.optional() });
 
 /** GET /api/v1/events?restaurant_id=... — رویدادهای ویژه‌ی پیش‌رو */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const { restaurant_id: rid } = parseQuery(req, querySchema);
     // v2 در کلید cache: شکلِ پاسخ عوض شده (slug/نامِ رستوران اضافه شد) و نباید
@@ -38,3 +40,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ events });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/events', GET_impl);

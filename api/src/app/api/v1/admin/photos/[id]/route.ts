@@ -9,6 +9,8 @@ import { canTransition, type PhotoStatus } from '@/lib/photo-moderation';
 import { deleteObject } from '@/lib/media-store';
 import { invalidate, cacheKey } from '@/lib/cache';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ id: zUuid });
 const bodySchema = z.object({
   action: z.enum(['approve', 'reject']),
@@ -26,7 +28,7 @@ const bodySchema = z.object({
  * هر دو تصمیم audit می‌شوند: این یک تصمیمِ انتشار روی برندِ پلتفرم است و
  * باید بشود گفت چه کسی و کِی آن را گرفته.
  */
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PATCH_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -94,7 +96,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
  * برای موارد عادی کافی است؛ این مسیر برای موردِ حاد است و فایل را هم پاک
  * می‌کند.
  */
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function DELETE_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -128,3 +130,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return errorResponse(e);
   }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const PATCH = withApiMetrics('/api/v1/admin/photos/[id]', PATCH_impl);
+export const DELETE = withApiMetrics('/api/v1/admin/photos/[id]', DELETE_impl);

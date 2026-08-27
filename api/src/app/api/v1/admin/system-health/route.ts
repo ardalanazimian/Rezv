@@ -4,12 +4,14 @@ import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 /**
  * GET /api/v1/admin/system-health — سلامت زیرساخت پلتفرم (پنل شرکت).
  * صف Job، webhookها، و خطاهای اخیر را در سطح کل پلتفرم نشان می‌دهد.
  * این به CEO/تیم فنی دید لحظه‌ای از سلامت سیستم می‌دهد.
  */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -59,3 +61,7 @@ export async function GET(req: Request) {
     });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/system-health', GET_impl);

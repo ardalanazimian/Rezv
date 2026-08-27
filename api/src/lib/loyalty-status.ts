@@ -1,5 +1,5 @@
 import { db } from './db';
-import { getPointsBalance } from './loyalty';
+import { getPointsBalance, LOYALTY_TIERS, tierFromPoints, type LoyaltyTier } from './loyalty';
 import { getGuestProfile } from './guest-profile';
 import { visitedStatusList } from './reservation-status';
 import { hourInTz, dateInTz } from './hours';
@@ -18,25 +18,12 @@ import { hourInTz, dateInTz } from './hours';
 //  schema نبود). اگر عددهایِ دیگری مدِ نظر است، فقط همین چند ثابت را عوض کن.
 // ═══════════════════════════════════════════════════════════════════════
 
-export interface LoyaltyTier {
-  key: 'bronze' | 'silver' | 'gold' | 'platinum';
-  name: string;
-  emoji: string;
-  min: number;
-}
-
-export const LOYALTY_TIERS: readonly LoyaltyTier[] = [
-  { key: 'bronze', name: 'برنزی', emoji: '🥉', min: 0 },
-  { key: 'silver', name: 'نقره‌ای', emoji: '🥈', min: 300 },
-  { key: 'gold', name: 'طلایی', emoji: '🥇', min: 800 },
-  { key: 'platinum', name: 'پلاتینیوم', emoji: '💎', min: 2000 },
-];
-
-export function tierFromPoints(points: number): LoyaltyTier {
-  let current = LOYALTY_TIERS[0];
-  for (const t of LOYALTY_TIERS) if (points >= t.min) current = t;
-  return current;
-}
+// ⚠️ `LOYALTY_TIERS` / `tierFromPoints` / `LoyaltyTier` دیگر این‌جا تعریف
+// نمی‌شوند — به `lib/loyalty.ts` منتقل شدند تا **همان** تابعی که سطح را برایِ
+// نمایش حساب می‌کند، سطحِ ذخیره‌شده‌ی `club_members.tier` را هم بنویسد (یک
+// تعریف، نه دو). این‌جا فقط بازصادر می‌شوند تا هیچ صداکننده‌ای نشکند.
+export { LOYALTY_TIERS, tierFromPoints };
+export type { LoyaltyTier };
 
 export interface TierProgress {
   tier: LoyaltyTier;

@@ -28,8 +28,25 @@ export function sigmoid(z: number): number {
   return 1 / (1 + Math.exp(-z));
 }
 
-/** ضربِ داخلیِ دو بردارِ هم‌طول. */
+/**
+ * ضربِ داخلیِ دو بردارِ **هم‌طول**.
+ *
+ * ⚠️ گاردِ طول عمدی است و از یک P0ِ واقعی زاده شد (۲۰۲۶-۰۸-۲۵، ممیزیِ نهایی).
+ * نسخه‌ی قبلی روی `a.length` حلقه می‌زد و طول‌ها را چک نمی‌کرد. وقتی بردارِ
+ * ویژگی از ۷ به ۱۲ رفت، `checkChannelBias` که هنوز کاوش‌های ۷ عنصری می‌ساخت
+ * به `b[7] === undefined` می‌رسید ⇒ `0 * undefined = NaN` ⇒ کلِ حاصل NaN ⇒
+ * `sigmoid(NaN) = NaN` ⇒ `Math.abs(NaN) > 0.2 === false` ⇒ **گیتِ بایاس
+ * برای همیشه خاموش**. هیچ خطایی، هیچ لاگی، و هر ۳۲ تستِ موجود سبز (چون همه
+ * وزنِ ۷ عنصری می‌دادند).
+ *
+ * NaN در ریاضیاتِ شناور بی‌صدا منتشر می‌شود و هر مقایسه‌اش false است — یعنی
+ * دقیقاً همان چیزی که یک گیتِ ایمنی را نامرئی از کار می‌اندازد. `rocAuc` از
+ * روزِ اول این گارد را داشت؛ اینجا نداشت. حالا دارد.
+ */
 export function dot(a: readonly number[], b: readonly number[]): number {
+  if (a.length !== b.length) {
+    throw new Error(`dot: طولِ بردارها یکی نیست (${a.length} در برابرِ ${b.length})`);
+  }
   let s = 0;
   for (let i = 0; i < a.length; i++) s += a[i] * b[i];
   return s;
@@ -37,7 +54,10 @@ export function dot(a: readonly number[], b: readonly number[]): number {
 
 export interface TrainOptions {
   learningRate?: number;
+  /** **سقفِ** تکرار، نه تعدادِ ثابت — با رسیدن به همگرایی زودتر می‌ایستد. */
   iterations?: number;
+  /** بزرگ‌ترین گامِ مجازِ پارامتر برای اعلامِ همگرایی. */
+  tolerance?: number;
   l2?: number; // regularization — بایاس (اندیسِ ۰) هرگز regularize نمی‌شود
 }
 
@@ -51,12 +71,27 @@ export function trainLogisticRegression(
   y: readonly number[],
   opts: TrainOptions = {},
 ): number[] {
-  const { learningRate = 0.3, iterations = 800, l2 = 0.02 } = opts;
+  const { learningRate = 0.3, iterations = 20_000, l2 = 0.02, tolerance = 1e-7 } = opts;
   const n = X.length;
   if (n === 0) throw new Error('trainLogisticRegression: دیتاست خالی است');
   const d = X[0].length;
   const w = new Array(d).fill(0);
 
+  // ⚠️ همگرایی حالا **تشخیص داده می‌شود**، نه اینکه به یک تعدادِ ثابت تکرار
+  // اعتماد شود. یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۵ که این را لازم کرد:
+  //
+  // سقفِ قبلی ۸۰۰ تکرارِ ثابت بود و برای بردارِ ۷تاییِ اولیه (که تقریباً
+  // همه‌اش دودویی بود) کافی بود. با گسترشِ بردار به ۱۲ ویژگیِ پیوسته، همان
+  // ۸۰۰ تکرار **زیرآموزش** می‌داد و مدلِ غنی‌تر روی هولدآوت از مدلِ فقیرتر
+  // بدتر می‌شد. اندازه‌گیریِ واقعی روی همان دادهٔ کنترل‌شده:
+  //   ۸۰۰ تکرار  → AUC ۰٫۶۶۴۲  (بدتر از v1 با ۰٫۶۶۶۱)
+  //   ۳۰۰۰ تکرار → AUC ۰٫۶۷۶۸  (بهتر از v1)
+  // یعنی نتیجه‌ی «ویژگیِ جدید کمکی نکرد» کاملاً غلط ولی کاملاً قابلِ‌باور
+  // بود. هیچ خطایی هم تولید نمی‌شد.
+  //
+  // با توقفِ مبتنی بر همگرایی، دفعه‌ی بعد که کسی ویژگی اضافه کند این تله
+  // دوباره سراغش نمی‌آید؛ و چون زودتر می‌ایستد، بردارِ سبک هزینه‌ی بیشتری
+  // هم نمی‌دهد (v1 هنوز حدودِ همان ۸۰۰ تکرار تمام می‌شود).
   for (let it = 0; it < iterations; it++) {
     const grad = new Array(d).fill(0);
     for (let i = 0; i < n; i++) {
@@ -64,10 +99,15 @@ export function trainLogisticRegression(
       const err = p - y[i];
       for (let j = 0; j < d; j++) grad[j] += err * X[i][j];
     }
+    let maxStep = 0;
     for (let j = 0; j < d; j++) {
       const reg = j === 0 ? 0 : l2 * w[j];
-      w[j] -= (learningRate / n) * (grad[j] + reg);
+      const step = (learningRate / n) * (grad[j] + reg);
+      w[j] -= step;
+      const abs = Math.abs(step);
+      if (abs > maxStep) maxStep = abs;
     }
+    if (maxStep < tolerance) break;
   }
   return w;
 }
@@ -97,6 +137,110 @@ export function brierScore(predictions: readonly number[], labels: readonly numb
  * مقاوم‌تر است و مستقیماً به واحدِ خودِ داده (تعداد رزرو/کاور) قابلِ‌تفسیر
  * می‌ماند — برخلافِ RMSE که خطا را به توانِ دو می‌برد.
  */
+/**
+ * AUC-ROC — قدرتِ **تفکیکِ** مدل، با روشِ رتبه‌ای (Mann–Whitney U).
+ *
+ * ⚠️ چرا Brier کافی نیست و این اضافه شد: Brier دو چیزِ متفاوت را با هم قاطی
+ * می‌کند — کالیبراسیون (آیا عددِ ۰٫۳ واقعاً یعنی ۳۰٪؟) و تفکیک (آیا
+ * پرریسک‌ها را از کم‌ریسک‌ها جدا می‌کند؟). یک مدل که به **همه** میانگینِ
+ * نرخِ no-show را بدهد، Brierِ نسبتاً خوبی می‌گیرد ولی عملاً بی‌فایده است:
+ * AUCش دقیقاً ۰٫۵ است.
+ *
+ * و سؤالِ عملیاتیِ واقعیِ رستوران‌دار همین تفکیک است: «امشب فقط وقتِ تماس با
+ * ۱۰ مهمان را دارم — آیا این ۱۰ تا درست‌اند؟» این را فقط AUC جواب می‌دهد.
+ *
+ * روشِ رتبه‌ای عمداً به‌جای شمارشِ زوجی: با n نمونه، زوجی O(n²) است و روی
+ * چند هزار رزرو کند می‌شود؛ رتبه‌ای O(n log n) است و با هم‌رتبه‌ها (ties)
+ * هم درست رفتار می‌کند (رتبه‌ی میانگین).
+ *
+ * @returns AUC در [۰،۱]، یا `null` اگر همه‌ی برچسب‌ها یک‌کلاسه باشند
+ *   (آنجا AUC **تعریف‌نشده** است، نه صفر — قاعده‌ی ML_CONTRACT).
+ */
+export function rocAuc(
+  predictions: readonly number[],
+  labels: readonly number[],
+): number | null {
+  if (predictions.length !== labels.length) {
+    throw new Error('rocAuc: طولِ پیش‌بینی و برچسب یکی نیست');
+  }
+  const n = predictions.length;
+  if (n === 0) return null;
+
+  const pos = labels.reduce((s, y) => s + (y === 1 ? 1 : 0), 0);
+  const neg = n - pos;
+  // تک‌کلاسه ⇒ تفکیک بی‌معناست. `null` یعنی «نمی‌دانیم»، نه «بد».
+  if (pos === 0 || neg === 0) return null;
+
+  const idx = Array.from({ length: n }, (_, i) => i)
+    .sort((a, b) => predictions[a] - predictions[b]);
+
+  // رتبه‌ی میانگین برای هم‌رتبه‌ها — بدونِ این، مدلی که به همه عددِ یکسان
+  // می‌دهد AUCِ ۱ یا ۰ می‌گیرد به‌جای ۰٫۵.
+  const rank = new Array<number>(n);
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    while (j + 1 < n && predictions[idx[j + 1]] === predictions[idx[i]]) j++;
+    const avg = (i + j) / 2 + 1;         // رتبه‌ها از ۱ شروع می‌شوند
+    for (let k = i; k <= j; k++) rank[idx[k]] = avg;
+    i = j + 1;
+  }
+
+  let sumRankPos = 0;
+  for (let k = 0; k < n; k++) if (labels[k] === 1) sumRankPos += rank[k];
+
+  return (sumRankPos - (pos * (pos + 1)) / 2) / (pos * neg);
+}
+
+/** یک سطلِ منحنیِ کالیبراسیون. */
+export interface CalibrationBucket {
+  /** مرزِ پایین و بالای احتمالِ پیش‌بینی‌شده. */
+  from: number;
+  to: number;
+  /** تعدادِ نمونه در این سطل. */
+  n: number;
+  /** میانگینِ احتمالِ پیش‌بینی‌شده. */
+  predicted: number;
+  /** نرخِ واقعیِ رخداد در همین سطل. */
+  observed: number;
+}
+
+/**
+ * منحنیِ کالیبراسیون — «وقتی مدل می‌گوید ۳۰٪، واقعاً ۳۰٪ رخ می‌دهد؟»
+ *
+ * چرا جدا از Brier: Brier یک عددِ خلاصه است و نمی‌گوید **کجا** خطا دارد.
+ * مدلی که ریسکِ بالا را دستِ‌بالا و ریسکِ پایین را دستِ‌پایین می‌زند
+ * می‌تواند Brierِ قابلِ‌قبولی داشته باشد، ولی همان اریبی یعنی رستوران‌دار
+ * روی «۸۰٪ خطر» بیش‌ازحد واکنش نشان می‌دهد. سطل‌بندی این را نشان می‌دهد.
+ *
+ * سطل‌های خالی حذف می‌شوند — گزارشِ `observed: 0` برای سطلی که هیچ نمونه‌ای
+ * ندارد یعنی ادعای اندازه‌گیری‌نشده (ML_CONTRACT).
+ */
+export function calibrationCurve(
+  predictions: readonly number[],
+  labels: readonly number[],
+  buckets = 10,
+): CalibrationBucket[] {
+  if (predictions.length !== labels.length) {
+    throw new Error('calibrationCurve: طولِ پیش‌بینی و برچسب یکی نیست');
+  }
+  if (buckets < 2) throw new Error('calibrationCurve: حداقل ۲ سطل لازم است');
+
+  const acc = Array.from({ length: buckets }, () => ({ n: 0, sumP: 0, sumY: 0 }));
+  for (let i = 0; i < predictions.length; i++) {
+    const p = Math.min(Math.max(predictions[i], 0), 1);
+    const b = Math.min(Math.floor(p * buckets), buckets - 1);
+    acc[b].n++; acc[b].sumP += p; acc[b].sumY += labels[i] === 1 ? 1 : 0;
+  }
+  return acc.flatMap((a, b) => a.n === 0 ? [] : [{
+    from: b / buckets,
+    to: (b + 1) / buckets,
+    n: a.n,
+    predicted: a.sumP / a.n,
+    observed: a.sumY / a.n,
+  }]);
+}
+
 export function meanAbsoluteError(predictions: readonly number[], actuals: readonly number[]): number {
   if (predictions.length === 0) return Infinity; // بدترینِ ممکن — نباید در عمل رخ دهد
   let sum = 0;
@@ -188,6 +332,17 @@ export type RawFeatureInput = {
   leadMinutes: number;
   partySize: number;
   source: string;
+  /**
+   * لحظه‌ی شروعِ اسلات — برای ویژگی‌های زمانی (ساعتِ روز، آخرِ هفته) در
+   * بردارِ v2.
+   *
+   * ⚠️ اختیاری است و این عمدی‌ست: `computeStaticScoreFromFeatures`
+   * (heuristic) هرگز از آن استفاده نمی‌کند و امضایش نباید بشکند. مسیرهایی
+   * که به مدلِ یادگرفته می‌رسند همیشه پُرش می‌کنند؛ نبودش در
+   * `buildFeatureVector` به‌صورتِ «سیگنالِ زمانی نداریم» رفتار می‌شود، نه
+   * یک ساعتِ ساختگی.
+   */
+  slotStart?: Date;
 };
 
 /**

@@ -5,6 +5,8 @@ import { errorResponse } from '@/lib/errors';
 import { parseQuery, zUuid, z } from '@/lib/schemas';
 import { visitedStatusList } from '@/lib/reservation-status';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════
 //  GET /api/v1/restaurants — لیست رستوران‌ها
 //  بهینه‌شده برای ۱۰۰هزار رستوران و ۵۰۰ req/s:
@@ -22,7 +24,7 @@ const querySchema = z.object({
   cursor: zUuid.optional(),
 });
 
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     const { vibe, city, cuisine, cursor } = parseQuery(req, querySchema);
 
@@ -62,7 +64,14 @@ export async function GET(req: Request) {
           priceBand: true, cbBasePct: true, latitude: true, longitude: true,
           cancellationPolicy: { select: { depositRequired: true, freeCancelHours: true, autoConfirm: true } },
         },
-        orderBy: { id: 'desc' },           // ترتیب پایدار برای cursor
+        // ⚠️ رتبه‌بندیِ واقعی (مهاجرتِ ۰۷۳). تا امروز اینجا `{ id: 'desc' }`
+        // بود — پایدار (که برایِ cursor لازم است) ولی `id` یک UUID است، پس
+        // ترتیبِ فیدی که اپِ مشتری «🔥 محبوب امشب» صدایش می‌زند عملاً تصادفی
+        // بود. سیگنالِ واقعی از قبل پایین‌تر در همین route حساب می‌شد و روی
+        // هر کارت هم نشان داده می‌شد (`visits7d`)، فقط **بعد از** صفحه‌بندی —
+        // پس نمی‌توانست مبنایِ مرتب‌سازی باشد.
+        // `id` به‌عنوانِ شکنندهٔ تساوی می‌ماند تا ترتیب قطعی و cursor سالم بماند.
+        orderBy: [{ visits7d: 'desc' }, { id: 'desc' }],
         take: PAGE_SIZE + 1,                // یکی بیشتر بگیر تا بفهمی صفحه‌ی بعد هست
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });
@@ -137,3 +146,7 @@ export async function GET(req: Request) {
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/restaurants', GET_impl);

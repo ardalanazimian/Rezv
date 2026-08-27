@@ -231,6 +231,19 @@ const API = {
   chatSend(id, body){ return this.post('/restaurant/chats/'+id, { body }); },
   delete(path){ return this.request(path, { method: 'DELETE' }); },
   // ── احراز هویت کارمند ──
+  // ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
+  // مسیرِ اصلی. شکلِ پاسخ دقیقاً همانِ مسیرِ OTP است، پس مدیریتِ توکن و
+  // مجوزها هم باید **عیناً** همان باشد — هر واگرایی اینجا یعنی کاربری که
+  // با رمز وارد شده منویِ محدودنشده می‌بیند و بعد ۴۰۳ می‌گیرد.
+  async staffLogin(username, password){
+    const res = await this.post('/auth/staff/login', { username, password });
+    if (res.ok && res.data?.access) {
+      this.setToken(res.data.access); this.setRefresh(res.data.refresh);
+      this.setPermissions(res.data.staff?.permissions || null);
+    }
+    return res;
+  },
+  async changeStaffPassword(payload){ return this.post('/restaurant/staff/password', payload); },
   async requestStaffOtp(phone){ return this.post('/auth/staff/request', { phone }); },
   async verifyStaffOtp(phone, code){
     const res = await this.post('/auth/staff/verify', { phone, code });
@@ -337,6 +350,22 @@ const API = {
   menuCreate(body){ return this.post('/restaurant/menu', body); },
   menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
   menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  // ── دسته‌های رابطه‌ایِ منو + مرتب‌سازیِ دسته‌ای (SPEC-A فاز ۱ / ۰۷۷) ──
+  menuCategories(){ return this.get('/restaurant/menu/categories'); },
+  menuCategoryCreate(body){ return this.post('/restaurant/menu/categories', body); },
+  menuCategoryUpdate(id, body){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuCategoryDelete(id){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'DELETE' }); },
+  menuReorder(body){ return this.request('/restaurant/menu/reorder', { method:'PATCH', body: JSON.stringify(body) }); },
+  // ── فاز ۲ (۰۷۸): افزودنی‌ها + برچسب‌ها ──
+  menuModifiers(itemId){ return this.get('/restaurant/menu/'+encodeURIComponent(itemId)+'/modifiers'); },
+  menuModifierGroupCreate(itemId, body){ return this.post('/restaurant/menu/'+encodeURIComponent(itemId)+'/modifiers', body); },
+  menuModifierGroupUpdate(id, body){ return this.request('/restaurant/menu/modifier-groups/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuModifierGroupDelete(id){ return this.request('/restaurant/menu/modifier-groups/'+encodeURIComponent(id), { method:'DELETE' }); },
+  // POST رویِ خودِ گروه = افزودنِ گزینه (قراردادِ route)
+  menuModifierOptionCreate(groupId, body){ return this.post('/restaurant/menu/modifier-groups/'+encodeURIComponent(groupId), body); },
+  menuModifierOptionUpdate(id, body){ return this.request('/restaurant/menu/modifier-options/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuModifierOptionDelete(id){ return this.request('/restaurant/menu/modifier-options/'+encodeURIComponent(id), { method:'DELETE' }); },
+  menuTagsSave(itemId, tags){ return this.request('/restaurant/menu/'+encodeURIComponent(itemId)+'/tags', { method:'PUT', body: JSON.stringify({ tags }) }); },
   /**
    * آپلود/جایگزینیِ عکسِ آیتمِ منو.
    * multipart است، پس نمی‌تواند از `post()` (که JSON می‌فرستد) عبور کند.

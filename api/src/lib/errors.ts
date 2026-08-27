@@ -10,12 +10,23 @@ export class ApiError extends Error {
 export const Err = {
   otpInvalid:   () => new ApiError('OTP_INVALID', 'کد تأیید نامعتبر یا منقضی است', 401),
   unauthorized: () => new ApiError('UNAUTHORIZED', 'ابتدا وارد شوید', 401),
+  // ورودِ نام‌کاربری/رمز (مهاجرتِ ۰۷۴). کدِ تازه لازم بود چون هیچ‌کدام از
+  // موجودها این معنی را ندارند: `UNAUTHORIZED` یعنی «توکن نداری» (کلاینت
+  // باید به صفحه‌ی ورود برود) و `OTP_INVALID` مالِ کدِ یک‌بارمصرف است.
+  // ⚠️ پیام عمداً **یکسان** برای «کاربر نیست»، «رمز غلط» و «رمز ست نشده»
+  // است — تفکیکشان یک اوراکلِ شمارشِ حساب می‌سازد.
+  invalidCredentials: () => new ApiError('INVALID_CREDENTIALS', 'نام کاربری یا رمز عبور اشتباه است', 401),
   forbidden:    (msg='دسترسی به این رستوران ندارید') => new ApiError('FORBIDDEN_TENANT', msg, 403),
   notFound:     (what='منبع') => new ApiError('NOT_FOUND', `${what} پیدا نشد`, 404),
   tableConflict:() => new ApiError('TABLE_CONFLICT', 'این میز در این بازه رزرو شده است', 409),
   lockTimeout:  () => new ApiError('SLOT_LOCK_TIMEOUT', 'این بازه در حال رزرو توسط کاربر دیگری است؛ دوباره تلاش کنید', 423),
   validation:   (msg: string, details: object = {}) => new ApiError('VALIDATION', msg, 422, details),
+  // SPEC-B (C9): تعارضِ منبع با details.reason ماشین‌خوان — 'duplicate_owner_phone' | 'slug_unavailable' | 'branch_limit_reached' | …
+  conflict:     (reason: string, msg = 'تعارض با وضعیتِ موجود') => new ApiError('CONFLICT', msg, 409, { reason }),
   rateLimited:  (retryAfterSec?: number) => new ApiError('RATE_LIMITED', 'تعداد درخواست بیش از حد مجاز', 429, retryAfterSec ? { retryAfterSec } : {}),
+  // وابستگیِ بیرونیِ لازم در دسترس نیست. عمداً ۵۰۳ و نه ۵۰۰: این خرابیِ ما
+  // نیست، ناتوانیِ **موقتِ** سرویس است و کلاینت باید بداند دوباره تلاش کند.
+  serviceUnavailable: (message: string) => new ApiError('SERVICE_UNAVAILABLE', message, 503),
 
   // ── خطاهای مشخص موتور رزرو (نیاز ۱۵: پیام بامعنی) ──
   restaurantClosed: () => new ApiError('RESTAURANT_CLOSED', 'رستوران در این زمان بسته است', 422),

@@ -1,8 +1,12 @@
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { db } from './db';
-import { redis } from './redis';
+import { enforceRateLimit, RULES } from './ratelimit';
 import { Err } from './errors';
-import { enqueueSms } from './sms';
+import { enqueueSms, smsTransportReady } from './sms';
+import { createLogger } from './logger';
+import { metrics } from './metrics';
+
+const log = createLogger('otp');
 
 const hash = (s: string) => createHash('sha256').update(s + process.env.JWT_SECRET).digest('hex');
 
@@ -24,14 +28,95 @@ export function normalizePhone(raw: string): string {
   throw Err.validation('شماره موبایل معتبر نیست (مثال: 09123456789)');
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  «شیشه را بشکن» — ورودِ اضطراریِ **یک** شماره بدونِ پیامک
+//
+//  ⚠️ چرا این وجود دارد و چرا این‌شکلی:
+//  تنها راهِ ورود به هر سه اپ OTPِ پیامکی است، و `OTP_DEV_MODE` در production
+//  عمداً استثنا پرتاب می‌کند. تا وقتی پنلِ کاوه‌نگار گرفته نشده، **هیچ‌کس**
+//  نمی‌تواند وارد شود — حتی خودِ مالکِ محصول. این مسیر همان یک قفل را برای
+//  یک شماره‌ی مشخص باز می‌کند تا پنل قابلِ بازدید باشد.
+//
+//  ── مرزِ دقیقِ کاری که می‌کند و **نمی‌کند** ──
+//  فقط **تحویلِ کد** را دور می‌زند، نه **اجازه‌ی دسترسی** را. تمامِ لایه‌های
+//  مجوز سرِ جایشان می‌مانند: `findPlatformAdmin` هنوز باید شماره را به‌عنوانِ
+//  مدیرِ پلتفرمِ فعال در دیتابیس پیدا کند، `verifiedStaffAuth` هنوز نقش و
+//  فعال‌بودن را از DB می‌خواند، و ریت‌لیمیت‌ها دست‌نخورده‌اند. کد هم مثلِ همیشه
+//  دو دقیقه اعتبار دارد و ۵ تلاشِ ناموفق باطلش می‌کند.
+//
+//  ── چهار گاردی که این را از «درِ پشتی» جدا می‌کند ──
+//  ۱. با **دو** متغیرِ محیطی فعال می‌شود؛ نبودِ هرکدام یعنی این قابلیت اصلاً
+//     وجود ندارد. هیچ مقداری در سورس هاردکد نیست — نه شماره، نه کد.
+//  ۲. فقط و فقط روی همان یک شماره اثر دارد (بعد از نرمال‌سازی، مقایسه‌ی دقیق).
+//  ۳. هر استفاده **بلند** است: لاگِ `error` + متریکِ قابلِ‌آلارم. اگر این عدد
+//     بالا برود یعنی یا کسی دارد سوءاستفاده می‌کند یا یادتان رفته خاموشش کنید.
+//  ۴. در بوت هم یک‌بار هشدار می‌دهد که فعال است.
+//
+//  ⚠️ **کد باید دقیقاً ۶ رقم باشد — و این اجباری است، نه توصیه.**
+//  با کدِ ۴ رقمی، امنیتِ واقعیِ این مسیر «مخفی‌بودنِ شماره» می‌شد نه خودِ کد:
+//  فضای ۱۰٬۰۰۰تایی در برابرِ ریت‌لیمیتِ ۸-در-۱۰-دقیقه یعنی حدودِ ۹ روز برای
+//  پویشِ کامل از **یک** IP — و مهاجم IP عوض می‌کند. با ۶ رقم فضا ۱۰۰ برابر
+//  می‌شود (۹۰۰٬۰۰۰ با شروع از ۱) و همان حمله عملاً بی‌معنا می‌شود.
+//  چون هزینه‌ی این تغییر برای صاحبِ شماره صفر است، کدِ کوتاه‌تر اصلاً پذیرفته
+//  نمی‌شود — پیکربندیِ ضعیف باید **رد** شود، نه اینکه با هشدار قبول شود.
+//
+//  با این حال **باید پیش از لانچِ عمومی برداشته شود** — در چک‌لیستِ انتشار
+//  ثبت شده و متریکش باید صفر بماند.
+const BREAK_GLASS_CODE_LEN = 6;
+
+let breakGlassWarned = false;
+
+/** اگر این شماره همان شماره‌ی اضطراری است، کدِ ثابتش را بده؛ وگرنه null. */
+function breakGlassCodeFor(normalizedPhone: string): string | null {
+  const rawPhone = process.env.BREAK_GLASS_PHONE;
+  const code = process.env.BREAK_GLASS_CODE;
+  // گاردِ ۱ — هر دو متغیر لازم است.
+  // ⚠️ صادقانه، طبقِ جهش‌آزمایی: این خط **افزونه** است. با تبدیلش به
+  // `&&` هیچ تستی قرمز نشد (۰ از ۱۲)، چون نیمه‌پیکربندی را در هر حالت
+  // گاردهای بعدی می‌گیرند: بدونِ `CODE` چکِ ۶ رقم رد می‌کند و بدونِ
+  // `PHONE` نرمال‌سازی throw می‌کند. پس مرزِ امنیتی اینجا نیست —
+  // گاردهای ۲ و ۳ هستند. این خط فقط مسیرِ پیش‌فرضِ مخزن (هیچ‌کدام ست
+  // نشده) را **ساکت** نگه می‌دارد تا هر درخواستِ OTP یک `log.error`
+  // بی‌مورد تولید نکند. اگر روزی حذفش کردی، امنیت کم نمی‌شود ولی لاگ پر
+  // می‌شود.
+  if (!rawPhone || !code) return null;
+
+  if (!new RegExp(`^\\d{${BREAK_GLASS_CODE_LEN}}$`).test(code)) {
+    // پیکربندیِ غلط نباید بی‌صدا بماند، و نباید هم نیمه‌فعال شود.
+    log.error(`BREAK_GLASS_CODE باید دقیقاً ${BREAK_GLASS_CODE_LEN} رقم باشد — قابلیت غیرفعال ماند`);
+    return null;
+  }
+
+  let target: string;
+  try { target = normalizePhone(rawPhone); }
+  catch { log.error('BREAK_GLASS_PHONE شماره‌ی معتبری نیست — قابلیت غیرفعال ماند'); return null; }
+
+  if (target !== normalizedPhone) return null;      // گاردِ ۲ — فقط همان یک شماره
+
+  if (!breakGlassWarned) {
+    breakGlassWarned = true;
+    log.error('⚠️ ورودِ اضطراری (break-glass) فعال است — پیش از لانچِ عمومی خاموشش کنید');
+  }
+  return code;
+}
+
 export async function requestOtp(rawPhone: string): Promise<{ devCode?: string }> {
   const phone = normalizePhone(rawPhone);
-  // rate limit: ۳ درخواست در ۱۰ دقیقه per phone
-  const rl = await redis.incr(`otp:rl:${phone}`);
-  if (rl === 1) await redis.expire(`otp:rl:${phone}`, 600);
-  if (rl > 3) throw Err.rateLimited();
+  // سقفِ per-phone — حالا از همان `RULES` مشترک، نه پیاده‌سازیِ دستیِ دوم.
+  // ⚠️ تا امروز اینجا یک incr/expireِ دست‌ساز بود که **دقیقاً** همان قاعده‌ی
+  // `RULES.otpPerPhone` (۳ در ۱۰ دقیقه) را تکرار می‌کرد. دو پیاده‌سازیِ موازی
+  // برای یک قاعده یعنی هر تغییرِ آینده باید در دو جا انجام شود — و یکی‌شان
+  // فراموش می‌شود. ضمناً نسخه‌ی دستی از `rateLimitWithFallback` رد نمی‌شد،
+  // پس با Redisِ خاموش بی‌صدا **باز** می‌شد (fail-open) در حالی که مسیرِ
+  // مشترک fallbackِ حافظه‌ای دارد.
+  await enforceRateLimit(phone, RULES.otpPerPhone);
 
-  const code = String(randomInt(100000, 1000000)); // ۶ رقمی (۹۰۰هزار فضا — مقاوم‌تر در برابر brute-force)
+  // ورودِ اضطراری — رجوع کن به توضیحِ کاملِ `breakGlassCodeFor` بالا.
+  // ریت‌لیمیتِ per-phone عمداً **بالاتر** از این خط است تا این مسیر هم مثلِ
+  // بقیه محدود بماند.
+  const breakGlass = breakGlassCodeFor(phone);
+
+  const code = breakGlass ?? String(randomInt(100000, 1000000)); // ۶ رقمی (۹۰۰هزار فضا — مقاوم‌تر در برابر brute-force)
   await db.otpCode.upsert({
     where: { phone },
     create: { phone, codeHash: hash(code), expiresAt: new Date(Date.now() + 2 * 60_000) },
@@ -40,6 +125,24 @@ export async function requestOtp(rawPhone: string): Promise<{ devCode?: string }
   // حالت dev: کد روی صفحه برمی‌گردد، پس نیازی به پیامک (و کاوه‌نگار) نیست.
   // این باعث می‌شود لاگین بدون هیچ وابستگی خارجی کار کند — برای تست قبل از راه‌اندازی SMS.
   // production حتماً پیامک می‌فرستد و کد را برنمی‌گرداند.
+  // ⚠️ گاردِ fail-closed (یافته‌ی ۲۰۲۶-۰۸-۲۵): اگر ترانسپورتِ پیامک آماده
+  // نباشد، **قبل از** ادعای موفقیت شکست بخور. بدونِ این، مسیر ۲۰۴ِ موفق
+  // برمی‌گرداند در حالی که هیچ پیامکی نرفته و — چون OTP_DEV_MODE در
+  // production استثنا می‌دهد — هیچ راهِ دیگری هم برای گرفتنِ کد نیست.
+  // نتیجه: کلِ محصول غیرقابلِ‌استفاده، بدونِ هیچ خطای قابلِ‌مشاهده‌ای.
+  // همان الگویِ ALLOWED_ORIGINS در middleware: بسته، نه بازِ خاموش.
+  if (breakGlass) {
+    // گاردِ ۳ — هر استفاده بلند است. سطحِ `error` عمدی است: این خط نباید در
+    // نویزِ info گم شود، و متریکش باید آلارم داشته باشد.
+    log.error('ورودِ اضطراری استفاده شد — پیامکی ارسال نشد', { phone: phone.slice(0, 6) + '***' });
+    metrics.breakGlassOtp.inc();
+    return {};   // کد در پاسخ برنمی‌گردد؛ صاحبِ شماره از قبل می‌داندش.
+  }
+
+  if (process.env.NODE_ENV === 'production' && !smsTransportReady()) {
+    throw Err.serviceUnavailable('ارسال پیامک موقتاً در دسترس نیست؛ کمی بعد دوباره تلاش کنید');
+  }
+
   const devMode = process.env.OTP_DEV_MODE === 'true';
   // ⚠️ فیکسِ حسابرسیِ ۲۰۲۶-۰۷-۱۹ (FINAL-PRODUCTION-AUDIT.md بخشِ ۳): قبلاً اینجا فقط
   // console.warn بود و چیزی جلوی OTP_DEV_MODE=true در production را نمی‌گرفت — یعنی

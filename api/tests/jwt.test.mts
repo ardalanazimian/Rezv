@@ -1,5 +1,6 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -98,16 +99,20 @@ describe('accessFromRefresh — تبدیل هم‌نوع برای صدور acces
 
 describe('authFromRequest', () => {
   test('بدون هدر Authorization رد می‌شود', () => {
-    const req = new Request('https://x.test/api');
+    const req = new Request('https://x.test/api', { headers: { 'x-real-ip': testIp() } });
     assert.throws(() => authFromRequest(req));
   });
   test('هدر بدون Bearer رد می‌شود', () => {
-    const req = new Request('https://x.test/api', { headers: { authorization: 'Basic xxx' } });
+    const req = new Request('https://x.test/api', {
+      headers: { authorization: 'Basic xxx', 'x-real-ip': testIp() },
+    });
     assert.throws(() => authFromRequest(req));
   });
   test('هدر Bearer معتبر پارس می‌شود', () => {
     const token = signAccess({ sub: 'u-1', kind: 'customer' });
-    const req = new Request('https://x.test/api', { headers: { authorization: `Bearer ${token}` } });
+    const req = new Request('https://x.test/api', {
+      headers: { authorization: `Bearer ${token}`, 'x-real-ip': testIp() },
+    });
     const payload = authFromRequest(req);
     assert.equal(payload.sub, 'u-1');
   });

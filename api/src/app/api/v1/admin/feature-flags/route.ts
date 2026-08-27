@@ -5,6 +5,8 @@ import { FEATURE_FLAG_KEYS, getAllFeatureFlags, setFeatureFlag } from '@/lib/fea
 import { errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const bodySchema = z.object({
   flags: z.array(z.object({
     key: z.enum(FEATURE_FLAG_KEYS),
@@ -13,7 +15,7 @@ const bodySchema = z.object({
 });
 
 /** GET /api/v1/admin/feature-flags — وضعیتِ فعلیِ همه‌ی سوییچ‌ها (فقط ادمینِ پلتفرم) */
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     await requireAdmin(req);
@@ -23,7 +25,7 @@ export async function GET(req: Request) {
 }
 
 /** PATCH /api/v1/admin/feature-flags — تغییرِ یک یا چند سوییچ · بدنه: { flags: [{key, enabled}] } */
-export async function PATCH(req: Request) {
+async function PATCH_impl(req: Request) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -33,3 +35,8 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: true, flags: current });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/admin/feature-flags', GET_impl);
+export const PATCH = withApiMetrics('/api/v1/admin/feature-flags', PATCH_impl);

@@ -22,13 +22,39 @@ const SAFE_DEFAULTS: Record<PermissionKey, boolean> = {
 
 export async function requirePermission(auth: AccessPayload, key: PermissionKey): Promise<void> {
   if (auth.kind !== 'staff') throw Err.forbidden();
-  if (auth.role === 'owner' || auth.role === 'manager') return; // دسترسی کامل، بدون تغییر رفتار قبلی
 
-  // خودِ کارمندِ لاگین‌کرده (auth.sub = staff.id) — نه یک کارمندِ دلخواه از همان تنانت.
-  // باگ: findFirst فقط با tenantId «اولین» staff را می‌گرفت، پس مجوزهای یک نفر
-  // به‌اشتباه به همه‌ی کارکنانِ تنانت اعمال می‌شد (privilege escalation یا denial اشتباه).
-  const staff = await db.staff.findFirst({ where: { id: auth.sub, tenantId: auth.tenantId }, select: { id: true } });
-  if (!staff) throw Err.forbidden();
+  // ⚠️ سخت‌شده (۲۰۲۶-۰۸-۲۵) — نقش از **دیتابیس** خوانده می‌شود، نه از توکن.
+  //
+  // تا امروز خطِ اولِ این تابع `if (auth.role === 'owner' || 'manager') return`
+  // بود و `auth.role` مستقیم از JWT می‌آمد. توکن عکسِ لحظه‌ی صدور است و
+  // ۱۵ دقیقه عمر دارد و هیچ لیستِ ابطالی ندارد؛ یعنی هر تنزلِ نقش تا ۱۵ دقیقه
+  // بی‌اثر می‌ماند — روی **همه‌ی** روت‌هایِ `withRestaurantAuth`، چون آن wrapper
+  // برخلافِ خواهرش `withStaffAuth` نقش را تازه نمی‌کند
+  // (`resolveStaffRestaurant` فقط `restaurantId`/`tenantId`/`isActive`
+  // می‌خواند — نه `role`).
+  //
+  // ⚠️ و صادقانه دربارهٔ شدت: **امروز مسیرِ APIی برای تغییرِ نقش وجود ندارد**
+  // (`PATCH /restaurant/staff` فقط name/is_active/restaurant_id/permissions را
+  // می‌پذیرد — بررسی شد)، پس این یک حفره‌ی زنده و قابلِ‌سوءاستفاده نبود؛ یک
+  // فرضِ نانوشته بود که با اولین «تغییرِ نقش» — چه از API، چه دستی در DB —
+  // بی‌صدا به حفره تبدیل می‌شد. همان الگویی که برای `isActive` در
+  // ۲۰۲۶-۰۸-۲۰ و برای `tenantId` بسته شد.
+  //
+  // هزینه‌اش یک کوئریِ اضافه روی کلیدِ اصلی برای مسیرِ owner/manager است
+  // (قبلاً صفر کوئری داشت). اندازه‌گیری‌شده روی Postgresِ واقعی، نه تخمین —
+  // عدد در پیامِ کامیت. `isActive` هم همین‌جا دوباره چک می‌شود تا این تابع
+  // به‌تنهایی هم درست باشد، نه فقط وقتی از دلِ `withRestaurantAuth` می‌آید.
+  const staff = await db.staff.findFirst({
+    // خودِ کارمندِ لاگین‌کرده (auth.sub = staff.id) — نه یک کارمندِ دلخواه از
+    // همان تنانت. باگِ قدیمی: findFirst فقط با tenantId «اولین» staff را
+    // می‌گرفت، پس مجوزهای یک نفر به همه‌ی کارکنانِ تنانت اعمال می‌شد.
+    where: { id: auth.sub, tenantId: auth.tenantId },
+    select: { id: true, role: true, isActive: true },
+  });
+  if (!staff || !staff.isActive) throw Err.forbidden();
+
+  if (staff.role === 'owner' || staff.role === 'manager') return; // دسترسی کامل
+
   const perm = await db.staffPermission.findUnique({ where: { staffId: staff.id } });
   const allowed = perm ? perm[key] : SAFE_DEFAULTS[key];
   if (!allowed) throw Err.forbidden('دسترسی شما برای این بخش محدود شده است');

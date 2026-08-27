@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -21,7 +22,6 @@ process.env.NEXT_PUBLIC_APP_URL = 'https://app.example.invalid';
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db');
-const { redis } = await import('../src/lib/redis');
 const { signAccess } = await import('../src/lib/jwt');
 const tablesRoute = await import('../src/app/api/v1/restaurant/tables/route');
 const tableQrRoute = await import('../src/app/api/v1/restaurant/tables/[id]/qr/route');
@@ -38,20 +38,25 @@ const routeArg = (id: string) => ({ params: Promise.resolve({ id }) });
 const jsonReq = (token: string, body?: unknown, method = 'POST') =>
   new Request('http://x/api', {
     method,
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
 const getReq = (token: string, qs = '') =>
-  new Request(`http://x/api${qs}`, { headers: { authorization: `Bearer ${token}` } });
+  new Request(`http://x/api${qs}`, {
+    headers: { authorization: `Bearer ${token}`, 'x-real-ip': testIp() },
+  });
 
-/** سهمیه‌ی rate-limit بینِ فایل‌هایِ رانر مشترک است (کلید بر پایه‌ی IP). */
-async function clearRateLimit() {
-  for (const p of ['rl:auth:*', 'rl:srch:*']) {
-    const keys = await redis.keys(p);
-    if (keys.length) await redis.del(...keys);
-  }
-}
+/*
+ * ⚠️ اینجا قبلاً `clearRateLimit()` بود که `rl:auth:*`, `rl:srch:*` و
+ * `rl:chkin:*` را **سراسری** پاک می‌کرد، چون IPِ هر `new Request()`ِ بی‌هدر
+ * `unknown` است و سهمیه بینِ فایل‌های رانر مشترک می‌شد. آن پاک‌سازی سطلِ
+ * فایل‌های دیگر را هم خالی می‌کرد. حالا هر Request با `testIp()` سطلِ جدا دارد.
+ */
 
 async function makeTenant(label: string): Promise<Ctx> {
   const t = await db.tenant.create({ data: { name: `[DEMO] ${label}` }, select: { id: true } });
@@ -75,7 +80,6 @@ async function makeTenant(label: string): Promise<Ctx> {
 }
 
 async function createTable(ctx: Ctx, capacity = 4) {
-  await clearRateLimit();
   const res = await tablesRoute.POST(jsonReq(ctx.token, { number: ++seq + 700, capacity }), { params: Promise.resolve({}) } as never);
   return await res.json() as { id: string; number: number; qr_code: string | null };
 }
@@ -94,31 +98,28 @@ async function makeLiveReservation(ctx: Ctx, tableId: string) {
   });
 }
 
-// [merge ۰۸-۲۴] توکنِ کارمند اجباری شد: /checkin در سخت‌سازیِ P0-2 (خطِ ممیزی)
-// دیگر عمومی نیست — اسکن‌کننده‌ی واقعی دستگاهِ میزبان است، نه اینترنتِ باز.
-// (گاردِ قراردادش: checkin-auth.integration.test.mts). ادعاهای این فایل —
-// ابطالِ واقعیِ کدِ قدیمی و کارکردنِ کدِ نو — دست‌نخورده می‌مانند.
-const scan = (qrCode: string, token: string) =>
+// اسکن دقیقاً همان‌طور که مهمان انجام می‌دهد: بدونِ هیچ توکنی. خودِ کدِ QR
+// اعتبارنامه است (۵۰ بیت آنتروپی) — قراردادِ کاملش در
+// `qr-checkin.integration.test.mts`. ادعاهای این فایل — ابطالِ واقعیِ کدِ
+// قدیمی و کارکردنِ کدِ نو — از این تغییر مستقل‌اند.
+const scan = (qrCode: string) =>
   checkinRoute.POST(new Request('http://x/api/v1/checkin', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
     body: JSON.stringify({ qr_code: qrCode }),
   }));
 
 const regenerate = async (ctx: Ctx, tableId: string) => {
-  await clearRateLimit();
   return tableQrRoute.POST(jsonReq(ctx.token, {}), routeArg(tableId) as never);
 };
 
 before(async () => {
-  await clearRateLimit();
   const s = Date.now().toString(36);
   A = await makeTenant(`${TAG}-a-${s}`);
   B = await makeTenant(`${TAG}-b-${s}`);
 });
 
 after(async () => {
-  await clearRateLimit();
   const rests = [A.restaurantId, B.restaurantId];
   await db.auditLog.deleteMany({ where: { restaurantId: { in: rests } } });
   await db.reservation.deleteMany({ where: { restaurantId: { in: rests } } });
@@ -155,12 +156,12 @@ describe('بازتولیدِ کد', () => {
     await makeLiveReservation(A, table.id);
 
     // پیش از بازتولید، کدِ قدیمی کار می‌کند (کنترلِ مثبت — وگرنه تستِ بعدی بی‌معناست)
-    const before = await scan(oldCode, A.token);
+    const before = await scan(oldCode);
     assert.equal(before.status, 200, 'کدِ اولیه باید قبل از بازتولید کار کند');
 
     await regenerate(A, table.id);
 
-    const after = await scan(oldCode, A.token);
+    const after = await scan(oldCode);
     assert.equal(after.status, 404, 'استیکرِ قدیمی باید از کار افتاده باشد');
   });
 
@@ -171,11 +172,15 @@ describe('بازتولیدِ کد', () => {
     const res = await regenerate(A, table.id);
     const { code } = await res.json() as { code: string };
 
-    const out = await scan(code, A.token);
+    const out = await scan(code);
     assert.equal(out.status, 200);
-    const body = await out.json() as { reservation_code: string | null; status: string };
-    assert.equal(body.reservation_code, resv.code);
+    const body = await out.json() as { reservation_code: string | null; status: string; checked_in: boolean };
+    // موفقیت از `checked_in` + وضعیتِ واقعیِ DB خوانده می‌شود، نه از
+    // `reservation_code` (که فقط به صاحبِ رزرو داده می‌شود).
+    assert.equal(body.checked_in, true);
     assert.equal(body.status, 'seated');
+    const row = await db.reservation.findUnique({ where: { id: resv.id }, select: { status: true } });
+    assert.equal(row?.status, 'seated', 'رزرو واقعاً باید seated شده باشد');
   });
 
   test('بازتولیدِ دوباره کدِ دیگری می‌دهد (هر بار تازه، نه یک‌بار)', async () => {
@@ -208,10 +213,13 @@ describe('گاردها', () => {
   });
 
   test('بدونِ ورود → ۴۰۱', async () => {
-    await clearRateLimit();
     const table = await createTable(A);
     const res = await tableQrRoute.POST(
-      new Request('http://x/api', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }),
+      new Request('http://x/api', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
+        body: '{}',
+      }),
       routeArg(table.id) as never,
     );
     assert.equal(res.status, 401);
@@ -232,7 +240,6 @@ describe('گاردها', () => {
     await db.staffPermission.create({ data: { staffId: weak.id, canManageTables: false } });
     const weakToken = signAccess({ sub: weak.id, kind: 'staff', tenantId: A.tenantId, role: 'staff' });
 
-    await clearRateLimit();
     const res = await tableQrRoute.POST(jsonReq(weakToken, {}), routeArg(table.id) as never);
     assert.equal(res.status, 403);
 
@@ -267,10 +274,8 @@ describe('ردِ ممیزی و بی‌اثریِ GET', () => {
     //    prefetchِ مرورگر یا هر خزنده‌ای می‌توانست استیکرهایِ یک رستوران را
     //    دسته‌جمعی باطل کند.
     const table = await createTable(A);
-    await clearRateLimit();
     const first = await tableQrRoute.GET(getReq(A.token), routeArg(table.id) as never);
     assert.equal(first.status, 200);
-    await clearRateLimit();
     const second = await tableQrRoute.GET(getReq(A.token), routeArg(table.id) as never);
 
     const c1 = decodeURIComponent(first.headers.get('X-Table-Code') ?? '');

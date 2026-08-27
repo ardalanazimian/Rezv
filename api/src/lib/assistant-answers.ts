@@ -1,7 +1,7 @@
 import { db } from './db';
 import { ACTIVE_RESERVATION_STATUSES } from './reservation-status';
 import { getManagerInsights, getWeekdayRanking } from './restaurant-manager';
-import { getDemandForecast } from './demand-forecast';
+import { getDemandForecast, tehranTodayIso } from './demand-forecast';
 import type { AssistantIntent } from './assistant-nlu';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -104,12 +104,34 @@ async function answerUpcomingHighRisk(restaurantId: string): Promise<string> {
 
 async function answerDemandTomorrow(restaurantId: string): Promise<string> {
   const forecast = await getDemandForecast(restaurantId, 1);
-  const tomorrow = forecast?.reservations.points[0]; // h=0 در attachDates یعنی «فردا»، نه امروز
-  if (!tomorrow) {
+  // ⚠️ `points[0]` طبقِ قراردادِ صریحِ buildForecastSeries همیشه **فردا**ست
+  // (مبدأ = lastObservedDay، و گام‌های تا امروز کنار گذاشته می‌شوند). تا
+  // ۲۰۲۶-۰۸-۲۵ این یک فرضِ نانوشته بود و در عمل روزِ دیگری را «فردا»
+  // می‌نامید؛ حالا از خودِ تاریخِ نقطه تأیید می‌شود تا اگر آن قرارداد روزی
+  // شکست، اینجا **سکوت** کند نه اینکه عددِ روزِ اشتباه را با اطمینان بگوید.
+  const tomorrow = forecast?.reservations.points[0];
+  if (!forecast || !tomorrow) {
     return 'هنوز تاریخچه‌ی کافی برای پیش‌بینیِ تقاضا نداریم — این بخش خودش را با گذشتِ زمان کالیبره می‌کند.';
   }
-  const src = forecast!.reservations.source === 'learned' ? 'از رویِ الگویِ یادگرفته‌شده‌ی خودتان' : 'با پیش‌بینیِ فصلیِ ساده';
-  return `پیش‌بینی برای فردا: حدودِ ${fmt(Math.round(tomorrow.predicted))} رزرو (${src}).`;
+  if (tomorrow.date !== tomorrowInTehran()) {
+    return 'پیش‌بینیِ تقاضا فعلاً به‌روز نیست — تا اجرای بعدیِ آموزشِ شبانه عددی برایش نمی‌گویم.';
+  }
+  const src = forecast.reservations.source === 'learned'
+    ? 'از رویِ الگویِ یادگرفته‌شده‌ی خودتان'
+    : 'با پیش‌بینیِ فصلیِ ساده';
+  // کهنگی پنهان نمی‌شود: عدد را می‌گوییم ولی نمی‌گذاریم به‌عنوانِ محاسبه‌ی
+  // امروز فهمیده شود (بندِ ۲۰ — هرگز قطعیتی که نداری نساز).
+  const staleNote = forecast.stale
+    ? ` ⚠️ این عدد از آخرین آموزشِ ${fmt(Math.round(forecast.age_hours))} ساعت پیش می‌آید، نه از داده‌ی امروز.`
+    : '';
+  return `پیش‌بینی برای فردا: حدودِ ${fmt(Math.round(tomorrow.predicted))} رزرو (${src}).${staleNote}`;
+}
+
+/** «فردا» به وقتِ تهران — همان تعریفی که demand-forecast برای تاریخ‌گذاری
+ *  استفاده می‌کند. جدا از UTC نگه داشته می‌شود چون در بازه‌ی ۲۰:۳۰ تا ۲۴:۰۰
+ *  به وقتِ UTC این دو یک روزِ تقویمی فرق دارند. */
+function tomorrowInTehran(): string {
+  return tehranTodayIso(new Date(Date.now() + 86_400_000));
 }
 
 async function answerNoShowModelStatus(restaurantId: string): Promise<string> {

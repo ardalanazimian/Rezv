@@ -219,3 +219,39 @@ describe('عکسِ آیتمِ منو', () => {
     assert.deepEqual(cleared, { imageUrl: null, imageStorageKey: null });
   });
 });
+
+describe('سکشن‌بندی و «ناموجود» (SPEC-A فاز ۱ / ۰۷۷)', () => {
+  test('endpointِ عمومی: فقط دسته‌های فعال در categories؛ آیتمِ ناموجود با فلگ برمی‌گردد', async () => {
+    const { GET } = await import('../src/app/api/v1/restaurants/[slug]/menu/route.ts');
+    const active = await db.menuCategory.create({
+      data: { restaurantId: rA, name: `فعال-${TAG}`, sortOrder: 1 }, select: { id: true },
+    });
+    const hidden = await db.menuCategory.create({
+      data: { restaurantId: rA, name: `مخفی-${TAG}`, isActive: false }, select: { id: true },
+    });
+    await db.menuItem.create({
+      data: { restaurantId: rA, name: `سوپِ ناموجود ${TAG}`, priceToman: 70_000,
+              categoryId: active.id, category: `فعال-${TAG}`, isOutOfStock: true, isActive: true },
+    });
+
+    const res = await GET(
+      new Request('http://x/api', { headers: { 'x-real-ip': `10.91.${Math.floor(Math.random()*250)}.${Math.floor(Math.random()*250)}` } }),
+      { params: Promise.resolve({ slug: `${TAG}-a` }) },
+    );
+    assert.equal(res.status, 200);
+    const d = await res.json();
+
+    const names = d.categories.map((c: { name: string }) => c.name);
+    assert.ok(names.includes(`فعال-${TAG}`), 'دسته‌ی فعال هست');
+    assert.equal(names.includes(`مخفی-${TAG}`), false, 'دسته‌ی غیرفعال در پاسخِ عمومی نیست');
+
+    const soup = d.items.find((m: { name: string }) => m.name === `سوپِ ناموجود ${TAG}`);
+    assert.ok(soup, 'آیتمِ ناموجود حذف نمی‌شود — با برچسب می‌آید');
+    assert.equal(soup.is_out_of_stock, true);
+    assert.equal(soup.category_id, active.id);
+
+    // پاک‌سازیِ محلی (الگوی فایل: هر تست دیتای خودش)
+    await db.menuItem.deleteMany({ where: { restaurantId: rA, name: `سوپِ ناموجود ${TAG}` } });
+    await db.menuCategory.deleteMany({ where: { id: { in: [active.id, hidden.id] } } });
+  });
+});

@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'crypto';
 import { renderMetrics } from '@/lib/metrics';
+import { withApiMetrics } from '@/lib/api-metrics';
 
 // GET /api/metrics — هدف scrape برای Prometheus.
 // خروجی در فرمت متنی استاندارد Prometheus (text/plain; version=0.0.4).
@@ -29,7 +30,7 @@ import { renderMetrics } from '@/lib/metrics';
 // ⚠️ مقایسه‌ی توکن حالا constant-time است. مقایسه‌ی `!==` رشته‌ای زودهنگام
 // خارج می‌شود و طولِ پیشوندِ درست را لو می‌دهد؛ همان قاعده‌ای که برای توکنِ
 // مهمانِ لیستِ انتظار (`tokensEqual`) رعایت شده.
-export async function GET(req: Request) {
+async function GET_impl(req: Request) {
   const required = process.env.METRICS_TOKEN?.trim();
 
   if (!required) {
@@ -74,3 +75,6 @@ function safeEqual(a: string, b: string): boolean {
   if (ba.length !== bb.length) return false;
   return timingSafeEqual(ba, bb);
 }
+
+// گاردِ ساختاریِ observability-coverage: هر route دقیقاً یک wrapperِ شمارنده.
+export const GET = withApiMetrics('/api/metrics', GET_impl);

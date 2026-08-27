@@ -23,6 +23,14 @@ const log = createLogger('audit');
 export type AuditAction =
   | 'auth.login' | 'auth.failure' | 'auth.logout'
   | 'staff.permission_change' | 'staff.login'
+  // ── ورود با رمز (مهاجرتِ ۰۷۴) ──
+  // ساخت/تغییرِ اعتبارنامه‌ی یک بیزنس توسطِ مدیرِ پلتفرم، و تغییرِ رمز توسطِ
+  // خودِ کارمند. هر دو مستقیماً روی «چه کسی می‌تواند وارد شود» اثر دارند و
+  // بدونِ ردِ مکتوب هیچ تحقیقِ امنیتیِ بعدی ممکن نیست.
+  // ⚠️ خودِ رمز هرگز در detail نمی‌رود — فقط نام کاربری و اینکه عوض شد.
+  | 'admin.staff_credentials_set' | 'staff.password_change'
+  // SPEC-B (C12): نامِ canonical از spec — 'admin.business_created' قبلی rename شد (تنها مصرف‌کننده: route ادمین)
+  | 'restaurant.provision' | 'restaurant.invite_resent' | 'restaurant.branch_created' | 'staff.invite_accepted'
   | 'giftcard.redeem' | 'coupon.redeem' | 'coupon.created'
   | 'reservation.cancel' | 'admin.action'
   | 'restaurant.activated' | 'restaurant.deactivated'
@@ -60,6 +68,24 @@ type AuditEntry = {
   success?: boolean;
 };
 
+/**
+ * ماسکِ شماره‌ی موبایل برای رکوردهای audit — `+989123456789` → `+98******6789`.
+ *
+ * چرا: رکوردِ audit در جدولِ `audit_logs` می‌ماند و برای تحقیقِ امنیتی خوانده
+ * می‌شود؛ برایِ «کدام حساب هدفِ حمله است» چهار رقمِ آخر کافی است و شماره‌ی
+ * کاملْ یک شناسه‌ی مستقیمِ فرد است. همان قاعده‌ای که `SENSITIVE_KEYS` در
+ * `lib/logger.ts` روی کلیدِ `phone` اعمال می‌کند (آنجا کاملاً `[REDACTED]`
+ * می‌شود) — اینجا چون کلید `phone_masked` است و مقدار از قبل ماسک شده،
+ * چیزی برای نشت نمی‌ماند.
+ */
+export function maskPhone(raw: string | null | undefined): string | null {
+  if (raw === null || raw === undefined) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (s.length <= 4) return '*'.repeat(s.length);
+  return s.slice(0, 3) + '*'.repeat(Math.max(1, s.length - 7)) + s.slice(-4);
+}
+
 export async function audit(entry: AuditEntry): Promise<void> {
   const traceId = currentTraceId();
   // همیشه لاگ ساختاریافته (برای alerting بلادرنگ حتی اگر DB کند باشد)
@@ -69,7 +95,18 @@ export async function audit(entry: AuditEntry): Promise<void> {
   });
 
   // متریک‌های امنیتی
-  if (entry.action === 'auth.failure') metrics.authFailures.inc();
+  //
+  // ⚠️ تا ۲۰۲۶-۰۸-۲۵ این خط عملاً مرده بود: هیچ routeِ احراز هویتی
+  // `auth.failure` صادر نمی‌کرد (grep روی کلِ src = صفر)، پس
+  // `rezervno_auth_failures_total` همیشه صفر می‌ماند و آلارمِ criticalِ
+  // `AuthFailureSpike` (brute-force) هرگز شلیک نمی‌شد. حالا هر پنج مسیرِ
+  // احراز هویت (otp/staff/admin verify، refresh، logout) صادرش می‌کنند.
+  //
+  // برچسبِ `actor_type` عمداً اضافه شد: «کدام سطح زیرِ حمله است» — پنلِ
+  // کارکنان، ادمینِ پلتفرم یا اپِ مشتری — پاسخِ عملیاتیِ کاملاً متفاوتی
+  // دارد. مقدارها بسته‌اند (۴ حالت)، پس کاردینالیتی امن است و
+  // `sum(rate(...))`ِ آلارمِ فعلی بدونِ تغییر کار می‌کند.
+  if (entry.action === 'auth.failure') metrics.authFailures.inc({ actor_type: entry.actorType ?? 'anonymous' });
 
   // ماندگاری در DB (best-effort)
   try {

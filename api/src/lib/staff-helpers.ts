@@ -128,3 +128,61 @@ export function sinceDays(days: number): Date {
   d.setDate(d.getDate() - days);
   return d;
 }
+
+/**
+ * کارمندِ متناظر با یک شماره، برایِ **مسیرِ ورود** — با ترتیبِ قطعی.
+ *
+ * ⚠️ چرا این تابع وجود دارد و چرا هر دو روتِ ورود باید از همین یکی استفاده
+ * کنند (هایجکِ تنانت، مهاجرتِ ۰۷۲):
+ *
+ * `staff` کلیدِ یکتایِ `(tenant_id, phone)` دارد ⇒ یک شماره می‌تواند در
+ * **چند** تنانت کارمند باشد. `auth/staff/request` و `auth/staff/verify` تا
+ * امروز هرکدام جداگانه `findFirst({ where: { phone } })` می‌زدند — بدونِ
+ * tenant و بدونِ `orderBy`. Postgres در آن حالت هیچ ترتیبی تضمین نمی‌کند و
+ * برنده به ترتیبِ فیزیکیِ ردیف‌ها در heap گره می‌خورد.
+ *
+ * مسیرِ حمله (بازتولیدشده): مهاجم شماره‌ی قربانی را در تنانتِ خودش ثبت
+ * می‌کند (`POST /v1/restaurant/staff` اثباتِ مالکیتِ شماره نمی‌خواهد)، بعد
+ * یک UPDATE معمولیِ خودِ قربانی — مثلاً ویرایشِ نام از پنل — ردیفش را جابه‌جا
+ * می‌کند و از آن لحظه ردیفِ مهاجم برنده می‌شود. قربانی با نقشِ تنزل‌یافته
+ * واردِ تنانتِ مهاجم می‌شود.
+ *
+ * قاعده حالا صریح است: **قدیمی‌ترین ثبت برنده است**؛ `id` فقط شکنندهٔ تساوی
+ * است تا نتیجه قطعی بماند.
+ *
+ * ⚠️ و چرا **یک** تابعِ مشترک، نه دو کوئریِ هم‌شکل: تا وقتی این منطق در دو
+ * روت کپی بود، یک تستِ نوشته‌شده روی کپیِ خودش هیچ‌چیزی را قفل نمی‌کرد و
+ * بازگشتِ یکی از دو روت بی‌صدا ممکن بود. حالا هر دو روت و تست به یک نقطه
+ * نگاه می‌کنند (§۲۲ — یک قرارداد، یک پیاده‌سازی).
+ */
+export function findStaffForLogin(normalizedPhone: string) {
+  return db.staff.findFirst({
+    where: { phone: normalizedPhone },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+}
+
+/**
+ * آیا این خطا نقضِ ایندکسِ یکتایِ جزئیِ «شماره‌ی owner» است؟ (مهاجرتِ ۰۷۹)
+ *
+ * هر دو مسیرِ سازنده‌ی owner (provisionBusiness و createTrialAccount) چکِ
+ * تکراریِ appسطح‌شان TOCTOU است؛ بازنده‌ی raceِ هم‌زمان به‌جای آن چک، به
+ * همین ایندکس داخلِ تراکنش می‌خورد و باید به همان پاسخِ تمیزِ مسیرِ ترتیبی
+ * نگاشت شود — نه ۵۰۰ِ خام. duck-type مثلِ isUniqueViolation در tables.ts
+ * (نه instanceof، که به هویتِ کلاسِ client گره می‌خورد).
+ *
+ * ⚠️ ایندکس با SQL خام ساخته شده و Prisma آن را نمی‌شناسد؛ بسته به نسخه،
+ * meta.target یا نامِ ایندکس است، یا فقط `['phone']` (شکلِ دیده‌شده‌ی واقعی:
+ * «Unique constraint failed on the fields: (`phone`)» هنگامِ اجرای ۰۷۹ روی
+ * دیتای کثیف). targetِ تک‌فیلدیِ phone در contextِ تراکنش‌های سازنده‌ی owner
+ * یکتاست: تنها uniqueِ دیگرِ phone روی staff مرکب است (tenant_id,phone) و
+ * target دوtاyی می‌دهد — پس تطبیقِ دقیقِ 'phone' برخوردِ کاذب ندارد.
+ */
+export function isOwnerPhoneUniqueViolation(e: unknown): boolean {
+  const err = e as { code?: string; meta?: { target?: unknown }; message?: string };
+  if (err?.code !== 'P2002') return false;
+  const t = err.meta?.target;
+  const s = Array.isArray(t) ? t.join(',') : String(t ?? '');
+  return s.includes('staff_owner_phone') || s === 'phone'
+    || /staff_owner_phone_unique_idx|fields: \(`phone`\)/.test(String(err.message ?? ''));
+}

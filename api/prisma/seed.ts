@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { genQrToken } from '../src/lib/tables';
 const db = new PrismaClient();
 
 // نام‌های نمونه برای ساخت مشتری
@@ -66,7 +67,12 @@ async function main() {
             mergeableWith: i === 0 ? [2] : i === 1 ? [1, 3] : i === 2 ? [2, 4] : i === 3 ? [3] : [],
             priority: zone === 'vip' ? 10 : zone === 'window' ? 5 : 0, // VIP و پنجره ترجیح بیشتر
             maxDurationMinutes: zone === 'vip' ? 180 : 120,            // VIP مدت بیشتر
-            qrCode: `T-DEMO${r.prefix}${String(n).padStart(2, '0')}`,   // کد QR دمو
+            // ⚠️ کدِ واقعیِ ۵۰ بیتی، نه الگویِ حدس‌زدنی. تا امروز اینجا
+            // `T-DEMO${r.prefix}<NN>` بود؛ وقتی /api/v1/checkin احرازِ کارمند
+            // می‌خواست بی‌خطر بود، ولی حالا که با اعتبارنامه‌ی QR عمومی شده،
+            // seed روی هر محیطِ در دسترسِ اینترنت میزهایی با کدِ قابلِ‌حدس
+            // می‌ساخت. منبعِ واحد: lib/tables.ts (الگوی دوم ساخته نشد).
+            qrCode: genQrToken(),
             posX: (i % 4) * 100 + 50, posY: Math.floor(i / 4) * 100 + 50,
           };
         }) },

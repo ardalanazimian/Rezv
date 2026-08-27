@@ -6,6 +6,8 @@ import { audit } from '@/lib/audit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseParams, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ id: zUuid });
 const bodySchema = z.object({
   action: z.enum(['activate', 'deactivate', 'set_plan', 'extend_plan', 'cancel_subscription']),
@@ -23,7 +25,7 @@ const bodySchema = z.object({
  *  { action: 'extend_plan', plan: 'pro'|'enterprise', months: number }  — تمدید واقعی با تاریخ انقضای جدید
  *  { action: 'cancel_subscription' }  — لغو فوری (انقضا = الان)
  */
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PATCH_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -102,3 +104,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true, ...result });
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const PATCH = withApiMetrics('/api/v1/admin/restaurants/[id]/control', PATCH_impl);

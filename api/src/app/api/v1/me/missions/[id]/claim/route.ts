@@ -7,13 +7,15 @@ import { isFeatureEnabled, featureFlagLabel } from '@/lib/feature-flags';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, zUuid, z } from '@/lib/schemas';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 const paramsSchema = z.object({ id: zUuid });
 
 /** POST /api/v1/me/missions/:id/claim — دریافتِ جایزه‌ی ماموریتِ تکمیل‌شده
  *  ⚠️ رفع‌شده: بنِ سختِ پلتفرم قبلاً فقط رویِ verify/refresh/POST reservations
  *  اجرا می‌شد — یعنی کاربرِ بن‌شده‌ای که توکنِ معتبر (از قبل صادرشده) داشت
  *  همچنان می‌تونست XP/سکه کسب کنه. حالا اینجا هم چک می‌شه. */
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function POST_impl(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = authFromRequest(req);
     if (auth.kind !== 'customer') throw Err.forbidden();
@@ -26,3 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json(result);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const POST = withApiMetrics('/api/v1/me/missions/[id]/claim', POST_impl);

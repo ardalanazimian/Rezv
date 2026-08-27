@@ -1,0 +1,22 @@
+-- ═══════════════════════════════════════════════════════════════════════
+-- ۰۷۵ — DEFAULTِ ستونِ id در economy_ledger_entries، در هر دو مسیرِ اسکیما
+--
+-- ⚠️ driftِ واقعیِ کشف‌شده در ادغامِ ۲۰۲۶-۰۸-۲۶ (۱۸ تستِ اقتصاد رویِ DBِ بکرِ
+-- db push قرمز شدند، با 23502 رویِ id=null) — دقیقاً کلاسِ «CI سبز، تولیدِ
+-- متفاوت» که CLAUDE.md §۷ برایش دروازه ساخته، فقط در جهتِ برعکس:
+--
+--  • مسیرِ تولید (migrate deploy + apply-sql): جدول را ۰۳۸ می‌سازد، با
+--    `id uuid PRIMARY KEY DEFAULT gen_random_uuid()` ⇒ درج‌های خامِ
+--    lib/economy.ts (که id نمی‌فرستند) کار می‌کنند.
+--  • مسیرِ CI/تست (db push): ستون از schema.prisma ساخته می‌شود که
+--    `@default(uuid())` داشت — پیش‌فرضِ **سمتِ کلاینتِ** Prisma، نه DB ⇒
+--    ستون بدونِ DEFAULT، و هر درجِ خام می‌شکند.
+--
+-- رفعِ دوطرفه (قاعده‌ی «هر چیزِ اسکیمایی باید در هر دو جا باشد»):
+--  ۱) schema.prisma → `@default(dbgenerated("gen_random_uuid()"))` تا db push
+--     هم DEFAULT بسازد؛
+--  ۲) این migration برای DBهایی که پیش‌تر با db pushِ قدیمی ساخته شده‌اند.
+-- رویِ DBِ مسیرِ تولید از قبل همین DEFAULT هست ⇒ idempotent و بی‌اثر.
+-- ═══════════════════════════════════════════════════════════════════════
+ALTER TABLE economy_ledger_entries
+  ALTER COLUMN id SET DEFAULT gen_random_uuid();

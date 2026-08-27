@@ -1,5 +1,6 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -83,12 +84,26 @@ after(async () => {
 function patchReq(id: string, body: unknown) {
   return new Request(`http://x/admin/hours-changes/${id}`, {
     method: 'PATCH',
-    headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${adminToken}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     body: JSON.stringify(body),
   });
 }
 
 describe('PATCH /admin/hours-changes/[id] — approve/reject روی Postgresِ واقعی', () => {
+  // ⚠️ چرا این `beforeEach` لازم است (باگِ واقعیِ رانرِ مشترک، ۲۰۲۶-۰۸-۲۵):
+  // `before`/`after` این فایل در **سطحِ فایل**‌اند، پس به سوئیتِ ROOT می‌چسبند
+  // و یک‌بار برایِ کلِ رانر اجرا می‌شوند — نه دورِ تست‌های همین فایل. از وقتی
+  // فایلِ دومی (`auth-otp-enumeration`) هم همین متغیرِ سراسری را ست می‌کند،
+  // آن یکی مقدارِ ما را overwrite می‌کرد و این تست‌ها ۴۰۳ می‌گرفتند — در حالی
+  // که فایل به‌تنهایی ۴/۴ سبز بود. یعنی یک شکستِ فقط-در-مجموعه.
+  // راهِ حل: هر سوئیت درست پیش از تست‌های خودش مقدارِ خودش را دوباره تثبیت
+  // کند. این نسبت به ترتیبِ اجرا مصون است.
+  beforeEach(() => { process.env.PLATFORM_ADMIN_TENANT_ID = adminTenantId; });
+
   test('approve: openingHoursِ زنده با pendingOpeningHours جایگزین می‌شود؛ صف پاک می‌شود', async () => {
     const { PATCH } = await import('../src/app/api/v1/admin/hours-changes/[id]/route.ts');
     const res = await PATCH(patchReq(restApproveId, { action: 'approve' }), { params: Promise.resolve({ id: restApproveId }) });

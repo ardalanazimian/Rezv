@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { createLogger } from './logger';
+import { NO_SHOW_FEATURE_VERSION as NO_SHOW_FEATURE_VECTOR_VERSION } from './no-show-model';
 
 const log = createLogger('ml');
 
@@ -26,11 +27,16 @@ const log = createLogger('ml');
  * می‌شوند و مقایسه‌ی تاریخی بی‌معنا می‌شود. تستِ
  * tests/prediction-ledger.test.mts این هم‌ترازی را قفل کرده است.
  */
-// v2 (۲۰۲۶-۰۸-۲۰، فازِ ۴): ترکیبِ ویژگی‌ها عوض نشد، ولی *معنایِ* priorTotal
-// عوض شد — از «سابقه در کلِ پلتفرم بدونِ dining» به «سابقه در همین رستوران
-// شاملِ dining»، تا با کوئریِ آموزش یکی شود. پیش‌بینی‌هایِ v1 و v2 نباید در
-// یک آمار قاطی شوند، پس نسخه بالا رفت.
-export const NO_SHOW_FEATURE_VERSION = 'no_show/v2';
+// ⚠️ مشتق است، نه هاردکد — و این رفعِ یک باگِ واقعی است (۲۰۲۶-۰۸-۲۵):
+// اینجا قبلاً یک ثابتِ **موازی** با همان نام بود (`'no_show/v2'`). وقتی
+// بردارِ ویژگی در no-show-model.ts عوض شد، این یکی دست‌نخورده ماند — پس
+// پیش‌بینی‌هایِ بردارِ تازه با همان برچسبِ قدیمی ثبت می‌شدند و در آمارِ دقتِ
+// تولید با پیش‌بینی‌هایِ بردارِ قبلی قاطی می‌شدند. یعنی دقیقاً همان چیزی که
+// خودِ این ثابت قرار بود جلویش را بگیرد، و کاملاً بی‌صدا.
+//
+// تاریخچه‌ی برچسب: no_show/v1 · no_show/v2 (معنیِ تازه‌ی priorTotal، فازِ ۴)
+// · no_show/v3 (بردارِ ۱۲تایی).
+export const NO_SHOW_FEATURE_VERSION = `no_show/${NO_SHOW_FEATURE_VECTOR_VERSION}`;
 
 export type PredictionConfidence = 'high' | 'medium' | 'low' | 'insufficient_data';
 
@@ -63,6 +69,15 @@ export interface RecordPredictionInput {
   entityId: string;
   modelSource: 'learned' | 'heuristic';
   modelRunId?: string | null;
+  /**
+   * دامنه‌ی مدل: `restaurant` | `platform` | `heuristic`.
+   *
+   * ⚠️ بدونِ این، دقتِ تولیدِ مدلِ **سراسری** اصلاً قابلِ نسبت‌دادن نبود:
+   * مدلِ سراسری اجرایِ per-restaurant ندارد پس `modelRunId` آن null است،
+   * و پیش‌بینی‌هایش با ردیف‌های بدونِ نسب‌نامه (پیش از مهاجرتِ ۰۵۶) در یک
+   * سطل می‌افتادند. مهاجرتِ ۰۷۱.
+   */
+  modelScope?: 'restaurant' | 'platform' | 'heuristic' | null;
   featureVersion: string;
   /** احتمالِ ۰..۱ برای طبقه‌بندی، یا مقدارِ عددی برای رگرسیون. */
   predictedValue: number;
@@ -88,6 +103,7 @@ export async function recordPrediction(input: RecordPredictionInput): Promise<st
         entityId: input.entityId,
         modelSource: input.modelSource,
         modelRunId: input.modelRunId ?? null,
+        modelScope: input.modelScope ?? null,
         featureVersion: input.featureVersion,
         predictedValue: input.predictedValue,
         confidence: input.confidence,

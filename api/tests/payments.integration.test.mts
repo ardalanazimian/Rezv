@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 import { randomInt, randomUUID } from 'node:crypto';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -25,7 +26,6 @@ delete process.env.ZARINPAL_SANDBOX;
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db');
-const { redis } = await import('../src/lib/redis');
 const { signAccess } = await import('../src/lib/jwt');
 const { fixturePhone } = await import('./_phone.helper.mts');
 const payRoute = await import('../src/app/api/v1/reservations/[code]/pay/route');
@@ -66,18 +66,26 @@ function stubFetch(overrides: { requestJson?: unknown; verifyJson?: unknown } = 
 
 after(() => { globalThis.fetch = ORIGINAL_FETCH; });
 
-async function clearRateLimit() {
-  const keys = await redis.keys('rl:srch:*');
-  if (keys.length) await redis.del(...keys);
-}
+/*
+ * ⚠️ اینجا قبلاً `clearRateLimit()` بود که `rl:srch:*` را **سراسری** پاک می‌کرد.
+ * لازم شده بود چون IPِ هر `new Request()`ِ بی‌هدر `unknown` است و سطل بینِ
+ * فایل‌های رانر مشترک می‌شد؛ ولی خودِ آن پاک‌سازی سطلِ فایل‌های دیگر را هم خالی
+ * می‌کرد. حالا هر Request با `testIp()` سطلِ خودش را دارد.
+ */
 
 const custReq = (token: string) =>
-  new Request('http://x/api', { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+  new Request('http://x/api', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'x-real-ip': testIp() },
+  });
 
 const routeArg = (code: string) => ({ params: Promise.resolve({ code }) });
 
 const callbackReq = (qs: string) =>
-  new Request(`http://x/api/v1/payments/callback${qs}`, { method: 'GET' });
+  new Request(`http://x/api/v1/payments/callback${qs}`, {
+    method: 'GET',
+    headers: { 'x-real-ip': testIp() },
+  });
 
 let tenantId: string;
 let restPayId: string;
@@ -89,7 +97,6 @@ let tokenB: string;
 let staffToken: string;
 
 before(async () => {
-  await clearRateLimit();
   const s = Date.now().toString(36);
   const t = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-${s}` }, select: { id: true } });
   tenantId = t.id;
@@ -116,7 +123,6 @@ before(async () => {
 });
 
 after(async () => {
-  await clearRateLimit();
   await db.payment.deleteMany({ where: { reservation: { restaurantId: { in: [restPayId, restNoPayId] } } } });
   await db.reservation.deleteMany({ where: { restaurantId: { in: [restPayId, restNoPayId] } } });
   await db.restaurant.deleteMany({ where: { id: { in: [restPayId, restNoPayId] } } });
@@ -233,7 +239,10 @@ describe('POST /reservations/:code/pay', () => {
 
   test('بدونِ ورود → ۴۰۱', async () => {
     const resv = await makeReservation({ depositRequested: true, depositAmountToman: 100_000 });
-    const res = await payRoute.POST(new Request('http://x/api', { method: 'POST' }), routeArg(resv.code));
+    const res = await payRoute.POST(
+      new Request('http://x/api', { method: 'POST', headers: { 'x-real-ip': testIp() } }),
+      routeArg(resv.code),
+    );
     assert.equal(res.status, 401);
   });
 });

@@ -9,9 +9,24 @@ const querySchema = z.object({
   cursor: zReservationCode.optional(),
 });
 
-/** GET ?date=today|tomorrow|upcoming|past|all — رزروهای رستوران. مهاجرت‌شده به wrapper. */
+/**
+ * GET ?date=today|tomorrow|upcoming|past|all — رزروهای رستوران. مهاجرت‌شده به wrapper.
+ *
+ * ⚠️ رفعِ نشتِ داده‌ی شخصی (ممیزیِ RBAC): این GET هیچ `permission:` نداشت، پس
+ * **هر** کارمندِ لاگین‌کرده — حتی کسی که هر ۹ مجوزش صریحاً `false` بود — کلِ
+ * فهرستِ رزروهای امروز را با `user.phone` و نام و نامِ‌خانوادگیِ هر مهمان
+ * می‌گرفت (تأییدشده با درخواستِ زنده: ۲۰۰ به‌همراهِ `"phone":"+98…"`). یعنی
+ * «کارمندِ بدونِ دسترسی» عملاً خواندنِ کاملِ دفترچه‌ی تلفنِ مهمان‌ها را داشت.
+ * حالا هم‌سطحِ خواهرش `.../[code]/status` است و با همان کلیدی محافظت می‌شود
+ * که پنل هم برایِ همین صفحه انتظارش را دارد (`VIEW_PERMISSION.reservations`
+ * در `apps/business/js/routing.js`).
+ *
+ * توجه: `SAFE_DEFAULTS` در `lib/permissions.ts` مقدارِ `canManageReservations`
+ * را `true` می‌گذارد، پس کارمندی که هیچ رکوردِ `StaffPermission` ندارد
+ * دست‌نخورده کار می‌کند؛ فقط کارمندی که **صریحاً محدود شده** رد می‌شود.
+ */
 export const GET = withRestaurantAuth(
-  { rateLimit: 'search' },
+  { permission: 'canManageReservations', rateLimit: 'search' },
   async (req, ctx) => {
     const restaurant = ctx.restaurant;
     const { date: filter, limit, cursor } = parseQuery(req, querySchema);

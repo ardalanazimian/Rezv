@@ -15,12 +15,15 @@ const feedbackSchema = z.object({
   correct_intent: z.enum(ASSISTANT_INTENTS),
 });
 
-export const POST = withRestaurantAuth({ rateLimit: 'search', permission: 'canViewAnalytics' }, async (req, ctx) => {
+// ⚠️ `auth` (۲۰/دقیقه) و نه `search`: این endpoint واژگانِ دائمیِ رستوران را
+// **می‌نویسد** — نوشتن‌ها طبقِ CLAUDE.md §۶ باید سطحِ `auth` بگیرند.
+export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canViewAnalytics' }, async (req, ctx) => {
   const b = await parseBody(req, feedbackSchema);
   const result = await teachAssistant({
     restaurantId: ctx.restaurant.id,
     logId: b.log_id,
     correctIntent: b.correct_intent,
+    staffId: ctx.auth.kind === 'staff' ? ctx.auth.sub : null,
   });
   return NextResponse.json(result);
 });

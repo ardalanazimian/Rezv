@@ -3,6 +3,8 @@ import { errorResponse, Err } from '@/lib/errors';
 import { getObject } from '@/lib/media-store';
 import { mimeFromKey, isValidStorageKey } from '@/lib/media';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════════════════
 //  GET /api/v1/media/<year>/<month>/<uuid>.<ext> — سرو کردنِ عکسِ آپلودشده
 //
@@ -26,7 +28,7 @@ import { mimeFromKey, isValidStorageKey } from '@/lib/media';
 //  Content-Type را عوض کند.
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function GET(req: Request, { params }: { params: Promise<{ key: string[] }> }) {
+async function GET_impl(req: Request, { params }: { params: Promise<{ key: string[] }> }) {
   try {
     await enforceRateLimit(clientIp(req), RULES.search);
     const { key: segments } = await params;
@@ -56,3 +58,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ key: str
     return errorResponse(e);
   }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/media/[...key]', GET_impl);

@@ -45,7 +45,7 @@ flowchart TB
   end
 
   subgraph EXT["External"]
-    KAV["Kavenegar SMS"]
+    KAV["Melipayamak SMS"]
     ZAR["Zarinpal"]
     FCM["FCM push"]
     S3["S3 backup (optional)"]
@@ -179,7 +179,7 @@ sequenceDiagram
   participant C as Client
   participant API as API
   participant DB as Postgres
-  participant SMS as Kavenegar
+  participant SMS as Melipayamak
 
   Note over C,API: Customer OTP login
   C->>API: POST /v1/auth/otp/request { phone }
@@ -339,7 +339,7 @@ flowchart LR
 
 | Service | Module | Purpose | Disabled when |
 |---------|--------|---------|---------------|
-| Kavenegar | `lib/sms.ts`, `sms-balance.ts` | OTP + lifecycle + campaign SMS | `KAVENEGAR_API_KEY` unset → logs only (needs `OTP_DEV_MODE` for login) |
+| Melipayamak | `lib/sms.ts`, `sms-balance.ts` | OTP + lifecycle + campaign SMS (pattern `bodyId`, and free text for campaigns) | credentials unset → logs only (needs `OTP_DEV_MODE` for login) |
 | Zarinpal | `lib/zarinpal.ts` | Deposit payments (request + verify) | merchant id unset (from `platform_settings` or env) |
 | FCM | `lib/notify.ts` | Web push | `FCM_SERVER_KEY` unset |
 | Email | `lib/notify.ts` | Email notifications | `EMAIL_API_KEY` unset |

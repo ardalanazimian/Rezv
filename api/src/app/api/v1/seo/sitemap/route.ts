@@ -3,6 +3,8 @@ import { dbRead as db } from '@/lib/db';
 import { cached, cacheKey } from '@/lib/cache';
 import { errorResponse } from '@/lib/errors';
 
+import { withApiMetrics } from '@/lib/api-metrics';
+
 // ═══════════════════════════════════════════════════════════
 //  GET /api/v1/seo/sitemap — دادهٔ خامِ sitemap برای وب‌سایتِ عمومی (apps/seo).
 //  slugِ همه‌ی رستوران‌های فعال + شهرها و آشپزی‌های متمایز + محتوای منتشرشده‌ی
@@ -32,7 +34,7 @@ const MAX_RESTAURANTS = 50_000; // سقفِ ایمنی؛ فراتر از آن ن
  */
 const DEMO_NAME_PREFIX = '[DEMO]';
 
-export async function GET() {
+async function GET_impl() {
   try {
     const data = await cached(cacheKey('seo-sitemap'), 300, async () => {
       const [restaurants, cityRows, cuisineRows, articles, pages] = await Promise.all([
@@ -79,3 +81,7 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (e) { return errorResponse(e); }
 }
+
+// ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).
+//    برچسبِ مسیر عمداً الگویِ ثابتِ فایل است، نه pathnameِ خام — رجوع کن به lib/api-metrics.ts.
+export const GET = withApiMetrics('/api/v1/seo/sitemap', GET_impl);

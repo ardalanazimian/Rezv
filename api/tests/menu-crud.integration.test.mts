@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -18,7 +19,6 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db');
-const { redis } = await import('../src/lib/redis');
 const { signAccess } = await import('../src/lib/jwt');
 const menuRoute = await import('../src/app/api/v1/restaurant/menu/route');
 const menuItemRoute = await import('../src/app/api/v1/restaurant/menu/[id]/route');
@@ -40,7 +40,11 @@ const routeArg = (id: string) => ({ params: Promise.resolve({ id }) });
 const json = (token: string, body?: unknown, method = 'POST') =>
   new Request('http://x/api', {
     method,
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'x-real-ip': testIp(),
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
@@ -62,14 +66,11 @@ async function makeTenantWithOwner(label: string) {
 }
 
 before(async () => {
-  // شمارنده‌ی rate-limit را پیش از شروع پاک می‌کنیم. این تست چند نوشتنِ پشت‌سرِهم
-  // انجام می‌دهد و کلیدِ محدودیت (بر پایه‌ی IP) بینِ اجراها انباشته می‌شد و از
-  // اجرایِ دوم به بعد ۴۲۹ می‌گرفت. توجه: خودِ سقفِ روت عمداً دست‌نخورده مانده
-  // (`rateLimit:'auth'` = همان چیزی که tables/notes هم دارند) — محدودیت واقعی و
-  // فعال است؛ فقط حالتِ نشتیِ بینِ اجراهایِ تست صفر می‌شود.
-  const stale = await redis.keys('*auth*');
-  if (stale.length) await redis.del(...stale);
-
+  // ⚠️ اینجا قبلاً کلِ سطل‌های `*auth*` سراسری پاک می‌شد، چون `new Request()`ِ
+  // بدونِ هدر همیشه IPِ `unknown` می‌داد و سهمیه بینِ همه‌ی فایل‌های رانر مشترک
+  // بود. آن پاک‌سازی سطلِ فایل‌های دیگر را هم خالی می‌کرد و ریت‌لیمیت را از تستِ
+  // آن‌ها پنهان می‌کرد. حالا `json()` با `testIp()` IPِ یکتا می‌گیرد؛ سقفِ خودِ
+  // روت (`rateLimit:'auth'`) دست‌نخورده و واقعی می‌ماند.
   const s = Date.now().toString(36);
   const a = await makeTenantWithOwner(`menu-a-${s}`);
   const b = await makeTenantWithOwner(`menu-b-${s}`);
