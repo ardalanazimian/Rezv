@@ -167,6 +167,15 @@ notify_push?, notify_email?, note? }`. Response includes
 | `/v1/events` | GET | public | Public special-events feed. |
 | `/v1/checkin` | POST | public | QR check-in at table. |
 
+### `GET /v1/restaurants/{slug}/menu` — `public` (rate-limited, cached 60s)
+
+Lightweight public menu for the QR page (`/r/{slug}/menu` on the SEO site).
+Returns `restaurant{...branding}`, `categories:[{id,name,sort_order}]` (active
+only — 077) and `items[]` (active only; `is_out_of_stock` items are **returned
+with the flag**, not hidden; `category` text kept for legacy grouping +
+`category_id`). Every menu mutation actively invalidates this cache and the
+restaurant-detail cache (`lib/menu-cache.ts`).
+
 ### `GET /v1/restaurants/{slug}/availability?date=YYYY-MM-DD&party=N`
 Query: `date` (required), `party` (1..30, default 2). Response (mocked shape used
 by tests):
@@ -215,8 +224,11 @@ shown where relevant. Owners/managers bypass permission checks.
 | `/coupons` | GET, POST | canManageCoupons | Coupons. |
 | `/members` | GET | canViewAnalytics | Club members. |
 | `/reviews` | GET, PATCH | canManageSettings | Reviews + replies. |
-| `/menu` | GET, POST | canManageSettings | Menu items. |
-| `/menu/[id]` | PATCH, DELETE | canManageSettings | Update / delete item. |
+| `/menu` | GET, POST | canManageSettings | Menu items (+`categories[]`, `category_id`, `is_out_of_stock` — 077). |
+| `/menu/[id]` | PATCH, DELETE | canManageSettings | Update / delete item (delete archives when used in pre-orders). |
+| `/menu/categories` | GET, POST | canManageSettings | Menu categories (077). Unique name per restaurant. |
+| `/menu/categories/[id]` | PATCH, DELETE | canManageSettings | Rename (mirrors item text in-transaction) / sort / soft-delete. |
+| `/menu/reorder` | PATCH | canManageSettings | Bulk `{categories?[], items?[]}` sort_order in one transaction; foreign id → 404 whole request. |
 | `/menu/[id]/photo` | POST, DELETE | canManageSettings | Item photo (`multipart/form-data`). |
 | `/menu/branding` · `/menu/qr` | GET, PATCH / GET | canManageSettings | Public-menu branding + QR. |
 | `/photos` | GET, POST, DELETE | canManageSettings | Photo gallery. **POST is `multipart/form-data`** (field `file`), not JSON. Uploads land as `pending` and are invisible publicly until the company panel approves them. See below. |

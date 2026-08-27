@@ -7,9 +7,15 @@
 
 ## 1. Overview
 
-- **Engine**: PostgreSQL (Supabase in production).
+- **Engine**: PostgreSQL — self-hosted `postgres:16-alpine` in the canonical
+  docker-compose deployment (`docker-compose.yml:12`). *(Corrected 2026-08-27: this
+  line previously claimed a Supabase-hosted production DB; the repo has no Supabase code,
+  env, or `directUrl` — Supabase appears only in comments about managed-PG
+  connection limits.)*
 - **ORM**: Prisma (`prisma-client-js`).
-- **IDs**: `uuid` PKs (`@default(uuid())`) except natural keys (`otp_codes.phone`,
+- **IDs**: `uuid` PKs — client-generated `@default(uuid())` for most models;
+  `@default(dbgenerated("gen_random_uuid()"))` where raw-SQL backfills need a DB
+  default (economy ledger `075`, `menu_categories` `077`) — except natural keys (`otp_codes.phone`,
   `idempotency_keys.key`, `platform_settings.key`, `club_code_counters`,
   composite keys on join/insight tables).
 - **Naming**: `snake_case` columns via `@map`, `camelCase` in TS.
@@ -182,7 +188,8 @@ Two layers (both applied in CI):
 
 1. **`prisma/migrations/0_init`** — the baseline Prisma migration
    (`migration.sql`). Applied by `prisma migrate deploy`.
-2. **`prisma/sql/*.sql`** — hand-written SQL scripts (`001` … `064`) for things
+2. **`prisma/sql/*.sql`** — hand-written SQL scripts (`001` … `077`, see the
+   files themselves for the live list) for things
    Prisma can't express: partitioning, exclusion constraints, partial unique
    indexes, RLS, expression indexes, FK/index back-fills. These are **not**
    Prisma migrations — they live outside `migrations/` (so they never trip
@@ -328,6 +335,22 @@ There is **no global soft-delete column**. Instead:
   a live requirement; a skipped cron run does not break inserts.
 - Keep `schema.prisma` in sync with the live DB — the `⚠️ همگام‌سازی‌شده`
   comments mark fields that previously existed only in the DB.
+
+## SPEC-A فاز ۱ (migration 077) — منوی دسته‌بندی‌شده
+
+- **`menu_categories`**: دسته‌ی رابطه‌ایِ منو (`@@unique([restaurantId, name])`،
+  ترتیبِ `sort_order`، حذفِ نرم با `is_active=false`). PK با
+  `dbgenerated("gen_random_uuid()")` چون backfillِ ۰۷۷ با INSERT خام ردیف می‌سازد.
+- **`menu_items.category_id`** (FK با `ON DELETE SET NULL`) و
+  **`menu_items.is_out_of_stock`** (برچسبِ «ناموجود» — آیتم مخفی نمی‌شود).
+- ستونِ متنیِ `menu_items.category` **میرورِ سازگاری** است: منبعِ حقیقت رابطه است
+  و سرور در هر تغییرِ دسته (ستِ آیتم، renameِ دسته، متنِ آزادِ کلاینتِ قدیمی →
+  find-or-create) رشته را سینک می‌کند تا مصرف‌کننده‌های موجود (SEO/مشتری/پنل) نشکنند.
+- backfillِ ۰۷۷ دوباراجرایی‌پذیر است: رشته‌های distinct → ردیفِ دسته
+  (`ON CONFLICT DO NOTHING`) → لینکِ `category_id` فقط روی NULLها.
+- کش: `cache:restaurant-public-menu:{slug}` (TTL ۶۰s) + `restaurant-detail` — از ۰۷۷
+  هر mutation منو (آیتم/دسته/reorder/عکس) هر دو را از طریقِ
+  `lib/menu-cache.ts:invalidatePublicMenu` باطل می‌کند.
 
 ## SPEC-B (migration 076) — provisioning و دعوتِ owner
 

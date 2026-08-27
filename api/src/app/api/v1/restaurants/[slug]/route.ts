@@ -36,8 +36,16 @@ async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: str
             orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
             select: {
               id: true, name: true, emoji: true, priceToman: true, category: true,
+              // ۰۷۷ — اپِ مشتری منو را از همین route می‌خواند (نه endpointِ
+              // اختصاصیِ منو)؛ سکشن‌بندی/برچسبِ «ناموجود» این دو را لازم دارد.
+              categoryId: true, isOutOfStock: true,
               description: true, imageUrl: true, sortOrder: true,
             },
+          },
+          menuCategories: {
+            where: { isActive: true },
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+            select: { id: true, name: true, sortOrder: true },
           },
           // ⚠️ رفعِ P1-3 (فازِ ۲، پروتکل §۲۰ — قراردادِ frontend↔backend).
           //
@@ -100,8 +108,13 @@ async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: str
         reviews_count: agg._count,
         menu: r.menuItems.map((m) => ({
           id: m.id, name: m.name, emoji: m.emoji, price_toman: m.priceToman,
-          category: m.category, description: m.description,
+          category: m.category, category_id: m.categoryId,
+          is_out_of_stock: m.isOutOfStock, description: m.description,
           image_url: m.imageUrl, sort_order: m.sortOrder,
+        })),
+        // ۰۷۷ — سکشن‌بندیِ ساخت‌یافته‌ی منو (فقط افزودنی)
+        menu_categories: r.menuCategories.map((c) => ({
+          id: c.id, name: c.name, sort_order: c.sortOrder,
         })),
         photos: r.photos.map((p) => ({ url: p.url, caption: p.caption, category: p.category })),
         // سیاستِ رزرو (P1-3). اگر رستوران رکوردِ سیاست نداشته باشد، همان

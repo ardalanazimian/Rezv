@@ -350,6 +350,12 @@ const API = {
   menuCreate(body){ return this.post('/restaurant/menu', body); },
   menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
   menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  // ── دسته‌های رابطه‌ایِ منو + مرتب‌سازیِ دسته‌ای (SPEC-A فاز ۱ / ۰۷۷) ──
+  menuCategories(){ return this.get('/restaurant/menu/categories'); },
+  menuCategoryCreate(body){ return this.post('/restaurant/menu/categories', body); },
+  menuCategoryUpdate(id, body){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuCategoryDelete(id){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'DELETE' }); },
+  menuReorder(body){ return this.request('/restaurant/menu/reorder', { method:'PATCH', body: JSON.stringify(body) }); },
   /**
    * آپلود/جایگزینیِ عکسِ آیتمِ منو.
    * multipart است، پس نمی‌تواند از `post()` (که JSON می‌فرستد) عبور کند.

@@ -39,12 +39,20 @@ async function GET_impl(req: Request, { params }: { params: Promise<{ slug: stri
           // شخصی‌سازیِ صفحه‌ی منو (مهاجرتِ ۰۵۳). NULL = انتخاب‌نشده →
           // صفحه به پیش‌فرضِ پلتفرم برمی‌گردد.
           menuAccent: true, menuTheme: true, menuTagline: true, menuLayout: true,
+          // ۰۷۷ — دسته‌های فعال برای سکشن‌بندیِ ساخت‌یافته. آیتمِ دسته‌ی
+          // غیرفعال حذف نمی‌شود؛ فقط در نمایش «دسته‌نشده» می‌شود.
+          menuCategories: {
+            where: { isActive: true },
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+            select: { id: true, name: true, sortOrder: true },
+          },
           menuItems: {
             where: { isActive: true },
             orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
             select: {
               id: true, name: true, emoji: true, priceToman: true,
-              category: true, description: true, imageUrl: true, sortOrder: true,
+              category: true, categoryId: true, isOutOfStock: true,
+              description: true, imageUrl: true, sortOrder: true,
             },
           },
         },
@@ -57,12 +65,19 @@ async function GET_impl(req: Request, { params }: { params: Promise<{ slug: stri
           menu_accent: r.menuAccent, menu_theme: r.menuTheme,
           menu_tagline: r.menuTagline, menu_layout: r.menuLayout,
         },
+        // ۰۷۷ — سکشن‌بندیِ ساخت‌یافته (فقط افزودنی؛ فیلدهای قبلی دست‌نخورده
+        // تا مصرف‌کننده‌ی متنیِ موجود — groupByCategoryِ SEO — نشکند).
+        categories: r.menuCategories.map((c) => ({
+          id: c.id, name: c.name, sort_order: c.sortOrder,
+        })),
         // آرایه‌ی خالی یعنی «این رستوران هنوز منو ثبت نکرده» — یک حالتِ
         // کاملاً معتبر، نه خطا. کلاینت باید حالتِ خالیِ صادق نشان دهد، نه
         // منویِ نمونه (همان اشتباهی که در رویدادهای اپِ مشتری رخ داده بود).
+        // «ناموجود» عمداً برمی‌گردد (با فلگ) — نمایش با برچسب، نه حذف.
         items: r.menuItems.map((m) => ({
           id: m.id, name: m.name, emoji: m.emoji, price_toman: m.priceToman,
-          category: m.category, description: m.description,
+          category: m.category, category_id: m.categoryId,
+          is_out_of_stock: m.isOutOfStock, description: m.description,
           image_url: m.imageUrl, sort_order: m.sortOrder,
         })),
       };

@@ -109,6 +109,36 @@ function finishRestRender(){
   setTimeout(()=>document.querySelectorAll('.rb-fill').forEach(f=>f.style.width=f.dataset.w+'%'),300);
   armReveals&&armReveals();
 }
+
+/** کارتِ یک آیتمِ منو — همه‌ی متن‌های سرورساخته esc می‌شوند (انضباطِ 7ecd0d6). */
+function menuItemHTML(m){
+  return `<div class="menu-item glass"${m.out?' style="opacity:.62"':''}>
+    <div class="menu-emoji">${m.img?`<img class="menu-thumb" src="${esc(resolveMediaUrl(m.img))}" alt="" loading="lazy">`:esc(m.e)}</div>
+    <div class="menu-info">
+      <div class="menu-name">${esc(m.n)}${m.out?' <span style="font-size:10px;background:var(--amber,#d97706);color:#fff;border-radius:6px;padding:1px 6px;white-space:nowrap">ناموجود</span>':''}</div>
+      ${m.d?`<div style="font-size:11px;color:var(--t2);margin:1px 0 2px;line-height:1.7">${esc(m.d)}</div>`:''}
+      <div class="menu-price">${m.p} تومان</div>
+    </div>
+  </div>`;
+}
+
+/**
+ * بخشِ منویِ صفحه‌ی رستوران (SPEC-A فاز ۱): اگر رستوران دسته‌ی فعال دارد،
+ * سکشن‌بندی با همان ترتیبِ خودش؛ وگرنه همان چیدمانِ تختِ قبلی. آیتمِ
+ * «ناموجود» حذف نمی‌شود — با برچسب می‌آید (تجربه‌ی صادق‌تر از غیب‌شدن).
+ */
+function menuSectionHTML(r){
+  if(!r.menu.length) return `<p class="rp-empty">این رستوران هنوز منویی ثبت نکرده.</p>`;
+  const byCat = {};
+  r.menu.forEach(m=>{ const k = m.catId || ''; (byCat[k] = byCat[k] || []).push(m); });
+  const secs = (r.menuCats || []).filter(c=>(byCat[c.id]||[]).length).map(c=>({ name:c.name, items: byCat[c.id] }));
+  if(!secs.length) return `<div class="menu-list">${r.menu.map(menuItemHTML).join('')}</div>`;
+  const parts = secs.map(sec=>`<div style="font-weight:800;font-size:13px;margin:12px 4px 6px">${esc(sec.name)}</div><div class="menu-list">${sec.items.map(menuItemHTML).join('')}</div>`);
+  const rest = byCat[''] || [];
+  if(rest.length) parts.push(`<div style="font-weight:800;font-size:13px;margin:12px 4px 6px">سایر</div><div class="menu-list">${rest.map(menuItemHTML).join('')}</div>`);
+  return parts.join('');
+}
+
 function renderRestPage(r){
   const id=r.id;
   const stars=n=>Array.from({length:5},(_,i)=>icon('star',{size:13,fill:i<Math.round(n)})).join('');
@@ -157,7 +187,7 @@ function renderRestPage(r){
 
       <div class="rp-section reveal"><h3>درباره</h3>${r.about?`<p class="rp-about">${esc(r.about)}</p>`:`<p class="rp-empty">این رستوران هنوز توضیحی ثبت نکرده.</p>`}${r.address?`<p class="rp-address">${icon('mapPin',{size:14})} ${esc(r.address)}</p>`:''}${r.feats.length?`<div class="feat-row">${r.feats.map(f=>`<span class="feat">${icon('check',{size:13})} ${esc(f)}</span>`).join('')}</div>`:''}</div>
 
-      <div class="rp-section reveal"><h3>منو</h3>${r.menu.length?`<div class="menu-list">${r.menu.map(m=>`<div class="menu-item glass"><div class="menu-emoji">${m[3]?`<img class="menu-thumb" src="${esc(resolveMediaUrl(m[3]))}" alt="" loading="lazy">`:esc(m[0])}</div><div class="menu-info"><div class="menu-name">${esc(m[1])}</div><div class="menu-price">${m[2]} تومان</div></div></div>`).join('')}</div>`:`<p class="rp-empty">این رستوران هنوز منویی ثبت نکرده.</p>`}</div>
+      <div class="rp-section reveal"><h3>منو</h3>${menuSectionHTML(r)}</div>
 
       <div class="rp-section reveal">
         <h3>امتیازها و نظرها</h3>

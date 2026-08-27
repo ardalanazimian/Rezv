@@ -189,9 +189,12 @@ export function bookStep2(r){
   // بخش با عنوانِ «پیش‌سفارش» و یک .opt-row کاملاً خالی رندر می‌شد — یعنی
   // شبیهِ یک باگِ بارگذاری، نه «این رستوران منو ندارد». حالا کلِ بخش با
   // منویِ خالی اصلاً نشان داده نمی‌شود.
-  const preorderBlock = r.menu.length
+  // آیتمِ «ناموجود» اصلاً پیشنهاد نمی‌شود (۰۷۷) — پیشنهاددادنِ چیزی که
+  // نمی‌شود سفارش داد، همان «موفقیتِ جعلی» است. enforcementِ سروری = فاز ۲.
+  const orderable = r.menu.filter(m=>!m.out);
+  const preorderBlock = orderable.length
     ? `<div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
-    <div class="opt-row">${r.menu.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m[0])} ${esc(m[1])}</div>`).join('')}</div>`
+    <div class="opt-row">${orderable.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m.e)} ${esc(m.n)}</div>`).join('')}</div>`
     : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>

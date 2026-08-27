@@ -15,6 +15,9 @@ cd api
 cp .env.example .env         # fill DATABASE_URL, REDIS_URL, JWT_SECRET, JWT_REFRESH_SECRET
 npm install                  # postinstall runs `prisma generate`
 # create schema (dev): either
+# ⚠️ `db push` is ONLY for bootstrapping a brand-new empty database. Never run
+# it against a migrated DB — it fails on the generated `block_end` column and
+# wants to DROP indexes it does not know (see DATABASE.md, migrations section).
 npx prisma db push
 # then apply the hand-written SQL (partitioning, exclusion constraint, RLS, ...)
 sh prisma/apply-sql.sh       # runs prisma/sql/*.sql via prisma db execute
@@ -142,12 +145,16 @@ curl -s -o /dev/null -w "%{http_code}\n" https://<domain>/api/v1/maintenance/exp
 
 ## 6. Database Deployment
 
-- **Supabase** (production Postgres). Use the **pooled** connection
-  (`?pgbouncer=true&connection_limit=...`) for `DATABASE_URL` and a **direct**
-  connection for `DATABASE_DIRECT_URL` (migrations only).
-- **Schema**: the app build only `prisma generate`s. Apply schema via
-  `prisma migrate deploy` (or `db push`) against the direct URL, then apply
-  `prisma/sql/*.sql` with `sh prisma/apply-sql.sh` (or the Supabase connector).
+- **Self-hosted Postgres 16** (`docker-compose.yml` service `postgres`) is the
+  canonical production database; `docker-entrypoint.sh` applies the two-step
+  schema path automatically (`migrate deploy` for `0_init`, then
+  `sh prisma/apply-sql.sh`). *(Corrected 2026-08-27: this section previously
+  described Supabase + `DATABASE_DIRECT_URL`; no Supabase integration exists and
+  `DATABASE_DIRECT_URL` is consumed nowhere — `schema.prisma` has no `directUrl`.)*
+- **Managed Postgres (optional)**: if deploying against a managed provider, use
+  its pooled connection string for `DATABASE_URL` and run the same two steps —
+  `prisma migrate deploy` **then** `sh prisma/apply-sql.sh` — against a direct
+  connection. Never `db push` on a migrated database.
   Verify: `npx prisma migrate status`.
 - **RLS** is defined for newer tables (`prisma/sql/023`).
 

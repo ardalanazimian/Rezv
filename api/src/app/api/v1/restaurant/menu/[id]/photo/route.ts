@@ -7,7 +7,7 @@ import { parseParams, zUuid, z } from '@/lib/schemas';
 import { inspectImage, storageKey, MAX_BYTES } from '@/lib/media';
 import { putObject, deleteObject } from '@/lib/media-store';
 import { mediaUrl } from '@/lib/photo-moderation';
-import { invalidate, cacheKey } from '@/lib/cache';
+import { invalidatePublicMenu } from '@/lib/menu-cache';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  عکسِ آیتمِ منو — آپلود / جایگزینی / حذف
@@ -46,15 +46,6 @@ async function findOwnedItem(id: string, restaurantId: string) {
   });
   if (!item || item.restaurantId !== restaurantId) throw Err.notFound('آیتمِ منو');
   return item;
-}
-
-/** کشِ خواندنی‌هایِ عمومی که عکسِ آیتم در آن‌هاست. */
-async function invalidatePublicMenu(restaurantId: string) {
-  const r = await db.restaurant.findUnique({ where: { id: restaurantId }, select: { slug: true } });
-  if (!r?.slug) return;
-  // هر دو مصرف‌کننده: صفحه‌ی کاملِ رستوران و منویِ سبکِ QR.
-  await invalidate(cacheKey('restaurant-detail', r.slug));
-  await invalidate(cacheKey('restaurant-public-menu', r.slug));
 }
 
 /**

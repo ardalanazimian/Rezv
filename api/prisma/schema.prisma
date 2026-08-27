@@ -183,6 +183,7 @@ model Restaurant {
   createdAt     DateTime         @default(now()) @map("created_at")
   tables        Table[]
   menuItems     MenuItem[]
+  menuCategories MenuCategory[]
   reservations  Reservation[]
   members       ClubMember[]
   reviews       Review[]
@@ -329,7 +330,18 @@ model MenuItem {
   sortOrder    Int               @default(0) @map("sort_order")
   soldCount    Int               @default(0) @map("sold_count")
   // دسته‌بندیِ منو (پیش‌غذا/اصلی/دسر/نوشیدنی/…). NULL = دسته‌بندی‌نشده.
+  //
+  // [SPEC-A فاز ۱ — مهاجرتِ ۰۷۷] این ستونِ متنی **میرورِ سازگاری** است:
+  // منبعِ حقیقت رابطه‌ی categoryId است و سرور در هر تغییرِ دسته (ستِ آیتم،
+  // renameِ دسته) این رشته را سینک می‌کند تا مصرف‌کننده‌های موجود
+  // (groupByCategoryِ سایتِ SEO، پنل، اپِ مشتری) بدونِ استقرارِ هم‌زمان نشکنند.
   category     String?
+  // آیتمِ «ناموجود» از منو حذف/مخفی نمی‌شود — با برچسب نمایش داده می‌شود و
+  // فقط از پیش‌سفارش کنار می‌رود. جدا از isActive (که یعنی «اصلاً در منو نیست»).
+  isOutOfStock Boolean           @default(false) @map("is_out_of_stock")
+  categoryId   String?           @map("category_id") @db.Uuid
+  // SetNull: حذفِ سختِ دسته نباید آیتم‌ها را بکشد — فقط «دسته‌نشده» می‌شوند.
+  categoryRef  MenuCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   inOrders     ReservationItem[]
   // کوئری منو: آیتم‌های فعال یک رستوران
   @@index([restaurantId, isActive])
@@ -338,7 +350,35 @@ model MenuItem {
   @@index([restaurantId, isActive, sortOrder, name], map: "menu_items_public_order_idx")
   // مهاجرتِ ۰۴۷ — پنل: آیتم‌ها به‌ترتیبِ دسته (قبلاً فقط در SQL بود و db push حذفش می‌خواست)
   @@index([restaurantId, category], map: "menu_items_restaurant_category_idx")
+  // مهاجرتِ ۰۷۷ — منویِ دسته‌بندی‌شده: آیتم‌هایِ یک دسته به ترتیبِ نمایش
+  @@index([restaurantId, categoryId, sortOrder], map: "menu_items_rest_cat_sort_idx")
   @@map("menu_items")
+}
+
+// ═══ SPEC-A فاز ۱ (مهاجرت ۰۷۷) — دسته‌بندیِ رابطه‌ایِ منو ═══
+//
+// جایگزینِ ساخت‌یافته‌ی ستونِ متنیِ MenuItem.category (که به‌عنوانِ میرورِ
+// سازگاری می‌ماند). PK با DEFAULTِ سمتِ DB چون backfillِ SQLِ ۰۷۷ با INSERT
+// خام ردیف می‌سازد (درسِ مهاجرتِ ۰۷۵).
+model MenuCategory {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  sortOrder    Int        @default(0) @map("sort_order")
+  // حذفِ دسته «نرم» است (isActive=false): در پنل می‌ماند، از منویِ عمومی
+  // کنار می‌رود و آیتم‌هایش در نمایش «دسته‌نشده» می‌شوند — آیتمی گم نمی‌شود.
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  // @default(now()) کنارِ @updatedAt عمدی است (الگوی موجودِ repo): بدونِ آن
+  // db push پیش‌فرضِ DBِ لازم برای INSERTهای خامِ backfill را DROP می‌خواست.
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  items        MenuItem[]
+
+  // دو دسته‌ی هم‌نام در یک رستوران = ابهام در پنل + backfillِ غیرقطعی
+  @@unique([restaurantId, name])
+  @@index([restaurantId, sortOrder])
+  @@map("menu_categories")
 }
 
 enum ReservationStatus {

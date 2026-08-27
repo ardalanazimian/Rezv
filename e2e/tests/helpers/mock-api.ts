@@ -51,6 +51,23 @@ export const DEMO_RESTAURANTS = [
   { id: 'a1b2c3d4-0000-4000-8000-000000000003', slug: 'demo-burger-lab', name: '[DEMO] برگر لب', cuisine: 'فست‌فود', rating: 4.6, price: '$$', cashback: 12, cover_emoji: '🍔' },
 ];
 
+/** منویِ نمونه‌ی رستورانِ اول (SPEC-A فاز ۱): دسته‌دار + یک آیتمِ «ناموجود».
+ *  فقط رستورانِ اول منو دارد تا حالتِ «منویی ثبت نشده» هم پوششِ واقعی بگیرد. */
+export const DEMO_MENU = {
+  menu_categories: [
+    { id: 'c1b2c3d4-0000-4000-8000-000000000001', name: 'پیش‌غذا', sort_order: 10 },
+    { id: 'c1b2c3d4-0000-4000-8000-000000000002', name: 'غذای اصلی', sort_order: 20 },
+  ],
+  menu: [
+    { id: 'd1b2c3d4-0000-4000-8000-000000000001', name: 'سالاد سزار', emoji: '🥗', price_toman: 180000,
+      category: 'پیش‌غذا', category_id: 'c1b2c3d4-0000-4000-8000-000000000001',
+      is_out_of_stock: false, description: 'با سسِ مخصوص', image_url: null, sort_order: 10 },
+    { id: 'd1b2c3d4-0000-4000-8000-000000000002', name: 'کبابِ کوبیده', emoji: '🍢', price_toman: 320000,
+      category: 'غذای اصلی', category_id: 'c1b2c3d4-0000-4000-8000-000000000002',
+      is_out_of_stock: true, description: null, image_url: null, sort_order: 10 },
+  ],
+};
+
 function openSlots() {
   return {
     date: '2026-07-10', party: 2,
@@ -115,6 +132,20 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
     // ── availabilityِ یک رستوران (شیتِ رزرو) ──
     if (/^\/restaurants\/[^/]+\/availability/.test(path) && method === 'GET') {
       return json(opts.slotsFull ? fullSlots() : openSlots());
+    }
+
+    // ── جزئیاتِ یک رستوران (صفحه‌ی rest + بخشِ منو — SPEC-A فاز ۱) ──
+    // ⚠️ باید *بعد از* هر دو الگویِ availability بماند؛ `[^/]+$` رشته‌ی
+    // «availability» را هم می‌گیرد و جابه‌جاییِ ترتیب آن‌ها را می‌دزدد.
+    if (/^\/restaurants\/[^/]+$/.test(path) && method === 'GET'
+        && path !== '/restaurants/availability' && path !== '/restaurants/live-stats') {
+      const slug = path.split('/').pop();
+      const r = DEMO_RESTAURANTS.find(x => x.slug === slug) || DEMO_RESTAURANTS[0];
+      // فقط رستورانِ اول منو دارد (حالتِ خالیِ صادق برای بقیه).
+      const extra = r.id === DEMO_RESTAURANTS[0].id ? DEMO_MENU : {};
+      // ⚠️ شکلِ واقعیِ پاسخِ backend **flat** است (restaurants/[slug]/route.ts —
+      // menu/photos/... در سطحِ بالا)؛ پوششِ {restaurant:...} غلط است.
+      return json({ ...r, ...extra });
     }
 
     // ── ساختِ رزرو (مسیرِ حیاتی) — code در سطحِ بالا (طبقِ قرارداد) ──

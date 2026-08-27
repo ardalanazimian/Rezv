@@ -2411,6 +2411,12 @@ const API = {
   menuCreate(body){ return this.post('/restaurant/menu', body); },
   menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
   menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  // ── دسته‌های رابطه‌ایِ منو + مرتب‌سازیِ دسته‌ای (SPEC-A فاز ۱ / ۰۷۷) ──
+  menuCategories(){ return this.get('/restaurant/menu/categories'); },
+  menuCategoryCreate(body){ return this.post('/restaurant/menu/categories', body); },
+  menuCategoryUpdate(id, body){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuCategoryDelete(id){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'DELETE' }); },
+  menuReorder(body){ return this.request('/restaurant/menu/reorder', { method:'PATCH', body: JSON.stringify(body) }); },
   /**
    * آپلود/جایگزینیِ عکسِ آیتمِ منو.
    * multipart است، پس نمی‌تواند از `post()` (که JSON می‌فرستد) عبور کند.
@@ -6066,9 +6072,8 @@ let MENU_ITEMS = [];
 let _menuLoaded = false;
 /** آدرسِ عمومیِ منو — از سرور می‌آید، نه ساختِ رشته اینجا. null = رستوران slug ندارد. */
 let MENU_PUBLIC_URL = null;
-
-/** دسته‌هایِ پیشنهادی. متنِ آزاد است — رستوران می‌تواند دسته‌ی دلخواه بنویسد. */
-const MENU_CATEGORY_SUGGESTIONS = ['پیش‌غذا', 'غذای اصلی', 'دسر', 'نوشیدنی', 'صبحانه'];
+/** دسته‌های رابطه‌ای (۰۷۷) — از سرور، با ترتیبِ خودِ رستوران‌دار. */
+let MENU_CATS = [];
 
 async function rMenu(){
   const el = document.getElementById('v-menu');
@@ -6094,6 +6099,7 @@ async function rMenu(){
     return;
   }
   MENU_ITEMS = res.data.items || [];
+  MENU_CATS = res.data.categories || [];
   MENU_PUBLIC_URL = res.data.public_menu_url || null;
   _menuLoaded = true;
   menuRender();
@@ -6103,11 +6109,13 @@ function menuRender(){
   const el = document.getElementById('v-menu');
   const active = MENU_ITEMS.filter(i=>i.is_active).length;
 
-  // گروه‌بندی بر اساسِ دسته، با «دسته‌بندی‌نشده» در انتها
-  const groups = {};
-  MENU_ITEMS.forEach(i=>{ const k = i.category || ''; (groups[k] = groups[k] || []).push(i); });
-  const keys = Object.keys(groups).filter(k=>k).sort((a,b)=>a.localeCompare(b,'fa'));
-  if(groups['']) keys.push('');
+  // گروه‌بندی بر اساسِ دسته‌ی رابطه‌ای (۰۷۷) با ترتیبِ خودِ رستوران‌دار؛
+  // آیتم‌های بدونِ دسته در انتها. دسته‌ی خالی هم رندر می‌شود تا دیده و
+  // مدیریت شود (وگرنه رستوران‌دار فکر می‌کند ساخته نشده).
+  const byCat = {};
+  MENU_ITEMS.forEach(i=>{ const k = i.category_id || ''; (byCat[k] = byCat[k] || []).push(i); });
+  const sections = MENU_CATS.map(c=>({ cat:c, items: byCat[c.id] || [] }));
+  const uncategorized = byCat[''] || [];
 
   el.innerHTML = `
     <div class="panel" style="margin-bottom:16px">
@@ -6116,7 +6124,10 @@ function menuRender(){
           <div class="panel-title">منویِ رستوران</div>
           <div class="panel-sub">${fa(MENU_ITEMS.length)} آیتم · ${fa(active)} فعال</div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="menuOpenForm()">${icon('plus',{size:15})} آیتمِ جدید</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-ghost" onclick="menuCatCreate()">${icon('plus',{size:14})} دسته‌ی جدید</button>
+          <button class="btn btn-primary btn-sm" onclick="menuOpenForm()">${icon('plus',{size:15})} آیتمِ جدید</button>
+        </div>
       </div>
       <div class="cash-note" style="margin-top:4px">${icon('info',{size:13})}
         منو تنها منبعِ مبلغ در رزرونوست: مهمان از همین فهرست پیش‌سفارش می‌دهد و
@@ -6127,19 +6138,37 @@ function menuRender(){
 
     ${menuPublicCardHTML(active)}
 
-    ${MENU_ITEMS.length === 0 ? `
+    ${(MENU_ITEMS.length === 0 && MENU_CATS.length === 0) ? `
       <div class="panel" style="text-align:center;padding:40px">
         <div style="margin-bottom:10px">${icon('menu',{size:30})}</div>
         <div style="font-weight:700;margin-bottom:6px">هنوز آیتمی در منو نیست</div>
         <div style="color:var(--t2);font-size:13px;margin-bottom:16px">اولین آیتم را اضافه کن تا مهمان‌ها بتوانند پیش‌سفارش بدهند.</div>
         <button class="btn btn-primary" onclick="menuOpenForm()">افزودنِ اولین آیتم</button>
       </div>` :
-      keys.map(k=>`
+      sections.map((sec,ix)=>menuCatSectionHTML(sec,ix,sections.length)).join('') + (uncategorized.length ? `
         <div class="panel" style="margin-bottom:14px">
-          <div class="panel-head"><div class="panel-title" style="font-size:15px">${k ? esc(k) : 'دسته‌بندی‌نشده'}</div></div>
-          ${groups[k].map(menuRowHTML).join('')}
-        </div>`).join('')
+          <div class="panel-head"><div class="panel-title" style="font-size:15px">دسته‌بندی‌نشده</div></div>
+          ${uncategorized.map(menuRowHTML).join('')}
+        </div>` : '')
     }`;
+}
+
+/** سکشنِ یک دسته: سربرگ با کنترل‌های مدیریت (جابه‌جایی/نام/فعال‌بودن) + ردیف‌ها. */
+function menuCatSectionHTML(sec, ix, total){
+  const c = sec.cat;
+  return `<div class="panel" style="margin-bottom:14px${c.is_active?'':';opacity:.65'}">
+    <div class="panel-head">
+      <div class="panel-title" style="font-size:15px">${esc(c.name)}${c.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-ghost" aria-label="انتقالِ دسته به بالا" ${ix===0?'disabled':''} onclick="menuCatMove(${jsq(c.id)},-1)">▲</button>
+        <button class="btn btn-sm btn-ghost" aria-label="انتقالِ دسته به پایین" ${ix===total-1?'disabled':''} onclick="menuCatMove(${jsq(c.id)},1)">▼</button>
+        <button class="btn btn-sm btn-ghost" onclick="menuCatRename(${jsq(c.id)})">تغییرِ نام</button>
+        <button class="btn btn-sm btn-ghost" onclick="menuCatToggle(${jsq(c.id)})">${c.is_active?'غیرفعال':'فعال‌سازی'}</button>
+      </div>
+    </div>
+    ${sec.items.length ? sec.items.map(menuRowHTML).join('')
+      : `<div style="color:var(--t2);font-size:13px;padding:6px 0">این دسته هنوز آیتمی ندارد.</div>`}
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -6370,9 +6399,12 @@ function menuRowHTML(i){
   return `<div class="top-cust" style="cursor:default;${i.is_active?'':'opacity:.55'}">
     ${thumb}
     <div class="top-body">
-      <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}</div>
+      <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}${i.is_out_of_stock?' <span class="seg-vip" style="background:var(--amber,#d97706)">ناموجود</span>':''}</div>
       <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}${i.image_url?'':' · بدونِ عکس'}</div>
     </div>
+    <button class="btn btn-sm btn-ghost" aria-pressed="${i.is_out_of_stock?'true':'false'}"
+      aria-label="${i.is_out_of_stock?'برگرداندن به موجود':'علامت‌گذاری به‌عنوانِ ناموجود'}"
+      onclick="menuToggleOut(${jsq(i.id)})">${i.is_out_of_stock?'موجود شد':'ناموجود'}</button>
     <button class="btn btn-sm btn-ghost" onclick="menuOpenForm(${jsq(i.id)})">ویرایش</button>
     <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuDelete(${jsq(i.id)})">حذف</button>
   </div>`;
@@ -6449,8 +6481,12 @@ function menuOpenForm(id){
     <div class="field-label">قیمت (تومان)</div>
     <input class="inp" id="miPrice" type="number" min="0" value="${it?it.price_toman:''}" placeholder="۱۸۵۰۰۰">
     <div class="field-label">دسته</div>
-    <input class="inp" id="miCat" maxlength="60" list="miCatList" value="${it&&it.category?esc(it.category):''}" placeholder="اختیاری">
-    <datalist id="miCatList">${MENU_CATEGORY_SUGGESTIONS.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+    <select class="inp" id="miCat">
+      <option value="">بدونِ دسته</option>
+      ${MENU_CATS.filter(c=>c.is_active || (it&&it.category_id===c.id)).map(c=>
+        `<option value="${esc(c.id)}"${it&&it.category_id===c.id?' selected':''}>${esc(c.name)}${c.is_active?'':' (غیرفعال)'}</option>`).join('')}
+    </select>
+    ${MENU_CATS.length===0?`<div style="color:var(--t2);font-size:12px;margin-top:4px">هنوز دسته‌ای نساخته‌ای — با «دسته‌ی جدید» بالای صفحه بساز.</div>`:''}
     <div class="field-label">ایموجی</div>
     <input class="inp" id="miEmoji" maxlength="16" value="${it&&it.emoji?esc(it.emoji):''}" placeholder="اختیاری — مثلاً 🍝">
     <div class="field-label">توضیح</div>
@@ -6467,9 +6503,13 @@ function menuOpenForm(id){
     <div style="color:var(--t2);font-size:12px;margin-top:4px">
       عددِ کوچک‌تر بالاتر نشان داده می‌شود. آیتم‌هایِ هم‌عدد بر اساسِ نام مرتب می‌شوند.
     </div>
-    <label style="display:flex;align-items:center;gap:8px;margin:12px 0">
+    <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px">
       <input type="checkbox" id="miActive" ${!it || it.is_active ? 'checked' : ''}>
       <span>در منو نمایش داده شود</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;margin:4px 0 12px">
+      <input type="checkbox" id="miOut" ${it && it.is_out_of_stock ? 'checked' : ''}>
+      <span>ناموجود (با برچسب دیده می‌شود؛ از پیش‌سفارش کنار می‌رود)</span>
     </label>
     <button class="btn btn-primary btn-block" onclick="menuSave(${id?`${jsq(id)}`:'null'})">${it?'ذخیره':'افزودن'}</button>`);
 }
@@ -6485,9 +6525,11 @@ async function menuSave(id){
   const body = {
     name,
     price_toman: price,
-    category: (document.getElementById('miCat').value||'').trim() || null,
+    // دسته‌ی رابطه‌ای (۰۷۷) — سرور خودش میرورِ متنی را از نامِ دسته می‌سازد.
+    category_id: document.getElementById('miCat').value || null,
     emoji: (document.getElementById('miEmoji').value||'').trim() || null,
     is_active: document.getElementById('miActive').checked,
+    is_out_of_stock: document.getElementById('miOut').checked,
     description: (document.getElementById('miDesc').value||'').trim() || null,
     // image_url اینجا نیست: عکس فقط با آپلودِ فایل عوض می‌شود (menuPickPhoto).
     sort_order: Number.isFinite(sort) && sort >= 0 ? sort : 0,
@@ -6514,6 +6556,103 @@ async function menuDelete(id){
   // ثبت‌شده به‌کار رفته حذف نمی‌شود تا سابقه‌ی مبلغ سالم بماند). پیامِ خودِ
   // سرور نشان داده می‌شود تا رستوران‌دار دقیقاً بداند چه شد.
   toast(res.data?.archived ? '' : '✓', res.data?.message || 'آیتم حذف شد');
+  rMenu();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  مدیریتِ دسته‌ها (SPEC-A فاز ۱ / ۰۷۷) + toggleِ «ناموجود»
+// ═══════════════════════════════════════════════════════════════════════
+
+/** toggleِ سریعِ «ناموجود» — بدونِ باز کردنِ فرم؛ فقط بعد از تأییدِ سرور رندر. */
+async function menuToggleOut(id){
+  const it = MENU_ITEMS.find(x=>x.id===id);
+  if(!it) return;
+  const res = await API.menuUpdate(id, { is_out_of_stock: !it.is_out_of_stock });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ثبت نشد'));
+    return;
+  }
+  it.is_out_of_stock = res.data.is_out_of_stock;
+  menuRender();
+  toast('✓', it.is_out_of_stock ? `«${it.name}» ناموجود شد — در منو با برچسب دیده می‌شود` : `«${it.name}» دوباره موجود شد`);
+}
+
+function menuCatCreate(){
+  openModal(`
+    <div class="modal-title">دسته‌ی جدید</div>
+    <div class="field-label" style="margin-top:12px">نامِ دسته</div>
+    <input class="inp" id="mcName" maxlength="60" placeholder="مثلاً پیش‌غذا">
+    <button class="btn btn-primary btn-block" style="margin-top:12px" onclick="menuCatCreateSave()">ساختنِ دسته</button>`);
+  const inp = document.getElementById('mcName');
+  if(inp) inp.focus();
+}
+
+async function menuCatCreateSave(){
+  const name = (document.getElementById('mcName').value||'').trim();
+  if(!name){ toast('','نامِ دسته لازم است'); return; }
+  const res = await API.menuCategoryCreate({ name, sort_order: (MENU_CATS.length + 1) * 10 });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ساخته نشد'));
+    return;
+  }
+  closeModal();
+  toast('✓', `دسته‌ی «${name}» ساخته شد`);
+  rMenu();
+}
+
+function menuCatRename(id){
+  const c = MENU_CATS.find(x=>x.id===id);
+  if(!c) return;
+  openModal(`
+    <div class="modal-title">تغییرِ نامِ دسته</div>
+    <div class="field-label" style="margin-top:12px">نامِ تازه</div>
+    <input class="inp" id="mcName" maxlength="60" value="${esc(c.name)}">
+    <div style="color:var(--t2);font-size:12px;margin-top:6px">
+      نامِ تازه بلافاصله در منویِ عمومی و آیتم‌های این دسته هم اعمال می‌شود.
+    </div>
+    <button class="btn btn-primary btn-block" style="margin-top:12px" onclick="menuCatRenameSave(${jsq(id)})">ذخیره</button>`);
+}
+
+async function menuCatRenameSave(id){
+  const name = (document.getElementById('mcName').value||'').trim();
+  if(!name){ toast('','نامِ دسته لازم است'); return; }
+  const res = await API.menuCategoryUpdate(id, { name });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ذخیره نشد'));
+    return;
+  }
+  closeModal();
+  toast('✓','نامِ دسته عوض شد');
+  rMenu();
+}
+
+/** فعال/غیرفعال‌کردنِ دسته. غیرفعال = حذفِ نرم (endpointِ DELETE)؛ فعال‌سازی = PATCH. */
+async function menuCatToggle(id){
+  const c = MENU_CATS.find(x=>x.id===id);
+  if(!c) return;
+  const res = c.is_active
+    ? await API.menuCategoryDelete(id)
+    : await API.menuCategoryUpdate(id, { is_active: true });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ثبت نشد'));
+    return;
+  }
+  toast(c.is_active ? '' : '✓', c.is_active ? (res.data?.message || 'دسته غیرفعال شد') : `دسته‌ی «${c.name}» فعال شد`);
+  rMenu();
+}
+
+/** جابه‌جاییِ ترتیبِ دسته با دکمه‌های بالا/پایین — کلِ ترتیبِ تازه در یک PATCH. */
+async function menuCatMove(id, dir){
+  const ix = MENU_CATS.findIndex(x=>x.id===id);
+  const jx = ix + dir;
+  if(ix < 0 || jx < 0 || jx >= MENU_CATS.length) return;
+  const order = MENU_CATS.slice();
+  const tmp = order[ix]; order[ix] = order[jx]; order[jx] = tmp;
+  const res = await API.menuReorder({ categories: order.map((c, i) => ({ id: c.id, sort_order: (i + 1) * 10 })) });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ترتیب ثبت نشد'));
+    return;
+  }
   rMenu();
 }
 

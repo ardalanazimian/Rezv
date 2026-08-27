@@ -88,6 +88,7 @@ import './guest-profile-rollup.integration.test.mts';
 import './events-restaurant-slug.integration.test.mts';
 import './member-create.integration.test.mts';
 import './menu-crud.integration.test.mts';
+import './menu-categories.integration.test.mts';
 import './ml-feature-v2.test.mts';
 import './ml-safety-gates.test.mts';
 import './ratelimit-coverage.test.mts';
