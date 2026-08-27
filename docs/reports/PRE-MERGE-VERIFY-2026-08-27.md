@@ -180,3 +180,65 @@ DOC-AUDIT هنوز روی هیچ شاخه‌ای اجرا نشده. آن‌چه 
   روی `origin/main` برگردانید تا merge‌های آینده گمراه نشوند.
 - هیچ‌کدام از آن دو snapshot در تاریخچه‌ی شاخه‌ی فعلی نیستند (تأییدشده با
   `merge-base --is-ancestor`).
+
+---
+
+## الحاقیه — بازبینیِ دوم (پیش از merge، همان روز)
+
+### ۱′ · ریسکِ ۰۷۹ روی داده‌ی واقعی
+
+کوئریِ مالک روی **هر DB قابل‌دسترس از این ماشین** اجرا شد:
+
+```text
+تستِ (55432):                      0 rows  ← امن
+استکِ محلیِ compose (rezv_pgdata):  0 rows  ← امن (۲ ownerِ seed، شماره‌ها متمایز؛
+                                            dupِ manager بینِ تنانت‌ها قانونی و خارج از predicate)
+production / staging:  از این ماشین connection stringی وجود ندارد —
+   .env فقط استکِ محلی است (۰۸-۲۶)، DEPLOYMENT.md §۶ می‌گوید DBِ تولید
+   همان استکِ self-hostedِ compose است و env-varهای Vercel فقط در
+   داشبورد؛ هیچ سندی staging تعریف نکرده. هیچ محیطِ مستقر شناسایی نشد.
+```
+
+پیش‌نیازِ اجباری (کوئری + قاعده‌ی «حذفِ خودکار ممنوع، لیست برای مالک») در
+headerِ خودِ ۰۷۹ و در DATABASE.md ثبت شد — برای هر deployِ آینده برقرار است.
+یادداشت: seed غیرidempotent است؛ اجرای دوباره‌اش پس از ۰۷۹ زودتر (روی همین
+ایندکس به‌جای slug) می‌میرد — همان کلاسِ tolerated در docker-entrypoint؛ نصبِ
+تازه امن است.
+
+### ۲′ · مسیرِ سوم — حق با بازبین بود
+
+sweepِ کاملِ نوشتن‌های staff (شش سایتِ Prisma + seedها + راه‌های SQL خام):
+`POST /admin/staff-credentials` دقیقاً همان مسیرِ سوم بود — هم createِ
+پیش‌فرضش owner است هم با `role` در بدنه یک staff/manager موجود را **ارتقا**
+می‌دهد (و ایندکسِ جزئی UPDATE را هم می‌گیرد). تا این اصلاح، برخورد ⇒ ۵۰۰ِ
+خامِ P2002. حالا: پیش‌چکِ خوانا + نگاشتِ P2002 → ۴۰۹ِ `duplicate_owner_phone`
+(همان الگوی provisioning). سه تستِ تازه در password-login: create-تداخل ⇒
+۴۰۹ بدونِ ردیفِ تازه؛ ارتقا-تداخل ⇒ ۴۰۹ و نقش/اعتبارنامه دست‌نخورده؛ ارتقای
+بی‌تداخل ⇒ همچنان ۲۰۰ (گارد بیش‌ازحد نمی‌بندد).
+بقیه‌ی مسیرها ساختاراً بسته‌اند: `POST /restaurant/staff` enumِ بدونِ owner؛
+`PATCH /restaurant/staff` اصلاً فیلدِ role/phone ندارد و ownerها را دست‌نزدنی
+می‌داند (خطِ ۱۵۱)؛ password/route فقط hash/username.
+
+### ۳′ · ownerِ غیرفعال/OFFBOARDED — عمدی، با دلیلِ ساختاری
+
+resolutionِ ورود («قدیمی‌ترین برنده»، `findStaffForLogin`) **بدونِ** فیلترِ
+isActive اجرا می‌شود و بعد ردیفِ غیرفعال رد می‌شود (`auth/staff/verify:42-44`)
+⇒ ownerِ جدیدِ هم‌شماره با ردیفِ غیرفعالِ قدیمی‌تر = حسابِ مرده. به‌علاوه
+predicateِ «AND is_active» خودِ reactivation را مسیرِ نقضِ تازه می‌کرد. پس
+شرطِ is_active عمداً نیست؛ پیامد (قفلِ شماره پس از offboard تا آزادسازیِ
+دستی) و مسیرِ آزادسازی (تغییر/آزادکردنِ phone یا حذفِ ردیف — demote کافی
+نیست چون چک‌های appسطح هر ردیفِ staff را می‌بینند) در headerِ ۰۷۹ و
+DATABASE.md ثبت شد.
+
+### ۴′ · mainِ محلی
+
+`git tag backup/local-main-8b5f475` (محلی) → `git branch -f main origin/main`
+— main محلی حالا `6df7ac0` است؛ کامیتِ یتیم پشتِ tag محفوظ.
+
+### verify بازبینیِ دوم
+
+```text
+tsc --noEmit: صفر خطا · eslint: پاک
+password-login (شاملِ ۳ تستِ تازه): tests 18 · pass 18 · fail 0
+سوئیتِ کاملِ بک‌اند: tests 1438 · pass 1438 · fail 0  (۱۴۳۵ + ۳ تستِ مسیرِ سوم)
+```

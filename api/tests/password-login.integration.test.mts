@@ -24,6 +24,7 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db');
+const { normalizePhone } = await import('../src/lib/otp');
 const { hashPassword, verifyPassword, normalizeUsername } = await import('../src/lib/password');
 const adminLogin = await import('../src/app/api/v1/auth/admin/login/route');
 const staffLogin = await import('../src/app/api/v1/auth/staff/login/route');
@@ -230,6 +231,78 @@ describe('🔴 مرزها — چیزهایی که نباید کار کنند', (
       assert.ok(res.status === 401 || res.status === 422, `رمزِ «${p}» نباید کار کند (${res.status})`);
     }
     await db.staff.delete({ where: { id: s.id } });
+  });
+
+  // ═══ مسیرِ سومِ ایندکسِ ۰۷۹ (بازبینیِ مالک، ۰۸-۲۷): این upsert هم owner می‌سازد ═══
+
+  test('🔴 ساختِ اعتبارنامه با شماره‌ای که در تنانتِ دیگری owner است → ۴۰۹ خوانا، نه ۵۰۰', async () => {
+    const admin = await (await adminLogin.POST(post({ username: ADMIN_USER, password: ADMIN_PASS }))).json();
+    // staff.phone همیشه نرمال‌شده (+98…) ذخیره می‌شود؛ درجِ خام تداخل را جور نمی‌کند.
+    const phone = normalizePhone(fixturePhone('0925'));
+    const other = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-other1` }, select: { id: true } });
+    try {
+      await db.staff.create({ data: { tenantId: other.id, phone, role: 'owner', isActive: true } });
+      // بدونِ role در بدنه → پیش‌فرضِ create برابرِ owner است (خطِ ۱۰۹ route).
+      const res = await creds.POST(post({
+        restaurant_id: restaurantId, phone,
+        username: `dup1_${TAG}`, password: 'Whatever!2026',
+      }, admin.access));
+      assert.equal(res.status, 409, await res.clone().text());
+      assert.equal((await res.json()).error?.details?.reason, 'duplicate_owner_phone');
+      // هیچ ردیفی در تنانتِ مقصد ساخته نشده
+      assert.equal(await db.staff.count({ where: { tenantId: bizTenantId, phone } }), 0);
+    } finally {
+      await db.staff.deleteMany({ where: { tenantId: other.id } }).catch(() => {});
+      await db.tenant.delete({ where: { id: other.id } }).catch(() => {});
+    }
+  });
+
+  test('🔴 ارتقایِ staff موجود به owner وقتی شماره‌اش جای دیگری owner است → ۴۰۹ و نقش دست‌نخورده', async () => {
+    // ایندکسِ جزئی UPDATE را هم می‌گیرد (predicate روی role است) — این تست
+    // دقیقاً همان مسیرِ ارتقاست، نه create.
+    const admin = await (await adminLogin.POST(post({ username: ADMIN_USER, password: ADMIN_PASS }))).json();
+    const phone = normalizePhone(fixturePhone('0925'));
+    const other = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-other2` }, select: { id: true } });
+    const local = await db.staff.create({
+      data: { tenantId: bizTenantId, phone, role: 'staff', isActive: true },
+      select: { id: true },
+    });
+    try {
+      await db.staff.create({ data: { tenantId: other.id, phone, role: 'owner', isActive: true } });
+      const res = await creds.POST(post({
+        restaurant_id: restaurantId, phone, role: 'owner',
+        username: `dup2_${TAG}`, password: 'Whatever!2026',
+      }, admin.access));
+      assert.equal(res.status, 409, await res.clone().text());
+      assert.equal((await res.json()).error?.details?.reason, 'duplicate_owner_phone');
+      const after = await db.staff.findUnique({ where: { id: local.id }, select: { role: true, username: true } });
+      assert.equal(after?.role, 'staff', 'ارتقا نباید نصفه اعمال شده باشد');
+      assert.equal(after?.username, null, 'اعتبارنامه هم نباید نصفه ست شده باشد');
+    } finally {
+      await db.staff.deleteMany({ where: { tenantId: other.id } }).catch(() => {});
+      await db.staff.delete({ where: { id: local.id } }).catch(() => {});
+      await db.tenant.delete({ where: { id: other.id } }).catch(() => {});
+    }
+  });
+
+  test('ارتقایِ staff به owner با شماره‌ی بدونِ تداخل همچنان کار می‌کند (گاردِ جدید بیش‌ازحد نمی‌بندد)', async () => {
+    const admin = await (await adminLogin.POST(post({ username: ADMIN_USER, password: ADMIN_PASS }))).json();
+    const phone = normalizePhone(fixturePhone('0925'));
+    const local = await db.staff.create({
+      data: { tenantId: bizTenantId, phone, role: 'staff', isActive: true },
+      select: { id: true },
+    });
+    try {
+      const res = await creds.POST(post({
+        restaurant_id: restaurantId, phone, role: 'owner',
+        username: `ok_${TAG}`, password: 'Whatever!2026',
+      }, admin.access));
+      assert.equal(res.status, 200, await res.clone().text());
+      const after = await db.staff.findUnique({ where: { id: local.id }, select: { role: true } });
+      assert.equal(after?.role, 'owner');
+    } finally {
+      await db.staff.delete({ where: { id: local.id } }).catch(() => {});
+    }
   });
 });
 

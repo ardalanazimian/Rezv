@@ -6,6 +6,7 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, parseQuery, zUuid, zPhone, zUsername, zPassword, z } from '@/lib/schemas';
 import { normalizePhone } from '@/lib/otp';
 import { hashPassword, normalizeUsername, passwordPolicyError, usernamePolicyError } from '@/lib/password';
+import { isOwnerPhoneUniqueViolation } from '@/lib/staff-helpers';
 import { audit } from '@/lib/audit';
 
 import { withApiMetrics } from '@/lib/api-metrics';
@@ -99,7 +100,7 @@ async function POST_impl(req: Request) {
 
     const existing = await db.staff.findUnique({
       where: { tenantId_phone: { tenantId: restaurant.tenantId, phone } },
-      select: { id: true },
+      select: { id: true, role: true },
     });
     if (taken && taken.id !== existing?.id) {
       throw Err.validation('این نام کاربری قبلاً گرفته شده است');
@@ -107,6 +108,27 @@ async function POST_impl(req: Request) {
 
     const passwordHash = await hashPassword(b.password);
     const role = b.role ?? 'owner';
+
+    // ⚠️ مسیرِ سومِ برخورد با ایندکسِ ۰۷۹ (staff_owner_phone_unique_idx):
+    // این upsert هم می‌تواند ردیفِ **تازه‌ی** owner بسازد (create با نقشِ
+    // پیش‌فرضِ owner) هم یک staff/manager موجود را به owner **ارتقا** دهد
+    // (update با b.role) — و ایندکسِ جزئی UPDATE را هم می‌گیرد. بدونِ این
+    // گارد، برخورد با ownerِ تنانتِ دیگر ۵۰۰ِ خامِ P2002 می‌شد. همان الگوی
+    // provisioning: چکِ خوانا اول (fast-path)، ایندکس پشتوانه‌ی ضدِ race،
+    // نگاشتِ P2002 پایین.
+    const willBeOwner = existing ? (b.role ?? existing.role) === 'owner' : role === 'owner';
+    if (willBeOwner && existing?.role !== 'owner') {
+      const otherOwner = await db.staff.findFirst({
+        where: { phone, role: 'owner', NOT: { tenantId: restaurant.tenantId } },
+        select: { id: true },
+      });
+      if (otherOwner) {
+        throw Err.conflict(
+          'duplicate_owner_phone',
+          'این شماره از قبل حسابِ مالک در کسب‌وکارِ دیگری دارد. برای شعبه‌ی جدیدِ همان مالک از «افزودنِ شعبه» استفاده کنید.',
+        );
+      }
+    }
 
     const staff = await db.staff.upsert({
       where: { tenantId_phone: { tenantId: restaurant.tenantId, phone } },
@@ -120,6 +142,16 @@ async function POST_impl(req: Request) {
         ...(b.role === undefined ? {} : { role }),
       },
       select: { id: true, username: true, role: true, phone: true, name: true, tenantId: true },
+    }).catch((e: unknown) => {
+      // بازنده‌ی raceِ هم‌زمان (که از چکِ بالا رد شده) روی ایندکسِ ۰۷۹ —
+      // همان ۴۰۹ِ مسیرِ ترتیبی، نه ۵۰۰ِ خام.
+      if (isOwnerPhoneUniqueViolation(e)) {
+        throw Err.conflict(
+          'duplicate_owner_phone',
+          'این شماره از قبل حسابِ مالک در کسب‌وکارِ دیگری دارد. برای شعبه‌ی جدیدِ همان مالک از «افزودنِ شعبه» استفاده کنید.',
+        );
+      }
+      throw e;
     });
 
     // ⚠️ رمز **هرگز** در audit نمی‌رود — فقط اینکه عوض شد و توسطِ که.
