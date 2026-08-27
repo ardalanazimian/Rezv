@@ -54,21 +54,127 @@ function rootHooks(src: string, fileName: string) {
   return out;
 }
 
+// ⚠️ نسخه‌ی اولِ این آشکارساز فقط *متنِ خام* را با پیشوند مچ می‌کرد
+// (`^globalThis\.` و …). بازبینیِ ۲۰۲۶-۰۸-۲۷ درست گفت که این سوراخ دارد:
+// `process.env['X']`، `Object.assign(process.env, …)`، `process.env.X ??= …`
+// و نامِ دیگری برای کلاینتِ Redis همگی از کنارش رد می‌شدند — یعنی گارد
+// می‌توانست سبز بماند در حالی که آلودگیِ بینِ تست‌ها اضافه شده است.
+// حالا مسیرها روی AST نرمال می‌شوند (`a['b']` ⇒ `a.b`)، هر عملگرِ انتساب
+// شمرده می‌شود، و نامِ کلاینتِ Redis از importها استخراج می‌گردد.
+//
+// 🔬 حدِّ صادقانه (ادعا نمی‌کنم کامل است): aliasِ **یک‌سطحیِ مستقیم** دنبال
+// می‌شود (`const env = process.env; env.X = 1`)، ولی نه ارجاعِ غیرمستقیم —
+// مثلاً وقتی `process.env` به یک تابعِ کمکی پاس داده شود و آن تابع بنویسد.
+// تشخیصِ آن به type-checkerِ کامل و dataflow نیاز دارد و از دامنه‌ی این گارد
+// بیرون است. این گارد «شبکه‌ی ایمنیِ الگوهای رایج» است، نه اثبات.
+
+/** مسیرِ نقطه‌ایِ نرمال‌شده‌ی یک دسترسی به property (یا null اگر مسیر نباشد). */
+function pathOf(n: ts.Node): string | null {
+  if (ts.isIdentifier(n)) return n.text;
+  if (ts.isPropertyAccessExpression(n)) {
+    const base = pathOf(n.expression);
+    return base ? `${base}.${n.name.text}` : null;
+  }
+  if (ts.isElementAccessExpression(n)) {
+    const base = pathOf(n.expression);
+    if (!base) return null;
+    const arg = n.argumentExpression;
+    // `process.env['X']` ⇒ `process.env.X` تا کلیدِ خط‌مبنا با فرمِ نقطه‌ای یکی شود.
+    if (ts.isStringLiteralLike(arg)) return `${base}.${arg.text}`;
+    return `${base}.[expr]`; // ایندکسِ پویا — ریشه همان است و همان‌قدر خطرناک
+  }
+  if (ts.isParenthesizedExpression(n)) return pathOf(n.expression);
+  return null;
+}
+
+const GLOBAL_ROOTS = ['globalThis', 'global', 'process.env'];
+function isGlobalPath(p: string): boolean {
+  return GLOBAL_ROOTS.some((r) => p === r || p.startsWith(`${r}.`));
+}
+
+/** aliasِ یک‌سطحی: `const env = process.env` / `const g = globalThis`. */
+function aliasMap(sf: ts.SourceFile): Map<string, string> {
+  const out = new Map<string, string>();
+  const visit = (n: ts.Node) => {
+    if (ts.isVariableDeclaration(n) && n.initializer && ts.isIdentifier(n.name)) {
+      const init = pathOf(n.initializer);
+      if (init && GLOBAL_ROOTS.includes(init)) out.set(n.name.text, init);
+    }
+    ts.forEachChild(n, visit);
+  };
+  ts.forEachChild(sf, visit);
+  return out;
+}
+
+/** ریشه‌ی مسیر را اگر alias بود به مسیرِ سراسریِ واقعی بازمی‌نویسد. */
+function deAlias(p: string | null, aliases: Map<string, string>): string | null {
+  if (!p) return null;
+  const dot = p.indexOf('.');
+  const root = dot === -1 ? p : p.slice(0, dot);
+  const mapped = aliases.get(root);
+  if (!mapped) return p;
+  return dot === -1 ? mapped : mapped + p.slice(dot);
+}
+
+/** نام‌هایی که از یک ماژولِ Redis import شده‌اند (هر aliasی که import داده باشد). */
+function redisBindings(sf: ts.SourceFile): Set<string> {
+  const out = new Set<string>();
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt)) continue;
+    const spec = stmt.moduleSpecifier;
+    if (!ts.isStringLiteralLike(spec) || !/redis/i.test(spec.text)) continue;
+    const c = stmt.importClause;
+    if (!c) continue;
+    if (c.name) out.add(c.name.text);
+    const nb = c.namedBindings;
+    if (nb && ts.isNamespaceImport(nb)) out.add(nb.name.text);
+    else if (nb && ts.isNamedImports(nb)) for (const el of nb.elements) out.add(el.name.text);
+  }
+  return out;
+}
+
+/** متدهایی که حالتِ مشترکِ Redis را **پاک** می‌کنند (خواندن مهم نیست). */
+const REDIS_DESTRUCTIVE = new Set(['del', 'unlink', 'flushall', 'flushdb']);
+
+function isRedisRef(recv: string, bindings: Set<string>): boolean {
+  const root = recv.split('.')[0];
+  return bindings.has(root) || /redis/i.test(root) || /redis/i.test(recv);
+}
+
+/** آیا این عملگر، انتساب است؟ (شاملِ `=`، `+=`، `||=`، `??=` و …) */
+function isAssignmentOperator(k: ts.SyntaxKind): boolean {
+  return k >= ts.SyntaxKind.FirstAssignment && k <= ts.SyntaxKind.LastAssignment;
+}
+
 /** نوشتنِ حالتِ سراسری در بدنه‌ی یک هوک. خروجی مرتب‌شده تا کلید پایدار بماند. */
 function globalWrites(node: ts.Node, sf: ts.SourceFile): string[] {
   const hits = new Set<string>();
+  const aliases = aliasMap(sf);
+  const redisNames = redisBindings(sf);
   const visit = (n: ts.Node) => {
-    if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-      const t = n.left.getText(sf);
-      if (/^(globalThis|global)\.|^process\.env\./.test(t)) hits.add(`set:${t}`);
+    if (ts.isBinaryExpression(n) && isAssignmentOperator(n.operatorToken.kind)) {
+      const t = deAlias(pathOf(n.left), aliases);
+      if (t && isGlobalPath(t)) hits.add(`set:${t}`);
     }
     if (ts.isDeleteExpression(n)) {
-      const t = n.expression.getText(sf);
-      if (/^process\.env\./.test(t)) hits.add(`del:${t}`);
+      const t = deAlias(pathOf(n.expression), aliases);
+      if (t && isGlobalPath(t)) hits.add(`del:${t}`);
     }
-    if (ts.isCallExpression(n)) {
-      const t = n.expression.getText(sf);
-      if (/^redis\.(del|flushall|flushdb)$/.test(t)) hits.add(`redis:${t}`);
+    if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)) {
+      const callee = n.expression;
+      const method = callee.name.text;
+
+      // `Object.assign(process.env, {...})` — نوشتنِ دسته‌جمعی
+      if (method === 'assign' && pathOf(callee.expression) === 'Object' && n.arguments.length > 0) {
+        const target = deAlias(pathOf(n.arguments[0]), aliases);
+        if (target && isGlobalPath(target)) hits.add(`set:${target}.*`);
+      }
+
+      // پاک‌کردنِ کلیدهای Redis — با هر نامی که کلاینت import شده باشد
+      const recv = pathOf(callee.expression);
+      if (recv && REDIS_DESTRUCTIVE.has(method.toLowerCase()) && isRedisRef(recv, redisNames)) {
+        hits.add(`redis:${recv}.${method}`);
+      }
     }
     ts.forEachChild(n, visit);
   };
@@ -131,6 +237,56 @@ describe('گاردِ ساختاری — هوکِ ریشه‌ای که حالتِ
     assert.equal(hooks.length, 1);
     assert.deepEqual(globalWrites(hooks[0].node, hooks[0].sf), [],
       'ساختِ فیکسچرِ خودی نباید خطرناک شمرده شود');
+  });
+
+  // ── کنترل‌های مثبتِ فرم‌هایی که نسخه‌ی اولِ آشکارساز از دستشان می‌داد ──
+  // هرکدام یک باگِ واقعیِ گارد بود، نه فرضِ نظری: دو موردِ اولْ همان روزی که
+  // اضافه شدند دو هوکِ ریشه‌ایِ واقعی را در همین ریپو لو دادند
+  // (`auth-guards` و `sms-queue-fallback-balance`).
+  const detect = (src: string) => {
+    const hooks = rootHooks(src, 'synthetic.ts');
+    assert.equal(hooks.length, 1, 'هوکِ ریشه باید پیدا شود');
+    return globalWrites(hooks[0].node, hooks[0].sf);
+  };
+
+  test('کنترلِ مثبت: نوشتن با براکت (`process.env[k]`) هم دیده می‌شود', () => {
+    assert.deepEqual(detect("after(() => { process.env['SMS_KEY'] = 'x'; });"),
+      ['set:process.env.SMS_KEY']);
+    // ایندکسِ پویا هم همان‌قدر خطرناک است و نباید بی‌صدا رد شود.
+    assert.deepEqual(detect('after(() => { process.env[k] = v; });'),
+      ['set:process.env.[expr]']);
+  });
+
+  test('کنترلِ مثبت: `delete` با براکت هم دیده می‌شود', () => {
+    assert.deepEqual(detect('before(() => { delete process.env[k]; });'),
+      ['del:process.env.[expr]']);
+  });
+
+  test('کنترلِ مثبت: عملگرهای انتسابِ دیگر (`??=`, `+=`) هم انتساب‌اند', () => {
+    assert.deepEqual(detect("before(() => { process.env.FLAG ??= '1'; });"),
+      ['set:process.env.FLAG']);
+  });
+
+  test('کنترلِ مثبت: `Object.assign(process.env, …)` نوشتنِ دسته‌جمعی است', () => {
+    assert.deepEqual(detect("before(() => { Object.assign(process.env, { A: '1' }); });"),
+      ['set:process.env.*']);
+  });
+
+  test('کنترلِ مثبت: aliasِ یک‌سطحیِ مستقیم دنبال می‌شود', () => {
+    const src = "const env = process.env;\nbefore(() => { env.SMS_KEY = 'x'; });";
+    assert.deepEqual(detect(src), ['set:process.env.SMS_KEY']);
+  });
+
+  test('کنترلِ مثبت: کلاینتِ Redis با هر نامی که import شده باشد', () => {
+    const src = "import { redis as r } from '../src/lib/redis.ts';\nafter(() => { r.flushall(); });";
+    assert.deepEqual(detect(src), ['redis:r.flushall']);
+  });
+
+  test('کنترلِ منفی: پاک‌کردنِ فیکسچرِ خودی هنوز آزاد است', () => {
+    // بدونِ این، سخت‌گیریِ تازه ۱۵۸ هوکِ درست را قرمز می‌کرد.
+    assert.deepEqual(detect("after(async () => { await db.tenant.deleteMany({ where: { id } }); });"), []);
+    assert.deepEqual(detect('before(() => { const v = process.env.NODE_ENV; use(v); });'), [],
+      '**خواندنِ** متغیرِ محیطی نوشتن نیست');
   });
 
   test('🔴 هیچ موردِ تازه‌ای بیرون از خط‌مبنا اضافه نشده', () => {

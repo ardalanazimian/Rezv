@@ -157,3 +157,108 @@ describe('Idempotency — رفتارِ پایه', () => {
       'ردیفِ زنده باید بماند');
   });
 });
+
+describe('Idempotency — مالکیتِ claim (قفلِ باگِ «پاک‌کردنِ claimِ دیگری»)', () => {
+  // ⚠️ باگی که بازبینیِ ۲۰۲۶-۰۸-۲۷ گرفت: `release()`/`commit()` فقط با `key`
+  // کار می‌کردند، پس درخواستِ کهنه‌ای که claimش بازپس‌گرفته شده بود می‌توانست
+  // ردیفِ **بازپس‌گیرنده** را پاک یا بازنویسی کند.
+  //
+  // «گذرِ زمان» با عقب‌بردنِ `created_at` شبیه‌سازی می‌شود؛ راهِ دیگری نیست چون
+  // آستانه (۶۰ ثانیه) ثابتِ ماژول است و انتظارِ واقعی تست را ۶۰ ثانیه‌ای می‌کند.
+  // چیزی که سنجیده می‌شود همان ثابتِ واقعی است: «نوشتنِ یک claimِ منسوخ نباید
+  // به claimِ فعلی برسد».
+
+  /** ردیف را آن‌قدر عقب می‌برد که «کهنه» شمرده شود. */
+  async function ageOut(scope: string) {
+    await db.$executeRaw`
+      UPDATE idempotency_keys SET created_at = now() - interval '61 seconds' WHERE scope = ${scope}
+    `;
+  }
+
+  test('releaseِ درخواستِ کهنه، claimِ بازپس‌گیرنده را حذف نمی‌کند', async () => {
+    const key = clientKey('own-release');
+    const scope = `${TAG}:own-release`;
+    const actor = 'customer:own1';
+
+    const a = await withIdempotency<{ who: string }>(key, scope, actor);
+    assert.equal(a.replayed, false, 'پیش‌شرط: A باید claim کند');
+    if (a.replayed) return;
+
+    await ageOut(scope);
+
+    const b = await withIdempotency<{ who: string }>(key, scope, actor);
+    assert.equal(b.replayed, false, 'پیش‌شرط: کلیدِ کهنه باید بازپس‌گرفته شود');
+    if (b.replayed) return;
+
+    // A حالا شکست می‌خورد و claimِ (منسوخ‌شده‌یِ) خودش را آزاد می‌کند.
+    await a.release();
+
+    const rows = await db.idempotencyKey.findMany({ where: { scope } });
+    assert.equal(rows.length, 1,
+      'releaseِ A نباید ردیفِ B را پاک کند — وگرنه یک درخواستِ سومِ همزمان ' +
+      'به‌جای ۴۰۹ اجازه‌ی اجرا می‌گیرد');
+    assert.equal(rows[0].status, 'in_progress');
+
+    // کنترلِ مثبت: claimِ B هنوز سالم است و مسیرِ عادی کار می‌کند.
+    await b.commit({ who: 'B' });
+    const third = await withIdempotency<{ who: string }>(key, scope, actor);
+    assert.equal(third.replayed, true, 'کنترلِ مثبت: پاسخِ B باید replay شود');
+    if (third.replayed) assert.equal(third.response.who, 'B');
+  });
+
+  test('commitِ درخواستِ کهنه، پاسخِ بازپس‌گیرنده را بازنویسی نمی‌کند', async () => {
+    const key = clientKey('own-commit');
+    const scope = `${TAG}:own-commit`;
+    const actor = 'customer:own2';
+
+    const a = await withIdempotency<{ who: string }>(key, scope, actor);
+    assert.equal(a.replayed, false, 'پیش‌شرط: A باید claim کند');
+    if (a.replayed) return;
+
+    await ageOut(scope);
+
+    const b = await withIdempotency<{ who: string }>(key, scope, actor);
+    assert.equal(b.replayed, false, 'پیش‌شرط: کلیدِ کهنه باید بازپس‌گرفته شود');
+    if (b.replayed) return;
+
+    // A دیر جواب گرفت و حالا commit می‌زند، **در حالی که B هنوز in_progress
+    // است**. این ترتیب عمدی است: اگر اول B را commit کنیم، شرطِ قدیمیِ
+    // `status='in_progress'` به‌تنهایی جلوی A را می‌گیرد و تست دیگر چیزی
+    // درباره‌ی مالکیت اثبات نمی‌کند (نسخه‌ی اولِ همین تست دقیقاً همین اشکال را
+    // داشت و زیرِ mutation سبز ماند).
+    await a.commit({ who: 'A' });
+
+    const mid = await db.idempotencyKey.findMany({ where: { scope } });
+    assert.equal(mid.length, 1);
+    assert.equal(mid[0].status, 'in_progress',
+      'commitِ A نباید claimِ B را done کند — وگرنه پاسخِ عملیاتِ A به‌عنوانِ ' +
+      'پاسخِ عملیاتِ B کش می‌شود و replayِ بعدی نتیجه‌ی اشتباه می‌دهد');
+
+    // کنترلِ مثبت: B هنوز می‌تواند پاسخِ خودش را ثبت کند.
+    await b.commit({ who: 'B' });
+    const replay = await withIdempotency<{ who: string }>(key, scope, actor);
+    assert.equal(replay.replayed, true);
+    if (replay.replayed) assert.equal(replay.response.who, 'B',
+      'پاسخِ ذخیره‌شده باید مالِ B باشد، نه A');
+  });
+
+  test('releaseِ صاحبِ واقعیِ claim کار می‌کند (تا گارد به no-opِ بی‌صدا تبدیل نشود)', async () => {
+    // بدونِ این کنترلِ مثبت، یک شرطِ مالکیتِ همیشه-غلط هم سبز می‌شد و
+    // release عملاً می‌مرد — همان باگِ H11 که از اول برایش ساخته شده بود.
+    const key = clientKey('own-happy');
+    const scope = `${TAG}:own-happy`;
+    const actor = 'customer:own3';
+
+    const a = await withIdempotency<unknown>(key, scope, actor);
+    assert.equal(a.replayed, false);
+    if (a.replayed) return;
+    await a.release();
+
+    assert.equal(await db.idempotencyKey.count({ where: { scope } }), 0,
+      'صاحبِ claim باید بتواند آن را آزاد کند');
+
+    const retry = await withIdempotency<unknown>(key, scope, actor);
+    assert.equal(retry.replayed, false,
+      'بعد از release، تلاشِ دوباره باید دوباره claim کند نه ۴۰۹ بگیرد');
+  });
+});

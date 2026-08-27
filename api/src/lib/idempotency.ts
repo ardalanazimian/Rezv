@@ -26,7 +26,8 @@ type IdempotentResult<T> =
        *  بدونِ این، هر شکستِ عملیات کلید را ۶۰ ثانیه (STALE_IN_PROGRESS_MS) در
        *  in_progress رها می‌کند و تلاشِ دوباره به‌جای علتِ واقعی
        *  ۴۰۹ IDEMPOTENCY_CONFLICT می‌گیرد — یعنی همان «خطایِ ناصادق» که §۶
-       *  ممنوع می‌کند. فراخوانی‌اش اختیاری است؛ مصرف‌کننده‌های قدیمی دست‌نخورده‌اند. */
+       *  ممنوع می‌کند. فراخوانی‌اش اختیاری است؛ مصرف‌کننده‌های قدیمی دست‌نخورده‌اند.
+       *  فقط claimِ *خودِ همین درخواست* را آزاد می‌کند (رجوع کن به «توکنِ مالکیت»). */
       release: () => Promise<void>;
     };
 
@@ -93,38 +94,76 @@ export async function withIdempotency<T>(
     .update(`${scope.length}:${scope}|${actor.length}:${actor}|${clientKey}`)
     .digest('hex');
 
-  // فقط ردیفِ هنوز-in_progress حذف می‌شود: اگر رقیبی در همین فاصله commit کرده
-  // باشد، پاسخِ ذخیره‌شده‌اش نباید پاک شود.
-  const makeRelease = () => async () => {
-    await db.idempotencyKey
-      .deleteMany({ where: { key, status: 'in_progress' } })
+  // ── توکنِ مالکیتِ claim ────────────────────────────────────────────────
+  // ⚠️ باگی که بازبینیِ ۲۰۲۶-۰۸-۲۷ روی همین PR گرفت (کلاسِ «پاک‌کردنِ claimِ
+  // دیگری»): نسخه‌ی اولِ release/commit فقط با `key` کار می‌کردند. سناریوی
+  // واقعی: درخواستِ A از STALE_IN_PROGRESS_MS رد می‌شود، B کلید را بازپس
+  // می‌گیرد، بعد A شکست می‌خورد و release می‌زند → claimِ **B** حذف می‌شد.
+  // پیامدش دوگانه بود: (۱) اگر B هنوز در حالِ اجرا بود، یک درخواستِ سومِ
+  // همزمان به‌جای ۴۰۹ اجازه‌ی اجرا می‌گرفت؛ (۲) اگر A دیرتر commit می‌کرد،
+  // پاسخِ A رویِ claimِ B می‌نشست و replayِ بعدی پاسخِ عملیاتِ اشتباه را
+  // برمی‌گرداند.
+  //
+  // رفع بدونِ مهاجرت: `created_at` خودش نشانگرِ «نسلِ claim» است — INSERT آن را
+  // با DEFAULT now() می‌گذارد و بازپس‌گیری صریحاً `created_at = now()` ست
+  // می‌کند. پس مقدارِ برگشتی از RETURNING یک توکنِ مالکیتِ کافی است و هر
+  // نوشتنِ بعدی باید با همان مقدار مچ شود.
+  //
+  // چرا یکتا بودنش قابلِ اتکاست (نه فرض): دو نسلِ claim برایِ یک کلید همیشه
+  // دستِ‌کم STALE_IN_PROGRESS_MS (۶۰ ثانیه) فاصله دارند، چون تنها راهِ ساختنِ
+  // نسلِ دوم عبور از همان آستانه است.
+  // ⚠️ توکن به‌صورتِ **متن** جابه‌جا می‌شود نه Date: ستون microsecond دارد ولی
+  // Date در جاوااسکریپت فقط millisecond — رفت‌وبرگشت از Date مقدار را گِرد
+  // می‌کرد و مقایسه هرگز مچ نمی‌شد (یعنی release بی‌صدا بی‌اثر می‌شد).
+  // ⚠️ ردیف‌هایِ in_progressی که *پیش از* این تغییر ساخته شده‌اند مشکلی ندارند:
+  // توکنشان هم از همان ستون خوانده می‌شود.
+  const makeRelease = (claimAt: string) => async () => {
+    // فقط ردیفِ هنوز-in_progressِ متعلق به همین claim حذف می‌شود: اگر رقیبی در
+    // این فاصله بازپس‌گرفته یا commit کرده باشد، دست نمی‌خورد.
+    await db
+      .$executeRaw`
+        DELETE FROM idempotency_keys
+        WHERE key = ${key} AND status = 'in_progress' AND created_at = ${claimAt}::timestamp
+      `
       .catch(() => {});
   };
 
-  const makeCommit = () => async (response: T) => {
+  const makeCommit = (claimAt: string) => async (response: T) => {
     // اگر ذخیره‌ی پاسخ شکست خورد، کلید را به‌جای رهاکردن در in_progress، حذف کن
     // تا retry بعدی بتواند دوباره claim کند (نه اینکه 409 دائمی بگیرد).
     try {
-      await db.idempotencyKey.update({
-        where: { key },
-        data: { status: 'done', response: response as object },
-      });
+      const updated = await db.$executeRaw`
+        UPDATE idempotency_keys
+        SET status = 'done', response = ${JSON.stringify(response ?? null)}::jsonb
+        WHERE key = ${key} AND status = 'in_progress' AND created_at = ${claimAt}::timestamp
+      `;
+      if (updated === 0) {
+        // claim دیگر مالِ ما نیست (بازپس‌گرفته یا حذف شده). پاسخ را رویِ ردیفِ
+        // کسِ دیگری نمی‌نویسیم — بی‌سر‌و‌صدا رد نمی‌شویم، صریح لاگ می‌کنیم.
+        log.warn('claimِ idempotency پیش از commit از دست رفته بود؛ پاسخ ذخیره نشد', { scope });
+      }
     } catch (e) {
       log.warn('ذخیره‌ی پاسخ idempotency ناموفق؛ آزادسازی کلید برای retry', (e as Error).message);
-      await db.idempotencyKey.delete({ where: { key } }).catch(() => {});
+      await db
+        .$executeRaw`
+          DELETE FROM idempotency_keys
+          WHERE key = ${key} AND status = 'in_progress' AND created_at = ${claimAt}::timestamp
+        `
+        .catch(() => {});
     }
   };
 
   // تلاش برای claim اتمیک (insert با ON CONFLICT DO NOTHING)
-  const claimed = await db.$queryRaw<{ key: string }[]>`
+  const claimed = await db.$queryRaw<{ claim_at: string }[]>`
     INSERT INTO idempotency_keys (key, scope, status, expires_at)
     VALUES (${key}, ${scope}, 'in_progress', now() + interval '24 hours')
     ON CONFLICT (key) DO NOTHING
-    RETURNING key
+    RETURNING created_at::text AS claim_at
   `;
 
   if (claimed.length > 0) {
-    return { replayed: false, commit: makeCommit(), release: makeRelease() };
+    const claimAt = claimed[0].claim_at;
+    return { replayed: false, commit: makeCommit(claimAt), release: makeRelease(claimAt) };
   }
 
   // کلید تکراری — وضعیتش را بخوان
@@ -139,15 +178,16 @@ export async function withIdempotency<T>(
     const age = Date.now() - new Date(existing.createdAt).getTime();
     if (age > STALE_IN_PROGRESS_MS) {
       // بازپس‌گیری اتمیک: فقط اگر هنوز in_progress است، به تازه ریست کن.
-      const reclaimed = await db.$queryRaw<{ key: string }[]>`
+      const reclaimed = await db.$queryRaw<{ claim_at: string }[]>`
         UPDATE idempotency_keys
         SET status = 'in_progress', expires_at = now() + interval '24 hours', created_at = now()
         WHERE key = ${key} AND status = 'in_progress'
-        RETURNING key
+        RETURNING created_at::text AS claim_at
       `;
       if (reclaimed.length > 0) {
         log.warn('کلید idempotency کهنه بازپس‌گرفته شد', { scope, ageMs: age });
-        return { replayed: false, commit: makeCommit(), release: makeRelease() };
+        const claimAt = reclaimed[0].claim_at;
+        return { replayed: false, commit: makeCommit(claimAt), release: makeRelease(claimAt) };
       }
       // اگر بازپس‌گیری نشد یعنی رقیب همین لحظه done کرد → دوباره بخوان.
       const after = await db.idempotencyKey.findUnique({ where: { key } });

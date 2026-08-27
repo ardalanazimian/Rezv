@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T10:59:30.694Z",
+  "generated_at": "2026-08-27T14:28:07.279Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -14,8 +14,8 @@
   "by_classification": {
     "review": 6,
     "safe_static": 55,
-    "unsafe": 70,
-    "escaped": 39,
+    "unsafe": 68,
+    "escaped": 41,
     "dom_api_safe": 52
   },
   "hits": [
@@ -1209,10 +1209,10 @@
     },
     {
       "file": "apps/business/js/staff-system.js",
-      "line": 532,
+      "line": 538,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "classification": "unsafe"
+      "classification": "escaped"
     },
     {
       "file": "apps/business/js/waitlist.js",
@@ -1464,10 +1464,10 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 915,
+      "line": 918,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "classification": "unsafe"
+      "classification": "escaped"
     },
     {
       "file": "apps/company/js/missions.js",
@@ -2181,49 +2181,49 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8041,
+      "line": 8047,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "classification": "unsafe"
+      "classification": "escaped"
     },
     {
       "file": "standalone/business.html",
-      "line": 8172,
+      "line": 8178,
       "kind": "innerHTML",
       "snippet": "view.innerHTML = `<div class=\"panel\"><div class=\"panel-head\"><div class=\"panel-title\">پیام‌های مشتریان</div><div class=\"panel-sub\" id=\"chatInboxSub\">در حال بارگ",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 8176,
+      "line": 8182,
       "kind": "innerHTML",
       "snippet": "if (!res.ok) { box.innerHTML = `<div class=\"chat-empty\">اتصال برقرار نشد.</div>`; return; }",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 8179,
+      "line": 8185,
       "kind": "innerHTML",
       "snippet": "if (!items.length) { box.innerHTML = `<div class=\"chat-empty\">هنوز پیامی از مشتری نیومده.</div>`; return; }",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 8180,
+      "line": 8186,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = items.map(t => `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
-      "line": 8234,
+      "line": 8240,
       "kind": "innerHTML",
       "snippet": "if (initial && !msgs.length) body.innerHTML = `<div class=\"chat-empty-thread\">هنوز پیامی نیست.</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 8258,
+      "line": 8264,
       "kind": "innerHTML",
       "snippet": "if (pend) pend.querySelector('.chat-b-t').innerHTML = icon('alert',{size:14});",
       "classification": "dom_api_safe"
@@ -2237,14 +2237,14 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8231,
+      "line": 8237,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
       "classification": "safe_static"
     },
     {
       "file": "standalone/business.html",
-      "line": 8250,
+      "line": 8256,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
       "classification": "safe_static"
@@ -2475,70 +2475,70 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3209,
+      "line": 3212,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
-      "classification": "unsafe"
+      "classification": "escaped"
     },
     {
       "file": "standalone/company.html",
-      "line": 3329,
+      "line": 3332,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 3335,
+      "line": 3338,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به سرو",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3342,
+      "line": 3345,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3463,
+      "line": 3466,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 3469,
+      "line": 3472,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به س",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3476,
+      "line": 3479,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3669,
+      "line": 3672,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3996,
+      "line": 3999,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 4225,
+      "line": 4228,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"
