@@ -22,6 +22,7 @@ let SALES_TAB = 'orders';       // orders | inquiries
 let SALES_FILTER = 'pending';   // pending | all
 let SALES_LOADING = false;
 let SALES_ERROR = null;
+let SALES_INQ_ERROR = null;   // خطای مستقلِ «پیام‌ها» (رجوع به loadSales)
 let SALES_BADGE = 0;            // شمارشِ کارِ باقی‌مانده برای نشانِ کنارِ منو
 
 const SALES_STATUS = {
@@ -80,6 +81,14 @@ async function loadSales() {
   } else {
     SALES_ORDERS = orders.data.items || [];
   }
+  // ⚠️ رفعِ ۲۰۲۶-۰۸-۲۶ (§۹/§۱۰): خطای این درخواست جدا ثبت می‌شود.
+  // قبلاً SALES_ERROR فقط از `orders` پر می‌شد، پس اگر orders موفق و
+  // inquiries ناموفق بود (مثلاً هر دو روی همان سطلِ rate-limit نشسته‌اند و
+  // دومی ۴۲۹ می‌گیرد) هیچ خطایی ثبت نمی‌شد و تبِ «پیام‌ها» با اطمینان
+  // می‌گفت «صندوقِ ورودی خالی است» — پیام‌های واقعیِ فروش بی‌پاسخ می‌ماندند.
+  SALES_INQ_ERROR = inquiries.ok ? null : (inquiries.offline
+    ? 'اتصال به سرور برقرار نیست.'
+    : (inquiries.error && inquiries.error.message) || 'دریافتِ پیام‌ها ناموفق بود.');
   SALES_INQUIRIES = inquiries.ok ? (inquiries.data.items || []) : [];
   // ⚠️ فازِ ۲ (§۳): شمارنده‌هایِ خلاصه قبلاً از رویِ همین آرایه‌ی **صفحه‌ی جاری**
   // (حداکثر ۵۰ ردیف) محاسبه می‌شدند، پس با نشانِ سایدبار در همان صفحه تناقض
@@ -109,13 +118,15 @@ function rSales() {
 
   // عددِ کلِ سرور مرجع است؛ شمارشِ محلی فقط وقتی که سرور عددی نداده.
   const pendingCount = SALES_PENDING ?? SALES_ORDERS.filter((o) => o.status === 'pending' && o.kind === 'purchase').length;
-  const openInquiries = SALES_OPEN_INQUIRIES ?? SALES_INQUIRIES.filter((q) => q.status === 'open').length;
+  // اگر خواندنِ پیام‌ها شکست خورده، شمارشِ محلی هم بی‌معنی است ⇒ «—».
+  const openInquiries = SALES_INQ_ERROR ? null
+    : (SALES_OPEN_INQUIRIES ?? SALES_INQUIRIES.filter((q) => q.status === 'open').length);
 
   el.innerHTML = `
     <div class="bill-summary">
       <div class="bill-stat"><div class="bs-val" style="color:var(--amber-600)">${fa(pendingCount)}</div><div class="bs-label">درخواستِ خریدِ در انتظارِ فعال‌سازی</div></div>
       <div class="bill-stat"><div class="bs-val" style="color:var(--ink)">${fa(SALES_ORDERS.filter(o=>o.kind==='trial').length)}</div><div class="bs-label">حسابِ دمو در این فهرست</div></div>
-      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${fa(openInquiries)}</div><div class="bs-label">پیامِ بازنشده‌ی سایت</div></div>
+      <div class="bill-stat"><div class="bs-val" style="color:var(--green-600)">${openInquiries===null?'—':fa(openInquiries)}</div><div class="bs-label">پیامِ بازنشده‌ی سایت</div></div>
     </div>
 
     <div class="panel">
@@ -172,6 +183,14 @@ function renderSalesOrders() {
 }
 
 function renderSalesInquiries() {
+  // «نتوانستیم بخوانیم» هرگز نباید «چیزی نیست» شود.
+  if (SALES_INQ_ERROR) {
+    return `<div style="padding:28px;text-align:center;font-size:13px">
+      <div style="font-weight:700;margin-bottom:6px">پیام‌ها بارگیری نشد</div>
+      <div style="color:var(--muted);margin-bottom:12px">${esc(SALES_INQ_ERROR)} صندوق ممکن است پیامِ بازنشده داشته باشد.</div>
+      <button class="btn btn-sm btn-primary" onclick="loadSales()">تلاش دوباره</button>
+    </div>`;
+  }
   if (!SALES_INQUIRIES.length) {
     return `<div style="padding:28px;text-align:center;color:var(--muted);font-size:13px">صندوقِ ورودی خالی است.</div>`;
   }

@@ -42,7 +42,11 @@ const { db } = await import('../src/lib/db.ts');
 // پیش‌فرض‌ها را DROP کند — انحرافِ آگاهانه‌ی محیطِ تست است، نه رانشِ واقعی.
 // (شکلِ چندخطی هم می‌آید: statementِ جدولِ پارتیشن‌بندی‌شده‌ی reservations خطِ
 //  «ALTER COLUMN …» را جدا از «ALTER TABLE …» گزارش می‌کند.)
-const ACCEPTED_DRIFT = /ALTER TABLE "reservations" DROP COLUMN "block_end"|(ALTER TABLE "[a-z_]+" )?ALTER COLUMN "id" DROP DEFAULT/;
+// پذیرفته‌ی سوم (مهاجرتِ ۰۷۹): staff_owner_phone_unique_idx یک ایندکسِ یکتایِ
+// **جزئی** است (WHERE role='owner') که Prisma در schema نمی‌تواند بیانش کند،
+// پس migrate diff همیشه قصدِ DROPش را دارد. حضورِ اجباری‌اش را تستِ «required»
+// همین فایل تضمین می‌کند؛ این regex فقط جلوی قرمزیِ کاذبِ diff را می‌گیرد.
+const ACCEPTED_DRIFT = /ALTER TABLE "reservations" DROP COLUMN "block_end"|(ALTER TABLE "[a-z_]+" )?ALTER COLUMN "id" DROP DEFAULT|DROP INDEX "(public"\.")?staff_owner_phone_unique_idx"/;
 
 describe('انحرافِ اسکیما بینِ schema.prisma و DBِ اعمال‌شده (§۲۴)', () => {
   test('هیچ دو ایندکسی با تعریفِ یکسان وجود ندارد', async () => {
@@ -78,6 +82,10 @@ describe('انحرافِ اسکیما بینِ schema.prisma و DBِ اعمال�
       // بدونشان getGuestProfile و فهرستِ رزروِ پنل به scanِ ترتیبی می‌افتادند.
       'customer_insights_user_id_idx',
       'reservations_restaurant_slot_idx',
+      // migration 079 — یکتاییِ سراسریِ شماره در نقشِ owner؛ ضدِ raceِ
+      // provisioning/trial. جزئی است و Prisma نمی‌تواند اعلامش کند، پس فقط
+      // همین‌جا و در SQL زندگی می‌کند (کامنتِ مدلِ Staff در schema).
+      'staff_owner_phone_unique_idx',
     ];
     const rows = await db.$queryRaw<Array<{ indexname: string }>>`
       SELECT indexname FROM pg_indexes WHERE schemaname = 'public'

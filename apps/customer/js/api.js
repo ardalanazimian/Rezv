@@ -300,7 +300,7 @@ export function mapApiRestaurant(apiR, sampleFallback){
     about: apiR.description || (isLive ? '' : sampleFallback?.about) || '',
     feats: apiR.features || (isLive ? [] : sampleFallback?.feats) || [],
     rb: apiR.rating_breakdown || (isLive ? EMPTY_RB : sampleFallback?.rb) || EMPTY_RB,
-    menu: apiR.menu || (isLive ? [] : sampleFallback?.menu) || [],
+    menu: (apiR.menu || (isLive ? [] : sampleFallback?.menu) || []).map(normalizeMenuEntry),
     good: isLive ? [] : (sampleFallback?.good || []),
     bad: isLive ? [] : (sampleFallback?.bad || []),
     revs: apiR.reviews || (isLive ? [] : sampleFallback?.revs) || [],
@@ -442,15 +442,34 @@ export function applyRestaurantDetail(r, d){
   const band = priceBandStr(d.price_band);
   if (band) r.price = band;
   if (Array.isArray(d.menu) && d.menu.length) {
-    // به همان شکلِ tuple که رندررِ فعلی می‌فهمد + عکسِ آیتم به‌عنوانِ عضوِ چهارم
-    r.menu = d.menu.map(m => [
-      m.emoji || '🍽️',
-      m.name,
-      Number(m.price_toman || 0).toLocaleString('fa-IR'),
-      m.image_url || null,
-    ]);
+    // شیءِ نرمال (۰۷۷): emoji/نام/قیمت/عکس + توضیح، دسته و «ناموجود» — که
+    // پیش‌تر در همین نقطه دور ریخته می‌شدند و مشتری هرگز نمی‌دیدشان.
+    r.menu = d.menu.map(m => ({
+      id: m.id || null,            // ۰۷۸ — برای ارسالِ واقعیِ pre-order لازم است
+      e: m.emoji || '🍽️',
+      n: m.name,
+      p: Number(m.price_toman || 0).toLocaleString('fa-IR'),
+      img: m.image_url || null,
+      d: m.description || null,
+      catId: m.category_id || null,
+      out: !!m.is_out_of_stock,
+      tags: Array.isArray(m.tags) ? m.tags : [],
+    }));
+    r.menuCats = Array.isArray(d.menu_categories) ? d.menu_categories : [];
   }
   return r;
+}
+
+/**
+ * منویِ نمونه (دموی آفلاین) هنوز tuple است [emoji, name, price, img?] —
+ * این نرمال‌ساز آن را به همان شیءِ بالا تبدیل می‌کند تا رندررها فقط یک شکل
+ * بشناسند. شیء را دست‌نخورده عبور می‌دهد.
+ */
+export function normalizeMenuEntry(m){
+  if (Array.isArray(m)) {
+    return { id: null, e: m[0] || '🍽️', n: m[1], p: m[2], img: m[3] || null, d: null, catId: null, out: false, tags: [] };
+  }
+  return m;
 }
 
 // ═══════════ DATA ═══════════

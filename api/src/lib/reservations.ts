@@ -3,6 +3,7 @@ import { db } from './db';
 import { isTimeWithinHours } from './hours';
 import { withSlotLock } from './redis';
 import { ApiError, Err } from './errors';
+import { isAvailableAt } from './menu-availability';
 import { enqueueSms } from './sms';
 import { emit } from './events';
 import { metrics } from './metrics';
@@ -320,6 +321,8 @@ export async function createReservation(
 async function placeReservation(
   input: CreateReservationInput,
   r: { id: string; name: string; clubPrefix: string; cbBasePct: number;
+       // ۰۷۸ — چکِ پنجره‌ی pre-order نسبت به slotStart در تایم‌زونِ رستوران
+       timezone?: string | null;
        cancellationPolicy?: { autoConfirm: boolean } | null },
   cfg: TimingConfig,
   ranges: { start: Date; end: Date; blockEnd: Date; duration: number; blockBufferMin: number },
@@ -474,7 +477,7 @@ async function insertReservation(
   tx: Prisma.TransactionClient,
   p: {
     input: CreateReservationInput;
-    r: { id: string; clubPrefix: string; cbBasePct: number };
+    r: { id: string; clubPrefix: string; cbBasePct: number; timezone?: string | null };
     status: 'pending' | 'confirmed';
     holdExpiresAt: Date | null;
     start: Date; end: Date; duration: number; blockBufferMin: number;
@@ -526,7 +529,35 @@ async function insertReservation(
     }
   }
 
+  // [SPEC-A فاز ۲ — ۰۷۸] اعتبارسنجیِ آیتم‌های pre-order **قبل از** درج.
+  //
+  // قبلاً درج اول انجام می‌شد و اعتبارسنجی پایین‌تر در بخشِ checkout بود؛
+  // نتیجه: UUIDِ ناموجود به‌جای ۴۲۲ی تمیز، به خطای خامِ FK می‌خورد (تراکنش
+  // rollback می‌شد ولی پیام قابلِ‌فهم نبود). حالا یک fetch، همه‌ی ردها با
+  // پیامِ دامنه‌ی صریح، بعد درج؛ checkout هم از همین نتیجه قیمت می‌گیرد.
+  let preorderItems: Array<{ id: string; priceToman: number }> = [];
   if (input.preorder?.length) {
+    const itemIds = [...new Set(input.preorder.map(x => x.menuItemId))];
+    const items = await tx.menuItem.findMany({
+      // فیلترِ restaurantId (رفعِ امنیتیِ ۰۸-۱۳ — ضدِ نشتِ بین‌رستورانی) حفظ شده.
+      where: { id: { in: itemIds }, restaurantId: r.id },
+      select: { id: true, name: true, priceToman: true, isActive: true, isOutOfStock: true, availability: true },
+    });
+    if (items.length !== itemIds.length) {
+      throw Err.validation('یک یا چند آیتمِ منو نامعتبر است یا متعلق به این رستوران نیست');
+    }
+    const tz = r.timezone ?? 'Asia/Tehran';
+    for (const it of items) {
+      if (!it.isActive) throw Err.validation(`«${it.name}» از منو برداشته شده و قابلِ پیش‌سفارش نیست`);
+      if (it.isOutOfStock) throw Err.validation(`«${it.name}» فعلاً ناموجود است و قابلِ پیش‌سفارش نیست`);
+      // پنجره نسبت به **زمانِ رزرو** سنجیده می‌شود، نه لحظه‌ی ثبت (B7):
+      // آیتمِ صبحانه برای رزروِ شام بی‌معناست، حتی اگر الان صبح باشد.
+      if (!isAvailableAt(it.availability, tz, p.start)) {
+        throw Err.validation(`«${it.name}» در زمانِ این رزرو سرو نمی‌شود (پنجره‌ی سروِ محدود دارد)`);
+      }
+    }
+    preorderItems = items.map(i => ({ id: i.id, priceToman: i.priceToman }));
+
     await tx.reservationItem.createMany({
       data: input.preorder.map(x => ({ reservationId: resv!.id, menuItemId: x.menuItemId, qty: x.qty })),
     });
@@ -543,25 +574,12 @@ async function insertReservation(
       throw Err.validation('فقط یکی از کوپن یا کارت هدیه قابل استفاده است');
     }
 
-    // مبلغ پایه = جمع قیمت آیتم‌های pre-order
-    // ⚠️ رفع‌شده (بازبینیِ امنیتی، ۲۰۲۶-۰۸-۱۳): قبلاً این کوئری restaurantId
-    // نداشت — یعنی یک menuItemId از رستورانِ دیگه هم پیدا می‌شد و قیمتِ واقعیِ
-    // *همون رستورانِ دیگه* رو برمی‌گردوند (نه فقط قیمتِ اشتباه؛ نشتِ داده‌ی
-    // بین‌رستورانی). بدتر از اون، اگر id اصلاً وجود نداشت، priceMap.get()
-    // مقدارِ undefined می‌داد و `?? 0` بی‌صدا قیمت رو صفر می‌کرد — یعنی هر
-    // UUIDِ دلخواه (حتی جعلی) یک آیتمِ «رایگان» به سبد اضافه می‌کرد. حالا
-    // restaurantId فیلتر می‌شه و اگر تعدادِ برگشتی با تعدادِ درخواستی یکی
-    // نباشه (یعنی حداقل یک id گم/غلط/متعلق‌به‌رستورانِ‌دیگه بوده)، خطای
-    // اعتبارسنجی پرتاب می‌شه — هرگز price??0 خاموش.
-    const itemIds = [...new Set(input.preorder.map(x => x.menuItemId))];
-    const items = await tx.menuItem.findMany({
-      where: { id: { in: itemIds }, restaurantId: r.id },
-      select: { id: true, priceToman: true },
-    });
-    if (items.length !== itemIds.length) {
-      throw Err.validation('یک یا چند آیتمِ منو نامعتبر است یا متعلق به این رستوران نیست');
-    }
-    const priceMap = new Map(items.map(i => [i.id, i.priceToman]));
+    // مبلغ پایه = جمع قیمت آیتم‌های pre-order — **از دیتابیس، هرگز از body**.
+    // تاریخچه: رفعِ امنیتیِ ۲۰۲۶-۰۸-۱۳ فیلترِ restaurantId و تطبیقِ شمارش را
+    // آورد (ضدِ نشتِ بین‌رستورانی و آیتمِ «رایگان»ِ جعلی)؛ از ۰۷۸ همان
+    // اعتبارسنجی — کامل‌تر (isActive/ناموجود/پنجره) — به بالای همین تراکنش و
+    // قبل از درجِ ReservationItem منتقل شد؛ اینجا فقط نتیجه‌اش مصرف می‌شود.
+    const priceMap = new Map(preorderItems.map(i => [i.id, i.priceToman]));
     const subtotal = input.preorder.reduce((sum, x) => sum + (priceMap.get(x.menuItemId) ?? 0) * x.qty, 0);
 
     let discount = 0;

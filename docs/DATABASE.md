@@ -7,9 +7,15 @@
 
 ## 1. Overview
 
-- **Engine**: PostgreSQL (Supabase in production).
+- **Engine**: PostgreSQL — self-hosted `postgres:16-alpine` in the canonical
+  docker-compose deployment (`docker-compose.yml:12`). *(Corrected 2026-08-27: this
+  line previously claimed a Supabase-hosted production DB; the repo has no Supabase code,
+  env, or `directUrl` — Supabase appears only in comments about managed-PG
+  connection limits.)*
 - **ORM**: Prisma (`prisma-client-js`).
-- **IDs**: `uuid` PKs (`@default(uuid())`) except natural keys (`otp_codes.phone`,
+- **IDs**: `uuid` PKs — client-generated `@default(uuid())` for most models;
+  `@default(dbgenerated("gen_random_uuid()"))` where raw-SQL backfills need a DB
+  default (economy ledger `075`, `menu_categories` `077`) — except natural keys (`otp_codes.phone`,
   `idempotency_keys.key`, `platform_settings.key`, `club_code_counters`,
   composite keys on join/insight tables).
 - **Naming**: `snake_case` columns via `@map`, `camelCase` in TS.
@@ -182,7 +188,8 @@ Two layers (both applied in CI):
 
 1. **`prisma/migrations/0_init`** — the baseline Prisma migration
    (`migration.sql`). Applied by `prisma migrate deploy`.
-2. **`prisma/sql/*.sql`** — hand-written SQL scripts (`001` … `064`) for things
+2. **`prisma/sql/*.sql`** — hand-written SQL scripts (`001` … `077`, see the
+   files themselves for the live list) for things
    Prisma can't express: partitioning, exclusion constraints, partial unique
    indexes, RLS, expression indexes, FK/index back-fills. These are **not**
    Prisma migrations — they live outside `migrations/` (so they never trip
@@ -328,3 +335,108 @@ There is **no global soft-delete column**. Instead:
   a live requirement; a skipped cron run does not break inserts.
 - Keep `schema.prisma` in sync with the live DB — the `⚠️ همگام‌سازی‌شده`
   comments mark fields that previously existed only in the DB.
+
+## SPEC-A فاز ۱ (migration 077) — منوی دسته‌بندی‌شده
+
+- **`menu_categories`**: دسته‌ی رابطه‌ایِ منو (`@@unique([restaurantId, name])`،
+  ترتیبِ `sort_order`، حذفِ نرم با `is_active=false`). PK با
+  `dbgenerated("gen_random_uuid()")` چون backfillِ ۰۷۷ با INSERT خام ردیف می‌سازد.
+- **`menu_items.category_id`** (FK با `ON DELETE SET NULL`) و
+  **`menu_items.is_out_of_stock`** (برچسبِ «ناموجود» — آیتم مخفی نمی‌شود).
+- ستونِ متنیِ `menu_items.category` **میرورِ سازگاری** است: منبعِ حقیقت رابطه است
+  و سرور در هر تغییرِ دسته (ستِ آیتم، renameِ دسته، متنِ آزادِ کلاینتِ قدیمی →
+  find-or-create) رشته را سینک می‌کند تا مصرف‌کننده‌های موجود (SEO/مشتری/پنل) نشکنند.
+- backfillِ ۰۷۷ دوباراجرایی‌پذیر است: رشته‌های distinct → ردیفِ دسته
+  (`ON CONFLICT DO NOTHING`) → لینکِ `category_id` فقط روی NULLها.
+- کش: `cache:restaurant-public-menu:{slug}` (TTL ۶۰s) + `restaurant-detail` — از ۰۷۷
+  هر mutation منو (آیتم/دسته/reorder/عکس) هر دو را از طریقِ
+  `lib/menu-cache.ts:invalidatePublicMenu` باطل می‌کند.
+
+## SPEC-A فاز ۲ (migration 078) — افزودنی‌ها، برچسب‌ها، پنجره‌ی سرو
+
+- **`menu_modifier_groups`** / **`menu_modifier_options`**: ساختارِ افزودنی
+  (سایز/مخلفات) با min/max انتخاب و دلتای قیمت (منفی مجاز؛ گاردِ دوطرفه‌ی
+  «قیمتِ نهایی هرگز منفی نشود» در routeها). فقط ساختارِ منو/نمایش — به سفارش
+  وصل نیست (§۲-۴ spec؛ `ReservationItem` دست‌نخورده).
+- **`menu_item_tags`** + enum **`menu_tag`** (۹ مقدار): برچسب‌های رژیمی/بازاری؛
+  PUT جایگزینِ کامل در پنل.
+- **`menu_items.availability jsonb`**: `{days:int[], start_min, end_min}` —
+  ۰=یکشنبه…۶=شنبه (قراردادِ `weekdayInTz`). NULL = همیشه. endpointهای عمومی
+  **پس از خواندنِ کش** فیلتر می‌کنند (`lib/menu-availability.ts`)؛ pre-order
+  نسبت به `slotStart` می‌سنجد نه «اکنون».
+- PKهای ۰۷۸ **DEFAULTِ DB ندارند** (برخلافِ ۰۷۷) — **این ناسازگاری عمدی است و
+  قاعده‌ی سراسری همین است** (تأییدِ صریح ۲۰۲۶-۰۸-۲۷):
+  - **PK فقط وقتی DEFAULTِ DB می‌گیرد که خودِ migration (یا مسیرِ SQL خامِ
+    دیگری) بدونِ ستونِ id ردیف INSERT کند** — مثلِ backfillِ ۰۷۷ که
+    `INSERT INTO menu_categories (restaurant_id, name) SELECT …` می‌زند و بدونِ
+    `gen_random_uuid()` می‌شکست. آن‌وقت schema هم باید همان را با
+    `@default(dbgenerated("gen_random_uuid()"))` اعلام کند تا drift صفر بماند.
+  - در غیرِ این صورت (۰۷۸: همه‌ی INSERTها از Prisma client می‌آیند) DEFAULT
+    اضافه **نزن**: schema `@default(uuid())` کلاینتی است، Prisma در emit خود
+    DEFAULT نمی‌سازد، و DEFAULTِ دستیِ SQL دقیقاً همان driftی می‌شود که
+    `schema-drift.integration.test.mts` می‌گیرد. (استثنای محیطِ تست:
+    `prisma/test-schema-fixups.sql` برای INSERTهای خامِ تست به همه DEFAULT
+    می‌دهد و در ACCEPTED_DRIFT پذیرفته شده — ربطی به تولید ندارد.)
+- کشِ منویِ عمومی: TTL از ۶۰ به **۳۰۰** — تازگی از invalidationِ فعالِ ۰۷۷
+  می‌آید، نه از انقضا.
+- اعتبارسنجیِ pre-order (lib/reservations.ts) از ۰۷۸ **قبل از** درجِ
+  ReservationItem اجرا می‌شود: cross-restaurant/جعلی/غیرفعال/ناموجود/بیرونِ
+  پنجره → ۴۲۲ی تمیز (قبلاً idِ جعلی به خطای FK می‌خورد).
+
+## SPEC-B (migration 076) — provisioning و دعوتِ owner
+
+- `restaurants.provision_status` (enum `restaurant_provision_status`:
+  `PENDING_ACTIVATION|ACTIVE|SUSPENDED|OFFBOARDED`). DEFAULT عمداً `ACTIVE`
+  است تا ردیف‌های موجود «در انتظار» نشوند؛ مسیرِ provision صریح PENDING
+  می‌نویسد و اولین ورودِ موفقِ owner (هوک در verify/login) ACTIVE می‌کند.
+- `tenants.branch_limit` — سقفِ شعبه، سطحِ تنانت.
+- جدولِ **`staff_invites`** (نامِ جمع طبق قراردادِ repo): `token` یکتای ۶۴هگزی
+  (شناسه‌ی لینک، **نه** احرازِ هویت)، `status` enum، `expires_at` (۷۲h)،
+  سه FK با `ON DELETE CASCADE ON UPDATE CASCADE` (بندِ ON UPDATE عمدی است —
+  گاردِ drift بدونش قرمز می‌شود، درسِ ۰۶۵). منطق: `api/src/lib/provisioning.ts`.
+
+## migration 079 — یکتاییِ سراسریِ شماره در نقشِ owner (بستنِ raceِ SPEC-B)
+
+- **`staff_owner_phone_unique_idx`**: ایندکسِ یکتایِ **جزئی**
+  (`ON staff (phone) WHERE role = 'owner'`). چکِ appسطحِ شماره‌ی تکراری در هر
+  دو مسیرِ سازنده‌ی owner (`provisionBusiness`، `createTrialAccount`) TOCTOU
+  است؛ زیرِ READ COMMITTED جابه‌جاییِ همان SELECT به داخلِ تراکنش هم race را
+  نمی‌بست. حالا بازنده‌ی هم‌زمانی داخلِ تراکنش `unique_violation` می‌گیرد،
+  **کلِ** تراکنشش رول‌بک می‌شود (هیچ Tenant/Restaurant/Invite یتیمی) و کد
+  P2002 را به همان پاسخِ مسیرِ ترتیبی نگاشت می‌کند
+  (`isOwnerPhoneUniqueViolation` در `lib/staff-helpers.ts`).
+- دامنه عمداً فقط `role='owner'`: تکرارِ شماره‌ی **کارمند** بینِ تنانت‌ها
+  قانونی می‌ماند (`@@unique([tenantId, phone])` + قاعده‌ی «قدیمی‌ترین ثبت
+  برنده» از ۰۷۲). raceِ نادرِ «owner+کارمند هم‌زمان با یک شماره در دو تنانت»
+  آگاهانه بیرونِ دامنه است — بستنش یکتاییِ سراسریِ phone می‌خواست که feature
+  بالا را می‌شکست.
+- ⚠️ Prisma ایندکسِ جزئی را نمی‌تواند در schema بیان کند: پوشش با کامنت روی
+  مدلِ `Staff` + فهرستِ `required` و `ACCEPTED_DRIFT` در
+  `schema-drift.integration.test.mts` (الگوی مصوبِ همان فایل).
+- روی دیتای کثیف (دو ownerِ هم‌شماره از قبل) migration **بلند** شکست می‌خورد
+  (پیامِ `Key (phone)=… is duplicated`) — پاک‌سازیِ خودکار عمداً نیست چون
+  ownerِ دوم ممکن است اعتبارنامه‌ی password (۰۷۴) داشته باشد؛ تصمیم با اپراتور.
+- 🚨 **پیش‌نیازِ deploy** (دستورِ مالک ۰۸-۲۷، متنِ کامل در headerِ خودِ ۰۷۹):
+  پیش از اعمال روی هر محیطِ واقعی، کوئریِ شمارشِ ownerهای هم‌شماره اجرا و
+  خالی‌بودنش ثبت شود؛ اگر خالی نبود، فهرست برای تصمیمِ مالک می‌رود و
+  reconciliationِ جداگانه پیش از ۰۷۹ لازم است — حذفِ خودکار ممنوع. نتیجه‌ی
+  ثبت‌شده: هر دو DB قابل‌دسترسِ توسعه (تست + استکِ محلی) صفر ردیف.
+- **نبودِ `is_active` در predicate عمدی است** (بازبینیِ ۰۸-۲۷): resolutionِ
+  ورود («قدیمی‌ترین برنده»، `findStaffForLogin`) فیلترِ isActive ندارد و بعد
+  ردیفِ غیرفعال را رد می‌کند — یعنی ownerِ جدیدِ هم‌شماره با ردیفِ غیرفعالِ
+  قدیمی‌تر حسابِ مرده می‌شد؛ و predicateِ فعال‌محور خودِ reactivation را مسیرِ
+  نقضِ تازه می‌کرد. پیامد: شماره‌ی ownerِ رستورانِ offboardشده تا آزادسازیِ
+  دستی قفل است. **مسیرِ آزادسازی** (اپراتورِ پلتفرم؛ routeی ندارد): تغییر/
+  آزادکردنِ phoneِ ردیفِ قدیمی یا حذفِ ردیف — demote کافی نیست (چک‌های
+  appسطح هر ردیفِ staff را می‌بینند).
+- **مسیرِ سوم** (بازبینیِ ۰۸-۲۷): `POST /admin/staff-credentials` هم owner
+  می‌سازد (createِ پیش‌فرض) هم **ارتقا** می‌دهد (update با role — ایندکسِ جزئی
+  UPDATE را هم می‌گیرد). حالا همان الگوی provisioning را دارد: پیش‌چکِ خوانا +
+  نگاشتِ P2002 به ۴۰۹ِ `duplicate_owner_phone`. مسیرهای دیگرِ نوشتنِ role
+  sweep شدند: `POST/PATCH /restaurant/staff` ساختاراً به owner نمی‌رسند
+  (enum بدونِ owner؛ PATCH اصلاً فیلدِ role/phone ندارد و ownerها را
+  دست‌نزدنی می‌داند)، password/route فقط hash/username می‌نویسد.
+- تستِ اتمیک‌بودن fault-injection **واقعی داخلِ تراکنش** دارد
+  (`admin-create-business.integration.test.mts`): درجِ رقیبِ commit‌نشده →
+  انتظارِ قفل روی INSERTِ بازنده (اثبات از `pg_stat_activity`) → commitِ رقیب
+  → رول‌بکِ کامل + ۴۰۹ِ `duplicate_owner_phone`.

@@ -189,9 +189,14 @@ export function bookStep2(r){
   // بخش با عنوانِ «پیش‌سفارش» و یک .opt-row کاملاً خالی رندر می‌شد — یعنی
   // شبیهِ یک باگِ بارگذاری، نه «این رستوران منو ندارد». حالا کلِ بخش با
   // منویِ خالی اصلاً نشان داده نمی‌شود.
-  const preorderBlock = r.menu.length
+  // آیتمِ «ناموجود» اصلاً پیشنهاد نمی‌شود (۰۷۷) — پیشنهاددادنِ چیزی که
+  // نمی‌شود سفارش داد، همان «موفقیتِ جعلی» است. enforcementِ سروری = فاز ۲.
+  // ۰۷۸ — فقط آیتم‌های id-دار (دیتای زنده) چیپ می‌شوند: انتخابِ آیتمِ نمونه
+  // (بدونِ id) قابلِ ارسال نیست و نمایشش «موفقیتِ جعلی» می‌شد.
+  const orderable = r.menu.filter(m=>!m.out && m.id);
+  const preorderBlock = orderable.length
     ? `<div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
-    <div class="opt-row">${r.menu.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m[0])} ${esc(m[1])}</div>`).join('')}</div>`
+    <div class="opt-row">${orderable.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" data-mid="${esc(m.id)}" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m.e)} ${esc(m.n)}</div>`).join('')}</div>`
     : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
@@ -200,7 +205,13 @@ export function bookStep2(r){
 }
 // wrapperِ سراسری: onclick در scope سراسری اجرا می‌شود و به R (ماژولی) دسترسی ندارد،
 // پس lookup را اینجا (با دسترسی به R) انجام می‌دهیم.
-export function toBookStep3(id){ openSheet(bookStep3(findR(id))); }
+export function toBookStep3(id){
+  // ۰۷۸ — انتخابِ چیپ‌ها همین‌جا (پیش از آنکه رندرِ گامِ ۳ DOMِ گامِ ۲ را
+  // جایگزین کند) در stateِ bk ذخیره می‌شود؛ در لحظه‌ی submit دیگر چیپی نیست.
+  bk.preorder = Array.from(document.querySelectorAll('.opt.sel[data-mid]'))
+    .map(el=>({ menu_item_id: el.getAttribute('data-mid'), qty: 1 }));
+  openSheet(bookStep3(findR(id)));
+}
 export function bookStep3(r){
   // نام/موبایل از حسابِ کاربر (اگر وارد شده) — نه مقدارِ ساختگی
   const name = isLoggedIn() ? userName() : '';
@@ -278,12 +289,17 @@ export async function confirmBook(id){
     ? prefsRaw.split(PREF_SEP).map(x=>x.trim()).filter(Boolean).slice(0,20).map(x=>x.slice(0,100))
     : undefined;
 
+  // ۰۷۸ — چیپ‌های انتخاب‌شده‌ی پیش‌سفارش واقعاً فرستاده می‌شوند (تا پیش از
+  // این فقط class می‌گرفتند و هیچ‌چیز به سرور نمی‌رسید — وعده‌ی پوچ).
+  const preorder = bk.preorder || [];
+
   const res=await API.post('/reservations',{
     restaurant_id:id,
     date:bk.dateVal||todayISO(),
     time:bk.timeRaw||String(bk.time||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
     party_size:bk.partyN||2,
     notify_sms:true,
+    ...(preorder.length ? { preorder } : {}),
     ...(preferences?.length ? { preferences } : {}),
   },{ 'Idempotency-Key': genIdempotencyKey() });
 

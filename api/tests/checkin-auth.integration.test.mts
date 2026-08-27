@@ -1,3 +1,5 @@
+// [رفعِ ویندوز ۲۰۲۶-۰۸-۲۶] fileURLToPath و نه .pathname: رویِ ویندوز pathname «/C:/…» می‌دهد
+import { fileURLToPath } from 'node:url';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -107,7 +109,7 @@ describe('QR check-in — قراردادِ ساختاریِ routeِ HTTP', () =>
     //     برگرداند، این تست می‌شکند و مجبور است تصمیم را آگاهانه بگیرد —
     //     چون همان کار قبلاً قابلیت را برای اپِ مشتری کشت.
     const { readFileSync } = await import('node:fs');
-    const src = readFileSync(new URL('../src/app/api/v1/checkin/route.ts', import.meta.url).pathname, 'utf8');
+    const src = readFileSync(fileURLToPath(new URL('../src/app/api/v1/checkin/route.ts', import.meta.url)), 'utf8');
 
     const mod = await import('../src/app/api/v1/checkin/route.ts');
     assert.equal(typeof mod.POST, 'function', 'POST باید export شود');

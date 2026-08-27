@@ -23,6 +23,7 @@ import { db } from './db';
 import { Err } from './errors';
 import { audit } from './audit';
 import { normalizePhone } from './otp';
+import { isOwnerPhoneUniqueViolation } from './staff-helpers';
 import { queueEmail } from './notify';
 import { recordEvent } from './platform-events';
 import { getPlatformSetting } from './platform-settings';
@@ -88,7 +89,10 @@ export function addMonths(base: Date, months: number): Date {
  * فارسی برای جست‌وجوی فارسی بهتر است و لایه‌ی سئو همه‌جا encodeURIComponent
  * می‌کند. اگر نام هیچ حرفِ قابلِ استفاده‌ای نداشت، کدِ سفارش جایگزین می‌شود.
  */
-function slugSeed(businessName: string, fallback: string): string {
+// [export ۲۰۲۶-۰۸-۲۶] این سه helper حالا مصرف‌کننده‌ی دوم دارند
+// (POST /admin/restaurants — ساختِ مستقیمِ کسب‌وکار از پنلِ شرکت). صادر شدند
+// تا پیاده‌سازیِ دومِ موازی ساخته نشود (§۶).
+export function slugSeed(businessName: string, fallback: string): string {
   const slug = businessName
     .toLowerCase()
     .replace(/[‌‏‎]/g, '')          // نیم‌فاصله و نشانه‌های جهت
@@ -100,7 +104,7 @@ function slugSeed(businessName: string, fallback: string): string {
 }
 
 /** اسلاگِ یکتا برای رستورانِ تازه (پسوندِ عددی تا آزاد شود). */
-async function uniqueRestaurantSlug(seed: string): Promise<string> {
+export async function uniqueRestaurantSlug(seed: string): Promise<string> {
   for (let i = 0; i < 30; i++) {
     const candidate = i === 0 ? seed : `${seed}-${i + 1}`;
     const hit = await db.restaurant.findUnique({ where: { slug: candidate }, select: { id: true } });
@@ -110,7 +114,7 @@ async function uniqueRestaurantSlug(seed: string): Promise<string> {
 }
 
 /** پیشوندِ باشگاهِ مشتریان (۳ حرف). از نامِ لاتین، وگرنه تصادفی. */
-function clubPrefixFrom(businessName: string): string {
+export function clubPrefixFrom(businessName: string): string {
   const letters = businessName.toUpperCase().replace(/[^A-Z]/g, '');
   if (letters.length >= 3) return letters.slice(0, 3);
   let s = letters;
@@ -279,6 +283,8 @@ export async function createTrialAccount(input: LeadInput, ctx: RequestContext):
   }
 
   // شماره‌ای که از قبل به یک کسب‌وکارِ دیگر وصل است → ورود، نه ساختِ حسابِ تازه
+  // ⚠️ fast-pathِ UX با TOCTOU؛ ضمانتِ واقعی ایندکسِ یکتایِ جزئیِ ۰۷۹ است
+  // (staff_owner_phone_unique_idx) — نگاشتِ بازنده‌ی race دورِ تراکنشِ پایین.
   const existingStaff = await db.staff.findFirst({ where: { phone }, select: { id: true } });
   if (existingStaff) {
     throw Err.validation('این شماره از قبل حسابِ کسب‌وکار دارد؛ از همان شماره وارد پنل شوید.');
@@ -340,6 +346,13 @@ export async function createTrialAccount(input: LeadInput, ctx: RequestContext):
     });
 
     return { tenant, restaurant, order };
+  }).catch((e: unknown) => {
+    // بازنده‌ی raceِ هم‌زمان روی ایندکسِ ownerِ ۰۷۹ → همان پیامِ مسیرِ ترتیبی
+    // (رول‌بکِ کامل انجام شده؛ نه تنانتِ یتیم می‌ماند نه ۵۰۰ِ خام می‌رود).
+    if (isOwnerPhoneUniqueViolation(e)) {
+      throw Err.validation('این شماره از قبل حسابِ کسب‌وکار دارد؛ از همان شماره وارد پنل شوید.');
+    }
+    throw e;
   });
 
   await notifyCompany({ ...provisioned.order });

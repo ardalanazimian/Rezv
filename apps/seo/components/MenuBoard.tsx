@@ -32,10 +32,18 @@ export function sectionId(name: string | null, i: number): string {
 }
 
 const money = (t: number) => `${t.toLocaleString('fa-IR')} تومان`;
+const delta = (t: number) => `${t > 0 ? '+' : '−'}${Math.abs(t).toLocaleString('fa-IR')}`;
+
+/** برچسب‌های منو (۰۷۸) — کلید = enumِ سرور؛ label محلی (همتای پنل/مشتری). */
+const TAG_FA: Record<string, string> = {
+  VEGETARIAN: 'گیاهی', VEGAN: 'وگان', SPICY: 'تند', GLUTEN_FREE: 'بدونِ گلوتن',
+  CONTAINS_NUTS: 'حاوی آجیل', CONTAINS_DAIRY: 'حاوی لبنیات', HALAL: 'حلال',
+  NEW: 'جدید', POPULAR: 'پرفروش',
+};
 
 function Row({ m }: { m: MenuItem }) {
   return (
-    <li className="mi">
+    <li className="mi" style={m.is_out_of_stock ? { opacity: 0.62 } : undefined}>
       {m.image_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img className="mi-img" src={m.image_url} alt={m.name} loading="lazy" decoding="async" width={72} height={72} />
@@ -44,10 +52,32 @@ function Row({ m }: { m: MenuItem }) {
       ) : null}
       <div className="mi-body">
         <div className="mi-top">
-          <span className="mi-name">{m.name}</span>
+          <span className="mi-name">
+            {m.name}
+            {m.is_out_of_stock ? (
+              // «ناموجود» با برچسب، نه حذف — همان فلسفه‌ی endpointِ عمومی (۰۷۷)
+              <span style={{ fontSize: 11, background: '#d97706', color: '#fff', borderRadius: 6, padding: '0 6px', marginInlineStart: 6, whiteSpace: 'nowrap' }}>ناموجود</span>
+            ) : null}
+          </span>
           <span className="mi-price">{money(m.price_toman)}</span>
         </div>
         {m.description ? <p className="mi-desc">{m.description}</p> : null}
+        {m.tags?.length ? (
+          <p className="mi-desc" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {m.tags.map((t) => (
+              <span key={t} style={{ fontSize: 10, border: '1px solid rgba(128,128,128,.35)', borderRadius: 8, padding: '0 6px' }}>{TAG_FA[t] || t}</span>
+            ))}
+          </p>
+        ) : null}
+        {m.modifiers?.filter((g) => g.options.length).map((g) => (
+          // افزودنی‌ها فقط نمایشِ SSR (فاز ۲ به سفارش وصل نیست — B5)
+          <p key={g.id} className="mi-desc">
+            {g.name}:{' '}
+            {g.options.map((o, i) => (
+              <span key={o.id}>{i > 0 ? ' · ' : ''}{o.name}{o.price_delta_toman ? ` (${delta(o.price_delta_toman)})` : ''}</span>
+            ))}
+          </p>
+        ))}
       </div>
     </li>
   );

@@ -54,6 +54,13 @@ const API = {
   // ── اعتبارنامه‌ی بیزنس‌ها (پنلِ شرکت یوزر/پسورد می‌سازد) ──
   staffCredentials(restaurantId){ return this.get(`/admin/staff-credentials?restaurant_id=${encodeURIComponent(restaurantId)}`); },
   setStaffCredentials(payload){ return this.post('/admin/staff-credentials', payload); },
+  // ── SPEC-B: provisioningِ کسب‌وکار از پنلِ شرکت ──
+  // Idempotency-Key اجباری است (دابل‌کلیک/retry = همان یک رستوران).
+  adminCreateRestaurant(body, idemKey){
+    return this.request('/admin/restaurants', { method:'POST', body: JSON.stringify(body||{}), headers:{ 'Idempotency-Key': idemKey } });
+  },
+  adminResendInvite(id){ return this.post(`/admin/restaurants/${id}/resend-invite`, {}); },
+  adminCreateBranch(id, body){ return this.post(`/admin/restaurants/${id}/branches`, body); },
   async requestAdminOtp(phone){ return this.request('/auth/admin/request', { method:'POST', body: JSON.stringify({ phone }) }); },
   async verifyAdminOtp(phone, code){
     const res = await this.request('/auth/admin/verify', { method:'POST', body: JSON.stringify({ phone, code }) });
@@ -134,6 +141,8 @@ function mapAdminRestaurant(apiR, fallback){
     reservations: apiR.reservations ?? 0,
     sms: apiR.sms_total_sent ?? 0,
     smsBalance: apiR.sms_balance ?? 0,
+    // SPEC-B: برای badge «در انتظارِ فعال‌سازی» و دکمه‌ی resend در پنل
+    provision_status: apiR.provision_status,
     joined: apiR.joined_at ? new Date(apiR.joined_at).toLocaleDateString('fa-IR') : '—',
   };
 }

@@ -28,7 +28,8 @@ export async function generateMetadata({ params }: { params: Promise<{ cuisine: 
 export default async function CuisinePage({ params }: { params: Promise<{ cuisine: string }> }) {
   const { cuisine: rawCuisine } = await params;
   const cuisine = decode(rawCuisine);
-  const items = await fetchRestaurantList({ cuisine });
+  // strict=true — دلیلش مثلِ صفحه‌ی شهر: قطعیِ API ≠ «آشپزیِ بی‌رستوران».
+  const items = await fetchRestaurantList({ cuisine }, 300, true);
   if (items.length < MIN_LISTINGS) notFound();
 
   return (

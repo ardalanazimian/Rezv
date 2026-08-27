@@ -10,9 +10,22 @@ export type SmsJob = {
     // ── قالب‌های چرخه‌ی حیات رزرو ──
     | 'booking_waitlist' | 'booking_preparing' | 'booking_rejected'
     | 'booking_cancelled' | 'booking_noshow' | 'booking_thanks'
-    | 'waitlist_joined' | 'waitlist_offer';
+    | 'waitlist_joined' | 'waitlist_offer'
+    // SPEC-B: دعوتِ اولین‌ورودِ owner — tokens: [ownerName, restaurantName, inviteUrl]
+    | 'staff_invite';
   tokens: string[];
   restaurantId?: string;  // اگر مشخص باشد، از موجودی SMS رستوران کم می‌شود (OTP سطح پلتفرم آن را ندارد)
+  /**
+   * متنِ آزاد (فقط ملی‌پیامک). اگر پر باشد، به‌جایِ الگو یک پیامکِ متن‌آزاد از
+   * خطِ اختصاصی ارسال می‌شود.
+   *
+   * چرا اضافه شد: کاوه‌نگار فقط `verify/lookup` (الگومحور) داشت، پس متنی که
+   * رستوران‌دار در کمپین می‌نوشت **قابلِ ارسال نبود** و بی‌صدا دور ریخته
+   * می‌شد. ملی‌پیامک `SendSMS` را دارد که متنِ دلخواه می‌فرستد.
+   * ⚠️ ارسالِ متنِ آزاد نیازِ خطِ اختصاصی (`MELIPAYAMAK_FROM`) دارد؛ خطِ
+   * خدماتیِ اشتراکی فقط الگو قبول می‌کند.
+   */
+  text?: string;
   /**
    * کلیدِ یکتاسازی — اگر داده شود، صف کارِ تکراری با همین کلید را نمی‌پذیرد.
    * صف از روزِ اول این را پشتیبانی می‌کرد (`enqueue`)، ولی `enqueueSms` آن را
@@ -22,26 +35,75 @@ export type SmsJob = {
   idempotencyKey?: string;
 };
 
-const TEMPLATE_MAP: Record<SmsJob['template'], string> = {
-  otp: process.env.KAVENEGAR_TPL_OTP || 'rezervno-otp',
-  booking_confirm: process.env.KAVENEGAR_TPL_BOOKING || 'rezervno-booking',
-  reminder: process.env.KAVENEGAR_TPL_REMINDER || 'rezervno-reminder',
-  welcome_visit: process.env.KAVENEGAR_TPL_WELCOME || 'rezervno-welcome',
-  campaign: process.env.KAVENEGAR_TPL_CAMPAIGN || 'rezervno-campaign',
-  winback_offer: process.env.KAVENEGAR_TPL_WINBACK || 'rezervno-winback',
-  // ── قالب‌های چرخه‌ی حیات (با پیش‌فرض؛ در پنل کاوه‌نگار قابل تعریف) ──
-  booking_waitlist: process.env.KAVENEGAR_TPL_WAITLIST || 'rezervno-waitlist',
-  booking_preparing: process.env.KAVENEGAR_TPL_PREPARING || 'rezervno-preparing',
-  booking_rejected: process.env.KAVENEGAR_TPL_REJECTED || 'rezervno-rejected',
-  booking_cancelled: process.env.KAVENEGAR_TPL_CANCELLED || 'rezervno-cancelled',
-  booking_noshow: process.env.KAVENEGAR_TPL_NOSHOW || 'rezervno-noshow',
-  booking_thanks: process.env.KAVENEGAR_TPL_THANKS || 'rezervno-thanks',
-  waitlist_joined: process.env.KAVENEGAR_TPL_WL_JOIN || 'rezervno-wl-join',
-  waitlist_offer: process.env.KAVENEGAR_TPL_WL_OFFER || 'rezervno-wl-offer',
-};
+/**
+ * نگاشتِ قالب → `bodyId`ِ ملی‌پیامک (سرویسِ «خطِ خدماتی/الگو»).
+ *
+ * ⚠️ مهاجرت از کاوه‌نگار (۲۰۲۶-۰۸-۲۶): کاوه‌نگار الگو را با **نام** صدا
+ * می‌زد (`rezervno-otp`)، ملی‌پیامک با **شناسه‌ی عددی** (`bodyId`) که پس از
+ * تأییدِ متنِ الگو در پنل صادر می‌شود. پس این‌ها پیش‌فرضِ معنادار ندارند —
+ * یک bodyIdِ حدسی یعنی ارسالِ رد‌شده. نبودشان **صریح** گزارش می‌شود، نه
+ * اینکه بی‌صدا به عددی جایگزین بیفتد.
+ */
+function bodyIdFor(template: SmsJob['template']): string | undefined {
+  // ⚠️ عمداً **تابع** است، نه ثابتِ سطحِ ماژول (اصلاح ۲۰۲۶-۰۸-۲۶): اعتبارنامه‌ها
+  // (`MELIPAYAMAK_USERNAME/PASSWORD`) از قبل در زمانِ فراخوانی خوانده می‌شدند،
+  // ولی bodyIdها در زمانِ **لودِ ماژول** — یک ناسازگاریِ واقعی: تغییرِ env
+  // نیازِ ری‌استارت داشت، و در تست هر فایلی مجبور می‌شد پیش از importِ این
+  // ماژول env بچیند (که با top-level await ترتیبِ رانر را به‌هم می‌ریخت و
+  // stubِ سراسریِ fetch را به تست‌های دیگر نشت می‌داد — با اجرای واقعی دیده شد).
+  const map: Record<SmsJob['template'], string | undefined> = {
+    otp: process.env.MELIPAYAMAK_BODYID_OTP,
+    booking_confirm: process.env.MELIPAYAMAK_BODYID_BOOKING,
+    reminder: process.env.MELIPAYAMAK_BODYID_REMINDER,
+    welcome_visit: process.env.MELIPAYAMAK_BODYID_WELCOME,
+    campaign: process.env.MELIPAYAMAK_BODYID_CAMPAIGN,
+    winback_offer: process.env.MELIPAYAMAK_BODYID_WINBACK,
+    booking_waitlist: process.env.MELIPAYAMAK_BODYID_WAITLIST,
+    booking_preparing: process.env.MELIPAYAMAK_BODYID_PREPARING,
+    booking_rejected: process.env.MELIPAYAMAK_BODYID_REJECTED,
+    booking_cancelled: process.env.MELIPAYAMAK_BODYID_CANCELLED,
+    booking_noshow: process.env.MELIPAYAMAK_BODYID_NOSHOW,
+    booking_thanks: process.env.MELIPAYAMAK_BODYID_THANKS,
+    waitlist_joined: process.env.MELIPAYAMAK_BODYID_WL_JOIN,
+    waitlist_offer: process.env.MELIPAYAMAK_BODYID_WL_OFFER,
+    staff_invite: process.env.MELIPAYAMAK_BODYID_INVITE,
+  };
+  return map[template];
+}
 
-/** سقفِ توکنِ lookupِ کاوه‌نگار (token, token2, token3). */
-export const MAX_SMS_TOKENS = 3;
+const MELI_BASE = 'https://rest.payamak-panel.com/api/SendSMS';
+
+/**
+ * جداکننده‌ی مقادیرِ توکن در سرویسِ الگویِ ملی‌پیامک.
+ *
+ * ⚠️ **راستی‌آزمایی‌نشده** (۲۰۲۶-۰۸-۲۶): ملی‌پیامک این جزئیات را عمومی مستند
+ * نکرده و هیچ‌کدام از SDKهای رسمی‌اش (python/php/C#) نمونه‌ی چندتوکنی ندارند.
+ * `;` قراردادِ رایجِ این سرویس است و پیش‌فرض گرفته شد، ولی **پیش از تولید
+ * باید از پنلِ خودت تأیید شود**. قابلِ تنظیم گذاشته شد تا اگر فرق داشت،
+ * نیازِ تغییرِ کد نباشد.
+ */
+function tokenSep(): string { return process.env.MELIPAYAMAK_TOKEN_SEPARATOR || ';'; }
+
+type MeliResponse = { Value?: string | number; RetStatus?: number; StrRetStatus?: string };
+
+/**
+ * موفقیت را از شکستِ ملی‌پیامک تفکیک می‌کند.
+ *
+ * قراردادِ سرویس: `RetStatus === 1` یعنی پذیرفته شد و `Value` همان recId است.
+ * در پاسخ‌های قدیمی‌تر فقط `Value` می‌آید که «recId یا شماره‌ی خطا» است
+ * (کامنتِ خودِ SDKِ رسمیِ PHP) — و کدهای خطا اعدادِ کوچک‌اند، پس recIdِ واقعی
+ * با طولش تشخیص داده می‌شود.
+ *
+ * عمداً محافظه‌کار است: هر چیزی که قطعاً موفق نیست، شکست حساب می‌شود. یک
+ * پیامکِ ارسال‌نشده که «ارسال شد» گزارش شود، دقیقاً همان جعلِ موفقیتی است که
+ * کلِ این ممیزی درباره‌اش است.
+ */
+function meliAccepted(d: MeliResponse | null): boolean {
+  if (!d) return false;
+  if (typeof d.RetStatus === 'number') return d.RetStatus === 1;
+  const v = Number(d.Value);
+  return Number.isFinite(v) && v > 1000;   // recId، نه کدِ خطا
+}
 
 /**
  * شکلِ محلیِ شماره (`+989…`/`98…` → `09…`). فرمتِ گیرنده‌ی کاوه‌نگار است.
@@ -138,68 +200,113 @@ export async function enqueueSms(job: SmsJob): Promise<void> {
   await sendDirectFallback(job);
 }
 
-/** ارسال واقعی یک SMS از طریق کاوه‌نگار (توسط worker صف یا مسیر OTP صدا زده می‌شود). */
 /**
- * آیا پیامک واقعاً قابلِ ارسال است؟ (کلیدِ کاوه‌نگار تنظیم شده؟)
- * مسیرهایی که **نتیجه‌شان به رسیدنِ پیامک وابسته است** — مثلِ OTP — باید
- * پیش از ادعای موفقیت این را بپرسند.
+ * آیا زیرساختِ پیامک واقعاً قابلِ استفاده است؟
+ *
+ * (میراثِ ادغام ۲۰۲۶-۰۸-۲۶: مفهوم از شاخه‌ی open-tasks-review آمد — آنجا برای
+ * کاوه‌نگار فقط وجودِ API_KEY بود. برای ملی‌پیامک «آماده» یعنی اعتبارنامه‌ها
+ * **و** bodyIdِ الگویِ OTP، چون بدونِ دومی مسیرِ ورود همچنان بی‌پیامک می‌ماند.)
+ *
+ * مسیرهایی که نتیجه‌شان به رسیدنِ پیامک وابسته است — مثلِ OTP — باید پیش از
+ * ادعای موفقیت این را بپرسند؛ وگرنه کاربر ۲۰۴ِ موفق می‌گیرد و کدی که هرگز
+ * نمی‌آید را انتظار می‌کشد (و چون OTP_DEV_MODE در production استثناست، عملاً
+ * **هیچ‌کس نمی‌تواند وارد شود** در حالی که همه‌ی لاگ‌ها تمیزند).
  */
 export function smsTransportReady(): boolean {
-  return Boolean(process.env.KAVENEGAR_API_KEY);
+  return Boolean(
+    process.env.MELIPAYAMAK_USERNAME &&
+    process.env.MELIPAYAMAK_PASSWORD &&
+    process.env.MELIPAYAMAK_BODYID_OTP,
+  );
 }
 
+/**
+ * سقفِ توکنِ سرویسِ الگویِ کاوه‌نگار (میراث). با ملی‌پیامک سقفِ سختِ ۳تایی
+ * وجود ندارد — همه‌ی توکن‌ها join می‌شوند و «بریدنِ خاموشِ توکنِ چهارم»
+ * (باگی که در booking_confirm کدِ رزرو را می‌انداخت) از اساس منتفی است.
+ * صادر می‌ماند چون reminders.ts به مفهومش ارجاع می‌دهد؛ حدِ طراحیِ الگوهاست،
+ * نه حدِ ارسال.
+ */
+export const MAX_SMS_TOKENS = 3;
+
+/**
+ * ارسالِ واقعیِ یک SMS از طریقِ **ملی‌پیامک** (توسطِ workerِ صف یا مسیرِ OTP).
+ *
+ * دو مسیرِ متفاوتِ سرویس — انتخاب بر اساسِ اینکه job متنِ آزاد دارد یا نه:
+ *   • `BaseServiceNumber` (bodyId)  → پیامکِ الگومحور رویِ خطِ خدماتی.
+ *     معادلِ مستقیمِ `verify/lookup`ِ کاوه‌نگار. برایِ OTP و پیام‌های تراکنشی
+ *     **الزامی** است (خطِ خدماتی متنِ آزاد قبول نمی‌کند).
+ *   • `SendSMS` (متنِ آزاد)          → از خطِ اختصاصی (`MELIPAYAMAK_FROM`).
+ *     چیزی که کاوه‌نگار اصلاً نداشت، و به همین دلیل متنِ کمپینِ رستوران‌دار
+ *     بی‌صدا دور ریخته می‌شد.
+ */
 export async function sendSmsNow(job: SmsJob): Promise<void> {
-  const apiKey = process.env.KAVENEGAR_API_KEY;
-  if (!apiKey) {
-    // ⚠️ یافته‌ی ۲۰۲۶-۰۸-۲۵ — خطرناک‌ترین حالتِ «سکوت» در کلِ سیستم:
-    // بدونِ کلید، این تابع بی‌صدا برمی‌گشت و **هیچ متریکی** نمی‌خورد. برای
-    // پیامکِ تبلیغاتی قابلِ‌تحمل است، ولی برای OTP یعنی: کاربر شماره می‌زند،
-    // پاسخِ ۲۰۴ِ **موفق** می‌گیرد، پیامک هرگز نمی‌آید، و منتظر می‌ماند.
-    // چون OTP_DEV_MODE در production استثنا می‌دهد، هیچ راهِ دیگری هم برای
-    // گرفتنِ کد نیست ⇒ **هیچ‌کس نمی‌تواند وارد شود** — نه مشتری، نه
-    // رستوران‌دار، نه ادمین — در حالی که API بالاست و لاگ تمیز.
-    // حالا دستِ‌کم شمرده و در production با هشدار لاگ می‌شود؛ و مسیرِ OTP
-    // خودش پیش از ادعای موفقیت `smsTransportReady()` را می‌پرسد.
-    metrics.smsFailed.inc({ template: job.template, reason: 'no_api_key' });
+  const username = process.env.MELIPAYAMAK_USERNAME;
+  const password = process.env.MELIPAYAMAK_PASSWORD;
+  if (!username || !password) {
+    // ⚠️ بلندی این شکست میراثِ ادغام است (یافته‌ی open-tasks-review دربارهٔ
+    // «خطرناک‌ترین سکوتِ سیستم»): بدونِ اعتبارنامه در production باید صدا
+    // داشته باشد و شمرده شود — نه debugِ بی‌صدا. مسیرِ OTP جداگانه پیش از
+    // ادعای موفقیت smsTransportReady() را می‌پرسد.
+    metrics.smsFailed.inc({ template: job.template, reason: 'not_configured' });
     if (process.env.NODE_ENV === 'production') {
-      log.error('KAVENEGAR_API_KEY تنظیم نشده — هیچ پیامکی ارسال نمی‌شود', { template: job.template });
+      log.error('MELIPAYAMAK_USERNAME/PASSWORD تنظیم نشده — هیچ پیامکی ارسال نمی‌شود', { template: job.template });
     } else {
       log.debug(`(dev) SMS → ${job.to}`, { template: job.template });
     }
     return;
   }
   const receptor = toLocalNumber(job.to);
-  const template = TEMPLATE_MAP[job.template];
 
-  // ⚠️ گاردِ بریدنِ خاموش (یافته‌ی ۲۰۲۶-۰۸-۲۵): این تابع فقط سه توکن را
-  // عبور می‌دهد (`token`, `token2`, `token3` — سقفِ lookupِ کاوه‌نگار)، ولی
-  // چند فراخوان **چهار** توکن می‌فرستادند. توکنِ چهارم بی‌صدا دور ریخته
-  // می‌شد. جدی‌ترین موردش `booking_confirm` بود که توکنِ چهارمش **کدِ رزرو**
-  // است: کاربر پیامکِ تأیید می‌گرفت بدونِ کدی که برای مراجعه لازم دارد.
-  //
-  // اینجا عمداً پیام را دستکاری یا بازچینش نمی‌کنیم — ترتیبِ توکن‌ها به
-  // قالبِ تعریف‌شده در پنلِ کاوه‌نگار وابسته است و حدس‌زدنش پیام را خراب
-  // می‌کند. کاری که می‌کنیم این است که **دیگر خاموش نباشد**.
-  if (job.tokens.length > MAX_SMS_TOKENS) {
-    log.error(`قالبِ ${job.template}: ${job.tokens.length} توکن داده شد ولی فقط ${MAX_SMS_TOKENS} تا ارسال می‌شود`, {
-      template: job.template, dropped: job.tokens.slice(MAX_SMS_TOKENS),
-    });
-    metrics.smsFailed.inc({ template: job.template, reason: 'token_overflow' });
+  // ── انتخابِ مسیر ──
+  const freeText = (job.text || '').trim();
+  let url: string;
+  let body: Record<string, string>;
+
+  if (freeText) {
+    const from = process.env.MELIPAYAMAK_FROM;
+    if (!from) {
+      // بدونِ خطِ اختصاصی، ارسالِ متنِ آزاد ممکن نیست. صریح شکست می‌خورد تا
+      // مصرف‌کننده «ارسال شد» نگوید.
+      log.error('ارسالِ متنِ آزاد بدونِ MELIPAYAMAK_FROM ممکن نیست', { template: job.template });
+      metrics.smsFailed.inc({ template: job.template, reason: 'no_sender_line' });
+      return;
+    }
+    url = `${MELI_BASE}/SendSMS`;
+    body = { username, password, to: receptor, from, text: freeText, isFlash: 'false' };
+  } else {
+    const bodyId = bodyIdFor(job.template);
+    if (!bodyId) {
+      // نبودِ bodyId یعنی الگو در پنل تعریف/تأیید نشده. حدس‌زدن ممنوع.
+      log.error('bodyIdِ الگو تنظیم نشده — پیامک ارسال نشد', { template: job.template });
+      metrics.smsFailed.inc({ template: job.template, reason: 'missing_bodyid' });
+      return;
+    }
+    url = `${MELI_BASE}/BaseServiceNumber`;
+    body = { username, password, to: receptor, bodyId, text: job.tokens.join(tokenSep()) };
   }
 
-  const params = new URLSearchParams({ receptor, template, token: job.tokens[0] || '' });
-  if (job.tokens[1]) params.set('token2', job.tokens[1]);
-  if (job.tokens[2]) params.set('token3', job.tokens[2]);
-  const url = `https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json?${params.toString()}`;
   try {
-    const res = await fetch(url, { method: 'GET' });
-    const data = await res.json().catch(() => null);
-    if (!res.ok || data?.return?.status !== 200) {
-      log.error(`ارسال ناموفق → ${receptor}`, { template: job.template, reason: data?.return?.message || res.status });
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json().catch(() => null)) as MeliResponse | null;
+    if (!res.ok || !meliAccepted(data)) {
+      // پاسخِ خامِ ارائه‌دهنده لاگ می‌شود، نه یک پیامِ حدسی: جدولِ کدهای خطای
+      // ملی‌پیامک عمومی مستند نیست، پس تشخیص باید از رویِ داده‌ی واقعی باشد.
+      log.error(`ارسال ناموفق → ${receptor}`, {
+        template: job.template,
+        status: res.status,
+        retStatus: data?.RetStatus,
+        strRetStatus: data?.StrRetStatus,
+        value: data?.Value,
+      });
       metrics.smsFailed.inc({ template: job.template, reason: 'rejected' });
       return;
     }
-    log.info(`ارسال شد → ${receptor}`, { template: job.template });
+    log.info(`ارسال شد → ${receptor}`, { template: job.template, recId: data?.Value });
     metrics.smsSent.inc({ template: job.template });
   } catch (e) {
     log.error(`خطای شبکه → ${receptor}`, { template: job.template, error: (e as Error).message });

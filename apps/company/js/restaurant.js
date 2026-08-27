@@ -18,6 +18,8 @@ function rDetail(){
       </div>
       <div class="detail-actions">
         <span class="badge ${badgeCls}" style="align-self:center"><span class="bdot"></span>${statusText}</span>
+        ${r.provision_status && r.provision_status!=='ACTIVE' ? `<span class="badge ${r.provision_status==='PENDING_ACTIVATION'?'trial':'expired'}" style="align-self:center" title="وضعیتِ provisioning">${({PENDING_ACTIVATION:'در انتظارِ فعال‌سازی',SUSPENDED:'معلق',OFFBOARDED:'خارج‌شده'})[r.provision_status]||esc(r.provision_status)}</span>`:''}
+        ${r.provision_status==='PENDING_ACTIVATION' ? `<button class="btn btn-ghost btn-sm" onclick="resendProvisionInvite(${jsq(r.id)},this)" aria-label="ارسالِ مجددِ دعوتِ اولین‌ورود">${icon('mail',{size:14})} ارسالِ مجددِ دعوت</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen(${jsq(r.id)})">${r.isOpen?`${icon('lock',{size:14})} غیرفعال کردن`:`${icon('check',{size:14})} فعال کردن`}</button>
         <button class="btn btn-primary btn-sm" onclick="openRenew(${jsq(r.id)})">${icon('refresh',{size:14})} مدیریت اشتراک</button>
       </div>
@@ -163,3 +165,18 @@ function rAnalytics(){
 }
 
 // ════════ هوش تجاری مشتریان — تجمیعی و واقعی، از /admin/business-intelligence ════════
+
+// ═══════════ SPEC-B — ارسالِ مجددِ دعوتِ اولین‌ورود (وضعیتِ PENDING) ═══════════
+// چهار حالت: loading (قفلِ دکمه) / error (toast با پیامِ سرور) / success
+// (toast با ماسکِ شماره). دکمه فقط برای رستورانِ PENDING_ACTIVATION رندر می‌شود.
+async function resendProvisionInvite(id, btn){
+  const label = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'در حالِ ارسال…'; }
+  const res = await API.adminResendInvite(id);
+  if(btn){ btn.disabled = false; btn.innerHTML = label; }
+  if(res.ok){
+    toast('', `دعوتِ تازه به ${res.data?.invite_sent_to || 'مالک'} ارسال شد`);
+  } else {
+    toast('', res.error?.message || (res.offline ? 'اتصال به سرور برقرار نشد' : 'ارسالِ دعوت ناموفق بود'));
+  }
+}

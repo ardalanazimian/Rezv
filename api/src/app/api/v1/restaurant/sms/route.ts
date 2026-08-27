@@ -232,6 +232,26 @@ export const POST = withRestaurantAuth(
     }
 
     const discount = (b.discount_code || '').slice(0, 20);
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  رفعِ P0 (۲۰۲۶-۰۸-۲۶): متنِ کمپین حالا واقعاً ارسال می‌شود.
+    //
+    //  ⚠️ باگی که رفع شد: `b.message` پذیرفته می‌شد (پس API با ۲۰۰ برمی‌گشت)
+    //  ولی **هیچ‌وقت** به `enqueueSms` نمی‌رسید — تنها مصرفش ذخیره در
+    //  `campaignLog.message` بود. یعنی رستوران‌دار متن را در پیش‌نمایشی که
+    //  می‌گفت «دقیقاً همینطوری ارسال می‌شه» تأیید می‌کرد، پولِ واقعیِ پیامک
+    //  خرج می‌شد، و مشتری یک قالبِ ثابتِ کاملاً متفاوت می‌گرفت.
+    //
+    //  چرا تا امروز رفع نشده بود: کاوه‌نگار فقط `verify/lookup`ِ الگومحور
+    //  داشت و ارسالِ متنِ آزاد اصلاً ممکن نبود. با مهاجرت به ملی‌پیامک
+    //  (`SendSMS`) این مسیر باز شد.
+    //
+    //  ⚠️ متنِ آزاد خطِ اختصاصی می‌خواهد (`MELIPAYAMAK_FROM`). اگر تنظیم
+    //  نباشد، لایه‌ی sms **صریح شکست می‌خورد و لاگ می‌کند** — بی‌صدا به قالب
+    //  برنمی‌گردد، چون آن دقیقاً همان باگِ بالا را برمی‌گرداند.
+    // ═══════════════════════════════════════════════════════════════════
+    const customText = kind === 'campaign' ? (b.message || '').trim() : '';
+
     let queued = 0;
     const delivered: typeof targets = [];
     for (const t of targets) {
@@ -255,7 +275,13 @@ export const POST = withRestaurantAuth(
       } else {
         tokens = [t.name || 'مهمان', restaurant.name];
       }
-      await enqueueSms({ to: t.phone, template, tokens, restaurantId: restaurant.id });
+      await enqueueSms({
+        to: t.phone, template, tokens, restaurantId: restaurant.id,
+        // متنِ آزادِ کمپین (ادغامِ ۲۰۲۶-۰۸-۲۶ از خطِ ملی‌پیامک): «دقیقاً
+        // همینطوری ارسال می‌شه» فقط با همین واقعاً درست است. `{نام}` تنها
+        // جای‌گذاریِ پشتیبانی‌شده است.
+        ...(customText ? { text: customText.replace(/\{نام\}/g, t.name || 'مهمان') } : {}),
+      });
       queued++;
       delivered.push(t);
     }

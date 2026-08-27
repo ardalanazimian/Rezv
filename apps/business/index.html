@@ -165,6 +165,21 @@
 </div>
 
 <!-- ── پنل business: ماژول‌های Vanilla JS (بدون build، ترتیب مهم) ── -->
+<script>
+// ── آدرسِ APIِ قابلِ‌تنظیم بدونِ build (۲۰۲۶-۰۸-۲۶) ──
+// چرا: پنل استاتیک است و پیش‌فرضِ api-core «same-origin» — پشتِ nginxِ
+// استقرار درست است، ولی هر سروِ استاتیکِ دیگر (serve محلی، بسته‌ی آفلاین
+// رویِ یک بک‌اندِ واقعی) POST را با 405 برمی‌گرداند و ورود ناممکن می‌شود.
+// یک‌بار «?api=http://host:port» به URL بده تا ذخیره شود؛ «?api=» خالی
+// پاکش می‌کند. بدونِ آن هیچ رفتاری عوض نمی‌شود (localStorage خالی = همان
+// same-origin). try/catch برای حالتِ خصوصیِ مرورگر.
+(function(){try{
+  var q=new URLSearchParams(location.search);
+  if(q.has('api')){var v=q.get('api')||'';v?localStorage.setItem('rz_api_base',v):localStorage.removeItem('rz_api_base');}
+  var s=localStorage.getItem('rz_api_base');
+  if(s) window.RZ_API_BASE=s;
+}catch(e){}})();
+</script>
 <script src="js/icons.js"></script>
 <script src="js/api-core.js"></script>
 <script src="js/format.js"></script>

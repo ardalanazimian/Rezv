@@ -276,6 +276,24 @@ jobs:
       - name: Check XSS sink audit artifact is fresh
         run: node tools/xss-sink-audit.mjs --check
 
+  # ── تازگیِ بسته‌ی آفلاین (standalone/) ────────────────────────────────
+  # چرا این جاب اضافه شد (۲۰۲۶-۰۸-۲۶): `CLAUDE.md` §۴b این چک را یک گیتِ
+  # *اجباریِ* پیش از پوش اعلام کرده بود، ولی هیچ جابی در CI اجرایش نمی‌کرد —
+  # یعنی تنها ضامنش این بود که یک آدم یادش بماند. دقیقاً همین‌طور هم شکست:
+  # `standalone/*.html` از ۲۰۲۶-۰۸-۱۸ تا ۲۰۲۶-۰۸-۲۳ کهنه ماند و بسته‌ی
+  # آفلاین یک P0 را تحویل می‌داد که در منبع رفع شده بود.
+  #
+  # گیتی که فقط در یک فایلِ markdown زندگی می‌کند، گیت نیست.
+  standalone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: بسته‌ی آفلاین با منبع هم‌خوان است؟
+        run: python tools/build-standalone.py --check
+
   # ── اپِ SEO (apps/seo · Next.js SSR/ISR، ADR 0001) — build + typecheck + lint ──
   # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند. build خودِ Next تایپ‌چک/لینت می‌کند.
   seo:

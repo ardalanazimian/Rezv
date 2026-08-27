@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>دعوت به رزرونو</title>
+<!--
+  صفحه‌ی دعوتِ اولین‌ورودِ مالک (SPEC-B §۶-۱) — فایلِ استاتیکِ مستقل.
+
+  چرا توکن در fragment (#token=…): این پنل بدونِ سرورِ اپلیکیشن سرو می‌شود؛
+  هاست‌های استاتیکِ cleanUrls-دار (مثلِ npx serve) invite.html?token=x را
+  301 به /invite می‌کنند و query را می‌اندازند، ولی fragment از redirect جان
+  به در می‌برد و به access-logِ سرور هم هرگز نمی‌رسد. lib/provisioning.ts
+  لینکِ پیامک را به همین شکل می‌سازد (invite.html#token=…). query و
+  /invite/{token} به‌عنوانِ fallbackِ سازگاری پذیرفته می‌مانند.
+
+  ⚠️ به دستورِ مالک (۲۰۲۶-۰۸-۲۶): ورودِ owner فقط OTP است — این صفحه هیچ
+  گزینه‌ی رمزی ندارد و claim هم دیگر متدها را اعلام نمی‌کند.
+
+  چهار حالت: loading / empty (توکنِ ناشناخته|غایب) / error (شبکه|سرور) /
+  success (سه زیرحالتِ valid|expired|used از پاسخِ claim).
+-->
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/tokens.css">
+<style>
+  /* رنگ‌ها از توکن‌های دیزاین‌سیستمِ خودِ پنل؛ فقط چیدمانِ صفحه محلی است. */
+  body{margin:0;background:var(--s-50,#f7f7f9);font-family:Vazirmatn,sans-serif;color:var(--ink,#16161d);
+       min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:var(--card,#fff);border:1px solid var(--border,#e6e6ee);border-radius:18px;
+        padding:32px 26px;max-width:400px;width:100%;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.06)}
+  .logo{width:56px;height:56px;border-radius:16px;background:var(--blue,#2f6bff);color:#fff;
+        display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px}
+  h1{font-size:18px;margin:0 0 6px}
+  .sub{font-size:13px;color:var(--t2,#6b6b7a);line-height:1.9;margin:0 0 4px}
+  .phone{direction:ltr;display:inline-block;font-weight:700}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;
+       min-height:48px;margin-top:18px;border:none;border-radius:12px;cursor:pointer;
+       font-family:inherit;font-size:15px;font-weight:700;background:var(--blue,#2f6bff);color:#fff;
+       text-decoration:none}
+  .btn:focus-visible{outline:3px solid var(--blue-300,#9db9ff);outline-offset:2px}
+  .muted{font-size:12px;color:var(--t3,#9a9aa8);margin-top:14px;line-height:1.9}
+  .state{display:none}
+  .state.active{display:block}
+  .spin{width:34px;height:34px;border:3px solid var(--border,#e6e6ee);border-top-color:var(--blue,#2f6bff);
+        border-radius:50%;margin:8px auto 14px;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .warn .logo{background:var(--amber,#d97706)}
+  .bad .logo{background:var(--red,#c0392b)}
+  @media (prefers-reduced-motion: reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<main class="card" id="card">
+
+  <!-- ── loading ── -->
+  <section class="state active" id="st-loading" aria-live="polite">
+    <div class="spin" role="status" aria-label="در حال بررسیِ دعوت"></div>
+    <h1>در حال بررسیِ دعوت…</h1>
+    <p class="sub">چند لحظه صبر کن.</p>
+  </section>
+
+  <!-- ── success · valid ── -->
+  <section class="state" id="st-valid">
+    <div class="logo" aria-hidden="true">🍽</div>
+    <h1 id="vTitle">دعوت به پنلِ رستوران</h1>
+    <p class="sub">برای مدیریتِ <b id="vName"></b> دعوت شده‌ای.</p>
+    <p class="sub">ورود با کدِ پیامکی به شماره‌ی <span class="phone" id="vPhone"></span></p>
+    <a class="btn" id="vGo" href="./">ورود با کدِ پیامکی</a>
+    <p class="muted">با ورودِ موفق، حسابت خودکار فعال می‌شود.</p>
+  </section>
+
+  <!-- ── success · used ── -->
+  <section class="state" id="st-used">
+    <div class="logo" aria-hidden="true">✅</div>
+    <h1>این دعوت قبلاً استفاده شده</h1>
+    <p class="sub">حسابِ <b id="uName"></b> فعال است — مستقیم وارد شو.</p>
+    <a class="btn" href="./">ورود به پنل</a>
+  </section>
+
+  <!-- ── success · expired ── -->
+  <section class="state warn" id="st-expired">
+    <div class="logo" aria-hidden="true">⏳</div>
+    <h1>این لینکِ دعوت منقضی شده</h1>
+    <p class="sub">از پشتیبانیِ رزرونو بخواه دعوتِ تازه‌ای برای <b id="eName"></b> بفرستد.</p>
+    <p class="muted">اگر پیامکِ جدیدتری داری، از لینکِ همان استفاده کن — هر ارسالِ مجدد، لینکِ قبلی را باطل می‌کند.</p>
+  </section>
+
+  <!-- ── empty: توکنِ غایب/ناشناخته ── -->
+  <section class="state bad" id="st-empty">
+    <div class="logo" aria-hidden="true">❓</div>
+    <h1>دعوتی پیدا نشد</h1>
+    <p class="sub">این لینک معتبر نیست. لینک را دقیقاً از پیامکِ دعوت باز کن.</p>
+  </section>
+
+  <!-- ── error: شبکه/سرور — «نمی‌دانیم»، نه «نیست» ── -->
+  <section class="state bad" id="st-error" aria-live="assertive">
+    <div class="logo" aria-hidden="true">⚠️</div>
+    <h1>وضعیتِ دعوت فعلاً در دسترس نیست</h1>
+    <p class="sub">ارتباط با سرور برقرار نشد — یعنی وضعیت را <b>نمی‌دانیم</b>، نه اینکه دعوتت نامعتبر باشد.</p>
+    <button class="btn" id="retryBtn" type="button">تلاش دوباره</button>
+  </section>
+
+</main>
+<script>
+(function(){
+  'use strict';
+  // آدرسِ API — همان قراردادِ پنل: ?api= یک‌بار ذخیره می‌شود؛ پیش‌فرض same-origin.
+  var qs=new URLSearchParams(location.search);
+  try{
+    if(qs.has('api')){var v=qs.get('api')||'';v?localStorage.setItem('rz_api_base',v):localStorage.removeItem('rz_api_base');}
+  }catch(e){}
+  var base='';try{base=localStorage.getItem('rz_api_base')||'';}catch(e){}
+
+  // اولویت با fragment (فرمِ لینکِ پیامکی — ضدِ redirect و بیرون از لاگِ سرور)؛
+  // بعد query (سازگاری/paste دستی)؛ بعد مسیرِ /invite/{token} (rewriteِ nginx).
+  var token='';
+  try{token=(new URLSearchParams((location.hash||'').replace(/^#/,'')).get('token')||'').trim();}catch(e){}
+  if(!token)token=(qs.get('token')||'').trim();
+  if(!token){var m=location.pathname.match(/\/invite\/([A-Za-z0-9]+)\/?$/);if(m)token=m[1];}
+
+  function show(id){
+    document.querySelectorAll('.state').forEach(function(s){s.classList.remove('active');});
+    document.getElementById(id).classList.add('active');
+  }
+  function esc(x){return String(x==null?'':x).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+  function load(){
+    show('st-loading');
+    if(!token){show('st-empty');return;}
+    var ctl=new AbortController();var t=setTimeout(function(){ctl.abort();},8000);
+    fetch(base+'/api/v1/auth/invite/'+encodeURIComponent(token)+'/claim',{method:'POST',signal:ctl.signal,
+      headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){
+      clearTimeout(t);
+      if(r.status===404){show('st-empty');return null;}
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.json();
+    })
+    .then(function(d){
+      if(!d)return;
+      var name=d.restaurant&&d.restaurant.name||'';
+      if(d.state==='used'){document.getElementById('uName').innerHTML=esc(name);show('st-used');return;}
+      if(d.state==='expired'){document.getElementById('eName').innerHTML=esc(name);show('st-expired');return;}
+      document.getElementById('vName').innerHTML=esc(name);
+      document.getElementById('vPhone').textContent=d.phone_mask||'';
+      document.title='دعوت به '+name+' | رزرونو';
+      show('st-valid');
+    })
+    .catch(function(){clearTimeout(t);show('st-error');});
+  }
+  document.getElementById('retryBtn').addEventListener('click',load);
+  load();
+})();
+</script>
+</body>
+</html>

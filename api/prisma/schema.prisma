@@ -14,9 +14,13 @@ model Tenant {
   planExpiresAt DateTime?    @map("plan_expires_at")
   trialEndsAt   DateTime?    @map("trial_ends_at")
   version       Int          @default(1)   // Optimistic Lock — جلوگیری از Lost Update در ویرایشِ همزمان
+  // SPEC-B (migration 076): سقفِ شعبه‌های این تنانت. سطحِ tenant است نه
+  // رستوران — سهمیه روی کلِ زنجیره اعمال می‌شود (C4ِ برنامه).
+  branchLimit   Int          @default(1) @map("branch_limit")
   createdAt     DateTime     @default(now()) @map("created_at")
   restaurants   Restaurant[]
   staff         Staff[]
+  staffInvites  StaffInvite[]
   @@map("tenants")
 }
 
@@ -111,6 +115,13 @@ model Staff {
   // drift-fix (فازِ ۲، §۲۴): در DB وجود دارد، در schema اعلام نشده بود.
   @@index([restaurantId])
   @@index([phone, createdAt, id], map: "staff_phone_created_idx")
+  // ⚠️ مهاجرتِ ۰۷۹ — ایندکسِ یکتایِ **جزئی** که Prisma نمی‌تواند اعلامش کند:
+  //   CREATE UNIQUE INDEX staff_owner_phone_unique_idx ON staff (phone) WHERE role = 'owner'
+  // بستنِ raceِ TOCTOUِ دو مسیرِ سازنده‌ی owner (provisionBusiness /
+  // createTrialAccount). تکرارِ شماره برای «کارمند» بینِ تنانت‌ها قانونی
+  // می‌ماند. پوشش در گاردِ drift: required + ACCEPTED_DRIFT
+  // (schema-drift.integration.test.mts).
+  invites   StaffInvite[]
   @@map("staff")
 }
 
@@ -171,9 +182,14 @@ model Restaurant {
   // این فیلد و بقیه‌ی موارد مشابه («⚠️ همگام‌سازی‌شده») از قبل روی DB بودند ولی هرگز
   // در این schema.prisma منعکس نشده بودند (drift بین DB و ریپو — کشف‌شده و رفع‌شده).
   paymentEnabled Boolean         @default(false) @map("payment_enabled") // فعال/غیرفعال‌بودن پرداخت آنلاین این رستوران
+  // SPEC-B (migration 076): چرخه‌ی provisioning. DEFAULT عمداً ACTIVE است تا
+  // ردیف‌های موجود یک‌شبه «در انتظار» نشوند (C11)؛ مسیرِ provision صریح
+  // PENDING_ACTIVATION می‌نویسد و اولین ورودِ موفقِ owner آن را ACTIVE می‌کند.
+  provisionStatus RestaurantProvisionStatus @default(ACTIVE) @map("provision_status")
   createdAt     DateTime         @default(now()) @map("created_at")
   tables        Table[]
   menuItems     MenuItem[]
+  menuCategories MenuCategory[]
   reservations  Reservation[]
   members       ClubMember[]
   reviews       Review[]
@@ -223,6 +239,7 @@ model Restaurant {
   @@map("restaurants")
   modelPredictions ModelPrediction[]
   outreachLog      OutreachLog[]
+  staffInvites     StaffInvite[]
 }
 
 // ── شکل میز (برای نقشه‌ی بصری و چیدمان) ──
@@ -319,7 +336,24 @@ model MenuItem {
   sortOrder    Int               @default(0) @map("sort_order")
   soldCount    Int               @default(0) @map("sold_count")
   // دسته‌بندیِ منو (پیش‌غذا/اصلی/دسر/نوشیدنی/…). NULL = دسته‌بندی‌نشده.
+  //
+  // [SPEC-A فاز ۱ — مهاجرتِ ۰۷۷] این ستونِ متنی **میرورِ سازگاری** است:
+  // منبعِ حقیقت رابطه‌ی categoryId است و سرور در هر تغییرِ دسته (ستِ آیتم،
+  // renameِ دسته) این رشته را سینک می‌کند تا مصرف‌کننده‌های موجود
+  // (groupByCategoryِ سایتِ SEO، پنل، اپِ مشتری) بدونِ استقرارِ هم‌زمان نشکنند.
   category     String?
+  // آیتمِ «ناموجود» از منو حذف/مخفی نمی‌شود — با برچسب نمایش داده می‌شود و
+  // فقط از پیش‌سفارش کنار می‌رود. جدا از isActive (که یعنی «اصلاً در منو نیست»).
+  isOutOfStock Boolean           @default(false) @map("is_out_of_stock")
+  // [SPEC-A فاز ۲ — ۰۷۸] پنجره‌ی دسترسی: {days:int[], start_min, end_min}.
+  // NULL = همیشه در دسترس. اعتبارسنجی در lib/menu-availability.ts؛ endpointِ
+  // عمومی پس از خواندنِ کش فیلتر می‌کند و pre-order نسبت به slotStart می‌سنجد.
+  availability Json?
+  modifierGroups MenuModifierGroup[]
+  tags         MenuItemTag[]
+  categoryId   String?           @map("category_id") @db.Uuid
+  // SetNull: حذفِ سختِ دسته نباید آیتم‌ها را بکشد — فقط «دسته‌نشده» می‌شوند.
+  categoryRef  MenuCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   inOrders     ReservationItem[]
   // کوئری منو: آیتم‌های فعال یک رستوران
   @@index([restaurantId, isActive])
@@ -328,7 +362,93 @@ model MenuItem {
   @@index([restaurantId, isActive, sortOrder, name], map: "menu_items_public_order_idx")
   // مهاجرتِ ۰۴۷ — پنل: آیتم‌ها به‌ترتیبِ دسته (قبلاً فقط در SQL بود و db push حذفش می‌خواست)
   @@index([restaurantId, category], map: "menu_items_restaurant_category_idx")
+  // مهاجرتِ ۰۷۷ — منویِ دسته‌بندی‌شده: آیتم‌هایِ یک دسته به ترتیبِ نمایش
+  @@index([restaurantId, categoryId, sortOrder], map: "menu_items_rest_cat_sort_idx")
   @@map("menu_items")
+}
+
+// ═══ SPEC-A فاز ۱ (مهاجرت ۰۷۷) — دسته‌بندیِ رابطه‌ایِ منو ═══
+//
+// جایگزینِ ساخت‌یافته‌ی ستونِ متنیِ MenuItem.category (که به‌عنوانِ میرورِ
+// سازگاری می‌ماند). PK با DEFAULTِ سمتِ DB چون backfillِ SQLِ ۰۷۷ با INSERT
+// خام ردیف می‌سازد (درسِ مهاجرتِ ۰۷۵).
+model MenuCategory {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  sortOrder    Int        @default(0) @map("sort_order")
+  // حذفِ دسته «نرم» است (isActive=false): در پنل می‌ماند، از منویِ عمومی
+  // کنار می‌رود و آیتم‌هایش در نمایش «دسته‌نشده» می‌شوند — آیتمی گم نمی‌شود.
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  // @default(now()) کنارِ @updatedAt عمدی است (الگوی موجودِ repo): بدونِ آن
+  // db push پیش‌فرضِ DBِ لازم برای INSERTهای خامِ backfill را DROP می‌خواست.
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  items        MenuItem[]
+
+  // دو دسته‌ی هم‌نام در یک رستوران = ابهام در پنل + backfillِ غیرقطعی
+  @@unique([restaurantId, name])
+  @@index([restaurantId, sortOrder])
+  @@map("menu_categories")
+}
+
+// ═══ SPEC-A فاز ۲ (مهاجرت ۰۷۸) — افزودنی‌ها (modifier)، برچسب‌ها، پنجره‌ی دسترسی ═══
+//
+// modifier در این فاز فقط ساختارِ منوست (پنل + نمایشِ عمومی/QR)؛ انتخاب/ذخیره‌اش
+// در سفارش طبق §۲-۴ی spec جداگانه است و ReservationItem دست نمی‌خورد.
+// PKها کلاینتی (@default(uuid())) چون هیچ backfill/INSERTِ خامی در کار نیست.
+
+model MenuModifierGroup {
+  id         String   @id @default(uuid()) @db.Uuid
+  menuItemId String   @map("menu_item_id") @db.Uuid
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name       String              // مثلاً «سایز»
+  minSelect  Int      @default(0) @map("min_select")
+  maxSelect  Int      @default(1) @map("max_select")
+  sortOrder  Int      @default(0) @map("sort_order")
+  options    MenuModifierOption[]
+
+  @@index([menuItemId, sortOrder])
+  @@map("menu_modifier_groups")
+}
+
+model MenuModifierOption {
+  id              String  @id @default(uuid()) @db.Uuid
+  groupId         String  @map("group_id") @db.Uuid
+  group           MenuModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name            String              // مثلاً «بزرگ»
+  // می‌تواند منفی باشد (تخفیف)، ولی قیمتِ نهایی هرگز منفی نمی‌شود —
+  // گاردش در routeها: delta ≥ -item.priceToman و چکِ متقابل در کاهشِ قیمت.
+  priceDeltaToman Int     @default(0) @map("price_delta_toman")
+  isActive        Boolean @default(true) @map("is_active")
+  sortOrder       Int     @default(0) @map("sort_order")
+
+  @@index([groupId, sortOrder])
+  @@map("menu_modifier_options")
+}
+
+enum MenuTag {
+  VEGETARIAN
+  VEGAN
+  SPICY
+  GLUTEN_FREE
+  CONTAINS_NUTS
+  CONTAINS_DAIRY
+  HALAL
+  NEW
+  POPULAR
+
+  @@map("menu_tag")
+}
+
+model MenuItemTag {
+  menuItemId String   @map("menu_item_id") @db.Uuid
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  tag        MenuTag
+
+  @@id([menuItemId, tag])
+  @@map("menu_item_tags")
 }
 
 enum ReservationStatus {
@@ -1025,6 +1145,48 @@ model StaffPermission {
   canManageSettings     Boolean @default(false) @map("can_manage_settings")
   updatedAt             DateTime @updatedAt @map("updated_at")
   @@map("staff_permissions")
+}
+
+// ═══ SPEC-B (migration 076) — provisioning و دعوتِ owner ═══
+
+enum RestaurantProvisionStatus {
+  PENDING_ACTIVATION // ساخته شد، owner هنوز اولین ورود را نکرده
+  ACTIVE
+  SUSPENDED          // موقتاً معلق؛ داده حفظ می‌شود (نگاشت به isOpen=false در control)
+  OFFBOARDED         // خروجِ نهایی — بدونِ حذفِ فیزیکی
+
+  @@map("restaurant_provision_status")
+}
+
+enum StaffInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+
+  @@map("staff_invite_status")
+}
+
+/// دعوتِ اولین ورودِ owner. توکن فقط «شناسه‌ی مقصدِ لینک» است، نه احرازِ
+/// هویت — احراز همان OTP/رمزِ موجود است (§۳-۲ spec، C10ِ برنامه).
+model StaffInvite {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  restaurantId String            @map("restaurant_id") @db.Uuid
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  staffId      String            @map("staff_id") @db.Uuid
+  staff        Staff             @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  phone        String
+  token        String            @unique
+  status       StaffInviteStatus @default(PENDING)
+  expiresAt    DateTime          @map("expires_at") @db.Timestamptz
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tenantId])
+  @@index([phone])
+  // نامِ جمع طبق قراردادِ repo (C13)، نه staff_invite مفردِ spec.
+  @@map("staff_invites")
 }
 
 // ── Audit Log عمومی برای رویدادهای امنیتی/حاکمیتی (observability) ──
@@ -1772,7 +1934,10 @@ enum EconomyLedgerKind {
 }
 
 model EconomyLedgerEntry {
-  id            String            @id @default(uuid()) @db.Uuid
+  // ⚠️ dbgenerated و نه uuid() (migration 075): uuid() پیش‌فرضِ سمتِ کلاینت
+  // است و db push ستون را بدونِ DEFAULT می‌سازد — ولی درج‌های خامِ economy.ts
+  // به DEFAULTِ دیتابیس تکیه دارند (23502 رویِ مسیرِ CI/تست).
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId        String            @map("user_id") @db.Uuid
   user          User              @relation(fields: [userId], references: [id])
   restaurantId  String?           @map("restaurant_id") @db.Uuid  // null = رویدادِ سراسری

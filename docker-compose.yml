@@ -63,14 +63,18 @@ services:
       OTP_DEV_MODE: ${OTP_DEV_MODE:-false}
       # شناسه‌ی tenant مدیر پلتفرم (از خروجی seed) — برای دسترسی پنل شرکت
       PLATFORM_ADMIN_TENANT_ID: ${PLATFORM_ADMIN_TENANT_ID:-}
-      # پیامک کاوه‌نگار (اختیاری — بدون آن فقط لاگ می‌شود)
-      KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
-      KAVENEGAR_TPL_OTP: ${KAVENEGAR_TPL_OTP:-rezervno-otp}
-      KAVENEGAR_TPL_BOOKING: ${KAVENEGAR_TPL_BOOKING:-rezervno-booking}
-      KAVENEGAR_TPL_REMINDER: ${KAVENEGAR_TPL_REMINDER:-rezervno-reminder}
-      KAVENEGAR_TPL_WELCOME: ${KAVENEGAR_TPL_WELCOME:-rezervno-welcome}
-      KAVENEGAR_TPL_CAMPAIGN: ${KAVENEGAR_TPL_CAMPAIGN:-rezervno-campaign}
-      KAVENEGAR_TPL_WINBACK: ${KAVENEGAR_TPL_WINBACK:-rezervno-winback}
+      # پیامک: ملی‌پیامک (اختیاری — بدونِ اعتبارنامه فقط لاگ می‌شود؛ مهاجرت ۲۰۲۶-۰۸-۲۶)
+      # ⚠️ الگوها با bodyIdِ عددی کار می‌کنند (نه نامِ قالب) — از پنلِ ملی‌پیامک.
+      MELIPAYAMAK_USERNAME: ${MELIPAYAMAK_USERNAME:-}
+      MELIPAYAMAK_PASSWORD: ${MELIPAYAMAK_PASSWORD:-}
+      MELIPAYAMAK_FROM: ${MELIPAYAMAK_FROM:-}
+      MELIPAYAMAK_BODYID_OTP: ${MELIPAYAMAK_BODYID_OTP:-}
+      MELIPAYAMAK_BODYID_BOOKING: ${MELIPAYAMAK_BODYID_BOOKING:-}
+      MELIPAYAMAK_BODYID_REMINDER: ${MELIPAYAMAK_BODYID_REMINDER:-}
+      MELIPAYAMAK_BODYID_WELCOME: ${MELIPAYAMAK_BODYID_WELCOME:-}
+      MELIPAYAMAK_BODYID_CAMPAIGN: ${MELIPAYAMAK_BODYID_CAMPAIGN:-}
+      MELIPAYAMAK_BODYID_WINBACK: ${MELIPAYAMAK_BODYID_WINBACK:-}
+      MELIPAYAMAK_TOKEN_SEPARATOR: ${MELIPAYAMAK_TOKEN_SEPARATOR:-;}
       # برای اولین راه‌اندازی RUN_SEED=true بگذار تا داده‌ی اولیه ساخته شود
       RUN_SEED: ${RUN_SEED:-false}
       # امنیت: منشأهای مجاز (CSRF) و کلید نگهداری (cron)

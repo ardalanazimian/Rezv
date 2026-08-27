@@ -1,3 +1,5 @@
+// [رفعِ ویندوز ۲۰۲۶-۰۸-۲۶] fileURLToPath و نه .pathname: رویِ ویندوز pathname «/C:/…» می‌دهد
+import { fileURLToPath } from 'node:url';
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -25,7 +27,7 @@ import { join } from 'node:path';
 //     ثبتِ audit). بدونِ DBِ متصل نتیجه‌شان بی‌معناست، نه «قرمز».
 // ═══════════════════════════════════════════════════════════════════════
 
-const API_ROOT = new URL('../src/app/api', import.meta.url).pathname;
+const API_ROOT = fileURLToPath(new URL('../src/app/api', import.meta.url));
 const HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 
 /** همه‌ی `route.ts`های زیرِ src/app/api */
@@ -109,7 +111,9 @@ describe('گاردِ ساختاری — پوششِ متریکِ HTTP روی هم
     const wrong: string[] = [];
     for (const file of ROUTE_FILES) {
       const src = readFileSync(file, 'utf8');
-      const expected = '/api' + file.slice(API_ROOT.length, file.length - '/route.ts'.length);
+      // [رفعِ ویندوز ۲۰۲۶-۰۸-۲۶] جداکننده‌ی فایل‌سیستم نرمال می‌شود؛ وگرنه
+      // رویِ ویندوز «\» با برچسب‌های «/»دار مقایسه و همه‌چیز قرمز می‌شد.
+      const expected = ('/api' + file.slice(API_ROOT.length, file.length - '/route.ts'.length)).split('\\').join('/');
       for (const m of src.matchAll(/withApiMetrics\('([^']+)'/g)) {
         if (m[1] !== expected) wrong.push(`${file.slice(API_ROOT.length + 1)} → '${m[1]}' (باید '${expected}' باشد)`);
       }

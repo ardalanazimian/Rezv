@@ -61,16 +61,32 @@ infra), `both`.
 
 ---
 
-## SMS (Kavenegar)
+## SMS (Melipayamak)
 
-| Name | Required | Default | Scope | Description |
+> **Migrated from Kavenegar on 2026-08-26.** The two providers are not
+> interchangeable: Kavenegar addressed a pattern by **name**
+> (`rezervno-otp`), Melipayamak by a **numeric `bodyId`** issued after the
+> pattern text is approved in the panel. There are therefore no meaningful
+> defaults — an unset `bodyId` means that message type is **not sent**, and
+> it is logged explicitly rather than silently falling back.
+>
+> REST base: `https://rest.payamak-panel.com/api/SendSMS/…`
+
+| Variable | Req | Default | Used by | Notes |
 |---|---|---|---|---|
-| `KAVENEGAR_API_KEY` | ➖ | — | api | Without it, real SMS is disabled (logs only → needs `OTP_DEV_MODE` for login). |
-| `KAVENEGAR_TPL_OTP` | ➖ | `rezervno-otp` | api | OTP template name. |
-| `KAVENEGAR_TPL_BOOKING` / `_REMINDER` / `_WELCOME` / `_CAMPAIGN` / `_WINBACK` | ➖ | template defaults | api | Lifecycle/marketing templates. |
-| `KAVENEGAR_TPL_REJECTED` / `_PREPARING` / `_CANCELLED` / `_NOSHOW` / `_THANKS` / `_WAITLIST` / `_WL_JOIN` / `_WL_OFFER` | ➖ | defaults | api | Reservation-lifecycle + waitlist templates. |
+| `MELIPAYAMAK_USERNAME` / `MELIPAYAMAK_PASSWORD` | ➖ | — | api | Without them, real SMS is disabled (logs only → needs `OTP_DEV_MODE` for login). |
+| `MELIPAYAMAK_FROM` | ➖ | — | api | Dedicated line. **Only** needed for free-text (campaign) SMS. Without it, free-text send fails explicitly — it does not silently fall back to a template. |
+| `MELIPAYAMAK_BODYID_OTP` | ➖ | — | api | Pattern id for the login code. |
+| `MELIPAYAMAK_BODYID_BOOKING` / `_REMINDER` / `_WELCOME` / `_CAMPAIGN` / `_WINBACK` | ➖ | — | api | Lifecycle/marketing patterns. |
+| `MELIPAYAMAK_BODYID_REJECTED` / `_PREPARING` / `_CANCELLED` / `_NOSHOW` / `_THANKS` / `_WAITLIST` / `_WL_JOIN` / `_WL_OFFER` | ➖ | — | api | Reservation-lifecycle + waitlist patterns. |
+| `MELIPAYAMAK_TOKEN_SEPARATOR` | ➖ | `;` | api | Separator between pattern token values. ⚠️ **Unverified** — Melipayamak does not publish this; confirm against your panel before production. |
 
----
+### Two send paths
+- **Pattern** (`BaseServiceNumber` + `bodyId`) — required for OTP and all
+  transactional messages; a service line will not accept free text.
+- **Free text** (`SendSMS` + `MELIPAYAMAK_FROM`) — used when a campaign
+  carries an author-written message. Kavenegar had no equivalent, which is
+  why campaign text was previously accepted by the API and then dropped.
 
 ## Payments (Zarinpal)
 

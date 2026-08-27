@@ -60,6 +60,12 @@ async function mockBiz(page: Page, opts: Opts = {}) {
     }
     // شکلِ واقعیِ پاسخ: { members: [...] } با birth_month عددیِ ۱..۱۲.
     if (path === '/restaurant/members') return json({ members: CLUB_MEMBERS });
+    // قراردادِ جدیدِ کمپین (۲۰۲۶-۰۸-۲۶): مخاطب پیش از ارسال از
+    // /restaurant/customers?segment= resolve می‌شود و بعد phones[] به
+    // /restaurant/sms می‌رود. شکلِ پاسخ همان routeِ واقعی است ({items:[…]}).
+    if (path === '/restaurant/customers') {
+      return json({ items: [{ user_id: 'u1', name: 'کیان', phone: '+989121112233' }], next_cursor: null });
+    }
     if (path === '/restaurant/cashback') {
       return json({ base_pct: 11, preorder_pct: 15, vip_pct: 20, winback_pct: 25 });
     }
@@ -153,8 +159,14 @@ test('کمپینِ پیامکی: قطعِ شبکه «ارسال شد» نمی‌
   // شبکه را دقیقاً پیش از ارسال قطع کن — مسیرِ res.offline که باگ در آن بود.
   await page.route('**/api/v1/restaurant/sms', (route) => route.abort('failed'));
   await page.evaluate(() => {
-    const w = window as unknown as { _campMessage: string; _campSegment: string; doSendCampaign: () => Promise<void> };
-    w._campMessage = 'سلام'; w._campSegment = 'all';
+    // ⚠️ هم‌تراز با قراردادِ جدید (۲۰۲۶-۰۸-۲۶): `_campSegment` حذف شد چون
+    // مقادیرش (at_risk/all) را بک‌اند نمی‌پذیرفت و ۳ از ۴ کارت همیشه ۴۰۰
+    // می‌گرفتند. حالا مخاطب با `_campAudience` تعریف و به phones[] resolve
+    // می‌شود. **assertionهای این تست عمداً دست‌نخورده‌اند** — نیتش («قطعِ
+    // شبکه نباید "ارسال شد" بگوید») مستقل از شکلِ مخاطب است.
+    const w = window as unknown as { _campMessage: string; _campAudience: unknown; doSendCampaign: () => Promise<void> };
+    w._campMessage = 'سلام';
+    w._campAudience = { kind: 'segment', value: 'vip', label: 'VIP' };
     return w.doSendCampaign();
   });
 

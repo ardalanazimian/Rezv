@@ -21,6 +21,8 @@ export const Err = {
   tableConflict:() => new ApiError('TABLE_CONFLICT', 'این میز در این بازه رزرو شده است', 409),
   lockTimeout:  () => new ApiError('SLOT_LOCK_TIMEOUT', 'این بازه در حال رزرو توسط کاربر دیگری است؛ دوباره تلاش کنید', 423),
   validation:   (msg: string, details: object = {}) => new ApiError('VALIDATION', msg, 422, details),
+  // SPEC-B (C9): تعارضِ منبع با details.reason ماشین‌خوان — 'duplicate_owner_phone' | 'slug_unavailable' | 'branch_limit_reached' | …
+  conflict:     (reason: string, msg = 'تعارض با وضعیتِ موجود') => new ApiError('CONFLICT', msg, 409, { reason }),
   rateLimited:  (retryAfterSec?: number) => new ApiError('RATE_LIMITED', 'تعداد درخواست بیش از حد مجاز', 429, retryAfterSec ? { retryAfterSec } : {}),
   // وابستگیِ بیرونیِ لازم در دسترس نیست. عمداً ۵۰۳ و نه ۵۰۰: این خرابیِ ما
   // نیست، ناتوانیِ **موقتِ** سرویس است و کلاینت باید بداند دوباره تلاش کند.

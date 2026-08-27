@@ -1,6 +1,9 @@
 import { test, describe, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fixturePhone } from './_phone.helper.mts';
+// [پورتِ ادغام ۲۰۲۶-۰۸-۲۶] ارائه‌دهنده به ملی‌پیامک مهاجرت کرد؛ «کلیدِ ترانسپورت» حالا سه متغیر است.
+const MELI_KEYS = ['MELIPAYAMAK_USERNAME','MELIPAYAMAK_PASSWORD','MELIPAYAMAK_BODYID_OTP','MELIPAYAMAK_BODYID_CAMPAIGN'];
+const setSmsTransport = (on) => { for (const k of MELI_KEYS) { if (on) process.env[k] = k.endsWith('OTP') ? '12345' : 'x'; else delete process.env[k]; } };
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -46,7 +49,7 @@ function newPhone(prefix: string): string {
   return p;
 }
 
-const ENV = ['BREAK_GLASS_PHONE', 'BREAK_GLASS_CODE', 'NODE_ENV', 'KAVENEGAR_API_KEY'] as const;
+const ENV = ['BREAK_GLASS_PHONE', 'BREAK_GLASS_CODE', 'NODE_ENV', ...MELI_KEYS] as const;
 let saved: Record<string, string | undefined> = {};
 
 function counterTotal(name: string): number {
@@ -93,7 +96,7 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     process.env.NODE_ENV = 'production';
-    delete process.env.KAVENEGAR_API_KEY;   // دقیقاً وضعیتِ امروز
+    setSmsTransport(false);
 
     const before = counterTotal('breakGlassOtp');
     const res = await requestOtp(bg);
@@ -130,7 +133,7 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
     const bg = newPhone('0922');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
-    process.env.KAVENEGAR_API_KEY = 'x';
+    setSmsTransport(true);
     for (let i = 0; i < 3; i++) await requestOtp(bg);
     await assert.rejects(() => requestOtp(bg), /RATE_LIMITED|بیش از حد/,
       'درخواستِ چهارم روی همان شماره باید ریت‌لیمیت شود');
@@ -145,7 +148,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     const bg = newPhone('0922');
     delete process.env.BREAK_GLASS_PHONE;
     delete process.env.BREAK_GLASS_CODE;
-    process.env.KAVENEGAR_API_KEY = 'x';   // تا مسیرِ عادی throw نکند
+    setSmsTransport(true);
     await requestOtp(bg);
     await assert.rejects(() => verifyOtp(bg, CODE), 'کدِ ثابت نباید کار کند');
   });
@@ -156,7 +159,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     const a = newPhone('0922');
     process.env.BREAK_GLASS_PHONE = a;
     delete process.env.BREAK_GLASS_CODE;
-    process.env.KAVENEGAR_API_KEY = 'x';
+    setSmsTransport(true);
     await requestOtp(a);
     await assert.rejects(() => verifyOtp(a, CODE));
 
@@ -173,7 +176,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     const other = newPhone('0923');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
-    process.env.KAVENEGAR_API_KEY = 'x';
+    setSmsTransport(true);
 
     await requestOtp(other);
     await assert.rejects(() => verifyOtp(other, CODE),
@@ -188,7 +191,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     process.env.NODE_ENV = 'production';
-    delete process.env.KAVENEGAR_API_KEY;
+    setSmsTransport(false);
 
     await assert.rejects(() => requestOtp(other), /پیامک/,
       'شماره‌ی عادی باید همچنان خطای صریح بگیرد');
@@ -199,7 +202,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     const bg = newPhone('0922');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = 'abcdef';   // رقم نیست
-    process.env.KAVENEGAR_API_KEY = 'x';
+    setSmsTransport(true);
     await requestOtp(bg);
     await assert.rejects(() => verifyOtp(bg, 'abcdef'));
   });
@@ -212,7 +215,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     const bg = newPhone('0922');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = '1234';
-    process.env.KAVENEGAR_API_KEY = 'x';
+    setSmsTransport(true);
     await requestOtp(bg);
     await assert.rejects(() => verifyOtp(bg, '1234'),
       'کدِ ۴ رقمی نباید کار کند — قابلیت باید کاملاً غیرفعال بماند');
@@ -223,7 +226,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     const bg = newPhone('0922');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = '1234567';
-    process.env.KAVENEGAR_API_KEY = 'x';
+    setSmsTransport(true);
     await requestOtp(bg);
     await assert.rejects(() => verifyOtp(bg, '1234567'));
   });
@@ -232,7 +235,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     const bg = newPhone('0922');
     process.env.BREAK_GLASS_PHONE = 'not-a-phone';
     process.env.BREAK_GLASS_CODE = CODE;
-    process.env.KAVENEGAR_API_KEY = 'x';
+    setSmsTransport(true);
     await requestOtp(bg);
     await assert.rejects(() => verifyOtp(bg, CODE));
   });

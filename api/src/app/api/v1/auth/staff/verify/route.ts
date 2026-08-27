@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyOtp, normalizePhone } from '@/lib/otp';
 import { signAccess, signRefresh } from '@/lib/jwt';
+import { acceptPendingInvites } from '@/lib/provisioning';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { ApiError, Err, errorResponse } from '@/lib/errors';
 import { parseBody, zPhone, zOtpCode, z } from '@/lib/schemas';
@@ -42,6 +43,10 @@ async function POST_impl(req: Request) {
     if (!staff) throw Err.forbidden('این شماره دسترسی پنل رستوران ندارد');
     if (!staff.isActive) throw Err.forbidden('این حساب غیرفعال شده است');
     await verifyOtp(normalized, code);
+    // SPEC-B (C10): پذیرشِ دعوت‌های PENDING به‌عنوانِ side-effectِ اولین ورودِ
+    // موفق — هرگز throw نمی‌کند و شکلِ پاسخِ این route را (که باید
+    // بایت‌به‌بایت ثابت بماند) لمس نمی‌کند.
+    await acceptPendingInvites(normalized);
     const role = (staff.role === 'owner' || staff.role === 'manager' || staff.role === 'staff') ? staff.role : 'staff';
     const principal = { sub: staff.id, kind: 'staff' as const, tenantId: staff.tenantId, role };
     const access = signAccess(principal);

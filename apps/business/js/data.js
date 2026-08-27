@@ -350,6 +350,22 @@ const API = {
   menuCreate(body){ return this.post('/restaurant/menu', body); },
   menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
   menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  // ── دسته‌های رابطه‌ایِ منو + مرتب‌سازیِ دسته‌ای (SPEC-A فاز ۱ / ۰۷۷) ──
+  menuCategories(){ return this.get('/restaurant/menu/categories'); },
+  menuCategoryCreate(body){ return this.post('/restaurant/menu/categories', body); },
+  menuCategoryUpdate(id, body){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuCategoryDelete(id){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'DELETE' }); },
+  menuReorder(body){ return this.request('/restaurant/menu/reorder', { method:'PATCH', body: JSON.stringify(body) }); },
+  // ── فاز ۲ (۰۷۸): افزودنی‌ها + برچسب‌ها ──
+  menuModifiers(itemId){ return this.get('/restaurant/menu/'+encodeURIComponent(itemId)+'/modifiers'); },
+  menuModifierGroupCreate(itemId, body){ return this.post('/restaurant/menu/'+encodeURIComponent(itemId)+'/modifiers', body); },
+  menuModifierGroupUpdate(id, body){ return this.request('/restaurant/menu/modifier-groups/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuModifierGroupDelete(id){ return this.request('/restaurant/menu/modifier-groups/'+encodeURIComponent(id), { method:'DELETE' }); },
+  // POST رویِ خودِ گروه = افزودنِ گزینه (قراردادِ route)
+  menuModifierOptionCreate(groupId, body){ return this.post('/restaurant/menu/modifier-groups/'+encodeURIComponent(groupId), body); },
+  menuModifierOptionUpdate(id, body){ return this.request('/restaurant/menu/modifier-options/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuModifierOptionDelete(id){ return this.request('/restaurant/menu/modifier-options/'+encodeURIComponent(id), { method:'DELETE' }); },
+  menuTagsSave(itemId, tags){ return this.request('/restaurant/menu/'+encodeURIComponent(itemId)+'/tags', { method:'PUT', body: JSON.stringify({ tags }) }); },
   /**
    * آپلود/جایگزینیِ عکسِ آیتمِ منو.
    * multipart است، پس نمی‌تواند از `post()` (که JSON می‌فرستد) عبور کند.

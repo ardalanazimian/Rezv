@@ -125,17 +125,41 @@ export interface OrderStatus {
   created_at: string;
 }
 
+/**
+ * نتیجه‌ی پیگیریِ سفارش — سه حالتِ **متفاوت** که نباید یکی شوند.
+ *
+ * ⚠️ یافته‌ی واقعیِ ۲۰۲۶-۰۸-۲۵: این تابع قبلاً در هر سه حالت `null` می‌داد و
+ * صفحه‌ی `/order/[code]` روی آن «درخواستی با این کد پیدا نشد» می‌نوشت و
+ * می‌گفت «کد را دوباره بررسی کنید». یعنی وقتی API در دسترس نبود، به کسی که
+ * واقعاً ثبت‌نام/خرید کرده گفته می‌شد سفارشش **وجود ندارد** — و به سمتِ
+ * نتیجه‌گیریِ غلط هدایت می‌شد. این همان قاعده‌ی §۱۰ در جهتِ معکوس است:
+ * قطعیِ شبکه نباید به یک «واقعیتِ» جعلی درباره‌ی دادهٔ کاربر تبدیل شود.
+ *
+ * توجه: بیلدِ CI عمداً بدونِ SITE_API_BASE اجرا می‌شود («حالتِ امن»)، پس
+ * حالتِ پیکربندی‌نشده یک وضعیتِ استقرارِ واقعی است، نه فرضِ نظری.
+ */
+export type OrderLookup =
+  | { kind: 'found'; order: OrderStatus }
+  | { kind: 'not_found' }
+  | { kind: 'unavailable' };
+
 /** وضعیتِ سفارش هرگز کش نمی‌شود — کاربر باید حالِ لحظه‌ای را ببیند. */
-export async function getOrderStatus(code: string): Promise<OrderStatus | null> {
-  if (!SERVER_BASE) return null;
+export async function getOrderStatus(code: string): Promise<OrderLookup> {
+  if (!SERVER_BASE) return { kind: 'unavailable' };
+  let res: Response;
   try {
-    const res = await fetch(`${SERVER_BASE}/api/v1/site/orders/${encodeURIComponent(code)}`, {
+    res = await fetch(`${SERVER_BASE}/api/v1/site/orders/${encodeURIComponent(code)}`, {
       cache: 'no-store',
     });
-    if (!res.ok) return null;
-    return (await res.json()) as OrderStatus;
   } catch {
-    return null;
+    return { kind: 'unavailable' };   // شبکه/DNS/timeout — «نمی‌دانیم»، نه «نیست»
+  }
+  if (res.status === 404) return { kind: 'not_found' };   // بالادست صریح گفت نیست
+  if (!res.ok) return { kind: 'unavailable' };            // ۵xx و بقیه — نمی‌دانیم
+  try {
+    return { kind: 'found', order: (await res.json()) as OrderStatus };
+  } catch {
+    return { kind: 'unavailable' };   // بدنه‌ی خراب هم «نمی‌دانیم» است
   }
 }
 

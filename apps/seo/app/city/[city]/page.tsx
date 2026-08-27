@@ -29,7 +29,9 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
 export default async function CityPage({ params }: { params: Promise<{ city: string }> }) {
   const { city: rawCity } = await params;
   const city = decode(rawCity);
-  const items = await fetchRestaurantList({ city });
+  // strict=true: یک قطعیِ API نباید به «شهرِ بی‌رستوران» و در نتیجه ۴۰۴ِ
+  // کش‌شده ترجمه شود (ضدِّ ایندکس). نبودِ واقعی همچنان ۴۰۴ می‌دهد.
+  const items = await fetchRestaurantList({ city }, 300, true);
   if (items.length < MIN_LISTINGS) notFound();
 
   return (

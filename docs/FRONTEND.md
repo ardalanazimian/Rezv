@@ -230,3 +230,33 @@ Global handlers are attached once via **event delegation** (`actions.js`,
   (`vN → vN+1`) or users keep the stale cached bundle.
 - E2E tests run with `serviceWorkers: 'block'` so reloads always re-run the app
   bootstrap (the SW otherwise serves cached assets on reload).
+
+## Menu (SPEC-A فاز ۱ — 2026-08-27)
+
+- **Business panel** (`apps/business/js/menu.js`): relational categories
+  (create/rename/soft-delete/reorder via `PATCH /restaurant/menu/reorder`),
+  item form uses a category `<select>` fed by the server (no free-text
+  datalist), and every item row has a quick **«ناموجود»** toggle
+  (`is_out_of_stock`) that never opens the form. Four states preserved.
+- **Customer app**: the restaurant page menu section groups by
+  `menu_categories` (owner order), shows item description and an amber
+  «ناموجود» chip (item stays visible); booking pre-order chips **exclude**
+  out-of-stock items (server-side enforcement is Phase 2). Menu entries are
+  normalized objects (`normalizeMenuEntry` in `js/api.js`) — sample tuples are
+  converted at the mapping layer.
+- The public QR menu page remains `apps/seo/app/r/[slug]/menu` — it is only
+  enriched by the new API fields; no `/m/{slug}` route exists.
+
+## Menu — Phase 2 (SPEC-A، 2026-08-27)
+
+- **Business panel**: item form gains tag chips (`MENU_TAG_LABEL`), a serving
+  window (day checkboxes — server convention 0=Sunday…6=Saturday — plus two
+  time inputs), and a lazy "افزودنی‌ها" box (group/option CRUD). Row shows a
+  «⏱ محدود» badge for windowed items.
+- **Customer app**: item cards show Persian tag chips; booking pre-order chips
+  are now **really wired** — selection is captured at step-2→3 transition into
+  `bk.preorder` (step-3 render replaces the DOM) and sent as
+  `preorder:[{menu_item_id,qty}]`. Out-of-stock and id-less (sample) items get
+  no chip. `sw.js` bumped to v36.
+- **SEO menu page**: `MenuBoard` renders tag chips, an out-of-stock badge and
+  display-only modifier lines — still zero client JS.

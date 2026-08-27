@@ -8,7 +8,11 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 //  بدونِ ترانسپورتِ پیامک، ورود باید **صریح** شکست بخورد — نه بی‌صدا
 //
 //  ⚠️ خطرناک‌ترین حالتِ سکوت در کلِ سیستم (یافته‌ی ۲۰۲۶-۰۸-۲۵):
-//  اگر `KAVENEGAR_API_KEY` تنظیم نباشد، `sendSmsNow` بی‌صدا برمی‌گشت و
+//  [پورتِ ادغام ۲۰۲۶-۰۸-۲۶] این تست برای کاوه‌نگار نوشته شده بود؛ ارائه‌دهنده
+//  در همین ادغام به ملی‌پیامک مهاجرت کرد (SendSMS/BaseServiceNumber، bodyId).
+//  «آماده‌بودنِ ترانسپورت» حالا سه متغیر است، نه یک کلید. سمانتیکِ fail-closed
+//  عیناً همان است و همین تست قفلش می‌کند.
+//  اگر اعتبارنامه‌ی ملی‌پیامک تنظیم نباشد، `sendSmsNow` بی‌صدا برمی‌گشت و
 //  **هیچ متریکی** نمی‌خورد. زنجیره‌ی کامل:
 //    کاربر شماره می‌زند → requestOtp کد می‌سازد → enqueueSms مستقیم به
 //    sendSmsNow می‌رود → کلید نیست → return → route پاسخِ **۲۰۴ موفق**
@@ -30,7 +34,14 @@ const { db } = await import('../src/lib/db');
 const { redis } = await import('../src/lib/redis');
 
 const ORIG_ENV = process.env.NODE_ENV;
-const ORIG_KEY = process.env.KAVENEGAR_API_KEY;
+const ORIG_U = process.env.MELIPAYAMAK_USERNAME;
+const ORIG_P = process.env.MELIPAYAMAK_PASSWORD;
+const ORIG_B = process.env.MELIPAYAMAK_BODYID_OTP;
+const setMeli = (on) => {
+  for (const [k, v] of [['MELIPAYAMAK_USERNAME','u'],['MELIPAYAMAK_PASSWORD','p'],['MELIPAYAMAK_BODYID_OTP','12345']]) {
+    if (on) process.env[k] = v; else delete process.env[k];
+  }
+};
 const ORIG_DEV = process.env.OTP_DEV_MODE;
 
 const made: string[] = [];
@@ -40,6 +51,10 @@ async function freshPhone() {
   return p;
 }
 
+// ⚠️ دامِ رانرِ تک‌پروسه‌ای: after()ِ سطحِ فایل فقط در انتهای *کلِ* سوئیت
+// اجرا می‌شود، نه بینِ فایل‌ها — پس هر تستی که ترانسپورت را روشن رها کند،
+// همه‌ی فایل‌های بعدی را آلوده می‌کند (دو تستِ fallback دقیقاً همین‌طور
+// قرمز شدند). afterEach تضمینِ per-test است.
 after(async () => {
   for (const p of made) {
     await db.otpCode.deleteMany({ where: { phone: { contains: p.slice(1) } } }).catch(() => {});
@@ -47,46 +62,36 @@ after(async () => {
 });
 
 describe('ترانسپورتِ پیامک — fail-closed در تولید', () => {
-  // ⚠️ بازیابیِ محیط تا ۲۰۲۶-۰۸-۲۶ در `after`ِ **ریشه‌ای** بود، یعنی فقط در
-  // پایانِ کلِ ران. تست‌های همین describe `NODE_ENV='production'` و
-  // `OTP_DEV_MODE='true'` ست می‌کنند و `KAVENEGAR_API_KEY` را حذف؛ پس آن
-  // مقادیر تا انتهای ران برایِ **همه‌ی فایل‌های بعدی** روی جا می‌ماندند —
-  // یعنی بقیه‌ی سوئیت با OTPِ حالتِ توسعه و ترانسپورتِ پیکربندی‌نشده اجرا
-  // می‌شد. حالا بعد از هر تست بازیابی می‌شود.
-  afterEach(() => {
-    process.env.NODE_ENV = ORIG_ENV;
-    if (ORIG_KEY === undefined) delete process.env.KAVENEGAR_API_KEY;
-    else process.env.KAVENEGAR_API_KEY = ORIG_KEY;
-    if (ORIG_DEV === undefined) delete process.env.OTP_DEV_MODE;
-    else process.env.OTP_DEV_MODE = ORIG_DEV;
-  });
-
-  // ⚠️ این هوک تا ۲۰۲۶-۰۸-۲۶ در **ریشه‌ی فایل** بود، نه داخلِ این describe.
-  // هوکِ ریشه به سوئیتِ ریشه می‌چسبد، و رانرِ ما همه‌ی فایل‌ها را در یک
-  // process اجرا می‌کند — پس این پاک‌سازی قبل از **هر تستِ کلِ سوئیت**
-  // اجرا می‌شد. اندازه‌گیری‌شده، نه تخمین: با یک شمارنده روی اجرای کامل،
-  // **۱۳۸۲ بار** در یک رانِ ۱۳۸۷ تستی.
-  //
-  // چرا مهم است: الگوها (`*otp*` و `*rl:*`) سراسری‌اند و سطلِ ریت‌لیمیتِ
-  // همه‌ی فایل‌های دیگر را هم خالی می‌کردند. یعنی یک گاردِ امنیتیِ واقعی از
-  // سنجشِ بقیه‌ی سوئیت بیرون می‌افتاد — دقیقاً همان چیزی که کامنتِ
-  // `tests/helpers/test-ip.mts` صریحاً ممنوع می‌کند:
-  // «پاک‌کردنِ کلیدهای Redis در before ... ریت‌لیمیت را از تستِ آن‌ها پنهان
-  //  می‌کند — یعنی یک گاردِ امنیتیِ واقعی را از سنجش خارج می‌کند.»
-  // جانبی: ۱۳۸۲×۲ فراخوانیِ `KEYS` که در Redis عملیاتِ O(N) و مسدودکننده است.
+  // ⚠️ این دو هوک تا merge در **ریشه‌ی فایل** بودند. کامنتِ بالا درست
+  // تشخیص داده بود که `after`ِ سطحِ فایل فقط در پایانِ کلِ سوئیت اجرا
+  // می‌شود — ولی خودِ هوک‌ها هنوز ریشه‌ای مانده بودند، پس همان مشکل باقی
+  // بود: پاک‌سازیِ `*otp*`/`*rl:*` قبل از **هر تستِ کلِ سوئیت** اجرا می‌شد
+  // (اندازه‌گیری‌شده: ۱۳۸۲ بار در رانِ ۱۳۸۷ تستی) و بازیابیِ env تا انتهای
+  // ران عقب می‌افتاد. گاردِ `root-hook-globals.test.mts` همین را می‌گیرد.
   beforeEach(async () => {
     for (const pat of ['*otp*', '*rl:*']) {
       const k = await redis.keys(pat);
       if (k.length) await redis.del(...k);
     }
   });
+  afterEach(() => {
+    process.env.NODE_ENV = ORIG_ENV;
+    for (const [k, v] of [['MELIPAYAMAK_USERNAME', ORIG_U],['MELIPAYAMAK_PASSWORD', ORIG_P],['MELIPAYAMAK_BODYID_OTP', ORIG_B]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+    if (ORIG_DEV === undefined) delete process.env.OTP_DEV_MODE;
+    else process.env.OTP_DEV_MODE = ORIG_DEV;
+  });
+
+  // scoped (نه سطحِ فایل — رجوع به دامِ رانرِ الحاقی): هیچ تستی ترانسپورت را روشن رها نکند.
+  afterEach(() => { setMeli(false); });
 
 
-  test('⚠️ در production بدونِ KAVENEGAR_API_KEY، درخواستِ OTP صریحاً شکست می‌خورد', async () => {
+  test('⚠️ در production بدونِ اعتبارنامه‌ی ملی‌پیامک، درخواستِ OTP صریحاً شکست می‌خورد', async () => {
     // بدونِ این گارد، این فراخوان بی‌صدا موفق می‌شد و کاربر برای همیشه
     // منتظرِ پیامکی می‌ماند که هرگز فرستاده نشده.
     process.env.NODE_ENV = 'production';
-    delete process.env.KAVENEGAR_API_KEY;
+    setMeli(false);
     delete process.env.OTP_DEV_MODE;
 
     const phone = await freshPhone();
@@ -104,7 +109,7 @@ describe('ترانسپورتِ پیامک — fail-closed در تولید', () =
   test('کنترلِ منفی: با کلیدِ تنظیم‌شده، درخواستِ OTP کار می‌کند', async () => {
     // بدونِ این، «همیشه ۵۰۳ بده» هم سبز می‌شد و ورود کاملاً می‌مرد.
     process.env.NODE_ENV = 'production';
-    process.env.KAVENEGAR_API_KEY = 'test-key-not-real';
+    setMeli(true);
     delete process.env.OTP_DEV_MODE;
     const out = await requestOtp(await freshPhone());
     assert.deepEqual(out, {}, 'در production نباید کد را برگرداند، ولی باید موفق شود');
@@ -113,17 +118,17 @@ describe('ترانسپورتِ پیامک — fail-closed در تولید', () =
   test('کنترلِ منفی: در توسعه بدونِ کلید همچنان کار می‌کند', async () => {
     // محیطِ توسعه/CI نباید به کلیدِ واقعیِ کاوه‌نگار نیاز داشته باشد.
     process.env.NODE_ENV = 'test';
-    delete process.env.KAVENEGAR_API_KEY;
+    setMeli(false);
     process.env.OTP_DEV_MODE = 'true';
     const out = await requestOtp(await freshPhone());
     assert.ok(out.devCode, 'در حالتِ dev کد باید برگردد تا تست بدونِ پیامک کار کند');
   });
 
   test('smsTransportReady وضعیتِ واقعیِ کلید را می‌گوید', () => {
-    delete process.env.KAVENEGAR_API_KEY;
+    setMeli(false);
     assert.equal(smsTransportReady(), false);
-    process.env.KAVENEGAR_API_KEY = 'x';
+    setMeli(true);
     assert.equal(smsTransportReady(), true);
-    delete process.env.KAVENEGAR_API_KEY;
+    setMeli(false);
   });
 });

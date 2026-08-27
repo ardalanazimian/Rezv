@@ -1,6 +1,6 @@
 import { createLogger } from './logger';
-import { metrics } from './metrics';
 import { enqueue } from './queue';
+import { metrics } from './metrics';
 const log = createLogger('notify');
 // ═══════════════════════════════════════════════════════════
 //  اعلان Push و Email — رزرونو
@@ -35,6 +35,13 @@ export async function sendPush(userId: string, title: string, _body: string): Pr
  * آیا ایمیل واقعاً قابلِ ارسال است؟ مسیرهایی که **نتیجه‌شان به رسیدنِ ایمیل
  * وابسته است** باید پیش از ادعای موفقیت این را بپرسند — همان قراردادِ
  * `smsTransportReady()` در lib/sms.ts.
+ *
+ * سابقه (ادغامِ ۲۰۲۶-۰۸-۲۶): دو شاخه هم‌زمان همین ناحیه را رفع کردند. این
+ * شاخه جعلِ موفقیت را مستند و صادقانه fail کرد (تا آن روز تنها فراخوانِ
+ * واقعیِ ارسال یک خطِ **کامنت‌شده** بود ولی «[EMAIL:ارسال]» لاگ می‌شد و صف
+ * ۱۰۰٪ سبز می‌ماند — با ۶ مصرف‌کننده‌ی واقعی)؛ شاخه‌ی open-tasks-review
+ * ارائه‌دهنده‌ی واقعی (SendGrid) را پیاده کرد. پیاده‌سازیِ واقعی نگه داشته
+ * شد؛ این یادداشت می‌ماند تا «چرا متریکِ ایمیل تازه است» بی‌جواب نماند.
  */
 export function emailTransportReady(): boolean {
   return Boolean(process.env.EMAIL_API_KEY);

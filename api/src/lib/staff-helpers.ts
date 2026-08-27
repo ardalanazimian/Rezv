@@ -161,3 +161,28 @@ export function findStaffForLogin(normalizedPhone: string) {
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
 }
+
+/**
+ * آیا این خطا نقضِ ایندکسِ یکتایِ جزئیِ «شماره‌ی owner» است؟ (مهاجرتِ ۰۷۹)
+ *
+ * هر دو مسیرِ سازنده‌ی owner (provisionBusiness و createTrialAccount) چکِ
+ * تکراریِ appسطح‌شان TOCTOU است؛ بازنده‌ی raceِ هم‌زمان به‌جای آن چک، به
+ * همین ایندکس داخلِ تراکنش می‌خورد و باید به همان پاسخِ تمیزِ مسیرِ ترتیبی
+ * نگاشت شود — نه ۵۰۰ِ خام. duck-type مثلِ isUniqueViolation در tables.ts
+ * (نه instanceof، که به هویتِ کلاسِ client گره می‌خورد).
+ *
+ * ⚠️ ایندکس با SQL خام ساخته شده و Prisma آن را نمی‌شناسد؛ بسته به نسخه،
+ * meta.target یا نامِ ایندکس است، یا فقط `['phone']` (شکلِ دیده‌شده‌ی واقعی:
+ * «Unique constraint failed on the fields: (`phone`)» هنگامِ اجرای ۰۷۹ روی
+ * دیتای کثیف). targetِ تک‌فیلدیِ phone در contextِ تراکنش‌های سازنده‌ی owner
+ * یکتاست: تنها uniqueِ دیگرِ phone روی staff مرکب است (tenant_id,phone) و
+ * target دوtاyی می‌دهد — پس تطبیقِ دقیقِ 'phone' برخوردِ کاذب ندارد.
+ */
+export function isOwnerPhoneUniqueViolation(e: unknown): boolean {
+  const err = e as { code?: string; meta?: { target?: unknown }; message?: string };
+  if (err?.code !== 'P2002') return false;
+  const t = err.meta?.target;
+  const s = Array.isArray(t) ? t.join(',') : String(t ?? '');
+  return s.includes('staff_owner_phone') || s === 'phone'
+    || /staff_owner_phone_unique_idx|fields: \(`phone`\)/.test(String(err.message ?? ''));
+}

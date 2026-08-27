@@ -1,5 +1,8 @@
 import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+// [پورتِ ادغام ۲۰۲۶-۰۸-۲۶] ارائه‌دهنده به ملی‌پیامک مهاجرت کرد؛ «کلیدِ ترانسپورت» حالا سه متغیر است.
+const MELI_KEYS = ['MELIPAYAMAK_USERNAME','MELIPAYAMAK_PASSWORD','MELIPAYAMAK_BODYID_OTP','MELIPAYAMAK_BODYID_CAMPAIGN'];
+const setSmsTransport = (on) => { for (const k of MELI_KEYS) { if (on) process.env[k] = k.endsWith('OTP') ? '12345' : 'x'; else delete process.env[k]; } };
 
 // ═══════════════════════════════════════════════════════════════════════
 //  رگرسیونِ «سقفِ موجودیِ پیامک در مسیرِ اضطراری» (مسیرِ پول)
@@ -34,7 +37,7 @@ const { renderMetrics } = await import('../src/lib/metrics.ts');
 
 const SFX = Date.now().toString(36).slice(-6);
 const NUL = String.fromCharCode(0);
-const ORIG_KEY = process.env.KAVENEGAR_API_KEY;
+const ORIG_MELI = MELI_KEYS.map(k => [k, process.env[k]]);
 const ORIG_FETCH = globalThis.fetch;
 
 let tenantId = '';
@@ -87,9 +90,11 @@ before(async () => {
   // بدونِ کلیدِ کاوه‌نگار، `sendSmsNow` هیچ درخواستِ شبکه‌ای نمی‌زند ولی
   // `smsFailed{reason:"no_api_key"}` را می‌شمارد — یعنی «تلاش برای ارسال»
   // قابلِ اندازه‌گیری است بدونِ اینکه پیامکِ واقعی برود.
+  setSmsTransport(false);
 });
 
 after(async () => {
+  for (const [k, v] of ORIG_MELI) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   // فقط ردیف‌های خودِ این فایل — نه `kind='sms'`ِ کلی: رانر تک‌پروسه‌ای است و
   // پاک‌کردنِ صفِ دیگران می‌تواند تستِ بعدی را بی‌صدا خراب کند.
   await db.$executeRaw`DELETE FROM jobs WHERE kind = 'sms' AND payload->>'to' = ${guestPhone}`
@@ -100,15 +105,10 @@ after(async () => {
 });
 
 describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ — پول)', () => {
-  // ⚠️ بازیابی تا ۲۰۲۶-۰۸-۲۶ در هوکِ **ریشه‌ای** بود، یعنی فقط در پایانِ کلِ
-  // ران اجرا می‌شد و تا آن لحظه حالتِ سراسری برایِ همه‌ی فایل‌های بعدیِ
-  // رانرِ تک-process آلوده می‌ماند.
-  before(() => { delete process.env.KAVENEGAR_API_KEY; });
-  afterEach(() => {
-    globalThis.fetch = ORIG_FETCH;
-    if (ORIG_KEY === undefined) delete process.env.KAVENEGAR_API_KEY;
-    else process.env.KAVENEGAR_API_KEY = ORIG_KEY;
-  });
+  // ⚠️ بازیابی از هوکِ **ریشه‌ای** به اینجا آمد: هوکِ ریشه فقط در پایانِ کلِ
+  // رانِ تک-process اجرا می‌شود، پس تا آن لحظه حالتِ سراسری برایِ همه‌ی
+  // فایل‌های بعدی آلوده می‌ماند. گاردش: tests/root-hook-globals.test.mts
+  afterEach(() => { globalThis.fetch = ORIG_FETCH; });
 
   beforeEach(async () => { globalThis.fetch = ORIG_FETCH; });
 
@@ -134,7 +134,7 @@ describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ 
   test('🔴 صف که بیفتد، مسیرِ اضطراری دقیقاً یک اعتبار کسر می‌کند', async () => {
     await setBalance(3);
     const txBefore = await db.smsTransaction.count({ where: { restaurantId } });
-    const sentBefore = smsFailed('no_api_key');
+    const sentBefore = smsFailed('not_configured');
 
     await enqueueSms(unqueueableJob());
 
@@ -147,18 +147,18 @@ describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ 
     assert.equal(tx[0].delta, -1);
     assert.equal(tx[0].reason, 'queue_fallback', 'مصرفِ مسیرِ اضطراری باید از مسیرِ عادی قابلِ تفکیک باشد');
     assert.equal(tx[0].balanceAfter, 2);
-    assert.equal(smsFailed('no_api_key'), sentBefore + 1, 'و پیام واقعاً تلاش به ارسال شده');
+    assert.equal(smsFailed('not_configured'), sentBefore + 1, 'و پیام واقعاً تلاش به ارسال شده');
   });
 
   test('🔴 با موجودیِ صفر، مسیرِ اضطراری اصلاً ارسال نمی‌کند', async () => {
     await setBalance(0);
     const txBefore = await db.smsTransaction.count({ where: { restaurantId } });
-    const sentBefore = smsFailed('no_api_key');
+    const sentBefore = smsFailed('not_configured');
     const blockedBefore = smsFailed('insufficient_balance');
 
     await enqueueSms(unqueueableJob());
 
-    assert.equal(smsFailed('no_api_key'), sentBefore,
+    assert.equal(smsFailed('not_configured'), sentBefore,
       'هیچ تلاشی برای ارسال نباید انجام شود — این همان ارسالِ بدونِ اعتبار بود');
     assert.equal(smsFailed('insufficient_balance'), blockedBefore + 1,
       'و نبودنِ اعتبار باید متریکِ قابلِ‌آلارم بدهد، نه سکوت');
@@ -169,7 +169,7 @@ describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ 
 
   test('🔴 شکستِ ارسال در مسیرِ اضطراری دیگر بی‌صدا بلعیده نمی‌شود', async () => {
     await setBalance(4);
-    process.env.KAVENEGAR_API_KEY = 'test-key-not-real';
+    setSmsTransport(true);
     // شکستِ شبکه‌ی قطعی و کاملاً محلی — هیچ درخواستِ بیرونی‌ای نمی‌رود.
     globalThis.fetch = (async () => { throw new Error('[DEMO] شبکه قطع است'); }) as typeof fetch;
     const swallowedBefore = smsFailed('fallback_failed');
@@ -177,7 +177,7 @@ describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ 
       await enqueueSms(unqueueableJob());
     } finally {
       globalThis.fetch = ORIG_FETCH;
-      delete process.env.KAVENEGAR_API_KEY;
+      setSmsTransport(false);
     }
     assert.equal(smsFailed('fallback_failed'), swallowedBefore + 1,
       'شکستِ ارسالِ بدونِ retry باید صریحاً شمرده شود (قبلاً `.catch(()=>{})` بود)');
@@ -186,10 +186,10 @@ describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ 
   test('پیامکِ بدونِ رستوران (سطحِ پلتفرم) هنوز از مسیرِ اضطراری می‌رود', async () => {
     // کنترلِ منفی برای خودِ رفع: گاردِ موجودی نباید مسیرهایی را که اصلاً
     // موجودیِ رستورانی ندارند (دعوتِ دوست، تبریکِ تولدِ سطحِ پلتفرم) ببندد.
-    const sentBefore = smsFailed('no_api_key');
+    const sentBefore = smsFailed('not_configured');
     const blockedBefore = smsFailed('insufficient_balance');
     await enqueueSms({ to: guestPhone, template: 'campaign', tokens: [`[DEMO]${NUL}`] });
-    assert.equal(smsFailed('no_api_key'), sentBefore + 1, 'باید تلاشِ ارسال انجام شود');
+    assert.equal(smsFailed('not_configured'), sentBefore + 1, 'باید تلاشِ ارسال انجام شود');
     assert.equal(smsFailed('insufficient_balance'), blockedBefore, 'و گاردِ موجودی نباید شلیک کند');
   });
 });

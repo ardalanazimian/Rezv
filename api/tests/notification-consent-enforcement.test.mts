@@ -1,3 +1,5 @@
+// [رفعِ ویندوز ۲۰۲۶-۰۸-۲۶] fileURLToPath و نه .pathname: رویِ ویندوز pathname «/C:/…» می‌دهد
+import { fileURLToPath } from 'node:url';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { testIp } from './helpers/test-ip.mts';
@@ -49,7 +51,7 @@ const { createReferral, grantBirthdayRewards } = await import('../src/lib/loyalt
 const { promoteNext } = await import('../src/lib/waitlist.ts');
 const smsRoute = await import('../src/app/api/v1/restaurant/sms/route.ts');
 
-const SRC = new URL('../src/lib/', import.meta.url).pathname;
+const SRC = fileURLToPath(new URL('../src/lib/', import.meta.url));
 const TAG = `nce-${Math.random().toString(36).slice(2, 8)}`;
 // پیش‌شماره‌ی ۰۹۰۰ در ایران تخصیص داده نشده — هیچ شماره‌ی واقعی‌ای این‌جا نیست.
 // شکلِ محلی عمداً دقیقاً ۱۱ رقمی است تا `normalizePhone` واقعاً قبولش کند

@@ -1483,10 +1483,11 @@ img{display:block;max-width:100%}
 .login-btn{width:100%;padding:14px;border:none;border-radius:12px;background:var(--blue);color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:18px;transition:all .15s}
 .login-btn:hover{background:var(--blue-600)}
 .login-btn:disabled{opacity:.6;cursor:default}
-/* هدفِ لمسی WCAG 2.2 (۲.۵.۸): بدونِ padding این دکمه ۷۰×۲۰ بود و از حدِ ۲۴×۲۴
-   پایین‌تر. margin-top از ۱۶ به ۸ آمد تا فاصله‌ی دیداری همان ۱۶px بماند
-   (۸ margin + ۸ padding) ولی ناحیه‌ی لمسی واقعاً بزرگ شود. */
-.login-back{background:none;border:none;color:var(--blue);font-weight:700;font-family:inherit;font-size:13px;cursor:pointer;margin-top:8px;padding:8px 12px;min-height:24px}
+/* ⚠️ رفعِ هدفِ لمسی (۲۰۲۶-۰۸-۲۶، یافته‌ی تستِ responsive-audit): این دکمه با
+   ورودِ password/پیامکی سوییچ می‌کند و ۷۰×۲۰ رندر می‌شد — زیرِ کفِ ۲۴×۲۴ی
+   WCAG 2.2 و عملاً سختِ لمس روی موبایل، آن هم رویِ حیاتی‌ترین صفحه (ورود).
+   44px همان کفِ راحتِ لمس در بقیه‌ی همین پنل‌هاست. */
+.login-back{background:none;border:none;color:var(--blue);font-weight:700;font-family:inherit;font-size:13px;cursor:pointer;margin-top:16px;min-height:44px;padding:10px 14px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px}
 .login-hint{background:var(--amber-50);border:1px solid #FDE68A;border-radius:10px;padding:10px 13px;font-size:12px;color:#92400E;margin-top:14px;line-height:1.5}
 .login-foot{font-size:11.5px;color:var(--t3);margin-top:18px;line-height:1.6}
 /* ═══════════ چت با مشتریان (business) ═══════════ */
@@ -1800,6 +1801,21 @@ img{display:block;max-width:100%}
 </div>
 
 <!-- ── پنل business: ماژول‌های Vanilla JS (بدون build، ترتیب مهم) ── -->
+<script>
+// ── آدرسِ APIِ قابلِ‌تنظیم بدونِ build (۲۰۲۶-۰۸-۲۶) ──
+// چرا: پنل استاتیک است و پیش‌فرضِ api-core «same-origin» — پشتِ nginxِ
+// استقرار درست است، ولی هر سروِ استاتیکِ دیگر (serve محلی، بسته‌ی آفلاین
+// رویِ یک بک‌اندِ واقعی) POST را با 405 برمی‌گرداند و ورود ناممکن می‌شود.
+// یک‌بار «?api=http://host:port» به URL بده تا ذخیره شود؛ «?api=» خالی
+// پاکش می‌کند. بدونِ آن هیچ رفتاری عوض نمی‌شود (localStorage خالی = همان
+// same-origin). try/catch برای حالتِ خصوصیِ مرورگر.
+(function(){try{
+  var q=new URLSearchParams(location.search);
+  if(q.has('api')){var v=q.get('api')||'';v?localStorage.setItem('rz_api_base',v):localStorage.removeItem('rz_api_base');}
+  var s=localStorage.getItem('rz_api_base');
+  if(s) window.RZ_API_BASE=s;
+}catch(e){}})();
+</script>
 <script data-src="js/icons.js">
 /* ═══════════════════════════════════════════════════════════
    رزرونو — سیستم آیکون (Iconography)
@@ -2412,6 +2428,22 @@ const API = {
   menuCreate(body){ return this.post('/restaurant/menu', body); },
   menuUpdate(id, body){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
   menuDelete(id){ return this.request('/restaurant/menu/'+encodeURIComponent(id), { method:'DELETE' }); },
+  // ── دسته‌های رابطه‌ایِ منو + مرتب‌سازیِ دسته‌ای (SPEC-A فاز ۱ / ۰۷۷) ──
+  menuCategories(){ return this.get('/restaurant/menu/categories'); },
+  menuCategoryCreate(body){ return this.post('/restaurant/menu/categories', body); },
+  menuCategoryUpdate(id, body){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuCategoryDelete(id){ return this.request('/restaurant/menu/categories/'+encodeURIComponent(id), { method:'DELETE' }); },
+  menuReorder(body){ return this.request('/restaurant/menu/reorder', { method:'PATCH', body: JSON.stringify(body) }); },
+  // ── فاز ۲ (۰۷۸): افزودنی‌ها + برچسب‌ها ──
+  menuModifiers(itemId){ return this.get('/restaurant/menu/'+encodeURIComponent(itemId)+'/modifiers'); },
+  menuModifierGroupCreate(itemId, body){ return this.post('/restaurant/menu/'+encodeURIComponent(itemId)+'/modifiers', body); },
+  menuModifierGroupUpdate(id, body){ return this.request('/restaurant/menu/modifier-groups/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuModifierGroupDelete(id){ return this.request('/restaurant/menu/modifier-groups/'+encodeURIComponent(id), { method:'DELETE' }); },
+  // POST رویِ خودِ گروه = افزودنِ گزینه (قراردادِ route)
+  menuModifierOptionCreate(groupId, body){ return this.post('/restaurant/menu/modifier-groups/'+encodeURIComponent(groupId), body); },
+  menuModifierOptionUpdate(id, body){ return this.request('/restaurant/menu/modifier-options/'+encodeURIComponent(id), { method:'PATCH', body: JSON.stringify(body) }); },
+  menuModifierOptionDelete(id){ return this.request('/restaurant/menu/modifier-options/'+encodeURIComponent(id), { method:'DELETE' }); },
+  menuTagsSave(itemId, tags){ return this.request('/restaurant/menu/'+encodeURIComponent(itemId)+'/tags', { method:'PUT', body: JSON.stringify({ tags }) }); },
   /**
    * آپلود/جایگزینیِ عکسِ آیتمِ منو.
    * multipart است، پس نمی‌تواند از `post()` (که JSON می‌فرستد) عبور کند.
@@ -3186,6 +3218,13 @@ function applyPermissionsToNav(){
 function nav(v){
   // دفاعِ لایه‌ی دوم: حتی اگر کسی دکمه را دور بزند، به صفحه‌ی بدونِ مجوز نمی‌رود.
   if (!canAccessView(v)) { if (typeof toast === 'function') toast('', 'دسترسی شما به این بخش محدود شده است'); return; }
+  // ⚠️ گاردِ تغییرِ ذخیره‌نشده (۲۰۲۶-۰۸-۲۶): تا امروز `_hoursDirty` فقط نوشته
+  // می‌شد و هیچ‌جا خوانده نمی‌شد، پس ساعتِ کاری/تعطیلیِ ذخیره‌نشده با یک
+  // کلیکِ ساده روی منو بی‌صدا از بین می‌رفت.
+  if (v !== 'profile' && typeof _hoursDirty !== 'undefined' && _hoursDirty) {
+    if (!confirm('تغییرهای ذخیره‌نشده‌ی ساعاتِ کاری از بین می‌روند. مطمئنی؟')) return;
+    _hoursDirty = false;   // کاربر آگاهانه صرف‌نظر کرد
+  }
   try{ if(window.rzTrack) window.rzTrack('page.viewed',{page:v}); }catch(e){}
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.getElementById('v-'+v).classList.add('active');
@@ -3280,6 +3319,10 @@ async function selectBranch(id){
   if(typeof _notifsLoaded!=='undefined') _notifsLoaded=false;
   if(typeof _weekdayInsightLoaded!=='undefined') _weekdayInsightLoaded=false;
   if(typeof _heatmapLoaded!=='undefined') _heatmapLoaded=false;
+  // ⚠️ CLUB هم به‌شعبه وابسته است ولی در این فهرست نبود: بعد از سوییچ،
+  // شمارِ «تولد این ماه» در کمپینِ پیامکی همچنان اعضای شعبه‌ی *قبلی* را
+  // می‌شمرد — یعنی کمپین برای مخاطبِ اشتباه برنامه‌ریزی می‌شد.
+  if(typeof CLUB!=='undefined') CLUB=[];
   await loadBranches();
   await loadTables();
   refreshActiveView();
@@ -4873,12 +4916,54 @@ function rProfile(){
     loadCancellationPolicy().then(()=>{ if(profTab==='cancellation') profRenderCancellationPolicy(); });
   }
 }
+// ═══════════════════════════════════════════════════════════════════════
+//  «نمی‌دانیم» ≠ «نیست»  (پروتکل §۹/§۱۰ · رفعِ ۲۰۲۶-۰۸-۲۶)
+//
+//  ⚠️ الگویی که در سه اپِ مستقل تکرار شده بود: یک fetchِ شکست‌خورده به
+//  آرایه‌ی خالی می‌افتاد و UI با اطمینان می‌گفت «هنوز نظری ثبت نشده» یا
+//  ✅ سبزِ «کسی نیاز به پیگیری ندارد». رستوران‌داری که واقعاً ۴۰ نظر دارد
+//  باور می‌کرد صفر دارد — بدونِ هیچ نشانه‌ای از خطا.
+//
+//  چرا به‌صورتِ یک هِلپرِ مشترک و نه رفعِ تک‌به‌تک: خطوطِ ۵۸۶–۵۹۷ همین فایل
+//  از قبل یک رفعِ درست برای `rfmRes` داشت، **با کامنتی که صریح می‌گفت
+//  «خطای واقعی باید دیده شود، نه پنهان»** — و دو خط پایین‌تر همان اشتباه
+//  برای دو فراخوانیِ دیگر تکرار شده بود. رفعِ موردی، نمونه‌ی بعدی را
+//  نمی‌گیرد؛ یک مکانیزمِ واحد می‌گیرد.
+//
+//  قرارداد: `[]`/`0` فقط وقتی مجاز است که **واقعاً اندازه گرفته باشیم**.
+// ═══════════════════════════════════════════════════════════════════════
+const LOAD_STATE = {};
+
+/** نتیجه‌ی یک بارگیری را ثبت می‌کند. `ok=false` یعنی «نمی‌دانیم». */
+function markLoad(key, ok){ LOAD_STATE[key] = ok ? 'ok' : 'failed'; }
+/** بارگیری صریحاً شکست خورده است (با نبودِ داده فرق دارد). */
+function loadFailed(key){ return LOAD_STATE[key] === 'failed'; }
+/** هنوز اصلاً تلاشی برای بارگیری نشده. */
+function loadPending(key){ return LOAD_STATE[key] === undefined; }
+
+/**
+ * بلوکِ صادقانه‌ی «بارگیری نشد» + دکمه‌ی تلاش دوباره.
+ * `retry` یک رشته‌ی فراخوانیِ inline است (همان سبکِ این پنل).
+ */
+function loadErrorBlock(title, retry){
+  return `<div class="panel" style="text-align:center;padding:36px">
+    <div style="margin-bottom:8px">${icon('alert',{size:26})}</div>
+    <div style="font-weight:700;margin-bottom:6px">${esc(title)}</div>
+    <div style="color:var(--t2);font-size:13px;margin-bottom:14px">ارتباط با سرور برقرار نشد — این یعنی وضعیت را <b>نمی‌دانیم</b>، نه اینکه چیزی ثبت نشده.</div>
+    ${retry?`<button class="btn btn-primary" onclick="${retry}">تلاش دوباره</button>`:''}
+  </div>`;
+}
+
+/** عددی که ممکن است نامعلوم باشد: `null`/نامعلوم → «—»، نه صفرِ ساختگی. */
+function faOrDash(v){ return (v===null||v===undefined) ? '—' : fa(v); }
+
 // بارگذاری گالری واقعی از /restaurant/photos
 // وضعیتِ بازبینی هم می‌آید: عکس تا تأییدِ پنلِ شرکت روی صفحه‌ی عمومی نمی‌رود
 // و رستوران‌دار باید همین‌جا ببیند کدام عکس منتشر شده و کدام نه.
 let GALLERY_COUNTS={total:0,approved:0,pending:0,rejected:0};
 async function loadGallery(){
   const res=await API.photos();
+  markLoad('gallery', res.ok && Array.isArray(res.data?.items));
   if(res.ok && Array.isArray(res.data?.items)){
     GALLERY=res.data.items.map(p=>({
       id:p.id, url:p.url, dataUrl:p.url, label:p.caption||'', emoji:'', type:p.category,
@@ -4893,6 +4978,7 @@ async function loadGallery(){
 let REVIEW_STATS={avg:0,total:0,unreplied:0,distribution:{1:0,2:0,3:0,4:0,5:0}};
 async function loadReviews(){
   const res=await API.reviews();
+  markLoad('reviews', !!res.ok);
   if(res.ok){
     REVIEW_STATS={avg:res.data.avg_rating||0,total:res.data.total||0,unreplied:res.data.unanswered||0,distribution:res.data.distribution||{1:0,2:0,3:0,4:0,5:0}};
     REVIEWS=(res.data.items||[]).map(r=>({
@@ -4931,6 +5017,10 @@ function refreshLogoDisplay(){
   }
 }
 function profRenderGallery(){
+  if(loadFailed('gallery')){
+    document.getElementById('pt-gallery').innerHTML=loadErrorBlock('گالریِ عکس بارگیری نشد','loadGallery().then(profRenderGallery)');
+    return;
+  }
   const logoPhoto=currentLogoPhoto();
   document.getElementById('pt-gallery').innerHTML=`
     <!-- هویت رستوران: نام + لوگو -->
@@ -5222,6 +5312,10 @@ async function doRemoveGallery(i){
 
 // ─── تب نظرات ───
 function profRenderReviews(){
+  if(loadFailed('reviews')){
+    document.getElementById('pt-reviews').innerHTML=loadErrorBlock('نظرها بارگیری نشد','loadReviews().then(profRenderReviews)');
+    return;
+  }
   let list=REVIEWS;
   if(revFilter==='positive')list=REVIEWS.filter(r=>r.rating>=4);
   else if(revFilter==='negative')list=REVIEWS.filter(r=>r.rating<=3);
@@ -5443,8 +5537,11 @@ async function custRenderOverview(){
   }
   const total=rfmRes.data.total||0;
   const segs=(rfmRes.data.segments||[]).slice().sort((a,b)=>b.count-a.count);
-  const vipCount=vipRes.ok?(vipRes.data.items?.length||0):0;
-  const cards=aiRes.ok?(aiRes.data.cards||[]):[];
+  // ⚠️ null یعنی «نمی‌دانیم» (فراخوانی شکست خورد)، صفر یعنی «اندازه گرفتیم و
+  // هیچ بود». قبلاً هر دو صفر می‌شدند و از هم قابلِ تفکیک نبودند — همان چیزی
+  // که clvHasSpend در همین فایل صریح ممنوع کرده است.
+  const vipCount=vipRes.ok?(vipRes.data.items?.length||0):null;
+  const cards=aiRes.ok?(aiRes.data.cards||[]):null;
   // عدد قهرمان فروش: ارزش کل مشتریان (مجموع CLV) — تخمین اگر بک‌اند نده
   const champCount=(segs.find(s=>s.segment==='champions')?.count)||0;
   const atRiskCount=segs.filter(s=>['at_risk','cant_lose','hibernating'].includes(s.segment)).reduce((a,s)=>a+s.count,0);
@@ -5455,13 +5552,13 @@ async function custRenderOverview(){
       <span class="ci-hero-badge">${icon('sparkle',{size:13,fill:true})} هوش مشتری رزرونو</span>
       <div class="ci-hero-grid">
         <div class="ci-hero-stat"><div class="n">${fa(total)}</div><div class="l">مشتری تحلیل‌شده</div></div>
-        <div class="ci-hero-stat"><div class="n warm">${fa(vipCount)}${vipCount>=50?'+':''}</div><div class="l">مشتری VIP</div></div>
+        <div class="ci-hero-stat"><div class="n warm">${faOrDash(vipCount)}${(vipCount!==null&&vipCount>=50)?'+':''}</div><div class="l">مشتری VIP</div></div>
         <div class="ci-hero-stat"><div class="n grn">${fa(champCount)}</div><div class="l">قهرمان (بهترین‌ها)</div></div>
         <div class="ci-hero-stat"><div class="n" style="color:#F0A868">${fa(atRiskCount)}</div><div class="l">در خطر ریزش</div></div>
       </div>
     </div>
 
-    ${cards.length?`<div class="ai-box" style="margin-bottom:16px">
+    ${(cards&&cards.length)?`<div class="ai-box" style="margin-bottom:16px">
       <div class="ai-box-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">خلاصه‌ی هوشمند</div><span class="tag">AI</span></div>
       ${cards.slice(0,3).map(c=>`<div class="ai-insight"><span class="ic ${c.severity==='high'?'warn':c.severity==='medium'?'info':'up'}">${c.severity==='high'?icon('alert',{size:15}):c.severity==='medium'?icon('trending',{size:15}):icon('check',{size:15})}</span><div><b>${esc(c.title)}</b><div style="margin-top:2px">${esc(c.detail)}</div></div></div>`).join('')}
     </div>`:''}
@@ -5574,6 +5671,7 @@ const HOURS_DOW_FA={0:'یکشنبه',1:'دوشنبه',2:'سه‌شنبه',3:'چ�
 // opening_hours فقط برای نمایشِ مرجعِ «چیزی که مشتری الان می‌بیند» می‌ماند.
 let HOURS_STATE={opening_hours:null,pending_opening_hours:null,hours_change_status:null,hours_change_reason:null,timezone:'Asia/Tehran',closures:[],draft:null};
 let _hoursLoaded=false, _hoursDirty=false;
+const HOURS_SAVE_LABEL='ارسالِ پیشنهاد برای تأیید';
 
 async function loadHours(){
   if(!API.getToken()) return;
@@ -5621,7 +5719,18 @@ function profRenderHours(){
   const el=document.getElementById('pt-hours'); if(!el) return;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
   const oh=HOURS_STATE.draft||{};
+  // ⚠️ رفعِ از‌دست‌رفتنِ بی‌صدای داده (۲۰۲۶-۰۸-۲۶):
+  // `_hoursDirty` در ۶ جا **نوشته** می‌شد و در کلِ ریپو در هیچ‌جا **خوانده**
+  // نمی‌شد. یعنی رستوران‌دار یک تعطیلیِ خاص اضافه می‌کرد، آن را در لیست
+  // می‌دید (از یک ردیفِ واقعاً ذخیره‌شده قابلِ تفکیک نبود)، تب عوض می‌کرد و
+  // تغییر بی‌صدا از بین می‌رفت — و رستوران در آن روز همچنان رزرو می‌گرفت.
+  const dirtyBanner = _hoursDirty ? `<div class="panel" style="border-color:var(--amber);background:var(--amber-50);margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px">
+      <span>${icon('alert',{size:18})}</span>
+      <div style="flex:1;font-size:13px"><b>تغییرهای ذخیره‌نشده داری.</b> تا وقتی «${esc(HOURS_SAVE_LABEL)}» را نزنی، این‌ها فقط در همین مرورگرند و با خروج از صفحه از بین می‌روند.</div>
+    </div></div>` : '';
   el.innerHTML=`
+    ${dirtyBanner}
     ${hoursStatusBannerHTML()}
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">ساعات کاری هفتگی</div><div class="panel-sub">${HOURS_STATE.hours_change_status?'این فرم پیشنهادِ توئه — بعد از ارسال باید شرکت تأیید کنه تا زنده بشه':'هر روز می‌تواند چند شیفت (مثلاً ناهار/شام) داشته باشد'}</div></div>
@@ -5680,7 +5789,9 @@ function addClosure(){
   const reason=document.getElementById('closureReason')?.value.trim();
   if(!date){ toast('','یه تاریخ انتخاب کن'); return; }
   if(HOURS_STATE.closures.some(c=>c.date===date)){ toast('','این تاریخ قبلاً اضافه شده'); return; }
-  HOURS_STATE.closures.push({date,reason:reason||null});
+  // `_unsaved` تا اولین saveHours همراهِ ردیف می‌ماند تا در UI از ردیفِ
+  // واقعاً ذخیره‌شده قابلِ تشخیص باشد.
+  HOURS_STATE.closures.push({date,reason:reason||null,_unsaved:true});
   _hoursDirty=true; profRenderHours();
 }
 function removeClosure(i){ HOURS_STATE.closures.splice(i,1); _hoursDirty=true; profRenderHours(); }
@@ -5833,18 +5944,31 @@ async function openCustomerDetail(userId){
 }
 
 // ─── تب ۳: کمپین پیامکی (مارکتینگ) ───
+// ⚠️ بازگردانده‌شده (۲۰۲۶-۰۸-۲۶): اعلانِ این کش در حلِ تعارضِ merge گم شده
+// بود و اولین خواندنش ReferenceError می‌داد — تستِ business-assistant گرفتش.
+// null یعنی «هنوز از سرور نپرسیده‌ایم» (متمایز از {}ی خالی).
+let _segCounts=null;
 async function custRenderCampaign(){
-  // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵؛ حفظ‌شده در ادغام با خطِ ممیزیِ #68):
-  // کارت‌های سگمنت رفتاری بودند (در خطر ریزش/VIP/جدید/تولد) ولی endpointِ SMS
-  // فقط بر اساسِ tierِ باشگاه (gold/silver/bronze) یا حذفِ segment («همه»)
-  // فیلتر می‌کند — پس ۳ از ۴ گزینه ۴۲۲ می‌گرفتند یا (بدتر، مثلِ «تولد») به
-  // «همه» ارسال می‌شدند: مخاطبِ اشتباه. زنده تأیید شد: at_risk → HTTP 422.
-  // حالا کارت‌ها دقیقاً همان چیزی‌اند که بک‌اند می‌تواند هدف بگیرد و شمارش از
-  // اعضای واقعیِ باشگاه می‌آید. هدف‌گیریِ رفتاری (at_risk/تولد) نیازمندِ تغییرِ
-  // بک‌اند است و در KNOWN_LIMITATIONS ثبت شد. (currentMonthFa از #68 همچنان
-  // برای «تولد این ماه» در صفحه‌ی باشگاه استفاده می‌شود.)
-  const tierCount=t=>fa((CLUB||[]).filter(m=>m.tier===t).length)+' نفر';
-  const segs=[['crown','اعضای طلایی',tierCount('gold')],['sparkle','اعضای نقره‌ای',tierCount('silver')],['ticket','اعضای برنزی',tierCount('bronze')],['users','همه اعضا',fa((CLUB||[]).length)+' نفر']];
+  // ⚠️ حلِ تعارضِ ادغام (۲۰۲۶-۰۸-۲۶): main همین باگِ «۳ از ۴ کارت ۴۲۲/۴۰۰»
+  // را با تقلیلِ کارت‌ها به tierهای باشگاه حل کرده بود؛ این شاخه با resolveِ
+  // مخاطبِ رفتاری از /restaurant/customers?segment= (که بک‌اند از قبل
+  // پشتیبانی می‌کند و phone برمی‌گرداند) و ارسالِ phones[]. قابلیتِ رفتاری
+  // حفظ شد (§۸) و محدودیتِ ثبت‌شده در KNOWN_LIMITATIONS دیگر صادق نیست.
+  if(!_segCounts && API.getToken()){
+    const [atRisk,vip]=await Promise.all([API.customers('segment=at_risk&limit=50'),API.customers('segment=vip&limit=50')]);
+    _segCounts={
+      at_risk: atRisk.ok?(atRisk.data.items?.length||0):null,
+      vip: vip.ok?(vip.data.items?.length||0):null,
+    };
+  }
+  const sc=_segCounts||{};
+  // ⚠️ شمارِ «تولد این ماه» از آرایه‌ی محلیِ CLUB می‌آید که فقط در rLoyalty یا
+  // بعد از walk-in پر می‌شود — در مسیرِ «مشتریان ← کمپین» هرگز. قبلاً این
+  // «۰ نفر» نشان می‌داد در حالی که دو کارتِ کنارش هنگامِ نامعلوم‌بودن صادقانه
+  // «—» می‌گفتند. حالا هر سه یک قرارداد دارند: نامعلوم = «—»، نه صفر.
+  const cnt=(v,suffix)=>v==null?'—':fa(v)+(v>=50?'+':'')+' '+suffix;
+  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید','—'],['calendar','تولد این ماه',(typeof CLUB!=='undefined'&&CLUB.length)?fa(CLUB.filter(m=>m.bMonth===currentMonthFa()).length)+' نفر':'—']];
+
   document.getElementById('ct-campaign').innerHTML=`
     <div class="panel">
       <div class="panel-head"><div><div class="panel-title">کمپین پیامکی هوشمند</div><div class="panel-sub">سگمنت انتخاب کن، پیام بنویس، پیش‌نمایش بگیر</div></div></div>
@@ -5911,7 +6035,10 @@ async function custRenderAI(){
   const [res,crmRes]=await Promise.all([API.aiRecommendations(),API.crmRecommendations()]);
   if(!res.ok){ cardsEl.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">${icon('alert',{size:16})} پیشنهادها بارگیری نشد — دستیار همچنان در دسترس است.</div>`; return; }
   const cards=res.data.cards||[];
-  const contacts=crmRes.ok?(crmRes.data.items||[]):[];
+  // ⚠️ null یعنی فراخوانی شکست خورد. قبلاً [] می‌شد و پنل با ✅ سبزِ «فعلاً
+  // مشتریِ نیازمندِ پیگیریِ فوری نیست» رندر می‌شد — رستوران‌دار باور می‌کرد
+  // هیچ مشتریِ در خطرِ ریزشی برای تماس نیست، در حالی که لیست اصلاً نیامده بود.
+  const contacts=crmRes.ok?(crmRes.data.items||[]):null;
   const crmEff=crmRes.ok?(crmRes.data.effectiveness||null):null;
   const URG_FA={high:'فوری',medium:'این هفته',low:'وقتِ آزاد'};
   cardsEl.innerHTML=`
@@ -5932,7 +6059,7 @@ async function custRenderAI(){
       </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">فعلاً پیشنهاد فوری‌ای نیست — وضعیت خوبه</div></div>`}
     <div class="panel" style="margin-top:20px">
       <div class="panel-head"><div><div class="panel-title">${icon('phone',{size:15})} کیا رو الان تماس/پیام بگیریم؟</div><div class="panel-sub">${crmEffectivenessFa(crmEff)}</div></div></div>
-      ${contacts.length?contacts.map(c=>`
+      ${(contacts&&contacts.length)?contacts.map(c=>`
         <div class="mini-row">
           <div class="mini-info">
             <div class="mini-name">${esc(c.name)} · <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:50px;background:${c.urgency==='high'?'var(--red-50)':c.urgency==='medium'?'var(--amber-50)':'var(--s-100)'};color:${c.urgency==='high'?'var(--red)':c.urgency==='medium'?'var(--amber)':'var(--t2)'}">${URG_FA[c.urgency]||''}</span></div>
@@ -5941,7 +6068,9 @@ async function custRenderAI(){
           <div style="display:flex;gap:6px;flex-shrink:0">
             ${c.channel==='call'?`<button class="btn btn-sm btn-primary" onclick="callRecommendedCustomer(${jsq(c.phone||'')},${jsq(c.user_id)})">${icon('phone',{size:12})} تماس</button>`:`<button class="btn btn-sm btn-primary" onclick="setCustTab('campaign')">${icon('message',{size:12})} پیامک</button>`}
           </div>
-        </div>`).join(''):`<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`}
+        </div>`).join(''):(contacts===null
+        ? `<div class="empty-state"><div class="empty-state-icon">${icon('alert',{size:30})}</div><div class="empty-state-desc">این فهرست بارگیری نشد — یعنی <b>نمی‌دانیم</b> کسی نیاز به پیگیری دارد یا نه.</div><button class="btn btn-sm btn-primary" style="margin-top:10px" onclick="custRenderAI()">تلاش دوباره</button></div>`
+        : `<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:30})}</div><div class="empty-state-desc">فعلاً مشتریِ نیازمندِ پیگیریِ فوری نیست</div></div>`)}
     </div>`;
 }
 // ⚠️ فازِ ۲ (§۲۶–۲۹): بک‌اند هفت نوع کارت می‌فرستد ولی این تابع فقط سه‌تا را
@@ -5978,9 +6107,19 @@ let MENU_ITEMS = [];
 let _menuLoaded = false;
 /** آدرسِ عمومیِ منو — از سرور می‌آید، نه ساختِ رشته اینجا. null = رستوران slug ندارد. */
 let MENU_PUBLIC_URL = null;
+/** دسته‌های رابطه‌ای (۰۷۷) — از سرور، با ترتیبِ خودِ رستوران‌دار. */
+let MENU_CATS = [];
 
-/** دسته‌هایِ پیشنهادی. متنِ آزاد است — رستوران می‌تواند دسته‌ی دلخواه بنویسد. */
-const MENU_CATEGORY_SUGGESTIONS = ['پیش‌غذا', 'غذای اصلی', 'دسر', 'نوشیدنی', 'صبحانه'];
+/** برچسب‌های منو (۰۷۸) — کلیدها = enumِ سرور (menu_tag)؛ فقط label محلی است. */
+const MENU_TAG_LABEL = {
+  VEGETARIAN:'گیاهی', VEGAN:'وگان', SPICY:'تند', GLUTEN_FREE:'بدونِ گلوتن',
+  CONTAINS_NUTS:'حاوی آجیل', CONTAINS_DAIRY:'حاوی لبنیات', HALAL:'حلال',
+  NEW:'جدید', POPULAR:'پرفروش',
+};
+/** روزهای هفته با شماره‌ی قراردادِ سرور (۰=یکشنبه…۶=شنبه)، به ترتیبِ نمایشِ ایرانی. */
+const MENU_DAY_ORDER = [ [6,'ش'], [0,'ی'], [1,'د'], [2,'س'], [3,'چ'], [4,'پ'], [5,'ج'] ];
+const minToTime = (m)=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const timeToMin = (t)=>{ const p=(t||'').split(':'); const h=parseInt(p[0],10), mi=parseInt(p[1],10); return (Number.isFinite(h)&&Number.isFinite(mi)) ? h*60+mi : null; };
 
 async function rMenu(){
   const el = document.getElementById('v-menu');
@@ -6006,6 +6145,7 @@ async function rMenu(){
     return;
   }
   MENU_ITEMS = res.data.items || [];
+  MENU_CATS = res.data.categories || [];
   MENU_PUBLIC_URL = res.data.public_menu_url || null;
   _menuLoaded = true;
   menuRender();
@@ -6015,11 +6155,13 @@ function menuRender(){
   const el = document.getElementById('v-menu');
   const active = MENU_ITEMS.filter(i=>i.is_active).length;
 
-  // گروه‌بندی بر اساسِ دسته، با «دسته‌بندی‌نشده» در انتها
-  const groups = {};
-  MENU_ITEMS.forEach(i=>{ const k = i.category || ''; (groups[k] = groups[k] || []).push(i); });
-  const keys = Object.keys(groups).filter(k=>k).sort((a,b)=>a.localeCompare(b,'fa'));
-  if(groups['']) keys.push('');
+  // گروه‌بندی بر اساسِ دسته‌ی رابطه‌ای (۰۷۷) با ترتیبِ خودِ رستوران‌دار؛
+  // آیتم‌های بدونِ دسته در انتها. دسته‌ی خالی هم رندر می‌شود تا دیده و
+  // مدیریت شود (وگرنه رستوران‌دار فکر می‌کند ساخته نشده).
+  const byCat = {};
+  MENU_ITEMS.forEach(i=>{ const k = i.category_id || ''; (byCat[k] = byCat[k] || []).push(i); });
+  const sections = MENU_CATS.map(c=>({ cat:c, items: byCat[c.id] || [] }));
+  const uncategorized = byCat[''] || [];
 
   el.innerHTML = `
     <div class="panel" style="margin-bottom:16px">
@@ -6028,7 +6170,10 @@ function menuRender(){
           <div class="panel-title">منویِ رستوران</div>
           <div class="panel-sub">${fa(MENU_ITEMS.length)} آیتم · ${fa(active)} فعال</div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="menuOpenForm()">${icon('plus',{size:15})} آیتمِ جدید</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-ghost" onclick="menuCatCreate()">${icon('plus',{size:14})} دسته‌ی جدید</button>
+          <button class="btn btn-primary btn-sm" onclick="menuOpenForm()">${icon('plus',{size:15})} آیتمِ جدید</button>
+        </div>
       </div>
       <div class="cash-note" style="margin-top:4px">${icon('info',{size:13})}
         منو تنها منبعِ مبلغ در رزرونوست: مهمان از همین فهرست پیش‌سفارش می‌دهد و
@@ -6039,19 +6184,37 @@ function menuRender(){
 
     ${menuPublicCardHTML(active)}
 
-    ${MENU_ITEMS.length === 0 ? `
+    ${(MENU_ITEMS.length === 0 && MENU_CATS.length === 0) ? `
       <div class="panel" style="text-align:center;padding:40px">
         <div style="margin-bottom:10px">${icon('menu',{size:30})}</div>
         <div style="font-weight:700;margin-bottom:6px">هنوز آیتمی در منو نیست</div>
         <div style="color:var(--t2);font-size:13px;margin-bottom:16px">اولین آیتم را اضافه کن تا مهمان‌ها بتوانند پیش‌سفارش بدهند.</div>
         <button class="btn btn-primary" onclick="menuOpenForm()">افزودنِ اولین آیتم</button>
       </div>` :
-      keys.map(k=>`
+      sections.map((sec,ix)=>menuCatSectionHTML(sec,ix,sections.length)).join('') + (uncategorized.length ? `
         <div class="panel" style="margin-bottom:14px">
-          <div class="panel-head"><div class="panel-title" style="font-size:15px">${k ? esc(k) : 'دسته‌بندی‌نشده'}</div></div>
-          ${groups[k].map(menuRowHTML).join('')}
-        </div>`).join('')
+          <div class="panel-head"><div class="panel-title" style="font-size:15px">دسته‌بندی‌نشده</div></div>
+          ${uncategorized.map(menuRowHTML).join('')}
+        </div>` : '')
     }`;
+}
+
+/** سکشنِ یک دسته: سربرگ با کنترل‌های مدیریت (جابه‌جایی/نام/فعال‌بودن) + ردیف‌ها. */
+function menuCatSectionHTML(sec, ix, total){
+  const c = sec.cat;
+  return `<div class="panel" style="margin-bottom:14px${c.is_active?'':';opacity:.65'}">
+    <div class="panel-head">
+      <div class="panel-title" style="font-size:15px">${esc(c.name)}${c.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-ghost" aria-label="انتقالِ دسته به بالا" ${ix===0?'disabled':''} onclick="menuCatMove(${jsq(c.id)},-1)">▲</button>
+        <button class="btn btn-sm btn-ghost" aria-label="انتقالِ دسته به پایین" ${ix===total-1?'disabled':''} onclick="menuCatMove(${jsq(c.id)},1)">▼</button>
+        <button class="btn btn-sm btn-ghost" onclick="menuCatRename(${jsq(c.id)})">تغییرِ نام</button>
+        <button class="btn btn-sm btn-ghost" onclick="menuCatToggle(${jsq(c.id)})">${c.is_active?'غیرفعال':'فعال‌سازی'}</button>
+      </div>
+    </div>
+    ${sec.items.length ? sec.items.map(menuRowHTML).join('')
+      : `<div style="color:var(--t2);font-size:13px;padding:6px 0">این دسته هنوز آیتمی ندارد.</div>`}
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -6282,9 +6445,12 @@ function menuRowHTML(i){
   return `<div class="top-cust" style="cursor:default;${i.is_active?'':'opacity:.55'}">
     ${thumb}
     <div class="top-body">
-      <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}</div>
+      <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}${i.is_out_of_stock?' <span class="seg-vip" style="background:var(--amber,#d97706)">ناموجود</span>':''}${i.availability?` <span class="seg-vip" style="background:var(--blue,#2563eb)" title="سروِ محدود: ${minToTime(i.availability.start_min)} تا ${minToTime(i.availability.end_min)}">⏱ محدود</span>`:''}</div>
       <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}${i.image_url?'':' · بدونِ عکس'}</div>
     </div>
+    <button class="btn btn-sm btn-ghost" aria-pressed="${i.is_out_of_stock?'true':'false'}"
+      aria-label="${i.is_out_of_stock?'برگرداندن به موجود':'علامت‌گذاری به‌عنوانِ ناموجود'}"
+      onclick="menuToggleOut(${jsq(i.id)})">${i.is_out_of_stock?'موجود شد':'ناموجود'}</button>
     <button class="btn btn-sm btn-ghost" onclick="menuOpenForm(${jsq(i.id)})">ویرایش</button>
     <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="menuDelete(${jsq(i.id)})">حذف</button>
   </div>`;
@@ -6361,12 +6527,35 @@ function menuOpenForm(id){
     <div class="field-label">قیمت (تومان)</div>
     <input class="inp" id="miPrice" type="number" min="0" value="${it?it.price_toman:''}" placeholder="۱۸۵۰۰۰">
     <div class="field-label">دسته</div>
-    <input class="inp" id="miCat" maxlength="60" list="miCatList" value="${it&&it.category?esc(it.category):''}" placeholder="اختیاری">
-    <datalist id="miCatList">${MENU_CATEGORY_SUGGESTIONS.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+    <select class="inp" id="miCat">
+      <option value="">بدونِ دسته</option>
+      ${MENU_CATS.filter(c=>c.is_active || (it&&it.category_id===c.id)).map(c=>
+        `<option value="${esc(c.id)}"${it&&it.category_id===c.id?' selected':''}>${esc(c.name)}${c.is_active?'':' (غیرفعال)'}</option>`).join('')}
+    </select>
+    ${MENU_CATS.length===0?`<div style="color:var(--t2);font-size:12px;margin-top:4px">هنوز دسته‌ای نساخته‌ای — با «دسته‌ی جدید» بالای صفحه بساز.</div>`:''}
     <div class="field-label">ایموجی</div>
     <input class="inp" id="miEmoji" maxlength="16" value="${it&&it.emoji?esc(it.emoji):''}" placeholder="اختیاری — مثلاً 🍝">
     <div class="field-label">توضیح</div>
     <input class="inp" id="miDesc" maxlength="300" value="${it&&it.description?esc(it.description):''}" placeholder="اختیاری — مثلاً «با سسِ قارچ و پنیرِ پارمزان»">
+    <div class="field-label">برچسب‌ها</div>
+    <div id="miTags" style="display:flex;gap:6px;flex-wrap:wrap">
+      ${Object.keys(MENU_TAG_LABEL).map(k=>{const on=!!(it&&Array.isArray(it.tags)&&it.tags.includes(k));return `<button type="button" class="btn btn-sm ${on?'btn-primary':'btn-ghost'}" data-tag="${k}" aria-pressed="${on?'true':'false'}" onclick="menuTagChipToggle(this)">${MENU_TAG_LABEL[k]}</button>`;}).join('')}
+    </div>
+    <div class="field-label">پنجره‌ی سرو (اختیاری)</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+      ${MENU_DAY_ORDER.map(d=>{const on=!!(it&&it.availability&&it.availability.days.includes(d[0]));return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" class="miDay" value="${d[0]}" ${on?'checked':''}>${d[1]}</label>`;}).join('')}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:13px">از <input class="inp" id="miAvFrom" type="time" style="width:110px" value="${it&&it.availability?minToTime(it.availability.start_min):''}"></label>
+      <label style="font-size:13px">تا <input class="inp" id="miAvTo" type="time" style="width:110px" value="${it&&it.availability?minToTime(it.availability.end_min):''}"></label>
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:4px">
+      خالی = همیشه. آیتمِ بیرونِ پنجره در منویِ عمومی نمایش داده نمی‌شود و برای رزروِ بیرونِ بازه قابلِ پیش‌سفارش نیست.
+    </div>
+    ${it ? `
+    <div class="field-label">افزودنی‌ها (سایز، مخلفات، …)</div>
+    <div id="miModsBox"><button type="button" class="btn btn-sm btn-ghost" onclick="menuLoadModifiers(${jsq(it.id)})">مدیریتِ افزودنی‌ها</button></div>
+    ` : ''}
     ${it ? `
     <div class="field-label">عکسِ آیتم</div>
     <div id="miPhotoBox">${menuPhotoBoxHTML(it)}</div>
@@ -6379,9 +6568,13 @@ function menuOpenForm(id){
     <div style="color:var(--t2);font-size:12px;margin-top:4px">
       عددِ کوچک‌تر بالاتر نشان داده می‌شود. آیتم‌هایِ هم‌عدد بر اساسِ نام مرتب می‌شوند.
     </div>
-    <label style="display:flex;align-items:center;gap:8px;margin:12px 0">
+    <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px">
       <input type="checkbox" id="miActive" ${!it || it.is_active ? 'checked' : ''}>
       <span>در منو نمایش داده شود</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;margin:4px 0 12px">
+      <input type="checkbox" id="miOut" ${it && it.is_out_of_stock ? 'checked' : ''}>
+      <span>ناموجود (با برچسب دیده می‌شود؛ از پیش‌سفارش کنار می‌رود)</span>
     </label>
     <button class="btn btn-primary btn-block" onclick="menuSave(${id?`${jsq(id)}`:'null'})">${it?'ذخیره':'افزودن'}</button>`);
 }
@@ -6397,17 +6590,39 @@ async function menuSave(id){
   const body = {
     name,
     price_toman: price,
-    category: (document.getElementById('miCat').value||'').trim() || null,
+    // دسته‌ی رابطه‌ای (۰۷۷) — سرور خودش میرورِ متنی را از نامِ دسته می‌سازد.
+    category_id: document.getElementById('miCat').value || null,
     emoji: (document.getElementById('miEmoji').value||'').trim() || null,
     is_active: document.getElementById('miActive').checked,
+    is_out_of_stock: document.getElementById('miOut').checked,
     description: (document.getElementById('miDesc').value||'').trim() || null,
     // image_url اینجا نیست: عکس فقط با آپلودِ فایل عوض می‌شود (menuPickPhoto).
     sort_order: Number.isFinite(sort) && sort >= 0 ? sort : 0,
   };
+
+  // ۰۷۸ — پنجره‌ی سرو: یا کامل (روز+از+تا) یا هیچ؛ نیمه‌کاره = خطای روشن.
+  const days = Array.from(document.querySelectorAll('.miDay:checked')).map(x=>parseInt(x.value,10));
+  const from = timeToMin(document.getElementById('miAvFrom').value);
+  const to   = timeToMin(document.getElementById('miAvTo').value);
+  if(days.length || from !== null || to !== null){
+    if(!days.length || from === null || to === null){ toast('','برای پنجره‌ی سرو، هم روزها هم «از/تا» لازم است — یا همه را خالی بگذار'); return; }
+    if(from >= to){ toast('','شروعِ پنجره باید قبل از پایانش باشد'); return; }
+    body.availability = { days, start_min: from, end_min: to };
+  } else {
+    body.availability = null;
+  }
   const res = id ? await API.menuUpdate(id, body) : await API.menuCreate(body);
   if(!res.ok){
     toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ذخیره نشد'));
     return;
+  }
+  // ۰۷۸ — برچسب‌ها endpointِ جدا دارند (PUT جایگزین). خطایش بی‌صدا نمی‌ماند.
+  const tagBtns = Array.from(document.querySelectorAll('#miTags [data-tag][aria-pressed="true"]'));
+  const tags = tagBtns.map(b=>b.getAttribute('data-tag'));
+  const itemIdForTags = id || res.data?.id;
+  if(itemIdForTags){
+    const tRes = await API.menuTagsSave(itemIdForTags, tags);
+    if(!tRes.ok){ toast('', 'آیتم ذخیره شد ولی برچسب‌ها ثبت نشد: '+(tRes.error?.message||'خطا')); }
   }
   closeModal();
   toast('✓', id ? 'آیتم به‌روزرسانی شد' : 'آیتم به منو اضافه شد');
@@ -6427,6 +6642,186 @@ async function menuDelete(id){
   // سرور نشان داده می‌شود تا رستوران‌دار دقیقاً بداند چه شد.
   toast(res.data?.archived ? '' : '✓', res.data?.message || 'آیتم حذف شد');
   rMenu();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  مدیریتِ دسته‌ها (SPEC-A فاز ۱ / ۰۷۷) + toggleِ «ناموجود»
+// ═══════════════════════════════════════════════════════════════════════
+
+/** toggleِ سریعِ «ناموجود» — بدونِ باز کردنِ فرم؛ فقط بعد از تأییدِ سرور رندر. */
+async function menuToggleOut(id){
+  const it = MENU_ITEMS.find(x=>x.id===id);
+  if(!it) return;
+  const res = await API.menuUpdate(id, { is_out_of_stock: !it.is_out_of_stock });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ثبت نشد'));
+    return;
+  }
+  it.is_out_of_stock = res.data.is_out_of_stock;
+  menuRender();
+  toast('✓', it.is_out_of_stock ? `«${it.name}» ناموجود شد — در منو با برچسب دیده می‌شود` : `«${it.name}» دوباره موجود شد`);
+}
+
+function menuCatCreate(){
+  openModal(`
+    <div class="modal-title">دسته‌ی جدید</div>
+    <div class="field-label" style="margin-top:12px">نامِ دسته</div>
+    <input class="inp" id="mcName" maxlength="60" placeholder="مثلاً پیش‌غذا">
+    <button class="btn btn-primary btn-block" style="margin-top:12px" onclick="menuCatCreateSave()">ساختنِ دسته</button>`);
+  const inp = document.getElementById('mcName');
+  if(inp) inp.focus();
+}
+
+async function menuCatCreateSave(){
+  const name = (document.getElementById('mcName').value||'').trim();
+  if(!name){ toast('','نامِ دسته لازم است'); return; }
+  const res = await API.menuCategoryCreate({ name, sort_order: (MENU_CATS.length + 1) * 10 });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ساخته نشد'));
+    return;
+  }
+  closeModal();
+  toast('✓', `دسته‌ی «${name}» ساخته شد`);
+  rMenu();
+}
+
+function menuCatRename(id){
+  const c = MENU_CATS.find(x=>x.id===id);
+  if(!c) return;
+  openModal(`
+    <div class="modal-title">تغییرِ نامِ دسته</div>
+    <div class="field-label" style="margin-top:12px">نامِ تازه</div>
+    <input class="inp" id="mcName" maxlength="60" value="${esc(c.name)}">
+    <div style="color:var(--t2);font-size:12px;margin-top:6px">
+      نامِ تازه بلافاصله در منویِ عمومی و آیتم‌های این دسته هم اعمال می‌شود.
+    </div>
+    <button class="btn btn-primary btn-block" style="margin-top:12px" onclick="menuCatRenameSave(${jsq(id)})">ذخیره</button>`);
+}
+
+async function menuCatRenameSave(id){
+  const name = (document.getElementById('mcName').value||'').trim();
+  if(!name){ toast('','نامِ دسته لازم است'); return; }
+  const res = await API.menuCategoryUpdate(id, { name });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ذخیره نشد'));
+    return;
+  }
+  closeModal();
+  toast('✓','نامِ دسته عوض شد');
+  rMenu();
+}
+
+/** فعال/غیرفعال‌کردنِ دسته. غیرفعال = حذفِ نرم (endpointِ DELETE)؛ فعال‌سازی = PATCH. */
+async function menuCatToggle(id){
+  const c = MENU_CATS.find(x=>x.id===id);
+  if(!c) return;
+  const res = c.is_active
+    ? await API.menuCategoryDelete(id)
+    : await API.menuCategoryUpdate(id, { is_active: true });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ثبت نشد'));
+    return;
+  }
+  toast(c.is_active ? '' : '✓', c.is_active ? (res.data?.message || 'دسته غیرفعال شد') : `دسته‌ی «${c.name}» فعال شد`);
+  rMenu();
+}
+
+/** جابه‌جاییِ ترتیبِ دسته با دکمه‌های بالا/پایین — کلِ ترتیبِ تازه در یک PATCH. */
+async function menuCatMove(id, dir){
+  const ix = MENU_CATS.findIndex(x=>x.id===id);
+  const jx = ix + dir;
+  if(ix < 0 || jx < 0 || jx >= MENU_CATS.length) return;
+  const order = MENU_CATS.slice();
+  const tmp = order[ix]; order[ix] = order[jx]; order[jx] = tmp;
+  const res = await API.menuReorder({ categories: order.map((c, i) => ({ id: c.id, sort_order: (i + 1) * 10 })) });
+  if(!res.ok){
+    toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ترتیب ثبت نشد'));
+    return;
+  }
+  rMenu();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  فاز ۲ (۰۷۸): برچسب‌ها + مدیریتِ افزودنی‌ها در فرمِ ویرایش
+// ═══════════════════════════════════════════════════════════════════════
+
+function menuTagChipToggle(btn){
+  const on = btn.getAttribute('aria-pressed') === 'true';
+  btn.setAttribute('aria-pressed', on ? 'false' : 'true');
+  btn.classList.toggle('btn-primary', !on);
+  btn.classList.toggle('btn-ghost', on);
+}
+
+/** جعبه‌ی افزودنی‌ها — الگوی lazyِ branding: دکمه → بارگیری → CRUD سبک. */
+async function menuLoadModifiers(itemId){
+  const box = document.getElementById('miModsBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال بارگیری…</div>`;
+  const res = await API.menuModifiers(itemId);
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">${esc(res.offline?'اتصال به سرور برقرار نیست.':(res.error?.message||'بارگیری نشد.'))}</div>
+      <button type="button" class="btn btn-sm btn-ghost" onclick="menuLoadModifiers(${jsq(itemId)})">تلاش دوباره</button>`;
+    return;
+  }
+  const groups = res.data.groups || [];
+  box.innerHTML = `
+    ${groups.length ? groups.map(g=>`
+      <div style="border:1px solid var(--line,#e6e8ec);border-radius:10px;padding:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:13px">${esc(g.name)}</b>
+          <span style="color:var(--t2);font-size:12px">انتخاب: ${fa(g.min_select)} تا ${fa(g.max_select)}</span>
+          <button type="button" class="btn btn-sm btn-ghost" style="color:var(--red);margin-inline-start:auto" onclick="menuModGroupDelete(${jsq(itemId)},${jsq(g.id)},${jsq(g.name)})">حذفِ گروه</button>
+        </div>
+        ${g.options.map(o=>`
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0${o.is_active?'':';opacity:.55'}">
+            <span>${esc(o.name)}</span>
+            <span style="color:var(--t2)">${o.price_delta_toman>0?'+':''}${fnMoney(o.price_delta_toman)} تومان</span>
+            <button type="button" class="btn btn-sm btn-ghost" style="color:var(--red);margin-inline-start:auto" aria-label="حذفِ گزینه‌ی ${esc(o.name)}" onclick="menuModOptionDelete(${jsq(itemId)},${jsq(o.id)})">حذف</button>
+          </div>`).join('')}
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <input class="inp" id="mo-name-${g.id}" maxlength="60" placeholder="گزینه — مثلاً بزرگ" style="flex:1;min-width:120px">
+          <input class="inp" id="mo-delta-${g.id}" type="number" placeholder="±تومان" style="width:110px">
+          <button type="button" class="btn btn-sm btn-ghost" onclick="menuModOptionAdd(${jsq(itemId)},${jsq(g.id)})">افزودن</button>
+        </div>
+      </div>`).join('') : `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">هنوز گروهی نساخته‌ای — مثلاً «سایز» با گزینه‌های کوچک/بزرگ.</div>`}
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <input class="inp" id="mgName" maxlength="60" placeholder="گروهِ جدید — مثلاً سایز" style="flex:1;min-width:120px">
+      <input class="inp" id="mgMin" type="number" min="0" value="0" style="width:70px" aria-label="کفِ انتخاب">
+      <input class="inp" id="mgMax" type="number" min="1" value="1" style="width:70px" aria-label="سقفِ انتخاب">
+      <button type="button" class="btn btn-sm btn-primary" onclick="menuModGroupAdd(${jsq(itemId)})">ساختِ گروه</button>
+    </div>`;
+}
+
+async function menuModGroupAdd(itemId){
+  const name = (document.getElementById('mgName').value||'').trim();
+  const min = parseInt(document.getElementById('mgMin').value,10);
+  const max = parseInt(document.getElementById('mgMax').value,10);
+  if(!name){ toast('','نامِ گروه لازم است'); return; }
+  const res = await API.menuModifierGroupCreate(itemId, { name, min_select: Number.isFinite(min)?min:0, max_select: Number.isFinite(max)?max:1 });
+  if(!res.ok){ toast('', res.offline?'اتصال به سرور برقرار نیست':(res.error?.message||'ساخته نشد')); return; }
+  menuLoadModifiers(itemId);
+}
+
+async function menuModGroupDelete(itemId, groupId, name){
+  if(!confirm(`گروهِ «${name}» و همه‌ی گزینه‌هایش حذف شود؟`)) return;
+  const res = await API.menuModifierGroupDelete(groupId);
+  if(!res.ok){ toast('', res.error?.message||'حذف نشد'); return; }
+  menuLoadModifiers(itemId);
+}
+
+async function menuModOptionAdd(itemId, groupId){
+  const name = (document.getElementById('mo-name-'+groupId).value||'').trim();
+  const delta = parseInt(document.getElementById('mo-delta-'+groupId).value,10);
+  if(!name){ toast('','نامِ گزینه لازم است'); return; }
+  const res = await API.menuModifierOptionCreate(groupId, { name, price_delta_toman: Number.isFinite(delta)?delta:0 });
+  if(!res.ok){ toast('', res.offline?'اتصال به سرور برقرار نیست':(res.error?.message||'ثبت نشد')); return; }
+  menuLoadModifiers(itemId);
+}
+
+async function menuModOptionDelete(itemId, optionId){
+  const res = await API.menuModifierOptionDelete(optionId);
+  if(!res.ok){ toast('', res.error?.message||'حذف نشد'); return; }
+  menuLoadModifiers(itemId);
 }
 
 </script>
@@ -6811,8 +7206,21 @@ async function createAutomation(){
   if(res.ok){ toast('','قانون فعال شد'); await loadMarketing(); rMarketing(); }
   else toast('', res.error?.message||'ساخت قانون ناموفق بود');
 }
+// ⚠️ رفعِ دادهٔ جعلی (۲۰۲۶-۰۸-۲۶ · §۳/§۱۰):
+//
+// این تابع قبلاً متنِ آماده را با یک «کدِ اختصاصی» پر می‌کرد که خروجیِ
+// `Math.random()` بود و **در جدولِ کوپن‌ها وجود نداشت** — مشتری کدی
+// می‌گرفت که موقعِ استفاده معتبر نبود. بدتر: `fa()` ارقامش را فارسی
+// می‌کرد («SPECIAL۷۳۴») که اصلاً قابلِ تایپ نبود.
+// نامِ «کافه ویستا» هم هاردکد بود و در پیامکِ *هر* رستورانی همان می‌رفت.
+//
+// حالا: بدونِ کدِ ساختگی، و با نامِ واقعیِ همین رستوران. اگر کدِ تخفیف
+// می‌خواهی، از بخشِ «کوپن‌ها» یک کوپنِ واقعی بساز و کدش را در متن بگذار.
 function pickSeg(i,el){document.querySelectorAll('.seg-card').forEach(s=>s.classList.remove('sel'));el.classList.add('sel');selSeg=i;
-  const codes=['SPECIAL','VIP','WELCOME','BDAY'];document.getElementById('campText').value=`سلام {نام} عزیز! 🌿\nیه پیشنهاد ویژه از کافه ویستا داریم.\nکد اختصاصیت: ${codes[i]}${fa(Math.floor(Math.random()*900+100))}\nمنتظرتیم ❤️`;
+  const restName=(typeof RESTAURANT!=='undefined' && RESTAURANT && RESTAURANT.name) ? RESTAURANT.name : 'ما';
+  document.getElementById('campText').value=`سلام {نام} عزیز! 🌿
+یه پیشنهاد ویژه از ${restName} داریم.
+منتظرتیم ❤️`;
   document.getElementById('charCount').textContent=fa(document.getElementById('campText').value.length);
 }
 function previewCamp(){
@@ -6821,9 +7229,21 @@ function previewCamp(){
   if(selSeg===null){toast('','سگمنت رو انتخاب کن');return}
   // ذخیره برای ارسال واقعی (نگاشت index سگمنت به segment بک‌اند)
   window._campMessage=txt;
-  // نگاشتِ کارت‌ها به سگمنت‌های واقعیِ بک‌اند (crm.js): طلایی/نقره‌ای/برنزی/همه.
-  // ۳ (همه) → undefined یعنی «بدونِ فیلترِ tier» که بک‌اند را به همه‌ی اعضا هدف می‌گیرد.
-  window._campSegment=({0:'gold',1:'silver',2:'bronze',3:undefined})[selSeg];
+  // ⚠️ رفعِ ۲۰۲۶-۰۸-۲۶: این نگاشت قبلاً `at_risk`/`all` می‌فرستاد، ولی
+  // `POST /restaurant/sms` فقط `z.enum(['gold','silver','bronze'])` می‌پذیرد
+  // ⇒ **۳ از ۴ کارتِ سگمنت همیشه ۴۰۰** می‌گرفتند؛ فقط VIP کار می‌کرد.
+  //
+  // این یک تصمیمِ محصولی نبود، یک اشتباهِ سیم‌کشی بود: هر چهار مخاطب از قبل
+  // در بک‌اند وجود دارند — `GET /restaurant/customers?segment=` صریحاً
+  // `new_customer|active|at_risk|churned|vip` را پشتیبانی می‌کند و `phone`
+  // هم برمی‌گرداند. پس مخاطب را همان‌جا resolve می‌کنیم و با `phones[]`
+  // می‌فرستیم — همان مسیرِ اثبات‌شده‌ای که `sendBirthdayGreetings` دارد.
+  window._campAudience=({
+    0:{kind:'segment', value:'at_risk',     label:'در خطر ریزش'},
+    1:{kind:'segment', value:'vip',         label:'VIP'},
+    2:{kind:'segment', value:'new_customer',label:'مشتری جدید'},
+    3:{kind:'birthday',                     label:'تولد این ماه'},
+  })[selSeg]||null;
   const rendered=txt.replace(/\{نام\}/g,'کیان');
   openModal(`<div class="modal-title">پیش‌نمایش پیام</div><div class="modal-sub">دقیقاً همینطوری برای مشتری ارسال می‌شه</div>
     <div style="background:#0c0c14;border-radius:var(--r-lg);padding:16px;margin-bottom:18px">
@@ -6848,11 +7268,32 @@ function confirmCamp(){
 async function doSendCampaign(){
   const btn=document.getElementById('campSendBtn');
   if(btn){btn.disabled=true;btn.textContent='در حال ارسال...';}
-  // segment انتخاب‌شده؛ undefined یعنی «همه اعضا» → فیلدِ segment اصلاً فرستاده
-  // نمی‌شود تا بک‌اند بدونِ فیلترِ tier همه را هدف بگیرد (سگمنتِ نامعتبر ۴۰۰ می‌داد).
-  const seg=window._campSegment;
+  // segment انتخاب‌شده (اگر در فرم کمپین بود) — پیش‌فرض همه
+  const aud=window._campAudience;
+  if(!aud){ toast('','سگمنت رو انتخاب کن'); if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';} return; }
   if(API.getToken()){
-    const res=await API.sendSms({kind:'campaign',...(seg?{segment:seg}:{}),message:window._campMessage||''});
+    // مخاطب را به فهرستِ شماره تبدیل کن. اگر resolve شکست بخورد، **ارسال
+    // نمی‌کنیم و صریح می‌گوییم** — نه اینکه به «همه» برگردیم (که پیامکِ پولی
+    // را به مخاطبِ اشتباه می‌فرستاد).
+    let phones=[];
+    if(aud.kind==='birthday'){
+      if(!CLUB.length){ await (typeof loadClubMembers==='function'?loadClubMembers():Promise.resolve()); }
+      phones=(CLUB||[]).filter(m=>m.bMonth===currentMonthFa()&&m.phone).map(m=>String(m.phone));
+    }else{
+      const cs=await API.customers('segment='+encodeURIComponent(aud.value)+'&limit=500');
+      if(!cs.ok){
+        toast('', (cs.error&&cs.error.message)||'فهرستِ مخاطب بارگیری نشد — کمپین ارسال نشد');
+        if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';}
+        return;
+      }
+      phones=(cs.data.items||[]).map(x=>x.phone).filter(Boolean).map(String);
+    }
+    if(!phones.length){
+      toast('','در سگمنتِ «'+aud.label+'» شماره‌ی معتبری برای ارسال نیست');
+      if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';}
+      return;
+    }
+    const res=await API.sendSms({kind:'campaign',phones,message:window._campMessage||''});
     if(res.ok){
       closeModal();
       toast('',`کمپین به ${fa(res.data?.queued||0)} نفر ارسال شد`);

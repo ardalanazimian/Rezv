@@ -1,3 +1,5 @@
+// [رفعِ ویندوز ۲۰۲۶-۰۸-۲۶] fileURLToPath و نه .pathname: رویِ ویندوز pathname «/C:/…» می‌دهد
+import { fileURLToPath } from 'node:url';
 import { test, describe, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { testIp } from './helpers/test-ip.mts';
@@ -44,7 +46,7 @@ const askRoute = await import('../src/app/api/v1/restaurant/assistant/route.ts')
 const feedbackRoute = await import('../src/app/api/v1/restaurant/assistant/feedback/route.ts');
 const retentionRoute = await import('../src/app/api/v1/maintenance/retention/route.ts');
 
-const SRC = new URL('../src/app/api/v1/restaurant/assistant/', import.meta.url).pathname;
+const SRC = fileURLToPath(new URL('../src/app/api/v1/restaurant/assistant/', import.meta.url));
 const SFX = Date.now().toString(36).slice(-6);
 const QUESTION = 'امروز چند رزرو داریم';
 const HONEST_INTENT = 'reservations_today';
@@ -237,7 +239,7 @@ describe('دستیار · مسمومیتِ واژگان مهار می‌شود',
     // رفتارش با ۵۰۰۰ ردیف قابلِ‌اندازه‌گیریِ ارزان نیست، ولی نبودِ `take`
     // دقیقاً همان باگ بود: کلِ واژگانِ یک tenant در هر سؤال لود می‌شد،
     // در پروسه‌ای که بینِ همه‌ی tenantها مشترک است.
-    const src = readFileSync(new URL('../src/lib/assistant.ts', import.meta.url).pathname, 'utf8');
+    const src = readFileSync(fileURLToPath(new URL('../src/lib/assistant.ts', import.meta.url)), 'utf8');
     const fn = src.slice(src.indexOf('async function loadLearnedVocab'));
     const body = fn.slice(0, fn.indexOf('\n}'));
     assert.match(body, /take:\s*MAX_LEARNED_VOCAB_ROWS/, 'خواندن باید سقف داشته باشد');
@@ -246,9 +248,9 @@ describe('دستیار · مسمومیتِ واژگان مهار می‌شود',
 });
 
 describe('دستیار · هرسِ نگه‌داری', () => {
-  // ⚠️ بازیابی تا ۲۰۲۶-۰۸-۲۶ در هوکِ **ریشه‌ای** بود، یعنی فقط در پایانِ کلِ
-  // ران اجرا می‌شد و تا آن لحظه حالتِ سراسری برایِ همه‌ی فایل‌های بعدیِ
-  // رانرِ تک-process آلوده می‌ماند.
+  // ⚠️ بازیابی از هوکِ **ریشه‌ای** به اینجا آمد: هوکِ ریشه فقط در پایانِ کلِ
+  // رانِ تک-process اجرا می‌شود، پس تا آن لحظه حالتِ سراسری برایِ همه‌ی
+  // فایل‌های بعدی آلوده می‌ماند. گاردش: tests/root-hook-globals.test.mts
   afterEach(() => {
     if (ORIG_MAINT === undefined) delete process.env.MAINTENANCE_KEY;
     else process.env.MAINTENANCE_KEY = ORIG_MAINT;

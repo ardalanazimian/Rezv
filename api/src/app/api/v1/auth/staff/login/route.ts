@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { signAccess, signRefresh } from '@/lib/jwt';
+import { acceptPendingInvites } from '@/lib/provisioning';
 import { clientIp } from '@/lib/ratelimit';
 import { ApiError, errorResponse } from '@/lib/errors';
 import { parseBody, zUsername, zPassword, z } from '@/lib/schemas';
@@ -35,6 +36,8 @@ async function POST_impl(req: Request) {
     const staff = await authenticateStaffByPassword(body.username, body.password, ip);
 
     const role = (staff.role === 'owner' || staff.role === 'manager' || staff.role === 'staff') ? staff.role : 'staff';
+    // SPEC-B (C10): همان هوکِ مسیرِ OTP — دعوتِ اولین‌ورود با رمز هم پذیرفته شود.
+    await acceptPendingInvites(staff.phone);
     const principal = { sub: staff.id, kind: 'staff' as const, tenantId: staff.tenantId, role };
     const permissions = await getEffectivePermissions(staff.id, role);
     const restaurant = await resolveStaffRestaurant(principal).catch(() => null);

@@ -1,3 +1,5 @@
+// [رفعِ ویندوز ۲۰۲۶-۰۸-۲۶] fileURLToPath و نه .pathname: رویِ ویندوز pathname «/C:/…» می‌دهد
+import { fileURLToPath } from 'node:url';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -21,7 +23,7 @@ import { readFileSync } from 'node:fs';
 
 const { LOYALTY_TIERS } = await import('../src/lib/loyalty');
 
-const PANEL = new URL('../../apps/business/js/loyalty.js', import.meta.url).pathname;
+const PANEL = fileURLToPath(new URL('../../apps/business/js/loyalty.js', import.meta.url));
 
 describe('سطوحِ باشگاه — تطابقِ بک‌اند و پنلِ رستوران', () => {
 

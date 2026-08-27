@@ -29,6 +29,8 @@ export type AuditAction =
   // بدونِ ردِ مکتوب هیچ تحقیقِ امنیتیِ بعدی ممکن نیست.
   // ⚠️ خودِ رمز هرگز در detail نمی‌رود — فقط نام کاربری و اینکه عوض شد.
   | 'admin.staff_credentials_set' | 'staff.password_change'
+  // SPEC-B (C12): نامِ canonical از spec — 'admin.business_created' قبلی rename شد (تنها مصرف‌کننده: route ادمین)
+  | 'restaurant.provision' | 'restaurant.invite_resent' | 'restaurant.branch_created' | 'staff.invite_accepted'
   | 'giftcard.redeem' | 'coupon.redeem' | 'coupon.created'
   | 'reservation.cancel' | 'admin.action'
   | 'restaurant.activated' | 'restaurant.deactivated'
