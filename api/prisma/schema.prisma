@@ -339,6 +339,12 @@ model MenuItem {
   // آیتمِ «ناموجود» از منو حذف/مخفی نمی‌شود — با برچسب نمایش داده می‌شود و
   // فقط از پیش‌سفارش کنار می‌رود. جدا از isActive (که یعنی «اصلاً در منو نیست»).
   isOutOfStock Boolean           @default(false) @map("is_out_of_stock")
+  // [SPEC-A فاز ۲ — ۰۷۸] پنجره‌ی دسترسی: {days:int[], start_min, end_min}.
+  // NULL = همیشه در دسترس. اعتبارسنجی در lib/menu-availability.ts؛ endpointِ
+  // عمومی پس از خواندنِ کش فیلتر می‌کند و pre-order نسبت به slotStart می‌سنجد.
+  availability Json?
+  modifierGroups MenuModifierGroup[]
+  tags         MenuItemTag[]
   categoryId   String?           @map("category_id") @db.Uuid
   // SetNull: حذفِ سختِ دسته نباید آیتم‌ها را بکشد — فقط «دسته‌نشده» می‌شوند.
   categoryRef  MenuCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -379,6 +385,64 @@ model MenuCategory {
   @@unique([restaurantId, name])
   @@index([restaurantId, sortOrder])
   @@map("menu_categories")
+}
+
+// ═══ SPEC-A فاز ۲ (مهاجرت ۰۷۸) — افزودنی‌ها (modifier)، برچسب‌ها، پنجره‌ی دسترسی ═══
+//
+// modifier در این فاز فقط ساختارِ منوست (پنل + نمایشِ عمومی/QR)؛ انتخاب/ذخیره‌اش
+// در سفارش طبق §۲-۴ی spec جداگانه است و ReservationItem دست نمی‌خورد.
+// PKها کلاینتی (@default(uuid())) چون هیچ backfill/INSERTِ خامی در کار نیست.
+
+model MenuModifierGroup {
+  id         String   @id @default(uuid()) @db.Uuid
+  menuItemId String   @map("menu_item_id") @db.Uuid
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name       String              // مثلاً «سایز»
+  minSelect  Int      @default(0) @map("min_select")
+  maxSelect  Int      @default(1) @map("max_select")
+  sortOrder  Int      @default(0) @map("sort_order")
+  options    MenuModifierOption[]
+
+  @@index([menuItemId, sortOrder])
+  @@map("menu_modifier_groups")
+}
+
+model MenuModifierOption {
+  id              String  @id @default(uuid()) @db.Uuid
+  groupId         String  @map("group_id") @db.Uuid
+  group           MenuModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name            String              // مثلاً «بزرگ»
+  // می‌تواند منفی باشد (تخفیف)، ولی قیمتِ نهایی هرگز منفی نمی‌شود —
+  // گاردش در routeها: delta ≥ -item.priceToman و چکِ متقابل در کاهشِ قیمت.
+  priceDeltaToman Int     @default(0) @map("price_delta_toman")
+  isActive        Boolean @default(true) @map("is_active")
+  sortOrder       Int     @default(0) @map("sort_order")
+
+  @@index([groupId, sortOrder])
+  @@map("menu_modifier_options")
+}
+
+enum MenuTag {
+  VEGETARIAN
+  VEGAN
+  SPICY
+  GLUTEN_FREE
+  CONTAINS_NUTS
+  CONTAINS_DAIRY
+  HALAL
+  NEW
+  POPULAR
+
+  @@map("menu_tag")
+}
+
+model MenuItemTag {
+  menuItemId String   @map("menu_item_id") @db.Uuid
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  tag        MenuTag
+
+  @@id([menuItemId, tag])
+  @@map("menu_item_tags")
 }
 
 enum ReservationStatus {

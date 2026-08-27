@@ -91,6 +91,13 @@ export interface MenuItem {
   description: string | null;
   image_url: string | null;
   sort_order: number;
+  // ── SPEC-A فاز ۲ (۰۷۸) — همه اختیاری تا پاسخ‌های قدیمی هم type-check شوند ──
+  is_out_of_stock?: boolean;
+  tags?: string[];
+  modifiers?: {
+    id: string; name: string; min_select: number; max_select: number;
+    options: { id: string; name: string; price_delta_toman: number }[];
+  }[];
 }
 
 export interface RestaurantDetail {

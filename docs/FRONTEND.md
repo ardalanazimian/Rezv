@@ -246,3 +246,17 @@ Global handlers are attached once via **event delegation** (`actions.js`,
   converted at the mapping layer.
 - The public QR menu page remains `apps/seo/app/r/[slug]/menu` — it is only
   enriched by the new API fields; no `/m/{slug}` route exists.
+
+## Menu — Phase 2 (SPEC-A، 2026-08-27)
+
+- **Business panel**: item form gains tag chips (`MENU_TAG_LABEL`), a serving
+  window (day checkboxes — server convention 0=Sunday…6=Saturday — plus two
+  time inputs), and a lazy "افزودنی‌ها" box (group/option CRUD). Row shows a
+  «⏱ محدود» badge for windowed items.
+- **Customer app**: item cards show Persian tag chips; booking pre-order chips
+  are now **really wired** — selection is captured at step-2→3 transition into
+  `bk.preorder` (step-3 render replaces the DOM) and sent as
+  `preorder:[{menu_item_id,qty}]`. Out-of-stock and id-less (sample) items get
+  no chip. `sw.js` bumped to v36.
+- **SEO menu page**: `MenuBoard` renders tag chips, an out-of-stock badge and
+  display-only modifier lines — still zero client JS.

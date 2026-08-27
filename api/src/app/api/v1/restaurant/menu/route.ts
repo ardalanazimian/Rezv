@@ -65,6 +65,7 @@ export const GET = withRestaurantAuth({ permission: 'canManageSettings' }, async
       id: true, name: true, emoji: true, priceToman: true,
       isActive: true, soldCount: true, category: true,
       categoryId: true, isOutOfStock: true,
+      availability: true, tags: { select: { tag: true } },
       description: true, imageUrl: true, sortOrder: true,
     },
   });
@@ -79,6 +80,7 @@ export const GET = withRestaurantAuth({ permission: 'canManageSettings' }, async
       id: m.id, name: m.name, emoji: m.emoji, price_toman: m.priceToman,
       is_active: m.isActive, sold_count: m.soldCount, category: m.category,
       category_id: m.categoryId, is_out_of_stock: m.isOutOfStock,
+      availability: m.availability, tags: m.tags.map(t => t.tag),
       description: m.description, image_url: m.imageUrl, sort_order: m.sortOrder,
     })),
     categories: cats.map(c => ({

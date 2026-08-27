@@ -17,6 +17,17 @@ let MENU_PUBLIC_URL = null;
 /** دسته‌های رابطه‌ای (۰۷۷) — از سرور، با ترتیبِ خودِ رستوران‌دار. */
 let MENU_CATS = [];
 
+/** برچسب‌های منو (۰۷۸) — کلیدها = enumِ سرور (menu_tag)؛ فقط label محلی است. */
+const MENU_TAG_LABEL = {
+  VEGETARIAN:'گیاهی', VEGAN:'وگان', SPICY:'تند', GLUTEN_FREE:'بدونِ گلوتن',
+  CONTAINS_NUTS:'حاوی آجیل', CONTAINS_DAIRY:'حاوی لبنیات', HALAL:'حلال',
+  NEW:'جدید', POPULAR:'پرفروش',
+};
+/** روزهای هفته با شماره‌ی قراردادِ سرور (۰=یکشنبه…۶=شنبه)، به ترتیبِ نمایشِ ایرانی. */
+const MENU_DAY_ORDER = [ [6,'ش'], [0,'ی'], [1,'د'], [2,'س'], [3,'چ'], [4,'پ'], [5,'ج'] ];
+const minToTime = (m)=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const timeToMin = (t)=>{ const p=(t||'').split(':'); const h=parseInt(p[0],10), mi=parseInt(p[1],10); return (Number.isFinite(h)&&Number.isFinite(mi)) ? h*60+mi : null; };
+
 async function rMenu(){
   const el = document.getElementById('v-menu');
   if(!API.getToken()){
@@ -341,7 +352,7 @@ function menuRowHTML(i){
   return `<div class="top-cust" style="cursor:default;${i.is_active?'':'opacity:.55'}">
     ${thumb}
     <div class="top-body">
-      <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}${i.is_out_of_stock?' <span class="seg-vip" style="background:var(--amber,#d97706)">ناموجود</span>':''}</div>
+      <div class="top-name">${esc(i.name)}${i.is_active?'':' <span class="seg-vip" style="background:var(--t3)">غیرفعال</span>'}${i.is_out_of_stock?' <span class="seg-vip" style="background:var(--amber,#d97706)">ناموجود</span>':''}${i.availability?` <span class="seg-vip" style="background:var(--blue,#2563eb)" title="سروِ محدود: ${minToTime(i.availability.start_min)} تا ${minToTime(i.availability.end_min)}">⏱ محدود</span>`:''}</div>
       <div class="top-meta">${fnMoney(i.price_toman)} تومان${i.sold_count?` · ${fa(i.sold_count)} فروش`:''}${i.image_url?'':' · بدونِ عکس'}</div>
     </div>
     <button class="btn btn-sm btn-ghost" aria-pressed="${i.is_out_of_stock?'true':'false'}"
@@ -433,6 +444,25 @@ function menuOpenForm(id){
     <input class="inp" id="miEmoji" maxlength="16" value="${it&&it.emoji?esc(it.emoji):''}" placeholder="اختیاری — مثلاً 🍝">
     <div class="field-label">توضیح</div>
     <input class="inp" id="miDesc" maxlength="300" value="${it&&it.description?esc(it.description):''}" placeholder="اختیاری — مثلاً «با سسِ قارچ و پنیرِ پارمزان»">
+    <div class="field-label">برچسب‌ها</div>
+    <div id="miTags" style="display:flex;gap:6px;flex-wrap:wrap">
+      ${Object.keys(MENU_TAG_LABEL).map(k=>{const on=!!(it&&Array.isArray(it.tags)&&it.tags.includes(k));return `<button type="button" class="btn btn-sm ${on?'btn-primary':'btn-ghost'}" data-tag="${k}" aria-pressed="${on?'true':'false'}" onclick="menuTagChipToggle(this)">${MENU_TAG_LABEL[k]}</button>`;}).join('')}
+    </div>
+    <div class="field-label">پنجره‌ی سرو (اختیاری)</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+      ${MENU_DAY_ORDER.map(d=>{const on=!!(it&&it.availability&&it.availability.days.includes(d[0]));return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" class="miDay" value="${d[0]}" ${on?'checked':''}>${d[1]}</label>`;}).join('')}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:13px">از <input class="inp" id="miAvFrom" type="time" style="width:110px" value="${it&&it.availability?minToTime(it.availability.start_min):''}"></label>
+      <label style="font-size:13px">تا <input class="inp" id="miAvTo" type="time" style="width:110px" value="${it&&it.availability?minToTime(it.availability.end_min):''}"></label>
+    </div>
+    <div style="color:var(--t2);font-size:12px;margin-top:4px">
+      خالی = همیشه. آیتمِ بیرونِ پنجره در منویِ عمومی نمایش داده نمی‌شود و برای رزروِ بیرونِ بازه قابلِ پیش‌سفارش نیست.
+    </div>
+    ${it ? `
+    <div class="field-label">افزودنی‌ها (سایز، مخلفات، …)</div>
+    <div id="miModsBox"><button type="button" class="btn btn-sm btn-ghost" onclick="menuLoadModifiers(${jsq(it.id)})">مدیریتِ افزودنی‌ها</button></div>
+    ` : ''}
     ${it ? `
     <div class="field-label">عکسِ آیتم</div>
     <div id="miPhotoBox">${menuPhotoBoxHTML(it)}</div>
@@ -476,10 +506,30 @@ async function menuSave(id){
     // image_url اینجا نیست: عکس فقط با آپلودِ فایل عوض می‌شود (menuPickPhoto).
     sort_order: Number.isFinite(sort) && sort >= 0 ? sort : 0,
   };
+
+  // ۰۷۸ — پنجره‌ی سرو: یا کامل (روز+از+تا) یا هیچ؛ نیمه‌کاره = خطای روشن.
+  const days = Array.from(document.querySelectorAll('.miDay:checked')).map(x=>parseInt(x.value,10));
+  const from = timeToMin(document.getElementById('miAvFrom').value);
+  const to   = timeToMin(document.getElementById('miAvTo').value);
+  if(days.length || from !== null || to !== null){
+    if(!days.length || from === null || to === null){ toast('','برای پنجره‌ی سرو، هم روزها هم «از/تا» لازم است — یا همه را خالی بگذار'); return; }
+    if(from >= to){ toast('','شروعِ پنجره باید قبل از پایانش باشد'); return; }
+    body.availability = { days, start_min: from, end_min: to };
+  } else {
+    body.availability = null;
+  }
   const res = id ? await API.menuUpdate(id, body) : await API.menuCreate(body);
   if(!res.ok){
     toast('', res.offline ? 'اتصال به سرور برقرار نیست' : (res.error?.message || 'ذخیره نشد'));
     return;
+  }
+  // ۰۷۸ — برچسب‌ها endpointِ جدا دارند (PUT جایگزین). خطایش بی‌صدا نمی‌ماند.
+  const tagBtns = Array.from(document.querySelectorAll('#miTags [data-tag][aria-pressed="true"]'));
+  const tags = tagBtns.map(b=>b.getAttribute('data-tag'));
+  const itemIdForTags = id || res.data?.id;
+  if(itemIdForTags){
+    const tRes = await API.menuTagsSave(itemIdForTags, tags);
+    if(!tRes.ok){ toast('', 'آیتم ذخیره شد ولی برچسب‌ها ثبت نشد: '+(tRes.error?.message||'خطا')); }
   }
   closeModal();
   toast('✓', id ? 'آیتم به‌روزرسانی شد' : 'آیتم به منو اضافه شد');
@@ -596,4 +646,87 @@ async function menuCatMove(id, dir){
     return;
   }
   rMenu();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  فاز ۲ (۰۷۸): برچسب‌ها + مدیریتِ افزودنی‌ها در فرمِ ویرایش
+// ═══════════════════════════════════════════════════════════════════════
+
+function menuTagChipToggle(btn){
+  const on = btn.getAttribute('aria-pressed') === 'true';
+  btn.setAttribute('aria-pressed', on ? 'false' : 'true');
+  btn.classList.toggle('btn-primary', !on);
+  btn.classList.toggle('btn-ghost', on);
+}
+
+/** جعبه‌ی افزودنی‌ها — الگوی lazyِ branding: دکمه → بارگیری → CRUD سبک. */
+async function menuLoadModifiers(itemId){
+  const box = document.getElementById('miModsBox');
+  if(!box) return;
+  box.innerHTML = `<div style="color:var(--t2);font-size:13px">در حال بارگیری…</div>`;
+  const res = await API.menuModifiers(itemId);
+  if(!res.ok){
+    box.innerHTML = `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">${esc(res.offline?'اتصال به سرور برقرار نیست.':(res.error?.message||'بارگیری نشد.'))}</div>
+      <button type="button" class="btn btn-sm btn-ghost" onclick="menuLoadModifiers(${jsq(itemId)})">تلاش دوباره</button>`;
+    return;
+  }
+  const groups = res.data.groups || [];
+  box.innerHTML = `
+    ${groups.length ? groups.map(g=>`
+      <div style="border:1px solid var(--line,#e6e8ec);border-radius:10px;padding:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:13px">${esc(g.name)}</b>
+          <span style="color:var(--t2);font-size:12px">انتخاب: ${fa(g.min_select)} تا ${fa(g.max_select)}</span>
+          <button type="button" class="btn btn-sm btn-ghost" style="color:var(--red);margin-inline-start:auto" onclick="menuModGroupDelete(${jsq(itemId)},${jsq(g.id)},${jsq(g.name)})">حذفِ گروه</button>
+        </div>
+        ${g.options.map(o=>`
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0${o.is_active?'':';opacity:.55'}">
+            <span>${esc(o.name)}</span>
+            <span style="color:var(--t2)">${o.price_delta_toman>0?'+':''}${fnMoney(o.price_delta_toman)} تومان</span>
+            <button type="button" class="btn btn-sm btn-ghost" style="color:var(--red);margin-inline-start:auto" aria-label="حذفِ گزینه‌ی ${esc(o.name)}" onclick="menuModOptionDelete(${jsq(itemId)},${jsq(o.id)})">حذف</button>
+          </div>`).join('')}
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <input class="inp" id="mo-name-${g.id}" maxlength="60" placeholder="گزینه — مثلاً بزرگ" style="flex:1;min-width:120px">
+          <input class="inp" id="mo-delta-${g.id}" type="number" placeholder="±تومان" style="width:110px">
+          <button type="button" class="btn btn-sm btn-ghost" onclick="menuModOptionAdd(${jsq(itemId)},${jsq(g.id)})">افزودن</button>
+        </div>
+      </div>`).join('') : `<div style="color:var(--t2);font-size:13px;margin-bottom:8px">هنوز گروهی نساخته‌ای — مثلاً «سایز» با گزینه‌های کوچک/بزرگ.</div>`}
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <input class="inp" id="mgName" maxlength="60" placeholder="گروهِ جدید — مثلاً سایز" style="flex:1;min-width:120px">
+      <input class="inp" id="mgMin" type="number" min="0" value="0" style="width:70px" aria-label="کفِ انتخاب">
+      <input class="inp" id="mgMax" type="number" min="1" value="1" style="width:70px" aria-label="سقفِ انتخاب">
+      <button type="button" class="btn btn-sm btn-primary" onclick="menuModGroupAdd(${jsq(itemId)})">ساختِ گروه</button>
+    </div>`;
+}
+
+async function menuModGroupAdd(itemId){
+  const name = (document.getElementById('mgName').value||'').trim();
+  const min = parseInt(document.getElementById('mgMin').value,10);
+  const max = parseInt(document.getElementById('mgMax').value,10);
+  if(!name){ toast('','نامِ گروه لازم است'); return; }
+  const res = await API.menuModifierGroupCreate(itemId, { name, min_select: Number.isFinite(min)?min:0, max_select: Number.isFinite(max)?max:1 });
+  if(!res.ok){ toast('', res.offline?'اتصال به سرور برقرار نیست':(res.error?.message||'ساخته نشد')); return; }
+  menuLoadModifiers(itemId);
+}
+
+async function menuModGroupDelete(itemId, groupId, name){
+  if(!confirm(`گروهِ «${name}» و همه‌ی گزینه‌هایش حذف شود؟`)) return;
+  const res = await API.menuModifierGroupDelete(groupId);
+  if(!res.ok){ toast('', res.error?.message||'حذف نشد'); return; }
+  menuLoadModifiers(itemId);
+}
+
+async function menuModOptionAdd(itemId, groupId){
+  const name = (document.getElementById('mo-name-'+groupId).value||'').trim();
+  const delta = parseInt(document.getElementById('mo-delta-'+groupId).value,10);
+  if(!name){ toast('','نامِ گزینه لازم است'); return; }
+  const res = await API.menuModifierOptionCreate(groupId, { name, price_delta_toman: Number.isFinite(delta)?delta:0 });
+  if(!res.ok){ toast('', res.offline?'اتصال به سرور برقرار نیست':(res.error?.message||'ثبت نشد')); return; }
+  menuLoadModifiers(itemId);
+}
+
+async function menuModOptionDelete(itemId, optionId){
+  const res = await API.menuModifierOptionDelete(optionId);
+  if(!res.ok){ toast('', res.error?.message||'حذف نشد'); return; }
+  menuLoadModifiers(itemId);
 }

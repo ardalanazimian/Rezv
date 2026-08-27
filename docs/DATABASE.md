@@ -352,6 +352,26 @@ There is **no global soft-delete column**. Instead:
   هر mutation منو (آیتم/دسته/reorder/عکس) هر دو را از طریقِ
   `lib/menu-cache.ts:invalidatePublicMenu` باطل می‌کند.
 
+## SPEC-A فاز ۲ (migration 078) — افزودنی‌ها، برچسب‌ها، پنجره‌ی سرو
+
+- **`menu_modifier_groups`** / **`menu_modifier_options`**: ساختارِ افزودنی
+  (سایز/مخلفات) با min/max انتخاب و دلتای قیمت (منفی مجاز؛ گاردِ دوطرفه‌ی
+  «قیمتِ نهایی هرگز منفی نشود» در routeها). فقط ساختارِ منو/نمایش — به سفارش
+  وصل نیست (§۲-۴ spec؛ `ReservationItem` دست‌نخورده).
+- **`menu_item_tags`** + enum **`menu_tag`** (۹ مقدار): برچسب‌های رژیمی/بازاری؛
+  PUT جایگزینِ کامل در پنل.
+- **`menu_items.availability jsonb`**: `{days:int[], start_min, end_min}` —
+  ۰=یکشنبه…۶=شنبه (قراردادِ `weekdayInTz`). NULL = همیشه. endpointهای عمومی
+  **پس از خواندنِ کش** فیلتر می‌کنند (`lib/menu-availability.ts`)؛ pre-order
+  نسبت به `slotStart` می‌سنجد نه «اکنون».
+- PKهای ۰۷۸ **DEFAULTِ DB ندارند** (برخلافِ ۰۷۷): schema آن‌ها را
+  `@default(uuid())` کلاینتی اعلام کرده و هیچ backfillی در کار نیست.
+- کشِ منویِ عمومی: TTL از ۶۰ به **۳۰۰** — تازگی از invalidationِ فعالِ ۰۷۷
+  می‌آید، نه از انقضا.
+- اعتبارسنجیِ pre-order (lib/reservations.ts) از ۰۷۸ **قبل از** درجِ
+  ReservationItem اجرا می‌شود: cross-restaurant/جعلی/غیرفعال/ناموجود/بیرونِ
+  پنجره → ۴۲۲ی تمیز (قبلاً idِ جعلی به خطای FK می‌خورد).
+
 ## SPEC-B (migration 076) — provisioning و دعوتِ owner
 
 - `restaurants.provision_status` (enum `restaurant_provision_status`:

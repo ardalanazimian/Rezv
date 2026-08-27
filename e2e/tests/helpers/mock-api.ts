@@ -53,6 +53,9 @@ export const DEMO_RESTAURANTS = [
 
 /** منویِ نمونه‌ی رستورانِ اول (SPEC-A فاز ۱): دسته‌دار + یک آیتمِ «ناموجود».
  *  فقط رستورانِ اول منو دارد تا حالتِ «منویی ثبت نشده» هم پوششِ واقعی بگیرد. */
+/** آخرین بدنه‌ی POST /reservations که mock دید — برای قفلِ سیم‌کشیِ pre-order (۰۷۸). */
+export const captured: { reservation: Record<string, unknown> | null } = { reservation: null };
+
 export const DEMO_MENU = {
   menu_categories: [
     { id: 'c1b2c3d4-0000-4000-8000-000000000001', name: 'پیش‌غذا', sort_order: 10 },
@@ -61,10 +64,14 @@ export const DEMO_MENU = {
   menu: [
     { id: 'd1b2c3d4-0000-4000-8000-000000000001', name: 'سالاد سزار', emoji: '🥗', price_toman: 180000,
       category: 'پیش‌غذا', category_id: 'c1b2c3d4-0000-4000-8000-000000000001',
-      is_out_of_stock: false, description: 'با سسِ مخصوص', image_url: null, sort_order: 10 },
+      is_out_of_stock: false, description: 'با سسِ مخصوص', image_url: null, sort_order: 10,
+      tags: ['POPULAR'], availability: null,
+      modifiers: [{ id: 'g1', name: 'سایز', min_select: 1, max_select: 1,
+        options: [{ id: 'o1', name: 'بزرگ', price_delta_toman: 40000 }] }] },
     { id: 'd1b2c3d4-0000-4000-8000-000000000002', name: 'کبابِ کوبیده', emoji: '🍢', price_toman: 320000,
       category: 'غذای اصلی', category_id: 'c1b2c3d4-0000-4000-8000-000000000002',
-      is_out_of_stock: true, description: null, image_url: null, sort_order: 10 },
+      is_out_of_stock: true, description: null, image_url: null, sort_order: 10,
+      tags: ['SPICY'], availability: null, modifiers: [] },
   ],
 };
 
@@ -92,6 +99,7 @@ function fullSlots() {
 
 /** اعمالِ mock روی همه‌ی درخواست‌های /api/v1/* یک صفحه. */
 export async function mockApi(page: Page, opts: MockOptions = {}) {
+  captured.reservation = null;
   await page.route('**/api/v1/**', async (route: Route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/.*\/api\/v1/, '');
@@ -150,6 +158,7 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
 
     // ── ساختِ رزرو (مسیرِ حیاتی) — code در سطحِ بالا (طبقِ قرارداد) ──
     if (path === '/reservations' && method === 'POST') {
+      captured.reservation = route.request().postDataJSON() as Record<string, unknown>;
       if (opts.reserveFull) {
         // ظرفیت هنگامِ تأیید پر شد → فرانت باید پیشنهادِ لیست انتظار بدهد
         return json({ error: { code: 'SLOT_FULL', message: 'ظرفیت این ساعت پر شد' } }, 409);

@@ -110,6 +110,13 @@ function finishRestRender(){
   armReveals&&armReveals();
 }
 
+/** برچسب‌های منو (۰۷۸) — کلید=enumِ سرور، label محلی (همتای پنل). */
+const MENU_TAG_FA = {
+  VEGETARIAN:'گیاهی', VEGAN:'وگان', SPICY:'تند', GLUTEN_FREE:'بدونِ گلوتن',
+  CONTAINS_NUTS:'حاوی آجیل', CONTAINS_DAIRY:'حاوی لبنیات', HALAL:'حلال',
+  NEW:'جدید', POPULAR:'پرفروش',
+};
+
 /** کارتِ یک آیتمِ منو — همه‌ی متن‌های سرورساخته esc می‌شوند (انضباطِ 7ecd0d6). */
 function menuItemHTML(m){
   return `<div class="menu-item glass"${m.out?' style="opacity:.62"':''}>
@@ -117,6 +124,7 @@ function menuItemHTML(m){
     <div class="menu-info">
       <div class="menu-name">${esc(m.n)}${m.out?' <span style="font-size:10px;background:var(--amber,#d97706);color:#fff;border-radius:6px;padding:1px 6px;white-space:nowrap">ناموجود</span>':''}</div>
       ${m.d?`<div style="font-size:11px;color:var(--t2);margin:1px 0 2px;line-height:1.7">${esc(m.d)}</div>`:''}
+      ${Array.isArray(m.tags)&&m.tags.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin:2px 0">${m.tags.map(t=>`<span style="font-size:10px;border:1px solid var(--line,#e6e8ec);border-radius:8px;padding:0 6px;color:var(--t2)">${esc(MENU_TAG_FA[t]||t)}</span>`).join('')}</div>`:''}
       <div class="menu-price">${m.p} تومان</div>
     </div>
   </div>`;

@@ -445,6 +445,7 @@ export function applyRestaurantDetail(r, d){
     // شیءِ نرمال (۰۷۷): emoji/نام/قیمت/عکس + توضیح، دسته و «ناموجود» — که
     // پیش‌تر در همین نقطه دور ریخته می‌شدند و مشتری هرگز نمی‌دیدشان.
     r.menu = d.menu.map(m => ({
+      id: m.id || null,            // ۰۷۸ — برای ارسالِ واقعیِ pre-order لازم است
       e: m.emoji || '🍽️',
       n: m.name,
       p: Number(m.price_toman || 0).toLocaleString('fa-IR'),
@@ -452,6 +453,7 @@ export function applyRestaurantDetail(r, d){
       d: m.description || null,
       catId: m.category_id || null,
       out: !!m.is_out_of_stock,
+      tags: Array.isArray(m.tags) ? m.tags : [],
     }));
     r.menuCats = Array.isArray(d.menu_categories) ? d.menu_categories : [];
   }
@@ -465,7 +467,7 @@ export function applyRestaurantDetail(r, d){
  */
 export function normalizeMenuEntry(m){
   if (Array.isArray(m)) {
-    return { e: m[0] || '🍽️', n: m[1], p: m[2], img: m[3] || null, d: null, catId: null, out: false };
+    return { id: null, e: m[0] || '🍽️', n: m[1], p: m[2], img: m[3] || null, d: null, catId: null, out: false, tags: [] };
   }
   return m;
 }

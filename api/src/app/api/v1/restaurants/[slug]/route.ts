@@ -4,6 +4,7 @@ import { cached, cacheKey } from '@/lib/cache';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, z } from '@/lib/schemas';
 import { PUBLIC_STATUS } from '@/lib/photo-moderation';
+import { filterAvailableNow } from '@/lib/menu-availability';
 
 import { withApiMetrics } from '@/lib/api-metrics';
 
@@ -39,6 +40,8 @@ async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: str
               // ۰۷۷ — اپِ مشتری منو را از همین route می‌خواند (نه endpointِ
               // اختصاصیِ منو)؛ سکشن‌بندی/برچسبِ «ناموجود» این دو را لازم دارد.
               categoryId: true, isOutOfStock: true,
+              // ۰۷۸ — پنجره برای فیلترِ پس-از-کش، برچسب‌ها برای chipهای مشتری.
+              availability: true, tags: { select: { tag: true } },
               description: true, imageUrl: true, sortOrder: true,
             },
           },
@@ -109,7 +112,9 @@ async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: str
         menu: r.menuItems.map((m) => ({
           id: m.id, name: m.name, emoji: m.emoji, price_toman: m.priceToman,
           category: m.category, category_id: m.categoryId,
-          is_out_of_stock: m.isOutOfStock, description: m.description,
+          is_out_of_stock: m.isOutOfStock,
+          availability: m.availability, tags: m.tags.map(t => t.tag),
+          description: m.description,
           image_url: m.imageUrl, sort_order: m.sortOrder,
         })),
         // ۰۷۷ — سکشن‌بندیِ ساخت‌یافته‌ی منو (فقط افزودنی)
@@ -134,6 +139,12 @@ async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: str
     });
 
     if (!data) throw Err.notFound('رستوران');
+    // ۰۷۸ — فیلترِ پنجره‌ی دسترسیِ آیتم‌های منو **پس از** خواندنِ کش (B6):
+    // کش منویِ کامل را نگه می‌دارد؛ اگر فیلتر داخلِ کش بود، مرزِ پنجره تا
+    // سررسیدِ TTL دروغ می‌گفت. mutate امن است — cached هر بار JSON.parse تازه می‌دهد.
+    if (Array.isArray(data.menu) && data.menu.length) {
+      data.menu = filterAvailableNow(data.menu, data.timezone || 'Asia/Tehran');
+    }
     return NextResponse.json(data);
   } catch (e) { return errorResponse(e); }
 }

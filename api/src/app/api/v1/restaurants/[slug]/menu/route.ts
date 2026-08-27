@@ -4,6 +4,7 @@ import { cached, cacheKey } from '@/lib/cache';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, z } from '@/lib/schemas';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
+import { filterAvailableNow } from '@/lib/menu-availability';
 
 import { withApiMetrics } from '@/lib/api-metrics';
 
@@ -29,13 +30,18 @@ async function GET_impl(req: Request, { params }: { params: Promise<{ slug: stri
     await enforceRateLimit(clientIp(req), RULES.search);
     const { slug } = parseParams(await params, paramsSchema);
 
-    const data = await cached(cacheKey('restaurant-public-menu', slug), 60, async () => {
+    // TTL ۶۰→۳۰۰ (SPEC-A فاز ۲ — B1): حالا که هر mutation منو کش را فعالانه
+    // باطل می‌کند (invalidatePublicMenu از ۰۷۷)، TTLِ بلندتر فقط بارِ DB را
+    // کم می‌کند؛ تازگی از invalidation می‌آید، نه از انقضا.
+    const data = await cached(cacheKey('restaurant-public-menu', slug), 300, async () => {
       const r = await db.restaurant.findUnique({
         where: { slug },
         select: {
           // فیلدهایِ عمومیِ لازم برایِ سرصفحه‌ی صفحه‌ی منو — نه بیشتر.
           // هیچ فیلدِ کارکنان/داخلی اینجا نمی‌آید.
           id: true, slug: true, name: true, cuisine: true, city: true,
+          // ۰۷۸ — برای فیلترِ پنجره‌ی پس-از-کش لازم است (داخلِ payloadِ کش).
+          timezone: true,
           // شخصی‌سازیِ صفحه‌ی منو (مهاجرتِ ۰۵۳). NULL = انتخاب‌نشده →
           // صفحه به پیش‌فرضِ پلتفرم برمی‌گردد.
           menuAccent: true, menuTheme: true, menuTagline: true, menuLayout: true,
@@ -52,6 +58,19 @@ async function GET_impl(req: Request, { params }: { params: Promise<{ slug: stri
             select: {
               id: true, name: true, emoji: true, priceToman: true,
               category: true, categoryId: true, isOutOfStock: true,
+              availability: true, tags: { select: { tag: true } },
+              // ۰۷۸ — افزودنی‌ها فقط برای نمایش (صفحه‌ی QR)؛ گزینه‌های فعال.
+              modifierGroups: {
+                orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+                select: {
+                  id: true, name: true, minSelect: true, maxSelect: true,
+                  options: {
+                    where: { isActive: true },
+                    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+                    select: { id: true, name: true, priceDeltaToman: true },
+                  },
+                },
+              },
               description: true, imageUrl: true, sortOrder: true,
             },
           },
@@ -62,6 +81,7 @@ async function GET_impl(req: Request, { params }: { params: Promise<{ slug: stri
       return {
         restaurant: {
           id: r.id, slug: r.slug, name: r.name, cuisine: r.cuisine, city: r.city,
+          timezone: r.timezone,
           menu_accent: r.menuAccent, menu_theme: r.menuTheme,
           menu_tagline: r.menuTagline, menu_layout: r.menuLayout,
         },
@@ -77,13 +97,24 @@ async function GET_impl(req: Request, { params }: { params: Promise<{ slug: stri
         items: r.menuItems.map((m) => ({
           id: m.id, name: m.name, emoji: m.emoji, price_toman: m.priceToman,
           category: m.category, category_id: m.categoryId,
-          is_out_of_stock: m.isOutOfStock, description: m.description,
+          is_out_of_stock: m.isOutOfStock,
+          availability: m.availability, tags: m.tags.map(t => t.tag),
+          modifiers: m.modifierGroups.map(g => ({
+            id: g.id, name: g.name, min_select: g.minSelect, max_select: g.maxSelect,
+            options: g.options.map(o => ({ id: o.id, name: o.name, price_delta_toman: o.priceDeltaToman })),
+          })),
+          description: m.description,
           image_url: m.imageUrl, sort_order: m.sortOrder,
         })),
       };
     });
 
     if (!data) throw Err.notFound('رستوران');
+    // ۰۷۸ — فیلترِ پنجره‌ی دسترسی **پس از** خواندنِ کش (B6): کش کامل است،
+    // سرو فیلترشده — وگرنه مرزِ پنجره تا سررسیدِ TTLِ ۳۰۰ ثانیه دروغ می‌گفت.
+    if (Array.isArray(data.items) && data.items.length) {
+      data.items = filterAvailableNow(data.items, data.restaurant?.timezone || 'Asia/Tehran');
+    }
     return NextResponse.json(data);
   } catch (e) { return errorResponse(e); }
 }

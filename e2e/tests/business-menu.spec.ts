@@ -17,19 +17,28 @@ const CATS = [
 const ITEMS = [
   { id: 'd0000000-0000-4000-8000-000000000001', name: 'سالاد سزار', emoji: '🥗', price_toman: 180000,
     is_active: true, sold_count: 3, category: 'پیش‌غذا', category_id: CATS[0].id,
-    is_out_of_stock: false, description: 'با سسِ مخصوص', image_url: null, sort_order: 10 },
+    is_out_of_stock: false, description: 'با سسِ مخصوص', image_url: null, sort_order: 10,
+    tags: [], availability: null },
   { id: 'd0000000-0000-4000-8000-000000000002', name: 'کبابِ کوبیده', emoji: '🍢', price_toman: 320000,
     is_active: true, sold_count: 9, category: 'غذای اصلی', category_id: CATS[1].id,
-    is_out_of_stock: false, description: null, image_url: null, sort_order: 10 },
+    is_out_of_stock: false, description: null, image_url: null, sort_order: 10,
+    tags: [], availability: null },
 ];
 
 type Opts = { menuStatus?: number; empty?: boolean; delayMs?: number };
-const calls: { itemPatch: { id: string; body: Record<string, unknown> }[]; reorder: Record<string, unknown>[] } =
-  { itemPatch: [], reorder: [] };
+const calls: {
+  itemPatch: { id: string; body: Record<string, unknown> }[];
+  reorder: Record<string, unknown>[];
+  tagsPut: { id: string; tags: string[] }[];
+  groupPost: Record<string, unknown>[];
+} = { itemPatch: [], reorder: [], tagsPut: [], groupPost: [] };
 
 async function mockPanel(page: Page, opts: Opts = {}) {
   calls.itemPatch = [];
   calls.reorder = [];
+  calls.tagsPut = [];
+  calls.groupPost = [];
+  const modGroups: Record<string, unknown>[] = [];
   // کپیِ قابلِ‌جهش تا PATCHِ mock تغییرِ واقعی را در GETِ بعدی هم منعکس کند.
   const items = ITEMS.map(i => ({ ...i }));
   await page.route('**/api/v1/**', async (route) => {
@@ -51,6 +60,23 @@ async function mockPanel(page: Page, opts: Opts = {}) {
       if (opts.menuStatus && opts.menuStatus >= 400) return json({ error: { message: 'خطای آزمایشیِ سرور' } }, opts.menuStatus);
       if (opts.empty) return json({ items: [], categories: [], public_menu_url: 'https://rezervno.ir/r/demo/menu' });
       return json({ items, categories: CATS, public_menu_url: 'https://rezervno.ir/r/demo/menu' });
+    }
+    if (/^\/restaurant\/menu\/[^/]+\/tags$/.test(path) && method === 'PUT') {
+      const id = path.split('/')[3];
+      const body = route.request().postDataJSON() as { tags: string[] };
+      calls.tagsPut.push({ id, tags: body.tags });
+      return json({ tags: body.tags });
+    }
+    if (/^\/restaurant\/menu\/[^/]+\/modifiers$/.test(path)) {
+      if (method === 'POST') {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        calls.groupPost.push(body);
+        const g = { id: 'g-' + (modGroups.length + 1), name: body.name,
+          min_select: body.min_select ?? 0, max_select: body.max_select ?? 1, sort_order: 0, options: [] };
+        modGroups.push(g);
+        return json(g, 201);
+      }
+      return json({ groups: modGroups });
     }
     if (path === '/restaurant/menu/reorder' && method === 'PATCH') {
       calls.reorder.push(route.request().postDataJSON() as Record<string, unknown>);
@@ -135,4 +161,48 @@ test('loading: قبل از پاسخ، وضعیتِ بارگیری دیده می�
   await loginBiz(page);
   await expect(page.locator('#v-menu')).toContainText('در حال بارگیریِ منو');
   await expect(page.locator('#v-menu')).toContainText('سالاد سزار', { timeout: 10_000 });
+});
+
+test('فرم: برچسب + پنجره‌ی سرو → PATCH و PUTِ درست (۰۷۸)', async ({ page }) => {
+  await mockPanel(page);
+  await loginBiz(page);
+  const row = page.locator('#v-menu .top-cust', { hasText: 'سالاد سزار' });
+  await row.locator('button:has-text("ویرایش")').click();
+
+  // برچسبِ «تند»
+  await page.locator('#miTags [data-tag="SPICY"]').click();
+  await expect(page.locator('#miTags [data-tag="SPICY"]')).toHaveAttribute('aria-pressed', 'true');
+
+  // پنجره: شنبه (=۶ در قراردادِ سرور) از ۰۸:۰۰ تا ۱۲:۰۰
+  // WebKitِ موبایل: hit-testِ چک‌باکسِ ریز داخلِ مودال گاهی به خودِ dialog
+  // می‌خورد؛ force + assertِ toBeChecked حالتِ واقعی را همچنان قفل می‌کند.
+  await page.locator('.miDay[value="6"]').check({ force: true });
+  await expect(page.locator('.miDay[value="6"]')).toBeChecked();
+  await page.locator('#miAvFrom').fill('08:00');
+  await page.locator('#miAvTo').fill('12:00');
+
+  await page.locator('button:has-text("ذخیره")').click();
+  await expect(page.locator('#v-menu')).toContainText('سالاد سزار');
+
+  expect(calls.itemPatch.length).toBe(1);
+  expect(calls.itemPatch[0].body.availability).toEqual({ days: [6], start_min: 480, end_min: 720 });
+  expect(calls.tagsPut.length).toBe(1);
+  expect(calls.tagsPut[0].tags).toEqual(['SPICY']);
+});
+
+test('افزودنی: ساختِ گروه از فرمِ ویرایش → POSTِ درست و رندرِ گروه (۰۷۸)', async ({ page }) => {
+  await mockPanel(page);
+  await loginBiz(page);
+  const row = page.locator('#v-menu .top-cust', { hasText: 'سالاد سزار' });
+  await row.locator('button:has-text("ویرایش")').click();
+
+  await page.locator('button:has-text("مدیریتِ افزودنی‌ها")').click();
+  await page.locator('#mgName').fill('سایز');
+  await page.locator('#mgMin').fill('1');
+  await page.locator('#mgMax').fill('1');
+  await page.locator('button:has-text("ساختِ گروه")').click();
+
+  await expect(page.locator('#miModsBox')).toContainText('سایز');
+  expect(calls.groupPost.length).toBe(1);
+  expect(calls.groupPost[0]).toEqual({ name: 'سایز', min_select: 1, max_select: 1 });
 });
