@@ -182,11 +182,20 @@ test('فرم: برچسب + پنجره‌ی سرو → PATCH و PUTِ درست (�
   await page.locator('#miAvTo').fill('12:00');
 
   await page.locator('button:has-text("ذخیره")').click();
-  await expect(page.locator('#v-menu')).toContainText('سالاد سزار');
+  // ⚠️ گیتِ واقعی، نه تزئینی (رفعِ شکستِ واقعیِ اجرای کاملِ ۲۰۲۶-۰۸-۲۷،
+  // هم‌زمان روی mobile-chrome و desktop-chrome): گیتِ قبلی
+  // toContainText('سالاد سزار') پوچ بود — فهرستِ زیرِ مودال از همان اول
+  // همین متن را دارد و هیچ هم‌گاه‌سازی‌ای با پایانِ ذخیره نمی‌کرد؛ در نتیجه
+  // شمارنده‌ها با درخواستِ دومِ اپ (PUTِ برچسب‌ها) مسابقه می‌دادند و زیرِ
+  // بارِ سه‌موتوره itemPatch=1 ولی tagsPut هنوز 0 دیده می‌شد. menuSave فقط
+  // بعد از هر دو await (PATCH و PUT) closeModal می‌کند، پس پنهان‌شدنِ مودال
+  // یعنی هر دو درخواست تمام شده‌اند — به‌علاوه همان الگوی pollِ تستِ reorder.
+  // هیچ assertionی ضعیف نشده؛ بسته‌شدنِ مودال یک قفلِ تازه هم هست.
+  await expect(page.locator('#modalBg')).toBeHidden();
+  await expect.poll(() => calls.tagsPut.length, { message: 'PUTِ برچسب‌ها باید ثبت شود' }).toBe(1);
 
   expect(calls.itemPatch.length).toBe(1);
   expect(calls.itemPatch[0].body.availability).toEqual({ days: [6], start_min: 480, end_min: 720 });
-  expect(calls.tagsPut.length).toBe(1);
   expect(calls.tagsPut[0].tags).toEqual(['SPICY']);
 });
 
