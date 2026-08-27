@@ -6,6 +6,7 @@ import { audit } from './audit';
 import { enqueueSms } from './sms';
 import { normalizePhone } from './otp';
 import { hashPassword, normalizeUsername, passwordPolicyError, usernamePolicyError } from './password';
+import { isOwnerPhoneUniqueViolation } from './staff-helpers';
 import { clubPrefixFrom, slugSeed, uniqueRestaurantSlug } from './site-orders';
 import { createLogger } from './logger';
 
@@ -100,6 +101,12 @@ export async function provisionBusiness(
   // قاعده‌ی «قدیمی‌ترین ثبتِ شماره برنده است» (مهاجرتِ ۰۷۲)، ownerِ دوم با
   // همان شماره در تنانتِ دیگر هرگز نمی‌توانست با OTP وارد شود. مسیرِ درستِ
   // «شعبه‌ی دوم» endpoint جداگانه‌ی branches است.
+  //
+  // ⚠️ این چک فقط fast-pathِ UX است (ردِ زودهنگام + پیامِ راهنما) و TOCTOU
+  // دارد: زیرِ READ COMMITTED دو درخواستِ هم‌زمان هر دو از آن عبور می‌کنند.
+  // ضمانتِ واقعی ایندکسِ یکتایِ جزئیِ ۰۷۹ (staff_owner_phone_unique_idx)
+  // است که بازنده را داخلِ تراکنش می‌کشد؛ نگاشتِ آن خطا پایین، دورِ خودِ
+  // تراکنش است.
   const existing = await db.staff.findFirst({ where: { phone }, select: { id: true } });
   if (existing) {
     throw Err.conflict(
@@ -141,6 +148,10 @@ export async function provisionBusiness(
   const token = randomBytes(32).toString('hex');
 
   // ── §۶-۷..۱۳: تراکنش — یا همه یا هیچ ──
+  // بازنده‌ی raceِ شماره‌ی تکراری (که از fast-pathِ بالا رد شده) این‌جا روی
+  // ایندکسِ ۰۷۹ می‌میرد؛ Postgres کلِ تراکنش را رول‌بک می‌کند (هیچ
+  // Tenant/Restaurantِ یتیمی) و catch پایین P2002 را به همان ۴۰۹ِ مسیرِ
+  // ترتیبی ترجمه می‌کند. تستِ fault-injection: admin-create-business.
   const created = await db.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({
       data: { name: input.businessName, plan: input.plan ?? 'free', trialEndsAt },
@@ -176,6 +187,14 @@ export async function provisionBusiness(
       select: { id: true },
     });
     return { tenant, restaurant, staff, invite };
+  }).catch((e: unknown) => {
+    if (isOwnerPhoneUniqueViolation(e)) {
+      throw Err.conflict(
+        'duplicate_owner_phone',
+        'این شماره از قبل حسابِ کسب‌وکار دارد. برای شعبه‌ی جدیدِ همان مالک از «افزودنِ شعبه» استفاده کنید.',
+      );
+    }
+    throw e;
   });
 
   await audit({

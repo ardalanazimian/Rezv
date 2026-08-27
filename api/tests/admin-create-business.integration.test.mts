@@ -17,6 +17,7 @@ const { signAccess } = await import('../src/lib/jwt');
 const { POST: createBusiness } = await import('../src/app/api/v1/admin/restaurants/route.ts');
 const { POST: staffLogin } = await import('../src/app/api/v1/auth/staff/login/route.ts');
 const { fixturePhone } = await import('./_phone.helper.mts');
+const { normalizePhone } = await import('../src/lib/otp');
 
 const SFX = Math.random().toString(36).slice(2, 8);
 const made: { tenantIds: string[] } = { tenantIds: [] };
@@ -193,13 +194,13 @@ describe('ساختِ کسب‌وکار از پنلِ شرکت', () => {
     assert.equal(await db.staffPermission.count({ where: { staffId: body.owner.staff_id } }), 0);
   });
 
-  test('اتمیک‌بودن (§۸): شکستِ وسطِ تراکنش هیچ tenant/رستورانِ یتیمی نمی‌گذارد', async () => {
+  // ⚠️ retitle صادقانه (بازبینیِ ۰۸-۲۷): این تست قبلاً «اتمیک‌بودن» نام داشت
+  // ولی slugِ اشغالی را چکِ **پیش از** تراکنش (provisioning.ts) می‌گیرد و
+  // تراکنش اصلاً شروع نمی‌شود — گاردِ ورودی را قفل می‌کند، نه رول‌بک را.
+  // اتمیک‌بودنِ واقعی را تستِ fault-injection پایین می‌سنجد.
+  test('گاردِ ورودی: slugِ اشغالی پیش از شروعِ تراکنش با ۴۰۹ رد می‌شود', async () => {
     const adminToken = await makeAdminToken();
     const name = `[DEMO] atomic ${SFX}`;
-    // تزریقِ خطا: username تکراری در **داخلِ** پنجره‌ی بینِ چکِ اولیه و تراکنش
-    // ساده‌تر و قطعی‌تر: slugِ اشغال‌شده بعد از عبور از چکِ dupِ شماره —
-    // با گرفتنِ slug از قبل، تراکنش اصلاً شروع نمی‌شود؛ برای شکستِ داخلِ
-    // تراکنش، همان slug را هم‌زمان با یک رستورانِ واقعی می‌گیریم:
     const t = await db.tenant.create({ data: { name: `[DEMO] holder ${SFX}` } });
     made.tenantIds.push(t.id);
     await db.restaurant.create({ data: { tenantId: t.id, slug: `atomic-${SFX}`, name: 'holder', clubPrefix: 'HLD' } });
@@ -209,6 +210,73 @@ describe('ساختِ کسب‌وکار از پنلِ شرکت', () => {
     assert.equal(r.status, 409);
     assert.equal((await r.json()).error?.details?.reason, 'slug_unavailable');
     assert.equal(await db.tenant.count({ where: { name } }), 0, 'هیچ tenantِ یتیمی');
+  });
+
+  // ═══ SPEC-B معیارِ پذیرشِ ۱ — fault-injection واقعاً **داخلِ** تراکنش ═══
+  //
+  // بازتولیدِ قطعیِ همان raceی که بازبینِ SPEC-B باز گذاشته بود: چکِ تکراریِ
+  // شماره TOCTOU است (SELECT بیرونِ تراکنش)، پس دو provisioningِ هم‌زمان با
+  // یک شماره هر دو از چک عبور می‌کنند. سناریو، بدونِ mock و روی Postgresِ
+  // واقعی:
+  //   ۱) تراکنشِ «نگه‌دارنده» ownerِ رقیب را درج می‌کند ولی commit را نگه
+  //      می‌دارد → چکِ اولیه‌ی provisioning (READ COMMITTED) آن را نمی‌بیند.
+  //   ۲) provisioning واردِ تراکنش می‌شود، Tenant و Restaurant را می‌سازد،
+  //      و INSERTِ staff پشتِ ایندکسِ یکتایِ ۰۷۹ **بلاک** می‌شود (منتظرِ
+  //      سرنوشتِ درجِ رقیب) — از pg_stat_activity همین انتظار اثبات می‌شود،
+  //      وگرنه تست حق ندارد سبز شود.
+  //   ۳) نگه‌دارنده commit می‌کند → INSERTِ بازنده unique_violation می‌گیرد →
+  //      کلِ تراکنشِ provisioning (شاملِ Tenant/Restaurantِ ساخته‌شده در
+  //      همان تراکنش) رول‌بک می‌شود.
+  // یعنی خطا دقیقاً وسطِ تراکنش تزریق شده — نه در گاردهای پیش از آن.
+  test('fault-injection داخلِ تراکنش: بازنده‌ی raceِ شماره‌ی owner رول‌بکِ کامل می‌شود — هیچ Tenant/Restaurantِ یتیمی', async () => {
+    const adminToken = await makeAdminToken();
+    const rawPhone = fixturePhone('0923');
+    const phone = normalizePhone(rawPhone);          // staff.phone نرمال‌شده ذخیره می‌شود
+    const name = `[DEMO] race ${SFX}`;
+
+    const holderTenant = await db.tenant.create({ data: { name: `[DEMO] race-holder ${SFX}` } });
+    made.tenantIds.push(holderTenant.id);
+
+    // ۱) تراکنشِ نگه‌دارنده: درجِ ownerِ رقیب، بدونِ commit تا اطلاعِ ثانوی.
+    let releaseHolder!: () => void;
+    const holderGate = new Promise<void>((r) => { releaseHolder = r; });
+    let markInserted!: () => void;
+    const insertedGate = new Promise<void>((r) => { markInserted = r; });
+    const holderTx = db.$transaction(async (tx) => {
+      await tx.staff.create({ data: { tenantId: holderTenant.id, phone, role: 'owner', isActive: true } });
+      markInserted();
+      await holderGate;                              // تراکنش عمداً باز می‌ماند
+    }, { timeout: 30_000 });
+    await insertedGate;
+
+    // ۲) provisioningِ هم‌زمان (بدونِ await — باید پشتِ ایندکس بلاک شود).
+    const attempt = createBusiness(req({ business_name: name, owner_phone: rawPhone }, adminToken));
+
+    // ۳) اثباتِ «داخلِ تراکنش بودن»: باید یک INSERT روی staff در انتظارِ قفل
+    // دیده شود. بدونِ این مشاهده، سبزشدن دروغ است و تست شکست می‌خورد.
+    let sawWaiter = false;
+    for (let i = 0; i < 100 && !sawWaiter; i++) {
+      const rows = await db.$queryRaw<Array<{ n: bigint }>>`
+        SELECT count(*)::bigint AS n FROM pg_stat_activity
+        WHERE wait_event_type = 'Lock' AND query LIKE 'INSERT INTO%staff%'`;
+      if (Number(rows[0]?.n ?? 0) > 0) sawWaiter = true;
+      else await new Promise((r) => setTimeout(r, 50));
+    }
+    releaseHolder();                                 // commitِ نگه‌دارنده → بازنده می‌میرد
+    await holderTx;
+    const res = await attempt;
+    const body = await res.text();
+    assert.ok(sawWaiter, 'INSERTِ provisioning هرگز پشتِ قفلِ ایندکسِ ۰۷۹ دیده نشد — سناریوی race اجرا نشده است');
+
+    // قراردادِ بیرونی: همان ۴۰۹ِ تمیزِ مسیرِ ترتیبی، نه ۵۰۰ِ خامِ P2002.
+    assert.equal(res.status, 409, body);
+    assert.equal(JSON.parse(body).error?.details?.reason, 'duplicate_owner_phone');
+
+    // معیارِ پذیرشِ ۱: رول‌بکِ کامل — هیچ یتیمی از تراکنشِ بازنده نماند.
+    assert.equal(await db.tenant.count({ where: { name } }), 0, 'Tenantِ یتیم مانده');
+    assert.equal(await db.restaurant.count({ where: { name } }), 0, 'Restaurantِ یتیم مانده');
+    assert.equal(await db.staffInvite.count({ where: { phone } }), 0, 'StaffInviteِ یتیم مانده');
+    assert.equal(await db.staff.count({ where: { phone } }), 1, 'فقط ownerِ برنده (نگه‌دارنده) باید بماند');
   });
 
   test('اعتبارنامه‌ی نیمه (فقط username) نیمه‌فعال نمی‌شود', async () => {

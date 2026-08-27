@@ -115,6 +115,12 @@ model Staff {
   // drift-fix (فازِ ۲، §۲۴): در DB وجود دارد، در schema اعلام نشده بود.
   @@index([restaurantId])
   @@index([phone, createdAt, id], map: "staff_phone_created_idx")
+  // ⚠️ مهاجرتِ ۰۷۹ — ایندکسِ یکتایِ **جزئی** که Prisma نمی‌تواند اعلامش کند:
+  //   CREATE UNIQUE INDEX staff_owner_phone_unique_idx ON staff (phone) WHERE role = 'owner'
+  // بستنِ raceِ TOCTOUِ دو مسیرِ سازنده‌ی owner (provisionBusiness /
+  // createTrialAccount). تکرارِ شماره برای «کارمند» بینِ تنانت‌ها قانونی
+  // می‌ماند. پوشش در گاردِ drift: required + ACCEPTED_DRIFT
+  // (schema-drift.integration.test.mts).
   invites   StaffInvite[]
   @@map("staff")
 }

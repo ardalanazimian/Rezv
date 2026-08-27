@@ -364,8 +364,19 @@ There is **no global soft-delete column**. Instead:
   ۰=یکشنبه…۶=شنبه (قراردادِ `weekdayInTz`). NULL = همیشه. endpointهای عمومی
   **پس از خواندنِ کش** فیلتر می‌کنند (`lib/menu-availability.ts`)؛ pre-order
   نسبت به `slotStart` می‌سنجد نه «اکنون».
-- PKهای ۰۷۸ **DEFAULTِ DB ندارند** (برخلافِ ۰۷۷): schema آن‌ها را
-  `@default(uuid())` کلاینتی اعلام کرده و هیچ backfillی در کار نیست.
+- PKهای ۰۷۸ **DEFAULTِ DB ندارند** (برخلافِ ۰۷۷) — **این ناسازگاری عمدی است و
+  قاعده‌ی سراسری همین است** (تأییدِ صریح ۲۰۲۶-۰۸-۲۷):
+  - **PK فقط وقتی DEFAULTِ DB می‌گیرد که خودِ migration (یا مسیرِ SQL خامِ
+    دیگری) بدونِ ستونِ id ردیف INSERT کند** — مثلِ backfillِ ۰۷۷ که
+    `INSERT INTO menu_categories (restaurant_id, name) SELECT …` می‌زند و بدونِ
+    `gen_random_uuid()` می‌شکست. آن‌وقت schema هم باید همان را با
+    `@default(dbgenerated("gen_random_uuid()"))` اعلام کند تا drift صفر بماند.
+  - در غیرِ این صورت (۰۷۸: همه‌ی INSERTها از Prisma client می‌آیند) DEFAULT
+    اضافه **نزن**: schema `@default(uuid())` کلاینتی است، Prisma در emit خود
+    DEFAULT نمی‌سازد، و DEFAULTِ دستیِ SQL دقیقاً همان driftی می‌شود که
+    `schema-drift.integration.test.mts` می‌گیرد. (استثنای محیطِ تست:
+    `prisma/test-schema-fixups.sql` برای INSERTهای خامِ تست به همه DEFAULT
+    می‌دهد و در ACCEPTED_DRIFT پذیرفته شده — ربطی به تولید ندارد.)
 - کشِ منویِ عمومی: TTL از ۶۰ به **۳۰۰** — تازگی از invalidationِ فعالِ ۰۷۷
   می‌آید، نه از انقضا.
 - اعتبارسنجیِ pre-order (lib/reservations.ts) از ۰۷۸ **قبل از** درجِ
@@ -383,3 +394,29 @@ There is **no global soft-delete column**. Instead:
   (شناسه‌ی لینک، **نه** احرازِ هویت)، `status` enum، `expires_at` (۷۲h)،
   سه FK با `ON DELETE CASCADE ON UPDATE CASCADE` (بندِ ON UPDATE عمدی است —
   گاردِ drift بدونش قرمز می‌شود، درسِ ۰۶۵). منطق: `api/src/lib/provisioning.ts`.
+
+## migration 079 — یکتاییِ سراسریِ شماره در نقشِ owner (بستنِ raceِ SPEC-B)
+
+- **`staff_owner_phone_unique_idx`**: ایندکسِ یکتایِ **جزئی**
+  (`ON staff (phone) WHERE role = 'owner'`). چکِ appسطحِ شماره‌ی تکراری در هر
+  دو مسیرِ سازنده‌ی owner (`provisionBusiness`، `createTrialAccount`) TOCTOU
+  است؛ زیرِ READ COMMITTED جابه‌جاییِ همان SELECT به داخلِ تراکنش هم race را
+  نمی‌بست. حالا بازنده‌ی هم‌زمانی داخلِ تراکنش `unique_violation` می‌گیرد،
+  **کلِ** تراکنشش رول‌بک می‌شود (هیچ Tenant/Restaurant/Invite یتیمی) و کد
+  P2002 را به همان پاسخِ مسیرِ ترتیبی نگاشت می‌کند
+  (`isOwnerPhoneUniqueViolation` در `lib/staff-helpers.ts`).
+- دامنه عمداً فقط `role='owner'`: تکرارِ شماره‌ی **کارمند** بینِ تنانت‌ها
+  قانونی می‌ماند (`@@unique([tenantId, phone])` + قاعده‌ی «قدیمی‌ترین ثبت
+  برنده» از ۰۷۲). raceِ نادرِ «owner+کارمند هم‌زمان با یک شماره در دو تنانت»
+  آگاهانه بیرونِ دامنه است — بستنش یکتاییِ سراسریِ phone می‌خواست که feature
+  بالا را می‌شکست.
+- ⚠️ Prisma ایندکسِ جزئی را نمی‌تواند در schema بیان کند: پوشش با کامنت روی
+  مدلِ `Staff` + فهرستِ `required` و `ACCEPTED_DRIFT` در
+  `schema-drift.integration.test.mts` (الگوی مصوبِ همان فایل).
+- روی دیتای کثیف (دو ownerِ هم‌شماره از قبل) migration **بلند** شکست می‌خورد
+  (پیامِ `Key (phone)=… is duplicated`) — پاک‌سازیِ خودکار عمداً نیست چون
+  ownerِ دوم ممکن است اعتبارنامه‌ی password (۰۷۴) داشته باشد؛ تصمیم با اپراتور.
+- تستِ اتمیک‌بودن fault-injection **واقعی داخلِ تراکنش** دارد
+  (`admin-create-business.integration.test.mts`): درجِ رقیبِ commit‌نشده →
+  انتظارِ قفل روی INSERTِ بازنده (اثبات از `pg_stat_activity`) → commitِ رقیب
+  → رول‌بکِ کامل + ۴۰۹ِ `duplicate_owner_phone`.

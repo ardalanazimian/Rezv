@@ -23,6 +23,7 @@ import { db } from './db';
 import { Err } from './errors';
 import { audit } from './audit';
 import { normalizePhone } from './otp';
+import { isOwnerPhoneUniqueViolation } from './staff-helpers';
 import { queueEmail } from './notify';
 import { recordEvent } from './platform-events';
 import { getPlatformSetting } from './platform-settings';
@@ -282,6 +283,8 @@ export async function createTrialAccount(input: LeadInput, ctx: RequestContext):
   }
 
   // شماره‌ای که از قبل به یک کسب‌وکارِ دیگر وصل است → ورود، نه ساختِ حسابِ تازه
+  // ⚠️ fast-pathِ UX با TOCTOU؛ ضمانتِ واقعی ایندکسِ یکتایِ جزئیِ ۰۷۹ است
+  // (staff_owner_phone_unique_idx) — نگاشتِ بازنده‌ی race دورِ تراکنشِ پایین.
   const existingStaff = await db.staff.findFirst({ where: { phone }, select: { id: true } });
   if (existingStaff) {
     throw Err.validation('این شماره از قبل حسابِ کسب‌وکار دارد؛ از همان شماره وارد پنل شوید.');
@@ -343,6 +346,13 @@ export async function createTrialAccount(input: LeadInput, ctx: RequestContext):
     });
 
     return { tenant, restaurant, order };
+  }).catch((e: unknown) => {
+    // بازنده‌ی raceِ هم‌زمان روی ایندکسِ ownerِ ۰۷۹ → همان پیامِ مسیرِ ترتیبی
+    // (رول‌بکِ کامل انجام شده؛ نه تنانتِ یتیم می‌ماند نه ۵۰۰ِ خام می‌رود).
+    if (isOwnerPhoneUniqueViolation(e)) {
+      throw Err.validation('این شماره از قبل حسابِ کسب‌وکار دارد؛ از همان شماره وارد پنل شوید.');
+    }
+    throw e;
   });
 
   await notifyCompany({ ...provisioned.order });
