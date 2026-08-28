@@ -217,9 +217,3 @@ window.refreshWL = refreshWL;
 window.acceptWL = acceptWL;
 window.declineWL = declineWL;
 window.leaveWL = leaveWL;
-
-// ⚠️ PROBE موقت — اثباتِ شکست‌پذیریِ ratchetِ گیتِ security روی لینوکس.
-// در کامیتِ بعدی revert می‌شود.
-export function __ratchetProbe(x){
-  document.getElementById('probe').innerHTML = `<div class="p">${x}</div>`;
-}
