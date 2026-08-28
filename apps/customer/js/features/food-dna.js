@@ -94,10 +94,10 @@ export function buildDNASlides(p, visitPercentile){
       <div class="dna-slide-desc">${esc(s.desc)}</div>
       ${s.persona?`<div class="dna-badge-persona">${icon('sparkle',{size:12,fill:true})} ${p._demo?'نمونه':'منحصر به تو'}</div>`:''}
     </div>`).join('') + `
-    <div class="dna-slide" data-i="${slides.length}">
+    <div class="dna-slide" data-i="${esc(slides.length)}">
       <div class="dna-share-card">
         <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:4px">DNA غذایی من ${p._demo?'(نمونه)':''}</div>
-        <div style="font-size:26px;font-weight:900;color:#fff;margin-bottom:16px;letter-spacing:-.03em">${_dnaPersona.emoji} ${esc(_dnaPersona.name)}</div>
+        <div style="font-size:26px;font-weight:900;color:#fff;margin-bottom:16px;letter-spacing:-.03em">${esc(_dnaPersona.emoji)} ${esc(_dnaPersona.name)}</div>
         <div class="dna-share-row"><span class="dna-share-k">بار بیرون غذا خوردم</span><span class="dna-share-v">${faNum(p.globalVisits||0)}</span></div>
         <div class="dna-share-row"><span class="dna-share-k">رستوران کشف کردم</span><span class="dna-share-v">${faNum(p.restaurantsVisited||0)}</span></div>
         ${_dnaPct!=null?`<div class="dna-share-row"><span class="dna-share-k">بهتر از</span><span class="dna-share-v">${faNum(_dnaPct)}٪ مردم</span></div>`:''}
@@ -196,7 +196,7 @@ export function renderProfile(){
         <div class="prof-card-id">
           <div class="prof-card-name">${esc(userName())}</div>
           <div class="prof-card-phone">${esc(faNum(USER.phone||''))}</div>
-          <span class="prof-tier">${tier.emoji} عضو ${tier.name}</span>
+          <span class="prof-tier">${esc(tier.emoji)} عضو ${esc(tier.name)}</span>
         </div>
       </div>
       <div class="prof-card-stats">

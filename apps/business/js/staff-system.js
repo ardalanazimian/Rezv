@@ -209,7 +209,7 @@ function renderNotifList(){
   // مثلِ قبل — بدونِ esc اینجا یک stored XSS واقعی در پنلِ کارکنان بود.
   el.innerHTML=NOTIFS.map((n,i)=>`<div class="notif-item ${n.unread?'unread':''}" onclick="readNotif(${i})">
     ${n.unread?'<span class="notif-dot"></span>':''}
-    <div class="notif-ic ${n.ic}">${icon(n.emoji,{size:16})}</div>
+    <div class="notif-ic ${esc(n.ic)}">${icon(n.emoji,{size:16})}</div>
     <div class="notif-body"><div class="notif-title">${esc(n.title)}</div><div class="notif-text">${esc(n.text)}</div><div class="notif-time">${esc(n.time)}</div></div>
   </div>`).join('');
 }

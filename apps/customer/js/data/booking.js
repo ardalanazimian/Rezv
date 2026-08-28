@@ -94,7 +94,7 @@ export function openBookSheet(id){
     <div class="bs-head"><div class="bs-title">رزرو میز</div><div class="bs-rest">${esc(r.n)}</div></div>
     <div id="bwDemoBanner"></div>
     <div class="bw-field"><label>تاریخ</label><select id="bwDate" onchange="refreshSlots(${jsq(String(id))})">${
-      dates.map(d=>`<option value="${d.iso}"${d.iso===dateSel?' selected':''}>${esc(d.label)}</option>`).join('')
+      dates.map(d=>`<option value="${esc(d.iso)}"${d.iso===dateSel?' selected':''}>${esc(d.label)}</option>`).join('')
     }</select></div>
     <div class="bw-field"><label>تعداد نفر</label><select id="bwParty" onchange="refreshSlots(${jsq(String(id))})">${
       Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
@@ -150,7 +150,7 @@ export async function refreshSlots(id){
   if(res.ok && Array.isArray(res.data?.slots)){
     const open=res.data.slots.filter(s=>s.status==='open');
     if(open.length){
-      sel.innerHTML=open.map(s=>`<option value="${s.time}">${faTime(s.time)}</option>`).join('');
+      sel.innerHTML=open.map(s=>`<option value="${esc(s.time)}">${faTime(s.time)}</option>`).join('');
     }else{
       // خالیِ صادقانه: هیچ ساعتِ اختراعی جایگزینش نمی‌شه.
       // ⚠️ ولی «خالی» یک علت ندارد. تا پیش از این، رستورانی که سیستمش آفلاین
@@ -212,7 +212,7 @@ export function bookStep2(r){
     ? `<div class="field-label">پیش‌سفارش (اختیاری)</div>
     <div class="opt-row">${orderable.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" data-mid="${esc(m.id)}" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m.e)} ${esc(m.n)}</div>`).join('')}</div>`
     : '';
-  return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
+  return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${esc(bk.date)} · ${esc(bk.time)} · ${bk.party}</div>
     <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
     ${preorderBlock}
     <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3(${jsq(String(r.id))})">ادامه</button>`;
@@ -255,7 +255,7 @@ export function bookStep3(r){
       این یادداشت به رستوران نشان داده می‌شود تا در آماده‌سازی لحاظ کند. تأییدِ پزشکی نیست —
       اگر آلرژیِ شدید داری، حتماً موقعِ حضور هم شفاهی به کارکنان بگو.
     </div>
-    <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${esc(r.n)}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
+    <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${esc(r.n)}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${esc(bk.date)} · ${esc(bk.time)}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
     ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
     ${cancelPolicyLabel(r)?`<div class="cancel-policy-note" style="font-size:11.5px;color:var(--t3);margin:8px 2px 0;line-height:1.7">${icon('info',{size:13})} ${esc(cancelPolicyLabel(r))}</div>`:''}
@@ -344,7 +344,7 @@ export async function confirmBook(id){
       <div style="text-align:center;padding:24px 16px">
         <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">⚠️</div>
         <div class="sheet-title" style="text-align:center">رزرو ثبت نشد</div>
-        <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}</div>
+        <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}</div>
         <div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:14px 0">اتصال به سرورِ رزرونو برقرار نشد، پس این رزرو در سیستمِ رستوران ثبت نشده و کدِ رزروی هم صادر نشده. یادآورِ پیامکی ارسال نمی‌شود. با وصل‌شدنِ اینترنت دوباره تلاش کن.</div>
         <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(id))})">تلاش دوباره</button>
         <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
@@ -374,7 +374,7 @@ export async function confirmBook(id){
     <div class="success">
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
       <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
-      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${bk.date} · ${bk.time}<br>یادآور با پیامک می‌فرستیم</div>
+      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}<br>یادآور با پیامک می‌فرستیم</div>
       <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode(${jsq(code)})" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
       ${(r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
       <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
@@ -393,7 +393,7 @@ export function initSearchCtx(){
   if(!when||!party) return;
   const dates=dateOptions();
   const sel=dates.some(d=>d.iso===bookingCtx.date)?bookingCtx.date:dates[0].iso;
-  when.innerHTML=dates.map(d=>`<option value="${d.iso}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');
+  when.innerHTML=dates.map(d=>`<option value="${esc(d.iso)}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');
   party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)
     .map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('');
 }
