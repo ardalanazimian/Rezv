@@ -5,10 +5,15 @@
 #  اجرا با هر دو فایل:
 #    docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
 #
-#  دسترسی:
-#    • Prometheus: http://localhost:9090
-#    • Grafana:    http://localhost:3001  (admin / مقدار GRAFANA_PASSWORD)
+#  دسترسی (هر دو فقط رویِ loopback — از بیرون با تونلِ SSH):
+#    ssh -L 9090:127.0.0.1:9090 -L 3001:127.0.0.1:3001 user@server
+#    • Prometheus: http://127.0.0.1:9090
+#    • Grafana:    http://127.0.0.1:3001  (admin / مقدار GRAFANA_PASSWORD)
 #      داشبورد «رزرونو — عملکرد و امنیت» از قبل provision شده.
+#
+#  پیش‌نیاز: فایلِ توکنِ scrape باید ساخته شود (فقط خودِ توکن، بدونِ خطِ جدید):
+#    printf '%s' "$METRICS_TOKEN" > observability/metrics-token
+#  این فایل gitignore شده است — هرگز کامیتش نکن.
 # ═══════════════════════════════════════════════════════════
 services:
   prometheus:
@@ -23,13 +28,21 @@ services:
       # غیرفعال بودن (Prometheus یا با خطا بالا نمی‌اومد یا rule file رو
       # پیدا نمی‌کرد). با live-checkِ این overlay پیدا شد.
       - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      # ⚠️ توکنِ scrape. Prometheus متغیرِ محیطی را داخلِ فایلِ پیکربندی بسط
+      # **نمی‌دهد**، پس `credentials: "${METRICS_TOKEN}"` رشته‌ی تحت‌اللفظی
+      # می‌فرستد و ۴۰۱ می‌گیرد. مسیرِ درست همین `credentials_file` است.
+      - ./observability/metrics-token:/etc/prometheus/metrics-token:ro
       - promdata:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=15d'   # نگه‌داری ۱۵ روزه‌ی متریک‌ها
     ports:
-      - "9090:9090"
+      # ⚠️ فقط loopback. Prometheus هیچ احرازِ هویتی ندارد؛ انتشار روی
+      # 0.0.0.0 یعنی کلِ سطحِ متریک (نامِ همه‌ی routeها، نرخِ خطا، طولِ صف‌ها،
+      # شمارِ رستوران‌ها) از اینترنت خواندنی است — همان چیزی که /api/metrics
+      # با توکن سفت شده بود، از یک درِ دیگر. دسترسی از بیرون با تونلِ SSH.
+      - "127.0.0.1:9090:9090"
     depends_on:
       - api
 
@@ -37,14 +50,18 @@ services:
     image: grafana/grafana:latest
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      # ⚠️ `:?` نه `:-`: پیش‌فرضِ `admin` رویِ پورتِ عمومی یعنی هرکسی وارد
+      # می‌شود. حالا نبودِ متغیر، بالا آمدنِ استک را متوقف می‌کند — همان
+      # انضباطی که composeِ پایه برای رمزِ Postgres دارد.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?GRAFANA_PASSWORD لازم است}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafanadata:/var/lib/grafana
     ports:
-      - "3001:3000"
+      # فقط loopback — مثلِ Prometheus. دسترسی از بیرون با تونلِ SSH.
+      - "127.0.0.1:3001:3000"
     depends_on:
       - prometheus
 
