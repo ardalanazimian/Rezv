@@ -166,6 +166,56 @@ jobs:
         env:
           ADMIN_URL: postgresql://test:test@localhost:5432/postgres
 
+  # ── مسیرِ بوتِ تولید: آیا کانتینر روی یک DBِ از‌پیش‌موجود اصلاً بالا می‌آید؟ ──
+  #
+  # ⚠️ چرا این job لازم است (شکافی که هیچ jobِ دیگری نمی‌بیند): سوئیتِ بک‌اند
+  # اسکیما را با `db push` می‌سازد و هرگز از مسیرِ واقعیِ بوت
+  # (`migrate deploy` + `apply-sql.sh` + شاخه‌ی baseline) عبور نمی‌کند. آن
+  # شاخه یک بار در تولید شکسته بود: DBی که جدول داشت ولی تاریخچه‌ی migration
+  # نداشت، `migrate deploy` را با P3005 می‌شکست و کانتینر **اصلاً بوت نمی‌شد**
+  # — با همه‌ی تست‌ها سبز.
+  #
+  # این job خودِ `docker-entrypoint.sh` را اجرا می‌کند، نه شبیه‌سازی‌اش. لایه‌ی
+  # ایمیج (کاربرِ non-root، dumb-init) را نمی‌سنجد؛ آن نیازِ ساختِ داکر است.
+  boot-path:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: rezervno_boot
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: api/package-lock.json
+      - name: Install dependencies
+        working-directory: api
+        run: npm ci || npm install
+      - name: Generate Prisma client
+        working-directory: api
+        run: npx prisma generate
+      - name: Boot path (docker-entrypoint.sh on a history-less DB)
+        run: sh tools/check-boot-path.sh
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/rezervno_boot
+          # لازم چون `npm run start` انتهایِ اسکریپت در حالتِ production
+          # نبودِ این‌ها را خطا می‌دهد؛ مقادیر ساختگی‌اند و استفاده نمی‌شوند.
+          JWT_SECRET: ci-boot-only-secret-at-least-32-chars
+          JWT_REFRESH_SECRET: ci-boot-only-refresh-secret-32-chars
+          REDIS_URL: redis://localhost:6379
+          ALLOWED_ORIGINS: https://ci.example.invalid
+
   # ── مرحله ۳: چک امنیتی پایه ──
   security:
     runs-on: ubuntu-latest
