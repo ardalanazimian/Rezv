@@ -184,6 +184,7 @@ import './validate.test.mts';
 import './waitlist-accept-clock.test.mts';
 import './prediction-ledger.integration.test.mts';
 import './public-menu.integration.test.mts';
+import './me-reservations-contract.integration.test.mts';
 import './temporal-leakage.integration.test.mts';
 import './tenant-gate.integration.test.mts';
 import './tenant-isolation.integration.test.mts';
