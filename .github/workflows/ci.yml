@@ -166,6 +166,51 @@ jobs:
         env:
           ADMIN_URL: postgresql://test:test@localhost:5432/postgres
 
+  # ── ایمیجِ تولید: آیا اصلاً ساخته می‌شود؟ ──
+  #
+  # ⚠️ چرا این job لازم است (شکافی که دو ماه باز بود): تا ۲۰۲۶-۰۸-۲۸ هیچ jobی
+  # ایمیجِ داکر را نمی‌ساخت. `api/package.json` در ۲۰۲۶-۰۷-۰۸ هوکِ
+  # `postinstall: prisma generate` گرفت، و چون Dockerfile در آن لایه هنوز فقط
+  # package.json را کپی کرده بود، `npm ci` با «Could not find Prisma Schema»
+  # می‌شکست — یعنی **ساختِ ایمیجِ تولید از یک checkoutِ تمیز ناممکن بود** و
+  # هر ۱۱ jobِ دیگر سبز می‌ماندند. آرتیفکتی که ساخته نمی‌شود، خراب است و کسی
+  # نمی‌فهمد.
+  #
+  # این job فقط build نمی‌کند؛ دو خاصیتِ سخت‌شدنِ ایمیج را هم **زنده** می‌سنجد،
+  # چون خواندنشان از Dockerfile اثبات نیست.
+  image-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build -f api/Dockerfile -t rezervno-api:ci api/
+
+      - name: Image runs as non-root
+        run: |
+          set -e
+          U=$(docker run --rm --entrypoint sh rezervno-api:ci -c 'id -u')
+          N=$(docker run --rm --entrypoint sh rezervno-api:ci -c 'whoami')
+          echo "uid=$U user=$N"
+          if [ "$U" = "0" ]; then
+            echo "✗ ایمیج به‌صورتِ root اجرا می‌شود"
+            exit 1
+          fi
+          echo "✓ non-root ($N)"
+
+      - name: dumb-init is PID 1
+        run: |
+          set -e
+          docker run -d --name pid1probe rezervno-api:ci sh -c 'sleep 60' >/dev/null
+          sleep 3
+          P1=$(docker exec pid1probe ps -o pid,args | awk '$1==1 {$1=""; print $0}')
+          docker rm -f pid1probe >/dev/null
+          echo "PID 1:$P1"
+          case "$P1" in
+            *dumb-init*) echo "✓ dumb-init به‌عنوانِ PID 1" ;;
+            *) echo "✗ PID 1 دست‌ورداشتنِ سیگنال را انجام نمی‌دهد: $P1"; exit 1 ;;
+          esac
+
   # ── مسیرِ بوتِ تولید: آیا کانتینر روی یک DBِ از‌پیش‌موجود اصلاً بالا می‌آید؟ ──
   #
   # ⚠️ چرا این job لازم است (شکافی که هیچ jobِ دیگری نمی‌بیند): سوئیتِ بک‌اند

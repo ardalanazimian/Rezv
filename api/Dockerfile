@@ -2,7 +2,13 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci || npm install
+# ⚠️ `--ignore-scripts` اجباری است، نه بهینه‌سازی (رفعِ ۲۰۲۶-۰۸-۲۸):
+# `package.json` هوکِ `postinstall: prisma generate` دارد، ولی در این لایه
+# هنوز فقط package.json کپی شده و `prisma/schema.prisma` وجود ندارد. بدونِ
+# این پرچم `npm ci` با «Could not find Prisma Schema» می‌شکند و **کلِ ساختِ
+# ایمیجِ تولید شکست می‌خورد**. از زمانِ افزودنِ آن هوک (9b0928f، ۲۰۲۶-۰۷-۰۸)
+# این ساخت خراب بود و هیچ jobی در CI ایمیج نمی‌سازد تا معلوم شود.
+RUN npm ci --ignore-scripts || npm install --ignore-scripts
 COPY . .
 RUN npx prisma generate
 RUN npm run build
@@ -21,8 +27,10 @@ RUN addgroup -g 1001 -S nodejs && adduser -u 1001 -S nextjs -G nodejs
 #    فقط برای build لازم بودند)، فقط وابستگی‌های production + prisma CLI نصب می‌شود.
 #    prisma CLI در زمان اجرا برای `migrate deploy` در entrypoint لازم است. ──
 COPY --chown=nextjs:nodejs package.json package-lock.json* ./
-RUN npm ci --omit=dev && \
-    npm install prisma@5.20.0 --no-save && \
+# `--ignore-scripts` به همان دلیلِ مرحله‌ی build؛ کلاینتِ تولیدشده چند خط
+# پایین‌تر مستقیماً از مرحله‌ی builder کپی می‌شود.
+RUN npm ci --omit=dev --ignore-scripts && \
+    npm install prisma@5.20.0 --no-save --ignore-scripts && \
     npm cache clean --force
 
 # فایل‌های build و اسکیمای لازم برای اجرا

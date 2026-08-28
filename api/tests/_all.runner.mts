@@ -110,6 +110,8 @@ import './assistant-vocab-poisoning.integration.test.mts';
 import './idempotency.integration.test.mts';
 import './incentive-engine.test.mts';
 import './jwt.test.mts';
+import './jwt-audience-contract.test.mts';
+import './permission-fallback-and-principal.integration.test.mts';
 import './lifecycle.test.mts';
 import './lifecycle-exclusivity.test.mts';
 import './checkin-points-panel-path.integration.test.mts';
