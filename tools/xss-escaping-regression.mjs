@@ -20,7 +20,7 @@
 //
 //  اجرا: node tools/xss-escaping-regression.mjs      (از ریشه‌ی مخزن)
 // ═══════════════════════════════════════════════════════════════════════
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -68,7 +68,11 @@ const PAYLOADS = [
   "');alert(1);//",
 ];
 
-const discover = await import(join(ROOT, 'apps/customer/js/data/discover.js'));
+// ⚠️ `pathToFileURL` اجباری است، نه سلیقه: روی ویندوز مسیرِ مطلق (`c:\…`) را
+// لودرِ ESM با `ERR_UNSUPPORTED_ESM_URL_SCHEME` رد می‌کند، پس این گیت — که
+// گیتِ اجباریِ پیش از push است — اصلاً محلی قابلِ اجرا نبود. روی لینوکس
+// (CI) بی‌اثر است چون همان فایل را آدرس می‌دهد.
+const discover = await import(pathToFileURL(join(ROOT, 'apps/customer/js/data/discover.js')).href);
 
 /** رستورانِ آزمایشی که **همه‌ی** فیلدهای رشته‌ایِ قابلِ‌نمایشش بارِ حمله دارند. */
 function poisoned(payload) {

@@ -359,6 +359,16 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/business/js/overview.js:315', 'heatmapِ html فقط از slots/days (محلیِ ثابت) + fa(v) (عدد) ساخته می‌شه.'],
   ['apps/business/js/staff-system.js:91', 'openModal(html) — فراخوان‌هایِ نمونه‌گیری‌شده (data.js changeStatus با esc(r.name)) امن بودن.'],
   ['apps/company/js/overview.js:129', 'openModal(html) — همون الگویِ staff-system.js:91؛ فراخوان‌هایِ نمونه‌گیری‌شده امن بودن.'],
+
+  // ── الگو ۹: sinkهایِ واردشده پس از تولیدِ آرتیفکتِ ۲۰۲۶-۰۸-۲۶ (ممیزیِ
+  //    پیش از لانچ، ۲۰۲۶-۰۸-۲۸). هر پنج مورد تک‌تک خوانده و امن تأیید شد؛
+  //    منشأشان: f658687 «صداقتِ سراسری» · d525e48 SPEC-A فاز ۲ ·
+  //    f4c27e4 SPEC-B provisioning. هیچ‌کدام رانشِ کیفیت نیست. ──
+  ['apps/business/js/crm.js:132', 'loadErrorBlock(title, retry) — هر دو آرگومان literalِ خودِ کدند؛ title با esc() می‌گذره و retry عمداً یک رشته‌ی **کد** برایِ onclick است (نه دیتا).'],
+  ['apps/business/js/crm.js:136', 'کارتِ هویت: RESTAURANT.name با esc() می‌گذره (تنها فیلدِ API)؛ logoEmoji/logoGradient فقط از پیکرِ محلی ست می‌شن (crm.js:274-275 ← pickLogoEmoji/pickLogoGrad)، هرگز از پاسخِ سرور؛ logoPhoto.url و statusLabel هم esc دارن؛ GALLERY.indexOf عدد است.'],
+  ['apps/business/js/crm.js:427', 'همان loadErrorBlock مثلِ crm.js:132 — آرگومان‌ها literalِ کدند.'],
+  ['apps/business/js/menu.js:674', 'گروه/آپشنِ افزودنی‌ها: esc(g.name)/esc(o.name) رویِ متن، jsq(itemId)/jsq(g.id)/jsq(g.name) داخلِ onclick، و fa(min_select)/fa(max_select) رویِ اعداد — هر مسیرِ دیتا پوشش داره.'],
+  ['apps/company/js/restaurant.js:176', 'btn.innerHTML = label که خودش چهار خط بالاتر از همان دکمه خوانده شده (ذخیره/بازگرداندنِ برچسبِ دکمه حینِ لودینگ) — رفت‌وبرگشتِ markupِ خودِ عنصر، بدونِ ورودِ هیچ دادهٔ بیرونی.'],
 ]);
 
 function scanFile(absPath, relPath) {
@@ -393,7 +403,12 @@ function main() {
     if (!existsSync(abs)) continue;
     const files = fg(abs, EXTENSIONS);
     for (const f of files) {
-      const relPath = relative(ROOT, f);
+      // مسیر همیشه با `/` ثبت می‌شود، مستقل از سیستم‌عامل: روی ویندوز
+      // `relative()` بک‌اسلش می‌دهد و آن‌وقت هم آرتیفکت با خروجیِ CI فرق
+      // می‌کند (‏`--check` همیشه «کهنه» می‌گوید)، هم چکِ report-only پایین
+      // که `startsWith(p + '/')` است هرگز نمی‌گیرد و `standalone/` اشتباهاً
+      // enforced شمرده می‌شود.
+      const relPath = relative(ROOT, f).split('\\').join('/');
       const hits = scanFile(f, relPath);
       allHits.push(...hits);
     }
