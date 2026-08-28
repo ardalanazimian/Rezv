@@ -192,6 +192,16 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # لازم است چون گارد یک probeِ واقعیِ /api/health می‌زند و آن endpoint
+      # سلامتِ Redis را هم می‌سنجد — بدونش سرور بالا می‌آید ولی ۵۰۳ می‌دهد.
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -205,6 +215,19 @@ jobs:
       - name: Generate Prisma client
         working-directory: api
         run: npx prisma generate
+      # ⚠️ لازم است: `docker-entrypoint.sh` با `npm run start` تمام می‌شود که
+      # به خروجیِ `.next` نیاز دارد. بدونِ این مرحله سرور هرگز بالا نمی‌آید و
+      # probeِ سلامتِ گارد شکست می‌خورد — همان‌طور که باید.
+      - name: Build (Next.js)
+        working-directory: api
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/rezervno_boot
+          JWT_SECRET: ci-boot-only-secret-at-least-32-chars
+          JWT_REFRESH_SECRET: ci-boot-only-refresh-secret-32-chars
+          REDIS_URL: redis://localhost:6379
+          ALLOWED_ORIGINS: https://ci.example.invalid
+
       - name: Boot path (docker-entrypoint.sh on a history-less DB)
         run: sh tools/check-boot-path.sh
         env:

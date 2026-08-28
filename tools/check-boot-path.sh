@@ -33,20 +33,46 @@ npx prisma db push --skip-generate --accept-data-loss >/dev/null 2>&1 \
   || { echo "✗ آماده‌سازیِ اسکیمای پایه ناموفق"; exit 1; }
 
 # اگر db push به‌هر دلیل تاریخچه ساخت، گارد بی‌معنا می‌شود — صریح رد کن.
-if npx prisma db execute --schema=prisma/schema.prisma --stdin >/dev/null 2>&1 <<'SQL'
-SELECT 1 FROM _prisma_migrations LIMIT 1;
+# ⚠️ «تاریخچه» یعنی **ردیفِ اعمال‌شده**، نه صرفاً وجودِ جدول: یک
+#    `_prisma_migrations`ِ خالی هم یک حالتِ معتبرِ history-less است و باید
+#    آزموده شود. پس به کدِ خروجیِ SELECT تکیه نمی‌کنیم (روی جدولِ خالی هم
+#    موفق است) و تعدادِ ردیف را می‌شماریم.
+APPLIED="$(npx prisma db execute --schema=prisma/schema.prisma --stdin 2>/dev/null <<'SQL' || true
+SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL;
 SQL
-then
-  echo "✗ پیش‌شرط برقرار نشد: _prisma_migrations از قبل وجود دارد،"
+)"
+APPLIED_N="$(printf '%s' "$APPLIED" | grep -oE '[0-9]+' | tail -1)"
+if [ -n "$APPLIED_N" ] && [ "$APPLIED_N" -gt 0 ] 2>/dev/null; then
+  echo "✗ پیش‌شرط برقرار نشد: $APPLIED_N migrationِ اعمال‌شده از قبل هست،"
   echo "  پس شاخه‌ی baseline اصلاً آزموده نمی‌شود. DBِ خالی بده."
   exit 1
 fi
-echo "✓ پیش‌شرط برقرار: جدول هست، تاریخچه نیست"
+echo "✓ پیش‌شرط برقرار: جدول هست، تاریخچه‌ی اعمال‌شده نیست"
 
-# ⚠️ `exec npm run start` انتهایِ اسکریپت هرگز برنمی‌گردد، پس با مهلت اجرا
-#    می‌شود و موفقیت از رویِ **مراحلِ طی‌شده** سنجیده می‌شود، نه کدِ خروج.
-echo "→ اجرای api/docker-entrypoint.sh"
-timeout 900 sh docker-entrypoint.sh > "$LOG" 2>&1 || true
+# ⚠️ `exec npm run start` انتهایِ اسکریپت هرگز برنمی‌گردد، پس در پس‌زمینه
+#    اجرا می‌شود. موفقیت **فقط** با یک probeِ واقعیِ سلامت ثابت می‌شود، نه با
+#    دیدنِ خطِ «استارت سرور» در لاگ: اگر `npm run start` آن خط را چاپ کند و
+#    بلافاصله بمیرد، همه‌ی پنج نشانه در لاگ حاضرند و گارد بی‌جا سبز می‌شود.
+export PORT="${PORT:-3000}"
+echo "→ اجرای api/docker-entrypoint.sh (probe رویِ پورتِ $PORT)"
+sh docker-entrypoint.sh > "$LOG" 2>&1 &
+BOOT_PID=$!
+cleanup() { kill "$BOOT_PID" 2>/dev/null || true; }
+trap cleanup EXIT INT TERM
+
+HEALTH=""
+i=0
+while [ "$i" -lt 180 ]; do            # سقفِ ۹ دقیقه (۱۸۰ × ۳ ثانیه)
+  # اگر فرایند مرده باشد، دیگر منتظر نمان — همان false-greenی که می‌خواهیم بگیریم.
+  if ! kill -0 "$BOOT_PID" 2>/dev/null; then
+    echo "  ✗ فرایندِ بوت پیش از پاسخ‌دادنِ /api/health مُرد"
+    break
+  fi
+  HEALTH="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/health" 2>/dev/null || true)"
+  [ "$HEALTH" = "200" ] && break
+  i=$((i + 1))
+  sleep 3
+done
 
 fail=0
 need() {
@@ -62,6 +88,13 @@ need 'baseline کردنِ 0_init'        'شاخه‌ی baseline شلیک کرد
 need 'اعمال migrationها'            'migrate deploy اجرا شد'
 need 'همه‌ی فایل‌های SQL اعمال شدند' 'apply-sql.sh کامل شد'
 need 'استارت سرور'                  'به مرحله‌ی استارتِ سرور رسید'
+
+if [ "$HEALTH" = "200" ]; then
+  echo "  ✓ /api/health واقعاً ۲۰۰ داد — سرور بالا ماند"
+else
+  echo "  ✗ /api/health پاسخِ ۲۰۰ نداد (آخرین کد: ${HEALTH:-هیچ})"
+  fail=1
+fi
 
 if grep -qE '✗ (migrate deploy ناموفق|اعمال SQL ناموفق|دیتابیس آماده نشد)' "$LOG"; then
   echo "  ✗ اسکریپت با خطای صریحِ خودش متوقف شد"
