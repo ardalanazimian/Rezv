@@ -162,6 +162,7 @@ import './rewards.integration.test.mts';
 import './redis.test.mts';
 import './reminder-sms.integration.test.mts';
 import './reservation-helpers.test.mts';
+import './reservation-guard-coverage.integration.test.mts';
 import './reservation-status.test.mts';
 import './reservation-horizon.integration.test.mts';
 import './restaurant-manager.test.mts';
