@@ -26,7 +26,7 @@
 ## بک‌اند — قراردادها
 - routeهای رستوران: `withRestaurantAuth({rateLimit?, permission?}, handler)` یا `withStaffAuth` (هر دو در `lib/with-restaurant-auth.ts`)؛ ادمین: `await requireAdmin(req)` (`lib/admin-auth.ts` — نامِ قدیمیِ `adminAuthFromRequest` مرده است).
 - **`restaurantId`/`tenantId` فقط از contextِ احراز (`ctx.restaurant.id`, `auth.tenantId`)** — هرگز از body/query (ضدِ cross-tenant).
-- خطا فقط با `Err.*` از `lib/errors.ts` (۲۶ متد؛ `Err.conflict` وجود ندارد — از `tableConflict/slotFull/concurrencyRetry` استفاده کن). `throw new Error` خام در مسیرِ request ممنوع؛ wrapper خودش `errorResponse` می‌زند.
+- خطا فقط با `Err.*` از `lib/errors.ts` (۲۹ متد). برای تداخلِ دامنه‌ای نامِ دقیق را بردار: `tableConflict` / `slotFull` / `concurrencyRetry`؛ `Err.conflict(reason, msg?)` هم وجود دارد (۴۰۹ عمومی با فیلدِ `reason` — مثالِ مصرف: `lib/provisioning.ts:139`). `throw new Error` خام در مسیرِ request ممنوع؛ wrapper خودش `errorResponse` می‌زند.
 - اعتبارسنجی با شِیمِ داخلیِ `lib/schemas.ts` (**Zod واقعی نیست**): `parseBody` (async) / `parseQuery` / `parseParams` + primitiveهای `zPhone, zUuid, zPartySize, …`.
 - عملیاتِ حساسِ ادمین/چرخه‌ی رزرو باید `audit(...)` بنویسد. تغییرِ auth/رزرو/اسکیما فقط با PR.
 
