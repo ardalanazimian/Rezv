@@ -15,7 +15,7 @@
     "test:watch": "tsx --test --watch tests/_all.runner.mts",
     "typecheck": "tsc --noEmit",
     "audit": "npm audit --audit-level=high",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint . --ext .ts,.tsx,.mts --max-warnings 0",
     "test:integration": "node --test tests/integration/*.test.mjs",
     "test:e2e": "playwright test",
     "test:load": "k6 run ../loadtest/k6-load-test.js",

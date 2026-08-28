@@ -1,4 +1,4 @@
-import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
+import { test, describe, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
