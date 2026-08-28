@@ -398,7 +398,8 @@ All accept `GET`/`POST` and are guarded by `guardMaintenance`
 | `/rewards` | Birthday/anniversary rewards. | daily 06:00 |
 | `/ensure-partitions` | Create upcoming `reservations` partitions. | monthly |
 
-(Schedules mirror `api/vercel.json` `crons`.)
+(Schedules come from `cron/crontab` — the single source of truth. `api/vercel.json`
+was deleted 2026-08-28; the API is not deployed to Vercel.)
 
 ---
 

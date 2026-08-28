@@ -827,7 +827,8 @@ See [SECURITY.md](./SECURITY.md) §12 for the full recommendations list.
 - `no_show_followup` رویِ `reservations.created_at >= now-6h` فیلتر می‌کرد.
 
 هر دو فرض می‌کردند cron هر چند دقیقه اجرا می‌شود — همان چیزی که کامنتِ خودِ
-`runAllDueAutomations` ادعا می‌کرد. واقعیتِ `api/vercel.json` و `cron/crontab`:
+`runAllDueAutomations` ادعا می‌کرد. واقعیتِ `cron/crontab` (منبعِ حقیقتِ زمان‌بندی؛
+`api/vercel.json` در ۲۰۲۶-۰۸-۲۸ حذف شد چون بک‌اند روی Vercel مستقر نیست):
 تنها فراخوانش (`/v1/maintenance/customer-insights`) **روزی یک‌بار** ساعتِ ۰۳:۰۰
 اجرا می‌شود. پس post_visit فقط یک پنجره‌ی یک‌ساعته از هر شبانه‌روز را می‌دید، و
 no_show_followup رویِ زمانِ *ثبتِ رزرو* فیلتر می‌کرد نه زمانِ ثبتِ عدم‌حضور —

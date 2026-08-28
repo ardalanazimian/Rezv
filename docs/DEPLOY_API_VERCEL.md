@@ -29,7 +29,7 @@
 اگر Root Directory روی `api` تنظیم **نشده** باشد، Vercel ریشه‌ی استاتیک را بیلد می‌کند،
 هیچ serverless functionای ساخته نمی‌شود و `/api/v1/*` ⟶ ۴۰۴.
 - Vercel → پروژه‌ی API → **Settings → Build & Deployment → Root Directory = `api`**.
-- Framework Preset: **Next.js** (از `api/vercel.json` هم می‌آید).
+- Framework Preset: **Next.js** (باید دستی انتخاب شود — `api/vercel.json` دیگر وجود ندارد).
 - Deployment Protection (Vercel Authentication/SSO): برای هاستی که فرانت به آن می‌زند
   باید **Off/Standard** باشد، وگرنه درخواست‌های API با ۴۰۱/redirect برمی‌گردند.
 
@@ -58,8 +58,11 @@
 - `OTP_DEV_MODE` — در production حتماً **خاموش** (تا کدِ ۱۲۳۴ دمو در prod نپذیرد).
 
 ## Cronها
-`api/vercel.json` هشت cronِ نگه‌داری تعریف کرده (`/api/v1/maintenance/*`). این‌ها فقط
-وقتی پروژه‌ی API با Root Directory درست دیپلوی شود فعال می‌شوند.
+⚠️ **منسوخ (۲۰۲۶-۰۸-۲۸):** `api/vercel.json` حذف شد. بک‌اند روی Vercel مستقر نیست —
+یک کانتینرِ بلندمدت پشتِ Caddy است (`deploy/caddy/Caddyfile`)، و
+`api/docker-entrypoint.sh` با مدلِ serverless سازگار نیست.
+**منبعِ حقیقتِ زمان‌بندی `cron/crontab` است** (سرویسِ `cron` در `docker-compose.yml`)،
+که ۹ job دارد — همان ۸ تای قبلی به‌علاوه‌ی `reminders` که در نسخه‌ی Vercel نبود.
 
 ## سلامتِ بک‌اند (تأییدشده در همین کار — سطحِ کد)
 - `npx prisma generate && npx tsc --noEmit` ⟶ **صفر خطا**.
