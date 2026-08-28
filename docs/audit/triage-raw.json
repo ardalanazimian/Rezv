@@ -1,0 +1,826 @@
+[
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 441,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${dist.map(d=>`<div class=\"rev-bar-row\"><span class=\"rl\">${fa(d.star)} ستاره</span><div class=\"rev-bar-track\"><div class=\"rev-bar-fill\" style=\"width:${totalCount?d.count/totalCount*100:0}%\"></div></div><span class=\"rv\">${fa(d.count)}</span></div>`).join('')}",
+   "${r.ava}",
+   "${r.seg==='vip'?icon('crown',{size:14,fill:true}):''}",
+   "${Array.from({length:5},(_,si)=>icon('star',{size:12,fill:si<r.rating})).join('')}"
+  ],
+  "head": "document.getElementById('pt-reviews').innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 582,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${m.fa}",
+   "${m.c}",
+   "${m.d}",
+   "${m.c}"
+  ],
+  "head": "el.innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 660,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${c.severity==='high'?'warn':c.severity==='medium'?'info':'up'}",
+   "${c.severity==='high'?icon('alert',{size:15}):c.severity==='medium'?icon('trending',{size:15}):icon('check',{size:15})}"
+  ],
+  "head": "el.innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 720,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${c.is_vip?icon('crown',{size:18,fill:true}):icon('user',{size:18})}",
+   "${c.predicted_clv_toman!=null?` · ${fnl(c.predicted_clv_toman)} تومان CLV`:''}",
+   "${iqClr[c.intelligence_tier]||'var(--t2)'}",
+   "${iqFa[c.intelligence_tier]||''}"
+  ],
+  "head": "el.innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 843,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${formatHoursCompact(HOURS_STATE.opening_hours)}"
+  ],
+  "head": "el.innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 958,
+  "cls": "review",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 1083,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('ct-campaign').innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 1109,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=logs.length?`<table class=\"tbl\"><thead><tr><th>سگمنت</th><th>تاریخ<"
+ },
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 1142,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "if(chatHtml){ el.innerHTML=chatHtml+`<div id=\"aiCards\"><div style=\"text-align:ce"
+ },
+ {
+  "file": "apps/business/js/crm.js",
+  "line": 1155,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${c.severity==='high'?'high':c.severity==='medium'?'med':'low'}",
+   "${c.severity==='high'?icon('alert',{size:15}):c.severity==='medium'?icon('trending',{size:15}):icon('check',{size:15})}",
+   "${c.urgency==='high'?'var(--red-50)':c.urgency==='medium'?'var(--amber-50)':'var(--s-100)'}",
+   "${c.urgency==='high'?'var(--red)':c.urgency==='medium'?'var(--amber)':'var(--t2)'}"
+  ],
+  "head": "cardsEl.innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/loyalty.js",
+  "line": 42,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${cbLoaded?fa(CB.base)+'٪':'—'}",
+   "${tiers.map(([l,c,col])=>`<div style=\"display:flex;align-items:center;gap:12px;margin-bottom:14px\"><span style=\"width:80px;font-size:13px;font-weight:600\">${l}</span><div style=\"flex:1;height:8px;background:var(--s-100);border-radius:4px;overflow:hidden\"><div style=\"height:100%;width:${total?c/total*100:0}%;background:${col};border-radius:4px;transition:width .8s\"></div></div><span style=\"font-weight:700;font-size:13px\">${fa(c)}</span></div>`).join('')}",
+   "${birthdays.length?birthdays.map(m=>m.fn+' '+m.ln).join(' · '):'این ماه تولدی نیست'}"
+  ],
+  "head": "document.getElementById('v-loyalty').innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/marketing.js",
+  "line": 56,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${Object.entries(COUPON_SEG_FA).map(([k,v])=>`<option value=\"${k}\">${v}</option>`).join('')}"
+  ],
+  "head": "el.innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/marketing.js",
+  "line": 106,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${Object.entries(AUTOMATION_TRIGGER_FA).map(([k,v])=>`<option value=\"${k}\">${v}</option>`).join('')}"
+  ],
+  "head": "el.innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/marketing.js",
+  "line": 387,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${A.avgInterval==null?'—':fa(A.avgInterval)}",
+   "${days.map(([d,v])=>`<div class=\"bar-col\"><div class=\"bar ${d==='ج'?'teal':''}\" style=\"height:${v/mx*100}%\"><span class=\"bar-val\">${fa(v)}</span></div><div class=\"bar-label\">${d}</div></div>`).join('')}",
+   "${A.newPct}",
+   "${A.newPct}"
+  ],
+  "head": "document.getElementById('v-analytics').innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/menu.js",
+  "line": 73,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${uncategorized.map(menuRowHTML).join('')}"
+  ],
+  "head": "el.innerHTML = `"
+ },
+ {
+  "file": "apps/business/js/menu.js",
+  "line": 291,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "box.innerHTML = `"
+ },
+ {
+  "file": "apps/business/js/overview.js",
+  "line": 159,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${k.occupancyPct}",
+   "${fmtMoney(k.revenue)}",
+   "${fmtMoney(k.avgSpend)}"
+  ],
+  "head": "document.getElementById('v-overview').innerHTML = `"
+ },
+ {
+  "file": "apps/business/js/overview.js",
+  "line": 280,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('peakChart').innerHTML=slots.map(h=>{"
+ },
+ {
+  "file": "apps/business/js/overview.js",
+  "line": 321,
+  "cls": "review",
+  "cat": "C",
+  "risky": [
+   "RHS یک متغیرِ خام است"
+  ],
+  "head": "document.getElementById('heatmap').innerHTML=html;"
+ },
+ {
+  "file": "apps/business/js/overview.js",
+  "line": 327,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${c.ava}",
+   "${c.spent}"
+  ],
+  "head": "document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`"
+ },
+ {
+  "file": "apps/business/js/overview.js",
+  "line": 355,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('insights').innerHTML=insights.slice(0,4).map(i=>`"
+ },
+ {
+  "file": "apps/business/js/overview.js",
+  "line": 376,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${n.pinned?icon('pin',{size:13})+' ':''}",
+   "${n.time}"
+  ],
+  "head": "el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`"
+ },
+ {
+  "file": "apps/business/js/reservations.js",
+  "line": 25,
+  "cls": "review",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('v-reservations').innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/reservations.js",
+  "line": 91,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${resDate=="
+ },
+ {
+  "file": "apps/business/js/reservations.js",
+  "line": 106,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=demoNote+`"
+ },
+ {
+  "file": "apps/business/js/reservations.js",
+  "line": 120,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=demoNote+`<div style=\"font-size:13px;color:var(--t2);margin-bottom:"
+ },
+ {
+  "file": "apps/business/js/staff-system.js",
+  "line": 56,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('v-staff').innerHTML=(isDemo?`<div class=\"cash-note\">${i"
+ },
+ {
+  "file": "apps/business/js/staff-system.js",
+  "line": 127,
+  "cls": "review",
+  "cat": "C",
+  "risky": [
+   "RHS یک متغیرِ خام است"
+  ],
+  "head": "document.getElementById('modalBody').innerHTML = html;"
+ },
+ {
+  "file": "apps/business/js/staff-system.js",
+  "line": 210,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${n.ic}"
+  ],
+  "head": "el.innerHTML=NOTIFS.map((n,i)=>`<div class=\"notif-item ${n.unread?'unread':''}\" "
+ },
+ {
+  "file": "apps/business/js/staff-system.js",
+  "line": 232,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('popupIc').innerHTML=iconName?icon(iconName,{size:18}):'"
+ },
+ {
+  "file": "apps/business/js/staff-system.js",
+  "line": 265,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('v-cashback').innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/staff-system.js",
+  "line": 322,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${\n      // ⚠️ سه حالتِ جدا (۲۰۲۶-۰۸-۲۰): قبلاً فقط دو حالت بود و شرطش `P.hasData`\n      // بود، یعنی رستورانی با چند رزروِ معدود جمله‌ی «این پیشنهادها از الگویِ\n      // خودت ساخته شدن» را می‌دید در حالی که بک‌اند (زیرِ MIN_OBSERVATIONS)\n      // اصلاً پیشنهادی نساخته بود — و دنباله‌ی «هر کدوم رو می‌تونی قبول کنی»\n      // به چیزی اشاره می‌کرد که وجود نداشت.\n      !P.suggestions.length\n        ? 'هنوز داده‌ی کافی برای الگوگیری نیست. با ثبتِ رزروِ بیشتر، پیشنهادها از شلوغیِ واقعیِ خودت ساخته می‌شن.'\n        : (P.hasData\n            ? 'این پیشنهادها از الگوی شلوغیِ ۹۰ روز اخیرِ خودت ساخته شدن — نه حدس. هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.'\n            : 'این‌ها پیشنهادِ نمونه‌ست (بک‌اند متصل نیست). هر کدوم رو می‌تونی قبول کنی. کنترل کاملش دستِ توئه.')\n    }",
+   "${(P.suggestions.length?P.suggestions:[]).map(sugCard).join('')||'<div class=\"pr-empty\">فعلاً پیشنهادی نیست. با ثبت رزروِ بیشتر، سیستم الگوها رو پیدا می‌کنه.</div>'}"
+  ],
+  "head": "document.getElementById('v-pricing').innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/staff-system.js",
+  "line": 516,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('loginCard').innerHTML = `"
+ },
+ {
+  "file": "apps/business/js/waitlist.js",
+  "line": 145,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${t.s}"
+  ],
+  "head": "document.getElementById('v-floor').innerHTML=`"
+ },
+ {
+  "file": "apps/business/js/waitlist.js",
+  "line": 326,
+  "cls": "review",
+  "cat": "B",
+  "risky": [],
+  "head": "box.innerHTML = `"
+ },
+ {
+  "file": "apps/business/js/waitlist.js",
+  "line": 481,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('toastMsg').innerHTML=msg+` <button class=\"undo-btn\" onc"
+ },
+ {
+  "file": "apps/company/js/hours.js",
+  "line": 122,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML = `"
+ },
+ {
+  "file": "apps/company/js/intelligence.js",
+  "line": 57,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${r.grad}",
+   "${r.logo}",
+   "${r.plan}",
+   "${PLAN_LABEL[r.plan]}"
+  ],
+  "head": "document.getElementById('v-billing').innerHTML=`"
+ },
+ {
+  "file": "apps/company/js/intelligence.js",
+  "line": 205,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${r.grad}",
+   "${r.logo}",
+   "${!r.isOpen?`<span class=\"dot-closed\" aria-hidden=\"true\"></span> غیرفعال · `:''}",
+   "${STATUS_LABEL[r.status]||''}"
+  ],
+  "head": "document.getElementById('v-support').innerHTML=`"
+ },
+ {
+  "file": "apps/company/js/intelligence.js",
+  "line": 234,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${Object.entries(d.jobs).map(([k,v])=>`<div style=\"display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px\"><span style=\"color:var(--t2)\">${k}</span><b>${fa(v)}</b></div>`).join('')}"
+  ],
+  "head": "document.getElementById('v-systemhealth').innerHTML=`"
+ },
+ {
+  "file": "apps/company/js/intelligence.js",
+  "line": 353,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${productionAccuracyPanelHTML(d.production_accuracy)}",
+   "${driftPanelHTML(d.drift)}"
+  ],
+  "head": "document.getElementById('v-aihealth').innerHTML=`"
+ },
+ {
+  "file": "apps/company/js/intelligence.js",
+  "line": 581,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('v-security').innerHTML=(mqRes.ok&&mqRes.data?moderation"
+ },
+ {
+  "file": "apps/company/js/intelligence.js",
+  "line": 664,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('v-security').innerHTML=unavailablePanelHTML('صفحه‌ی امن"
+ },
+ {
+  "file": "apps/company/js/intelligence.js",
+  "line": 716,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "box.innerHTML=renderCustomer360(res.data);"
+ },
+ {
+  "file": "apps/company/js/intelligence.js",
+  "line": 915,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('loginCard').innerHTML = `"
+ },
+ {
+  "file": "apps/company/js/overview.js",
+  "line": 37,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${[['فعال',sub.active,'var(--green)'],['رو به اتمام',sub.expiring,'var(--amber)'],['آزمایشی',(sub.trial||0)+(sub.trial_expired||0),'var(--ink)'],['منقضی',sub.expired,'var(--red)']].map(([l,c,col])=>`\n            <div style=\"display:flex;align-items:center;gap:12px\"><span style=\"width:100px;font-size:13px;font-weight:600\">${l}</span><div style=\"flex:1;height:10px;background:var(--s-100);border-radius:5px;overflow:hidden\"><div style=\"height:100%;width:${total?c/total*100:0}%;background:${col};border-radius:5px;transition:width .8s\"></div></div><span style=\"font-weight:800;font-size:14px;width:24px;text-align:left\">${fa(c)}</span></div>`).join('')}"
+  ],
+  "head": "document.getElementById('v-overview').innerHTML=`"
+ },
+ {
+  "file": "apps/company/js/overview.js",
+  "line": 125,
+  "cls": "review",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=list.map(r=>{"
+ },
+ {
+  "file": "apps/company/js/overview.js",
+  "line": 156,
+  "cls": "review",
+  "cat": "C",
+  "risky": [
+   "RHS یک متغیرِ خام است"
+  ],
+  "head": "document.getElementById('modalBody').innerHTML = html;"
+ },
+ {
+  "file": "apps/company/js/photos.js",
+  "line": 136,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML = `"
+ },
+ {
+  "file": "apps/company/js/restaurant.js",
+  "line": 11,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${r.grad}",
+   "${r.logo}",
+   "${r.joined}",
+   "${r.plan}"
+  ],
+  "head": "document.getElementById('v-detail').innerHTML=`"
+ },
+ {
+  "file": "apps/company/js/restaurant.js",
+  "line": 76,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "box.innerHTML = `"
+ },
+ {
+  "file": "apps/company/js/restaurant.js",
+  "line": 142,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${Object.entries(planDist).map(([p,c])=>`<div style=\"display:flex;align-items:center;gap:12px\"><span style=\"width:100px;font-size:13px;font-weight:600\">${PLAN_LABEL[p]||p}</span><div style=\"flex:1;height:10px;background:var(--s-100);border-radius:5px;overflow:hidden\"><div style=\"height:100%;width:${RESTAURANTS.length?c/RESTAURANTS.length*100:0}%;background:var(--ink);border-radius:5px\"></div></div><span style=\"font-weight:800;font-size:14px;width:24px;text-align:left\">${fa(c)}</span></div>`).join('')}"
+  ],
+  "head": "document.getElementById('v-analytics').innerHTML=`"
+ },
+ {
+  "file": "apps/company/js/sales.js",
+  "line": 125,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML = `"
+ },
+ {
+  "file": "apps/customer/js/auth.js",
+  "line": 238,
+  "cls": "review",
+  "cat": "C",
+  "risky": [
+   "RHS یک متغیرِ خام است"
+  ],
+  "head": "document.getElementById('sheetBody').innerHTML=html;"
+ },
+ {
+  "file": "apps/customer/js/data/booking.js",
+  "line": 130,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "sel.innerHTML=(r.slots.length?r.slots:FALLBACK_TIMES).map(s=>`<option value=\"${s"
+ },
+ {
+  "file": "apps/customer/js/data/booking.js",
+  "line": 153,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${s.time}",
+   "${faTime(s.time)}"
+  ],
+  "head": "sel.innerHTML=open.map(s=>`<option value=\"${s.time}\">${faTime(s.time)}</option>`"
+ },
+ {
+  "file": "apps/customer/js/data/booking.js",
+  "line": 343,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${bk.date}",
+   "${bk.time}"
+  ],
+  "head": "sheetBody.innerHTML=`"
+ },
+ {
+  "file": "apps/customer/js/data/booking.js",
+  "line": 373,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${bk.date}",
+   "${bk.time}",
+   "${(r.cb>0)?`<div class=\"reward-row\"><div class=\"reward\"><div class=\"rv teal\">${fmtFa(r.cb)}٪</div><div class=\"rl\">کش‌بک</div></div></div>`:''}"
+  ],
+  "head": "sheetBody.innerHTML=`"
+ },
+ {
+  "file": "apps/customer/js/data/booking.js",
+  "line": 396,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${d.iso}"
+  ],
+  "head": "when.innerHTML=dates.map(d=>`<option value=\"${d.iso}\"${d.iso===sel?' selected':'"
+ },
+ {
+  "file": "apps/customer/js/data/booking.js",
+  "line": 397,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)"
+ },
+ {
+  "file": "apps/customer/js/data/detail.js",
+  "line": 158,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${r.now?`<span class=\"rp-hero-badge live\"><span class=\"live-dot\" aria-hidden=\"true\"></span> الان باز</span>`:''}"
+  ],
+  "head": "document.getElementById('page-rest').innerHTML=`"
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 64,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "if(box) box.innerHTML = slotsHTML(r);"
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 203,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "f.innerHTML=list.map(()=>`<div class=\"rc\" style=\"opacity:1;transform:none\"><div "
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 206,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);"
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 248,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,f"
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 294,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,"
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 301,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=[...R].sort((a,b)=>(b.rt||0)-(a.rt||0)).slice(0,6).map(r=>hCardHTML"
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 327,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=trend.map((r,i)=>hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true"
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 361,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=eventsHtml(events,false);"
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 365,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${res.status?`خطای ${res.status}`:'دوباره تلاش کن'}"
+  ],
+  "head": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('ale"
+ },
+ {
+  "file": "apps/customer/js/data/discover.js",
+  "line": 368,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=eventsHtml(SAMPLE_EVENTS,true);"
+ },
+ {
+  "file": "apps/customer/js/features/chat.js",
+  "line": 52,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "body.innerHTML = `<div class=\"chat-empty\">${msg}</div>`;"
+ },
+ {
+  "file": "apps/customer/js/features/chat.js",
+  "line": 58,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${t.unread > 0 ? `<span class=\"chat-badge\">${t.unread}</span>` : ''}"
+  ],
+  "head": "body.innerHTML = items.map(t => `"
+ },
+ {
+  "file": "apps/customer/js/features/food-dna.js",
+  "line": 63,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "document.getElementById('dnaProgress').innerHTML = Array.from({length:nSlides},("
+ },
+ {
+  "file": "apps/customer/js/features/food-dna.js",
+  "line": 88,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${s.emoji?`<div class=\"dna-slide-emoji\">${s.emoji}</div>`:''}",
+   "${s.big?`<div class=\"dna-slide-big\">${s.big}</div>`:''}",
+   "${slides.length}",
+   "${_dnaPersona.emoji}"
+  ],
+  "head": "wrap.innerHTML = slides.map((s,i)=>`"
+ },
+ {
+  "file": "apps/customer/js/features/food-dna.js",
+  "line": 191,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${tier.emoji}",
+   "${tier.name}"
+  ],
+  "head": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">"
+ },
+ {
+  "file": "apps/customer/js/features/food-dna.js",
+  "line": 261,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "host.outerHTML ="
+ },
+ {
+  "file": "apps/customer/js/features/notifications.js",
+  "line": 150,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "tabs.innerHTML = Object.entries(CATS).map(([k,v])=>`<button class=\"notif-tab ${k"
+ },
+ {
+  "file": "apps/customer/js/features/notifications.js",
+  "line": 160,
+  "cls": "review",
+  "cat": "B",
+  "risky": [],
+  "head": "list.innerHTML = items.map(n=>{"
+ },
+ {
+  "file": "apps/customer/js/features/palette.js",
+  "line": 99,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "list.innerHTML = _items.length ? _items.map(itemHTML).join('') : '<li class=\"cmd"
+ },
+ {
+  "file": "apps/customer/js/features/rewards.js",
+  "line": 122,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "el.innerHTML=`<div class=\"gift-check ${d.valid?'valid':'invalid'}\">"
+ },
+ {
+  "file": "apps/customer/js/features/trips.js",
+  "line": 105,
+  "cls": "unsafe",
+  "cat": "A",
+  "risky": [
+   "${res.data.svg}"
+  ],
+  "head": "box.innerHTML = `<div style=\"background:#fff;border-radius:8px;padding:8px;displ"
+ },
+ {
+  "file": "apps/customer/js/reservation.js",
+  "line": 22,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.query"
+ },
+ {
+  "file": "apps/customer/js/reservation.js",
+  "line": 128,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "listEl.innerHTML=skTrip.repeat(3);"
+ },
+ {
+  "file": "apps/customer/js/reservation.js",
+  "line": 152,
+  "cls": "review",
+  "cat": "B",
+  "risky": [],
+  "head": "listEl.innerHTML=summary+trips.map(t=>{"
+ },
+ {
+  "file": "apps/customer/js/user-profile.js",
+  "line": 85,
+  "cls": "review",
+  "cat": "B",
+  "risky": [],
+  "head": "now.innerHTML = ready"
+ },
+ {
+  "file": "apps/customer/js/waitlist.js",
+  "line": 21,
+  "cls": "review",
+  "cat": "A",
+  "risky": [
+   "${bk.date}",
+   "${bk.time}"
+  ],
+  "head": "sheetBody.innerHTML=`"
+ },
+ {
+  "file": "apps/customer/js/waitlist.js",
+  "line": 92,
+  "cls": "unsafe",
+  "cat": "B",
+  "risky": [],
+  "head": "sheetBody.innerHTML=`"
+ }
+]
