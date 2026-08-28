@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-28T10:26:56.181Z",
+  "generated_at": "2026-08-28T13:16:28.390Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -10,11 +10,11 @@
     "demo-mvp",
     "standalone"
   ],
-  "total_hits": 224,
+  "total_hits": 225,
   "by_classification": {
     "review": 22,
     "safe_static": 56,
-    "unsafe": 66,
+    "unsafe": 67,
     "escaped": 23,
     "dom_api_safe": 57
   },
@@ -602,6 +602,13 @@
       "line": 92,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
+      "classification": "unsafe"
+    },
+    {
+      "file": "apps/customer/js/waitlist.js",
+      "line": 224,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('probe').innerHTML = `<div class=\"p\">${x}</div>`;",
       "classification": "unsafe"
     },
     {
@@ -2599,546 +2606,553 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2720,
+      "line": 2606,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('probe').innerHTML = `<div class=\"p\">${x}</div>`;",
+      "classification": "unsafe"
+    },
+    {
+      "file": "standalone/customer.html",
+      "line": 2726,
       "kind": "innerHTML",
       "snippet": "if(b)b.innerHTML=`<div style=\"background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:12.5px;line-h",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 2724,
+      "line": 2730,
       "kind": "innerHTML",
       "snippet": "if(b)b.innerHTML='';",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 2732,
+      "line": 2738,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=(r.slots.length?r.slots:FALLBACK_TIMES).map(s=>`<option value=\"${s}\">${s} (نمونه)</option>`).join('');",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 2750,
+      "line": 2756,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML='<option>در حال بررسی...</option>';",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 2755,
+      "line": 2761,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=open.map(s=>`<option value=\"${s.time}\">${faTime(s.time)}</option>`).join('');",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 2766,
+      "line": 2772,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=`<option value=\"\">${esc(why)}</option>`;",
       "classification": "escaped"
     },
     {
       "file": "standalone/customer.html",
-      "line": 2945,
+      "line": 2951,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 2975,
+      "line": 2981,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 2998,
+      "line": 3004,
       "kind": "innerHTML",
       "snippet": "when.innerHTML=dates.map(d=>`<option value=\"${d.iso}\"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 2999,
+      "line": 3005,
       "kind": "innerHTML",
       "snippet": "party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 3774,
+      "line": 3780,
       "kind": "innerHTML",
       "snippet": "if(box) box.innerHTML = slotsHTML(r);",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 3901,
+      "line": 3907,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=`",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 3910,
+      "line": 3916,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(()=>`<div class=\"rc\" style=\"opacity:1;transform:none\"><div class=\"rc-img sk\" style=\"border-radius:0\"></div><div class=\"rc-body\"><div class=",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 3913,
+      "line": 3919,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 3934,
+      "line": 3940,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 3955,
+      "line": 3961,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,fill:true})+' محبوب امشب':esc(el.textContent.trim());",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4000,
+      "line": 4006,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4007,
+      "line": 4013,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=[...R].sort((a,b)=>(b.rt||0)-(a.rt||0)).slice(0,6).map(r=>hCardHTML(r,'')).join('');",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4033,
+      "line": 4039,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=trend.map((r,i)=>hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true})} داغ`:'')).join('');",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4058,
+      "line": 4064,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('calendar',{size:40})}</div><div class=\"empty-state-title\">فعلاً رویدادِ ویژه‌ای نیس",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4067,
+      "line": 4073,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=eventsHtml(events,false);",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4071,
+      "line": 4077,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('alert',{size:40})}</div><div class=\"empty-state-title\">رویدادها بارگذاری نشد</div><",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4074,
+      "line": 4080,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=eventsHtml(SAMPLE_EVENTS,true);",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4131,
+      "line": 4137,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4142,
+      "line": 4148,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feed').innerHTML=`",
       "classification": "escaped"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4161,
+      "line": 4167,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=icon('heart',{size:20,fill:on});",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4171,
+      "line": 4177,
       "kind": "innerHTML",
       "snippet": "if(el){ el.innerHTML=icon('heart',{size:20,fill:true}); el.setAttribute('aria-pressed','true'); el.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4186,
+      "line": 4192,
       "kind": "innerHTML",
       "snippet": "btn.innerHTML=icon('heart',{size:22,fill:on});",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4195,
+      "line": 4201,
       "kind": "innerHTML",
       "snippet": "if(btn){ btn.innerHTML=icon('heart',{size:22,fill:true}); btn.setAttribute('aria-pressed','true'); btn.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4369,
+      "line": 4375,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-rest').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4479,
+      "line": 4485,
       "kind": "innerHTML",
       "snippet": "if(!list.length){grid.innerHTML='';empty.style.display='block';return}",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4480,
+      "line": 4486,
       "kind": "innerHTML",
       "snippet": "empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.querySelectorAll('.rc').forEach(c=>c.classList.add('in'));",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4586,
+      "line": 4592,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=skTrip.repeat(3);",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4602,
+      "line": 4608,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('calendar',{size:44})}</div><div class=\"empty-state-title\">هنوز رزروی نداری</div",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4610,
+      "line": 4616,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=summary+trips.map(t=>{",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4774,
+      "line": 4780,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t3);font-size:12px;text-align:center;padding:16px 8px\">",
       "classification": "escaped"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4781,
+      "line": 4787,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"background:#fff;border-radius:8px;padding:8px;display:inline-block\">",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4872,
+      "line": 4878,
       "kind": "innerHTML",
       "snippet": "if(errBox) errBox.innerHTML='';",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 4882,
+      "line": 4888,
       "kind": "innerHTML",
       "snippet": "if(errBox) errBox.innerHTML=`<div role=\"alert\" style=\"font-size:12px;line-height:1.7;color:var(--warning-ink);background:var(--warning-soft);border-radius:var(-",
       "classification": "escaped"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5025,
+      "line": 5031,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5040,
+      "line": 5046,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5052,
+      "line": 5058,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\"><div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('alert',{size:44})}</div><div class=\"empty-state-title\">",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5064,
+      "line": 5070,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5158,
+      "line": 5164,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5171,
+      "line": 5177,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5184,
+      "line": 5190,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\"><div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('alert',{size:44})}</div><div class=\"empty-state-title\">",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5204,
+      "line": 5210,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5382,
+      "line": 5388,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"gift-check ${d.valid?'valid':'invalid'}\">",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5389,
+      "line": 5395,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"gift-check invalid\"><div class=\"gc-status\">اتصال به سرور برقرار نشد — موجودی خوانده نشد</div></div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5390,
+      "line": 5396,
       "kind": "innerHTML",
       "snippet": "}else{el.innerHTML=`<div class=\"gift-check invalid\"><div class=\"gc-status\">کارت پیدا نشد</div></div>`;}",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5531,
+      "line": 5537,
       "kind": "innerHTML",
       "snippet": "document.getElementById('dnaProgress').innerHTML = Array.from({length:nSlides},()=>'<div class=\"dna-progress-bar\"><i></i></div>').join('');",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5555,
+      "line": 5561,
       "kind": "innerHTML",
       "snippet": "wrap.innerHTML = slides.map((s,i)=>`",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5633,
+      "line": 5639,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5655,
+      "line": 5661,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5808,
+      "line": 5814,
       "kind": "innerHTML",
       "snippet": "page.innerHTML = `<div class=\"chat-list-head\"><button class=\"icon-btn\" onclick=\"go('discover')\" aria-label=\"بازگشت\">${icon('arrowR',{size:20})}</button><h2>پیام",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5814,
+      "line": 5820,
       "kind": "innerHTML",
       "snippet": "document.getElementById('chatListBody').innerHTML =",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5832,
+      "line": 5838,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = `<div class=\"chat-empty\">${msg}</div>`;",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5836,
+      "line": 5842,
       "kind": "innerHTML",
       "snippet": "if (!items.length) { body.innerHTML = `<div class=\"chat-empty\">هنوز گفتگویی نداری.<br>از صفحه‌ی هر رستوران می‌تونی پیام بدی.</div>`; return; }",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5838,
+      "line": 5844,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = items.map(t => `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5868,
+      "line": 5874,
       "kind": "innerHTML",
       "snippet": "page.innerHTML = `",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5917,
+      "line": 5923,
       "kind": "innerHTML",
       "snippet": "bodyEl.innerHTML = `<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('message',{size:40})}</div><div class=\"empty-state-title\">هنوز پیامی نیست</div",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6146,
+      "line": 6152,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6198,
+      "line": 6204,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = _items.length ? _items.map(itemHTML).join('') : '<li class=\"cmdk-empty\">چیزی پیدا نشد</li>';",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6375,
+      "line": 6381,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6395,
+      "line": 6401,
       "kind": "innerHTML",
       "snippet": "tabs.innerHTML = Object.entries(CATS).map(([k,v])=>`<button class=\"notif-tab ${k===_filter?'on':''}\" role=\"tab\" aria-selected=\"${k===_filter}\" data-k=\"${k}\">${v",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6402,
+      "line": 6408,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = `<div class=\"notif-empty\"><div class=\"notif-empty-ic\">${icon('bell',{size:36})}</div><div>اعلانی نداری</div></div>`;",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6405,
+      "line": 6411,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = items.map(n=>{",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6523,
+      "line": 6529,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6598,
+      "line": 6604,
       "kind": "innerHTML",
       "snippet": "e.innerHTML = '<div class=\"ptr-spin\"></div>';",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6803,
+      "line": 6809,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = out; // اگر چیزی نبود → نوارِ خالی (حالتِ خالیِ صادقانه)",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6898,
+      "line": 6904,
       "kind": "innerHTML",
       "snippet": "now.innerHTML = ready",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 7203,
+      "line": 7209,
       "kind": "innerHTML",
       "snippet": "document.getElementById('sheetBody').innerHTML=html;",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 7258,
+      "line": 7264,
       "kind": "innerHTML",
       "snippet": "s.innerHTML='<span class=\"us-msg\"></span><button class=\"us-btn\" type=\"button\">بازگرداندن</button>';",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 7293,
+      "line": 7299,
       "kind": "innerHTML",
       "snippet": "function updateThemeIcon(){ const k=document.getElementById('themeKnob'); if(k) k.innerHTML=icon(_root.getAttribute('data-theme')==='dark'?'moon':'sun',{size:16",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 7351,
+      "line": 7357,
       "kind": "innerHTML",
       "snippet": "b.innerHTML=`",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5725,
+      "line": 5731,
       "kind": "outerHTML",
       "snippet": "host.outerHTML =",
       "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5913,
+      "line": 5919,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl.insertAdjacentHTML('beforeend', bubble(m));",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 5936,
+      "line": 5942,
       "kind": "insertAdjacentHTML",
       "snippet": "tempEl.insertAdjacentHTML('beforeend', `<div class=\"chat-bubble mine pending\"><div class=\"chat-bubble-text\">${chatEsc(body)}</div><div class=\"chat-bubble-time\">",
       "classification": "safe_static"
