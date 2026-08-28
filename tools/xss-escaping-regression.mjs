@@ -62,10 +62,19 @@ globalThis.fetch = async () => ({ ok: false, status: 0, json: async () => ({}) }
 
 // ── بارهای حمله ──
 // هرکدام یک شکلِ متفاوت از فرار: تگِ کامل، بستنِ attribute، و بستنِ رشته‌ی JS.
+//
+// ⚠️ هر بار `markers` دارد و دلیلش یک نقطه‌کورِ واقعی است (۲۰۲۶-۰۸-۲۸):
+// ادعای قبلی فقط `html.includes(payload)` بود، یعنی **کلِ** رشته باید خام
+// می‌بود. با یک رگرسیونِ جزئی — مثلاً وقتی `esc()` دیگر `<` را escape نکند
+// ولی `>` را هنوز بکند — خروجی `<img src=x onerror=alert(1)&gt;` می‌شود:
+// رشته‌ی کامل حاضر نیست، پس گیت **سبز** می‌ماند در حالی که `<` خام بیرون
+// آمده. و رگرسیونِ جزئی دقیقاً همان چیزی است که در عمل رخ می‌دهد؛ کسی کلِ
+// escaper را یک‌جا حذف نمی‌کند. اثباتِ زنده: جهشِ `/[&<>"']/` به `/[&>"']/`
+// از گیتِ قدیمی سالم رد می‌شد.
 const PAYLOADS = [
-  '<img src=x onerror=alert(1)>',
-  '"><script>alert(1)</script>',
-  "');alert(1);//",
+  { value: '<img src=x onerror=alert(1)>', markers: ['<img'] },
+  { value: '"><script>alert(1)</script>', markers: ['<script', '</script'] },
+  { value: "');alert(1);//", markers: ["');alert("] },
 ];
 
 // ⚠️ `pathToFileURL` اجباری است، نه سلیقه: روی ویندوز مسیرِ مطلق (`c:\…`) را
@@ -89,9 +98,37 @@ const CASES = [
   { name: 'slotsHTML (چیپ‌هایِ ساعت)', run: (p) => discover.slotsHTML(poisoned(p)) },
 ];
 
+// ⚠️ هر نشانه باید دستِ‌کم یک کاراکترِ escapeشدنی داشته باشد، وگرنه بعد از
+// escapeِ درست هم به‌صورتِ متنِ بی‌اثر در خروجی می‌ماند و یک مثبتِ کاذبِ دائمی
+// می‌سازد. (`onerror=` دقیقاً همین بود: در `&lt;img … onerror=alert(1)&gt;`
+// هنوز حاضر است ولی هیچ کاری نمی‌کند.)
+for (const { value, markers } of PAYLOADS) {
+  for (const m of markers) {
+    if (!/[&<>"']/.test(m)) {
+      console.error(`✗ نشانه‌ی «${m}» (بارِ ${JSON.stringify(value)}) هیچ کاراکترِ escapeشدنی ندارد`);
+      process.exit(1);
+    }
+  }
+}
+
 let failures = 0;
 for (const c of CASES) {
-  for (const payload of PAYLOADS) {
+  // ── مبنا: همان قالب با مقداری کاملاً بی‌ضرر ──
+  // شمارشِ نشانه‌ها در این خروجی، سهمِ **خودِ قالب** است (مثلاً `<img` برای
+  // عکسِ رستوران). نشتی یعنی شمارش از این مبنا **بالاتر** برود. بدونِ این
+  // مقایسه‌ی تفاضلی، هر نشانه‌ای که قالب به‌طور طبیعی دارد یک مثبتِ کاذب
+  // می‌سازد و گیت روی کدِ سالم هم قرمز می‌شود.
+  let baseline;
+  try {
+    baseline = c.run('BENIGN');
+  } catch (e) {
+    console.error(`✗ ${c.name} با مقدارِ بی‌ضرر استثنا داد: ${e.message}`);
+    failures++;
+    continue;
+  }
+  const count = (hay, needle) => hay.split(needle).length - 1;
+
+  for (const { value: payload, markers } of PAYLOADS) {
     let html;
     try {
       html = c.run(payload);
@@ -100,8 +137,16 @@ for (const c of CASES) {
       failures++;
       continue;
     }
-    if (html.includes(payload)) {
-      console.error(`✗ ${c.name}: بارِ ${JSON.stringify(payload)} **خام** در خروجی است — escape نشده`);
+    // شکستِ کامل: کلِ بار خام بیرون آمده.
+    // شکستِ جزئی: فقط یک نشانه‌ی خطرناک خام رد شده — همان‌قدر قابلِ بهره‌برداری،
+    // و همان چیزی که در عمل رخ می‌دهد (کسی کلِ escaper را یک‌جا حذف نمی‌کند).
+    const leaked = html.includes(payload)
+      ? [JSON.stringify(payload)]
+      : markers
+        .filter((m) => count(html, m) > count(baseline, m))
+        .map((m) => JSON.stringify(m));
+    if (leaked.length > 0) {
+      console.error(`✗ ${c.name}: ${leaked.join('، ')} **خام** در خروجی است — escape نشده`);
       failures++;
     } else {
       console.log(`✓ ${c.name} · ${JSON.stringify(payload)}`);
