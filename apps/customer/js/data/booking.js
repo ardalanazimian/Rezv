@@ -69,6 +69,20 @@ export function depositLabel(r){
   return '';   // نامعلوم → سکوت، نه ادعا
 }
 
+// ⚠️ پنجره‌ی لغوِ رایگان — **قاعده‌ای که واقعاً اجرا می‌شود**، نه متنِ تزئینی.
+//
+// سرور در `lib/economy.ts:111` لغوِ دیرتر از این پنجره را با امتیازِ ۳۵ (به‌جایِ
+// ۸۵) و یک strike ثبت می‌کند، و strike در `computeReputationTier` جلویِ سطحِ
+// platinum را می‌گیرد — نشانی که به رستوران‌ها هم نمایش داده می‌شود. تا پیش از
+// این هیچ‌جای اپ این پنجره را نمی‌گفت: یعنی جریمه اجرا می‌شد ولی اعلام نشده بود.
+//
+// همان قاعده‌ی `depositLabel`: مقدارِ نامعلوم → سکوت، نه حدس.
+export function cancelPolicyLabel(r){
+  const h = r?.freeCancelHours;
+  if(typeof h !== 'number' || !(h > 0)) return '';
+  return `لغوِ رایگان تا ${fmtFa(h)} ساعت پیش از زمانِ رزرو. دیرتر از آن، یک تخلف در سابقه‌ات ثبت می‌شود و نشانِ اعتبارت پایین می‌آید — این نشان به رستوران‌ها هم نشان داده می‌شود.`;
+}
+
 // شیت رزرو که با دکمه‌ی پایین باز می‌شود (تاریخ/ساعت/نفر)
 export function openBookSheet(id){
   const r=findR(id);
@@ -195,7 +209,7 @@ export function bookStep2(r){
   // (بدونِ id) قابلِ ارسال نیست و نمایشش «موفقیتِ جعلی» می‌شد.
   const orderable = r.menu.filter(m=>!m.out && m.id);
   const preorderBlock = orderable.length
-    ? `<div class="field-label">پیش‌سفارش (اختیاری) — <span style="color:var(--teal-600)">+۲۰ امتیاز</span></div>
+    ? `<div class="field-label">پیش‌سفارش (اختیاری)</div>
     <div class="opt-row">${orderable.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" data-mid="${esc(m.id)}" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m.e)} ${esc(m.n)}</div>`).join('')}</div>`
     : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${bk.date} · ${bk.time} · ${bk.party}</div>
@@ -244,6 +258,7 @@ export function bookStep3(r){
     <div class="summary"><div class="sum-row"><span class="k">رستوران</span><span class="v">${esc(r.n)}</span></div><div class="sum-row"><span class="k">تاریخ و ساعت</span><span class="v">${bk.date} · ${bk.time}</span></div><div class="sum-row"><span class="k">تعداد</span><span class="v">${bk.party}</span></div></div>
     ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
+    ${cancelPolicyLabel(r)?`<div class="cancel-policy-note" style="font-size:11.5px;color:var(--t3);margin:8px 2px 0;line-height:1.7">${icon('info',{size:13})} ${esc(cancelPolicyLabel(r))}</div>`:''}
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(r.id))})">تأیید رزرو</button>`;
 }
 export async function confirmBook(id){

@@ -215,9 +215,7 @@ export function renderProfile(){
     </div>
     <div class="settings-list reveal">
       <div class="set-item" id="profEditItem" role="button" tabindex="0" onclick="editProfileInline()"><div class="set-icon">${icon('user',{size:20})}</div><div class="set-label">ویرایش پروفایل</div><span class="set-arrow">‹</span></div>
-      <div class="set-item" role="button" tabindex="0" onclick="toast('','کیف پول کش‌بک')"><div class="set-icon">${icon('wallet',{size:20})}</div><div class="set-label">کیف پول کش‌بک</div><span class="set-arrow">‹</span></div>
       <div class="set-item" role="button" tabindex="0" onclick="openNotifPrefs()"><div class="set-icon">${icon('bell',{size:20})}</div><div class="set-label">اعلان‌ها</div><span class="set-arrow">‹</span></div>
-      <div class="set-item" role="button" tabindex="0" onclick="toast('','پشتیبانی')"><div class="set-icon">${icon('message',{size:20})}</div><div class="set-label">پشتیبانی</div><span class="set-arrow">‹</span></div>
       <div class="set-item" role="button" tabindex="0" onclick="logout()"><div class="set-icon">${icon('logout',{size:20})}</div><div class="set-label" style="color:var(--red)">خروج از حساب</div><span class="set-arrow">‹</span></div>
     </div>
   </div>`;
