@@ -195,6 +195,40 @@ function extractRhs(expr, kind) {
   return (close > open ? expr.slice(open + 1, close) : expr.slice(open + 1)).trim();
 }
 
+// ── آیا یک درجِ `${...}` به‌تنهایی امن است؟ ──
+// امن یعنی یکی از این‌ها: از esc()/jsq() رد شده · فراخوانیِ یک تولیدکننده‌ی
+// allowlistشده که ثابت است HTMLِ مهاجم نمی‌سازد · یا عبارتی کاملاً literal.
+// هر چیزِ دیگر «نمی‌دانیم» است و برچسبِ review می‌گیرد تا دستی بررسی شود.
+//
+// ⚠️ `faNum` عمداً در این فهرست **نیست**: فقط ارقام را نگاشت می‌کند و بقیه
+//    را خام رد می‌کند. اگر روزی کسی وسوسه شد اضافه‌اش کند، اول باید خودِ
+//    faNum را به یک escaper تبدیل کند.
+const SAFE_GENERATORS = /^\$\{\s*(?:icon|fmtFa|gradFor|jsq|esc)\s*\(/;
+
+function isSafeInterp(interp) {
+  if (/\b(?:esc|jsq)\s*\(/.test(interp)) return true;
+  if (SAFE_GENERATORS.test(interp)) return true;
+  // فقط عدد/رشته‌ی literal و عملگرهای ساده — بدونِ هیچ شناسه‌ای
+  const inner = interp.slice(2, -1);
+  if (/^[\s\d+\-*/%().,'"?:]*$/.test(inner)) return true;
+  return false;
+}
+
+
+// ── خطِ پایه‌ی ratchet ──────────────────────────────────────────────
+// این دو عدد «کف»‌اند، نه هدف: گیت فقط اجازه‌ی **کاهش** می‌دهد. اگر یک
+// sinkِ ناامنِ تازه اضافه شود CI قرمز می‌شود؛ اگر تعداد کم شود، گیت خودش
+// می‌گوید عدد را پایین بیاور تا پیشرفت قفل شود.
+//
+// ⚠️ چرا لازم شد (ممیزیِ ۲۰۲۶-۰۸-۲۸): تنها چیزی که CI اجرا می‌کرد
+// `--check` بود و آن **فقط کهنگیِ آرتیفکت** را می‌سنجید. شرطِ شکستِ خودِ
+// ابزار («۶۶ sinkِ unsafe باقی مانده» با exit 1) در مسیرِ تولیدِ آرتیفکت
+// بود که CI هرگز اجرایش نمی‌کرد — یعنی jobِ security می‌توانست سبز باشد
+// در حالی که خودِ ابزار کدبیس را مردود می‌دانست، و هیچ‌کس متوجه نمی‌شد
+// اگر عدد از ۶۶ به ۸۰ می‌رفت.
+const UNSAFE_BASELINE = 66;
+const REVIEW_BASELINE = 22;
+
 function classify(expr, kind) {
   // eval/new Function: همیشه لایقِ review دستی‌اند (به‌ندرت با دیتایِ کاربر، ولی خطرناکن)
   if (kind === 'eval' || kind === 'new Function') return 'review';
@@ -208,8 +242,21 @@ function classify(expr, kind) {
   // — «review» صادقانه‌ترین برچسبه.
   if (/^[a-zA-Z_$][\w.]*$/.test(rhs)) return 'review';
 
-  // escaped: esc( جایی در rhs حضور داره
-  if (/\besc\s*\(/.test(rhs)) return 'escaped';
+  // escaped: **هر** درجِ ${...} باید امن باشد — نه فقط یکی از آن‌ها.
+  //
+  // ⚠️ چرا این سخت‌گیری (ممیزیِ ۲۰۲۶-۰۸-۲۸): قاعده‌ی قبلی یک تستِ زیررشته‌ای
+  // بود و کلِ sink را `escaped` اعلام می‌کرد اگر `esc(` فقط **یک‌جا** دیده
+  // می‌شد. یک templateِ پانزده‌درجی که چهارده تایش خام بود، با یک esc()
+  // برچسبِ امن می‌گرفت و از شمارشِ unsafe بیرون می‌افتاد. دو موردِ واقعی که
+  // بازبینِ بیرونی گرفت و ما نگرفتیم: `${faNum(USER.phone)}` در food-dna و
+  // `${t.party}` در reservation — هر دو داخلِ templateهایی که جایِ دیگرشان
+  // esc() داشت. `faNum` فقط ارقامِ اسکی را نگاشت می‌کند و هر کاراکترِ دیگر
+  // (از جمله `<`) را دست‌نخورده رد می‌کند؛ escaper نیست.
+  if (/\besc\s*\(/.test(rhs)) {
+    const interps = rhs.match(/\$\{[\s\S]*?\}/g) || [];
+    if (interps.every(isSafeInterp)) return 'escaped';
+    return 'review';   // esc() هست ولی همه‌ی درج‌ها را نمی‌پوشاند
+  }
 
   // safe_static: فقط رشته‌یِ literal (تک/دابل‌کوت یا template بدونِ ${...})،
   // بدونِ concatenation با متغیر و بدونِ ${varName} در template.
@@ -255,6 +302,15 @@ function classify(expr, kind) {
 //  متفاوت/محتوایِ متفاوت) رو دوباره بررسی کنه.
 // ═══════════════════════════════════════════════════════════════════════
 const MANUAL_REVIEW_OVERRIDES = new Map([
+  // ── بازبینِ بیرونی (Sourcery/opengrep) روی PR #79 ──
+  // این سه محل را قاعده‌ی `insecure-innerhtml` علامت زد. تک‌تک در سورس بررسی
+  // شدند؛ نتیجه در گزارشِ دورِ ششم. دو موردِ اولِ آن سه (food-dna:191 و
+  // reservation:152) **واقعی بودند و رفع شدند** (faNum یک escaper نیست)، پس
+  // اینجا override نمی‌خورند. فقط موردِ زیر مثبتِ کاذب بود:
+  ['apps/customer/js/features/trips.js:206',
+   'مثبتِ کاذبِ opengrep: تنها مقدارِ پویا esc(res.error?.message||…) است و '
+   + "icon(alert,{size:13}) کلیدِ literal است. قاعده الگویِ innerHTML= را "
+   + 'بدونِ dataflow علامت می‌زند. گاردِ خودمان هم مستقل «escaped» می‌دهد.'],
   // ── الگو ۱: escِ واقعی داخلِ تابعِ کمکیِ جداگانه‌ست (cardHTML/hCardHTML/
   //    wlCard/resItemHTML/sugCard/bubble/chatEsc/itemHTML/...) — بررسی و
   //    تأیید شد که خودِ آن تابع esc()/chatEsc() رو صحیح استفاده می‌کنه. ──
@@ -473,6 +529,28 @@ function main() {
       process.exit(1);
     }
     console.log('✓ آرتیفکتِ ممیزیِ XSS با کد هماهنگ است');
+
+    // ── ratchet: عدد فقط پایین می‌رود ──
+    const nUnsafe = enforced.filter((h) => h.classification === 'unsafe').length;
+    const nReview = enforced.filter((h) => h.classification === 'review').length;
+    let regressed = false;
+
+    for (const [label, n, base] of [
+      ['unsafe', nUnsafe, UNSAFE_BASELINE],
+      ['review', nReview, REVIEW_BASELINE],
+    ]) {
+      if (n > base) {
+        console.error(`✗ sinkهای ${label} از ${base} به ${n} رسید (+${n - base}).`);
+        console.error(`  یا امنش کن یا — اگر واقعاً امن است — در MANUAL_REVIEW_OVERRIDES ثبتش کن.`);
+        regressed = true;
+      } else if (n < base) {
+        console.log(`✓ sinkهای ${label}: ${n} (خطِ پایه ${base}) — عدد را در`);
+        console.log(`  tools/xss-sink-audit.mjs به ${n} برسان تا این پیشرفت قفل شود.`);
+      } else {
+        console.log(`✓ sinkهای ${label} روی خطِ پایه: ${n}`);
+      }
+    }
+    if (regressed) process.exit(1);
     process.exit(0);
   }
 

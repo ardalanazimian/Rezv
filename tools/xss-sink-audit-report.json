@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-28T04:40:22.287Z",
+  "generated_at": "2026-08-28T10:26:56.181Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -12,10 +12,10 @@
   ],
   "total_hits": 224,
   "by_classification": {
-    "review": 5,
+    "review": 22,
     "safe_static": 56,
     "unsafe": 66,
-    "escaped": 40,
+    "escaped": 23,
     "dom_api_safe": 57
   },
   "hits": [
@@ -80,21 +80,21 @@
       "line": 343,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/customer/js/data/booking.js",
       "line": 373,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/customer/js/data/booking.js",
       "line": 396,
       "kind": "innerHTML",
       "snippet": "when.innerHTML=dates.map(d=>`<option value=\"${d.iso}\"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/customer/js/data/booking.js",
@@ -276,7 +276,7 @@
       "line": 58,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = items.map(t => `",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/customer/js/features/chat.js",
@@ -347,7 +347,7 @@
       "line": 88,
       "kind": "innerHTML",
       "snippet": "wrap.innerHTML = slides.map((s,i)=>`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/customer/js/features/food-dna.js",
@@ -361,7 +361,7 @@
       "line": 191,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/customer/js/features/food-dna.js",
@@ -434,7 +434,7 @@
       "line": 160,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = items.map(n=>{",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/customer/js/features/onboarding.js",
@@ -553,7 +553,7 @@
       "line": 152,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=summary+trips.map(t=>{",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/customer/js/theme-pwa.js",
@@ -581,7 +581,7 @@
       "line": 21,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/customer/js/waitlist.js",
@@ -830,7 +830,7 @@
       "line": 958,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/business/js/crm.js",
@@ -1104,7 +1104,7 @@
       "line": 327,
       "kind": "innerHTML",
       "snippet": "document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/business/js/overview.js",
@@ -1118,14 +1118,14 @@
       "line": 376,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/business/js/reservations.js",
       "line": 25,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-reservations').innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/business/js/reservations.js",
@@ -1181,7 +1181,7 @@
       "line": 210,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=NOTIFS.map((n,i)=>`<div class=\"notif-item ${n.unread?'unread':''}\" onclick=\"readNotif(${i})\">",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/business/js/staff-system.js",
@@ -1266,7 +1266,7 @@
       "line": 326,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/business/js/waitlist.js",
@@ -1535,7 +1535,7 @@
       "line": 125,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=list.map(r=>{",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/company/js/overview.js",
@@ -1556,7 +1556,7 @@
       "line": 11,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-detail').innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "apps/company/js/restaurant.js",
@@ -1650,7 +1650,7 @@
       "line": 3670,
       "kind": "innerHTML",
       "snippet": "document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/business.html",
@@ -1664,14 +1664,14 @@
       "line": 3719,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/business.html",
       "line": 3871,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-reservations').innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/business.html",
@@ -1734,7 +1734,7 @@
       "line": 4700,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/business.html",
@@ -1888,7 +1888,7 @@
       "line": 5822,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/business.html",
@@ -2154,7 +2154,7 @@
       "line": 7694,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=NOTIFS.map((n,i)=>`<div class=\"notif-item ${n.unread?'unread':''}\" onclick=\"readNotif(${i})\">",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/business.html",
@@ -2308,7 +2308,7 @@
       "line": 1951,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=list.map(r=>{",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/company.html",
@@ -2322,7 +2322,7 @@
       "line": 2120,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-detail').innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/company.html",
@@ -2574,7 +2574,7 @@
       "line": 2404,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/customer.html",
@@ -2644,21 +2644,21 @@
       "line": 2945,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/customer.html",
       "line": 2975,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/customer.html",
       "line": 2998,
       "kind": "innerHTML",
       "snippet": "when.innerHTML=dates.map(d=>`<option value=\"${d.iso}\"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/customer.html",
@@ -2840,7 +2840,7 @@
       "line": 4610,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=summary+trips.map(t=>{",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/customer.html",
@@ -2959,7 +2959,7 @@
       "line": 5555,
       "kind": "innerHTML",
       "snippet": "wrap.innerHTML = slides.map((s,i)=>`",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/customer.html",
@@ -2973,7 +2973,7 @@
       "line": 5655,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/customer.html",
@@ -3064,7 +3064,7 @@
       "line": 6405,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = items.map(n=>{",
-      "classification": "escaped"
+      "classification": "review"
     },
     {
       "file": "standalone/customer.html",

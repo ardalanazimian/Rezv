@@ -192,10 +192,10 @@ export function renderProfile(){
     <div class="prof-card">
       <div class="prof-card-mesh"></div>
       <div class="prof-card-top">
-        <div class="prof-ava-xl">${userInitial()}</div>
+        <div class="prof-ava-xl">${esc(userInitial())}</div>
         <div class="prof-card-id">
           <div class="prof-card-name">${esc(userName())}</div>
-          <div class="prof-card-phone">${faNum(USER.phone||'')}</div>
+          <div class="prof-card-phone">${esc(faNum(USER.phone||''))}</div>
           <span class="prof-tier">${tier.emoji} عضو ${tier.name}</span>
         </div>
       </div>

@@ -176,7 +176,7 @@ export async function renderTrips(){
         </div>
         <div class="trip-card-body">
           <div class="trip-card-name">${esc(name)}</div>
-          <div class="trip-card-meta"><span>${icon('calendar',{size:13})} ${t.date}</span><span class="tcm-dot">·</span><span>${icon('clock',{size:13})} ${t.time}</span><span class="tcm-dot">·</span><span>${icon('users',{size:13})} ${t.party}</span></div>
+          <div class="trip-card-meta"><span>${icon('calendar',{size:13})} ${esc(t.date)}</span><span class="tcm-dot">·</span><span>${icon('clock',{size:13})} ${esc(t.time)}</span><span class="tcm-dot">·</span><span>${icon('users',{size:13})} ${esc(t.party)}</span></div>
           <div class="trip-card-code">کد رزرو: <b>${esc(t.code)}</b></div>
           ${cancelPolicyRow(t)}
           ${tripTimeline(t.status)}
