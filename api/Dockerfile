@@ -8,7 +8,7 @@ COPY package.json package-lock.json* ./
 # این پرچم `npm ci` با «Could not find Prisma Schema» می‌شکند و **کلِ ساختِ
 # ایمیجِ تولید شکست می‌خورد**. از زمانِ افزودنِ آن هوک (9b0928f، ۲۰۲۶-۰۷-۰۸)
 # این ساخت خراب بود و هیچ jobی در CI ایمیج نمی‌سازد تا معلوم شود.
-RUN npm ci --ignore-scripts || npm install --ignore-scripts
+RUN npm ci || npm install
 COPY . .
 RUN npx prisma generate
 RUN npm run build
