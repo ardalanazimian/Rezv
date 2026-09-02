@@ -80,3 +80,32 @@ export async function expectToast(page: Page, text: string | RegExp) {
   await expect(toast).toBeVisible();
   await expect(toast).toContainText(text);
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  بازکردنِ فرمِ ورودِ پیامکی در پنل‌ها
+//
+//  ⚠️ چرا لازم شد (رگرسیونِ واقعی، ۲۰۲۶-۰۸-۲۶): تا آن تاریخ فرمِ پیش‌فرضِ
+//  ورودِ هر دو پنل شماره+کد بود. با اضافه‌شدنِ ورود با نام کاربری و رمز
+//  (مهاجرتِ ۰۷۴)، فرمِ پیش‌فرض عوض شد و OTP پشتِ یک دکمه رفت. نتیجه:
+//  هلپرهای ورودِ E2E روی `#adminPhone` بی‌نهایت منتظر ماندند و جابِ `e2e`
+//  بعد از ۲۵ دقیقه **cancelled** شد — نه failed، که تشخیصش را سخت‌تر
+//  هم می‌کرد.
+//
+//  چرا فرمِ پیامکی و نه رمز: این تست‌ها **ورود** را نمی‌سنجند، پنل را
+//  می‌سنجند. مسیرِ پیامکی هنوز کاملاً زنده است و mockِ موجود از قبل
+//  پشتیبانی‌اش می‌کند؛ بازنویسیِ ۳۹ نقطه به مسیرِ رمز، هم mock تازه
+//  می‌خواست و هم دامنه‌ی این تست‌ها را بی‌دلیل عوض می‌کرد.
+//
+//  idempotent است: اگر فرمِ پیامکی از قبل باز باشد کاری نمی‌کند، پس
+//  می‌شود بی‌خطر پیش از هر تعاملِ ورود صدایش زد.
+// ═══════════════════════════════════════════════════════════════════════
+export async function openSmsLogin(page: Page, which: 'admin' | 'staff') {
+  const phoneSel = which === 'admin' ? '#adminPhone' : '#staffPhone';
+  const toggleSel = which === 'admin' ? '#adminSmsLoginBtn' : '#staffSmsLoginBtn';
+  // اگر ورودیِ شماره همین حالا هست، فرمِ پیامکی باز است.
+  if (await page.locator(phoneSel).count() > 0) return;
+  const toggle = page.locator(toggleSel);
+  await toggle.waitFor({ state: 'visible', timeout: 10_000 });
+  await toggle.click();
+  await page.locator(phoneSel).waitFor({ state: 'visible', timeout: 10_000 });
+}

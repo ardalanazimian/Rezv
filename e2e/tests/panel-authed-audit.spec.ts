@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openSmsLogin } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ممیزیِ پنل در حالتِ **واردشده** (§۷ و §۱۷)
@@ -12,9 +13,12 @@ import { test, expect, type Page } from '@playwright/test';
 //  در دسترس نیست) — رفتارِ موجود، نه چیزی که برایِ تست ساخته باشیم.
 // ═══════════════════════════════════════════════════════════════════════
 
+// ⚠️ `kind` از ۲۰۲۶-۰۸-۲۶ اضافه شد: فرمِ پیش‌فرضِ ورود حالا نام کاربری و
+// رمز است و OTP پشتِ یک دکمه رفته (مهاجرتِ ۰۷۴). `openSmsLogin` آن دکمه را
+// می‌زند؛ بدونش این تست‌ها روی سلکتورِ شماره بی‌نهایت منتظر می‌مانند.
 const PANELS = [
-  { name: 'business', url: 'http://localhost:8081/', phone: '#staffPhone', send: '#staffSendBtn', code: '#staffCode', verify: '#staffVerifyBtn' },
-  { name: 'company',  url: 'http://localhost:8082/', phone: '#adminPhone', send: '#adminSendBtn',  code: '#adminCode',  verify: '#adminVerifyBtn' },
+  { name: 'business', kind: 'staff' as const, url: 'http://localhost:8081/', phone: '#staffPhone', send: '#staffSendBtn', code: '#staffCode', verify: '#staffVerifyBtn' },
+  { name: 'company',  kind: 'admin' as const, url: 'http://localhost:8082/', phone: '#adminPhone', send: '#adminSendBtn',  code: '#adminCode',  verify: '#adminVerifyBtn' },
 ];
 
 /** پاسخِ موفقِ OTPِ کارکنان/ادمین را mock می‌کنیم.
@@ -41,8 +45,7 @@ async function mockStaffAuth(page: Page) {
 async function loginDemo(page: Page, p: typeof PANELS[number]) {
   await mockStaffAuth(page);
   await page.goto(p.url);
-  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرض «نام کاربری و رمز» است؛ به فرمِ پیامکی سوییچ کن.
-  { const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }
+  await openSmsLogin(page, p.kind);
   await page.locator(p.phone).waitFor({ timeout: 15_000 });
   await page.locator(p.phone).fill('09123456789');
   await page.locator(p.send).click();

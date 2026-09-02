@@ -35,7 +35,11 @@ let adminToken: string;
 before(async () => {
   const adminTenant = await db.tenant.create({ data: { name: '[DEMO] platform admin tenant (hours-approval test)' } });
   adminTenantId = adminTenant.id;
-  process.env.PLATFORM_ADMIN_TENANT_ID = adminTenantId;
+  // ⚠️ اینجا عمداً `process.env.PLATFORM_ADMIN_TENANT_ID` ست **نمی‌شود**.
+  // این `before` ریشه‌ای است، پس ستش در ابتدای کلِ رانْ یک‌بار اجرا می‌شد و
+  // — چون هیچ بازیابی‌ای هم نداشت — تا پایانِ ران برایِ **همه‌ی** فایل‌ها
+  // باقی می‌ماند. اضافی هم بود: `beforeEach`ِ داخلِ describe پایین همین
+  // مقدار را قبل از هر تستِ این فایل ست می‌کند.
   // ⚠️ اصلاح‌شده (۲۰۲۶-۰۸-۲۱): این فیکسچر توکنی برایِ `ADMIN_SUB` می‌ساخت که
   // **هیچ ردیفِ staffی نداشت**. گاردِ قدیمی قبولش می‌کرد چون اصلاً به دیتابیس
   // نگاه نمی‌کرد؛ حالا که `requireAdmin` وضعیتِ واقعیِ کارمند را می‌پرسد،

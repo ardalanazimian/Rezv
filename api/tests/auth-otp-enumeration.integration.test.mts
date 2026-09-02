@@ -1,4 +1,4 @@
-import { test, describe, before, after, beforeEach} from 'node:test';
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { testIp } from './helpers/test-ip.mts';
 
@@ -100,7 +100,6 @@ before(async () => {
   ]);
   platformTenant = tp.id; normalTenant = tn.id;
   prevPlatformEnv = process.env.PLATFORM_ADMIN_TENANT_ID;
-  process.env.PLATFORM_ADMIN_TENANT_ID = platformTenant;
 
   await db.staff.createMany({
     data: [
@@ -113,8 +112,6 @@ before(async () => {
 });
 
 after(async () => {
-  if (prevPlatformEnv === undefined) delete process.env.PLATFORM_ADMIN_TENANT_ID;
-  else process.env.PLATFORM_ADMIN_TENANT_ID = prevPlatformEnv;
   await db.otpCode.deleteMany({ where: { phone: { in: ['+989121000001', '+989121000002', '+989121000003', '+989121000004', '+989121000005'] } } }).catch(() => {});
   await db.staff.deleteMany({ where: { tenantId: { in: [platformTenant, normalTenant] } } }).catch(() => {});
   await db.tenant.deleteMany({ where: { id: { in: [platformTenant, normalTenant] } } }).catch(() => {});
@@ -125,6 +122,12 @@ describe('POST /auth/admin/request — شمارش‌ناپذیریِ ابَرا�
   // به سوئیتِ ROOT می‌چسبند، پس دو فایل که یک متغیرِ سراسری را ست می‌کنند
   // همدیگر را خراب می‌کنند. هر سوئیت مقدارِ خودش را دوباره تثبیت می‌کند.
   beforeEach(() => { process.env.PLATFORM_ADMIN_TENANT_ID = platformTenant; });
+  // بازیابی بعد از هر تستِ همین describe — نه در `after`ِ ریشه، که فقط در
+  // پایانِ کلِ ران اجرا می‌شد و تا آن لحظه env برایِ همه‌ی فایل‌ها آلوده بود.
+  afterEach(() => {
+    if (prevPlatformEnv === undefined) delete process.env.PLATFORM_ADMIN_TENANT_ID;
+    else process.env.PLATFORM_ADMIN_TENANT_ID = prevPlatformEnv;
+  });
 
   test('شماره‌ی غیرادمین و شماره‌ی ناموجود پاسخِ کاملاً یکسان می‌گیرند', async () => {
     await clearLimits();
@@ -157,6 +160,12 @@ describe('POST /auth/staff/request — شمارش‌ناپذیریِ کارکن�
   // به سوئیتِ ROOT می‌چسبند، پس دو فایل که یک متغیرِ سراسری را ست می‌کنند
   // همدیگر را خراب می‌کنند. هر سوئیت مقدارِ خودش را دوباره تثبیت می‌کند.
   beforeEach(() => { process.env.PLATFORM_ADMIN_TENANT_ID = platformTenant; });
+  // بازیابی بعد از هر تستِ همین describe — نه در `after`ِ ریشه، که فقط در
+  // پایانِ کلِ ران اجرا می‌شد و تا آن لحظه env برایِ همه‌ی فایل‌ها آلوده بود.
+  afterEach(() => {
+    if (prevPlatformEnv === undefined) delete process.env.PLATFORM_ADMIN_TENANT_ID;
+    else process.env.PLATFORM_ADMIN_TENANT_ID = prevPlatformEnv;
+  });
 
   test('هر سه حالتِ نامعتبر/غیرفعال پاسخِ یکسان می‌گیرند', async () => {
     await clearLimits();

@@ -183,6 +183,8 @@ function moreBtnHTML(list){
 let FEED_TOKEN = 0;
 /** ابطالِ هر رندرِ در جریانِ فید — هر کسی که مستقیم #feed را می‌نویسد باید صدایش بزند. */
 export function invalidateFeed(){ return ++FEED_TOKEN; }
+/** observerِ انیمیشنِ ورودِ کارت‌ها — یکی برای کلِ اپ، نه یکی به‌ازای هر رندر. */
+let _feedIo=null;
 export function renderFeed(list){
   const f=document.getElementById('feed');
   const token=invalidateFeed();
@@ -204,8 +206,17 @@ export function renderFeed(list){
   setTimeout(()=>{
     if(token!==FEED_TOKEN) return;   // رندرِ تازه‌تری از راه رسیده — این یکی کهنه است
     f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);
-    const io=new IntersectionObserver(es=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);io.unobserve(e.target)}}),{threshold:.05});
-    f.querySelectorAll('.rc').forEach(c=>io.observe(c));
+    // ⚠️ نشتِ observer (رفعِ ۲۰۲۶-۰۸-۲۶): این خط در **هر** رندرِ فید یک
+    // IntersectionObserverِ تازه می‌ساخت و هیچ‌وقت disconnect نمی‌شد. کارت‌های
+    // رندرِ قبلی با جایگزینیِ innerHTML از DOM جدا می‌شوند، ولی observerِ قبلی
+    // هنوز رویشان observation دارد — پس هم خودش و هم گره‌های جداشده زنده
+    // می‌مانند. renderFeed کم اجرا نمی‌شود: جست‌وجو، فیلتر، انتخابِ مناسبت،
+    // «بیشتر» و تازه‌سازی همه صدایش می‌زنند (وجودِ FEED_TOKEN برای لغوِ رندرِ
+    // کهنه دقیقاً به همین دلیل است).
+    // الگو همان singletonِ `theme-pwa.js` در همین ریپو است، نه چیزِ تازه.
+    if(_feedIo) _feedIo.disconnect();
+    _feedIo=new IntersectionObserver((es,obs)=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);obs.unobserve(e.target)}}),{threshold:.05});
+    f.querySelectorAll('.rc').forEach(c=>_feedIo.observe(c));
   },280);
 }
 // کشف بر اساس موقعیت — هر موقعیت به چند vibe نگاشت می‌شود (منطق واقعی روی داده)

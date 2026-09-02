@@ -1010,7 +1010,16 @@ img{display:block;max-width:100%}
 .kpi-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
 .kpi-trend{font-size:11px;font-weight:700;color:var(--t3);background:var(--s-100);padding:3px 9px;border-radius:50px}
 .kpi-trend.up{color:var(--green);background:var(--green-50)}
-.kpi-trend.down{color:var(--red);background:#FEE2E2}
+/* ⚠️ کنتراست: `var(--red)` (#DC2626) رویِ #FEE2E2 نسبتِ **۳٫۹۵** می‌دهد —
+   زیرِ ۴٫۵ی که WCAG AA برایِ متنِ عادی می‌خواهد. متنِ چیپ ۱۱px bold است و
+   «درشت» حساب نمی‌شود (درشت یعنی ≥۱۸٫۶۶px). #B91C1C همان قرمزی است که
+   `.btn-danger` در همین فایل استفاده می‌کند — رنگِ تازه‌ای اختراع نشد —
+   و نسبت را به **۵٫۳۰** می‌رساند.
+   اندازه‌گیری در Chromium واقعی، نه حسابِ دستی: tests/panel-kpi-trend-contrast.spec.ts
+   ⚠️ چرا ممیزیِ کنتراستِ موجود نگرفته بود: چیپِ `.down` فقط وقتی رندر
+   می‌شود که روندی واقعاً نزولی باشد، و دادهٔ mockِ ممیزی هیچ‌وقت آن حالت
+   را نمی‌ساخت. */
+.kpi-trend.down{color:#B91C1C;background:#FEE2E2}
 .kpi-trend.est{color:#A16207;background:#FEF9C3}
 .kpi-card .kpi-val{font-size:30px;font-weight:800;color:var(--ink);line-height:1;letter-spacing:-.5px}
 .kpi-sub{font-size:16px;color:var(--t3);font-weight:600}
@@ -1663,7 +1672,15 @@ img{display:block;max-width:100%}
       <div class="sb-logo">R</div>
       <div class="sb-brand-text">رزرونو<small>پنل کسب‌وکار</small></div>
     </div>
-    <div class="sb-switch" onclick="openBranchSwitcher()">
+    <!-- ⚠️ role/tabindex/onkeydown لازم‌اند چون این یک <div> است، نه <button>:
+         بدونشان سوییچرِ شعبه با کیبورد نه قابلِ رسیدن بود و نه قابلِ فعال‌سازی
+         (یافته‌ی `branch-switcher-not-keyboard-reachable`، راستی‌آزمایی‌شده
+         ۲۰۲۶-۰۸-۲۶). ممیزیِ هدفِ لمسی هم نمی‌دیدش، چون سلکتورش فقط
+         button/a/input/[role]/[tabindex] را می‌گیرد و این هیچ‌کدام نبود.
+         aria-label جداست چون متنِ دیداری نامِ شعبه‌ی *فعلی* است، نه خودِ کنش. -->
+    <div class="sb-switch" role="button" tabindex="0" aria-label="تغییر شعبه"
+         onclick="openBranchSwitcher()"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openBranchSwitcher();}">
       <div class="sb-switch-emoji" id="swEmoji" style="background:linear-gradient(135deg,#34D399,#059669)">🌿</div>
       <div class="sb-switch-info"><div class="sb-switch-name" id="swName">کافه‌رستوران ویستا</div><div class="sb-switch-meta">شعبه اصلی</div></div>
       <span class="sb-switch-arr">⇅</span>
@@ -2809,7 +2826,15 @@ async function loadTopGuestsForDashboard(){
       // باشد (رفعِ باگش در customer-insights.ts)، ولی این عددِ مشتق‌شده تا
       // ۶۰ ثانیه کش می‌شود؛ کلمپِ دولایه یعنی حتی یک مقدارِ کهنه/منفی هم
       // «۱۰۱٪ بازگشت» در UI نشان نمی‌دهد.
-      ret:c.churn_risk_score!=null?Math.min(100,Math.max(0,100-c.churn_risk_score)):0,
+      // ⚠️ `null` یعنی «نمی‌دانیم»، نه صفر (ML_CONTRACT: «کمبودِ شواهد یعنی
+      // insufficient_data/null، نه صفر — صفر یعنی اندازه گرفتیم و هیچ بود»).
+      // قبلاً اینجا `:0` بود و UI برایِ مشتریِ تازه‌ای که سرور هنوز
+      // churn_risk_score ندارد «۰٪ بازگشت» نشان می‌داد — یعنی «قطعاً
+      // برنمی‌گردد»، بدترین خوانشِ ممکن، در حالی که هیچ داده‌ای نبود.
+      // خطِ بالاییِ همین map از قبل درست عمل می‌کرد (`spent: … : '—'`) و
+      // `crm.js` هم همین قاعده را صریح نوشته — پس این یک جاافتادگی بود، نه
+      // تصمیم.
+      ret:c.churn_risk_score!=null?Math.min(100,Math.max(0,100-c.churn_risk_score)):null,
     }));
     _guestsLoaded=true;
     return true;
@@ -3834,7 +3859,7 @@ function viewCustomerHistory(name){
     <div class="ch-stats">
       <div class="ch-stat"><div class="ch-stat-v">${fa(c.visits||0)}</div><div class="ch-stat-l">بازدید</div></div>
       <div class="ch-stat"><div class="ch-stat-v">${c.spent||'۰'}</div><div class="ch-stat-l">خرید</div></div>
-      <div class="ch-stat"><div class="ch-stat-v">${fa(c.ret||0)}٪</div><div class="ch-stat-l">بازگشت</div></div>
+      <div class="ch-stat"><div class="ch-stat-v">${c.ret==null?'—':fa(c.ret)+'٪'}</div><div class="ch-stat-l">بازگشت</div></div>
     </div>
     <div class="ch-hist-title">سابقه‌ی رزرو</div>
     <div class="ch-hist">${history.length?history.map(h=>`<div class="ch-hrow"><span>${icon(STATUS_META[h.status]?.icon||'info',{size:12})} ${h.dLabel||h.date}</span><span class="ch-hmeta">${h.t} · ${fa(h.party)} نفر</span></div>`).join(''):'<div class="snote-empty">سابقه‌ای ثبت نشده</div>'}</div>`);
@@ -7936,10 +7961,13 @@ function showStaffLogin(){
     <label class="login-field-label" for="staffPass">رمز عبور</label>
     <input class="login-inp" id="staffPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')staffPasswordLogin()">
     <button class="login-btn" id="staffLoginBtn" onclick="staffPasswordLogin()">ورود به پنل</button>
-    <button class="login-back" onclick="showStaffLoginPhone()">ورود با پیامک</button>
+    <button class="login-back" id="staffSmsLoginBtn" onclick="showStaffLoginPhone()">ورود با پیامک</button>
     <div class="login-foot">اگر نام کاربری نداری، با پشتیبانی رزرونو تماس بگیر</div>`;
   setTimeout(()=>document.getElementById('staffUser')?.focus(),200);
 }
+
+/** اطلاعاتِ کارمند در حالتِ دمو/آفلاین — همان شکلی که مسیرِ OTP می‌سازد. */
+const DEMO_STAFF_INFO = { role:'owner', restaurant_name:'کافه‌رستوران ویستا' };
 
 async function staffPasswordLogin(){
   const u = (document.getElementById('staffUser')?.value||'').trim();
@@ -7949,11 +7977,24 @@ async function staffPasswordLogin(){
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
   const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
 
-  if (location.protocol === 'file:') { await enterStaffPanel(true); return; }
+  // ⚠️ باگِ P0 که با اسپکِ e2eِ تازه گرفته شد (۲۰۲۶-۰۸-۲۶): این سه خط
+  // `enterStaffPanel()` را صدا می‌زدند — تابعی که **در این اپ وجود ندارد**.
+  // نامِ واقعی `enterPanel` است (پایینِ همین فایل). یعنی ورودِ رمز — که از
+  // مهاجرتِ ۰۷۴ فرمِ *پیش‌فرضِ* این پنل است — با ReferenceError می‌مرد: توکن
+  // ذخیره می‌شد ولی overlay هرگز بسته نمی‌شد و کاربر گیر می‌کرد.
+  // هر ۹ جابِ CI سبز بود چون هیچ اسپکی این مسیر را درایو نمی‌کرد.
+  if (location.protocol === 'file:') { STAFF_INFO = DEMO_STAFF_INFO; enterPanel(true); return; }
 
   const res = await API.staffLogin(u, p);
-  if (res.ok && res.data?.access){ await enterStaffPanel(); return; }
-  if (res.offline){ await enterStaffPanel(true); return; }
+  if (res.ok && res.data?.access){
+    // STAFF_INFO دقیقاً مثلِ مسیرِ OTP ست می‌شود. بدونش منو و تاپ‌بار بدونِ
+    // نقش و نامِ رستوران رندر می‌شدند — همان واگرایی‌ای که کامنتِ
+    // `API.staffLogin` در data.js صریحاً منع می‌کند.
+    STAFF_INFO = res.data.staff || STAFF_INFO;
+    enterPanel();
+    return;
+  }
+  if (res.offline){ STAFF_INFO = DEMO_STAFF_INFO; enterPanel(true); return; }
   // پیامِ سرور برای «کاربر نیست» و «رمز غلط» عمداً یکسان است؛ اینجا هم
   // نباید دقیق‌تر شود، وگرنه نشتی که سرور بست از سمتِ کلاینت باز می‌شود.
   toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');
@@ -7997,15 +8038,21 @@ async function staffSendOtp(){
 }
 function showStaffLoginCode(devCode, offline){
   setStaffGateLocked(true);
+  // ⚠️ escapeِ صریح (۲۰۲۶-۰۸-۲۷): `toFaDigits` فقط ارقامِ ASCII را نگاشت می‌کند و
+  // هر چیزِ دیگری را دست‌نخورده رد می‌کند، پس به‌تنهایی محافظ نیست. `devCode`
+  // از **پاسخِ سرور** می‌آید و تنها sinkِ `unsafe`ِ این فایل بود که واقعاً دادهٔ
+  // غیرثابت داشت (tools/xss-sink-audit.mjs).
+  // ترتیب عمدی است: اول toFaDigits بعد esc — برعکسش `&#39;`ِ خروجیِ esc را هم
+  // فارسی می‌کرد و خودِ entity را خراب می‌کرد.
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('mail',{size:34})}</div>
     <div class="login-title">کد ورود رو وارد کن</div>
-    <div class="login-sub">کد ورود به شماره‌ی ${toFaDigits(_staffPhone)} ارسال شد</div>
+    <div class="login-sub">کد ورود به شماره‌ی ${esc(toFaDigits(String(_staffPhone ?? '')))} ارسال شد</div>
     <label class="login-field-label" for="staffCode">کد ورود</label>
     <input class="login-inp code" id="staffCode" inputmode="numeric" maxlength="6" placeholder="······" onkeydown="if(event.key==='Enter')staffConfirmOtp()">
     <button class="login-btn" id="staffVerifyBtn" onclick="staffConfirmOtp()">ورود به پنل</button>
     <button class="login-back" onclick="showStaffLoginPhone()">تغییر شماره</button>
-    ${devCode ? `<div class="login-hint">${offline?'حالت دمو (بک‌اند متصل نیست):':'حالت توسعه:'} کد ورود <b>${toFaDigits(devCode)}</b> است</div>` : ''}`;
+    ${devCode ? `<div class="login-hint">${offline?'حالت دمو (بک‌اند متصل نیست):':'حالت توسعه:'} کد ورود <b>${esc(toFaDigits(String(devCode)))}</b> است</div>` : ''}`;
   setTimeout(()=>document.getElementById('staffCode')?.focus(),200);
 }
 async function staffConfirmOtp(){

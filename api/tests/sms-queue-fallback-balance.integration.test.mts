@@ -1,4 +1,4 @@
-import { test, describe, before, after, beforeEach } from 'node:test';
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 // [پورتِ ادغام ۲۰۲۶-۰۸-۲۶] ارائه‌دهنده به ملی‌پیامک مهاجرت کرد؛ «کلیدِ ترانسپورت» حالا سه متغیر است.
 const MELI_KEYS = ['MELIPAYAMAK_USERNAME','MELIPAYAMAK_PASSWORD','MELIPAYAMAK_BODYID_OTP','MELIPAYAMAK_BODYID_CAMPAIGN'];
@@ -77,35 +77,47 @@ function unqueueableJob(overrides: Record<string, unknown> = {}) {
   };
 }
 
-before(async () => {
-  const t = await db.tenant.create({ data: { name: `[DEMO] tenant sms-fallback ${SFX}` } });
-  tenantId = t.id;
-  const r = await db.restaurant.create({
-    data: {
-      tenantId, slug: `zz-smsfb-${SFX}`, name: '[DEMO] رستورانِ سقفِ پیامک',
-      clubPrefix: 'SFB', smsBalance: 0,
-    },
-  });
-  restaurantId = r.id;
-  // بدونِ کلیدِ کاوه‌نگار، `sendSmsNow` هیچ درخواستِ شبکه‌ای نمی‌زند ولی
-  // `smsFailed{reason:"no_api_key"}` را می‌شمارد — یعنی «تلاش برای ارسال»
-  // قابلِ اندازه‌گیری است بدونِ اینکه پیامکِ واقعی برود.
-  setSmsTransport(false);
-});
-
-after(async () => {
-  globalThis.fetch = ORIG_FETCH;
-  for (const [k, v] of ORIG_MELI) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
-  // فقط ردیف‌های خودِ این فایل — نه `kind='sms'`ِ کلی: رانر تک‌پروسه‌ای است و
-  // پاک‌کردنِ صفِ دیگران می‌تواند تستِ بعدی را بی‌صدا خراب کند.
-  await db.$executeRaw`DELETE FROM jobs WHERE kind = 'sms' AND payload->>'to' = ${guestPhone}`
-    .catch(() => 0);
-  await db.smsTransaction.deleteMany({ where: { restaurantId } }).catch(() => {});
-  await db.restaurant.deleteMany({ where: { tenantId } }).catch(() => {});
-  await db.tenant.deleteMany({ where: { id: tenantId } }).catch(() => {});
-});
-
 describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ — پول)', () => {
+  // ⚠️ بازیابی از هوکِ **ریشه‌ای** به اینجا آمد: هوکِ ریشه فقط در پایانِ کلِ
+  // رانِ تک-process اجرا می‌شود، پس تا آن لحظه حالتِ سراسری برایِ همه‌ی
+  // فایل‌های بعدی آلوده می‌ماند. گاردش: tests/root-hook-globals.test.mts
+  //
+  // ⚠️ دورِ دومِ همان درس (۲۰۲۶-۰۸-۲۷): `before`/`after` هم ریشه‌ای بودند.
+  // `setSmsTransport(false)` چهار متغیرِ MELIPAYAMAK_* را **در ابتدای کلِ ران**
+  // پاک می‌کرد و بازگرداندنشان تا **پایانِ کلِ ران** عقب می‌افتاد — یعنی هر
+  // فایلِ دیگری که به پیکربندیِ ترانسپورتِ پیامک نگاه می‌کرد، در تمامِ ران آن
+  // را «تنظیم‌نشده» می‌دید. با انتقال به داخلِ describe، پنجره به همین فایل
+  // محدود شد. (نسخه‌ی اولِ گاردِ ساختاری این را نمی‌دید چون فقط متنِ خام را
+  // با پیشوند مچ می‌کرد و اینجا نوشتن با `process.env[k]` است.)
+  before(async () => {
+    const t = await db.tenant.create({ data: { name: `[DEMO] tenant sms-fallback ${SFX}` } });
+    tenantId = t.id;
+    const r = await db.restaurant.create({
+      data: {
+        tenantId, slug: `zz-smsfb-${SFX}`, name: '[DEMO] رستورانِ سقفِ پیامک',
+        clubPrefix: 'SFB', smsBalance: 0,
+      },
+    });
+    restaurantId = r.id;
+    // بدونِ کلیدِ ترانسپورت، `sendSmsNow` هیچ درخواستِ شبکه‌ای نمی‌زند ولی
+    // `smsFailed{reason:"no_api_key"}` را می‌شمارد — یعنی «تلاش برای ارسال»
+    // قابلِ اندازه‌گیری است بدونِ اینکه پیامکِ واقعی برود.
+    setSmsTransport(false);
+  });
+
+  after(async () => {
+    for (const [k, v] of ORIG_MELI) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    // فقط ردیف‌های خودِ این فایل — نه `kind='sms'`ِ کلی: رانر تک‌پروسه‌ای است و
+    // پاک‌کردنِ صفِ دیگران می‌تواند تستِ بعدی را بی‌صدا خراب کند.
+    await db.$executeRaw`DELETE FROM jobs WHERE kind = 'sms' AND payload->>'to' = ${guestPhone}`
+      .catch(() => 0);
+    await db.smsTransaction.deleteMany({ where: { restaurantId } }).catch(() => {});
+    await db.restaurant.deleteMany({ where: { tenantId } }).catch(() => {});
+    await db.tenant.deleteMany({ where: { id: tenantId } }).catch(() => {});
+  });
+
+  afterEach(() => { globalThis.fetch = ORIG_FETCH; });
+
   beforeEach(async () => { globalThis.fetch = ORIG_FETCH; });
 
   test('کنترلِ مثبت: مسیرِ عادی واقعاً در صف می‌نشیند و اعتبار کم نمی‌کند', async () => {

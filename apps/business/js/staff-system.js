@@ -452,10 +452,13 @@ function showStaffLogin(){
     <label class="login-field-label" for="staffPass">رمز عبور</label>
     <input class="login-inp" id="staffPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')staffPasswordLogin()">
     <button class="login-btn" id="staffLoginBtn" onclick="staffPasswordLogin()">ورود به پنل</button>
-    <button class="login-back" onclick="showStaffLoginPhone()">ورود با پیامک</button>
+    <button class="login-back" id="staffSmsLoginBtn" onclick="showStaffLoginPhone()">ورود با پیامک</button>
     <div class="login-foot">اگر نام کاربری نداری، با پشتیبانی رزرونو تماس بگیر</div>`;
   setTimeout(()=>document.getElementById('staffUser')?.focus(),200);
 }
+
+/** اطلاعاتِ کارمند در حالتِ دمو/آفلاین — همان شکلی که مسیرِ OTP می‌سازد. */
+const DEMO_STAFF_INFO = { role:'owner', restaurant_name:'کافه‌رستوران ویستا' };
 
 async function staffPasswordLogin(){
   const u = (document.getElementById('staffUser')?.value||'').trim();
@@ -465,11 +468,24 @@ async function staffPasswordLogin(){
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
   const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
 
-  if (location.protocol === 'file:') { await enterStaffPanel(true); return; }
+  // ⚠️ باگِ P0 که با اسپکِ e2eِ تازه گرفته شد (۲۰۲۶-۰۸-۲۶): این سه خط
+  // `enterStaffPanel()` را صدا می‌زدند — تابعی که **در این اپ وجود ندارد**.
+  // نامِ واقعی `enterPanel` است (پایینِ همین فایل). یعنی ورودِ رمز — که از
+  // مهاجرتِ ۰۷۴ فرمِ *پیش‌فرضِ* این پنل است — با ReferenceError می‌مرد: توکن
+  // ذخیره می‌شد ولی overlay هرگز بسته نمی‌شد و کاربر گیر می‌کرد.
+  // هر ۹ جابِ CI سبز بود چون هیچ اسپکی این مسیر را درایو نمی‌کرد.
+  if (location.protocol === 'file:') { STAFF_INFO = DEMO_STAFF_INFO; enterPanel(true); return; }
 
   const res = await API.staffLogin(u, p);
-  if (res.ok && res.data?.access){ await enterStaffPanel(); return; }
-  if (res.offline){ await enterStaffPanel(true); return; }
+  if (res.ok && res.data?.access){
+    // STAFF_INFO دقیقاً مثلِ مسیرِ OTP ست می‌شود. بدونش منو و تاپ‌بار بدونِ
+    // نقش و نامِ رستوران رندر می‌شدند — همان واگرایی‌ای که کامنتِ
+    // `API.staffLogin` در data.js صریحاً منع می‌کند.
+    STAFF_INFO = res.data.staff || STAFF_INFO;
+    enterPanel();
+    return;
+  }
+  if (res.offline){ STAFF_INFO = DEMO_STAFF_INFO; enterPanel(true); return; }
   // پیامِ سرور برای «کاربر نیست» و «رمز غلط» عمداً یکسان است؛ اینجا هم
   // نباید دقیق‌تر شود، وگرنه نشتی که سرور بست از سمتِ کلاینت باز می‌شود.
   toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');
@@ -513,15 +529,21 @@ async function staffSendOtp(){
 }
 function showStaffLoginCode(devCode, offline){
   setStaffGateLocked(true);
+  // ⚠️ escapeِ صریح (۲۰۲۶-۰۸-۲۷): `toFaDigits` فقط ارقامِ ASCII را نگاشت می‌کند و
+  // هر چیزِ دیگری را دست‌نخورده رد می‌کند، پس به‌تنهایی محافظ نیست. `devCode`
+  // از **پاسخِ سرور** می‌آید و تنها sinkِ `unsafe`ِ این فایل بود که واقعاً دادهٔ
+  // غیرثابت داشت (tools/xss-sink-audit.mjs).
+  // ترتیب عمدی است: اول toFaDigits بعد esc — برعکسش `&#39;`ِ خروجیِ esc را هم
+  // فارسی می‌کرد و خودِ entity را خراب می‌کرد.
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('mail',{size:34})}</div>
     <div class="login-title">کد ورود رو وارد کن</div>
-    <div class="login-sub">کد ورود به شماره‌ی ${toFaDigits(_staffPhone)} ارسال شد</div>
+    <div class="login-sub">کد ورود به شماره‌ی ${esc(toFaDigits(String(_staffPhone ?? '')))} ارسال شد</div>
     <label class="login-field-label" for="staffCode">کد ورود</label>
     <input class="login-inp code" id="staffCode" inputmode="numeric" maxlength="6" placeholder="······" onkeydown="if(event.key==='Enter')staffConfirmOtp()">
     <button class="login-btn" id="staffVerifyBtn" onclick="staffConfirmOtp()">ورود به پنل</button>
     <button class="login-back" onclick="showStaffLoginPhone()">تغییر شماره</button>
-    ${devCode ? `<div class="login-hint">${offline?'حالت دمو (بک‌اند متصل نیست):':'حالت توسعه:'} کد ورود <b>${toFaDigits(devCode)}</b> است</div>` : ''}`;
+    ${devCode ? `<div class="login-hint">${offline?'حالت دمو (بک‌اند متصل نیست):':'حالت توسعه:'} کد ورود <b>${esc(toFaDigits(String(devCode)))}</b> است</div>` : ''}`;
   setTimeout(()=>document.getElementById('staffCode')?.focus(),200);
 }
 async function staffConfirmOtp(){

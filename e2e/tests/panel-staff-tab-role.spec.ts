@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openSmsLogin } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  تبِ «کارکنان» با **نقش** گیت می‌شود، نه با کلیدِ مجوز
@@ -36,10 +37,10 @@ async function loginAs(page: Page, role: 'owner' | 'manager' | 'staff', permissi
       : r.fulfill({ status: 200, contentType: 'application/json', body: '{"data":[],"items":[],"total":0}' }));
 
   await page.goto(BUSINESS);
-  // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
-  // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
-  {{ const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }}
-  await page.locator('#staffPhone').waitFor({ timeout: 15_000 });
+  // ⚠️ waitFor روی #staffPhone را اینجا نگذار: از مهاجرتِ ۰۷۴ آن فیلد تا وقتی
+  // «ورود با پیامک» زده نشود اصلاً در DOM نیست. خودِ openSmsLogin هم منتظرِ
+  // دکمه می‌ماند و هم منتظرِ ظاهرشدنِ فیلد.
+  await openSmsLogin(page, 'staff');
   await page.locator('#staffPhone').fill('09123456789');
   await page.locator('#staffSendBtn').click();
   await page.locator('#staffCode').waitFor({ timeout: 15_000 });

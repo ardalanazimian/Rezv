@@ -1,4 +1,4 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { testIp } from './helpers/test-ip.mts';
 import { readFileSync } from 'node:fs';
@@ -77,20 +77,30 @@ before(async () => {
   outsiderOwnerId = await mk(otherTenantId, 'owner', true);
 });
 
-after(async () => {
-  await db.staff.deleteMany({ where: { tenantId: { in: [platformTenantId, otherTenantId] } } });
-  await db.tenant.deleteMany({ where: { id: { in: [platformTenantId, otherTenantId] } } });
-  // محیط را دقیقاً همان‌طور که بود برگردان — فایل‌های بعدیِ رانر به آن وابسته‌اند.
+// ⚠️ بازیابیِ محیط از هوکِ **ریشه‌ای** بیرون آمد (۲۰۲۶-۰۸-۲۷). تک‌تکِ
+// تست‌های این فایل عمداً `MAINTENANCE_KEY`/`CRON_SECRET`/
+// `PLATFORM_ADMIN_TENANT_ID` را ست یا حذف می‌کنند؛ تا دیروز بازگرداندنشان در
+// `after`ِ ریشه بود که در رانرِ تک-process فقط در **پایانِ کلِ ران** اجرا
+// می‌شود — یعنی بعد از این فایل، همه‌ی فایل‌های بعدی محیطِ آلوده را می‌دیدند.
+// حالا `afterEach` در هر دو describe، پنجره را به یک تست محدود می‌کند.
+function restoreAuthEnv() {
   const set = (k: string, v: string | undefined) => {
     if (v === undefined) delete process.env[k]; else process.env[k] = v;
   };
   set('MAINTENANCE_KEY', ORIG.maint);
   set('CRON_SECRET', ORIG.cron);
   set('PLATFORM_ADMIN_TENANT_ID', ORIG.tenant);
+}
+
+after(async () => {
+  await db.staff.deleteMany({ where: { tenantId: { in: [platformTenantId, otherTenantId] } } });
+  await db.tenant.deleteMany({ where: { id: { in: [platformTenantId, otherTenantId] } } });
 });
 
 // ─────────────────────────────────────────────────────────────────────
 describe('guardMaintenance — درِ cronها', () => {
+  afterEach(restoreAuthEnv);
+
   test('کلیدِ درست از هدرِ x-maintenance-key رد می‌شود', () => {
     process.env.MAINTENANCE_KEY = 'maint-secret-abc';
     delete process.env.CRON_SECRET;
@@ -151,6 +161,8 @@ describe('guardMaintenance — درِ cronها', () => {
 
 // ─────────────────────────────────────────────────────────────────────
 describe('requireAdmin — درِ پنلِ شرکت', () => {
+  afterEach(restoreAuthEnv);
+
   test('مدیرِ پلتفرمِ سالم عبور می‌کند (کنترلِ مثبت)', async () => {
     // بدونِ این، گاردی که *همیشه* رد کند هم بقیه‌ی تست‌ها را پاس می‌کرد.
     process.env.PLATFORM_ADMIN_TENANT_ID = platformTenantId;

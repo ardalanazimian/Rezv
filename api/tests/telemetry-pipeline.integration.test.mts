@@ -1,4 +1,4 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -102,9 +102,6 @@ after(async () => {
   await db.platformEvent.deleteMany({ where: { OR: [{ sessionId: SID }, { type: PROBE_TYPE }] } }).catch(() => {});
   await db.staff.deleteMany({ where: { tenantId: { in: [platformTenantId, otherTenantId] } } }).catch(() => {});
   await db.tenant.deleteMany({ where: { id: { in: [platformTenantId, otherTenantId] } } }).catch(() => {});
-  // محیط را دقیقاً همان‌طور که بود برگردان — فایل‌های بعدیِ رانر به آن وابسته‌اند.
-  if (ORIG_TENANT === undefined) delete process.env.PLATFORM_ADMIN_TENANT_ID;
-  else process.env.PLATFORM_ADMIN_TENANT_ID = ORIG_TENANT;
 });
 
 // ─────────────────────────────────────────────────────────────────────
@@ -295,6 +292,16 @@ describe('شکستِ درج صادقانه گزارش می‌شود', () => {
 //  ۴) بن‌بستِ خواندن — حالا یک مصرف‌کننده هست
 // ─────────────────────────────────────────────────────────────────────
 describe('GET /admin/telemetry — تنها مصرف‌کننده‌ی platform_events', () => {
+  // ⚠️ این بازیابی تا ۲۰۲۶-۰۸-۲۶ در `after`ِ **ریشه‌ای** بود و کامنتش می‌گفت
+  // «فایل‌های بعدیِ رانر به آن وابسته‌اند» — قصد درست بود ولی جایش قصد را
+  // خنثی می‌کرد: هوکِ ریشه فقط در پایانِ **کلِ ران** اجرا می‌شود، پس env از
+  // اولین تستِ همین describe تا انتهای ران آلوده می‌ماند. تنها همین describe
+  // آن را می‌نویسد، پس بازیابی به اینجا آمد.
+  afterEach(() => {
+    if (ORIG_TENANT === undefined) delete process.env.PLATFORM_ADMIN_TENANT_ID;
+    else process.env.PLATFORM_ADMIN_TENANT_ID = ORIG_TENANT;
+  });
+
   const adminReq = (headers: Record<string, string>, qs = '') =>
     ADMIN_GET(new Request(`http://x/api/v1/admin/telemetry${qs}`, {
       headers: { 'x-real-ip': testIp(), ...headers },
