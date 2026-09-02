@@ -160,7 +160,7 @@ async function rFloor(){
       </div>
       <div class="floor ${floorEdit?'edit-mode':''}">
         <div class="tables-area">
-          ${TABLES.map((t,i)=>`<div class="table-el ${t.s}" ${floorEdit?'':'role="button" tabindex="0"'} onclick="${floorEdit?'':`openTableSheet(${i})`}">
+          ${TABLES.map((t,i)=>`<div class="table-el ${esc(t.s)}" ${floorEdit?'':'role="button" tabindex="0"'} onclick="${floorEdit?'':`openTableSheet(${i})`}">
             <button class="t-remove" onclick="event.stopPropagation();removeTable(${i})">×</button>
             <span class="t-icon">${icon('utensils',{size:15})}</span><span class="t-num">${esc(tableLabel(t))}</span>
             ${t._guest?`<span class="t-guest">${esc(t._guest.length>10?t._guest.slice(0,9)+'…':t._guest)}</span><span class="t-time">${t._time}</span>`:`<span class="t-cap">${fa(t.c)} نفره</span>`}

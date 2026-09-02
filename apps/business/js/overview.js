@@ -179,7 +179,7 @@ function renderEnterpriseDashboard(){
         <div class="kpi-top"><span class="kpi-ic" style="background:var(--green-50)">${icon('utensils',{size:18})}</span><span class="kpi-trend">${fa(k.occupancyPct)}٪</span></div>
         <div class="kpi-val">${fa(k.seatedTables)}<span class="kpi-sub">/${fa(k.totalTables)}</span></div>
         <div class="kpi-lbl">اشغال فعلی</div>
-        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:0" data-w="${k.occupancyPct}"></div></div>
+        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:0" data-w="${esc(k.occupancyPct)}"></div></div>
       </div>
       <div class="kpi-card">
         <div class="kpi-top"><span class="kpi-ic" style="background:#FEF3C7">${icon('clock',{size:18})}</span><span class="kpi-trend">${fa(k.expectedGuests)} نفر</span></div>
@@ -327,9 +327,9 @@ function renderTopCustomers(){
   document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`
     <div class="top-cust" onclick="viewCustomerHistory(${jsq(c.name)})">
       <span class="top-rank">${fa(i+1)}</span>
-      <span class="top-ava">${c.ava}</span>
+      <span class="top-ava">${esc(c.ava)}</span>
       <div class="top-body"><div class="top-name">${esc(c.name)} ${c.seg==='vip'?'<span class="seg-vip">VIP</span>':''}</div>
-        <div class="top-meta">${fa(c.visits)} بازدید · ${c.spent} خرید</div></div>
+        <div class="top-meta">${fa(c.visits)} بازدید · ${esc(c.spent)} خرید</div></div>
       <span class="top-arrow">${icon('chevronL',{size:14})}</span>
     </div>`).join('');
 }
@@ -375,7 +375,7 @@ function renderStaffNotes(){
   if(API.getToken() && !_notesLoaded){ loadStaffNotes().then(renderStaffNotes); }
   el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`
     <div class="snote"${n.pinned?' style="border-color:var(--amber);background:var(--amber-50)"':''}><div class="snote-body"><div class="snote-txt">${n.pinned?icon('pin',{size:13})+' ':''}${esc(n.txt)}</div>
-      <div class="snote-meta">${esc(n.who)} · ${n.time}</div></div>
+      <div class="snote-meta">${esc(n.who)} · ${esc(n.time)}</div></div>
       <button class="snote-del" onclick="delStaffNote(${jsq(n.id||'')})">×</button></div>`).join(''):'<div class="snote-empty">یادداشتی ثبت نشده</div>';
 }
 function addStaffNote(){

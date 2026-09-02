@@ -17,9 +17,13 @@ scrape_configs:
   - job_name: rezervno-api
     metrics_path: /api/metrics
     scheme: http
-    # اگر METRICS_TOKEN تنظیم شده باشد، اینجا هم باید بیاید:
-    # authorization:
-    #   credentials: "${METRICS_TOKEN}"
+    # ⚠️ اجباری، نه اختیاری: /api/metrics در production بدونِ این هدر یا ۴۰۱
+    # می‌دهد (توکن ست است) یا ۵۰۳ (ست نیست) — هر دو یعنی **همه‌ی داشبوردها و
+    # هر ۱۳ alert بی‌صدا خالی‌اند**، نه چون چیزی سالم است بلکه چون داده‌ای نیست.
+    # `credentials_file` است نه `credentials: "${METRICS_TOKEN}"` — Prometheus
+    # متغیرِ محیطی را در فایلِ پیکربندی بسط نمی‌دهد و رشته‌ی خام را می‌فرستد.
+    authorization:
+      credentials_file: /etc/prometheus/metrics-token
     static_configs:
       - targets: ['api:3000']      # نام سرویس در docker-compose
         labels:

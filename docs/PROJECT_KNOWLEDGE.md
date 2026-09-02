@@ -249,7 +249,9 @@ Two supported models — both present in the repo:
 ### A) Managed (Vercel) — production
 - **API**: a Vercel project with Root Directory `api`, framework Next.js.
   Build = `prisma generate && next build`; `postinstall` also runs
-  `prisma generate`. Cron endpoints are wired via `api/vercel.json` `crons`.
+  `prisma generate`. **(Corrected 2026-08-28: the API is not deployed to Vercel —
+  it runs as a long-lived Docker container behind Caddy, see `deploy/caddy/Caddyfile`.
+  `api/vercel.json` was deleted; cron scheduling lives in `cron/crontab`.)**
 - **Front-ends**: static. Because `apps/*` use absolute asset paths, each app is
   intended to be deployed with its own Root Directory (`apps/customer`, etc.).
   **(uncertain / follow-up: no root `vercel.json` wires the front-ends; this is

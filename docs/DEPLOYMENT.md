@@ -119,9 +119,12 @@ JWT_SECRET (≥32), JWT_REFRESH_SECRET (≥32, different), ALLOWED_ORIGINS, CRON
 
 - **API project**: Root Directory = `api`, framework Next.js (auto). Build =
   default (`postinstall` runs `prisma generate`; `next build`). Region `fra1`.
-- **Cron**: defined in `api/vercel.json` (`crons`) — Vercel calls the
-  `/api/v1/maintenance/*` endpoints on schedule, sending
-  `Authorization: Bearer ${CRON_SECRET}`.
+- **Cron**: **(Corrected 2026-08-28)** `api/vercel.json` was deleted — the API is not
+  deployed to Vercel (`deploy/caddy/Caddyfile` reverse-proxies `api:3000`, and
+  `api/docker-entrypoint.sh` is a long-lived container boot script). **`cron/crontab`
+  is the single source of truth for scheduling**; the `cron` compose service calls
+  `/api/v1/maintenance/*` with the `x-maintenance-key` header. It runs 9 jobs — the
+  8 that were listed for Vercel, plus `reminders`, which Vercel never had.
 - **Env vars**: set in the Vercel dashboard (Production + Preview) — at minimum
   the list above, plus `MELIPAYAMAK_USERNAME`/`MELIPAYAMAK_PASSWORD`, `ZARINPAL_MERCHANT_ID`,
   `PLATFORM_ADMIN_TENANT_ID`, etc.

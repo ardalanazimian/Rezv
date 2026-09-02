@@ -32,11 +32,6 @@ function stub(payload: unknown, ok = true) {
   }) as unknown as typeof fetch;
 }
 
-/** stub را فقط برایِ همین فراخوانی نصب می‌کند و حتماً برمی‌گرداند. */
-async function withStub<T>(payload: unknown, fn: () => Promise<T>, ok = true): Promise<T> {
-  stub(payload, ok);
-  try { return await fn(); } finally { globalThis.fetch = realFetch; }
-}
 
 // ⚠️ envِ هر تست از نو ساخته می‌شود، نه دست‌کاریِ دستیِ داخلِ تست:
 // اگر یک assert وسطِ تست بیفتد، خطِ «restore»ِ دستی هرگز اجرا نمی‌شود و تستِ

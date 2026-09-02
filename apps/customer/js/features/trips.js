@@ -4,7 +4,8 @@ import { API, isLoggedIn } from '../api.js';
 import { icon } from '../icons.js';
 import { closeSheet, esc, jsq, openSheet, toast, undoSnack } from '../auth.js';
 import { openRest } from '../data/detail.js';
-import { go } from '../data/discover.js';
+import { fmtFa, go } from '../data/discover.js';
+import { myTrips } from '../data/seed.js';
 import { findR } from '../init.js';
 // ⚠️ رفع‌شده (R2 — حسابرسیِ تقویم، ۲۰۲۶-۰۸-۱۴): این تابع همیشه «فردا» فرض
 // می‌کرد (setDate(+1))، بدونِ توجه به اینکه پارامترِ date واقعاً چه بود —
@@ -108,13 +109,108 @@ export async function loadReservationQr(boxId, code, size){
 }
 // ── رزرو مجدد (پیش‌پرکردن با همان رستوران) ──
 export function repeatReservation(rid){
-  const r=R.find(x=>String(x.id)===String(rid));
+  const r=findR(rid);
   if(!r){toast('','رستوران پیدا نشد');return;}
   go('rest');openRest(rid);
   toast('','اطلاعات رزرو قبلی آماده‌ست — فقط زمان رو انتخاب کن');
 }
 // لغو رزرو (متصل به API اگر آنلاین)
+/**
+ * آیا لغوِ این رزرو **دیرتر از پنجره‌ی رایگان** است؟
+ *
+ * پنجره از سرور می‌آید (`GET /me/reservations` → `restaurant.freeCancelHours`)
+ * و سرور همین را در `lib/economy.ts:111` برای امتیاز و strike می‌سنجد — پس
+ * کلاینت همان قاعده را می‌خواند، نه قاعده‌ی موازیِ خودش.
+ *
+ * «نمی‌دانیم» (نبودِ پنجره یا زمانِ رزرو) عمداً `false` است: در آن حالت نه
+ * هشدار نشان داده می‌شود نه دیالوگ باز می‌شود — حدس‌زدن بدتر از سکوت است.
+ */
+export function isLateCancel(trip){
+  const h = trip?.freeCancelHours;
+  if(typeof h !== 'number' || !(h > 0) || !trip?.slotStartIso) return false;
+  const ms = new Date(trip.slotStartIso).getTime();
+  if(!Number.isFinite(ms)) return false;
+  return (ms - Date.now()) / 3600000 < h;
+}
+
+/** رزروِ زنده‌ی متناظرِ این کد — از دادهٔ **سرور** (`myTrips`)، نه از نمونه (`TRIPS`). */
+function liveTrip(code){
+  return Array.isArray(myTrips) ? myTrips.find(t=>t.code===code) || null : null;
+}
+
+/**
+ * دیالوگِ تأییدِ لغوِ دیرهنگام — فقط برایِ مسیرِ دیرهنگام.
+ *
+ * لغوِ داخلِ پنجره عمداً همان `undoSnack`ِ بی‌اصطکاک را نگه می‌دارد: لغوِ آسان
+ * no-show را کم می‌کند. اصطکاک فقط جایی اضافه می‌شود که پیامدِ واقعی دارد.
+ *
+ * چهار حالت: پرسش (idle) · در حالِ ارسال (دکمه قفل) · خطا (پیامِ سرور + تلاشِ
+ * دوباره) · موفق (بسته‌شدن + به‌روزرسانیِ فهرست). «خالی» برایِ یک دیالوگِ تأیید
+ * موضوعیت ندارد.
+ *
+ * a11y از خودِ `openSheet` می‌آید (نه الگویِ تازه): `role="dialog"` و
+ * `aria-modal` رویِ `#sheet`، تلهٔ فوکوس، Escape، و بازگرداندنِ فوکوس. تنها
+ * چیزی که این‌جا اضافه می‌شود نامِ دسترس‌پذیرِ دقیق است، چون برچسبِ پیش‌فرضِ
+ * ظرف («جزئیات رزرو») برایِ یک تأییدِ مخرب گمراه‌کننده است.
+ */
+function openLateCancelConfirm(code, trip){
+  const sheet=document.getElementById('sheet');
+  const prevLabel=sheet?sheet.getAttribute('aria-label'):null;
+  if(sheet) sheet.setAttribute('aria-label','تأیید لغو رزرو');
+  // ⚠️ سه مسیرِ بستن وجود دارد: دکمه‌ی «بی‌خیال»، کلیدِ Escape (هندلرِ خودِ
+  // openSheet)، و کلیک رویِ overlay (که در `index.html:240` مستقیم closeSheet
+  // را صدا می‌زند). اگر برچسب فقط در یکی برگردانده شود، شیتِ **بعدی** با نامِ
+  // «تأیید لغو رزرو» باز می‌شود — یعنی یک نامِ دسترس‌پذیرِ دروغ. ناظرِ زیر هر
+  // سه را می‌پوشاند چون همه در نهایت کلاسِ `show` را برمی‌دارند، و خودش را
+  // قطع می‌کند تا نشت نکند.
+  if(sheet && prevLabel!==null && typeof MutationObserver==='function'){
+    const obs=new MutationObserver(()=>{
+      if(!sheet.classList.contains('show')){
+        sheet.setAttribute('aria-label',prevLabel);
+        obs.disconnect();
+      }
+    });
+    obs.observe(sheet,{attributes:true,attributeFilter:['class']});
+  }
+
+  const h=trip.freeCancelHours;
+  openSheet(`
+    <div class="sheet-title" id="lateCancelTitle">${icon('alert',{size:18})} لغوِ دیرهنگام</div>
+    <div class="sheet-sub">این رزرو کمتر از ${esc(fmtFa(h))} ساعت تا زمانش مانده</div>
+    <div id="lateCancelErr"></div>
+    <div style="font-size:13px;color:var(--t2);line-height:1.85;margin:10px 2px 16px">
+      اگر الان لغو کنی، یک تخلف در سابقه‌ات ثبت می‌شود و نشانِ اعتبارت پایین می‌آید —
+      این نشان به رستوران‌ها هم نشان داده می‌شود.
+    </div>
+    <button class="btn btn-danger btn-lg btn-block" id="lateCancelGo"
+      onclick="confirmLateCancel(${jsq(code)})">لغوِ رزرو</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px"
+      onclick="closeSheet()">بی‌خیال</button>
+  `);
+}
+
+/** commitِ لغوِ دیرهنگام از داخلِ دیالوگ — با چهار حالتِ صریح. */
+export async function confirmLateCancel(code){
+  const go=document.getElementById('lateCancelGo');
+  const errBox=document.getElementById('lateCancelErr');
+  if(errBox) errBox.innerHTML='';
+  if(go){ go.disabled=true; go.textContent='در حالِ لغو…'; }        // حالتِ لودینگ
+  const res=await API.post('/reservations/'+encodeURIComponent(code)+'/cancel',{});
+  if(res.ok){                                                        // حالتِ موفق
+    closeSheet();   // ناظرِ برچسب خودش با برداشتنِ کلاسِ `show` بازمی‌گرداند
+    toast('','رزرو لغو شد');
+    if(typeof window.renderTrips==='function') window.renderTrips();
+    return;
+  }
+  if(go){ go.disabled=false; go.textContent='لغوِ رزرو'; }           // حالتِ خطا
+  if(errBox) errBox.innerHTML=`<div role="alert" style="font-size:12px;line-height:1.7;color:var(--warning-ink);background:var(--warning-soft);border-radius:var(--radius-md);padding:8px 10px;margin:8px 0">${icon('alert',{size:13})} ${esc(res.offline?'اتصال برقرار نیست — رزرو لغو نشد. دوباره تلاش کن':(res.error?.message||'لغو ناموفق بود'))}</div>`;
+}
+
 export async function cancelTrip(code,btn){
+  // مسیرِ دیرهنگام: دیالوگِ تأیید با پیامدِ صریح، بدونِ undoSnack.
+  const trip=liveTrip(code);
+  if(isLateCancel(trip)){ openLateCancelConfirm(code, trip); return; }
+
   const tripEl=btn.closest('.trip-card')||btn.closest('.trip');
   // Undoِ امن: کارت فوراً کم‌رنگ می‌شود، ولی لغوِ واقعی ۵ ثانیه به تعویق می‌افتد.
   if(tripEl)tripEl.style.opacity=.5;
@@ -224,6 +320,7 @@ window.addToWallet = addToWallet;
 window.showCheckInQR = showCheckInQR;
 window.repeatReservation = repeatReservation;
 window.cancelTrip = cancelTrip;
+window.confirmLateCancel = confirmLateCancel;
 window.openReviewSheet = openReviewSheet;
 window.setReviewStars = setReviewStars;
 window.submitReview = submitReview;

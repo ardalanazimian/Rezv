@@ -24,7 +24,6 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 // ═══════════════════════════════════════════════════════════════════════
 
 const { db } = await import('../src/lib/db');
-const { zonedTimeToUtc } = await import('../src/lib/hours');
 const availRoute = await import('../src/app/api/v1/restaurants/[slug]/availability/route');
 
 const TAG = `avo-${randomUUID().slice(0, 8)}`;

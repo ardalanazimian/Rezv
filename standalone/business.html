@@ -3547,7 +3547,7 @@ function renderEnterpriseDashboard(){
         <div class="kpi-top"><span class="kpi-ic" style="background:var(--green-50)">${icon('utensils',{size:18})}</span><span class="kpi-trend">${fa(k.occupancyPct)}٪</span></div>
         <div class="kpi-val">${fa(k.seatedTables)}<span class="kpi-sub">/${fa(k.totalTables)}</span></div>
         <div class="kpi-lbl">اشغال فعلی</div>
-        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:0" data-w="${k.occupancyPct}"></div></div>
+        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:0" data-w="${esc(k.occupancyPct)}"></div></div>
       </div>
       <div class="kpi-card">
         <div class="kpi-top"><span class="kpi-ic" style="background:#FEF3C7">${icon('clock',{size:18})}</span><span class="kpi-trend">${fa(k.expectedGuests)} نفر</span></div>
@@ -3695,9 +3695,9 @@ function renderTopCustomers(){
   document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`
     <div class="top-cust" onclick="viewCustomerHistory(${jsq(c.name)})">
       <span class="top-rank">${fa(i+1)}</span>
-      <span class="top-ava">${c.ava}</span>
+      <span class="top-ava">${esc(c.ava)}</span>
       <div class="top-body"><div class="top-name">${esc(c.name)} ${c.seg==='vip'?'<span class="seg-vip">VIP</span>':''}</div>
-        <div class="top-meta">${fa(c.visits)} بازدید · ${c.spent} خرید</div></div>
+        <div class="top-meta">${fa(c.visits)} بازدید · ${esc(c.spent)} خرید</div></div>
       <span class="top-arrow">${icon('chevronL',{size:14})}</span>
     </div>`).join('');
 }
@@ -3743,7 +3743,7 @@ function renderStaffNotes(){
   if(API.getToken() && !_notesLoaded){ loadStaffNotes().then(renderStaffNotes); }
   el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`
     <div class="snote"${n.pinned?' style="border-color:var(--amber);background:var(--amber-50)"':''}><div class="snote-body"><div class="snote-txt">${n.pinned?icon('pin',{size:13})+' ':''}${esc(n.txt)}</div>
-      <div class="snote-meta">${esc(n.who)} · ${n.time}</div></div>
+      <div class="snote-meta">${esc(n.who)} · ${esc(n.time)}</div></div>
       <button class="snote-del" onclick="delStaffNote(${jsq(n.id||'')})">×</button></div>`).join(''):'<div class="snote-empty">یادداشتی ثبت نشده</div>';
 }
 function addStaffNote(){
@@ -4559,7 +4559,7 @@ async function rFloor(){
       </div>
       <div class="floor ${floorEdit?'edit-mode':''}">
         <div class="tables-area">
-          ${TABLES.map((t,i)=>`<div class="table-el ${t.s}" ${floorEdit?'':'role="button" tabindex="0"'} onclick="${floorEdit?'':`openTableSheet(${i})`}">
+          ${TABLES.map((t,i)=>`<div class="table-el ${esc(t.s)}" ${floorEdit?'':'role="button" tabindex="0"'} onclick="${floorEdit?'':`openTableSheet(${i})`}">
             <button class="t-remove" onclick="event.stopPropagation();removeTable(${i})">×</button>
             <span class="t-icon">${icon('utensils',{size:15})}</span><span class="t-num">${esc(tableLabel(t))}</span>
             ${t._guest?`<span class="t-guest">${esc(t._guest.length>10?t._guest.slice(0,9)+'…':t._guest)}</span><span class="t-time">${t._time}</span>`:`<span class="t-cap">${fa(t.c)} نفره</span>`}
@@ -5350,9 +5350,9 @@ function profRenderReviews(){
         const origIdx=REVIEWS.indexOf(r);
         return `<div class="rev-card">
         <div class="rev-card-top">
-          <div class="rev-ava">${r.ava}</div>
+          <div class="rev-ava">${esc(r.ava)}</div>
           <div><div class="rev-name">${esc(r.name)} ${r.seg==='vip'?icon('crown',{size:14,fill:true}):''}</div><div class="rev-stars-sm">${Array.from({length:5},(_,si)=>icon('star',{size:12,fill:si<r.rating})).join('')}</div></div>
-          <div class="rev-date">${r.date}</div>
+          <div class="rev-date">${esc(r.date)}</div>
         </div>
         <div class="rev-text">${esc(r.text)}</div>
         <div class="rev-subratings"><span>غذا <b>${fa(r.food)}</b></span><span>سرویس <b>${fa(r.service)}</b></span><span>فضا <b>${fa(r.atmo)}</b></span></div>
@@ -5367,7 +5367,7 @@ function openReplyModal(i){
   const r=REVIEWS[i];
   openModal(`
     <div class="modal-title">پاسخ به ${esc(r.name)}</div>
-    <div class="modal-sub">${Array.from({length:5},(_,si)=>icon('star',{size:13,fill:si<r.rating})).join('')} · ${r.date}</div>
+    <div class="modal-sub">${Array.from({length:5},(_,si)=>icon('star',{size:13,fill:si<r.rating})).join('')} · ${esc(r.date)}</div>
     <div style="background:var(--s-50);border-radius:var(--r);padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--t2);line-height:1.5">${esc(r.text)}</div>
     <div class="field-label">پاسخ شما</div>
     <textarea class="inp" id="replyText" style="min-height:90px;resize:vertical" placeholder="ممنون از نظرت...">${r.rating<=3?'از بازخوردت ممنونیم و بابت تجربه‌ی نه‌چندان خوبت عذرخواهی می‌کنیم. ':''}</textarea>
@@ -5489,10 +5489,10 @@ function custRenderOverviewDemo(el){
         const m=RFM_META[s.segment]||RFM_META.unknown;
         const p=Math.round(s.count/segTotal*100);
         return `<div class="seg-cell" onclick="setCustTab('profiles')">
-          <div class="seg-top"><span class="seg-name">${m.fa}</span><span class="seg-dot" style="background:${m.c}"></span></div>
+          <div class="seg-top"><span class="seg-name">${esc(m.fa)}</span><span class="seg-dot" style="background:${esc(m.c)}"></span></div>
           <div class="seg-count">${fa(s.count)}</div>
-          <div class="seg-pct">${fa(p)}٪ · ${m.d}</div>
-          <div class="seg-bar"><i style="width:${p}%;background:${m.c}"></i></div>
+          <div class="seg-pct">${fa(p)}٪ · ${esc(m.d)}</div>
+          <div class="seg-bar"><i style="width:${p}%;background:${esc(m.c)}"></i></div>
         </div>`;
       }).join('')}</div>
     </div>
@@ -5569,10 +5569,10 @@ async function custRenderOverview(){
         const m=RFM_META[s.segment]||RFM_META.unknown;
         const p=total?Math.round(s.count/total*100):0;
         return `<div class="seg-cell" onclick="setCustTab('profiles')">
-          <div class="seg-top"><span class="seg-name">${m.fa}</span><span class="seg-dot" style="background:${m.c}"></span></div>
+          <div class="seg-top"><span class="seg-name">${esc(m.fa)}</span><span class="seg-dot" style="background:${esc(m.c)}"></span></div>
           <div class="seg-count">${fa(s.count)}</div>
-          <div class="seg-pct">${fa(p)}٪ · ${m.d}</div>
-          <div class="seg-bar"><i style="width:${p}%;background:${m.c}"></i></div>
+          <div class="seg-pct">${fa(p)}٪ · ${esc(m.d)}</div>
+          <div class="seg-bar"><i style="width:${p}%;background:${esc(m.c)}"></i></div>
         </div>`;
       }).join('')}</div>`:'<div style="text-align:center;color:var(--t2);padding:20px;font-size:12.5px">هنوز محاسبه نشده — کرون شبانه باید یک‌بار اجرا شده باشه</div>'}
     </div>
@@ -5631,8 +5631,8 @@ async function custRenderProfiles(){
         </div>
         ${c.intelligence_score!=null?`<div style="display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:11.5px;color:var(--t2)">${icon('sparkle',{size:12,fill:true})} امتیازِ هوشِ مشتری: <b style="color:${iqClr[c.intelligence_tier]||'var(--t2)'}">${fa(c.intelligence_score)}</b> · ${iqFa[c.intelligence_tier]||''}</div>`:''}
         <div class="sig-row">
-          <div class="sig"><div class="sig-val" style="color:var(--red)">${fa(c.churn_risk_score)}٪</div><div class="sig-label">ریسک ریزش</div><div class="sig-track"><div class="sig-fill" style="width:${c.churn_risk_score}%;background:var(--red)"></div></div></div>
-          <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(c.no_show_rate_pct)}٪</div><div class="sig-label">عدم‌حضور</div><div class="sig-track"><div class="sig-fill" style="width:${c.no_show_rate_pct}%;background:var(--amber)"></div></div></div>
+          <div class="sig"><div class="sig-val" style="color:var(--red)">${fa(c.churn_risk_score)}٪</div><div class="sig-label">ریسک ریزش</div><div class="sig-track"><div class="sig-fill" style="width:${esc(c.churn_risk_score)}%;background:var(--red)"></div></div></div>
+          <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(c.no_show_rate_pct)}٪</div><div class="sig-label">عدم‌حضور</div><div class="sig-track"><div class="sig-fill" style="width:${esc(c.no_show_rate_pct)}%;background:var(--amber)"></div></div></div>
         </div>
         <div class="smart-actions">
           <button class="btn btn-sm btn-ghost" onclick="callCustomer(${jsq(c.phone||'')})">${icon('phone',{size:13})} ${esc(c.phone||'بدون شماره')}</button>
@@ -7468,7 +7468,7 @@ async function rAnalytics(){
       <div class="panel">
         <div class="panel-head"><div class="panel-title">مشتری جدید و قدیمی</div></div>
         <div class="donut-wrap">
-          <div class="donut" style="background:conic-gradient(var(--blue) 0 ${A.newPct}%,var(--teal) ${A.newPct}% 100%)"><div class="donut-hole"><div class="dv">${fa(totalGuests)}</div><div class="dl">مشتری</div></div></div>
+          <div class="donut" style="background:conic-gradient(var(--blue) 0 ${esc(A.newPct)}%,var(--teal) ${esc(A.newPct)}% 100%)"><div class="donut-hole"><div class="dv">${fa(totalGuests)}</div><div class="dl">مشتری</div></div></div>
           <div class="legend">
             <div class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>جدید<span class="legend-val">${fa(A.newPct)}٪</span></div>
             <div class="legend-item"><span class="legend-dot" style="background:var(--teal)"></span>قدیمی (بازگشتی)<span class="legend-val">${fa(returnRate)}٪</span></div>
@@ -7718,7 +7718,7 @@ function renderNotifList(){
   // مثلِ قبل — بدونِ esc اینجا یک stored XSS واقعی در پنلِ کارکنان بود.
   el.innerHTML=NOTIFS.map((n,i)=>`<div class="notif-item ${n.unread?'unread':''}" onclick="readNotif(${i})">
     ${n.unread?'<span class="notif-dot"></span>':''}
-    <div class="notif-ic ${n.ic}">${icon(n.emoji,{size:16})}</div>
+    <div class="notif-ic ${esc(n.ic)}">${icon(n.emoji,{size:16})}</div>
     <div class="notif-body"><div class="notif-title">${esc(n.title)}</div><div class="notif-text">${esc(n.text)}</div><div class="notif-time">${esc(n.time)}</div></div>
   </div>`).join('');
 }

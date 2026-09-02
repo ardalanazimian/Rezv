@@ -64,8 +64,9 @@ GET /sw.js                → ۲۰۰
 ## ۲) پروژه‌ی API (`rezervno-os`) — از قبل درست است
 
 - **Root Directory = `api`** ✅ · Framework = Next.js (auto) · Region `fra1`.
-- Cron در `api/vercel.json` تعریف شده (۸ job → `/api/v1/maintenance/*` با
-  `Authorization: Bearer ${CRON_SECRET}`).
+- ⚠️ **کهنه (۲۰۲۶-۰۸-۲۸):** cron دیگر در Vercel تعریف نمی‌شود. `api/vercel.json`
+  حذف شد چون بک‌اند روی Vercel مستقر نیست. **منبعِ حقیقتِ زمان‌بندی
+  `cron/crontab` است** (سرویسِ `cron` در `docker-compose.yml`).
 - **Env varها** باید در Production + Preview ست باشند. فهرستِ کامل و معتبر:
   [`ENVIRONMENT.md`](./ENVIRONMENT.md). حداقل‌های حیاتی:
   `DATABASE_URL`, `DATABASE_DIRECT_URL`, `REDIS_URL`, `JWT_SECRET`,
