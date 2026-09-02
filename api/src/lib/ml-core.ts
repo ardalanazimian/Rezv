@@ -241,6 +241,28 @@ export function calibrationCurve(
   }]);
 }
 
+/**
+ * Expected Calibration Error — میانگینِ وزنیِ |پیش‌بینی − نرخِ واقعی| رویِ
+ * سطل‌هایِ calibrationCurve. یک عددِ خلاصه از همان منحنی: صفر یعنی کاملاً
+ * کالیبره، هرچه بالاتر یعنی مدل جایی سیستماتیک دستِ‌بالا یا دستِ‌پایین می‌زند.
+ *
+ * چرا کنارِ calibrationCurve و نه داخلِ آن: منحنی برایِ *نمایش* لازم است
+ * (نمودار/جدول)، ECE برایِ *مقایسه* لازم است (یک عدد که بشود در طولِ زمان
+ * یا بینِ نسخه‌هایِ مدل ترندش را دید) — دو مصرف‌کننده‌ی متفاوت، دو تابعِ
+ * جدا، تا فراخوان‌کننده‌ای که فقط منحنی می‌خواهد مجبور به محاسبه‌ی این هم نباشد.
+ *
+ * وزن‌دهی با n هرسطل عمداً است: سطلی با ۲ نمونه نباید هم‌وزنِ سطلی با ۲۰۰
+ * نمونه باشد، وگرنه یک سطلِ کم‌جمعیت با خطایِ اتفاقیِ بزرگ کلِ عدد را
+ * منحرف می‌کند.
+ */
+export function expectedCalibrationError(buckets: readonly CalibrationBucket[]): number {
+  const total = buckets.reduce((s, b) => s + b.n, 0);
+  if (total === 0) return 0; // بدونِ سطل یعنی بدونِ داده — صفر، نه NaN
+  let err = 0;
+  for (const b of buckets) err += (b.n / total) * Math.abs(b.predicted - b.observed);
+  return err;
+}
+
 export function meanAbsoluteError(predictions: readonly number[], actuals: readonly number[]): number {
   if (predictions.length === 0) return Infinity; // بدترینِ ممکن — نباید در عمل رخ دهد
   let sum = 0;

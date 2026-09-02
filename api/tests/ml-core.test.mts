@@ -2,7 +2,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 // import پویا عمداً — همان دلیلِ محیطیِ ذکرشده در tests/validate.test.mts.
-const { meanAbsoluteError, decideModelActivation } = await import('../src/lib/ml-core.ts');
+const { meanAbsoluteError, decideModelActivation, calibrationCurve, expectedCalibrationError } =
+  await import('../src/lib/ml-core.ts');
 
 // ═══════════════════════════════════════════════════════════════════════
 //  این تست‌ها فقط بخش‌هایی از ml-core.ts را می‌سنجند که از طریقِ
@@ -81,5 +82,45 @@ describe('decideModelActivation — قاعده‌ی ایمنیِ عمومی (ف�
       baselineLabel: 'پیش‌بینیِ فصلیِ ساده',
     });
     assert.match(d.reason, /پیش‌بینیِ فصلیِ ساده/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  expectedCalibrationError — تنها چیزِ جدیدِ ریاضیِ این تغییر.
+//  calibrationCurve از قبل در ml-discrimination.test.mts تست شده؛ اینجا
+//  فقط تابعِ خلاصه‌سازِ رویِ آن سنجیده می‌شود.
+// ═══════════════════════════════════════════════════════════════════════
+describe('expectedCalibrationError', () => {
+  test('مدلِ کاملاً کالیبره → صفر', () => {
+    // چهار پیش‌بینیِ ۰٫۵ که دقیقاً نیمی رخ داده‌اند: predicted=observed=۰٫۵
+    const curve = calibrationCurve([0.5, 0.5, 0.5, 0.5], [1, 1, 0, 0], 10);
+    assert.equal(expectedCalibrationError(curve), 0);
+  });
+
+  test('مدلی که همیشه ۹۰٪ می‌گوید ولی هیچ‌وقت رخ نمی‌دهد → نزدیکِ ۰٫۹', () => {
+    const preds = Array(20).fill(0.9);
+    const labels = Array(20).fill(0);
+    const curve = calibrationCurve(preds, labels, 10);
+    const ece = expectedCalibrationError(curve);
+    assert.ok(Math.abs(ece - 0.9) < 1e-9, `انتظار ≈۰٫۹، شد ${ece}`);
+  });
+
+  test('وزن‌دهی با تعدادِ نمونه — سطلِ پرجمعیت بیشتر از سطلِ کم‌جمعیت اثر می‌گذارد', () => {
+    // ۹۰ نمونه در سطلِ کاملاً غلط (خطایِ ۰٫۹) + ۱۰ نمونه در سطلِ کاملاً درست
+    // (خطایِ ۰) → میانگینِ وزنی باید نزدیکِ ۰٫۸۱ باشد، نه میانگینِ ساده‌ی ۰٫۴۵.
+    const preds = [...Array(90).fill(0.9), ...Array(10).fill(0.05)];
+    const labels = [...Array(90).fill(0), ...Array(10).fill(0)];
+    const curve = calibrationCurve(preds, labels, 20);
+    const ece = expectedCalibrationError(curve);
+    assert.ok(ece > 0.7, `وزنِ سطلِ بزرگ باید غالب باشد، شد ${ece}`);
+  });
+
+  test('ورودیِ خالی → صفر، نه NaN', () => {
+    assert.equal(expectedCalibrationError([]), 0);
+  });
+
+  test('همیشه نامنفی است، حتی با مدلی که به‌طورِ سیستماتیک دست‌کم‌گویی می‌کند', () => {
+    const curve = calibrationCurve(Array(20).fill(0.1), Array(20).fill(1), 10);
+    assert.ok(expectedCalibrationError(curve) > 0);
   });
 });

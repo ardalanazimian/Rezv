@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { createLogger } from './logger';
 import { NO_SHOW_FEATURE_VERSION as NO_SHOW_FEATURE_VECTOR_VERSION } from './no-show-model';
+import { calibrationCurve, expectedCalibrationError, type CalibrationBucket } from './ml-core';
 
 const log = createLogger('ml');
 
@@ -383,4 +384,104 @@ export async function getLedgerHealth(params: {
       mae: enough && r.mae !== null ? Number(r.mae) : null,
     };
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  کالیبراسیونِ تولیدی — شکافی که فازِ ۵-۷ پر نکرده بود
+//
+//  calibrationCurve/CalibrationBucket در lib/ml-core.ts از قبل وجود دارند،
+//  ولی تنها مصرف‌کننده‌شان (no-show-model.ts:trainAndCalibrateNoShowModel)
+//  آن‌ها را فقط رویِ هولدآوتِ *لحظه‌ی آموزش* صدا می‌زند — دقیقاً همان جدایی‌ای
+//  که کلِ فازِ ۵ (این فایل) برایِ Brier/MAE بست: «موقعِ آموزش خوب بود» با
+//  «در تولید خوب است» دو ادعایِ متفاوت‌اند. calibrationCurve هرگز رویِ
+//  دفترِ پیش‌بینی/نتیجه صدا زده نمی‌شد؛ getPlatformCalibration این را می‌بندد،
+//  با همان دو تابعِ ریاضیِ خالصِ موجود (چیزِ جدیدی در ml-core.ts نساخته شد
+//  جز expectedCalibrationError — یک عدد که ادعایِ منحنی را قابلِ‌مقایسه در
+//  طولِ زمان می‌کند).
+// ═══════════════════════════════════════════════════════════════════════
+
+/** سقفِ ردیفِ خام برایِ ساختِ منحنیِ کالیبراسیون. برخلافِ Brier/MAE (AVG در
+ *  خودِ SQL) اینجا توزیعِ خامِ مقادیر لازم است، پس محدودیت صریح می‌شود —
+ *  همان الگویِ detectOutputDrift در lib/model-drift.ts، این‌بار در سطحِ
+ *  پلتفرم به‌جایِ یک رستوران. عددِ بزرگ‌تر منحنیِ دقیق‌تر می‌دهد؛ این سقف
+ *  فقط جلویِ کوئریِ نامحدود را می‌گیرد. */
+const MAX_CALIBRATION_ROWS = 50_000;
+
+export interface PlatformCalibration {
+  predictionType: string;
+  modelSource: string;
+  resolvedCount: number;
+  /** خالی اگر resolvedCount زیرِ MIN_RESOLVED_FOR_ACCURACY باشد. */
+  buckets: CalibrationBucket[];
+  /** null با همان کف — نه عددِ ساختگی از رویِ چند نمونه. */
+  ece: number | null;
+}
+
+/**
+ * کالیبراسیونِ تولیدی در سطحِ پلتفرم — «وقتی مدل می‌گوید ۷۰٪، واقعاً ۷۰٪
+ * رخ می‌دهد؟» رویِ چیزی که واقعاً تحویلِ رستوران شد، نه هولدآوتِ آموزش.
+ *
+ * فقط پیش‌بینی‌هایِ احتمالاتی (۰..۱) معنا دارند — گاردِ predicted_value
+ * BETWEEN 0 AND 1 در خودِ کوئری این را تضمین می‌کند تا اگر روزی نوعِ
+ * پیش‌بینیِ غیرِاحتمالاتی (مثلاً تعدادِ تقاضا) اضافه شد، بی‌صدا وارد سطل‌های
+ * بی‌معنا نشود.
+ *
+ * بدونِ restaurantId یعنی کلِ پلتفرم (پنلِ شرکت)؛ با آن یعنی یک رستوران —
+ * دقیقاً همان امضایِ getLedgerHealth، تا هر دو مسیر یک قانون داشته باشند
+ * و بشود ایزولاسیونِ تنانت را رویِ همین تابع هم اثبات کرد.
+ */
+export async function getPlatformCalibration(params: {
+  restaurantId?: string;
+  predictionType?: string;
+  sinceDays?: number;
+  buckets?: number;
+} = {}): Promise<PlatformCalibration[]> {
+  const since = new Date(Date.now() - (params.sinceDays ?? 90) * 86_400_000);
+  const bucketCount = params.buckets ?? 10;
+  const restaurantFilter = params.restaurantId
+    ? Prisma.sql`AND p.restaurant_id = ${params.restaurantId}::uuid`
+    : Prisma.empty;
+  const typeFilter = params.predictionType
+    ? Prisma.sql`AND p.prediction_type = ${params.predictionType}`
+    : Prisma.empty;
+
+  const rows = await db.$queryRaw<{
+    prediction_type: string; model_source: string;
+    predicted_value: number; observed_value: number;
+  }[]>(Prisma.sql`
+    SELECT p.prediction_type, p.model_source,
+           p.predicted_value, o.observed_value
+    FROM model_predictions p
+    JOIN model_outcomes o ON o.prediction_id = p.id
+    WHERE p.generated_at >= ${since}
+      ${restaurantFilter}
+      AND p.predicted_value BETWEEN 0 AND 1
+      ${typeFilter}
+    ORDER BY p.generated_at DESC
+    LIMIT ${MAX_CALIBRATION_ROWS}
+  `);
+
+  const groups = new Map<string, { predictionType: string; modelSource: string; p: number[]; y: number[] }>();
+  for (const r of rows) {
+    const key = `${r.prediction_type} ${r.model_source}`;
+    let g = groups.get(key);
+    if (!g) { g = { predictionType: r.prediction_type, modelSource: r.model_source, p: [], y: [] }; groups.set(key, g); }
+    g.p.push(Number(r.predicted_value));
+    g.y.push(Number(r.observed_value));
+  }
+
+  return Array.from(groups.values())
+    .sort((a, b) => a.predictionType.localeCompare(b.predictionType) || a.modelSource.localeCompare(b.modelSource))
+    .map(g => {
+      const resolvedCount = g.p.length;
+      const enough = resolvedCount >= MIN_RESOLVED_FOR_ACCURACY;
+      const buckets = enough ? calibrationCurve(g.p, g.y, bucketCount) : [];
+      return {
+        predictionType: g.predictionType,
+        modelSource: g.modelSource,
+        resolvedCount,
+        buckets,
+        ece: enough ? expectedCalibrationError(buckets) : null,
+      };
+    });
 }
