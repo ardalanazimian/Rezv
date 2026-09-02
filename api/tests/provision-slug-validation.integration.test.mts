@@ -84,11 +84,18 @@ describe('اعتبارسنجیِ slug در provisionBusiness', () => {
 });
 
 after(async () => {
+  // ⚠️ بدونِ .catch(()=>{}) و با ترتیبِ FK. نسخه‌ی قبلی خطای پاک‌سازی را می‌بلعید:
+  // provision برایِ رستوران **میز** می‌سازد، `restaurant.deleteMany` رویِ
+  // `tables_restaurant_id_fkey` می‌شکست، و تنانت در DBِ تست می‌ماند — در ۶ روز
+  // ۷۶ تنانتِ [DEMO] از این و ۵۰ فایلِ مشابه انباشته شد (شمارشِ ۲۰۲۶-۰۹-۰۲).
+  // پاک‌سازی‌ای که بی‌صدا شکست بخورد، اندازه‌گیریِ بعدی را مسموم می‌کند.
   for (const t of madeTenants) {
-    await db.staffInvite.deleteMany({ where: { staff: { tenantId: t } } }).catch(() => {});
-    await db.staff.deleteMany({ where: { tenantId: t } }).catch(() => {});
-    await db.restaurant.deleteMany({ where: { tenantId: t } }).catch(() => {});
-    await db.tenant.deleteMany({ where: { id: t } }).catch(() => {});
+    await db.table.deleteMany({ where: { restaurant: { tenantId: t } } });
+    await db.staffInvite.deleteMany({ where: { restaurant: { tenantId: t } } });
+    await db.auditLog.deleteMany({ where: { restaurant: { tenantId: t } } });
+    await db.staff.deleteMany({ where: { tenantId: t } });
+    await db.restaurant.deleteMany({ where: { tenantId: t } });
+    await db.tenant.deleteMany({ where: { id: t } });
   }
   await db.$disconnect();
 });
