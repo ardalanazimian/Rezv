@@ -308,6 +308,11 @@ function classify(expr, kind) {
 //  متفاوت/محتوایِ متفاوت) رو دوباره بررسی کنه.
 // ═══════════════════════════════════════════════════════════════════════
 const MANUAL_REVIEW_OVERRIDES = new Map([
+  // ── فرمِ ورودِ سه‌عاملیِ پنلِ شرکت ──
+  ['apps/company/js/intelligence.js:860',
+   'فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت.'],
+  ['standalone/company.html:3159',
+   'فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت.'],
   // ── بازبینِ بیرونی (Sourcery/opengrep) روی PR #79 ──
   // این سه محل را قاعده‌ی `insecure-innerhtml` علامت زد. تک‌تک در سورس بررسی
   // شدند؛ نتیجه در گزارشِ دورِ ششم. دو موردِ اولِ آن سه (food-dna:191 و
