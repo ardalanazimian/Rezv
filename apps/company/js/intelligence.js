@@ -71,8 +71,8 @@ function rBilling(){
           else if(r.status==='expiring')st=`${fa(r.daysLeft)} روز مونده`;
           else st=`آزمایشی · ${fa(r.daysLeft)} روز`;
           return `<div class="mini-row" style="flex-wrap:wrap">
-            <div class="rest-logo" style="background:${r.grad};width:38px;height:38px;font-size:16px">${r.logo}</div>
-            <div class="mini-info" style="min-width:140px"><div class="mini-name">${esc(r.name)}</div><div class="mini-sub"><span class="plan-badge ${r.plan}">${PLAN_LABEL[r.plan]}</span> · موجودی: ${fa(r.smsBalance||0)} پیامک</div>
+            <div class="rest-logo" style="background:${esc(r.grad)};width:38px;height:38px;font-size:16px">${esc(r.logo)}</div>
+            <div class="mini-info" style="min-width:140px"><div class="mini-name">${esc(r.name)}</div><div class="mini-sub"><span class="plan-badge ${esc(r.plan)}">${PLAN_LABEL[r.plan]}</span> · موجودی: ${fa(r.smsBalance||0)} پیامک</div>
             </div>
             <span class="badge ${badgeCls}" style="align-self:flex-start"><span class="bdot"></span>${st}</span>
             <div style="display:flex;gap:6px">
@@ -212,7 +212,7 @@ function rSupport(){
       <div class="panel-head"><div><div class="panel-title">رستوران‌های نیازمند اقدام</div><div class="panel-sub">${fa(needsAttention.length)} مورد</div></div></div>
       <div class="mini-list">
         ${needsAttention.length?needsAttention.map(r=>`<div class="mini-row">
-          <div class="rest-logo" style="background:${r.grad};width:36px;height:36px;font-size:15px">${r.logo}</div>
+          <div class="rest-logo" style="background:${esc(r.grad)};width:36px;height:36px;font-size:15px">${esc(r.logo)}</div>
           <div class="mini-info"><div class="mini-name">${esc(r.name)}</div><div class="mini-sub">${!r.isOpen?`<span class="dot-closed" aria-hidden="true"></span> غیرفعال · `:''}${STATUS_LABEL[r.status]||''}</div></div>
           <div style="display:flex;gap:6px">
             <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen(${jsq(r.id)})">${r.isOpen?'غیرفعال کن':'فعال کن'}</button>

@@ -12,9 +12,14 @@
 ## ۰) واقعیتِ استقرار — پیش از هر چیز
 
 RezervnoOS **serverless روی Vercel** است، نه k8s/VM:
-- بک‌اند = Next.js 14 روی Vercel Functions (منطقه‌ی `fra1`).
-- سه فرانت‌اند = static روی Vercel (هر کدام پروژه‌ی جدا).
-- زمان‌بندی = **Vercel Cron** (۸ کران در `api/vercel.json`).
+> ⚠️ **کهنه (تصحیحِ ۲۰۲۶-۰۸-۲۸):** سه بندِ زیر وضعیتِ امروز نیست. بک‌اند
+> Next 16 است و به‌صورتِ کانتینرِ داکر پشتِ Caddy اجرا می‌شود (نه Vercel
+> Functions)؛ سه پنل را همان Caddy سرو می‌کند؛ و زمان‌بندی از `cron/crontab`
+> می‌آید (۹ job)، نه Vercel Cron. `api/vercel.json` حذف شد.
+
+- ~~بک‌اند = Next.js 14 روی Vercel Functions (منطقه‌ی `fra1`).~~
+- ~~سه فرانت‌اند = static روی Vercel (هر کدام پروژه‌ی جدا).~~
+- ~~زمان‌بندی = **Vercel Cron** (۸ کران در `api/vercel.json`).~~
 
 پیامدِ صادقانه برای چک‌لیست:
 | خواسته‌ی enterprise | وضعیت روی Vercel |

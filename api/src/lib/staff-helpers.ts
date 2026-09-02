@@ -178,6 +178,27 @@ export function findStaffForLogin(normalizedPhone: string) {
  * یکتاست: تنها uniqueِ دیگرِ phone روی staff مرکب است (tenant_id,phone) و
  * target دوtاyی می‌دهد — پس تطبیقِ دقیقِ 'phone' برخوردِ کاذب ندارد.
  */
+/**
+ * همان الگویِ `isOwnerPhoneUniqueViolation`، برایِ ایندکسِ یکتای **نامِ کاربری**
+ * (`staff_username_key` — مهاجرتِ ۰۷۴ + `@unique` در schema.prisma).
+ *
+ * ⚠️ چرا لازم شد (نمونه‌گیریِ جهش V1، ۲۰۲۶-۰۸-۲۹): پیش‌بررسیِ اپلیکیشنیِ
+ * `provisionRestaurant` تنها چیزی بود که ۴۰۹ِ تمیزِ `username_taken` را
+ * می‌ساخت. ایندکسِ دیتابیس جلویِ رکوردِ تکراری را می‌گیرد (پس حفره‌ی امنیتی
+ * نبود)، ولی در **مسابقه‌ی همزمان** دو درخواست از پیش‌بررسی رد می‌شوند و
+ * بازنده به‌جای ۴۰۹، خطای خامِ P2002 می‌گرفت. کامنتِ `provisioning.ts` مدت‌ها
+ * ادعا می‌کرد این ترجمه وجود دارد — برای شماره‌ی مالک وجود داشت، برای نامِ
+ * کاربری نه.
+ */
+export function isUsernameUniqueViolation(e: unknown): boolean {
+  const err = e as { code?: string; meta?: { target?: unknown }; message?: string };
+  if (err?.code !== 'P2002') return false;
+  const t = err.meta?.target;
+  const s = Array.isArray(t) ? t.join(',') : String(t ?? '');
+  return s.includes('staff_username') || s === 'username'
+    || /staff_username_key|fields: \(`username`\)/.test(String(err.message ?? ''));
+}
+
 export function isOwnerPhoneUniqueViolation(e: unknown): boolean {
   const err = e as { code?: string; meta?: { target?: unknown }; message?: string };
   if (err?.code !== 'P2002') return false;

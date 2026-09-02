@@ -15,7 +15,10 @@ export default [
       // قواعدِ منطقی برای پروژه‌ی production — نه سخت‌گیرانه‌ی آزاردهنده
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      // ⚠️ `error` نه `warn`: «`console.log` در کدِ تحویلی ممنوع» یک قاعده‌ی
+      // صریحِ پروژه است. تا وقتی warn بود، CI اجرایش نمی‌کرد و فقط به این
+      // دلیل نقض نشده بود که کسی ننوشته — نه چون گیتی جلویش را می‌گرفت.
+      'no-console': ['error', { allow: ['warn', 'error'] }],
       'prefer-const': 'warn',
       'no-var': 'error',
       eqeqeq: ['warn', 'smart'],
@@ -27,7 +30,27 @@ export default [
     rules: { 'no-console': 'off' },
   },
   {
+    // ── تست‌ها: همان پارسر، قواعدِ سبک‌تر ──
+    // تا ۲۰۲۶-۰۸-۲۸ کلِ `tests/**` از lint خارج بود؛ یعنی ۱۲۲ فایلِ تست هیچ
+    // بررسیِ ایستایی نمی‌دیدند. بدونِ بلوکِ زیر eslint این فایل‌ها را با پارسرِ
+    // پیش‌فرضِ JS می‌خواند و روی هر کدام «Unexpected token :» می‌داد.
+    files: ['tests/**/*.mts', 'tests/**/*.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: { ecmaVersion: 2022, sourceType: 'module' },
+    },
+    plugins: { '@typescript-eslint': tsPlugin },
+    rules: {
+      'no-var': 'error',
+      // خروجیِ تشخیصی در تست مشروع است — برخلافِ کدِ تحویلی.
+      'no-console': 'off',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      eqeqeq: ['warn', 'smart'],
+    },
+  },
+  {
     // فایل‌های تولیدشده و وابستگی‌ها نادیده گرفته شوند
-    ignores: ['node_modules/**', '.next/**', 'prisma/migrations/**', 'tests/**'],
+    ignores: ['node_modules/**', '.next/**', 'prisma/migrations/**'],
   },
 ];

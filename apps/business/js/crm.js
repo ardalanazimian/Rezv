@@ -461,9 +461,9 @@ function profRenderReviews(){
         const origIdx=REVIEWS.indexOf(r);
         return `<div class="rev-card">
         <div class="rev-card-top">
-          <div class="rev-ava">${r.ava}</div>
+          <div class="rev-ava">${esc(r.ava)}</div>
           <div><div class="rev-name">${esc(r.name)} ${r.seg==='vip'?icon('crown',{size:14,fill:true}):''}</div><div class="rev-stars-sm">${Array.from({length:5},(_,si)=>icon('star',{size:12,fill:si<r.rating})).join('')}</div></div>
-          <div class="rev-date">${r.date}</div>
+          <div class="rev-date">${esc(r.date)}</div>
         </div>
         <div class="rev-text">${esc(r.text)}</div>
         <div class="rev-subratings"><span>غذا <b>${fa(r.food)}</b></span><span>سرویس <b>${fa(r.service)}</b></span><span>فضا <b>${fa(r.atmo)}</b></span></div>
@@ -478,7 +478,7 @@ function openReplyModal(i){
   const r=REVIEWS[i];
   openModal(`
     <div class="modal-title">پاسخ به ${esc(r.name)}</div>
-    <div class="modal-sub">${Array.from({length:5},(_,si)=>icon('star',{size:13,fill:si<r.rating})).join('')} · ${r.date}</div>
+    <div class="modal-sub">${Array.from({length:5},(_,si)=>icon('star',{size:13,fill:si<r.rating})).join('')} · ${esc(r.date)}</div>
     <div style="background:var(--s-50);border-radius:var(--r);padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--t2);line-height:1.5">${esc(r.text)}</div>
     <div class="field-label">پاسخ شما</div>
     <textarea class="inp" id="replyText" style="min-height:90px;resize:vertical" placeholder="ممنون از نظرت...">${r.rating<=3?'از بازخوردت ممنونیم و بابت تجربه‌ی نه‌چندان خوبت عذرخواهی می‌کنیم. ':''}</textarea>
@@ -600,10 +600,10 @@ function custRenderOverviewDemo(el){
         const m=RFM_META[s.segment]||RFM_META.unknown;
         const p=Math.round(s.count/segTotal*100);
         return `<div class="seg-cell" onclick="setCustTab('profiles')">
-          <div class="seg-top"><span class="seg-name">${m.fa}</span><span class="seg-dot" style="background:${m.c}"></span></div>
+          <div class="seg-top"><span class="seg-name">${esc(m.fa)}</span><span class="seg-dot" style="background:${esc(m.c)}"></span></div>
           <div class="seg-count">${fa(s.count)}</div>
-          <div class="seg-pct">${fa(p)}٪ · ${m.d}</div>
-          <div class="seg-bar"><i style="width:${p}%;background:${m.c}"></i></div>
+          <div class="seg-pct">${fa(p)}٪ · ${esc(m.d)}</div>
+          <div class="seg-bar"><i style="width:${p}%;background:${esc(m.c)}"></i></div>
         </div>`;
       }).join('')}</div>
     </div>
@@ -680,10 +680,10 @@ async function custRenderOverview(){
         const m=RFM_META[s.segment]||RFM_META.unknown;
         const p=total?Math.round(s.count/total*100):0;
         return `<div class="seg-cell" onclick="setCustTab('profiles')">
-          <div class="seg-top"><span class="seg-name">${m.fa}</span><span class="seg-dot" style="background:${m.c}"></span></div>
+          <div class="seg-top"><span class="seg-name">${esc(m.fa)}</span><span class="seg-dot" style="background:${esc(m.c)}"></span></div>
           <div class="seg-count">${fa(s.count)}</div>
-          <div class="seg-pct">${fa(p)}٪ · ${m.d}</div>
-          <div class="seg-bar"><i style="width:${p}%;background:${m.c}"></i></div>
+          <div class="seg-pct">${fa(p)}٪ · ${esc(m.d)}</div>
+          <div class="seg-bar"><i style="width:${p}%;background:${esc(m.c)}"></i></div>
         </div>`;
       }).join('')}</div>`:'<div style="text-align:center;color:var(--t2);padding:20px;font-size:12.5px">هنوز محاسبه نشده — کرون شبانه باید یک‌بار اجرا شده باشه</div>'}
     </div>
@@ -742,8 +742,8 @@ async function custRenderProfiles(){
         </div>
         ${c.intelligence_score!=null?`<div style="display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:11.5px;color:var(--t2)">${icon('sparkle',{size:12,fill:true})} امتیازِ هوشِ مشتری: <b style="color:${iqClr[c.intelligence_tier]||'var(--t2)'}">${fa(c.intelligence_score)}</b> · ${iqFa[c.intelligence_tier]||''}</div>`:''}
         <div class="sig-row">
-          <div class="sig"><div class="sig-val" style="color:var(--red)">${fa(c.churn_risk_score)}٪</div><div class="sig-label">ریسک ریزش</div><div class="sig-track"><div class="sig-fill" style="width:${c.churn_risk_score}%;background:var(--red)"></div></div></div>
-          <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(c.no_show_rate_pct)}٪</div><div class="sig-label">عدم‌حضور</div><div class="sig-track"><div class="sig-fill" style="width:${c.no_show_rate_pct}%;background:var(--amber)"></div></div></div>
+          <div class="sig"><div class="sig-val" style="color:var(--red)">${fa(c.churn_risk_score)}٪</div><div class="sig-label">ریسک ریزش</div><div class="sig-track"><div class="sig-fill" style="width:${esc(c.churn_risk_score)}%;background:var(--red)"></div></div></div>
+          <div class="sig"><div class="sig-val" style="color:var(--amber)">${fa(c.no_show_rate_pct)}٪</div><div class="sig-label">عدم‌حضور</div><div class="sig-track"><div class="sig-fill" style="width:${esc(c.no_show_rate_pct)}%;background:var(--amber)"></div></div></div>
         </div>
         <div class="smart-actions">
           <button class="btn btn-sm btn-ghost" onclick="callCustomer(${jsq(c.phone||'')})">${icon('phone',{size:13})} ${esc(c.phone||'بدون شماره')}</button>

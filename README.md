@@ -129,10 +129,10 @@ its `js/`/`css/` change; preserve CRLF files (some HTML/JS are CRLF — see
 
 ## Deployment
 
-- **Managed (Vercel)** — deploy `api` as its own project (**Root Directory `api`**);
-  cron endpoints are wired in `api/vercel.json`. Front-ends are static (one
-  Vercel project per app). The root `.vercelignore` must keep ignoring `api` +
-  infra folders.
+- **Managed (Vercel)** — used **only** for the two Next.js sites: `apps/landing`
+  (root domain) and `apps/seo` (own project, see `docs/adr/0001-seo-rendering-architecture.md`).
+  The `api` backend is **not** deployed to Vercel — see the self-host bullet below.
+  The root `.vercelignore` must keep ignoring `api` + infra folders.
 - **Self-host (Docker Compose)** — `docker-compose.yml` (local),
   `docker-compose.prod.yml` (Caddy + TLS), `docker-compose.observability.yml`
   (Prometheus + Grafana).

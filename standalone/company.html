@@ -2120,10 +2120,10 @@ function rDetail(){
   document.getElementById('v-detail').innerHTML=`
     <button class="back-btn" onclick="nav('restaurants')">${icon('arrowR',{size:15})} بازگشت به لیست</button>
     <div class="detail-hero">
-      <div class="detail-logo" style="background:${r.grad}">${r.logo}</div>
+      <div class="detail-logo" style="background:${esc(r.grad)}">${esc(r.logo)}</div>
       <div class="detail-info">
         <div class="detail-name">${esc(r.name)}</div>
-        <div class="detail-meta">عضو از ${r.joined} · <span class="plan-badge ${r.plan}">${PLAN_LABEL[r.plan]}</span> · ${r.isOpen?`<span class="live-dot" aria-hidden="true"></span> باز`:`<span class="dot-closed" aria-hidden="true"></span> بسته`}</div>
+        <div class="detail-meta">عضو از ${esc(r.joined)} · <span class="plan-badge ${esc(r.plan)}">${PLAN_LABEL[r.plan]}</span> · ${r.isOpen?`<span class="live-dot" aria-hidden="true"></span> باز`:`<span class="dot-closed" aria-hidden="true"></span> بسته`}</div>
       </div>
       <div class="detail-actions">
         <span class="badge ${badgeCls}" style="align-self:center"><span class="bdot"></span>${statusText}</span>
@@ -2264,11 +2264,11 @@ function rAnalytics(){
     <div class="row-2">
       <div class="panel">
         <div class="panel-head"><div class="panel-title">برترین بر اساس باشگاه</div></div>
-        ${topByMembers.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest(${jsq(r.id)})"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.reservations)} رزرو</div></div><div class="ls-val">${fa(r.members)}</div></div>`).join('')}
+        ${topByMembers.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest(${jsq(r.id)})"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${esc(r.grad)};width:34px;height:34px;font-size:15px">${esc(r.logo)}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.reservations)} رزرو</div></div><div class="ls-val">${fa(r.members)}</div></div>`).join('')}
       </div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title">برترین بر اساس رزرو</div></div>
-        ${topByRes.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest(${jsq(r.id)})"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${r.grad};width:34px;height:34px;font-size:15px">${r.logo}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.members)} عضو</div></div><div class="ls-val">${fa(r.reservations)}</div></div>`).join('')}
+        ${topByRes.map((r,i)=>`<div class="list-stat" style="cursor:pointer" onclick="openRest(${jsq(r.id)})"><div class="ls-rank">${fa(i+1)}</div><div class="rest-logo" style="background:${esc(r.grad)};width:34px;height:34px;font-size:15px">${esc(r.logo)}</div><div class="ls-info"><div class="ls-name">${esc(r.name)}</div><div class="ls-meta">${fa(r.members)} عضو</div></div><div class="ls-val">${fa(r.reservations)}</div></div>`).join('')}
       </div>
     </div>`;
 }
@@ -2365,8 +2365,8 @@ function rBilling(){
           else if(r.status==='expiring')st=`${fa(r.daysLeft)} روز مونده`;
           else st=`آزمایشی · ${fa(r.daysLeft)} روز`;
           return `<div class="mini-row" style="flex-wrap:wrap">
-            <div class="rest-logo" style="background:${r.grad};width:38px;height:38px;font-size:16px">${r.logo}</div>
-            <div class="mini-info" style="min-width:140px"><div class="mini-name">${esc(r.name)}</div><div class="mini-sub"><span class="plan-badge ${r.plan}">${PLAN_LABEL[r.plan]}</span> · موجودی: ${fa(r.smsBalance||0)} پیامک</div>
+            <div class="rest-logo" style="background:${esc(r.grad)};width:38px;height:38px;font-size:16px">${esc(r.logo)}</div>
+            <div class="mini-info" style="min-width:140px"><div class="mini-name">${esc(r.name)}</div><div class="mini-sub"><span class="plan-badge ${esc(r.plan)}">${PLAN_LABEL[r.plan]}</span> · موجودی: ${fa(r.smsBalance||0)} پیامک</div>
             </div>
             <span class="badge ${badgeCls}" style="align-self:flex-start"><span class="bdot"></span>${st}</span>
             <div style="display:flex;gap:6px">
@@ -2506,7 +2506,7 @@ function rSupport(){
       <div class="panel-head"><div><div class="panel-title">رستوران‌های نیازمند اقدام</div><div class="panel-sub">${fa(needsAttention.length)} مورد</div></div></div>
       <div class="mini-list">
         ${needsAttention.length?needsAttention.map(r=>`<div class="mini-row">
-          <div class="rest-logo" style="background:${r.grad};width:36px;height:36px;font-size:15px">${r.logo}</div>
+          <div class="rest-logo" style="background:${esc(r.grad)};width:36px;height:36px;font-size:15px">${esc(r.logo)}</div>
           <div class="mini-info"><div class="mini-name">${esc(r.name)}</div><div class="mini-sub">${!r.isOpen?`<span class="dot-closed" aria-hidden="true"></span> غیرفعال · `:''}${STATUS_LABEL[r.status]||''}</div></div>
           <div style="display:flex;gap:6px">
             <button class="btn btn-ghost btn-sm" onclick="toggleRestOpen(${jsq(r.id)})">${r.isOpen?'غیرفعال کن':'فعال کن'}</button>

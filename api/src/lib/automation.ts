@@ -67,7 +67,7 @@ const MAX_LOOKBACK_MS = 25 * 3600_000;
  *
  * ⚠️ چرا از `lastRunAt` مشتق می‌شود و نه از یک ثابت: این توابع قبلاً پنجره‌ی
  * ثابتِ «۱ ساعت» و «۶ ساعت» داشتند که فرض می‌کرد cron هر چند دقیقه اجرا
- * می‌شود. واقعیت (api/vercel.json + cron/crontab): تنها فراخوانِ
+ * می‌شود. واقعیت (cron/crontab — منبعِ حقیقتِ زمان‌بندی): تنها فراخوانِ
  * runAllDueAutomations یعنی /v1/maintenance/customer-insights **روزی یک‌بار**
  * (۰۳:۰۰) اجرا می‌شود — پس آن پنجره‌ها تقریباً همیشه خالی بودند. مشتق‌کردن
  * از lastRunAt پنجره را مستقل از آهنگِ cron درست می‌کند: نه شکاف، نه تکرار.
@@ -211,8 +211,8 @@ export async function runAllDueAutomations() {
   for (const a of automations) {
     // ⚠️ اصلاحِ کامنتِ کهنه: اینجا قبلاً نوشته بود «post_visit/no_show_followup
     // هر اجرا (هر چند دقیقه) چک می‌شوند». تنها فراخوانِ این تابع
-    // /v1/maintenance/customer-insights است که طبقِ api/vercel.json و
-    // cron/crontab **روزی یک‌بار** اجرا می‌شود. این دو trigger هر اجرا چک
+    // /v1/maintenance/customer-insights است که طبقِ cron/crontab (منبعِ
+    // حقیقتِ زمان‌بندی) **روزی یک‌بار** اجرا می‌شود. این دو trigger هر اجرا چک
     // می‌شوند، ولی «هر چند دقیقه» نیست — و پنجره‌ی هدف‌گیری‌شان از همین‌جا
     // (lastRunAt) مشتق می‌شود تا به آهنگِ cron وابسته نباشد.
     // birthday/winback/vip_milestone روزی یک‌بار کافی‌ست.

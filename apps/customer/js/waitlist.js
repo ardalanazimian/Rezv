@@ -25,7 +25,7 @@ export function offerWaitlist(id, r){
         <span class="wl-join-emoji">${icon('inbox',{size:28})}</span>
       </div>
       <div class="sheet-title" style="text-align:center">ظرفیت این ساعت پره</div>
-      <div class="sheet-sub" style="text-align:center;margin-bottom:18px">${esc(r.n)} · ${bk.date} · ${bk.time}<br>به صف بپیوند — اگه میزی آزاد شه، <b>اول به تو</b> خبر می‌دیم</div>
+      <div class="sheet-sub" style="text-align:center;margin-bottom:18px">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}<br>به صف بپیوند — اگه میزی آزاد شه، <b>اول به تو</b> خبر می‌دیم</div>
       <div class="wl-benefits">
         <div class="wl-benefit"><span class="wl-bene-ic">${icon('bell',{size:18})}</span><div><b>اطلاع فوری</b><small>پیامک + نوتیفیکیشن لحظه‌ای</small></div></div>
         <div class="wl-benefit"><span class="wl-bene-ic">⏱️</span><div><b>تخمین زمان</b><small>می‌دونی چقدر باید صبر کنی</small></div></div>

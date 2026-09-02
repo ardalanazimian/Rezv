@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { join, relative } from 'node:path';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  گاردِ ساختاری — «transitionReservation تنها نویسنده‌ی وضعیتِ رزرو است»

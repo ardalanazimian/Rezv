@@ -402,7 +402,7 @@ async function rAnalytics(){
       <div class="panel">
         <div class="panel-head"><div class="panel-title">مشتری جدید و قدیمی</div></div>
         <div class="donut-wrap">
-          <div class="donut" style="background:conic-gradient(var(--blue) 0 ${A.newPct}%,var(--teal) ${A.newPct}% 100%)"><div class="donut-hole"><div class="dv">${fa(totalGuests)}</div><div class="dl">مشتری</div></div></div>
+          <div class="donut" style="background:conic-gradient(var(--blue) 0 ${esc(A.newPct)}%,var(--teal) ${esc(A.newPct)}% 100%)"><div class="donut-hole"><div class="dv">${fa(totalGuests)}</div><div class="dl">مشتری</div></div></div>
           <div class="legend">
             <div class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>جدید<span class="legend-val">${fa(A.newPct)}٪</span></div>
             <div class="legend-item"><span class="legend-dot" style="background:var(--teal)"></span>قدیمی (بازگشتی)<span class="legend-val">${fa(returnRate)}٪</span></div>

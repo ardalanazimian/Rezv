@@ -83,3 +83,6 @@ RezervnoOSv2/
 
 # فایل‌های موقتِ ابزارهای AI/ادیتور
 .copilot-temp/
+
+# توکنِ scrapeِ Prometheus — راز است، مثلِ .env
+observability/metrics-token

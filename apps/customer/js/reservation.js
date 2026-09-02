@@ -10,7 +10,7 @@ import { esc, faNum, jsq } from './auth.js';
 import { openRest } from './data/detail.js';
 import { cardHTML, fmtFa, go } from './data/discover.js';
 import { TRIPS, favHas, gradFor, setMyTrips } from './data/seed.js';
-import { addToCalendar, addToWallet, cancelTrip, openReviewSheet, repeatReservation, showCheckInQR } from './features/trips.js';
+import { addToCalendar, addToWallet, cancelTrip, isLateCancel, openReviewSheet, repeatReservation, showCheckInQR } from './features/trips.js';
 import { R, findR } from './init.js';
 import { armReveals, buzz } from './theme-pwa.js';
 import { icon } from './icons.js';
@@ -58,6 +58,10 @@ export function mapApiTrip(apiR){
     date:dateStr||'—',
     time:timeStr||'—',
     slotStartIso: apiR.slotStart || null,
+    // پنجره‌ی لغوِ رایگان — از سرور می‌آید (تنها منبع). null یعنی «نمی‌دانیم»
+    // و در آن حالت نه هشداری نشان داده می‌شود نه دیالوگی باز می‌شود.
+    freeCancelHours: typeof apiR.restaurant?.freeCancelHours === 'number'
+      ? apiR.restaurant.freeCancelHours : null,
     party:faNum((apiR.partySize||2))+' نفر',
     code:apiR.code||'—',
     status:mapTripStatus(apiR.status),
@@ -72,6 +76,29 @@ export function mapApiTrip(apiR){
     // یعنی مشتری فکر می‌کرد میزش قطعی است در حالی که رستوران هنوز تأیید نکرده.
     awaitingApproval: apiR.status === 'pending',
   };
+}
+
+/**
+ * سطرِ سیاستِ لغو رویِ کارتِ رزرو — دو حالت:
+ *   • رزروِ پیش‌رو و هنوز داخلِ پنجره  → اطلاعِ خنثی
+ *   • رزروِ پیش‌رو و **داخلِ پنجره‌ی جریمه** → هشدارِ فعال
+ * پنجره‌ی نامعلوم یا رزروِ غیرِ‌پیش‌رو → هیچ‌چیز (سکوت، نه حدس).
+ *
+ * مبنایِ «دیرهنگام» همان `isLateCancel` است که دیالوگِ تأیید هم از آن استفاده
+ * می‌کند — یک قاعده، دو مصرف‌کننده؛ نه دو منطقِ موازی که از هم جدا بیفتند.
+ */
+function cancelPolicyRow(t){
+  if(t.status!=='up') return '';
+  const h=t.freeCancelHours;
+  if(typeof h!=='number' || !(h>0)) return '';
+  if(isLateCancel(t)){
+    return `<div class="trip-cancel-note late" style="font-size:11.5px;line-height:1.7;color:var(--warning-ink);background:var(--warning-soft);border-radius:var(--radius-md);padding:6px 8px;margin-top:6px">
+      ${icon('alert',{size:12})} پنجره‌ی لغوِ رایگان (${fmtFa(h)} ساعت) گذشته — لغو از این پس یک تخلف در سابقه‌ات ثبت می‌کند.
+    </div>`;
+  }
+  return `<div class="trip-cancel-note" style="font-size:11.5px;line-height:1.7;color:var(--t3);margin-top:6px">
+    ${icon('info',{size:12})} لغوِ رایگان تا ${fmtFa(h)} ساعت پیش از زمانِ رزرو.
+  </div>`;
 }
 
 function tripTimeline(status){
@@ -149,8 +176,9 @@ export async function renderTrips(){
         </div>
         <div class="trip-card-body">
           <div class="trip-card-name">${esc(name)}</div>
-          <div class="trip-card-meta"><span>${icon('calendar',{size:13})} ${t.date}</span><span class="tcm-dot">·</span><span>${icon('clock',{size:13})} ${t.time}</span><span class="tcm-dot">·</span><span>${icon('users',{size:13})} ${t.party}</span></div>
+          <div class="trip-card-meta"><span>${icon('calendar',{size:13})} ${esc(t.date)}</span><span class="tcm-dot">·</span><span>${icon('clock',{size:13})} ${esc(t.time)}</span><span class="tcm-dot">·</span><span>${icon('users',{size:13})} ${esc(t.party)}</span></div>
           <div class="trip-card-code">کد رزرو: <b>${esc(t.code)}</b></div>
+          ${cancelPolicyRow(t)}
           ${tripTimeline(t.status)}
           ${acts?`<div class="trip-card-actions">${acts}</div>`:''}
         </div>
