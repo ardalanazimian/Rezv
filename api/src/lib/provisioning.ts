@@ -6,7 +6,7 @@ import { audit } from './audit';
 import { enqueueSms } from './sms';
 import { normalizePhone } from './otp';
 import { hashPassword, normalizeUsername, passwordPolicyError, usernamePolicyError } from './password';
-import { isOwnerPhoneUniqueViolation } from './staff-helpers';
+import { isOwnerPhoneUniqueViolation, isUsernameUniqueViolation } from './staff-helpers';
 import { clubPrefixFrom, slugSeed, uniqueRestaurantSlug } from './site-orders';
 import { createLogger } from './logger';
 
@@ -150,7 +150,8 @@ export async function provisionBusiness(
   // ── §۶-۷..۱۳: تراکنش — یا همه یا هیچ ──
   // بازنده‌ی raceِ شماره‌ی تکراری (که از fast-pathِ بالا رد شده) این‌جا روی
   // ایندکسِ ۰۷۹ می‌میرد؛ Postgres کلِ تراکنش را رول‌بک می‌کند (هیچ
-  // Tenant/Restaurantِ یتیمی) و catch پایین P2002 را به همان ۴۰۹ِ مسیرِ
+  // Tenant/Restaurantِ یتیمی) و catch پایین هر دو P2002 (شماره‌ی مالک و
+  // نامِ کاربری) را به همان ۴۰۹ِ مسیرِ
   // ترتیبی ترجمه می‌کند. تستِ fault-injection: admin-create-business.
   const created = await db.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({
@@ -193,6 +194,12 @@ export async function provisionBusiness(
         'duplicate_owner_phone',
         'این شماره از قبل حسابِ کسب‌وکار دارد. برای شعبه‌ی جدیدِ همان مالک از «افزودنِ شعبه» استفاده کنید.',
       );
+    }
+    // مسابقه‌ی همزمانِ نامِ کاربری: بازنده از پیش‌بررسیِ بالا رد شده و این‌جا
+    // رویِ ایندکسِ `staff_username_key` می‌میرد. بدونِ این ترجمه، خطای خامِ
+    // P2002 به کاربر می‌رسید — همان ۴۰۹ِ مسیرِ ترتیبی را می‌دهیم.
+    if (isUsernameUniqueViolation(e)) {
+      throw Err.conflict('username_taken', 'نام کاربری قبلاً گرفته شده است');
     }
     throw e;
   });
