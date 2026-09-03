@@ -418,8 +418,17 @@
   "agents_round19": {
     "A10": {
       "model": "claude-sonnet-5",
-      "status": "first task accepted (wiring plan); second task (Iran reachability, founder condition ii) files on disk — A10-IRAN-REACHABILITY.md + A10-PLAN.json founder_actions 1i/1iii — awaiting its final reply after the process restart; pilot executed via check-host.net with facebook.com negative control (7/7 FAIL) and digikala/wikipedia/vercel.com positive controls",
-      "ceo_spot_check": "sections 0, 3.1, 3.2, 4 read by CEO — consistent; acceptance pending the JSON block"
+      "status": "accepted (wiring plan + Iran-reachability design)",
+      "ceo_spot_check": {
+        "sections_read": "0, 3.1, 3.2, 4 of 7 + reachability_test JSON block",
+        "confirmed": true,
+        "rejected": 0,
+        "notes": [
+          "pilot live-executed via check-host.net, permanent link 49dddd12kf31; negative control facebook.com 7/7 FAIL; positive controls digikala/wikipedia 7/7 pass; vercel.com 7/7 reachable in one snapshot",
+          "globalping probes designed but explicitly NOT executed — honest",
+          "repo conflict recorded as P0-019 (founder decision)"
+        ]
+      }
     }
   },
   "founder_directive_3_2026-09-03": {

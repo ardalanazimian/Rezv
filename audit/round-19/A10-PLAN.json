@@ -298,6 +298,130 @@
     },
     "restore_from_backup_as_last_resort": "See backups section above — restore.sh replays a pg_dump text/gzip snapshot; this is the ultimate rollback for any schema change judged unsalvageable by forward-fix, at the cost of losing all writes since that backup (max staleness ≈ BACKUP_CRON interval, default 24h)."
   },
+  "reachability_test": {
+    "full_writeup": "audit/round-19/A10-IRAN-REACHABILITY.md",
+    "repo_conflict": "ADR 0002 (docs/adr/0002-public-website-and-cms.md:33) + deploy/caddy/Caddyfile:8-13,117-153 + docker-compose.prod.yml:38-46 already serve the three panels (customer/business/company) from self-hosted Caddy file_server blocks, with Vercel reserved only for apps/landing + apps/seo. Founder's baseline (b) — these three panels on Vercel — reverses a recorded, already-implemented decision. Not a blocker to running this test, but must be reconciled explicitly (a dated ADR 0002 amendment) if the test PASSES, so the Caddyfile's own 'ADR 0002' comment doesn't contradict reality for the next reader.",
+    "test_object": {
+      "minimal_probe_page": "Recommend a dedicated 1-line probe page, not the full customer index.html (which pulls fonts/CSS/ES-module chain and would confound reachability with asset weight): apps/customer/probe.html = '<!doctype html><html><head><meta charset=\"utf-8\"><title>rz-probe</title></head><body>rz-ok-v1</body></html>' (~120 bytes). Assert the literal string rz-ok-v1 in the body, not just HTTP 200 — catches DPI/captive-portal block-page substitution that a status-code-only check would miss.",
+      "variant_A_vercel_app": "https://<project>.vercel.app (or preview alias) — Vercel's shared anycast edge, shared IP ranges across all Vercel customers, resolved via Vercel's own nameservers. Less likely to be individually DNS-poisoned (shared platform suffix); still subject to any IP-range-level block of Vercel's edge itself.",
+      "variant_B_custom_domain": "e.g. app.rezervno.ir pointed at the same Vercel project — adds a founder-controlled DNS hop that is a SEPARATE potential failure point (Iran does domain-specific DNS poisoning/NXDOMAIN independent of IP blocking). If Variant A fails, B will very likely fail the same way (IP block); if A passes but B fails, that isolates DNS-layer filtering of the custom domain specifically.",
+      "not_yet_testable_caveat": "No rezervno Vercel project exists yet (0 projects, confirmed live via Vercel MCP list_projects). All pilot results below used vercel.com itself (Vercel's own apex domain, same shared edge) as a stand-in for Variant A — this MUST be re-run against the actual probe page once a project + domain exist; a marketing site being reachable does not guarantee a specific new project's edge assignment behaves identically."
+    },
+    "probes": [
+      {
+        "tool": "check-host.net",
+        "url": "https://check-host.net/about/api (docs); https://check-host.net/nodes/hosts (live node list, unauthenticated JSON)",
+        "iran_nodes_confirmed_live_2026-09-03": [
+          {"node": "ir1.node.check-host.net", "city": "Tehran", "asn": "AS47430"},
+          {"node": "ir2.node.check-host.net", "city": "Isfahan", "asn": "AS209279"},
+          {"node": "ir3.node.check-host.net", "city": "Shiraz", "asn": "AS213953"},
+          {"node": "ir4.node.check-host.net", "city": "Shiraz", "asn": "AS212077"},
+          {"node": "ir5.node.check-host.net", "city": "Tehran", "asn": "AS214431"},
+          {"node": "ir7.node.check-host.net", "city": "Tehran", "asn": "AS213727"},
+          {"node": "ir8.node.check-host.net", "city": "Tehran", "asn": "AS214361"}
+        ],
+        "command": "curl -s -H \"Accept: application/json\" \"https://check-host.net/check-http?host=<TARGET>&max_nodes=10&node=ir1.node.check-host.net&node=ir2.node.check-host.net&node=ir3.node.check-host.net&node=ir4.node.check-host.net&node=ir5.node.check-host.net&node=ir7.node.check-host.net&node=ir8.node.check-host.net\"  →  returns request_id  →  curl -s -H \"Accept: application/json\" \"https://check-host.net/check-result/<request_id>\" (poll after ~5-10s). Response per node: [1|0 (ok/fail), seconds, status text, http code|null, resolved IP|null].",
+        "caveat": "Nodes are Iranian datacenter/hosting ASNs, not consumer ISPs (Irancell/MCI/TCI/Shatel/Rightel) — tests the national-gateway choke point, not carrier-specific NAT/DPI. This tool was actually executed by this agent (see controls[] below); results are live, not simulated.",
+        "executed_by_this_agent": true
+      },
+      {
+        "tool": "globalping.io / globalping CLI",
+        "url": "https://api.globalping.io/v1/probes (live probe list, unauthenticated JSON); https://github.com/jsdelivr/globalping-cli (CLI docs)",
+        "iran_probes_confirmed_live_2026-09-03": [
+          {"city": "Tehran", "asn": "AS202468", "network": "AbrArvan CDN and IaaS"},
+          {"city": "Tehran", "asn": "AS202468", "network": "AbrArvan CDN and IaaS (2nd probe)"},
+          {"city": "Tehran", "asn": "AS59580", "network": "Batterflyai Media"},
+          {"city": "Tehran", "asn": "AS59441", "network": "Hostiran Network"},
+          {"city": "Tehran", "asn": "AS42043", "network": "Parsian High Tech Company"}
+        ],
+        "command": "globalping http <TARGET> from Iran --limit 5   |   globalping ping <TARGET> from Iran --limit 5 --latency",
+        "caveat": "All 5 probes are Tehran-only hosting/datacenter networks today; volunteer network, no uptime guarantee — re-verify probe list is still online before the founder's 3-day run.",
+        "executed_by_this_agent": false,
+        "note": "This agent verified the probe list is live (5 Iran probes exist right now) but did NOT execute an actual http/ping check via globalping — only check-host.net checks were actually run. Command above is for the founder/next agent to execute."
+      },
+      {
+        "tool": "OONI Probe (official censorship-classification app)",
+        "url": "https://ooni.org/install (app); https://explorer.ooni.org/country/IR (data — returned HTTP 403 to this agent's WebFetch, likely bot-protection, not a finding about Iran)",
+        "caveat": "Complementary/corroborating only — applies OONI's own confirmed/possible/anomaly classification, but not scriptable into the N=20-per-cell protocol the way curl/check-host/globalping are.",
+        "executed_by_this_agent": false
+      },
+      {
+        "tool": "founder's own devices, >=2 Iranian ISPs (mandatory, not optional)",
+        "url": "n/a — manual",
+        "command": "for i in $(seq 1 20); do curl -s -o /dev/null -w \"%{http_code} connect=%{time_connect}s tls=%{time_appconnect}s ttfb=%{time_starttransfer}s total=%{time_total}s\\n\" \"https://<TARGET>/probe.html\"; sleep 2; done",
+        "why_mandatory": "check-host.net and globalping both only reach Iranian DATACENTER networks, not residential/mobile carrier NAT/DPI paths — this is the only probe class that tests what a real customer's phone actually sees.",
+        "executed_by_this_agent": false
+      }
+    ],
+    "thresholds": {
+      "cells": "2 ISPs minimum (mobile: Irancell or Hamrah-e-Aval; fixed: Shatel or TCI/Mokhaberat; Rightel as an optional 3rd) x 3 time-of-day windows (09:00, 15:00, 22:00 Tehran local) x 3 days = 18 cells minimum, each independently scored — a single consistently-bad cell fails the whole test, PASS is not an average.",
+      "N": 20,
+      "PASS": ">=95% of N=20 return HTTP 200 (or expected 2xx/3xx chain) AND contain literal 'rz-ok-v1' AND meet latency_ms, in EVERY one of the 18 cells, for both variant_A and variant_B",
+      "FLAKY": "80-95% success in 1+ cells, OR >=95% success with latency_ms breached in >10% of successful attempts, OR a clear time-of-day-dependent pattern",
+      "FAIL": "<80% success in any single cell, OR any day where 2+ automated probes AND both manual ISPs show <50% success simultaneously (systemic block), OR automated probes stay green while a real device fails 3+ consecutive attempts across 2+ sessions (forces FAIL regardless of aggregate stats — this is the datacenter-vs-consumer-path gap the automated probes cannot see)",
+      "latency_ms": {
+        "tls_handshake_time_appconnect": "< 1000ms for >=90% of successful attempts",
+        "ttfb_time_starttransfer": "< 1500ms for >=90% of successful attempts",
+        "basis": "Derived from this agent's live pilot (Iran-datacenter-to-vercel.com measured 190-270ms total) with ~4-5x margin for real mobile/last-mile conditions; adjust before the 3-day run if the founder's own device pilot data comes in tighter or looser, and record why."
+      },
+      "positive_control_required_every_session": "If the domestic positive control (e.g. digikala.com) or the founder's own known-working baseline fails during any session of the 3-day run, that session's data is VOID (Iran-side outage, not a Vercel finding) — do not count it toward PASS/FAIL/FLAKY."
+    },
+    "controls": [
+      {
+        "host": "facebook.com",
+        "role": "negative control — officially blocked in Iran since June 2009; corroborated by OONI's Iran measurement catalogue (WhatsApp/Facebook Messenger/Telegram/Signal tested per search-result summary of explorer.ooni.org/country/IR)",
+        "pilot_result": "7/7 Iran nodes FAILED — ir1/ir4: 'Connection refused'; ir2/ir3/ir5/ir7/ir8: 'Connection timed out' (2.9-15.6s)",
+        "pilot_executed": true,
+        "pilot_date": "2026-09-03",
+        "check_host_request_id": "49dddd12kf31",
+        "check_host_permanent_link": "https://check-host.net/check-report/49dddd12kf31"
+      },
+      {
+        "host": "digikala.com",
+        "role": "positive control (domestic) — Iran's largest e-commerce site; if this fails, the whole test rig/session is untrustworthy (Iran-side outage), not a Vercel finding",
+        "pilot_result": "7/7 Iran nodes SUCCESS — HTTP 301, 0.039-0.128s",
+        "pilot_executed": true,
+        "pilot_date": "2026-09-03",
+        "check_host_request_id": "49dddd25k607",
+        "check_host_permanent_link": "https://check-host.net/check-report/49dddd25k607"
+      },
+      {
+        "host": "wikipedia.org",
+        "role": "positive control (foreign, non-Vercel) — isolates 'foreign HTTPS works at all' from 'Vercel specifically works'",
+        "pilot_result": "7/7 Iran nodes SUCCESS — HTTP 301, 0.163-0.468s",
+        "pilot_executed": true,
+        "pilot_date": "2026-09-03",
+        "check_host_request_id": "49ddf017k319",
+        "check_host_permanent_link": "https://check-host.net/check-report/49ddf017k319"
+      },
+      {
+        "host": "vercel.com",
+        "role": "Vercel-edge proxy target — STAND-IN ONLY, not the real rezervno project (none exists yet, 0 Vercel projects confirmed live). Must be re-run against the actual probe page once deployed.",
+        "pilot_result": "7/7 Iran nodes SUCCESS — HTTP 308 redirect, resolved to 64.239.x.x (Vercel edge range), 0.187-0.266s",
+        "pilot_executed": true,
+        "pilot_date": "2026-09-03",
+        "check_host_request_id": "49dddcfdkf9a",
+        "check_host_permanent_link": "https://check-host.net/check-report/49dddcfdkf9a",
+        "historical_context_not_settled_by_this_pilot": "Vercel staff stated in 2021 (github.com/vercel/vercel/discussions/5891, fetched): 'we cannot guarantee the deliverability for countries under US sanctions and embargoes. Normally our upstream provider (AWS) will block those countries.' Independent Iran-unreachability reports continued May 2025 (community.vercel.com/t/domain-cant-reach-from-iran-ip/12230) and May 9 2026 (community.vercel.com/t/request-for-temporary-access-exception-for-users-in-iran/41504, which instead blames Iranian government-side NAT, not AWS). Today's clean 7/7 does not retroactively invalidate those reports or guarantee tomorrow's state — enforcement on either side has a documented history of changing without notice. This is why the full 18-cell/3-day protocol, not this single snapshot, is the actual test."
+      }
+    ],
+    "decision_rule": {
+      "PASS": "Baseline (b) stands — customer/business/company deploy as Vercel projects per vercel.projects_to_create above. Record this as a deliberate, dated amendment to docs/adr/0002-public-website-and-cms.md (it currently says otherwise) so the Caddyfile's own ADR-0002 comment doesn't contradict live reality for the next reader.",
+      "FAIL_or_FLAKY": "Fallback — all three frontends served by production Caddy; Vercel used for previews only. See fallback_checklist."
+    },
+    "fallback_checklist": [
+      "Caddy static roots: ALREADY WIRED, no new code — deploy/caddy/Caddyfile:117-153 (app./business./admin. handle blocks, file_server off /srv/customer|business|company) + docker-compose.prod.yml:38-46 (volumes already mount apps/customer|business|company read-only into the caddy service). Only needs a real host (founder_action 1iii) and `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`.",
+      "Cache headers: GAP FOUND, not yet in the Caddyfile — the three handle blocks (Caddyfile:130-152) have no explicit Cache-Control directives. Add 'Cache-Control: no-cache' (or short max-age) for index.html and sw.js specifically, and long max-age+immutable for hashed static assets, before relying on this path in production — otherwise a stale-cache bug class is possible that Vercel's CDN would have prevented automatically.",
+      "CACHE_VERSION discipline (CLAUDE.md, apps/customer/sw.js line 14): unchanged requirement, but becomes the ONLY safety net under self-host (no Vercel atomic-deploy/CDN purge behind it) — treat a missed bump as higher severity here than on Vercel.",
+      "CORS / RZ_API_BASE: fallback REMOVES this problem rather than adding work — Caddyfile's api_upstream snippet (imported by all three panel blocks) reverse-proxies /api/* to the api container on the same origin, so resolveApiBase() stays at its default '' (same-origin), zero code change, zero CORS/ALLOWED_ORIGINS work beyond what the API already needs for its own cookie/CSRF handling. This is the inverse of the frontend-to-API wiring gap (blocker B6) that Vercel-hosted frontends would still need to build."
+    ],
+    "unverified_by_this_agent": [
+      "globalping.io actual http/ping check execution (only the live probe LIST was verified; no check was actually run — command provided for founder/next agent)",
+      "OONI Probe data for Iran (explorer.ooni.org/country/IR returned HTTP 403 to this agent's WebFetch — could not independently confirm current blocklist contents beyond search-result summaries)",
+      "Whether the founder's real rezervno Vercel project (once created) will share vercel.com's exact edge PoP assignment / be subject to any account-level geo-restriction — cannot be tested without creating the project (out of scope, no MCP write tools used)",
+      "Real-device (Irancell/MCI/Shatel/TCI/Rightel) latency and success numbers — nothing in this block substitutes for the founder's actual 3-day run"
+    ]
+  },
   "blockers": [
     {
       "id": "B1",
@@ -307,7 +431,8 @@
     {
       "id": "B2",
       "text": "Architecture decision required before creating the Vercel API project: does it replace the current self-hosted Docker/Caddy production deployment (requiring cron to move to Vercel Cron / api/vercel.json to be recreated), or is it exploratory/staging-only (in which case cron/crontab stays authoritative and this project must never receive production DNS)? Creating the project without this decision risks either double-firing all 9 maintenance jobs (if both cron paths run against the same DB) or silently NOT running any cron jobs (if founder assumes Vercel handles it but api/vercel.json was never recreated).",
-      "evidence": "docs/DEPLOYMENT.md:96-101, cron/crontab:1-13"
+      "evidence": "docs/DEPLOYMENT.md:96-101, cron/crontab:1-13",
+      "amendment_round19b": "RESOLVED for the API: founder decision received — API stays self-hosted Docker/Caddy, cron/crontab remains authoritative, no Vercel API project. Still open: founder_actions '1i' (confirm intent behind commit 3422936 in writing) and '1iii' (name the production host). A NEW, narrower architecture question was opened by the same decision for the FRONTENDS — see reachability_test.architecture_conflict_found (customer/business/company were already assigned to self-hosted Caddy by docs/adr/0002-public-website-and-cms.md, not Vercel)."
     },
     {
       "id": "B3",
@@ -333,8 +458,18 @@
   "founder_actions": [
     {
       "order": 1,
-      "action": "DECIDE: Vercel-hosted API (replacing self-hosted Docker/Caddy) vs. Vercel for frontends only (API stays self-hosted, cron/crontab stays authoritative). Write the decision down — it changes steps 3, 6, and 7 below.",
-      "why_first": "Every subsequent Vercel step for the API project depends on this."
+      "action": "DECIDED by founder (message received during this round): baseline (b) = API stays self-hosted Docker/Caddy (cron/crontab stays authoritative); customer/business/company go on Vercel, CONDITIONAL on 3 inputs: (i) below, (ii) the Iran-reachability test (see audit/round-19/A10-IRAN-REACHABILITY.md), (iii) below. Note this changes docs/adr/0002-public-website-and-cms.md:33 and deploy/caddy/Caddyfile:8-13,117-153, which currently put customer/business/company on self-hosted Caddy (already wired in docker-compose.prod.yml:38-46) and reserve Vercel for apps/landing + apps/seo only — see A10-IRAN-REACHABILITY.md §0. If the reachability test PASSES, record this as a deliberate ADR 0002 amendment, not a silent contradiction.",
+      "why_first": "Every subsequent Vercel step for the frontend projects depends on the reachability test's outcome (§4 of A10-IRAN-REACHABILITY.md)."
+    },
+    {
+      "order": "1i",
+      "action": "Founder condition (i): confirm in writing that the 2026-08-28 deletion of api/vercel.json (commit 3422936, 'حذفِ api/vercel.json و اعلامِ cron/crontab به‌عنوانِ تنها منبعِ حقیقتِ زمان‌بندی') was an intentional architecture decision (API stays self-hosted, cron/crontab authoritative) and not an accidental loss of Vercel Cron config that should be restored.",
+      "evidence": "git log commit 3422936; cron/crontab:1-13; docs/DEPLOYMENT.md:96-101"
+    },
+    {
+      "order": "1iii",
+      "action": "Founder condition (iii): name the production host target (provider + region) for the self-hosted piece — the API always, and the three frontends too if the Iran-reachability test comes back FAIL/FLAKY. No production infrastructure exists anywhere today.",
+      "evidence": "This agent's B4/B6 (no production DB reachable, frontend-to-API wiring absent); independently recorded by the CEO as blocker P0-017 in audit/round-15/ground-truth.json:225-233 ('Provisioning the production host (provider/region) is itself a launch blocker — founder names the target', status 'open — founder input (iii)'), which cites this same A10-PLAN.json's B4/B6 as its evidence."
     },
     {
       "order": 2,
