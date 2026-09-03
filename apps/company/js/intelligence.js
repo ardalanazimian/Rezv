@@ -845,6 +845,8 @@ function faD(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
 // است: یک عنصرِ `display:none` با `display:flex` دور زده شد. چیزی که رندر
 // نشود قابلِ دور زدن نیست.
 let _totpRequired = false;
+// آیا مسیرِ ورودِ پیامکیِ ادمین اصلاً فعال است؟ (فلگِ سرور، پیش‌فرض خاموش)
+let _otpLoginEnabled = false;
 
 function showAdminLogin(){
   setAdminGateLocked(true);
@@ -867,7 +869,7 @@ function showAdminLogin(){
     <input class="login-inp" id="adminPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')${_totpRequired ? "document.getElementById('adminTotp')?.focus()" : 'adminPasswordLogin()'}">
     ${totpBlock}
     <button class="login-btn" id="adminLoginBtn" onclick="adminPasswordLogin()">ورود به پنل</button>
-    <button class="login-back" onclick="showAdminLoginPhone()">ورود با پیامک</button>
+    ${_otpLoginEnabled ? `<button class="login-back" onclick="showAdminLoginPhone()">ورود با پیامک</button>` : ''}
     <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
   setTimeout(()=>document.getElementById('adminUser')?.focus(),200);
 }
@@ -880,7 +882,11 @@ async function loadAdminLoginForm(){
   try {
     const res = await API.adminTotpRequired();
     _totpRequired = !!(res.ok && res.data && res.data.totp_required);
-  } catch { _totpRequired = false; }
+    // ⚠️ پیش‌فرضِ **خاموش** وقتی سرور پاسخ نداد: مسیرِ OTPِ ادمین عاملِ سوم
+    // را دور می‌زند، پس در ابهام نباید پیشنهادش کنیم. برعکسِ totp_required
+    // که پیش‌فرضش false است چون آن‌جا ابهام یعنی «هنوز روشن نشده».
+    _otpLoginEnabled = !!(res.ok && res.data && res.data.otp_login_enabled);
+  } catch { _totpRequired = false; _otpLoginEnabled = false; }
   showAdminLogin();
 }
 

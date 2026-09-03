@@ -157,6 +157,7 @@ import './rbac-permission-coverage.test.mts';
 import './rbac-role-from-db.integration.test.mts';
 import './password-login.integration.test.mts';
 import './admin-totp-login.integration.test.mts';
+import './admin-otp-flag.integration.test.mts';
 import './admin-panel-contract.integration.test.mts';
 import './restaurant-staff-tenant-pin.integration.test.mts';
 import './business-panel-contract.integration.test.mts';

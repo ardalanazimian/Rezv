@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-02T07:03:17.386Z",
+  "generated_at": "2026-09-02T14:32:59.521Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -1468,22 +1468,22 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 860,
+      "line": 862,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "dom_api_safe",
-      "manual_review_note": "فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت."
+      "manual_review_note": "فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت. ۲۰۲۶-۰۹-۰۲: درجِ سومِ _otpLoginEnabled هم اضافه شد — همان جنس: یک booleanِ سرور که فقط تصمیم می‌گیرد رشته‌ی literal ساخته شود یا نه."
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 922,
+      "line": 928,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "safe_static"
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 956,
+      "line": 962,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "unsafe"
@@ -2481,85 +2481,85 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3159,
+      "line": 3161,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "dom_api_safe",
-      "manual_review_note": "فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت."
+      "manual_review_note": "فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت. ۲۰۲۶-۰۹-۰۲: درجِ سومِ _otpLoginEnabled هم اضافه شد — همان جنس: یک booleanِ سرور که فقط تصمیم می‌گیرد رشته‌ی literal ساخته شود یا نه."
     },
     {
       "file": "standalone/company.html",
-      "line": 3221,
+      "line": 3227,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 3255,
+      "line": 3261,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3376,
+      "line": 3382,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 3382,
+      "line": 3388,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به سرو",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3389,
+      "line": 3395,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3510,
+      "line": 3516,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 3516,
+      "line": 3522,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به س",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3523,
+      "line": 3529,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3716,
+      "line": 3722,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 4043,
+      "line": 4049,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 4272,
+      "line": 4278,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"

@@ -7,6 +7,7 @@ import { authenticateStaffByPassword } from '@/lib/password-auth';
 import { normalizeUsername } from '@/lib/password';
 import { audit } from '@/lib/audit';
 import { adminLoginEnabled, verifyAdminTotp, type TotpOutcome } from '@/lib/admin-totp';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 
 import { withApiMetrics } from '@/lib/api-metrics';
 
@@ -121,7 +122,18 @@ async function POST_impl(req: Request) {
  * این‌جا بیرون نمی‌رود.
  */
 async function GET_impl() {
-  return NextResponse.json({ totp_required: adminLoginEnabled() });
+  return NextResponse.json({
+    totp_required: adminLoginEnabled(),
+    // ⚠️ پنلِ شرکت استاتیک است و نه `process.env` می‌بیند نه
+    // `platform_settings`. بدونِ این پرچم، UI مجبور می‌شد دکمه‌ی «ورود با
+    // پیامک» را همیشه بسازد و با CSS پنهانش کند — و `display:none` قبلاً در
+    // همین مخزن با `display:flex` دور زده شده بود. تصمیم باید سمتِ سرور
+    // گرفته شود تا دکمه اصلاً در DOM نیاید.
+    //
+    // نشتِ اطلاعات نیست: روشن/خاموش بودنِ یک مسیرِ ورود رازِ امنیتی نیست
+    // (مهاجم با یک درخواست هم می‌فهمید). رازِ واقعی ADMIN_TOTP_SECRET است.
+    otp_login_enabled: await isFeatureEnabled('admin_otp_login_enabled'),
+  });
 }
 
 export const GET = withApiMetrics('/api/v1/auth/admin/login', GET_impl);
