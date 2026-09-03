@@ -2201,7 +2201,7 @@ async function loadCredentials(restaurantId){
       <label class="login-field-label" for="credUser">نام کاربری</label>
       <input class="login-inp" id="credUser" spellcheck="false" placeholder="فقط حروف انگلیسی، رقم، نقطه، خط تیره">
       <label class="login-field-label" for="credPass">رمز عبور</label>
-      <input class="login-inp" id="credPass" type="text" placeholder="حداقل ۸ کاراکتر">
+      <input class="login-inp" id="credPass" type="password" autocomplete="new-password" placeholder="حداقل ۸ کاراکتر">
       <button class="btn btn-primary btn-block" id="credSaveBtn" onclick="saveCredentials(${jsq(String(restaurantId))})">ذخیره‌ی دسترسی</button>
       <div style="font-size:12px;color:var(--t3);line-height:1.9">
         اگر این شماره از قبل ثبت شده باشد، فقط نام کاربری و رمزش عوض می‌شود و کاربرِ تکراری ساخته نمی‌شود.
