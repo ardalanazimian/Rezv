@@ -2,6 +2,7 @@
   "name": "rezervno-api",
   "version": "1.0.0-phase1",
   "private": true,
+  "engines": { "node": "20.x" },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
