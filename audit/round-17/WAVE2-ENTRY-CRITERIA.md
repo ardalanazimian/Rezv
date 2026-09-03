@@ -20,9 +20,17 @@ Model discipline (§0.2, amended 2026-09-03): A4 and A5 are Tier 1 → `claude-o
 
 | # | Item | Owner |
 |---|---|---|
-| S1 | P0-014 Supabase credential desync — live drift (`information_schema.columns` vs `schema.prisma`) + RLS (`pg_class.relrowsecurity`) | founder resets password → CEO runs immediately |
+| S1 | **P0-014 REDEFINED (directive 4, 2026-09-03)** — the production DB is on an **auto-pausing tier**; `28P01` was a symptom of the pause, not a credential fault (founder's earlier correction withdrawn). Live drift (`information_schema.columns` vs `schema.prisma`) + RLS (`pg_class.relrowsecurity`) still run the moment the founder confirms the restore + password reset in writing. | founder restores + resets → CEO runs immediately |
 | S2 | Melipayamak key rotation — written confirmation | founder |
 | S3 | A10 (sonnet) wiring plan accepted → Vercel ×4 projects + Sentry project created by founder with the exact settings | founder + A10 plan |
+
+## Hard **launch** gate added by founder directive 4 (2026-09-03) — not a Wave-2 entry gate
+
+| # | Criterion | How it is verified |
+|---|---|---|
+| L1 | **Production DB tier/host is decided and provably non-pausing.** Founder chooses (1) Supabase Pro or (2) Postgres inside the existing Docker stack (`docker-compose.yml:12-26` + backup service `:137-167`). A10 folds the outcome into the deployment plan **before any production wiring**. | *Provable* = the chosen host answers a **real query** (not `get_project`) after a documented idle window, raw result recorded. A control-plane status alone is never accepted. |
+
+**New standing rule for every agent (landmine list):** never declare a live-infrastructure fact from control-plane metadata alone — `get_project`/`list_projects` status is cached and was **STALE** here (`ACTIVE_HEALTHY` while `execute_sql` returned `28P01` and `get_advisors` said *hibernated*). Cross-check with a data-plane query and record the raw output. Zero-trust applies to founder statements too: the founder's own correction on this item was withdrawn by the founder after re-testing.
 
 ## Wave 2 scope handed to A4 / A5 (inputs already verified — do not re-derive)
 

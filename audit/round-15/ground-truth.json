@@ -24,7 +24,7 @@
   },
   "schema_drift": {
     "live_vs_prisma": "blocked",
-    "reason": "Credential desync (P0-014), not hibernation - see finding. Local side prepared (scratchpad/local_cols.txt).",
+    "reason": "Production DB unreachable: project auto-paused (hibernated) on its current tier. 28P01 on execute_sql is a symptom of the pause, not an independent credential fault (P0-014 REDEFINED 2026-09-03, founder correction withdrawn). Local side prepared (scratchpad/local_cols.txt).",
     "local_side_ready": "scratchpad/local_cols.txt — 72 tables produced by db push + apply-sql.sh + test-schema-fixups.sql (what schema.prisma+migrations yield)",
     "local_guard": "api/tests/schema-drift.integration.test.mts 3/3 green (EXIT=0, 2026-09-03)"
   },
@@ -217,10 +217,11 @@
       "id": "P0-014",
       "severity": "blocker",
       "area": "infra/db",
-      "claim": "Supabase MCP <-> project zmyuvtpbchytqvtgyewt credential desync: 28P01 password authentication failed for BOTH postgres (execute_sql) and supabase_read_only_user (list_tables). Project is ACTIVE_HEALTHY (founder-verified); the CEO's earlier 'hibernated' reading (taken from a get_advisors error text) was a misdiagnosis - two roles failing auth is not a hibernation symptom. Live schema-drift + RLS checks are blocked until the DB password is reset.",
-      "evidence": "MCP execute_sql -> FATAL 28P01 for user postgres; list_tables -> same for supabase_read_only_user; list_projects -> ACTIVE_HEALTHY; founder-side MCP check 2026-09-03 confirms",
-      "status": "open - founder resets DB password from the Supabase dashboard; CEO's FIRST action after written confirmation = live drift (information_schema.columns string_agg vs schema.prisma) + RLS (pg_class.relrowsecurity)",
-      "verified_by": "founder+ceo"
+      "claim": "REDEFINED 2026-09-03 (founder directive 4). The production Supabase project sits on a tier that AUTO-PAUSES on inactivity. This is not a wake-it-up chore: a self-pausing database cannot serve a launched product - the first low-traffic night takes the platform down. The earlier 'credential desync' reading is WITHDRAWN by the founder; 28P01 is a symptom of the pause, not an independent fault. Launch gate: the production DB tier/host must be decided and provably non-pausing before any production wiring.",
+      "evidence": "Founder-side check 2026-09-03, three endpoints, same project 40563480/zmyuvtpbchytqvtgyewt: get_project -> ACTIVE_HEALTHY (control-plane metadata, STALE); execute_sql -> 28P01; get_advisors -> 'Project 40563480 is currently hibernated and will wake on next supported request'. CEO-side MCP results of the same day are consistent.",
+      "status": "open - ESCALATED to founder decision: (1) Supabase Pro (no pausing, managed backups, connection strings unchanged, FX payment required) or (2) Postgres inside the existing Docker stack (docker-compose.yml:12-26 postgres:16-alpine + :137-167 backup service with pg_dump cron/retention/optional S3 - VERIFIED present; no FX dependency; ops burden ours). Founder is restoring the project and resetting the DB password now; live drift + RLS remain the CEO's first action on written confirmation. A10 must fold the outcome into the deployment plan BEFORE any production wiring.",
+      "verified_by": "founder+ceo",
+      "supersedes": "P0-014 as recorded on 2026-09-03 (credential desync) - withdrawn by the founder"
     },
     {
       "id": "P0-017",
@@ -443,5 +444,21 @@
     ],
     "s0_2_amended": "CEO stays on claude-opus-5 for all remaining rounds; Fable reserved for the final GO/NO-GO synthesis only; model column mandatory",
     "wave2_entry_criteria": "APPROVED as written (audit/round-17/WAVE2-ENTRY-CRITERIA.md)"
+  },
+  "founder_directive_4_2026-09-03": {
+    "subject": "P0-014 REDEFINED - founder correction withdrawn, self-pausing production DB escalated",
+    "founder_side_error_recorded": "The founder's 2026-09-03 correction 'credential desync, not hibernation' was wrong and is withdrawn by the founder himself. The CEO's ORIGINAL hibernation reading was correct. Recorded in the audit trail per the founder's explicit instruction: zero-trust runs in BOTH directions - a founder statement is a claim, not truth, exactly like a doc or an agent report.",
+    "ceo_error_also_recorded": "The CEO accepted the founder's correction without re-testing it against a live endpoint. That was the process failure on this side: a claim contradicting an executed tool result was adopted because of its source. Same class of defect as trusting get_project.",
+    "process_rule_new": "NEVER declare a live-infrastructure fact from control-plane metadata alone. get_project / list_projects status is cached and can be STALE while the data plane is down. Every live-infra claim must be cross-checked with a real query (execute_sql or an equivalent data-plane call) and the raw result recorded. Added to the known-landmines list for all agents.",
+    "decision_pending_founder": {
+      "id": "P0-014-DECISION",
+      "question": "Production Postgres host: Supabase Pro vs Postgres inside the existing Docker stack",
+      "option_1": "Supabase Pro - no pausing, managed backups + PITR, connection strings unchanged, RLS/advisors keep working, MCP tooling keeps working. Cost: monthly USD, requires an FX payment path from Iran; data lives outside Iran (latency + jurisdiction).",
+      "option_2": "Postgres in the existing Docker stack - docker-compose.yml already ships postgres:16-alpine (:12-26) and a backup service (:137-167: BACKUP_CRON default '0 3 * * *', BACKUP_KEEP 14, BACKUP_ON_START, uploads volume tarred, optional S3 fields). No FX dependency, same host as the API (lowest latency), full control. Ops burden ours: patching, disk, monitoring, and a PROVEN restore drill become launch gates.",
+      "ceo_recommendation": "Option 2 for launch (baseline (b) already puts the API on the self-hosted stack, so option 1 would put the DB on a different continent from its only client and add an FX dependency to the critical path), with three hard conditions: (a) an executed restore drill, not a documented one; (b) off-host backup copies - the S3 fields exist but are empty; (c) uptime/disk alerting before launch. Option 1 stays the fallback if the founder does not want to own DB ops.",
+      "status": "awaiting founder"
+    },
+    "hard_launch_gate_added": "'Production DB tier/host is decided and provably non-pausing' is now a hard launch gate. A10 folds it into the deployment plan before any production wiring. Provable = the chosen host answers a real query after a documented idle window, with the raw result recorded.",
+    "unchanged": "Live drift + RLS remains the CEO's first action on the founder's written confirmation of the password reset; the order-5 queue behind P0-014 is unchanged."
   }
 }

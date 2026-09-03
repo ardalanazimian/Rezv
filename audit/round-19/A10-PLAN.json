@@ -5,14 +5,14 @@
   "scope_note": "PLAN + VERIFY only. No resources created. No repo edits. All MCP calls were read-only (list_teams, list_projects, find_organizations, find_projects) — no create/deploy/buy tool was invoked.",
   "architecture_conflict_flagged": {
     "summary": "The mission asks to define a 4th Vercel project for the API. Current repo docs (most recently touched of the two competing sources) say the API is NOT deployed to Vercel: api/vercel.json was deliberately deleted 2026-08-28, and cron/crontab was declared the single source of scheduling truth because the production backend is a long-lived Docker container behind Caddy, not Vercel serverless.",
-      "evidence": [
-        "docs/DEPLOYMENT.md:96-113 (section 5, 'Cron: (Corrected 2026-08-28)' — 'the API is not deployed to Vercel ... cron/crontab is the single source of truth for scheduling')",
-        "docs/DEPLOY_API_VERCEL.md:1-13 (marked ARCHIVED-SNAPSHOT at top — superseded by newer docs where they conflict)",
-        "cron/crontab:1-13 (header states this file is 'the sole source of scheduling truth (2026-08-28)' and explains api/vercel.json was removed because the backend does not run on Vercel)",
-        "git log: commit 3422936 'حذفِ api/vercel.json و اعلامِ cron/crontab به‌عنوانِ تنها منبعِ حقیقتِ زمان‌بندی' (2026-08-28), more recent than DEPLOY_API_VERCEL.md",
-        "docs/DEPLOYMENT.md:1-4 still lists Vercel as one of 'two supported deployment models', so Vercel-for-API is a documented option, just not the one currently in production"
-      ],
-      "what_this_means_for_the_plan": "The 4-project Vercel plan below is written as requested (API + 3 static frontends). Founder must explicitly decide whether creating the Vercel API project REPLACES the self-hosted Docker/Caddy deployment (in which case cron must move to Vercel Cron, i.e. vercel.json needs to be recreated) or is exploratory/staging only (in which case cron/crontab stays authoritative and the Vercel API project should never receive production DNS). This is founder_actions item 1 and blockers item 1."
+    "evidence": [
+      "docs/DEPLOYMENT.md:96-113 (section 5, 'Cron: (Corrected 2026-08-28)' — 'the API is not deployed to Vercel ... cron/crontab is the single source of truth for scheduling')",
+      "docs/DEPLOY_API_VERCEL.md:1-13 (marked ARCHIVED-SNAPSHOT at top — superseded by newer docs where they conflict)",
+      "cron/crontab:1-13 (header states this file is 'the sole source of scheduling truth (2026-08-28)' and explains api/vercel.json was removed because the backend does not run on Vercel)",
+      "git log: commit 3422936 'حذفِ api/vercel.json و اعلامِ cron/crontab به‌عنوانِ تنها منبعِ حقیقتِ زمان‌بندی' (2026-08-28), more recent than DEPLOY_API_VERCEL.md",
+      "docs/DEPLOYMENT.md:1-4 still lists Vercel as one of 'two supported deployment models', so Vercel-for-API is a documented option, just not the one currently in production"
+    ],
+    "what_this_means_for_the_plan": "The 4-project Vercel plan below is written as requested (API + 3 static frontends). Founder must explicitly decide whether creating the Vercel API project REPLACES the self-hosted Docker/Caddy deployment (in which case cron must move to Vercel Cron, i.e. vercel.json needs to be recreated) or is exploratory/staging only (in which case cron/crontab stays authoritative and the Vercel API project should never receive production DNS). This is founder_actions item 1 and blockers item 1."
   },
   "vercel": {
     "mcp_reads": {
@@ -68,7 +68,13 @@
       "classification": {
         "required_at_boot": {
           "count": 5,
-          "vars": ["DATABASE_URL", "REDIS_URL", "JWT_SECRET", "JWT_REFRESH_SECRET", "ALLOWED_ORIGINS"],
+          "vars": [
+            "DATABASE_URL",
+            "REDIS_URL",
+            "JWT_SECRET",
+            "JWT_REFRESH_SECRET",
+            "ALLOWED_ORIGINS"
+          ],
           "evidence": [
             "JWT_SECRET: api/src/lib/jwt.ts:29-30 — `if (!s || s.length < 32) throw new Error(...)`",
             "JWT_REFRESH_SECRET: api/src/lib/jwt.ts:34-35 — same fail-fast pattern, different secret",
@@ -79,7 +85,14 @@
         },
         "infra_only": {
           "count": 6,
-          "vars": ["DB_CONNECTION_LIMIT", "DB_POOL_TIMEOUT", "DATABASE_REPLICA_URL", "REDIS_CLUSTER_NODES", "REDIS_COMMAND_TIMEOUT_MS", "REDIS_CONNECT_TIMEOUT_MS"],
+          "vars": [
+            "DB_CONNECTION_LIMIT",
+            "DB_POOL_TIMEOUT",
+            "DATABASE_REPLICA_URL",
+            "REDIS_CLUSTER_NODES",
+            "REDIS_COMMAND_TIMEOUT_MS",
+            "REDIS_CONNECT_TIMEOUT_MS"
+          ],
           "note": "Pool/cluster/timeout tuning with safe defaults per docs/ENVIRONMENT.md; irrelevant or differently-behaved under Vercel's serverless connection model (no long-lived pool) — needs its own decision, see founder_actions."
         },
         "optional": {
@@ -89,10 +102,17 @@
       },
       "docs_vs_code_gaps": {
         "in_code_but_undocumented_in_ENVIRONMENT_md": [
-          "ADMIN_LOGIN_ENABLED", "ADMIN_TOTP_SECRET", "ADMIN_TOTP_USERNAME",
-          "BREAK_GLASS_CODE", "BREAK_GLASS_PHONE", "INVITE_BASE_URL",
-          "MELIPAYAMAK_BODYID_INVITE", "REDIS_COMMAND_TIMEOUT_MS",
-          "REDIS_CONNECT_TIMEOUT_MS", "SALES_NOTIFY_EMAIL", "UPLOAD_DIR"
+          "ADMIN_LOGIN_ENABLED",
+          "ADMIN_TOTP_SECRET",
+          "ADMIN_TOTP_USERNAME",
+          "BREAK_GLASS_CODE",
+          "BREAK_GLASS_PHONE",
+          "INVITE_BASE_URL",
+          "MELIPAYAMAK_BODYID_INVITE",
+          "REDIS_COMMAND_TIMEOUT_MS",
+          "REDIS_CONNECT_TIMEOUT_MS",
+          "SALES_NOTIFY_EMAIL",
+          "UPLOAD_DIR"
         ],
         "count": 11,
         "documented_but_dead_in_code": {
@@ -178,7 +198,11 @@
     },
     "proof_procedure_for_one_real_pattern_send": {
       "no_send_performed": true,
-      "env_needed": ["MELIPAYAMAK_USERNAME", "MELIPAYAMAK_PASSWORD", "MELIPAYAMAK_BODYID_OTP (or another already-approved bodyId)"],
+      "env_needed": [
+        "MELIPAYAMAK_USERNAME",
+        "MELIPAYAMAK_PASSWORD",
+        "MELIPAYAMAK_BODYID_OTP (or another already-approved bodyId)"
+      ],
       "steps": [
         "1. Set the 3 env vars above in a non-production environment pointed at a real Melipayamak account with at least one approved pattern.",
         "2. Trigger a real send through the code path, not a curl — e.g. call POST /api/v1/auth/otp/request with a real test-owned phone number (OTP path is synchronous, api/src/lib/sms.ts:227: 'if (job.template === otp) { await sendSmsNow(job); return; }' — no queue involved, so the HTTP response IS the send outcome).",
@@ -218,7 +242,7 @@
       "8. Time every step (backup duration, restore duration) to derive real RTO; note the DB size at drill time to make the number meaningful for future comparison.",
       "9. Record PASS/FAIL with the actual command outputs (exit codes) in the launch log — a restore drill that isn't falsifiable against a known fingerprint is exactly the pattern CLAUDE.md rule §5 warns about ('تستی که وقتی موضوعش غایب است سبز می‌ماند، تست نیست')."
     ],
-    "note_on_production_access": "No production database is reachable from this machine (per mission constraint and confirmed by docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note that Supabase/production access is blocked by credential desync, P0-014). This drill can only be rehearsed against a scratch/local DB; it does NOT substitute for testing restore of an actual production backup file once one exists."
+    "note_on_production_access": "No production database is reachable from this machine (per mission constraint and confirmed by docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note that Supabase/production access is blocked by P0-014 REDEFINED 2026-09-03: the project auto-pauses on its tier; 28P01 was a symptom of the pause, not a credential fault). This drill can only be rehearsed against a scratch/local DB; it does NOT substitute for testing restore of an actual production backup file once one exists."
   },
   "monitoring": {
     "metrics_endpoint_protection": {
@@ -312,13 +336,41 @@
         "tool": "check-host.net",
         "url": "https://check-host.net/about/api (docs); https://check-host.net/nodes/hosts (live node list, unauthenticated JSON)",
         "iran_nodes_confirmed_live_2026-09-03": [
-          {"node": "ir1.node.check-host.net", "city": "Tehran", "asn": "AS47430"},
-          {"node": "ir2.node.check-host.net", "city": "Isfahan", "asn": "AS209279"},
-          {"node": "ir3.node.check-host.net", "city": "Shiraz", "asn": "AS213953"},
-          {"node": "ir4.node.check-host.net", "city": "Shiraz", "asn": "AS212077"},
-          {"node": "ir5.node.check-host.net", "city": "Tehran", "asn": "AS214431"},
-          {"node": "ir7.node.check-host.net", "city": "Tehran", "asn": "AS213727"},
-          {"node": "ir8.node.check-host.net", "city": "Tehran", "asn": "AS214361"}
+          {
+            "node": "ir1.node.check-host.net",
+            "city": "Tehran",
+            "asn": "AS47430"
+          },
+          {
+            "node": "ir2.node.check-host.net",
+            "city": "Isfahan",
+            "asn": "AS209279"
+          },
+          {
+            "node": "ir3.node.check-host.net",
+            "city": "Shiraz",
+            "asn": "AS213953"
+          },
+          {
+            "node": "ir4.node.check-host.net",
+            "city": "Shiraz",
+            "asn": "AS212077"
+          },
+          {
+            "node": "ir5.node.check-host.net",
+            "city": "Tehran",
+            "asn": "AS214431"
+          },
+          {
+            "node": "ir7.node.check-host.net",
+            "city": "Tehran",
+            "asn": "AS213727"
+          },
+          {
+            "node": "ir8.node.check-host.net",
+            "city": "Tehran",
+            "asn": "AS214361"
+          }
         ],
         "command": "curl -s -H \"Accept: application/json\" \"https://check-host.net/check-http?host=<TARGET>&max_nodes=10&node=ir1.node.check-host.net&node=ir2.node.check-host.net&node=ir3.node.check-host.net&node=ir4.node.check-host.net&node=ir5.node.check-host.net&node=ir7.node.check-host.net&node=ir8.node.check-host.net\"  →  returns request_id  →  curl -s -H \"Accept: application/json\" \"https://check-host.net/check-result/<request_id>\" (poll after ~5-10s). Response per node: [1|0 (ok/fail), seconds, status text, http code|null, resolved IP|null].",
         "caveat": "Nodes are Iranian datacenter/hosting ASNs, not consumer ISPs (Irancell/MCI/TCI/Shatel/Rightel) — tests the national-gateway choke point, not carrier-specific NAT/DPI. This tool was actually executed by this agent (see controls[] below); results are live, not simulated.",
@@ -328,11 +380,31 @@
         "tool": "globalping.io / globalping CLI",
         "url": "https://api.globalping.io/v1/probes (live probe list, unauthenticated JSON); https://github.com/jsdelivr/globalping-cli (CLI docs)",
         "iran_probes_confirmed_live_2026-09-03": [
-          {"city": "Tehran", "asn": "AS202468", "network": "AbrArvan CDN and IaaS"},
-          {"city": "Tehran", "asn": "AS202468", "network": "AbrArvan CDN and IaaS (2nd probe)"},
-          {"city": "Tehran", "asn": "AS59580", "network": "Batterflyai Media"},
-          {"city": "Tehran", "asn": "AS59441", "network": "Hostiran Network"},
-          {"city": "Tehran", "asn": "AS42043", "network": "Parsian High Tech Company"}
+          {
+            "city": "Tehran",
+            "asn": "AS202468",
+            "network": "AbrArvan CDN and IaaS"
+          },
+          {
+            "city": "Tehran",
+            "asn": "AS202468",
+            "network": "AbrArvan CDN and IaaS (2nd probe)"
+          },
+          {
+            "city": "Tehran",
+            "asn": "AS59580",
+            "network": "Batterflyai Media"
+          },
+          {
+            "city": "Tehran",
+            "asn": "AS59441",
+            "network": "Hostiran Network"
+          },
+          {
+            "city": "Tehran",
+            "asn": "AS42043",
+            "network": "Parsian High Tech Company"
+          }
         ],
         "command": "globalping http <TARGET> from Iran --limit 5   |   globalping ping <TARGET> from Iran --limit 5 --latency",
         "caveat": "All 5 probes are Tehran-only hosting/datacenter networks today; volunteer network, no uptime guarantee — re-verify probe list is still online before the founder's 3-day run.",
@@ -442,7 +514,7 @@
     {
       "id": "B4",
       "text": "No production database is reachable from this machine — the backup/restore drill in this plan can only be rehearsed against a scratch DB. It has NOT been validated against an actual production backup file, because none exists / is accessible yet.",
-      "evidence": "mission constraint; corroborated by docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note on blocked Supabase/production access (P0-014, credential desync)"
+      "evidence": "mission constraint; corroborated by docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note on blocked Supabase/production access (P0-014, P0-014 REDEFINED 2026-09-03: the project auto-pauses on its tier; 28P01 was a symptom of the pause, not a credential fault)"
     },
     {
       "id": "B5",
@@ -453,9 +525,21 @@
       "id": "B6",
       "text": "Frontend-to-API wiring (same-origin rewrite vercel.json OR RZ_API_BASE + CORS) does not exist yet for apps/customer|business|company — this is new work required to stand up the 4 Vercel projects usably, not a pre-existing landmine to merely audit.",
       "evidence": "Glob **/vercel.json returns only apps/landing/vercel.json and apps/seo/vercel.json; docs/DEPLOYMENT.md:107-111 marks this '(uncertain / follow-up)'"
+    },
+    {
+      "id": "B7",
+      "text": "HARD LAUNCH GATE (founder directive 4, 2026-09-03): the production database currently sits on an AUTO-PAUSING Supabase tier. A self-pausing DB cannot serve a launched product - the first low-traffic night takes the platform down. No production wiring (Vercel projects, DNS, env matrix, cron secrets, backup/restore drill, 079 pre-deploy query) proceeds until the founder picks the production DB host and it is PROVEN non-pausing. Options: (1) Supabase Pro; (2) Postgres in the existing Docker stack (docker-compose.yml:12-26 postgres:16-alpine, backup service :137-167). This blocker also changes B4 and B5: both are executed against whichever host wins, not against the paused project.",
+      "evidence": "Founder-side check 2026-09-03 on project 40563480: get_project -> ACTIVE_HEALTHY (STALE control-plane metadata); execute_sql -> 28P01; get_advisors -> 'Project 40563480 is currently hibernated and will wake on next supported request'. Docker option verified present in-repo: docker-compose.yml:12-26 (postgres:16-alpine + healthcheck + pgdata volume) and :137-167 (backup service: BACKUP_CRON '0 3 * * *', BACKUP_KEEP 14, BACKUP_ON_START, uploads tar, optional S3 env fields all defaulting to empty).",
+      "proof_of_non_pausing_required": "The chosen host must answer a REAL data-plane query after a documented idle window, with the raw result recorded. A control-plane status (get_project/list_projects) is never accepted as proof - it was STALE here.",
+      "status": "open - awaiting founder decision"
     }
   ],
   "founder_actions": [
+    {
+      "order": 0,
+      "action": "NEW, ranks ahead of everything else (founder directive 4, 2026-09-03): decide the production Postgres host - (1) Supabase Pro (no pausing, managed backups/PITR, connection strings unchanged, FX payment required, data outside Iran) or (2) Postgres inside the existing Docker stack (no FX dependency, same host as the API, ops burden ours: patching, disk, monitoring, and an EXECUTED restore drill + off-host backup copies become launch gates - the S3 fields in the backup service exist but are empty). CEO recommendation: option (2) for launch, since baseline (b) already puts the API on the self-hosted stack; option (1) is the fallback if the founder does not want to own DB ops.",
+      "why_first": "A self-pausing production database is a launch-stopper on its own, and every remaining item in this plan - env matrix, backup/restore drill (B4), the 079 pre-deploy query (B5), monitoring - is executed against whichever host wins. Doing them against the paused Supabase project would be work thrown away."
+    },
     {
       "order": 1,
       "action": "DECIDED by founder (message received during this round): baseline (b) = API stays self-hosted Docker/Caddy (cron/crontab stays authoritative); customer/business/company go on Vercel, CONDITIONAL on 3 inputs: (i) below, (ii) the Iran-reachability test (see audit/round-19/A10-IRAN-REACHABILITY.md), (iii) below. Note this changes docs/adr/0002-public-website-and-cms.md:33 and deploy/caddy/Caddyfile:8-13,117-153, which currently put customer/business/company on self-hosted Caddy (already wired in docker-compose.prod.yml:38-46) and reserve Vercel for apps/landing + apps/seo only — see A10-IRAN-REACHABILITY.md §0. If the reachability test PASSES, record this as a deliberate ADR 0002 amendment, not a silent contradiction.",
