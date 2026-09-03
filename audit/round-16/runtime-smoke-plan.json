@@ -71,13 +71,14 @@
       "app": "customer",
       "element": "Step 2 pre-order chips",
       "api": "sent in POST /api/v1/reservations body.preorder",
-      "method": null,
-      "path": null,
+      "method": "POST",
+      "path": "/api/v1/reservations",
       "service": "api/src/app/api/v1/reservations/route.ts:29; api/src/lib/reservations.ts:538-562",
       "db": "ReservationItem.insert",
       "side_effects": [],
       "panel_file": "apps/customer/js/data/booking.js:201-228",
-      "status": "pending"
+      "status": "pending",
+      "manual_mapping": "body.preorder[] — smoke = create a reservation with 1 preorder item; expect 201 + reservation_items row"
     },
     {
       "row": 46,
@@ -257,13 +258,14 @@
       "app": "customer",
       "element": "«اعلان‌ها» preference toggles ×5",
       "api": "GET/PATCH /api/v1/me/notification-prefs",
-      "method": null,
-      "path": null,
+      "method": "GET+PATCH",
+      "path": "/api/v1/me/notification-prefs",
       "service": "api/src/lib/notification-prefs.ts (enforced: offers automation.ts:168/loyalty.ts:194; loyalty loyalty.ts:421; availability waitlist.ts:670; reminder reminders.ts:105; dna dna-summary/route.ts:37)",
       "db": "User.notificationPrefs",
       "side_effects": [],
       "panel_file": "apps/customer/js/user-profile.js:30-60,89-121",
-      "status": "pending"
+      "status": "pending",
+      "manual_mapping": "smoke = GET prefs, PATCH one toggle, GET again — value persisted"
     },
     {
       "row": 84,
