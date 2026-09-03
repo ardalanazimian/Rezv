@@ -221,6 +221,24 @@
       "evidence": "MCP execute_sql -> FATAL 28P01 for user postgres; list_tables -> same for supabase_read_only_user; list_projects -> ACTIVE_HEALTHY; founder-side MCP check 2026-09-03 confirms",
       "status": "open - founder resets DB password from the Supabase dashboard; CEO's FIRST action after written confirmation = live drift (information_schema.columns string_agg vs schema.prisma) + RLS (pg_class.relrowsecurity)",
       "verified_by": "founder+ceo"
+    },
+    {
+      "id": "P0-017",
+      "severity": "blocker",
+      "area": "infra",
+      "claim": "No production infrastructure exists: Vercel 0 projects, Sentry 0 projects, no reachable production DB from this machine, frontend-to-API wiring absent (A10 B4/B6). Provisioning the production host (provider/region) is itself a launch blocker — founder names the target",
+      "evidence": "A10-PLAN.json blockers B4,B6; Vercel MCP list_projects=[]; Sentry find_projects=[]; docs/DEPLOYMENT.md self-host design",
+      "status": "open — founder input (iii)",
+      "verified_by": "ceo"
+    },
+    {
+      "id": "P0-018",
+      "severity": "minor",
+      "area": "docs",
+      "claim": "FCM_SERVER_KEY is documented (docs/ENVIRONMENT.md:109) but has zero references in api/src — a documented capability that does not exist",
+      "evidence": "grep -rn FCM_SERVER_KEY api/src apps → 0",
+      "status": "ticketed — docs row annotated (no silent removal); founder decides build vs remove",
+      "verified_by": "ceo"
     }
   ],
   "wave0": {
@@ -371,5 +389,18 @@
         "5 required(-for-security) vars: DATABASE_URL, REDIS_URL, JWT_SECRET, JWT_REFRESH_SECRET, ALLOWED_ORIGINS; 6 infra-only; 43 optional"
       ]
     }
+  },
+  "founder_directive_3_2026-09-03": {
+    "s10": "ACCEPTED; fd00be1 correction stands; merge sequence unchanged",
+    "B2": "option (b) BASELINE — frontends on Vercel, API stays self-hosted Docker+Caddy — conditional on: (i) founder confirms the 08-28 vercel.json deletion was intentional; (ii) A10 designs a falsifiable Iran-reachability test for a Vercel-hosted static page (fallback: all three frontends served by production Caddy, Vercel previews only); (iii) founder names the production host target (provider/region)",
+    "order3_A5": "ALLOWED_ORIGINS missing in production must be FATAL at boot (fail-closed) with a falsifiable test: unset var -> boot refuses -> EXIT!=0 (currently middleware.ts:45-48 warns and disables the CSRF Origin check)",
+    "order4_hardening_batch": "engines.node=20.x added to api/package.json (CI setup-node 20, Dockerfile node:20-alpine); FCM_SERVER_KEY ticketed as P0-018 (docs row annotated, not deleted)",
+    "order5_queue_behind_P0-014": [
+      "live drift + RLS",
+      "079 pre-deploy duplicate-owner-phone query on production (B5)",
+      "backup/restore drill against production (B4)"
+    ],
+    "s0_2_amended": "CEO stays on claude-opus-5 for all remaining rounds; Fable reserved for the final GO/NO-GO synthesis only; model column mandatory",
+    "wave2_entry_criteria": "APPROVED as written (audit/round-17/WAVE2-ENTRY-CRITERIA.md)"
   }
 }
