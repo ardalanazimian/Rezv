@@ -1,6 +1,9 @@
-# Wave 2 — entry criteria (Phase 3: A4 backend-correctness ‖ A5 security) — draft 2026-09-03
+# Wave 2 — entry criteria (Phase 3: A4 backend-correctness ‖ A5 security) — **APPROVED by founder 2026-09-03 (directive 3, item 7)**
 
-Model discipline (§0.2): A4 and A5 are Tier 1 → `claude-opus-5`, set explicitly on the Agent call; every report carries a `model` field. CEO spot-check ≥20% of each agent's rows before acceptance.
+Model discipline (§0.2, amended 2026-09-03): A4 and A5 are Tier 1 → `claude-opus-5`, set explicitly on the Agent call; the CEO stays on `claude-opus-5` for all remaining rounds (Fable reserved for the final GO/NO-GO synthesis only); every report carries a `model` column. CEO spot-check ≥20% of each agent's rows before acceptance.
+
+## Founder order 3 (2026-09-03) — added to A5 scope, mandatory
+`ALLOWED_ORIGINS` missing in production currently **warns and disables the CSRF Origin check** (`api/src/middleware.ts:45-48`) — fail-open. A5 must make it **fatal at boot in production** (fail-closed): a startup assertion (e.g. Next `instrumentation.ts` `register()` or the first-loaded env module) that refuses to boot when `NODE_ENV=production` and `ALLOWED_ORIGINS` is unset/empty. Falsifiable proof required: (a) unit test importing the assertion with `NODE_ENV=production` and the var unset → throws; set → passes; (b) process-level: `NODE_ENV=production ALLOWED_ORIGINS= npm run start` (or `node` on the built server) → **EXIT≠0** with a clear message; with the var set → boots. Record both exit codes.
 
 ## Hard gates that must be TRUE before Wave 2 starts
 
