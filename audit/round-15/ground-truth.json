@@ -239,6 +239,24 @@
       "evidence": "grep -rn FCM_SERVER_KEY api/src apps → 0",
       "status": "ticketed — docs row annotated (no silent removal); founder decides build vs remove",
       "verified_by": "ceo"
+    },
+    {
+      "id": "P0-019",
+      "severity": "major",
+      "area": "deploy/decision",
+      "claim": "Founder baseline (b) — three panels on Vercel — reverses a decision already recorded and built: ADR 0002 (docs/adr/0002-public-website-and-cms.md:33) puts only the public website on Vercel, and deploy/caddy/Caddyfile:117-153 + docker-compose.prod.yml:38-46 already serve app./business./admin. from Caddy (/srv/customer|business|company). The 'fallback' of the reachability test is what the repo implements today. Founder must reconcile: amend ADR 0002 for (b), or keep the ADR (panels on Caddy, Vercel previews only).",
+      "evidence": "audit/round-19/A10-IRAN-REACHABILITY.md section 0 (A10, sonnet); CEO read Caddyfile refs",
+      "status": "open — founder decision",
+      "verified_by": "ceo"
+    },
+    {
+      "id": "P0-020",
+      "severity": "minor",
+      "area": "deploy",
+      "claim": "Caddy static blocks for the three panels have no explicit Cache-Control headers (Caddyfile:130-152) — under the fallback, stale bundles would depend solely on the SW CACHE_VERSION discipline",
+      "evidence": "A10-IRAN-REACHABILITY.md section 4 activation checklist",
+      "status": "open → A10/A7 (Wave 3)",
+      "verified_by": "agent"
     }
   ],
   "wave0": {
@@ -400,25 +418,8 @@
   "agents_round19": {
     "A10": {
       "model": "claude-sonnet-5",
-      "status": "accepted",
-      "coverage": "31/34 (3 unverified are founder/production-dependent: real SMS send, production DB, live rotation status)",
-      "ceo_spot_check": {
-        "sampled": 9,
-        "confirmed": 8,
-        "wording_corrections": 1,
-        "rejected": 0,
-        "notes": [
-          "ALLOWED_ORIGINS is not enforced at boot: middleware.ts:45-48 only warns in production and disables the CSRF Origin check — reclassify as required-for-security, not required-at-boot",
-          "undocumented env count: A10=11 distinct names (MELIPAYAMAK_BODYID_* documented as a family) vs CEO Phase-0 token count 22/23 — same set, different counting; A10's is the useful one"
-        ]
-      },
-      "key_findings": [
-        "B2 ARCHITECTURE CONFLICT: docs/DEPLOYMENT.md (newest) = self-hosted Docker/Caddy + cron/crontab; api/vercel.json deliberately deleted in 3422936 (2026-08-28). The audit prompt's Phase-7 premise (Vercel API project) contradicts repo truth → founder decision required before any Vercel project is created",
-        "Sentry: hand-rolled fetch sink exists at api/src/lib/logger.ts:35-53 (no SDK), active when SENTRY_DSN set; org rezvno has 0 projects",
-        "api/package.json has no engines field",
-        "FCM_SERVER_KEY documented but dead (0 refs)",
-        "5 required(-for-security) vars: DATABASE_URL, REDIS_URL, JWT_SECRET, JWT_REFRESH_SECRET, ALLOWED_ORIGINS; 6 infra-only; 43 optional"
-      ]
+      "status": "first task accepted (wiring plan); second task (Iran reachability, founder condition ii) files on disk — A10-IRAN-REACHABILITY.md + A10-PLAN.json founder_actions 1i/1iii — awaiting its final reply after the process restart; pilot executed via check-host.net with facebook.com negative control (7/7 FAIL) and digikala/wikipedia/vercel.com positive controls",
+      "ceo_spot_check": "sections 0, 3.1, 3.2, 4 read by CEO — consistent; acceptance pending the JSON block"
     }
   },
   "founder_directive_3_2026-09-03": {
