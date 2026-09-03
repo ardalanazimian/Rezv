@@ -24,7 +24,7 @@
   },
   "schema_drift": {
     "live_vs_prisma": "blocked",
-    "reason": "Supabase MCP on mandated project zmyuvtpbchytqvtgyewt: pg auth failed for `postgres` (execute_sql) and `supabase_read_only_user` (list_tables); get_advisors then reported 'project hibernated, will wake on next request'; auto-mode classifier denied the wake/retry execute_sql. list_projects: zmyuvtpbchytqvtgyewt=rezervno ACTIVE_HEALTHY (only active); nxtvmfoczgnjjgdgrxli=Kikiz INACTIVE (the poisoned one); ulqnyneohwuvnfchgqba=rezervno-schema-test INACTIVE.",
+    "reason": "Credential desync (P0-014), not hibernation - see finding. Local side prepared (scratchpad/local_cols.txt).",
     "local_side_ready": "scratchpad/local_cols.txt — 72 tables produced by db push + apply-sql.sh + test-schema-fixups.sql (what schema.prisma+migrations yield)",
     "local_guard": "api/tests/schema-drift.integration.test.mts 3/3 green (EXIT=0, 2026-09-03)"
   },
@@ -197,12 +197,13 @@
       "status": "fixed — committed a2cf39d: shared mockAdminOtpFlag(page, enabled) in e2e/tests/helpers/mock-api.ts registered before page.goto in the 9 sites + negative UI-gate test; local desktop-chrome smoke 11 passed (26 s, EXIT=0); mutation (button unconditional, intelligence.js:872) → negative test EXIT=1; byte-for-byte restore → EXIT=0; 3-profile CI on a2cf39d is the gate"
     },
     {
-      "id": "P0-014",
+      "id": "P0-016",
       "severity": "major",
       "area": "company-panel",
       "claim": "admin_otp_login_enabled switch never rendered: client label map FEATURE_FLAG_LABEL_FA (6 keys) drives the render loop, server FEATURE_FLAG_KEYS has 7 — the OTP kill-switch could not be toggled from the UI (A3-001, CEO-confirmed)",
       "evidence": "apps/company/js/intelligence.js:451-461,467 vs api/src/lib/feature-flags.ts:12-20",
-      "status": "fixed — committed 37b2a82 (label added; XSS overrides re-pinned 862→865, 3161→3164; xss --check 0 @65, standalone --check 0)"
+      "status": "fixed — committed 37b2a82 (label added; XSS overrides re-pinned 862→865, 3161→3164; xss --check 0 @65, standalone --check 0)",
+      "note": "renumbered from P0-014 (founder assigned P0-014 to the Supabase credential desync)"
     },
     {
       "id": "P0-015",
@@ -211,6 +212,15 @@
       "claim": "Business-panel password login (the only production path) threw ReferenceError: staffPasswordLogin called enterStaffPanel ×3, defined nowhere (only enterPanel exists) — since 6301ff1 (2026-08-26), on origin/main; no e2e exercised it (all specs click «ورود با پیامک») (A2-001, CEO-confirmed)",
       "evidence": "apps/business/js/staff-system.js:468,471,472 vs :556; grep -rn 'function enterStaffPanel' apps/business shared/js → 0; git log -S enterStaffPanel → 6301ff1",
       "status": "fixed — committed 580cf7f: calls → enterPanel; new e2e/tests/business-password-login.spec.ts (POST /auth/staff/login mock → overlay hidden, no ReferenceError); spec EXIT=0; mutation (one call site re-broken) → EXIT=1; restore → EXIT=0"
+    },
+    {
+      "id": "P0-014",
+      "severity": "blocker",
+      "area": "infra/db",
+      "claim": "Supabase MCP <-> project zmyuvtpbchytqvtgyewt credential desync: 28P01 password authentication failed for BOTH postgres (execute_sql) and supabase_read_only_user (list_tables). Project is ACTIVE_HEALTHY (founder-verified); the CEO's earlier 'hibernated' reading (taken from a get_advisors error text) was a misdiagnosis - two roles failing auth is not a hibernation symptom. Live schema-drift + RLS checks are blocked until the DB password is reset.",
+      "evidence": "MCP execute_sql -> FATAL 28P01 for user postgres; list_tables -> same for supabase_read_only_user; list_projects -> ACTIVE_HEALTHY; founder-side MCP check 2026-09-03 confirms",
+      "status": "open - founder resets DB password from the Supabase dashboard; CEO's FIRST action after written confirmation = live drift (information_schema.columns string_agg vs schema.prisma) + RLS (pg_class.relrowsecurity)",
+      "verified_by": "founder+ceo"
     }
   ],
   "wave0": {
@@ -291,5 +301,19 @@
       "status": "not run — died twice on session limit (429) at 07:30 and ~13:00; only A6-baseline.txt written; rerun after 14:40 Asia/Tehran"
     }
   },
-  "pr81": "GREEN at 580cf7f — merge-ready; merge requires founder (gh token invalid in this session)"
+  "pr81": "GREEN at 580cf7f — merge-ready; merge requires founder (gh token invalid in this session)",
+  "founder_decisions_2026-09-03": {
+    "pr81": "APPROVED for merge on 580cf7f - founder merges after eyeballing the checks page",
+    "ci_hardening": "APPROVED - concurrency {group: ci-${{ github.ref }}, cancel-in-progress: true} + timeout-minutes: 15 on test; falsifiability proof required",
+    "melipayamak_key_rotation": "NOT DONE until founder confirms in writing",
+    "wave1": "A6 || A2-002 fix || A10 (Vercel+Sentry wiring) + A3 password type=text fix",
+    "phase1_gate": "CONDITIONAL - CEO personally verifies 100% of FAKE(9)+blockers(2)+majors(35) + random >=15% of remaining rows; any rejection -> that agent's census re-runs",
+    "runtime_truth": "static REAL -> REAL-STATIC until a runtime smoke pass (real API+DB) for money/auth/reservation flows",
+    "branch_discipline": "Wave 0 through #81 accepted; from Wave 1 all fixes via audit/launch-hardening PRs"
+  },
+  "model_reporting": {
+    "ceo_session": "claude-opus-5 (harness system prompt); founder prompt 0.2 expects Fable for the CEO",
+    "subagents_so_far": "A1, A2, A3 and all three A6 attempts ran on claude-fable-5-1 - inherited default because no model was set (violates 0.2 'never spawn Fable subagents'; this exhausted the session limit at 07:30 and ~13:00)",
+    "correction": "from Wave 1 every Agent call sets model explicitly: Tier1 opus (A4,A5,A6,A9), Tier2 sonnet (A1-A3,A7,A8,A10), Tier3 haiku (mechanical sweeps); the Fable A6 run was stopped at ~15:10 before relaunch on opus"
+  }
 }

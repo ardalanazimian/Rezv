@@ -1,6 +1,8 @@
 # Round 16 — Phase 1 Feature Reality Census — REPORT (2026-09-03)
 
-Gate: every visible interactive element/flow classified REAL / PARTIAL / DEMO-ONLY / FAKE / DEAD with `file:line` evidence. Method this round: static trace at `dbec99f` (no live API — A6 owned the DB). Machine output: `feature-census.json`.
+**GATE STATUS: CONDITIONAL** (founder directive 2026-09-03) - the CEO's 5-per-agent spot-check (~2%) did not meet the >=20% rule; the CEO is now personally verifying 100% of FAKE+blockers+majors plus a random >=15% of the remaining rows, and REAL rows on money/auth/reservation flows are relabelled REAL-STATIC until a runtime smoke pass. Agents A1-A3 ran on claude-fable-5-1 (inherited default; 0.2 violation, corrected for re-runs).
+
+Gate definition: every visible interactive element/flow classified REAL / PARTIAL / DEMO-ONLY / FAKE / DEAD with `file:line` evidence. Method this round: static trace at `dbec99f` (no live API — A6 owned the DB). Machine output: `feature-census.json`.
 
 | App | Agent | Coverage | REAL | PARTIAL | DEMO-ONLY | FAKE | DEAD | blocker | major | minor | CEO spot-check |
 |---|---|---|---|---|---|---|---|---|---|---|---|

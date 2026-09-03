@@ -2,7 +2,7 @@
   "round": 16,
   "phase": 1,
   "date": "2026-09-03",
-  "gate": "100% of interactive elements classified with evidence",
+  "gate": "CONDITIONAL (founder directive 2026-09-03): CEO must personally verify 100% of FAKE+blockers+majors and a random >=15% of remaining rows; REAL-STATIC rows need a runtime smoke pass (real API+DB) before the label is final",
   "apps": {
     "customer": {
       "agent": "A1",
@@ -280,7 +280,8 @@
         "success": true
       },
       "note": "no I/O; states n/a",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C02",
@@ -300,7 +301,8 @@
         "success": true
       },
       "note": "no I/O",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C03",
@@ -320,7 +322,8 @@
         "success": true
       },
       "note": "no I/O",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C04",
@@ -331,7 +334,7 @@
       "service": "api/src/lib/loyalty-status.ts:getLoyaltyStatus",
       "db": "PointsLedger.read, User.read",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -340,7 +343,8 @@
         "success": true
       },
       "note": "hidden for guests; «—» while loading/on error",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C05",
@@ -360,7 +364,8 @@
         "success": true
       },
       "note": "no I/O",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C06",
@@ -373,7 +378,7 @@
       "side_effects": [
         "localStorage rz_notif_read"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -382,7 +387,8 @@
         "success": true
       },
       "note": "client-derived notifications; fetch failure silently keeps previous state (no error indicator)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C07",
@@ -404,7 +410,8 @@
         "success": true
       },
       "note": "client-only over loaded R and server-loaded myTrips; empty «چیزی پیدا نشد»",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C08",
@@ -426,7 +433,8 @@
         "success": true
       },
       "note": "no I/O",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C09",
@@ -446,7 +454,8 @@
         "success": true
       },
       "note": "no I/O",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C10",
@@ -468,7 +477,8 @@
         "success": true
       },
       "note": "no I/O",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C11",
@@ -490,7 +500,8 @@
         "success": true
       },
       "note": "no I/O",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C12",
@@ -512,7 +523,8 @@
         "success": true
       },
       "note": "no I/O",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C13",
@@ -535,7 +547,8 @@
         "success": true
       },
       "note": "browser API only",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C14",
@@ -557,7 +570,8 @@
         "success": true
       },
       "note": "CACHE_VERSION rezervno-v40, no drift vs js/css (both 6e953c2)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C15",
@@ -579,7 +593,8 @@
         "success": true
       },
       "note": "same-origin default; no hardcode",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C16",
@@ -592,7 +607,7 @@
       "side_effects": [
         "audit auth.failure on refresh failure"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -601,7 +616,8 @@
         "success": true
       },
       "note": "single shared refresh promise; rotation",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C17",
@@ -623,7 +639,8 @@
         "success": true
       },
       "note": "server distinguishes permanent 202-reject vs 503 transient (telemetry/route.ts:27-40)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C18",
@@ -643,7 +660,8 @@
         "success": true
       },
       "note": "spinner until real request completes",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C19",
@@ -665,7 +683,8 @@
         "success": true
       },
       "note": "success pattern only fired after res.ok (booking.js:327)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C20",
@@ -685,7 +704,8 @@
         "success": true
       },
       "note": "no server search; «محله» placeholder not matched",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C21",
@@ -707,7 +727,8 @@
         "success": true
       },
       "note": "context carried into booking sheet; stale-response token guard init.js:81-91",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C22",
@@ -727,7 +748,8 @@
         "success": true
       },
       "note": "client-only vibe mapping over loaded page",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C23",
@@ -747,7 +769,8 @@
         "success": true
       },
       "note": "empty list → renderFeed empty state («الان رستورانِ فعالی…») which is the wrong message for a filter",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C24",
@@ -767,7 +790,8 @@
         "success": false
       },
       "note": "no data source at all",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C25",
@@ -787,7 +811,8 @@
         "success": true
       },
       "note": "honest fallback = count of loaded restaurants; empty strip if nothing",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C26",
@@ -807,7 +832,8 @@
         "success": true
       },
       "note": "empty state honest (discover.js:193-202); demo labelled «نمونه»/[DEMO]",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C27",
@@ -827,7 +853,8 @@
         "success": true
       },
       "note": "failure = silent CTA fallback («ببین سانس‌ها»), no invented times",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C28",
@@ -847,7 +874,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C29",
@@ -867,7 +895,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C30",
@@ -889,7 +918,8 @@
         "success": true
       },
       "note": "device-local only (A1-022)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C31",
@@ -909,7 +939,8 @@
         "success": true
       },
       "note": "button only when next_cursor present",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C32",
@@ -931,7 +962,8 @@
         "success": true
       },
       "note": "honest title switch; haversine on server lat/lng",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C33",
@@ -951,7 +983,8 @@
         "success": true
       },
       "note": "label implies weekly-trend ranking that is not computed",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C34",
@@ -971,7 +1004,8 @@
         "success": true
       },
       "note": "offline → SAMPLE_EVENTS labelled «نمونه»; no loading state (A1-028)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C35",
@@ -991,7 +1025,8 @@
         "success": true
       },
       "note": "progressive render; demo badge when no slug",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C36",
@@ -1011,7 +1046,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C37",
@@ -1033,7 +1069,8 @@
         "success": true
       },
       "note": "no deep link per restaurant (copies app URL, says so)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C38",
@@ -1055,7 +1092,8 @@
         "success": true
       },
       "note": "device-local (A1-022)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C39",
@@ -1075,7 +1113,8 @@
         "success": true
       },
       "note": "cards intentionally show gradient+emoji, no fake photos",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C40",
@@ -1095,7 +1134,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C41",
@@ -1115,7 +1155,8 @@
         "success": true
       },
       "note": "rating breakdown bars only for seed data",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C42",
@@ -1135,7 +1176,8 @@
         "success": true
       },
       "note": "guest → raw 401 toast (A1-016); disabled for demo restaurants",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C43",
@@ -1148,7 +1190,7 @@
       "side_effects": [
         "sessionStorage rz_booking_ctx"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1157,7 +1199,8 @@
         "success": true
       },
       "note": "error/offline → labelled demo times with warning banner; deposit label from server policy",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C44",
@@ -1177,7 +1220,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C45",
@@ -1188,7 +1232,7 @@
       "service": "api/src/app/api/v1/reservations/route.ts:29; api/src/lib/reservations.ts:538-562",
       "db": "ReservationItem.insert",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1197,7 +1241,8 @@
         "success": true
       },
       "note": "only id-bearing, in-stock items offered",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C46",
@@ -1217,7 +1262,8 @@
         "success": true
       },
       "note": "allergy note reaches restaurant panel; medical disclaimer honest",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C47",
@@ -1234,7 +1280,7 @@
         "no-show prediction ledger",
         "points cashback on completion (reservations.ts:613)"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1243,7 +1289,8 @@
         "success": true
       },
       "note": "offline → explicit «رزرو ثبت نشد» + retry; SLOT_FULL/NO_TABLE_FOR_PARTY → waitlist offer; success only with server code",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C48",
@@ -1263,7 +1310,8 @@
         "success": true
       },
       "note": "10-minute one-shot",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C49",
@@ -1285,7 +1333,8 @@
         "success": true
       },
       "note": "toasts «کد کپی شد» even when clipboard write rejects (.catch(done)) — minor",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C50",
@@ -1305,7 +1354,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C51",
@@ -1318,7 +1368,7 @@
       "side_effects": [
         "sms waitlist_joined (consent 'availability', waitlist.ts:633,670-676)"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1327,7 +1377,8 @@
         "success": true
       },
       "note": "Idempotency-Key ignored server-side (A1-024); duplicate guarded by lib:169-173",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C52",
@@ -1338,7 +1389,7 @@
       "service": "api/src/app/api/v1/waitlist/[id]/route.ts:20-55",
       "db": "WaitlistEntry.read",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1347,7 +1398,8 @@
         "success": true
       },
       "note": "offline → honest «به‌روز نشد»",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C53",
@@ -1360,7 +1412,7 @@
       "side_effects": [
         "sms booking_confirm"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1369,7 +1421,8 @@
         "success": true
       },
       "note": "requires reservation_code in 200; offline → error sheet + retry",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C54",
@@ -1389,7 +1442,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C55",
@@ -1409,7 +1463,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C56",
@@ -1429,7 +1484,8 @@
         "success": true
       },
       "note": "5-min fallback only when server omits",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C57",
@@ -1449,7 +1505,8 @@
         "success": true
       },
       "note": "pending → «در انتظارِ تأییدِ رستوران»; file:// demo banner labelled",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C58",
@@ -1460,7 +1517,7 @@
       "service": "api/src/app/api/v1/reservations/[code]/qr/route.ts:55-92 (ownership check, server-side QR SVG)",
       "db": "Reservation.read",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1469,7 +1526,8 @@
         "success": true
       },
       "note": "text code fallback when QR fails",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C59",
@@ -1491,7 +1549,8 @@
         "success": true
       },
       "note": "honest refusal when slotStartIso missing",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C60",
@@ -1511,7 +1570,8 @@
         "success": false
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C61",
@@ -1534,7 +1594,8 @@
         "success": false
       },
       "note": "offline → honest error + opacity restored",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C62",
@@ -1556,7 +1617,8 @@
         "success": false
       },
       "note": "window from server freeCancelHours; aria-label restored via MutationObserver",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C63",
@@ -1576,7 +1638,8 @@
         "success": true
       },
       "note": "reuses wired buttons",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C64",
@@ -1596,7 +1659,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C65",
@@ -1616,7 +1680,8 @@
         "success": true
       },
       "note": "only rendered when server UUIDs present",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C66",
@@ -1636,7 +1701,8 @@
         "success": true
       },
       "note": "silent when window unknown",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C67",
@@ -1656,7 +1722,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C68",
@@ -1676,7 +1743,8 @@
         "success": true
       },
       "note": "localStorage only (A1-022); reads loaded R so favourites on unloaded pages vanish",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C69",
@@ -1687,7 +1755,7 @@
       "service": "api/src/lib/loyalty-status.ts:getLoyaltyStatus (LOYALTY_TIERS 0/300/800/2000 — matches client food-dna.js:190)",
       "db": "PointsLedger.read",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1696,7 +1764,8 @@
         "success": true
       },
       "note": "error state without retry (A1-023); guest CTA",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C70",
@@ -1716,7 +1785,8 @@
         "success": true
       },
       "note": "marketing copy",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C71",
@@ -1736,7 +1806,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C72",
@@ -1747,7 +1818,7 @@
       "service": "api/src/lib/loyalty.ts:228 getReferralStats",
       "db": "Referral.read",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -1756,7 +1827,8 @@
         "success": true
       },
       "note": "guest sees placeholder REF•••• code",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C73",
@@ -1778,7 +1850,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C74",
@@ -1800,7 +1873,8 @@
         "success": true
       },
       "note": "smsSent claim now conditional on recipient phone",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C75",
@@ -1820,7 +1894,8 @@
         "success": true
       },
       "note": "window-bound (previously dead)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C76",
@@ -1831,7 +1906,7 @@
       "service": "api/src/lib/loyalty.ts:284 checkGiftCard",
       "db": "GiftCard.read",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -1840,7 +1915,8 @@
         "success": true
       },
       "note": "offline honest; no spinner",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C77",
@@ -1854,7 +1930,7 @@
         "points (cron)",
         "sms 'loyalty' consent (loyalty.ts:421-424)"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1863,7 +1939,8 @@
         "success": true
       },
       "note": "anniversary in title has no write path (A1-014)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C78",
@@ -1883,7 +1960,8 @@
         "success": true
       },
       "note": "error state without retry (A1-023)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C79",
@@ -1896,7 +1974,7 @@
       "side_effects": [
         "points/wallet"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -1905,7 +1983,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C80",
@@ -1918,7 +1997,7 @@
       "side_effects": [
         "points/wallet"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -1927,7 +2006,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C81",
@@ -1938,7 +2018,7 @@
       "service": "as C57",
       "db": "Reservation.read",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1947,7 +2027,8 @@
         "success": true
       },
       "note": "«—» until server answers; tier thresholds match server",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C82",
@@ -1967,7 +2048,8 @@
         "success": true
       },
       "note": "offline → «محلی ذخیره شد — روی حسابت هنوز ثبت نشده»",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C83",
@@ -1978,7 +2060,7 @@
       "service": "api/src/lib/notification-prefs.ts (enforced: offers automation.ts:168/loyalty.ts:194; loyalty loyalty.ts:421; availability waitlist.ts:670; reminder reminders.ts:105; dna dna-summary/route.ts:37)",
       "db": "User.notificationPrefs",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -1987,7 +2069,8 @@
         "success": true
       },
       "note": "localStorage is display cache only; server is source of truth",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C84",
@@ -2007,7 +2090,8 @@
         "success": true
       },
       "note": "UI honestly says push not yet live",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C85",
@@ -2020,7 +2104,7 @@
       "side_effects": [
         "audit auth.logout"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -2029,7 +2113,8 @@
         "success": true
       },
       "note": "does not purge SW cache (A1-001)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C86",
@@ -2051,7 +2136,8 @@
         "success": true
       },
       "note": "no-history users get labelled demo («نمونه»); entry-card title overclaims (A1-017)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C87",
@@ -2071,7 +2157,8 @@
         "success": true
       },
       "note": "guest CTA; 401/offline/other distinguished",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C88",
@@ -2091,7 +2178,8 @@
         "success": true
       },
       "note": "header shows «گفتگو» (no name) when opened from restaurant page",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C89",
@@ -2111,7 +2199,8 @@
         "success": true
       },
       "note": "optimistic bubble; failure marked «⚠️ ناموفق»",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C90",
@@ -2124,7 +2213,7 @@
       "side_effects": [
         "sms otp (enqueueSms otp.ts:158)"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -2133,7 +2222,8 @@
         "success": true
       },
       "note": "offline on http(s) → labelled demo 1234 (A1-025, policy-permitted)",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C91",
@@ -2146,7 +2236,7 @@
       "side_effects": [
         "audit auth.login / auth.failure"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -2155,7 +2245,8 @@
         "success": true
       },
       "note": "tokens persisted in localStorage",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C92",
@@ -2175,7 +2266,8 @@
         "success": true
       },
       "note": "offline on http(s) → honest «نامت ثبت نشد»",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C93",
@@ -2195,7 +2287,8 @@
         "success": true
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C94",
@@ -2209,7 +2302,7 @@
         "points on arrival (lifecycle.ts:139-150)",
         "sms on transition if notify"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -2218,7 +2311,8 @@
         "success": true
       },
       "note": "no in-app scanner offered (honestly absent); offline/404/no-reservation/success sheets",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C95",
@@ -2238,7 +2332,8 @@
         "success": true
       },
       "note": "count = loaded page, labelled with date/party context",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C96",
@@ -2258,7 +2353,8 @@
         "success": false
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C97",
@@ -2278,7 +2374,8 @@
         "success": false
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C98",
@@ -2298,7 +2395,8 @@
         "success": false
       },
       "note": "server badges used instead",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C99",
@@ -2318,7 +2416,8 @@
         "success": false
       },
       "note": "",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C100",
@@ -2338,7 +2437,8 @@
         "success": false
       },
       "note": "dev hook",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "id": "C101",
@@ -2358,7 +2458,8 @@
         "success": true
       },
       "note": "all labelled: [DEMO] names, «نمونه» chips, warning banners, «(نمونه)» slide tags",
-      "app": "customer"
+      "app": "customer",
+      "method": "static-trace"
     },
     {
       "element": "?api= bootstrap (RZ_API_BASE override)",
@@ -2381,7 +2482,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "localStorage rz_api_base",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Skip link",
@@ -2403,7 +2505,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Sidebar nav buttons (14 views)",
@@ -2426,7 +2529,8 @@
       "guest_context": "n/a",
       "count": 14,
       "note": "routing.js:L61-79; permission-hidden via applyPermissionsToNav routing.js:L50-59; VIEW_PERMISSION L6-21, VIEW_ROLE L34-36",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Burger + overlay toggleSidebar",
@@ -2449,7 +2553,8 @@
       "guest_context": "n/a",
       "count": 2,
       "note": "routing.js:L181-192 aria-expanded synced",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Branch switcher (open + select row)",
@@ -2472,7 +2577,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "routing.js:L85-180; no permission by documented decision (branches/route.ts:L35-65); header X-Restaurant-Id resolved in lib/staff-helpers.ts:L78-99",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Notification bell",
@@ -2495,7 +2601,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "staff-system.js:L180-215; 403 -> empty list (L195-199)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Notifications: 'خواندن همه' + item read",
@@ -2517,7 +2624,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Popup close ×",
@@ -2539,7 +2647,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Modal: backdrop/Esc/focus-trap/restore-focus",
@@ -2562,7 +2671,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "staff-system.js:L125-161",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Keyboard activation for role=button",
@@ -2584,7 +2694,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Username/password login (primary path)",
@@ -2608,7 +2719,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Switch to OTP login",
@@ -2630,7 +2742,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "OTP request",
@@ -2645,7 +2758,7 @@
         "sms",
         "audit"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -2656,7 +2769,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "devCode shown only when server returns it (OTP_DEV_MODE); file:// -> fixed 1234 (L500-503)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "OTP verify -> enterPanel",
@@ -2670,7 +2784,7 @@
       "side_effects": [
         "audit"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -2681,7 +2795,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "sets STAFF_INFO (L540) incl. restaurant_id; enterPanel L556-586 loads tables/branches/heartbeat/outbox",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Login back buttons (تغییر شماره / ورود با نام کاربری)",
@@ -2703,7 +2818,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Session restore on page load",
@@ -2725,7 +2841,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Session expired -> login gate",
@@ -2748,7 +2865,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "data.js:L185-188,L200",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Access-token refresh (401 -> refresh -> retry)",
@@ -2760,7 +2878,7 @@
       "service": "api/src/app/api/v1/auth/refresh",
       "db": "RefreshToken rotate",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": null,
@@ -2770,7 +2888,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Logout",
@@ -2792,7 +2911,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Change my password form",
@@ -2816,7 +2936,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "invite.html claim page (4 states + retry)",
@@ -2828,7 +2949,7 @@
       "service": "api/src/app/api/v1/auth/invite/[token]/claim/route.ts:L41-56",
       "db": "Invite.findUnique",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -2838,7 +2959,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Quick actions (walk-in, new reservation, waitlist, floor, search)",
@@ -2861,7 +2983,8 @@
       "guest_context": "n/a",
       "count": 5,
       "note": "role=button tabindex=0 present",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "KPI card 'رزرو امروز' click",
@@ -2884,7 +3007,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "no role/tabindex (a11y minor)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Today KPIs (count/occupancy/expected/no-show)",
@@ -2896,7 +3020,7 @@
       "service": "api/src/app/api/v1/restaurant/reservations/route.ts:L28 ; tables/route.ts:L26",
       "db": "Reservation.findMany, Table.findMany",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -2907,7 +3031,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "data.js:L657-666,L696-707; demo banner + 'داده‌ی نمونه' badge until _resLoaded&&_tablesLoaded (overview.js:L470-476)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Revenue KPI + avg spend KPI",
@@ -2929,7 +3054,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "'اتصال صندوق' button",
@@ -2951,7 +3077,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Tonight row 'ثبت ورود'",
@@ -2966,7 +3093,7 @@
         "points",
         "sms"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -2977,7 +3104,8 @@
       "guest_context": "partial",
       "count": 1,
       "note": "index into RES consistent here (RES.indexOf(r) L105)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Tonight row 'تماس' (high-risk only)",
@@ -2999,7 +3127,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "'همه رزروها' / 'مدیریت' links",
@@ -3021,7 +3150,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Dashboard waitlist 'آفر میز'",
@@ -3036,7 +3166,7 @@
         "sms",
         "push"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -3046,7 +3176,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "AI strip 'ارسال پیام کش‌بک'",
@@ -3068,7 +3199,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Peak-hours chart",
@@ -3091,7 +3223,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "computed from RES (today only after load)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Weekly heatmap",
@@ -3114,7 +3247,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "data.js:L790-802; 403 -> stop retrying",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Top customers rows -> customer history modal",
@@ -3136,7 +3270,8 @@
       },
       "guest_context": "partial",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Smart insights panel",
@@ -3159,7 +3294,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "data.js:L767-781",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Staff note: add",
@@ -3181,7 +3317,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Staff note: delete ×",
@@ -3204,7 +3341,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "icon-only button without aria-label",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Live refresh every 15s",
@@ -3226,7 +3364,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Demo-data banner + live badge",
@@ -3248,7 +3387,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Search input + clear ×",
@@ -3271,7 +3411,8 @@
       "guest_context": "n/a",
       "count": 2,
       "note": "clear button lacks aria-label",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "'رزرو جدید' button",
@@ -3293,7 +3434,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Date tabs (امروز/فردا/آینده/گذشته/همه)",
@@ -3305,7 +3447,7 @@
       "service": "reservations/route.ts:L28-85",
       "db": "Reservation.findMany (cursor, 100/page)",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -3316,7 +3458,8 @@
       "guest_context": "partial",
       "count": 5,
       "note": "row fields: name, phone, party_size, table_number, status, preorder[], note, reputation_tier, code (route L78-85)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Tonight filters (همه/۳۰ دقیقه/نرسیده/رسیده)",
@@ -3338,7 +3481,8 @@
       },
       "guest_context": "n/a",
       "count": 4,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Reservation list states",
@@ -3360,7 +3504,8 @@
       },
       "guest_context": "partial",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Row 'رسید'",
@@ -3385,7 +3530,8 @@
       },
       "guest_context": "partial",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Row 'نشاند'",
@@ -3407,7 +3553,8 @@
       },
       "guest_context": "partial",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Row 'نیومد' (confirm)",
@@ -3429,7 +3576,8 @@
       },
       "guest_context": "partial",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Row 'وضعیت' menu + status options",
@@ -3454,7 +3602,8 @@
       },
       "guest_context": "partial",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Row 'تماس'",
@@ -3477,7 +3626,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "crm.js:L756 tel: link; disabled when no phone",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Row 'لغو' + reason modal",
@@ -3501,7 +3651,8 @@
       },
       "guest_context": "partial",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Row 'تاریخچه'",
@@ -3523,7 +3674,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Row 'رزرو مجدد'",
@@ -3545,7 +3697,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Manual reservation modal + 'ثبت رزرو'",
@@ -3570,7 +3723,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Manual reservation date dropdown",
@@ -3592,7 +3746,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Manual reservation offline Outbox",
@@ -3614,7 +3769,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Walk-in: phone lookup",
@@ -3636,7 +3792,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Walk-in: confirm (member / new guest)",
@@ -3651,7 +3808,7 @@
         "sms (welcome_visit L906)",
         "points"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -3662,7 +3819,8 @@
       "guest_context": "partial",
       "count": 2,
       "note": "Jalali->Gregorian birthday conversion L348-358",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Walk-in offline Outbox (same idempotency key)",
@@ -3685,7 +3843,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "local record has no code -> later status change on it is local-only",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Party-size .opt pickers",
@@ -3708,7 +3867,8 @@
       "guest_context": "n/a",
       "count": 2,
       "note": "div without role/tabindex",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Floor: edit toggle",
@@ -3730,7 +3890,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Floor: table tap -> state sheet",
@@ -3752,7 +3913,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Floor: remove table × (+undo)",
@@ -3775,7 +3937,8 @@
       "guest_context": "n/a",
       "count": 2,
       "note": "× lacks aria-label; ::before enlarges hit area (panel.css:L277)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Floor: add table",
@@ -3797,7 +3960,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Floor: state options + rename + confirm",
@@ -3820,7 +3984,8 @@
       "guest_context": "n/a",
       "count": 2,
       "note": ".tbl-act divs lack role",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Floor: table QR (view/SVG/PNG/print/regenerate)",
@@ -3844,7 +4009,8 @@
       },
       "guest_context": "n/a",
       "count": 5,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Floor/KPI: demo tables after failed load",
@@ -3866,7 +4032,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Waitlist: 'آفر به نفر بعدی' + card 'آفر میز'",
@@ -3881,7 +4048,7 @@
         "sms",
         "push"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -3891,7 +4058,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Waitlist: remove entry",
@@ -3906,7 +4074,7 @@
         "sms (L676)",
         "push"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -3916,7 +4084,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Waitlist: offline offer Outbox",
@@ -3938,7 +4107,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Waitlist: analytics cards",
@@ -3960,7 +4130,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Waitlist: queue list states",
@@ -3982,7 +4153,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Profile tabs",
@@ -4004,7 +4176,8 @@
       },
       "guest_context": "n/a",
       "count": 4,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Gallery: load + error/retry",
@@ -4026,7 +4199,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Logo: upload photo",
@@ -4050,7 +4224,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Logo: emoji/gradient fallback (pick ×2 + save)",
@@ -4072,7 +4247,8 @@
       },
       "guest_context": "n/a",
       "count": 3,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Restaurant name edit",
@@ -4094,7 +4270,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Gallery: add photos (picker + submit)",
@@ -4118,7 +4295,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Gallery: delete ×",
@@ -4143,7 +4321,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "× lacks aria-label",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Gallery: rejected-reason badge",
@@ -4166,7 +4345,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "div/span without role",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Reviews: filters",
@@ -4188,7 +4368,8 @@
       },
       "guest_context": "n/a",
       "count": 4,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Reviews: load + error/retry",
@@ -4210,7 +4391,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Reviews: reply",
@@ -4232,7 +4414,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Hours: draft controls (toggle day, add/remove/update shift, add/remove closure)",
@@ -4255,7 +4438,8 @@
       "guest_context": "n/a",
       "count": 6,
       "note": "unsaved-changes guard in nav() routing.js:L67-70",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Hours: 'ارسالِ پیشنهاد برای تأیید'",
@@ -4279,7 +4463,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Hours: load",
@@ -4301,7 +4486,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Cancellation policy: 5 fields + save",
@@ -4324,7 +4510,8 @@
       "guest_context": "n/a",
       "count": 6,
       "note": "per-row honesty badges (L956-957)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Cancellation policy: load",
@@ -4346,7 +4533,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu: load (loading/empty/error+retry/success)",
@@ -4368,7 +4556,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu: new category",
@@ -4390,7 +4579,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu: item form create/edit + tags",
@@ -4412,7 +4602,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu: category move ▲▼",
@@ -4434,7 +4625,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu: category rename",
@@ -4456,7 +4648,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu: category enable/disable",
@@ -4478,7 +4671,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu row: out-of-stock toggle",
@@ -4501,7 +4695,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "aria-pressed/aria-label present",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu row: edit",
@@ -4523,7 +4718,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu row: delete (archive-aware)",
@@ -4545,7 +4741,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu item photo upload / remove",
@@ -4567,7 +4764,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu modifiers (load, group add/delete, option add/delete)",
@@ -4589,7 +4787,8 @@
       },
       "guest_context": "n/a",
       "count": 5,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu public: copy URL, preview link, build QR, download SVG/PNG",
@@ -4611,7 +4810,8 @@
       },
       "guest_context": "n/a",
       "count": 5,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu branding: load / save / reset accent",
@@ -4633,7 +4833,8 @@
       },
       "guest_context": "n/a",
       "count": 3,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Menu tag chips toggle",
@@ -4655,7 +4856,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Customers tabs",
@@ -4677,7 +4879,8 @@
       },
       "guest_context": "n/a",
       "count": 4,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Customers overview (RFM + AI cards + VIP count) + retry",
@@ -4699,7 +4902,8 @@
       },
       "guest_context": "full",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Customers overview: seg cells + quick actions",
@@ -4722,7 +4926,8 @@
       "guest_context": "n/a",
       "count": 4,
       "note": "seg-cell divs lack role",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Customer profiles: sort buttons",
@@ -4745,7 +4950,8 @@
       "guest_context": "full",
       "count": 4,
       "note": "error state has no retry button (L716)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Customer profile row: call / جزئیات / ارسال پیام",
@@ -4767,7 +4973,8 @@
       },
       "guest_context": "full",
       "count": 3,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Customer detail modal",
@@ -4789,7 +4996,8 @@
       },
       "guest_context": "full",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Campaign: segment cards",
@@ -4811,7 +5019,8 @@
       },
       "guest_context": "n/a",
       "count": 4,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Campaign: text + char counter",
@@ -4833,7 +5042,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Campaign: preview -> confirm -> send",
@@ -4858,7 +5068,8 @@
       "guest_context": "n/a",
       "count": 3,
       "note": "free text sent only if MELIPAYAMAK_FROM is configured (CLAUDE.md rule; sms layer fails explicitly otherwise); preview header shows hard-coded 'کافه‌رستوران ویستا' (L186)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Campaign history",
@@ -4881,7 +5092,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "error state has no retry",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Assistant chat: send (button + Enter)",
@@ -4903,7 +5115,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Assistant chat: teach chips",
@@ -4925,7 +5138,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "AI cards + action buttons",
@@ -4947,7 +5161,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "CRM contacts: call (logged) / پیامک",
@@ -4969,7 +5184,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Loyalty: load members + KPIs + list",
@@ -4991,7 +5207,8 @@
       },
       "guest_context": "partial",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Loyalty: 'رفتن به ثبتِ ورود'",
@@ -5013,7 +5230,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Loyalty: birthday SMS",
@@ -5038,7 +5256,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "message becomes the literal SMS text 'تبریکِ تولد' (customText path sms/route.ts:L253,L283) — no name/discount",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Loyalty: tel links",
@@ -5060,7 +5279,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Marketing tabs",
@@ -5082,7 +5302,8 @@
       },
       "guest_context": "n/a",
       "count": 2,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Coupon create",
@@ -5094,7 +5315,7 @@
       "service": "coupons/route.ts:L39 ; lib/coupons.ts",
       "db": "Coupon.create",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -5104,7 +5325,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Coupon list",
@@ -5126,7 +5348,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Automation create",
@@ -5148,7 +5371,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Automation list",
@@ -5170,7 +5394,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Analytics page",
@@ -5192,7 +5417,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Cashback: load + error/retry",
@@ -5214,7 +5440,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Cashback sliders",
@@ -5236,7 +5463,8 @@
       },
       "guest_context": "n/a",
       "count": 4,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Cashback confirm + apply",
@@ -5258,7 +5486,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Pricing: load suggestions/rules",
@@ -5280,7 +5509,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Pricing: accept suggestion -> save",
@@ -5302,7 +5532,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Staff list",
@@ -5324,7 +5555,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Staff permission editor + save",
@@ -5347,7 +5579,8 @@
       "guest_context": "n/a",
       "count": 2,
       "note": "no audit() in staff/route.ts (grep count 0); body.restaurant_id (branch assignment) is tenant-validated at L184",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Chat inbox",
@@ -5370,7 +5603,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "error state has no retry",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Chat thread open + 4s polling",
@@ -5392,7 +5626,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Chat send",
@@ -5416,7 +5651,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Chat close",
@@ -5438,7 +5674,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Heartbeat every 30s",
@@ -5461,7 +5698,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "no permission by documented decision (heartbeat/route.ts:L17-49)",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Telemetry batch emitter",
@@ -5483,7 +5721,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Outbox sync + conflict modal",
@@ -5506,7 +5745,8 @@
       "guest_context": "n/a",
       "count": 1,
       "note": "stops on offline, surfaces server rejections to staff",
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Online/offline bar",
@@ -5528,7 +5768,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Branch switch cache invalidation + refresh",
@@ -5550,7 +5791,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Reservations 'load more' (cursor pagination)",
@@ -5572,7 +5814,8 @@
       },
       "guest_context": "n/a",
       "count": 1,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "element": "Unused API client methods (branchCreate, createMember, events×4, assistantStats, chatList/chatMessages/chatSend)",
@@ -5594,7 +5837,8 @@
       },
       "guest_context": "n/a",
       "count": 10,
-      "app": "business"
+      "app": "business",
+      "method": "static-trace"
     },
     {
       "id": "C01",
@@ -5608,7 +5852,7 @@
       "side_effects": [
         "audit auth.login / auth.failure"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -5619,7 +5863,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "button disabled + label during request (:903-904); uniform error toast (:922); TOTP input cleared after failure (:909-910)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C02",
@@ -5633,7 +5878,7 @@
       "side_effects": [
         "audit detail.totp outcome"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -5644,7 +5889,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "active only when ADMIN_LOGIN_ENABLED=true; not exercised at runtime in this run; rate limit adminTotpLogin 5/15min per IP and per user (login/route.ts:56-59, ratelimit.ts:179)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C03",
@@ -5656,7 +5902,7 @@
       "service": "login/route.ts:124-137 -> api/src/lib/feature-flags.ts:62-66 -> platform-settings.ts:14-20",
       "db": "PlatformSettings.findUnique (cached 30s)",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -5667,7 +5913,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "failure -> totp false, otp false (:888-889); no rate limit (A3-014)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C04",
@@ -5690,7 +5937,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "built only when server otp_login_enabled=true (:849, :888); default absent from DOM",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C05",
@@ -5705,7 +5953,7 @@
         "sms (OTP via enqueueSms)",
         "audit auth.failure NOT_PLATFORM_ADMIN"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -5716,7 +5964,8 @@
       "echoes_secret": true,
       "looked_at": "HEAD",
       "notes": "feature-gated: admin_otp_login_enabled default OFF -> 404; devCode echoed in dev mode (secret_echo_map #1); uniform 204 for admin/non-admin",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C06",
@@ -5730,7 +5979,7 @@
       "side_effects": [
         "audit auth.login / auth.failure"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -5741,7 +5990,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "issues platform-admin principal WITHOUT TOTP - the reason the flag defaults OFF (feature-flags.ts:48-54)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C07",
@@ -5764,7 +6014,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "labelled: [DEMO] names :1013-1017, banner :1012, toast :1019; fixed code 1234 accepted only client-side",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C08",
@@ -5787,7 +6038,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C09",
@@ -5799,7 +6051,7 @@
       "service": "api/src/app/api/v1/auth/logout/route.ts (exists, 2.0K)",
       "db": "refresh token revoke",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -5810,7 +6062,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "tokens cleared locally even if network fails (:76-77)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C10",
@@ -5824,7 +6077,7 @@
       "side_effects": [
         "audit auth.failure on revoked"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -5835,7 +6088,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "single shared promise, rotation (api-core.js:88-91)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C11",
@@ -5858,7 +6112,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "re-locks app (inert/aria-hidden :828-836) and re-renders login form",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C12",
@@ -5883,7 +6138,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "map at data.js:38 covers all 15 #v-* containers (index.html:130-144)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C13",
@@ -5906,7 +6162,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "aria-expanded synced",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C14",
@@ -5929,7 +6186,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "empty result message :124",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C15",
@@ -5952,7 +6210,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "driven by API.online which is only set by loadAdminRestaurants/enterAdminPanel (A3-003)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C16",
@@ -5975,7 +6234,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "focus restore + body scroll lock",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C17",
@@ -5998,7 +6258,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "no hardcoded API host",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C18",
@@ -6021,7 +6282,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "fire-and-forget by design; eventId for server dedup :69",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C19",
@@ -6044,7 +6306,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "CLV shown as unmeasured when null (:29-35, honest)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C20",
@@ -6067,7 +6330,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "works via event bubbling; keyboard-focused button also bubbles click",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C21",
@@ -6090,7 +6354,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C22",
@@ -6115,7 +6380,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "empty state «همه‌ی اشتراک‌ها فعالن» :84",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C23",
@@ -6138,7 +6404,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "empty per filter :124",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C24",
@@ -6164,7 +6431,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "409 reasons mapped without green toast (:235-240,:276-279); button locked during request (:262); key built ad hoc (A3-012); double-open guard (:210)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C25",
@@ -6176,7 +6444,7 @@
       "service": "restaurants/route.ts:15-46",
       "db": "Restaurant.findMany",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -6187,7 +6455,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C26",
@@ -6210,7 +6479,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C27",
@@ -6225,7 +6495,7 @@
         "audit restaurant.invite_resent",
         "sms staff_invite enqueue"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -6236,7 +6506,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "same enqueue-vs-delivery wording caveat as A3-005 (toast :178)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C28",
@@ -6250,7 +6521,7 @@
       "side_effects": [
         "audit restaurant.activated/deactivated"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -6261,7 +6532,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "no confirm, no button lock (A3-010)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C29",
@@ -6275,7 +6547,7 @@
       "side_effects": [
         "audit"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -6286,7 +6558,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C30",
@@ -6309,7 +6582,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "honest privacy note :35-39 (no per-guest data here)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C31",
@@ -6321,7 +6595,7 @@
       "service": "staff-credentials/route.ts:30-59",
       "db": "Restaurant.findUnique, Staff.findMany (select excludes passwordHash)",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -6332,7 +6606,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "error without retry (A3-011); only has_password rendered (:73)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C32",
@@ -6346,7 +6621,7 @@
       "side_effects": [
         "audit admin.staff_credentials_set (password excluded)"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -6357,7 +6632,8 @@
       "echoes_secret": true,
       "looked_at": "HEAD",
       "notes": "echoes_secret = UI-side only: input type=\"text\" shows typed password (:90); API never returns it; no forced change on first login (A3-007); 409 duplicate_owner_phone shown via toast message (:117)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C33",
@@ -6380,7 +6656,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C34",
@@ -6403,7 +6680,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "error without retry (A3-011); CLV null handled as unmeasured (:26,:40)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C35",
@@ -6426,7 +6704,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "MRR honestly '—' when online (:56,:60)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C36",
@@ -6440,7 +6719,7 @@
       "side_effects": [
         "audit admin.action sms_topup"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -6451,7 +6730,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "double-click guard (:112); balance updated from server response (:116-118)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C37",
@@ -6474,7 +6754,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "role=button + tabindex + global keyboard activation api.js:195-199",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C38",
@@ -6488,7 +6769,7 @@
       "side_effects": [
         "audit plan.changed"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -6499,7 +6780,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "double-submit lock (:163); plan chips limited to pro/enterprise matching server :70-72",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C39",
@@ -6513,7 +6795,7 @@
       "side_effects": [
         "audit subscription.cancelled"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -6524,7 +6806,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "confirm modal yes; no button lock (A3-010)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C40",
@@ -6547,7 +6830,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "independent inquiry error (:89-92, :187-193) with retry; no sample data by design (:12-13)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C41",
@@ -6570,7 +6854,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C42",
@@ -6593,7 +6878,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "all fields esc()'d",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C43",
@@ -6618,7 +6904,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "confirm() before; window.prompt for tenant id when unlinked (server validates zUuid :29)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C44",
@@ -6643,7 +6930,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "min 3 chars client-side",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C45",
@@ -6668,7 +6956,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C46",
@@ -6693,7 +6982,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C47",
@@ -6716,7 +7006,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "on failure badge left unchanged (unknown != 0)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C48",
@@ -6739,7 +7030,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "offline -> labelled [DEMO] sample, actions blocked (:86-94,:157-160,:207-211); badge never from sample (:94)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C49",
@@ -6762,7 +7054,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C50",
@@ -6788,7 +7081,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C51",
@@ -6813,7 +7107,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C52",
@@ -6839,7 +7134,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C53",
@@ -6862,7 +7158,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C54",
@@ -6885,7 +7182,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "offline -> labelled [DEMO] sample, actions blocked (:76-84,:143-146,:193-197)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C55",
@@ -6908,7 +7206,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C56",
@@ -6934,7 +7233,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C57",
@@ -6959,7 +7259,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "client enforces non-empty reason (:213)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C58",
@@ -6982,7 +7283,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C59",
@@ -7005,7 +7307,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "error without retry (A3-011)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C60",
@@ -7028,7 +7331,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "insufficient_data shown explicitly (:313,:335); error without retry (A3-011)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C61",
@@ -7040,7 +7344,7 @@
       "service": "security/route.ts:17-97; feature-flags/route.ts:18-25; moderation-queue.ts:11; banned-ips/route.ts:13-22; economy-rules/route.ts:16-25",
       "db": "AuditLog.findMany, CustomerEconomyProfile (fraud.listFlaggedAbuseUsers), PlatformSettings, Redis ban keys",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -7051,7 +7355,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "sub-panel unknown states with retry (:531-533); top-level !res.ok has no retry (:561, A3-011); catch-all (:662-665)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C62",
@@ -7076,7 +7381,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "confirm() before write (:489); unknown state explicit (:471-476)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C63",
@@ -7099,7 +7405,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "div rows with cursor:pointer but no role=button/tabindex (a11y gap, not in mandate severity list)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C64",
@@ -7124,7 +7431,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "confirm() yes",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C65",
@@ -7138,7 +7446,7 @@
       "side_effects": [
         "audit economy_rule.update"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -7149,7 +7457,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "editor not rendered when read fails (:661, prevents saving defaults); no confirm/lock (A3-010)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C66",
@@ -7172,7 +7481,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "error without retry (A3-011); all fields esc()/jsq()",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C67",
@@ -7197,7 +7507,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "reason required + confirm(); already_banned surfaced honestly (:790)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C68",
@@ -7222,7 +7533,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C69",
@@ -7247,7 +7559,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "confirm() + button lock (:674-675)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C70",
@@ -7270,7 +7583,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "honest banner that remote-connect is not implemented (:208) - not FAKE",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C71",
@@ -7293,7 +7607,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "error without retry (A3-011)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C72",
@@ -7318,7 +7633,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "no submit lock (A3-010)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C73",
@@ -7343,7 +7659,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "confirm() with resolved name; already_granted surfaced (:108)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C74",
@@ -7368,7 +7685,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C75",
@@ -7393,7 +7711,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "confirm() yes",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C76",
@@ -7405,7 +7724,7 @@
       "service": "missions/route.ts:34-46",
       "db": "Mission.findMany",
       "side_effects": [],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": true,
@@ -7416,7 +7735,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "error without retry (A3-011)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C77",
@@ -7430,7 +7750,7 @@
       "side_effects": [
         "audit mission.created / mission.updated"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -7441,7 +7761,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "no submit lock (A3-010)",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C78",
@@ -7455,7 +7776,7 @@
       "side_effects": [
         "audit mission.updated"
       ],
-      "class": "REAL",
+      "class": "REAL-STATIC",
       "broken_link": null,
       "ui_states": {
         "loading": false,
@@ -7466,7 +7787,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "confirm() yes",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C79",
@@ -7491,7 +7813,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "usage-count command: no API.adminCreateBranch outside api.js",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C80",
@@ -7514,7 +7837,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     },
     {
       "id": "C81",
@@ -7539,7 +7863,8 @@
       "echoes_secret": false,
       "looked_at": "HEAD",
       "notes": "",
-      "app": "company"
+      "app": "company",
+      "method": "static-trace"
     }
   ],
   "findings": [
@@ -8255,7 +8580,8 @@
       "confirmed": 5,
       "rejected": 0
     },
-    "rule": "any rejection → full re-run of that agent; none occurred"
+    "rule": "any rejection → full re-run of that agent; none occurred",
+    "founder_correction": "5 of 245 ~ 2% violated the >=20% rule -> gate downgraded to CONDITIONAL; full verification in progress"
   },
   "fixed_by_ceo_this_round": [
     "A3-001 → 37b2a82",
@@ -8264,7 +8590,8 @@
   "totals": {
     "census_rows": 325,
     "classes": {
-      "REAL": 245,
+      "REAL": 190,
+      "REAL-STATIC": 55,
       "PARTIAL": 56,
       "FAKE": 9,
       "DEAD": 13,
@@ -8274,6 +8601,74 @@
       "major": 35,
       "minor": 40,
       "blocker": 2
+    }
+  },
+  "model_reporting": {
+    "A1": "claude-fable-5-1 (inherited default - 0.2 violation)",
+    "A2": "claude-fable-5-1 (same)",
+    "A3": "claude-fable-5-1 (same)",
+    "correction": "Tier 2 = claude-sonnet-5 for any re-run"
+  },
+  "ceo_full_verification": {
+    "status": "in progress",
+    "must_verify": {
+      "FAKE": 9,
+      "blockers": 2,
+      "majors": 35
+    },
+    "random_sample_15pct": {
+      "population": 316,
+      "k": 48,
+      "row_indexes": [
+        9,
+        11,
+        18,
+        36,
+        62,
+        66,
+        70,
+        72,
+        75,
+        83,
+        90,
+        94,
+        97,
+        100,
+        110,
+        112,
+        118,
+        120,
+        122,
+        123,
+        130,
+        139,
+        143,
+        144,
+        145,
+        169,
+        173,
+        178,
+        185,
+        187,
+        215,
+        218,
+        219,
+        229,
+        236,
+        247,
+        250,
+        252,
+        255,
+        261,
+        267,
+        272,
+        281,
+        291,
+        298,
+        309,
+        317,
+        321
+      ]
     }
   }
 }
