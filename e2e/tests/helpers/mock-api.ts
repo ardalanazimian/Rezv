@@ -220,3 +220,19 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
     return json({ ok: true });
   });
 }
+
+/**
+ * پرچمِ سرورِ «ورود با پیامک» برایِ پنلِ شرکت (فلگِ admin_otp_login_enabled، ۲۰۲۶-۰۹-۰۳).
+ * پنلِ شرکت دکمه‌ی «ورود با پیامک» را فقط وقتی می‌سازد که GET /auth/admin/login
+ * otp_login_enabled=true بدهد (پیش‌فرضِ تولید: خاموش → ۴۰۴). specهایی که با
+ * OTP واردِ پنلِ شرکت می‌شوند باید این را **پیش از** page.goto ثبت کنند — بعد از
+ * catch-allِ خودشان، چون Playwright آخرین route ثبت‌شده را برنده می‌داند.
+ * enabled=false برایِ تستِ منفی: دکمه نباید اصلاً در DOM بیاید.
+ */
+export async function mockAdminOtpFlag(page: Page, enabled = true) {
+  await page.route('**/api/v1/auth/admin/login', (route: Route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ totp_required: false, otp_login_enabled: enabled }) });
+  });
+}

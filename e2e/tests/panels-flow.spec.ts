@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { mockAdminOtpFlag } from './helpers/mock-api';
 
 // ═══════════════════════════════════════════════════════════
 //  e2e رفتاریِ پنلِ کسب‌وکار (business) — ورودِ staff → بازِ پنل
@@ -91,6 +92,7 @@ test('پنلِ شرکت: ورودِ مدیرِ پلتفرم (شماره → کد
   page.on('pageerror', (e) => errors.push(String(e)));
   await mockPanelApi(page); // همان mockِ staff-auth (company هم /auth/staff/* را صدا می‌زند)
 
+  await mockAdminOtpFlag(page);
   await page.goto(CO);
 
   // مرحله‌ی ۱: شماره‌ی موبایلِ مدیر
@@ -169,6 +171,7 @@ test('پنلِ شرکت: ناوبری به «رستوران‌ها» لیستِ 
   page.on('pageerror', (e) => errors.push(String(e)));
   await mockPanelApi(page);
 
+  await mockAdminOtpFlag(page);
   await page.goto(CO);
 
   // ورودِ مدیرِ پلتفرم (دمو)
@@ -220,6 +223,7 @@ test('پنلِ شرکت: صفِ «تأییدِ ساعتِ کاری» پیشنه�
     });
   });
 
+  await mockAdminOtpFlag(page);
   await page.goto(CO);
   // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
   // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
