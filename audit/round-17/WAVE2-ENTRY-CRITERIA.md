@@ -20,7 +20,7 @@ Model discipline (§0.2, amended 2026-09-03): A4 and A5 are Tier 1 → `claude-o
 
 | # | Item | Owner |
 |---|---|---|
-| S1 | **P0-014 REDEFINED (directive 4, 2026-09-03)** — the production DB is on an **auto-pausing tier**; `28P01` was a symptom of the pause, not a credential fault (founder's earlier correction withdrawn). Live drift (`information_schema.columns` vs `schema.prisma`) + RLS (`pg_class.relrowsecurity`) still run the moment the founder confirms the restore + password reset in writing. | founder restores + resets → CEO runs immediately |
+| S1 | **P0-014 DECIDED (2026-09-03).** Founder chose **Postgres inside the existing Docker stack** for launch (Supabase Pro kept as a later fallback). Supabase **leaves the critical path** — the restore + password reset is cancelled, and P0-014 folds into **P0-017** (no production infrastructure exists). Live drift + RLS now run against a **production-shaped** Postgres (built `db push` → `apply-sql.sh` → fixups), not against the paused project. | CEO runs the drift/RLS pass on the production-shaped DB; the three hard conditions stay open (see L1) |
 | S2 | Melipayamak key rotation — written confirmation | founder |
 | S3 | A10 (sonnet) wiring plan accepted → Vercel ×4 projects + Sentry project created by founder with the exact settings | founder + A10 plan |
 
@@ -28,7 +28,9 @@ Model discipline (§0.2, amended 2026-09-03): A4 and A5 are Tier 1 → `claude-o
 
 | # | Criterion | How it is verified |
 |---|---|---|
-| L1 | **Production DB tier/host is decided and provably non-pausing.** Founder chooses (1) Supabase Pro or (2) Postgres inside the existing Docker stack (`docker-compose.yml:12-26` + backup service `:137-167`). A10 folds the outcome into the deployment plan **before any production wiring**. | *Provable* = the chosen host answers a **real query** (not `get_project`) after a documented idle window, raw result recorded. A control-plane status alone is never accepted. |
+| L1 | **Production DB tier/host is decided and provably non-pausing.** ✅ *Decided 2026-09-03: Postgres in the Docker stack (`docker-compose.yml:12-26` + backup service `:137-167`).* **Still open as a gate:** (a) an **executed** restore drill — dump → restore into an empty DB → row-count comparison → exit code recorded (B4 states this has never run against a real production backup); (b) **off-host** backup copies — the `S3_*` fields exist but are empty; (c) uptime + disk alerting before launch. | *Provable non-pausing* = the stack answers a **real query** (never `get_project`) after a documented idle window, raw result recorded. |
+
+**RLS caveat (P0-021, verified 2026-09-03):** RLS is enabled on 34+ tables with **zero policies** and the backend connects as the **owner** role, which bypasses RLS (`grep 'CREATE POLICY' api/prisma/sql/*.sql` → 0; `FORCE ROW LEVEL SECURITY` → 0; `037-rls-core-tables.sql` says so itself). The RLS pass therefore proves *defense-in-depth is declared*, **not** that a DB-level tenant boundary works — the real boundary is application-layer and belongs to A5's isolation matrix. No report may cite "RLS enabled" as isolation evidence.
 
 **New standing rule for every agent (landmine list):** never declare a live-infrastructure fact from control-plane metadata alone — `get_project`/`list_projects` status is cached and was **STALE** here (`ACTIVE_HEALTHY` while `execute_sql` returned `28P01` and `get_advisors` said *hibernated*). Cross-check with a data-plane query and record the raw output. Zero-trust applies to founder statements too: the founder's own correction on this item was withdrawn by the founder after re-testing.
 

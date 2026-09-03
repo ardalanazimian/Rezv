@@ -258,6 +258,15 @@
       "evidence": "A10-IRAN-REACHABILITY.md section 4 activation checklist",
       "status": "open → A10/A7 (Wave 3)",
       "verified_by": "agent"
+    },
+    {
+      "id": "P0-021",
+      "severity": "minor",
+      "area": "infra/db-security",
+      "claim": "The live-RLS check queued behind P0-014 would have proven nothing about tenant isolation. RLS is ENABLED on 34+ core tables but with ZERO policies (deny-by-default), and the backend connects as the DB OWNER role, which bypasses RLS entirely (no table uses FORCE ROW LEVEL SECURITY). The real tenant boundary is application-layer (ctx.restaurant.id / auth.tenantId), which is exactly what A5's isolation matrix tests. Recorded so no report, doc or launch checklist can cite 'RLS enabled' as evidence of a working DB-level isolation boundary.",
+      "evidence": "grep 'CREATE POLICY' api/prisma/sql/*.sql -> 0 matches; grep 'FORCE ROW LEVEL SECURITY' -> 0 matches; api/prisma/sql/037-rls-core-tables.sql header states it itself: 'the backend connects with the owner role (which bypasses RLS); real access control remains in the application code - this only completes the DB-level defense-in-depth layer'.",
+      "status": "open - routed to A5: state explicitly in the security report whether any doc or UI claims DB-level isolation, and either add real policies + a non-owner app role or keep RLS honestly labelled as inert defense-in-depth",
+      "verified_by": "ceo"
     }
   ],
   "wave0": {
@@ -456,9 +465,16 @@
       "option_1": "Supabase Pro - no pausing, managed backups + PITR, connection strings unchanged, RLS/advisors keep working, MCP tooling keeps working. Cost: monthly USD, requires an FX payment path from Iran; data lives outside Iran (latency + jurisdiction).",
       "option_2": "Postgres in the existing Docker stack - docker-compose.yml already ships postgres:16-alpine (:12-26) and a backup service (:137-167: BACKUP_CRON default '0 3 * * *', BACKUP_KEEP 14, BACKUP_ON_START, uploads volume tarred, optional S3 fields). No FX dependency, same host as the API (lowest latency), full control. Ops burden ours: patching, disk, monitoring, and a PROVEN restore drill become launch gates.",
       "ceo_recommendation": "Option 2 for launch (baseline (b) already puts the API on the self-hosted stack, so option 1 would put the DB on a different continent from its only client and add an FX dependency to the critical path), with three hard conditions: (a) an executed restore drill, not a documented one; (b) off-host backup copies - the S3 fields exist but are empty; (c) uptime/disk alerting before launch. Option 1 stays the fallback if the founder does not want to own DB ops.",
-      "status": "awaiting founder"
+      "status": "DECIDED by founder 2026-09-03",
+      "founder_decision": "Option 2 NOW, option 1 later if needed: launch on Postgres inside the existing Docker stack under the three hard conditions (executed restore drill, off-host backup copies, uptime/disk alerting); migrate to Supabase Pro only if the ops burden proves real. The decision is not locked, but the 'provably non-pausing' gate runs before launch either way. Supabase restore + password reset: CANCELLED - the project leaves the critical path."
     },
     "hard_launch_gate_added": "'Production DB tier/host is decided and provably non-pausing' is now a hard launch gate. A10 folds it into the deployment plan before any production wiring. Provable = the chosen host answers a real query after a documented idle window, with the raw result recorded.",
-    "unchanged": "Live drift + RLS remains the CEO's first action on the founder's written confirmation of the password reset; the order-5 queue behind P0-014 is unchanged."
+    "unchanged": "Live drift + RLS remains the CEO's first action on the founder's written confirmation of the password reset; the order-5 queue behind P0-014 is unchanged.",
+    "consequences_of_the_decision": {
+      "supabase_off_critical_path": "No production Supabase project remains in the launch path. P0-014 therefore FOLDS INTO P0-017 (no production infrastructure exists): the production DB is now a service to be stood up on the same host as the API, not an external project to be un-paused.",
+      "drift_and_rls_check_changes_meaning": "The queued live drift + RLS check was aimed at a long-lived Supabase project that had accumulated uncommitted manual console changes (documented in api/prisma/sql/037-rls-core-tables.sql header: migration 023's claim was true on the live DB of the time but had no migration behind it). A production DB built fresh from this repo (db push -> apply-sql.sh) has zero drift BY CONSTRUCTION. So the check is now run against a CI-faithful DB built the production way, and it verifies the repo is self-sufficient - it no longer discovers hidden console edits, because the DB that held them is being abandoned.",
+      "rls_portability_verified": "RLS is NOT a Supabase feature here: it is declared in the repo's own SQL (api/prisma/sql/023-rls-new-tables.sql, 037-rls-core-tables.sql, 024, 029, 031, 038, 040, 050) and applied by prisma/apply-sql.sh. Moving to self-hosted Postgres loses nothing on this axis.",
+      "open_item_supabase_data": "Before the Supabase project is decommissioned, one pg_dump must be taken OR the founder must confirm it holds no data worth keeping. It cannot be queried while paused, so this is unknown - and 'unknown' is never reported as 'empty'."
+    }
   }
 }
