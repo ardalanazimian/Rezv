@@ -1,0 +1,26 @@
+diff --git a/api/tests/helpers/test-env.mts b/api/tests/helpers/test-env.mts
+index ef54d30..e59179a 100644
+--- a/api/tests/helpers/test-env.mts
++++ b/api/tests/helpers/test-env.mts
+@@ -20,3 +20,21 @@ process.env.REDIS_CONNECT_TIMEOUT_MS ??= '8000';
+ // عمداً عاملِ سوم را می‌خواهد بعد از importها اجرا می‌شود و این را override می‌کند.
+ process.env.ADMIN_LOGIN_ENABLED = 'false';
+ export {};
++
++// ── نگهبانِ hang (P0-005، ۲۰۲۶-۰۹-۰۳) ──
++// یک hookِ سطحِ ریشه که پیش از `db.$disconnect()` بمیرد، همه‌ی after()های بعدی —
++// از جمله بستنِ Prisma/Redis در انتهای _all.runner.mts — را رد می‌کند (node:test
++// بعد از اولین خطای hook بقیه را اجرا نمی‌کند). handleِ باز یعنی event loop هرگز
++// خالی نمی‌شود، `npm test` تا ابد زنده می‌ماند و CI فقط با سقفِ ۳۶۰ دقیقه‌ی
++// GitHub می‌میرد (۲۶۴+ دقیقه دیده شد). این تایمر unref است: در اجرای سالم چیزی را
++// زنده نگه نمی‌دارد و هرگز شلیک نمی‌شود؛ فقط اگر پروسه بعد از سقف هنوز زنده باشد،
++// با کدِ ۱ خارج می‌شود. سقف ~۴× زمانِ محلیِ کلِ سوئیت (۱۴۸ ثانیه) و ~۱۰× CI (۵۳ ثانیه).
++const WATCHDOG_MS = Number(process.env.TEST_WATCHDOG_MS ?? 10 * 60_000);
++if (WATCHDOG_MS > 0) {
++  setTimeout(() => {
++    const open = (process as unknown as { getActiveResourcesInfo?: () => string[] }).getActiveResourcesInfo?.() ?? [];
++    process.stderr.write(`\n✖ TEST WATCHDOG: the suite is still alive after ${WATCHDOG_MS} ms — treating as a hang (P0-005). ` +
++      `Open handles: ${JSON.stringify(open)}\n`);
++    process.exit(1);
++  }, WATCHDOG_MS).unref();
++}

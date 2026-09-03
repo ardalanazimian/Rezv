@@ -316,7 +316,38 @@
       }
     },
     "A6": {
-      "status": "not run — died twice on session limit (429) at 07:30 and ~13:00; only A6-baseline.txt written; rerun after 14:40 Asia/Tehran"
+      "model": "claude-opus-5",
+      "status": "accepted",
+      "coverage": "9/9 tasks",
+      "findings": {
+        "blocker": 1,
+        "major": 9,
+        "minor": 6
+      },
+      "ceo_spot_check": {
+        "sampled": 9,
+        "confirmed": 9,
+        "rejected": 0,
+        "notes": [
+          "chain R1=124 (600 s hang reproduced) / R2=1 (watchdog fired at 63 s, open handles PipeWrap x2 + TCPSocketWrap) / R3=0 (1528/1528 in 161 s) verified in task1-r16-chain.log",
+          "admin-auth.ts role re-read is at L61 (select role) not L73 — line drift, claim holds",
+          "falsifiability table has 12 rows (summary said 13); row 12 honestly recorded as DID NOT GO RED (A6-023)",
+          "task2 probe script hit a module-path error but evidence 1 (.prisma/client/index.js L1523 warnEnvConflicts->tryLoadEnvs->dotenv) plus the earlier password-login 401 observation confirm A6-016"
+        ]
+      },
+      "key_findings": [
+        "A6-001 (blocker) hang root cause reproduced first-hand: root after() throws -> only DB/Redis teardown in _all.runner.mts:227-234 skipped -> process never exits",
+        "A6-015: 10 of 12 CI jobs still have no timeout-minutes (only test + e2e)",
+        "A6-016: importing the generated Prisma client runs dotenv over api/.env non-overridingly -> local suite inherits ADMIN_LOGIN_ENABLED/OTP_DEV_MODE/PLATFORM_ADMIN_TENANT_ID; 2 unpinned readers",
+        "A6-017: 134 hard process.env= vs 30 ??= across tests; OTP_DEV_MODE=true set globally",
+        "A6-018: fixed fixture phones shared by two files (0912111000x)",
+        "A6-024 surviving mutant (auth): dropping staff.role !== 'owner' at auth/admin/login:66 survives all 5 auth test files (not exploitable — admin-auth.ts re-reads role from DB — but unpinned)",
+        "A6-025 surviving mutant (SMS/OTP): smsTransportReady() without BODYID_OTP survives fail-closed test because setMeli() toggles all three vars together",
+        "A6-023 surviving mutant: partial revert of the A2-002 fix (wrong-guest welcome SMS + Outbox code) keeps business-reservations-row-identity.spec.ts green -> spec needs a second assertion",
+        "A6-027 empirical proof of shared state: five files green alone, red together (B1/B2 EXIT=1)",
+        "proposals (uncommitted, proven red->green): audit/round-16/A6-proposals/{test-env-watchdog.patch, ci-hang-guard.patch, check-prisma-client-fresh.mjs, check-test-runner-imports.sh}"
+      ],
+      "recommendation_needs_founder_ok": "apply the runner watchdog + timeout-minutes on the 10 uncapped jobs + the runner-imports and prisma-fresh CI checks via audit/launch-hardening — beyond the approved scope (concurrency + timeout on test), so not applied yet"
     }
   },
   "pr81": "GREEN at 580cf7f — merge-ready; merge requires founder (gh token invalid in this session)",
