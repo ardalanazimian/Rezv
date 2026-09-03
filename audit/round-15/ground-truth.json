@@ -1,0 +1,192 @@
+{
+  "round": 15,
+  "phase": 0,
+  "date": "2026-09-03",
+  "verified_by": "ceo",
+  "repo": {
+    "remote": "https://github.com/ardalanazimian/Rezv.git",
+    "note": "prompt §3 cites ardalanaz/RezervnoOS and Next.js 14 — stale; repo is Next 16",
+    "main_head": "origin/main = merge PR #79 (2026-09-02)",
+    "open_pr": "#81 feat/admin-totp-login @ 660456b"
+  },
+  "ci": {
+    "pr81_last_seen": "11/13 success, 1 skipped (Sourcery), `test` in_progress; e2e, boot-path, schema-drift, image-build green",
+    "final": "PR #81 @660456b: 11/13 success, 1 skipped, `test` job step 'Run tests' in_progress 63+ min (job 100496680224, run 33706516188) — hang on COMMITTED code; job has no timeout-minutes (only e2e: 25)"
+  },
+  "local_gates_on_worktree": {
+    "tsc_noEmit": 0,
+    "npm_run_lint": 0,
+    "sync_design_system_check": 0,
+    "build_standalone_check": 0,
+    "xss_escaping_regression": 0,
+    "xss_sink_audit_check": "0 (UNSAFE_BASELINE=65 unchanged vs HEAD)",
+    "full_suite": "1528/1528 pass, REAL_NPM_TEST_EXIT=0, 147.9 s — clean DB (db push + apply-sql + fixups), ADMIN_LOGIN_ENABLED=false, worktree incl. 14-file OTP work + 3 test fixes (scratchpad/suite6.log)"
+  },
+  "schema_drift": {
+    "live_vs_prisma": "blocked",
+    "reason": "Supabase MCP on mandated project zmyuvtpbchytqvtgyewt: pg auth failed for `postgres` (execute_sql) and `supabase_read_only_user` (list_tables); get_advisors then reported 'project hibernated, will wake on next request'; auto-mode classifier denied the wake/retry execute_sql. list_projects: zmyuvtpbchytqvtgyewt=rezervno ACTIVE_HEALTHY (only active); nxtvmfoczgnjjgdgrxli=Kikiz INACTIVE (the poisoned one); ulqnyneohwuvnfchgqba=rezervno-schema-test INACTIVE.",
+    "local_side_ready": "scratchpad/local_cols.txt — 72 tables produced by db push + apply-sql.sh + test-schema-fixups.sql (what schema.prisma+migrations yield)",
+    "local_guard": "api/tests/schema-drift.integration.test.mts 3/3 green (EXIT=0, 2026-09-03)"
+  },
+  "rls": {
+    "status": "blocked (same reason as schema_drift)"
+  },
+  "vercel": {
+    "team": "team_gLTPq1IJB0ayoC3NsDE4yoXg (hobby)",
+    "projects": 0,
+    "finding": "confirmed zero projects — deployment wiring absent (launch blocker)"
+  },
+  "sentry": {
+    "org": "rezvno (https://de.sentry.io)",
+    "projects": 0,
+    "finding": "no project exists → no DSN can be set (Phase-7 monitoring blocker)"
+  },
+  "carried_over_blockers": {
+    "S2_null_sms_response_as_success": {
+      "status": "fixed",
+      "evidence": "api/src/lib/sms.ts:101-106 meliAccepted(null)=false, RetStatus===1 or Value>1000; :296 `if (!res.ok || !meliAccepted(data))` → error path"
+    },
+    "P2002_to_409_provisioning": {
+      "status": "fixed",
+      "evidence": "api/src/lib/provisioning.ts:192 isOwnerPhoneUniqueViolation → Err.conflict('duplicate_owner_phone'); also site-orders.ts:352, admin/staff-credentials/route.ts:148; fault-injection test admin-create-business 9/9 EXIT=0; DROP INDEX staff_owner_phone_unique_idx → EXIT=1 (proven red-able 2026-09-03); index restored → EXIT=0"
+    },
+    "sms_panel_credentials_at_rest": {
+      "status": "open",
+      "evidence": "grep -rnE 'createCipheriv|encrypt\\(' api/src/lib → 0 matches; api/src/lib/platform-settings.ts:23-24 upsert stores raw `value` → plaintext"
+    },
+    "melipayamak_key_rotation": {
+      "status": "unverifiable_from_repo",
+      "evidence": "git ls-files shows only .env.example; rotation is an ops action outside the repo — founder must confirm"
+    }
+  },
+  "env_matrix": {
+    "in_code_missing_from_ENVIRONMENT_md": [
+      "ADMIN_LOGIN_ENABLED",
+      "ADMIN_TOTP_SECRET",
+      "ADMIN_TOTP_USERNAME",
+      "BREAK_GLASS_CODE",
+      "BREAK_GLASS_PHONE",
+      "INVITE_BASE_URL",
+      "MELIPAYAMAK_BODYID_* (12 keys)",
+      "MELIPAYAMAK_PASSWORD",
+      "REDIS_COMMAND_TIMEOUT_MS",
+      "REDIS_CONNECT_TIMEOUT_MS",
+      "SALES_NOTIFY_EMAIL",
+      "UPLOAD_DIR"
+    ],
+    "in_doc_not_in_code": [
+      "BACKUP_CRON",
+      "BACKUP_KEEP",
+      "BACKUP_ON_START",
+      "DATABASE_DIRECT_URL",
+      "DOMAIN",
+      "FCM_SERVER_KEY",
+      "GRAFANA_PASSWORD",
+      "POSTGRES_DB",
+      "POSTGRES_PASSWORD",
+      "POSTGRES_USER",
+      "REDIS_PASSWORD",
+      "RUN_SEED",
+      "S3_ENDPOINT"
+    ],
+    "note": "doc-only names may be compose/infra vars, not app vars — A10 to reconcile"
+  },
+  "new_findings_phase0": [
+    {
+      "id": "P0-001",
+      "severity": "blocker",
+      "area": "auth",
+      "claim": "OTP admin path (auth/admin/request|verify) issues the platform-admin principal without TOTP; the feature-flag fix (admin_otp_login_enabled, default OFF, 404 when off) exists only as uncommitted worktree — 14 files untouched since 2026-09-02 17:51",
+      "evidence": "HEAD api/src/app/api/v1/auth/admin/verify/route.ts:23 principal role=owner, :30 signAccess; worktree adds isFeatureEnabled guard at request/route.ts:52; tests/admin-otp-flag.integration.test.mts 8/8 EXIT=0; mutation Err.notFound→Err.forbidden → EXIT=1 (gate proven)",
+      "status": "open — commit+push pending founder decision (PR #81 does not touch request/verify)"
+    },
+    {
+      "id": "P0-002",
+      "severity": "major",
+      "area": "tests",
+      "claim": "provision-slug-validation after() used a non-existent AuditLog.restaurant relation → PrismaClientValidationError → cleanup never ran, 3 tests died",
+      "evidence": "api/prisma/schema.prisma:1193-1209 AuditLog has restaurantId but no relation; fixed in worktree (findMany ids → restaurantId in); 8/8 EXIT=0",
+      "status": "fixed (worktree)"
+    },
+    {
+      "id": "P0-003",
+      "severity": "major",
+      "area": "tests",
+      "claim": "auth-otp-enumeration uses fixed owner phones; with index 079 any crashed prior run poisons the next run (P2002 on staff.phone)",
+      "evidence": "leftover rows created 02:35:27Z by the killed run; fixed via pre-delete in before(); 9/9 EXIT=0",
+      "status": "fixed (worktree)"
+    },
+    {
+      "id": "P0-004",
+      "severity": "major",
+      "area": "tests",
+      "claim": "feature-flags test's deliberate manual DEFAULT_OFF mirror lacked admin_otp_login_enabled (the mirror did its job — it forced a human record)",
+      "evidence": "api/tests/feature-flags.integration.test.mts:26; fixed with justification; 15/15 EXIT=0",
+      "status": "fixed (worktree)"
+    },
+    {
+      "id": "P0-005",
+      "severity": "blocker",
+      "area": "ci",
+      "claim": "`npm test` hangs: locally 17 min silent after a file-level failure in provision-slug-validation; in CI the `test` job on 660456b is at 63+ min with no timeout-minutes → PR #81 cannot go green",
+      "evidence": "suite2.log stall after L3905 (file-level ✖ provision-slug-validation); CI job 100496680224 step 'Run tests' 63.3 min in_progress; ci.yml has timeout-minutes only on e2e (L328); local clean run WITH the P0-002 fix: 1528/1528 in 148 s, no hang",
+      "status": "open — hypothesis: after() threw before db.$disconnect() → open handle → node:test never exits; likely fixed by P0-002; A6 task #1 must falsify"
+    },
+    {
+      "id": "P0-006",
+      "severity": "minor",
+      "area": "tests",
+      "claim": "local generated Prisma client was stale vs schema (index.d.ts 09:49 < schema 15:20) → validation errors invisible in CI because `npm ci` regenerates",
+      "evidence": "stat; `prisma generate` hit EPERM on query_engine dll while runners were alive; succeeded after kill (GEN_EXIT=0)",
+      "status": "fixed locally → A6 to add a pretest staleness guard"
+    },
+    {
+      "id": "P0-007",
+      "severity": "major",
+      "area": "security",
+      "claim": "platform_settings values (incl. SMS panel credentials) stored plaintext; standing decision §3 requires encryption at rest, key only in env, UI never echoes secrets",
+      "evidence": "api/src/lib/platform-settings.ts:23-24; 0 cipher usages in api/src/lib",
+      "status": "open → A5"
+    },
+    {
+      "id": "P0-008",
+      "severity": "blocker",
+      "area": "ops",
+      "claim": "No deployment target and no error monitoring exist: Vercel team has 0 projects; Sentry org has 0 projects",
+      "evidence": "Vercel MCP list_projects(team_gLTPq1IJB0ayoC3NsDE4yoXg) → []; Sentry MCP find_projects(rezvno) → []",
+      "status": "open → A10"
+    },
+    {
+      "id": "P0-009",
+      "severity": "minor",
+      "area": "docs",
+      "claim": "Prompt §2.8/§9 reference `prisma/migrations/manual/` + P3015 pattern; repo CLAUDE.md states that folder does not exist and migrations live in api/prisma/sql (last: 079)",
+      "evidence": "CLAUDE.md; `ls api/prisma/sql`",
+      "status": "noted — CLAUDE.md governs; do not create manual/"
+    },
+    {
+      "id": "P0-010",
+      "severity": "minor",
+      "area": "process",
+      "claim": "Duplicate work across parallel sessions: modifiersJson finding was written twice into docs/recovery/OPEN-FINDINGS.md (branch claude/rezervno-intelligence-platform-w7wcty @01:34 and this session @05:15)",
+      "evidence": "git log 40f4c94; local duplicate reverted",
+      "status": "fixed — coordination rule: check `git log --all -- <file>` before editing shared docs"
+    },
+    {
+      "id": "P0-011",
+      "severity": "major",
+      "area": "tests",
+      "claim": "Tests depend on ambient env: api/.env sets ADMIN_LOGIN_ENABLED=true locally → password-login 22 fail (401≠200); with ADMIN_LOGIN_ENABLED=false 22/22. CI has no .env so it is green there — the suite is not hermetic",
+      "evidence": "api/.env:9; tests/password-login.integration.test.mts pins JWT_* (L5-6) but not ADMIN_LOGIN_ENABLED; runs: EXIT=1 (22 fail) vs EXIT=0",
+      "status": "open → A6 task #2 (env pin helper)"
+    },
+    {
+      "id": "P0-012",
+      "severity": "major",
+      "area": "tests",
+      "claim": "Single-process runner interleaves root-level before/after hooks across files: auth-otp-enumeration's root before() set a flag that feature-flags' root clearFlags() wiped → 404≠204 only in the full run",
+      "evidence": "_all.runner.mts L104 vs L108; fixed by moving flag-ON into a describe-level beforeEach; full run green after",
+      "status": "fixed (worktree) → A6 task #3 sweep for siblings"
+    }
+  ]
+}

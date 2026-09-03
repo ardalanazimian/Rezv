@@ -1,6 +1,9 @@
 import { test, describe, before, after, beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import { testIp } from './helpers/test-ip.mts';
+// مسیرِ OTPِ ادمین پشتِ فلگِ پیش‌فرض‌خاموشِ admin_otp_login_enabled است (۲۰۲۶-۰۹-۰۲)؛
+// این تست خودِ مسیر را می‌سنجد، پس فلگ را فقط برای مدتِ همین فایل روشن می‌کند.
+const OTP_FLAG = 'feature_flag:admin_otp_login_enabled';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -102,6 +105,9 @@ before(async () => {
   prevPlatformEnv = process.env.PLATFORM_ADMIN_TENANT_ID;
   process.env.PLATFORM_ADMIN_TENANT_ID = platformTenant;
 
+  // شماره‌های ثابت + role='owner' + ایندکسِ ۰۷۹ = هر اجرای نیمه‌کاره‌ی قبلی (بدونِ after)
+  // اجرای بعدی را با P2002 می‌کشد (۲۰۲۶-۰۹-۰۳ دو بار). پاک‌سازیِ پیش‌دستانه، نه بلعیدنِ خطا.
+  await db.staff.deleteMany({ where: { phone: { in: ['+989121000001', '+989121000002', '+989121000003', '+989121000004', '+989121000005'] } } });
   await db.staff.createMany({
     data: [
       { tenantId: platformTenant, phone: '+989121000001', role: 'owner', isActive: true },   // ابَرادمین
@@ -113,6 +119,7 @@ before(async () => {
 });
 
 after(async () => {
+  await db.platformSettings.deleteMany({ where: { key: OTP_FLAG } }).catch(() => {});
   if (prevPlatformEnv === undefined) delete process.env.PLATFORM_ADMIN_TENANT_ID;
   else process.env.PLATFORM_ADMIN_TENANT_ID = prevPlatformEnv;
   await db.otpCode.deleteMany({ where: { phone: { in: ['+989121000001', '+989121000002', '+989121000003', '+989121000004', '+989121000005'] } } }).catch(() => {});
@@ -121,6 +128,13 @@ after(async () => {
 });
 
 describe('POST /auth/admin/request — شمارش‌ناپذیریِ ابَرادمین', () => {
+  // فلگ در beforeEach، نه در before ی root: runner تک‌پروسه است و before ی root ی
+  // فایلِ feature-flags (clearFlags) بینِ before ی این فایل و تست‌هایش اجرا می‌شد →
+  // ۴۰۴ به‌جای ۲۰۴ فقط در اجرای کامل (۲۰۲۶-۰۹-۰۳). §۸.۷: shared mutable state.
+  beforeEach(async () => {
+    const { setPlatformSetting } = await import('../src/lib/platform-settings');
+    await setPlatformSetting(OTP_FLAG, 'true');
+  });
   // رجوع کن به توضیحِ همین الگو در `hours-change-approval`: hookهای سطحِ فایل
   // به سوئیتِ ROOT می‌چسبند، پس دو فایل که یک متغیرِ سراسری را ست می‌کنند
   // همدیگر را خراب می‌کنند. هر سوئیت مقدارِ خودش را دوباره تثبیت می‌کند.
