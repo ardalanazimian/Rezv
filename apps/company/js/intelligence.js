@@ -449,6 +449,9 @@ function initialOf(name){ return (String(name||'').trim()[0]) || '؟'; }
 
 // سوییچ‌هایِ قابلیت — عمداً همون واژگانِ featureFlagLabel در lib/feature-flags.ts (بک‌اند)
 const FEATURE_FLAG_LABEL_FA = {
+  // ۲۰۲۶-۰۹-۰۳ (A3-001): بدونِ این ورودی، سوییچِ فلگِ تازه هرگز رندر نمی‌شد — نقشه‌ی
+  // کلاینت منبعِ حلقه‌ی رندر است، نه فهرستِ سرور. همان واژگانِ featureFlagLabel.
+  admin_otp_login_enabled: 'ورودِ پنلِ شرکت با پیامک (OTP)',
   reservations_enabled: 'ثبتِ رزروِ آنلاین',
   waitlist_enabled: 'پیوستن به لیستِ انتظار',
   reward_marketplace_enabled: 'خرجِ سکه در فروشگاهِ جایزه',
