@@ -2,7 +2,7 @@
   "round": 16,
   "phase": 1,
   "date": "2026-09-03",
-  "gate": "CONDITIONAL (founder directive 2026-09-03): CEO must personally verify 100% of FAKE+blockers+majors and a random >=15% of remaining rows; REAL-STATIC rows need a runtime smoke pass (real API+DB) before the label is final",
+  "gate": "PASSED 2026-09-03 after CEO full verification (0 rejections across FAKE 9/9, blockers 2/2, majors 35/35, random 48/48). Caveat carried into Phase 2/3: 55 REAL-STATIC rows (money/auth/reservation flows) keep that label until a runtime smoke pass against real API+DB (scheduled after A6 releases the local DB).",
   "apps": {
     "customer": {
       "agent": "A1",
@@ -791,7 +791,8 @@
       },
       "note": "no data source at all",
       "app": "customer",
-      "method": "static-trace"
+      "method": "static-trace",
+      "verified_by": "ceo"
     },
     {
       "id": "C25",
@@ -984,7 +985,8 @@
       },
       "note": "label implies weekly-trend ranking that is not computed",
       "app": "customer",
-      "method": "static-trace"
+      "method": "static-trace",
+      "verified_by": "ceo"
     },
     {
       "id": "C34",
@@ -1571,7 +1573,8 @@
       },
       "note": "",
       "app": "customer",
-      "method": "static-trace"
+      "method": "static-trace",
+      "verified_by": "ceo"
     },
     {
       "id": "C61",
@@ -1786,7 +1789,8 @@
       },
       "note": "marketing copy",
       "app": "customer",
-      "method": "static-trace"
+      "method": "static-trace",
+      "verified_by": "ceo"
     },
     {
       "id": "C71",
@@ -3055,7 +3059,8 @@
       "guest_context": "n/a",
       "count": 1,
       "app": "business",
-      "method": "static-trace"
+      "method": "static-trace",
+      "verified_by": "ceo"
     },
     {
       "element": "'اتصال صندوق' button",
@@ -3770,7 +3775,8 @@
       "guest_context": "n/a",
       "count": 1,
       "app": "business",
-      "method": "static-trace"
+      "method": "static-trace",
+      "verified_by": "ceo"
     },
     {
       "element": "Walk-in: phone lookup",
@@ -4033,7 +4039,8 @@
       "guest_context": "n/a",
       "count": 1,
       "app": "business",
-      "method": "static-trace"
+      "method": "static-trace",
+      "verified_by": "ceo"
     },
     {
       "element": "Waitlist: 'آفر به نفر بعدی' + card 'آفر میز'",
@@ -4154,7 +4161,8 @@
       "guest_context": "n/a",
       "count": 1,
       "app": "business",
-      "method": "static-trace"
+      "method": "static-trace",
+      "verified_by": "ceo"
     },
     {
       "element": "Profile tabs",
@@ -5556,7 +5564,8 @@
       "guest_context": "n/a",
       "count": 1,
       "app": "business",
-      "method": "static-trace"
+      "method": "static-trace",
+      "verified_by": "ceo"
     },
     {
       "element": "Staff permission editor + save",
@@ -7876,7 +7885,8 @@
       "evidence": "apps/customer/sw.js:52-56 (isApi → networkFirst), sw.js:68-80 (cache.put on any 200; caches.match on failure); api/src/middleware.ts:104 sets Cache-Control: no-store (Cache API cache.put does not honour it); middleware.ts:83 Vary is only 'Origin' so caches.match cannot separate Authorization contexts; apps/customer/js/api.js:124-133 doLogout() clears tokens only, never caches.delete; api-core.js:47-53 treats the cached 200 as ok:true",
       "status": "open",
       "note": "Escalate to the security lens; would be a blocker if shared devices are in launch scope.",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-002",
@@ -7885,7 +7895,8 @@
       "claim": "Both cancel paths leave the reservation card stale after a successful POST …/cancel: the late-cancel dialog calls window.renderTrips which is never bound anywhere (silent no-op), and the in-window cancel returns without re-rendering — the card keeps status «پیش‌رو» with live «QR ورود»/«تقویم»/«لغو» actions until the user navigates away.",
       "evidence": "apps/customer/js/features/trips.js:202 `if(typeof window.renderTrips==='function') window.renderTrips();` — grep -rn 'window.renderTrips' apps/customer/js → only this line (reservation.js exports renderTrips but never assigns it to window; window bindings at reservation.js:215 only export openReviewSheetFromTrip); trips.js:227-228 `if(res.ok)return;` after commit leaves tripEl at opacity .5 and status label unchanged",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-003",
@@ -7894,7 +7905,8 @@
       "claim": "The «پیشنهاد هوشمند برای تو» strip is hard-coded marketing shown to every visitor (including anonymous): «بر اساس رزروهای قبلی‌ات، احتمالاً آوا روف‌تاپ رو دوست داری — جمعه شب میز با ویو داره». Nothing in JS ever updates #aiStripText, and the «ببین» CTA calls openRest(6) — the numeric id of a seed restaurant — so on a live deployment findR(6) fails and the button only toasts «این رستوران فعلاً در دسترس نیست». The strip also names a demo restaurant without its [DEMO] prefix.",
       "evidence": "apps/customer/index.html:162-169; grep -rn 'aiStripText' apps/customer/js → 0 hits; index.html:168 `onclick=\"openRest(6)\"`; apps/customer/js/data/detail.js:67 (toast on missing restaurant); apps/customer/js/data/seed.js:54 (id 6 = '[DEMO] آوا روف‌تاپ')",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-004",
@@ -7903,7 +7915,8 @@
       "claim": "Search, vibe chips and occasion picker filter only the client-loaded page (PAGE_SIZE=24) and report «چیزی برای «q» پیدا نشد» for restaurants that exist on later pages — 'don't know' rendered as 'does not exist'. The server supports ?vibe/?city/?cuisine but the client never sends them; the placeholder promises «محله» search yet only name/cuisine/vibes are matched (city is never compared).",
       "evidence": "apps/customer/js/data/discover.js:429 (`R.filter(r=>r.n.includes(q)||r.cuisine.includes(q)||r.vibes.some(...))`), discover.js:436-443 (empty state text), discover.js:248 (filterVibe on R), index.html:105 (placeholder «رستوران، آشپزی، محله...»); api/src/app/api/v1/restaurants/route.ts:18 (PAGE_SIZE = 24), route.ts:39-42 (vibe/city/cuisine filters exist server-side); grep 'vibe=' apps/customer/js → 0",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-005",
@@ -7912,7 +7925,8 @@
       "claim": "The referral promise «۵۰۰ امتیاز برای هر دعوت موفق» can never be fulfilled: POST /me/referral creates the Referral row and sends an SMS to the invitee, but completeReferral() — the only function that awards the points — has zero callers in api/src. points_earned stays 0 forever while third parties receive invitation SMS.",
       "evidence": "apps/customer/js/features/loyalty.js:70, features/rewards.js:13 (promise text); api/src/lib/loyalty.ts:14 (referralReward: 500), loyalty.ts:176-204 createReferral (enqueueSms at :197), loyalty.ts:206 completeReferral; grep -rn completeReferral api/src → only the definition",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-006",
@@ -7921,7 +7935,8 @@
       "claim": "The discover feed has no error state: a non-offline server failure (5xx/4xx on GET /restaurants) is handled identically to offline and returns R_SAMPLE — six [DEMO] restaurants labelled «نمونه» — with no error message and no retry. Demo data masks a broken production path.",
       "evidence": "apps/customer/js/api.js:349-358 (`if (res.ok) {…return []} … API.online=false; return R_SAMPLE;` — the `res.offline` check only gates a console.info), apps/customer/js/data/discover.js:186-210 renderFeed has loading skeleton + empty state but no error branch",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-007",
@@ -7930,7 +7945,8 @@
       "claim": "The «کارت هدیه» purchase flow is fully exposed on the loyalty page (amount picker, recipient, «خرید و ارسال هدیه») while the backend flag gift_card_purchase_enabled defaults OFF because the flow mints spendable balance with no payment step; every default-config attempt ends in a FEATURE_DISABLED toast after the user has filled the form. The client has no public flags endpoint to hide it.",
       "evidence": "apps/customer/js/features/loyalty.js:74-78, features/rewards.js:42-58, rewards.js:75-92; api/src/app/api/v1/gift-cards/route.ts:57-59; api/src/lib/feature-flags.ts:38-46 (rationale: no payment gateway), :55-56 (DEFAULT_OFF); route inventory has no public /feature-flags (only admin/feature-flags)",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-008",
@@ -7939,7 +7955,8 @@
       "claim": "«کیف پول» on every upcoming reservation opens a pass-styled sheet whose primary button «افزودن به Apple Wallet» only toasts «برای افزودن واقعی، سرور فایل pkpass امضاشده می‌سازد»; no .pkpass or Google Wallet endpoint exists. The QR inside is real, the wallet capability is not.",
       "evidence": "apps/customer/js/features/trips.js:38-53 (addToWallet), trips.js:50 (toast-only onclick); api/src/app/api/v1 route inventory (162 routes) contains no wallet/pkpass route",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-009",
@@ -7948,7 +7965,8 @@
       "claim": "declineWL() and leaveWL() show «آفر رد شد» / «از صف خارج شدی» and close the sheet without checking the response. API.post/request never reject (they resolve {ok:false}), so the .catch is dead and the success toast fires on 4xx/5xx/offline — the guest believes they left the queue while the server still holds (and may offer/SMS) the entry.",
       "evidence": "apps/customer/js/waitlist.js:204-208 (`await API.post(...).catch(()=>{}); toast('','آفر رد شد'); WL=null; closeSheet();`), waitlist.js:209-212 (same for DELETE); apps/customer/js/api.js:56-69 request() always resolves",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-010",
@@ -7957,7 +7975,8 @@
       "claim": "Fetch failure is rendered as 'nothing exists': the trips view shows «هنوز رزروی نداری» when GET /me/reservations fails (offline or 5xx) on a real deployment, and the economy view silently drops the «ماموریت‌ها»/«فروشگاهِ جایزه» sections when their fetches fail. Neither offers an error state or retry.",
       "evidence": "apps/customer/js/reservation.js:122-146 (trips=[] on failure → empty-state branch at :143-146; comment at :119-121 calls this 'honest empty'), apps/customer/js/features/economy.js:92-93 (`(missionsRes.ok && …) || []`)",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-011",
@@ -7966,7 +7985,8 @@
       "claim": "The chat-thread view has no loading and no error state: the log is blank until the first poll returns, and if GET /me/chats/:id fails pollOnce() returns silently, leaving an empty thread with no message and no retry.",
       "evidence": "apps/customer/js/features/chat.js:88-104 (no skeleton/aria-busy on #chatBody), chat.js:124-125 (`if (!res.ok) return;`)",
       "status": "open",
-      "app": "customer"
+      "app": "customer",
+      "verified_by": "ceo"
     },
     {
       "id": "A1-012",
@@ -8128,7 +8148,8 @@
       "claim": "The primary username/password login crashes after a successful 2xx: staffPasswordLogin() awaits enterStaffPanel(), which is not defined anywhere in the repository (only enterPanel() exists). The button stays on 'در حال بررسی...'; the token is already in localStorage so a manual reload enters the panel. Every e2e spec clicks 'ورود با پیامک' first, so the path is never exercised.",
       "evidence": "apps/business/js/staff-system.js:L468,L471,L472 (calls) vs L556 (function enterPanel); grep -rn enterStaffPanel -> only those 3 lines + standalone/business.html:L7952-7956; e2e/tests/panel-authed-audit.spec.ts:L45, panels-batch18-regression.spec.ts:L79 (OTP path only)",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-002",
@@ -8137,7 +8158,8 @@
       "claim": "On the reservations tab every row action (رسید/نشاند/نیومد/وضعیت/لغو/تاریخچه) passes the row index of the freshly fetched `source` array, but the handlers read RES[i]; RES only ever holds the dashboard's 'today' fetch. On the فردا/آینده/گذشته/همه tabs (or whenever ordering differs) a different reservation is mutated; when RES is still the demo array a row without `code` shows a success toast with no request at all.",
       "evidence": "apps/business/js/reservations.js:L54-58,L65,L162-168,L179,L200,L205; apps/business/js/data.js:L42,L56,L661 (only RES assignment); data.js:L100-103 (toast without request)",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-003",
@@ -8146,7 +8168,8 @@
       "claim": "'رزرو جدید' sends restaurant_id = STAFF_INFO?.restaurant_id. STAFF_INFO is only set by the OTP path and is null after any page reload (session restore) or password login; the API requires restaurant_id as a UUID -> 422. After a branch switch it is the login-time branch -> 403 'رزرو فقط برایِ شعبه‌ی فعالِ خودت'.",
       "evidence": "apps/business/js/reservations.js:L441; apps/business/js/staff-system.js:L431,L540,L607-623; api/src/app/api/v1/reservations/route.ts:L22,L100-101",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-004",
@@ -8155,7 +8178,8 @@
       "claim": "The offline Outbox entry for a manual reservation uses restaurant_id:'self', date:'today|tomorrow|upcoming' and a Persian-digit time; the schema requires zUuid/zDateStr/zTimeStr, so the queued op is rejected on every sync while the toast promised it would sync.",
       "evidence": "apps/business/js/reservations.js:L466-471,L482-484; api/src/app/api/v1/reservations/route.ts:L20-25",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-005",
@@ -8164,7 +8188,8 @@
       "claim": "changeStatus() calls renderResList() (which re-fetches from the server) before the PATCH is sent and does not re-render after success; the list shows the pre-change status next to a success toast until the user navigates.",
       "evidence": "apps/business/js/data.js:L64-70; apps/business/js/reservations.js:L50-58",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-006",
@@ -8173,7 +8198,8 @@
       "claim": "loadWaitlist sets _wlLoaded=true regardless of fetch result; after a 403/500/timeout the 'نمونه' note is hidden and WL_DEMO_QUEUE (سارا محمدی, علی رضایی, مریم کریمی) plus WL_DEMO_ANALYTICS (142/69%/22 دق) render as the restaurant's real queue on the waitlist page and the dashboard. The analytics endpoint needs canViewAnalytics while the view is gated by canManageWaitlist, so a waitlist-only employee always sees the fake analytics.",
       "evidence": "apps/business/js/waitlist.js:L4-21,L36-37; apps/business/js/overview.js:L118-131; apps/business/js/routing.js:L9; api/src/app/api/v1/restaurant/waitlist/analytics/route.ts:L9-10",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-007",
@@ -8182,7 +8208,8 @@
       "claim": "loadStaff sets _staffLoaded=true even on failure, so STAFF_DEMO (ids demo1/demo2, ۰۹۱۲۰۰۰۰۰۰۱) renders as the real team without the 'نمونه' note; the permission editor then PATCHes with a fake staff_id.",
       "evidence": "apps/business/js/staff-system.js:L3-8,L24-29,L55-56,L112",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-008",
@@ -8191,7 +8218,8 @@
       "claim": "loadTables installs DEMO_TABLES (ids 'demo-t1'…'demo-t10') and marks _tablesLoaded=true on any failure; the floor plan, occupancy KPI and the walk-in table picker then present 10 fake tables as real, and every write (rename/state/QR/delete/walk-in table_id) hits the server with a fake id.",
       "evidence": "apps/business/js/data.js:L685-707; apps/business/js/overview.js:L470-472; apps/business/js/reservations.js:L291-297,L365",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-009",
@@ -8200,7 +8228,8 @@
       "claim": "'درآمد امروز' and 'میانگین خرید هر نفر' are computed from constants (850,000 × party × 1.8 VIP × 1.25 preorder) with REVENUE_CONFIG.connected hard-coded false; they are labelled 'تخمین'/≈ but not [DEMO]. The 'اتصال صندوق' button only shows a toast.",
       "evidence": "apps/business/js/overview.js:L26-45,L158,L194-206",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-010",
@@ -8209,7 +8238,8 @@
       "claim": "When GET /restaurant/pricing fails, rPricing keeps the hard-coded sample suggestions with live 'قبول' buttons; accepting one calls pricingSave -> PUT with the fabricated rule and base_min_spend_toman:0, overwriting the server's real rules.",
       "evidence": "apps/business/js/staff-system.js:L284-298,L341-355",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-011",
@@ -8218,7 +8248,8 @@
       "claim": "loadClubMembers returns [] on any non-2xx, so the loyalty page renders '۰ عضو', empty tiers and 'این ماه تولدی نیست' with no error state or retry — 'نمی‌دانیم' reported as 'وجود ندارد'.",
       "evidence": "apps/business/js/data.js:L836-856; apps/business/js/loyalty.js:L9-15,L45-48",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-012",
@@ -8227,7 +8258,8 @@
       "claim": "loadHours and loadCancellationPolicy have no failure marker: after a failed GET the empty draft / hard-coded default policy render as the current configuration, and 'ذخیره' / 'ارسالِ پیشنهاد' would send those defaults to the server.",
       "evidence": "apps/business/js/crm.js:L787-806,L829-832,L927-934,L1003-1006",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-013",
@@ -8236,7 +8268,8 @@
       "claim": "There is no logout control anywhere in the panel: staffLogout() has zero call sites, and the refresh token is persisted in localStorage, so a session on a shared front-desk device never ends.",
       "evidence": "apps/business/js/staff-system.js:L587-596; apps/business/js/data.js:L135; grep -rn staffLogout apps/business -> definition only; index.html has no logout element",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-014",
@@ -8245,7 +8278,8 @@
       "claim": "loadMoreReservations() and RES_NEXT_CURSOR exist but nothing calls them; the API pages at 100, so a day with more than 100 reservations is silently truncated in the reservations tab and dashboard.",
       "evidence": "apps/business/js/data.js:L917,L938,L946-954; api/src/app/api/v1/restaurant/reservations/route.ts:L50-52; grep loadMoreReservations -> 0 call sites",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-015",
@@ -8254,7 +8288,8 @@
       "claim": "viewCustomerHistory builds 'سابقه‌ی رزرو' by filtering the in-memory RES (today's list) by display name; guests with real history see 'سابقه‌ای ثبت نشده'. The customers tab already has a real detail endpoint that is not used here.",
       "evidence": "apps/business/js/overview.js:L480-497; apps/business/js/data.js:L657-666; apps/business/js/crm.js:L1012 (real detail modal)",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-016",
@@ -8263,7 +8298,8 @@
       "claim": "cbApply's offline branch commits CB locally, clears the dirty banner, locks the button and pushes the notification 'کش‌بک به‌روز شد' without a 2xx and without an Outbox entry; the change is lost on reload while the notification list keeps claiming it was updated. The route also has no audit().",
       "evidence": "apps/business/js/staff-system.js:L398-403,L412-415; api/src/app/api/v1/restaurant/cashback/route.ts (grep 'audit(' -> 0)",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-017",
@@ -8272,7 +8308,8 @@
       "claim": "The manual-reservation date dropdown labels are generated from a hard-coded start 'پنجشنبه ۱۵ خرداد' while the submitted date is today+offset; on any other day the shown weekday/date and the success toast label disagree with the stored date.",
       "evidence": "apps/business/js/reservations.js:L222-240,L242-251,L426,L454",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-018",
@@ -8281,7 +8318,8 @@
       "claim": "When the reservations fetch fails for a logged-in user, the tab shows the demo rows (with live action buttons) and a 'نمونه' note instead of an error state with retry.",
       "evidence": "apps/business/js/reservations.js:L54-64; apps/business/js/data.js:L941-943",
       "status": "open",
-      "app": "business"
+      "app": "business",
+      "verified_by": "ceo"
     },
     {
       "id": "A2-019",
@@ -8443,7 +8481,8 @@
       "claim": "The company panel does not render the admin_otp_login_enabled switch, so the only kill-switch for the TOTP-bypassing OTP login path can be neither seen nor toggled from the UI. The panel iterates a hard-coded client label map (6 keys) instead of the server's FEATURE_FLAG_KEYS (7 keys); the API does return the flag.",
       "evidence": "apps/company/js/intelligence.js:451-461 (FEATURE_FLAG_LABEL_FA, 6 keys) and :467 (Object.entries(FEATURE_FLAG_LABEL_FA)) vs api/src/lib/feature-flags.ts:12-20 (7 keys) and :30 (label 'ورودِ پنلِ شرکت با پیامک (OTP)'); api/src/app/api/v1/admin/feature-flags/route.ts:22-23 returns getAllFeatureFlags() incl. the key; command: grep -n admin_otp_login_enabled apps/company/js/*.js -> 0 hits",
       "status": "open",
-      "app": "company"
+      "app": "company",
+      "verified_by": "ceo"
     },
     {
       "id": "A3-002",
@@ -8452,7 +8491,8 @@
       "claim": "On an http(s) deployment, a network failure/timeout during login drops the operator into the DEMO dashboard (labelled banner + [DEMO] names + toast) instead of showing an error with retry. This contradicts the shared transport rule that http(s) failures must be errors, not sample data, and masks a production outage at the most important entry point. Applies to the password path and both OTP steps.",
       "evidence": "apps/company/js/intelligence.js:918 (if (res.offline){ await enterAdminPanel(true) }), :952-958 (offline -> shows code ۱۲۳۴ hint), :987-989 (offline + 1234 -> enterAdminPanel(true)); rule at apps/company/js/api-core.js:17-19; enterAdminPanel demo branch :1010-1021",
       "status": "open",
-      "app": "company"
+      "app": "company",
+      "verified_by": "ceo"
     },
     {
       "id": "A3-003",
@@ -8461,7 +8501,8 @@
       "claim": "After session restore the dashboard is painted synchronously from RESTAURANTS_SAMPLE before /admin/restaurants and /admin/overview resolve: KPI cards show fabricated totals (8 restaurants, 5128 members, 12712 reservations, 28940 SMS) with NO offline banner (API.online is still true) for up to the 8 s request timeout. Only the top-5 list names carry the [DEMO] prefix; the aggregated numbers do not.",
       "evidence": "apps/company/js/intelligence.js:1052-1058 (rOverview() at :1055 runs before await at :1057); apps/company/js/data.js:17 (let RESTAURANTS = RESTAURANTS_SAMPLE); apps/company/js/overview.js:9-14 (reduce over RESTAURANTS); apps/company/js/api.js:14 (timeout 8000), :184-187 (banner only when API.online=false)",
       "status": "open",
-      "app": "company"
+      "app": "company",
+      "verified_by": "ceo"
     },
     {
       "id": "A3-004",
@@ -8470,7 +8511,8 @@
       "claim": "Five views derived from the RESTAURANTS array (overview, restaurants, analytics, billing, support) have no loading state and no error+retry state: ANY failure of GET /admin/restaurants (including 500 or 401 after a failed refresh) substitutes the [DEMO] dataset with the offline banner. Financial controls (SMS top-up, renew, cancel) are then rendered against demo ids 1..8; a click sends the demo id to the API which rejects it with 422 (zUuid), surfacing as an error toast. Labelled, therefore not fake success, but the error state is missing.",
       "evidence": "apps/company/js/api.js:171-182 (fallback to RESTAURANTS_SAMPLE on !res.ok regardless of status), overview.js:8 (rOverview), overview.js:90 (rRestaurants), restaurant.js:135 (rAnalytics), intelligence.js:45 (rBilling), intelligence.js:203 (rSupport); server id validation api/src/app/api/v1/admin/restaurants/[id]/sms/route.ts:11, control/route.ts:11",
       "status": "open",
-      "app": "company"
+      "app": "company",
+      "verified_by": "ceo"
     },
     {
       "id": "A3-005",
@@ -8479,7 +8521,8 @@
       "claim": "The provisioning success modal states the first-login invite 'ارسال شد' (was sent) although the API only ENQUEUED the SMS job; delivery failures (missing MELIPAYAMAK_BODYID_INVITE, missing MELIPAYAMAK_USERNAME/PASSWORD, provider rejection, insufficient balance) are logged and counted server-side but never surfaced to the admin, and there is no job-status read-back endpoint. Same wording on resend. Classified PARTIAL, broken link = enqueue != delivery.",
       "evidence": "apps/company/js/overview.js:270 ('دعوتِ اولین‌ورود به ... ارسال شد'), restaurant.js:178; api/src/app/api/v1/admin/restaurants/route.ts:122 (invite_sent_to returned unconditionally); api/src/lib/provisioning.ts:218-241 (enqueueSms, void); api/src/lib/sms.ts:69 (bodyId env), :246-257 (no credentials -> return), :278-284 (missing bodyId -> return)",
       "status": "open",
-      "app": "company"
+      "app": "company",
+      "verified_by": "ceo"
     },
     {
       "id": "A3-006",
@@ -8488,7 +8531,8 @@
       "claim": "The 409 duplicate_owner_phone message (client and server) instructs the admin to use «افزودنِ شعبه» (Add branch) on the restaurant page, but no such control exists anywhere in the panel; the API wrapper API.adminCreateBranch has zero callers while the backend endpoint is fully implemented. The documented recovery path for a second branch is a dead end.",
       "evidence": "apps/company/js/overview.js:236 (PROV_REASON_FA.duplicate_owner_phone), api/src/lib/provisioning.ts:114,:195 (server text); apps/company/js/api.js:68 (adminCreateBranch) - command: grep -ohE 'API\\.[a-zA-Z0-9_]+' apps/company/js/*.js | sort | uniq -c -> no adminCreateBranch; backend api/src/app/api/v1/admin/restaurants/[id]/branches/route.ts:25-38 -> api/src/lib/provisioning.ts:335-385",
       "status": "open",
-      "app": "company"
+      "app": "company",
+      "verified_by": "ceo"
     },
     {
       "id": "A3-007",
@@ -8497,7 +8541,8 @@
       "claim": "Standing decision 'initial owner password is system-generated, shown once, forced change on first login' is NOT implemented. Provisioning accepts an optional admin-typed username/password (never sent by this UI); onboarding is an invite magic-link + OTP/password login; there is no forced-change field in the schema; the staff-credentials form lets the admin type a password into a visible type=\"text\" input with no rotation on first login.",
       "evidence": "api/src/app/api/v1/admin/restaurants/route.ts:71-72 (username/password optional), api/src/lib/provisioning.ts:120-132 (no generation), apps/company/js/overview.js:250-259 (body has no credentials); command: grep -nE 'mustChange|forcePassword|passwordExpires' api/prisma/schema.prisma -> none (only passwordUpdatedAt at :113); apps/company/js/restaurant.js:90 (credPass type=\"text\"), :92-94 (copy tells admin to keep it somewhere safe); invite acceptance hook api/src/lib/provisioning.ts:251-280",
       "status": "open",
-      "app": "company"
+      "app": "company",
+      "verified_by": "ceo"
     },
     {
       "id": "A3-008",
@@ -8506,7 +8551,8 @@
       "claim": "platform_settings values are still written and read as plaintext (no encryption, no KMS): zarinpal_merchant_id, feature_flag:*, economy_rule:* today, and the module header declares the intent to also hold the SMS provider key there. GET /admin/settings returns the raw merchant id. Mitigating facts: Melipayamak credentials are currently env-only (not in DB) and no company-panel screen consumes /admin/settings, so no secret is echoed by this UI.",
       "evidence": "api/src/lib/platform-settings.ts:6-8 (intent incl. SMS key), :24-28 (upsert raw value), :14-20 (read raw); api/src/app/api/v1/admin/settings/route.ts:19 (ALLOWED_KEYS), :33-37 (returns raw); api/src/lib/sms.ts:244-245 (env creds); command: grep -rn admin/settings apps/company/js apps/company/index.html -> 0 hits",
       "status": "open",
-      "app": "company"
+      "app": "company",
+      "verified_by": "ceo"
     },
     {
       "id": "A3-009",
@@ -8610,7 +8656,7 @@
     "correction": "Tier 2 = claude-sonnet-5 for any re-run"
   },
   "ceo_full_verification": {
-    "status": "in progress",
+    "status": "complete 2026-09-03",
     "must_verify": {
       "FAKE": 9,
       "blockers": 2,
@@ -8669,6 +8715,44 @@
         317,
         321
       ]
+    },
+    "results": {
+      "FAKE": {
+        "total": 9,
+        "confirmed": 9,
+        "rejected": 0,
+        "method": "cited source windows read by CEO (index.html:162-169, discover.js:323-328, trips.js:38-53, seed.js:62+loyalty.js:14-17, overview.js:26-45, reservations.js:462-472, data.js:700-708, waitlist.js:15-21, staff-system.js:24-29)"
+      },
+      "blockers": {
+        "total": 2,
+        "confirmed": 2,
+        "rejected": 0,
+        "note": "A2-001 fixed 580cf7f; A2-002 fixed 89de4bf (audit/launch-hardening) with mutation-proven e2e"
+      },
+      "majors": {
+        "total": 35,
+        "confirmed": 35,
+        "rejected": 0,
+        "corrections": [
+          {
+            "id": "A2-016",
+            "note": "offline branch does commit locally and lock the button (confirmed, staff-system.js:412-415), but its toast is honest (offline - not saved on server yet); the 'fake success notification' wording is withdrawn; the defect is the cleared dirty flag with no re-send path"
+          }
+        ]
+      },
+      "random_sample": {
+        "k": 48,
+        "consistent": 48,
+        "rejected": 0,
+        "notes": [
+          {
+            "row": 247,
+            "note": "evidence line intelligence.js:872 drifted to :875 after commit 37b2a82 (CEO's own later edit) - class REAL unchanged"
+          }
+        ]
+      },
+      "rejections_total": 0,
+      "agent_reruns_required": []
     }
   }
 }

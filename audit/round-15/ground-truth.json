@@ -315,5 +315,15 @@
     "ceo_session": "claude-opus-5 (harness system prompt); founder prompt 0.2 expects Fable for the CEO",
     "subagents_so_far": "A1, A2, A3 and all three A6 attempts ran on claude-fable-5-1 - inherited default because no model was set (violates 0.2 'never spawn Fable subagents'; this exhausted the session limit at 07:30 and ~13:00)",
     "correction": "from Wave 1 every Agent call sets model explicitly: Tier1 opus (A4,A5,A6,A9), Tier2 sonnet (A1-A3,A7,A8,A10), Tier3 haiku (mechanical sweeps); the Fable A6 run was stopped at ~15:10 before relaunch on opus"
+  },
+  "phase1_gate": {
+    "status": "PASSED",
+    "verified_by": "ceo",
+    "fake": "9/9",
+    "blockers": "2/2",
+    "majors": "35/35 (A2-016 wording corrected)",
+    "random_15pct": "48/48",
+    "rejections": 0,
+    "caveat": "55 REAL-STATIC rows pending runtime smoke pass"
   }
 }
