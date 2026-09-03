@@ -658,7 +658,11 @@ tells you what the API *said*, not what it *wrote*.
 - **`localStorage` tokens** are XSS-exposed; every front-end `innerHTML` sink
   must escape user data (`esc()` — unit-tested, `api/tests/esc.test.mts`,
   PR #16).
-- **RLS is partial** (started in `manual/023`); not all tenant tables have it.
+- **RLS is inert, not partial** (P0-021, corrected 2026-09-04). It is *enabled* on
+  61/73 tables (`prisma/sql/023` + `037` - the old `manual/` path no longer
+  exists), but with **zero policies** and an **owner** app role it isolates
+  nothing. Coverage was never the real gap; policies + a non-owner role are.
+  Post-launch ticket: P0-022.
 - **Rate-limit fail-open — now observable, residual-hardening PR
   (۲۰۲۶-۰۸-۱۴).** When Redis is down, the fallback to a per-process
   in-memory floor (`max × instances` under multi-instance deployment) is

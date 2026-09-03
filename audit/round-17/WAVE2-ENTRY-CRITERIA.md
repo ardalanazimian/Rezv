@@ -41,7 +41,18 @@ Model discipline (§0.2, amended 2026-09-03): A4 and A5 are Tier 1 → `claude-o
 - A3-007: initial owner password must be system-generated, shown once, forced change on first login (`api/src/app/api/v1/admin/restaurants/route.ts:71-72`, `lib/provisioning.ts:120-132`) — schema field + flow + tests.
 - A3 secret-echo map: `admin/settings/route.ts:33-37` returns raw `zarinpal_merchant_id`; OTP `devCode` only under `OTP_DEV_MODE` (keep, verify prod guard `lib/otp.ts:151-152`).
 - A1-001: customer SW caches authenticated `/api/v1/me/*` GET responses (`apps/customer/sw.js:52-56, 68-80`) → exclude auth'd API from `cache.put` + `CACHE_VERSION` bump.
-- Tenant-isolation matrix: every `/restaurant/*` route × cross-tenant token → `FORBIDDEN_TENANT`, machine-generated (Tier-3 haiku may generate the call list), run against the real API.
+- 🔴 **Tenant-isolation matrix — SCOPE ELEVATED by founder directive 5, order 3 (2026-09-04).**
+  Because RLS is inert (P0-021 — 61/73 tables RLS-enabled, **zero policies**, app connects as
+  owner+`SUPERUSER`+`BYPASSRLS`), the application-layer matrix is now the **SOLE** tenant boundary.
+  There is no second line behind it. Therefore:
+  - **Exhaustive, zero sampling:** every `/restaurant/*` **and every `/admin/*`** route × cross-tenant
+    token → `FORBIDDEN_TENANT`. Machine-generated from the route tree (Tier-3 haiku may generate the
+    call list), run against the real API — not a representative subset.
+  - **Raw output recorded per row.** A row without its actual response body/status is not evidence.
+  - **Any gap is a BLOCKER, not a major** — including a route the generator could not classify. An
+    unclassified route is a gap, not a pass.
+  - A route that is legitimately tenant-agnostic must be named and justified individually; a silent
+    skip is the escape hatch that CLAUDE.md rule 5 forbids.
 - RBAC map per `route.ts` (`withRestaurantAuth({permission})`) vs `API_REFERENCE.md` "(uncertain)" rows.
 - Refresh-token principal preservation (`auth/refresh`), rate limits (`RULES.*`), audit-log coverage on admin/lifecycle mutations.
 

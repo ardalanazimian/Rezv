@@ -184,7 +184,14 @@ sequenceDiagram
 - **کلاینت‌ها:** یک ماژولِ کوچکِ `analytics.js` (customer) / global (business/company)
   که رویدادها را batch و با `navigator.sendBeacon` می‌فرستد. اگر آفلاین → صف در
   `localStorage`. **دمومود دست‌نخورده** (رویداد اختیاری است، نبودِ بک‌اند نمی‌شکند).
-- **immutability** با نبودِ endpointِ update/delete و RLSِ فقط-درج تضمین می‌شود.
+- **immutability** فقط با **نبودِ endpointِ update/delete** تضمین می‌شود.
+  ⚠️ اصلاحِ ۲۰۲۶-۰۹-۰۴ (P0-021): متنِ قبلی «RLSِ فقط-درج» را هم به‌عنوانِ ضامن
+  می‌آورد. **چنین policyی وجود ندارد** — `029-platform-events.sql:39` فقط
+  `ENABLE ROW LEVEL SECURITY` می‌زند و در کلِ مخزن صفر `CREATE POLICY` هست؛
+  ضمناً اپ با نقشِ owner وصل می‌شود که RLS را دور می‌زند. پس RLS **هیچ** سهمی
+  در immutability ندارد. اگر ضمانتِ سطحِ DB لازم است، مسیرش تریگرِ
+  `BEFORE UPDATE OR DELETE … RAISE EXCEPTION` است یا policyِ واقعی + نقشِ
+  غیرِowner + `FORCE ROW LEVEL SECURITY` (تیکتِ post-launchِ P0-022).
 
 ---
 

@@ -173,6 +173,7 @@ import './reservation-guard-coverage.integration.test.mts';
 import './reservation-status.test.mts';
 import './reservation-horizon.integration.test.mts';
 import './restaurant-manager.test.mts';
+import './rls-policy-honesty.integration.test.mts';
 import './schema-drift.integration.test.mts';
 import './security-hardening.integration.test.mts';
 import './shell-scripts-lf.test.mts';

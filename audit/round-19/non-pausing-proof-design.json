@@ -1,0 +1,51 @@
+{
+  "gate": "L1(d) — production DB is PROVABLY non-pausing",
+  "ordered_by": "founder directive 4, order 4 (2026-09-04)",
+  "chosen_host": "Postgres inside the existing Docker stack (docker-compose.yml:12-26), per the P0-014 decision",
+  "rule": "Control-plane status is never evidence. On 2026-09-03 get_project returned ACTIVE_HEALTHY while execute_sql returned 28P01 and get_advisors said the project was hibernated.",
+
+  "assumption_to_confirm": {
+    "claim": "the old Supabase tier pauses after ~7 days of inactivity",
+    "status": "UNVERIFIED by the CEO — stated in Supabase's own docs, not measured here",
+    "handling": "the idle window below is set to >= 7 days so the proof holds whether the real threshold is 1 day or 7; founder can confirm the exact number from the dashboard, it only ever shortens the wait"
+  },
+
+  "proofs": [
+    {
+      "id": "P1",
+      "name": "ordered idle-window test",
+      "what": "Stand up the production Postgres, write a marker row, then leave the stack completely untouched for a documented idle window of >= 7 days (no queries, no deploys, no health-check traffic against the DB). At the end, run a real query.",
+      "pass_criteria": "the query returns the marker row on the FIRST attempt, with no wake-up latency and no error; raw psql output + timestamps recorded",
+      "records": ["idle window start/end timestamps", "raw query output", "wall-clock latency of the first query", "docker container uptime across the window"],
+      "why_first_attempt_matters": "a paused host also answers eventually — 'wakes on next supported request' is exactly what the Supabase advisor said. The failure signature is a first request that errors or stalls, so only the FIRST attempt is evidence.",
+      "practicality": "cheap but slow: it costs nothing but calendar time and can run in parallel with the rest of the pre-launch work, provided nobody touches the box. Start it the day the host exists."
+    },
+    {
+      "id": "P2",
+      "name": "structural evidence",
+      "what": "Record that the chosen host has no pause mechanism to begin with: postgres:16-alpine has no inactivity-suspend feature, the service is declared restart: unless-stopped, and no managed control plane can suspend it.",
+      "pass_criteria": "docker-compose.yml:12-26 cited + `docker inspect` showing RestartPolicy=unless-stopped + no scheduler/cron on the host that stops the container",
+      "honest_limit": "This is an argument from the absence of a feature. It is strong, but it is not a measurement — it does NOT replace P1, it explains why P1 is expected to pass."
+    },
+    {
+      "id": "P3",
+      "name": "the risk that REPLACED pausing (CEO addition, not in the order)",
+      "why": "Self-hosting removes auto-pause and puts three different failure modes in its place. A gate that only proves 'it does not pause' would declare victory against last week's failure while the same 4am outage arrives by another route.",
+      "modes": [
+        { "mode": "host reboot / power event", "proof": "container comes back automatically — reboot the host once, confirm the stack is up and answering with no manual step, record the exit code" },
+        { "mode": "disk full (backups accumulate on the same volume)", "proof": "disk alerting exists and fires below 100% — this is gate (c), and it is why gate (b) requires off-host backup copies" },
+        { "mode": "OOM / container crash loop", "proof": "restart policy plus an alert on repeated restarts; a container that restarts every 30s is 'up' to Docker and down to customers" }
+      ],
+      "recommendation": "fold P3 into gate (c) alerting rather than tracking it separately — same alerting channel, same launch gate"
+    }
+  ],
+
+  "what_would_make_this_gate_fake": [
+    "accepting a control-plane/dashboard status instead of a query result — the exact P0-014 mistake",
+    "running the P1 query more than once and reporting the successful retry — the first attempt IS the measurement",
+    "any traffic touching the DB during the idle window (a health check, a cron, an idle Prisma pool keepalive) — it invalidates the window; record what was stopped",
+    "proving P2 only, and calling the gate met — absence of a pause feature is an argument, not a measurement"
+  ],
+
+  "status": "designed 2026-09-04; NOT executed — the production host does not exist yet (P0-017). P1 starts the day it does."
+}

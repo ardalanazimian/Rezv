@@ -168,7 +168,10 @@ curl -s -o /dev/null -w "%{http_code}\n" https://<domain>/api/v1/maintenance/exp
   `prisma migrate deploy` **then** `sh prisma/apply-sql.sh` — against a direct
   connection. Never `db push` on a migrated database.
   Verify: `npx prisma migrate status`.
-- **RLS** is defined for newer tables (`prisma/sql/023`).
+- **RLS is enabled but inert (P0-021).** `prisma/sql/023` + `037` enable it on
+  61/73 tables, but with **zero policies** and an **owner** app role it provides
+  no isolation - see `docs/SECURITY.md` §10. Do not treat it as a deployment
+  security control.
 
 ---
 

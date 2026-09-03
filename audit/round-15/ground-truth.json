@@ -265,7 +265,17 @@
       "area": "infra/db-security",
       "claim": "The live-RLS check queued behind P0-014 would have proven nothing about tenant isolation. RLS is ENABLED on 34+ core tables but with ZERO policies (deny-by-default), and the backend connects as the DB OWNER role, which bypasses RLS entirely (no table uses FORCE ROW LEVEL SECURITY). The real tenant boundary is application-layer (ctx.restaurant.id / auth.tenantId), which is exactly what A5's isolation matrix tests. Recorded so no report, doc or launch checklist can cite 'RLS enabled' as evidence of a working DB-level isolation boundary.",
       "evidence": "grep 'CREATE POLICY' api/prisma/sql/*.sql -> 0 matches; grep 'FORCE ROW LEVEL SECURITY' -> 0 matches; api/prisma/sql/037-rls-core-tables.sql header states it itself: 'the backend connects with the owner role (which bypasses RLS); real access control remains in the application code - this only completes the DB-level defense-in-depth layer'.",
-      "status": "open - routed to A5: state explicitly in the security report whether any doc or UI claims DB-level isolation, and either add real policies + a non-owner app role or keep RLS honestly labelled as inert defense-in-depth",
+      "status": "ACTED ON 2026-09-04 (founder directive 5, order 2). (a) Docs corrected in six files: SECURITY.md (new §10 non-control bullet + §12.4 rewritten), DATABASE.md (§10 + three migration-table rows), DEPLOYMENT.md, KNOWN_LIMITATIONS.md, SUPABASE-SECURITY.md (stale '32 tables' count, the 'two layers of protection' conclusion, and the checked pre-deploy box), and INTELLIGENCE-PLATFORM-ARCHITECTURE.md (a FALSE guarantee that platform_events immutability is ensured by an insert-only RLS policy that does not exist). (b) Falsifiable gate added: api/tests/rls-policy-honesty.integration.test.mts, wired into _all.runner.mts, proven red->green on three separate clauses (audit/round-19/rls-honesty-gate-proof.json). (c) Post-launch work scoped as P0-022, deliberately NOT implemented pre-launch.",
+      "verified_by": "ceo",
+      "ceo_variance_from_the_order": "The order named SECURITY.md and DATABASE.md as presenting RLS as active defense-in-depth. Verified against source: neither lists RLS in its controls sections - SECURITY.md's only mention was in §12 'forward-looking' and even hedged 'behind the application checks'. Both were still misleading and were corrected. But the sharpest false claim was elsewhere and would have been missed by following the order literally: INTELLIGENCE-PLATFORM-ARCHITECTURE.md:187 asserted event-log immutability is guaranteed by an insert-only RLS policy - zero such policy exists in the repo. Two docs (PROJECT-AUDIT-HANDOFF-DATABASE.md, SUPABASE-SECURITY.md §'why this is safe') were already fully honest and were left alone except for the stale count and the 'two layers' conclusion. Dated historical audit reports were not rewritten."
+    },
+    {
+      "id": "P0-022",
+      "severity": "major",
+      "area": "infra/db-security",
+      "claim": "Real DB-level defense-in-depth is now feasible because the P0-014 decision gives us the role layer (self-hosted Postgres). It requires all three of: a non-owner application role, actual policies, and FORCE ROW LEVEL SECURITY - any one missing and the other two protect nothing.",
+      "evidence": "audit/round-19/P0-022-real-rls-post-launch.md (scope, work breakdown, acceptance)",
+      "status": "SCOPED AND DEFERRED to post-launch by founder order (directive 5, order 2c). Not implemented pre-launch: the app connects as owner+SUPERUSER+BYPASSRLS today, so moving it to a non-owner role re-authorizes every query at once with no production traffic to catch breakage and no rollback window, for defense-in-depth behind a boundary that already exists and is separately tested.",
       "verified_by": "ceo"
     }
   ],
@@ -476,5 +486,13 @@
       "rls_portability_verified": "RLS is NOT a Supabase feature here: it is declared in the repo's own SQL (api/prisma/sql/023-rls-new-tables.sql, 037-rls-core-tables.sql, 024, 029, 031, 038, 040, 050) and applied by prisma/apply-sql.sh. Moving to self-hosted Postgres loses nothing on this axis.",
       "open_item_supabase_data": "Before the Supabase project is decommissioned, one pg_dump must be taken OR the founder must confirm it holds no data worth keeping. It cannot be queried while paused, so this is unknown - and 'unknown' is never reported as 'empty'."
     }
+  },
+  "founder_directive_5_2026-09-04": {
+    "subject": "P0-021 orders + Supabase decommission protocol",
+    "order_1_supabase_dump": "Protocol written: audit/round-19/supabase-decommission-checklist.md (D1-D7) + audit/round-19/supabase-dump-manifest.json (status NOT_TAKEN). The project is not deleted until an archived dump exists AND its per-table row counts are committed AND the dump has been restored into a scratch DB with a zero per-table diff (D6 - a dump that has never been restored is a file, not a backup). The manifest file states explicitly that its own emptiness is NOT evidence the database is empty: while paused, no row count is obtainable at all.",
+    "order_2_p0_021": "done this round - see the P0-021 status line and the ceo_variance_from_the_order note",
+    "order_3_a5_scope_elevated": "Recorded in audit/round-17/WAVE2-ENTRY-CRITERIA.md: with RLS inert, the application-layer isolation matrix is the SOLE tenant boundary. Exhaustive (every /restaurant/* and /admin/* route x cross-tenant token, machine-generated, zero sampling), raw output recorded per row, any gap is a BLOCKER not a major.",
+    "order_4_non_pausing_proof": "Designed: audit/round-19/non-pausing-proof-design.json. P1 = documented idle window >= 7 days (>= the old tier's stated pause threshold; the threshold itself is flagged UNVERIFIED and the window is set so the proof holds either way), then a real query whose FIRST attempt must succeed - a paused host also answers eventually, so only the first attempt is evidence. P2 = structural evidence, explicitly labelled an argument rather than a measurement. P3 = CEO addition: self-hosting removes auto-pause and replaces it with host reboot / disk-full / OOM-crash-loop, so a gate proving only 'it does not pause' would win against last week's failure while the same 4am outage arrives by another route; folded into gate (c) alerting.",
+    "order_5_gates_abc_to_a10": "Assigned to A10 against the chosen host in audit/round-19/A10-PLAN.json (B7). The restore drill must compare row counts and record the exit code - a documented drill is not a drill."
   }
 }

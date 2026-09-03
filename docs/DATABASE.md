@@ -211,7 +211,7 @@ Two layers (both applied in CI):
 | `021-restaurant-closures`, `024-chat`, `025-reviews-fk-indexes` | Later features + index back-fills. |
 | `021b-sms-transactions-table` | Creates `sms_transactions` — a table `schema.prisma` declares but no script built (only `db push` did). Idempotent; runs before `022`'s FK. |
 | `022-audit-fixes-2026-07-19` | Reconciled DB↔schema drift (FKs/`@map` that existed only in the live DB). |
-| `037-rls-core-tables` | Row-Level Security on the core tenant tables. |
+| `037-rls-core-tables` | `ENABLE ROW LEVEL SECURITY` on the core tenant tables - **no policies**, so it isolates nothing (P0-021, §10). |
 | `038-unified-economy` | XP/points economy ledger + customer economy profile. |
 | `044-waitlist-guest-token-hash` | Hash guest access tokens at rest. |
 | `054-index-hygiene` | Dropped redundant / added missing indexes. |
@@ -231,13 +231,13 @@ Two layers (both applied in CI):
 > (see `api/docker-entrypoint.sh` lines 39 and 54). `apply-sql.sh` alone cannot build a
 > schema from an empty database, because migration `001` assumes the base tables exist.
 > `tools/check-schema-drift.sh` gates exactly this two-step path in CI.
-| `023-rls-new-tables` | Row-Level Security for new tables. |
+| `023-rls-new-tables` | `ENABLE ROW LEVEL SECURITY` for new tables - **no policies** (P0-021, §10). |
 | `026-consolidate-exclusion-constraint` | Canonical `block_end` + `no_table_overlap` (idempotent); replaced `0_init/EXTRA`. |
 | `027-staff-name` | Adds `staff.name` (business-panel display name). |
 | `028-enum-columns-staff-plan` | Upgrades `staff.role` and `tenants.plan` from `TEXT` to their enums (`staff_role`, `subscription_plan`). Same schema-vs-`migrate deploy` drift family as `021b`/`sms_transactions`: `0_init` builds them as `TEXT` but `schema.prisma` declares enums. **No-op on the live DB** (already enum via `db push`); only realigns a fresh Docker install. |
 | `029-platform-events` · `059b-telemetry-trust-boundary` · `060-platform-events-retention` | Behavioural-event ingest, its **trust-level CHECK** (`SERVER_VERIFIED`…`SYNTHETIC`) and retention pruning. |
 | `033-no-show-model` · `034-demand-forecast` · `042-model-training-runs` | Learned models plus the **append-only** `model_training_runs` history (metrics, sample size, activation decision). |
-| `037-rls-core-tables` | Row-Level Security on core tables (extends `023`). |
+| `037-rls-core-tables` | `ENABLE ROW LEVEL SECURITY` on core tables (extends `023`) - **no policies** (P0-021, §10). |
 | `038-unified-economy` · `040-user-badges` · `043-customer-intelligence-score` | Coins/XP ledger, badges, weighted customer score. |
 | `041-waitlist-guest-token` → `044-waitlist-guest-token-hash` | Guest access token for waitlist actions, later stored **hashed** (compared timing-safe). |
 | `061-drop-duplicate-indexes` · `062-hot-path-indexes` | Removed 45 duplicate index pairs (two DDL sources built the same index under different names), then added the two indexes real hot paths needed. |
@@ -325,7 +325,18 @@ There is **no global soft-delete column**. Instead:
   blocker is gone (they no longer sit inside `migrations/`), and both Docker and
   CI apply them via `prisma/apply-sql.sh`. Every new script **must be committed
   the moment it is applied** (past drift caused the `022` reconciliation).
-- **RLS** exists for newer tables (`023`); ensure new tables also get RLS.
+- **RLS is enabled but inert (P0-021, verified 2026-09-04).** `023` and `037`
+  turn Row-Level Security on for 61 of 73 `public` tables, but there are **zero
+  `CREATE POLICY` statements in the whole repo** and the API connects as the
+  **owner** role, which bypasses RLS (no table uses `FORCE ROW LEVEL SECURITY`).
+  So RLS **isolates nothing today** - the real tenant boundary is
+  application-layer. Migration `037`'s own header says this; it is repeated here
+  because the previous wording (“RLS exists for newer tables; ensure new tables
+  also get RLS”) read as if it were protection, and was also stale (`037` covers
+  the core tables). Adding RLS to a new table therefore adds **no** security - it
+  only adds a row to the allowlist in
+  `api/tests/rls-policy-honesty.integration.test.mts`, which fails on any
+  undisclosed RLS-without-policy table.
 - **Partitioning is not enabled.** `011` is a `-- @manual-only` scaffold (guarded
   by `RAISE EXCEPTION`, with the data-copy/rename steps commented out) and has
   never been applied — `reservations` is a plain table (`relkind='r'`) on

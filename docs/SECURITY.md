@@ -166,6 +166,17 @@ flowchart LR
 - **Dependency audit** in CI: `npm audit --audit-level=critical` **fails** the
   build; `high` warns.
 - **CI secrets**: E2E mocks the API entirely (no real backend/secrets in E2E).
+- 🚫 **Row-Level Security is NOT a control today (P0-021, verified 2026-09-04).**
+  RLS is **enabled on 61 of 73 `public` tables with ZERO policies**, and the API
+  connects as the database **owner** role (locally verified: `rezervno super=true
+  bypassrls=true`), with `FORCE ROW LEVEL SECURITY` set on **no** table. Therefore
+  **RLS provides no tenant isolation today** - it hides nothing from anyone. The
+  tenant boundary is **application-layer** (`ctx.restaurant.id` / `auth.tenantId`)
+  and is verified by the A5 isolation matrix.
+  Never cite “RLS is enabled” as isolation evidence in a report, checklist or
+  launch gate. The guard `api/tests/rls-policy-honesty.integration.test.mts`
+  fails on any table that is RLS-enabled with zero policies outside its
+  documented allowlist, and on any policy that lacks `FORCE ROW LEVEL SECURITY`.
 
 ---
 
@@ -284,8 +295,16 @@ Zarinpal `merchant_id`, not available in this environment.
    needed.
 3. **Rotate secrets** regularly; ensure `CRON_SECRET`/`MAINTENANCE_KEY` are set
    in every environment (cron endpoints must never be public).
-4. **RLS everywhere**: extend Row-Level Security (started in `manual/023`) to all
-   tenant-scoped tables as defense-in-depth behind the application checks.
+4. **Make RLS real, or keep calling it inert (P0-021).** Today RLS is enabled on
+   61/73 tables with **zero policies** and the app connects as **owner**, so it is
+   inert - see §10. Real defense-in-depth needs all three of: a **non-owner**
+   application role, **actual policies**, and **`FORCE ROW LEVEL SECURITY`**;
+   any one of them missing and the other two protect nothing. Scoped as a
+   **post-launch** ticket (P0-022) because switching the app off the owner role
+   pre-launch risks breaking every query. (The old wording said “extend RLS,
+   started in `manual/023`” - the path `prisma/migrations/manual/` no longer
+   exists; the scripts live in `api/prisma/sql/`, and `037` already extended RLS
+   to the 34 core tables.)
 5. **Alerting** on the rate-limit fail-open path, auto-bans, and (as of
    Time-Range/EXCLUDE/Redis-evidence, Aug 2026) the reservation slot-lock
    fail-open path (`rezervno_slot_lock_fallback_total`, §11) — currently
