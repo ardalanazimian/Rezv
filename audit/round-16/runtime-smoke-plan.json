@@ -1,0 +1,816 @@
+{
+  "round": 16,
+  "purpose": "runtime smoke pass for REAL-STATIC rows (founder directive): real API + DB, per-row pass/fail; only then REAL",
+  "preconditions": [
+    "local DB free (A6 finished) — check pg_stat_activity = 0",
+    "api dev server on http://localhost:3000 with DATABASE_URL=test DB, REDIS_URL=redis://localhost:56500, JWT_* pinned, ADMIN_LOGIN_ENABLED=false, OTP_DEV_MODE=true",
+    "fixture: one tenant/restaurant/owner + one customer via existing integration-test helpers (api/tests/_phone.helper.mts, admin-create-business flow)"
+  ],
+  "method": "for each row: call the row's API with a valid token via the panel's own client path where possible (Playwright against the real API, not mocks), else curl; PASS = expected 2xx + response shape the JS reads; FAIL = anything else (recorded verbatim)",
+  "rows": [
+    {
+      "row": 3,
+      "app": "customer",
+      "element": "Points chip (nav-pts)",
+      "api": "GET /api/v1/me/loyalty",
+      "method": "GET",
+      "path": "/api/v1/me/loyalty",
+      "service": "api/src/lib/loyalty-status.ts:getLoyaltyStatus",
+      "db": "PointsLedger.read, User.read",
+      "side_effects": [],
+      "panel_file": "apps/customer/index.html:85-88",
+      "status": "pending"
+    },
+    {
+      "row": 5,
+      "app": "customer",
+      "element": "Notification centre (bell, tabs, read-all, item action, close/Esc, badge)",
+      "api": "GET /api/v1/me/reservations; GET /api/v1/me/dna-summary",
+      "method": "GET",
+      "path": "/api/v1/me/reservations;",
+      "service": "api/src/app/api/v1/me/reservations/route.ts; api/src/lib/dna-summary.ts",
+      "db": "Reservation.read, User.read",
+      "side_effects": [
+        "localStorage rz_notif_read"
+      ],
+      "panel_file": "apps/customer/index.html:78-81; apps/customer/js/features/notifications.js:52-189",
+      "status": "pending"
+    },
+    {
+      "row": 15,
+      "app": "customer",
+      "element": "Session restore / silent refresh / session-expired",
+      "api": "GET /api/v1/me; POST /api/v1/auth/refresh",
+      "method": "GET",
+      "path": "/api/v1/me;",
+      "service": "api/src/app/api/v1/me/route.ts:16-27; api/src/app/api/v1/auth/refresh/route.ts (revocation + ban + principal check)",
+      "db": "User.read, RevokedToken.read",
+      "side_effects": [
+        "audit auth.failure on refresh failure"
+      ],
+      "panel_file": "apps/customer/js/init.js:35-46; apps/customer/js/api.js:56-78,152-157; apps/customer/js/api-core.js:78-98",
+      "status": "pending"
+    },
+    {
+      "row": 42,
+      "app": "customer",
+      "element": "«رزرو میز» → booking sheet + availability",
+      "api": "GET /api/v1/restaurants/{slug}/availability?date=&party=",
+      "method": "GET",
+      "path": "/api/v1/restaurants/{slug}/availability?date=&party=",
+      "service": "api/src/lib/reservations.ts:getAvailability + restaurants/[slug]/availability/route.ts:40-57 (online/closed reason)",
+      "db": "Reservation/Table/OpeningHours read",
+      "side_effects": [
+        "sessionStorage rz_booking_ctx"
+      ],
+      "panel_file": "apps/customer/js/data/booking.js:87-175",
+      "status": "pending"
+    },
+    {
+      "row": 44,
+      "app": "customer",
+      "element": "Step 2 pre-order chips",
+      "api": "sent in POST /api/v1/reservations body.preorder",
+      "method": null,
+      "path": null,
+      "service": "api/src/app/api/v1/reservations/route.ts:29; api/src/lib/reservations.ts:538-562",
+      "db": "ReservationItem.insert",
+      "side_effects": [],
+      "panel_file": "apps/customer/js/data/booking.js:201-228",
+      "status": "pending"
+    },
+    {
+      "row": 46,
+      "app": "customer",
+      "element": "«تأیید رزرو»",
+      "api": "POST /api/v1/reservations (Idempotency-Key)",
+      "method": "POST",
+      "path": "/api/v1/reservations",
+      "service": "api/src/app/api/v1/reservations/route.ts:60-146 (flag reservations_enabled, ban, withIdempotency) → api/src/lib/reservations.ts:92-470 createReservation (autoConfirm→pending, table/slot conflicts)",
+      "db": "Reservation.insert, ReservationItem.insert, availability cache invalidate",
+      "side_effects": [
+        "sms booking_confirm (reservations.ts:410-416)",
+        "reservationEvent",
+        "webhook emit reservation.created",
+        "no-show prediction ledger",
+        "points cashback on completion (reservations.ts:613)"
+      ],
+      "panel_file": "apps/customer/js/data/booking.js:264-384",
+      "status": "pending"
+    },
+    {
+      "row": 50,
+      "app": "customer",
+      "element": "Waitlist offer → «پیوستن به لیست انتظار»",
+      "api": "POST /api/v1/waitlist",
+      "method": "POST",
+      "path": "/api/v1/waitlist",
+      "service": "api/src/app/api/v1/waitlist/route.ts:26-52 (flag waitlist_enabled, ban) → api/src/lib/waitlist.ts:162-235 joinWaitlist",
+      "db": "WaitlistEntry.insert",
+      "side_effects": [
+        "sms waitlist_joined (consent 'availability', waitlist.ts:633,670-676)"
+      ],
+      "panel_file": "apps/customer/js/waitlist.js:19-86",
+      "status": "pending"
+    },
+    {
+      "row": 51,
+      "app": "customer",
+      "element": "Waitlist «به‌روزرسانی وضعیت»",
+      "api": "GET /api/v1/waitlist/{id}",
+      "method": "GET",
+      "path": "/api/v1/waitlist/{id}",
+      "service": "api/src/app/api/v1/waitlist/[id]/route.ts:20-55",
+      "db": "WaitlistEntry.read",
+      "side_effects": [],
+      "panel_file": "apps/customer/js/waitlist.js:160-172",
+      "status": "pending"
+    },
+    {
+      "row": 52,
+      "app": "customer",
+      "element": "Waitlist «قبول می‌کنم»",
+      "api": "POST /api/v1/waitlist/{id}/accept",
+      "method": "POST",
+      "path": "/api/v1/waitlist/{id}/accept",
+      "service": "api/src/lib/waitlist.ts:405-493 acceptOffer → createReservation",
+      "db": "Reservation.insert, WaitlistEntry.update",
+      "side_effects": [
+        "sms booking_confirm"
+      ],
+      "panel_file": "apps/customer/js/waitlist.js:177-203",
+      "status": "pending"
+    },
+    {
+      "row": 57,
+      "app": "customer",
+      "element": "«QR ورود»",
+      "api": "GET /api/v1/reservations/{code}/qr?size=",
+      "method": "GET",
+      "path": "/api/v1/reservations/{code}/qr?size=",
+      "service": "api/src/app/api/v1/reservations/[code]/qr/route.ts:55-92 (ownership check, server-side QR SVG)",
+      "db": "Reservation.read",
+      "side_effects": [],
+      "panel_file": "apps/customer/js/features/trips.js:55-109; apps/customer/js/api.js:94-105",
+      "status": "pending"
+    },
+    {
+      "row": 68,
+      "app": "customer",
+      "element": "Loyalty page (points, tier, progress)",
+      "api": "GET /api/v1/me/loyalty",
+      "method": "GET",
+      "path": "/api/v1/me/loyalty",
+      "service": "api/src/lib/loyalty-status.ts:getLoyaltyStatus (LOYALTY_TIERS 0/300/800/2000 — matches client food-dna.js:190)",
+      "db": "PointsLedger.read",
+      "side_effects": [],
+      "panel_file": "apps/customer/js/features/loyalty.js:19-96",
+      "status": "pending"
+    },
+    {
+      "row": 71,
+      "app": "customer",
+      "element": "«دوستات رو دعوت کن» (stats + code copy)",
+      "api": "GET /api/v1/me/referral",
+      "method": "GET",
+      "path": "/api/v1/me/referral",
+      "service": "api/src/lib/loyalty.ts:228 getReferralStats",
+      "db": "Referral.read",
+      "side_effects": [],
+      "panel_file": "apps/customer/js/features/rewards.js:7-25",
+      "status": "pending"
+    },
+    {
+      "row": 75,
+      "app": "customer",
+      "element": "«بررسی موجودی کارت هدیه»",
+      "api": "GET /api/v1/gift-cards?code=",
+      "method": "GET",
+      "path": "/api/v1/gift-cards?code=",
+      "service": "api/src/lib/loyalty.ts:284 checkGiftCard",
+      "db": "GiftCard.read",
+      "side_effects": [],
+      "panel_file": "apps/customer/js/features/rewards.js:107-131",
+      "status": "pending"
+    },
+    {
+      "row": 76,
+      "app": "customer",
+      "element": "«پاداش تولد و سالگرد» → birthday date",
+      "api": "PATCH /api/v1/me {first_name,last_name?,birth_date}",
+      "method": "PATCH",
+      "path": "/api/v1/me",
+      "service": "api/src/app/api/v1/me/route.ts:34-55; reward by cron/crontab:28 `0 9 * * * rewards` → maintenance/rewards → api/src/lib/loyalty.ts:376-446 grantBirthdayRewards",
+      "db": "User.birthDate; PointsLedger +1000 on birthday",
+      "side_effects": [
+        "points (cron)",
+        "sms 'loyalty' consent (loyalty.ts:421-424)"
+      ],
+      "panel_file": "apps/customer/js/features/rewards.js:154-195",
+      "status": "pending"
+    },
+    {
+      "row": 78,
+      "app": "customer",
+      "element": "«دریافتِ جایزه» (mission claim)",
+      "api": "POST /api/v1/me/missions/{id}/claim",
+      "method": "POST",
+      "path": "/api/v1/me/missions/{id}/claim",
+      "service": "api/src/app/api/v1/me/missions/[id]/claim/route.ts:21-28 (flag missions_claim_enabled default ON, ban) → api/src/lib/missions.ts:110 claimMission",
+      "db": "MissionProgress.update, EconomyLedgerEntry.insert",
+      "side_effects": [
+        "points/wallet"
+      ],
+      "panel_file": "apps/customer/js/features/economy.js:130-135",
+      "status": "pending"
+    },
+    {
+      "row": 79,
+      "app": "customer",
+      "element": "«خرج کن» (reward redeem) + code sheet",
+      "api": "POST /api/v1/me/rewards/{id}/redeem",
+      "method": "POST",
+      "path": "/api/v1/me/rewards/{id}/redeem",
+      "service": "api/src/app/api/v1/me/rewards/[id]/redeem/route.ts:19-26 (flag reward_marketplace_enabled default ON) → api/src/lib/rewards.ts:34-134 redeemRewardItem",
+      "db": "wallet debit, Coupon/GiftCard.insert",
+      "side_effects": [
+        "points/wallet"
+      ],
+      "panel_file": "apps/customer/js/features/economy.js:142-164",
+      "status": "pending"
+    },
+    {
+      "row": 80,
+      "app": "customer",
+      "element": "Profile card (name, phone, tier, counts)",
+      "api": "GET /api/v1/me/reservations (count); pts via C04",
+      "method": "GET",
+      "path": "/api/v1/me/reservations",
+      "service": "as C57",
+      "db": "Reservation.read",
+      "side_effects": [],
+      "panel_file": "apps/customer/js/features/food-dna.js:166-250",
+      "status": "pending"
+    },
+    {
+      "row": 82,
+      "app": "customer",
+      "element": "«اعلان‌ها» preference toggles ×5",
+      "api": "GET/PATCH /api/v1/me/notification-prefs",
+      "method": null,
+      "path": null,
+      "service": "api/src/lib/notification-prefs.ts (enforced: offers automation.ts:168/loyalty.ts:194; loyalty loyalty.ts:421; availability waitlist.ts:670; reminder reminders.ts:105; dna dna-summary/route.ts:37)",
+      "db": "User.notificationPrefs",
+      "side_effects": [],
+      "panel_file": "apps/customer/js/user-profile.js:30-60,89-121",
+      "status": "pending"
+    },
+    {
+      "row": 84,
+      "app": "customer",
+      "element": "«خروج از حساب»",
+      "api": "POST /api/v1/auth/logout",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "service": "api/src/app/api/v1/auth/logout/route.ts (revokeRefreshToken)",
+      "db": "RevokedToken.insert",
+      "side_effects": [
+        "audit auth.logout"
+      ],
+      "panel_file": "apps/customer/js/api.js:124-133,144-150",
+      "status": "pending"
+    },
+    {
+      "row": 89,
+      "app": "customer",
+      "element": "Login sheet → «ارسال کد ورود»",
+      "api": "POST /api/v1/auth/otp/request",
+      "method": "POST",
+      "path": "/api/v1/auth/otp/request",
+      "service": "api/src/lib/otp.ts:103-160 requestOtp (rate limit, devCode only when OTP_DEV_MODE && !production, fail-closed if SMS transport not ready in production)",
+      "db": "OtpCode.insert",
+      "side_effects": [
+        "sms otp (enqueueSms otp.ts:158)"
+      ],
+      "panel_file": "apps/customer/js/auth.js:31-69",
+      "status": "pending"
+    },
+    {
+      "row": 90,
+      "app": "customer",
+      "element": "«تأیید و ورود» (OTP verify)",
+      "api": "POST /api/v1/auth/otp/verify",
+      "method": "POST",
+      "path": "/api/v1/auth/otp/verify",
+      "service": "api/src/app/api/v1/auth/otp/verify/route.ts (verifyOtp, ban check, signAccess/signRefresh, is_new)",
+      "db": "User.upsert, OtpCode.update",
+      "side_effects": [
+        "audit auth.login / auth.failure"
+      ],
+      "panel_file": "apps/customer/js/auth.js:83-126; apps/customer/js/api.js:111-118",
+      "status": "pending"
+    },
+    {
+      "row": 93,
+      "app": "customer",
+      "element": "Table-QR check-in via ?checkin=",
+      "api": "POST /api/v1/checkin",
+      "method": "POST",
+      "path": "/api/v1/checkin",
+      "service": "api/src/app/api/v1/checkin/route.ts:77-92 (per-IP rate limit, restaurant derived from QR) → api/src/lib/tables.ts:190 qrCheckIn → lifecycle checked_in→seated",
+      "db": "Reservation.update, Table.state=occupied, ReservationEvent",
+      "side_effects": [
+        "points on arrival (lifecycle.ts:139-150)",
+        "sms on transition if notify"
+      ],
+      "panel_file": "apps/customer/js/features/checkin.js:37-138; apps/customer/js/init.js:31",
+      "status": "pending"
+    },
+    {
+      "row": 113,
+      "app": "business",
+      "element": "OTP request",
+      "api": "POST /api/v1/auth/staff/request",
+      "method": "POST",
+      "path": "/api/v1/auth/staff/request",
+      "service": "api/src/app/api/v1/auth/staff/request/route.ts:L50-68",
+      "db": "OtpCode + audit",
+      "side_effects": [
+        "sms",
+        "audit"
+      ],
+      "panel_file": "apps/business/js/staff-system.js:L492-513",
+      "status": "pending"
+    },
+    {
+      "row": 114,
+      "app": "business",
+      "element": "OTP verify -> enterPanel",
+      "api": "POST /api/v1/auth/staff/verify",
+      "method": "POST",
+      "path": "/api/v1/auth/staff/verify",
+      "service": "api/src/app/api/v1/auth/staff/verify/route.ts:L35-87",
+      "db": "Staff + audit",
+      "side_effects": [
+        "audit"
+      ],
+      "panel_file": "apps/business/js/staff-system.js:L527-550",
+      "status": "pending"
+    },
+    {
+      "row": 118,
+      "app": "business",
+      "element": "Access-token refresh (401 -> refresh -> retry)",
+      "api": "POST /api/v1/auth/refresh",
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "service": "api/src/app/api/v1/auth/refresh",
+      "db": "RefreshToken rotate",
+      "side_effects": [],
+      "panel_file": "apps/business/js/api-core.js:L78-98",
+      "status": "pending"
+    },
+    {
+      "row": 121,
+      "app": "business",
+      "element": "invite.html claim page (4 states + retry)",
+      "api": "POST /api/v1/auth/invite/[token]/claim",
+      "method": "POST",
+      "path": "/api/v1/auth/invite/[token]/claim",
+      "service": "api/src/app/api/v1/auth/invite/[token]/claim/route.ts:L41-56",
+      "db": "Invite.findUnique",
+      "side_effects": [],
+      "panel_file": "apps/business/invite.html:L127-152",
+      "status": "pending"
+    },
+    {
+      "row": 124,
+      "app": "business",
+      "element": "Today KPIs (count/occupancy/expected/no-show)",
+      "api": "GET /api/v1/restaurant/reservations?date=today ; GET /api/v1/restaurant/tables",
+      "method": "GET",
+      "path": "/api/v1/restaurant/reservations?date=today",
+      "service": "api/src/app/api/v1/restaurant/reservations/route.ts:L28 ; tables/route.ts:L26",
+      "db": "Reservation.findMany, Table.findMany",
+      "side_effects": [],
+      "panel_file": "apps/business/js/overview.js:L54-77,L172-193",
+      "status": "pending"
+    },
+    {
+      "row": 127,
+      "app": "business",
+      "element": "Tonight row 'ثبت ورود'",
+      "api": "PATCH /api/v1/restaurant/reservations/[code]/status ; POST /api/v1/restaurant/sms {kind:campaign,message:'welcome'}",
+      "method": "PATCH",
+      "path": "/api/v1/restaurant/reservations/[code]/status",
+      "service": "api/src/lib/lifecycle.ts:L79 transitionReservation ; sms/route.ts:L54-59 resolveKind",
+      "db": "Reservation.update, ReservationEvent.create, PointsLedger (L175), Sms job",
+      "side_effects": [
+        "points",
+        "sms"
+      ],
+      "panel_file": "apps/business/js/overview.js:L108,L133-138",
+      "status": "pending"
+    },
+    {
+      "row": 130,
+      "app": "business",
+      "element": "Dashboard waitlist 'آفر میز'",
+      "api": "POST /api/v1/restaurant/waitlist",
+      "method": "POST",
+      "path": "/api/v1/restaurant/waitlist",
+      "service": "api/src/lib/waitlist.ts:L283 promoteNext",
+      "db": "WaitlistEntry.update, Table",
+      "side_effects": [
+        "sms",
+        "push"
+      ],
+      "panel_file": "apps/business/js/overview.js:L128",
+      "status": "pending"
+    },
+    {
+      "row": 142,
+      "app": "business",
+      "element": "Date tabs (امروز/فردا/آینده/گذشته/همه)",
+      "api": "GET /api/v1/restaurant/reservations?date=",
+      "method": "GET",
+      "path": "/api/v1/restaurant/reservations?date=",
+      "service": "reservations/route.ts:L28-85",
+      "db": "Reservation.findMany (cursor, 100/page)",
+      "side_effects": [],
+      "panel_file": "apps/business/js/reservations.js:L38-42,L127",
+      "status": "pending"
+    },
+    {
+      "row": 157,
+      "app": "business",
+      "element": "Walk-in: confirm (member / new guest)",
+      "api": "POST /api/v1/restaurant/walkin (Idempotency-Key)",
+      "method": "POST",
+      "path": "/api/v1/restaurant/walkin",
+      "service": "api/src/lib/reservations.ts:L734 createWalkin",
+      "db": "User.upsert, ClubMember.create(L814), Reservation.create(seated), Table.update",
+      "side_effects": [
+        "sms (welcome_visit L906)",
+        "points"
+      ],
+      "panel_file": "apps/business/js/reservations.js:L343,L360-417",
+      "status": "pending"
+    },
+    {
+      "row": 167,
+      "app": "business",
+      "element": "Waitlist: 'آفر به نفر بعدی' + card 'آفر میز'",
+      "api": "POST /api/v1/restaurant/waitlist",
+      "method": "POST",
+      "path": "/api/v1/restaurant/waitlist",
+      "service": "api/src/lib/waitlist.ts:L283 promoteNext",
+      "db": "WaitlistEntry.update, Table",
+      "side_effects": [
+        "sms",
+        "push"
+      ],
+      "panel_file": "apps/business/js/waitlist.js:L49,L66,L71-87",
+      "status": "pending"
+    },
+    {
+      "row": 168,
+      "app": "business",
+      "element": "Waitlist: remove entry",
+      "api": "DELETE /api/v1/restaurant/waitlist?entry_id=",
+      "method": "DELETE",
+      "path": "/api/v1/restaurant/waitlist?entry_id=",
+      "service": "lib/waitlist.ts:L538 leaveWaitlist",
+      "db": "WaitlistEntry.update",
+      "side_effects": [
+        "sms (L676)",
+        "push"
+      ],
+      "panel_file": "apps/business/js/waitlist.js:L67,L123-134",
+      "status": "pending"
+    },
+    {
+      "row": 221,
+      "app": "business",
+      "element": "Coupon create",
+      "api": "POST /api/v1/restaurant/coupons",
+      "method": "POST",
+      "path": "/api/v1/restaurant/coupons",
+      "service": "coupons/route.ts:L39 ; lib/coupons.ts",
+      "db": "Coupon.create",
+      "side_effects": [],
+      "panel_file": "apps/business/js/marketing.js:L73,L87-102",
+      "status": "pending"
+    },
+    {
+      "row": 244,
+      "app": "company",
+      "element": "Login: username + password inputs + «ورود به پنل»",
+      "api": "POST /api/v1/auth/admin/login",
+      "method": "POST",
+      "path": "/api/v1/auth/admin/login",
+      "service": "api/src/lib/password-auth.ts:49-76; api/src/app/api/v1/auth/admin/login/route.ts:42-110",
+      "db": "Staff.findUnique(username) + Tenant",
+      "side_effects": [
+        "audit auth.login / auth.failure"
+      ],
+      "panel_file": "apps/company/js/intelligence.js:866-871",
+      "status": "pending"
+    },
+    {
+      "row": 245,
+      "app": "company",
+      "element": "Login: TOTP 6-digit field (DOM-conditional)",
+      "api": "POST /api/v1/auth/admin/login {totp}",
+      "method": "POST",
+      "path": "/api/v1/auth/admin/login",
+      "service": "api/src/lib/admin-totp.ts:54-55 (adminLoginEnabled), :102-120 (verifyAdminTotp); login/route.ts:73-83",
+      "db": "none (env secret)",
+      "side_effects": [
+        "audit detail.totp outcome"
+      ],
+      "panel_file": "apps/company/js/intelligence.js:853-860",
+      "status": "pending"
+    },
+    {
+      "row": 246,
+      "app": "company",
+      "element": "Login: pre-render flag fetch",
+      "api": "GET /api/v1/auth/admin/login",
+      "method": "GET",
+      "path": "/api/v1/auth/admin/login",
+      "service": "login/route.ts:124-137 -> api/src/lib/feature-flags.ts:62-66 -> platform-settings.ts:14-20",
+      "db": "PlatformSettings.findUnique (cached 30s)",
+      "side_effects": [],
+      "panel_file": "apps/company/js/intelligence.js:881-891",
+      "status": "pending"
+    },
+    {
+      "row": 248,
+      "app": "company",
+      "element": "OTP login: phone input + «ارسال کد ورود»",
+      "api": "POST /api/v1/auth/admin/request",
+      "method": "POST",
+      "path": "/api/v1/auth/admin/request",
+      "service": "request/route.ts:40-79 (flag 404 :52, ratelimit otpVerify :54, findPlatformAdmin platform-admin.ts:5-16, requestOtp otp.ts:103-160)",
+      "db": "Staff.findFirst(platform tenant, owner, active); OtpCode create",
+      "side_effects": [
+        "sms (OTP via enqueueSms)",
+        "audit auth.failure NOT_PLATFORM_ADMIN"
+      ],
+      "panel_file": "apps/company/js/intelligence.js:933-934",
+      "status": "pending"
+    },
+    {
+      "row": 249,
+      "app": "company",
+      "element": "OTP login: code input + «ورود به پنل»",
+      "api": "POST /api/v1/auth/admin/verify",
+      "method": "POST",
+      "path": "/api/v1/auth/admin/verify",
+      "service": "verify/route.ts:15-53 (flag 404 :28, verifyOtp otp.ts:164-170, signAccess/signRefresh)",
+      "db": "Staff.findFirst; OtpCode verify/consume",
+      "side_effects": [
+        "audit auth.login / auth.failure"
+      ],
+      "panel_file": "apps/company/js/intelligence.js:967-968",
+      "status": "pending"
+    },
+    {
+      "row": 252,
+      "app": "company",
+      "element": "Sidebar «خروج» (logout)",
+      "api": "POST /api/v1/auth/logout {refresh}",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "service": "api/src/app/api/v1/auth/logout/route.ts (exists, 2.0K)",
+      "db": "refresh token revoke",
+      "side_effects": [],
+      "panel_file": "apps/company/index.html:108",
+      "status": "pending"
+    },
+    {
+      "row": 253,
+      "app": "company",
+      "element": "Session restore + silent refresh on 401",
+      "api": "POST /api/v1/auth/refresh",
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "service": "api/src/app/api/v1/auth/refresh/route.ts:49-61 (re-reads staff.isActive/role)",
+      "db": "Staff.findUnique",
+      "side_effects": [
+        "audit auth.failure on revoked"
+      ],
+      "panel_file": "apps/company/js/api.js:22,29-31",
+      "status": "pending"
+    },
+    {
+      "row": 268,
+      "app": "company",
+      "element": "Provisioning success «باشه» (reload list)",
+      "api": "GET /api/v1/admin/restaurants",
+      "method": "GET",
+      "path": "/api/v1/admin/restaurants",
+      "service": "restaurants/route.ts:15-46",
+      "db": "Restaurant.findMany",
+      "side_effects": [],
+      "panel_file": "apps/company/js/overview.js:272",
+      "status": "pending"
+    },
+    {
+      "row": 270,
+      "app": "company",
+      "element": "Detail «ارسالِ مجددِ دعوت» (PENDING_ACTIVATION only)",
+      "api": "POST /api/v1/admin/restaurants/[id]/resend-invite",
+      "method": "POST",
+      "path": "/api/v1/admin/restaurants/[id]/resend-invite",
+      "service": "resend-invite/route.ts:17-25 -> provisioning.ts:283-328",
+      "db": "Restaurant.findUnique, Staff.findFirst(owner), $transaction StaffInvite.updateMany(REVOKED)+create",
+      "side_effects": [
+        "audit restaurant.invite_resent",
+        "sms staff_invite enqueue"
+      ],
+      "panel_file": "apps/company/js/restaurant.js:22,172-182",
+      "status": "pending"
+    },
+    {
+      "row": 271,
+      "app": "company",
+      "element": "Detail «فعال کردن / غیرفعال کردن»",
+      "api": "PATCH /api/v1/admin/restaurants/[id]/control {activate|deactivate}",
+      "method": "PATCH",
+      "path": "/api/v1/admin/restaurants/[id]/control",
+      "service": "control/route.ts:44-53",
+      "db": "Restaurant.update(isOpen)",
+      "side_effects": [
+        "audit restaurant.activated/deactivated"
+      ],
+      "panel_file": "apps/company/js/restaurant.js:23,121-132",
+      "status": "pending"
+    },
+    {
+      "row": 272,
+      "app": "company",
+      "element": "Detail «مدیریت اشتراک»",
+      "api": "PATCH /api/v1/admin/restaurants/[id]/control",
+      "method": "PATCH",
+      "path": "/api/v1/admin/restaurants/[id]/control",
+      "service": "control/route.ts",
+      "db": "Tenant.update",
+      "side_effects": [
+        "audit"
+      ],
+      "panel_file": "apps/company/js/restaurant.js:24",
+      "status": "pending"
+    },
+    {
+      "row": 274,
+      "app": "company",
+      "element": "Detail: credentials table («دسترسی پنل رستوران»)",
+      "api": "GET /api/v1/admin/staff-credentials?restaurant_id=",
+      "method": "GET",
+      "path": "/api/v1/admin/staff-credentials?restaurant_id=",
+      "service": "staff-credentials/route.ts:30-59",
+      "db": "Restaurant.findUnique, Staff.findMany (select excludes passwordHash)",
+      "side_effects": [],
+      "panel_file": "apps/company/js/restaurant.js:42-48,59-97",
+      "status": "pending"
+    },
+    {
+      "row": 275,
+      "app": "company",
+      "element": "Detail: «ذخیره‌ی دسترسی» (set username/password)",
+      "api": "POST /api/v1/admin/staff-credentials",
+      "method": "POST",
+      "path": "/api/v1/admin/staff-credentials",
+      "service": "staff-credentials/route.ts:72-175 (policy checks :83-86, hash :109, owner-phone guard :119-131)",
+      "db": "Staff.upsert(tenantId_phone)",
+      "side_effects": [
+        "audit admin.staff_credentials_set (password excluded)"
+      ],
+      "panel_file": "apps/company/js/restaurant.js:83-91,99-120",
+      "status": "pending"
+    },
+    {
+      "row": 279,
+      "app": "company",
+      "element": "Billing «شارژ پیامک» modal + «تأیید و شارژ»",
+      "api": "POST /api/v1/admin/restaurants/[id]/sms {amount}",
+      "method": "POST",
+      "path": "/api/v1/admin/restaurants/[id]/sms",
+      "service": "sms/route.ts:30-49 -> api/src/lib/sms-balance.ts:26-45",
+      "db": "Restaurant.update(smsBalance increment) + SmsTransaction.create",
+      "side_effects": [
+        "audit admin.action sms_topup"
+      ],
+      "panel_file": "apps/company/js/intelligence.js:79,89-104,108-124",
+      "status": "pending"
+    },
+    {
+      "row": 281,
+      "app": "company",
+      "element": "Billing/Detail «مدیریت» -> renew modal + «تمدید اشتراک»",
+      "api": "PATCH /api/v1/admin/restaurants/[id]/control {extend_plan, plan, months}",
+      "method": "PATCH",
+      "path": "/api/v1/admin/restaurants/[id]/control",
+      "service": "control/route.ts:67-90",
+      "db": "Tenant.findUnique + Tenant.update(plan, planExpiresAt, trialEndsAt=null)",
+      "side_effects": [
+        "audit plan.changed"
+      ],
+      "panel_file": "apps/company/js/intelligence.js:80,127-174",
+      "status": "pending"
+    },
+    {
+      "row": 282,
+      "app": "company",
+      "element": "Renew modal «لغو اشتراک» -> confirm -> «بله، لغو کن»",
+      "api": "PATCH /api/v1/admin/restaurants/[id]/control {cancel_subscription}",
+      "method": "PATCH",
+      "path": "/api/v1/admin/restaurants/[id]/control",
+      "service": "control/route.ts:91-99",
+      "db": "Tenant.update(planExpiresAt = now-1s)",
+      "side_effects": [
+        "audit subscription.cancelled"
+      ],
+      "panel_file": "apps/company/js/intelligence.js:151,175-193",
+      "status": "pending"
+    },
+    {
+      "row": 304,
+      "app": "company",
+      "element": "Security view composite load",
+      "api": "GET /api/v1/admin/security; /admin/feature-flags; /admin/moderation-queue; /admin/security/banned-ips; /admin/economy-rules",
+      "method": "GET",
+      "path": "/api/v1/admin/security;",
+      "service": "security/route.ts:17-97; feature-flags/route.ts:18-25; moderation-queue.ts:11; banned-ips/route.ts:13-22; economy-rules/route.ts:16-25",
+      "db": "AuditLog.findMany, CustomerEconomyProfile (fraud.listFlaggedAbuseUsers), PlatformSettings, Redis ban keys",
+      "side_effects": [],
+      "panel_file": "apps/company/js/intelligence.js:552-667",
+      "status": "pending"
+    },
+    {
+      "row": 308,
+      "app": "company",
+      "element": "Security: economy rules «ذخیره»",
+      "api": "PATCH /api/v1/admin/economy-rules",
+      "method": "PATCH",
+      "path": "/api/v1/admin/economy-rules",
+      "service": "economy-rules/route.ts:26-39 -> economy-rules.ts:44-47",
+      "db": "PlatformSettings.upsert(economy_rule:*)",
+      "side_effects": [
+        "audit economy_rule.update"
+      ],
+      "panel_file": "apps/company/js/intelligence.js:534-550",
+      "status": "pending"
+    },
+    {
+      "row": 319,
+      "app": "company",
+      "element": "Missions list",
+      "api": "GET /api/v1/admin/missions",
+      "method": "GET",
+      "path": "/api/v1/admin/missions",
+      "service": "missions/route.ts:34-46",
+      "db": "Mission.findMany",
+      "side_effects": [],
+      "panel_file": "apps/company/js/missions.js:7-39",
+      "status": "pending"
+    },
+    {
+      "row": 320,
+      "app": "company",
+      "element": "«ماموریتِ جدید» / «ویرایش» modal + submit",
+      "api": "POST /api/v1/admin/missions | PATCH /api/v1/admin/missions/[id]",
+      "method": "POST",
+      "path": "/api/v1/admin/missions",
+      "service": "missions/route.ts:48-70; missions/[id]/route.ts:29-57",
+      "db": "Mission.create | Mission.update",
+      "side_effects": [
+        "audit mission.created / mission.updated"
+      ],
+      "panel_file": "apps/company/js/missions.js:24,34,41-78",
+      "status": "pending"
+    },
+    {
+      "row": 321,
+      "app": "company",
+      "element": "Mission «آرشیو / فعال‌سازی»",
+      "api": "PATCH /api/v1/admin/missions/[id] {status}",
+      "method": "PATCH",
+      "path": "/api/v1/admin/missions/[id]",
+      "service": "missions/[id]/route.ts:29-57",
+      "db": "Mission.update",
+      "side_effects": [
+        "audit mission.updated"
+      ],
+      "panel_file": "apps/company/js/missions.js:35,79-86",
+      "status": "pending"
+    }
+  ],
+  "counts": {
+    "customer": 22,
+    "business": 12,
+    "company": 21
+  }
+}
