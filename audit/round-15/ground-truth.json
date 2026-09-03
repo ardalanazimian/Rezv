@@ -11,7 +11,7 @@
   },
   "ci": {
     "pr81_last_seen": "11/13 success, 1 skipped (Sourcery), `test` in_progress; e2e, boot-path, schema-drift, image-build green",
-    "final": "PR #81 @660456b: 11/13 success, 1 skipped, `test` job step 'Run tests' in_progress 63+ min (job 100496680224, run 33706516188) — hang on COMMITTED code; job has no timeout-minutes (only e2e: 25)"
+    "final": "580cf7f (current PR #81 head, incl. A3-001 + A2-001 fixes): 12/13 success + Sourcery skipped, 0 failed — e2e 14.2 min (3 profiles), test 2.8 min. a2cf39d: 12/13 green. dbec99f: test 2.8 min success (hang fixed), e2e cancelled 24.4 min (P0-013). 660456b old run: test auto-cancelled after 361 min (no concurrency block)."
   },
   "local_gates_on_worktree": {
     "tsc_noEmit": 0,
@@ -98,7 +98,7 @@
       "area": "auth",
       "claim": "OTP admin path (auth/admin/request|verify) issues the platform-admin principal without TOTP; the feature-flag fix (admin_otp_login_enabled, default OFF, 404 when off) exists only as uncommitted worktree — 14 files untouched since 2026-09-02 17:51",
       "evidence": "HEAD api/src/app/api/v1/auth/admin/verify/route.ts:23 principal role=owner, :30 signAccess; worktree adds isFeatureEnabled guard at request/route.ts:52; tests/admin-otp-flag.integration.test.mts 8/8 EXIT=0; mutation Err.notFound→Err.forbidden → EXIT=1 (gate proven)",
-      "status": "open — commit+push pending founder decision (PR #81 does not touch request/verify)"
+      "status": "fixed — committed d1e7365, pushed to feat/admin-totp-login (PR #81)"
     },
     {
       "id": "P0-002",
@@ -106,7 +106,7 @@
       "area": "tests",
       "claim": "provision-slug-validation after() used a non-existent AuditLog.restaurant relation → PrismaClientValidationError → cleanup never ran, 3 tests died",
       "evidence": "api/prisma/schema.prisma:1193-1209 AuditLog has restaurantId but no relation; fixed in worktree (findMany ids → restaurantId in); 8/8 EXIT=0",
-      "status": "fixed (worktree)"
+      "status": "fixed — committed dbec99f"
     },
     {
       "id": "P0-003",
@@ -114,7 +114,7 @@
       "area": "tests",
       "claim": "auth-otp-enumeration uses fixed owner phones; with index 079 any crashed prior run poisons the next run (P2002 on staff.phone)",
       "evidence": "leftover rows created 02:35:27Z by the killed run; fixed via pre-delete in before(); 9/9 EXIT=0",
-      "status": "fixed (worktree)"
+      "status": "fixed — committed dbec99f"
     },
     {
       "id": "P0-004",
@@ -122,15 +122,15 @@
       "area": "tests",
       "claim": "feature-flags test's deliberate manual DEFAULT_OFF mirror lacked admin_otp_login_enabled (the mirror did its job — it forced a human record)",
       "evidence": "api/tests/feature-flags.integration.test.mts:26; fixed with justification; 15/15 EXIT=0",
-      "status": "fixed (worktree)"
+      "status": "fixed — committed dbec99f"
     },
     {
       "id": "P0-005",
       "severity": "blocker",
       "area": "ci",
       "claim": "`npm test` hangs: locally 17 min silent after a file-level failure in provision-slug-validation; in CI the `test` job on 660456b is at 63+ min with no timeout-minutes → PR #81 cannot go green",
-      "evidence": "suite2.log stall after L3905 (file-level ✖ provision-slug-validation); CI job 100496680224 step 'Run tests' 63.3 min in_progress; ci.yml has timeout-minutes only on e2e (L328); local clean run WITH the P0-002 fix: 1528/1528 in 148 s, no hang",
-      "status": "open — hypothesis: after() threw before db.$disconnect() → open handle → node:test never exits; likely fixed by P0-002; A6 task #1 must falsify"
+      "evidence": "suite2.log stall after L3905 (file-level ✖ provision-slug-validation); CI job 100496680224 step 'Run tests' 63.3 min in_progress; ci.yml has timeout-minutes only on e2e (L328); local clean run WITH the P0-002 fix: 1528/1528 in 148 s, no hang; CI @dbec99f job 100545215402 'test' success 2.8 min",
+      "status": "hypothesis CONFIRMED in CI: after P0-002 fix, `test` completes in 2.8 min (was 252+ min hang on 660456b). Guard still missing → A6 task #1 (b): add timeout-minutes/watchdog and prove red-able"
     },
     {
       "id": "P0-006",
@@ -178,7 +178,7 @@
       "area": "tests",
       "claim": "Tests depend on ambient env: api/.env sets ADMIN_LOGIN_ENABLED=true locally → password-login 22 fail (401≠200); with ADMIN_LOGIN_ENABLED=false 22/22. CI has no .env so it is green there — the suite is not hermetic",
       "evidence": "api/.env:9; tests/password-login.integration.test.mts pins JWT_* (L5-6) but not ADMIN_LOGIN_ENABLED; runs: EXIT=1 (22 fail) vs EXIT=0",
-      "status": "open → A6 task #2 (env pin helper)"
+      "status": "fixed — committed dbec99f (test-env.mts + password-login pin); A6 to sweep for other ambient-env reads"
     },
     {
       "id": "P0-012",
@@ -186,7 +186,110 @@
       "area": "tests",
       "claim": "Single-process runner interleaves root-level before/after hooks across files: auth-otp-enumeration's root before() set a flag that feature-flags' root clearFlags() wiped → 404≠204 only in the full run",
       "evidence": "_all.runner.mts L104 vs L108; fixed by moving flag-ON into a describe-level beforeEach; full run green after",
-      "status": "fixed (worktree) → A6 task #3 sweep for siblings"
+      "status": "fixed — committed dbec99f → A6 task #3 sweep for siblings"
+    },
+    {
+      "id": "P0-013",
+      "severity": "major",
+      "area": "e2e",
+      "claim": "Commit d1e7365 (OTP button rendered only when GET /auth/admin/login returns otp_login_enabled=true) broke the company-panel e2e login used by 6 specs / 9 sites: none mocked that GET → button absent → #adminPhone never rendered → 60 s timeout × 2 retries per test; CI e2e job on dbec99f CANCELLED at 24.4 min (timeout-minutes: 25) vs 11.7 min before",
+      "evidence": "CI job 100545215311 'Run E2E tests' cancelled 24.4 min; e2e/tests/company-provisioning.spec.ts:61-70 loginCo(); grep auth/admin/login in e2e/ → 0 mocks",
+      "status": "fixed — committed a2cf39d: shared mockAdminOtpFlag(page, enabled) in e2e/tests/helpers/mock-api.ts registered before page.goto in the 9 sites + negative UI-gate test; local desktop-chrome smoke 11 passed (26 s, EXIT=0); mutation (button unconditional, intelligence.js:872) → negative test EXIT=1; byte-for-byte restore → EXIT=0; 3-profile CI on a2cf39d is the gate"
+    },
+    {
+      "id": "P0-014",
+      "severity": "major",
+      "area": "company-panel",
+      "claim": "admin_otp_login_enabled switch never rendered: client label map FEATURE_FLAG_LABEL_FA (6 keys) drives the render loop, server FEATURE_FLAG_KEYS has 7 — the OTP kill-switch could not be toggled from the UI (A3-001, CEO-confirmed)",
+      "evidence": "apps/company/js/intelligence.js:451-461,467 vs api/src/lib/feature-flags.ts:12-20",
+      "status": "fixed — committed 37b2a82 (label added; XSS overrides re-pinned 862→865, 3161→3164; xss --check 0 @65, standalone --check 0)"
+    },
+    {
+      "id": "P0-015",
+      "severity": "blocker",
+      "area": "business-panel",
+      "claim": "Business-panel password login (the only production path) threw ReferenceError: staffPasswordLogin called enterStaffPanel ×3, defined nowhere (only enterPanel exists) — since 6301ff1 (2026-08-26), on origin/main; no e2e exercised it (all specs click «ورود با پیامک») (A2-001, CEO-confirmed)",
+      "evidence": "apps/business/js/staff-system.js:468,471,472 vs :556; grep -rn 'function enterStaffPanel' apps/business shared/js → 0; git log -S enterStaffPanel → 6301ff1",
+      "status": "fixed — committed 580cf7f: calls → enterPanel; new e2e/tests/business-password-login.spec.ts (POST /auth/staff/login mock → overlay hidden, no ReferenceError); spec EXIT=0; mutation (one call site re-broken) → EXIT=1; restore → EXIT=0"
     }
-  ]
+  ],
+  "wave0": {
+    "commits": [
+      "d1e7365 admin_otp_login_enabled flag (11 files)",
+      "dbec99f test integrity + audit/round-15 + race report",
+      "a2cf39d e2e mockAdminOtpFlag + negative UI-gate test (regression fix for d1e7365)",
+      "37b2a82 company-panel flag switch label + XSS override re-pin (A3-001)",
+      "580cf7f business-panel password login fix + e2e (A2-001)"
+    ],
+    "push": "660456b..dbec99f, dbec99f..a2cf39d, a2cf39d..580cf7f — feat/admin-totp-login, all exit 0",
+    "local_proof": "suite6: 1528/1528 EXIT=0 on from-scratch DB; password-login 22/22 with .env=true after pin"
+  },
+  "agents_round16": {
+    "A1": {
+      "status": "accepted",
+      "coverage": "101/101",
+      "classes": {
+        "REAL": 72,
+        "PARTIAL": 19,
+        "FAKE": 4,
+        "DEAD": 5,
+        "DEMO-ONLY": 1
+      },
+      "findings": {
+        "major": 11,
+        "minor": 17
+      },
+      "ceo_spot_check": {
+        "sampled": 5,
+        "confirmed": 4,
+        "plausible": 1,
+        "rejected": 0
+      },
+      "note": "agent process died on 429 after writing outputs"
+    },
+    "A2": {
+      "status": "accepted",
+      "coverage": "245/245 (143 rows)",
+      "classes": {
+        "REAL": 103,
+        "PARTIAL": 30,
+        "DEAD": 5,
+        "FAKE": 5
+      },
+      "findings": {
+        "blocker": 2,
+        "major": 16,
+        "minor": 17
+      },
+      "ceo_spot_check": {
+        "sampled": 5,
+        "confirmed": 5,
+        "rejected": 0
+      },
+      "src_v2": "DEAD — already deleted in 95e95f1 (mandate stale)"
+    },
+    "A3": {
+      "status": "accepted",
+      "coverage": "81/81",
+      "classes": {
+        "REAL": 70,
+        "PARTIAL": 7,
+        "DEMO-ONLY": 1,
+        "DEAD": 3
+      },
+      "findings": {
+        "major": 8,
+        "minor": 6
+      },
+      "ceo_spot_check": {
+        "sampled": 5,
+        "confirmed": 5,
+        "rejected": 0
+      }
+    },
+    "A6": {
+      "status": "not run — died twice on session limit (429) at 07:30 and ~13:00; only A6-baseline.txt written; rerun after 14:40 Asia/Tehran"
+    }
+  },
+  "pr81": "GREEN at 580cf7f — merge-ready; merge requires founder (gh token invalid in this session)"
 }
