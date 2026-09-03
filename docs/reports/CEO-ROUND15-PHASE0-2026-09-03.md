@@ -214,4 +214,40 @@ A6 (opus؛ با ۷ گیتِ falsifiable و ۴ proposal که نسخه‌ی قبل
 ۱۵ اقدامِ مرتبِ مالک در `A10-PLAN.json › founder_actions` (اولی همان B2 است).
 
 ### Wave 2 — معیارهای ورود
-نوشته و کامیت شد: `audit/round-17/WAVE2-ENTRY-CRITERIA.md` — شش گیتِ سخت (E1 merge #81 · E2 PR ی hardening سبز · E3 اثباتِ CI hardening ثبت‌شده · E4 A6 پذیرفته · E5 smokeِ ۵۵ ردیفِ REAL-STATIC · E6 DB ی CI-faithful) + سه گیتِ نرم (P0-014، چرخشِ کلید، پذیرشِ نقشه‌ی A10) + دامنه‌ی دقیقِ A4/A5 روی opus با ورودی‌های از-پیش-تأییدشده.
+نوشته و کامیت شد (و در دستورِ سوم **مصوب**): `audit/round-17/WAVE2-ENTRY-CRITERIA.md` — شش گیتِ سخت (E1 merge #81 · E2 PR ی hardening سبز · E3 اثباتِ CI hardening ثبت‌شده · E4 A6 پذیرفته · E5 smokeِ ۵۵ ردیفِ REAL-STATIC · E6 DB ی CI-faithful) + سه گیتِ نرم (P0-014، چرخشِ کلید، پذیرشِ نقشه‌ی A10) + دامنه‌ی دقیقِ A4/A5 روی opus با ورودی‌های از-پیش-تأییدشده.
+
+---
+
+## ۱۱. دستورِ سوم + A6 (opus) — فازِ ۲: یکپارچگیِ تست
+
+### دستورِ سوم — اجرا شد
+B2 پایه‌ی (ب) با سه شرط ثبت شد؛ **(ii) به A10 سپرده شد** (تستِ falsifiable ی دسترسی از ایران با کنترلِ منفی)؛ «زیرساختِ تولید وجود ندارد» → **P0-017 (blocker)**. دستورِ ۳ (`ALLOWED_ORIGINS` fail-closed در production، اثبات با `EXIT≠0`) در دامنه‌ی اجباریِ A5. بندِ ۴: `engines.node=20.x` اضافه شد (CI و Dockerfile هر دو Node 20)؛ `FCM_SERVER_KEY` حذف **نشد** — ردیفِ docs با تیکتِ **P0-018** علامت خورد. §۰.۲ اصلاح‌شده و صفِ پشتِ P0-014 ثبت شد. کامیت‌ها: `5d867b7`، `82ca2a0`.
+
+### A6 — `claude-opus-5` — **پذیرفته** (نمونه‌گیریِ من: ۹ از ~۳۳ = ۲۷٪، ۹ تأیید، ۰ رد)
+
+| | |
+|---|---|
+| **A6-001 (blocker) — ریشه‌ی hang، دستِ اول** | `timeout 600 npm test` → **EXIT 124** روی DBِ تمیز؛ stall دقیقاً بعد از `✖ provision-slug-validation` (لاگ ۳۹۸۰ خطی، خطِ ۳۹۲۶). node:test خلاصه را چاپ می‌کند ولی پروسه هرگز خارج نمی‌شود: `after()`ِ root که می‌میرد تنها teardownِ DB/Redis در `_all.runner.mts:227-234` را رد می‌کند و `npm test` `--test-force-exit` ندارد |
+| **زنجیره‌ی اثبات** | R1 = ۱۲۴ (hang بازتولید) → R2 = **۱ در ۶۳ ثانیه** (watchdog؛ `Open handles: PipeWrap×2, TCPSocketWrap`) → R3 = **۰** (۱۵۲۸/۱۵۲۸ در ۱۶۱ ثانیه، watchdog ساکت). عیناً در `A6-logs/task1-r16-chain.log` |
+| **A6-016 — معمای صبح حل شد** | importِ کلاینتِ Prisma خودش `dotenv` را روی `api/.env` اجرا می‌کند (`.prisma/client/index.js:1523 → tryLoadEnvs`) — به همین دلیل `ADMIN_LOGIN_ENABLED=true` به تست‌ها می‌رسید. ۲ خواننده‌ی pin‌نشده مانده |
+| **A6-015** | ۱۰ از ۱۲ jobِ CI هنوز `timeout-minutes` ندارند (فقط `test` و `e2e`) — تأیید شد: `jobs=12 timeouts=2` |
+| **A6-017 / 018 / 027** | ۱۳۴ `process.env=` سخت در برابرِ ۳۰ `??=`؛ `OTP_DEV_MODE=true` سراسری؛ شماره‌های ثابت مشترک بینِ دو فایل؛ و **اثباتِ تجربی**: پنج فایل تنها سبز، با هم قرمز (`B1`/`B2` EXIT=1) |
+| **۴ جهشِ زنده** (money محافظت شده: `IRT→IRR` می‌میرد) | **A6-024 auth:** حذفِ `staff.role !== 'owner'` در `auth/admin/login:66` از هر ۵ فایلِ تستِ auth رد می‌شود — قابلِ سوءاستفاده نیست (`admin-auth.ts` role را از DB دوباره می‌خواند) ولی گارد pin نشده · **A6-025 SMS/OTP:** `smsTransportReady()` بدونِ `BODYID_OTP` از تستِ fail-closed رد می‌شود چون `setMeli()` هر سه متغیر را با هم می‌زند — همان حالتِ «کد ارسال شد، پیامکی نرفت، کسی وارد نشد، لاگ تمیز» · **A6-023:** revertِ نیمه‌ی رفعِ A2-002 (پیامکِ خوش‌آمد به مهمانِ اشتباه + code ی Outbox) specِ تازه‌ام را سبز نگه می‌دارد → spec یک assertion ی دوم می‌خواهد · A6-026 (minor، قیدِ DB می‌پوشاند) |
+| **جدولِ falsifiability** | ۱۲ ردیف: ۱۱ red→green اثبات‌شده (schema-drift، xss ×۲، standalone، design-system، classic-scripts، watchdog، runner-imports، prisma-fresh، e2e row-identity، و یک ردیفِ **کنترل** که خودِ hang را با ۱۲۴ بازتولید می‌کند) + **۱ ردیف که قرمز نشد و صادقانه ثبت شده** (A6-023) |
+| **افشای روش** | پاسِ اولِ mutation دو baseline ی قرمز و دو تزریقِ grep ی اشتباه داشت؛ آن نتایج به‌عنوانِ kill گزارش **نشدند** — همه با baseline ی سبزِ per-file و diff ی تأییدشده دوباره اجرا شدند. همین تصحیح A6-027 را تولید کرد |
+
+**Proposalهای آماده و اثبات‌شده (commit‌نشده):** `test-env-watchdog.patch` (نگهبانِ hang در runner)، `ci-hang-guard.patch` (timeout روی ۱۰ jobِ بی‌سقف + گامِ runner-imports)، `check-prisma-client-fresh.mjs`، `check-test-runner-imports.sh` — همه در `audit/round-16/A6-proposals/`. **اعمالشان فراتر از مصوبه‌ی شماست** (فقط concurrency + timeout روی `test`)، پس اعمال نشده‌اند. **توصیه: تصویب هر چهار** — هر کدام red→green دارد.
+
+### در جریان — همین لحظه
+- **A11 (`claude-sonnet-5`) — smokeِ زمانِ اجرای ۵۵ ردیفِ REAL-STATIC** روی API + DB واقعی (DB را از A6 تحویل گرفت؛ ریستِ CI-faithful؛ PASS/FAIL/BLOCKED per row). بعد از اتمام ≥۲۰٪ ردیف‌ها را خودم دوباره اجرا می‌کنم.
+- **A10 (`claude-sonnet-5`) — طراحیِ تستِ دسترسی از ایران** (شرطِ ii ی B2).
+
+### ستونِ مدل — به‌روز
+
+| عامل | مدل | وضعیت |
+|---|---|---|
+| A1 / A2 / A3 | `claude-fable-5-1` (ارثی — نقض، ثبت‌شده) | پذیرفته + راستی‌آزماییِ ۱۰۰٪ |
+| A6 | **`claude-opus-5`** | **پذیرفته** |
+| A10 | **`claude-sonnet-5`** | پذیرفته؛ کارِ دوم در جریان |
+| A11 | **`claude-sonnet-5`** | در جریان |
+| CEO | `claude-opus-5` (§۰.۲ اصلاح‌شده: تا GO/NO-GO) | — |
