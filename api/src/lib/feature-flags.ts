@@ -16,6 +16,7 @@ export const FEATURE_FLAG_KEYS = [
   'missions_claim_enabled',
   'ai_recommendations_enabled',
   'gift_card_purchase_enabled',
+  'admin_otp_login_enabled',
 ] as const;
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];
 
@@ -26,6 +27,7 @@ const FLAG_LABEL: Record<FeatureFlagKey, string> = {
   missions_claim_enabled: 'دریافتِ جایزه‌یِ ماموریت',
   ai_recommendations_enabled: 'پیشنهادهایِ هوشمند',
   gift_card_purchase_enabled: 'خریدِ کارتِ هدیه',
+  admin_otp_login_enabled: 'ورودِ پنلِ شرکت با پیامک (OTP)',
 };
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -43,8 +45,16 @@ const FLAG_LABEL: Record<FeatureFlagKey, string> = {
 //  تا وقتی پرداخت (zarinpal، که برایِ بیعانه از قبل هست) به این جریان وصل
 //  نشده، پیش‌فرض باید خاموش بماند.
 // ═══════════════════════════════════════════════════════════════════════
+//  admin_otp_login_enabled (۲۰۲۶-۰۹-۰۲): مسیرِ OTPِ پنلِ شرکت
+//  (`auth/admin/request|verify`) همان principalِ platform-admin را صادر
+//  می‌کند **بدونِ اینکه TOTP بخواهد** — یعنی عاملِ سومی که در
+//  `auth/admin/login` ساخته شد را کاملاً دور می‌زند. تا وقتی آن مسیر
+//  زنده باشد، ورودِ سه‌عاملی یک درِ باز پشتِ سرش دارد.
+//  پس پیش‌فرض **خاموش**: هرکس عمداً روشنش کند، آگاهانه عاملِ سوم را
+//  کنار گذاشته است.
 const DEFAULT_OFF: ReadonlySet<string> = new Set<FeatureFlagKey>([
   'gift_card_purchase_enabled',
+  'admin_otp_login_enabled',
 ]);
 export function featureFlagLabel(key: FeatureFlagKey): string { return FLAG_LABEL[key]; }
 

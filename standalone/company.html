@@ -1541,9 +1541,14 @@ const API = {
   // ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
   // مسیرِ اصلیِ ورود به پنلِ شرکت. OTP کنارش می‌ماند چون مسیرِ پشتیبان است:
   // اگر رمز فراموش شد و کاوه‌نگار راه افتاده باشد، راهِ برگشت وجود دارد.
-  async adminLogin(username, password){
+  // آیا سرور عاملِ سوم (TOTP) می‌خواهد؟ پاسخِ منفی یعنی فیلد اصلاً رندر نشود.
+  // ⚠️ تصمیم عمداً سمتِ سرور است: پنل استاتیک است و env را نمی‌بیند، و
+  // پنهان‌کردنِ فیلد با CSS قبلاً در همین مخزن دور زده شده بود.
+  adminTotpRequired(){ return this.get('/auth/admin/login'); },
+  async adminLogin(username, password, totp){
     const res = await this.request('/auth/admin/login', {
-      method:'POST', body: JSON.stringify({ username, password }),
+      method:'POST',
+      body: JSON.stringify(totp ? { username, password, totp } : { username, password }),
     });
     if (res.ok && res.data?.access) { this.setToken(res.data.access); this.setRefresh(res.data.refresh); }
     return res;
@@ -2743,6 +2748,9 @@ function initialOf(name){ return (String(name||'').trim()[0]) || '؟'; }
 
 // سوییچ‌هایِ قابلیت — عمداً همون واژگانِ featureFlagLabel در lib/feature-flags.ts (بک‌اند)
 const FEATURE_FLAG_LABEL_FA = {
+  // ۲۰۲۶-۰۹-۰۳ (A3-001): بدونِ این ورودی، سوییچِ فلگِ تازه هرگز رندر نمی‌شد — نقشه‌ی
+  // کلاینت منبعِ حلقه‌ی رندر است، نه فهرستِ سرور. همان واژگانِ featureFlagLabel.
+  admin_otp_login_enabled: 'ورودِ پنلِ شرکت با پیامک (OTP)',
   reservations_enabled: 'ثبتِ رزروِ آنلاین',
   waitlist_enabled: 'پیوستن به لیستِ انتظار',
   reward_marketplace_enabled: 'خرجِ سکه در فروشگاهِ جایزه',
@@ -3133,8 +3141,26 @@ function faD(s){ return String(s).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
 // دلیل: تنها راهِ ورود پیامک بود و بدونِ KAVENEGAR_API_KEY هیچ‌کس —
 // حتی مدیرِ پلتفرم — نمی‌توانست وارد شود. مسیرِ OTP حذف نشد و به‌عنوانِ
 // پشتیبان می‌ماند (اگر رمز فراموش شد و پیامک راه افتاده باشد).
+// ── عاملِ سوم (TOTP) ──
+// ⚠️ فیلد فقط وقتی **در DOM ساخته می‌شود** که سرور بگوید لازم است — نه
+// اینکه همیشه ساخته و با CSS پنهان شود. دلیلش یک شکستِ واقعیِ همین مخزن
+// است: یک عنصرِ `display:none` با `display:flex` دور زده شد. چیزی که رندر
+// نشود قابلِ دور زدن نیست.
+let _totpRequired = false;
+// آیا مسیرِ ورودِ پیامکیِ ادمین اصلاً فعال است؟ (فلگِ سرور، پیش‌فرض خاموش)
+let _otpLoginEnabled = false;
+
 function showAdminLogin(){
   setAdminGateLocked(true);
+  const totpBlock = _totpRequired ? `
+    <label class="login-field-label" for="adminTotp">کد تأیید دومرحله‌ای</label>
+    <input class="login-inp" id="adminTotp" type="text" inputmode="numeric" pattern="[0-9]*"
+           autocomplete="one-time-code" maxlength="6" spellcheck="false"
+           placeholder="۶ رقم از اپلیکیشن"
+           aria-describedby="adminTotpHint"
+           onkeydown="if(event.key==='Enter')adminPasswordLogin()">
+    <div class="login-hint" id="adminTotpHint">کد ۶ رقمی را از Google Authenticator یا Aegis وارد کنید</div>` : '';
+
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">R</div>
     <div class="login-title">پنل شرکت رزرونو</div>
@@ -3142,25 +3168,54 @@ function showAdminLogin(){
     <label class="login-field-label" for="adminUser">نام کاربری</label>
     <input class="login-inp" id="adminUser" autocomplete="username" spellcheck="false" placeholder="نام کاربری" onkeydown="if(event.key==='Enter')document.getElementById('adminPass')?.focus()">
     <label class="login-field-label" for="adminPass">رمز عبور</label>
-    <input class="login-inp" id="adminPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')adminPasswordLogin()">
+    <input class="login-inp" id="adminPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')${_totpRequired ? "document.getElementById('adminTotp')?.focus()" : 'adminPasswordLogin()'}">
+    ${totpBlock}
     <button class="login-btn" id="adminLoginBtn" onclick="adminPasswordLogin()">ورود به پنل</button>
-    <button class="login-back" onclick="showAdminLoginPhone()">ورود با پیامک</button>
+    ${_otpLoginEnabled ? `<button class="login-back" onclick="showAdminLoginPhone()">ورود با پیامک</button>` : ''}
     <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
   setTimeout(()=>document.getElementById('adminUser')?.focus(),200);
+}
+
+// پرچم را **پیش از** رندرِ فرم می‌گیرد. شکستِ این درخواست عمداً «لازم نیست»
+// تفسیر می‌شود، نه «لازم است»: اگر بک‌اند در دسترس نباشد، ورودِ آفلاین/دمو
+// که پایین‌تر مدیریت می‌شود نباید پشتِ فیلدی قفل شود که هیچ‌وقت پر نمی‌شود.
+// سرور در هر حال fail-closed است و بدونِ کدِ درست توکن نمی‌دهد.
+async function loadAdminLoginForm(){
+  try {
+    const res = await API.adminTotpRequired();
+    _totpRequired = !!(res.ok && res.data && res.data.totp_required);
+    // ⚠️ پیش‌فرضِ **خاموش** وقتی سرور پاسخ نداد: مسیرِ OTPِ ادمین عاملِ سوم
+    // را دور می‌زند، پس در ابهام نباید پیشنهادش کنیم. برعکسِ totp_required
+    // که پیش‌فرضش false است چون آن‌جا ابهام یعنی «هنوز روشن نشده».
+    _otpLoginEnabled = !!(res.ok && res.data && res.data.otp_login_enabled);
+  } catch { _totpRequired = false; _otpLoginEnabled = false; }
+  showAdminLogin();
 }
 
 async function adminPasswordLogin(){
   const u = (document.getElementById('adminUser')?.value||'').trim();
   const p = document.getElementById('adminPass')?.value||'';
+  const t = (document.getElementById('adminTotp')?.value||'').trim();
   if (!u || !p) { toast('','نام کاربری و رمز را وارد کن'); return; }
+  if (_totpRequired && !/^\d{6}$/.test(t)) {
+    toast('','کد ۶ رقمی را وارد کن');
+    document.getElementById('adminTotp')?.focus();
+    return;
+  }
   const btn = document.getElementById('adminLoginBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
-  const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
+  const reset = () => {
+    if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; }
+    // کدِ مصرف‌شده دیگر معتبر نیست (ضدِ replayِ سرور) — پاکش کن و فوکوس را
+    // همان‌جا بگذار تا کاربر کدِ تازه را بدونِ کلیک وارد کند.
+    const ti = document.getElementById('adminTotp');
+    if (ti){ ti.value=''; ti.focus(); }
+  };
 
   // مسیرِ دمویِ آفلاین دست‌نخورده می‌ماند (بازکردنِ فایل بدونِ بک‌اند).
   if (location.protocol === 'file:') { await enterAdminPanel(true); return; }
 
-  const res = await API.adminLogin(u, p);
+  const res = await API.adminLogin(u, p, _totpRequired ? t : undefined);
   if (res.ok && res.data?.access){ await enterAdminPanel(); return; }
   if (res.offline){ await enterAdminPanel(true); return; }
   // ⚠️ پیامِ سرور عمداً برای «کاربر نیست» و «رمز غلط» یکسان است — اینجا
@@ -3179,7 +3234,7 @@ function showAdminLoginPhone(){
     <label class="login-field-label" for="adminPhone">شماره موبایل</label>
     <input class="login-inp" id="adminPhone" inputmode="tel" placeholder="۰۹۱۲۳۴۵۶۷۸۹" onkeydown="if(event.key==='Enter')adminSendOtp()">
     <button class="login-btn" id="adminSendBtn" onclick="adminSendOtp()">ارسال کد ورود</button>
-    <button class="login-back" onclick="showAdminLogin()">ورود با نام کاربری و رمز</button>
+    <button class="login-back" onclick="loadAdminLoginForm()">ورود با نام کاربری و رمز</button>
     <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
   setTimeout(()=>document.getElementById('adminPhone')?.focus(),200);
 }
@@ -3284,13 +3339,13 @@ async function adminLogout(){
   await API.doLogout();
   document.getElementById('loginOverlay').classList.remove('hidden');
   setAdminGateLocked(true);
-  showAdminLogin();
+  loadAdminLoginForm();
   toast('','از پنل خارج شدید');
 }
 function onAdminSessionExpired(){
   document.getElementById('loginOverlay').classList.remove('hidden');
   setAdminGateLocked(true);
-  showAdminLogin();
+  loadAdminLoginForm();
   toast('','نشست منقضی شد، دوباره وارد شوید');
 }
 
@@ -3314,7 +3369,8 @@ if (API.getToken()) {
   })();
 } else {
   setAdminGateLocked(true);
-  showAdminLogin();
+  // نقطه‌ی ورودِ اصلی — پرچمِ TOTP پیش از رندرِ فرم گرفته می‌شود.
+  loadAdminLoginForm();
 }
 
 </script>
