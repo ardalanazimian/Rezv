@@ -1,0 +1,410 @@
+{
+  "agent": "A10",
+  "model": "claude-sonnet-5",
+  "round": 19,
+  "scope_note": "PLAN + VERIFY only. No resources created. No repo edits. All MCP calls were read-only (list_teams, list_projects, find_organizations, find_projects) — no create/deploy/buy tool was invoked.",
+  "architecture_conflict_flagged": {
+    "summary": "The mission asks to define a 4th Vercel project for the API. Current repo docs (most recently touched of the two competing sources) say the API is NOT deployed to Vercel: api/vercel.json was deliberately deleted 2026-08-28, and cron/crontab was declared the single source of scheduling truth because the production backend is a long-lived Docker container behind Caddy, not Vercel serverless.",
+      "evidence": [
+        "docs/DEPLOYMENT.md:96-113 (section 5, 'Cron: (Corrected 2026-08-28)' — 'the API is not deployed to Vercel ... cron/crontab is the single source of truth for scheduling')",
+        "docs/DEPLOY_API_VERCEL.md:1-13 (marked ARCHIVED-SNAPSHOT at top — superseded by newer docs where they conflict)",
+        "cron/crontab:1-13 (header states this file is 'the sole source of scheduling truth (2026-08-28)' and explains api/vercel.json was removed because the backend does not run on Vercel)",
+        "git log: commit 3422936 'حذفِ api/vercel.json و اعلامِ cron/crontab به‌عنوانِ تنها منبعِ حقیقتِ زمان‌بندی' (2026-08-28), more recent than DEPLOY_API_VERCEL.md",
+        "docs/DEPLOYMENT.md:1-4 still lists Vercel as one of 'two supported deployment models', so Vercel-for-API is a documented option, just not the one currently in production"
+      ],
+      "what_this_means_for_the_plan": "The 4-project Vercel plan below is written as requested (API + 3 static frontends). Founder must explicitly decide whether creating the Vercel API project REPLACES the self-hosted Docker/Caddy deployment (in which case cron must move to Vercel Cron, i.e. vercel.json needs to be recreated) or is exploratory/staging only (in which case cron/crontab stays authoritative and the Vercel API project should never receive production DNS). This is founder_actions item 1 and blockers item 1."
+  },
+  "vercel": {
+    "mcp_reads": {
+      "list_teams": "team_gLTPq1IJB0ayoC3NsDE4yoXg, name 'ardalanaz2-4503's projects', plan hobby — confirmed live via mcp__claude_ai_Vercel__list_teams",
+      "list_projects": "0 projects for team_gLTPq1IJB0ayoC3NsDE4yoXg — confirmed live via mcp__claude_ai_Vercel__list_projects (matches mission's stated baseline)"
+    },
+    "projects_to_create": [
+      {
+        "name": "rezervno-api (suggested)",
+        "root_directory": "api",
+        "framework_preset": "Next.js (must be selected manually — no api/vercel.json exists to auto-detect it; DEPLOY_API_VERCEL.md:26 confirms 'api/vercel.json دیگر وجود ندارد')",
+        "build_command": "default (postinstall runs `prisma generate` per api/package.json:8; next build)",
+        "output": "default Next.js server output (App Router, not static export)",
+        "node_version": "20.x — evidence: api/Dockerfile:2,17 'FROM node:20-alpine', .github/workflows/ci.yml uses node-version:'20' at 8 locations (e.g. line 30). api/package.json has NO 'engines' field (verified: `grep -n engines api/package.json` empty) — founder_action: add `\"engines\":{\"node\":\"20.x\"}` to api/package.json before/while creating the project so the version is pinned instead of relying on Vercel's default LTS.",
+        "region": "not currently pinned for api/ (apps/landing/vercel.json:3 and apps/seo/vercel.json:3 both pin 'fra1' — recommend the same region for the API project for latency-consistency with those two, and because ENVIRONMENT.md's SMS/payment providers are Iran-facing)",
+        "deployment_protection": "must be OFF/Standard for the domain the frontends call, per docs/DEPLOY_API_VERCEL.md:29-30 — otherwise 401/redirect breaks every API call",
+        "vercelignore_landmine_check": {
+          "finding": "RESOLVED, not present today.",
+          "evidence": ".vercelignore (repo root) explicitly does NOT ignore apps/ — its own comment says so: '.vercelignore:3-4 نکته: پس از انتقال فرانت‌اند به apps/، دیگر apps را ignore نمی‌کنیم؛ بک‌اند و پوشه‌های زیرساخت/بیلد ignore می‌مانند'. It does ignore api, deploy, backup, observability, cron, loadtest, e2e, docs, shared, tools, standalone, demo-mvp, .github, docker-compose*.yml, *.md, .env.example (.vercelignore:8-20). No vercel.json exists at repo root or under api/ (confirmed via Glob **/vercel.json — only apps/landing/vercel.json and apps/seo/vercel.json exist). apps/business/src-v2 (the old duplicate frontend tree the mission's landmine language refers to) was already deleted at commit 95e95f1 per docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md:127.",
+          "residual_risk": "Because Root Directory for the API project would be `api`, and .vercelignore always evaluates paths relative to the REPO ROOT regardless of a project's Root Directory setting, deploying the API project must be verified in practice (not just by reading the file) that Vercel does not also try to ignore api/ for the API project itself — the same line that correctly protects the root static deploy could, in theory, interact oddly with Root Directory=api. This is flagged as UNVERIFIED (cannot be tested without deploying) — first API deploy's build log must be checked for 'no source files found' or similar."
+        }
+      },
+      {
+        "name": "rezervno-customer (suggested)",
+        "root_directory": "apps/customer",
+        "framework_preset": "Other / static (no build) — apps/customer is an ES module app with no bundler per CLAUDE.md: 'بدون build و بدون فریم‌ورک'",
+        "build_command": "none (static files served as-is)",
+        "output_directory": "apps/customer (root)",
+        "note": "apps/customer uses absolute /paths (per docs/DEPLOYMENT.md:113-116), so Root Directory must be exactly apps/customer, not a subfolder."
+      },
+      {
+        "name": "rezervno-business (suggested)",
+        "root_directory": "apps/business",
+        "framework_preset": "Other / static (no build) — classic JS, script order in index.html is load-bearing per CLAUDE.md",
+        "build_command": "none",
+        "output_directory": "apps/business (root)"
+      },
+      {
+        "name": "rezervno-company (suggested)",
+        "root_directory": "apps/company",
+        "framework_preset": "Other / static (no build) — classic JS, same constraint as business",
+        "build_command": "none",
+        "output_directory": "apps/company (root)"
+      }
+    ],
+    "frontend_to_api_wiring": {
+      "options_documented": "docs/DEPLOYMENT.md:96-113 and docs/DEPLOY_API_VERCEL.md:34-46 both describe two options: (a) same-origin rewrite via a vercel.json on each frontend project proxying /api/:path* to the API domain (recommended, avoids CORS), or (b) separate domain with window.RZ_API_BASE / <meta name=\"rz-api-base\"> override, requiring the API to send CORS headers for the frontend origins.",
+      "current_state": "Neither wiring exists yet in the repo for apps/customer|business|company (only apps/landing and apps/seo have vercel.json, and those don't proxy to the API — verified via Glob **/vercel.json). This is a real gap, not a landmine that was fixed — it still needs to be built as part of standing up these 4 projects.",
+      "single_source_of_base_url": "shared/js/api-core.js resolveApiBase() per docs/DEPLOY_API_VERCEL.md:41-43 — confirms all three apps already share one resolution function, so wiring only needs to be done once per app via env/meta tag, not per-file."
+    },
+    "env_vars_by_project": {
+      "method": "grep -rhoE \"process\\.env\\.[A-Z_0-9]+\" api/src | sort -u  →  54 distinct vars found in api/src, cross-checked against docs/ENVIRONMENT.md",
+      "classification": {
+        "required_at_boot": {
+          "count": 5,
+          "vars": ["DATABASE_URL", "REDIS_URL", "JWT_SECRET", "JWT_REFRESH_SECRET", "ALLOWED_ORIGINS"],
+          "evidence": [
+            "JWT_SECRET: api/src/lib/jwt.ts:29-30 — `if (!s || s.length < 32) throw new Error(...)`",
+            "JWT_REFRESH_SECRET: api/src/lib/jwt.ts:34-35 — same fail-fast pattern, different secret",
+            "ALLOWED_ORIGINS: api/src/middleware.ts:45-61 — throws Error in production if unset or has no valid origin",
+            "DATABASE_URL: api/src/lib/db.ts:73 — `makeClient(process.env.DATABASE_URL)` with no fallback; Prisma Client cannot serve any DB-backed route without it",
+            "REDIS_URL: api/src/lib/redis.ts:89 — `new Redis(process.env.REDIS_URL!, ...)` (non-null assertion) unless REDIS_CLUSTER_NODES is set instead"
+          ]
+        },
+        "infra_only": {
+          "count": 6,
+          "vars": ["DB_CONNECTION_LIMIT", "DB_POOL_TIMEOUT", "DATABASE_REPLICA_URL", "REDIS_CLUSTER_NODES", "REDIS_COMMAND_TIMEOUT_MS", "REDIS_CONNECT_TIMEOUT_MS"],
+          "note": "Pool/cluster/timeout tuning with safe defaults per docs/ENVIRONMENT.md; irrelevant or differently-behaved under Vercel's serverless connection model (no long-lived pool) — needs its own decision, see founder_actions."
+        },
+        "optional": {
+          "count": 43,
+          "note": "All remaining vars found in code degrade gracefully (feature disabled / explicit logged skip) when unset — includes all 14 MELIPAYAMAK_BODYID_* vars, MELIPAYAMAK_USERNAME/PASSWORD/FROM/TOKEN_SEPARATOR, ZARINPAL_MERCHANT_ID/SANDBOX, EMAIL_API_KEY/FROM, SENTRY_DSN, METRICS_TOKEN, CRON_SECRET, MAINTENANCE_KEY, PLATFORM_ADMIN_TENANT_ID (fail-closed per-request, not boot-crash), OTP_DEV_MODE, TRUST_PROXY_HEADERS, ALLOW_PRIVATE_WEBHOOKS, LOG_LEVEL, NODE_ENV, NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_APP_URL, SALES_NOTIFY_EMAIL, INVITE_BASE_URL, BREAK_GLASS_CODE, BREAK_GLASS_PHONE, ADMIN_TOTP_SECRET, ADMIN_TOTP_USERNAME, ADMIN_LOGIN_ENABLED, UPLOAD_DIR. CRON_SECRET and PLATFORM_ADMIN_TENANT_ID are launch-critical in practice (cron 401s / company panel fail-closed without them) even though they don't crash the boot."
+        }
+      },
+      "docs_vs_code_gaps": {
+        "in_code_but_undocumented_in_ENVIRONMENT_md": [
+          "ADMIN_LOGIN_ENABLED", "ADMIN_TOTP_SECRET", "ADMIN_TOTP_USERNAME",
+          "BREAK_GLASS_CODE", "BREAK_GLASS_PHONE", "INVITE_BASE_URL",
+          "MELIPAYAMAK_BODYID_INVITE", "REDIS_COMMAND_TIMEOUT_MS",
+          "REDIS_CONNECT_TIMEOUT_MS", "SALES_NOTIFY_EMAIL", "UPLOAD_DIR"
+        ],
+        "count": 11,
+        "documented_but_dead_in_code": {
+          "var": "FCM_SERVER_KEY",
+          "evidence": "docs/ENVIRONMENT.md lists it under Push/email ('unset → push disabled'), but `grep -rn FCM_SERVER_KEY api/src` returns zero matches — it is not read anywhere in api/src. Push is not merely 'disabled without the key', it is not wired to it at all.",
+          "founder_action_needed": "Either wire FCM_SERVER_KEY into an actual push send path, or correct docs/ENVIRONMENT.md to say push is unimplemented rather than 'toggle-disabled'."
+        },
+        "documented_and_confirmed_inert": {
+          "var": "DATABASE_DIRECT_URL",
+          "evidence": "docs/ENVIRONMENT.md already self-flags this as inert ('nothing reads it today'); independently confirmed by the same grep — DATABASE_DIRECT_URL does not appear in the api/src env-var list at all."
+        }
+      }
+    },
+    "cron": {
+      "finding": "No Vercel cron definitions exist in the repo today (api/vercel.json was deleted). The 9 maintenance jobs are currently scheduled by cron/crontab (self-hosted docker-compose `cron` service) calling POST /api/v1/maintenance/{job} with header `x-maintenance-key: ${MAINTENANCE_KEY}` — see cron/crontab:1-31 and cron/run.sh:1-11.",
+      "jobs_confirmed_to_exist_as_routes": [
+        "waitlist (*/2 * * * *) — api/src/app/api/v1/maintenance/waitlist/route.ts:46",
+        "jobs-drain (* * * * *) — api/src/app/api/v1/maintenance/jobs-drain/route.ts:25",
+        "lifecycle (*/5 * * * *) — api/src/app/api/v1/maintenance/lifecycle/route.ts:58",
+        "reminders (*/15 * * * *) — api/src/app/api/v1/maintenance/reminders/route.ts:31",
+        "expire (*/5 * * * *) — api/src/app/api/v1/maintenance/expire/route.ts:21",
+        "rewards (0 9 * * *) — api/src/app/api/v1/maintenance/rewards/route.ts:21",
+        "customer-insights (0 3 * * *) — api/src/app/api/v1/maintenance/customer-insights/route.ts:184",
+        "retention (0 4 * * *) — api/src/app/api/v1/maintenance/retention/route.ts:105",
+        "ensure-partitions (0 2 1 * *) — api/src/app/api/v1/maintenance/ensure-partitions/route.ts:47"
+      ],
+      "cron_secret_check": {
+        "file_line": "api/src/lib/maintenance-auth.ts:27-53 (function guardMaintenance)",
+        "two_accepted_credentials": [
+          "x-maintenance-key header, constant-time compared via timingSafeEqual — api/src/lib/maintenance-auth.ts:29-32",
+          "Authorization: Bearer ${CRON_SECRET} — the header Vercel Cron auto-injects — api/src/lib/maintenance-auth.ts:45-48, also constant-time (`safeEqual`) since the 2026-08-21 fix documented in the same file's comment (the sibling branch was previously `===`, a timing leak)"
+        ],
+        "if_no_credential_matches": "401 { ok:false, error:{ code:'UNAUTHORIZED', message:'دسترسی غیرمجاز' } } — api/src/lib/maintenance-auth.ts:50-53"
+      },
+      "two_options_if_API_moves_to_Vercel": [
+        "(A) Recreate api/vercel.json with a `crons` array (9 entries, one per maintenance route, using the schedules in cron/crontab) — Vercel auto-injects `Authorization: Bearer $CRON_SECRET` on those requests, so no code change needed, only CRON_SECRET must be set in the Vercel dashboard. If chosen, the self-hosted `cron` compose service must be disabled to avoid double-firing jobs.",
+        "(B) Keep cron/crontab authoritative and repoint API_URL in the self-hosted `cron` service (cron/run.sh:4) at the Vercel-hosted API's HTTPS domain, continuing to send x-maintenance-key. No Vercel cron needed; Docker cron container keeps running standalone even if API itself moves."
+      ],
+      "verification_steps_401_without_secret_200_with_secret": [
+        "1. `curl -s -o /dev/null -w \"%{http_code}\\n\" https://<api-domain>/api/v1/maintenance/expire -X POST` → expect 401 (matches docs/DEPLOYMENT.md's own post-deploy checklist line: 'cron endpoints must 401 without the secret')",
+        "2. `curl -s -o /dev/null -w \"%{http_code}\\n\" -X POST https://<api-domain>/api/v1/maintenance/expire -H \"x-maintenance-key: $MAINTENANCE_KEY\"` → expect 200 (or the route's real success status)",
+        "3. `curl -s -o /dev/null -w \"%{http_code}\\n\" -X POST https://<api-domain>/api/v1/maintenance/expire -H \"Authorization: Bearer $CRON_SECRET\"` → expect 200, proving the Vercel-Cron-style header path also works",
+        "4. Repeat step 1 with a WRONG key (`x-maintenance-key: wrong`) to confirm it's a real compare, not `if(header)` — expect 401, not 200",
+        "5. Record all 4 status codes + response bodies in the launch log; do not accept a 'trust me' pass."
+      ]
+    }
+  },
+  "sentry": {
+    "mcp_reads": {
+      "find_organizations": "org 'rezvno', webUrl https://rezvno.sentry.io, regionUrl https://de.sentry.io — confirmed live via mcp__claude_ai_Sentry__find_organizations",
+      "find_projects": "0 projects for org 'rezvno' (regionUrl https://de.sentry.io) — confirmed live via mcp__claude_ai_Sentry__find_projects (matches mission's stated baseline)"
+    },
+    "code_integration_exists": true,
+    "integration_description": "A hand-rolled Sentry sink exists — NOT the @sentry/node SDK, a direct fetch() to Sentry's legacy Store API. api/src/lib/logger.ts:35-53 (function sendToSentry): parses SENTRY_DSN with regex `^https:\\/\\/([^@]+)@([^/]+)\\/(.+)$`, builds `https://${host}/api/${project}/store/?sentry_key=${key}&sentry_version=7`, POSTs a JSON body {level, logger, message, timestamp, tags:{scope,traceId}, extra, environment} for every log call at level 'warn' or 'error' only (api/src/lib/logger.ts:38). Called fire-and-forget from every createLogger(...).error/.warn call via emit() at api/src/lib/logger.ts:109 (`void sendToSentry(...)`).",
+    "dsn_env_var": "SENTRY_DSN — read once, at api/src/lib/logger.ts:37",
+    "sensitive_data_redaction": "safeMeta() at api/src/lib/logger.ts:65-73 redacts SENSITIVE_KEYS (password/token/otp/phone/email/allergy/dietary/etc — api/src/lib/logger.ts:63) recursively before either console output or the Sentry payload, so the Sentry sink inherits the same redaction as normal logs.",
+    "projects_to_create": [
+      {
+        "suggested_slug": "rezervno-api",
+        "platform": "node",
+        "reasoning": "Only api/src/lib/logger.ts sends to Sentry; no frontend (apps/customer|business|company) or apps/landing|seo code references SENTRY_DSN or Sentry — confirmed via `grep -rn SENTRY api/src apps/*/js` and a broader `grep -rln Sentry api apps`, both returning only the logger.ts hits above. One backend project is sufficient; do not create frontend Sentry projects unless frontend error tracking is added later (out of scope today)."
+      }
+    ],
+    "how_to_wire": [
+      "Create the project in the Sentry org 'rezvno' (dashboard — not doable via the READ-only MCP tools available to this agent).",
+      "Copy the legacy DSN (must be the classic Store-API-compatible DSN format `https://<key>@<host>/<project>` — the regex at logger.ts:39 will reject the newer envelope-only DSN format if Sentry ever deprecates /store/; verify this endpoint is still active for a fresh 2026 project before relying on it).",
+      "Set SENTRY_DSN in the Vercel dashboard (or the self-hosted .env) for the API project only.",
+      "Verify: trigger any warn/error log path (e.g. hit a route that throws Err.validation) and confirm the event lands in the new Sentry project within ~1 minute."
+    ]
+  },
+  "sms": {
+    "provider": "Melipayamak (migrated from Kavenegar 2026-08-26, per api/src/lib/sms.ts:41-46 and docs/ENVIRONMENT.md)",
+    "pattern_send_path": {
+      "endpoint": "POST https://rest.payamak-panel.com/api/SendSMS/BaseServiceNumber — api/src/lib/sms.ts:74,285",
+      "body_fields": "{ username, password, to, bodyId, text: tokens.join(tokenSep()) } — api/src/lib/sms.ts:283-286",
+      "bodyid_mapping": "bodyIdFor() at api/src/lib/sms.ts:47-69 maps each SmsJob['template'] (otp, booking_confirm, reminder, welcome_visit, campaign, winback_offer, booking_waitlist, booking_preparing, booking_rejected, booking_cancelled, booking_noshow, booking_thanks, waitlist_joined, waitlist_offer, staff_invite) to its own MELIPAYAMAK_BODYID_* env var — 15 templates, 15 env vars.",
+      "token_separator": "MELIPAYAMAK_TOKEN_SEPARATOR, default ';' — api/src/lib/sms.ts:85. Explicitly marked UNVERIFIED in code comments (sms.ts:76-83): Melipayamak does not publicly document this and no official SDK sample shows multi-token; must be confirmed against the actual panel before production reliance."
+    },
+    "fail_closed_acceptance_check": {
+      "function": "meliAccepted(d) — api/src/lib/sms.ts:101-106",
+      "logic": "If d.RetStatus is a number, accepted iff RetStatus === 1. Otherwise falls back to Number(d.Value) > 1000 (a real recId, distinguished from Melipayamak's small numeric error codes). Any non-conclusive response is treated as failure — comment at sms.ts:90-99 states this is deliberately conservative: 'a message that wasn't sent must never be reported as sent'.",
+      "smsTransportReady": "api/src/lib/sms.ts:215-223 — requires MELIPAYAMAK_USERNAME + MELIPAYAMAK_PASSWORD + MELIPAYAMAK_BODYID_OTP all set before the OTP path will claim readiness; without it, OTP delivery would silently never arrive even though the request looks like a 2xx (guarded against per the comment)."
+    },
+    "proof_procedure_for_one_real_pattern_send": {
+      "no_send_performed": true,
+      "env_needed": ["MELIPAYAMAK_USERNAME", "MELIPAYAMAK_PASSWORD", "MELIPAYAMAK_BODYID_OTP (or another already-approved bodyId)"],
+      "steps": [
+        "1. Set the 3 env vars above in a non-production environment pointed at a real Melipayamak account with at least one approved pattern.",
+        "2. Trigger a real send through the code path, not a curl — e.g. call POST /api/v1/auth/otp/request with a real test-owned phone number (OTP path is synchronous, api/src/lib/sms.ts:227: 'if (job.template === otp) { await sendSmsNow(job); return; }' — no queue involved, so the HTTP response IS the send outcome).",
+        "3. Expect RetStatus === 1 in the (currently un-logged-to-caller) provider response; the code itself only logs it (api/src/lib/sms.ts:288-297: `log.info('ارسال شد → ...', { template, recId: data?.Value })` on success, `log.error` with `retStatus/strRetStatus/value` on failure) — the proof must read the API server's logs, not the OTP HTTP response body.",
+        "4. For a non-OTP template (e.g. booking_confirm), the send goes through the Job queue instead (api/src/lib/sms.ts:229-241, enqueue({kind:'sms', payload: job})). To prove it: after triggering, query `SELECT id, kind, status, attempts, result, last_error FROM jobs WHERE kind='sms' ORDER BY created_at DESC LIMIT 1;` (jobs table — api/prisma/schema.prisma:1235-1256) and confirm status transitions pending → done with no last_error, within the worker's poll interval (maintenance/jobs-drain, run every minute per cron/crontab:15).",
+        "5. Cross-check api/src/app/api/metrics output for rezervno_sms_sent_total{template=...} incrementing (api/src/lib/sms.ts:296 `metrics.smsSent.inc({ template })`) as a second, provider-independent confirmation signal.",
+        "6. Record the actual RetStatus/Value from step 3's log line in the launch log as the proof artifact — a 2xx HTTP response alone is NOT proof (meliAccepted() explicitly treats some 2xx-wrapped bodies as failure)."
+      ]
+    },
+    "key_rotation_status": {
+      "status": "NOT DONE — cannot be confirmed from the repository.",
+      "evidence": "docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md (section on credential hygiene): 'چرخشِ کلیدِ ملی‌پیامک ؟ از مخزن قابلِ تأیید نیست — فقط شما' ('Melipayamak key rotation — cannot be confirmed from the repo — only you [the founder] know'). This agent independently confirms: there is no code, log, or doc artifact anywhere in the repo that would prove or disprove a rotation happened.",
+      "recorded_as": "blocker #1 in this plan, per mission instruction — requires founder written confirmation before this item can be marked done."
+    }
+  },
+  "backups": {
+    "what_exists": {
+      "self_hosted_backup_service": "docker-compose.yml:137-160 — a dedicated `backup` container, `backup/Dockerfile` + `backup/entrypoint.sh`, running backup/scripts/backup.sh on a cron schedule (BACKUP_CRON, default '0 3 * * *' — docker-compose.yml:151) with BACKUP_KEEP retention (default 14 — docker-compose.yml:153) and optional immediate backup on container start.",
+      "backup_script": "backup/scripts/backup.sh — pg_dump --no-owner --no-acl piped through gzip to $BACKUP_DIR/rezervno_<timestamp>.sql.gz, verifies the file is >1KB (else deletes and exits 1 — treats an empty dump as a hard failure, not a silent success), rotates to keep only the newest BACKUP_KEEP files, ALSO tars the uploads volume separately (rezervno_media_<timestamp>.tar.gz, same rotation) because gallery photos live on disk, not in Postgres — restoring the SQL dump alone would give clean DB rows pointing at missing image files. Optionally uploads both to S3-compatible storage if S3_BUCKET/S3_ENDPOINT/S3_ACCESS_KEY/S3_SECRET_KEY are set (falls back to local-only, does not fail the backup, if `aws` CLI is missing).",
+      "list_script": "backup/scripts/list.sh — lists existing rezervno_*.sql.gz with size/date/count.",
+      "restore_script": "backup/scripts/restore.sh — takes a filename arg or defaults to the newest backup; 5-second Ctrl+C grace window; then `gunzip -c $FILE | psql -h $PGHOST -U $PGUSER -d $PGDATABASE` (a straight psql replay, not pg_restore — consistent with pg_dump's plain-text/gzip output, not a custom-format dump).",
+      "env_vars": "BACKUP_CRON, BACKUP_KEEP, BACKUP_ON_START, S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY — all documented under 'Self-host / compose only' in docs/ENVIRONMENT.md, all compose-scope (not read by api/src, confirmed by their absence from the api/src env-var grep)."
+    },
+    "gaps_found": [
+      "No automated restore drill exists anywhere in the repo (no CI job, no script that self-tests restore.sh against a scratch DB) — this violates CLAUDE.md rule §4 ('هر آرتیفکتِ تحویلی باید یک jobِ CI داشته باشد که واقعاً می‌سازدش') by the same logic that rule was written for: a backup script that has never been proven to restore is unverified, not working.",
+      "restore.sh uses plain psql replay of a pg_dump text/gzip file — there is no verification step inside the script itself (e.g. no post-restore row-count check or schema-version check) confirming the restore actually succeeded beyond psql's own exit code.",
+      "The media tar backup and the SQL backup are two independent files with independent timestamps — a restore drill must verify BOTH are restored from the SAME backup run (matching timestamp), or a media/DB mismatch (orphaned photo rows) is possible."
+    ],
+    "restore_drill_procedure_against_scratch_db": [
+      "1. Stand up an isolated scratch stack (NOT touching the developer's already-running local Postgres per CLAUDE.md's ban on interfering with another agent's DB): `docker compose -p rz-drill -f docker-compose.yml up -d postgres redis` with a throwaway .env (random POSTGRES_PASSWORD).",
+      "2. Apply schema via the documented two-step path: `docker compose -p rz-drill exec api npx prisma migrate deploy` then `sh prisma/apply-sql.sh` (per docs/DEPLOYMENT.md:9-16) — OR, simpler for a pure-backup drill, seed via `npm run db:seed` to get non-trivial, identifiable rows.",
+      "3. Record a fingerprint before backup: `SELECT count(*) FROM reservations; SELECT count(*) FROM users; SELECT md5(string_agg(id::text,',' ORDER BY id)) FROM restaurants;` (or similar) — save the numbers.",
+      "4. Run backup/scripts/backup.sh inside the drill's backup container (or manually with the same pg_dump invocation) → produces rezervno_<ts>.sql.gz (+ media tar if UPLOADS_DIR populated with a test file).",
+      "5. Destroy and recreate the scratch Postgres data volume entirely (`docker compose -p rz-drill down -v postgres && docker compose -p rz-drill up -d postgres`) to simulate real data loss, not just an empty extra DB.",
+      "6. Run backup/scripts/restore.sh against the fresh empty instance, pointing BACKUP_DIR at the drill's backup output.",
+      "7. Re-run the step-3 fingerprint queries against the restored DB — PASS only if all counts/hashes match exactly. Also verify the media tar extracts and file bytes match (e.g. sha256sum) the pre-backup test file.",
+      "8. Time every step (backup duration, restore duration) to derive real RTO; note the DB size at drill time to make the number meaningful for future comparison.",
+      "9. Record PASS/FAIL with the actual command outputs (exit codes) in the launch log — a restore drill that isn't falsifiable against a known fingerprint is exactly the pattern CLAUDE.md rule §5 warns about ('تستی که وقتی موضوعش غایب است سبز می‌ماند، تست نیست')."
+    ],
+    "note_on_production_access": "No production database is reachable from this machine (per mission constraint and confirmed by docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note that Supabase/production access is blocked by credential desync, P0-014). This drill can only be rehearsed against a scratch/local DB; it does NOT substitute for testing restore of an actual production backup file once one exists."
+  },
+  "monitoring": {
+    "metrics_endpoint_protection": {
+      "file_line": "api/src/app/api/metrics/route.ts:33-50 (function GET_impl)",
+      "logic": "required = METRICS_TOKEN?.trim() (line 34). If unset: production → 503 with an explicit operator-facing message (lines 37-44); non-production → served unauthenticated (dev convenience). If set: constant-time compare of `Authorization: Bearer <token>` via safeEqual/timingSafeEqual (lines 46-49, 60-67) — a prior version used fail-open `if(METRICS_TOKEN)` gating and `!==` string compare (both fixed 2026-08-21 per the route's own comment, lines 8-27).",
+      "middleware_note": "middleware.ts's Origin check only runs on mutating methods (POST/PATCH/PUT/DELETE) per the route's own comment (metrics/route.ts:11) — GET /api/metrics is not covered by that layer at all, so METRICS_TOKEN is the ONLY guard."
+    },
+    "rate_limit_fail_open": {
+      "file_line": "api/src/lib/ratelimit.ts:49-53 (function rateLimit) — `if (!res) { // Redis در دسترس نبود: fail-open ... return { allowed: true, ... } }`",
+      "layered_fallback": "api/src/lib/ratelimit.ts:99-113 (rateLimitWithFallback) additionally catches any throw from rateLimit() and falls back to rateLimitInMemory() (defined ~line 300+) — a documented, deliberate two-layer fail-open: Redis down → serve, but count in-process as a weaker per-instance cap, not zero cap.",
+      "auto_ban": {
+        "file_line": "api/src/lib/ratelimit.ts:215-246",
+        "logic": "recordViolation(ip) increments `viol:<ip>` in Redis (5-minute window, BAN_WINDOW_MS = 5*60_000, line 217); at BAN_THRESHOLD=10 violations (line 216) within that window, sets `ban:<ip>` for BAN_DURATION_S=3600 (1 hour, line 218) and logs a structured warning with event:'rate_limit.auto_ban' (line 244) plus metrics.rateLimitAutoBan.inc() (line 245).",
+        "ban_check_fail_open": "isBanned(ip) at api/src/lib/ratelimit.ts:222-232 — if Redis is unreachable, logs a warning ('fail-open (بن اعمال نمی‌شود)') and metrics.banCheckFailOpen.inc() (line 230), then returns false (ban not enforced) — same fail-open philosophy as the rate limiter itself, now with a distinct counter so it's separately alertable.",
+        "admin_visibility": "GET/POST /api/v1/admin/security/banned-ips (api/src/app/api/v1/admin/security/banned-ips/route.ts:12-30) — list currently-banned IPs and manually unban one, both requireAdmin-gated."
+      }
+    },
+    "alerting_gap_found": {
+      "existing_alerting": "observability/alerts.yml already defines 11 Prometheus alert rules across 5 groups: availability (HighErrorRate, HttpMetricsMissing, HighLatencyP95), security (AuthFailureSpike, StaffAuthFailureSpike, RateLimitSpike), queue (SmsQueueBacklog, DeadLetterGrowth), notifications (SmsFailureRate, SmsAllFailing), payments (PaymentEndpointErrors, PaymentCallbackLatency), business (ReservationConflictSpike) — this is a materially more complete monitoring setup than a bare /api/metrics endpoint; wired to observability/prometheus.yml (scrape config already requires the METRICS_TOKEN via `credentials_file`, observability/prometheus.yml:20-27) and Grafana dashboards under observability/grafana/.",
+      "gap": "Three metrics that api/src/lib/metrics.ts DEFINES and the code actively increments have NO alert rule in observability/alerts.yml: `rezervno_rate_limit_fallback_total` (metrics.ts:144, incremented whenever Redis is down and rate-limiting degrades to in-memory — this is exactly the kind of degraded-but-invisible state CLAUDE.md rule §5 warns about), `rezervno_ban_check_fail_open_total` (metrics.ts:146, incremented whenever the auto-ban check itself is bypassed due to Redis being down), and `rezervno_rate_limit_auto_ban_total` (metrics.ts:145, incremented on every real auto-ban — currently only visible by manually querying, no alert fires even during an active DDoS being auto-banned).",
+      "evidence_alert_absent": "`grep -n 'rate_limit\\|ban' observability/alerts.yml` matches only line 79 (RateLimitSpike, which alerts on `rezervno_rate_limit_hits_total`, a DIFFERENT metric than the three above)."
+    }
+  },
+  "load_test": {
+    "existing_assets_found": {
+      "note": "A k6 load-test suite already exists in the repo (loadtest/) — this plan extends it rather than proposing from scratch.",
+      "files": [
+        "loadtest/k6-load-test.js — base sanity test, up to 500 VUs, hits GET /api/v1/restaurants and GET /api/v1/restaurants/:slug/availability only (read paths). Thresholds: p95<250ms, p50<150ms, error rate<1% (loadtest/k6-load-test.js:29-34).",
+        "loadtest/k6-scale-400k.js — realistic-browse scenario ramping to 400,000 VUs (documented as requiring k6 Cloud or many distributed instances, NOT a single machine — loadtest/k6-scale-400k.js:5-19), same two read endpoints, thresholds p95<500ms/p99<1200ms, error<5%.",
+        "loadtest/k6-security-probe.js — separate script for rate-limit/SQLi/auth/XSS defenses (not load, out of scope here).",
+        "loadtest/README.md — documents all three plus infra prerequisites for reaching 400k (multi-instance API behind LB, read-replica via DATABASE_REPLICA_URL, Redis cluster via REDIS_CLUSTER_NODES, PgBouncer, CDN)."
+      ],
+      "gap": "Neither existing script exercises the reservation WRITE path (POST /api/v1/reservations) — both explicitly say so in their own header comments ('مسیرهای نوشتنی (رزرو) عمداً اینجا نیستند چون داده‌ی تست واقعی و auth می‌خواهند' — loadtest/k6-load-test.js:14-16). This is exactly the hot path the mission asks to plan for."
+    },
+    "new_scenario_to_add": {
+      "endpoint": "POST /api/v1/reservations — api/src/app/api/v1/reservations/route.ts:49",
+      "payload_shape": "{ restaurant_id (uuid), date (YYYY-MM-DD), time (HH:MM), party_size (int), preferences?, preorder?, guest?, notify_sms?, duration_minutes?, hold?, coupon_code?, gift_card_code?, gift_card_amount? } — schema defined at api/src/app/api/v1/reservations/route.ts:22-42 (reservationSchema).",
+      "auth_needed": "Requires a valid customer JWT (authFromRequest at route.ts:52) or staff JWT with canManageReservations permission — a k6 test user must be seeded and logged in via /api/v1/auth/otp/verify first (with OTP_DEV_MODE=true in the load-test target env so the code is returned in the response instead of requiring real SMS, per CLAUDE.md's documented demo/OTP rule).",
+      "idempotency_header": "Must send a unique `Idempotency-Key` per VU-iteration (route.ts:82-90) — otherwise concurrent identical keys across VUs would incorrectly replay one VU's cached response onto another, which would silently invalidate the load test's own throughput numbers, not just be unrealistic.",
+      "rate_limit_awareness": "RULES.reservation = { max: 10, windowMs: 60_000 } per api/src/lib/ratelimit.ts (RULES.reservation) — enforced BEFORE body parsing (route.ts:65, 'اول ریت‌لیمیت، بعد پارسِ بدنه'). A naive high-VU test against one IP will mostly measure 429s, not the reservation transaction — the k6 scenario must either spread across enough distinct source IPs/X-Real-IP overrides (only trusted if the test target has TRUST_PROXY_HEADERS=false, or hits a proxy that legitimately sets X-Real-IP) or explicitly budget for it: target concurrency should be designed as (max reservation attempts) ≈ 10 × (number of distinct test identities) per minute, and 429 rate should be tracked as a separate, expected metric (not folded into the error rate) — the same pattern loadtest/k6-scale-400k.js already uses for its own rl429 counter (loadtest/k6-scale-400k.js:20,66)."
+    },
+    "concurrency_retry_context": {
+      "file_line": "api/src/lib/reservations.ts:60 — `const TX_MAX_RETRIES = 5;`",
+      "retry_logic": "api/src/lib/reservations.ts:244-260 — up to 5 attempts, each wrapped in a Redis-based slot lock (acquireSlotLock, 8s timeout, line 241) plus a Postgres SERIALIZABLE transaction retry loop with randomized backoff (`20 * (attempt+1) + random*30` ms, line 255) on serialization errors.",
+      "when_CONCURRENCY_RETRY_409_is_thrown": "api/src/lib/reservations.ts:261 (all 5 attempts exhausted with a non-serialization error or the loop falls through), :313 (after the outer catch re-verifies the slot really is full/conflicted and it ISN'T — i.e. genuinely 'try again', not a disguised SLOT_FULL) — this is the 409 CONCURRENCY_RETRY defined at api/src/lib/errors.ts:46.",
+      "why_this_matters_for_the_load_test": "A write-path load test targeting a SINGLE popular restaurant+timeslot (the realistic worst case — many users racing for the same Friday 8pm table) will deliberately manufacture serialization conflicts; success criteria must therefore be 'exactly one 201 per contested slot + everyone else gets a clean 409 SLOT_FULL/TABLE_CONFLICT/CONCURRENCY_RETRY, zero 500s, zero double-bookings' rather than a flat p95 threshold — this mirrors the real incident already documented in the code's own comments (reservations.ts:266-274, 'یافته‌ی واقعیِ ممیزی — با تستِ زنده‌ی ۳۰ کاربرِ هم‌زمان روی یک میز پیدا شد')."
+    },
+    "target_p95": "No project-wide reservation-specific p95 target is documented; the existing suite's global API target is p95<250ms / p50<150ms for READS (loadtest/k6-load-test.js:29-30, matching the header comment 'هدف: API<۱۵۰ms، P95<۲۵۰ms'). Recommend the SAME p95<250ms ceiling for the reservation WRITE path under moderate, non-contested load (distinct slots/restaurants), but a SEPARATE, looser bound (e.g. p95<1500ms, since each retry can add up to ~150ms backoff × 5) for the deliberately-contested single-slot scenario, and track 409 rate as a first-class pass/fail metric rather than an error."
+  },
+  "rollback": {
+    "vercel_rollback": "docs/DEPLOYMENT.md:172-174 — 'Instant Rollback to the previous deployment (each push is an immutable deployment)' for the managed path; self-host equivalent is redeploying the previous image tag via `docker compose up -d --build` from the prior commit.",
+    "feature_flags_as_a_softer_rollback": "docs/DEPLOYMENT.md:196-198 — several behaviors are DB-driven (paymentEnabled, platform_settings, plan controls) so risky features can be disabled without a redeploy at all; api/src/lib/feature-flags.ts backs this (isFeatureEnabled, referenced at api/src/app/api/v1/reservations/route.ts:68 for reservations_enabled itself).",
+    "db_migration_reversibility_07x": {
+      "general_policy": "docs/DEPLOYMENT.md:176-180 — 'Forward-only migrations: manual SQL migrations are not auto-reversible — write compensating scripts for risky changes and test restore from backup before schema changes.'",
+      "075": {
+        "change": "ALTER TABLE economy_ledger_entries ALTER COLUMN id SET DEFAULT gen_random_uuid(); — api/prisma/sql/075-economy-ledger-id-default.sql",
+        "reversibility": "Trivially reversible (DROP DEFAULT) and non-destructive; idempotent already (no-op if the default already exists, per the file's own comment)."
+      },
+      "076": {
+        "change": "Adds 2 enums, 2 nullable-with-default columns (restaurants.provision_status, tenants.branch_limit), and a new staff_invites table — api/prisma/sql/076-restaurant-provisioning.sql",
+        "reversibility": "Additive only (new table + new columns with defaults) — safe to leave in place even if the owning feature (SPEC-B provisioning) is rolled back at the app layer via a feature flag; a real rollback would need explicit DROP TABLE/DROP COLUMN scripts which do not exist today."
+      },
+      "077": {
+        "change": "New menu_categories table + menu_items.category_id FK + is_out_of_stock column + a data BACKFILL from the existing text category column — api/prisma/sql/077-menu-categories.sql",
+        "reversibility": "The backfill is the risky part — additive and idempotent (ON CONFLICT DO NOTHING per the file's own comment) but a rollback that needs to UNDO the backfill (e.g. if menu_categories data is judged wrong) has no compensating script. The legacy text column is deliberately kept as a mirror precisely so the old code path still works if the new one is rolled back at the app layer (comment: 'ستونِ متنیِ menu_items.category حذف نمی‌شود: میرورِ سازگاری برای مصرف‌کننده‌های موجود')."
+      },
+      "078": {
+        "change": "Adds menu_tag enum, menu_modifier_groups/options tables, menu_item_tags, menu_items.availability jsonb — api/prisma/sql/078-menu-modifiers-tags-availability.sql",
+        "reversibility": "Additive only, no backfill of existing rows into these new tables (comment explicitly notes PKs have no server-side DEFAULT because 'هیچ backfill/INSERTِ خامی در کار نیست') — cleanly droppable if needed, low risk."
+      },
+      "079": {
+        "change": "CREATE UNIQUE INDEX staff_owner_phone_unique_idx ON staff(phone) WHERE role='owner' — api/prisma/sql/079-staff-owner-phone-unique.sql",
+        "reversibility": "DROP INDEX is trivial, BUT the migration has a MANDATORY pre-deploy precondition documented in its own header (lines ~55-60 of the file): the operator MUST run `SELECT phone, count(*), array_agg(id ORDER BY created_at) FROM staff WHERE role='owner' GROUP BY phone HAVING count(*) > 1;` against the target environment and confirm it returns ZERO rows before applying 079 to ANY real environment — the migration will hard-fail (unique_violation) on dirty data by design, and the file explicitly forbids any automatic cleanup of duplicate owner rows in the migration itself. This is a genuine rollback-runbook item: before applying 079 to production, this precondition query result must be recorded in the launch log (the file notes it was checked clean on 2026-08-27 against dev-only DBs — production has never been checked, since no production DB is reachable from any of these audit sessions).",
+        "founder_action": "Run the precondition query against production BEFORE 079 is ever applied there, and record the (expected: empty) result."
+      },
+      "no_destructive_DDL_found_in_075_079": "Confirmed via `grep -ln 'DROP COLUMN\\|DROP TABLE\\|DROP CONSTRAINT' api/prisma/sql/06*.sql api/prisma/sql/07*.sql` — only 065 matches (a DROP CONSTRAINT immediately followed by re-ADD CONSTRAINT for an ON UPDATE CASCADE fix, not data-destructive)."
+    },
+    "restore_from_backup_as_last_resort": "See backups section above — restore.sh replays a pg_dump text/gzip snapshot; this is the ultimate rollback for any schema change judged unsalvageable by forward-fix, at the cost of losing all writes since that backup (max staleness ≈ BACKUP_CRON interval, default 24h)."
+  },
+  "blockers": [
+    {
+      "id": "B1",
+      "text": "Melipayamak (SMS) key rotation status cannot be confirmed from the repository. Per mission instruction, this is NOT DONE until the founder confirms in writing.",
+      "evidence": "docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md: 'چرخشِ کلیدِ ملی‌پیامک ؟ از مخزن قابلِ تأیید نیست — فقط شما'"
+    },
+    {
+      "id": "B2",
+      "text": "Architecture decision required before creating the Vercel API project: does it replace the current self-hosted Docker/Caddy production deployment (requiring cron to move to Vercel Cron / api/vercel.json to be recreated), or is it exploratory/staging-only (in which case cron/crontab stays authoritative and this project must never receive production DNS)? Creating the project without this decision risks either double-firing all 9 maintenance jobs (if both cron paths run against the same DB) or silently NOT running any cron jobs (if founder assumes Vercel handles it but api/vercel.json was never recreated).",
+      "evidence": "docs/DEPLOYMENT.md:96-101, cron/crontab:1-13"
+    },
+    {
+      "id": "B3",
+      "text": "MELIPAYAMAK_TOKEN_SEPARATOR (default ';') is explicitly marked unverified in the code itself — Melipayamak does not publicly document multi-token separator behavior and no official SDK sample demonstrates it. Must be confirmed against the live panel before any multi-token pattern (e.g. booking_confirm with restaurant/date/time tokens) is trusted in production.",
+      "evidence": "api/src/lib/sms.ts:76-83"
+    },
+    {
+      "id": "B4",
+      "text": "No production database is reachable from this machine — the backup/restore drill in this plan can only be rehearsed against a scratch DB. It has NOT been validated against an actual production backup file, because none exists / is accessible yet.",
+      "evidence": "mission constraint; corroborated by docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note on blocked Supabase/production access (P0-014, credential desync)"
+    },
+    {
+      "id": "B5",
+      "text": "Migration 079's mandatory pre-deploy precondition query (duplicate owner-phone check) has only ever been run against dev/local databases, never against a real production environment, because none exists/is reachable yet. This MUST be re-run and recorded clean immediately before 079 is ever applied to a real environment.",
+      "evidence": "api/prisma/sql/079-staff-owner-phone-unique.sql (header comment, precondition + 2026-08-27 dev-only confirmation)"
+    },
+    {
+      "id": "B6",
+      "text": "Frontend-to-API wiring (same-origin rewrite vercel.json OR RZ_API_BASE + CORS) does not exist yet for apps/customer|business|company — this is new work required to stand up the 4 Vercel projects usably, not a pre-existing landmine to merely audit.",
+      "evidence": "Glob **/vercel.json returns only apps/landing/vercel.json and apps/seo/vercel.json; docs/DEPLOYMENT.md:107-111 marks this '(uncertain / follow-up)'"
+    }
+  ],
+  "founder_actions": [
+    {
+      "order": 1,
+      "action": "DECIDE: Vercel-hosted API (replacing self-hosted Docker/Caddy) vs. Vercel for frontends only (API stays self-hosted, cron/crontab stays authoritative). Write the decision down — it changes steps 3, 6, and 7 below.",
+      "why_first": "Every subsequent Vercel step for the API project depends on this."
+    },
+    {
+      "order": 2,
+      "action": "Add `\"engines\": { \"node\": \"20.x\" }` to api/package.json (currently absent) so Vercel pins the same Node version already used in api/Dockerfile:2,17 and .github/workflows/ci.yml.",
+      "exact_change": "Edit api/package.json, add an \"engines\" key at the top level alongside \"dependencies\"."
+    },
+    {
+      "order": 3,
+      "action": "In the Vercel dashboard, under team ardalanaz2-4503's projects (team_gLTPq1IJB0ayoC3NsDE4yoXg): create project 'rezervno-api' — Import Git Repository, then in Settings → General set Root Directory = `api`, Framework Preset = Next.js (manual selection, no auto-detect), Node.js Version = 20.x. Do NOT deploy yet — set env vars first (step 5).",
+      "prereq": "step 1 decision = Vercel-hosted API"
+    },
+    {
+      "order": 4,
+      "action": "Create 3 more Vercel projects: 'rezervno-customer' (Root Directory=apps/customer), 'rezervno-business' (Root Directory=apps/business), 'rezervno-company' (Root Directory=apps/company). Framework Preset = Other (no build command, static output) for all three."
+    },
+    {
+      "order": 5,
+      "action": "Set env vars on the API project: at minimum the 5 required-at-boot vars (DATABASE_URL as a POOLED connection string, REDIS_URL, JWT_SECRET, JWT_REFRESH_SECRET, ALLOWED_ORIGINS) — all for Production AND Preview. Then add the 43 optional vars actually needed for launch (all 15 MELIPAYAMAK_* vars, ZARINPAL_MERCHANT_ID, PLATFORM_ADMIN_TENANT_ID, CRON_SECRET or MAINTENANCE_KEY, METRICS_TOKEN). Set OTP_DEV_MODE=false in Production explicitly (the code rejects it in prod anyway, but don't rely on that). Cross-check against the 11 vars this plan found undocumented in docs/ENVIRONMENT.md (ADMIN_LOGIN_ENABLED, ADMIN_TOTP_SECRET, ADMIN_TOTP_USERNAME, BREAK_GLASS_CODE, BREAK_GLASS_PHONE, INVITE_BASE_URL, MELIPAYAMAK_BODYID_INVITE, REDIS_COMMAND_TIMEOUT_MS, REDIS_CONNECT_TIMEOUT_MS, SALES_NOTIFY_EMAIL, UPLOAD_DIR) so none are silently missed."
+    },
+    {
+      "order": 6,
+      "action": "Wire cron per the step-1 decision: (A) if API moves to Vercel — recreate api/vercel.json with a `crons` array covering the 9 jobs/schedules in cron/crontab, then disable the self-hosted `cron` compose service in production to prevent double-firing; OR (B) if API stays self-hosted — leave cron/crontab as-is, do not create any Vercel cron config.",
+      "verification": "Run the 4-step 401/200 verification sequence listed under vercel.cron.verification_steps_401_without_secret_200_with_secret in A10-PLAN.json, against whichever host ends up serving the maintenance routes."
+    },
+    {
+      "order": 7,
+      "action": "Wire frontend-to-API: add a vercel.json with an /api/:path* rewrite to the API's domain on each of the 3 frontend projects (recommended, avoids CORS) — OR set window.RZ_API_BASE / <meta name=\"rz-api-base\"> on each app's index.html and add the frontend origins to ALLOWED_ORIGINS/CORS on the API. Verify with `curl -sI https://<frontend-domain>/api/v1/restaurants` returning something other than a 404 from the STATIC host."
+    },
+    {
+      "order": 8,
+      "action": "In Sentry org 'rezvno' (https://de.sentry.io), create ONE project (platform: node) for the API — no frontend Sentry project needed, since no frontend code references Sentry today. Copy its DSN and set SENTRY_DSN on the API's Vercel/host env. Verify by triggering any warn/error-level log path and confirming the event appears in Sentry within ~1 minute."
+    },
+    {
+      "order": 9,
+      "action": "Confirm in writing (blocker B1): has the Melipayamak account credential/API key ever been rotated since go-live? Record yes/when or no."
+    },
+    {
+      "order": 10,
+      "action": "Run the SMS pattern-send proof procedure (sms.proof_procedure_for_one_real_pattern_send in A10-PLAN.json) against a real Melipayamak test account — record the actual RetStatus/Value from the server log, not just an HTTP 2xx."
+    },
+    {
+      "order": 11,
+      "action": "Run the backup/restore drill (backups.restore_drill_procedure_against_scratch_db) against a scratch DB and record PASS/FAIL with fingerprint match evidence."
+    },
+    {
+      "order": 12,
+      "action": "Before migration 079 is ever applied to a real environment, run its precondition query (SELECT phone, count(*)... FROM staff WHERE role='owner' GROUP BY phone HAVING count(*)>1) and record the (expected: empty) result."
+    },
+    {
+      "order": 13,
+      "action": "Add the 3 missing Prometheus alert rules for rezervno_rate_limit_fallback_total, rezervno_ban_check_fail_open_total, and rezervno_rate_limit_auto_ban_total to observability/alerts.yml, following the existing groups' style (this is a code change, out of this READ-only agent's scope to make — escalate to an implementation agent)."
+    },
+    {
+      "order": 14,
+      "action": "Extend loadtest/ with a reservation-write scenario per load_test.new_scenario_to_add in A10-PLAN.json, run it against a staging/scratch deployment (never production), and record p95/409-rate/500-count results."
+    },
+    {
+      "order": 15,
+      "action": "Draft and rehearse the rollback runbook end-to-end once: pick a low-risk recent deploy, perform an Instant Rollback (or self-host image-tag redeploy) in a non-production environment, and confirm /api/health returns 200 immediately after."
+    }
+  ],
+  "coverage": {
+    "items_total": 34,
+    "items_verified": 31,
+    "verified_breakdown": "Vercel team/0-projects (MCP), Sentry org/0-projects (MCP), .vercelignore content, vercel.json inventory (2 files, neither is api/root), api/package.json build+node evidence, docs/DEPLOYMENT.md + docs/DEPLOY_API_VERCEL.md conflict, cron/crontab + cron/run.sh, all 9 maintenance routes exist, maintenance-auth.ts CRON_SECRET/MAINTENANCE_KEY check, metrics.ts route METRICS_TOKEN check, logger.ts Sentry sink, sms.ts pattern-send path + meliAccepted + smsTransportReady, jobs table schema, backup/restore/list scripts, docker-compose backup service, ratelimit.ts fail-open + auto-ban + admin visibility, observability/alerts.yml (11 rules) vs metrics.ts (3 unalerted metrics), loadtest/ existing 3 scripts, reservations.ts TX_MAX_RETRIES + retry loop + CONCURRENCY_RETRY throws, prisma/sql 075-079 content + no destructive DDL in 06x/07x, env var full list (54) vs docs/ENVIRONMENT.md diff (11 undocumented, 1 dead-in-code FCM_SERVER_KEY, 1 confirmed-inert DATABASE_DIRECT_URL), JWT_SECRET/JWT_REFRESH_SECRET/ALLOWED_ORIGINS/DATABASE_URL/REDIS_URL required-at-boot evidence.",
+    "unverified_breakdown": "3 items — see `unverified` array."
+  },
+  "unverified": [
+    "Whether Vercel's .vercelignore-is-relative-to-repo-root behavior actually causes any conflict for an API project with Root Directory=api while the repo-root .vercelignore also lists 'api' — could only be confirmed by an actual first deploy's build log, which this READ-only mission does not perform.",
+    "Whether Sentry's legacy /api/<project>/store/ ingestion endpoint (which api/src/lib/logger.ts:41 hand-rolls against) is still accepted by a brand-new 2026 Sentry project, versus requiring the newer envelope API — could only be confirmed once a project is actually created and a real event is sent.",
+    "MELIPAYAMAK_TOKEN_SEPARATOR's correctness for multi-token patterns — explicitly unverified in the source code itself (api/src/lib/sms.ts:76-83) and not verifiable without access to the live Melipayamak panel."
+  ]
+}
