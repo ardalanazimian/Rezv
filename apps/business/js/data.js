@@ -53,7 +53,7 @@ function openStatusMenu(i){
 // به بک‌اند بفرستد (به‌جایِ اینکه cancelRes/doCancelRes مسیرِ جدا و
 // ناقصِ خودشان را داشته باشند — رجوع کن به یافته‌ی reservations.js).
 async function changeStatus(i,to,reason){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   closeModal();
   // به‌روزرسانی خوش‌بینانه‌ی UI
   const old=r.status, oldReason=r.cancelReason; r.status=to;
@@ -646,6 +646,10 @@ const RES_DEMO = [
   {t:'۱۹:۰۰',name:'سپیده یاری',party:4,table:6,status:'completed',seg:'regular',pre:true,note:'',phone:'۰۹۱۲۸۹۰۱۲۳۴',date:'past',dLabel:'۳ روز پیش'},
 ];
 let RES = RES_DEMO.slice();
+// A2-002 (۲۰۲۶-۰۹-۰۳): آرایه‌ای که renderResList واقعاً رندر کرده (fetch‌شده یا نمونه).
+// دکمه‌های ردیف با index روی همین کار می‌کنند، نه روی RES ی امروز — وگرنه در تب‌های
+// فردا/آینده/گذشته رزروِ اشتباه (یا ردیفِ نمونه‌ی بدونِ code) PATCH می‌خورد.
+let RES_VIEW = null;
 let _resLoaded = false;
 /**
  * رزروهای «امروز» را برایِ داشبورد از سرور می‌گیرد و RES را جایگزین می‌کند.
