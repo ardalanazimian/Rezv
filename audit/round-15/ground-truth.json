@@ -325,5 +325,27 @@
     "random_15pct": "48/48",
     "rejections": 0,
     "caveat": "55 REAL-STATIC rows pending runtime smoke pass"
+  },
+  "founder_directive_2_2026-09-03": {
+    "verdict": "section 9 corrections ACCEPTED; Phase-1 gate close legitimate; model discipline (0.2) mandatory in every report",
+    "sequencing": [
+      "1. founder merges #81 (580cf7f)",
+      "2. CEO merges latest main into audit/launch-hardening BEFORE its PR runs CI; verify merge base contains dbec99f",
+      "3. founder opens hardening PR; CEO runs the CI-hardening proof (hang commit -> red <=15 min -> next push cancels previous run -> revert -> green)"
+    ],
+    "ceo_verified_facts": {
+      "branch_contains_dbec99f": true,
+      "branch_contains_580cf7f": true,
+      "branch_cut_from": "fd00be1 (descendant of 580cf7f on feat/admin-totp-login)",
+      "origin_main_at_check": "c0327c2 = merge PR #79 — unchanged since the cut (0 new commits)",
+      "dry_run_merge_conflicts": 0,
+      "note": "the hang fix is already in the branch; step 2 is still executed as ordered so the PR diff is only the 7 Wave-1 commits"
+    },
+    "standing_obligations": [
+      "runtime smoke for 55 REAL-STATIC rows the moment A6 releases the DB — per-row pass/fail",
+      "live drift + RLS immediately on written Supabase password-reset confirmation (P0-014)",
+      "close Melipayamak blocker only on written rotation confirmation",
+      "next report: A6 full findings (opus), A10 wiring plan (sonnet), model column per agent, Wave-2 entry criteria"
+    ]
   }
 }
