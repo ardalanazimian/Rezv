@@ -387,6 +387,13 @@ jobs:
       # پوششِ E2Eِ رفتاری ندارند. این قدم همان شکاف را می‌بندد.
       - name: Check classic panel scripts parse (business/company)
         run: sh tools/check-classic-scripts.sh
+      # ⚠️ tools/check-fonts.py وجود داشت ولی تا ۲۰۲۶-۰۹-۰۴ در CI نبود — یعنی
+      # یک عادت بود، نه یک گیت. فونتِ فارسی برای محصولی که مخاطبش در ایران
+      # است اختیاری نیست، و این اسکریپت علاوه بر وجودِ فایل، بایت‌های واقعی،
+      # جاسازیِ آفلاین، و (بندِ ۵) اینکه CSPِ پروکسی هیچ میزبانِ فونتِ ثالثی
+      # را مجاز نکند را هم می‌سنجد.
+      - name: Fonts self-hosted (files, bytes, offline embed, and proxy CSP)
+        run: python tools/check-fonts.py
       # ⚠️ XSSِ ذخیره‌شده‌ی واقعی (۲۰۲۶-۰۸-۲۵): `cardHTML` در فیدِ مشتری فیلدِ
       # `cuisine` را بدونِ esc داخلِ innerHTML می‌گذاشت. آن فیلد را صاحبِ رستوران
       # می‌نویسد (فقط `max(50)`، بدونِ پاک‌سازیِ HTML) و از APIِ عمومی به فیدِ

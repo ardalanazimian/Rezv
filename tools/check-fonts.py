@@ -100,6 +100,46 @@ for app in APPS:
     if 'as="font"' in live:
         fails.append(p + ' — <link rel=preload as=font> باقی مانده (روی file:// فقط ۴۰۴)')
 
+# ── ۵) CSP هیچ میزبانِ فونتِ ثالثی را مجاز نکند ──
+#
+# چرا این بند جداگانه لازم بود: بندِ ۳ فقط HTML را می‌دید. تا ۲۰۲۶-۰۹-۰۴
+# هر دو پروکسی در CSP به fonts.googleapis.com و fonts.gstatic.com اجازه می‌دادند
+# در حالی که هیچ کدی آن‌ها را صدا نمی‌زد — یعنی گارد سبز بود و در عینِ حال
+# درِ پشتی باز مانده بود.
+#
+# چرا مجوزِ بلااستفاده بی‌ضرر نیست: اگر یک رگرسیون دوباره <link> را بیاورد،
+# در ایران مرورگر تا timeout منتظر می‌ماند؛ و چون stylesheet رندر را مسدود
+# می‌کند، کاربر چند ثانیه صفحه‌ی سفید می‌بیند. با بستنِ CSP، همان
+# درخواست فوری رد می‌شود: شکستِ سریع به‌جای معلقِ کند.
+PROXY_CONFIGS = ('deploy/caddy/Caddyfile', 'deploy/nginx/nginx.conf')
+THIRD_PARTY_FONT_HOSTS = ('fonts.googleapis.com', 'fonts.gstatic.com')
+
+_seen_csp = 0
+for p in PROXY_CONFIGS:
+    if not os.path.exists(p):
+        fails.append(p + ' — نیست؛ بندِ ۵ بدونِ موضوع توخالی سبز می‌ماند')
+        continue
+    text = io.open(p, encoding='utf-8').read()
+    # کامنت‌ها را حذف کن — توضیحِ «چرا حذفش کردیم» نباید خودش گارد را قرمز کند.
+    live = re.sub(r'^\s*#.*$', '', text, flags=re.M)
+    for line in live.splitlines():
+        if 'Content-Security-Policy' not in line:
+            continue
+        _seen_csp += 1
+        for host in THIRD_PARTY_FONT_HOSTS:
+            if host in line:
+                fails.append(p + ' — CSP هنوز ' + host + ' را مجاز می‌کند؛ در ایران یعنی رندرِ معلق تا timeout')
+        # ⚠️ دریوِ font-src را جدا کن، نه کلِ خط. نسخه‌ی اول `'data:' not in line` بود و
+        # چون همان خط `img-src 'self' data: https:` دارد، حذفِ data: از font-src را
+        # نمی‌گرفت — با جهشِ M3 پیدا شد (۲۰۲۶-۰۹-۰۴).
+        m = re.search(r'font-src([^;"]*)', line)
+        if m and 'data:' not in m.group(1):
+            fails.append(p + " — font-src بدونِ data: است؛ بسته‌ی standalone فونتِ base64 دارد و می‌شکند")
+
+# قاعده‌ی ۵ CLAUDE.md: نبودِ موضوع باید خطا باشد، نه عبور.
+if _seen_csp == 0:
+    fails.append('هیچ هدرِ CSP در پیکربندیِ پروکسی پیدا نشد — بندِ ۵ چیزی را نسنجیده است')
+
 # ── گزارش ──
 print()
 for w in warns:
@@ -110,4 +150,4 @@ if fails:
         print('    • ' + f)
     sys.exit(1)
 print('✓ فونت درست است: منبع، کپیِ هر سه اپ، اعلانِ @font-face، و جاسازیِ آفلاین')
-print('  (بدونِ هیچ وابستگی به CDNِ ثالث)')
+print('  (بدونِ هیچ وابستگی به CDNِ ثالث — نه در HTML و نه در CSPِ پروکسی)')
