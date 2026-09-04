@@ -525,6 +525,26 @@ function scanFile(absPath, relPath) {
   return hits;
 }
 
+// ثابتِ درونیِ طبقه‌بند (دستورِ ۰۱۵، ۲۰۲۶-۰۹-۰۴).
+//
+// `safe_static` طبقِ تعریفِ خودِ همین فایل یعنی «literal یا template بدونِ
+// هیچ ${...}». پس سینکی که این برچسب را دارد ولی در خطِ خودش `${` دیده
+// می‌شود، یک تناقض است: طبقه‌بند درباره‌ی متنی حکم داده که از آنچه خط
+// واقعاً دارد کمتر بوده.
+//
+// این دقیقاً امضای insertAdjacentHTML بود: chat.js:157 در دیدِ کامل
+// `${esc(body)}` داشت و `safe_static` گرفته بود، چون استخراج روی آرگومانِ
+// موقعیت ایستاده بود. نام‌بردن از همان یک مورد کافی نیست — نوعِ سینکِ
+// بعدی با همین شکافِ استخراج، بی‌صدا تکرارش می‌کند.
+function assertNoUnearnedSafeStatic(hits) {
+  const bad = hits.filter((h) => h.classification === 'safe_static' && /\$\{/.test(h.snippet || ''));
+  if (!bad.length) return;
+  console.error(`\n✗ تناقضِ درونیِ طبقه‌بند: ${bad.length} سینک برچسبِ safe_static دارند`);
+  console.error(`  ولی در خطِ خودشان \${...} دیده می‌شود. safe_static یعنی «هیچ درجی ندارد»،`);
+  console.error(`  پس طبقه‌بند کمتر از آنچه خط دارد را دیده — همان کلاسِ insertAdjacentHTML.`);
+  for (const h of bad.slice(0, 5)) console.error(`    - ${h.file}:${h.line}  ${h.snippet.slice(0, 80)}`);
+  process.exit(1);
+}
 function main() {
   const args = process.argv.slice(2);
   const pathsArgIdx = args.indexOf('--paths');
@@ -547,6 +567,8 @@ function main() {
       allHits.push(...hits);
     }
   }
+
+  assertNoUnearnedSafeStatic(allHits);
 
   const isReportOnly = (file) => REPORT_ONLY_PATHS.some((p) => file.startsWith(p + '/'));
   const enforced = allHits.filter((h) => !isReportOnly(h.file));
@@ -704,6 +726,19 @@ function renderMarkdown(report, unsafe) {
   }
   const reviewed = report.hits.filter((h) => h.manual_review_note);
   if (reviewed.length > 0) {
+    const notCaptured = report.hits.filter((h) => h.classification === 'payload_not_captured');
+    if (notCaptured.length) {
+      lines.push('## Payload never examined — no verdict earned');
+      lines.push('');
+      lines.push('For these sinks the expression extractor stops before the payload argument, so the scanner has **not read the inserted content at all**. This is not a finding and not a clearance — it is an explicit "we do not know", recorded so it cannot be mistaken for either. Until the extractor is fixed, the only thing that can clear one of these is a human reading it.');
+      lines.push('');
+      lines.push('| File:Line | Kind | Line as written |');
+      lines.push('|---|---|---|');
+      for (const h of notCaptured) {
+        lines.push(`| \`${h.file}:${h.line}\` | ${h.kind} | \`${(h.snippet || '').slice(0, 90).replace(/\|/g, '\\|')}\` |`);
+      }
+      lines.push('');
+    }
     lines.push('## Manually reviewed (not auto-classified safe)');
     lines.push('');
     lines.push('The regex classifier flagged these as `unsafe`/`review`; each was read by hand and reclassified with a justification (see `MANUAL_REVIEW_OVERRIDES` in `tools/xss-sink-audit.mjs`). Each override is keyed on a hash of the sink expression itself, so moving code keeps the review attached and CHANGING the sink drops it (the gate then goes red). The line number below is where the sink sat when the report was generated — it is a pointer for the reader, not the key.');
