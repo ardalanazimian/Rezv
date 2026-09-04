@@ -10,6 +10,37 @@ to go re-check something.
 
 ## 2026
 
+- **2026-09-04** — OpenTable's April 16, 2026 client-agreement update requires partner restaurants
+  to make OpenTable their "primary system of record" for reservations/tables/guests — drew a formal
+  antitrust complaint to Washington State, which responded in writing that it would review whether
+  the new terms "may constitute an anticompetitive practice." → fed proposal
+  `proposals/003-transparent-restaurant-terms.md` and MATRIX.md row "No exclusivity/lock-in clause."
+  Sources: [Restaurant Dive](https://www.restaurantdive.com/news/open-table-client-agreement-updates-primary-table-mangement/815706/);
+  [Washington State Standard, 2026-04-15](https://washingtonstatestandard.com/2026/04/15/opentables-new-rules-have-a-seattle-business-leader-calling-foul/).
+
+- **2026-09-04** — Quandoo (global reservation marketplace, commission-per-cover model, same family
+  as OpenTable's pricing) announced a full wind-down: stopped new bookings Sept 30, 2026, full
+  shutdown Dec 31, 2026, after a "strategic portfolio review." A live case study of a per-cover
+  commission model failing in a market that shifted toward flat-fee competitors (Eat App, Zenchef,
+  Servme). Source: [search synthesis of 2026 migration-guide posts](https://reserve.skiper.io/en/quandoo-alternative-restaurant-booking)
+  (secondary sourcing only — primary Quandoo announcement not independently re-fetched this pass).
+
+- **2026-09-04** [Iran] — Fidilio (2024, reported retrospectively this pass): a controversy broke
+  after a user found Snapp Food branding/addresses appearing inside Fidilio's app without clear
+  disclosure — addresses saved in Snapp Food stayed in sync with edits inside Fidilio. CEO Mohammad
+  Bagheri called it a "technical bug" from API integration; Digiato/Tabnak/Startup360 covered the
+  explanation as disputed. → fed proposal `proposals/002-data-provenance-receipt.md` and MATRIX.md
+  row "Cross-tenant / cross-brand data isolation." Sources: [Digiato](https://digiato.com/iran-technology-news/is-fidilio-the-same-as-snappfood);
+  [Tabnak](https://www.tabnak.ir/fa/news/1283338/); [Startup360](https://startup360.ir/snappfood-fidilio-does-not-have-any-data-from-snappfood/).
+
+- **2026-09-04** [Iran] — SmartX (Aug 2025, reported retrospectively this pass): the company's own
+  site carries an apology page, `smartx.ir/sorry/` ("اختلالات باشگاه مشتریان | مرداد ماه ۱۴۰۴"),
+  acknowledging Customer Club service disruptions, sandwiched between two consecutive "Stay Strong"
+  retention campaigns (`smartx.ir/stay-strong/`, `/stay-strong-2/`, Tir 1404 / June–July 2025) — a
+  self-admitted reliability incident serious enough to require back-to-back anti-churn campaigns.
+  Source: `smartx.ir/sorry/`, `smartx.ir/stay-strong/`, `smartx.ir/stay-strong-2/` (via WebSearch
+  synthesis — WebFetch blocked this pass, page text not independently re-read).
+
 - **2026-09-04** — Starbucks Rewards' March 2026 tier relaunch (Green/Gold/Reserve) triggered
   visible backlash: longtime members logged in and found themselves re-labeled "Green," read it as
   a demotion, and pushed back across Reddit/X/Instagram — because the tier-naming change (Gold was
