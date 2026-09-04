@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-03T11:52:28.112Z",
+  "generated_at": "2026-09-04T18:46:27.820Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -372,11 +372,11 @@
     },
     {
       "file": "apps/customer/js/features/live-strip.js",
-      "line": 38,
+      "line": 49,
       "kind": "innerHTML",
-      "snippet": "el.innerHTML = out; // اگر چیزی نبود → نوارِ خالی (حالتِ خالیِ صادقانه)",
+      "snippet": "el.innerHTML = out; // موفق+صفر → خالیِ صادق. ناموفق/شبکه → همان خالی، هرگز عددِ جعلی.",
       "classification": "dom_api_safe",
-      "manual_review_note": "out فقط از pill(fmtFa(عدد)) ساخته می‌شه — بدونِ متنِ کاربر/API."
+      "manual_review_note": "out فقط از pill(fmtFa(عدد)) ساخته می‌شه — بدونِ متنِ کاربر/API. هر سه درج پشتِ گاردِ `Number(d.x) > 0` هستند، پس رشته‌ای که `<` داشته باشد NaN می‌شود و اصلاً رندر نمی‌شود؛ fmtFa هم `n.toLocaleString('fa-IR')` است که فقط رقم/جداکننده تولید می‌کند. ۲۰۲۶-۰۹-۰۴: کلید از :38 به :49 جابه‌جا شد چون راندِ ۲۰ شاخه‌ی res.ok را افزود؛ خودِ سینک دوباره دستی خوانده شد، نه فقط شماره‌خطِ جدید جایگزین."
     },
     {
       "file": "apps/customer/js/features/loyalty.js",
@@ -2285,203 +2285,203 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 1868,
+      "line": 1892,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 1922,
+      "line": 1946,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-restaurants').innerHTML=`",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 1955,
+      "line": 1979,
       "kind": "innerHTML",
       "snippet": "if(!list.length){el.innerHTML=`<div style=\"text-align:center;color:var(--t2);padding:40px\">${restQuery?'رستورانی با این نام پیدا نشد':'رستورانی در این دسته نیست",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 1956,
+      "line": 1980,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=list.map(r=>{",
       "classification": "review"
     },
     {
       "file": "standalone/company.html",
-      "line": 1987,
+      "line": 2011,
       "kind": "innerHTML",
       "snippet": "document.getElementById('modalBody').innerHTML = html;",
       "classification": "review"
     },
     {
       "file": "standalone/company.html",
-      "line": 2125,
+      "line": 2149,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-detail').innerHTML=`",
       "classification": "review"
     },
     {
       "file": "standalone/company.html",
-      "line": 2178,
+      "line": 2202,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div class=\"empty-state-title\">فهرست دسترسی‌ها بارگذاری نشد</div>",
       "classification": "escaped"
     },
     {
       "file": "standalone/company.html",
-      "line": 2190,
+      "line": 2214,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2256,
+      "line": 2280,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2290,
+      "line": 2314,
       "kind": "innerHTML",
       "snippet": "if(btn){ btn.disabled = false; btn.innerHTML = label; }",
       "classification": "review"
     },
     {
       "file": "standalone/company.html",
-      "line": 2306,
+      "line": 2330,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 2312,
+      "line": 2336,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به ",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2321,
+      "line": 2345,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2356,
+      "line": 2380,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-billing').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2504,
+      "line": 2528,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-support').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2527,
+      "line": 2551,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-systemhealth').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 2530,
+      "line": 2554,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){document.getElementById('v-systemhealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2533,
+      "line": 2557,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-systemhealth').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2645,
+      "line": 2669,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-aihealth').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 2648,
+      "line": 2672,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){document.getElementById('v-aihealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2652,
+      "line": 2676,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-aihealth').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2855,
+      "line": 2879,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 2863,
+      "line": 2887,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){document.getElementById('v-security').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2883,
+      "line": 2907,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=(mqRes.ok&&mqRes.data?moderationQueuePanelHTML(mqRes.data):unavailablePanelHTML('خلاصه‌ی صفِ نظارت خوانده نشد — ",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 2966,
+      "line": 2990,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=unavailablePanelHTML('صفحه‌ی امنیت بارگذاری نشد');",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3012,
+      "line": 3036,
       "kind": "innerHTML",
       "snippet": "box.innerHTML=`<div style=\"text-align:center;padding:30px;color:var(--t2)\">در حال جست‌وجو...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 3015,
+      "line": 3039,
       "kind": "innerHTML",
       "snippet": "box.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:24px;color:var(--t2)\">${icon('alert',{size:15})} ${esc(res.error?.message||'کاربر پیدا نشد')}",
       "classification": "escaped"
     },
     {
       "file": "standalone/company.html",
-      "line": 3018,
+      "line": 3042,
       "kind": "innerHTML",
       "snippet": "box.innerHTML=renderCustomer360(res.data);",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3164,
+      "line": 3188,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "dom_api_safe",
@@ -2489,77 +2489,77 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3230,
+      "line": 3254,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 3264,
+      "line": 3288,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3385,
+      "line": 3409,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 3391,
+      "line": 3415,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به سرو",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3398,
+      "line": 3422,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3519,
+      "line": 3543,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "classification": "safe_static"
     },
     {
       "file": "standalone/company.html",
-      "line": 3525,
+      "line": 3549,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به س",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3532,
+      "line": 3556,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 3725,
+      "line": 3749,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 4052,
+      "line": 4076,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"
     },
     {
       "file": "standalone/company.html",
-      "line": 4281,
+      "line": 4305,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "classification": "unsafe"
@@ -3084,42 +3084,42 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6803,
+      "line": 6814,
       "kind": "innerHTML",
-      "snippet": "el.innerHTML = out; // اگر چیزی نبود → نوارِ خالی (حالتِ خالیِ صادقانه)",
+      "snippet": "el.innerHTML = out; // موفق+صفر → خالیِ صادق. ناموفق/شبکه → همان خالی، هرگز عددِ جعلی.",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 6898,
+      "line": 6909,
       "kind": "innerHTML",
       "snippet": "now.innerHTML = ready",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 7203,
+      "line": 7214,
       "kind": "innerHTML",
       "snippet": "document.getElementById('sheetBody').innerHTML=html;",
       "classification": "review"
     },
     {
       "file": "standalone/customer.html",
-      "line": 7258,
+      "line": 7269,
       "kind": "innerHTML",
       "snippet": "s.innerHTML='<span class=\"us-msg\"></span><button class=\"us-btn\" type=\"button\">بازگرداندن</button>';",
       "classification": "safe_static"
     },
     {
       "file": "standalone/customer.html",
-      "line": 7293,
+      "line": 7304,
       "kind": "innerHTML",
       "snippet": "function updateThemeIcon(){ const k=document.getElementById('themeKnob'); if(k) k.innerHTML=icon(_root.getAttribute('data-theme')==='dark'?'moon':'sun',{size:16",
       "classification": "dom_api_safe"
     },
     {
       "file": "standalone/customer.html",
-      "line": 7351,
+      "line": 7362,
       "kind": "innerHTML",
       "snippet": "b.innerHTML=`",
       "classification": "dom_api_safe"

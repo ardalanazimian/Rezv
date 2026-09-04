@@ -311,7 +311,7 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   // ── فرمِ ورودِ سه‌عاملیِ پنلِ شرکت ──
   ['apps/company/js/intelligence.js:865',
    'فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت. ۲۰۲۶-۰۹-۰۲: درجِ سومِ _otpLoginEnabled هم اضافه شد — همان جنس: یک booleanِ سرور که فقط تصمیم می‌گیرد رشته‌ی literal ساخته شود یا نه.'],
-  ['standalone/company.html:3164',
+  ['standalone/company.html:3188',
    'فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت. ۲۰۲۶-۰۹-۰۲: درجِ سومِ _otpLoginEnabled هم اضافه شد — همان جنس: یک booleanِ سرور که فقط تصمیم می‌گیرد رشته‌ی literal ساخته شود یا نه.'],
   // ── بازبینِ بیرونی (Sourcery/opengrep) روی PR #79 ──
   // این سه محل را قاعده‌ی `insecure-innerhtml` علامت زد. تک‌تک در سورس بررسی
@@ -422,7 +422,12 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   //    قالب‌هایِ کاملاً استاتیک استفاده می‌کردن — هیچ فراخوانِ خامِ
   //    escape‌نشده‌ای پیدا نشد. ──
   ['apps/customer/js/auth.js:209', 'openSheet(html) — فراخوان‌ها بررسی شدن (bookStep2/3 با esc(r.n)، rewards.js/trips.js با قالبِ استاتیک) — امن.'],
-  ['apps/customer/js/features/live-strip.js:38', 'out فقط از pill(fmtFa(عدد)) ساخته می‌شه — بدونِ متنِ کاربر/API.'],
+  ['apps/customer/js/features/live-strip.js:49',
+   'out فقط از pill(fmtFa(عدد)) ساخته می‌شه — بدونِ متنِ کاربر/API. هر سه درج پشتِ گاردِ '
+   + '`Number(d.x) > 0` هستند، پس رشته‌ای که `<` داشته باشد NaN می‌شود و اصلاً رندر نمی‌شود؛ '
+   + 'fmtFa هم `n.toLocaleString(\'fa-IR\')` است که فقط رقم/جداکننده تولید می‌کند. '
+   + '۲۰۲۶-۰۹-۰۴: کلید از :38 به :49 جابه‌جا شد چون راندِ ۲۰ شاخه‌ی res.ok را افزود؛ '
+   + 'خودِ سینک دوباره دستی خوانده شد، نه فقط شماره‌خطِ جدید جایگزین.'],
   ['apps/business/js/overview.js:315', 'heatmapِ html فقط از slots/days (محلیِ ثابت) + fa(v) (عدد) ساخته می‌شه.'],
   ['apps/business/js/staff-system.js:91', 'openModal(html) — فراخوان‌هایِ نمونه‌گیری‌شده (data.js changeStatus با esc(r.name)) امن بودن.'],
   ['apps/company/js/overview.js:129', 'openModal(html) — همون الگویِ staff-system.js:91؛ فراخوان‌هایِ نمونه‌گیری‌شده امن بودن.'],
