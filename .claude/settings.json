@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git reset --hard origin/main:*)",
+      "Bash(docker compose down -v:*)",
+      "Bash(docker-compose down -v:*)",
+      "Bash(npx prisma migrate reset:*)",
+      "Bash(dropdb:*)"
+    ]
+  }
+}
