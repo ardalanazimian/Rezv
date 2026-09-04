@@ -154,15 +154,19 @@ await audit({ action: 'staff.permission_change', actorId, targetId, restaurantId
 - `rezervno_rate_limit_hits_total` — جهش = ترافیک مخرب احتمالی.
 - `AuditLog` با action `security.idor_attempt` / `auth.failure` — برای تحقیق.
 
-**Alerting پیشنهادی** (در Prometheus Alertmanager یا Grafana):
-- نرخ خطای ۵xx > ۱٪ برای ۵ دقیقه.
-- شکست احراز هویت > ۱۰۰/دقیقه (brute-force).
-- طول صف SMS > ۵۰۰۰ (worker از کار افتاده).
-- P95 latency > ۵۰۰ms برای ۵ دقیقه.
-- health endpoint = degraded.
+**این بخش کهنه بود** — قوانینِ alert دیگر «پیشنهادی» و hard-code‌نشده نیستند:
+از ۱۶ قاعده در `observability/alerts.yml` (شاملِ سه قاعده‌ی امنیتیِ round-20:
+`RateLimitRedisFailOpen`/`BanCheckFailOpen`/`RateLimitAutoBanSpike`)، پنج
+موردِ بالا هم از قبل واقعاً پیاده بودند: `HighErrorRate`، `AuthFailureSpike`،
+`SmsQueueBacklog`، `HighLatencyP95`، و health را نگاه کن (`GET /api/health`
+بخشِ ۷ همینجا). جزئیات، توجیهِ آستانه‌ها، و اثباتِ فایرشدن با
+`promtool test rules`: `audit/round-20/ALERTS-GAP.md`.
 
-(قوانین alert عمداً اینجا hard-code نشده‌اند چون به آستانه‌های واقعی production
-بستگی دارند که باید بعد از مشاهده‌ی baseline تنظیم شوند.)
+⚠️ آنچه هنوز واقعاً وجود ندارد: تحویلِ آلارم به یک انسان. این استک فقط
+Prometheus + Grafana را بالا می‌آورد (§۵) — هیچ Alertmanager و هیچ
+notification channelِ Grafana provision نشده، پس یک قاعده‌ی فایرشده امروز
+فقط در UIِ خودِ Prometheus/Grafana دیده می‌شود، نه در Slack/ایمیل/PagerDuty.
+سیمکشیِ آن تصمیمِ مالک است (انتخابِ کانال + credential).
 
 ---
 

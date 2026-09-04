@@ -21,7 +21,43 @@ import { fileURLToPath } from 'node:url';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const EVID = join(REPO, 'audit/sms/transport-proof.json');
 const LEDGER = join(REPO, 'docs/DECISIONS.md');
+const RUNNER = join(REPO, 'api/tests/_all.runner.mts');
 const DEFAULT_CAP = 500;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ۲۰۲۶-۰۹-۰۴ — «وجود داشتن» با «اجرا شدن» یکی نیست.
+//
+//  این گیت تا امروز برای هر ادعای «تست دارد» فقط existsSync می‌زد. ولی در
+//  همین مخزن ثابت شده که تستی که در api/tests/_all.runner.mts ایمپورت نشده
+//  باشد هرگز اجرا نمی‌شود — یک‌بار سه فایل هم‌زمان پنهان ماندند در حالی که
+//  یک PR «۳۷۵/۳۷۵ سبز» اعلام می‌کرد و عددِ واقعی ۳۵۲ بود. پس یک فایلِ
+//  یتیم روی دیسک این گیت را کاملاً راضی می‌کرد.
+//
+//  معیار از خواهرِ خودش گرفته شده، نه از بیرون: gate-destructive.mjs:85-88
+//  به رکوردِ درِیل بسنده نمی‌کند — وجودِ فایل، اندازه، و sha256 را **دوباره
+//  محاسبه** می‌کند، چون فرض می‌گیرد شواهدش ممکن است دروغ بگویند. گیتی که
+//  ارسالِ واقعی به شماره‌ی واقعیِ مشتری را مجاز می‌کند نباید سست‌تر از گیتی
+//  باشد که drop کردنِ دیتابیس را مجاز می‌کند.
+// ═══════════════════════════════════════════════════════════════════════
+function assertTestActuallyRuns(testPath, label) {
+  if (!testPath || !existsSync(join(REPO, testPath))) {
+    deny(`${label}: فایلِ تست وجود ندارد — ادعا بدونِ تست: ${testPath ?? '(بدونِ مسیر)'}`);
+  }
+  if (!existsSync(RUNNER)) deny(`runnerِ تست پیدا نشد: api/tests/_all.runner.mts`);
+  const runner = readFileSync(RUNNER, 'utf8');
+  const base = testPath.split('/').pop();
+  // runner با `import './x.test.mts';` جمع می‌کند — نامِ فایل باید در یک خطِ
+  // importِ واقعی بیاید، نه صرفاً جایی در متن (مثلاً داخلِ یک کامنت).
+  const imported = runner
+    .split('\n')
+    .some((l) => /^\s*import\s+['"]\.\/.+['"]\s*;?\s*$/.test(l) && l.includes(base));
+  if (!imported) {
+    deny(
+      `${label}: «${base}» در api/tests/_all.runner.mts ایمپورت نشده — ` +
+        'فایل روی دیسک هست ولی npm test هرگز اجرایش نمی‌کند. وجود ≠ اجرا.',
+    );
+  }
+}
 
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf(n); return i === -1 ? d : argv[i + 1]; };
@@ -53,15 +89,13 @@ if (String(e.test_send.provider_raw_response).trim() === '') deny('پاسخِ خ
 if (e.null_response_as_success_impossible !== true) {
   deny('اثبات نشده که «پاسخِ null = موفقیت» ناممکن است — این باید یک تستِ قرمزشونده داشته باشد');
 }
-if (!e.null_response_test?.path || !existsSync(join(REPO, e.null_response_test.path))) {
-  deny('فایلِ تستِ null-response وجود ندارد — ادعا بدونِ تست');
-}
+assertTestActuallyRuns(e.null_response_test?.path, 'تستِ null-response');
 
 // ── سقف و ساعتِ سکوت در کد ─────────────────────────────────────────────
 for (const k of ['frequency_cap', 'quiet_hours']) {
   const t = e.enforced_in_code?.[k];
   if (t?.enforced !== true) deny(`${k} در کد اجرا نمی‌شود`);
-  if (!t.test_path || !existsSync(join(REPO, t.test_path))) deny(`${k} تستِ موجود ندارد: ${t.test_path ?? '(بدونِ مسیر)'}`);
+  assertTestActuallyRuns(t.test_path, k);
 }
 
 // ── سقفِ گیرنده ────────────────────────────────────────────────────────

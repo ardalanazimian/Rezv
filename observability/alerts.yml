@@ -82,6 +82,80 @@ groups:
         annotations:
           summary: "جهش rate-limit (ترافیک مخرب احتمالی)"
 
+      # ── A10-PLAN.json:614 escalation (۲۰۲۶-۰۹-۰۴) ───────────────────────
+      # سه شمارنده‌ی زیر از قبل صادر می‌شدند ولی هیچ قاعده‌ای نمی‌خواندشان
+      # (round-19، هیچ‌کس escalation را برنداشت). هر سه از middleware.ts روی
+      # **هر** درخواستِ /api/* واقعاً صدا زده می‌شوند (matcher: '/api/:path*')،
+      # نه مسیرِ مرده — نویسنده‌ها: rezervno_rate_limit_fallback_total در
+      # lib/ratelimit.ts:99 (صداشده از middleware.ts:151 و enforceRateLimit،
+      # ۵۹+ routeِ دیگر از طریقِ withRestaurantAuth/withStaffAuth)،
+      # rezervno_ban_check_fail_open_total در lib/ratelimit.ts:230 (صداشده از
+      # middleware.ts:126)، rezervno_rate_limit_auto_ban_total در
+      # lib/ratelimit.ts:245 (صداشده از middleware.ts:141 و :153).
+      #
+      # چرا `for` طولانی‌تر از پنجره‌ی `increase()` است (نه برعکس) برایِ دو
+      # قاعده‌ی fail-open: آستانه‌ی شمارش عمداً `> 0` است — حتی یک بار
+      # fail-open یعنی یک کنترلِ امنیتی موقتاً خاموش بوده. ولی اگر `for`
+      # کوتاه‌تر یا مساویِ پنجره باشد، همان یک رویدادِ مجزا (که با یک وقفه‌ی
+      # چندثانیه‌ایِ شبکه هم ممکن است رخ بدهد، نه فقط با قطعیِ واقعیِ Redis) هم
+      # پیج می‌شود — دقیقاً همان «پیج‌شدن با یک blip» که باید جلویش گرفته شود.
+      # با `for` **بلندتر** از پنجره‌ی `increase`، اثرِ یک رویدادِ مجزا (که رویِ
+      # نمودار فقط به‌اندازه‌ی طولِ پنجره «true» می‌ماند، چون شمارنده بعدش دیگر
+      # رشد نمی‌کند) قبل از رسیدنِ `for` خودش خاموش می‌شود؛ فقط وقتی fail-open
+      # **مکرراً** رخ می‌دهد (Redis واقعاً چند دقیقه قطع است، پس هر درخواستِ
+      # بعدی روی همان مسیر دوباره inc می‌کند) پنجره پیوسته «true» می‌ماند و
+      # بعد از `for` فایر می‌شود. اثباتش (سناریوی مجزا = سکوت، سناریوی
+      # ادامه‌دار = فایر) در observability/alerts.test.yml.
+      - alert: RateLimitRedisFailOpen
+        expr: sum(increase(rezervno_rate_limit_fallback_total[2m])) > 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "ریت‌لیمیت به‌خاطرِ قطعیِ Redis به سقفِ in-memory سقوط کرده"
+          description: >-
+            حداقل ۵ دقیقه fallback به سقفِ per-process ادامه دارد، یعنی Redis
+            در دسترسِ API نیست. سقفِ واقعیِ ریت‌لیمیت الان
+            max × تعدادِ instance شده (lib/ratelimit.ts:293-303)، و همین
+            قطعی رویِ cache و قفلِ رزرو
+            (rezervno_slot_lock_fallback_total، lib/redis.ts:166 — نویسنده‌اش
+            اما هنوز آلارم ندارد) هم اثر می‌گذارد. Redis را چک کن، نه فقط API.
+
+      - alert: BanCheckFailOpen
+        expr: sum(increase(rezervno_ban_check_fail_open_total[2m])) > 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "چکِ بنِ IP fail-open شده — بن‌های فعال اعمال نمی‌شوند"
+          description: >-
+            حداقل ۵ دقیقه isBanned() به‌خاطرِ قطعیِ Redis fail-open می‌شود
+            (lib/ratelimit.ts:221-232، صداشده از middleware.ts:126 روی هر
+            درخواستِ /api/*)؛ یعنی هر IPِ قبلاً بن‌شده الان بدونِ محدودیت رد
+            می‌شود. با قطعِ Redis همزمان رخ می‌دهد؛ رفعِ Redis همین بن‌ها را
+            هم برمی‌گرداند.
+
+      # آستانه‌ی این یکی برعکسِ دو موردِ بالاست: خودِ بن‌شدن رفتارِ **درستِ**
+      # سیستم است (دفاع دارد کار می‌کند)، پس `> 0` بی‌معنا بود — هر رستورانِ
+      # پرترافیک چند بنِ خودکارِ طبیعی در روز دارد. سیگنالِ واقعی «خوشه‌ای‌شدن»
+      # است: یا حمله‌ی واقعی (خوب، دفاع کار می‌کند، فقط دیده شود) یا CGNAT
+      # (بد — طبقِ کامنتِ qrCheckin در lib/ratelimit.ts:189-193، صدها مشترکِ
+      # ایرانی پشتِ یک IPِ عمومی مشترک‌اند و بنِ آن IP مشتریانِ واقعی را هم
+      # می‌بندد؛ رفعش لغوِ دستی با unbanIp در پنلِ شرکت است،
+      # lib/ratelimit.ts:276). عددِ ۵ در ۱۰ دقیقه حدسِ محافظه‌کارانه است —
+      # بدونِ ترافیکِ تولیدِ واقعی (P0-017: صفر زیرساختِ تولید امروز) قابلِ
+      # calibrate نیست؛ بعد از لانچ با baseline واقعی تنظیم شود، دقیقاً مثلِ
+      # کامنتِ RULES در lib/ratelimit.ts:154.
+      - alert: RateLimitAutoBanSpike
+        expr: sum(increase(rezervno_rate_limit_auto_ban_total[10m])) > 5
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "خوشه‌ی بنِ خودکارِ IP در ۱۰ دقیقه"
+          description: >-
+            بیش از ۵ بنِ خودکار در ۱۰ دقیقه (recordViolation،
+            lib/ratelimit.ts:236-248) — یا حمله‌ی واقعی یا بنِ اشتباهیِ یک
+            IPِ به‌اشتراک‌گذاشته‌شده (CGNAT). فهرست را با listBannedIps در
+            پنلِ ادمین/شرکت نگاه کن؛ لغوِ دستی با unbanIp در دسترس است.
+
   - name: rezervno_queue
     rules:
       - alert: SmsQueueBacklog

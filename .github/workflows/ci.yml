@@ -319,6 +319,53 @@ jobs:
           npm audit --audit-level=critical
           npm audit --audit-level=high || echo "::warning::یافته‌ی high در dependencyها — بررسی کن (build را نمی‌شکند)"
 
+  # ── قواعدِ Alert (Prometheus) — تا round-20 هیچ jobی این فایل را نمی‌ساخت/نمی‌سنجید ──
+  #
+  # ⚠️ چرا این job لازم است (بندِ ۵ منشور: هر آرتیفکتِ تحویلی یک jobِ CI می‌خواهد
+  # که واقعاً می‌سازدش): observability/alerts.yml یک آرتیفکتِ تحویلی است (Prometheus
+  # با mount در docker-compose.observability.yml آن را می‌خواند) ولی تا امروز هیچ
+  # jobی آن را حتی parse نمی‌کرد — یک syntax error یا یک نامِ متریکِ اشتباه فقط در
+  # زمانِ boot شدنِ خودِ Prometheus کشف می‌شد (وقتی همه‌ی ۱۳/۱۶ قاعده از کار افتاده‌اند).
+  # `promtool` روی هاست نصب نیست؛ همان ایمیجِ `prom/prometheus` که
+  # docker-compose.observability.yml برایِ خودِ Prometheus استفاده می‌کند (نه ابزارِ
+  # تازه‌ی نصب‌شده) هم برای syntax-check و هم برای تستِ واحدِ قواعد استفاده می‌شود.
+  #
+  # ⚠️ Pin به v3.14.0 (نه :latest، ۲۰۲۶-۰۹-۰۴): همان کلاسِ مشکلِ
+  # mcr.microsoft.com/playwright:v1.62.1-noble در jobِ e2e پایین‌تر — یک
+  # ایمیجِ tag-نشده یعنی این job می‌تواند بینِ دو اجرا، بدونِ هیچ تغییری در
+  # این ریپو، رفتارِ متفاوت بدهد یا حتی breaking changeِ خودِ promtool را
+  # بی‌خبر بگیرد. verify شد: در زمانِ pin کردن، digestِ v3.14.0 دقیقاً با
+  # digestِ :latest یکی بود (sha256:5ce7540c...) — این یک downgrade نیست.
+  observability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: promtool check rules (کلِ alerts.yml — یک قاعده‌ی خراب نباید بقیه را هم پنهان کند)
+        run: |
+          docker run --rm -v "${{ github.workspace }}/observability:/etc/prometheus:ro" \
+            --entrypoint promtool prom/prometheus:v3.14.0 check rules /etc/prometheus/alerts.yml
+
+      # round-20 (A10-PLAN.json:614 escalation): سه قاعده‌ی fail-open تازه
+      # (RateLimitRedisFailOpen / BanCheckFailOpen / RateLimitAutoBanSpike) با
+      # سری‌های زمانیِ ساختگی — هم سناریوی «باید فایر شود» هم «باید ساکت بماند».
+      # قاعده‌ای که هرگز firing دیده نشده گیت نیست (CLAUDE.md بخشِ ۲).
+      - name: promtool test rules (سناریوهای فایر/سکوتِ قواعدِ round-20)
+        run: |
+          docker run --rm -v "${{ github.workspace }}/observability:/etc/prometheus:ro" \
+            -w /etc/prometheus --entrypoint promtool prom/prometheus:v3.14.0 \
+            test rules alerts.test.yml
+
+      # round-20 (F-C escalation): promtool فقط PromQL/رفتارِ سری‌های ساختگی
+      # را می‌سنجد، هرگز کدِ واقعی را نمی‌خواند — یک بازبین با rename کردنِ
+      # فقط سمتِ metrics.ts (بدونِ دست‌زدن به alerts.yml) ثابت کرد هر دو
+      # promtool سبز می‌مانند درحالی‌که قاعده دیگر به هیچ متریکِ واقعی‌ای گوش
+      # نمی‌دهد. این گارد آن سمت را می‌بندد: هر rezervno_* که در یک expr
+      # استفاده شده باید در کد (new Counter/Gauge/Histogram) واقعاً اعلام
+      # شده باشد، وگرنه exit غیرصفر.
+      - name: هر متریکِ استفاده‌شده در alerts.yml در کد اعلام شده؟ (بایندینگِ متریک↔آلارم)
+        run: node tools/check-alert-metric-binding.mjs
+
   # ── مرحله ۴: E2E (Playwright، اپ کاستومر — API کاملاً mock می‌شود، بدونِ نیاز به DB/بک‌اند) ──
   e2e:
     runs-on: ubuntu-latest
@@ -407,6 +454,14 @@ jobs:
       # این دو را ندارد به دستور اعتراض نمیکند و heuristic را هوش برچسب میزند.
       - name: Every agent carries both charter skills
         run: node tools/check-agent-charter.mjs
+      # ⚠️ بدترین fake-greenِ ثبت‌شده‌ی این مخزن (۲۰۲۶-۰۸-۱۴): سه فایلِ تست ساخته
+      # شدند و در api/tests/_all.runner.mts ایمپورت نشدند، پس `npm test` هرگز
+      # اجراشان نکرد — و PRِ مربوطه «۳۷۵/۳۷۵ پاس» اعلام کرد در حالی که عددِ واقعی
+      # ۳۵۲ بود. درسی که آن روز ثبت شد یک **کامنت** بود که یک دستورِ شل را تجویز
+      # می‌کرد؛ آن دستور حتی اجراشدنی هم نبود (الگویِ `grep -oP`ش با «...» حذف شده
+      # بود). تا امروز، ۱۵۷ فایلِ تست فقط با انضباطِ انسانی محافظت می‌شدند.
+      - name: Every test file is actually imported by the runner
+        run: node tools/check-runner-completeness.mjs
       # ⚠️ XSSِ ذخیره‌شده‌ی واقعی (۲۰۲۶-۰۸-۲۵): `cardHTML` در فیدِ مشتری فیلدِ
       # `cuisine` را بدونِ esc داخلِ innerHTML می‌گذاشت. آن فیلد را صاحبِ رستوران
       # می‌نویسد (فقط `max(50)`، بدونِ پاک‌سازیِ HTML) و از APIِ عمومی به فیدِ

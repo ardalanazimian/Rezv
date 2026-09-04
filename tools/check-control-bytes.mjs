@@ -29,10 +29,21 @@ const RUNNABLE = /\.(mjs|js|ts|mts|sh|yml|yaml|sql|py)$/;
 // مجاز: tab (\t=9) · LF (10) · CR (13). بقیه‌ی C0 و DEL ممنوع‌اند.
 const FORBIDDEN = (c) => (c < 0x20 && c !== 9 && c !== 10 && c !== 13) || c === 0x7f;
 
+// ۲۰۲۶-۰۹-۰۴: تعریفِ عامل‌ها هم «اجرا» می‌شود — frontmatterِ آن‌ها را
+// tools/check-agent-charter.mjs ماشینی parse می‌کند، پس یک بایتِ کنترلی آنجا
+// دقیقاً همان‌طور بی‌صدا یک گارد را از کار می‌اندازد که `\b`ِ heredoc انداخت.
+// عمداً به‌صورتِ شمارشِ **جدا** اضافه شده و نه با افزودنِ `md` به RUNNABLE:
+// آن کار دو README نثرِ بی‌ربط زیرِ api/prisma/sql/ را هم می‌گرفت، یعنی نویز —
+// همان اشتباهی که در گاردِ کهنگی ۲۳ مثبتِ کاذب از ۲۶ ساخت (بندِ ۴b منشور).
+const AGENT_DEFS = ['.claude/agents/'];
+
 let files;
 try {
-  files = execFileSync('git', ['ls-files', ...SCOPE], { cwd: REPO, encoding: 'utf8' })
+  const runnable = execFileSync('git', ['ls-files', ...SCOPE], { cwd: REPO, encoding: 'utf8' })
     .split('\n').map((s) => s.trim()).filter((f) => f && RUNNABLE.test(f));
+  const agentDefs = execFileSync('git', ['ls-files', ...AGENT_DEFS], { cwd: REPO, encoding: 'utf8' })
+    .split('\n').map((s) => s.trim()).filter((f) => f && /\.md$/.test(f));
+  files = [...new Set([...runnable, ...agentDefs])];
 } catch (e) {
   console.error('❌ git ls-files نشد:', String(e));
   process.exit(1);
