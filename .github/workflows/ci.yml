@@ -399,6 +399,14 @@ jobs:
       # تصحیح فقط در تاریخچه‌ی چت زندگی می‌کرد و هیچ گیتی نمی‌دیدش.
       - name: Docs are not stale (repo address, proxy hosts, env vars)
         run: node tools/check-doc-staleness.mjs
+      # ششمین نمونهی fake-green و اولینی که از خواندنِ کد پیدا نمیشد: یک بایتِ
+      # backspace که heredoc تولید کرده بود، یک regex را بیصدا از کار انداخت.
+      - name: No invisible control bytes in runnable files
+        run: node tools/check-control-bytes.mjs
+      # هر عاملی باید منشورِ Gen-Z و قانوننامهی ممیزی را preload کند. عاملی که
+      # این دو را ندارد به دستور اعتراض نمیکند و heuristic را هوش برچسب میزند.
+      - name: Every agent carries both charter skills
+        run: node tools/check-agent-charter.mjs
       # ⚠️ XSSِ ذخیره‌شده‌ی واقعی (۲۰۲۶-۰۸-۲۵): `cardHTML` در فیدِ مشتری فیلدِ
       # `cuisine` را بدونِ esc داخلِ innerHTML می‌گذاشت. آن فیلد را صاحبِ رستوران
       # می‌نویسد (فقط `max(50)`، بدونِ پاک‌سازیِ HTML) و از APIِ عمومی به فیدِ

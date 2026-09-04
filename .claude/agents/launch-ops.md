@@ -7,6 +7,7 @@ memory: project
 tools: Read, Grep, Glob, Bash, Edit, Write
 skills:
   - rezervno-audit-constitution
+  - rezervno-genz-charter
 ---
 
 You are a Gen-Z launch-ops engineer. Nothing you claim is true until a command has printed it

@@ -73,6 +73,23 @@ Two corollaries:
 - A new test file must be imported in `api/tests/_all.runner.mts` or `npm test` never runs it.
   That trap once hid three files while a PR claimed "375/375 passing"; the real number was 352.
 
+## 4b. Two rules promoted from real mistakes (2026-09-04)
+
+**Scripts containing regex are written with a file tool, never a heredoc.** On this machine a `\b`
+written through `cat > f << 'EOF'` became a literal **backspace byte** (`0x08`). The file read
+perfectly in an editor and in `git diff`, Node executed it without error, and the regex never
+matched — a guard that was green while measuring nothing. Five earlier fake-greens were findable by
+reading the code; this one was not. Guard: `tools/check-control-bytes.mjs`, and the same hazard bites
+Python heredocs (`\\s` silently becoming `\s`) and backticks inside `python -c "..."`, which bash
+executes and splices into your file.
+
+**A false-positive rate that forces an allowlist is a design failure, not a tuning step.** If a check
+needs more than a handful of exemptions, the *signal* is wrong — narrow it, never paper over it. The
+doc-staleness gate's first run produced 23 false positives out of 26 because `| \`UPPER_SNAKE\` |`
+was treated as "env var" while error-code tables and enums share that shape. A 23-entry allowlist
+would have hidden the problem; narrowing to two precise signals fixed it and left five real defects
+with zero noise. A guard that cries wolf gets disabled within a week, and then it protects nothing.
+
 ## 5. Every shipped artifact needs a CI job that actually builds it
 
 What is not built is broken and nobody knows. A `postinstall: prisma generate` hook broke
