@@ -87,6 +87,13 @@ export const metrics = {
   httpDuration: new Histogram('rezervno_http_request_duration_seconds', 'مدت زمان درخواست HTTP بر حسب ثانیه'),
   reservationsCreated: new Counter('rezervno_reservations_created_total', 'تعداد رزروهای موفق ساخته‌شده'),
   reservationConflicts: new Counter('rezervno_reservation_conflicts_total', 'تعداد رد رزرو به‌خاطر تداخل (double-booking جلوگیری‌شده)'),
+  // ⚠️ زیرِ isolationِ Serializable، ابطال با ۴۰۰۰۱/۴۰P۰۱ رفتارِ *عادیِ* SSI است
+  // و مکانیزمِ retry (reservation-helpers.ts → withSerializationRetry) مسیرِ داغ
+  // است، نه یک حالتِ لبه. بدونِ این شمارنده هیچ راهی نبود بفهمیم retry واقعاً
+  // شلیک می‌کند یا فقط در کد حاضر است — و یک مکانیزمِ اندازه‌گیری‌نشده در مسیرِ
+  // رزرو دقیقاً همان چیزی است که «سبزِ توخالی» می‌سازد. صعودِ ناگهانی‌اش یعنی
+  // فشارِ همزمانی رویِ یک اسلات؛ صفرِ دائمی‌اش زیرِ بار یعنی retry مرده است.
+  serializationRetries: new Counter('rezervno_serialization_retries_total', 'تعداد تلاشِ مجددِ تراکنش پس از تداخلِ serialization/deadlock (۴۰۰۰۱/۴۰P۰۱/P۲۰۳۴)'),
   smsQueueDepth: new Gauge('rezervno_sms_queue_depth', 'تعداد پیام‌های در صف SMS'),
   smsSent: new Counter('rezervno_sms_sent_total', 'تعداد پیامک‌های ارسال‌شده'),
   smsFailed: new Counter('rezervno_sms_failed_total', 'تعداد پیامک‌های ناموفق (به دست مشتری نرسید)'),
