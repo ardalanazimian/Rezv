@@ -111,22 +111,36 @@ before(async () => {
   userId = u.id;
 });
 
-beforeEach(async () => {
-  // هر تست از صفر شروع می‌شود؛ وگرنه رزروی که تستِ قبلی ساخته در شمارشِ
-  // بازگشتیِ تستِ بعدی می‌آید و ادعاهای عددی بی‌معنا می‌شوند.
-  const ids = [restaurantId, otherRestaurantId];
+// فرزندانِ reservations که ON DELETE ِ NO ACTION دارند و حذفِ رزرو را بلوکه
+// می‌کنند. reservation_events و reservation_items خودشان CASCADE‌اند؛
+// chat_threads/outreach_log/reviews هم SET NULL — پس فقط این دو می‌مانند.
+// چرا لازم است: خودِ کدِ زیرِ تست این ردیف را می‌سازد —
+// lifecycle.ts → processReservationEconomyEvent() → INSERT در
+// economy_ledger_entries (economy.ts:212). یعنی این پاک‌سازی هرگز اختیاری
+// نبود؛ نبودش با کدِ ۲۳۵۰۳ کلِ سوئیت را می‌خواباند (رانر همه را در یک
+// پروسه import می‌کند). payments هم همان قید را دارد و بمبِ بعدی بود.
+async function purgeReservations(ids: string[]) {
+  await db.$executeRaw`
+    DELETE FROM economy_ledger_entries WHERE reservation_id IN
+      (SELECT id FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[]))`;
+  await db.$executeRaw`
+    DELETE FROM payments WHERE reservation_id IN
+      (SELECT id FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[]))`;
   await db.$executeRaw`
     DELETE FROM reservation_events WHERE reservation_id IN
       (SELECT id FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[]))`;
   await db.$executeRaw`DELETE FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[])`;
+}
+
+beforeEach(async () => {
+  // هر تست از صفر شروع می‌شود؛ وگرنه رزروی که تستِ قبلی ساخته در شمارشِ
+  // بازگشتیِ تستِ بعدی می‌آید و ادعاهای عددی بی‌معنا می‌شوند.
+  await purgeReservations([restaurantId, otherRestaurantId]);
 });
 
 after(async () => {
   const ids = [restaurantId, otherRestaurantId];
-  await db.$executeRaw`
-    DELETE FROM reservation_events WHERE reservation_id IN
-      (SELECT id FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[]))`.catch(() => 0);
-  await db.$executeRaw`DELETE FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[])`.catch(() => 0);
+  await purgeReservations(ids).catch(() => 0);
   await db.table.deleteMany({ where: { restaurantId: { in: ids } } }).catch(() => {});
   await db.restaurant.deleteMany({ where: { id: { in: ids } } }).catch(() => {});
   await db.tenant.deleteMany({ where: { id: tenantId } }).catch(() => {});
