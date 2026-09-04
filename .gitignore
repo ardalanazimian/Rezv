@@ -86,3 +86,8 @@ RezervnoOSv2/
 
 # توکنِ scrapeِ Prometheus — راز است، مثلِ .env
 observability/metrics-token
+
+# درِیلِ بازیابی: رکوردهای JSON شاهدند و commit می‌شوند، ولی خودِ dumpها نه —
+# یک dumpِ دیتابیس داده دارد و در مخزن جایش نیست. نتیجه: در یک clone تازه
+# گیتِ A1 قرمز است، که درست هم هست: آن ماشین هیچ درِیلی اجرا نکرده.
+audit/drills/dumps/
