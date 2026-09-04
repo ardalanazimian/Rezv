@@ -1,0 +1,8 @@
+{
+  "_note": "Redacted 2026-09-04 (A11 credential-hygiene fix, see A11-REPORT.md). This file is safe to commit — it carries no secret. It is the LEGACY fixture from the abandoned 2026-09-03 run (target DB rezervno_test, never used by the 2026-09-04 rerun). The plaintext password that used to live here (identical to the one duplicated in api/platform-fixture.json, now deleted) has been removed. The 2026-09-04 rerun's own fixture identifiers are in A11-logs/a11-run-state.json (also safe to commit, also no secret; corrected 2026-09-04 — this note previously named a11-run-fixture.json, a file that has never existed); its actual generated passwords/TOTP secret live only in the git-ignored A11-logs/a11-secrets.env.",
+  "platformTenantId": "c1e290a8-c233-4d0d-beaf-059243da8433",
+  "ownerStaffId": "2509fc4d-517a-45c4-ab3e-b233b64e7299",
+  "ownerPhone": "09910984666",
+  "ownerUsername": "a11admin",
+  "ownerPassword": "<redacted 2026-09-04 — see note above>"
+}

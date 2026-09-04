@@ -3,7 +3,7 @@
   "purpose": "runtime smoke pass for REAL-STATIC rows (founder directive): real API + DB, per-row pass/fail; only then REAL",
   "preconditions": [
     "local DB free (A6 finished) — check pg_stat_activity = 0",
-    "api dev server on http://localhost:3000 with DATABASE_URL=test DB, REDIS_URL=redis://localhost:56500, JWT_* pinned, ADMIN_LOGIN_ENABLED=false, OTP_DEV_MODE=true",
+    "api dev server on http://localhost:3000 with DATABASE_URL=test DB, REDIS_URL=redis://localhost:56379 (rezv-test-redis; the previous value redis://localhost:56500 pointed at nothing — A11 2026-09-03 run: 16,507 ioredis error lines in A11-logs/api.log and zero rows executed; fixed 2026-09-04, see A11-REPORT.md), JWT_* pinned, ADMIN_LOGIN_ENABLED=false, OTP_DEV_MODE=true",
     "fixture: one tenant/restaurant/owner + one customer via existing integration-test helpers (api/tests/_phone.helper.mts, admin-create-business flow)"
   ],
   "method": "for each row: call the row's API with a valid token via the panel's own client path where possible (Playwright against the real API, not mocks), else curl; PASS = expected 2xx + response shape the JS reads; FAIL = anything else (recorded verbatim)",
