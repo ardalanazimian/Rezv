@@ -31,7 +31,7 @@
         "deployment_protection": "must be OFF/Standard for the domain the frontends call, per docs/DEPLOY_API_VERCEL.md:29-30 — otherwise 401/redirect breaks every API call",
         "vercelignore_landmine_check": {
           "finding": "RESOLVED, not present today.",
-          "evidence": ".vercelignore (repo root) explicitly does NOT ignore apps/ — its own comment says so: '.vercelignore:3-4 نکته: پس از انتقال فرانت‌اند به apps/، دیگر apps را ignore نمی‌کنیم؛ بک‌اند و پوشه‌های زیرساخت/بیلد ignore می‌مانند'. It does ignore api, deploy, backup, observability, cron, loadtest, e2e, docs, shared, tools, standalone, demo-mvp, .github, docker-compose*.yml, *.md, .env.example (.vercelignore:8-20). No vercel.json exists at repo root or under api/ (confirmed via Glob **/vercel.json — only apps/landing/vercel.json and apps/seo/vercel.json exist). apps/business/src-v2 (the old duplicate frontend tree the mission's landmine language refers to) was already deleted at commit 95e95f1 per docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md:127.",
+          "evidence": ".vercelignore (repo root) explicitly does NOT ignore apps/ — its own comment says so: '.vercelignore:3-4 نکته: پس از انتقال فرانت‌اند به apps/، دیگر apps را ignore نمی‌کنیم؛ بک‌اند و پوشه‌های زیرساخت/بیلد ignore می‌مانند'. It does ignore api, deploy, backup, observability, cron, loadtest, e2e, docs, shared, tools, standalone, demo-mvp, .github, docker-compose*.yml, *.md, .env.example (.vercelignore:8-20). No vercel.json exists at repo root or under api/ (confirmed via Glob **/vercel.json — only apps/landing/vercel.json and apps/seo/vercel.json exist). apps/business/src-v2 (the old duplicate frontend tree the mission's landmine language refers to) was already deleted at commit 95e95f1 per docs/audit/reports/CEO-ROUND15-PHASE0-2026-09-03.md:127.",
           "residual_risk": "Because Root Directory for the API project would be `api`, and .vercelignore always evaluates paths relative to the REPO ROOT regardless of a project's Root Directory setting, deploying the API project must be verified in practice (not just by reading the file) that Vercel does not also try to ignore api/ for the API project itself — the same line that correctly protects the root static deploy could, in theory, interact oddly with Root Directory=api. This is flagged as UNVERIFIED (cannot be tested without deploying) — first API deploy's build log must be checked for 'no source files found' or similar."
         }
       },
@@ -214,7 +214,7 @@
     },
     "key_rotation_status": {
       "status": "NOT DONE — cannot be confirmed from the repository.",
-      "evidence": "docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md (section on credential hygiene): 'چرخشِ کلیدِ ملی‌پیامک ؟ از مخزن قابلِ تأیید نیست — فقط شما' ('Melipayamak key rotation — cannot be confirmed from the repo — only you [the founder] know'). This agent independently confirms: there is no code, log, or doc artifact anywhere in the repo that would prove or disprove a rotation happened.",
+      "evidence": "docs/audit/reports/CEO-ROUND15-PHASE0-2026-09-03.md (section on credential hygiene): 'چرخشِ کلیدِ ملی‌پیامک ؟ از مخزن قابلِ تأیید نیست — فقط شما' ('Melipayamak key rotation — cannot be confirmed from the repo — only you [the founder] know'). This agent independently confirms: there is no code, log, or doc artifact anywhere in the repo that would prove or disprove a rotation happened.",
       "recorded_as": "blocker #1 in this plan, per mission instruction — requires founder written confirmation before this item can be marked done."
     }
   },
@@ -242,7 +242,7 @@
       "8. Time every step (backup duration, restore duration) to derive real RTO; note the DB size at drill time to make the number meaningful for future comparison.",
       "9. Record PASS/FAIL with the actual command outputs (exit codes) in the launch log — a restore drill that isn't falsifiable against a known fingerprint is exactly the pattern CLAUDE.md rule §5 warns about ('تستی که وقتی موضوعش غایب است سبز می‌ماند، تست نیست')."
     ],
-    "note_on_production_access": "No production database is reachable from this machine (per mission constraint and confirmed by docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note that Supabase/production access is blocked by P0-014 REDEFINED 2026-09-03: the project auto-pauses on its tier; 28P01 was a symptom of the pause, not a credential fault). This drill can only be rehearsed against a scratch/local DB; it does NOT substitute for testing restore of an actual production backup file once one exists."
+    "note_on_production_access": "No production database is reachable from this machine (per mission constraint and confirmed by docs/audit/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note that Supabase/production access is blocked by P0-014 REDEFINED 2026-09-03: the project auto-pauses on its tier; 28P01 was a symptom of the pause, not a credential fault). This drill can only be rehearsed against a scratch/local DB; it does NOT substitute for testing restore of an actual production backup file once one exists."
   },
   "monitoring": {
     "metrics_endpoint_protection": {
@@ -498,7 +498,7 @@
     {
       "id": "B1",
       "text": "Melipayamak (SMS) key rotation status cannot be confirmed from the repository. Per mission instruction, this is NOT DONE until the founder confirms in writing.",
-      "evidence": "docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md: 'چرخشِ کلیدِ ملی‌پیامک ؟ از مخزن قابلِ تأیید نیست — فقط شما'"
+      "evidence": "docs/audit/reports/CEO-ROUND15-PHASE0-2026-09-03.md: 'چرخشِ کلیدِ ملی‌پیامک ؟ از مخزن قابلِ تأیید نیست — فقط شما'"
     },
     {
       "id": "B2",
@@ -514,7 +514,7 @@
     {
       "id": "B4",
       "text": "No production database is reachable from this machine — the backup/restore drill in this plan can only be rehearsed against a scratch DB. It has NOT been validated against an actual production backup file, because none exists / is accessible yet.",
-      "evidence": "mission constraint; corroborated by docs/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note on blocked Supabase/production access (P0-014, P0-014 REDEFINED 2026-09-03: the project auto-pauses on its tier; 28P01 was a symptom of the pause, not a credential fault)"
+      "evidence": "mission constraint; corroborated by docs/audit/reports/CEO-ROUND15-PHASE0-2026-09-03.md's own note on blocked Supabase/production access (P0-014, P0-014 REDEFINED 2026-09-03: the project auto-pauses on its tier; 28P01 was a symptom of the pause, not a credential fault)"
     },
     {
       "id": "B5",

@@ -1,0 +1,111 @@
+{
+  "round": "round-20",
+  "subject": "api/src/lib/redis.ts:163 — «DB منبعِ حقیقتِ ضدِ double-booking است»",
+  "verdict": "TRUE",
+  "verdict_summary": "With the reservation slot lock fully failed open (Redis unreachable), the database alone still guarantees exactly one winner per physical table+slot. Proven live and concurrently on a real Postgres. Correctness is preserved by TWO mechanisms: the no_table_overlap EXCLUDE constraint (primary table_id) and the SERIALIZABLE isolation level plus in-transaction re-check (merged secondary tables, which EXCLUDE is structurally blind to). Before this pass the second mechanism had zero test coverage: deleting it left all 11 pre-existing concurrency tests green with exit 0.",
+  "environment": {
+    "scratch_db": "rezervno_slotlock on rezv-test-pg:55432 (created for this pass; rezervno_a11 untouched)",
+    "clean_recipe_sanity": "tables=72 · staff=0 · rls=61 · policies=0 (exit 0)",
+    "redis": "rezv-test-redis:56379 (shared rezervno-redis never taken down)",
+    "dev_db": "rezervno on rezervno-postgres — read-only queries only, not modified",
+    "note": "RLS is inert here (61 tables enabled, 0 policies, owner+SUPERUSER+BYPASSRLS) and is not cited as a control anywhere in this report."
+  },
+  "findings": [
+    {
+      "id": "R20-SLOTLOCK-01",
+      "severity": "minor",
+      "area": "reservations / redis fail-open",
+      "claim": "The parenthetical at api/src/lib/redis.ts:163 is TRUE: with the slot lock failed open, the database alone prevents double-booking. A Redis outage costs throughput, error-message quality and latency — not correctness.",
+      "evidence": "Deterministic write-skew, two concurrent psql sessions, both reading before either writes, on the live scratch DB. SERIALIZABLE: 'ERROR: could not serialize access due to read/write dependencies among transactions / DETAIL: Reason code: Canceled on identification as a pivot, during write.' → 1 row committed, physical-overlap detector returned 0 rows, T1_PSQL_EXIT=0 T2_PSQL_EXIT=0 GROUNDTRUTH_EXIT=0 SCRIPT_EXIT=0. Application level: 10 concurrent createReservation calls through the REAL withSlotLock fail-open branch → {\"ok\":1,\"codes\":{\"TABLE_CONFLICT\":9},\"db_active_rows\":1,\"physical_overlaps\":0}; control arm with a working Redis lock identical.",
+      "verified_by": "api/tests/slot-lock-failopen-double-booking.test.mts (7 tests, exit 0) + scratchpad interleave scripts; constraint confirmed in api/prisma/sql/026-consolidate-exclusion-constraint.sql:70-79, absent-by-necessity from api/prisma/schema.prisma (grep count 0), and byte-identical on BOTH live databases."
+    },
+    {
+      "id": "R20-SLOTLOCK-02",
+      "severity": "major",
+      "area": "test integrity / reservations",
+      "claim": "Half of that safety property was completely unguarded. Downgrading reservations.ts:396 from Serializable to ReadCommitted keeps the entire pre-existing concurrency and lock suite green — including the describe named 'C2 — قفلِ Redis کاملاً fail-open — DB به‌تنهایی هنوز محافظت می‌کند'. That is a gate that passes with the feature deleted.",
+      "evidence": "Mutation M3 at api/src/lib/reservations.ts:396. tests/redis.test.mts + tests/table-merge-occupancy-concurrency.test.mts → 'ℹ tests 11 / ℹ pass 11 / ℹ fail 0', EXISTING_EXIT=0. Under the same mutation the new gate fails with 'هیچ SIReadLockی روی reservations دیده نشد ⇒ تراکنشِ درجِ رزرو SERIALIZABLE نیست' AND with a genuine product-path double-booking: 'دقیقاً یک برنده انتظار می‌رود، 2 تا شد' — ONEFILE_EXIT=1. Reverted with git checkout; reservations.ts:396 confirmed back to Serializable.",
+      "verified_by": "api/tests/slot-lock-failopen-double-booking.test.mts layers 2 and 3, imported at api/tests/_all.runner.mts:192"
+    },
+    {
+      "id": "R20-SLOTLOCK-03",
+      "severity": "major",
+      "area": "reservations / walk-in (outside the mandate)",
+      "claim": "createWalkin can seat a guest on a table that is already physically occupied as the SECONDARY table of an active merged reservation. No concurrency, no Redis outage, no attacker — a plain sequential staff action on the happy path. createWalkin never calls getOccupiedTableNumbers, and createWalkinTx runs at default (READ COMMITTED) isolation, so its only guard is the EXCLUDE constraint, which keys on table_id and cannot see merged secondaries.",
+      "evidence": "Live sequential probe on the scratch DB with a positive control. Control (walk-in aimed at the PRIMARY table of the active merge): {\"step\":\"control-primary-841\",\"outcome\":\"REJECTED code=TABLE_CONFLICT\"} — the constraint does fire, so the probe is valid. Actual: {\"step\":\"walkin-on-merged-SECONDARY-842\",\"outcome\":\"ACCEPTED code=RZJGXRVX2 table=842\"} then {\"step\":\"ground-truth\",\"physical_overlaps\":1,\"detail\":[{\"num\":842}]} and rows [{\"code\":\"RZJGXRVX2\",\"num\":842,\"merged\":[]},{\"code\":\"WKM-845f\",\"num\":841,\"merged\":[841,842]}]. WALKIN_PROBE_EXIT=0.",
+      "verified_by": "scratch probe api/tests/_probe-walkin-merged.mts (removed after the run; reproduction steps in decision_package.reproduction below). Code: api/src/lib/reservations.ts createWalkin/createWalkinTx; blindness documented by the repo itself at api/src/lib/table-occupancy.ts:5-19."
+    },
+    {
+      "id": "R20-SLOTLOCK-04",
+      "severity": "minor",
+      "area": "observability",
+      "claim": "rezervno_slot_lock_fallback_total should now be alerted, at severity warning, described as degraded reservation throughput and explicitly NOT as a correctness alarm. Round-20 deliberately deferred it pending this investigation.",
+      "evidence": "audit/round-20/ALERTS-GAP.md §7 ('remains completely unwired') and §8.2. observability/alerts.yml:120-121 already carries the sentence 'rezervno_slot_lock_fallback_total، lib/redis.ts:166 — نویسنده‌اش اما هنوز آلارم ندارد' inside RateLimitRedisFailOpen's description — a documented gap living inside a production artefact. Writer confirmed live: the counter reached 'rezervno_slot_lock_fallback_total 24' during this pass, once per entry into the fail-open branch.",
+      "verified_by": "metrics assertion in api/tests/slot-lock-failopen-double-booking.test.mts (fallbackDelta === setDelta); mutation M4 (deleting metrics.slotLockFallback.inc() at redis.ts:166) → ONEFILE_EXIT=1, reverted."
+    },
+    {
+      "id": "R20-SLOTLOCK-05",
+      "severity": "minor",
+      "area": "test integrity / self-reported",
+      "claim": "Three defects in my own work, reported before anyone found them: (a) probe v1 spaced scenarios 60 min apart while a booking blocks for 105 min, producing 7 false 'failures'; (b) the first control interleave passed a quoted isolation level so BEGIN was a syntax error and the sessions ran in autocommit rather than explicit transactions; (c) the first version of layer 2 used a fixed 2.5s observation window that passed standalone and failed inside the full 1542-test run, and its blocked-session detector filtered on pg_locks.database, which is NULL for transactionid locks — the exact lock type an EXCLUDE wait takes.",
+      "evidence": "(a) scratchpad probe-2.log, 7 FAIL lines all of form 'got 0' where 0 winners was the correct answer; fixed by one restaurant per scenario. (b) 'psql:<stdin>:3: ERROR: syntax error at or near ''read committed''' — re-run correctly, same conclusion. (c) full-test.log line 4009 vs three consecutive green standalone runs; after switching to pg_stat_activity (datname=current_database() AND wait_event_type='Lock') the test passes 3/3 and runs in ~580ms instead of ~2600ms.",
+      "verified_by": "all three corrections re-verified; no assertion was weakened — (a) and (c) were mechanism fixes, and the (a)/(c) assertions became strictly harder to satisfy."
+    }
+  ],
+  "mutation_rounds": [
+    { "id": "baseline", "target": "none", "result": "7 pass / 0 fail", "exit_code": 0 },
+    { "id": "M1", "target": "live DB: DROP CONSTRAINT no_table_overlap", "result": "5 pass / 2 fail (layer 1 'دقیقاً یک EXCLUDE constraint ... 0 پیدا شد')", "exit_code": 1 },
+    { "id": "M1-revert", "target": "re-run prisma/sql/026", "result": "constraint restored", "exit_code": 0 },
+    { "id": "M2", "target": "live DB: rebuild constraint without status 'dining' (partial mutation)", "result": "5 pass / 2 fail (layer 1 set-equality, 'بازگشتِ باگِ C1')", "exit_code": 1 },
+    { "id": "M2-revert", "target": "re-run prisma/sql/026; grep -c dining = 1", "result": "restored", "exit_code": 0 },
+    { "id": "M3", "target": "reservations.ts:396 Serializable → ReadCommitted", "result": "layer 2 red (SIReadLock=0) AND layer 3 red with a real product-path double-booking (2 winners)", "exit_code": 1 },
+    { "id": "M3-existing-suite", "target": "same mutation, pre-existing gates only", "result": "11 pass / 0 fail — gate passes with the feature deleted", "exit_code": 0 },
+    { "id": "M3-revert", "target": "git checkout api/src/lib/reservations.ts", "result": "line 396 back to Serializable", "exit_code": 0 },
+    { "id": "M4", "target": "redis.ts:166 delete metrics.slotLockFallback.inc()", "result": "5 pass / 2 fail (fallback-evidence assertions)", "exit_code": 1 },
+    { "id": "M4-revert", "target": "git checkout api/src/lib/redis.ts", "result": "line 166 restored", "exit_code": 0 },
+    { "id": "M5", "target": "table-occupancy.ts: delete the merged_table_numbers UNION branch", "result": "NOT caught by the new file — 7 pass on 3 consecutive runs (honest blind spot)", "exit_code": 0 },
+    { "id": "M5-existing-suite", "target": "same mutation, tests/table-merge-occupancy.test.mts", "result": "8 pass / 1 fail — the pre-existing sequential test does cover it", "exit_code": 1 },
+    { "id": "M5-revert", "target": "git checkout api/src/lib/table-occupancy.ts", "result": "restored", "exit_code": 0 }
+  ],
+  "decision_package": {
+    "id": "R20-SLOTLOCK-03",
+    "title": "createWalkin can double-book a merged secondary table",
+    "requires": "architect sign-off — touches the reservation lifecycle. NOT implemented in this pass.",
+    "verbatim_source": "api/src/lib/reservations.ts, createWalkin: `if (input.tableId) { const t = await db.table.findUnique({ where: { id: input.tableId } }); if (!t || t.restaurantId !== input.restaurantId) throw Err.notFound('میز'); if (!t.isActive || t.state === 'maintenance') throw Err.tableUnavailable(t.number); }` — there is no occupancy check of any kind, and createWalkinTx calls `db.$transaction(async (tx) => {...})` with no isolationLevel option (default READ COMMITTED).",
+    "reproduction": "1) restaurant with tables 841 and 842, both isMergeable, mergeableWith each other. 2) INSERT an active merged reservation: table_id = 841, merged_table_numbers = {841,842}, status 'seated', slot_start now-10min, slot_end now+80min. 3) createWalkin({ tableId: <841> }) → must be REJECTED with TABLE_CONFLICT (positive control, proves EXCLUDE fires). 4) createWalkin({ tableId: <842> }) → currently ACCEPTED. 5) run the primary+merged overlap detector → 1 row on table 842.",
+    "depends_on": [
+      "api/src/app/api/v1/restaurant/walkin/route.ts — the only HTTP caller",
+      "api/src/lib/table-occupancy.ts:5-19 — already documents that EXCLUDE covers primary table_id only",
+      "api/src/lib/reservations.ts:373 — the equivalent check createReservation performs inside its transaction",
+      "prisma/sql/026-consolidate-exclusion-constraint.sql:70-79 — the constraint whose blind spot this is"
+    ],
+    "options": [
+      {
+        "option": "A — add the in-transaction occupancy check to createWalkinTx and raise its isolation to Serializable",
+        "cost": "small: one call to getOccupiedTableNumbers(tx, ...) before the insert, plus the isolationLevel option and a retry loop for 40001. Mirrors placeReservation exactly, so no new pattern.",
+        "blast_radius": "walk-in path only. Staff will start seeing TABLE_CONFLICT where the operation silently succeeded before — which is the point, but it is a behaviour change on a path staff use under time pressure. Serializable adds retry-able 40001s that createWalkin does not currently handle.",
+        "reversibility": "high — pure application code, revert is a git revert; no schema change, no migration."
+      },
+      {
+        "option": "B — model merged secondary tables as real rows (a blocker reservation per secondary table) so the EXCLUDE constraint covers them",
+        "cost": "large: data model change, a migration, and every reader of reservations (availability, analytics, panel lists, cancellation, lifecycle) must learn to filter blocker rows.",
+        "blast_radius": "very wide — every consumer of the reservations table. Would also make table-occupancy.ts's UNION branch redundant and close the whole class of merge blindness at once, including M5.",
+        "reversibility": "low — a schema and data migration; reverting after production data exists is expensive."
+      },
+      {
+        "option": "C — accept and document the risk",
+        "cost": "zero engineering.",
+        "blast_radius": "a restaurant seats two parties at one physical table. Recovery is manual and happens in front of the guest.",
+        "reversibility": "n/a"
+      }
+    ],
+    "recommendation": "Option A before launch, Option B recorded as the real structural fix for after launch. A is the same shape as the guard createReservation already has, is cheap, and is reversible; B is correct but is a data-model change and cannot be justified on this timeline. Whichever is chosen, it ships with a regression test imported in api/tests/_all.runner.mts, plus its own mutation round with recorded exit codes.",
+    "not_done_deliberately": "No fix implemented, no commit made, and no alert rule added — the alert belongs to round-20's observability scope and needs its own promtool falsifiability pass against observability/alerts.test.yml."
+  },
+  "artifacts": {
+    "report": "audit/round-20/SLOT-LOCK-FAILOPEN.md",
+    "new_test": "api/tests/slot-lock-failopen-double-booking.test.mts",
+    "runner_import": "api/tests/_all.runner.mts:192",
+    "runner_completeness": "comm -23 (ls tests/*.test.mts) (runner imports) → empty; files=155 imports=155"
+  }
+}

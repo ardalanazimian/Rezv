@@ -1,0 +1,139 @@
+{
+  "meta": {
+    "generated_at": "2026-09-04T07:44:14.554Z",
+    "hostname": "DESKTOP-8DAJNO5",
+    "platform": "win32 10.0.26200",
+    "node_version": "v24.20.0",
+    "cwd": "C:\\Users\\Asus\\Desktop\\rezv3\\rezervnofullsource"
+  },
+  "rows": [
+    {
+      "area": "Agent charter",
+      "command": "node tools/check-agent-charter.mjs",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/agent-charter.log"
+    },
+    {
+      "area": "Control bytes",
+      "command": "node tools/check-control-bytes.mjs",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/control-bytes.log"
+    },
+    {
+      "area": "Doc staleness",
+      "command": "node tools/check-doc-staleness.mjs",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/doc-staleness.log"
+    },
+    {
+      "area": "Classic scripts",
+      "command": "sh tools/check-classic-scripts.sh",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/classic-scripts.log"
+    },
+    {
+      "area": "Fonts",
+      "command": "python tools/check-fonts.py",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/fonts.log"
+    },
+    {
+      "area": "Schema drift",
+      "command": "sh tools/check-schema-drift.sh",
+      "exit": "2",
+      "state": "COULD_NOT_RUN",
+      "note": "خودِ گیت اعلام کرد اجرا نشد (کدِ خروجِ ۲ — پیش‌نیازِ غایب/خراب، مثلِ psql). جزئیات در لاگِ خام.",
+      "log": "audit/round-20/gate-inventory/schema-drift.log"
+    },
+    {
+      "area": "A1 destructive (--scope local/rezervno_verify)",
+      "command": "node tools/gate-destructive.mjs --scope local/rezervno_verify",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/destructive-local_rezervno_verify.log"
+    },
+    {
+      "area": "A1 destructive (--scope production)",
+      "command": "node tools/gate-destructive.mjs --scope production",
+      "exit": "1",
+      "state": "RED",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/destructive-production.log"
+    },
+    {
+      "area": "A2 deploy/DNS",
+      "command": "node tools/gate-deploy.mjs",
+      "exit": "1",
+      "state": "RED",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/deploy.log"
+    },
+    {
+      "area": "A3 decision (--id D-001)",
+      "command": "node tools/gate-decision.mjs --id D-001",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/decision-D-001.log"
+    },
+    {
+      "area": "A3 decision (--id D-002)",
+      "command": "node tools/gate-decision.mjs --id D-002",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/decision-D-002.log"
+    },
+    {
+      "area": "A3 decision (--id D-003)",
+      "command": "node tools/gate-decision.mjs --id D-003",
+      "exit": "1",
+      "state": "RED",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/decision-D-003.log"
+    },
+    {
+      "area": "A4 real sends (--recipients 1)",
+      "command": "node tools/gate-send.mjs --recipients 1",
+      "exit": "1",
+      "state": "RED",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/send.log"
+    },
+    {
+      "area": "A1 restore drill executor (tools/restore-drill.sh)",
+      "command": "(اجرا نشد)",
+      "exit": "—",
+      "state": "UNKNOWN",
+      "note": "اجراکننده است، نه گیت: واقعاً pg_dump/CREATE DATABASE/pg_restore/DROP DATABASE انجام می‌دهد. خودِ فایل هم تصریح می‌کند اجراکننده و تفسیرکننده (gate-destructive.mjs) عمداً جدا نگه داشته شده‌اند. این ابزار طبقِ محدودیتِ صریحِ خودش («فقط ارزیابی») چنین چیزی را اجرا نمی‌کند.",
+      "log": null
+    },
+    {
+      "area": "boot-path (tools/check-boot-path.sh)",
+      "command": "(اجرا نشد)",
+      "exit": "—",
+      "state": "UNKNOWN",
+      "note": "یک Postgresِ کاملاً خالی و دورانداختنی می‌سازد/می‌شکند و برایِ ۹ دقیقه یک سرورِ واقعی روی یک پورت بالا می‌آورد — یک jobِ سنگینِ CI است (ci.yml)، نه یک چکِ سبکِ محلی؛ به‌علاوه cwd را عوض می‌کند و روی وضعیتِ DB اثر می‌گذارد.",
+      "log": null
+    },
+    {
+      "area": "CI-only jobs (build, test, image-build, security, observability, e2e, design-system, standalone, seo, landing, base-freshness)",
+      "command": "(اجرا نشد)",
+      "exit": "—",
+      "state": "UNKNOWN",
+      "note": "در .github/workflows/ci.yml تعریف شده‌اند، نیازمندِ سرویس‌های Postgres/Redisِ CI، Docker build، یا مرورگرهایِ Playwright‌اند. این‌ها jobِ CI‌اند نه گیتِ محلیِ سبک؛ اجرایشان اینجا محدودیتِ «بدونِ عملِ سنگین/بیرونی» را نقض می‌کند.",
+      "log": null
+    }
+  ]
+}
