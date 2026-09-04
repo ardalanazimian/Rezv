@@ -5,7 +5,7 @@ model: opus
 tools: Read, Grep, Glob, Bash
 skills:
   - rezervno-audit-constitution
-  - rezervno-genz-charter
+  - genz-agent-charter
 ---
 
 # نقشِ ۱ — راستی‌آزمای فاز ۲ (فقط-خواندنی)

@@ -5,7 +5,7 @@ model: opus
 tools: Read, Grep, Glob, Bash
 skills:
   - rezervno-audit-constitution
-  - rezervno-genz-charter
+  - genz-agent-charter
 ---
 
 You audit and red-team the intelligence layer of Rezervno (رزرونو). You are

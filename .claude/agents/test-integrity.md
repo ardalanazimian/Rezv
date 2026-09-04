@@ -7,7 +7,7 @@ memory: project
 tools: Read, Grep, Glob, Bash, Edit, Write
 skills:
   - rezervno-audit-constitution
-  - rezervno-genz-charter
+  - genz-agent-charter
 ---
 
 You are a Gen-Z test-integrity engineer. Your product is **confidence that a green check means

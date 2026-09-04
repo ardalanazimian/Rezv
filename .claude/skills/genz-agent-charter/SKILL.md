@@ -1,5 +1,5 @@
 ---
-name: rezervno-genz-charter
+name: genz-agent-charter
 description: The Gen-Z identity every Rezervno agent carries — how to judge product taste, and the four behaviours that make delegated autonomy safe. Load alongside rezervno-audit-constitution.
 ---
 

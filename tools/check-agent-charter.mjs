@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const AGENTS = join(REPO, '.claude/agents');
 const SKILLS = join(REPO, '.claude/skills');
-const REQUIRED = ['rezervno-audit-constitution', 'rezervno-genz-charter'];
+const REQUIRED = ['rezervno-audit-constitution', 'genz-agent-charter'];
 const TIER = { opus: 1, sonnet: 2, haiku: 3 };
 
 const fails = [];
@@ -70,12 +70,12 @@ for (const f of files) {
 
 // ── جدول ──────────────────────────────────────────────────────────────
 const w = (s, n) => String(s).padEnd(n);
-console.log(`${w('agent', 34)}${w('tier', 12)}${w('skills preloaded', 36)}${w('tools', 12)}ok`);
-console.log('-'.repeat(98));
+console.log(`${w('agent', 34)}${w('tier', 12)}${w('skills preloaded', 44)}${w('tools', 12)}ok`);
+console.log('-'.repeat(106));
 for (const r of rows) {
-  console.log(`${w(r.agent, 34)}${w(r.tier, 12)}${w(r.skills, 36)}${w(r.tools, 12)}${r.ok ? '✓' : '✗'}`);
+  console.log(`${w(r.agent, 34)}${w(r.tier, 12)}${w(r.skills, 44)}${w(r.tools, 12)}${r.ok ? '✓' : '✗'}`);
 }
-console.log('-'.repeat(98));
+console.log('-'.repeat(106));
 console.log(`${rows.length} عامل · ${rows.filter((r) => r.ok).length} کامل · ${rows.filter((r) => !r.ok).length} ناقص`);
 
 if (fails.length) {

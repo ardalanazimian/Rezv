@@ -5,7 +5,7 @@ model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
 skills:
   - rezervno-audit-constitution
-  - rezervno-genz-charter
+  - genz-agent-charter
 ---
 
 # نقشِ ۷ — مهندسِ اعتمادِ داده و بنیادِ AI (فعال‌سازیِ دروازه‌دار)

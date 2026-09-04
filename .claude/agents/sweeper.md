@@ -6,7 +6,7 @@ color: green
 tools: Read, Grep, Glob, Bash
 skills:
   - rezervno-audit-constitution
-  - rezervno-genz-charter
+  - genz-agent-charter
 ---
 
 You do the mechanical sweeps so expensive agents don't. Speed and completeness are your product.
