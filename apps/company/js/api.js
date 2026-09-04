@@ -157,6 +157,7 @@ async function loadAdminRestaurants(){
   const res = await API.get('/admin/restaurants');
   if (res.ok && Array.isArray(res.data?.restaurants)) {
     API.online = true;
+    API.degraded = false;   // بدونِ این، یک بارِ شکستِ شکلِ پاسخ برای همیشه latch می‌شد
     updateOfflineBanner();
     return res.data.restaurants.map(apiR => {
       // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۴): apiR.id همیشه UUID است و idِ نمونه عددِ
@@ -169,7 +170,19 @@ async function loadAdminRestaurants(){
       return mapAdminRestaurant(apiR, fb);
     });
   }
-  API.online = false;
+  // ⚠️ رفع‌شده (۲۰۲۶-۰۹-۰۴): تا امروز هر دو حالت به `API.online = false` می‌رسید،
+  // یعنی وقتی سرور **جواب داده بود** ولی شکلِ پاسخ قابلِ استفاده نبود، به اپراتور
+  // گفته می‌شد «اتصال برقرار نیست». این یک ادعای علّی است که شواهد پشتش نیست:
+  // `API.online` ادعایی درباره‌ی **در دسترس بودن** است، و شکستِ parse ادعایی
+  // درباره‌ی **محتوای پاسخ**. هزینه‌اش در لحظه‌ی حادثه پرداخت می‌شود — بعد از یک
+  // رگرسیونِ شکلِ پاسخ، اپراتور دنبالِ مشکلِ شبکه می‌گردد نه دیپلویی که payload را
+  // عوض کرده، دقیقاً وقتی زمان مهم است.
+  const reachable = !!(res && res.ok);
+  API.online = reachable;      // در دسترس بود یا نه — واقعیت، نه استنتاج
+  API.degraded = reachable;    // رسید ولی شکلش ناسالم بود
+  if (reachable) {
+    console.warn('[رزرونو] admin/restaurants: سرور جواب داد ولی شکلِ پاسخ قابلِ استفاده نیست — این «آفلاین» نیست', res && res.status);
+  }
   updateOfflineBanner();
   // ⚠️ برچسبِ [DEMO] روی خودِ نام (فازِ ۲، §۳ + قاعده‌ی صریحِ CLAUDE.md).
   // `_demo: true` قبلاً ست می‌شد ولی هیچ‌جا رندر نمی‌شد — تنها نشانه‌ی صداقت
@@ -183,7 +196,18 @@ async function loadAdminRestaurants(){
 }
 function updateOfflineBanner(){
   const el = document.getElementById('offlineBanner');
-  if (el) el.style.display = API.online ? 'none' : 'flex';
+  if (!el) return;
+  // دو حالتِ متفاوت، دو پیامِ متفاوت — بنر در هر دو دیده می‌شود چون در هر دو
+  // ردیف‌ها [DEMO] هستند، ولی علتی که اعلام می‌کنیم باید همانی باشد که رخ داده.
+  if (API.degraded) {
+    el.textContent = '⚠️ سرور پاسخ داد ولی شکلِ پاسخ قابلِ استفاده نبود — داده‌های نمایش‌داده‌شده نمونه (دمو) هستن، نه واقعی.';
+    el.style.display = 'flex';
+  } else if (!API.online) {
+    el.textContent = '⚠️ اتصال به سرور برقرار نیست — داده‌های نمایش‌داده‌شده نمونه (دمو) هستن، نه واقعی.';
+    el.style.display = 'flex';
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 // ════════ داده‌ی رستوران‌ها (شبیه‌سازی — در محصول واقعی از API) ════════

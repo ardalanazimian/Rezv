@@ -9,6 +9,7 @@ import { smsAllowedForCategory } from './notification-prefs';
 import { queuePush, queueEmail } from './notify';
 import { cached, cacheKey } from './cache';
 import { activeStatusList } from './reservation-status';
+import { isTableNumberOccupied } from './table-occupancy';
 import { dateKeyInTz, timeKeyInTz } from './hours';
 
 // ═══════════════════════════════════════════════════════════
@@ -330,7 +331,22 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
           slotStart: { lt: horizon }, slotEnd: { gt: now },
         },
       });
-      if (conflict > 0) {
+      // ⚠️ رفع‌شده (۲۰۲۶-۰۹-۰۴): چکِ بالا فقط `table_id` را می‌شمارد — یعنی
+      // میزِ **ثانویه‌یِ** یک رزروِ ترکیبیِ فعال را نمی‌بیند. میزِ ثانویه
+      // ردیفِ رزروِ خودش را ندارد (فقط عددی در `merged_table_numbers`) و
+      // `tables.state`ش هم هرگز به occupied تغییر نمی‌کند، پس از فیلترِ
+      // `state:'free'`ِ کاندیدها هم رد می‌شود. نتیجه: صف می‌توانست میزی را
+      // آفر بدهد که همین حالا نصفِ یک گروهِ ترکیبی سرش نشسته است.
+      //
+      // این دقیقاً همان کلاسِ باگی است که در createWalkin پیدا شد؛ هر دو از
+      // یک قلم‌افتادگیِ مشترک می‌آیند (رجوع کن به table-occupancy.ts).
+      // عمداً چکِ قبلی حذف **نشده**: معناهای زمانیِ دو چک یکی نیست (این یکی
+      // block_end را هم حساب می‌کند، یعنی زمانِ نظافت) و حذفِ چکِ قدیمی یک
+      // تغییرِ رفتاریِ جداست، نه بخشی از این رفع.
+      const mergedBusy = conflict === 0
+        && await isTableNumberOccupied(tx, restaurantId, t.number, now, horizon);
+
+      if (conflict > 0 || mergedBusy) {
         // این میز رزرو هم‌پوشان دارد → آزادش کن و کاندید بعدی
         await tx.table.update({ where: { id: t.id }, data: { state: 'free' } });
         return false;
