@@ -677,8 +677,21 @@ tells you what the API *said*, not what it *wrote*.
   outage turned into an uncaught throw → a generic error response, not the
   documented fail-open floor. Only the global `middleware.ts` path had the
   in-memory fallback. Both paths now share one implementation
-  (`rateLimitWithFallback` in `ratelimit.ts`). Operators must still wire an
-  alert on these metrics themselves — none exists yet.
+  (`rateLimitWithFallback` in `ratelimit.ts`). **Alert rules now exist,
+  round-20 (۲۰۲۶-۰۹-۰۴, `audit/round-20/ALERTS-GAP.md`)**:
+  `RateLimitRedisFailOpen`, `BanCheckFailOpen`, `RateLimitAutoBanSpike` in
+  `observability/alerts.yml`, each proven able to fire via
+  `promtool test rules` (`observability/alerts.test.yml`) — a red→green
+  mutation test on the thresholds is recorded in the round-20 report. **This
+  proves the rule, not the page**: no Alertmanager and no Grafana
+  notification channel is deployed anywhere in this repo
+  (`docker-compose.observability.yml` only runs `prometheus` + `grafana`),
+  so a firing rule today is visible in Prometheus's/Grafana's own UI and
+  nowhere else — nobody is actually paged until a founder picks a
+  notification channel (Slack/email/PagerDuty) and provides its credentials.
+  A fourth, related counter, `rezervno_slot_lock_fallback_total`
+  (`lib/redis.ts:166`, the reservation-lock fail-open path), was found during
+  this pass and is **still completely unwired** — out of round-20's scope.
 - **Full `innerHTML`/`insertAdjacentHTML`/`document.write`/`eval` sink audit
   — done, residual-hardening PR (۲۰۲۶-۰۸-۱۴).** `tools/xss-sink-audit.mjs`
   automatically scans `apps/customer|business|company` + `shared/js`,

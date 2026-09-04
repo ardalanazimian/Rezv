@@ -90,6 +90,35 @@ was treated as "env var" while error-code tables and enums share that shape. A 2
 would have hidden the problem; narrowing to two precise signals fixed it and left five real defects
 with zero noise. A guard that cries wolf gets disabled within a week, and then it protects nothing.
 
+## 4c. Two more, promoted 2026-09-04 — both about the guard, not the code
+
+**A guard that enumerates its subjects from one authority while the risk lives in another is
+green for a structural reason, not a safe one.** Ask of every check: *where does it get its list,
+and where does the danger actually live?* If those are two different places, it is blind and the
+blindness will not show up as a failure. Two instances found the same afternoon:
+
+- `observability/alerts.yml` named metrics; the risk lived in `api/src/lib/metrics.ts`. Renaming
+  `rezervno_rate_limit_fallback_total` in the code alone left **both** `promtool check rules` and
+  `promtool test rules` at exit 0, with the alert watching a metric nothing emitted. `promtool test
+  rules` feeds synthetic series, so it can never see a producer-side change. Guard:
+  `tools/check-alert-metric-binding.mjs`.
+- `tools/check-control-bytes.mjs:34` enumerates via `git ls-files` — **tracked files only** — while
+  the risk lives in the working tree. A file in `tools/` containing a real `0x08` byte, untracked
+  and not ignored, was missed entirely: the guard reported "✓ clean, 119 files checked", exit 0.
+  It is blind exactly when a script is newest: written, not yet staged, least reviewed. The guard
+  that exists *because* a heredoc `\b` became `0x08` could not see the case it was built for.
+
+The corollary matters more than either instance: **a falsifiability proof is per-axis.** Injecting a
+mutation into the rule proves the gate red on the rule axis and says nothing about the producer axis.
+When you certify a gate, name which axes you tested and which you did not.
+
+**A guard hostile to the evidence format we mandate corrupts the record it exists to protect.** This
+constitution requires commands with their exit codes, so our documents are full of pasted terminal
+transcripts. The doc-staleness gate read shell variables inside fenced blocks as stale config, and an
+author — auditing us — had to lowercase `EXIT=` to `exit=` and elide a hostname **in their own
+recorded evidence** to get the gate green. The gate was editing the record. If a check punishes
+verbatim evidence, the check is wrong, not the evidence.
+
 ## 5. Every shipped artifact needs a CI job that actually builds it
 
 What is not built is broken and nobody knows. A `postinstall: prisma generate` hook broke

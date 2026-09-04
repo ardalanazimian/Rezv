@@ -5,7 +5,7 @@ model: opus
 color: purple
 memory: project
 permissionMode: acceptEdits
-tools: Agent, Read, Grep, Glob, Bash, Write, Edit, NotebookEdit, WebSearch, WebFetch, Skill, ToolSearch, TodoWrite, SendMessage
+tools: Agent(ai-intelligence-auditor, backend-integrity-engineer, census, contracts-consolidation-engineer, data-trust-engineer, ds-token-guardian, e2e-regression-engineer, launch-ops, panels-ui-engineer, phase2-verifier, security, sweeper, test-integrity), Read, Grep, Glob, Bash, Write, Edit, NotebookEdit, WebSearch, WebFetch, Skill, ToolSearch, TodoWrite, SendMessage
 skills:
   - genz-agent-charter
   - rezervno-audit-constitution

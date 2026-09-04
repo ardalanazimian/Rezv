@@ -136,8 +136,23 @@ flowchart LR
   observable**: every fallback emits `rezervno_rate_limit_fallback_total`
   (labels `prefix`, `scope`) and a structured warn log; auto-bans emit
   `rezervno_rate_limit_auto_ban_total`; a failed ban-check (fail-open, ban
-  not enforced) emits `rezervno_ban_check_fail_open_total`. No alerting is
-  wired to these yet — see §12.
+  not enforced) emits `rezervno_ban_check_fail_open_total`. **Alerting wired,
+  round-20 (2026-09-04)**: `observability/alerts.yml` (`rezervno_security`
+  group) now has `RateLimitRedisFailOpen`, `BanCheckFailOpen` and
+  `RateLimitAutoBanSpike`, proven able to fire with `promtool test rules`
+  (`observability/alerts.test.yml`, both a silent-blip series and a
+  sustained/clustered series per rule). What this does **not** prove: that a
+  human actually gets paged. No Alertmanager (or a Grafana notification
+  channel) is deployed anywhere in this repo —
+  `docker-compose.observability.yml` runs only `prometheus` + `grafana`, and
+  neither has a configured receiver. Today a firing rule is visible in
+  Prometheus's own `/alerts` page and in Grafana if someone looks; nothing
+  pushes it to a person. That gap predates this rule set (all 13 prior rules
+  have the same limitation) and needs a founder-chosen notification channel
+  and credentials before "alerting" is actually true end-to-end. The related
+  reservation-lock fail-open counter, `rezervno_slot_lock_fallback_total`
+  (`lib/redis.ts:166`), remains unwired — out of round-20's scope, tracked
+  as a follow-up (see §12.5).
 - **Client IP** is derived safely (prefers `X-Real-IP`/`CF-Connecting-IP`, else
   the **right-most** `XFF` hop) to prevent spoofing (`TRUST_PROXY_HEADERS` gates
   this).
@@ -305,10 +320,16 @@ Zarinpal `merchant_id`, not available in this environment.
    started in `manual/023`” - the path `prisma/migrations/manual/` no longer
    exists; the scripts live in `api/prisma/sql/`, and `037` already extended RLS
    to the 34 core tables.)
-5. **Alerting** on the rate-limit fail-open path, auto-bans, and (as of
-   Time-Range/EXCLUDE/Redis-evidence, Aug 2026) the reservation slot-lock
-   fail-open path (`rezervno_slot_lock_fallback_total`, §11) — currently
-   log-only in places.
+5. **Alerting on the rate-limit fail-open path and auto-bans — rules exist,
+   round-20 (2026-09-04)** (`RateLimitRedisFailOpen`, `BanCheckFailOpen`,
+   `RateLimitAutoBanSpike` in `observability/alerts.yml`, proven with
+   `promtool test rules`; see §8). **Delivery is not wired**: no Alertmanager
+   or Grafana notification channel exists in this repo, so nothing pages a
+   human yet — a founder decision on notification channel + credentials is
+   still needed. The reservation slot-lock fail-open path
+   (`rezervno_slot_lock_fallback_total`, §11, `lib/redis.ts:166`) is still
+   completely unwired — it was out of round-20's scope and remains
+   log-only.
 6. **Pen-test the payment callback** (`/payments/callback`) — it is
    intentionally unauthenticated and relies on `authority + code + amount`
    matching; confirm amount/authority binding is strict. Payment idempotency
