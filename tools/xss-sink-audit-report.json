@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-04T19:03:37.793Z",
+  "generated_at": "2026-09-04T19:13:36.775Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -13,10 +13,11 @@
   "total_hits": 224,
   "by_classification": {
     "review": 20,
-    "safe_static": 55,
+    "safe_static": 50,
     "unsafe": 65,
     "escaped": 26,
-    "dom_api_safe": 58
+    "dom_api_safe": 58,
+    "payload_not_captured": 5
   },
   "hits": [
     {
@@ -337,7 +338,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl.insertAdjacentHTML('beforeend', bubble(m));",
       "sink_hash": "e3d2fa444a59",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "apps/customer/js/features/chat.js",
@@ -345,7 +346,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "tempEl.insertAdjacentHTML('beforeend', `<div class=\"chat-bubble mine pending\"><div class=\"chat-bubble-text\">${esc(body)}</div><div class=\"chat-bubble-time\">…</d",
       "sink_hash": "68b65856e216",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "apps/customer/js/features/economy.js",
@@ -733,7 +734,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', html);",
       "sink_hash": "3e84a562e826",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "apps/business/js/chat.js",
@@ -790,7 +791,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
       "sink_hash": "d9400c3c27c7",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "apps/business/js/chat.js",
@@ -798,7 +799,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
       "sink_hash": "9565b12114d0",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "apps/business/js/crm.js",
@@ -2570,7 +2571,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', html);",
       "sink_hash": "3e84a562e826",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "standalone/business.html",
@@ -2578,7 +2579,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
       "sink_hash": "d9400c3c27c7",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "standalone/business.html",
@@ -2586,7 +2587,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
       "sink_hash": "9565b12114d0",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "standalone/business.html",
@@ -3579,7 +3580,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl.insertAdjacentHTML('beforeend', bubble(m));",
       "sink_hash": "e3d2fa444a59",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "standalone/customer.html",
@@ -3587,7 +3588,7 @@
       "kind": "insertAdjacentHTML",
       "snippet": "tempEl.insertAdjacentHTML('beforeend', `<div class=\"chat-bubble mine pending\"><div class=\"chat-bubble-text\">${chatEsc(body)}</div><div class=\"chat-bubble-time\">",
       "sink_hash": "fa0d8d6d39e1",
-      "classification": "safe_static"
+      "classification": "payload_not_captured"
     },
     {
       "file": "standalone/website.html",

@@ -236,9 +236,28 @@ function isSafeInterp(interp) {
 const UNSAFE_BASELINE = 65;
 const REVIEW_BASELINE = 20;
 
+// تعدادِ سینک‌هایی که payloadشان اصلاً استخراج نشده. در کلِ مخزن ۱۰ سینکِ
+// insertAdjacentHTML چنین‌اند، ولی خطِ پایه فقط دامنه‌ی enforced را می‌شمارد
+// (apps/* + shared/js) که ۵ تاست؛ ۵ تای دیگر در standalone/ و report-only
+// است. ششمی در دامنه‌ی enforced گیت را قرمز می‌کند.
+const PAYLOAD_NOT_CAPTURED_BASELINE = 5;
+
+// آیا عبارتِ استخراج‌شده اصلاً به آرگومانِ payload رسیده است؟
+// برای `insertAdjacentHTML(position, payload)` استخراج روی کوتیشنِ اولین
+// آرگومان می‌ایستد، پس هیچ کامایی در عبارت نیست و payload دیده نشده.
+function payloadCaptured(expr, kind) {
+  if (kind !== 'insertAdjacentHTML') return true;
+  return /,/.test(String(expr));
+}
 function classify(expr, kind) {
   // eval/new Function: همیشه لایقِ review دستی‌اند (به‌ندرت با دیتایِ کاربر، ولی خطرناکن)
   if (kind === 'eval' || kind === 'new Function') return 'review';
+
+  // ⚠️ حکمِ ناکسب‌شده (دستورِ ۰۱۵، ۲۰۲۶-۰۹-۰۴): اگر payload اصلاً استخراج
+  // نشده، هر برچسبی درباره‌ی محتوایش ادعایی است که این ابزار نسنجیده.
+  // پیش از این چنین موردی `safe_static` می‌شد — یعنی «محتوا را دیدم و
+  // ثابت بود» — در حالی که محتوا اصلاً دیده نشده بود. اسمِ درستش این است.
+  if (!payloadCaptured(expr, kind)) return 'payload_not_captured';
 
   const rhs = extractRhs(expr, kind);
 
@@ -607,11 +626,13 @@ function main() {
     if (unusedKeys.length > 5) console.warn(`    … و ${unusedKeys.length - 5} تای دیگر`);
   }
   const nReview = enforced.filter((h) => h.classification === 'review').length;
+    const nNotCaptured = enforced.filter((h) => h.classification === 'payload_not_captured').length;
     let regressed = false;
 
     for (const [label, n, base] of [
       ['unsafe', nUnsafe, UNSAFE_BASELINE],
       ['review', nReview, REVIEW_BASELINE],
+      ['payload_not_captured', nNotCaptured, PAYLOAD_NOT_CAPTURED_BASELINE],
     ]) {
       if (n > base) {
         console.error(`✗ sinkهای ${label} از ${base} به ${n} رسید (+${n - base}).`);
@@ -662,6 +683,7 @@ function renderMarkdown(report, unsafe) {
   lines.push('- `safe_static` — sink argument is a literal/constant string, no interpolated variable.');
   lines.push('- `escaped` — the sink expression routes through `esc(` before use.');
   lines.push('- `dom_api_safe` — line uses `textContent`, not an HTML sink, or is a benign adjacent match.');
+    lines.push('- `payload_not_captured` — **the scanner never saw the inserted content.** The expression extractor stops before the payload argument (every `insertAdjacentHTML` sink), so no verdict about that content has been earned. It is NOT a finding and NOT a clearance: it marks a sink a human must read. Previously these were labelled `safe_static`, which claimed something the tool had not checked.');
   lines.push('- `unsafe` — a sink interpolates a variable without going through `esc(`. **Must be zero for this script to exit 0.**');
   lines.push('- `review` — `eval`/`new Function` calls; always flagged for manual review regardless of content.');
   lines.push('');
