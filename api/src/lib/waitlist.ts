@@ -343,6 +343,24 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
       // عمداً چکِ قبلی حذف **نشده**: معناهای زمانیِ دو چک یکی نیست (این یکی
       // block_end را هم حساب می‌کند، یعنی زمانِ نظافت) و حذفِ چکِ قدیمی یک
       // تغییرِ رفتاریِ جداست، نه بخشی از این رفع.
+      //
+      // 🚨 دامنه‌ی این رفع — نصفِ مسئله را می‌بندد، نه همه‌اش:
+      //   ✔ حالتِ ترتیبی: رزروِ ترکیبیِ **commitشده**‌ای که این میز ثانویه‌اش
+      //     است، حالا دیده می‌شود. این باگِ واقعی بسته شد.
+      //   ✗ حالتِ هم‌زمان: **باز است.** این تراکنش (`db.$transaction` در
+      //     خطِ ۳۱۵) هیچ `isolationLevel`ی ندارد، یعنی READ COMMITTED. طبقِ
+      //     بندِ صریحِ table-occupancy.ts، SSIِ Postgres فقط رویِ خواندنِ
+      //     تراکنش‌هایِ Serializable قفلِ SIREAD می‌گیرد؛ خواندنِ یک تراکنشِ
+      //     READ COMMITTED برایِ تشخیصِ تداخل نامرئی است، پس اگر یک merge
+      //     هم‌زمان در حالِ commit باشد، این چک آن را نمی‌بیند و هیچ‌کس abort
+      //     نمی‌شود. دقیقاً همان چیزی که در createWalkin در ۴ از ۶ تکرارِ
+      //     زنده بازتولید شد.
+      // ارتقا به Serializable عمداً اینجا انجام **نشده**: معنایِ `upd === 0`
+      // را عوض می‌کند (امروز «رقیب میز را گرفت، برو کاندیدِ بعدی»؛ زیرِ
+      // Serializable بخشی از همان حالت‌ها خطایِ سریال‌سازی می‌شود و باید
+      // retry شود نه skip) و به `withSerializationRetry` رویِ این مسیر نیاز
+      // دارد. یک تغییرِ رفتاری است، نه یک سوئیچ — بسته‌ی تصمیمش در
+      // docs/audit/reports/CEO-TREE-STATE-2026-09-04.md §۵ آمده.
       const mergedBusy = conflict === 0
         && await isTableNumberOccupied(tx, restaurantId, t.number, now, horizon);
 

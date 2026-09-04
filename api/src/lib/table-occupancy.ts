@@ -99,8 +99,15 @@ export async function getOccupiedTableNumbers(
  * وضعیتِ فعلیِ فراخوان‌ها (۲۰۲۶-۰۹-۰۴):
  *   • placeReservation  (reservations.ts) — Serializable + retry ✔
  *   • createWalkinTx    (reservations.ts) — Serializable + retry ✔
- *   • promoteNext       (waitlist.ts)     — هنوز READ COMMITTED ✗ (ثبت‌شده،
- *     رفعش نیازِ تصمیمِ جدا دارد چون معناهایِ `upd === 0` را عوض می‌کند)
+ *   • promoteNext       (waitlist.ts:347) — فراخوان هست، ولی READ COMMITTED ✗
+ *     یعنی طبقِ همین قاعده‌ی بالا، گارد در سطحِ اشتباه نشسته: حالتِ ترتیبی
+ *     (merge ی که قبلاً commit شده) را می‌گیرد، حالتِ هم‌زمان را نه.
+ *     ارتقا نیازِ تصمیمِ جدا دارد چون معنایِ `upd === 0` را عوض می‌کند.
+ *
+ * ⚠️ این فهرست تا ۲۰۲۶-۰۹-۰۴ می‌گفت promoteNext «هنوز» فراخوان نیست، در
+ * حالی که همان روز فراخوان شد. یک فهرستِ وضعیت که از کدِ کنارش عقب بماند،
+ * بدتر از نداشتنش است — خواننده نتیجه می‌گیرد مسیری وجود ندارد که دارد.
+ * هر کس فراخوانِ تازه‌ای اضافه می‌کند، همین‌جا هم ردیفش را بنویسد.
  */
 export async function isTableNumberOccupied(
   tx: Pick<PrismaClient, '$queryRaw'>,
