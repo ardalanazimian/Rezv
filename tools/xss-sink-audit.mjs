@@ -23,6 +23,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fg from './internal/simple-glob.mjs';
@@ -307,18 +308,59 @@ function classify(expr, kind) {
 //  دورِ بعدیِ ممیزی باید override‌هایی که دیگه با کدِ واقعی مچ نمی‌شن (خطِ
 //  متفاوت/محتوایِ متفاوت) رو دوباره بررسی کنه.
 // ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+//  هویتِ سینک — چرا کلیدِ overrideها دیگر شماره‌خط نیست (۲۰۲۶-۰۹-۰۴)
+//
+//  کلیدِ `path:line` در یک جهت fail-closed بود و در جهتِ دیگر fail-OPEN:
+//
+//   • سینکِ بازبینی‌شده از خطِ کلیدخورده **برود** → override بی‌لنگر می‌شود،
+//     طبقه‌بندی به review/unsafe برمی‌گردد، گیت قرمز می‌شود. سالم.
+//   • سینکِ **دیگری** روی آن خط **بنشیند** → همان override می‌گیرد و آن را
+//     بی‌صدا `dom_api_safe` می‌کند. سینکی که هیچ‌کس نخوانده، بازبینیِ
+//     شخصِ دیگری را به ارث می‌برد. نه قرمزی، نه هشدار، هیچ.
+//
+//  جهتِ دوم فرضی نبود — با یک جهشِ حداقلی بازتولید شد: خطِ ۴۹ِ live-strip.js
+//  با `el.innerHTML = location.hash + document.referrer;` جایگزین شد و گیت
+//  با EXIT=0 سبز ماند و یادداشتِ بازبینیِ سینکِ قبلی را به آن چسباند.
+//  `standalone/*` این را تضمینی می‌کرد: تولیدی‌اند و با هر تغییرِ پنل
+//  یک‌جا می‌لغزند.
+//
+//  تنها چیزی که سندِ «این را دستی خواندم» را معنادار می‌کند، گره‌زدنش به
+//  **خودِ کد** است، نه به جایی که آن روز نشسته بود. پس کلید = مسیر + هَشِ
+//  عبارتِ نرمال‌شده‌ی سینک. نتیجه: جابه‌جاییِ کد بی‌ضرر است (و کارِ دستیِ
+//  دوباره‌کلیدزدن حذف می‌شود)، ولی **تغییرِ خودِ عبارت** override را باطل
+//  می‌کند و سینک قرمز می‌شود — دقیقاً همان چیزی که می‌خواهیم.
+//
+//  و اگر کلیدی به هیچ سینکی نخورد، خطاست نه سکوت (پایینِ main): overrideِ
+//  بی‌مصرف یعنی یا کد رفته یا امضا عوض شده؛ هر دو باید دیده شوند.
+// ═══════════════════════════════════════════════════════════════════════
+function normalizeSinkExpr(expr) {
+  return String(expr).replace(/\s+/g, ' ').trim();
+}
+
+function sinkHash(expr, sourceLine) {
+  const identity = normalizeSinkExpr(expr) + '|' + normalizeSinkExpr(sourceLine);
+  return createHash('sha256').update(identity).digest('hex').slice(0, 12);
+}
+
+function overrideKeyFor(relPath, expr, sourceLine) {
+  return `${relPath}#${sinkHash(expr, sourceLine)}`;
+}
+
+// هر کلیدی که واقعاً مصرف شد؛ برایِ کشفِ overrideهای بی‌لنگر در main.
+const USED_OVERRIDE_KEYS = new Set();
 const MANUAL_REVIEW_OVERRIDES = new Map([
   // ── فرمِ ورودِ سه‌عاملیِ پنلِ شرکت ──
-  ['apps/company/js/intelligence.js:865',
+  ['apps/company/js/intelligence.js#1797949972c4',
    'فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت. ۲۰۲۶-۰۹-۰۲: درجِ سومِ _otpLoginEnabled هم اضافه شد — همان جنس: یک booleanِ سرور که فقط تصمیم می‌گیرد رشته‌ی literal ساخته شود یا نه.'],
-  ['standalone/company.html:3188',
+  ['standalone/company.html#1797949972c4',
    'فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت. ۲۰۲۶-۰۹-۰۲: درجِ سومِ _otpLoginEnabled هم اضافه شد — همان جنس: یک booleanِ سرور که فقط تصمیم می‌گیرد رشته‌ی literal ساخته شود یا نه.'],
   // ── بازبینِ بیرونی (Sourcery/opengrep) روی PR #79 ──
   // این سه محل را قاعده‌ی `insecure-innerhtml` علامت زد. تک‌تک در سورس بررسی
   // شدند؛ نتیجه در گزارشِ دورِ ششم. دو موردِ اولِ آن سه (food-dna:191 و
   // reservation:152) **واقعی بودند و رفع شدند** (faNum یک escaper نیست)، پس
   // اینجا override نمی‌خورند. فقط موردِ زیر مثبتِ کاذب بود:
-  ['apps/customer/js/features/trips.js:206',
+  ['apps/customer/js/features/trips.js#6ea9860e2c7f',
    'مثبتِ کاذبِ opengrep: تنها مقدارِ پویا esc(res.error?.message||…) است و '
    + "icon(alert,{size:13}) کلیدِ literal است. قاعده الگویِ innerHTML= را "
    + 'بدونِ dataflow علامت می‌زند. گاردِ خودمان هم مستقل «escaped» می‌دهد.'],
@@ -330,14 +372,14 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/customer/js/data/discover.js:202', 'hCardHTML() از قبل esc(r.n) داشت — بررسی شد.'],
   ['apps/customer/js/data/discover.js:220', 'hCardHTML() از قبل esc(r.n) داشت — بررسی شد.'],
   ['apps/customer/js/features/chat.js:112', 'bubble(m) از قبل esc(m.body) داشت — بررسی شد.'],
-  ['apps/customer/js/features/economy.js:106', 'missionCard(m) دیگه esc(m.title)/esc(m.description) داره (رفع‌شده در همین PR).'],
+  ['apps/customer/js/features/economy.js#15dccaa57a8f', 'missionCard(m) دیگه esc(m.title)/esc(m.description) داره (رفع‌شده در همین PR).'],
   ['apps/customer/js/features/palette.js:94', 'itemHTML(it,i) از قبل esc(it.t)/esc(it.sub) داشت — بررسی شد.'],
-  ['apps/customer/js/reservation.js:21', 'cardHTML() دیگه esc(r.n) داره (رفع‌شده در همین PR).'],
-  ['apps/business/js/waitlist.js:38', 'wlCard(w,i) از قبل esc(w.name) داشت — بررسی شد.'],
+  ['apps/customer/js/reservation.js#a04503eb4fdb', 'cardHTML() دیگه esc(r.n) داره (رفع‌شده در همین PR).'],
+  ['apps/business/js/waitlist.js#0327998ad65e', 'wlCard(w,i) از قبل esc(w.name) داشت — بررسی شد.'],
   ['apps/business/js/reservations.js:75', 'resItemHTML(r,i) از قبل esc(r.name)/esc(r.phone)/esc(r.note)/esc(r.cancelReason) داشت — بررسی شد.'],
   ['apps/business/js/staff-system.js:282', 'sugCard از PR#13 قبلاً esc(s.reason) داره؛ r.label هم در همین PR با esc() رفع شد.'],
-  ['apps/company/js/badges.js:21', 'BADGES_LIST.map از قبل esc(b.name)/esc(b.description)/... داشت — بررسی شد.'],
-  ['apps/company/js/missions.js:21', 'MISSIONS_LIST.map از قبل esc(m.title) داشت — بررسی شد.'],
+  ['apps/company/js/badges.js#f65ffcf1d105', 'BADGES_LIST.map از قبل esc(b.name)/esc(b.description)/... داشت — بررسی شد.'],
+  ['apps/company/js/missions.js#3b88af950f9f', 'MISSIONS_LIST.map از قبل esc(m.title) داشت — بررسی شد.'],
   ['apps/business/js/crm.js:891', 'کارت‌هایِ AI/تماس از قبل esc(c.title)/esc(c.detail)/esc(c.name)/esc(c.reason) داشتن — بررسی شد.'],
 
   // ── الگو ۲: متغیرِ محلی از قبل چند خط بالاتر esc() شده، اسکنر فقط
@@ -368,20 +410,20 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   // ── الگو ۶: مقایسه/ترنریِ محلی که رجکسِ ابزار نتونست parse کنه ولی
   //    دستی بررسی شد کاملاً امنه (رشته‌ی ثابت/تابعِ trusted). ──
   ['apps/customer/js/data/discover.js:151', 'ترنریِ icon(...)+رشته یا esc(el.textContent) — هردو امن.'],
-  ['apps/customer/js/features/loyalty.js:25', 'perksBlock() از PERKS محلی (shared/js seed) می‌سازه؛ tier فقط esc(b.name) بعدِ رفعِ این PR.'],
-  ['apps/customer/js/features/loyalty.js:64', 'badges.map دیگه esc(b.name) داره (رفع‌شده در همین PR)؛ tier.emoji/tier.name از enumِ ثابتِ سطحِ باشگاهه.'],
+  ['apps/customer/js/features/loyalty.js#388c8b826e92', 'perksBlock() از PERKS محلی (shared/js seed) می‌سازه؛ tier فقط esc(b.name) بعدِ رفعِ این PR.'],
+  ['apps/customer/js/features/loyalty.js#c31403f24fd3', 'badges.map دیگه esc(b.name) داره (رفع‌شده در همین PR)؛ tier.emoji/tier.name از enumِ ثابتِ سطحِ باشگاهه.'],
   ['apps/customer/js/features/notifications.js:73', 'رشته‌هایِ ثابت (concat با +) — بدونِ دیتایِ کاربر.'],
   ['apps/customer/js/features/notifications.js:93', 'Object.entries(CATS) — آبجکتِ محلیِ ثابت.'],
-  ['apps/customer/js/features/onboarding.js:42', 'کارتِ onboarding کاملاً استاتیکه.'],
+  ['apps/customer/js/features/onboarding.js#650b709cbb1e', 'کارتِ onboarding کاملاً استاتیکه.'],
   ['apps/customer/js/features/rewards.js:108', 'd.valid ترنری با icon(...)؛ d.balance_toman از fmtFa می‌گذره.'],
   ['apps/customer/js/waitlist.js:55', 'isOffered ترنری رویِ HTMLِ استاتیک.'],
   ['apps/customer/js/data/booking.js:69', 'r.slots رشته‌هایِ ساعتِ ثابت‌فرمت (HH:MM) از سرور، نه متنِ آزاد.'],
   ['apps/customer/js/data/booking.js:82', 's.time مشابه — فرمتِ ثابتِ ساعت.'],
   ['apps/customer/js/data/booking.js:92', 'مشابهِ L69.'],
   ['apps/customer/js/data/booking.js:219', 'Array.from({length:PARTY_MAX}) — آرایه‌ی محلیِ عددی.'],
-  ['apps/business/js/chat.js:24', 'chatEsc در همه‌ی فیلدها استفاده شده؛ t.id ستونِ Postgres UUID (فرمت تضمین‌شده).'],
-  ['apps/business/js/chat.js:75', 'bizBubble از الگویِ chatEsc پیروی می‌کنه (مشابهِ chat.js:94).'],
-  ['apps/business/js/chat.js:94', 'chatEsc(body) مستقیم رویِ ورودی.'],
+  ['apps/business/js/chat.js#be1d8c440b90', 'chatEsc در همه‌ی فیلدها استفاده شده؛ t.id ستونِ Postgres UUID (فرمت تضمین‌شده).'],
+  ['apps/business/js/chat.js#d9400c3c27c7', 'bizBubble از الگویِ chatEsc پیروی می‌کنه (مشابهِ chat.js:94).'],
+  ['apps/business/js/chat.js#9565b12114d0', 'chatEsc(body) مستقیم رویِ ورودی.'],
   ['apps/business/js/crm.js:89', 'logoPhoto.url دیگه esc شده (رفع‌شده در همین PR).'],
   ['apps/business/js/crm.js:379', 'dist فقط {star:number,count:number} — بدونِ رشته.'],
   ['apps/business/js/crm.js:551', 'کارتِ hero — اعداد/توابعِ trusted (fnl/fa)؛ متنِ ثابت.'],
@@ -396,7 +438,7 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/business/js/staff-system.js:399', 'devCode — کدِ OTPِ حالتِ دمو، رشته‌ی محلی (نه ورودیِ کاربر).'],
   ['apps/business/js/waitlist.js:115', 'floorEdit ترنریِ بولینِ محلی رویِ HTMLِ استاتیک.'],
   ['apps/business/js/waitlist.js:270', 'undoFn نامِ تابعِ ثابتیه که خودِ کدِ ما در toastUndo(msg, "fnName") پاس می‌ده، نه ورودیِ کاربر.'],
-  ['apps/company/js/intelligence.js:22', 'fa(d.guests.total_clv_toman) + rfm_distribution.map — اعداد/توابعِ trusted.'],
+  ['apps/company/js/intelligence.js#11f2da47d260', 'fa(d.guests.total_clv_toman) + rfm_distribution.map — اعداد/توابعِ trusted.'],
   ['apps/company/js/intelligence.js:50', 'RESTAURANTS.map — فیلدهایِ نمایش‌داده‌شده اعداد/enumِ status‌اند.'],
   ['apps/company/js/intelligence.js:183', 'متنِ ثابتِ توضیحی + fa(needsAttention.length).'],
   ['apps/company/js/intelligence.js:212', 'healthMeta از یک لوکاپِ محلیِ ثابت؛ d.jobs.dead عدد.'],
@@ -422,7 +464,7 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   //    قالب‌هایِ کاملاً استاتیک استفاده می‌کردن — هیچ فراخوانِ خامِ
   //    escape‌نشده‌ای پیدا نشد. ──
   ['apps/customer/js/auth.js:209', 'openSheet(html) — فراخوان‌ها بررسی شدن (bookStep2/3 با esc(r.n)، rewards.js/trips.js با قالبِ استاتیک) — امن.'],
-  ['apps/customer/js/features/live-strip.js:49',
+  ['apps/customer/js/features/live-strip.js#9bc628165d01',
    'out فقط از pill(fmtFa(عدد)) ساخته می‌شه — بدونِ متنِ کاربر/API. هر سه درج پشتِ گاردِ '
    + '`Number(d.x) > 0` هستند، پس رشته‌ای که `<` داشته باشد NaN می‌شود و اصلاً رندر نمی‌شود؛ '
    + 'fmtFa هم `n.toLocaleString(\'fa-IR\')` است که فقط رقم/جداکننده تولید می‌کند. '
@@ -436,11 +478,11 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   //    پیش از لانچ، ۲۰۲۶-۰۸-۲۸). هر پنج مورد تک‌تک خوانده و امن تأیید شد؛
   //    منشأشان: f658687 «صداقتِ سراسری» · d525e48 SPEC-A فاز ۲ ·
   //    f4c27e4 SPEC-B provisioning. هیچ‌کدام رانشِ کیفیت نیست. ──
-  ['apps/business/js/crm.js:132', 'loadErrorBlock(title, retry) — هر دو آرگومان literalِ خودِ کدند؛ title با esc() می‌گذره و retry عمداً یک رشته‌ی **کد** برایِ onclick است (نه دیتا).'],
-  ['apps/business/js/crm.js:136', 'کارتِ هویت: RESTAURANT.name با esc() می‌گذره (تنها فیلدِ API)؛ logoEmoji/logoGradient فقط از پیکرِ محلی ست می‌شن (crm.js:274-275 ← pickLogoEmoji/pickLogoGrad)، هرگز از پاسخِ سرور؛ logoPhoto.url و statusLabel هم esc دارن؛ GALLERY.indexOf عدد است.'],
-  ['apps/business/js/crm.js:427', 'همان loadErrorBlock مثلِ crm.js:132 — آرگومان‌ها literalِ کدند.'],
-  ['apps/business/js/menu.js:674', 'گروه/آپشنِ افزودنی‌ها: esc(g.name)/esc(o.name) رویِ متن، jsq(itemId)/jsq(g.id)/jsq(g.name) داخلِ onclick، و fa(min_select)/fa(max_select) رویِ اعداد — هر مسیرِ دیتا پوشش داره.'],
-  ['apps/company/js/restaurant.js:176', 'btn.innerHTML = label که خودش چهار خط بالاتر از همان دکمه خوانده شده (ذخیره/بازگرداندنِ برچسبِ دکمه حینِ لودینگ) — رفت‌وبرگشتِ markupِ خودِ عنصر، بدونِ ورودِ هیچ دادهٔ بیرونی.'],
+  ['apps/business/js/crm.js#10fff8cec69d', 'loadErrorBlock(title, retry) — هر دو آرگومان literalِ خودِ کدند؛ title با esc() می‌گذره و retry عمداً یک رشته‌ی **کد** برایِ onclick است (نه دیتا).'],
+  ['apps/business/js/crm.js#12cae07d62d0', 'کارتِ هویت: RESTAURANT.name با esc() می‌گذره (تنها فیلدِ API)؛ logoEmoji/logoGradient فقط از پیکرِ محلی ست می‌شن (crm.js:274-275 ← pickLogoEmoji/pickLogoGrad)، هرگز از پاسخِ سرور؛ logoPhoto.url و statusLabel هم esc دارن؛ GALLERY.indexOf عدد است.'],
+  ['apps/business/js/crm.js#dd7a5ecb6671', 'همان loadErrorBlock مثلِ crm.js:132 — آرگومان‌ها literalِ کدند.'],
+  ['apps/business/js/menu.js#cbbe45f8aea6', 'گروه/آپشنِ افزودنی‌ها: esc(g.name)/esc(o.name) رویِ متن، jsq(itemId)/jsq(g.id)/jsq(g.name) داخلِ onclick، و fa(min_select)/fa(max_select) رویِ اعداد — هر مسیرِ دیتا پوشش داره.'],
+  ['apps/company/js/restaurant.js#c5a4dbdd770c', 'btn.innerHTML = label که خودش چهار خط بالاتر از همان دکمه خوانده شده (ذخیره/بازگرداندنِ برچسبِ دکمه حینِ لودینگ) — رفت‌وبرگشتِ markupِ خودِ عنصر، بدونِ ورودِ هیچ دادهٔ بیرونی.'],
 ]);
 
 function scanFile(absPath, relPath) {
@@ -454,10 +496,11 @@ function scanFile(absPath, relPath) {
       let classification = classify(expr, kind);
       const lineNum = text.slice(0, m.index).split('\n').length;
       const snippet = text.split('\n')[lineNum - 1].trim().slice(0, 160);
-      const overrideKey = `${relPath}:${lineNum}`;
+      const hash = sinkHash(expr, snippet);
+      const overrideKey = overrideKeyFor(relPath, expr, snippet);
       const overrideNote = (classification === 'unsafe' || classification === 'review') ? MANUAL_REVIEW_OVERRIDES.get(overrideKey) : undefined;
-      if (overrideNote) classification = 'dom_api_safe';
-      hits.push({ file: relPath, line: lineNum, kind, snippet, classification, ...(overrideNote ? { manual_review_note: overrideNote } : {}) });
+      if (overrideNote) { classification = 'dom_api_safe'; USED_OVERRIDE_KEYS.add(overrideKey); }
+      hits.push({ file: relPath, line: lineNum, kind, snippet, sink_hash: hash, classification, ...(overrideNote ? { manual_review_note: overrideNote } : {}) });
     }
   }
   return hits;
@@ -548,7 +591,22 @@ function main() {
 
     // ── ratchet: عدد فقط پایین می‌رود ──
     const nUnsafe = enforced.filter((h) => h.classification === 'unsafe').length;
-    const nReview = enforced.filter((h) => h.classification === 'review').length;
+    // ── overrideهای بی‌مصرف ────────────────────────────────────────────
+  // هر کلیدی که هیچ سینکی را نگرفت. پیش از ۲۰۲۶-۰۹-۰۴ این‌ها بی‌صدا بودند و
+  // کلیدِ `path:line`شان می‌توانست با نشستنِ کدِ بی‌ربط روی همان خط دوباره
+  // «زنده» شود و یک سینکِ نخوانده را امن اعلام کند. حالا کلید هویتی است، پس
+  // بی‌اثرند — ولی بی‌اثر یعنی بازبینیِ ثبت‌شده‌شان هم دیگر کار نمی‌کند، و آن
+  // را باید دید نه حدس زد.
+  const declared = [...MANUAL_REVIEW_OVERRIDES.keys()];
+  const unusedKeys = declared.filter((k) => !USED_OVERRIDE_KEYS.has(k));
+  if (unusedKeys.length) {
+    console.warn(`\n⚠ ${unusedKeys.length} از ${declared.length} overrideِ اعلام‌شده هیچ سینکی را نگرفت.`);
+    console.warn(`  این‌ها بی‌اثرند (کلیدِ هویتی جعلی‌شان نمی‌کند)، ولی بازبینیِ ثبت‌شده‌شان هم مرده است.`);
+    console.warn(`  جا‌به‌جا کردنشان کارِ بازبینیِ انسانی است، نه اسکریپت. نمونه:`);
+    for (const k of unusedKeys.slice(0, 5)) console.warn(`    - ${k}`);
+    if (unusedKeys.length > 5) console.warn(`    … و ${unusedKeys.length - 5} تای دیگر`);
+  }
+  const nReview = enforced.filter((h) => h.classification === 'review').length;
     let regressed = false;
 
     for (const [label, n, base] of [
@@ -626,7 +684,7 @@ function renderMarkdown(report, unsafe) {
   if (reviewed.length > 0) {
     lines.push('## Manually reviewed (not auto-classified safe)');
     lines.push('');
-    lines.push('The regex classifier flagged these as `unsafe`/`review`; each was read by hand and reclassified with a justification (see `MANUAL_REVIEW_OVERRIDES` in `tools/xss-sink-audit.mjs`). Re-review if the cited line ever changes.');
+    lines.push('The regex classifier flagged these as `unsafe`/`review`; each was read by hand and reclassified with a justification (see `MANUAL_REVIEW_OVERRIDES` in `tools/xss-sink-audit.mjs`). Each override is keyed on a hash of the sink expression itself, so moving code keeps the review attached and CHANGING the sink drops it (the gate then goes red). The line number below is where the sink sat when the report was generated — it is a pointer for the reader, not the key.');
     lines.push('');
     lines.push('| File:Line | Justification |');
     lines.push('|---|---|');
