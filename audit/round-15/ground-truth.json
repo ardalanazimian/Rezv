@@ -277,6 +277,16 @@
       "evidence": "audit/round-19/P0-022-real-rls-post-launch.md (scope, work breakdown, acceptance)",
       "status": "SCOPED AND DEFERRED to post-launch by founder order (directive 5, order 2c). Not implemented pre-launch: the app connects as owner+SUPERUSER+BYPASSRLS today, so moving it to a non-owner role re-authorizes every query at once with no production traffic to catch breakage and no rollback window, for defense-in-depth behind a boundary that already exists and is separately tested.",
       "verified_by": "ceo"
+    },
+    {
+      "id": "P0-023",
+      "severity": "blocker",
+      "area": "infra/dns",
+      "claim": "Two founder documents name the business panel's host as `biz.rezervno.ir`, but the live reverse proxy serves `business.{$DOMAIN}`. If DNS is registered for `biz.`, Caddy never obtains an ACME certificate for it and the business panel is unreachable on launch day. The delivery mandate puts this hostname inside an ACCEPTANCE CRITERION (surface B's golden journey), so the criterion as written can never pass.",
+      "evidence": "deploy/caddy/Caddyfile:113 api.{$DOMAIN} · :140 app.{$DOMAIN} · :156 business.{$DOMAIN} · :172 admin.{$DOMAIN}. HOSTING-DOMAIN-DECISION.md subdomain table and DELIVERY-MANDATE.md section 1.B both say `biz.rezervno.ir`.",
+      "status": "open - founder decides which name wins, then ONE of them changes: either the Caddyfile block is renamed to biz. (and docs/ENVIRONMENT.md ALLOWED_ORIGINS examples follow), or both documents are corrected to business. Recommendation: keep `business.` - it is the built, running configuration, and renaming a live vhost buys nothing.",
+      "class_fix_not_instance_fix": "This is the SECOND document carrying the same error, which makes it a class defect, not a typo: subdomain names live in the Caddyfile, in docs/ENVIRONMENT.md's ALLOWED_ORIGINS examples, and in founder mandates, with nothing keeping them in sync. Per the delivery mandate's own section 3 ('fix the class, not the instance'), the durable fix is a single source of truth plus a check that fails when a document names a host the proxy does not serve. Proposed as the next gate after the current wave.",
+      "verified_by": "ceo"
     }
   ],
   "wave0": {
@@ -494,5 +504,20 @@
     "order_3_a5_scope_elevated": "Recorded in audit/round-17/WAVE2-ENTRY-CRITERIA.md: with RLS inert, the application-layer isolation matrix is the SOLE tenant boundary. Exhaustive (every /restaurant/* and /admin/* route x cross-tenant token, machine-generated, zero sampling), raw output recorded per row, any gap is a BLOCKER not a major.",
     "order_4_non_pausing_proof": "Designed: audit/round-19/non-pausing-proof-design.json. P1 = documented idle window >= 7 days (>= the old tier's stated pause threshold; the threshold itself is flagged UNVERIFIED and the window is set so the proof holds either way), then a real query whose FIRST attempt must succeed - a paused host also answers eventually, so only the first attempt is evidence. P2 = structural evidence, explicitly labelled an argument rather than a measurement. P3 = CEO addition: self-hosting removes auto-pause and replaces it with host reboot / disk-full / OOM-crash-loop, so a gate proving only 'it does not pause' would win against last week's failure while the same 4am outage arrives by another route; folded into gate (c) alerting.",
     "order_5_gates_abc_to_a10": "Assigned to A10 against the chosen host in audit/round-19/A10-PLAN.json (B7). The restore drill must compare row counts and record the exit code - a documented drill is not a drill."
+  },
+  "founder_directive_6_2026-09-04": {
+    "subject": "Hosting/domain decision (P0-017), ML moat mandate, delivery mandate",
+    "hosting_decision_recorded": "Staging-first on an Iranian cloud (ArvanCloud recommended, ParsPack fallback), register rezervno.ir via an IRNIC reseller, four subdomains, and a 13-item proof list before the host is declared usable. The egress reality check (npm/Docker Hub/GitHub/Sentry from an Iranian IP) is correctly placed first, because it decides the whole build pipeline. Founder actions 1-5 are founder-side; A10 runs the proof list once SSH and DNS land.",
+    "hosting_doc_corrections": [
+      "`biz.` vs `business.` - recorded as P0-023 (blocker).",
+      "Section 3's central argument cites CUSTOMER_APP_URL as defaulting to https://app.rezervno.ir. That variable was REMOVED on 2026-08-22 (docs/ENVIRONMENT.md:100). The conclusion (register rezervno.ir) still holds, but on different evidence: NEXT_PUBLIC_SITE_URL defaults to https://rezervno.ir (:50, and it is printed inside menu QR codes) and EMAIL_FROM defaults to noreply@rezervno.ir (:111)."
+    ],
+    "ml_mandate_variances": [
+      "No-show is NOT a rule-based tier. It is already a trained logistic regression with gradient descent, Brier, ROC AUC, calibration curve, channel-bias check and an activation decision (src/lib/no-show-model.ts:7,24,213,318). The mandate's model-1 row names the wrong baseline; the real change it asks for is technique and pooling, not building a first model.",
+      "Section 1c mandates pooled training. The shipped code is PER-TENANT (no-show-model.ts:417,484,562,642). The mandate is right - with zero data a per-tenant model can never clear its own activation gates - but this is a rewrite of a shipped, gated subsystem, which changes the M2 estimate.",
+      "Provenance was half-built: model_predictions.modelSource existed (schema.prisma:959) but the reservation row carried the tier with no source. FIXED this round - see P0-ML-3.",
+      "The event substrate is thinner than the mandate assumes: lib/events.ts emit() is a WEBHOOK dispatcher (db.webhook.findMany + HMAC), not a log; of its 7 declared domain event types exactly one is ever called (reservations.ts:420); and recordEvent(), the real platform_events writer, is called only from lib/site-orders.ts. ZERO reservation-lifecycle events reach platform_events, so M0 has no substrate at all for the reservation domain."
+    ],
+    "delivery_mandate_status": "Accepted. Acceptance is on staging over the real domain, which is blocked on the founder's hosting actions. The one item that cannot wait is P0-023, because it sits inside surface B's acceptance criterion."
   }
 }

@@ -5,6 +5,7 @@ import { sinceDays } from '@/lib/staff-helpers';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { NO_SHOW_FEATURE_NAMES } from '@/lib/no-show-model';
 import { getDemandForecast } from '@/lib/demand-forecast';
+import { countUpcomingHighRiskByProvenance, provenanceLabel } from '@/lib/no-show-provenance';
 // ⚠️ «روزِ هفته» باید روزِ **تهران** باشد، نه UTC — تعریف و دلیلش یک‌جا در
 // lib/restaurant-manager.ts. نامِ روزها هم از همان‌جا می‌آید تا اندیسِ DOW و
 // نام هرگز از هم جدا نیفتند.
@@ -40,14 +41,15 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
       }
 
       // ── ۲) no-show بالا در رزروهای آینده‌ی نزدیک ──
-      const highRiskUpcoming = await db.reservation.count({
-        where: { restaurantId: restaurant.id, status: { in: ['confirmed', 'auto_confirmed', 'pending'] }, slotStart: { gte: new Date(), lte: new Date(Date.now() + 48 * 3600_000) }, noShowRiskTier: 'high' as any },
-      });
-      if (highRiskUpcoming > 0) {
+      // نسب‌نامه همراهِ عدد می‌آید (مهاجرتِ ۰۸۰): این کارت زیرِ سطحی نمایش
+      // داده می‌شود که «هوشمند» خوانده می‌شود، پس باید بگوید عدد از مدل آمده
+      // یا از قاعده‌ی دستی. تا پیش از این، هر دو یک‌شکل نمایش داده می‌شدند.
+      const risk = await countUpcomingHighRiskByProvenance(restaurant.id, 48);
+      if (risk.total > 0) {
         out.push({
-          id: 'noshow_upcoming', severity: highRiskUpcoming >= 5 ? 'high' : 'medium',
-          title: `${highRiskUpcoming} رزرو پرریسک در ۴۸ ساعت آینده`,
-          detail: 'این مهمان‌ها سابقه‌ی no-show یا الگوی رزرو پرریسک دارند. یادآوری SMS اضافه یا درخواست بیعانه می‌تواند نرخ no-show را کم کند.',
+          id: 'noshow_upcoming', severity: risk.total >= 5 ? 'high' : 'medium',
+          title: `${risk.total} رزرو پرریسک در ۴۸ ساعت آینده`,
+          detail: `این مهمان‌ها سابقه‌ی no-show یا الگوی رزرو پرریسک دارند. یادآوری SMS اضافه یا درخواست بیعانه می‌تواند نرخ no-show را کم کند. ${provenanceLabel(risk)}`,
           action_label: 'ارسال یادآوری گروهی',
           action: { type: 'send_reminder', risk_tier: 'high' },
         });
