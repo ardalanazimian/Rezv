@@ -394,6 +394,11 @@ jobs:
       # را مجاز نکند را هم می‌سنجد.
       - name: Fonts self-hosted (files, bytes, offline embed, and proxy CSP)
         run: python tools/check-fonts.py
+      # سندی که دروغ می‌گوید هم‌کلاسِ فیچرِ جعلی است — و این مخزن چهار بار همین را
+      # تحویل داده. یکی از آن چهار (آدرسِ مخزن) قبلاً تصحیح شده بود و برگشت، چون
+      # تصحیح فقط در تاریخچه‌ی چت زندگی می‌کرد و هیچ گیتی نمی‌دیدش.
+      - name: Docs are not stale (repo address, proxy hosts, env vars)
+        run: node tools/check-doc-staleness.mjs
       # ⚠️ XSSِ ذخیره‌شده‌ی واقعی (۲۰۲۶-۰۸-۲۵): `cardHTML` در فیدِ مشتری فیلدِ
       # `cuisine` را بدونِ esc داخلِ innerHTML می‌گذاشت. آن فیلد را صاحبِ رستوران
       # می‌نویسد (فقط `max(50)`، بدونِ پاک‌سازیِ HTML) و از APIِ عمومی به فیدِ

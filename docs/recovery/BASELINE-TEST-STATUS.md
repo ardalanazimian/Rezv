@@ -22,7 +22,7 @@ docker run -d --name rezv-test-redis -p 56379:6379 redis:7
 
 export DATABASE_URL="postgresql://test:test@localhost:55432/rezervno_test"
 export REDIS_URL="redis://localhost:56379"
-export JWT_ACCESS_SECRET="testsecret_access_0123456789abcdef"
+export JWT_SECRET="testsecret_access_0123456789abcdef"
 export JWT_REFRESH_SECRET="testsecret_refresh_0123456789abcdef"
 
 cd api

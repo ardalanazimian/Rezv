@@ -104,7 +104,7 @@ GET /sw.js                → ۲۰۰
 | دامنه | پروژه |
 |---|---|
 | `app.rezervno.ir` | `apps/customer` |
-| `biz.rezervno.ir` | `apps/business` |
+| `business.rezervno.ir` | `apps/business` |
 | `admin.rezervno.ir` | `apps/company` |
 | `api.rezervno.ir` | `api` |
 
