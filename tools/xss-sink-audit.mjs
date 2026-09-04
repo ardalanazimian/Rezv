@@ -543,6 +543,11 @@ function assertNoUnearnedSafeStatic(hits) {
   console.error(`  ولی در خطِ خودشان \${...} دیده می‌شود. safe_static یعنی «هیچ درجی ندارد»،`);
   console.error(`  پس طبقه‌بند کمتر از آنچه خط دارد را دیده — همان کلاسِ insertAdjacentHTML.`);
   for (const h of bad.slice(0, 5)) console.error(`    - ${h.file}:${h.line}  ${h.snippet.slice(0, 80)}`);
+  console.error(`\n  ⚠ آرتیفکت نوشته نشد. این اجرا پیش از writeFileSync متوقف شد، پس`);
+  console.error(`    tools/xss-sink-audit-report.json و docs/XSS_SINK_AUDIT.md هنوز اجرای`);
+  console.error(`    *قبلی* را توصیف می‌کنند — دربارهٔ این اجرا مدرک نیستند. تنها شاهدِ این`);
+  console.error(`    اجرا همین خروجی است. (ابزاری که هنگام شکست نمی‌نویسد، آرتیفکتش را از`);
+  console.error(`    مدرک‌بودن می‌اندازد — گزارشِ rezervnofullsource-ed، ۲۰۲۶-۰۹-۰۴.)`);
   process.exit(1);
 }
 function main() {
