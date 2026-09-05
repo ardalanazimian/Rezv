@@ -208,6 +208,7 @@ import './tenant-gate.integration.test.mts';
 import './tenant-isolation.integration.test.mts';
 import './waitlist.test.mts';
 import './waitlist-flow.integration.test.mts';
+import './waitlist-merge-occupancy.test.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ یافته‌ی واقعیِ دوم (۲۰۲۶-۰۸-۱۴، همون ممیزی): table-merge-occupancy.test.mts
