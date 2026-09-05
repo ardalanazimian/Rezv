@@ -44,6 +44,22 @@
       "verified_by": "metrics assertion in api/tests/slot-lock-failopen-double-booking.test.mts (fallbackDelta === setDelta); mutation M4 (deleting metrics.slotLockFallback.inc() at redis.ts:166) → ONEFILE_EXIT=1, reverted."
     },
     {
+      "id": "R20-SLOTLOCK-06",
+      "severity": "blocker",
+      "area": "environment / agent infrastructure",
+      "claim": "The build machine is at 100% disk usage with zero bytes free. At that point the agent harness itself cannot write, and Postgres queries against the scratch DB time out. Any test result produced on this machine while it is in that state must be treated as suspect until re-run with headroom.",
+      "evidence": "df -h /c → 'C: 119G 119G 0 100% /c'. Harness failure: \"ENOSPC: no space left on device, open '.../tasks/b4b7zroq9.output'\". A plain `docker exec ... psql -c \"SELECT count(*) ...\"` exceeded a 120s timeout. The abandoned probe's real termination cause was \"tee: 'standard output': No space left on device / [exited with code 1]\", and it never printed its own PROBE_EXIT marker (grep -c PROBE_EXIT → 0).",
+      "verified_by": "raw df output and harness error above; ~110MB freed from my own and stale temp task outputs solely to be able to write this record. The 119GB was NOT reclaimed — deciding what to delete (docker images/volumes, node_modules, .next caches) is an ops decision and was escalated rather than taken."
+    },
+    {
+      "id": "R20-SLOTLOCK-07",
+      "severity": "major",
+      "area": "self-correction",
+      "claim": "I attributed the mid-investigation probe stall to a cross-transaction gate in my Prisma interleave that never resolves when one side aborts. That was a hypothesis stated as a finding. The raw evidence shows the process died on ENOSPC / a blocked stdout pipe. The gate-deadlock explanation is WITHDRAWN.",
+      "evidence": "Abandoned task output: \"tee: 'standard output': No space left on device\" then \"[exited with code 1]\"; no PROBE_EXIT marker was ever printed. Corrected in audit/round-20/SLOT-LOCK-FAILOPEN.md §11 and in two source comments in api/tests/slot-lock-failopen-double-booking.test.mts (the gateless interleave design is kept on its own merits, not because the hypothesis was confirmed).",
+      "verified_by": "no conclusion in this report depends on that claim — the §4a interleave evidence comes from psql sessions, not from that probe. Residual uncertainty explicitly recorded: 'the fix is why layer 2 is green' is not fully separable from 'the disk freed up'; a re-run on a machine with headroom is the outstanding verification."
+    },
+    {
       "id": "R20-SLOTLOCK-05",
       "severity": "minor",
       "area": "test integrity / self-reported",

@@ -461,7 +461,84 @@ rather than assumed.
 - `rezervno_a11` and the dev DB `rezervno` were not modified; the dev DB was
   only read.
 
-## 11. One thing to flag for whoever schedules agents
+## 11. Correction to this report, and a live environment blocker
+
+**Correction — I stated a cause I had not established.** Mid-investigation a
+scratch probe stopped producing output and I attributed it, in this report and
+in a source comment, to a cross-transaction gate in my Prisma interleave that
+never resolves when one side aborts. That was a hypothesis presented as a
+finding. When the abandoned process finally reported, its raw output was:
+
+```
+tee: 'standard output': No space left on device
+tee: '…/scratchpad/probe-3.log': No space left on device
+[exited with code 1]
+```
+
+It never printed its own `PROBE_EXIT` marker (`grep -c PROBE_EXIT` → `0`), so
+the process died on a full disk / blocked stdout pipe, not on my gate. The
+gate-deadlock explanation is **withdrawn**. The gateless interleave design is
+kept because it is correct on its own merits, not because that hypothesis was
+confirmed; both source comments have been corrected to say so.
+
+Nothing else in this report depends on that claim — the interleave evidence in
+§4a comes from `psql`, not from that probe.
+
+**Live blocker: the machine is out of disk.**
+
+```
+$ df -h /c
+Filesystem      Size  Used Avail Use% Mounted on
+C:              119G  119G     0 100% /c
+```
+
+At zero bytes the agent harness itself failed
+(`ENOSPC: no space left on device, open '…/tasks/….output'`) and a plain
+`psql -c "SELECT count(*)"` against the scratch DB exceeded a 120 s timeout.
+I freed ~110 MB of my own and stale temp task outputs purely to be able to write
+this correction; I did **not** attempt to reclaim the 119 GB, because deciding
+what to delete (Docker images and volumes, `node_modules`, `.next` caches) is an
+ops decision, not mine to take unilaterally.
+
+**What this does and does not put in doubt.** The final full-suite run completed
+and its wrapper wrote the last line of the log, `NPM_TEST_EXIT=0`, after
+`ℹ pass 1542 / ℹ fail 0` — a truncated log could not contain its own final line,
+so that result stands. What I cannot rule out is that disk pressure contributed
+to the earlier layer-2 flakes I attributed in §5 to the fixed window, the
+`pg_locks.database` NULL and the noisy proxy. Those three are mechanism defects
+that are true independently — the `transactionid`/NULL behaviour and index-level
+SIReadLocks are properties of Postgres, not of this machine — and mutation M3
+still drives the final version red with 196 samples and an empty lock dump. But
+"the fix is why it is green" is, honestly, **not fully separable** from "the disk
+freed up", and I am not going to claim it is. Re-running the suite on a machine
+with headroom is the outstanding verification.
+
+## 11b. Two cross-session facts discovered while closing out
+
+**My §8 walk-in finding has been escalated by a parallel test-integrity session,
+and I have not verified their result.** The shared memory namespace now records
+that racing `createWalkin` against a merge booking with the **real, unmodified**
+`withSlotLock` (no dependency injection, real Redis) produces double-bookings —
+one note says 6/6, another 14/15 — and reclassifies R20-SLOTLOCK-03 as **P0**.
+Their added lesson is that injecting a fake lock for "determinism" had handed the
+merge side a zero-latency path it never has in production, so the DI version came
+back 0/8 and 0/15 "safe". That is a sharper result than my sequential probe and it
+is consistent with it, but it is **their claim, not my measurement** — I did not
+run it, and the two numbers are not identical. Treat it as a lead to re-verify,
+not as established, and note it raises the severity of the decision package.
+
+**This work was committed by another session, against my "do not commit"
+instruction.** `api/tests/slot-lock-failopen-double-booking.test.mts` landed in
+`036b453`; my misplaced memory directory was swept into `81ed857`. I did not make
+either commit. The corrections in §11 are uncommitted modifications on top of
+`036b453`, and the working tree now also contains a deletion of
+`api/.claude/agent-memory/test-integrity/` — those four files were mine, written
+to the wrong path (repo convention is the tracked root `.claude/agent-memory/<ns>/`,
+where `census/` and `launch-ops/` live). Byte-identical copies now sit at
+`.claude/agent-memory/test-integrity/`, verified with `diff -q` before removal, and
+the originals remain in git history.
+
+## 12. One thing to flag for whoever schedules agents
 
 Full-suite run #3 failed `schema-drift.integration.test.mts` with
 `ALTER TABLE "restaurants" ADD COLUMN "drift_test_marker_zzz" TEXT`. That test

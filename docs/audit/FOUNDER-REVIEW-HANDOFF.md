@@ -82,7 +82,7 @@ offered as a live fact, or "zero"/"empty" where the truth is "we could not query
 
 A hand-written table here is exactly the kind of artifact this audit warns against: accurate the day
 it was typed, silently wrong the day a gate, a script, or this machine changes. So this section is no
-longer typed by hand. `tools/gate-inventory.mjs` (round-20) **runs every evaluation-only gate itself**,
+longer typed by hand. `tools/report-gate-status.mjs` (round-20) **runs every evaluation-only gate itself**,
 records the literal command and the literal exit code, classifies each as `GREEN` / `RED` /
 `COULD_NOT_RUN` / `UNKNOWN`, and writes the raw stdout+stderr of every run to
 `audit/round-20/gate-inventory/<id>.log` plus a full JSON at `audit/round-20/gate-inventory/gate-inventory.json`.
@@ -91,14 +91,14 @@ are read-only evaluators — confirmed by reading their source, not assumed), ne
 argument-requiring gate without saying which argument and why, and carries no allowlist of expected
 results: it reports what actually happened, not what it expects to see.
 
-**Re-run it rather than trusting the table below** — `node tools/gate-inventory.mjs` — that is the
+**Re-run it rather than trusting the table below** — `node tools/report-gate-status.mjs` — that is the
 entire point of the section. The table below is one snapshot, captured on 2026-09-04, machine
 `DESKTOP-8DAJNO5` (win32 10.0.26200, node v24.20.0); a gate inventory is inherently machine-local and
 this one will visibly rot the moment `psql` is installed here or a gate changes.
 
 `docs/DECISIONS.md:30-35` describes the A-gates in prose; the rows below are the gates themselves.
 
-> تولیدشده توسطِ `node tools/gate-inventory.mjs` در 2026-09-04T07:33:06.807Z روی DESKTOP-8DAJNO5 (win32 10.0.26200, node v24.20.0). **این جدول یک عکسِ لحظه‌ای است، نه یک ادعای دائمی — دوباره اجرا کن، اعتماد نکن.**
+> تولیدشده توسطِ `node tools/report-gate-status.mjs` در 2026-09-04T07:33:06.807Z روی DESKTOP-8DAJNO5 (win32 10.0.26200, node v24.20.0). **این جدول یک عکسِ لحظه‌ای است، نه یک ادعای دائمی — دوباره اجرا کن، اعتماد نکن.**
 
 | Gate | Command | Exit | State | Note |
 |---|---|---|---|---|
@@ -121,7 +121,7 @@ pass):
 
 | Gate | Why not run |
 |---|---|
-| `tools/restore-drill.sh` | It is the drill *executor*, not a gate — it really runs `pg_dump`/`CREATE DATABASE`/`pg_restore`/`DROP DATABASE`. `gate-inventory.mjs` only runs pure evaluators. |
+| `tools/restore-drill.sh` | It is the drill *executor*, not a gate — it really runs `pg_dump`/`CREATE DATABASE`/`pg_restore`/`DROP DATABASE`. `report-gate-status.mjs` only runs pure evaluators. |
 | `tools/check-boot-path.sh` | Builds and tears down a disposable schema and holds a real server up for up to 9 minutes on a port — a CI-weight job, not a lightweight local gate. |
 | CI-only jobs: `build`, `test`, `image-build`, `security`, `observability`, `e2e`, `design-system`, `standalone`, `seo`, `landing`, `base-freshness` | Defined in `.github/workflows/ci.yml`; need CI's Postgres/Redis services, a Docker build, or Playwright browsers — out of scope for a local gate inventory. `observability` was added 2026-09-04; before that **nothing in CI parsed `observability/alerts.yml`**. |
 
