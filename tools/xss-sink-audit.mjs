@@ -671,7 +671,10 @@ function scanFile(absPath, relPath) {
       const overrideKey = overrideKeyFor(relPath, expr, snippet);
       const overrideNote = (classification === 'unsafe' || classification === 'review') ? MANUAL_REVIEW_OVERRIDES.get(overrideKey) : undefined;
       if (overrideNote) { classification = 'dom_api_safe'; USED_OVERRIDE_KEYS.add(overrideKey); }
-      hits.push({ file: relPath, line: lineNum, kind, snippet, sink_hash: hash, classification, ...(overrideNote ? { manual_review_note: overrideNote } : {}) });
+      // فراخوان‌محور بودن را از خودِ matchِ الگو می‌فهمیم، نه از فهرستِ
+      // دستیِ نام‌ها — تا نوعِ سینکِ تازه هم خودبه‌خود مشمول شود.
+      const truncated = consumedParen && !expr.trim().endsWith(')');
+      hits.push({ file: relPath, line: lineNum, kind, snippet, sink_hash: hash, classification, ...(truncated ? { expr_truncated: true } : {}), ...(overrideNote ? { manual_review_note: overrideNote } : {}) });
     }
   }
   return hits;
@@ -688,6 +691,28 @@ function scanFile(absPath, relPath) {
 // `${esc(body)}` داشت و `safe_static` گرفته بود، چون استخراج روی آرگومانِ
 // موقعیت ایستاده بود. نام‌بردن از همان یک مورد کافی نیست — نوعِ سینکِ
 // بعدی با همین شکافِ استخراج، بی‌صدا تکرارش می‌کند.
+// هر سینکِ فراخوان‌محور باید تا پرانتزِ بسته خوانده شده باشد.
+//
+// ⚠️ درسِ ۲۰۲۶-۰۹-۰۵ که این را لازم کرد: نقصِ بریدگی هرگز مالِ
+// insertAdjacentHTML نبود، مالِ **استخراج‌کننده** بود. هر سه نشست فقط
+// insertAdjacentHTML را نگاه کردند چون اولین نمونه آنجا پیدا شده بود، و
+// document.write تمامِ این مدت مبتلا بود و کسی ندیدش. رفعِ یک کلاس به
+// شکلِ اولین نمونه‌اش، بقیه‌ی کلاس را سرِ پا می‌گذارد.
+//
+// پس ادعا را عمومی می‌کنیم: اگر عبارت به `)` نرسیده باشد، طبقه‌بند دارد
+// درباره‌ی یک **تکه** حکم می‌دهد — هر نوع سینکی که باشد، حتی نوعی که
+// سال‌ها بعد اضافه شود.
+function assertCallSinksFullyCaptured(hits) {
+  const bad = hits.filter((h) => h.expr_truncated);
+  if (!bad.length) return;
+  console.error(`\n✗ ${bad.length} سینکِ فراخوان‌محور ناقص خوانده شده‌اند — به پرانتزِ بسته نرسیده‌اند.`);
+  console.error(`  طبقه‌بند درباره‌ی یک تکه حکم می‌دهد، نه کلِ فراخوان — همان نقصی که`);
+  console.error(`  ده سینکِ insertAdjacentHTML و یک document.write را بی‌صدا امن اعلام کرد.`);
+  for (const h of bad.slice(0, 5)) console.error(`    - ${h.file}:${h.line} (${h.kind})  ${h.snippet.slice(0, 70)}`);
+  console.error(`\n  ⚠ آرتیفکت نوشته نشد — تنها شاهدِ این اجرا همین خروجی است.`);
+  process.exit(1);
+}
+
 function assertNoUnearnedSafeStatic(hits) {
   const bad = hits.filter((h) => h.classification === 'safe_static' && /\$\{/.test(h.snippet || ''));
   if (!bad.length) return;
@@ -725,6 +750,7 @@ function main() {
     }
   }
 
+  assertCallSinksFullyCaptured(allHits);
   assertNoUnearnedSafeStatic(allHits);
 
   const isReportOnly = (file) => REPORT_ONLY_PATHS.some((p) => file.startsWith(p + '/'));
