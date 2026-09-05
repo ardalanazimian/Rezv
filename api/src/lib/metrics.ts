@@ -144,6 +144,22 @@ export const metrics = {
   cacheHits: new Counter('rezervno_cache_hits_total', 'تعداد اصابت کش (cache hit)'),
   cacheMisses: new Counter('rezervno_cache_misses_total', 'تعداد عدم‌اصابت کش (cache miss)'),
   waitlistPromoted: new Counter('rezervno_waitlist_promoted_total', 'تعداد ارتقاء از لیست انتظار به رزرو (وقتی جا باز می‌شود)'),
+  // ⚠️ آلارم‌پذیر. تا ۲۰۲۶-۰۹-۰۵ هر چهار فراخوانِ `promoteNext` خطایش را با
+  // `.catch(() => {})` می‌بلعید (waitlist.ts:553/596/644 و مسیرِ sweep که اصلاً
+  // گاردی نداشت). نتیجه‌اش یک ترکیبِ چهارلایه بود که هیچ‌کدام از لایه‌هایش
+  // به‌تنهایی غلط نبود ولی حاصلشان «موفقیت» گزارش می‌کرد: promoteNext خطا را
+  // می‌بلعید، expireOffers دوباره می‌بلعید، endpoint‌ی ۲xx می‌داد، و
+  // `cron/run.sh:10` یک `✓ waitlist` چاپ می‌کرد. یعنی یک ارتقایِ **سیستماتیکاً
+  // شکست‌خورده** از یک ارتقایِ سالم قابلِ تفکیک نبود — cron هر ۲ دقیقه
+  // (cron/crontab:17) دوباره تلاش می‌کرد، هر ۲ دقیقه شکست می‌خورد، و هیچ
+  // سیگنالی تولید نمی‌شد.
+  //
+  // ⚠️ چرا برچسبِ `site` اجباری است — دقیقاً همان استدلالِ
+  // `withSerializationRetry('walkin', …)` در reservation-helpers.ts: بدونِ
+  // برچسب، شمارشِ چهار مسیر در یک عدد جمع می‌شد و یک مسیرِ **مرده** (مثلاً
+  // ارتقا از مسیرِ decline که همیشه شکست می‌خورد) پشتِ ترافیکِ مسیرِ sweep
+  // نامرئی می‌ماند. `site=decline|cancel|expire|sweep`.
+  waitlistPromotionFailed: new Counter('rezervno_waitlist_promotion_failed_total', 'تعداد تلاش‌هایِ ناموفقِ ارتقا از لیستِ انتظار (کنشِ خودِ کاربر موفق بوده؛ فقط ارتقا شکست خورده) — label: site=decline|cancel|expire|sweep'),
   rateLimitHits: new Counter('rezervno_rate_limit_hits_total', 'تعداد دفعات فعال‌شدن rate-limit'),
   // ⚠️ سه متریکِ زیر برایِ A3 (سختگیریِ acquisition-grade، ۲۰۲۶-۰۸-۱۴) اضافه
   // شدن — قبلاً fail-open رویِ rate-limit/بن فقط لاگِ ساده (یا هیچی) داشت،

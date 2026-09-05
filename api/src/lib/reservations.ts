@@ -15,7 +15,7 @@ import { type OpeningHours } from './hours';
 import { computeRanges, genReservationCode, isConflictError, isSerializationError, withSerializationRetry } from './reservation-helpers';
 import { invalidateAvailability } from './availability-cache';
 import { transitionReservation } from './lifecycle';
-import { getOccupiedTableNumbers, isTableNumberOccupied } from './table-occupancy';
+import { blockTailMinutes, getOccupiedTableNumbers, isTableNumberOccupied } from './table-occupancy';
 
 // ⚠️ درسِ تاریخی (باگِ واقعیِ P0 که با تستِ زنده پیدا شد، نه فرض): مقایسه‌ی
 // خامِ `status IN (...)` در $queryRaw بدونِ کستِ صریح با enumِ Postgres شکست
@@ -651,8 +651,34 @@ async function tryMergeTables(
   start: Date,
   blockEnd: Date,
 ): Promise<{ primaryId: string; numbers: number[] } | null> {
+  // ⚠️ رفعِ ۲۰۲۶-۰۹-۰۵ — `state: 'free'` به‌جایِ `state != 'maintenance'`.
+  //
+  // این فیلتر تنها جایی بود که یک تخصیص‌دهنده‌ی میزِ فیزیکی از ستونِ `state`
+  // چشم می‌پوشید. `promoteNext` (waitlist.ts) دقیقاً همین انتخاب را با
+  // `state: 'free'` انجام می‌دهد و `createWalkin` میز را `occupied` می‌کند؛
+  // فقط merge هر چیزی جز `maintenance` را قابلِ‌ترکیب می‌دید.
+  //
+  // چه چیزی از این شکاف رد می‌شد: وقتی صف میزی را به مهمانی آفر می‌دهد،
+  // آن میز `state='reserved'` می‌شود ولی **هیچ ردیفِ رزروی** ندارد — پس نه
+  // `getOccupiedTableNumbers` پایین می‌بیندش (فقط `reservations` را می‌خواند)
+  // و نه این فیلتر. نتیجه: merge همان میزِ فیزیکی را برمی‌داشت در حالی که
+  // مهمانِ صف پیامکِ «میزت آماده است» گرفته بود.
+  //
+  // اندازه‌گیریِ زنده‌ی ۲۰۲۶-۰۹-۰۵ رویِ کدِ پیش از این رفع: حالتِ **ترتیبی**
+  // (اول آفرِ صف، بعد merge) ۶ از ۶ بازتولید شد، و حالتِ **هم‌زمان** ۱۲ از
+  // ۱۲ — و بالابردنِ isolationِ promoteNext به‌تنهایی هیچ‌کدام را نبست، چون
+  // مسئله «خواندنی که دیده نمی‌شود» نبود، «خواندنی که اصلاً انجام نمی‌شد» بود.
+  // این فیلتر آن خواندن را اضافه می‌کند؛ و چون هر دو طرف حالا Serializable
+  // هستند، حالتِ هم‌زمان هم با SSI به abort/retry ختم می‌شود.
+  // گارد: tests/waitlist-merge-occupancy-concurrency.test.mts
+  //
+  // چرا امن است: رزروِ عادی هرگز `state` را تغییر نمی‌دهد (فقط واک‌ین،
+  // QR check-in، تنظیمِ دستیِ پرسنل، و آفرِ صف)، و
+  // `lifecycle.ts:296-302` آن را در وضعیتِ پایانی به `free` برمی‌گرداند. پس
+  // این فیلتر میزهایِ رزروشده‌ی معمولی را از merge حذف نمی‌کند — تداخلِ آن‌ها
+  // همچنان با `getOccupiedTableNumbers` پایین سنجیده می‌شود.
   const tables = await tx.table.findMany({
-    where: { restaurantId, isActive: true, state: { not: 'maintenance' }, isMergeable: true },
+    where: { restaurantId, isActive: true, state: 'free', isMergeable: true },
     select: { id: true, number: true, capacity: true, mergeableWith: true },
     orderBy: { number: 'asc' },
   });
@@ -756,7 +782,9 @@ export async function createWalkin(input: WalkinInput) {
     select: { cleaningMinutes: true, bufferMinutes: true },
   });
   if (!cfgRow) throw Err.notFound('رستوران');
-  const blockBufferMin = (cfgRow.cleaningMinutes ?? 15) + (cfgRow.bufferMinutes ?? 0);
+  // همان تعریفِ واحدی که `computeRanges` هم از آن می‌خواند (۲۰۲۶-۰۹-۰۵) — پیش
+  // از این، این خط سومین transcriptionِ مستقلِ همان جمع بود.
+  const blockBufferMin = blockTailMinutes(cfgRow);
 
   try {
     // ⚠️ اضافه‌شده (۲۰۲۶-۰۹-۰۴، هم‌راه با بالابردنِ isolation به Serializable):

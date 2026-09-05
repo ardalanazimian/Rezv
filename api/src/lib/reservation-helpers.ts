@@ -16,6 +16,7 @@
 // ═══════════════════════════════════════════════════════════
 import { Prisma } from '@prisma/client';
 import { zonedTimeToUtc } from './hours';
+import { blockTailMinutes } from './table-occupancy';
 import { randomBytes } from 'crypto';
 import { Err } from './errors';
 import { metrics } from './metrics';
@@ -33,8 +34,11 @@ export function computeRanges(date: string, time: string, cfg: TimingConfig, dur
   if (isNaN(+start)) throw Err.validation('تاریخ یا ساعت نامعتبر است');
   const duration = durationOverride ?? cfg.slotMinutes;
   const end = new Date(+start + duration * 60_000);
-  // بازه‌ی بلاک = مدت رزرو + زمان نظافت + بافر ایمنی
-  const blockBufferMin = cfg.cleaningMinutes + cfg.bufferMinutes;
+  // بازه‌ی بلاک = مدت رزرو + زمان نظافت + بافر ایمنی.
+  // ⚠️ از ۲۰۲۶-۰۹-۰۵ این جمع **اینجا نوشته نمی‌شود**: تعریفِ واحد در
+  // `table-occupancy.blockTailMinutes` است و چهار مصرف‌کننده از همان می‌خوانند.
+  // پیش از آن، تنها گره‌ی بینشان یک کامنت بود و افقِ صف واقعاً واگرا شده بود.
+  const blockBufferMin = blockTailMinutes(cfg);
   const blockEnd = new Date(+end + blockBufferMin * 60_000);
   return { start, end, blockEnd, duration, blockBufferMin };
 }
@@ -139,7 +143,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * دقیقاً کاری که createReservation در `reservations.ts:304-314` می‌کند.
  */
 export async function withSerializationRetry<T>(
-  op: 'reservation' | 'walkin',
+  op: 'reservation' | 'walkin' | 'waitlist',
   fn: (attempt: number) => Promise<T>,
 ): Promise<T> {
   let lastErr: unknown;
