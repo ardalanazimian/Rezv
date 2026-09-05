@@ -104,6 +104,7 @@ import './staff-auth-guard.integration.test.mts';
 import './auth-otp-enumeration.integration.test.mts';
 import './availability.integration.test.mts';
 import './availability-boundary.test.mts';
+import './availability-held-table-horizon.test.mts';
 import './automation.integration.test.mts';
 import './feature-flags.integration.test.mts';
 import './assistant-nlu.test.mts';
@@ -209,6 +210,9 @@ import './tenant-isolation.integration.test.mts';
 import './waitlist.test.mts';
 import './waitlist-flow.integration.test.mts';
 import './waitlist-merge-occupancy.test.mts';
+import './waitlist-promotion-observability.test.mts';
+import './waitlist-merge-occupancy-concurrency.test.mts';
+import './waitlist-promotion-horizon.test.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ یافته‌ی واقعیِ دوم (۲۰۲۶-۰۸-۱۴، همون ممیزی): table-merge-occupancy.test.mts

@@ -209,7 +209,45 @@ describe('صف — ارتقا و ادعایِ اتمیکِ میز', () => {
       });
     }
 
-    const results = await Promise.all(Array.from({ length: 4 }, () => promoteNext(restaurantId)));
+    // ⚠️ به‌روزشده ۲۰۲۶-۰۹-۰۵ — `allSettled` به‌جایِ `all`، و دلیلش یک
+    // تغییرِ رفتاریِ **واقعی** است که باید صریح بماند، نه یک نرم‌کردنِ تست:
+    //
+    // از وقتی تراکنشِ `promoteNext` به Serializable ارتقا یافت (رفعِ
+    // double-bookingِ میزِ ثانویه)، ابطالِ SSI با ۴۰۰۰۱ روی این مسیر یک
+    // رفتارِ **عادی** است، نه خطا. `withSerializationRetry('waitlist', …)`
+    // تا TX_MAX_RETRIES تلاش می‌کند، ولی ۴ فراخوانیِ کاملاً هم‌زمان رویِ
+    // **یک** ردیفِ میز می‌تواند بودجه‌ی retry را تمام کند و آن‌وقت خطا به
+    // فراخواننده می‌رسد. این در تولید مهار شده است: هر چهار فراخوانِ واقعی
+    // از `tryPromoteNext` رد می‌شوند که خطا را می‌شمارد و لاگ می‌کند بی‌آنکه
+    // کنشِ کاربر را بشکند، و جاروبِ هر ۲ دقیقه دوباره تلاش می‌کند. ضمناً
+    // خودِ این بار در تولید ساختنی نیست: جاروبِ cron هر رستوران را با
+    // `distinct` فقط **یک بار** صدا می‌زند.
+    //
+    // پس ادعایِ اصلیِ این تست (باگِ H8) دست‌نخورده می‌ماند — «یک میز به دو
+    // نفر آفر نمی‌شود» — و فقط این اضافه می‌شود که یک ردشدنِ ناشی از
+    // سریال‌سازی **مجاز** است. عمداً *هر* خطایی مجاز نیست: هر ردشدنی که
+    // ۴۰۰۰۱/۴۰P۰۱/P۲۰۳۴ نباشد این تست را می‌شکند، وگرنه این تغییر می‌توانست
+    // یک باگِ واقعیِ دیگر را هم بی‌صدا قورت بدهد.
+    const settled = await Promise.allSettled(Array.from({ length: 4 }, () => promoteNext(restaurantId)));
+    const rejected = settled.filter(s => s.status === 'rejected') as PromiseRejectedResult[];
+    for (const r of rejected) {
+      const msg = String((r.reason as Error)?.message ?? r.reason);
+      const code = (r.reason as { code?: string })?.code;
+      assert.ok(
+        code === '40001' || code === '40P01' || code === 'P2034'
+        || code === 'CONCURRENCY_RETRY' || /40001|40P01/.test(msg),
+        `تنها ردشدنِ مجاز، تداخلِ سریال‌سازی است. این خطا چیزِ دیگری است: ${code ?? msg}`,
+      );
+    }
+    assert.ok(
+      rejected.length < 4,
+      'هر چهار فراخوان با تداخل رد شدند — یعنی هیچ‌کس ارتقا نگرفت و مسیر عملاً ' +
+      'زیرِ همزمانی مرده است، نه فقط شلوغ',
+    );
+
+    const results = settled
+      .filter(s => s.status === 'fulfilled')
+      .map(s => (s as PromiseFulfilledResult<Awaited<ReturnType<typeof promoteNext>>>).value);
     const ok = results.filter(x => x.promoted);
     assert.equal(ok.length, 1, `فقط یک نفر باید آفر بگیرد، نه ${ok.length}`);
 
@@ -275,7 +313,7 @@ describe('صف — انقضایِ آفر (قفلِ باگِ رقابتِ رفع�
     const t1 = await mkTable(1);
     const id = await seedOffer(t1, new Date(Date.now() - 60_000));
 
-    assert.equal(await expireOffers(), 1);
+    assert.equal((await expireOffers()).expired, 1);
     assert.equal((await entryOf(id)).status, 'no_response');
     assert.equal(await tableState(t1.id), 'free');
   });
@@ -283,7 +321,7 @@ describe('صف — انقضایِ آفر (قفلِ باگِ رقابتِ رفع�
   test('آفری که هنوز مهلت دارد دست نمی‌خورد', async () => {
     const t1 = await mkTable(1);
     const id = await seedOffer(t1, new Date(Date.now() + 10 * 60_000));
-    assert.equal(await expireOffers(), 0);
+    assert.equal((await expireOffers()).expired, 0);
     assert.equal((await entryOf(id)).status, 'offered');
     assert.equal(await tableState(t1.id), 'reserved');
   });
@@ -300,7 +338,7 @@ describe('صف — انقضایِ آفر (قفلِ باگِ رقابتِ رفع�
     const id = await seedOffer(t1, new Date(Date.now() - 60_000));
 
     const counts = await Promise.all([expireOffers(), expireOffers(), expireOffers()]);
-    const total = counts.reduce((a, b) => a + b, 0);
+    const total = counts.reduce((a, b) => a + b.expired, 0);
     assert.equal(total, 1, `مجموعِ انقضاها باید ۱ باشد، نه ${total}`);
     assert.equal((await entryOf(id)).status, 'no_response');
   });
