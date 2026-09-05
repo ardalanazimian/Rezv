@@ -21,6 +21,7 @@
 //  اجرا:  node tools/check-runner-completeness.mjs
 //  خروج:  ۰ = کامل · ۱ = ناقص (نام‌ها چاپ می‌شوند)
 // ═══════════════════════════════════════════════════════════════════════
+import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,6 +96,45 @@ for (const imp of imported) {
   if (!existsSync(join(TESTS_DIR, imp))) {
     fails.push(`runner «${imp}» را ایمپورت می‌کند ولی این فایل وجود ندارد — کلِ اجرا در یک پروسه می‌میرد`);
   }
+}
+
+// ── جهتِ ۳: ایمپورتی که **کامیت نمی‌شود** ───────────────────────────────
+// دو جهتِ بالا درختِ کاری را می‌سنجند. این یکی فاصله‌ی بینِ درخت و index را
+// می‌سنجد، که جای دیگری است و همان عاقبت را دارد:
+//
+//   `git add -u` فقط تغییرِ فایل‌هایِ **tracked** را stage می‌کند. اگر runner
+//   ایمپورتِ تازه‌ای داشته باشد و فایلِ هدف هنوز untracked باشد، آن کامیت یک
+//   runner می‌فرستد که ماژولِ ناموجود ایمپورت می‌کند — و چون همه در **یک**
+//   پروسه ایمپورت می‌شوند، این «یک تستِ گم‌شده» نیست، **کلِ سوئیت بالا
+//   نمی‌آید**. دو بار در ۲۰۲۶-۰۹-۰۴/۰۵ یک دستور با آن فاصله داشتیم.
+//
+// ⚠️ باریک بودنِ شرط عمدی است. «هر وقت runner فایلِ untracked ایمپورت کرد
+// قرمز شو» در توسعه‌ی عادی شلیک می‌کند (تست بنویس → ایمپورت کن → تا `git add`
+// قرمز)، و گاردی که در کارِ روزمره قرمز است دور زده می‌شود — که از نبودنش
+// بدتر است. پس فقط در پنجره‌ی خطرناک شلیک می‌کند: **وقتی خودِ runner
+// stage شده**، هر ایمپورتش باید tracked یا staged باشد.
+try {
+  const runnerStaged = execFileSync('git', ['diff', '--cached', '--name-only', '--', 'api/tests/_all.runner.mts'], { cwd: REPO, encoding: 'utf8' }).trim();
+  if (runnerStaged) {
+    const known = new Set(
+      execFileSync('git', ['ls-files', 'api/tests'], { cwd: REPO, encoding: 'utf8' })
+        .split('\n').map((s) => s.trim()).filter(Boolean),
+    );
+    for (const s of execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: REPO, encoding: 'utf8' }).split('\n')) {
+      if (s.trim()) known.add(s.trim());
+    }
+    for (const imp of imported) {
+      if (!known.has(`api/tests/${imp}`)) {
+        fails.push(
+          `runner **stage شده** ولی هدفِ ایمپورتش «${imp}» نه tracked است نه staged — ` +
+            'کامیتِ بعدی runnerی می‌فرستد که ماژولِ ناموجود ایمپورت می‌کند و کلِ سوئیت بالا نمی‌آید',
+        );
+      }
+    }
+  }
+} catch (e) {
+  console.error(`❌ وضعیتِ git خوانده نشد: ${String(e)}`);
+  process.exit(1);
 }
 
 if (fails.length) {

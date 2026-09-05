@@ -230,6 +230,44 @@ groups:
           summary: "بازگشت از درگاهِ پرداخت کند شده"
           description: "P95 مسیرِ callback بالای ۳ ثانیه — ریسکِ تایم‌اوتِ درگاه و پرداختِ بی‌رزرو."
 
+  # ── لیستِ انتظار ───────────────────────────────────────────────────────
+  # `rezervno_waitlist_promotion_failed_total` از ۲۰۲۶-۰۹-۰۵ صادر می‌شود
+  # (lib/waitlist.ts، تابعِ tryPromoteNext) و برچسبِ `site` نقطه‌ی صدور را
+  # مشخص می‌کند: decline|cancel|expire|sweep.
+  #
+  # چرا این قاعده اصلاً لازم است: پیش از آن تاریخ، هر چهار نقطه خطا را
+  # می‌بلعیدند و ترکیبِ چهارلایه (promoteNext → expireOffers → endpoint ۲xx →
+  # `✓ waitlist` در cron/run.sh:10) برایِ یک شکست، «موفقیت» گزارش می‌کرد.
+  # یعنی یک ارتقایِ سیستماتیکاً شکست‌خورده از یک ارتقایِ سالم قابلِ تفکیک
+  # نبود. این قاعده تنها سیگنالِ مستقل از مقیاسِ آن حالت است — تیکِ ✓/✗ در
+  # لاگِ cron فقط حالتِ «همه شکست خوردند» را می‌گیرد (توضیحِ کاملِ قرارداد در
+  # maintenance/waitlist/route.ts).
+  #
+  # ⚠️ چرا `for` بلندتر از پنجره‌ی `increase` است: دقیقاً همان استدلالِ
+  # RateLimitRedisFailOpen بالا. آستانه عمداً `> 0` است (یک ارتقایِ ازدست‌رفته
+  # یک مهمانِ واقعیِ منتظر است)، ولی با `for` بلندتر از پنجره، یک شکستِ مجزا
+  # پیش از رسیدنِ `for` خودش خاموش می‌شود و فقط شکستِ **مکرر** — که یعنی
+  # cronِ هر ۲ دقیقه (cron/crontab:17) هر بار دوباره شکست می‌خورد — پیج
+  # می‌کند.
+  #
+  # `by (site)` عمدی است: افتِ یک مسیر نباید پشتِ ترافیکِ مسیرِ دیگر پنهان
+  # شود؛ همان دلیلی که خودِ برچسب برایش اضافه شد.
+  - name: rezervno_waitlist
+    rules:
+      - alert: WaitlistPromotionFailing
+        expr: sum by (site) (increase(rezervno_waitlist_promotion_failed_total[5m])) > 0
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "ارتقایِ لیستِ انتظار مکرراً شکست می‌خورد (site={{ $labels.site }})"
+          description: >-
+            دستِ‌کم ۱۰ دقیقه است تلاش‌هایِ ارتقا از صف شکست می‌خورند. کنشِ خودِ
+            مهمان (رد/لغو/انقضا) موفق بوده — فقط نفرِ بعدیِ صف میزِ آزادشده را
+            نمی‌گیرد. اگر site=sweep یا expire باشد، خودِ شبکه‌ی ایمنیِ ۲دقیقه‌ای
+            (cron/crontab:17) است که دارد شکست می‌خورد، پس دو مسیرِ دیگر هم
+            جبران نمی‌شوند. لاگِ ساختاریافته‌ی `waitlist.promotion_failed` علتِ
+            دقیق را دارد.
+
   - name: rezervno_business
     rules:
       - alert: ReservationConflictSpike

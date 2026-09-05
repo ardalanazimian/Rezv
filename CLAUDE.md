@@ -29,7 +29,7 @@
 - PK = `@id @default(uuid()) @db.Uuid` · نامِ ستون snake_case با `@map` · در TS همیشه camelCase.
 - مقادیرِ بسته = **enumِ سطحِ DB** (مثل `SubscriptionPlan`, `ReservationStatus`)، نه stringِ آزاد.
 - **مسیرِ اسکیما دومرحله‌ای است** (`api/docker-entrypoint.sh`): ۱) `prisma migrate deploy` (فقط `0_init`) ۲) `sh prisma/apply-sql.sh` روی `api/prisma/sql/NNN-*.sql`.
-  ⚠️ پوشه‌ی `prisma/migrations/manual/` **وجود ندارد** — مهاجرت‌ها فقط در `api/prisma/sql/` (آخرین: ۰۷۵).
+  ⚠️ پوشه‌ی `prisma/migrations/manual/` **وجود ندارد** — مهاجرت‌ها فقط در `api/prisma/sql/`.
 - `prisma db push` **فقط** بوت‌استرپِ DBِ کاملاً خالی (تست/CI)؛ روی DBِ migrateشده اجرایش نکن (روی `block_end` می‌شکند و ایندکسِ اعلام‌نشده را DROP می‌کند).
 - مهاجرتِ جدید = فایلِ `NNN-*.sql` با شماره‌ی بعدی، **idempotent**: `IF NOT EXISTS` یا
   `DO $$ BEGIN … EXCEPTION WHEN duplicate_object|duplicate_column THEN NULL; END $$;` — فایلِ قبلی را هرگز ویرایش نکن.
