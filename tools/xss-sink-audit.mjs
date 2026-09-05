@@ -57,6 +57,51 @@ const SINK_PATTERNS = [
  * رو balance می‌کنیم. برایِ innerHTML= با رشته‌ی معمولی (' یا ")، تا کوتیشنِ
  * بسته می‌ریم. Fallback: تا اولین ; یا سقفِ ۲۰۰۰ کاراکتر.
  */
+// شمارنده‌ی پرانتزی که رشته و template را می‌فهمد.
+//
+// ⚠️ چرا لازم شد (۲۰۲۶-۰۹-۰۵): شاخه‌ی balanceِ قبلی پرانتزهای خام را
+// می‌شمرد، از جمله پرانتزهای داخلِ متنِ HTML و CSS. تا وقتی اسکن از *بعدِ*
+// پرانتز شروع می‌شد این شاخه برای sinkهای template-محور اصلاً اجرا نمی‌شد و
+// نقصش پنهان بود؛ به‌محضِ اینکه اسکن را از خودِ پرانتز شروع کردم،
+// `w.document.write(\`<!doctype html>…\`)` در waitlist.js:422 از `escaped` به
+// `review` سقوط کرد، چون یک پرانتزِ بی‌جفت داخلِ متنِ HTML شمارش را خراب
+// می‌کرد. یعنی رفعِ insertAdjacentHTML یک سینکِ بی‌ربط را بد طبقه‌بندی کرد.
+//
+// همان شکافِ رشته/template که در splitTopLevelArgs حل شده، اینجا هم باید حل
+// شود — وگرنه خودِ payloadهای insertAdjacentHTML (که HTML‌اند) هم قربانیِ
+// همین شمارشِ غلط می‌شوند.
+function matchingParen(text, start, limit) {
+  let depth = 0, i = start;
+  const tmpl = [];
+  while (i < limit) {
+    const c = text[i];
+    const top = tmpl.length ? tmpl[tmpl.length - 1] : null;
+
+    if (top && !top.inExpr) {
+      if (c === '\\') { i += 2; continue; }
+      if (c === '`') { tmpl.pop(); i++; continue; }
+      if (c === '$' && text[i + 1] === '{') { top.inExpr = true; top.braces = 1; i += 2; continue; }
+      i++; continue;
+    }
+    if (top && top.inExpr) {
+      if (c === '{') { top.braces++; i++; continue; }
+      if (c === '}') { top.braces--; if (top.braces === 0) top.inExpr = false; i++; continue; }
+      if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
+      if (c === "'" || c === '"') { i = skipQuoted(text, i); continue; }
+      if (c === '(') depth++;
+      else if (c === ')') { depth--; if (depth === 0) return i + 1; }
+      i++; continue;
+    }
+
+    if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
+    if (c === "'" || c === '"') { i = skipQuoted(text, i); continue; }
+    if (c === '(') { depth++; i++; continue; }
+    if (c === ')') { depth--; if (depth === 0) return i + 1; i++; continue; }
+    i++;
+  }
+  return i;
+}
+
 function grabExpression(text, matchStart, searchFrom = matchStart) {
   const CAP = 4000;
   let i = searchFrom;
@@ -92,13 +137,7 @@ function grabExpression(text, matchStart, searchFrom = matchStart) {
   }
   const opener = text[i];
   if (opener === '(') {
-    let depth = 0;
-    const start = i;
-    for (; i < n; i++) {
-      if (text[i] === '(') depth++;
-      else if (text[i] === ')') { depth--; if (depth === 0) { i++; break; } }
-    }
-    return text.slice(matchStart, i);
+    return text.slice(matchStart, matchingParen(text, i, n));
   }
   // backtick یا کوتیشن: تا بستنِ متناظرِ بدونِ backslash قبلش
   const closer = opener;
@@ -184,6 +223,58 @@ function extractInterpolations(expr) {
  * innerHTML/outerHTML) یا داخلِ پرانتز (برایِ insertAdjacentHTML/document.write/
  * eval/jquery.html) رو در نظر بگیریم — نه کلِ خطِ خام.
  */
+// جدا کردنِ آرگومان‌ها روی کاماهایِ سطحِ بالا. باید تودرتویی، رشته، و درجِ
+// template را رعایت کند: payloadهایِ این کدبیس معمولاً از جنسِ
+// `<div>${esc(x)}</div>` داخلِ backtick هستند و یک split(',')ِ ساده وسطِ
+// template را می‌بُرد و طبقه‌بندی را بی‌معنا می‌کرد.
+function skipQuoted(src, i) {
+  const q = src[i];
+  let j = i + 1;
+  while (j < src.length) {
+    if (src[j] === '\\') { j += 2; continue; }
+    if (src[j] === q) return j + 1;
+    j++;
+  }
+  return j;
+}
+
+function splitTopLevelArgs(src) {
+  const args = [];
+  let depth = 0, start = 0, i = 0;
+  const tmpl = [];   // پشته‌ی templateها، برای ${...}ِ تودرتو
+  while (i < src.length) {
+    const c = src[i];
+    const top = tmpl.length ? tmpl[tmpl.length - 1] : null;
+
+    if (top && !top.inExpr) {
+      // داخلِ متنِ خامِ یک template: فقط ${ یا backtickِ بسته مهم است
+      if (c === '\\') { i += 2; continue; }
+      if (c === '`') { tmpl.pop(); i++; continue; }
+      if (c === '$' && src[i + 1] === '{') { top.inExpr = true; top.braces = 1; i += 2; continue; }
+      i++; continue;
+    }
+
+    if (top && top.inExpr) {
+      if (c === '{') { top.braces++; i++; continue; }
+      if (c === '}') { top.braces--; if (top.braces === 0) top.inExpr = false; i++; continue; }
+      if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
+      if (c === "'" || c === '"') { i = skipQuoted(src, i); continue; }
+      i++; continue;
+    }
+
+    if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
+    if (c === "'" || c === '"') { i = skipQuoted(src, i); continue; }
+    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+    if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
+    if (c === ',' && depth === 0) { args.push(src.slice(start, i)); start = i + 1; i++; continue; }
+    i++;
+  }
+  args.push(src.slice(start));
+  const out = args.map((a) => a.trim());
+  if (out.length > 1 && out[out.length - 1] === '') out.pop();
+  return out;
+}
+
 function extractRhs(expr, kind) {
   if (kind === 'innerHTML' || kind === 'outerHTML') {
     const eq = expr.indexOf('=');
@@ -193,7 +284,15 @@ function extractRhs(expr, kind) {
   const open = expr.indexOf('(');
   const close = expr.lastIndexOf(')');
   if (open === -1) return '';
-  return (close > open ? expr.slice(open + 1, close) : expr.slice(open + 1)).trim();
+  const inner = (close > open ? expr.slice(open + 1, close) : expr.slice(open + 1)).trim();
+  // insertAdjacentHTML(position, payload) — آنچه رندر می‌شود آرگومانِ **آخر**
+  // است. دادنِ رشته‌ی موقعیت به طبقه‌بند همان چیزی بود که ده سینک را بی‌آنکه
+  // payloadشان خوانده شود `safe_static` می‌کرد (دستورِ ۰۱۵).
+  if (kind === 'insertAdjacentHTML') {
+    const args = splitTopLevelArgs(inner);
+    return args.length ? args[args.length - 1] : '';
+  }
+  return inner;
 }
 
 // ── آیا یک درجِ `${...}` به‌تنهایی امن است؟ ──
@@ -240,26 +339,20 @@ const REVIEW_BASELINE = 20;
 // insertAdjacentHTML چنین‌اند، ولی خطِ پایه فقط دامنه‌ی enforced را می‌شمارد
 // (apps/* + shared/js) که ۵ تاست؛ ۵ تای دیگر در standalone/ و report-only
 // است. ششمی در دامنه‌ی enforced گیت را قرمز می‌کند.
-const PAYLOAD_NOT_CAPTURED_BASELINE = 5;
+const PAYLOAD_NOT_CAPTURED_BASELINE = 0;
 
-// مهلتِ رفعِ ریشه‌ای. تا این تاریخ، «دیده‌شدن» کافی است؛ بعد از آن نه.
-//
-// payload_not_captured فقط نمایان‌گر است، نه پوشش: پنج سینک روی خطِ پایه‌اند
-// با این معنا که «یک انسان باید این را بخواند»، و هنوز نخوانده. چیزی که این
-// را به پوششِ واقعی تبدیل می‌کند رفعِ extractRhs است (گرفتنِ آخرین آرگومانِ
-// فراخوان)، نه این برچسب.
-//
-// تاریخ اینجاست نه فقط در گزارش، چون این مخزن یک موردِ چهاربار-معوق دارد
-// (standalone/website.html) و هر چهار بار توسطِ آدم‌های معقول معوق شد —
-// هیچ‌کدام تاریخ نگذاشتند. مهلتی که خودم اجرایش نکنم، همان تعویقِ پنجم است.
-const PAYLOAD_FIX_DEADLINE = '2026-09-11';
 
 // آیا عبارتِ استخراج‌شده اصلاً به آرگومانِ payload رسیده است؟
 // برای `insertAdjacentHTML(position, payload)` استخراج روی کوتیشنِ اولین
 // آرگومان می‌ایستد، پس هیچ کامایی در عبارت نیست و payload دیده نشده.
 function payloadCaptured(expr, kind) {
   if (kind !== 'insertAdjacentHTML') return true;
-  return /,/.test(String(expr));
+  // فراخوانِ کامل یعنی به پرانتزِ بسته رسیده‌ایم و بیش از یک آرگومان داریم.
+  const e = String(expr).trim();
+  if (!e.endsWith(')')) return false;
+  const open = e.indexOf('(');
+  if (open === -1) return false;
+  return splitTopLevelArgs(e.slice(open + 1, e.lastIndexOf(')'))).length >= 2;
 }
 function classify(expr, kind) {
   // eval/new Function: همیشه لایقِ review دستی‌اند (به‌ندرت با دیتایِ کاربر، ولی خطرناکن)
@@ -381,6 +474,48 @@ function overrideKeyFor(relPath, expr, sourceLine) {
 // هر کلیدی که واقعاً مصرف شد؛ برایِ کشفِ overrideهای بی‌لنگر در main.
 const USED_OVERRIDE_KEYS = new Set();
 const MANUAL_REVIEW_OVERRIDES = new Map([
+  // ── QRِ میز: تنها درجِ escapeنشده‌ی قالبِ چاپ. خوانده‌شده ۲۰۲۶-۰۹-۰۵. ──
+  ['apps/business/js/waitlist.js#a35cc85e253d',
+   'قالبِ چاپِ QRِ میز دو درج دارد: esc(_tableQrLabel) و _tableQrSvg خام. '
+   + 'دومی از GET restaurant/tables/:id/qr می‌آید که withRestaurantAuth دارد و '
+   + 'صریح table.restaurantId را با ctx.restaurant.id می‌سنجد. محتوایش خروجیِ '
+   + 'QRCode.toString(url,{type:svg}) از کتابخانه‌ی qrcode است — هندسه‌ی '
+   + 'ماژول‌ها، نه متنِ کاربر؛ و خودِ url هم سمتِ سرور از codeِ اختصاصیِ '
+   + 'assignQrCode ساخته می‌شود، پس حتی ورودی‌اش هم مهاجم‌پذیر نیست. '
+   + 'اسکنر نمی‌تواند داخلِ کتابخانه را ببیند، پس این ثبتِ دستی لازم است. '
+   + '⚠️ اگر روزی منبعِ svg عوض شود (کتابخانه‌ی دیگر، یا svg از دیتای کاربر)، '
+   + 'این درج یک تزریقِ مستقیم است — و چون خطِ سینک عوض نمی‌شود، این override '
+   + 'همچنان اعمال می‌شود. منبع را عوض کردی، این را هم بازبینی کن.'],
+  // ── سه سینکِ insertAdjacentHTML، دستی خوانده‌شده در ۲۰۲۶-۰۹-۰۵ پس از
+  //    رفعِ ریشه‌ایِ extractRhs. تا پیش از آن طبقه‌بند payload را اصلاً
+  //    نمی‌دید و همه را safe_static می‌کرد؛ حالا می‌بیند و درست علامتشان
+  //    می‌زند، چون payload یک فراخوانِ کمکی است که خودِ اسکنر دنبالش
+  //    نمی‌رود. این‌ها همان «الگو ۱» هستند: escِ واقعی داخلِ تابعِ کمکی.
+  //
+  //    ⚠️ محدودیتی که باید صریح باشد: کلیدِ هویت خطِ **سینک** را می‌بندد،
+  //    نه بدنه‌ی تابعِ کمکی را. اگر روزی esc از داخلِ bubble()/bizBubble()
+  //    برداشته شود، خطِ سینک عوض نشده و این override همچنان اعمال می‌شود.
+  //    گاردِ واقعیِ آن رفتاری است (tools/xss-escaping-regression.mjs) و
+  //    امروز این دو تابع را پوشش نمی‌دهد — چون هیچ‌کدام export نشده‌اند
+  //    (bubble در یک ES module ولی بدونِ export، bizBubble در JSِ classic).
+  //    بستنِ آن، تغییر در سورسِ اپ می‌خواهد نه در این ابزار؛ ثبت شد.
+  ['apps/customer/js/features/chat.js#ac1498949c1d',
+   'bubble(m) دو درج دارد: esc(m.body) — escaperِ واقعیِ [&<>"\'] — و '
+   + 'faTime(m.created_at) که new Date(iso).toLocaleTimeString(fa-IR) است و '
+   + 'برای هر ورودی فقط رقم/جداکننده می‌دهد (ورودیِ نامعتبر: catch → رشته‌ی خالی). '
+   + 'هیچ مسیری برای markup نیست. خوانده‌شده ۲۰۲۶-۰۹-۰۵.'],
+  ['apps/business/js/chat.js#7dc23113c97a',
+   'bizBubble(m) قرینه‌ی bubble است: chatEsc(m.body) همان پنج کاراکتر را '
+   + 'escape می‌کند و chatTime(m.created_at) همان toLocaleTimeString است. '
+   + 'خوانده‌شده ۲۰۲۶-۰۹-۰۵.'],
+  ['apps/business/js/assistant.js#77816159c682',
+   'assistantAppend(html) یک پارامترِ خام می‌گیرد، پس قاعده‌ی شناسه‌ی خام '
+   + 'درست review می‌دهد. هر شش فراخوان خوانده شد: :51 esc(message) · '
+   + ':57 pendingId که ap+Date.now() است · :65 رشته‌ی literal · :69 esc(d.answer) · '
+   + ':85 esc(res.data.answer) · :74 chips که عمداً خام است چون فقط از '
+   + 'jsq(d.log_id)، jsq(s.intent) و esc(s.label) ساخته شده — و jsq خودش '
+   + 'esc(JSON.stringify(String(v))) است. خوانده‌شده ۲۰۲۶-۰۹-۰۵ (و مستقلاً '
+   + 'توسطِ دو نشستِ دیگر).'],
   // ── فرمِ ورودِ سه‌عاملیِ پنلِ شرکت ──
   ['apps/company/js/intelligence.js#1797949972c4',
    'فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت. ۲۰۲۶-۰۹-۰۲: درجِ سومِ _otpLoginEnabled هم اضافه شد — همان جنس: یک booleanِ سرور که فقط تصمیم می‌گیرد رشته‌ی literal ساخته شود یا نه.'],
@@ -523,7 +658,12 @@ function scanFile(absPath, relPath) {
     const lineRe = new RegExp(re.source, 'g');
     let m;
     while ((m = lineRe.exec(text)) !== null) {
-      const expr = grabExpression(text, m.index, m.index + m[0].length);
+      // اگر الگو خودش `(` را بلعیده (سینک‌های call-form)، اسکن را از خودِ
+      // پرانتز شروع کن نه بعد از آن — وگرنه حلقه روی کوتیشنِ آرگومانِ اول
+      // می‌شکند و شاخه‌ی balanceِ پرانتز، که همیشه درست بود، هرگز اجرا نمی‌شود.
+      const consumedParen = m[0].endsWith('(');
+      const scanFrom = m.index + m[0].length - (consumedParen ? 1 : 0);
+      const expr = grabExpression(text, m.index, scanFrom);
       let classification = classify(expr, kind);
       const lineNum = text.slice(0, m.index).split('\n').length;
       const snippet = text.split('\n')[lineNum - 1].trim().slice(0, 160);
@@ -683,17 +823,6 @@ function main() {
       } else {
         console.log(`✓ sinkهای ${label} روی خطِ پایه: ${n}`);
       }
-    }
-    // مهلت گذشته و هنوز سینکِ خوانده‌نشده هست؟ آن‌وقت این دیگر «نمایان و
-    // تاریخ‌دار» نیست، تعویق است.
-    if (nNotCaptured > 0 && new Date().toISOString().slice(0, 10) > PAYLOAD_FIX_DEADLINE) {
-      console.error(`\n✗ مهلتِ ${PAYLOAD_FIX_DEADLINE} گذشت و هنوز ${nNotCaptured} سینک هست که`);
-      console.error(`  payloadشان هرگز خوانده نشده. برچسبِ payload_not_captured فقط`);
-      console.error(`  نمایان‌گر بود، نه پوشش — و مهلتش تمام شد.`);
-      console.error(`  رفع: extractRhs باید آخرین آرگومانِ فراخوان را بگیرد، بعد ۵ موردِ`);
-      console.error(`  جابه‌جاشده دستی بازبینی و خطِ پایه هم‌زمان به‌روز شود.`);
-      console.error(`  اگر تاریخ باید عقب برود، آگاهانه در همین فایل عقبش ببر — نه بی‌صدا.`);
-      regressed = true;
     }
     if (regressed) process.exit(1);
     process.exit(0);

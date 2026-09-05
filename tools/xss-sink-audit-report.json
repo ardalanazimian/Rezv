@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-04T19:24:40.963Z",
+  "generated_at": "2026-09-05T01:33:19.815Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -16,8 +16,7 @@
     "safe_static": 50,
     "unsafe": 65,
     "escaped": 26,
-    "dom_api_safe": 58,
-    "payload_not_captured": 5
+    "dom_api_safe": 63
   },
   "hits": [
     {
@@ -337,16 +336,17 @@
       "line": 134,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl.insertAdjacentHTML('beforeend', bubble(m));",
-      "sink_hash": "e3d2fa444a59",
-      "classification": "payload_not_captured"
+      "sink_hash": "ac1498949c1d",
+      "classification": "dom_api_safe",
+      "manual_review_note": "bubble(m) دو درج دارد: esc(m.body) — escaperِ واقعیِ [&<>\"'] — و faTime(m.created_at) که new Date(iso).toLocaleTimeString(fa-IR) است و برای هر ورودی فقط رقم/جداکننده می‌دهد (ورودیِ نامعتبر: catch → رشته‌ی خالی). هیچ مسیری برای markup نیست. خوانده‌شده ۲۰۲۶-۰۹-۰۵."
     },
     {
       "file": "apps/customer/js/features/chat.js",
       "line": 157,
       "kind": "insertAdjacentHTML",
       "snippet": "tempEl.insertAdjacentHTML('beforeend', `<div class=\"chat-bubble mine pending\"><div class=\"chat-bubble-text\">${esc(body)}</div><div class=\"chat-bubble-time\">…</d",
-      "sink_hash": "68b65856e216",
-      "classification": "payload_not_captured"
+      "sink_hash": "d78ce4186ebe",
+      "classification": "escaped"
     },
     {
       "file": "apps/customer/js/features/economy.js",
@@ -733,8 +733,9 @@
       "line": 41,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', html);",
-      "sink_hash": "3e84a562e826",
-      "classification": "payload_not_captured"
+      "sink_hash": "77816159c682",
+      "classification": "dom_api_safe",
+      "manual_review_note": "assistantAppend(html) یک پارامترِ خام می‌گیرد، پس قاعده‌ی شناسه‌ی خام درست review می‌دهد. هر شش فراخوان خوانده شد: :51 esc(message) · :57 pendingId که ap+Date.now() است · :65 رشته‌ی literal · :69 esc(d.answer) · :85 esc(res.data.answer) · :74 chips که عمداً خام است چون فقط از jsq(d.log_id)، jsq(s.intent) و esc(s.label) ساخته شده — و jsq خودش esc(JSON.stringify(String(v))) است. خوانده‌شده ۲۰۲۶-۰۹-۰۵ (و مستقلاً توسطِ دو نشستِ دیگر)."
     },
     {
       "file": "apps/business/js/chat.js",
@@ -790,16 +791,17 @@
       "line": 75,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
-      "sink_hash": "d9400c3c27c7",
-      "classification": "payload_not_captured"
+      "sink_hash": "7dc23113c97a",
+      "classification": "dom_api_safe",
+      "manual_review_note": "bizBubble(m) قرینه‌ی bubble است: chatEsc(m.body) همان پنج کاراکتر را escape می‌کند و chatTime(m.created_at) همان toLocaleTimeString است. خوانده‌شده ۲۰۲۶-۰۹-۰۵."
     },
     {
       "file": "apps/business/js/chat.js",
       "line": 94,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
-      "sink_hash": "9565b12114d0",
-      "classification": "payload_not_captured"
+      "sink_hash": "227bc62f1250",
+      "classification": "dom_api_safe"
     },
     {
       "file": "apps/business/js/crm.js",
@@ -1483,8 +1485,9 @@
       "line": 422,
       "kind": "document.write",
       "snippet": "w.document.write(`<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\">",
-      "sink_hash": "eec24d119d20",
-      "classification": "escaped"
+      "sink_hash": "a35cc85e253d",
+      "classification": "dom_api_safe",
+      "manual_review_note": "قالبِ چاپِ QRِ میز دو درج دارد: esc(_tableQrLabel) و _tableQrSvg خام. دومی از GET restaurant/tables/:id/qr می‌آید که withRestaurantAuth دارد و صریح table.restaurantId را با ctx.restaurant.id می‌سنجد. محتوایش خروجیِ QRCode.toString(url,{type:svg}) از کتابخانه‌ی qrcode است — هندسه‌ی ماژول‌ها، نه متنِ کاربر؛ و خودِ url هم سمتِ سرور از codeِ اختصاصیِ assignQrCode ساخته می‌شود، پس حتی ورودی‌اش هم مهاجم‌پذیر نیست. اسکنر نمی‌تواند داخلِ کتابخانه را ببیند، پس این ثبتِ دستی لازم است. ⚠️ اگر روزی منبعِ svg عوض شود (کتابخانه‌ی دیگر، یا svg از دیتای کاربر)، این درج یک تزریقِ مستقیم است — و چون خطِ سینک عوض نمی‌شود، این override همچنان اعمال می‌شود. منبع را عوض کردی، این را هم بازبینی کن."
     },
     {
       "file": "apps/company/js/badges.js",
@@ -2570,32 +2573,32 @@
       "line": 6849,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', html);",
-      "sink_hash": "3e84a562e826",
-      "classification": "payload_not_captured"
+      "sink_hash": "77816159c682",
+      "classification": "review"
     },
     {
       "file": "standalone/business.html",
       "line": 8197,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
-      "sink_hash": "d9400c3c27c7",
-      "classification": "payload_not_captured"
+      "sink_hash": "7dc23113c97a",
+      "classification": "unsafe"
     },
     {
       "file": "standalone/business.html",
       "line": 8216,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
-      "sink_hash": "9565b12114d0",
-      "classification": "payload_not_captured"
+      "sink_hash": "227bc62f1250",
+      "classification": "dom_api_safe"
     },
     {
       "file": "standalone/business.html",
       "line": 4801,
       "kind": "document.write",
       "snippet": "w.document.write(`<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\">",
-      "sink_hash": "eec24d119d20",
-      "classification": "escaped"
+      "sink_hash": "a35cc85e253d",
+      "classification": "review"
     },
     {
       "file": "standalone/company.html",
@@ -3579,16 +3582,16 @@
       "line": 5913,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl.insertAdjacentHTML('beforeend', bubble(m));",
-      "sink_hash": "e3d2fa444a59",
-      "classification": "payload_not_captured"
+      "sink_hash": "ac1498949c1d",
+      "classification": "unsafe"
     },
     {
       "file": "standalone/customer.html",
       "line": 5936,
       "kind": "insertAdjacentHTML",
       "snippet": "tempEl.insertAdjacentHTML('beforeend', `<div class=\"chat-bubble mine pending\"><div class=\"chat-bubble-text\">${chatEsc(body)}</div><div class=\"chat-bubble-time\">",
-      "sink_hash": "fa0d8d6d39e1",
-      "classification": "payload_not_captured"
+      "sink_hash": "e51d5da043e8",
+      "classification": "dom_api_safe"
     },
     {
       "file": "standalone/website.html",
