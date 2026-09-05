@@ -62,6 +62,7 @@ async function renderResList(){
   // موقتاً جواب نمی‌داد) اسم/شماره‌ی مهمانانِ ساختگی را عینِ رزروهایِ واقعیِ
   // خودش می‌دید.
   const demoNote=isDemo?`<div class="cash-note" style="margin-bottom:14px">${icon('info',{size:13})} این فهرست نمونه است، رزروهایِ واقعیِ تو نیست.</div>`:'';
+  RES_VIEW=source; // A2-002: index ی دکمه‌ها به همین آرایه اشاره می‌کند
   let list=source.map((r,i)=>({r,i}));
   // API از قبل بر اساس تاریخ فیلتر کرده؛ نمونه باید محلی فیلتر شود
   if(resDate!=='all' && !API.online)list=list.filter(x=>x.r.date===resDate);
@@ -176,7 +177,7 @@ function resItemHTML(r,i){
 // واقعی + rollback روی خطا) استفاده می‌شه؛ رفتارِ صف‌بندیِ آفلاینِ قبلی
 // (Outbox) هم عیناً حفظ شده چون آن بخش واقعاً درست بود.
 async function markArrived(i){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   if(isOffline() && API.getToken()){
     r.status='checked_in';rReservations();
     Outbox.enqueue({ type:'checkin', path:`/restaurant/reservations/${r.code||r.id||''}/status`, method:'PATCH', body:{ status:'checked_in' }, label:`ثبت ورود ${r.name}` });
@@ -197,12 +198,12 @@ async function markSeated(i){
 // no_show وضعیتِ نهایی/برگشت‌ناپذیره (STATUS_TRANSITIONS['no_show']=[]) —
 // طبقِ ماموریت با تأییدِ صریح انجام می‌شه تا لمسِ اشتباه، رزروِ واقعی رو خراب نکنه.
 async function markNoShow(i){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   if(!window.confirm(`${r.name} به‌عنوانِ «نیومد» ثبت بشه؟ این وضعیت برگشت‌پذیر نیست.`))return;
   await changeStatus(i,'no_show');
 }
 function cancelRes(i){
-  openModal(`<div class="modal-title">لغو رزرو</div><div class="modal-sub">${esc(RES[i].name)} — ساعت ${esc(RES[i].t)}</div>
+  openModal(`<div class="modal-title">لغو رزرو</div><div class="modal-sub">${esc((RES_VIEW||RES)[i].name)} — ساعت ${esc((RES_VIEW||RES)[i].t)}</div>
     <div class="field-label">دلیل لغو (الزامی)</div>
     <input class="inp" id="cancelReason" placeholder="مثلاً تماس مشتری، تداخل میز...">
     <div style="display:flex;gap:8px"><button class="btn btn-danger btn-lg" style="flex:1" onclick="doCancelRes(${i})">تأیید لغو</button><button class="btn btn-ghost btn-lg" onclick="closeModal()">انصراف</button></div>`);

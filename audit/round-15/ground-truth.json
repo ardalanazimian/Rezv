@@ -1,0 +1,447 @@
+{
+  "round": 15,
+  "phase": 0,
+  "date": "2026-09-03",
+  "verified_by": "ceo",
+  "repo": {
+    "remote": "https://github.com/ardalanazimian/Rezv.git",
+    "note": "prompt §3 cites ardalanaz/RezervnoOS and Next.js 14 — stale; repo is Next 16",
+    "main_head": "origin/main = merge PR #79 (2026-09-02)",
+    "open_pr": "#81 feat/admin-totp-login @ 660456b"
+  },
+  "ci": {
+    "pr81_last_seen": "11/13 success, 1 skipped (Sourcery), `test` in_progress; e2e, boot-path, schema-drift, image-build green",
+    "final": "580cf7f (current PR #81 head, incl. A3-001 + A2-001 fixes): 12/13 success + Sourcery skipped, 0 failed — e2e 14.2 min (3 profiles), test 2.8 min. a2cf39d: 12/13 green. dbec99f: test 2.8 min success (hang fixed), e2e cancelled 24.4 min (P0-013). 660456b old run: test auto-cancelled after 361 min (no concurrency block)."
+  },
+  "local_gates_on_worktree": {
+    "tsc_noEmit": 0,
+    "npm_run_lint": 0,
+    "sync_design_system_check": 0,
+    "build_standalone_check": 0,
+    "xss_escaping_regression": 0,
+    "xss_sink_audit_check": "0 (UNSAFE_BASELINE=65 unchanged vs HEAD)",
+    "full_suite": "1528/1528 pass, REAL_NPM_TEST_EXIT=0, 147.9 s — clean DB (db push + apply-sql + fixups), ADMIN_LOGIN_ENABLED=false, worktree incl. 14-file OTP work + 3 test fixes (scratchpad/suite6.log)"
+  },
+  "schema_drift": {
+    "live_vs_prisma": "blocked",
+    "reason": "Credential desync (P0-014), not hibernation - see finding. Local side prepared (scratchpad/local_cols.txt).",
+    "local_side_ready": "scratchpad/local_cols.txt — 72 tables produced by db push + apply-sql.sh + test-schema-fixups.sql (what schema.prisma+migrations yield)",
+    "local_guard": "api/tests/schema-drift.integration.test.mts 3/3 green (EXIT=0, 2026-09-03)"
+  },
+  "rls": {
+    "status": "blocked (same reason as schema_drift)"
+  },
+  "vercel": {
+    "team": "team_gLTPq1IJB0ayoC3NsDE4yoXg (hobby)",
+    "projects": 0,
+    "finding": "confirmed zero projects — deployment wiring absent (launch blocker)"
+  },
+  "sentry": {
+    "org": "rezvno (https://de.sentry.io)",
+    "projects": 0,
+    "finding": "no project exists → no DSN can be set (Phase-7 monitoring blocker)"
+  },
+  "carried_over_blockers": {
+    "S2_null_sms_response_as_success": {
+      "status": "fixed",
+      "evidence": "api/src/lib/sms.ts:101-106 meliAccepted(null)=false, RetStatus===1 or Value>1000; :296 `if (!res.ok || !meliAccepted(data))` → error path"
+    },
+    "P2002_to_409_provisioning": {
+      "status": "fixed",
+      "evidence": "api/src/lib/provisioning.ts:192 isOwnerPhoneUniqueViolation → Err.conflict('duplicate_owner_phone'); also site-orders.ts:352, admin/staff-credentials/route.ts:148; fault-injection test admin-create-business 9/9 EXIT=0; DROP INDEX staff_owner_phone_unique_idx → EXIT=1 (proven red-able 2026-09-03); index restored → EXIT=0"
+    },
+    "sms_panel_credentials_at_rest": {
+      "status": "open",
+      "evidence": "grep -rnE 'createCipheriv|encrypt\\(' api/src/lib → 0 matches; api/src/lib/platform-settings.ts:23-24 upsert stores raw `value` → plaintext"
+    },
+    "melipayamak_key_rotation": {
+      "status": "unverifiable_from_repo",
+      "evidence": "git ls-files shows only .env.example; rotation is an ops action outside the repo — founder must confirm"
+    }
+  },
+  "env_matrix": {
+    "in_code_missing_from_ENVIRONMENT_md": [
+      "ADMIN_LOGIN_ENABLED",
+      "ADMIN_TOTP_SECRET",
+      "ADMIN_TOTP_USERNAME",
+      "BREAK_GLASS_CODE",
+      "BREAK_GLASS_PHONE",
+      "INVITE_BASE_URL",
+      "MELIPAYAMAK_BODYID_* (12 keys)",
+      "MELIPAYAMAK_PASSWORD",
+      "REDIS_COMMAND_TIMEOUT_MS",
+      "REDIS_CONNECT_TIMEOUT_MS",
+      "SALES_NOTIFY_EMAIL",
+      "UPLOAD_DIR"
+    ],
+    "in_doc_not_in_code": [
+      "BACKUP_CRON",
+      "BACKUP_KEEP",
+      "BACKUP_ON_START",
+      "DATABASE_DIRECT_URL",
+      "DOMAIN",
+      "FCM_SERVER_KEY",
+      "GRAFANA_PASSWORD",
+      "POSTGRES_DB",
+      "POSTGRES_PASSWORD",
+      "POSTGRES_USER",
+      "REDIS_PASSWORD",
+      "RUN_SEED",
+      "S3_ENDPOINT"
+    ],
+    "note": "doc-only names may be compose/infra vars, not app vars — A10 to reconcile"
+  },
+  "new_findings_phase0": [
+    {
+      "id": "P0-001",
+      "severity": "blocker",
+      "area": "auth",
+      "claim": "OTP admin path (auth/admin/request|verify) issues the platform-admin principal without TOTP; the feature-flag fix (admin_otp_login_enabled, default OFF, 404 when off) exists only as uncommitted worktree — 14 files untouched since 2026-09-02 17:51",
+      "evidence": "HEAD api/src/app/api/v1/auth/admin/verify/route.ts:23 principal role=owner, :30 signAccess; worktree adds isFeatureEnabled guard at request/route.ts:52; tests/admin-otp-flag.integration.test.mts 8/8 EXIT=0; mutation Err.notFound→Err.forbidden → EXIT=1 (gate proven)",
+      "status": "fixed — committed d1e7365, pushed to feat/admin-totp-login (PR #81)"
+    },
+    {
+      "id": "P0-002",
+      "severity": "major",
+      "area": "tests",
+      "claim": "provision-slug-validation after() used a non-existent AuditLog.restaurant relation → PrismaClientValidationError → cleanup never ran, 3 tests died",
+      "evidence": "api/prisma/schema.prisma:1193-1209 AuditLog has restaurantId but no relation; fixed in worktree (findMany ids → restaurantId in); 8/8 EXIT=0",
+      "status": "fixed — committed dbec99f"
+    },
+    {
+      "id": "P0-003",
+      "severity": "major",
+      "area": "tests",
+      "claim": "auth-otp-enumeration uses fixed owner phones; with index 079 any crashed prior run poisons the next run (P2002 on staff.phone)",
+      "evidence": "leftover rows created 02:35:27Z by the killed run; fixed via pre-delete in before(); 9/9 EXIT=0",
+      "status": "fixed — committed dbec99f"
+    },
+    {
+      "id": "P0-004",
+      "severity": "major",
+      "area": "tests",
+      "claim": "feature-flags test's deliberate manual DEFAULT_OFF mirror lacked admin_otp_login_enabled (the mirror did its job — it forced a human record)",
+      "evidence": "api/tests/feature-flags.integration.test.mts:26; fixed with justification; 15/15 EXIT=0",
+      "status": "fixed — committed dbec99f"
+    },
+    {
+      "id": "P0-005",
+      "severity": "blocker",
+      "area": "ci",
+      "claim": "`npm test` hangs: locally 17 min silent after a file-level failure in provision-slug-validation; in CI the `test` job on 660456b is at 63+ min with no timeout-minutes → PR #81 cannot go green",
+      "evidence": "suite2.log stall after L3905 (file-level ✖ provision-slug-validation); CI job 100496680224 step 'Run tests' 63.3 min in_progress; ci.yml has timeout-minutes only on e2e (L328); local clean run WITH the P0-002 fix: 1528/1528 in 148 s, no hang; CI @dbec99f job 100545215402 'test' success 2.8 min",
+      "status": "hypothesis CONFIRMED in CI: after P0-002 fix, `test` completes in 2.8 min (was 252+ min hang on 660456b). Guard still missing → A6 task #1 (b): add timeout-minutes/watchdog and prove red-able"
+    },
+    {
+      "id": "P0-006",
+      "severity": "minor",
+      "area": "tests",
+      "claim": "local generated Prisma client was stale vs schema (index.d.ts 09:49 < schema 15:20) → validation errors invisible in CI because `npm ci` regenerates",
+      "evidence": "stat; `prisma generate` hit EPERM on query_engine dll while runners were alive; succeeded after kill (GEN_EXIT=0)",
+      "status": "fixed locally → A6 to add a pretest staleness guard"
+    },
+    {
+      "id": "P0-007",
+      "severity": "major",
+      "area": "security",
+      "claim": "platform_settings values (incl. SMS panel credentials) stored plaintext; standing decision §3 requires encryption at rest, key only in env, UI never echoes secrets",
+      "evidence": "api/src/lib/platform-settings.ts:23-24; 0 cipher usages in api/src/lib",
+      "status": "open → A5"
+    },
+    {
+      "id": "P0-008",
+      "severity": "blocker",
+      "area": "ops",
+      "claim": "No deployment target and no error monitoring exist: Vercel team has 0 projects; Sentry org has 0 projects",
+      "evidence": "Vercel MCP list_projects(team_gLTPq1IJB0ayoC3NsDE4yoXg) → []; Sentry MCP find_projects(rezvno) → []",
+      "status": "open → A10"
+    },
+    {
+      "id": "P0-009",
+      "severity": "minor",
+      "area": "docs",
+      "claim": "Prompt §2.8/§9 reference `prisma/migrations/manual/` + P3015 pattern; repo CLAUDE.md states that folder does not exist and migrations live in api/prisma/sql (last: 079)",
+      "evidence": "CLAUDE.md; `ls api/prisma/sql`",
+      "status": "noted — CLAUDE.md governs; do not create manual/"
+    },
+    {
+      "id": "P0-010",
+      "severity": "minor",
+      "area": "process",
+      "claim": "Duplicate work across parallel sessions: modifiersJson finding was written twice into docs/recovery/OPEN-FINDINGS.md (branch claude/rezervno-intelligence-platform-w7wcty @01:34 and this session @05:15)",
+      "evidence": "git log 40f4c94; local duplicate reverted",
+      "status": "fixed — coordination rule: check `git log --all -- <file>` before editing shared docs"
+    },
+    {
+      "id": "P0-011",
+      "severity": "major",
+      "area": "tests",
+      "claim": "Tests depend on ambient env: api/.env sets ADMIN_LOGIN_ENABLED=true locally → password-login 22 fail (401≠200); with ADMIN_LOGIN_ENABLED=false 22/22. CI has no .env so it is green there — the suite is not hermetic",
+      "evidence": "api/.env:9; tests/password-login.integration.test.mts pins JWT_* (L5-6) but not ADMIN_LOGIN_ENABLED; runs: EXIT=1 (22 fail) vs EXIT=0",
+      "status": "fixed — committed dbec99f (test-env.mts + password-login pin); A6 to sweep for other ambient-env reads"
+    },
+    {
+      "id": "P0-012",
+      "severity": "major",
+      "area": "tests",
+      "claim": "Single-process runner interleaves root-level before/after hooks across files: auth-otp-enumeration's root before() set a flag that feature-flags' root clearFlags() wiped → 404≠204 only in the full run",
+      "evidence": "_all.runner.mts L104 vs L108; fixed by moving flag-ON into a describe-level beforeEach; full run green after",
+      "status": "fixed — committed dbec99f → A6 task #3 sweep for siblings"
+    },
+    {
+      "id": "P0-013",
+      "severity": "major",
+      "area": "e2e",
+      "claim": "Commit d1e7365 (OTP button rendered only when GET /auth/admin/login returns otp_login_enabled=true) broke the company-panel e2e login used by 6 specs / 9 sites: none mocked that GET → button absent → #adminPhone never rendered → 60 s timeout × 2 retries per test; CI e2e job on dbec99f CANCELLED at 24.4 min (timeout-minutes: 25) vs 11.7 min before",
+      "evidence": "CI job 100545215311 'Run E2E tests' cancelled 24.4 min; e2e/tests/company-provisioning.spec.ts:61-70 loginCo(); grep auth/admin/login in e2e/ → 0 mocks",
+      "status": "fixed — committed a2cf39d: shared mockAdminOtpFlag(page, enabled) in e2e/tests/helpers/mock-api.ts registered before page.goto in the 9 sites + negative UI-gate test; local desktop-chrome smoke 11 passed (26 s, EXIT=0); mutation (button unconditional, intelligence.js:872) → negative test EXIT=1; byte-for-byte restore → EXIT=0; 3-profile CI on a2cf39d is the gate"
+    },
+    {
+      "id": "P0-016",
+      "severity": "major",
+      "area": "company-panel",
+      "claim": "admin_otp_login_enabled switch never rendered: client label map FEATURE_FLAG_LABEL_FA (6 keys) drives the render loop, server FEATURE_FLAG_KEYS has 7 — the OTP kill-switch could not be toggled from the UI (A3-001, CEO-confirmed)",
+      "evidence": "apps/company/js/intelligence.js:451-461,467 vs api/src/lib/feature-flags.ts:12-20",
+      "status": "fixed — committed 37b2a82 (label added; XSS overrides re-pinned 862→865, 3161→3164; xss --check 0 @65, standalone --check 0)",
+      "note": "renumbered from P0-014 (founder assigned P0-014 to the Supabase credential desync)"
+    },
+    {
+      "id": "P0-015",
+      "severity": "blocker",
+      "area": "business-panel",
+      "claim": "Business-panel password login (the only production path) threw ReferenceError: staffPasswordLogin called enterStaffPanel ×3, defined nowhere (only enterPanel exists) — since 6301ff1 (2026-08-26), on origin/main; no e2e exercised it (all specs click «ورود با پیامک») (A2-001, CEO-confirmed)",
+      "evidence": "apps/business/js/staff-system.js:468,471,472 vs :556; grep -rn 'function enterStaffPanel' apps/business shared/js → 0; git log -S enterStaffPanel → 6301ff1",
+      "status": "fixed — committed 580cf7f: calls → enterPanel; new e2e/tests/business-password-login.spec.ts (POST /auth/staff/login mock → overlay hidden, no ReferenceError); spec EXIT=0; mutation (one call site re-broken) → EXIT=1; restore → EXIT=0"
+    },
+    {
+      "id": "P0-014",
+      "severity": "blocker",
+      "area": "infra/db",
+      "claim": "Supabase MCP <-> project zmyuvtpbchytqvtgyewt credential desync: 28P01 password authentication failed for BOTH postgres (execute_sql) and supabase_read_only_user (list_tables). Project is ACTIVE_HEALTHY (founder-verified); the CEO's earlier 'hibernated' reading (taken from a get_advisors error text) was a misdiagnosis - two roles failing auth is not a hibernation symptom. Live schema-drift + RLS checks are blocked until the DB password is reset.",
+      "evidence": "MCP execute_sql -> FATAL 28P01 for user postgres; list_tables -> same for supabase_read_only_user; list_projects -> ACTIVE_HEALTHY; founder-side MCP check 2026-09-03 confirms",
+      "status": "open - founder resets DB password from the Supabase dashboard; CEO's FIRST action after written confirmation = live drift (information_schema.columns string_agg vs schema.prisma) + RLS (pg_class.relrowsecurity)",
+      "verified_by": "founder+ceo"
+    },
+    {
+      "id": "P0-017",
+      "severity": "blocker",
+      "area": "infra",
+      "claim": "No production infrastructure exists: Vercel 0 projects, Sentry 0 projects, no reachable production DB from this machine, frontend-to-API wiring absent (A10 B4/B6). Provisioning the production host (provider/region) is itself a launch blocker — founder names the target",
+      "evidence": "A10-PLAN.json blockers B4,B6; Vercel MCP list_projects=[]; Sentry find_projects=[]; docs/DEPLOYMENT.md self-host design",
+      "status": "open — founder input (iii)",
+      "verified_by": "ceo"
+    },
+    {
+      "id": "P0-018",
+      "severity": "minor",
+      "area": "docs",
+      "claim": "FCM_SERVER_KEY is documented (docs/ENVIRONMENT.md:109) but has zero references in api/src — a documented capability that does not exist",
+      "evidence": "grep -rn FCM_SERVER_KEY api/src apps → 0",
+      "status": "ticketed — docs row annotated (no silent removal); founder decides build vs remove",
+      "verified_by": "ceo"
+    },
+    {
+      "id": "P0-019",
+      "severity": "major",
+      "area": "deploy/decision",
+      "claim": "Founder baseline (b) — three panels on Vercel — reverses a decision already recorded and built: ADR 0002 (docs/adr/0002-public-website-and-cms.md:33) puts only the public website on Vercel, and deploy/caddy/Caddyfile:117-153 + docker-compose.prod.yml:38-46 already serve app./business./admin. from Caddy (/srv/customer|business|company). The 'fallback' of the reachability test is what the repo implements today. Founder must reconcile: amend ADR 0002 for (b), or keep the ADR (panels on Caddy, Vercel previews only).",
+      "evidence": "audit/round-19/A10-IRAN-REACHABILITY.md section 0 (A10, sonnet); CEO read Caddyfile refs",
+      "status": "open — founder decision",
+      "verified_by": "ceo"
+    },
+    {
+      "id": "P0-020",
+      "severity": "minor",
+      "area": "deploy",
+      "claim": "Caddy static blocks for the three panels have no explicit Cache-Control headers (Caddyfile:130-152) — under the fallback, stale bundles would depend solely on the SW CACHE_VERSION discipline",
+      "evidence": "A10-IRAN-REACHABILITY.md section 4 activation checklist",
+      "status": "open → A10/A7 (Wave 3)",
+      "verified_by": "agent"
+    }
+  ],
+  "wave0": {
+    "commits": [
+      "d1e7365 admin_otp_login_enabled flag (11 files)",
+      "dbec99f test integrity + audit/round-15 + race report",
+      "a2cf39d e2e mockAdminOtpFlag + negative UI-gate test (regression fix for d1e7365)",
+      "37b2a82 company-panel flag switch label + XSS override re-pin (A3-001)",
+      "580cf7f business-panel password login fix + e2e (A2-001)"
+    ],
+    "push": "660456b..dbec99f, dbec99f..a2cf39d, a2cf39d..580cf7f — feat/admin-totp-login, all exit 0",
+    "local_proof": "suite6: 1528/1528 EXIT=0 on from-scratch DB; password-login 22/22 with .env=true after pin"
+  },
+  "agents_round16": {
+    "A1": {
+      "status": "accepted",
+      "coverage": "101/101",
+      "classes": {
+        "REAL": 72,
+        "PARTIAL": 19,
+        "FAKE": 4,
+        "DEAD": 5,
+        "DEMO-ONLY": 1
+      },
+      "findings": {
+        "major": 11,
+        "minor": 17
+      },
+      "ceo_spot_check": {
+        "sampled": 5,
+        "confirmed": 4,
+        "plausible": 1,
+        "rejected": 0
+      },
+      "note": "agent process died on 429 after writing outputs"
+    },
+    "A2": {
+      "status": "accepted",
+      "coverage": "245/245 (143 rows)",
+      "classes": {
+        "REAL": 103,
+        "PARTIAL": 30,
+        "DEAD": 5,
+        "FAKE": 5
+      },
+      "findings": {
+        "blocker": 2,
+        "major": 16,
+        "minor": 17
+      },
+      "ceo_spot_check": {
+        "sampled": 5,
+        "confirmed": 5,
+        "rejected": 0
+      },
+      "src_v2": "DEAD — already deleted in 95e95f1 (mandate stale)"
+    },
+    "A3": {
+      "status": "accepted",
+      "coverage": "81/81",
+      "classes": {
+        "REAL": 70,
+        "PARTIAL": 7,
+        "DEMO-ONLY": 1,
+        "DEAD": 3
+      },
+      "findings": {
+        "major": 8,
+        "minor": 6
+      },
+      "ceo_spot_check": {
+        "sampled": 5,
+        "confirmed": 5,
+        "rejected": 0
+      }
+    },
+    "A6": {
+      "model": "claude-opus-5",
+      "status": "accepted",
+      "coverage": "9/9 tasks",
+      "findings": {
+        "blocker": 1,
+        "major": 9,
+        "minor": 6
+      },
+      "ceo_spot_check": {
+        "sampled": 9,
+        "confirmed": 9,
+        "rejected": 0,
+        "notes": [
+          "chain R1=124 (600 s hang reproduced) / R2=1 (watchdog fired at 63 s, open handles PipeWrap x2 + TCPSocketWrap) / R3=0 (1528/1528 in 161 s) verified in task1-r16-chain.log",
+          "admin-auth.ts role re-read is at L61 (select role) not L73 — line drift, claim holds",
+          "falsifiability table has 12 rows (summary said 13); row 12 honestly recorded as DID NOT GO RED (A6-023)",
+          "task2 probe script hit a module-path error but evidence 1 (.prisma/client/index.js L1523 warnEnvConflicts->tryLoadEnvs->dotenv) plus the earlier password-login 401 observation confirm A6-016"
+        ]
+      },
+      "key_findings": [
+        "A6-001 (blocker) hang root cause reproduced first-hand: root after() throws -> only DB/Redis teardown in _all.runner.mts:227-234 skipped -> process never exits",
+        "A6-015: 10 of 12 CI jobs still have no timeout-minutes (only test + e2e)",
+        "A6-016: importing the generated Prisma client runs dotenv over api/.env non-overridingly -> local suite inherits ADMIN_LOGIN_ENABLED/OTP_DEV_MODE/PLATFORM_ADMIN_TENANT_ID; 2 unpinned readers",
+        "A6-017: 134 hard process.env= vs 30 ??= across tests; OTP_DEV_MODE=true set globally",
+        "A6-018: fixed fixture phones shared by two files (0912111000x)",
+        "A6-024 surviving mutant (auth): dropping staff.role !== 'owner' at auth/admin/login:66 survives all 5 auth test files (not exploitable — admin-auth.ts re-reads role from DB — but unpinned)",
+        "A6-025 surviving mutant (SMS/OTP): smsTransportReady() without BODYID_OTP survives fail-closed test because setMeli() toggles all three vars together",
+        "A6-023 surviving mutant: partial revert of the A2-002 fix (wrong-guest welcome SMS + Outbox code) keeps business-reservations-row-identity.spec.ts green -> spec needs a second assertion",
+        "A6-027 empirical proof of shared state: five files green alone, red together (B1/B2 EXIT=1)",
+        "proposals (uncommitted, proven red->green): audit/round-16/A6-proposals/{test-env-watchdog.patch, ci-hang-guard.patch, check-prisma-client-fresh.mjs, check-test-runner-imports.sh}"
+      ],
+      "recommendation_needs_founder_ok": "apply the runner watchdog + timeout-minutes on the 10 uncapped jobs + the runner-imports and prisma-fresh CI checks via audit/launch-hardening — beyond the approved scope (concurrency + timeout on test), so not applied yet"
+    }
+  },
+  "pr81": "GREEN at 580cf7f — merge-ready; merge requires founder (gh token invalid in this session)",
+  "founder_decisions_2026-09-03": {
+    "pr81": "APPROVED for merge on 580cf7f - founder merges after eyeballing the checks page",
+    "ci_hardening": "APPROVED - concurrency {group: ci-${{ github.ref }}, cancel-in-progress: true} + timeout-minutes: 15 on test; falsifiability proof required",
+    "melipayamak_key_rotation": "NOT DONE until founder confirms in writing",
+    "wave1": "A6 || A2-002 fix || A10 (Vercel+Sentry wiring) + A3 password type=text fix",
+    "phase1_gate": "CONDITIONAL - CEO personally verifies 100% of FAKE(9)+blockers(2)+majors(35) + random >=15% of remaining rows; any rejection -> that agent's census re-runs",
+    "runtime_truth": "static REAL -> REAL-STATIC until a runtime smoke pass (real API+DB) for money/auth/reservation flows",
+    "branch_discipline": "Wave 0 through #81 accepted; from Wave 1 all fixes via audit/launch-hardening PRs"
+  },
+  "model_reporting": {
+    "ceo_session": "claude-opus-5 (harness system prompt); founder prompt 0.2 expects Fable for the CEO",
+    "subagents_so_far": "A1, A2, A3 and all three A6 attempts ran on claude-fable-5-1 - inherited default because no model was set (violates 0.2 'never spawn Fable subagents'; this exhausted the session limit at 07:30 and ~13:00)",
+    "correction": "from Wave 1 every Agent call sets model explicitly: Tier1 opus (A4,A5,A6,A9), Tier2 sonnet (A1-A3,A7,A8,A10), Tier3 haiku (mechanical sweeps); the Fable A6 run was stopped at ~15:10 before relaunch on opus"
+  },
+  "phase1_gate": {
+    "status": "PASSED",
+    "verified_by": "ceo",
+    "fake": "9/9",
+    "blockers": "2/2",
+    "majors": "35/35 (A2-016 wording corrected)",
+    "random_15pct": "48/48",
+    "rejections": 0,
+    "caveat": "55 REAL-STATIC rows pending runtime smoke pass"
+  },
+  "founder_directive_2_2026-09-03": {
+    "verdict": "section 9 corrections ACCEPTED; Phase-1 gate close legitimate; model discipline (0.2) mandatory in every report",
+    "sequencing": [
+      "1. founder merges #81 (580cf7f)",
+      "2. CEO merges latest main into audit/launch-hardening BEFORE its PR runs CI; verify merge base contains dbec99f",
+      "3. founder opens hardening PR; CEO runs the CI-hardening proof (hang commit -> red <=15 min -> next push cancels previous run -> revert -> green)"
+    ],
+    "ceo_verified_facts": {
+      "branch_contains_dbec99f": true,
+      "branch_contains_580cf7f": true,
+      "branch_cut_from": "fd00be1 (descendant of 580cf7f on feat/admin-totp-login)",
+      "origin_main_at_check": "c0327c2 = merge PR #79 — unchanged since the cut (0 new commits)",
+      "dry_run_merge_conflicts": 0,
+      "note": "the hang fix is already in the branch; step 2 is still executed as ordered so the PR diff is only the 7 Wave-1 commits"
+    },
+    "standing_obligations": [
+      "runtime smoke for 55 REAL-STATIC rows the moment A6 releases the DB — per-row pass/fail",
+      "live drift + RLS immediately on written Supabase password-reset confirmation (P0-014)",
+      "close Melipayamak blocker only on written rotation confirmation",
+      "next report: A6 full findings (opus), A10 wiring plan (sonnet), model column per agent, Wave-2 entry criteria"
+    ]
+  },
+  "agents_round19": {
+    "A10": {
+      "model": "claude-sonnet-5",
+      "status": "accepted (wiring plan + Iran-reachability design)",
+      "ceo_spot_check": {
+        "sections_read": "0, 3.1, 3.2, 4 of 7 + reachability_test JSON block",
+        "confirmed": true,
+        "rejected": 0,
+        "notes": [
+          "pilot live-executed via check-host.net, permanent link 49dddd12kf31; negative control facebook.com 7/7 FAIL; positive controls digikala/wikipedia 7/7 pass; vercel.com 7/7 reachable in one snapshot",
+          "globalping probes designed but explicitly NOT executed — honest",
+          "repo conflict recorded as P0-019 (founder decision)"
+        ]
+      }
+    }
+  },
+  "founder_directive_3_2026-09-03": {
+    "s10": "ACCEPTED; fd00be1 correction stands; merge sequence unchanged",
+    "B2": "option (b) BASELINE — frontends on Vercel, API stays self-hosted Docker+Caddy — conditional on: (i) founder confirms the 08-28 vercel.json deletion was intentional; (ii) A10 designs a falsifiable Iran-reachability test for a Vercel-hosted static page (fallback: all three frontends served by production Caddy, Vercel previews only); (iii) founder names the production host target (provider/region)",
+    "order3_A5": "ALLOWED_ORIGINS missing in production must be FATAL at boot (fail-closed) with a falsifiable test: unset var -> boot refuses -> EXIT!=0 (currently middleware.ts:45-48 warns and disables the CSRF Origin check)",
+    "order4_hardening_batch": "engines.node=20.x added to api/package.json (CI setup-node 20, Dockerfile node:20-alpine); FCM_SERVER_KEY ticketed as P0-018 (docs row annotated, not deleted)",
+    "order5_queue_behind_P0-014": [
+      "live drift + RLS",
+      "079 pre-deploy duplicate-owner-phone query on production (B5)",
+      "backup/restore drill against production (B4)"
+    ],
+    "s0_2_amended": "CEO stays on claude-opus-5 for all remaining rounds; Fable reserved for the final GO/NO-GO synthesis only; model column mandatory",
+    "wave2_entry_criteria": "APPROVED as written (audit/round-17/WAVE2-ENTRY-CRITERIA.md)"
+  }
+}

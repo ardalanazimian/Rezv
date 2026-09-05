@@ -2,6 +2,7 @@
   "name": "rezervno-api",
   "version": "1.0.0-phase1",
   "private": true,
+  "engines": { "node": "20.x" },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -26,6 +27,7 @@
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
     "next": "^16.2.12",
+    "otpauth": "^9.5.1",
     "qrcode": "^1.5.4",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"

@@ -7,6 +7,13 @@ on:
   pull_request:
     branches: [main, develop]
 
+# P0-005 / A6-002 (۲۰۲۶-۰۹-۰۳، تصویبِ مالک): یک hang در npm test تا سقفِ ۳۶۰ دقیقه‌ی GitHub
+# زنده ماند و push ی بعدی اجرای قبلی را لغو نمی‌کرد. push ی تازه روی همان ref اجرای در حالِ
+# انجام را لغو می‌کند.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ── مرحله ۱: type-check + build ──
   build:
@@ -53,6 +60,8 @@ jobs:
   # ── مرحله ۲: تست‌ها (با Postgres + Redis واقعی در CI) ──
   test:
     runs-on: ubuntu-latest
+    # P0-005: سوئیت در CI ~۳ دقیقه است؛ hang باید ظرفِ دقایق قرمز شود، نه ۳۶۰ دقیقه.
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: api

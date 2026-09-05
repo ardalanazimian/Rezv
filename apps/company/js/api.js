@@ -44,9 +44,14 @@ const API = {
   // ── ورود با نام کاربری و رمز (مهاجرتِ ۰۷۴) ──
   // مسیرِ اصلیِ ورود به پنلِ شرکت. OTP کنارش می‌ماند چون مسیرِ پشتیبان است:
   // اگر رمز فراموش شد و کاوه‌نگار راه افتاده باشد، راهِ برگشت وجود دارد.
-  async adminLogin(username, password){
+  // آیا سرور عاملِ سوم (TOTP) می‌خواهد؟ پاسخِ منفی یعنی فیلد اصلاً رندر نشود.
+  // ⚠️ تصمیم عمداً سمتِ سرور است: پنل استاتیک است و env را نمی‌بیند، و
+  // پنهان‌کردنِ فیلد با CSS قبلاً در همین مخزن دور زده شده بود.
+  adminTotpRequired(){ return this.get('/auth/admin/login'); },
+  async adminLogin(username, password, totp){
     const res = await this.request('/auth/admin/login', {
-      method:'POST', body: JSON.stringify({ username, password }),
+      method:'POST',
+      body: JSON.stringify(totp ? { username, password, totp } : { username, password }),
     });
     if (res.ok && res.data?.access) { this.setToken(res.data.access); this.setRefresh(res.data.refresh); }
     return res;

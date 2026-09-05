@@ -14,13 +14,22 @@ git clone <repo> && cd RezervnoOS
 cd api
 cp .env.example .env         # fill DATABASE_URL, REDIS_URL, JWT_SECRET, JWT_REFRESH_SECRET
 npm install                  # postinstall runs `prisma generate`
-# create schema (dev): either
-# ⚠️ `db push` is ONLY for bootstrapping a brand-new empty database. Never run
-# it against a migrated DB — it fails on the generated `block_end` column and
-# wants to DROP indexes it does not know (see DATABASE.md, migrations section).
-npx prisma db push
-# then apply the hand-written SQL (partitioning, exclusion constraint, RLS, ...)
+# create schema (dev) — the SAME two-step path the production entrypoint runs.
+# Verified 2026-08-29 against an empty Postgres 16: no baseline step needed,
+# `_prisma_migrations` gets `0_init`, then apply-sql applies 79 files and
+# skips the 2 tagged @manual-only. Using the deploy path locally means a
+# broken migration is found on your laptop, not on the server.
+npx prisma migrate deploy    # applies prisma/migrations/0_init
 sh prisma/apply-sql.sh       # runs prisma/sql/*.sql via prisma db execute
+npx prisma migrate status    # must print "Database schema is up to date!"
+# ⚠️ Do NOT use `prisma db push` here. It was the old local shortcut; it diverges
+# from the deploy path, fails on the generated `block_end` column of a migrated
+# DB, and wants to DROP indexes it does not know (see DATABASE.md).
+# ⚠️ Credentials drift: Postgres reads POSTGRES_PASSWORD only on FIRST init and
+# persists it in the data volume. If you rotate the password in `.env` while a
+# volume already exists, every connection fails with P1000 — the container is
+# still using the old password. Either keep `.env` in sync with the volume, or
+# recreate the volume. (Hit exactly this on 2026-08-29.)
 npm run db:seed              # optional demo data (prints platform tenant id)
 npm run dev                  # http://localhost:3000
 

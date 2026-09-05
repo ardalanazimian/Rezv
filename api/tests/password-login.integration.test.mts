@@ -5,6 +5,10 @@ import { testIp } from './helpers/test-ip.mts';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
+// ⚠️ ست‌شدنِ صریح: این فایل مسیرِ «فقط رمز» را می‌سنجد؛ api/.env محلی
+// ADMIN_LOGIN_ENABLED=true دارد و پیش از این فایل بار می‌شود → ۴۰۱≠۲۰۰ (۲۰۲۶-۰۹-۰۳،
+// P0-011). تستِ عاملِ سوم خودش این را در هوکِ خودش true می‌کند.
+process.env.ADMIN_LOGIN_ENABLED = 'false';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ورود با نامِ کاربری و رمز (مهاجرتِ ۰۷۴)
