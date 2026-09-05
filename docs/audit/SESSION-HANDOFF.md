@@ -62,14 +62,50 @@ Local environment (verified working):
 - Containers: rezervno-postgres :5432 (dev DB `rezervno` — POLLUTED, see below),
   rezv-test-pg :55432 (user/pass test/test), rezervno-redis :6379, rezv-test-redis :56379.
 - `api/.env` is the working env file. Do NOT edit it; override with an environment variable.
-- Clean CI-faithful DB recipe (expect tables=72 · staff=0 · rls=61 · policies=0):
+- Clean CI-faithful DB recipe (expect tables=72 · staff=0 · rls=61 · policies=0).
+  ⚠️ `rls=61 · policies=0` is the **correct** shape and it means RLS is **inert**: enabled on 61
+  tables with zero policies, which enforces nothing against an owner / `BYPASSRLS` role — and the
+  app connects as exactly that. The `0` is a faithful reproduction of production (P0-021/P0-022),
+  not a fixture defect. The tenant boundary is application-layer only (`ctx.restaurant.id` /
+  `auth.tenantId`). Stated here because "61 RLS" sitting inside a green verification line reads
+  like isolation coverage and is its precise opposite.
+
+  Recipe:
     createdb -> DATABASE_URL=... npx prisma db push --skip-generate --accept-data-loss
              -> sh prisma/apply-sql.sh
              -> npx prisma db execute --file prisma/test-schema-fixups.sql --schema prisma/schema.prisma
+             -> docker exec rezv-test-redis redis-cli FLUSHALL      # ⚠️ بندِ زیر را بخوان
+- 🚨 **A clean DB is not enough — the test Redis must be flushed too, and this step was missing
+  from this recipe until 2026-09-05.** Measured that day, same commit, twice in a row:
+  with 96 stale keys left over from earlier runs the full suite gave **exit 1 with 12 failures**,
+  all in rate-limit and TOTP-replay tests; after `FLUSHALL`, with **zero code changes**, the same
+  suite gave **exit 0**. CI never sees this because its `redis:7` service is created fresh per job,
+  so the failure exists only locally — which is the dangerous shape: a local red that CI cannot
+  reproduce invites "flaky test" or a hunt for a bug that is not there. The stale keys are not
+  rate-limit counters (those expire) but caches, `revoked:` JWT ids and `avail:` entries that
+  outlive the DB they described — a rebuilt DB plus a remembered Redis is an **inconsistent pair**.
 - Full suite baseline on a clean DB: tests 1535 · pass 1535 · fail 0 · exit 0 (~240s).
+- Full suite baseline 2026-09-05 after the walk-in P0: tests 1547 · pass 1547 · fail 0 · exit 0.
 - Shell warning: heredocs in this environment MANGLE backslashes. A `\b` written through one
   became a literal backspace byte and silently disabled a guard. Write scripts with the file
   tool, never through a heredoc, whenever they contain regex escapes.
+- 🚨 **DISK: every full suite run costs host disk permanently.** On 2026-09-04 this machine hit
+  0 bytes free and Docker wedged; recovery took hours. The loop: a suite run grows
+  `AppData/Local/Docker/wsl/disk/docker_data.vhdx`, **a vhdx never shrinks on its own**, disk
+  trends to zero, Docker hangs, every test becomes unrunnable. Measured 2026-09-05: vhdx 8.88GB
+  on disk vs ~5.84GB actually in use (`docker system df`), ~0.7GB growth per run-stretch.
+  - `docker image prune` / `builder prune` free space **inside** the vhdx only — `df` on the host
+    does not move. Pruning both reclaimables would strand ~7.74GB that only a **compact**
+    (Docker Desktop purge, or `Optimize-VHD`) returns. Do not quote "reclaimable" as host gain.
+  - Before a long run, check `df -h /c`. Under ~2GB free, free space first or expect a
+    mid-run failure that looks like a code defect.
+- Two failure signatures this machine produces that do **not** announce themselves, both cost
+  hours on 2026-09-04: a full disk surfaces as a plausible technical diagnosis (one agent
+  reported a "gate deadlock"; the raw output was `tee: No space left on device`), and a hung
+  Docker daemon is indistinguishable from a deleted one — `docker ps -a` hangs to `exit 124`
+  while `docker system df` returns **exit 0 on a connection failure**. Assert on output shape,
+  never on a docker exit code. And a recovering system looks broken if you sample it once:
+  containers reported "gone" were `Exited (0)` and started fine.
 
 Start by telling me, in Persian, what you will do first and why — then do it.
 ```
