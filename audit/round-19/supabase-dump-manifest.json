@@ -1,0 +1,27 @@
+{
+  "project": { "ref": "zmyuvtpbchytqvtgyewt", "id": 40563480 },
+  "purpose": "Row-count manifest for the pre-decommission pg_dump (founder directive 4, order 1). The Supabase project is NOT deleted until this file is filled from a real dump and committed.",
+  "status": "NOT_TAKEN",
+  "why_empty": "The project was paused on 2026-09-04; while paused every data-plane query returns 28P01, so no row count can be obtained. Nothing about the contents of this database may be asserted until the founder completes step D1 of supabase-decommission-checklist.md. In particular: this file being empty is NOT evidence that the database is empty.",
+  "dump": {
+    "taken_at": null,
+    "taken_by": null,
+    "command": "pg_dump --no-owner --no-privileges -Fc -d \"$SUPABASE_DIRECT_URL\" -f supabase-<date>.dump",
+    "file_path": null,
+    "size_bytes": null,
+    "sha256": null,
+    "stored_off_host": null
+  },
+  "row_counts_query": "SELECT relname AS table, n_live_tup AS approx_rows FROM pg_stat_user_tables ORDER BY 1;  -- then confirm every non-zero table with an exact SELECT count(*)",
+  "tables": [],
+  "totals": { "tables": null, "non_empty_tables": null, "total_rows": null },
+  "restore_drill": {
+    "performed": false,
+    "target": "scratch Postgres (never the production stack)",
+    "exit_code": null,
+    "per_table_diff_vs_manifest": null,
+    "note": "Checklist step D6. A dump that has never been restored is a file, not a backup."
+  },
+  "founder_decisions_per_non_empty_table": [],
+  "sign_off": { "ceo": null, "founder": null }
+}

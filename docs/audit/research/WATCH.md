@@ -10,6 +10,131 @@ to go re-check something.
 
 ## 2026
 
+- **2026-09-05** [METHOD — read this before trusting a date below] — **`WebFetch` works in this
+  session.** Batches 1 and 2 recorded it as blocked for every domain tested including neutral controls,
+  and every quote in `profiles/fidilio.md`, `profiles/smartx.md`, `profiles/foodism.md`,
+  `profiles/servme.md`, `profiles/opentable-resy-sevenrooms.md` and `recon-notes-global.md` therefore
+  came through `WebSearch`'s server-side synthesis. From batch 3 onward, items marked `[fetched]` were
+  read by Scout directly from the named URL. This immediately produced **three corrections to prior
+  batches** (SmartX pricing, SmartX `/sorry/`, Foodism's store listing — all below), which is the
+  expected yield when a weaker method is replaced by a stronger one, not a sign the earlier work was
+  careless. **Second-order lesson, learned the hard way this pass:** `WebFetch` answers your *prompt*
+  against the page, so a differently-worded prompt on the same URL surfaces different content — my
+  first fetch of `smartx.ir/sorry/` reported "no incident on this page," my second returned its title
+  «اختلالات باشگاه مشتریان». **A single negative `WebFetch` result is not evidence of absence.**
+
+- **2026-09-05** — **TheFork/American Express: announced 2026-06-15, NOT closed as of today.** The $700M
+  all-cash sale from Tripadvisor is gated on the French Works Council consultation for LaFourchette SAS
+  plus regulatory approvals, with completion expected before end-2026. Amex says the combined dining
+  ecosystem would reach ~75,000 bookable venues. **Any statement that "Amex owns TheFork" is wrong
+  today** — flagged because it would be an easy error to make in a deck. TheFork's own figures in the
+  filing: 50,000+ restaurants, $232M revenue for the year to 31 March 2026 (+25% YoY), $28M adj.
+  EBITDA. → promoted TheFork from Tier-2 recon to Tier-1: `profiles/thefork.md`; added as a MATRIX
+  column. Sources: [Tripadvisor IR](https://ir.tripadvisor.com/news-releases/news-release-details/tripadvisor-enters-agreement-sell-thefork-american-express-700);
+  [Qz](https://qz.com/american-express-thefork-tripadvisor-acquisition-700-million-061526) `[search]`.
+  **Standing watch item:** if this closes, one card issuer owns Resy, Tock and TheFork; DoorDash owns
+  SevenRooms; Quandoo is winding down. Re-check the closing in Q4 2026.
+
+- **2026-09-05** — **TheFork: a cluster of accrued-value confiscations, four in four weeks.** Reading
+  the 21 most recent 1-star Trustpilot reviews (corpus: **21,638 reviews, 4.4/5, 12% one-star**),
+  **4 of 21 (19%)** report an account suspended and the earned balance lost, with no reason given:
+  Yvonne (GB, 2026-07-20) *"My account was suspended suddenly!"* / *"I have earned 20000 Yums in my
+  account and it cannot be used now"* (≈£500 at TheFork's published 2000 Yums = £50 rate); Francesco
+  Pagliano (IT, 2026-08-02) *"My account was blocked with more than 450 euro in gift cards i paid"*;
+  Harry Rose (FR, 2026-07-21); lestamunda (GB, 2026-07-20). Two further reviews report money charged
+  without warning — Clive Fathers (GB, 2026-07-21) *"The App did not alert me to the charge, otherwise
+  I wouldn't have cancelled"* (£100), AJK (GB, ~2026-08-29) *"Charged £40 even though attended the
+  booking."* **Why this changes our model:** TheFork's *expiry* policy is the cleanest in this whole
+  programme (one clock, one year, rounded to month-end, one sentence) and it protected none of these
+  users, because the loss vector was a platform decision, not a clock. `proposals/001` addresses clocks
+  only. → fed the new `proposals/005-no-silent-taking-points-ledger.md` and
+  `proposals/006-disclosure-coupled-to-money-capture.md`, and MATRIX's new loyalty-governance row.
+  Source: [trustpilot.com/review/www.thefork.com](https://www.trustpilot.com/review/www.thefork.com)
+  `[fetched]`.
+
+- **2026-09-05** [Iran] — **NEW COMPETITOR: آرسی / RSEE (`rsee.ir`) — and the diner pays to book.**
+  The only live, dedicated, consumer-facing Iranian table-reservation platform found in a full sweep
+  (see `profiles/iran-reservation-longtail.md`). Claims **«۲۰۰۰+»** venues. Its currency is the
+  **آرسی**, and its own site states **«هر بسته رزروی شامل تعدادی آرسی می شود و هر آرسی معادل یک صندلی
+  از یک میز می باشد»** — one ARSEE = one chair, deducted per seat booked, from a package the user buys
+  (**«کاربر می تواند اقدام به خرید بسته نماید»** — *can*; whether it is mandatory is UNKNOWN, `/plans`
+  `/rules` `/faq` all 404'd). Published cancellation terms `[search]`: 100% back if cancelled >3h
+  before, **50% back** between 3h and one slot, **nothing** otherwise. Restaurant-side pricing is
+  published with no sales call: free 4 months · **۹۹۰,۰۰۰ تومان**/12mo · **۲,۹۹۰,۰۰۰**/6mo or
+  **۳,۹۹۰,۰۰۰**/12mo. **Strategic read:** the Iranian incumbent model already charges the diner for the
+  right to reserve, and forfeits it. Rezervno's "free to book" is a differentiator against a live local
+  competitor, not just against Western fee models. → new MATRIX column; fed `proposals/006`. Source:
+  [rsee.ir](https://rsee.ir/) `[fetched]`.
+
+- **2026-09-05** [Iran] — **CORRECTION to batch 1: SmartX *does* publish restaurant pricing.**
+  `MATRIX.md` recorded "ABSENT — several tiers require a sales call" from search synthesis. A direct
+  fetch of [smartx.ir/pricing](https://smartx.ir/pricing/) returns a full Toman price list: ارزیابی
+  هوشمند ۳۳,۶۵۰,۰۰۰ · باشگاه هوشمند ۵۱,۰۰۰,۰۰۰ · **رزرو هوشمند ۵۲,۸۰۰,۰۰۰** · وای‌فای هوشمند (۱۰ کاربر)
+  ۲۱,۰۰۰,۰۰۰, plus bundles to ۱۹۹,۲۵۰,۰۰۰ (مدیریت هوشمند رستوران, ≈۵۴۶,۰۰۰ تومان/روز); all annual. A
+  usage-based alternative is also published: activation ۲۹,۵۰۰,۰۰۰ + ۱۰,۰۰۰ تومان per transaction, with
+  a **30% discount if 75%+ of invoices carry a customer phone number** — SmartX pays restaurants to
+  harvest phone numbers, which sharpens the phone-capture finding already in `profiles/smartx.md`.
+  Only intermediate volume bands route to sales (۹۰۰۰-۰۱۱۲۳). **And SmartX contradicts itself:**
+  [smartx.ir/services/reserve/restaurant](https://smartx.ir/services/reserve/restaurant/) states
+  **۲۱,۴۵۰,۰۰۰ تومان/year** for the same reservation product — a 2.5× gap between two pages of one
+  company. Both quoted, neither endorsed. **Landscape effect:** against RSEE's ۳,۹۹۰,۰۰۰/year, SmartX's
+  reservation product is **5.4×–13.2×** more expensive; against RSEE's ۹۹۰,۰۰۰ tier, **21.7×–53.3×**.
+  The Iranian price of a reservation system spans ~1.7 orders of magnitude with no reliable anchor. →
+  MATRIX row "Public, self-serve restaurant pricing" for SmartX: ABSENT → REAL-with-caveat. `[fetched]`
+
+- **2026-09-05** [Iran] — **REFINEMENT to batch 1: the SmartX `smartx.ir/sorry/` apology — confirmed at
+  the title, not in the body.** First-hand fetch confirms the page's HTML `<title>` is exactly
+  **«اختلالات باشگاه مشتریان | مرداد ماه 1404»** (Mordad 1404 ≈ 2025-07-23 → 2025-08-22), so the
+  self-admitted Customer Club disruption stands. **But the body carries no description of the incident
+  and no explicit apology for it** — its `h1` is «ما خودمان را مدیون اعتماد شما می دانیم.» and its
+  sections are «خبرهای خوبی در راه است» (three new free features "this week"), «درخواست پشتیبانی» and
+  «معرفی سرویس های جدید». It is a goodwill/retention page whose *title* names a disruption. → MATRIX
+  cell revised from bare `REAL` to `REAL (title-level admission only)`. The prior batch's claim was
+  right about the fact and overstated about its form. `[fetched]`
+
+- **2026-09-05** [Iran] — **STATUS CHANGE: Foodism is degrading.** `MATRIX.md` footnote 55 recorded the
+  Cafe Bazaar listing as "confirmed live." `cafebazaar.ir/app/app.foodism.tech` now returns **HTTP
+  404** on three attempts across two URL forms — and this is not a site outage, since
+  `cafebazaar.ir/app/com.fidilio` fetched normally in the same minute. The Myket listing is live but
+  shows a build last updated **۱۴۰۱/۰۹/۱۰** (≈ **2022-12-01**, ~3¾ years stale), 4.3/5 over **226**
+  reviews, 25,000 installs — and the **first verbatim Foodism user review ever obtained in this
+  programme** (batch 2 found none anywhere), معصومه, **۳ خرداد ۱۴۰۵** (≈ **2026-05-24**):
+  **«کار نمیکنه»** — *"it doesn't work."* → status **DEGRADED — likely abandoned, not confirmed dead**
+  (no install performed). Should not be modelled as a live competitor. Sources:
+  [myket.ir/app/app.foodism.tech](https://myket.ir/app/app.foodism.tech) `[fetched]`;
+  `cafebazaar.ir/app/app.foodism.tech` `[fetched — HTTP 404]`.
+
+- **2026-09-05** [Iran] — **Fidilio: a login-blocking OTP defect, reported by two different users 28
+  days apart, unfixed in between.** First direct read of
+  [cafebazaar.ir/app/com.fidilio](https://cafebazaar.ir/app/com.fidilio): **3.7/5 over ۵۸۱ رأی,
+  ۱۱۰,۰۰۰ installs** (batch 1 had 3.7/578 via synthesis and could not read the install count — now
+  retired). Verbatim: علیرضا, **۱۴۰۴/۰۶/۲۲** (≈2025-09-13) — **«برنامه بسیار ضعیفه پشتیبانی فاجعه س کد
+  تایید هم 6 رقمی میفرستن ولی برنامه 4 رقمی میخواد»**; محمد, **۱۴۰۴/۰۷/۱۹** (≈2025-10-11) — **«این دیگه
+  چجورشه کد تایید شش رقمی برای وارد کردن 4 رقم!!»**; alireza, **۱۴۰۴/۰۷/۳۰** (≈2025-10-22) — **«واقعا
+  افتضاحه تازه که وارد برنامه میشی یه ارور 404میده بعد موقع پرداخت انلاین»**. **The SMS sends 6 digits
+  and the input field accepts 4** — a total login failure on the first screen of the funnel, live for at
+  least a month across 110,000 installs. Also worth noting: the app's own store name is
+  **«فیدیلیو | سفارش غذا»** — *food ordering*, positioning it against SnappFood, not as a reservation
+  product. → fed the `profiles/fidilio.md` addendum and a concrete suggestion for `test-integrity`
+  (pin OTP code length end-to-end; Rezervno's `lib/sms.ts` fail-closed guard is a *different* defect
+  class and does not cover this one). `[fetched]`
+
+- **2026-09-05** [Iran] — **Category finding: nobody has won Iranian table reservation, and two serious
+  attempts are in the graveyard.** A full sweep of Cafe Bazaar/Myket/web (see
+  `profiles/iran-reservation-longtail.md`) found: **ایتامین/Eatamin** — self-described "first restaurant
+  table reservation app in Iran," 3.5/5 over 31 ratings, **520 installs**, last updated **۱۳۹۶/۰۵/۱۸
+  (≈2017-08-09)**; **دیدو فود/Dido Food** — 360°/AR discovery *with table reservation*, 3.2/5 over 31
+  reviews, **7,000 installs**, last updated **۱۳۹۹/۰۷/۰۳ (≈2020-09-24)**, one reviewer's verdict
+  **«متاسفانه طرح شکست خورده»** (*"the project has failed"*). Also newly logged: **علاءالدین تراول**
+  (`alaedin.travel`) runs a real restaurant booking desk with **717 venues** nationally (Tehran 189,
+  Mashhad 73, Isfahan 53) on a prepay-and-voucher model — so the claim "no Iranian platform has
+  restaurant supply at scale" is **false**; and **سپیدز/Sepidz** sells a B2B reservation module bundled
+  with POS and a loyalty club, pricing gated behind «درخواست لیست قیمت». Two search-surfaced leads were
+  checked and are **not** what they appeared: `mizaa.ir` (described as 3D table reservation) is an image
+  gallery, and Myket's «کافه آرسی» is an unrelated classifieds app, not RSEE. **Read:** building the
+  operator software is demonstrably not the hard part — Eatamin and Dido both shipped it. Demand-side
+  pull is. `[fetched]`
+
 - **2026-09-04** — Servme (2024, reported retrospectively this pass, deep-profiled per the prior
   batch's flag): the clearest example found in this whole recon of a competitor turning
   "region-specific messaging-app-first diner behavior" into an explicit marketing wedge, not an

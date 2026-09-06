@@ -15,4 +15,8 @@
 //  محصول همان ۲۵۰msِ سختگیرانه را نگه می‌دارد.
 process.env.REDIS_COMMAND_TIMEOUT_MS ??= '8000';
 process.env.REDIS_CONNECT_TIMEOUT_MS ??= '8000';
+// هرمتیک‌بودنِ سوئیت (P0-011): بدونِ این، api/.env ی محلی (ADMIN_LOGIN_ENABLED=true)
+// نتیجه‌ی اجرای کامل را عوض می‌کرد در حالی که CI (بدونِ .env) سبز بود. هوکِ تستی که
+// عمداً عاملِ سوم را می‌خواهد بعد از importها اجرا می‌شود و این را override می‌کند.
+process.env.ADMIN_LOGIN_ENABLED = 'false';
 export {};

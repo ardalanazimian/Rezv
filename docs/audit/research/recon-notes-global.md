@@ -10,9 +10,53 @@ pages, not an independent re-fetch. Anything not reached at all is marked UNKNOW
 
 ---
 
+## ⚠️ UPDATE 2026-09-05 (batch 3) — the tooling limitation above is GONE
+
+**`WebFetch` works in this session.** Every caveat in the italic header above, and every line of
+"What I did NOT verify" at the foot of this file, was written under a hard block on direct page
+fetches. That block is not present in batch 3. Concretely, in batch 3 Scout **read directly**:
+Trustpilot's TheFork profile (including the filtered 1-star and 5-star listings), TheFork's YUMS page,
+Cafe Bazaar's Fidilio listing (with verbatim Persian reviews), Myket's Foodism and Dido listings,
+`smartx.ir/pricing`, `smartx.ir/sorry`, `smartx.ir/services/reserve/restaurant`, `rsee.ir`,
+`sepidz.com`, `alaedin.travel`, and several negative results (HTTP 404s) that are themselves evidence.
+
+**What did NOT change:** `play.google.com` returned `connect ECONNREFUSED`, and no Apple App Store
+listing was successfully fetched. So app-store rating data for global platforms is still
+search-sourced. Reddit was not retried this pass.
+
+**A second-order caution learned the hard way.** `WebFetch` runs your *prompt* against the page and
+returns an answer, not the raw page. Two prompts against the same URL can disagree: asking
+`smartx.ir/sorry/` "what incident is being apologised for" returned *"there is no apology or incident
+on this page"*, while asking the same URL for its `<title>` and every heading verbatim returned
+«اختلالات باشگاه مشتریان | مرداد ماه 1404». **A single negative fetch is not evidence of absence.**
+Where a negative result is cited as evidence in batch 3 (Foodism's 404, TheFork's 404 pricing pages),
+it was repeated across attempts and/or controlled against a known-good URL on the same host.
+
+---
+
 ## Reservation / guest platforms (lighter recon)
 
-### TheFork (formerly LaFourchette)
+### TheFork (formerly LaFourchette) — ⬆️ **PROMOTED TO TIER-1, 2026-09-05**
+
+> **This section is superseded by `profiles/thefork.md`.** It is left in place unedited below as the
+> record of what light recon produced, so the two can be compared. What the deep pass changed:
+> - **Amex deal status:** announced **2026-06-15** for **$700M**, and **NOT closed as of 2026-09-05** —
+>   gated on the French Works Council consultation for LaFourchette SAS plus regulatory approvals.
+>   The note below said "expected to close by end of 2026," which remains the guidance.
+> - **YUMS, now verified verbatim** from [thefork.co.uk/yums](https://www.thefork.co.uk/yums)
+>   `[fetched]`: 100 Yums/booking (200 at "Yums x2" venues, 500 referral), credited *"Three days after
+>   your meal, if you honour your booking"*; **1000 Yums = £20 off** (min £30 bill), **2000 = £50 off**
+>   (min £60 bill), cap 2000/booking; **"Yums are valid for one year. They can be exchanged until the
+>   last day of the month in which they expire."**; **no tiers at all**; and
+>   **"You do not earn Yums when you book with a loyalty discount."**
+> - **The complaint pattern below was paraphrase from search synthesis. It is now sourced.** Trustpilot
+>   `[fetched]`: **21,638 reviews, 4.4/5, 12% one-star** — the largest independent corpus in this whole
+>   programme. The dominant recent 1-star cluster is **not** the "silently cancelled reservation"
+>   pattern guessed below (though that appears too, 4 of 21) — it is **accrued balance confiscated on
+>   account suspension with no reason given**, 4 of the 21 most recent, all within four weeks.
+> - Financials from the acquisition filing: 50,000+ restaurants, 11 countries, **$232M revenue** for
+>   the year to 2026-03-31 (+25% YoY), **$28M adj. EBITDA**.
+
 - What it is: European reservation + dining-deals marketplace, strong in France and 11 European
   countries; ~50,000 restaurants, ~20M active diners claimed (TripAdvisor-era figures).
 - Ownership churn: TripAdvisor acquired it in May 2014 (~$140M); TripAdvisor agreed to **divest it
@@ -322,3 +366,19 @@ instruction to focus on streak/tier/mission/expiry mechanics and what users say 
   reputation.
 - The Zenchef France-vs-Europe pricing discrepancy (€129–249 vs €69–119) is unresolved.
 - The exact MWM.ai Chipotle app-rating-drop numbers (2.89→2.03) are reported-but-unverified.
+
+---
+
+## ADDED 2026-09-05 (batch 3) — the Iranian long tail now has its own file
+
+This file has always been *global* recon. Batch 3 ran the equivalent sweep for Iran, which the prior
+BRIEFs carried as an open item ("any other Iranian reservation/loyalty app on Cafe Bazaar/Myket/Sibapp
+not yet found"). It is written up in **`profiles/iran-reservation-longtail.md`** rather than here.
+
+One-line summary so this file is not misleading by omission: **the Iranian dedicated table-reservation
+category has no winner.** Live: **آرسی/RSEE** (`rsee.ir`, "۲۰۰۰+" venues, and the diner buys
+chair-denominated credits to book), **علاءالدین تراول** (717 venues on a prepay-voucher model), and
+**سپیدز/Sepidz** (B2B module bundled with POS, contact-us pricing). Dead: **ایتامین/Eatamin** (last
+build 2017, 520 installs) and **دیدو فود/Dido** (last build 2020, 7,000 installs, one reviewer:
+«متاسفانه طرح شکست خورده»). Degrading: **فودیسم/Foodism**. Two search-surfaced leads were checked and
+are not reservation products at all. **Sibapp was not checked** — carried forward as an open item.

@@ -526,6 +526,10 @@ model Reservation {
   // ── ریسک no-show (فاز v2 — هوش مشتری) ──
   noShowRiskScore  Int?         @map("no_show_risk_score") @db.SmallInt
   noShowRiskTier   String?      @map("no_show_risk_tier")
+  /// نسب‌نامه‌ی امتیاز (مهاجرتِ ۰۸۰): 'learned' | 'heuristic'، و NULL برای
+  /// ردیف‌های پیش از مهاجرت که منبعشان **واقعاً نامعلوم** است. مصرف‌کننده
+  /// حق ندارد NULL را «مدل گفته» بخواند. CHECK سطحِ DB در ۰۸۰ است.
+  noShowRiskSource String?      @map("no_show_risk_source")
   depositRequested Boolean      @default(false) @map("deposit_requested")
   // ⚠️ همگام‌سازی‌شده با DB زنده (migration 019_payments_deposit):
   depositAmountToman Int?       @map("deposit_amount_toman")
@@ -550,6 +554,10 @@ model Reservation {
   // گزارش‌های زمانی و تحلیل (رزروهای ثبت‌شده در بازه)
   @@index([restaurantId, createdAt])
   @@index([restaurantId, noShowRiskTier, slotStart])
+  /// مهاجرتِ ۰۸۰ — اینجا اعلام شده چون در prisma/sql/080 هم ساخته می‌شود؛
+  /// نبودنش در این فایل یعنی `prisma db push` روی DBِ migrateشده DROPش کند
+  /// (همان درسِ مهاجرتِ ۰۷۵؛ گارد: schema-drift.integration.test.mts).
+  @@index([restaurantId, noShowRiskTier, noShowRiskSource], map: "reservations_risk_source_idx")
   // migration 049 — فهرستِ رزروِ پنل: بازه‌ی slot_start + ترتیب رویِ همان ستون.
   // ایندکس‌هایِ دیگر یک ستونِ غیرِ بازه‌ای بینِ restaurant_id و slot_start دارند.
   @@index([restaurantId, slotStart], map: "reservations_restaurant_slot_idx")

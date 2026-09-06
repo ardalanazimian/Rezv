@@ -23,7 +23,13 @@ const {
  * با موجودیِ واقعیِ خرج‌شدنی می‌سازد بدونِ هیچ درگاهِ پرداختی — پیش‌فرضِ
  * روشن آنجا یعنی «پولِ رایگان».
  */
-const DEFAULT_OFF_KEYS: readonly string[] = ['gift_card_purchase_enabled'];
+/**
+ * `admin_otp_login_enabled` (۲۰۲۶-۰۹-۰۲): مسیرِ OTPِ پنلِ شرکت همان principalِ
+ * platform-admin را بدونِ TOTP صادر می‌کند — عاملِ سومِ `auth/admin/login` را
+ * دور می‌زند. پیش‌فرضِ روشن یعنی «درِ پشتیِ باز»؛ ثبتِ آگاهانه‌ی این استثنا
+ * این‌جا همان ردِ انسانی‌ای است که کامنتِ بالا می‌خواهد.
+ */
+const DEFAULT_OFF_KEYS: readonly string[] = ['gift_card_purchase_enabled', 'admin_otp_login_enabled'];
 const isDefaultOff = (k: string) => DEFAULT_OFF_KEYS.includes(k);
 const { getPlatformSetting, setPlatformSetting } = await import('../src/lib/platform-settings.ts');
 

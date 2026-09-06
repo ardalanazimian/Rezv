@@ -1,6 +1,8 @@
 import { randomBytes, timingSafeEqual, createHash } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { createReservation } from './reservations';
+import { withSerializationRetry } from './reservation-helpers';
 import { redis } from './redis';
 import { metrics } from './metrics';
 import { Err } from './errors';
@@ -9,7 +11,11 @@ import { smsAllowedForCategory } from './notification-prefs';
 import { queuePush, queueEmail } from './notify';
 import { cached, cacheKey } from './cache';
 import { activeStatusList } from './reservation-status';
+import { holdHorizonMinutes, isTableNumberOccupied, OFFER_TTL_MINUTES } from './table-occupancy';
 import { dateKeyInTz, timeKeyInTz } from './hours';
+import { createLogger } from './logger';
+
+const log = createLogger('waitlist');
 
 // ═══════════════════════════════════════════════════════════
 //  سیستم لیست انتظار رزرونو (مدل OpenTable)
@@ -23,7 +29,11 @@ import { dateKeyInTz, timeKeyInTz } from './hours';
 //  اعلان سه‌کاناله: SMS + Push + Email.
 // ═══════════════════════════════════════════════════════════
 
-const OFFER_TTL_MINUTES = 5;          // مهلت پاسخ مشتری به آفر (تایمر انقضا)
+// ⚠️ OFFER_TTL_MINUTES (مهلتِ پاسخِ مشتری به آفر) از ۲۰۲۶-۰۹-۰۵ در
+// `table-occupancy.ts` تعریف می‌شود و از آنجا import می‌شود. اینجا نبود چون
+// یک مصرف‌کننده‌ی دوم پیدا کرد: `availability` باید بداند یک میزِ
+// `state='reserved'` حداکثر تا کِی می‌تواند به رزرو تبدیل شود. نگه‌داشتنِ
+// عدد در این فایل یعنی کپی‌کردنش در آن یکی — دو ثابت برایِ یک مفهوم.
 const AVG_DINING_MINUTES = 75;        // پیش‌فرضِ سراسری — فقط وقتی تاریخچه‌ی خودِ رستوران کافی نیست
 const VIP_PRIORITY = 100;             // امتیاز اولویت VIP
 const CLUB_GOLD_PRIORITY = 50;        // امتیاز باشگاه طلایی/پلاتینیوم
@@ -214,6 +224,22 @@ export async function joinWaitlist(input: JoinWaitlistInput) {
     },
   });
 
+  // ⚠️ یافته‌ی اندازه‌گیری‌شده‌ی ۲۰۲۶-۰۹-۰۵ — این پنج `redis.del` (اینجا و
+  // خطوطِ معادل در promoteNext/acceptOffer/declineOffer/leaveWaitlist) کلیدی
+  // را پاک می‌کنند که **هیچ کدی در مخزن نمی‌نویسد**. تنها نویسنده‌هایِ Redis
+  // در `api/src` اینها هستند و هیچ‌کدام پیشوندِ `waitlist:` تولید نمی‌کند:
+  //   admin-totp.ts:130 (`totp-replay:`) · security.ts:13 (`revoked:`) ·
+  //   ratelimit.ts:239/242 (`viol:`/`ban:`) · cache.ts:29 (همیشه `cache:`) ·
+  //   availability.ts:191/248 (`avail-lock:`/`avail:`)
+  // و `cached`/`cacheKey` هم در همین فایل import شده‌اند ولی **هرگز صدا زده
+  // نمی‌شوند** (`getQueue` مستقیم از DB می‌خواند). یعنی این باطل‌سازی‌ها
+  // no-op‌اند و شکستشان چیزی را خراب نمی‌کند.
+  //
+  // به همین دلیل عمداً شمارنده/آلارم نگرفتند: ابزارِ رصد روی کدِ بی‌اثر یک
+  // سیگنالِ جعلی می‌سازد («صف کش دارد») که وجود ندارد. حذفشان هم در همین
+  // batch انجام نشد — یک پاک‌سازیِ مستقل است و قاطی‌کردنش با پرریسک‌ترین
+  // تغییرِ این دور دقیقاً همان چیزی است که بندِ ۳۲ منع می‌کند. ثبت شد تا
+  // بازبینِ بعدی دوباره کشفش نکند.
   await redis.del(`waitlist:${r.id}`).catch(() => {});
 
   // اعلان پیوستن
@@ -281,6 +307,28 @@ export async function getQueue(restaurantId: string) {
  * فقط یک نفر در هر فراخوانی آفر می‌گیرد (تا میز دوبار آفر نشود).
  */
 export async function promoteNext(restaurantId: string): Promise<{ promoted: boolean; entryId?: string; table?: number }> {
+  // ═══════════════════════════════════════════════════════════════════
+  //  ⚠️ چرا کارِ DB داخلِ `withSerializationRetry` است و عوارضِ جانبی بیرون
+  //
+  //  زیرِ Serializable، ابطال با ۴۰۰۰۱ رفتارِ **عادیِ** SSI است نه حالتِ لبه؛
+  //  پس بالابردنِ isolation بدونِ retry فقط یک double-bookingِ بی‌صدا را به
+  //  یک شکستِ پرصدا تبدیل می‌کرد. همان سیاستِ واحدِ createReservation و
+  //  createWalkin، از همان تابعِ مشترک — عمداً حلقه‌ی دومی نوشته نشد.
+  //
+  //  و عوارضِ جانبی (اعلان، باطل‌سازی، متریکِ موفقیت) بیرونِ واحدِ retry
+  //  می‌مانند: اگر داخل بودند، یک retry می‌توانست به یک مهمان دو بار پیامکِ
+  //  «میزت آماده است» بدهد، یا `waitlistPromoted` را دوبار بشمارد.
+  // ═══════════════════════════════════════════════════════════════════
+  const res = await withSerializationRetry('waitlist', () => promoteNextTx(restaurantId));
+  if (res.promoted && res.entryId && res.table !== undefined) {
+    await notifyEntry(res.entryId, 'offered', { table: res.table, ttl: OFFER_TTL_MINUTES });
+    await redis.del(`waitlist:${restaurantId}`).catch(() => {});
+    metrics.waitlistPromoted.inc();  // متریک: ارتقاء موفق از لیست انتظار
+  }
+  return res;
+}
+
+async function promoteNextTx(restaurantId: string): Promise<{ promoted: boolean; entryId?: string; table?: number }> {
   // نفر اول صف (بالاترین اولویت، زودترین)
   const next = await db.waitlistEntry.findFirst({
     where: { restaurantId, status: 'waiting' },
@@ -288,9 +336,55 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
   });
   if (!next) return { promoted: false };
 
-  // پیدا کردن میزهای کاندید آزادِ اکنون برای این گروه (تخصیص خودکار)
+  // ═══════════════════════════════════════════════════════════════════
+  //  افقِ چکِ تداخل — **قرارداد**، نه آمار (رفعِ ۲۰۲۶-۰۹-۰۵)
+  //
+  //  تا امروز این خط `AVG_DINING_MINUTES` (=۷۵) بود. آن عدد به سؤالِ «مردمِ
+  //  این رستوران معمولاً چقدر می‌نشینند؟» جواب می‌دهد — یک آمار برایِ تخمینِ
+  //  زمانِ انتظار. ولی رزروی که `acceptOffer` واقعاً می‌سازد به‌اندازه‌ی
+  //  `slotMinutes + cleaningMinutes + bufferMinutes` میز را می‌بندد — یک
+  //  قرارداد. با پیش‌فرض‌هایِ اسکیما (۹۰+۱۵+۰=۱۰۵) یعنی یک پنجره‌ی کورِ
+  //  ۳۰دقیقه‌ای: رزروی که ۷۵ تا ۱۰۵ دقیقه‌ی دیگر شروع می‌شد برایِ این چک
+  //  نامرئی بود و در لحظه‌ی پذیرش تداخل می‌کرد — یعنی صف میزی را آفر می‌داد
+  //  که پذیرشش از پیش محکوم به شکست بود.
+  //
+  //  ⚠️ و جهتِ آینه، که کم‌تر دیده می‌شود ولی همان‌قدر واقعی است: برایِ یک
+  //  فست‌فود با سانسِ ۳۰ دقیقه، ۷۵ **بیش‌ازحد بلند** بود و رزروِ یک‌ساعتِ
+  //  دیگر یک میزِ کاملاً قابلِ‌آفر را حبس می‌کرد. هر دو جهت در
+  //  `tests/waitlist-promotion-horizon.test.mts` قفل شده‌اند.
+  //
+  //  ⚠️ چرا هارد‌کدِ ۱۰۵ هم غلط بود: `slotMinutes` پیکربندی‌پذیر است. یک
+  //  رستوران با سانسِ ۱۸۰ پنجره‌ی کورِ ۱۲۵دقیقه‌ای می‌داشت و پیش‌فرض آن را
+  //  پشتِ عددِ ۳۰ پنهان می‌کرد. پس افق از `holdHorizonMinutes` می‌آید —
+  //  **همان** تابعی که `availability` با آن این هولد را تفسیر می‌کند
+  //  (`availability.holdsFromTables`). نویسنده و خواننده‌ی یک پرچم باید یک
+  //  افق داشته باشند، وگرنه صف میزی را آفر می‌دهد که خودِ availability آن را
+  //  ناتوان از میزبانی می‌داند.
+  //
+  //  ⚠️ چرا این خواندن **بیرونِ** تراکنشِ Serializable است و نه داخلش: یک
+  //  `SELECT` رویِ ردیفِ `restaurants` داخلِ تراکنشِ Serializable یک قفلِ
+  //  SIREAD رویِ همان ردیف می‌گیرد، و آن ردیف با هر heartbeatِ پنل به‌روز
+  //  می‌شود (`restaurant/heartbeat/route.ts:53` هر بار `lastSeenAt` را
+  //  می‌نویسد). نتیجه یک منبعِ تازه‌ی ۴۰۰۱ می‌شد که هیچ ربطی به تداخلِ میز
+  //  ندارد. پیکربندیِ زمان‌بندی هم داده‌ی رقابتی نیست — `acceptOffer` خودش
+  //  دوباره و تازه می‌خواندش.
+  //
+  //  `AVG_DINING_MINUTES` عمداً حذف نشد: در تخمینِ زمانِ انتظار
+  //  (`estimateWaitMinutes` / `getAvgDiningResult`) واقعاً آمار است و آن‌جا
+  //  ورودیِ درستی است.
+  // ═══════════════════════════════════════════════════════════════════
   const now = new Date();
-  const horizon = new Date(+now + AVG_DINING_MINUTES * 60_000);
+  const timing = await db.restaurant.findUnique({
+    where: { id: restaurantId },
+    select: { slotMinutes: true, cleaningMinutes: true, bufferMinutes: true },
+  });
+  // نبودِ رستوران «هیچ کاندیدی نبود» نیست — یک خطایِ واقعی است و باید دیده
+  // شود. `tryPromoteNext` آن را می‌شمارد و لاگ می‌کند، بی‌آنکه کنشِ صداکننده
+  // را بشکند.
+  if (!timing) throw Err.notFound('رستوران');
+  const horizon = new Date(+now + holdHorizonMinutes(timing) * 60_000);
+
+  // پیدا کردن میزهای کاندید آزادِ اکنون برای این گروه (تخصیص خودکار)
   const candidates = await db.table.findMany({
     where: {
       restaurantId, isActive: true, state: 'free',
@@ -317,7 +411,26 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
         UPDATE tables SET state = 'reserved'
         WHERE id = ${t.id}::uuid AND state = 'free'
       `;
-      if (upd === 0) return false; // رقیب زودتر گرفت → کاندید بعدی
+      // ── ⚠️ نیمه‌ی باربَرِ ارتقا به Serializable: `upd === 0` **یک** معنا دارد،
+      //    نه دو تا. این تفکیک را خودِ Postgres تضمین می‌کند، نه این کد:
+      //
+      //  • رقیبی که **قبلاً commit کرده** → ردیف دیگر `state='free'` نیست →
+      //    شرطِ WHERE نمی‌گیرد → ۰ ردیف. میز واقعاً رفته؛ درست‌ترین کار
+      //    «کاندیدِ بعدی» است. اینجا retry فقط همان صفر را دوباره می‌دید.
+      //
+      //  • رقیبی که **هنوز commit نکرده** → این UPDATE رویِ قفلِ ردیف
+      //    **بلاک می‌شود**؛ وقتی رقیب commit کرد، Postgres زیرِ Serializable
+      //    خطایِ ۴۰۰۰۱ می‌دهد. یعنی این حالت اصلاً از این خط عبور نمی‌کند و
+      //    هرگز به شکلِ `upd === 0` ظاهر نمی‌شود — throw می‌شود، از حلقه
+      //    بیرون می‌رود و `withSerializationRetry` کلِ تلاش را از نو
+      //    (با صفِ تازه و کاندیدهایِ تازه) اجرا می‌کند.
+      //
+      // پس «skip» و «retry» دو مسیرِ فیزیکیِ جدا هستند و قاطی‌شدنشان ممکن
+      // نیست — به شرطی که هیچ‌کس این تراکنش را در یک try/catch نپیچد و
+      // خطایِ سریال‌سازی را به «کاندیدِ بعدی» ترجمه نکند. آن کار یک مهمانِ
+      // واجد را بی‌صدا از صف می‌انداخت. گاردش:
+      // `waitlist-merge-occupancy-concurrency.test.mts` (بخشِ تفکیکِ upd===0).
+      if (upd === 0) return false; // رقیبِ commitشده میز را گرفت → کاندید بعدی
 
       // ۲) چک تداخل رزرو (حالا که میز قفل است، امن)
       const conflict = await tx.reservation.count({
@@ -330,7 +443,53 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
           slotStart: { lt: horizon }, slotEnd: { gt: now },
         },
       });
-      if (conflict > 0) {
+      // ⚠️ رفع‌شده (۲۰۲۶-۰۹-۰۴): چکِ بالا فقط `table_id` را می‌شمارد — یعنی
+      // میزِ **ثانویه‌یِ** یک رزروِ ترکیبیِ فعال را نمی‌بیند. میزِ ثانویه
+      // ردیفِ رزروِ خودش را ندارد (فقط عددی در `merged_table_numbers`) و
+      // `tables.state`ش هم هرگز به occupied تغییر نمی‌کند، پس از فیلترِ
+      // `state:'free'`ِ کاندیدها هم رد می‌شود. نتیجه: صف می‌توانست میزی را
+      // آفر بدهد که همین حالا نصفِ یک گروهِ ترکیبی سرش نشسته است.
+      //
+      // این دقیقاً همان کلاسِ باگی است که در createWalkin پیدا شد؛ هر دو از
+      // یک قلم‌افتادگیِ مشترک می‌آیند (رجوع کن به table-occupancy.ts).
+      // عمداً چکِ قبلی حذف **نشده**: معناهای زمانیِ دو چک یکی نیست (این یکی
+      // block_end را هم حساب می‌کند، یعنی زمانِ نظافت) و حذفِ چکِ قدیمی یک
+      // تغییرِ رفتاریِ جداست، نه بخشی از این رفع.
+      //
+      // 🚨 دامنه‌ی این گارد — **به‌روزشده ۲۰۲۶-۰۹-۰۵.** متنِ قبلی می‌گفت
+      // «حالتِ هم‌زمان باز است و ارتقا به Serializable عمداً انجام نشده».
+      // آن دیگر HEAD را توصیف نمی‌کند؛ ولی جمله‌ی جایگزین هم نباید بیش از
+      // اندازه ادعا کند. وضعیتِ دقیق:
+      //
+      //   ✔ حالتِ ترتیبی (merge قبلاً commit شده) — بسته. از ۲۰۲۶-۰۹-۰۴.
+      //     گارد: waitlist-merge-occupancy.test.mts
+      //   ✔ حالتِ هم‌زمان (merge در حالِ commit) — **حالا بسته.** این تراکنش
+      //     `isolationLevel: Serializable` دارد، پس خواندنِ
+      //     `isTableNumberOccupied` قفلِ SIREAD می‌گیرد و چرخه‌ی
+      //     rw-antidependency کامل می‌شود؛ یکی از دو طرف با ۴۰۰۰۱ abort
+      //     می‌شود و `withSerializationRetry('waitlist', …)` دوباره تلاش
+      //     می‌کند. پیش از این تغییر، همین سناریو **۱۲ از ۱۲** بازتولید
+      //     می‌شد. گارد: waitlist-merge-occupancy-concurrency.test.mts
+      //
+      //   ✗ و آنچه این تغییر **نمی‌بندد** — جهتِ معکوس، که اصلاً مسئله‌ی
+      //     ایزولاسیون نیست: `tryMergeTables` از `getOccupiedTableNumbers`
+      //     استفاده می‌کند و آن تابع **فقط جدولِ `reservations` را می‌خواند**
+      //     (table-occupancy.ts:38-52). یک آفرِ زنده‌ی لیستِ انتظار نه ردیفِ
+      //     رزرو دارد و نه در آن کوئری دیده می‌شود، و فیلترِ merge هم فقط
+      //     `state != 'maintenance'` است، پس میزی که همین حالا `reserved`
+      //     شده باز هم کاندیدِ ترکیب است. نتیجه: **اگر آفرِ صف اول باشد و
+      //     merge دوم، merge همان میز را می‌گیرد — کاملاً ترتیبی، بدونِ هیچ
+      //     همزمانی. اندازه‌گیریِ زنده‌ی ۲۰۲۶-۰۹-۰۵: ۶ از ۶.**
+      //     Serializable این را درست نمی‌کند، چون مسئله «خواندنی که دیده
+      //     نمی‌شود» نیست، «خواندنی که اصلاً انجام نمی‌شود» است — چرخه‌ای
+      //     وجود ندارد که SSI بخواهد ببیند.
+      //     رفعش یعنی گسترشِ مرجعِ اشغال تا آفرهایِ زنده‌ی صف، که همزمان
+      //     availability و walk-in و merge را تغییر می‌دهد — یک تصمیمِ
+      //     دامنه‌ای، نه یک سوئیچ. ارجاع داده شد؛ عمداً اینجا رفع نشده.
+      const mergedBusy = conflict === 0
+        && await isTableNumberOccupied(tx, restaurantId, t.number, now, horizon);
+
+      if (conflict > 0 || mergedBusy) {
         // این میز رزرو هم‌پوشان دارد → آزادش کن و کاندید بعدی
         await tx.table.update({ where: { id: t.id }, data: { state: 'free' } });
         return false;
@@ -345,17 +504,95 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
         },
       });
       return true;
-    });
+    },
+    // هم‌ترازِ placeReservation (`reservations.ts:396`) و createWalkinTx
+    // (`:937`) — عمداً هر سه یکی است: سه نویسنده‌ای که رویِ یک میزِ فیزیکی
+    // رقابت می‌کنند باید زیرِ یک قاعده‌ی همزمانی باشند. همین ناهم‌ترازی بود
+    // که این باگ را ساخت؛ `isTableNumberOccupied` تنها محافظِ میزِ ثانویه
+    // است و در READ COMMITTED برایِ SSI نامرئی بود.
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 10_000 },
+    );
 
     if (claimed) {
-      await notifyEntry(next.id, 'offered', { table: t.number, ttl: OFFER_TTL_MINUTES });
-      await redis.del(`waitlist:${restaurantId}`).catch(() => {});
-      metrics.waitlistPromoted.inc();  // متریک: ارتقاء موفق از لیست انتظار
+      // ⚠️ عوارضِ جانبی اینجا **نیستند** — به `promoteNext` منتقل شدند تا
+      // یک retryِ سریال‌سازی نتواند دو بار پیامک بفرستد یا متریکِ موفقیت را
+      // دوبار بشمارد.
       return { promoted: true, entryId: next.id, table: t.number };
     }
   }
 
   return { promoted: false }; // همه‌ی کاندیدها گرفته شدند یا تداخل داشتند
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  سیاستِ *واحدِ* «تلاشِ ارتقا که نباید کنشِ صداکننده را بشکند»
+//
+//  ── مسئله‌ای که این تابع می‌بندد ──────────────────────────────────────
+//  چهار نقطه `promoteNext` را «پس از آزادشدنِ میز» صدا می‌زنند و هر چهار،
+//  تا ۲۰۲۶-۰۹-۰۵، خطا را یا با `.catch(() => {})` می‌بلعیدند یا (در مسیرِ
+//  sweep) اصلاً گاردی نداشتند و کلِ دسته را می‌انداختند. هر دو سرِ طیف غلط
+//  بود:
+//    • بلعیدن  → شکستِ سیستماتیک از نبودِ شکست قابلِ تفکیک نبود.
+//    • throwِ خام در sweep → یک رستورانِ خراب کلِ جاروبِ ناوگان را می‌کشت.
+//
+//  ── چرا throw نمی‌کنیم (این نیمه‌ی باربَرِ تصمیم است) ─────────────────
+//  در هر چهار نقطه، کنشِ اصلی (decline / cancel / expire) **قبلاً commit
+//  شده**. اگر بعد از آن پاسخِ صداکننده را با خطا بشکنیم، برای یک موفقیتِ
+//  واقعی یک شکستِ جعلی گزارش کرده‌ایم — همان الگویِ ممنوعِ «موفقیتِ جعلی»
+//  این مخزن، فقط در جهتِ آینه. مشتری آفرش را *واقعاً* رد کرده؛ اینکه نفرِ
+//  بعدیِ صف ارتقا نگرفت مشکلِ اوست نه او.
+//
+//  ── پس چه چیزی جایِ throw را می‌گیرد ────────────────────────────────
+//  یک لاگِ ساختاریافته + یک شمارنده‌ی برچسب‌دار (`site`)، و برگرداندنِ
+//  `ok:false` تا صداکننده — اگر خودش cron است — بتواند در سطحِ خودش
+//  صادقانه گزارش دهد. تفکیکِ صریحِ دو واقعیتِ متفاوت: «کنشِ کاربر موفق بود»
+//  و «ارتقا شکست خورد».
+//
+//  ⚠️ شبکه‌ی ایمنی وجود دارد ولی **در عمل تأیید نشده**: `cron/crontab:17`
+//  هر ۲ دقیقه `/run.sh waitlist` را می‌زند و
+//  `maintenance/waitlist/route.ts:34-37` برایِ هر رستورانِ دارایِ صف دوباره
+//  `promoteNext` می‌زند. پس یک شکستِ بلعیده‌شده «برای همیشه» مهمان را در صف
+//  رها نمی‌کند، حداکثر ~۲ دقیقه. این ادعا **در سورس اثبات شده و در عملیات
+//  اثبات نشده** — هیچ محیطی مستقر نیست که این زنجیره در آن اجرا شده باشد و
+//  کلِ آن به یکی‌بودنِ `MAINTENANCE_KEY` وابسته است. اگر آن کلید در لانچ
+//  اشتباه تنظیم شود، شبکه‌ی ایمنی **غایب** است و شدت به همان «دائمی»
+//  برمی‌گردد. به همین دلیل شمارنده‌ی زیر جایگزینِ آن زنجیره است، نه مکملش.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** نقطه‌ی صدورِ تلاشِ ارتقا — برچسبِ متریک و لاگ. */
+export type PromotionSite = 'decline' | 'cancel' | 'expire' | 'sweep';
+
+export interface PromotionAttempt {
+  /** آیا `promoteNext` بدونِ خطا برگشت؟ (نه «آیا کسی ارتقا گرفت») */
+  ok: boolean;
+  /** آیا واقعاً کسی ارتقا گرفت؟ `false` وقتی صف خالی است یا میزی نبود — این *شکست نیست*. */
+  promoted: boolean;
+}
+
+/**
+ * `promoteNext` را صدا می‌زند و شکستش را به یک سیگنالِ دیدنی تبدیل می‌کند،
+ * بدونِ اینکه به صداکننده throw کند.
+ *
+ * ⚠️ تفکیکِ عمدی: `ok:true, promoted:false` یعنی «همه‌چیز درست کار کرد، فقط
+ * کاندیدی نبود» — این حالتِ کاملاً عادی است و **شمرده نمی‌شود**. فقط
+ * `ok:false` (یعنی خطایِ واقعی) شمارنده را بالا می‌برد. یکی‌گرفتنِ این دو،
+ * شمارنده را با ترافیکِ عادیِ رستورانِ بی‌صف پر می‌کرد و آلارم را در یک هفته
+ * بی‌اعتبار می‌کرد.
+ */
+export async function tryPromoteNext(restaurantId: string, site: PromotionSite): Promise<PromotionAttempt> {
+  try {
+    const res = await promoteNext(restaurantId);
+    return { ok: true, promoted: res.promoted };
+  } catch (e) {
+    metrics.waitlistPromotionFailed.inc({ site });
+    log.error('ارتقایِ لیستِ انتظار شکست خورد — کنشِ صداکننده موفق بود، فقط ارتقا نه', {
+      event: 'waitlist.promotion_failed',
+      site,
+      restaurantId,
+      error: (e as Error)?.message ?? String(e),
+    });
+    return { ok: false, promoted: false };
+  }
 }
 
 // ── مالکیتِ عملیاتِ نویسنده روی یک ورودیِ صف (accept/decline/leave) ──
@@ -515,8 +752,9 @@ export async function declineOffer(entryId: string, _actor = 'customer', auth: {
   if (updated === 0) throw Err.validation('این آفر دیگر قابل رد نیست'); // رقیب زودتر تغییرش داد
   await redis.del(`waitlist:${e.restaurantId}`).catch(() => {});
 
-  // آفر به نفر بعدی
-  await promoteNext(e.restaurantId).catch(() => {});
+  // آفر به نفر بعدی — شکستش نباید این پاسخ را بشکند (decline قبلاً commit شده)
+  // ولی دیگر بی‌صدا هم نیست. رجوع کن به `tryPromoteNext`.
+  await tryPromoteNext(e.restaurantId, 'decline');
   return { status: 'declined' };
 }
 
@@ -559,18 +797,53 @@ export async function leaveWaitlist(
   });
   if (updated === 0) throw Err.validation('این ورودی دیگر قابل لغو نیست');
   await redis.del(`waitlist:${e.restaurantId}`).catch(() => {});
-  if (e.status === 'offered') await promoteNext(e.restaurantId).catch(() => {});
+  if (e.status === 'offered') await tryPromoteNext(e.restaurantId, 'cancel');
   return { status: 'cancelled' };
 }
 
 // ═══════════════════════════════════════════════════════════
 //  انقضای آفرهای بی‌پاسخ (cron) — تایمر انقضا
 // ═══════════════════════════════════════════════════════════
-export async function expireOffers(): Promise<number> {
+/**
+ * نتیجه‌ی یک اجرایِ انقضا. **عمداً یک عدد نیست.**
+ *
+ * ⚠️ چرا امضا عوض شد (این گران‌ترین بخشِ این تغییر است و دلیلش باید بماند):
+ * `expireOffers` تنها مصرف‌کننده‌ی واقعی‌اش cron است، و تا امروز فقط
+ * `expired` را برمی‌گرداند. ارتقاهایی که داخلِ همین حلقه شکست می‌خوردند با
+ * `.catch(() => {})` بلعیده می‌شدند، تابع «عادی» برمی‌گشت، endpoint ۲xx
+ * می‌داد و `cron/run.sh:10` یک `✓ waitlist` چاپ می‌کرد. یعنی این نقطه — که
+ * خودش شبکه‌ی ایمنیِ دو نقطه‌ی دیگر است — **سیگنالِ مثبتِ موفقیت رویِ یک
+ * شکست** تولید می‌کرد. یک عددِ تنها نمی‌تواند این را حمل کند؛ پس امضا سه
+ * واقعیتِ متفاوت را جدا حمل می‌کند.
+ */
+export interface ExpirySweepResult {
+  /** چند آفرِ بی‌پاسخ واقعاً به `no_response` رفت. */
+  expired: number;
+  /** چند بار پس از آزادشدنِ میز، ارتقا **تلاش** شد. */
+  promotionAttempts: number;
+  /** از آن تلاش‌ها چند تا با خطا شکست خورد (نه «کسی نبود» — رجوع کن به `tryPromoteNext`). */
+  promotionFailures: number;
+  /**
+   * چند مهمان واقعاً از این مسیر ارتقا گرفتند.
+   *
+   * ⚠️ یافته‌ی جانبیِ ۲۰۲۶-۰۹-۰۵ (با تستِ زنده پیدا شد، نه با بازخوانی):
+   * فیلدِ `promoted`ِ پاسخِ endpointِ نگهداری **فقط** از حلقه‌ی sweep شمرده
+   * می‌شد. ارتقاهایی که همین‌جا — پس از منقضی‌شدنِ یک آفر و آزادشدنِ میزش —
+   * رخ می‌دادند هیچ‌وقت شمرده نمی‌شدند. یعنی cron می‌توانست چند مهمان را
+   * واقعاً ارتقا بدهد و در پاسخ `promoted: 0` گزارش کند. کم‌گزارشی است نه
+   * بیش‌گزارشی، ولی از همان خانواده‌ی «عددی که با واقعیت نمی‌خواند».
+   */
+  promotionsMade: number;
+}
+
+export async function expireOffers(): Promise<ExpirySweepResult> {
   const expired = await db.waitlistEntry.findMany({
     where: { status: 'offered', offerExpiresAt: { lt: new Date() } },
   });
   let n = 0;
+  let promotionAttempts = 0;
+  let promotionFailures = 0;
+  let promotionsMade = 0;
   for (const e of expired) {
     // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰، با اجرای زنده اثبات شد نه با حدس):
     // این‌جا `update` بی‌قیدوشرط رویِ id بود، در حالی که `declineOffer` و
@@ -606,11 +879,21 @@ export async function expireOffers(): Promise<number> {
     });
     if (applied === 0) continue;   // رقیب (مشتری یا اجرای موازیِ همین cron) زودتر تغییرش داد
     await notifyEntry(e.id, 'expired', {});
-    // میز آزاد شد → آفر به نفر بعدی
-    await promoteNext(e.restaurantId).catch(() => {});
+    // میز آزاد شد → آفر به نفر بعدی.
+    //
+    // ⚠️ اینجا throw نمی‌کنیم — نه از رویِ عادت، از رویِ یک تفاوتِ معنایی:
+    // انقضا برایِ **این** ورودی قبلاً commit شده و بقیه‌ی ورودی‌هایِ فهرست
+    // هنوز پردازش نشده‌اند. یک throw هم آن انقضایِ موفق را «شکست» گزارش
+    // می‌کرد و هم بقیه‌ی مهمان‌هایِ منقضی را بی‌پردازش رها می‌کرد. پس شکست
+    // *شمرده* می‌شود و در سطحِ endpoint گزارش می‌شود، جایی که تصویرِ کاملِ
+    // «چند تلاش، چند شکست» وجود دارد.
+    promotionAttempts++;
+    const attempt = await tryPromoteNext(e.restaurantId, 'expire');
+    if (!attempt.ok) promotionFailures++;
+    if (attempt.promoted) promotionsMade++;
     n++;
   }
-  return n;
+  return { expired: n, promotionAttempts, promotionFailures, promotionsMade };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -651,6 +934,42 @@ async function notifyEntry(entryId: string, kind: NotifyKind, data: Record<strin
   };
 
   const m = messages[kind];
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  ⚠️ سه `.catch(() => {})`ِ زیر — بررسیِ ۲۰۲۶-۰۹-۰۵، نتیجه: **می‌مانند**
+  //
+  //  فرضِ اولیه این بود که این‌ها بدتر از catchهایِ `promoteNext`اند («هیچ
+  //  cronی اعلان را دوباره نمی‌فرستد؛ مهمان ارتقا می‌گیرد و خبردار نمی‌شود»).
+  //  نیمه‌ی اولِ آن درست است، ولی «بی‌صدا» **غلط** است — و خودِ catch هم
+  //  اصلاً جایی نیست که خطا بلعیده شود:
+  //
+  //   • `queuePush`  (notify.ts:132-138) و `queueEmail` (:123-129) هر دو
+  //     خطایِ `enqueue` را داخلِ خودشان می‌گیرند و به ارسالِ مستقیم fallback
+  //     می‌کنند که آن هم `.catch(() => {})` دارد → **هرگز reject نمی‌شوند**.
+  //   • `enqueueSms` (sms.ts:179-201) برایِ هر قالبی جز `otp` همین شکل را
+  //     دارد: `enqueue` در try، و `sendDirectFallback` (:146-177) هر مسیرِ
+  //     خطایش را خودش می‌گیرد → **هرگز reject نمی‌شود**. این فایل هیچ‌وقت
+  //     قالبِ `otp` نمی‌فرستد (فقط waitlist_joined/waitlist_offer/booking_confirm).
+  //
+  //  یعنی هر سه catch امروز **غیرقابلِ‌دسترس** اند؛ حذفشان رفتار را عوض
+  //  نمی‌کند و نگه‌داشتنشان هم چیزی را پنهان نمی‌کند. طبقِ بندِ ۲۱ (حذفِ
+  //  شهودی ممنوع) می‌مانند: اگر روزی قراردادِ آن ترنسپورت‌ها عوض شود و شروع
+  //  به throw کنند، این سه خط مانعِ شکستنِ کلِ `notifyEntry` (و در نتیجه
+  //  `promoteNext`) به‌خاطرِ یک اعلان می‌شوند.
+  //
+  //  و شکستِ واقعی از قبل شمرده می‌شود، در لایه‌ی درست (خودِ ترنسپورت):
+  //    `rezervno_sms_failed_total{template,reason}`  · sms.ts:155/162/175
+  //    `rezervno_push_not_sent_total{reason}`        · notify.ts:29
+  //    `rezervno_email_failed_total{reason}`         · notify.ts:80/101/107
+  //  گذاشتنِ شمارنده‌ی دومی این‌جا همان عددها را دوبار می‌شمرد.
+  //
+  //  ⚠️ شکافِ واقعیِ باقی‌مانده اینجا نیست، در آلارم است: از این سه، فقط
+  //  `sms_failed` قاعده دارد (observability/alerts.yml، گروهِ
+  //  rezervno_notifications). `push_not_sent` و `email_failed` هیچ قاعده‌ای
+  //  ندارند — تأییدشده با `node tools/check-alert-metric-binding.mjs`. این
+  //  خارج از دامنه‌ی این تغییر است و به‌عنوانِ یافته گزارش شد، نه اینجا رفع.
+  // ═══════════════════════════════════════════════════════════════════
+
   // SMS
   if (e.notifySms && e.guestPhone && m.sms) {
     // ── رضایت (§۱۳/§۱۷) ────────────────────────────────────────────────

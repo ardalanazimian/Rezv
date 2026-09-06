@@ -117,3 +117,89 @@ Being explicit, as required:
 9. **Exact Shenasa investment amount** — only that a round happened (~2019, "10th year"), not disclosed size.
 10. **Only 3 real reviews total were verifiable** (2 named/dated complaints, 1 unnamed neutral comment) against a background aggregate of 3.7/5 over 578 Cafe Bazaar ratings. I deliberately did not invent additional reviews, star ratings, or quotes to fill out the "top 5 complaints / top 5 praises" template structure the task requested — that structure is under-filled here on purpose, not by oversight.
 11. **Discrepancy between Fidilio's own marketing rating claim ("4.9 stars") and the independently-observed Cafe Bazaar aggregate (3.7/5, 578 ratings)** is noted but not reconciled — I don't know if the 4.9 figure is stale, from a different store, or simply promotional copy not grounded in a real aggregate.
+
+---
+
+# ADDENDUM — 2026-09-05 (batch 3): first-hand fetch, and what it retires
+
+_Everything above was written when `WebFetch` was blocked for every domain (see item 1 of "What I did
+NOT verify"). **In this session `WebFetch` works.** The listing below was read directly from Cafe
+Bazaar by me on 2026-09-05, not through a search engine's summary. This addendum does not rewrite the
+profile above; it appends first-hand evidence and marks which of the eleven "NOT verified" items it
+retires._
+
+**Source (fetched directly, 2026-09-05):** [cafebazaar.ir/app/com.fidilio](https://cafebazaar.ir/app/com.fidilio)
+
+## Store facts, first-hand
+
+| Field | Value as printed |
+|---|---|
+| App name | **فیدیلیو \| سفارش غذا** ("Fidilio \| Food Ordering") |
+| Developer | فیدیلیو |
+| Rating | **۳.۷ از ۵** |
+| Ratings count | **۵۸۱ رأی** |
+| **Installs** | **۱۱۰,۰۰۰** ← retires item 6 ("could not read install count") |
+| Category | آشپزی و رستوران |
+
+**The 3.7/578 figure in the profile above is confirmed and now first-hand at 3.7/581** — the count moved
++3 between batch 1 and today, which is what a live-but-slow listing looks like. **The 4.9-star marketing
+claim (item 11) is still unreconciled**, but the independent aggregate is now verified twice by two
+different methods, which strengthens the side of that discrepancy that matters.
+
+**Note the app's own name.** It is *«سفارش غذا»* — **food ordering**, not reservation. The Cafe Bazaar
+description (via `[search]`, the description block did not render on my fetch) presents Fidilio as
+ordering from restaurants, cafés, bakeries and juice bars with delivery, **operating in Tehran**. On the
+store shelf where Iranian diners actually choose apps, Fidilio presents as a delivery competitor to
+SnappFood, not as a table-reservation product.
+
+## Reviews — verbatim Persian, first-hand
+
+This retires item 1 (no direct page access) and materially improves item 10 (only 3 reviews, none
+verbatim-confirmed). Three reviews rendered, quoted exactly as printed, with Persian dates verbatim and
+**my own** Gregorian conversion:
+
+1. **علیرضا — ۱۴۰۴/۰۶/۲۲** (≈ **2025-09-13**)
+   > «برنامه بسیار ضعیفه پشتیبانی فاجعه س کد تایید هم 6 رقمی میفرستن ولی برنامه 4 رقمی میخواد»
+   *"The app is very weak, support is a disaster, and they send a 6-digit verification code but the app
+   asks for 4 digits."*
+
+2. **محمد — ۱۴۰۴/۰۷/۱۹** (≈ **2025-10-11**)
+   > «این دیگه چجورشه کد تایید شش رقمی برای وارد کردن 4 رقم!!»
+   *"What kind of thing is this — a six-digit verification code to enter into 4 digits!!"*
+
+3. **alireza — ۱۴۰۴/۰۷/۳۰** (≈ **2025-10-22**)
+   > «واقعا افتضاحه تازه که وارد برنامه میشی یه ارور 404میده بعد موقع پرداخت انلاین»
+   *"Truly awful — the moment you enter the app it gives a 404 error, then during online payment…"*
+   (review text ends mid-sentence as printed)
+
+## The finding worth escalating: a broken OTP path, reported twice, ~4 weeks apart, unfixed
+
+Two **different** reviewers, **28 days apart**, report the identical defect: **the SMS carries a 6-digit
+code and the app's input field accepts 4.** That is a total login failure for any user who does not guess
+the workaround, sitting on the very first screen of the funnel — the highest-leverage bug position that
+exists. It was still being reported a month after first appearing.
+
+**Why this is the most useful competitor finding in the Iranian set:**
+
+- It is **not** a taste or design complaint. It is a broken authentication contract between two systems
+  (the SMS sender and the client), which is exactly the class of defect that a fail-closed SMS discipline
+  and a real end-to-end OTP test are supposed to catch.
+- Rezervno's equivalent path is code-verified fail-closed at the *send* side: on ref
+  **`audit/launch-hardening` @ `35fff27`**, `api/src/lib/sms.ts:278-281` refuses to send and logs
+  `log.error('bodyIdِ الگو تنظیم نشده — پیامک ارسال نشد', …)` when a template `bodyId` is missing —
+  guessing is explicitly forbidden (`:280`, «حدس‌زدن ممنوع»).
+- **But that is not the same defect.** Fidilio's bug is a **length mismatch between the code sent and the
+  field that accepts it** — a client/server contract drift, not a refusal to send. I did **not** verify
+  that Rezervno has a test pinning OTP code length end-to-end across `lib/sms.ts` and the customer app's
+  input field. **That is a concrete, cheap thing for `test-integrity` to check**, and the reason to check
+  it is that a real competitor shipped this exact bug to 110,000 installs and left it live for at least a
+  month.
+
+## What this addendum does NOT retire
+
+Items **2** (commission %), **3** (Fidilio Club cost / consumer reservation fee), **4** (iOS), **5**
+(Myket listing), **7** (restaurant-owner complaints), **8** (notifications, referral, first-session
+speed) and **9** (investment size) all stand exactly as written. No app was installed and no account was
+created. Only the three reviews Cafe Bazaar itself renders on the listing page were readable — I did not
+reach a paginated full review corpus, so "top 5 complaints / top 5 praises" remains deliberately
+under-filled rather than padded.

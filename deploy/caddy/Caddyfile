@@ -38,7 +38,16 @@
 		X-XSS-Protection "1; mode=block"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "geolocation=(self), microphone=(), camera=()"
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+		# ⚠️ هیچ میزبانِ فونتِ ثالثی اینجا مجاز نیست (۲۰۲۶-۰۹-۰۴).
+		# تا پیش از این style-src و font-src به fonts.googleapis.com و fonts.gstatic.com
+		# اجازه می‌دادند — در حالی که فونت همه‌جا self-host است و هیچ کدی آن‌ها را
+		# صدا نمی‌زند. مجوزِ بلااستفاده بی‌ضرر نیست: اگر روزی یک <link> برگردد، در
+		# ایران مرورگر تا timeout منتظر می‌ماند و چون stylesheet رندررا مسدود
+		# می‌کند، کاربر چند ثانیه صفحه‌ی سفید می‌بیند. با حذفِ اجازه، CSP
+		# همان درخواست را فوری می‌بندد: شکستِ سریع به‌جای معلقِ کند.
+		# `data:` در font-src لازم است — بسته‌ی standalone فونت را base64 جاسازی می‌کند.
+		# گارد: tools/check-fonts.py بندِ ۵.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
 		-Server
 	}
 }

@@ -1,0 +1,287 @@
+{
+  "audit": "M0 - event substrate",
+  "date": "2026-09-04",
+  "branch": "audit/launch-hardening",
+  "scope": "api/src event-emitting mechanisms, reservation lifecycle coverage, platform_events schema safety, tenant safety of event writes, doc-vs-code drift",
+  "method": "source tracing (grep call sites, not just definitions), live schema inspection via psql against rezv-test-pg databases (rezervno_verify, rezervno_test2), live single-file test execution (npx tsx --test --test-force-exit), read-only. No api/src edits made. No full suite / build / migration run.",
+
+  "handoff_verification": {
+    "quoted_claim_source": "docs/audit/SESSION-HANDOFF.md:95-97",
+    "quoted_claim": "M0 event substrate - lib/events.ts emit() is a WEBHOOK dispatcher, not a log; of its 7 declared domain events exactly one is called; recordEvent() (the real platform_events writer) is called only from site-orders.ts. Zero reservation-lifecycle events are logged.",
+    "clauses": [
+      {
+        "clause": "emit() is a WEBHOOK dispatcher, not a log",
+        "verdict": "CONFIRMED",
+        "evidence": "api/src/lib/events.ts:35-67 - emit() queries db.webhook.findMany() for the restaurants active webhook subscriptions and enqueues one delivery job per hook (kind:webhook). It performs zero writes to any durable event-log table. Delivery itself happens later in api/src/lib/worker.ts:41 -> deliverWebhook() (api/src/lib/events.ts:122-159), which does an HTTP POST, not a DB insert.",
+        "verified_by": "file read plus grep for db.* calls inside emit()"
+      },
+      {
+        "clause": "of its 7 declared domain events exactly one is called",
+        "verdict": "REVISED",
+        "evidence": "api/src/lib/events.ts:20-23 declares the DomainEvent union with 8 members, not 7: reservation.created, reservation.cancelled, reservation.completed, reservation.no_show, waitlist.joined, waitlist.seated, customer.vip_reached, coupon.redeemed. Grep for emit( across api/src found exactly one call site: api/src/lib/reservations.ts:420 (event: reservation.created). So the 1-of-N-called part is correct; N=8, not 7.",
+        "verified_by": "Grep pattern for emit( across api/src; manual count of the union members"
+      },
+      {
+        "clause": "recordEvent() (the real platform_events writer) is called only from site-orders.ts",
+        "verdict": "REVISED",
+        "evidence": "True for the literal recordEvent() function: 4 call sites, all in api/src/lib/site-orders.ts (lines 206, 485, 597, 641), none related to reservations (they log site.order.created / site.trial.created / site.order.activated / site.order.rejected - the marketing/subscription funnel on the public landing site). But platform_events has a second writer, recordEventsDetailed(), defined in api/src/lib/platform-events.ts:134-146 and called from api/src/app/api/v1/telemetry/route.ts:276 - this is the actual client-facing, higher-traffic ingestion path used by customer/business/company analytics.js. The handoff names only recordEvent() and thereby omits the telemetry path entirely from the writer inventory.",
+        "verified_by": "Grep for recordEvent(, recordEvents( and recordEventsDetailed( across api/src; read of telemetry/route.ts"
+      },
+      {
+        "clause": "Zero reservation-lifecycle events are logged",
+        "verdict": "REFUTED",
+        "evidence": "True only if event is read narrowly as a row in platform_events. False in the load-bearing sense: every reservation status transition (hold expiry, confirmation, check-in/arrival, seating, no-show, completion, cancellation, QR check-in) is durably logged, append-only, with actor/reason/timestamp, in the reservation_events table via the single writer transitionReservation() at api/src/lib/lifecycle.ts:79-136 (tx.reservationEvent.create at lifecycle.ts:125). This table is not decorative: it is the real point-in-time feature source consumed by the working no-show ML model (api/src/lib/no-show-model.ts:432-509 and :776-806, both using a settled_at sub-query against reservation_events), by api/src/lib/fraud.ts:127-132, and by api/src/lib/waitlist.ts:79-84 (dining-duration estimation). A fresh session reading this sentence would reasonably conclude there is no reservation-lifecycle log at all; there is one, it is well engineered, and it is the actual substrate the one working ML model depends on.",
+        "verified_by": "grep for transitionReservation( call sites (9 call sites across reservations.ts, lifecycle.ts crons, reservation-lifecycle-ops.ts, tables.ts, cancel/route.ts, restaurant/reservations/[code]/status/route.ts); grep for reservationEvent.create (exactly 1 call site, lifecycle.ts:125); grep for reservation_events consumers in no-show-model.ts, fraud.ts and waitlist.ts; live schema check against rezv-test-pg/rezervno_verify; live test execution: tests/temporal-leakage.integration.test.mts (3/3 pass, exit 0) and tests/feature-parity.integration.test.mts (4/4 pass, exit 0) against rezervno_test2, both exercising the reservation_events-backed history query"
+      }
+    ],
+    "overall_assessment": "The handoffs individual factual atoms (webhook-only emit, 1-of-N called, recordEvent-only-in-site-orders) are each roughly right but the count is off by one and the writer inventory is incomplete. The real defect is the closing sentences framing: it collapses platform_events has no reservation rows (true) into reservation lifecycle is not logged (false), which erases the existence and importance of reservation_events. A fresher, more accurate, already-written analysis of this exact area exists at docs/ml/P0-audit.md (uncommitted, dated 2026-09-02) and independently reaches the same corrected conclusions this audit reaches (it even states the correct count of 8, not 7). That file never propagated into SESSION-HANDOFF.md's summary."
+  },
+  "findings": [
+    {
+      "id": "M0-001",
+      "severity": "major",
+      "area": "documentation / session-handoff accuracy",
+      "claim": "SESSION-HANDOFF.md:95-97 states Zero reservation-lifecycle events are logged, which will be read by every fresh session (it is the paste-ready onboarding prompt's referenced map) as there is no reservation lifecycle log, when in fact reservation_events (migration api/prisma/sql/004-lifecycle-events.sql) is a complete, append-only, point-in-time-safe log of every status transition, and is the actual feature source for the one working ML model in the codebase.",
+      "evidence": "docs/audit/SESSION-HANDOFF.md:95-97; api/src/lib/lifecycle.ts:79-136; api/src/lib/no-show-model.ts:432-509,776-806; api/src/lib/fraud.ts:127-132; api/src/lib/waitlist.ts:79-84; api/prisma/sql/004-lifecycle-events.sql",
+      "verified_by": "source trace of every transitionReservation() call site plus live schema check plus live test execution (temporal-leakage, feature-parity, both exit 0)"
+    },
+        {
+      "id": "M0-002",
+      "severity": "minor",
+      "area": "event inventory accuracy",
+      "claim": "DomainEvent in events.ts declares 8 event types, not 7 as the handoff states.",
+      "evidence": "api/src/lib/events.ts:20-23",
+      "verified_by": "manual enumeration of the union type"
+    },
+    {
+      "id": "M0-003",
+      "severity": "minor",
+      "area": "event inventory completeness",
+      "claim": "platform_events has two writer functions, not one: recordEvent() (site-orders.ts only, 4 call sites) and recordEventsDetailed() (telemetry route, the client-facing path). The handoff names only the former.",
+      "evidence": "api/src/lib/platform-events.ts:104-146; api/src/lib/site-orders.ts:206,485,597,641; api/src/app/api/v1/telemetry/route.ts:276",
+      "verified_by": "grep for all call sites of recordEvent/recordEvents/recordEventsDetailed across api/src"
+    },
+{
+      "id": "M0-004",
+      "severity": "major",
+      "area": "intelligence data foundation - dead pipe",
+      "claim": "platform_events is schema-complete and well engineered (append-only, occurredAt vs ingestedAt separation, trust levels, per-trust-level retention) but is functionally a dead end today: (a) zero reservation-domain events are ever written to it; (b) of the 12 allowlisted type prefixes in the telemetry route, client code across apps/customer, apps/business, apps/company and shared/ only ever emits 2 constant type strings, app.opened and page.viewed, confirmed by grep with zero dynamic or templated type construction found anywhere; (c) no model, recommender, or feature builder in api/src reads platform_events at all - the only reader is an admin health-check aggregate added 2026-08-26 (api/src/app/api/v1/admin/telemetry/route.ts) whose own header comment states that before that date platform_events had zero readers in the entire codebase.",
+      "evidence": "api/src/app/api/v1/telemetry/route.ts:119-141 (allowlist); apps/customer/js/analytics.js:88, apps/customer/js/data/discover.js:16, apps/business/js/analytics.js:82, apps/business/js/routing.js:71, apps/company/js/analytics.js:82, apps/company/js/data.js:31, shared/js/analytics.panel.js:82 (the only 2 event type strings ever sent - app.opened, page.viewed); api/src/app/api/v1/admin/telemetry/route.ts:11-15 (comment documenting the zero-reader history); grep for db.platformEvent.findMany/groupBy/aggregate across api/src returned only this one file",
+      "verified_by": "grep across apps js and shared js for track( and rzTrack( call sites; grep across api/src for platformEvent read methods"
+    },
+    {
+      "id": "M0-005",
+      "severity": "minor",
+      "area": "declared-but-dead event names, second instance",
+      "claim": "Beyond the 7 dead DomainEvent members, audit.ts independently declares reservation.cancel as an AuditAction with zero call sites anywhere in api/src, and declares coupon.redeem which is spelled differently from events.ts's coupon.redeemed for what is nominally the same business event - the two vocabularies are not just partially unused, they are not even mutually consistent.",
+      "evidence": "api/src/lib/audit.ts:35 (reservation.cancel, coupon.redeem); api/src/lib/events.ts:23 (coupon.redeemed)",
+      "verified_by": "grep for the strings reservation.cancel and coupon.redeem across api/src - only the type declarations themselves matched, no call sites"
+    },
+    {
+      "id": "M0-006",
+      "severity": "minor",
+      "area": "reservation_events completeness",
+      "claim": "Reservation creation itself is never written to reservation_events, only post-creation status transitions are (transitionReservation() requires an existing row and a from-not-equal-to change). The Prisma schema comment describing fromStatus as null for the first event describes an intent the code never fulfills. Currently harmless because reservations.createdAt on the main row already carries the creation timestamp, and the no-show model's history sub-query falls back safely (undercounts, never overcounts) when no matching event exists, but reservation_events alone cannot answer when or by whom a reservation was created, only how it changed afterward.",
+      "evidence": "api/prisma/schema.prisma:588 (comment) versus api/src/lib/reservations.ts:502 (tx.reservation.create, no reservationEvent write) versus api/src/lib/lifecycle.ts:125 (the only reservationEvent.create call site, always has a non-null from-status because it requires an existing row)",
+      "verified_by": "grep for reservationEvent.create (1 call site) plus read of insertReservation()"
+    },
+    {
+      "id": "M0-007",
+      "severity": "major",
+      "area": "tenant safety of event writes",
+      "claim": "POST /api/v1/telemetry accepts restaurantId from the client-supplied request body per event, not from auth context, and validates only that the id refers to some existing restaurant, not that the caller has any relationship to it. Any client, anonymous or authenticated, can tag a telemetry event, and thereby its derived tenantId, to any real restaurant. This differs from the reservation-creation path (restaurant_id from body, but staff callers are checked against their own branch, and the value is the actual booking target) and the site-orders path (tenantId is always server-generated, never client-supplied). Practical impact today is near zero because platform_events has no ML or feature consumer (see M0-004) and clients only ever send app.opened/page.viewed with no restaurant-scoped payload data, but the design pattern is exactly the body-sourced-tenant-id anti-pattern CLAUDE.md prohibits for restaurant-scoped writes, and it will become a real data-poisoning vector for the intelligence layer the day platform_events gains a real consumer.",
+      "evidence": "api/src/app/api/v1/telemetry/route.ts:188-192 (restaurant lookup keyed only on client-supplied ids, no ownership check), :251-252 (restaurantId/tenantId attached from that lookup)",
+      "verified_by": "read of telemetry/route.ts POST_impl end to end; not classified as blocker because no read or mutation of another tenant's private data occurs and there is currently no downstream consumer to poison; see decision package in the markdown report for the recommended fix before platform_events gains a consumer"
+    },
+    {
+      "id": "M0-008",
+      "severity": "minor",
+      "area": "code comment accuracy, migration numbers",
+      "claim": "schema.prisma:1638 and :1640, and api/src/lib/platform-events.ts:165, cite migration 046 and migration 047 for the trust_level index and the retention index on platform_events. The actual migrations are 059b-telemetry-trust-boundary.sql (trust_level_idx) and 060-platform-events-retention.sql (trust_ingested_idx); 046 and 047 are unrelated migrations (customer-insight-spend-nullable, menu-item-category). No functional impact, but misleads anyone tracing why an index exists.",
+      "evidence": "api/prisma/schema.prisma:1638-1641; api/src/lib/platform-events.ts:165; api/prisma/sql/059b-telemetry-trust-boundary.sql:68; api/prisma/sql/060-platform-events-retention.sql:21-26; api/prisma/sql/046-customer-insight-spend-nullable.sql and 047-menu-item-category.sql both grepped and contain no platform_events or trust_level references",
+      "verified_by": "grep for platform_events_trust_level_idx and platform_events_trust_ingested_idx across api/prisma/sql"
+    },
+    {
+      "id": "M0-009",
+      "severity": "major",
+      "area": "lifecycle coverage, waitlist",
+      "claim": "The waitlist lifecycle (joined, offered, accepted, declined, expired or no_response, cancelled, seated) has no append-only event log at all, unlike the reservation lifecycle. WaitlistEntry rows are mutated in place; once an entry cycles through states, only the latest occurrence of offeredAt, respondedAt and seatedAt survives - prior states and their timestamps are overwritten, not preserved. This is a genuine, durable hole in the data foundation for anything modeling waitlist behavior such as offer-decline rate, time-to-seat, or repeat-offer patterns.",
+      "evidence": "api/src/lib/waitlist.ts:201 (create), :340,433,478,485,506,551,598 (in-place update or updateMany calls, no companion history-table writes); DomainEvent's waitlist.joined and waitlist.seated (events.ts:22) are declared but never called, consistent with M0-002/M0-003",
+      "verified_by": "grep for waitlistEntry.update/updateMany/create across waitlist.ts; grep for a WaitlistEvent model in schema.prisma - none exists"
+    }
+  ],
+  "lifecycle_coverage": [
+    {
+      "transition": "creation (pending/confirmed, including holds)",
+      "durable_event_written": false,
+      "file_line": "api/src/lib/reservations.ts:502 (tx.reservation.create - direct insert, not via transitionReservation)",
+      "table": "reservations (createdAt column only; no reservation_events row)",
+      "webhook_emit": "yes - reservation.created, api/src/lib/reservations.ts:420 (unconditional, fires for holds too)",
+      "platform_events_write": false,
+      "payload_fields": "webhook payload only: code, party_size, slot_start, status",
+      "notes": "see M0-006"
+    },
+    {
+      "transition": "hold expiry to expired",
+      "durable_event_written": true,
+      "file_line": "api/src/lib/reservation-lifecycle-ops.ts:47 -> api/src/lib/lifecycle.ts:125",
+      "table": "reservation_events",
+      "webhook_emit": "no - expired is not even a member of DomainEvent",
+      "platform_events_write": false,
+      "payload_fields": "fromStatus, toStatus=expired, actor=cron, isAutomatic=true, createdAt"
+    },
+    {
+      "transition": "staff confirmation (pending to confirmed)",
+      "durable_event_written": true,
+      "file_line": "api/src/app/api/v1/restaurant/reservations/[code]/status/route.ts:41 -> lifecycle.ts:125",
+      "table": "reservation_events",
+      "webhook_emit": "no - reservation.confirmed is not a member of DomainEvent",
+      "platform_events_write": false,
+      "payload_fields": "fromStatus, toStatus=confirmed, actor=staff:{id}, reason optional, createdAt"
+    },
+    {
+      "transition": "arrival / check-in (to checked_in)",
+      "durable_event_written": true,
+      "file_line": "api/src/lib/tables.ts:247; api/src/lib/reservations.ts:876 (markArrival) -> lifecycle.ts:125; also restaurant status route",
+      "table": "reservation_events",
+      "webhook_emit": "no",
+      "platform_events_write": false,
+      "payload_fields": "fromStatus, toStatus=checked_in, actor, isAutomatic, createdAt",
+      "notes": "side effects on this transition: club points (lifecycle.ts:174-186), welcome SMS (reservations.ts:915)"
+    },
+    {
+      "transition": "seating (checked_in to seated), including QR check-in path",
+      "durable_event_written": true,
+      "file_line": "api/src/lib/tables.ts:250 -> lifecycle.ts:125",
+      "table": "reservation_events",
+      "webhook_emit": "no",
+      "platform_events_write": false,
+      "payload_fields": "fromStatus, toStatus=seated, actor=system, isAutomatic=true, createdAt"
+    },
+    {
+      "transition": "no-show (running_late to no_show, cron)",
+      "durable_event_written": true,
+      "file_line": "api/src/lib/lifecycle.ts:365 (autoMarkNoShow) -> lifecycle.ts:125; also writes ML outcome ledger at lifecycle.ts:224 (recordOutcome)",
+      "table": "reservation_events plus model_outcomes (prediction ledger)",
+      "webhook_emit": "no - reservation.no_show declared in DomainEvent but 0 call sites",
+      "platform_events_write": false,
+      "payload_fields": "reservation_events: fromStatus=running_late, toStatus=no_show, actor=cron, isAutomatic=true; model_outcomes: entityType=reservation, observedValue=1, source=reservation_status"
+    },
+    {
+      "transition": "completion (seated/dining to completed, cron)",
+      "durable_event_written": true,
+      "file_line": "api/src/lib/lifecycle.ts:385 (autoComplete) -> lifecycle.ts:125; ML outcome at lifecycle.ts:224",
+      "table": "reservation_events plus model_outcomes",
+      "webhook_emit": "no - reservation.completed declared, 0 call sites",
+      "platform_events_write": false,
+      "payload_fields": "reservation_events: toStatus=completed, actor=cron, isAutomatic=true; model_outcomes: observedValue=0"
+    },
+    {
+      "transition": "cancellation (customer or staff)",
+      "durable_event_written": true,
+      "file_line": "api/src/app/api/v1/reservations/[code]/cancel/route.ts:74 -> lifecycle.ts:125",
+      "table": "reservation_events",
+      "webhook_emit": "no - reservation.cancelled declared, 0 call sites",
+      "platform_events_write": false,
+      "payload_fields": "fromStatus, toStatus=cancelled, actor, reason optional, createdAt",
+      "notes": "audit.ts's reservation.cancel AuditAction is also declared and also never called (M0-005), so this transition has neither a webhook, a platform_event, nor an audit_logs row; only reservation_events."
+    },
+    {
+      "transition": "waitlist joined",
+      "durable_event_written": false,
+      "file_line": "api/src/lib/waitlist.ts:201 (mutable row create, no history table)",
+      "table": "waitlist_entries (mutable, no companion append-only log)",
+      "webhook_emit": "no - waitlist.joined declared, 0 call sites",
+      "platform_events_write": false,
+      "payload_fields": "n/a",
+      "notes": "see M0-009"
+    },
+    {
+      "transition": "waitlist offered, accepted, declined, expired-no_response, cancelled",
+      "durable_event_written": false,
+      "file_line": "api/src/lib/waitlist.ts:340,433,478,485,506,551,598 (in-place update or updateMany)",
+      "table": "waitlist_entries (overwritten in place)",
+      "webhook_emit": "no - waitlist.seated declared, 0 call sites; no DomainEvent member exists for offered/declined/expired at all",
+      "platform_events_write": false,
+      "payload_fields": "n/a",
+      "notes": "see M0-009"
+    },
+    {
+      "transition": "coupon redemption",
+      "durable_event_written": "not verified",
+      "file_line": "n/a - audit(coupon.redeem) call sites not exhaustively traced in this audit (out of primary scope)",
+      "table": "unknown",
+      "webhook_emit": "no - coupon.redeemed declared, 0 call sites",
+      "platform_events_write": false,
+      "payload_fields": "n/a"
+    },
+    {
+      "transition": "customer VIP reached",
+      "durable_event_written": "not verified (refreshVipFlags in customer-insights.ts sets a flag column; not traced for a companion history row)",
+      "file_line": "n/a",
+      "table": "unknown",
+      "webhook_emit": "no - customer.vip_reached declared, 0 call sites",
+      "platform_events_write": false,
+      "payload_fields": "n/a"
+    }
+  ],
+  "schema_safety": {
+    "platform_events": {
+      "append_only_in_code": true,
+      "evidence": "grep for db.platformEvent.update/delete/upsert across api/src: zero matches. Only .create (platform-events.ts:106) and .createMany (platform-events.ts:140) exist, both insert-only with skipDuplicates. prunePlatformEvents() (platform-events.ts:201-223) does DELETE rows past retention, a documented, deliberate exception for retention, not mutation, gated by trust_level plus ingested_at.",
+      "event_time_vs_ingest_time": true,
+      "evidence_2": "schema.prisma:1611 occurredAt (event time, client-influenced, clamped to a bounded window by clampOccurredAt in platform-events.ts:70-77) versus :1612 ingestedAt and :1633 serverReceivedAt (both server-authoritative, default now())",
+      "monotonic_ordering_key": "partial - id is a random uuid, not sortable, but occurredAt, ingestedAt and serverReceivedAt give usable temporal ordering; no bigserial sequence column exists",
+      "live_schema_matches_prisma": true,
+      "live_schema_evidence": "psql against rezervno_verify (the meta-command that lists a table's columns and indexes) matches schema.prisma:1608-1643 column for column and index for index; no drift found for this table"
+    },
+    "reservation_events": {
+      "append_only_in_code": true,
+      "evidence": "grep for tx.reservationEvent.create/update/delete/upsert across api/src: exactly one call site total (lifecycle.ts:125), it is a create, and transitionReservation() is documented and grep-verified as the only function that writes reservation status at all",
+      "event_time_vs_ingest_time": "n/a - createdAt is set server-side at the exact moment of the real transition, inside the same DB transaction as the status change, so there is no client-supplied event time to diverge from ingest time here",
+      "cascade_delete_risk": "reservation_events has ON DELETE CASCADE from reservations(id). No db.reservation.delete or deleteMany call site exists anywhere in api/src (grep confirmed), so this is currently inert, but it means a future GDPR/right-to-erasure feature that hard-deletes a reservation would silently destroy its lifecycle history too - worth a note for whoever builds that feature.",
+      "live_schema_matches_prisma": true,
+      "live_schema_evidence": "psql against rezervno_verify matches schema.prisma:584-596 column for column and index for index; no drift found for this table"
+    }
+  },
+  "live_db_context": {
+    "dev_db_rezervno_at_time_of_audit": "near-empty: 1 reservation, 0 platform_events rows, 0 reservation_events rows (checked via docker exec against rezervno-postgres). This is NOT evidence about code correctness, already established from source plus isolated live tests; it only means the local dev DB has almost no real traffic. Matches docs/ml/P0-audit.md's independent 2026-09-02 finding of an empty working DB.",
+    "test_dbs_available": "rezv-test-pg container hosts postgres, rezervno_a11, rezervno_boot2, rezervno_hunt1, rezervno_test, rezervno_test2, rezervno_verify, all 72-table and migrated. This audit used rezervno_verify for schema inspection (read-only) and rezervno_test2 for the two live single-file test runs (writes and deletes test fixtures only, not shared with other in-flight audits)."
+  },
+  "live_tests_executed": [
+    {
+      "command": "DATABASE_URL=postgresql://test:test@localhost:55432/rezervno_test2 REDIS_URL=redis://localhost:56379 npx tsx --test --test-force-exit tests/temporal-leakage.integration.test.mts",
+      "result": "tests 3, pass 3, fail 0",
+      "exit_code": 0,
+      "purpose": "live-verifies the no-show training query's point-in-time guard (h.slot_start earlier than r.created_at) against a real Postgres instance, including a mandatory positive control, not just an always-passes-when-empty check"
+    },
+    {
+      "command": "DATABASE_URL=postgresql://test:test@localhost:55432/rezervno_test2 REDIS_URL=redis://localhost:56379 npx tsx --test --test-force-exit tests/feature-parity.integration.test.mts",
+      "result": "tests 4, pass 4, fail 0",
+      "exit_code": 0,
+      "purpose": "live-verifies train/serve parity for the reservation_events-backed prior-history feature, including a cross-tenant negative control"
+    }
+  ],
+  "not_verified": [
+    {
+      "item": "Whether audit(coupon.redeem) is ever actually called from a real coupon-redemption code path, as opposed to being another dead AuditAction member like reservation.cancel.",
+      "why_not_established": "out of primary M0 scope, since coupon redemption is not a reservation-lifecycle transition; would require tracing lib/coupons.ts and its callers, which this audit did not do exhaustively.",
+      "what_would_establish_it": "grep for audit with action coupon.redeem across api/src and trace the call site's caller chain to a real route"
+    },
+    {
+      "item": "Whether customer.vip_reached has any companion durable record, such as a flag-change history, despite having zero webhook emit call sites.",
+      "why_not_established": "out of primary M0 scope; refreshVipFlags in customer-insights.ts was not traced in this audit.",
+      "what_would_establish_it": "read customer-insights.ts's refreshVipFlags function and grep for any history-table write alongside the flag update"
+    },
+    {
+      "item": "Production platform_events and reservation_events volumes, and any real-world data-poisoning via the telemetry restaurantId gap (M0-007).",
+      "why_not_established": "no production database is reachable from this machine, consistent with prior audit rounds' documented finding; the local dev DB is near-empty and not representative.",
+      "what_would_establish_it": "a query against the actual production Postgres instance, which is out of reach for this audit environment"
+    },
+    {
+      "item": "Whether deliverWebhook() failures, SSRF-blocked or non-2xx, are counted or alerted anywhere beyond the worker's generic dead-letter path.",
+      "why_not_established": "worker.ts's job-failure and dead-letter-queue metrics were not traced end-to-end in this audit; tangential to the event-substrate mandate.",
+      "what_would_establish_it": "read worker.ts's per-kind error handling and the metrics it increments on job failure versus dead-letter"
+    }
+  ]
+}

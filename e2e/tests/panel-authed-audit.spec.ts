@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { mockAdminOtpFlag } from './helpers/mock-api';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ممیزیِ پنل در حالتِ **واردشده** (§۷ و §۱۷)
@@ -40,6 +41,7 @@ async function mockStaffAuth(page: Page) {
 
 async function loginDemo(page: Page, p: typeof PANELS[number]) {
   await mockStaffAuth(page);
+  await mockAdminOtpFlag(page);
   await page.goto(p.url);
   // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرض «نام کاربری و رمز» است؛ به فرمِ پیامکی سوییچ کن.
   { const _t = page.locator('button:has-text("ورود با پیامک")'); if (await _t.isVisible().catch(() => false)) await _t.click(); }

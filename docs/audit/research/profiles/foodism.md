@@ -337,3 +337,24 @@ opened and read directly myself.
 12. **Notification behavior, redemption mechanics, and actual first-session UX speed** — no
     evidence found either way; would require hands-on app testing, outside what this session's
     tooling allowed.
+
+---
+
+# ADDENDUM — 2026-09-05 (batch 3): status change — DEGRADED, likely abandoned
+
+_First-hand fetch, 2026-09-05 (`WebFetch` was blocked when this profile was written). Full write-up in
+`profiles/iran-reservation-longtail.md` §"Two corrections to prior batches"; summary here so this file
+is not left asserting a live product._
+
+- **`cafebazaar.ir/app/app.foodism.tech` now returns HTTP 404** — three attempts, two URL forms. This
+  file's footnote-55 claim that the Cafe Bazaar listing is "confirmed live" is **superseded**. It is not
+  a site-wide outage: `cafebazaar.ir/app/com.fidilio` fetched normally in the same minute.
+- **`myket.ir/app/app.foodism.tech` is live**: 4.3/5 from **226** reviews (batch 2 recorded 4/5 over 216
+  — both moved slightly upward, so the listing is not frozen), **25,000 installs**, last updated
+  **۱۴۰۱/۰۹/۱۰** (my conversion: **2022-12-01**) — a binary that has not shipped in ~3¾ years.
+- **First verbatim Foodism user review ever obtained in this programme** — batch 2 found none anywhere.
+  **معصومه, ۳ خرداد ۱۴۰۵** (my conversion: **2026-05-24**): **«کار نمیکنه»** — *"it doesn't work."*
+
+**Status: DEGRADED — likely abandoned, NOT confirmed dead.** I did not install the app. One review is
+one review. But a 2022 binary, a 404'd primary-store listing and a 2026 "it doesn't work" together mean
+Foodism should not be modelled as a live competitor in any Rezervno planning.

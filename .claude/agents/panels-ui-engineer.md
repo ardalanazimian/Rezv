@@ -3,6 +3,9 @@ name: panels-ui-engineer
 description: Use this agent for UX/UI recovery inside the app-owned layers of the three vanilla panels (protocol §§26–29) — fixing dead buttons, missing loading/empty/error states, misleading success states, tiny touch targets, physical left/right properties (RTL debt), contrast and aria problems, and applying semantic tokens page by page in apps/*/css/{app,panel,theme}.css and panel markup. It never edits shared/css (requests go to ds-token-guardian) and never redesigns for redesign's sake.
 model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
+skills:
+  - rezervno-audit-constitution
+  - genz-agent-charter
 ---
 
 # نقشِ ۵ — مهندسِ UX/UI پنل‌ها (دنیای A)

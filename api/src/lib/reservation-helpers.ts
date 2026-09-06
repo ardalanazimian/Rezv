@@ -6,13 +6,20 @@
 //   • genReservationCode — کد رزروِ امن و غیرقابل‌حدس
 //   • isConflictError    — تشخیصِ خطای تداخل/exclusion دیتابیس (conflicts)
 //   • isSerializationError — تشخیصِ خطای serialization/deadlock
+//   • withSerializationRetry — سیاستِ *واحدِ* تلاشِ مجدد رویِ آن خطاها
 //
-//  این‌ها توابعِ خالص‌اند (بدونِ side-effect، بدونِ DB) — قابلِ تستِ واحدِ ساده.
+//  چهار موردِ اول توابعِ خالص‌اند (بدونِ side-effect، بدونِ DB) — قابلِ تستِ
+//  واحدِ ساده. `withSerializationRetry` عمداً استثناست و دو side-effect دارد
+//  (یک تایمرِ backoff و یک شمارنده‌ی متریک)؛ این‌جا زندگی می‌کند چون سیاستِ
+//  retry و تشخیصِ خطایی که آن را فعال می‌کند باید یک‌جا بمانند، وگرنه دقیقاً
+//  همان drift رخ می‌دهد که این فایل برایِ جلوگیری از آن ساخته شد.
 // ═══════════════════════════════════════════════════════════
 import { Prisma } from '@prisma/client';
 import { zonedTimeToUtc } from './hours';
+import { blockTailMinutes } from './table-occupancy';
 import { randomBytes } from 'crypto';
 import { Err } from './errors';
+import { metrics } from './metrics';
 
 export interface TimingConfig {
   slotMinutes: number;
@@ -27,8 +34,11 @@ export function computeRanges(date: string, time: string, cfg: TimingConfig, dur
   if (isNaN(+start)) throw Err.validation('تاریخ یا ساعت نامعتبر است');
   const duration = durationOverride ?? cfg.slotMinutes;
   const end = new Date(+start + duration * 60_000);
-  // بازه‌ی بلاک = مدت رزرو + زمان نظافت + بافر ایمنی
-  const blockBufferMin = cfg.cleaningMinutes + cfg.bufferMinutes;
+  // بازه‌ی بلاک = مدت رزرو + زمان نظافت + بافر ایمنی.
+  // ⚠️ از ۲۰۲۶-۰۹-۰۵ این جمع **اینجا نوشته نمی‌شود**: تعریفِ واحد در
+  // `table-occupancy.blockTailMinutes` است و چهار مصرف‌کننده از همان می‌خوانند.
+  // پیش از آن، تنها گره‌ی بینشان یک کامنت بود و افقِ صف واقعاً واگرا شده بود.
+  const blockBufferMin = blockTailMinutes(cfg);
   const blockEnd = new Date(+end + blockBufferMin * 60_000);
   return { start, end, blockEnd, duration, blockBufferMin };
 }
@@ -86,4 +96,69 @@ export function isSerializationError(e: unknown): boolean {
   if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2034') return true;
   const unknownCode = pgCodeFromUnknownRequestError(e);
   return unknownCode === '40001' || unknownCode === '40P01';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  سیاستِ واحدِ تلاشِ مجدد رویِ تداخلِ serialization
+//
+//  چرا این‌جا و نه یک حلقه‌ی دومِ کپی‌شده در هر نویسنده:
+//  زیرِ isolationِ Serializable، ابطالِ یک تراکنش با ۴۰۰۰۱/۴۰P۰۱ رفتارِ
+//  **عادی و موردِ انتظارِ** Postgres است، نه یک خطایِ استثنایی — SSI عمداً
+//  یکی از دو طرفِ چرخه‌ی rw-antidependency را می‌کُشد. یعنی هر مسیری که
+//  isolation را بالا می‌برد، *در همان تغییر* باید retry هم داشته باشد؛
+//  وگرنه چیزی که پیش‌تر بی‌صدا خراب می‌شد، حالا بی‌دلیل به کاربر خطا می‌دهد.
+//
+//  ⚠️ چرا کپی‌کردنِ حلقه ممنوع است (درسِ همین مخزن): محافظِ اشغالِ میز در
+//  ۲۰۲۶-۰۹-۰۴ به createWalkin و promoteNext اضافه شد، ولی چون هر مسیر
+//  سیاستِ همزمانیِ *خودش* را داشت، فقط createReservation در سطحی اجرا
+//  می‌شد که خواندنش برایِ SSI قابلِ‌دیدن باشد. یک سیاست در یک نقطه = هر
+//  نویسنده‌ی بعدی هم به‌طورِ پیش‌فرض درست است.
+//
+//  متریک عمداً داخلِ خودِ helper شمرده می‌شود، نه در محلِ فراخوانی: اگر
+//  شمارش وظیفه‌ی فراخواننده بود، سومین فراخواننده آن را از قلم می‌انداخت و
+//  ما دوباره یک مکانیزمِ اندازه‌گیری‌نشده می‌داشتیم.
+//
+//  ⚠️ چرا `op` اجباری است و شمارنده label دارد: بدونِ label، شمارشِ همه‌ی
+//  مسیرها در یک عدد جمع می‌شد و یک مسیرِ *مرده* (retryی که هرگز شلیک نمی‌کند،
+//  یعنی دقیقاً همان حالتِ خطرناک) پشتِ ترافیکِ مسیرِ پرکارِ دیگر نامرئی
+//  می‌ماند. این همان دامِ «گارد از یک منبع می‌شمارد، خطر جایِ دیگری است» است.
+//  با label، «walkin=0 در حالی که reservation>0» یک سیگنالِ خواناست.
+//  اندازه‌گیریِ زنده‌ی ۲۰۲۶-۰۹-۰۴ (۱۵ مسابقه‌ی واقعی) همین را لازم کرد: بدونِ
+//  label نمی‌شد ثابت کرد کدام طرف واقعاً retry می‌کند.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** حداکثر تلاش رویِ تداخلِ serialization (شاملِ خودِ تلاشِ اول). */
+export const TX_MAX_RETRIES = 5;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * `fn` را تا `TX_MAX_RETRIES` بار اجرا می‌کند و فقط رویِ خطایِ
+ * serialization/deadlock (`isSerializationError`) با backoffِ تصادفی دوباره
+ * تلاش می‌کند. هر خطایِ دیگری بلافاصله بالا می‌رود — یک ۴۰۹ی واقعی
+ * (TABLE_CONFLICT/SLOT_FULL) هرگز نباید retry شود.
+ *
+ * اگر همه‌ی تلاش‌ها مصرف شوند، **آخرین خطایِ واقعی** بالا می‌رود (نه یک خطایِ
+ * عمومی) تا فراخواننده بتواند آن را به یک پیامِ صادقِ دامنه‌ای ترجمه کند —
+ * دقیقاً کاری که createReservation در `reservations.ts:304-314` می‌کند.
+ */
+export async function withSerializationRetry<T>(
+  op: 'reservation' | 'walkin' | 'waitlist',
+  fn: (attempt: number) => Promise<T>,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < TX_MAX_RETRIES; attempt++) {
+    try {
+      return await fn(attempt);
+    } catch (e) {
+      lastErr = e;
+      if (isSerializationError(e) && attempt < TX_MAX_RETRIES - 1) {
+        metrics.serializationRetries.inc({ op });
+        await sleep(20 * (attempt + 1) + Math.random() * 30); // backoff تصادفی
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr ?? Err.concurrencyRetry();
 }

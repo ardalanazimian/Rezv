@@ -118,7 +118,10 @@ export async function resolveStaffRestaurant(auth: AccessPayload, req?: Request)
   }
 
   const restaurant = await defaultRestaurantForTenant(auth.tenantId);
-  if (!restaurant) throw Err.notFound('رستورانی برای این حساب یافت نشد');
+  // ⚠️ `Err.notFound(what)` خودش «پیدا نشد» می‌چسباند؛ جمله‌ی کامل این‌جا پیامِ
+  // دوبله می‌ساخت («… یافت نشد پیدا نشد») و به کاربر می‌رسید (دیده‌شده در
+  // اولین ورودِ واقعیِ ادمین، ۲۰۲۶-۰۹-۰۲). فقط «چه چیزی» را بده.
+  if (!restaurant) throw Err.notFound('رستورانی برای این حساب');
   return restaurant;
 }
 

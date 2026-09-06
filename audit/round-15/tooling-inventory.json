@@ -1,0 +1,124 @@
+{
+  "round": 15,
+  "date": "2026-09-03",
+  "mcp_servers": {
+    "Supabase": {
+      "used": [
+        "list_projects OK",
+        "execute_sql FAIL 28P01",
+        "list_tables FAIL 28P01",
+        "get_advisors FAIL (error text mentioned hibernation)"
+      ],
+      "note": "auto-mode classifier denied one execute_sql retry; project zmyuvtpbchytqvtgyewt only"
+    },
+    "Vercel": {
+      "used": [
+        "list_teams OK",
+        "list_projects OK (0 projects)"
+      ],
+      "available": [
+        "create_git_project",
+        "list_deployments",
+        "get_deployment_build_logs",
+        "get_runtime_logs",
+        "get_project_deployment_protection"
+      ]
+    },
+    "Sentry": {
+      "used": [
+        "find_organizations OK (rezvno, de)",
+        "find_projects OK (0)"
+      ],
+      "available": [
+        "search_issues",
+        "search_events",
+        "get_sentry_resource"
+      ]
+    },
+    "graphify": {
+      "used": [
+        "list_repositories OK (ardalanazimian/Rezv, 3597 nodes, queryable)"
+      ],
+      "available": [
+        "graphify_callers/callees/impact/trace/tests_for"
+      ]
+    },
+    "Context7": "available (docs lookup)",
+    "Postman": "available - candidate for contract-suite scaffolding",
+    "Figma/Canva/Mobbin/Vuetify/dot.": "design tooling - Phase 4 candidates (Mobbin for Gen-Z UI references)",
+    "LlamaParse/NotebookLM/Microsoft Learn": "not relevant to this audit",
+    "Endor ai-plugins": "security agents (findings-browser, dependency-reviewer, cicd-posture) - require Endor setup; not configured",
+    "42crunch": "API security audit/scan skills - require OAS spec; candidate for A5",
+    "Prisma-Remote": "Prisma Postgres cloud - not used (stack is Supabase)",
+    "disconnected": [
+      "MCP_DOCKER (connection closed)",
+      "plugin:prisma:Prisma-Local (timeout)"
+    ],
+    "auth_required": [
+      "Cloudflare",
+      "Control Plane",
+      "Google Calendar",
+      "Google Drive",
+      "HubSpot",
+      "Linear",
+      "Pi Security",
+      "Semrush",
+      "Unblocked"
+    ]
+  },
+  "skills": [
+    "security-review",
+    "code-review",
+    "simplify",
+    "run",
+    "init",
+    "playground",
+    "design",
+    "dataviz",
+    "artifact-design/diagramming/capabilities",
+    "update-config",
+    "keybindings-help",
+    "fewer-permission-prompts",
+    "loop",
+    "schedule",
+    "claude-api",
+    "workflow-authoring",
+    "skill-creator",
+    "claude-md-management:*",
+    "claude-code-setup:*",
+    "42crunch:*",
+    "figma:*",
+    "agent-sdk-dev:*",
+    "ai-plugins:endor-agent-kit-setup"
+  ],
+  "repo_agents": [
+    ".claude/agents/ai-intelligence-auditor",
+    "backend-integrity-engineer",
+    "contracts-consolidation-engineer",
+    "data-trust-engineer",
+    "ds-token-guardian",
+    "e2e-regression-engineer",
+    "panels-ui-engineer",
+    "phase2-verifier",
+    "_TEAM.md"
+  ],
+  "vscode": {
+    "diagnostics": "delivered via PostToolUse hook on Edit (markdownlint MD060/MD032 observed); TypeScript diagnostics not surfaced for .ts edits this session - tsc --noEmit used instead",
+    "test_runner": "not exposed as a tool; Playwright/node:test run via Bash"
+  },
+  "cli": {
+    "git": "OK push works",
+    "gh": "FAIL token invalid (401) - no PR/merge/log access",
+    "docker": "OK (Docker Desktop at %LOCALAPPDATA%\\Programs\\DockerDesktop)",
+    "node/npx": "OK",
+    "python": "OK (cp1252 console - use PYTHONIOENCODING=utf-8)",
+    "playwright": "1.62.1, chromium only installed locally",
+    "psql": "only inside rezv-test-pg container",
+    "github_public_api": "60 req/h unauthenticated - rate-limited twice"
+  },
+  "gotchas": [
+    "large heredocs with Persian/quotes fail under the rtk hook -> use the Write tool for scripts",
+    "a background command's 'exit code 0' is the shell's, not npm's -> write the REAL exit into the log",
+    "never reset the test DB while a background suite may hold connections"
+  ]
+}

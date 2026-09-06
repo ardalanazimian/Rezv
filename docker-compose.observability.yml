@@ -17,7 +17,14 @@
 # ═══════════════════════════════════════════════════════════
 services:
   prometheus:
-    image: prom/prometheus:latest
+    # ⚠️ Pin به v3.14.0، نه :latest (round-20، ۲۰۲۶-۰۹-۰۴): همان کلاسِ مشکلی
+    # که mcr.microsoft.com/playwright:v1.62.1-noble در api/e2e/ci.yml برایِ آن
+    # pin شده — یک تگِ بدونِ نسخه یعنی این سرویس می‌تواند بینِ دو `docker
+    # compose pull`، بدونِ هیچ تغییری در این ریپو، نسخه/رفتارِ متفاوتی بگیرد
+    # (یا حتی قوانینِ alert را با یک breaking change در PromQL بی‌صدا بشکند).
+    # همانِ تگی که در جابِ CI `observability` استفاده می‌شود (ci.yml) — با
+    # ارتقاء، هر دو جا باید هم‌زمان به‌روز شوند.
+    image: prom/prometheus:v3.14.0
     restart: unless-stopped
     user: "nobody"
     volumes:
@@ -47,7 +54,10 @@ services:
       - api
 
   grafana:
-    image: grafana/grafana:latest
+    # ⚠️ Pin به 13.2.1، نه :latest — همان دلیلِ prometheus بالا؛ verify شد
+    # (round-20، ۲۰۲۶-۰۹-۰۴): digestِ grafana/grafana:13.2.1 در زمانِ pin
+    # دقیقاً با digestِ :latest یکی بود، پس این downgrade نیست.
+    image: grafana/grafana:13.2.1
     restart: unless-stopped
     environment:
       # ⚠️ `:?` نه `:-`: پیش‌فرضِ `admin` رویِ پورتِ عمومی یعنی هرکسی وارد

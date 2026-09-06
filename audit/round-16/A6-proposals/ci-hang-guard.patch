@@ -1,0 +1,114 @@
+--- ../.github/workflows/ci.yml	2026-09-02 03:56:07.795265000 +0330
++++ .github/workflows/ci.yml (proposed)	2026-09-03 10:27:13.910782900 +0330
+@@ -7,10 +7,18 @@
+   pull_request:
+     branches: [main, develop]
+ 
++# ⚠️ P0-005 (۲۰۲۶-۰۹-۰۳): یک hang در `npm test` ۲۶۴+ دقیقه زنده ماند چون سقفِ
++# پیش‌فرضِ GitHub ۳۶۰ دقیقه است و push‌های بعدی اجرای قبلی را لغو نمی‌کردند.
++# با این بلوک، push تازه روی همان ref اجرای در حالِ انجام را لغو می‌کند.
++concurrency:
++  group: ci-${{ github.workflow }}-${{ github.ref }}
++  cancel-in-progress: true
++
+ jobs:
+   # ── مرحله ۱: type-check + build ──
+   build:
+     runs-on: ubuntu-latest
++    timeout-minutes: 15
+     defaults:
+       run:
+         working-directory: api
+@@ -53,6 +61,8 @@
+   # ── مرحله ۲: تست‌ها (با Postgres + Redis واقعی در CI) ──
+   test:
+     runs-on: ubuntu-latest
++    # P0-005: سوئیت ~۱ دقیقه در CI است؛ hang باید ظرفِ دقایق قرمز شود، نه ۳۶۰ دقیقه (پیش‌فرضِ GitHub).
++    timeout-minutes: 15
+     defaults:
+       run:
+         working-directory: api
+@@ -113,6 +123,11 @@
+           DATABASE_URL: postgresql://test:test@localhost:5432/rezervno_test
+           DATABASE_DIRECT_URL: postgresql://test:test@localhost:5432/rezervno_test
+ 
++      # هر فایلِ tests/*.test.mts باید در _all.runner.mts import شده باشد، وگرنه `npm test`
++      # بی‌صدا ردش می‌کند (سه فایل در ۲۰۲۶-۰۸-۱۴ دقیقاً همین‌طور نادیده ماندند).
++      - name: All test files are imported by the runner
++        run: sh ../tools/check-test-runner-imports.sh
++
+       - name: Run tests
+         run: npm test
+         env:
+@@ -135,6 +150,7 @@
+   # «CI سبز، تولید خراب» دقیقاً همان چیزی است که این job جلویش را می‌گیرد.
+   schema-drift:
+     runs-on: ubuntu-latest
++    timeout-minutes: 15
+     services:
+       postgres:
+         image: postgres:17
+@@ -180,6 +196,7 @@
+   # چون خواندنشان از Dockerfile اثبات نیست.
+   image-build:
+     runs-on: ubuntu-latest
++    timeout-minutes: 20
+     steps:
+       - uses: actions/checkout@v4
+ 
+@@ -224,6 +241,7 @@
+   # ایمیج (کاربرِ non-root، dumb-init) را نمی‌سنجد؛ آن نیازِ ساختِ داکر است.
+   boot-path:
+     runs-on: ubuntu-latest
++    timeout-minutes: 20
+     services:
+       postgres:
+         image: postgres:17
+@@ -287,6 +305,7 @@
+   # ── مرحله ۳: چک امنیتی پایه ──
+   security:
+     runs-on: ubuntu-latest
++    timeout-minutes: 10
+     defaults:
+       run:
+         working-directory: api
+@@ -360,6 +379,7 @@
+   # ── مرحله ۵: هماهنگیِ دیزاین‌سیستم (بدونِ drift بین shared/ و اپ‌ها) ──
+   design-system:
+     runs-on: ubuntu-latest
++    timeout-minutes: 10
+     steps:
+       - uses: actions/checkout@v4
+       - name: Check design-system in sync with shared/
+@@ -404,6 +424,7 @@
+   # گیتی که فقط در یک فایلِ markdown زندگی می‌کند، گیت نیست.
+   standalone:
+     runs-on: ubuntu-latest
++    timeout-minutes: 10
+     steps:
+       - uses: actions/checkout@v4
+       - uses: actions/setup-python@v5
+@@ -416,6 +437,7 @@
+   # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند. build خودِ Next تایپ‌چک/لینت می‌کند.
+   seo:
+     runs-on: ubuntu-latest
++    timeout-minutes: 15
+     defaults:
+       run:
+         working-directory: apps/seo
+@@ -440,6 +462,7 @@
+   # هم سبز باشد، وگرنه یک قطعیِ API می‌تواند دیپلوی را هم زمین بزند.
+   landing:
+     runs-on: ubuntu-latest
++    timeout-minutes: 15
+     defaults:
+       run:
+         working-directory: apps/landing
+@@ -480,6 +503,7 @@
+   base-freshness:
+     if: github.event_name == 'pull_request'
+     runs-on: ubuntu-latest
++    timeout-minutes: 5
+     steps:
+       - uses: actions/checkout@v4
+         with:

@@ -12,7 +12,7 @@
 > ولی مقادیرِ نمونه (مثلِ `--scope ardalanaz2-4503s-projects`) را با مقادیرِ
 > واقعیِ حسابِ فعلی جایگزین کن، کورکورانه کپی نکن.
 
-مخزن (قدیمی، تاریخی): `https://github.com/ardalanaz/RezervnoOS` · ۱۶ کامیتِ آماده
+مخزن (قدیمی، تاریخی): `https://github.com/ardalanazimian/Rezv` · ۱۶ کامیتِ آماده
 
 هرچه در سطحِ سورس‌کد ممکن بود انجام شده. سه کار باقی است که به شبکه یا حسابِ
 شما نیاز دارد. دستورها دقیقاً به همین ترتیب اجرا شوند.
@@ -22,7 +22,7 @@
 ## ۱) Push به GitHub
 
 ```bash
-git clone https://github.com/ardalanaz/RezervnoOS.git
+git clone https://github.com/ardalanazimian/Rezv.git
 cd RezervnoOS
 git checkout -b release/design-system-and-hardening
 

@@ -106,7 +106,7 @@ infra), `both`.
 
 | Name | Required | Default | Scope | Description |
 |---|---|---|---|---|
-| `FCM_SERVER_KEY` | ➖ | — | api | Firebase key for web push; unset → push disabled. |
+| `FCM_SERVER_KEY` | ➖ | — | api | Firebase key for web push; unset → push disabled. ⚠️ **Not implemented** — zero references in `api/src` (A10, 2026-09-03); ticketed as P0-018, founder decides: build the feature or remove this row. |
 | `EMAIL_API_KEY` | ➖ | — | api | Email provider key; unset → email disabled. |
 | `EMAIL_FROM` | ➖ | `noreply@rezervno.ir` | api | From address. |
 

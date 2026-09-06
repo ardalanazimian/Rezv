@@ -342,3 +342,52 @@ WebSearch's synthesis was built from, not pages I opened directly:
   per-transaction fees** were referenced as existing but no Toman figures were found.
 - **"Where it beats Rezervno" / "Where Rezervno beats it"** — explicitly out of scope
   for this pass per the task brief; needs repo-side verification.
+
+---
+
+# ADDENDUM — 2026-09-05 (batch 3): two corrections from first-hand fetch
+
+_`WebFetch` was blocked when this profile was written; it works this session. Both items below were
+read directly from `smartx.ir` by me on **2026-09-05**. Full tables and the pricing-landscape
+comparison live in `profiles/iran-reservation-longtail.md` §"Two corrections to prior batches" —
+this addendum exists so a reader of *this* file is not left with the superseded claim._
+
+## Correction 1 — "pricing is ABSENT / behind a sales call" was WRONG
+
+[smartx.ir/pricing](https://smartx.ir/pricing/) publishes a full Toman price list with no sales call:
+ارزیابی هوشمند ۳۳,۶۵۰,۰۰۰ · باشگاه هوشمند ۵۱,۰۰۰,۰۰۰ · **رزرو هوشمند ۵۲,۸۰۰,۰۰۰** · وای‌فای هوشمند (۱۰
+کاربر) ۲۱,۰۰۰,۰۰۰ — plus four bundles up to مدیریت هوشمند رستوران ۱۹۹,۲۵۰,۰۰۰ (≈۵۴۶,۰۰۰ تومان/روز), all
+annual. A second usage-based model is also published: activation ۲۹,۵۰۰,۰۰۰ تومان + ۱۰,۰۰۰ تومان per
+transaction. **Only intermediate volume bands route to a sales line (۹۰۰۰-۰۱۱۲۳).** The MATRIX cell
+moves ABSENT → REAL-with-caveat.
+
+**One detail sharpens, rather than softens, this profile's phone-capture finding:** the usage-based
+model offers a **30% discount when 75%+ of invoices carry a customer phone number**. SmartX pays
+restaurants to harvest phone numbers.
+
+**And SmartX contradicts itself.** [smartx.ir/services/reserve/restaurant](https://smartx.ir/services/reserve/restaurant/)
+states **۲۱,۴۵۰,۰۰۰ تومان/year** for the reservation product against **۵۲,۸۰۰,۰۰۰ تومان** on the pricing
+page — same company, same product, a 2.5× gap. Both quoted; neither endorsed.
+
+## Correction 2 — the `/sorry/` apology claim: confirmed at the title, NOT in the body
+
+This profile and `WATCH.md` recorded `smartx.ir/sorry/` as an apology page for Customer Club outages.
+First-hand fetch, 2026-09-05:
+
+- **CONFIRMED:** the page's HTML `<title>` is exactly **«اختلالات باشگاه مشتریان | مرداد ماه 1404»** —
+  SmartX itself names Customer Club *disruptions* in Mordad 1404 (≈ 2025-07-23 → 2025-08-22).
+- **NOT CONFIRMED:** the body contains no description of the incident and no explicit apology for it.
+  Its `h1` is «ما خودمان را مدیون اعتماد شما می دانیم.» and its sections are «خبرهای خوبی در راه است»
+  (three new free features "this week" plus a forthcoming premium service), «درخواست پشتیبانی» and
+  «معرفی سرویس های جدید». It reads as a goodwill/retention page whose *title* references a disruption.
+
+**Revised verdict:** "self-admitted reliability incident" holds — a company does not title a page
+«اختلالات باشگاه مشتریان» about a month that had none. "Public apology explaining what happened" does
+**not** hold. MATRIX cell revised from a bare REAL to **REAL (title-level admission only)**.
+
+> **Methodology warning worth carrying forward.** My *first* fetch of this page, with a prompt asking
+> "what incident is being apologised for," returned "there is no apology or incident on this page."
+> A *second* fetch of the same URL asking for the `<title>` and every heading verbatim returned the
+> title above. `WebFetch` answers the prompt against the page; a differently-worded prompt surfaces
+> different content. **A single negative WebFetch result is not evidence of absence.** Both fetches are
+> reported here rather than only the one that agreed with the prior batch.

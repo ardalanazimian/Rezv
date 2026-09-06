@@ -16,6 +16,7 @@ import { redis } from './redis';
 import { Err } from './errors';
 import { availabilityKey } from './availability-cache';
 import { ACTIVE_RESERVATION_STATUSES } from './reservation-status';
+import { blockTailMinutes, holdHorizonMinutes, tableStateBlocksNow } from './table-occupancy';
 import { filterTimesByHours, generateTimesFromHours, zonedTimeToUtc, type OpeningHours } from './hours';
 
 /** پیکربندیِ زمان‌بندیِ رستوران — مدت سانس، بافر، نظافت، هولد. */
@@ -56,6 +57,24 @@ export interface AvailabilitySlot {
 }
 
 /**
+ * یک هولدِ نقطه‌ای که به یک **بازه‌ی صریح** لنگر انداخته است.
+ *
+ * ⚠️ چرا `from`/`through` و نه یک پرچمِ ساده: `tables.state` بی‌زمان است و
+ * `computeSlots` بازه‌ای. تبدیلِ پرچم به بازه **باید** یک جایِ مشخص انجام شود
+ * (`holdsFromTables`)، وگرنه هر مصرف‌کننده افقِ خودش را می‌سازد — همان الگویی
+ * که سه تخصیص‌دهنده‌ی میز را با سه فیلترِ متفاوت به جا گذاشت.
+ *
+ * و چون بازه با لحظه‌هایِ **مطلق** بیان می‌شود، دقیقاً هم‌جنسِ `busy` است و
+ * انضباطِ «الان داخلِ مقدارِ کش‌شده نمی‌رود» را نمی‌شکند: «میزِ ۵ تا ۲۰:۵۰
+ * مدعی دارد» یک واقعیتِ زمان‌دار است، نه ساعتِ خواندنِ کش.
+ */
+export interface AvailabilityHold {
+  tableNumber: number;
+  from: Date;
+  through: Date;
+}
+
+/**
  * آیا این میز برای گروهی با این اندازه قابلِ استفاده است؟
  *
  * ⚠️ منبعِ واحد: تا پیش از این، این قاعده فقط به‌صورتِ `where` در کوئریِ Prisma
@@ -65,6 +84,21 @@ export interface AvailabilitySlot {
  * می‌گوید ۲۰:۰۰ آزاد است و شیتِ رزرو همان لحظه می‌گوید پر. حالا هر دو مسیر
  * همین تابع را صدا می‌زنند. قاعده عیناً همان reservations است: maxPartySize
  * برابرِ null یعنی سقف = capacity.
+ *
+ * 🚨 **چرا اینجا فقط `maintenance` است و نه `state === 'free'`** (تصمیمِ
+ * ۲۰۲۶-۰۹-۰۵، directives/020). این تابع بی‌زمان است: یک‌بار برایِ کلِ روز
+ * اجرا می‌شود، پیش از حلقه‌ی سانس‌ها. پس هر شرطی که اینجا بنشیند رویِ
+ * **همه‌ی** سانس‌هایِ آن تاریخ اثر می‌گذارد.
+ *
+ *  • `maintenance` = «خارج از سرویس تا وقتی کارکنان برش‌گردانند» — بازه‌ی
+ *    کوتاه نیست و افق‌پذیر هم نیست. حذفِ بی‌زمانش درست است.
+ *  • `reserved` / `occupied` / `cleaning` = پرچم‌هایِ **نقطه‌ای** با عمرِ
+ *    دقیقه‌ای. اگر اینجا اضافه می‌شدند، میزی که همین حالا مهمان سرش نشسته از
+ *    رزروِ **سه‌شنبه‌ی بعد** هم پنهان می‌شد — یعنی خطای رده‌ایِ «پرچمِ نقطه‌ای
+ *    را بدونِ افق روی همه‌ی بازه‌ها اعمال کن»، فقط یک طبقه پایین‌تر.
+ *
+ * آن‌ها به‌جایش از راهِ `holds` واردِ حلقه‌ی سانس می‌شوند، جایی که بازه‌ی هر
+ * سانس معلوم است و می‌توان با افق مقایسه‌شان کرد.
  */
 export function tableFitsParty(t: AvailabilityTable, party: number): boolean {
   return t.isActive
@@ -97,8 +131,11 @@ export function computeSlots(input: {
   closureSet: Set<string>;
   tables: AvailabilityTable[];
   busy: AvailabilityBusy[];
+  /** هولدهایِ نقطه‌ایِ لنگرانداخته — با `holdsFromTables` ساخته می‌شوند. */
+  holds?: AvailabilityHold[];
 }): AvailabilitySlot[] {
   const { date, party, tz, cfg, openingHours, closureSet, tables, busy } = input;
+  const holds = input.holds ?? [];
   // ⚠️ Part 1 (حسابرسیِ صداقتِ سانس، ۲۰۲۶-۰۸-۱۴): اگر شیفتِ همین روز صریحاً در
   // ساعتِ کاریِ رستوران تعریف شده باشد، سانس‌ها را مستقیماً با گامِ ۳۰دقیقه‌ای
   // از خودِ شیفتِ واقعی می‌سازیم (generateTimesFromHours) — نه فقط زیرمجموعه‌ای
@@ -109,7 +146,8 @@ export function computeSlots(input: {
   const times = generated ?? filterTimesByHours(SERVICE_TIMES, openingHours, date, tz, closureSet);
 
   const fitting = tables.filter(t => tableFitsParty(t, party));
-  const blockBuffer = cfg.cleaningMinutes + cfg.bufferMinutes;
+  // همان تعریفِ واحدِ `computeRanges` — نه یک کپیِ قابلِ‌واگرایی (۲۰۲۶-۰۹-۰۵).
+  const blockBuffer = blockTailMinutes(cfg);
 
   return times.map(time => {
     const start = zonedTimeToUtc(date, time, tz);
@@ -125,6 +163,18 @@ export function computeSlots(input: {
         const bBlockEnd = new Date(+b.slotEnd + (b.blockBufferMinutes ?? 0) * 60_000);
         return b.slotStart < blockEnd && bBlockEnd > start; // هم‌پوشانی بازه‌ی بلاک
       }))
+      // ⚠️ رفعِ ۲۰۲۶-۰۹-۰۵ — هولدهایِ بدونِ ردیفِ رزرو.
+      // `busy` بالا از جدولِ `reservations` می‌آید. یک آفرِ زنده‌ی لیستِ انتظار
+      // ردیفِ رزرو **ندارد** (فقط `tables.state='reserved'`)، پس تا ۵ دقیقه
+      // میزی که برایِ مهمانِ صف نگه داشته شده به همه «آزاد» اعلام می‌شد و
+      // پذیرشش بعداً رویِ `no_table_overlap` می‌شکست.
+      //
+      // مقایسه **عیناً** همان حسابِ هم‌پوشانیِ بالاست (نیم‌باز، `<` و `>`).
+      // عمداً کپی نشده بلکه هم‌شکل نگه داشته شده: دو مرزِ متفاوت برایِ یک
+      // مفهوم دقیقاً همان چیزی بود که availability-boundary از آن زاده شد.
+      .filter(t => !holds.some(h =>
+        h.tableNumber === t.number && h.from < blockEnd && h.through > start,
+      ))
       .map(t => t.number);
     return { time, free_tables: freeTables, status: freeTables.length ? 'open' : 'full' } as AvailabilitySlot;
   });
@@ -138,6 +188,36 @@ export function timingOf(r: { slotMinutes?: number | null; bufferMinutes?: numbe
     cleaningMinutes: r.cleaningMinutes ?? 15,
     holdMinutes: r.holdMinutes ?? 10,
   };
+}
+
+/**
+ * پرچمِ نقطه‌ایِ `tables.state` → بازه‌ی صریح، در **یک** جا برایِ هر دو مسیر.
+ *
+ * این تنها نقطه‌ای است که «چه وضعیتی مدعی است» (از `table-occupancy`) به
+ * «تا کِی» (از `holdHorizonMinutes`) وصل می‌شود. مسیرِ تکی و مسیرِ گروهی هر دو
+ * همین را صدا می‌زنند — به همان دلیلی که `computeSlots` مشترک است: دو نسخه‌ی
+ * قابلِ‌واگرایی از یک قاعده یعنی کارت بگوید «۲۰:۰۰ آزاد» و شیت بگوید «پر».
+ *
+ * ⚠️ ردیف‌هایِ میز از قبل خوانده شده‌اند (`AVAILABILITY_TABLE_SELECT` شاملِ
+ * `state` است)، پس این رفع **هیچ کوئریِ اضافه‌ای** به مسیرِ داغِ availability
+ * اضافه نمی‌کند.
+ *
+ * ⚠️ باقی‌مانده‌ی صادقانه (رفع نشده، پنهان هم نشده): خروجی داخلِ payloadِ
+ * کش‌شده می‌رود و هیچ‌کدام از مسیرهایِ لیستِ انتظار
+ * `invalidateAvailability` را صدا نمی‌زنند. پس یک هولدِ تازه تا سقفِ پنجره‌ی
+ * تازگیِ کش (۳۰ ثانیه) دیده نمی‌شود، و یک هولدِ آزادشده تا همان اندازه بیش‌از‌حد
+ * سرکوب می‌کند. بستنش یعنی افزودنِ باطل‌سازی به چرخه‌ی عمرِ لیستِ انتظار —
+ * تغییری در فایلِ دیگر و خارج از دامنه‌ی این رفع.
+ */
+export function holdsFromTables(
+  tables: AvailabilityTable[],
+  cfg: TimingConfig,
+  now: Date,
+): AvailabilityHold[] {
+  const through = new Date(+now + holdHorizonMinutes(cfg) * 60_000);
+  return tables
+    .filter(t => tableStateBlocksNow(t.state))
+    .map(t => ({ tableNumber: t.number, from: now, through }));
 }
 
 /**
@@ -241,6 +321,7 @@ export async function computeAndCacheAvailability(restaurantId: string, date: st
     closureSet,
     tables: tables as AvailabilityTable[],
     busy,
+    holds: holdsFromTables(tables as AvailabilityTable[], cfg, new Date()),
   });
 
   const payload = { date, party, slots, tz };
@@ -365,17 +446,23 @@ export async function computeBulkSlots(
     busyByRest.set(b.restaurantId, arr);
   }
 
+  // یک «الان» برایِ کلِ دسته: دو رستوران در یک پاسخ نباید افقشان چند
+  // میلی‌ثانیه با هم فرق کند.
+  const now = new Date();
   for (const r of restaurants) {
     const tz = r.timezone ?? 'Asia/Tehran';
+    const cfg = timingOf(r);
+    const restTables = tablesByRest.get(r.id) ?? [];
     out[r.id] = {
       tz,
       slots: computeSlots({
         date, party, tz,
-        cfg: timingOf(r),
+        cfg,
         openingHours: (r.openingHours as OpeningHours | null) ?? null,
         closureSet: closuresByRest.get(r.id) ?? new Set<string>(),
-        tables: tablesByRest.get(r.id) ?? [],
+        tables: restTables,
         busy: busyByRest.get(r.id) ?? [],
+        holds: holdsFromTables(restTables, cfg, now),
       }),
     };
   }

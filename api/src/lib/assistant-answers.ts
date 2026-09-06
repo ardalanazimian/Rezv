@@ -2,6 +2,7 @@ import { db } from './db';
 import { ACTIVE_RESERVATION_STATUSES } from './reservation-status';
 import { getManagerInsights, getWeekdayRanking } from './restaurant-manager';
 import { getDemandForecast, tehranTodayIso } from './demand-forecast';
+import { countUpcomingHighRiskByProvenance, provenanceLabel } from './no-show-provenance';
 import type { AssistantIntent } from './assistant-nlu';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -90,16 +91,12 @@ async function answerTablesNow(restaurantId: string): Promise<string> {
 }
 
 async function answerUpcomingHighRisk(restaurantId: string): Promise<string> {
-  const count = await db.reservation.count({
-    where: {
-      restaurantId,
-      status: { in: ['confirmed', 'auto_confirmed', 'pending'] },
-      slotStart: { gte: new Date(), lte: new Date(Date.now() + 48 * 3600_000) },
-      noShowRiskTier: 'high',
-    },
-  });
-  if (count === 0) return 'در ۴۸ ساعتِ آینده رزروِ پرریسکی (احتمالِ بالای no-show) نداریم.';
-  return `${fmt(count)} رزرو در ۴۸ ساعتِ آینده ریسکِ نیامدنِ بالایی دارند. یادآوریِ SMS اضافه یا درخواستِ بیعانه می‌تواند کمک کند.`;
+  // مهاجرتِ ۰۸۰ — دستیار عدد را به‌عنوانِ دانش می‌گوید؛ پس باید بگوید
+  // از کجا آمده. همان helperِ روتِ /restaurant/ai است — دو کپیِ جدا از
+  // این منطق دیر یا زود واگرا می‌شدند.
+  const risk = await countUpcomingHighRiskByProvenance(restaurantId, 48);
+  if (risk.total === 0) return 'در ۴۸ ساعتِ آینده رزروِ پرریسکی (احتمالِ بالای no-show) نداریم.';
+  return `${fmt(risk.total)} رزرو در ۴۸ ساعتِ آینده ریسکِ نیامدنِ بالایی دارند. یادآوریِ SMS اضافه یا درخواستِ بیعانه می‌تواند کمک کند. ${provenanceLabel(risk)}`;
 }
 
 async function answerDemandTomorrow(restaurantId: string): Promise<string> {

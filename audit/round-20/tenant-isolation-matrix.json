@@ -1,0 +1,2167 @@
+{
+  "generated_by": "tools/gen-tenant-isolation-matrix.mjs",
+  "generated_at": "2026-09-04",
+  "why": "RLS is inert (P0-021), so the application layer is the SOLE tenant boundary. This matrix is machine-generated so no route can be forgotten.",
+  "route_files": 164,
+  "total_endpoints": 234,
+  "by_guard": {
+    "UNGUARDED": 30,
+    "inline": 6,
+    "requireAdmin": 52,
+    "authFromRequest": 33,
+    "guardMaintenance": 18,
+    "withRestaurantAuth": 91,
+    "withStaffAuth": 4
+  },
+  "by_boundary": {
+    "UNGUARDED": 30,
+    "inline-custom": 6,
+    "platform-admin": 52,
+    "user": 33,
+    "maintenance-key": 18,
+    "restaurant-tenant": 95
+  },
+  "tenant_scoped_count": 95,
+  "unguarded_count": 30,
+  "unguarded": [
+    "GET /api/health (api/src/app/api/health/route.ts)",
+    "HEAD /api/health (api/src/app/api/health/route.ts)",
+    "GET /api/v1/auth/admin/login (api/src/app/api/v1/auth/admin/login/route.ts)",
+    "POST /api/v1/auth/admin/login (api/src/app/api/v1/auth/admin/login/route.ts)",
+    "POST /api/v1/auth/admin/request (api/src/app/api/v1/auth/admin/request/route.ts)",
+    "POST /api/v1/auth/admin/verify (api/src/app/api/v1/auth/admin/verify/route.ts)",
+    "POST /api/v1/auth/invite/:token/claim (api/src/app/api/v1/auth/invite/[token]/claim/route.ts)",
+    "POST /api/v1/auth/logout (api/src/app/api/v1/auth/logout/route.ts)",
+    "POST /api/v1/auth/otp/request (api/src/app/api/v1/auth/otp/request/route.ts)",
+    "POST /api/v1/auth/otp/verify (api/src/app/api/v1/auth/otp/verify/route.ts)",
+    "POST /api/v1/auth/refresh (api/src/app/api/v1/auth/refresh/route.ts)",
+    "POST /api/v1/auth/staff/login (api/src/app/api/v1/auth/staff/login/route.ts)",
+    "POST /api/v1/auth/staff/request (api/src/app/api/v1/auth/staff/request/route.ts)",
+    "POST /api/v1/auth/staff/verify (api/src/app/api/v1/auth/staff/verify/route.ts)",
+    "GET /api/v1/events (api/src/app/api/v1/events/route.ts)",
+    "GET /api/v1/media/:key (api/src/app/api/v1/media/[...key]/route.ts)",
+    "GET /api/v1/payments/callback (api/src/app/api/v1/payments/callback/route.ts)",
+    "GET /api/v1/restaurants/:slug/availability (api/src/app/api/v1/restaurants/[slug]/availability/route.ts)",
+    "GET /api/v1/restaurants/:slug/menu (api/src/app/api/v1/restaurants/[slug]/menu/route.ts)",
+    "GET /api/v1/restaurants/:slug (api/src/app/api/v1/restaurants/[slug]/route.ts)",
+    "GET /api/v1/restaurants/availability (api/src/app/api/v1/restaurants/availability/route.ts)",
+    "GET /api/v1/restaurants/live-stats (api/src/app/api/v1/restaurants/live-stats/route.ts)",
+    "GET /api/v1/restaurants (api/src/app/api/v1/restaurants/route.ts)",
+    "GET /api/v1/seo/sitemap (api/src/app/api/v1/seo/sitemap/route.ts)",
+    "GET /api/v1/site/:collection/:slug (api/src/app/api/v1/site/[collection]/[slug]/route.ts)",
+    "GET /api/v1/site/:collection (api/src/app/api/v1/site/[collection]/route.ts)",
+    "POST /api/v1/site/contact (api/src/app/api/v1/site/contact/route.ts)",
+    "GET /api/v1/site/orders/:code (api/src/app/api/v1/site/orders/[code]/route.ts)",
+    "POST /api/v1/site/orders (api/src/app/api/v1/site/orders/route.ts)",
+    "POST /api/v1/site/trial (api/src/app/api/v1/site/trial/route.ts)"
+  ],
+  "note": "Generating this list proves nothing on its own. Each row is proven only by an executed cross-tenant request with its raw status recorded.",
+  "rows": [
+    {
+      "url": "/api/health",
+      "method": "GET",
+      "file": "api/src/app/api/health/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/health",
+      "method": "HEAD",
+      "file": "api/src/app/api/health/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/metrics",
+      "method": "GET",
+      "file": "api/src/app/api/metrics/route.ts",
+      "guard": "inline",
+      "permission": null,
+      "boundary": "inline-custom",
+      "expectation": "authenticates inline rather than via a named guard — each one must be proven individually with an executed request"
+    },
+    {
+      "url": "/api/v1/admin/abuse-flags/:userId",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/abuse-flags/[userId]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/ai/model-health",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/ai/model-health/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/badges/:id/grant",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/badges/[id]/grant/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/badges/:id/revoke",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/badges/[id]/revoke/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/badges/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/badges/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/badges",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/badges/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/badges",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/badges/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/business-intelligence",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/business-intelligence/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/economy-rules",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/economy-rules/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/economy-rules",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/economy-rules/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/feature-flags",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/feature-flags/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/feature-flags",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/feature-flags/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/hours-changes/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/hours-changes/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/hours-changes",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/hours-changes/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/missions/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/missions/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/missions",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/missions/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/missions",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/missions/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/moderation-queue",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/moderation-queue/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/overview",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/overview/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/photos/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/photos/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/photos/:id",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/admin/photos/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/photos",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/photos/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/restaurants/:id/branches",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/restaurants/[id]/branches/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/restaurants/:id/control",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/restaurants/[id]/control/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/restaurants/:id/resend-invite",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/restaurants/[id]/resend-invite/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/restaurants/:id/sms",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/restaurants/[id]/sms/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/restaurants/:id/sms",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/restaurants/[id]/sms/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/restaurants",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/restaurants/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/restaurants",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/restaurants/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/security/banned-ips",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/security/banned-ips/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/security/banned-ips",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/security/banned-ips/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/security",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/security/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/settings",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/settings/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/settings",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/settings/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/:collection/:id",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/site/[collection]/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/:collection/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/site/[collection]/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/:collection/:id",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/admin/site/[collection]/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/:collection",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/site/[collection]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/:collection",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/site/[collection]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/inquiries/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/site/inquiries/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/inquiries",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/site/inquiries/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/orders/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/admin/site/orders/[id]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/orders",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/site/orders/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/site/overview",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/site/overview/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/staff-credentials",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/staff-credentials/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/staff-credentials",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/staff-credentials/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/system-health",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/system-health/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/telemetry",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/telemetry/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/users/:userId/ban",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/users/[userId]/ban/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/users/:userId",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/users/[userId]/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/users/:userId/unban",
+      "method": "POST",
+      "file": "api/src/app/api/v1/admin/users/[userId]/unban/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/admin/users",
+      "method": "GET",
+      "file": "api/src/app/api/v1/admin/users/route.ts",
+      "guard": "requireAdmin",
+      "permission": null,
+      "boundary": "platform-admin",
+      "expectation": "a non-admin or cross-tenant token MUST be rejected; only a platform admin may pass"
+    },
+    {
+      "url": "/api/v1/auth/admin/login",
+      "method": "GET",
+      "file": "api/src/app/api/v1/auth/admin/login/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/admin/login",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/admin/login/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/admin/request",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/admin/request/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/admin/verify",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/admin/verify/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/invite/:token/claim",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/invite/[token]/claim/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/logout",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/logout/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/otp/request",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/otp/request/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/otp/verify",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/otp/verify/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/refresh",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/refresh/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/staff/login",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/staff/login/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/staff/request",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/staff/request/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/auth/staff/verify",
+      "method": "POST",
+      "file": "api/src/app/api/v1/auth/staff/verify/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/checkin",
+      "method": "POST",
+      "file": "api/src/app/api/v1/checkin/route.ts",
+      "guard": "inline",
+      "permission": null,
+      "boundary": "inline-custom",
+      "expectation": "authenticates inline rather than via a named guard — each one must be proven individually with an executed request"
+    },
+    {
+      "url": "/api/v1/events",
+      "method": "GET",
+      "file": "api/src/app/api/v1/events/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/gift-cards",
+      "method": "GET",
+      "file": "api/src/app/api/v1/gift-cards/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/gift-cards",
+      "method": "POST",
+      "file": "api/src/app/api/v1/gift-cards/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/maintenance/customer-insights",
+      "method": "GET",
+      "file": "api/src/app/api/v1/maintenance/customer-insights/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/customer-insights",
+      "method": "POST",
+      "file": "api/src/app/api/v1/maintenance/customer-insights/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/ensure-partitions",
+      "method": "GET",
+      "file": "api/src/app/api/v1/maintenance/ensure-partitions/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/ensure-partitions",
+      "method": "POST",
+      "file": "api/src/app/api/v1/maintenance/ensure-partitions/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/expire",
+      "method": "GET",
+      "file": "api/src/app/api/v1/maintenance/expire/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/expire",
+      "method": "POST",
+      "file": "api/src/app/api/v1/maintenance/expire/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/jobs-drain",
+      "method": "GET",
+      "file": "api/src/app/api/v1/maintenance/jobs-drain/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/jobs-drain",
+      "method": "POST",
+      "file": "api/src/app/api/v1/maintenance/jobs-drain/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/lifecycle",
+      "method": "GET",
+      "file": "api/src/app/api/v1/maintenance/lifecycle/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/lifecycle",
+      "method": "POST",
+      "file": "api/src/app/api/v1/maintenance/lifecycle/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/reminders",
+      "method": "GET",
+      "file": "api/src/app/api/v1/maintenance/reminders/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/reminders",
+      "method": "POST",
+      "file": "api/src/app/api/v1/maintenance/reminders/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/retention",
+      "method": "GET",
+      "file": "api/src/app/api/v1/maintenance/retention/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/retention",
+      "method": "POST",
+      "file": "api/src/app/api/v1/maintenance/retention/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/rewards",
+      "method": "GET",
+      "file": "api/src/app/api/v1/maintenance/rewards/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/rewards",
+      "method": "POST",
+      "file": "api/src/app/api/v1/maintenance/rewards/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/waitlist",
+      "method": "GET",
+      "file": "api/src/app/api/v1/maintenance/waitlist/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/maintenance/waitlist",
+      "method": "POST",
+      "file": "api/src/app/api/v1/maintenance/waitlist/route.ts",
+      "guard": "guardMaintenance",
+      "permission": null,
+      "boundary": "maintenance-key",
+      "expectation": "no secret => 401; correct secret => 200. Not reachable with any tenant token"
+    },
+    {
+      "url": "/api/v1/me/chats/:id",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/chats/[id]/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/chats/:id",
+      "method": "POST",
+      "file": "api/src/app/api/v1/me/chats/[id]/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/chats",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/chats/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/dna-summary",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/dna-summary/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/economy",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/economy/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/incentives",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/incentives/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/loyalty",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/loyalty/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/missions/:id/claim",
+      "method": "POST",
+      "file": "api/src/app/api/v1/me/missions/[id]/claim/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/missions",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/missions/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/notification-prefs",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/notification-prefs/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/notification-prefs",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/me/notification-prefs/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/points",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/points/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/profile",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/profile/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/push-subscribe",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/push-subscribe/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/push-subscribe",
+      "method": "POST",
+      "file": "api/src/app/api/v1/me/push-subscribe/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/referral",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/referral/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/referral",
+      "method": "POST",
+      "file": "api/src/app/api/v1/me/referral/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/reservations",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/reservations/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/reviews",
+      "method": "POST",
+      "file": "api/src/app/api/v1/me/reviews/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/rewards/:id/redeem",
+      "method": "POST",
+      "file": "api/src/app/api/v1/me/rewards/[id]/redeem/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me/rewards",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/rewards/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me",
+      "method": "GET",
+      "file": "api/src/app/api/v1/me/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/me",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/me/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/media/:key",
+      "method": "GET",
+      "file": "api/src/app/api/v1/media/[...key]/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/payments/callback",
+      "method": "GET",
+      "file": "api/src/app/api/v1/payments/callback/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/reservations/:code/arrive",
+      "method": "POST",
+      "file": "api/src/app/api/v1/reservations/[code]/arrive/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/reservations/:code/cancel",
+      "method": "POST",
+      "file": "api/src/app/api/v1/reservations/[code]/cancel/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/reservations/:code/pay",
+      "method": "POST",
+      "file": "api/src/app/api/v1/reservations/[code]/pay/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/reservations/:code/qr",
+      "method": "GET",
+      "file": "api/src/app/api/v1/reservations/[code]/qr/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/reservations/:code",
+      "method": "GET",
+      "file": "api/src/app/api/v1/reservations/[code]/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/reservations",
+      "method": "POST",
+      "file": "api/src/app/api/v1/reservations/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/restaurant/ai",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/ai/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/analytics",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/analytics/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/assistant/feedback",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/assistant/feedback/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/assistant",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/assistant/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/assistant",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/assistant/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/automations",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/automations/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageCampaigns",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/automations",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/automations/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageCampaigns",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/branches",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/branches/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": null,
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/branches",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/branches/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/campaigns",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/campaigns/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageCampaigns",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/cancellation-policy",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/cancellation-policy/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/cancellation-policy",
+      "method": "PUT",
+      "file": "api/src/app/api/v1/restaurant/cancellation-policy/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/cashback",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/cashback/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/cashback",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/cashback/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/chats/:id",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/chats/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/chats/:id",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/chats/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/chats",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/chats/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/coupons",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/coupons/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageCoupons",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/coupons",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/coupons/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageCoupons",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/crm/recommendations/contacted",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/crm/recommendations/contacted/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/crm/recommendations",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/crm/recommendations/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/customers/:userId",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/customers/[userId]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/customers/:userId",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/customers/[userId]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/customers",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/customers/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/events",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/events/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/events",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/events/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/events",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/events/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/events",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/events/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/fraud-signals",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/fraud-signals/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewRevenue",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/heartbeat",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/heartbeat/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": null,
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/hours",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/hours/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/hours",
+      "method": "PUT",
+      "file": "api/src/app/api/v1/restaurant/hours/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/manager-insights",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/manager-insights/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/members",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/members/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/members",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/members/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageCampaigns",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/:id/modifiers",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/menu/[id]/modifiers/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/:id/modifiers",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/menu/[id]/modifiers/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/:id/photo",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/menu/[id]/photo/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/:id/photo",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/menu/[id]/photo/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/menu/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/:id",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/menu/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/:id/tags",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/menu/[id]/tags/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/:id/tags",
+      "method": "PUT",
+      "file": "api/src/app/api/v1/restaurant/menu/[id]/tags/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/branding",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/menu/branding/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/branding",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/menu/branding/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/categories/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/menu/categories/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/categories/:id",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/menu/categories/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/categories",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/menu/categories/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/categories",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/menu/categories/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/modifier-groups/:id",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/menu/modifier-groups/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/modifier-groups/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/menu/modifier-groups/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/modifier-groups/:id",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/menu/modifier-groups/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/modifier-options/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/menu/modifier-options/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/modifier-options/:id",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/menu/modifier-options/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/qr",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/menu/qr/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu/reorder",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/menu/reorder/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/menu/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/menu",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/menu/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/notes",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/notes/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/notes",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/notes/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/notes",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/notes/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/notes",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/notes/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/notifications",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/notifications/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/photos",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/photos/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/photos",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/photos/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/photos",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/photos/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/pricing",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/pricing/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/pricing",
+      "method": "PUT",
+      "file": "api/src/app/api/v1/restaurant/pricing/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/profile",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/profile/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/profile",
+      "method": "PUT",
+      "file": "api/src/app/api/v1/restaurant/profile/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/reports",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/reports/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewRevenue",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/reservations/:code/events",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/reservations/[code]/events/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/reservations/:code/status",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/reservations/[code]/status/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/reservations",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/reservations/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/reviews",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/reviews/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/reviews",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/reviews/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/rfm",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/rfm/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/sms",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/sms/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageCampaigns",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/staff/password",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/staff/password/route.ts",
+      "guard": "withStaffAuth",
+      "permission": null,
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/staff",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/staff/route.ts",
+      "guard": "withStaffAuth",
+      "permission": null,
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/staff",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/staff/route.ts",
+      "guard": "withStaffAuth",
+      "permission": null,
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/staff",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/staff/route.ts",
+      "guard": "withStaffAuth",
+      "permission": null,
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/tables/:id/qr",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/tables/[id]/qr/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/tables/:id/qr",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/tables/[id]/qr/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/tables/:id",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/tables/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/tables/:id",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/tables/[id]/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/tables/:id/state",
+      "method": "PATCH",
+      "file": "api/src/app/api/v1/restaurant/tables/[id]/state/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/tables",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/tables/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/tables",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/tables/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/waitlist/analytics",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/waitlist/analytics/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/waitlist",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurant/waitlist/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageWaitlist",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/waitlist",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/waitlist/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageWaitlist",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/waitlist",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/restaurant/waitlist/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageWaitlist",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurant/walkin",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurant/walkin/route.ts",
+      "guard": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "boundary": "restaurant-tenant",
+      "expectation": "cross-tenant restaurant token MUST yield FORBIDDEN_TENANT — this is the row the matrix exists to prove"
+    },
+    {
+      "url": "/api/v1/restaurants/:slug/availability",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurants/[slug]/availability/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/restaurants/:slug/chat",
+      "method": "POST",
+      "file": "api/src/app/api/v1/restaurants/[slug]/chat/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/restaurants/:slug/menu",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurants/[slug]/menu/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/restaurants/:slug",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurants/[slug]/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/restaurants/availability",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurants/availability/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/restaurants/live-stats",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurants/live-stats/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/restaurants",
+      "method": "GET",
+      "file": "api/src/app/api/v1/restaurants/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/seo/sitemap",
+      "method": "GET",
+      "file": "api/src/app/api/v1/seo/sitemap/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/site/:collection/:slug",
+      "method": "GET",
+      "file": "api/src/app/api/v1/site/[collection]/[slug]/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/site/:collection",
+      "method": "GET",
+      "file": "api/src/app/api/v1/site/[collection]/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/site/contact",
+      "method": "POST",
+      "file": "api/src/app/api/v1/site/contact/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/site/orders/:code",
+      "method": "GET",
+      "file": "api/src/app/api/v1/site/orders/[code]/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/site/orders",
+      "method": "POST",
+      "file": "api/src/app/api/v1/site/orders/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/site/trial",
+      "method": "POST",
+      "file": "api/src/app/api/v1/site/trial/route.ts",
+      "guard": "UNGUARDED",
+      "permission": null,
+      "boundary": "UNGUARDED",
+      "expectation": "no recognised guard and no inline auth. Either deliberately public (must be named and justified individually) or a hole. UNKNOWN is a GAP, never a pass"
+    },
+    {
+      "url": "/api/v1/telemetry",
+      "method": "POST",
+      "file": "api/src/app/api/v1/telemetry/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    },
+    {
+      "url": "/api/v1/waitlist/:id/accept",
+      "method": "POST",
+      "file": "api/src/app/api/v1/waitlist/[id]/accept/route.ts",
+      "guard": "inline",
+      "permission": null,
+      "boundary": "inline-custom",
+      "expectation": "authenticates inline rather than via a named guard — each one must be proven individually with an executed request"
+    },
+    {
+      "url": "/api/v1/waitlist/:id/decline",
+      "method": "POST",
+      "file": "api/src/app/api/v1/waitlist/[id]/decline/route.ts",
+      "guard": "inline",
+      "permission": null,
+      "boundary": "inline-custom",
+      "expectation": "authenticates inline rather than via a named guard — each one must be proven individually with an executed request"
+    },
+    {
+      "url": "/api/v1/waitlist/:id",
+      "method": "GET",
+      "file": "api/src/app/api/v1/waitlist/[id]/route.ts",
+      "guard": "inline",
+      "permission": null,
+      "boundary": "inline-custom",
+      "expectation": "authenticates inline rather than via a named guard — each one must be proven individually with an executed request"
+    },
+    {
+      "url": "/api/v1/waitlist/:id",
+      "method": "DELETE",
+      "file": "api/src/app/api/v1/waitlist/[id]/route.ts",
+      "guard": "inline",
+      "permission": null,
+      "boundary": "inline-custom",
+      "expectation": "authenticates inline rather than via a named guard — each one must be proven individually with an executed request"
+    },
+    {
+      "url": "/api/v1/waitlist",
+      "method": "POST",
+      "file": "api/src/app/api/v1/waitlist/route.ts",
+      "guard": "authFromRequest",
+      "permission": null,
+      "boundary": "user",
+      "expectation": "another user's token MUST NOT read or mutate this user's rows (the per-user boundary, not the tenant one)"
+    }
+  ]
+}

@@ -23,6 +23,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fg from './internal/simple-glob.mjs';
@@ -56,6 +57,51 @@ const SINK_PATTERNS = [
  * رو balance می‌کنیم. برایِ innerHTML= با رشته‌ی معمولی (' یا ")، تا کوتیشنِ
  * بسته می‌ریم. Fallback: تا اولین ; یا سقفِ ۲۰۰۰ کاراکتر.
  */
+// شمارنده‌ی پرانتزی که رشته و template را می‌فهمد.
+//
+// ⚠️ چرا لازم شد (۲۰۲۶-۰۹-۰۵): شاخه‌ی balanceِ قبلی پرانتزهای خام را
+// می‌شمرد، از جمله پرانتزهای داخلِ متنِ HTML و CSS. تا وقتی اسکن از *بعدِ*
+// پرانتز شروع می‌شد این شاخه برای sinkهای template-محور اصلاً اجرا نمی‌شد و
+// نقصش پنهان بود؛ به‌محضِ اینکه اسکن را از خودِ پرانتز شروع کردم،
+// `w.document.write(\`<!doctype html>…\`)` در waitlist.js:422 از `escaped` به
+// `review` سقوط کرد، چون یک پرانتزِ بی‌جفت داخلِ متنِ HTML شمارش را خراب
+// می‌کرد. یعنی رفعِ insertAdjacentHTML یک سینکِ بی‌ربط را بد طبقه‌بندی کرد.
+//
+// همان شکافِ رشته/template که در splitTopLevelArgs حل شده، اینجا هم باید حل
+// شود — وگرنه خودِ payloadهای insertAdjacentHTML (که HTML‌اند) هم قربانیِ
+// همین شمارشِ غلط می‌شوند.
+function matchingParen(text, start, limit) {
+  let depth = 0, i = start;
+  const tmpl = [];
+  while (i < limit) {
+    const c = text[i];
+    const top = tmpl.length ? tmpl[tmpl.length - 1] : null;
+
+    if (top && !top.inExpr) {
+      if (c === '\\') { i += 2; continue; }
+      if (c === '`') { tmpl.pop(); i++; continue; }
+      if (c === '$' && text[i + 1] === '{') { top.inExpr = true; top.braces = 1; i += 2; continue; }
+      i++; continue;
+    }
+    if (top && top.inExpr) {
+      if (c === '{') { top.braces++; i++; continue; }
+      if (c === '}') { top.braces--; if (top.braces === 0) top.inExpr = false; i++; continue; }
+      if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
+      if (c === "'" || c === '"') { i = skipQuoted(text, i); continue; }
+      if (c === '(') depth++;
+      else if (c === ')') { depth--; if (depth === 0) return i + 1; }
+      i++; continue;
+    }
+
+    if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
+    if (c === "'" || c === '"') { i = skipQuoted(text, i); continue; }
+    if (c === '(') { depth++; i++; continue; }
+    if (c === ')') { depth--; if (depth === 0) return i + 1; i++; continue; }
+    i++;
+  }
+  return i;
+}
+
 function grabExpression(text, matchStart, searchFrom = matchStart) {
   const CAP = 4000;
   let i = searchFrom;
@@ -91,13 +137,7 @@ function grabExpression(text, matchStart, searchFrom = matchStart) {
   }
   const opener = text[i];
   if (opener === '(') {
-    let depth = 0;
-    const start = i;
-    for (; i < n; i++) {
-      if (text[i] === '(') depth++;
-      else if (text[i] === ')') { depth--; if (depth === 0) { i++; break; } }
-    }
-    return text.slice(matchStart, i);
+    return text.slice(matchStart, matchingParen(text, i, n));
   }
   // backtick یا کوتیشن: تا بستنِ متناظرِ بدونِ backslash قبلش
   const closer = opener;
@@ -183,6 +223,58 @@ function extractInterpolations(expr) {
  * innerHTML/outerHTML) یا داخلِ پرانتز (برایِ insertAdjacentHTML/document.write/
  * eval/jquery.html) رو در نظر بگیریم — نه کلِ خطِ خام.
  */
+// جدا کردنِ آرگومان‌ها روی کاماهایِ سطحِ بالا. باید تودرتویی، رشته، و درجِ
+// template را رعایت کند: payloadهایِ این کدبیس معمولاً از جنسِ
+// `<div>${esc(x)}</div>` داخلِ backtick هستند و یک split(',')ِ ساده وسطِ
+// template را می‌بُرد و طبقه‌بندی را بی‌معنا می‌کرد.
+function skipQuoted(src, i) {
+  const q = src[i];
+  let j = i + 1;
+  while (j < src.length) {
+    if (src[j] === '\\') { j += 2; continue; }
+    if (src[j] === q) return j + 1;
+    j++;
+  }
+  return j;
+}
+
+function splitTopLevelArgs(src) {
+  const args = [];
+  let depth = 0, start = 0, i = 0;
+  const tmpl = [];   // پشته‌ی templateها، برای ${...}ِ تودرتو
+  while (i < src.length) {
+    const c = src[i];
+    const top = tmpl.length ? tmpl[tmpl.length - 1] : null;
+
+    if (top && !top.inExpr) {
+      // داخلِ متنِ خامِ یک template: فقط ${ یا backtickِ بسته مهم است
+      if (c === '\\') { i += 2; continue; }
+      if (c === '`') { tmpl.pop(); i++; continue; }
+      if (c === '$' && src[i + 1] === '{') { top.inExpr = true; top.braces = 1; i += 2; continue; }
+      i++; continue;
+    }
+
+    if (top && top.inExpr) {
+      if (c === '{') { top.braces++; i++; continue; }
+      if (c === '}') { top.braces--; if (top.braces === 0) top.inExpr = false; i++; continue; }
+      if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
+      if (c === "'" || c === '"') { i = skipQuoted(src, i); continue; }
+      i++; continue;
+    }
+
+    if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
+    if (c === "'" || c === '"') { i = skipQuoted(src, i); continue; }
+    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+    if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
+    if (c === ',' && depth === 0) { args.push(src.slice(start, i)); start = i + 1; i++; continue; }
+    i++;
+  }
+  args.push(src.slice(start));
+  const out = args.map((a) => a.trim());
+  if (out.length > 1 && out[out.length - 1] === '') out.pop();
+  return out;
+}
+
 function extractRhs(expr, kind) {
   if (kind === 'innerHTML' || kind === 'outerHTML') {
     const eq = expr.indexOf('=');
@@ -192,7 +284,15 @@ function extractRhs(expr, kind) {
   const open = expr.indexOf('(');
   const close = expr.lastIndexOf(')');
   if (open === -1) return '';
-  return (close > open ? expr.slice(open + 1, close) : expr.slice(open + 1)).trim();
+  const inner = (close > open ? expr.slice(open + 1, close) : expr.slice(open + 1)).trim();
+  // insertAdjacentHTML(position, payload) — آنچه رندر می‌شود آرگومانِ **آخر**
+  // است. دادنِ رشته‌ی موقعیت به طبقه‌بند همان چیزی بود که ده سینک را بی‌آنکه
+  // payloadشان خوانده شود `safe_static` می‌کرد (دستورِ ۰۱۵).
+  if (kind === 'insertAdjacentHTML') {
+    const args = splitTopLevelArgs(inner);
+    return args.length ? args[args.length - 1] : '';
+  }
+  return inner;
 }
 
 // ── آیا یک درجِ `${...}` به‌تنهایی امن است؟ ──
@@ -235,9 +335,34 @@ function isSafeInterp(interp) {
 const UNSAFE_BASELINE = 65;
 const REVIEW_BASELINE = 20;
 
+// تعدادِ سینک‌هایی که payloadشان اصلاً استخراج نشده. در کلِ مخزن ۱۰ سینکِ
+// insertAdjacentHTML چنین‌اند، ولی خطِ پایه فقط دامنه‌ی enforced را می‌شمارد
+// (apps/* + shared/js) که ۵ تاست؛ ۵ تای دیگر در standalone/ و report-only
+// است. ششمی در دامنه‌ی enforced گیت را قرمز می‌کند.
+const PAYLOAD_NOT_CAPTURED_BASELINE = 0;
+
+
+// آیا عبارتِ استخراج‌شده اصلاً به آرگومانِ payload رسیده است؟
+// برای `insertAdjacentHTML(position, payload)` استخراج روی کوتیشنِ اولین
+// آرگومان می‌ایستد، پس هیچ کامایی در عبارت نیست و payload دیده نشده.
+function payloadCaptured(expr, kind) {
+  if (kind !== 'insertAdjacentHTML') return true;
+  // فراخوانِ کامل یعنی به پرانتزِ بسته رسیده‌ایم و بیش از یک آرگومان داریم.
+  const e = String(expr).trim();
+  if (!e.endsWith(')')) return false;
+  const open = e.indexOf('(');
+  if (open === -1) return false;
+  return splitTopLevelArgs(e.slice(open + 1, e.lastIndexOf(')'))).length >= 2;
+}
 function classify(expr, kind) {
   // eval/new Function: همیشه لایقِ review دستی‌اند (به‌ندرت با دیتایِ کاربر، ولی خطرناکن)
   if (kind === 'eval' || kind === 'new Function') return 'review';
+
+  // ⚠️ حکمِ ناکسب‌شده (دستورِ ۰۱۵، ۲۰۲۶-۰۹-۰۴): اگر payload اصلاً استخراج
+  // نشده، هر برچسبی درباره‌ی محتوایش ادعایی است که این ابزار نسنجیده.
+  // پیش از این چنین موردی `safe_static` می‌شد — یعنی «محتوا را دیدم و
+  // ثابت بود» — در حالی که محتوا اصلاً دیده نشده بود. اسمِ درستش این است.
+  if (!payloadCaptured(expr, kind)) return 'payload_not_captured';
 
   const rhs = extractRhs(expr, kind);
 
@@ -307,13 +432,101 @@ function classify(expr, kind) {
 //  دورِ بعدیِ ممیزی باید override‌هایی که دیگه با کدِ واقعی مچ نمی‌شن (خطِ
 //  متفاوت/محتوایِ متفاوت) رو دوباره بررسی کنه.
 // ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+//  هویتِ سینک — چرا کلیدِ overrideها دیگر شماره‌خط نیست (۲۰۲۶-۰۹-۰۴)
+//
+//  کلیدِ `path:line` در یک جهت fail-closed بود و در جهتِ دیگر fail-OPEN:
+//
+//   • سینکِ بازبینی‌شده از خطِ کلیدخورده **برود** → override بی‌لنگر می‌شود،
+//     طبقه‌بندی به review/unsafe برمی‌گردد، گیت قرمز می‌شود. سالم.
+//   • سینکِ **دیگری** روی آن خط **بنشیند** → همان override می‌گیرد و آن را
+//     بی‌صدا `dom_api_safe` می‌کند. سینکی که هیچ‌کس نخوانده، بازبینیِ
+//     شخصِ دیگری را به ارث می‌برد. نه قرمزی، نه هشدار، هیچ.
+//
+//  جهتِ دوم فرضی نبود — با یک جهشِ حداقلی بازتولید شد: خطِ ۴۹ِ live-strip.js
+//  با `el.innerHTML = location.hash + document.referrer;` جایگزین شد و گیت
+//  با EXIT=0 سبز ماند و یادداشتِ بازبینیِ سینکِ قبلی را به آن چسباند.
+//  `standalone/*` این را تضمینی می‌کرد: تولیدی‌اند و با هر تغییرِ پنل
+//  یک‌جا می‌لغزند.
+//
+//  تنها چیزی که سندِ «این را دستی خواندم» را معنادار می‌کند، گره‌زدنش به
+//  **خودِ کد** است، نه به جایی که آن روز نشسته بود. پس کلید = مسیر + هَشِ
+//  عبارتِ نرمال‌شده‌ی سینک. نتیجه: جابه‌جاییِ کد بی‌ضرر است (و کارِ دستیِ
+//  دوباره‌کلیدزدن حذف می‌شود)، ولی **تغییرِ خودِ عبارت** override را باطل
+//  می‌کند و سینک قرمز می‌شود — دقیقاً همان چیزی که می‌خواهیم.
+//
+//  و اگر کلیدی به هیچ سینکی نخورد، خطاست نه سکوت (پایینِ main): overrideِ
+//  بی‌مصرف یعنی یا کد رفته یا امضا عوض شده؛ هر دو باید دیده شوند.
+// ═══════════════════════════════════════════════════════════════════════
+function normalizeSinkExpr(expr) {
+  return String(expr).replace(/\s+/g, ' ').trim();
+}
+
+function sinkHash(expr, sourceLine) {
+  const identity = normalizeSinkExpr(expr) + '|' + normalizeSinkExpr(sourceLine);
+  return createHash('sha256').update(identity).digest('hex').slice(0, 12);
+}
+
+function overrideKeyFor(relPath, expr, sourceLine) {
+  return `${relPath}#${sinkHash(expr, sourceLine)}`;
+}
+
+// هر کلیدی که واقعاً مصرف شد؛ برایِ کشفِ overrideهای بی‌لنگر در main.
+const USED_OVERRIDE_KEYS = new Set();
 const MANUAL_REVIEW_OVERRIDES = new Map([
+  // ── QRِ میز: تنها درجِ escapeنشده‌ی قالبِ چاپ. خوانده‌شده ۲۰۲۶-۰۹-۰۵. ──
+  ['apps/business/js/waitlist.js#a35cc85e253d',
+   'قالبِ چاپِ QRِ میز دو درج دارد: esc(_tableQrLabel) و _tableQrSvg خام. '
+   + 'دومی از GET restaurant/tables/:id/qr می‌آید که withRestaurantAuth دارد و '
+   + 'صریح table.restaurantId را با ctx.restaurant.id می‌سنجد. محتوایش خروجیِ '
+   + 'QRCode.toString(url,{type:svg}) از کتابخانه‌ی qrcode است — هندسه‌ی '
+   + 'ماژول‌ها، نه متنِ کاربر؛ و خودِ url هم سمتِ سرور از codeِ اختصاصیِ '
+   + 'assignQrCode ساخته می‌شود، پس حتی ورودی‌اش هم مهاجم‌پذیر نیست. '
+   + 'اسکنر نمی‌تواند داخلِ کتابخانه را ببیند، پس این ثبتِ دستی لازم است. '
+   + '⚠️ اگر روزی منبعِ svg عوض شود (کتابخانه‌ی دیگر، یا svg از دیتای کاربر)، '
+   + 'این درج یک تزریقِ مستقیم است — و چون خطِ سینک عوض نمی‌شود، این override '
+   + 'همچنان اعمال می‌شود. منبع را عوض کردی، این را هم بازبینی کن.'],
+  // ── سه سینکِ insertAdjacentHTML، دستی خوانده‌شده در ۲۰۲۶-۰۹-۰۵ پس از
+  //    رفعِ ریشه‌ایِ extractRhs. تا پیش از آن طبقه‌بند payload را اصلاً
+  //    نمی‌دید و همه را safe_static می‌کرد؛ حالا می‌بیند و درست علامتشان
+  //    می‌زند، چون payload یک فراخوانِ کمکی است که خودِ اسکنر دنبالش
+  //    نمی‌رود. این‌ها همان «الگو ۱» هستند: escِ واقعی داخلِ تابعِ کمکی.
+  //
+  //    ⚠️ محدودیتی که باید صریح باشد: کلیدِ هویت خطِ **سینک** را می‌بندد،
+  //    نه بدنه‌ی تابعِ کمکی را. اگر روزی esc از داخلِ bubble()/bizBubble()
+  //    برداشته شود، خطِ سینک عوض نشده و این override همچنان اعمال می‌شود.
+  //    گاردِ واقعیِ آن رفتاری است (tools/xss-escaping-regression.mjs) و
+  //    امروز این دو تابع را پوشش نمی‌دهد — چون هیچ‌کدام export نشده‌اند
+  //    (bubble در یک ES module ولی بدونِ export، bizBubble در JSِ classic).
+  //    بستنِ آن، تغییر در سورسِ اپ می‌خواهد نه در این ابزار؛ ثبت شد.
+  ['apps/customer/js/features/chat.js#ac1498949c1d',
+   'bubble(m) دو درج دارد: esc(m.body) — escaperِ واقعیِ [&<>"\'] — و '
+   + 'faTime(m.created_at) که new Date(iso).toLocaleTimeString(fa-IR) است و '
+   + 'برای هر ورودی فقط رقم/جداکننده می‌دهد (ورودیِ نامعتبر: catch → رشته‌ی خالی). '
+   + 'هیچ مسیری برای markup نیست. خوانده‌شده ۲۰۲۶-۰۹-۰۵.'],
+  ['apps/business/js/chat.js#7dc23113c97a',
+   'bizBubble(m) قرینه‌ی bubble است: chatEsc(m.body) همان پنج کاراکتر را '
+   + 'escape می‌کند و chatTime(m.created_at) همان toLocaleTimeString است. '
+   + 'خوانده‌شده ۲۰۲۶-۰۹-۰۵.'],
+  ['apps/business/js/assistant.js#77816159c682',
+   'assistantAppend(html) یک پارامترِ خام می‌گیرد، پس قاعده‌ی شناسه‌ی خام '
+   + 'درست review می‌دهد. هر شش فراخوان خوانده شد: :51 esc(message) · '
+   + ':57 pendingId که ap+Date.now() است · :65 رشته‌ی literal · :69 esc(d.answer) · '
+   + ':85 esc(res.data.answer) · :74 chips که عمداً خام است چون فقط از '
+   + 'jsq(d.log_id)، jsq(s.intent) و esc(s.label) ساخته شده — و jsq خودش '
+   + 'esc(JSON.stringify(String(v))) است. خوانده‌شده ۲۰۲۶-۰۹-۰۵ (و مستقلاً '
+   + 'توسطِ دو نشستِ دیگر).'],
+  // ── فرمِ ورودِ سه‌عاملیِ پنلِ شرکت ──
+  ['apps/company/js/intelligence.js#1797949972c4',
+   'فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت. ۲۰۲۶-۰۹-۰۲: درجِ سومِ _otpLoginEnabled هم اضافه شد — همان جنس: یک booleanِ سرور که فقط تصمیم می‌گیرد رشته‌ی literal ساخته شود یا نه.'],
+  ['standalone/company.html#1797949972c4',
+   'فرمِ ورودِ مدیر (TOTP، ۲۰۲۶-۰۸-۲۹): هر دو درجِ این قالب markupِ **داخلیِ ثابت** است — `totpBlock` یک رشته‌ی literal یا خالی، و ternaryِ onkeydown دو literal. هیچ داده‌ی کاربر/سرور واردش نمی‌شود؛ پرچمِ `_totpRequired` یک boolean از GET /auth/admin/login است. پیش از این تغییر همین محل safe_static بود چون اصلاً درج نداشت. ۲۰۲۶-۰۹-۰۲: درجِ سومِ _otpLoginEnabled هم اضافه شد — همان جنس: یک booleanِ سرور که فقط تصمیم می‌گیرد رشته‌ی literal ساخته شود یا نه.'],
   // ── بازبینِ بیرونی (Sourcery/opengrep) روی PR #79 ──
   // این سه محل را قاعده‌ی `insecure-innerhtml` علامت زد. تک‌تک در سورس بررسی
   // شدند؛ نتیجه در گزارشِ دورِ ششم. دو موردِ اولِ آن سه (food-dna:191 و
   // reservation:152) **واقعی بودند و رفع شدند** (faNum یک escaper نیست)، پس
   // اینجا override نمی‌خورند. فقط موردِ زیر مثبتِ کاذب بود:
-  ['apps/customer/js/features/trips.js:206',
+  ['apps/customer/js/features/trips.js#6ea9860e2c7f',
    'مثبتِ کاذبِ opengrep: تنها مقدارِ پویا esc(res.error?.message||…) است و '
    + "icon(alert,{size:13}) کلیدِ literal است. قاعده الگویِ innerHTML= را "
    + 'بدونِ dataflow علامت می‌زند. گاردِ خودمان هم مستقل «escaped» می‌دهد.'],
@@ -325,14 +538,14 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/customer/js/data/discover.js:202', 'hCardHTML() از قبل esc(r.n) داشت — بررسی شد.'],
   ['apps/customer/js/data/discover.js:220', 'hCardHTML() از قبل esc(r.n) داشت — بررسی شد.'],
   ['apps/customer/js/features/chat.js:112', 'bubble(m) از قبل esc(m.body) داشت — بررسی شد.'],
-  ['apps/customer/js/features/economy.js:106', 'missionCard(m) دیگه esc(m.title)/esc(m.description) داره (رفع‌شده در همین PR).'],
+  ['apps/customer/js/features/economy.js#15dccaa57a8f', 'missionCard(m) دیگه esc(m.title)/esc(m.description) داره (رفع‌شده در همین PR).'],
   ['apps/customer/js/features/palette.js:94', 'itemHTML(it,i) از قبل esc(it.t)/esc(it.sub) داشت — بررسی شد.'],
-  ['apps/customer/js/reservation.js:21', 'cardHTML() دیگه esc(r.n) داره (رفع‌شده در همین PR).'],
-  ['apps/business/js/waitlist.js:38', 'wlCard(w,i) از قبل esc(w.name) داشت — بررسی شد.'],
+  ['apps/customer/js/reservation.js#a04503eb4fdb', 'cardHTML() دیگه esc(r.n) داره (رفع‌شده در همین PR).'],
+  ['apps/business/js/waitlist.js#0327998ad65e', 'wlCard(w,i) از قبل esc(w.name) داشت — بررسی شد.'],
   ['apps/business/js/reservations.js:75', 'resItemHTML(r,i) از قبل esc(r.name)/esc(r.phone)/esc(r.note)/esc(r.cancelReason) داشت — بررسی شد.'],
   ['apps/business/js/staff-system.js:282', 'sugCard از PR#13 قبلاً esc(s.reason) داره؛ r.label هم در همین PR با esc() رفع شد.'],
-  ['apps/company/js/badges.js:21', 'BADGES_LIST.map از قبل esc(b.name)/esc(b.description)/... داشت — بررسی شد.'],
-  ['apps/company/js/missions.js:21', 'MISSIONS_LIST.map از قبل esc(m.title) داشت — بررسی شد.'],
+  ['apps/company/js/badges.js#f65ffcf1d105', 'BADGES_LIST.map از قبل esc(b.name)/esc(b.description)/... داشت — بررسی شد.'],
+  ['apps/company/js/missions.js#3b88af950f9f', 'MISSIONS_LIST.map از قبل esc(m.title) داشت — بررسی شد.'],
   ['apps/business/js/crm.js:891', 'کارت‌هایِ AI/تماس از قبل esc(c.title)/esc(c.detail)/esc(c.name)/esc(c.reason) داشتن — بررسی شد.'],
 
   // ── الگو ۲: متغیرِ محلی از قبل چند خط بالاتر esc() شده، اسکنر فقط
@@ -363,20 +576,20 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   // ── الگو ۶: مقایسه/ترنریِ محلی که رجکسِ ابزار نتونست parse کنه ولی
   //    دستی بررسی شد کاملاً امنه (رشته‌ی ثابت/تابعِ trusted). ──
   ['apps/customer/js/data/discover.js:151', 'ترنریِ icon(...)+رشته یا esc(el.textContent) — هردو امن.'],
-  ['apps/customer/js/features/loyalty.js:25', 'perksBlock() از PERKS محلی (shared/js seed) می‌سازه؛ tier فقط esc(b.name) بعدِ رفعِ این PR.'],
-  ['apps/customer/js/features/loyalty.js:64', 'badges.map دیگه esc(b.name) داره (رفع‌شده در همین PR)؛ tier.emoji/tier.name از enumِ ثابتِ سطحِ باشگاهه.'],
+  ['apps/customer/js/features/loyalty.js#388c8b826e92', 'perksBlock() از PERKS محلی (shared/js seed) می‌سازه؛ tier فقط esc(b.name) بعدِ رفعِ این PR.'],
+  ['apps/customer/js/features/loyalty.js#c31403f24fd3', 'badges.map دیگه esc(b.name) داره (رفع‌شده در همین PR)؛ tier.emoji/tier.name از enumِ ثابتِ سطحِ باشگاهه.'],
   ['apps/customer/js/features/notifications.js:73', 'رشته‌هایِ ثابت (concat با +) — بدونِ دیتایِ کاربر.'],
   ['apps/customer/js/features/notifications.js:93', 'Object.entries(CATS) — آبجکتِ محلیِ ثابت.'],
-  ['apps/customer/js/features/onboarding.js:42', 'کارتِ onboarding کاملاً استاتیکه.'],
+  ['apps/customer/js/features/onboarding.js#650b709cbb1e', 'کارتِ onboarding کاملاً استاتیکه.'],
   ['apps/customer/js/features/rewards.js:108', 'd.valid ترنری با icon(...)؛ d.balance_toman از fmtFa می‌گذره.'],
   ['apps/customer/js/waitlist.js:55', 'isOffered ترنری رویِ HTMLِ استاتیک.'],
   ['apps/customer/js/data/booking.js:69', 'r.slots رشته‌هایِ ساعتِ ثابت‌فرمت (HH:MM) از سرور، نه متنِ آزاد.'],
   ['apps/customer/js/data/booking.js:82', 's.time مشابه — فرمتِ ثابتِ ساعت.'],
   ['apps/customer/js/data/booking.js:92', 'مشابهِ L69.'],
   ['apps/customer/js/data/booking.js:219', 'Array.from({length:PARTY_MAX}) — آرایه‌ی محلیِ عددی.'],
-  ['apps/business/js/chat.js:24', 'chatEsc در همه‌ی فیلدها استفاده شده؛ t.id ستونِ Postgres UUID (فرمت تضمین‌شده).'],
-  ['apps/business/js/chat.js:75', 'bizBubble از الگویِ chatEsc پیروی می‌کنه (مشابهِ chat.js:94).'],
-  ['apps/business/js/chat.js:94', 'chatEsc(body) مستقیم رویِ ورودی.'],
+  ['apps/business/js/chat.js#be1d8c440b90', 'chatEsc در همه‌ی فیلدها استفاده شده؛ t.id ستونِ Postgres UUID (فرمت تضمین‌شده).'],
+  ['apps/business/js/chat.js#d9400c3c27c7', 'bizBubble از الگویِ chatEsc پیروی می‌کنه (مشابهِ chat.js:94).'],
+  ['apps/business/js/chat.js#9565b12114d0', 'chatEsc(body) مستقیم رویِ ورودی.'],
   ['apps/business/js/crm.js:89', 'logoPhoto.url دیگه esc شده (رفع‌شده در همین PR).'],
   ['apps/business/js/crm.js:379', 'dist فقط {star:number,count:number} — بدونِ رشته.'],
   ['apps/business/js/crm.js:551', 'کارتِ hero — اعداد/توابعِ trusted (fnl/fa)؛ متنِ ثابت.'],
@@ -391,7 +604,7 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/business/js/staff-system.js:399', 'devCode — کدِ OTPِ حالتِ دمو، رشته‌ی محلی (نه ورودیِ کاربر).'],
   ['apps/business/js/waitlist.js:115', 'floorEdit ترنریِ بولینِ محلی رویِ HTMLِ استاتیک.'],
   ['apps/business/js/waitlist.js:270', 'undoFn نامِ تابعِ ثابتیه که خودِ کدِ ما در toastUndo(msg, "fnName") پاس می‌ده، نه ورودیِ کاربر.'],
-  ['apps/company/js/intelligence.js:22', 'fa(d.guests.total_clv_toman) + rfm_distribution.map — اعداد/توابعِ trusted.'],
+  ['apps/company/js/intelligence.js#11f2da47d260', 'fa(d.guests.total_clv_toman) + rfm_distribution.map — اعداد/توابعِ trusted.'],
   ['apps/company/js/intelligence.js:50', 'RESTAURANTS.map — فیلدهایِ نمایش‌داده‌شده اعداد/enumِ status‌اند.'],
   ['apps/company/js/intelligence.js:183', 'متنِ ثابتِ توضیحی + fa(needsAttention.length).'],
   ['apps/company/js/intelligence.js:212', 'healthMeta از یک لوکاپِ محلیِ ثابت؛ d.jobs.dead عدد.'],
@@ -417,7 +630,12 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   //    قالب‌هایِ کاملاً استاتیک استفاده می‌کردن — هیچ فراخوانِ خامِ
   //    escape‌نشده‌ای پیدا نشد. ──
   ['apps/customer/js/auth.js:209', 'openSheet(html) — فراخوان‌ها بررسی شدن (bookStep2/3 با esc(r.n)، rewards.js/trips.js با قالبِ استاتیک) — امن.'],
-  ['apps/customer/js/features/live-strip.js:38', 'out فقط از pill(fmtFa(عدد)) ساخته می‌شه — بدونِ متنِ کاربر/API.'],
+  ['apps/customer/js/features/live-strip.js#9bc628165d01',
+   'out فقط از pill(fmtFa(عدد)) ساخته می‌شه — بدونِ متنِ کاربر/API. هر سه درج پشتِ گاردِ '
+   + '`Number(d.x) > 0` هستند، پس رشته‌ای که `<` داشته باشد NaN می‌شود و اصلاً رندر نمی‌شود؛ '
+   + 'fmtFa هم `n.toLocaleString(\'fa-IR\')` است که فقط رقم/جداکننده تولید می‌کند. '
+   + '۲۰۲۶-۰۹-۰۴: کلید از :38 به :49 جابه‌جا شد چون راندِ ۲۰ شاخه‌ی res.ok را افزود؛ '
+   + 'خودِ سینک دوباره دستی خوانده شد، نه فقط شماره‌خطِ جدید جایگزین.'],
   ['apps/business/js/overview.js:315', 'heatmapِ html فقط از slots/days (محلیِ ثابت) + fa(v) (عدد) ساخته می‌شه.'],
   ['apps/business/js/staff-system.js:91', 'openModal(html) — فراخوان‌هایِ نمونه‌گیری‌شده (data.js changeStatus با esc(r.name)) امن بودن.'],
   ['apps/company/js/overview.js:129', 'openModal(html) — همون الگویِ staff-system.js:91؛ فراخوان‌هایِ نمونه‌گیری‌شده امن بودن.'],
@@ -426,11 +644,11 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   //    پیش از لانچ، ۲۰۲۶-۰۸-۲۸). هر پنج مورد تک‌تک خوانده و امن تأیید شد؛
   //    منشأشان: f658687 «صداقتِ سراسری» · d525e48 SPEC-A فاز ۲ ·
   //    f4c27e4 SPEC-B provisioning. هیچ‌کدام رانشِ کیفیت نیست. ──
-  ['apps/business/js/crm.js:132', 'loadErrorBlock(title, retry) — هر دو آرگومان literalِ خودِ کدند؛ title با esc() می‌گذره و retry عمداً یک رشته‌ی **کد** برایِ onclick است (نه دیتا).'],
-  ['apps/business/js/crm.js:136', 'کارتِ هویت: RESTAURANT.name با esc() می‌گذره (تنها فیلدِ API)؛ logoEmoji/logoGradient فقط از پیکرِ محلی ست می‌شن (crm.js:274-275 ← pickLogoEmoji/pickLogoGrad)، هرگز از پاسخِ سرور؛ logoPhoto.url و statusLabel هم esc دارن؛ GALLERY.indexOf عدد است.'],
-  ['apps/business/js/crm.js:427', 'همان loadErrorBlock مثلِ crm.js:132 — آرگومان‌ها literalِ کدند.'],
-  ['apps/business/js/menu.js:674', 'گروه/آپشنِ افزودنی‌ها: esc(g.name)/esc(o.name) رویِ متن، jsq(itemId)/jsq(g.id)/jsq(g.name) داخلِ onclick، و fa(min_select)/fa(max_select) رویِ اعداد — هر مسیرِ دیتا پوشش داره.'],
-  ['apps/company/js/restaurant.js:176', 'btn.innerHTML = label که خودش چهار خط بالاتر از همان دکمه خوانده شده (ذخیره/بازگرداندنِ برچسبِ دکمه حینِ لودینگ) — رفت‌وبرگشتِ markupِ خودِ عنصر، بدونِ ورودِ هیچ دادهٔ بیرونی.'],
+  ['apps/business/js/crm.js#10fff8cec69d', 'loadErrorBlock(title, retry) — هر دو آرگومان literalِ خودِ کدند؛ title با esc() می‌گذره و retry عمداً یک رشته‌ی **کد** برایِ onclick است (نه دیتا).'],
+  ['apps/business/js/crm.js#12cae07d62d0', 'کارتِ هویت: RESTAURANT.name با esc() می‌گذره (تنها فیلدِ API)؛ logoEmoji/logoGradient فقط از پیکرِ محلی ست می‌شن (crm.js:274-275 ← pickLogoEmoji/pickLogoGrad)، هرگز از پاسخِ سرور؛ logoPhoto.url و statusLabel هم esc دارن؛ GALLERY.indexOf عدد است.'],
+  ['apps/business/js/crm.js#dd7a5ecb6671', 'همان loadErrorBlock مثلِ crm.js:132 — آرگومان‌ها literalِ کدند.'],
+  ['apps/business/js/menu.js#cbbe45f8aea6', 'گروه/آپشنِ افزودنی‌ها: esc(g.name)/esc(o.name) رویِ متن، jsq(itemId)/jsq(g.id)/jsq(g.name) داخلِ onclick، و fa(min_select)/fa(max_select) رویِ اعداد — هر مسیرِ دیتا پوشش داره.'],
+  ['apps/company/js/restaurant.js#c5a4dbdd770c', 'btn.innerHTML = label که خودش چهار خط بالاتر از همان دکمه خوانده شده (ذخیره/بازگرداندنِ برچسبِ دکمه حینِ لودینگ) — رفت‌وبرگشتِ markupِ خودِ عنصر، بدونِ ورودِ هیچ دادهٔ بیرونی.'],
 ]);
 
 function scanFile(absPath, relPath) {
@@ -440,19 +658,75 @@ function scanFile(absPath, relPath) {
     const lineRe = new RegExp(re.source, 'g');
     let m;
     while ((m = lineRe.exec(text)) !== null) {
-      const expr = grabExpression(text, m.index, m.index + m[0].length);
+      // اگر الگو خودش `(` را بلعیده (سینک‌های call-form)، اسکن را از خودِ
+      // پرانتز شروع کن نه بعد از آن — وگرنه حلقه روی کوتیشنِ آرگومانِ اول
+      // می‌شکند و شاخه‌ی balanceِ پرانتز، که همیشه درست بود، هرگز اجرا نمی‌شود.
+      const consumedParen = m[0].endsWith('(');
+      const scanFrom = m.index + m[0].length - (consumedParen ? 1 : 0);
+      const expr = grabExpression(text, m.index, scanFrom);
       let classification = classify(expr, kind);
       const lineNum = text.slice(0, m.index).split('\n').length;
       const snippet = text.split('\n')[lineNum - 1].trim().slice(0, 160);
-      const overrideKey = `${relPath}:${lineNum}`;
+      const hash = sinkHash(expr, snippet);
+      const overrideKey = overrideKeyFor(relPath, expr, snippet);
       const overrideNote = (classification === 'unsafe' || classification === 'review') ? MANUAL_REVIEW_OVERRIDES.get(overrideKey) : undefined;
-      if (overrideNote) classification = 'dom_api_safe';
-      hits.push({ file: relPath, line: lineNum, kind, snippet, classification, ...(overrideNote ? { manual_review_note: overrideNote } : {}) });
+      if (overrideNote) { classification = 'dom_api_safe'; USED_OVERRIDE_KEYS.add(overrideKey); }
+      // فراخوان‌محور بودن را از خودِ matchِ الگو می‌فهمیم، نه از فهرستِ
+      // دستیِ نام‌ها — تا نوعِ سینکِ تازه هم خودبه‌خود مشمول شود.
+      const truncated = consumedParen && !expr.trim().endsWith(')');
+      hits.push({ file: relPath, line: lineNum, kind, snippet, sink_hash: hash, classification, ...(truncated ? { expr_truncated: true } : {}), ...(overrideNote ? { manual_review_note: overrideNote } : {}) });
     }
   }
   return hits;
 }
 
+// ثابتِ درونیِ طبقه‌بند (دستورِ ۰۱۵، ۲۰۲۶-۰۹-۰۴).
+//
+// `safe_static` طبقِ تعریفِ خودِ همین فایل یعنی «literal یا template بدونِ
+// هیچ ${...}». پس سینکی که این برچسب را دارد ولی در خطِ خودش `${` دیده
+// می‌شود، یک تناقض است: طبقه‌بند درباره‌ی متنی حکم داده که از آنچه خط
+// واقعاً دارد کمتر بوده.
+//
+// این دقیقاً امضای insertAdjacentHTML بود: chat.js:157 در دیدِ کامل
+// `${esc(body)}` داشت و `safe_static` گرفته بود، چون استخراج روی آرگومانِ
+// موقعیت ایستاده بود. نام‌بردن از همان یک مورد کافی نیست — نوعِ سینکِ
+// بعدی با همین شکافِ استخراج، بی‌صدا تکرارش می‌کند.
+// هر سینکِ فراخوان‌محور باید تا پرانتزِ بسته خوانده شده باشد.
+//
+// ⚠️ درسِ ۲۰۲۶-۰۹-۰۵ که این را لازم کرد: نقصِ بریدگی هرگز مالِ
+// insertAdjacentHTML نبود، مالِ **استخراج‌کننده** بود. هر سه نشست فقط
+// insertAdjacentHTML را نگاه کردند چون اولین نمونه آنجا پیدا شده بود، و
+// document.write تمامِ این مدت مبتلا بود و کسی ندیدش. رفعِ یک کلاس به
+// شکلِ اولین نمونه‌اش، بقیه‌ی کلاس را سرِ پا می‌گذارد.
+//
+// پس ادعا را عمومی می‌کنیم: اگر عبارت به `)` نرسیده باشد، طبقه‌بند دارد
+// درباره‌ی یک **تکه** حکم می‌دهد — هر نوع سینکی که باشد، حتی نوعی که
+// سال‌ها بعد اضافه شود.
+function assertCallSinksFullyCaptured(hits) {
+  const bad = hits.filter((h) => h.expr_truncated);
+  if (!bad.length) return;
+  console.error(`\n✗ ${bad.length} سینکِ فراخوان‌محور ناقص خوانده شده‌اند — به پرانتزِ بسته نرسیده‌اند.`);
+  console.error(`  طبقه‌بند درباره‌ی یک تکه حکم می‌دهد، نه کلِ فراخوان — همان نقصی که`);
+  console.error(`  ده سینکِ insertAdjacentHTML و یک document.write را بی‌صدا امن اعلام کرد.`);
+  for (const h of bad.slice(0, 5)) console.error(`    - ${h.file}:${h.line} (${h.kind})  ${h.snippet.slice(0, 70)}`);
+  console.error(`\n  ⚠ آرتیفکت نوشته نشد — تنها شاهدِ این اجرا همین خروجی است.`);
+  process.exit(1);
+}
+
+function assertNoUnearnedSafeStatic(hits) {
+  const bad = hits.filter((h) => h.classification === 'safe_static' && /\$\{/.test(h.snippet || ''));
+  if (!bad.length) return;
+  console.error(`\n✗ تناقضِ درونیِ طبقه‌بند: ${bad.length} سینک برچسبِ safe_static دارند`);
+  console.error(`  ولی در خطِ خودشان \${...} دیده می‌شود. safe_static یعنی «هیچ درجی ندارد»،`);
+  console.error(`  پس طبقه‌بند کمتر از آنچه خط دارد را دیده — همان کلاسِ insertAdjacentHTML.`);
+  for (const h of bad.slice(0, 5)) console.error(`    - ${h.file}:${h.line}  ${h.snippet.slice(0, 80)}`);
+  console.error(`\n  ⚠ آرتیفکت نوشته نشد. این اجرا پیش از writeFileSync متوقف شد، پس`);
+  console.error(`    tools/xss-sink-audit-report.json و docs/XSS_SINK_AUDIT.md هنوز اجرای`);
+  console.error(`    *قبلی* را توصیف می‌کنند — دربارهٔ این اجرا مدرک نیستند. تنها شاهدِ این`);
+  console.error(`    اجرا همین خروجی است. (ابزاری که هنگام شکست نمی‌نویسد، آرتیفکتش را از`);
+  console.error(`    مدرک‌بودن می‌اندازد — گزارشِ rezervnofullsource-ed، ۲۰۲۶-۰۹-۰۴.)`);
+  process.exit(1);
+}
 function main() {
   const args = process.argv.slice(2);
   const pathsArgIdx = args.indexOf('--paths');
@@ -475,6 +749,9 @@ function main() {
       allHits.push(...hits);
     }
   }
+
+  assertCallSinksFullyCaptured(allHits);
+  assertNoUnearnedSafeStatic(allHits);
 
   const isReportOnly = (file) => REPORT_ONLY_PATHS.some((p) => file.startsWith(p + '/'));
   const enforced = allHits.filter((h) => !isReportOnly(h.file));
@@ -538,12 +815,29 @@ function main() {
 
     // ── ratchet: عدد فقط پایین می‌رود ──
     const nUnsafe = enforced.filter((h) => h.classification === 'unsafe').length;
-    const nReview = enforced.filter((h) => h.classification === 'review').length;
+    // ── overrideهای بی‌مصرف ────────────────────────────────────────────
+  // هر کلیدی که هیچ سینکی را نگرفت. پیش از ۲۰۲۶-۰۹-۰۴ این‌ها بی‌صدا بودند و
+  // کلیدِ `path:line`شان می‌توانست با نشستنِ کدِ بی‌ربط روی همان خط دوباره
+  // «زنده» شود و یک سینکِ نخوانده را امن اعلام کند. حالا کلید هویتی است، پس
+  // بی‌اثرند — ولی بی‌اثر یعنی بازبینیِ ثبت‌شده‌شان هم دیگر کار نمی‌کند، و آن
+  // را باید دید نه حدس زد.
+  const declared = [...MANUAL_REVIEW_OVERRIDES.keys()];
+  const unusedKeys = declared.filter((k) => !USED_OVERRIDE_KEYS.has(k));
+  if (unusedKeys.length) {
+    console.warn(`\n⚠ ${unusedKeys.length} از ${declared.length} overrideِ اعلام‌شده هیچ سینکی را نگرفت.`);
+    console.warn(`  این‌ها بی‌اثرند (کلیدِ هویتی جعلی‌شان نمی‌کند)، ولی بازبینیِ ثبت‌شده‌شان هم مرده است.`);
+    console.warn(`  جا‌به‌جا کردنشان کارِ بازبینیِ انسانی است، نه اسکریپت. نمونه:`);
+    for (const k of unusedKeys.slice(0, 5)) console.warn(`    - ${k}`);
+    if (unusedKeys.length > 5) console.warn(`    … و ${unusedKeys.length - 5} تای دیگر`);
+  }
+  const nReview = enforced.filter((h) => h.classification === 'review').length;
+    const nNotCaptured = enforced.filter((h) => h.classification === 'payload_not_captured').length;
     let regressed = false;
 
     for (const [label, n, base] of [
       ['unsafe', nUnsafe, UNSAFE_BASELINE],
       ['review', nReview, REVIEW_BASELINE],
+      ['payload_not_captured', nNotCaptured, PAYLOAD_NOT_CAPTURED_BASELINE],
     ]) {
       if (n > base) {
         console.error(`✗ sinkهای ${label} از ${base} به ${n} رسید (+${n - base}).`);
@@ -594,6 +888,7 @@ function renderMarkdown(report, unsafe) {
   lines.push('- `safe_static` — sink argument is a literal/constant string, no interpolated variable.');
   lines.push('- `escaped` — the sink expression routes through `esc(` before use.');
   lines.push('- `dom_api_safe` — line uses `textContent`, not an HTML sink, or is a benign adjacent match.');
+    lines.push('- `payload_not_captured` — **the scanner never saw the inserted content.** The expression extractor stops before the payload argument (every `insertAdjacentHTML` sink), so no verdict about that content has been earned. It is NOT a finding and NOT a clearance: it marks a sink a human must read. Previously these were labelled `safe_static`, which claimed something the tool had not checked.');
   lines.push('- `unsafe` — a sink interpolates a variable without going through `esc(`. **Must be zero for this script to exit 0.**');
   lines.push('- `review` — `eval`/`new Function` calls; always flagged for manual review regardless of content.');
   lines.push('');
@@ -614,9 +909,22 @@ function renderMarkdown(report, unsafe) {
   }
   const reviewed = report.hits.filter((h) => h.manual_review_note);
   if (reviewed.length > 0) {
+    const notCaptured = report.hits.filter((h) => h.classification === 'payload_not_captured');
+    if (notCaptured.length) {
+      lines.push('## Payload never examined — no verdict earned');
+      lines.push('');
+      lines.push('For these sinks the expression extractor stops before the payload argument, so the scanner has **not read the inserted content at all**. This is not a finding and not a clearance — it is an explicit "we do not know", recorded so it cannot be mistaken for either. Until the extractor is fixed, the only thing that can clear one of these is a human reading it.');
+      lines.push('');
+      lines.push('| File:Line | Kind | Line as written |');
+      lines.push('|---|---|---|');
+      for (const h of notCaptured) {
+        lines.push(`| \`${h.file}:${h.line}\` | ${h.kind} | \`${(h.snippet || '').slice(0, 90).replace(/\|/g, '\\|')}\` |`);
+      }
+      lines.push('');
+    }
     lines.push('## Manually reviewed (not auto-classified safe)');
     lines.push('');
-    lines.push('The regex classifier flagged these as `unsafe`/`review`; each was read by hand and reclassified with a justification (see `MANUAL_REVIEW_OVERRIDES` in `tools/xss-sink-audit.mjs`). Re-review if the cited line ever changes.');
+    lines.push('The regex classifier flagged these as `unsafe`/`review`; each was read by hand and reclassified with a justification (see `MANUAL_REVIEW_OVERRIDES` in `tools/xss-sink-audit.mjs`). Each override is keyed on a hash of the sink expression itself, so moving code keeps the review attached and CHANGING the sink drops it (the gate then goes red). The line number below is where the sink sat when the report was generated — it is a pointer for the reader, not the key.');
     lines.push('');
     lines.push('| File:Line | Justification |');
     lines.push('|---|---|');

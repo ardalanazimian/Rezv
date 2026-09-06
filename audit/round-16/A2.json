@@ -1,0 +1,3415 @@
+{
+  "agent": "A2",
+  "round": 16,
+  "scope": "apps/business feature census",
+  "head": "dbec99f (feat/admin-totp-login)",
+  "mode": "static trace only (no API, no DB, no docker, no npm test)",
+  "gates": {
+    "python tools/build-standalone.py --check": "exit 0 (بسته‌ی standalone با منبع هم‌خوان است)"
+  },
+  "findings": [
+    {
+      "id": "A2-001",
+      "severity": "blocker",
+      "area": "login/password",
+      "claim": "The primary username/password login crashes after a successful 2xx: staffPasswordLogin() awaits enterStaffPanel(), which is not defined anywhere in the repository (only enterPanel() exists). The button stays on 'در حال بررسی...'; the token is already in localStorage so a manual reload enters the panel. Every e2e spec clicks 'ورود با پیامک' first, so the path is never exercised.",
+      "evidence": "apps/business/js/staff-system.js:L468,L471,L472 (calls) vs L556 (function enterPanel); grep -rn enterStaffPanel -> only those 3 lines + standalone/business.html:L7952-7956; e2e/tests/panel-authed-audit.spec.ts:L45, panels-batch18-regression.spec.ts:L79 (OTP path only)",
+      "status": "open"
+    },
+    {
+      "id": "A2-002",
+      "severity": "blocker",
+      "area": "reservations/actions",
+      "claim": "On the reservations tab every row action (رسید/نشاند/نیومد/وضعیت/لغو/تاریخچه) passes the row index of the freshly fetched `source` array, but the handlers read RES[i]; RES only ever holds the dashboard's 'today' fetch. On the فردا/آینده/گذشته/همه tabs (or whenever ordering differs) a different reservation is mutated; when RES is still the demo array a row without `code` shows a success toast with no request at all.",
+      "evidence": "apps/business/js/reservations.js:L54-58,L65,L162-168,L179,L200,L205; apps/business/js/data.js:L42,L56,L661 (only RES assignment); data.js:L100-103 (toast without request)",
+      "status": "open"
+    },
+    {
+      "id": "A2-003",
+      "severity": "major",
+      "area": "reservations/manual",
+      "claim": "'رزرو جدید' sends restaurant_id = STAFF_INFO?.restaurant_id. STAFF_INFO is only set by the OTP path and is null after any page reload (session restore) or password login; the API requires restaurant_id as a UUID -> 422. After a branch switch it is the login-time branch -> 403 'رزرو فقط برایِ شعبه‌ی فعالِ خودت'.",
+      "evidence": "apps/business/js/reservations.js:L441; apps/business/js/staff-system.js:L431,L540,L607-623; api/src/app/api/v1/reservations/route.ts:L22,L100-101",
+      "status": "open"
+    },
+    {
+      "id": "A2-004",
+      "severity": "major",
+      "area": "reservations/offline",
+      "claim": "The offline Outbox entry for a manual reservation uses restaurant_id:'self', date:'today|tomorrow|upcoming' and a Persian-digit time; the schema requires zUuid/zDateStr/zTimeStr, so the queued op is rejected on every sync while the toast promised it would sync.",
+      "evidence": "apps/business/js/reservations.js:L466-471,L482-484; api/src/app/api/v1/reservations/route.ts:L20-25",
+      "status": "open"
+    },
+    {
+      "id": "A2-005",
+      "severity": "major",
+      "area": "reservations/status",
+      "claim": "changeStatus() calls renderResList() (which re-fetches from the server) before the PATCH is sent and does not re-render after success; the list shows the pre-change status next to a success toast until the user navigates.",
+      "evidence": "apps/business/js/data.js:L64-70; apps/business/js/reservations.js:L50-58",
+      "status": "open"
+    },
+    {
+      "id": "A2-006",
+      "severity": "major",
+      "area": "waitlist/fake-data",
+      "claim": "loadWaitlist sets _wlLoaded=true regardless of fetch result; after a 403/500/timeout the 'نمونه' note is hidden and WL_DEMO_QUEUE (سارا محمدی, علی رضایی, مریم کریمی) plus WL_DEMO_ANALYTICS (142/69%/22 دق) render as the restaurant's real queue on the waitlist page and the dashboard. The analytics endpoint needs canViewAnalytics while the view is gated by canManageWaitlist, so a waitlist-only employee always sees the fake analytics.",
+      "evidence": "apps/business/js/waitlist.js:L4-21,L36-37; apps/business/js/overview.js:L118-131; apps/business/js/routing.js:L9; api/src/app/api/v1/restaurant/waitlist/analytics/route.ts:L9-10",
+      "status": "open"
+    },
+    {
+      "id": "A2-007",
+      "severity": "major",
+      "area": "staff/fake-data",
+      "claim": "loadStaff sets _staffLoaded=true even on failure, so STAFF_DEMO (ids demo1/demo2, ۰۹۱۲۰۰۰۰۰۰۱) renders as the real team without the 'نمونه' note; the permission editor then PATCHes with a fake staff_id.",
+      "evidence": "apps/business/js/staff-system.js:L3-8,L24-29,L55-56,L112",
+      "status": "open"
+    },
+    {
+      "id": "A2-008",
+      "severity": "major",
+      "area": "floor/fake-data",
+      "claim": "loadTables installs DEMO_TABLES (ids 'demo-t1'…'demo-t10') and marks _tablesLoaded=true on any failure; the floor plan, occupancy KPI and the walk-in table picker then present 10 fake tables as real, and every write (rename/state/QR/delete/walk-in table_id) hits the server with a fake id.",
+      "evidence": "apps/business/js/data.js:L685-707; apps/business/js/overview.js:L470-472; apps/business/js/reservations.js:L291-297,L365",
+      "status": "open"
+    },
+    {
+      "id": "A2-009",
+      "severity": "major",
+      "area": "dashboard/fabricated-revenue",
+      "claim": "'درآمد امروز' and 'میانگین خرید هر نفر' are computed from constants (850,000 × party × 1.8 VIP × 1.25 preorder) with REVENUE_CONFIG.connected hard-coded false; they are labelled 'تخمین'/≈ but not [DEMO]. The 'اتصال صندوق' button only shows a toast.",
+      "evidence": "apps/business/js/overview.js:L26-45,L158,L194-206",
+      "status": "open"
+    },
+    {
+      "id": "A2-010",
+      "severity": "major",
+      "area": "pricing/sample-write",
+      "claim": "When GET /restaurant/pricing fails, rPricing keeps the hard-coded sample suggestions with live 'قبول' buttons; accepting one calls pricingSave -> PUT with the fabricated rule and base_min_spend_toman:0, overwriting the server's real rules.",
+      "evidence": "apps/business/js/staff-system.js:L284-298,L341-355",
+      "status": "open"
+    },
+    {
+      "id": "A2-011",
+      "severity": "major",
+      "area": "loyalty/unknown-as-empty",
+      "claim": "loadClubMembers returns [] on any non-2xx, so the loyalty page renders '۰ عضو', empty tiers and 'این ماه تولدی نیست' with no error state or retry — 'نمی‌دانیم' reported as 'وجود ندارد'.",
+      "evidence": "apps/business/js/data.js:L836-856; apps/business/js/loyalty.js:L9-15,L45-48",
+      "status": "open"
+    },
+    {
+      "id": "A2-012",
+      "severity": "major",
+      "area": "profile/hours+policy",
+      "claim": "loadHours and loadCancellationPolicy have no failure marker: after a failed GET the empty draft / hard-coded default policy render as the current configuration, and 'ذخیره' / 'ارسالِ پیشنهاد' would send those defaults to the server.",
+      "evidence": "apps/business/js/crm.js:L787-806,L829-832,L927-934,L1003-1006",
+      "status": "open"
+    },
+    {
+      "id": "A2-013",
+      "severity": "major",
+      "area": "session/logout",
+      "claim": "There is no logout control anywhere in the panel: staffLogout() has zero call sites, and the refresh token is persisted in localStorage, so a session on a shared front-desk device never ends.",
+      "evidence": "apps/business/js/staff-system.js:L587-596; apps/business/js/data.js:L135; grep -rn staffLogout apps/business -> definition only; index.html has no logout element",
+      "status": "open"
+    },
+    {
+      "id": "A2-014",
+      "severity": "major",
+      "area": "reservations/pagination",
+      "claim": "loadMoreReservations() and RES_NEXT_CURSOR exist but nothing calls them; the API pages at 100, so a day with more than 100 reservations is silently truncated in the reservations tab and dashboard.",
+      "evidence": "apps/business/js/data.js:L917,L938,L946-954; api/src/app/api/v1/restaurant/reservations/route.ts:L50-52; grep loadMoreReservations -> 0 call sites",
+      "status": "open"
+    },
+    {
+      "id": "A2-015",
+      "severity": "major",
+      "area": "dashboard/customer-history",
+      "claim": "viewCustomerHistory builds 'سابقه‌ی رزرو' by filtering the in-memory RES (today's list) by display name; guests with real history see 'سابقه‌ای ثبت نشده'. The customers tab already has a real detail endpoint that is not used here.",
+      "evidence": "apps/business/js/overview.js:L480-497; apps/business/js/data.js:L657-666; apps/business/js/crm.js:L1012 (real detail modal)",
+      "status": "open"
+    },
+    {
+      "id": "A2-016",
+      "severity": "major",
+      "area": "cashback/offline-success",
+      "claim": "cbApply's offline branch commits CB locally, clears the dirty banner, locks the button and pushes the notification 'کش‌بک به‌روز شد' without a 2xx and without an Outbox entry; the change is lost on reload while the notification list keeps claiming it was updated. The route also has no audit().",
+      "evidence": "apps/business/js/staff-system.js:L398-403,L412-415; api/src/app/api/v1/restaurant/cashback/route.ts (grep 'audit(' -> 0)",
+      "status": "open"
+    },
+    {
+      "id": "A2-017",
+      "severity": "major",
+      "area": "reservations/manual-date",
+      "claim": "The manual-reservation date dropdown labels are generated from a hard-coded start 'پنجشنبه ۱۵ خرداد' while the submitted date is today+offset; on any other day the shown weekday/date and the success toast label disagree with the stored date.",
+      "evidence": "apps/business/js/reservations.js:L222-240,L242-251,L426,L454",
+      "status": "open"
+    },
+    {
+      "id": "A2-018",
+      "severity": "major",
+      "area": "reservations/error-state",
+      "claim": "When the reservations fetch fails for a logged-in user, the tab shows the demo rows (with live action buttons) and a 'نمونه' note instead of an error state with retry.",
+      "evidence": "apps/business/js/reservations.js:L54-64; apps/business/js/data.js:L941-943",
+      "status": "open"
+    },
+    {
+      "id": "A2-019",
+      "severity": "minor",
+      "area": "backend/audit",
+      "claim": "Staff permission changes (PATCH /restaurant/staff) and cashback percentage changes (PATCH /restaurant/cashback) write without audit(); hours, photos, table-QR and password routes do audit.",
+      "evidence": "api/src/app/api/v1/restaurant/staff/route.ts and cashback/route.ts: grep -c 'audit(' = 0; hours/route.ts, photos/route.ts, tables/[id]/qr/route.ts, staff/password/route.ts = 1",
+      "status": "open"
+    },
+    {
+      "id": "A2-020",
+      "severity": "minor",
+      "area": "analytics/error-state",
+      "claim": "rAnalytics falls back to the hard-coded sample block (136 رزرو, ۶۶٪, ۲۴۸ مشتری, fixed weekday bars) with a 'داده‌ی نمونه' banner and no retry when the fetch fails.",
+      "evidence": "apps/business/js/marketing.js:L287-297,L336,L354,L389",
+      "status": "open"
+    },
+    {
+      "id": "A2-021",
+      "severity": "minor",
+      "area": "dashboard/dead-branch",
+      "claim": "The 'ریسک نوشو' chip and the high-risk 'تماس' button on tonight's rows can never render: r.noShowTier / r.risk are not produced by mapResRow.",
+      "evidence": "apps/business/js/overview.js:L103,L108; apps/business/js/data.js:L919-932",
+      "status": "open"
+    },
+    {
+      "id": "A2-022",
+      "severity": "minor",
+      "area": "campaign/cosmetics",
+      "claim": "Campaign preview header shows the hard-coded sender 'کافه‌رستوران ویستا'; the 'مشتری جدید' segment count is always '—'; the birthday SMS body is the literal two-word text 'تبریکِ تولد'.",
+      "evidence": "apps/business/js/marketing.js:L186; apps/business/js/crm.js:L1081; apps/business/js/loyalty.js:L135; api/src/app/api/v1/restaurant/sms/route.ts:L253,L283",
+      "status": "open"
+    },
+    {
+      "id": "A2-023",
+      "severity": "minor",
+      "area": "branch-switch/stale",
+      "claim": "refreshActiveView omits 'chat' and 'menu', so after a branch switch those views keep the previous branch's data.",
+      "evidence": "apps/business/js/data.js:L597; apps/business/js/routing.js:L171",
+      "status": "open"
+    },
+    {
+      "id": "A2-024",
+      "severity": "minor",
+      "area": "waitlist/offline-offer",
+      "claim": "The offline 'آفر میز' Outbox op carries entry_id but the route ignores the body; on sync promoteNext may offer the table to a different guest than the one named in the toast.",
+      "evidence": "apps/business/js/waitlist.js:L107,L111; api/src/app/api/v1/restaurant/waitlist/route.ts:L23-30",
+      "status": "open"
+    },
+    {
+      "id": "A2-025",
+      "severity": "minor",
+      "area": "marketing/pricing/no-delete",
+      "claim": "Coupons, automations and accepted pricing rules cannot be deactivated or removed from the UI (only GET/POST routes exist for coupons/automations; pricing PUT replaces but no remove control).",
+      "evidence": "apps/business/js/marketing.js:L83,L126; apps/business/js/staff-system.js:L338; api/src/app/api/v1/restaurant/coupons/route.ts, automations/route.ts (GET/POST only)",
+      "status": "open"
+    },
+    {
+      "id": "A2-026",
+      "severity": "minor",
+      "area": "a11y/touch-targets",
+      "claim": "Touch targets below 24–44px: .snote-del has no size (font 20px, padding 0 4px), .notif-clear is a text button with no min-height, .dr-act ≈26px, .gal-del/.s-clear/.t-remove exactly 24px, .btn-sm 34px (< 44px comfortable floor).",
+      "evidence": "apps/business/css/panel.css:L488,L775,L370,L568,L520,L275(+L277 hit-area),L64; tokens.css:L105 (--touch-min:44px unused here)",
+      "status": "open"
+    },
+    {
+      "id": "A2-027",
+      "severity": "minor",
+      "area": "a11y/RTL-debt",
+      "claim": "Physical left/right properties instead of logical ones in the panel stylesheet and inline styles.",
+      "evidence": "apps/business/css/panel.css:L74-75,L100,L109,L120,L138,L172,L180-183,L201,L211,L221,L275,L394,L435,L461,L514,L520,L566,L568,L585,L598,L607,L618,L622,L645,L647,L649,L676,L686,L690,L764; apps/business/js/marketing.js:L80,L420; menu.js:L162; staff-system.js:L370",
+      "status": "open"
+    },
+    {
+      "id": "A2-028",
+      "severity": "minor",
+      "area": "a11y/aria",
+      "claim": "Icon-only × buttons without aria-label, and 14 clickable <div>s without role/tabindex (party-size .opt, .tbl-act state options, .seg-card/.seg-cell, .top-cust, .kpi-card, .notif-item, branch rows, logo pickers).",
+      "evidence": "apps/business/js/crm.js:L172,L145,L227,L231,L602,L682,L1087; overview.js:L173,L328,L379; reservations.js:L32,L312,L335; waitlist.js:L164,L187,L263; routing.js:L136; staff-system.js:L210",
+      "status": "open"
+    },
+    {
+      "id": "A2-029",
+      "severity": "minor",
+      "area": "client/dead-code",
+      "claim": "Ten API client methods have no call site in the panel (branchCreate, createMember, events/addEvent/updateEvent/deleteEvent, assistantStats, chatList/chatMessages/chatSend); routes /restaurant/fraud-signals, /restaurant/reports, POST /restaurant/members and PATCH /restaurant/customers/[userId] are unreached from this panel.",
+      "evidence": "apps/business/js/data.js:L229-232,L283,L348,L406-409,L434; grep counts in this audit (0 call sites outside data.js)",
+      "status": "open"
+    },
+    {
+      "id": "A2-030",
+      "severity": "minor",
+      "area": "walk-in/lookup",
+      "claim": "walkinLookup decides 'مشتری قدیمی' vs 'مهمان جدید' from the in-memory CLUB array, which is only populated by the loyalty tab or a prior walk-in; returning members are usually shown as new (the server still enrols/reuses correctly).",
+      "evidence": "apps/business/js/reservations.js:L290,L298-341; apps/business/js/data.js:L826; apps/business/js/loyalty.js:L11-14",
+      "status": "open"
+    },
+    {
+      "id": "A2-031",
+      "severity": "minor",
+      "area": "notifications/local-state",
+      "claim": "Notification read state is local only; server items arrive unread:false so the unread ping only ever reflects locally pushed events.",
+      "evidence": "apps/business/js/staff-system.js:L184,L205,L222-223",
+      "status": "open"
+    },
+    {
+      "id": "A2-032",
+      "severity": "minor",
+      "area": "ai/placeholder",
+      "claim": "handleAiAction falls back to the toast 'این اقدام به‌زودی به‌صورت خودکار قابل‌اجراست' for unknown card ids — a placeholder in the production path.",
+      "evidence": "apps/business/js/crm.js:L1191-1196",
+      "status": "open"
+    },
+    {
+      "id": "A2-033",
+      "severity": "minor",
+      "area": "ui-states/no-retry",
+      "claim": "Error states without a retry control: customer profiles, campaign history, chat inbox.",
+      "evidence": "apps/business/js/crm.js:L716,L1106; apps/business/js/chat.js:L20",
+      "status": "open"
+    },
+    {
+      "id": "A2-034",
+      "severity": "minor",
+      "area": "mandate/src-v2",
+      "claim": "The mandate describes apps/business/src-v2 as a present React experiment; it was deleted in commit 95e95f1 and is absent from disk, the git index and CI. Docs/mandates referencing it are stale.",
+      "evidence": "ls apps/business/src-v2 -> No such file; git ls-files apps/business/src-v2 -> 0; git show --stat 95e95f1 -> RestaurantIntelligenceDashboard.jsx 249 deletions",
+      "status": "verified"
+    },
+    {
+      "id": "A2-035",
+      "severity": "minor",
+      "area": "backend/restaurantId-source",
+      "claim": "Two routes read a restaurant id from the body: POST /api/v1/reservations (restaurant_id) and PATCH /api/v1/restaurant/staff (restaurant_id as branch assignment). Both validate it against the authenticated tenant/branch (resolveStaffRestaurant equality; tenant-scoped findFirst), so no cross-tenant path was found. Recorded for completeness.",
+      "evidence": "api/src/app/api/v1/reservations/route.ts:L22,L99-101; api/src/app/api/v1/restaurant/staff/route.ts:L40,L181-187",
+      "status": "verified-safe"
+    }
+  ],
+  "census": [
+    {
+      "element": "?api= bootstrap (RZ_API_BASE override)",
+      "file": "apps/business/index.html:L168-173",
+      "handler": "IIFE",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "localStorage rz_api_base"
+    },
+    {
+      "element": "Skip link",
+      "file": "apps/business/index.html:L25",
+      "handler": "static anchor",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Sidebar nav buttons (14 views)",
+      "file": "apps/business/index.html:L46-103",
+      "handler": "nav(v)",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 14,
+      "note": "routing.js:L61-79; permission-hidden via applyPermissionsToNav routing.js:L50-59; VIEW_PERMISSION L6-21, VIEW_ROLE L34-36"
+    },
+    {
+      "element": "Burger + overlay toggleSidebar",
+      "file": "apps/business/index.html:L32,L117",
+      "handler": "toggleSidebar()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2,
+      "note": "routing.js:L181-192 aria-expanded synced"
+    },
+    {
+      "element": "Branch switcher (open + select row)",
+      "file": "apps/business/index.html:L39",
+      "handler": "openBranchSwitcher()/selectBranch()",
+      "api": "GET /api/v1/restaurant/branches",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": null,
+      "service": "api/src/app/api/v1/restaurant/branches/route.ts:L63",
+      "db": "Restaurant.findMany",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "routing.js:L85-180; no permission by documented decision (branches/route.ts:L35-65); header X-Restaurant-Id resolved in lib/staff-helpers.ts:L78-99"
+    },
+    {
+      "element": "Notification bell",
+      "file": "apps/business/index.html:L125",
+      "handler": "toggleNotif()/loadNotifications()",
+      "api": "GET /api/v1/restaurant/notifications",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "api/src/lib/notifications.ts",
+      "db": "read (activity feed)",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "staff-system.js:L180-215; 403 -> empty list (L195-199)"
+    },
+    {
+      "element": "Notifications: 'خواندن همه' + item read",
+      "file": "apps/business/index.html:L127",
+      "handler": "clearNotif()/readNotif()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "read-state is local only; server items arrive unread:false (staff-system.js:L184) so ping never lights for real data",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Popup close ×",
+      "file": "apps/business/index.html:L156",
+      "handler": "classList.remove",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Modal: backdrop/Esc/focus-trap/restore-focus",
+      "file": "apps/business/index.html:L151",
+      "handler": "openModal()/closeModal()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "staff-system.js:L125-161"
+    },
+    {
+      "element": "Keyboard activation for role=button",
+      "file": "apps/business/js/routing.js:L204-208",
+      "handler": "document keydown",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Username/password login (primary path)",
+      "file": "apps/business/js/staff-system.js:L444-477",
+      "handler": "staffPasswordLogin()",
+      "api": "POST /api/v1/auth/staff/login",
+      "auth_wrapper": "withApiMetrics (manual)",
+      "permission": null,
+      "service": "api/src/app/api/v1/auth/staff/login/route.ts:L30-72",
+      "db": "Staff.findUnique + audit",
+      "side_effects": [
+        "audit"
+      ],
+      "class": "PARTIAL",
+      "broken_link": "enterStaffPanel() called at L468/L471/L472 is not defined anywhere in the repo (only enterPanel() exists at L556) -> ReferenceError after a 2xx login; token already stored so a manual reload enters the panel",
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": false
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Switch to OTP login",
+      "file": "apps/business/js/staff-system.js:L455",
+      "handler": "showStaffLoginPhone()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "OTP request",
+      "file": "apps/business/js/staff-system.js:L492-513",
+      "handler": "staffSendOtp()",
+      "api": "POST /api/v1/auth/staff/request",
+      "auth_wrapper": "withApiMetrics (manual)",
+      "permission": null,
+      "service": "api/src/app/api/v1/auth/staff/request/route.ts:L50-68",
+      "db": "OtpCode + audit",
+      "side_effects": [
+        "sms",
+        "audit"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "devCode shown only when server returns it (OTP_DEV_MODE); file:// -> fixed 1234 (L500-503)"
+    },
+    {
+      "element": "OTP verify -> enterPanel",
+      "file": "apps/business/js/staff-system.js:L527-550",
+      "handler": "staffConfirmOtp()",
+      "api": "POST /api/v1/auth/staff/verify",
+      "auth_wrapper": "withApiMetrics (manual)",
+      "permission": null,
+      "service": "api/src/app/api/v1/auth/staff/verify/route.ts:L35-87",
+      "db": "Staff + audit",
+      "side_effects": [
+        "audit"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "sets STAFF_INFO (L540) incl. restaurant_id; enterPanel L556-586 loads tables/branches/heartbeat/outbox"
+    },
+    {
+      "element": "Login back buttons (تغییر شماره / ورود با نام کاربری)",
+      "file": "apps/business/js/staff-system.js:L523,L488",
+      "handler": "showStaffLoginPhone()/showStaffLogin()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Session restore on page load",
+      "file": "apps/business/js/staff-system.js:L607-623",
+      "handler": "API.restoreSession()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "STAFF_INFO is never restored (stays null, L431) -> manual reservation body lacks restaurant_id (see A2-003)",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Session expired -> login gate",
+      "file": "apps/business/js/staff-system.js:L598-604",
+      "handler": "onStaffSessionExpired()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "data.js:L185-188,L200"
+    },
+    {
+      "element": "Access-token refresh (401 -> refresh -> retry)",
+      "file": "apps/business/js/api-core.js:L78-98",
+      "handler": "refreshAccessToken()",
+      "api": "POST /api/v1/auth/refresh",
+      "auth_wrapper": "none (auth route)",
+      "permission": null,
+      "service": "api/src/app/api/v1/auth/refresh",
+      "db": "RefreshToken rotate",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Logout",
+      "file": "apps/business/js/staff-system.js:L587-596",
+      "handler": "staffLogout()",
+      "api": "POST /api/v1/auth/logout",
+      "auth_wrapper": "none (auth route)",
+      "permission": null,
+      "service": "auth/logout",
+      "db": "RefreshToken revoke",
+      "side_effects": [],
+      "class": "DEAD",
+      "broken_link": "no UI element calls staffLogout (grep: definition only); refresh token stays in localStorage (data.js:L135)",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Change my password form",
+      "file": "apps/business/js/staff-system.js:L35-50,L57-70",
+      "handler": "submitPasswordChange()",
+      "api": "POST /api/v1/restaurant/staff/password",
+      "auth_wrapper": "withStaffAuth",
+      "permission": null,
+      "service": "api/src/app/api/v1/restaurant/staff/password/route.ts:L34",
+      "db": "Staff.update(passwordHash) + audit",
+      "side_effects": [
+        "audit"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "invite.html claim page (4 states + retry)",
+      "file": "apps/business/invite.html:L127-152",
+      "handler": "load()",
+      "api": "POST /api/v1/auth/invite/[token]/claim",
+      "auth_wrapper": "withApiMetrics (manual)",
+      "permission": null,
+      "service": "api/src/app/api/v1/auth/invite/[token]/claim/route.ts:L41-56",
+      "db": "Invite.findUnique",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Quick actions (walk-in, new reservation, waitlist, floor, search)",
+      "file": "apps/business/js/overview.js:L164-168",
+      "handler": "openWalkin()/openManual()/nav()/focusSearch()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 5,
+      "note": "role=button tabindex=0 present"
+    },
+    {
+      "element": "KPI card 'رزرو امروز' click",
+      "file": "apps/business/js/overview.js:L173",
+      "handler": "nav('reservations')",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "no role/tabindex (a11y minor)"
+    },
+    {
+      "element": "Today KPIs (count/occupancy/expected/no-show)",
+      "file": "apps/business/js/overview.js:L54-77,L172-193",
+      "handler": "calcTodayKPIs()",
+      "api": "GET /api/v1/restaurant/reservations?date=today ; GET /api/v1/restaurant/tables",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations / canManageTables",
+      "service": "api/src/app/api/v1/restaurant/reservations/route.ts:L28 ; tables/route.ts:L26",
+      "db": "Reservation.findMany, Table.findMany",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "data.js:L657-666,L696-707; demo banner + 'داده‌ی نمونه' badge until _resLoaded&&_tablesLoaded (overview.js:L470-476)"
+    },
+    {
+      "element": "Revenue KPI + avg spend KPI",
+      "file": "apps/business/js/overview.js:L26-51,L194-203",
+      "handler": "calcRevenue()/estimateSpend()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "FAKE",
+      "broken_link": "REVENUE_CONFIG.connected=false hard-coded; value = 850_000 × party × multipliers (L28-37); no data source; labelled 'تخمین'/≈ not [DEMO]",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "'اتصال صندوق' button",
+      "file": "apps/business/js/overview.js:L206",
+      "handler": "toast(...)",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "DEAD",
+      "broken_link": "button only shows a toast; no settings page or endpoint exists",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Tonight row 'ثبت ورود'",
+      "file": "apps/business/js/overview.js:L108,L133-138",
+      "handler": "dashCheckIn()->markArrived()->changeStatus()",
+      "api": "PATCH /api/v1/restaurant/reservations/[code]/status ; POST /api/v1/restaurant/sms {kind:campaign,message:'welcome'}",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations ; canManageCampaigns",
+      "service": "api/src/lib/lifecycle.ts:L79 transitionReservation ; sms/route.ts:L54-59 resolveKind",
+      "db": "Reservation.update, ReservationEvent.create, PointsLedger (L175), Sms job",
+      "side_effects": [
+        "points",
+        "sms"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 1,
+      "note": "index into RES consistent here (RES.indexOf(r) L105)"
+    },
+    {
+      "element": "Tonight row 'تماس' (high-risk only)",
+      "file": "apps/business/js/overview.js:L103,L108,L140-146",
+      "handler": "callGuest()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "DEAD",
+      "broken_link": "r.noShowTier / r.risk are never set by mapResRow (data.js:L919-932) -> chip and button never render",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "'همه رزروها' / 'مدیریت' links",
+      "file": "apps/business/js/overview.js:L211,L215",
+      "handler": "nav()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Dashboard waitlist 'آفر میز'",
+      "file": "apps/business/js/overview.js:L128",
+      "handler": "promoteNextWL()",
+      "api": "POST /api/v1/restaurant/waitlist",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageWaitlist",
+      "service": "api/src/lib/waitlist.ts:L283 promoteNext",
+      "db": "WaitlistEntry.update, Table",
+      "side_effects": [
+        "sms",
+        "push"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "AI strip 'ارسال پیام کش‌بک'",
+      "file": "apps/business/js/overview.js:L227",
+      "handler": "nav('cashback')",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "label promises sending a cashback message; destination is the cashback % settings page",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Peak-hours chart",
+      "file": "apps/business/js/overview.js:L272-286",
+      "handler": "renderPeakChart()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "computed from RES (today only after load)"
+    },
+    {
+      "element": "Weekly heatmap",
+      "file": "apps/business/js/overview.js:L293-322",
+      "handler": "renderHeatmap()",
+      "api": "GET /api/v1/restaurant/analytics",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "api/src/app/api/v1/restaurant/analytics/route.ts:L15",
+      "db": "raw SQL heatmap",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "data.js:L790-802; 403 -> stop retrying"
+    },
+    {
+      "element": "Top customers rows -> customer history modal",
+      "file": "apps/business/js/overview.js:L325-334,L480-498",
+      "handler": "viewCustomerHistory(name)",
+      "api": "GET /api/v1/restaurant/customers?sort=visits&limit=5",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "api/src/app/api/v1/restaurant/customers/route.ts:L20",
+      "db": "CustomerInsight.findMany",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "'سابقه‌ی رزرو' filters only the in-memory RES (today's dashboard list, data.js:L657-666) by display name -> guests with real history get 'سابقه‌ای ثبت نشده'",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 1
+    },
+    {
+      "element": "Smart insights panel",
+      "file": "apps/business/js/overview.js:L338-358",
+      "handler": "renderInsights()",
+      "api": "GET /api/v1/restaurant/manager-insights",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "api/src/lib/restaurant-manager.ts",
+      "db": "read",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "data.js:L767-781"
+    },
+    {
+      "element": "Staff note: add",
+      "file": "apps/business/js/overview.js:L257,L381-407",
+      "handler": "addStaffNote()/saveStaffNote()",
+      "api": "POST /api/v1/restaurant/notes",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "api/src/app/api/v1/restaurant/notes/route.ts:L37",
+      "db": "StaffNote.create",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Staff note: delete ×",
+      "file": "apps/business/js/overview.js:L379,L408-420",
+      "handler": "delStaffNote()",
+      "api": "DELETE /api/v1/restaurant/notes?id=",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "notes/route.ts:L64",
+      "db": "StaffNote.delete",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "icon-only button without aria-label"
+    },
+    {
+      "element": "Live refresh every 15s",
+      "file": "apps/business/js/overview.js:L423-462",
+      "handler": "refreshLiveKPIs()",
+      "api": "GET reservations?date=today ; GET customers?sort=visits",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations / canViewAnalytics",
+      "service": "-",
+      "db": "read",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Demo-data banner + live badge",
+      "file": "apps/business/js/overview.js:L160-161,L470-476",
+      "handler": "dashboardUsingDemoData()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Search input + clear ×",
+      "file": "apps/business/js/reservations.js:L31-32,L125-126",
+      "handler": "searchRes()/clearResSearch()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2,
+      "note": "clear button lacks aria-label"
+    },
+    {
+      "element": "'رزرو جدید' button",
+      "file": "apps/business/js/reservations.js:L34",
+      "handler": "openManual()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Date tabs (امروز/فردا/آینده/گذشته/همه)",
+      "file": "apps/business/js/reservations.js:L38-42,L127",
+      "handler": "setResDate()->rReservations()",
+      "api": "GET /api/v1/restaurant/reservations?date=",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "reservations/route.ts:L28-85",
+      "db": "Reservation.findMany (cursor, 100/page)",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 5,
+      "note": "row fields: name, phone, party_size, table_number, status, preorder[], note, reputation_tier, code (route L78-85)"
+    },
+    {
+      "element": "Tonight filters (همه/۳۰ دقیقه/نرسیده/رسیده)",
+      "file": "apps/business/js/reservations.js:L44,L16",
+      "handler": "tonightFilterSet()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 4
+    },
+    {
+      "element": "Reservation list states",
+      "file": "apps/business/js/reservations.js:L50-122",
+      "handler": "renderResList()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "fetch failure (loadReservations null, data.js:L941-943) falls back to RES demo rows with live action buttons and a 'نمونه' note; no error state, no retry",
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 1
+    },
+    {
+      "element": "Row 'رسید'",
+      "file": "apps/business/js/reservations.js:L162,L178-193",
+      "handler": "markArrived(i)",
+      "api": "PATCH /api/v1/restaurant/reservations/[code]/status ; POST /api/v1/restaurant/sms",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations ; canManageCampaigns",
+      "service": "api/src/lib/lifecycle.ts:L79",
+      "db": "Reservation.update, ReservationEvent.create, PointsLedger",
+      "side_effects": [
+        "points",
+        "sms"
+      ],
+      "class": "PARTIAL",
+      "broken_link": "button index i is from the freshly fetched `source` array (L54-58,L65) but handler reads RES[i] (L179; data.js:L42,L56) — RES only ever holds the dashboard's today list (data.js:L661)",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 1
+    },
+    {
+      "element": "Row 'نشاند'",
+      "file": "apps/business/js/reservations.js:L163,L194-196",
+      "handler": "markSeated(i)",
+      "api": "PATCH …/status",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "lib/lifecycle.ts:L79",
+      "db": "Reservation.update",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "same RES[i] index mismatch",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 1
+    },
+    {
+      "element": "Row 'نیومد' (confirm)",
+      "file": "apps/business/js/reservations.js:L164,L199-203",
+      "handler": "markNoShow(i)",
+      "api": "PATCH …/status",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "lib/lifecycle.ts:L79",
+      "db": "Reservation.update",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "same RES[i] index mismatch",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 1
+    },
+    {
+      "element": "Row 'وضعیت' menu + status options",
+      "file": "apps/business/js/reservations.js:L165 ; apps/business/js/data.js:L41-104",
+      "handler": "openStatusMenu(i)/changeStatus(i,to)",
+      "api": "PATCH …/status",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "lib/lifecycle.ts:L79",
+      "db": "Reservation.update, ReservationEvent.create",
+      "side_effects": [
+        "points",
+        "sms"
+      ],
+      "class": "PARTIAL",
+      "broken_link": "same RES[i] mismatch; and rows without r.code (demo/local) toast success with no request (data.js:L100-103)",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 2
+    },
+    {
+      "element": "Row 'تماس'",
+      "file": "apps/business/js/reservations.js:L166",
+      "handler": "callCustomer(phone)",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "crm.js:L756 tel: link; disabled when no phone"
+    },
+    {
+      "element": "Row 'لغو' + reason modal",
+      "file": "apps/business/js/reservations.js:L167,L204-220",
+      "handler": "cancelRes(i)/doCancelRes(i)",
+      "api": "PATCH …/status {status:cancelled,reason}",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "lib/lifecycle.ts:L79",
+      "db": "Reservation.update",
+      "side_effects": [
+        "sms"
+      ],
+      "class": "PARTIAL",
+      "broken_link": "same RES[i] mismatch (modal header shows RES[i].name, L205)",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 1
+    },
+    {
+      "element": "Row 'تاریخچه'",
+      "file": "apps/business/js/reservations.js:L168 ; data.js:L105-120",
+      "handler": "viewHistory(i)",
+      "api": "GET /api/v1/restaurant/reservations/[code]/events",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "reservations/[code]/events/route.ts:L28",
+      "db": "ReservationEvent.findMany",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "same RES[i] mismatch",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Row 'رزرو مجدد'",
+      "file": "apps/business/js/reservations.js:L168",
+      "handler": "openManual()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Manual reservation modal + 'ثبت رزرو'",
+      "file": "apps/business/js/reservations.js:L252-264,L419-460",
+      "handler": "saveManual()",
+      "api": "POST /api/v1/reservations (Idempotency-Key)",
+      "auth_wrapper": "none (manual: authFromRequest + requirePermission + resolveStaffRestaurant)",
+      "permission": "canManageReservations",
+      "service": "api/src/app/api/v1/reservations/route.ts:L55-146 ; lib/reservations.ts createReservation",
+      "db": "Reservation.create, User.upsert, ClubMember",
+      "side_effects": [
+        "sms",
+        "points"
+      ],
+      "class": "PARTIAL",
+      "broken_link": "body.restaurant_id = STAFF_INFO?.restaurant_id (L441) — null after page reload or password login -> zUuid required (route L22) -> 422; after branch switch -> 403 (route L100-101)",
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Manual reservation date dropdown",
+      "file": "apps/business/js/reservations.js:L222-240",
+      "handler": "buildDateOptions()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "labels start from a hard-coded 'پنجشنبه ۱۵ خرداد' (L226-227) while the sent date is today+offset (L242-251) -> displayed weekday/date and toast label (L426,L454) are wrong on any other day",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Manual reservation offline Outbox",
+      "file": "apps/business/js/reservations.js:L461-485",
+      "handler": "Outbox.enqueue",
+      "api": "POST /api/v1/reservations (deferred)",
+      "auth_wrapper": "none",
+      "permission": "canManageReservations",
+      "service": "reservations/route.ts:L20-46 schema",
+      "db": "-",
+      "side_effects": [],
+      "class": "FAKE",
+      "broken_link": "queued body {restaurant_id:'self', date:'today|tomorrow|upcoming', time:'۲۰:۰۰'} (L466-471) can never pass zUuid/zDateStr/zTimeStr -> always rejected on sync; toast promises 'با برگشت اینترنت همگام می‌شود' (L482-484)",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Walk-in: phone lookup",
+      "file": "apps/business/js/reservations.js:L266-342",
+      "handler": "openWalkin()/walkinLookup()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "member detection uses in-memory CLUB (L290) which is only loaded by the loyalty tab / after a walk-in (data.js:L826; loyalty.js:L12) -> returning members usually shown as 'مهمان جدید' (server still resolves correctly)",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Walk-in: confirm (member / new guest)",
+      "file": "apps/business/js/reservations.js:L343,L360-417",
+      "handler": "walkinCheckinReal()/walkinNewSave()",
+      "api": "POST /api/v1/restaurant/walkin (Idempotency-Key)",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "api/src/lib/reservations.ts:L734 createWalkin",
+      "db": "User.upsert, ClubMember.create(L814), Reservation.create(seated), Table.update",
+      "side_effects": [
+        "sms (welcome_visit L906)",
+        "points"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 2,
+      "note": "Jalali->Gregorian birthday conversion L348-358"
+    },
+    {
+      "element": "Walk-in offline Outbox (same idempotency key)",
+      "file": "apps/business/js/reservations.js:L384-395",
+      "handler": "Outbox.enqueue",
+      "api": "POST /api/v1/restaurant/walkin (deferred)",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "walkin/route.ts:L33-39",
+      "db": "-",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "local record has no code -> later status change on it is local-only"
+    },
+    {
+      "element": "Party-size .opt pickers",
+      "file": "apps/business/js/reservations.js:L312,L335",
+      "handler": "inline onclick",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2,
+      "note": "div without role/tabindex"
+    },
+    {
+      "element": "Floor: edit toggle",
+      "file": "apps/business/js/waitlist.js:L158,L175",
+      "handler": "toggleFloorEdit()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Floor: table tap -> state sheet",
+      "file": "apps/business/js/waitlist.js:L163,L243-275",
+      "handler": "openTableSheet(i)",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Floor: remove table × (+undo)",
+      "file": "apps/business/js/waitlist.js:L164,L208-239",
+      "handler": "removeTable()/doRemoveTable()/undoRemoveTable()",
+      "api": "DELETE /api/v1/restaurant/tables/[id] ; POST /api/v1/restaurant/tables",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "service": "tables/[id]/route.ts:L82 ; tables/route.ts:L45",
+      "db": "Table.delete / Table.create",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2,
+      "note": "× lacks aria-label; ::before enlarges hit area (panel.css:L277)"
+    },
+    {
+      "element": "Floor: add table",
+      "file": "apps/business/js/waitlist.js:L168,L180-204",
+      "handler": "addTable()/confirmAddTable()",
+      "api": "POST /api/v1/restaurant/tables",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "service": "tables/route.ts:L45",
+      "db": "Table.create",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Floor: state options + rename + confirm",
+      "file": "apps/business/js/waitlist.js:L263,L447-477",
+      "handler": "confirmTableStatus()",
+      "api": "PATCH /api/v1/restaurant/tables/[id] ; PATCH /api/v1/restaurant/tables/[id]/state",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "service": "tables/[id]/route.ts:L35 ; tables/[id]/state/route.ts:L20 ; lib/tables.ts",
+      "db": "Table.update",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2,
+      "note": ".tbl-act divs lack role"
+    },
+    {
+      "element": "Floor: table QR (view/SVG/PNG/print/regenerate)",
+      "file": "apps/business/js/waitlist.js:L272,L294-446",
+      "handler": "openTableQr()/tableLoadQr()/tableDownloadQr()/tablePrintQr()/tableRegenerateQr()",
+      "api": "GET /api/v1/restaurant/tables/[id]/qr ; POST /api/v1/restaurant/tables/[id]/qr",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageTables",
+      "service": "tables/[id]/qr/route.ts:L39,L99",
+      "db": "Table.update(qrCode)",
+      "side_effects": [
+        "audit"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 5
+    },
+    {
+      "element": "Floor/KPI: demo tables after failed load",
+      "file": "apps/business/js/data.js:L696-707",
+      "handler": "loadTables()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "FAKE",
+      "broken_link": "on any non-2xx with empty TABLES, DEMO_TABLES (ids 'demo-t1'…) are installed and _tablesLoaded=true -> floor plan, occupancy KPI and walk-in table picker show 10 fake tables as real; every write then hits the server with a fake id",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Waitlist: 'آفر به نفر بعدی' + card 'آفر میز'",
+      "file": "apps/business/js/waitlist.js:L49,L66,L71-87",
+      "handler": "promoteNextWL()",
+      "api": "POST /api/v1/restaurant/waitlist",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageWaitlist",
+      "service": "api/src/lib/waitlist.ts:L283 promoteNext",
+      "db": "WaitlistEntry.update, Table",
+      "side_effects": [
+        "sms",
+        "push"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Waitlist: remove entry",
+      "file": "apps/business/js/waitlist.js:L67,L123-134",
+      "handler": "removeWL(id)",
+      "api": "DELETE /api/v1/restaurant/waitlist?entry_id=",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageWaitlist",
+      "service": "lib/waitlist.ts:L538 leaveWaitlist",
+      "db": "WaitlistEntry.update",
+      "side_effects": [
+        "sms (L676)",
+        "push"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Waitlist: offline offer Outbox",
+      "file": "apps/business/js/waitlist.js:L99-112",
+      "handler": "offerWLSeat(id)",
+      "api": "POST /api/v1/restaurant/waitlist (deferred)",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageWaitlist",
+      "service": "waitlist/route.ts:L23-30",
+      "db": "-",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "queued body {action:'offer',entry_id} is ignored by the route (no body parsing) -> promoteNext picks whoever is first at sync time",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Waitlist: analytics cards",
+      "file": "apps/business/js/waitlist.js:L17-19,L41-44",
+      "handler": "loadWaitlist()",
+      "api": "GET /api/v1/restaurant/waitlist/analytics",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "waitlist/analytics/route.ts:L9 ; lib/waitlist.ts",
+      "db": "aggregate",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "view is gated by canManageWaitlist (routing.js:L9) but analytics needs canViewAnalytics -> 403 leaves WL_DEMO_ANALYTICS (142/69%/22min) rendered as real once _wlLoaded=true",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Waitlist: queue list states",
+      "file": "apps/business/js/waitlist.js:L15-21,L36-54",
+      "handler": "rWaitlist()",
+      "api": "GET /api/v1/restaurant/waitlist",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageWaitlist",
+      "service": "lib/waitlist.ts getQueue",
+      "db": "WaitlistEntry.findMany",
+      "side_effects": [],
+      "class": "FAKE",
+      "broken_link": "_wlLoaded=true is set even when the fetch failed (L20) -> isDemo=false hides the 'نمونه' note (L36-37) and WL_DEMO_QUEUE names (سارا محمدی…) render as the real queue on both the waitlist page and the dashboard",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Profile tabs",
+      "file": "apps/business/js/crm.js:L9-12,L103-107",
+      "handler": "setProfTab()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 4
+    },
+    {
+      "element": "Gallery: load + error/retry",
+      "file": "apps/business/js/crm.js:L75-87,L130-134",
+      "handler": "loadGallery()/profRenderGallery()",
+      "api": "GET /api/v1/restaurant/photos",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "photos/route.ts:L22",
+      "db": "RestaurantPhoto.findMany",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Logo: upload photo",
+      "file": "apps/business/js/crm.js:L204-270",
+      "handler": "openLogoEditor()/handleLogoUpload()",
+      "api": "POST /api/v1/restaurant/photos (multipart, category=logo)",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "photos/route.ts:L50 ; lib/media.ts ; lib/photo-moderation.ts",
+      "db": "RestaurantPhoto.create(status=pending)",
+      "side_effects": [
+        "audit"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Logo: emoji/gradient fallback (pick ×2 + save)",
+      "file": "apps/business/js/crm.js:L227,L231,L273-281",
+      "handler": "pickLogoEmoji()/pickLogoGrad()/saveLogoFallback()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "session-only, honestly labelled (toast L280); divs lack role",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 3
+    },
+    {
+      "element": "Restaurant name edit",
+      "file": "apps/business/js/crm.js:L283-316",
+      "handler": "saveRestName()",
+      "api": "PUT /api/v1/restaurant/profile",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "profile/route.ts:L30",
+      "db": "Restaurant.update",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Gallery: add photos (picker + submit)",
+      "file": "apps/business/js/crm.js:L177-181,L325-390",
+      "handler": "handleGalleryUpload()/submitPhotoUpload()",
+      "api": "POST /api/v1/restaurant/photos",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "photos/route.ts:L50",
+      "db": "RestaurantPhoto.create(pending)",
+      "side_effects": [
+        "audit"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Gallery: delete ×",
+      "file": "apps/business/js/crm.js:L172,L391-422",
+      "handler": "removeGalleryImg()/doRemoveGallery()",
+      "api": "DELETE /api/v1/restaurant/photos?id=",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "photos/route.ts:L128",
+      "db": "RestaurantPhoto.delete",
+      "side_effects": [
+        "audit"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "× lacks aria-label"
+    },
+    {
+      "element": "Gallery: rejected-reason badge",
+      "file": "apps/business/js/crm.js:L145,L175,L188-195",
+      "handler": "showRejectReason()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "div/span without role"
+    },
+    {
+      "element": "Reviews: filters",
+      "file": "apps/business/js/crm.js:L454-457",
+      "handler": "setRevFilter()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 4
+    },
+    {
+      "element": "Reviews: load + error/retry",
+      "file": "apps/business/js/crm.js:L90-101,L425-429",
+      "handler": "loadReviews()/profRenderReviews()",
+      "api": "GET /api/v1/restaurant/reviews",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "reviews/route.ts:L17",
+      "db": "Review.findMany",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Reviews: reply",
+      "file": "apps/business/js/crm.js:L470,L477-510",
+      "handler": "openReplyModal()/saveReply()",
+      "api": "PATCH /api/v1/restaurant/reviews {id,reply}",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "reviews/route.ts:L52",
+      "db": "Review.update",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Hours: draft controls (toggle day, add/remove/update shift, add/remove closure)",
+      "file": "apps/business/js/crm.js:L857-908",
+      "handler": "toggleHoursDay()/addHoursShift()/removeHoursShift()/updateHoursShift()/addClosure()/removeClosure()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 6,
+      "note": "unsaved-changes guard in nav() routing.js:L67-70"
+    },
+    {
+      "element": "Hours: 'ارسالِ پیشنهاد برای تأیید'",
+      "file": "apps/business/js/crm.js:L848,L909-920",
+      "handler": "saveHours()",
+      "api": "PUT /api/v1/restaurant/hours",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "hours/route.ts:L133",
+      "db": "Restaurant.update(pending_opening_hours), RestaurantClosure upsert",
+      "side_effects": [
+        "audit"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Hours: load",
+      "file": "apps/business/js/crm.js:L787-806,L829-832",
+      "handler": "loadHours()",
+      "api": "GET /api/v1/restaurant/hours",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "hours/route.ts:L90",
+      "db": "read",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "no markLoad(): a failed GET silently renders the empty default draft as the restaurant's hours; submitting would send that draft",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Cancellation policy: 5 fields + save",
+      "file": "apps/business/js/crm.js:L961,L970-1009",
+      "handler": "updateCancelPolicyField()/toggleCancelPolicyField()/saveCancellationPolicy()",
+      "api": "PUT /api/v1/restaurant/cancellation-policy",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "cancellation-policy/route.ts:L34",
+      "db": "Restaurant.update",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 6,
+      "note": "per-row honesty badges (L956-957)"
+    },
+    {
+      "element": "Cancellation policy: load",
+      "file": "apps/business/js/crm.js:L927-934",
+      "handler": "loadCancellationPolicy()",
+      "api": "GET /api/v1/restaurant/cancellation-policy",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "cancellation-policy/route.ts:L22",
+      "db": "read",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "failed GET keeps hard-coded defaults (L927) and renders them as the current policy; 'ذخیره' would overwrite the server with those defaults",
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Menu: load (loading/empty/error+retry/success)",
+      "file": "apps/business/js/menu.js:L31-59",
+      "handler": "rMenu()",
+      "api": "GET /api/v1/restaurant/menu",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/route.ts:L50",
+      "db": "MenuItem.findMany, MenuCategory.findMany",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Menu: new category",
+      "file": "apps/business/js/menu.js:L81,L572-593",
+      "handler": "menuCatCreate()/menuCatCreateSave()",
+      "api": "POST /api/v1/restaurant/menu/categories",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/categories/route.ts:L39",
+      "db": "MenuCategory.create",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Menu: item form create/edit + tags",
+      "file": "apps/business/js/menu.js:L82,L428-537",
+      "handler": "menuOpenForm()/menuSave()",
+      "api": "POST /api/v1/restaurant/menu ; PATCH /api/v1/restaurant/menu/[id] ; PUT /api/v1/restaurant/menu/[id]/tags",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/route.ts:L97 ; menu/[id]/route.ts:L49 ; menu/[id]/tags/route.ts:L43",
+      "db": "MenuItem.create/update, MenuItemTag",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Menu: category move ▲▼",
+      "file": "apps/business/js/menu.js:L116-117,L637-649",
+      "handler": "menuCatMove()",
+      "api": "PATCH /api/v1/restaurant/menu/reorder",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/reorder/route.ts:L29",
+      "db": "MenuCategory.update×n",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Menu: category rename",
+      "file": "apps/business/js/menu.js:L118,L595-619",
+      "handler": "menuCatRename()/menuCatRenameSave()",
+      "api": "PATCH /api/v1/restaurant/menu/categories/[id]",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/categories/[id]/route.ts:L30",
+      "db": "MenuCategory.update",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Menu: category enable/disable",
+      "file": "apps/business/js/menu.js:L119,L622-634",
+      "handler": "menuCatToggle()",
+      "api": "DELETE|PATCH /api/v1/restaurant/menu/categories/[id]",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/categories/[id]/route.ts:L30,L80",
+      "db": "MenuCategory.update(is_active)",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Menu row: out-of-stock toggle",
+      "file": "apps/business/js/menu.js:L358-360,L559-570",
+      "handler": "menuToggleOut()",
+      "api": "PATCH /api/v1/restaurant/menu/[id]",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/[id]/route.ts:L49",
+      "db": "MenuItem.update",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "aria-pressed/aria-label present"
+    },
+    {
+      "element": "Menu row: edit",
+      "file": "apps/business/js/menu.js:L361",
+      "handler": "menuOpenForm(id)",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Menu row: delete (archive-aware)",
+      "file": "apps/business/js/menu.js:L362,L539-552",
+      "handler": "menuDelete()",
+      "api": "DELETE /api/v1/restaurant/menu/[id]",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/[id]/route.ts:L130",
+      "db": "MenuItem.delete|update(archived)",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Menu item photo upload / remove",
+      "file": "apps/business/js/menu.js:L383-423",
+      "handler": "menuPickPhoto()/menuRemovePhoto()",
+      "api": "POST|DELETE /api/v1/restaurant/menu/[id]/photo",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/[id]/photo/route.ts:L59,L137 ; lib/media.ts",
+      "db": "MenuItem.update(imageUrl)",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Menu modifiers (load, group add/delete, option add/delete)",
+      "file": "apps/business/js/menu.js:L663-732",
+      "handler": "menuLoadModifiers()/menuModGroupAdd()/menuModGroupDelete()/menuModOptionAdd()/menuModOptionDelete()",
+      "api": "GET|POST /api/v1/restaurant/menu/[id]/modifiers ; POST|DELETE /api/v1/restaurant/menu/modifier-groups/[id] ; DELETE /api/v1/restaurant/menu/modifier-options/[id]",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/[id]/modifiers/route.ts:L36,L63 ; modifier-groups/[id]/route.ts:L72,L94 ; modifier-options/[id]/route.ts:L60",
+      "db": "MenuModifierGroup/Option",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 5
+    },
+    {
+      "element": "Menu public: copy URL, preview link, build QR, download SVG/PNG",
+      "file": "apps/business/js/menu.js:L163-169,L255-336",
+      "handler": "menuCopyUrl()/menuLoadQr()/menuDownloadQr()",
+      "api": "GET /api/v1/restaurant/menu/qr?size=",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/qr/route.ts:L34 ; lib/public-urls.ts",
+      "db": "read",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 5
+    },
+    {
+      "element": "Menu branding: load / save / reset accent",
+      "file": "apps/business/js/menu.js:L177,L193-253",
+      "handler": "menuLoadBranding()/menuBrandSaveForm()/menuBrandSave()",
+      "api": "GET|PATCH /api/v1/restaurant/menu/branding",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "menu/branding/route.ts:L53,L58",
+      "db": "Restaurant.update(menu_*)",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 3
+    },
+    {
+      "element": "Menu tag chips toggle",
+      "file": "apps/business/js/menu.js:L449,L655-660",
+      "handler": "menuTagChipToggle()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Customers tabs",
+      "file": "apps/business/js/crm.js:L516-519,L530-533",
+      "handler": "setCustTab()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 4
+    },
+    {
+      "element": "Customers overview (RFM + AI cards + VIP count) + retry",
+      "file": "apps/business/js/crm.js:L627-707",
+      "handler": "custRenderOverview()",
+      "api": "GET /api/v1/restaurant/rfm ; GET /api/v1/restaurant/ai ; GET /api/v1/restaurant/customers?segment=vip",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "lib/rfm.ts ; restaurant/ai/route.ts:L23 ; customers/route.ts:L20",
+      "db": "CustomerInsight, raw SQL",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "full",
+      "count": 1
+    },
+    {
+      "element": "Customers overview: seg cells + quick actions",
+      "file": "apps/business/js/crm.js:L682,L695-697",
+      "handler": "setCustTab()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 4,
+      "note": "seg-cell divs lack role"
+    },
+    {
+      "element": "Customer profiles: sort buttons",
+      "file": "apps/business/js/crm.js:L711-755",
+      "handler": "custRenderProfiles()",
+      "api": "GET /api/v1/restaurant/customers?sort=&limit=20",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "customers/route.ts:L20-63",
+      "db": "CustomerInsight.findMany (cached 60s)",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "full",
+      "count": 4,
+      "note": "error state has no retry button (L716)"
+    },
+    {
+      "element": "Customer profile row: call / جزئیات / ارسال پیام",
+      "file": "apps/business/js/crm.js:L749-751",
+      "handler": "callCustomer()/openCustomerDetail()/setCustTab()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "full",
+      "count": 3
+    },
+    {
+      "element": "Customer detail modal",
+      "file": "apps/business/js/crm.js:L1012-1055",
+      "handler": "openCustomerDetail(userId)",
+      "api": "GET /api/v1/restaurant/customers/[userId]",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "customers/[userId]/route.ts:L10 ; lib/fraud.ts",
+      "db": "CustomerInsight, Reservation timeline",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "full",
+      "count": 1
+    },
+    {
+      "element": "Campaign: segment cards",
+      "file": "apps/business/js/crm.js:L1081,L1087 ; marketing.js:L153-159",
+      "handler": "pickSeg()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "'مشتری جدید' count is always '—' (L1081); 'تولد این ماه' depends on CLUB being loaded elsewhere; cards are divs without role",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 4
+    },
+    {
+      "element": "Campaign: text + char counter",
+      "file": "apps/business/js/crm.js:L1089-1098",
+      "handler": "input listener",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Campaign: preview -> confirm -> send",
+      "file": "apps/business/js/marketing.js:L160-250",
+      "handler": "previewCamp()/confirmCamp()/doSendCampaign()",
+      "api": "GET /api/v1/restaurant/customers?segment=&limit=500 ; POST /api/v1/restaurant/sms {kind:campaign,phones[],message}",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics ; canManageCampaigns",
+      "service": "restaurant/sms/route.ts:L141-290 (customText -> enqueueSms text L253,L279-283) ; lib/sms.ts enqueueSms ; lib/outreach-ledger.ts",
+      "db": "CampaignLog, Job(sms), OutreachLedger",
+      "side_effects": [
+        "sms"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 3,
+      "note": "free text sent only if MELIPAYAMAK_FROM is configured (CLAUDE.md rule; sms layer fails explicitly otherwise); preview header shows hard-coded 'کافه‌رستوران ویستا' (L186)"
+    },
+    {
+      "element": "Campaign history",
+      "file": "apps/business/js/crm.js:L1101-1112",
+      "handler": "loadCampaignHistory()",
+      "api": "GET /api/v1/restaurant/campaigns",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageCampaigns",
+      "service": "campaigns/route.ts:L6",
+      "db": "CampaignLog.findMany",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "error state has no retry"
+    },
+    {
+      "element": "Assistant chat: send (button + Enter)",
+      "file": "apps/business/js/assistant.js:L26-76",
+      "handler": "sendAssistantMessage()",
+      "api": "POST /api/v1/restaurant/assistant",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "restaurant/assistant/route.ts:L28 ; lib/assistant.ts ; lib/assistant-nlu.ts",
+      "db": "AssistantLog.create",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Assistant chat: teach chips",
+      "file": "apps/business/js/assistant.js:L72,L79-87",
+      "handler": "assistantTeach()",
+      "api": "POST /api/v1/restaurant/assistant/feedback",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "assistant/feedback/route.ts:L20",
+      "db": "AssistantLog.update + NLU example",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "AI cards + action buttons",
+      "file": "apps/business/js/crm.js:L1146-1170,L1191-1196",
+      "handler": "custRenderAI()/handleAiAction()",
+      "api": "GET /api/v1/restaurant/ai",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "restaurant/ai/route.ts:L23 ; lib/no-show-model.ts ; lib/demand-forecast.ts",
+      "db": "read",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "unknown card ids fall back to toast 'به‌زودی' (L1195) — placeholder in production path",
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "CRM contacts: call (logged) / پیامک",
+      "file": "apps/business/js/crm.js:L1173-1181,L766-771",
+      "handler": "callRecommendedCustomer()/setCustTab()",
+      "api": "GET /api/v1/restaurant/crm/recommendations ; POST /api/v1/restaurant/crm/recommendations/contacted",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "lib/crm-recommendations.ts ; crm/recommendations/contacted/route.ts:L41 ; lib/outreach-ledger.ts",
+      "db": "OutreachLedger.create",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Loyalty: load members + KPIs + list",
+      "file": "apps/business/js/loyalty.js:L9-107 ; data.js:L836-856",
+      "handler": "rLoyalty()/loadClubMembers()",
+      "api": "GET /api/v1/restaurant/members?limit=100",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "members/route.ts:L24 ; lib/club-enroll.ts",
+      "db": "ClubMember.findMany",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "loadClubMembers returns [] on any failure (data.js:L851-855) -> page renders '۰ عضو' / empty tiers with no error state or retry",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "partial",
+      "count": 1
+    },
+    {
+      "element": "Loyalty: 'رفتن به ثبتِ ورود'",
+      "file": "apps/business/js/loyalty.js:L77",
+      "handler": "openWalkin()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Loyalty: birthday SMS",
+      "file": "apps/business/js/loyalty.js:L85,L128-145",
+      "handler": "sendBirthdayGreetings()",
+      "api": "POST /api/v1/restaurant/sms {kind:campaign,phones[],message:'تبریکِ تولد'}",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageCampaigns",
+      "service": "sms/route.ts:L141",
+      "db": "Job(sms), CampaignLog",
+      "side_effects": [
+        "sms"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "message becomes the literal SMS text 'تبریکِ تولد' (customText path sms/route.ts:L253,L283) — no name/discount"
+    },
+    {
+      "element": "Loyalty: tel links",
+      "file": "apps/business/js/loyalty.js:L103",
+      "handler": "<a href=tel:>",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Marketing tabs",
+      "file": "apps/business/js/marketing.js:L41-42,L48-52",
+      "handler": "setMktTab()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2
+    },
+    {
+      "element": "Coupon create",
+      "file": "apps/business/js/marketing.js:L73,L87-102",
+      "handler": "createCoupon()",
+      "api": "POST /api/v1/restaurant/coupons",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageCoupons",
+      "service": "coupons/route.ts:L39 ; lib/coupons.ts",
+      "db": "Coupon.create",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Coupon list",
+      "file": "apps/business/js/marketing.js:L75-85",
+      "handler": "renderCoupons()",
+      "api": "GET /api/v1/restaurant/coupons",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageCoupons",
+      "service": "coupons/route.ts:L22",
+      "db": "Coupon.findMany",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "status chip only; no deactivate/delete control and no PATCH/DELETE route exists",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Automation create",
+      "file": "apps/business/js/marketing.js:L116,L130-142",
+      "handler": "createAutomation()",
+      "api": "POST /api/v1/restaurant/automations",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageCampaigns",
+      "service": "automations/route.ts:L61",
+      "db": "MarketingAutomation.create",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Automation list",
+      "file": "apps/business/js/marketing.js:L118-128",
+      "handler": "renderAutomations()",
+      "api": "GET /api/v1/restaurant/automations",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageCampaigns",
+      "service": "automations/route.ts:L21 ; lib/outreach-ledger.ts",
+      "db": "MarketingAutomation.findMany",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "no deactivate control; conversion honesty is correct (L20-28)",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Analytics page",
+      "file": "apps/business/js/marketing.js:L285-439",
+      "handler": "rAnalytics()",
+      "api": "GET /api/v1/restaurant/analytics",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canViewAnalytics",
+      "service": "analytics/route.ts:L15 ; lib/restaurant-manager.ts",
+      "db": "raw SQL aggregates",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "on fetch failure the hard-coded sample block (136 / 66% / 248 …, L287-292,L354) renders with a 'داده‌ی نمونه' banner but no error state or retry",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Cashback: load + error/retry",
+      "file": "apps/business/js/staff-system.js:L245-262",
+      "handler": "rCashback()",
+      "api": "GET /api/v1/restaurant/cashback",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "cashback/route.ts:L18",
+      "db": "Restaurant read",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Cashback sliders",
+      "file": "apps/business/js/staff-system.js:L269,L356-364",
+      "handler": "cbChange()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 4
+    },
+    {
+      "element": "Cashback confirm + apply",
+      "file": "apps/business/js/staff-system.js:L278,L365-427",
+      "handler": "cbConfirm()/cbApply()",
+      "api": "PATCH /api/v1/restaurant/cashback",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "cashback/route.ts:L33-45",
+      "db": "Restaurant.update(cb_*_pct)",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "offline branch (L412-415) commits CB locally, clears the dirty banner and pushes notification 'کش‌بک به‌روز شد' without a 2xx and without Outbox -> lost on reload; no audit() on the route",
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Pricing: load suggestions/rules",
+      "file": "apps/business/js/staff-system.js:L282-340",
+      "handler": "rPricing()",
+      "api": "GET /api/v1/restaurant/pricing",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "pricing/route.ts:L23 ; lib/pricing.ts ; lib/restaurant-manager.ts",
+      "db": "PricingRule read",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "on fetch failure the three hard-coded sample suggestions (L284-291) render with working 'قبول' buttons",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Pricing: accept suggestion -> save",
+      "file": "apps/business/js/staff-system.js:L319,L341-355",
+      "handler": "pricingAccept()/pricingSave()",
+      "api": "PUT /api/v1/restaurant/pricing {rules, base_min_spend_toman}",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageSettings",
+      "service": "pricing/route.ts:L51",
+      "db": "PricingRule replace",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "after a failed GET (P.base=0, sample rules) accepting writes the fabricated rule and base_min_spend_toman:0 to the server; no UI to remove a rule",
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Staff list",
+      "file": "apps/business/js/staff-system.js:L24-29,L52-84",
+      "handler": "rStaff()/loadStaff()",
+      "api": "GET /api/v1/restaurant/staff",
+      "auth_wrapper": "withStaffAuth",
+      "permission": "role owner|manager (assertManagerOrOwner staff/route.ts:L79)",
+      "service": "staff/route.ts:L95",
+      "db": "Staff.findMany + permissions",
+      "side_effects": [],
+      "class": "FAKE",
+      "broken_link": "_staffLoaded=true even when the fetch failed (L28) -> 'نمونه' note hidden (L55-56) and STAFF_DEMO rows (ids demo1/demo2) render as the real team",
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Staff permission editor + save",
+      "file": "apps/business/js/staff-system.js:L78,L87-119",
+      "handler": "openPermEditor()/savePermEditor()",
+      "api": "PATCH /api/v1/restaurant/staff {staff_id, permissions}",
+      "auth_wrapper": "withStaffAuth",
+      "permission": "role owner|manager",
+      "service": "staff/route.ts:L144",
+      "db": "StaffPermission upsert",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 2,
+      "note": "no audit() in staff/route.ts (grep count 0); body.restaurant_id (branch assignment) is tenant-validated at L184"
+    },
+    {
+      "element": "Chat inbox",
+      "file": "apps/business/js/chat.js:L14-33",
+      "handler": "rChat()",
+      "api": "GET /api/v1/restaurant/chats",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "chats/route.ts:L20",
+      "db": "ChatThread.findMany",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": true,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "error state has no retry"
+    },
+    {
+      "element": "Chat thread open + 4s polling",
+      "file": "apps/business/js/chat.js:L36-80",
+      "handler": "openBizChat()/bizPoll()",
+      "api": "GET /api/v1/restaurant/chats/[id]?after=",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "chats/[id]/route.ts:L21 ; lib/chat.ts",
+      "db": "ChatMessage.findMany",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": false,
+        "empty": true,
+        "error": false,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Chat send",
+      "file": "apps/business/js/chat.js:L87-105",
+      "handler": "sendBizChat()",
+      "api": "POST /api/v1/restaurant/chats/[id]",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "chats/[id]/route.ts:L38 ; lib/chat.ts",
+      "db": "ChatMessage.create",
+      "side_effects": [
+        "push"
+      ],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": true,
+        "empty": null,
+        "error": true,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Chat close",
+      "file": "apps/business/js/chat.js:L42,L56-61",
+      "handler": "closeBizChat()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Heartbeat every 30s",
+      "file": "apps/business/js/data.js:L603-615",
+      "handler": "Heartbeat.start()",
+      "api": "POST /api/v1/restaurant/heartbeat",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": null,
+      "service": "heartbeat/route.ts:L47",
+      "db": "Restaurant.update(lastHeartbeatAt)",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "no permission by documented decision (heartbeat/route.ts:L17-49)"
+    },
+    {
+      "element": "Telemetry batch emitter",
+      "file": "apps/business/js/analytics.js:L10-84",
+      "handler": "rzTrack()/flush()",
+      "api": "POST /api/v1/telemetry",
+      "auth_wrapper": "none (anonymous, sanitized)",
+      "permission": null,
+      "service": "telemetry/route.ts:L38-167",
+      "db": "TelemetryEvent.createMany (eventId dedup)",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Outbox sync + conflict modal",
+      "file": "apps/business/js/data.js:L453-553",
+      "handler": "Outbox.sync()/_reportConflicts()",
+      "api": "replays queued ops",
+      "auth_wrapper": "(per op)",
+      "permission": null,
+      "service": "-",
+      "db": "-",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1,
+      "note": "stops on offline, surfaces server rejections to staff"
+    },
+    {
+      "element": "Online/offline bar",
+      "file": "apps/business/js/data.js:L556-589",
+      "handler": "Net.init()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "REAL",
+      "broken_link": null,
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Branch switch cache invalidation + refresh",
+      "file": "apps/business/js/routing.js:L142-180 ; data.js:L593-598",
+      "handler": "selectBranch()/refreshActiveView()",
+      "api": "none",
+      "auth_wrapper": "none",
+      "permission": null,
+      "service": "n/a",
+      "db": "n/a",
+      "side_effects": [],
+      "class": "PARTIAL",
+      "broken_link": "refreshActiveView map omits 'chat' and 'menu' (data.js:L597) -> those views keep the previous branch's data until re-navigated",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Reservations 'load more' (cursor pagination)",
+      "file": "apps/business/js/data.js:L917,L938,L946-954",
+      "handler": "loadMoreReservations()",
+      "api": "GET /api/v1/restaurant/reservations?cursor=",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "canManageReservations",
+      "service": "reservations/route.ts:L52",
+      "db": "Reservation.findMany",
+      "side_effects": [],
+      "class": "DEAD",
+      "broken_link": "defined, never called (grep 0 call sites); RES_NEXT_CURSOR is stored and discarded -> days with >100 reservations are silently truncated",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 1
+    },
+    {
+      "element": "Unused API client methods (branchCreate, createMember, events×4, assistantStats, chatList/chatMessages/chatSend)",
+      "file": "apps/business/js/data.js:L434,L283,L406-409,L348,L229-231",
+      "handler": "API.*",
+      "api": "POST /restaurant/branches ; POST /restaurant/members ; /restaurant/events ; GET /restaurant/assistant ; /restaurant/chats",
+      "auth_wrapper": "withRestaurantAuth",
+      "permission": "various",
+      "service": "-",
+      "db": "-",
+      "side_effects": [],
+      "class": "DEAD",
+      "broken_link": "no call sites in apps/business (grep); routes fraud-signals, reports, customers/[userId] PATCH also unreached from this panel",
+      "ui_states": {
+        "loading": null,
+        "empty": null,
+        "error": null,
+        "success": true
+      },
+      "guest_context": "n/a",
+      "count": 10
+    }
+  ],
+  "src_v2": {
+    "class": "DEAD",
+    "proof": "apps/business/src-v2 does not exist at dbec99f: `ls apps/business/src-v2` -> No such file or directory; `git ls-files apps/business/src-v2 | wc -l` -> 0; last touching commit 95e95f1 deleted apps/business/src-v2/RestaurantIntelligenceDashboard.jsx (249 deletions); no <script>/import/CI reference (rg src-v2 -> only the 3 stale call-free mentions above are absent; .github/workflows/ci.yml has none)."
+  },
+  "guest_context_summary": {
+    "reservation rows (tab + tonight board)": "partial — name, phone, party, table, status, note(preferences), preorder flag, reputation_tier; no visit count, spend, no-show tier, tags",
+    "dashboard customer history modal": "partial — visits, CLV-derived spend, churn-inverse return %; history list broken (A2-015)",
+    "customers/profiles + detail modal": "full — total_visits, CLV, churn_risk_score, no_show_rate_pct, segment, is_vip, intelligence_score, timeline",
+    "waitlist cards": "partial — party, waited/estimated minutes, VIP flag only"
+  },
+  "injection_scan": "No instructions addressed to agents/tools were found in the audited repository files or data; nothing to report.",
+  "coverage": {
+    "items_total": 245,
+    "items_verified": 245,
+    "verification": "static source trace with file:line for every item; live behaviour not executed per run override"
+  },
+  "unverified": [],
+  "class_counts": {
+    "REAL": 189,
+    "PARTIAL": 37,
+    "DEAD": 14,
+    "FAKE": 5
+  },
+  "severity_counts": {
+    "blocker": 2,
+    "major": 16,
+    "minor": 17
+  }
+}

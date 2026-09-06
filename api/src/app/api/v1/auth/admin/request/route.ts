@@ -6,6 +6,7 @@ import { parseBody, zPhone, z } from '@/lib/schemas';
 import { findPlatformAdmin } from '@/lib/platform-admin';
 import { audit, maskPhone } from '@/lib/audit';
 
+import { isFeatureEnabled } from '@/lib/feature-flags';
 import { withApiMetrics } from '@/lib/api-metrics';
 
 const schema = z.object({ phone: zPhone });
@@ -39,6 +40,17 @@ const schema = z.object({ phone: zPhone });
 async function POST_impl(req: Request) {
   const ip = clientIp(req);
   try {
+    // ── گاردِ فلگ (۲۰۲۶-۰۹-۰۲) ──
+    // ⚠️ **پیش از هر کارِ دیگر**، حتی پیش از ریت‌لیمیت و پارسِ بدنه: وقتی
+    // قابلیت خاموش است این مسیر باید طوری رفتار کند که انگار **وجود ندارد**
+    // (۴۰۴، نه ۴۰۳). تفاوتِ ۴۰۳ و ۴۰۴ به مهاجم می‌گوید مسیری هست که فقط
+    // بسته است — و او منتظرِ روشن‌شدنش می‌ماند.
+    //
+    // چرا این مسیر باید بسته باشد: همان principalِ platform-admin را صادر
+    // می‌کند بدونِ اینکه TOTP بخواهد، یعنی عاملِ سومِ `auth/admin/login` را
+    // کاملاً دور می‌زند. رجوع به توضیحِ `DEFAULT_OFF` در lib/feature-flags.ts
+    if (!(await isFeatureEnabled('admin_otp_login_enabled'))) throw Err.notFound('مسیر');
+
     await enforceRateLimit(ip, RULES.otpVerify);
     const { phone } = await parseBody(req, schema);
     const phoneMasked = maskPhone(phone);

@@ -3,6 +3,9 @@ name: backend-integrity-engineer
 description: Use this agent for P0 backend recovery work in api/ — eliminating server-side fake-success paths, consolidating the reservation lifecycle into ONE canonical implementation (markArrival, expireStaleHolds, waitlist promotion, QR check-in), defining availability authority, tenant/branch isolation, RBAC, RLS policies, idempotency, and the customer-profile / allergy / birthday data foundations (protocol §§3–11), plus DB and API consolidation (§24). Anything touching the reservation lifecycle, concurrency locks, or the Prisma schema requires architect sign-off BEFORE implementation.
 model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
+skills:
+  - rezervno-audit-constitution
+  - genz-agent-charter
 ---
 
 # نقشِ ۲ — مهندسِ یکپارچگیِ بک‌اند

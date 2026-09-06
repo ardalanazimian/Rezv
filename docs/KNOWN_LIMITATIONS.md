@@ -658,7 +658,11 @@ tells you what the API *said*, not what it *wrote*.
 - **`localStorage` tokens** are XSS-exposed; every front-end `innerHTML` sink
   must escape user data (`esc()` — unit-tested, `api/tests/esc.test.mts`,
   PR #16).
-- **RLS is partial** (started in `manual/023`); not all tenant tables have it.
+- **RLS is inert, not partial** (P0-021, corrected 2026-09-04). It is *enabled* on
+  61/73 tables (`prisma/sql/023` + `037` - the old `manual/` path no longer
+  exists), but with **zero policies** and an **owner** app role it isolates
+  nothing. Coverage was never the real gap; policies + a non-owner role are.
+  Post-launch ticket: P0-022.
 - **Rate-limit fail-open — now observable, residual-hardening PR
   (۲۰۲۶-۰۸-۱۴).** When Redis is down, the fallback to a per-process
   in-memory floor (`max × instances` under multi-instance deployment) is
@@ -673,8 +677,21 @@ tells you what the API *said*, not what it *wrote*.
   outage turned into an uncaught throw → a generic error response, not the
   documented fail-open floor. Only the global `middleware.ts` path had the
   in-memory fallback. Both paths now share one implementation
-  (`rateLimitWithFallback` in `ratelimit.ts`). Operators must still wire an
-  alert on these metrics themselves — none exists yet.
+  (`rateLimitWithFallback` in `ratelimit.ts`). **Alert rules now exist,
+  round-20 (۲۰۲۶-۰۹-۰۴, `audit/round-20/ALERTS-GAP.md`)**:
+  `RateLimitRedisFailOpen`, `BanCheckFailOpen`, `RateLimitAutoBanSpike` in
+  `observability/alerts.yml`, each proven able to fire via
+  `promtool test rules` (`observability/alerts.test.yml`) — a red→green
+  mutation test on the thresholds is recorded in the round-20 report. **This
+  proves the rule, not the page**: no Alertmanager and no Grafana
+  notification channel is deployed anywhere in this repo
+  (`docker-compose.observability.yml` only runs `prometheus` + `grafana`),
+  so a firing rule today is visible in Prometheus's/Grafana's own UI and
+  nowhere else — nobody is actually paged until a founder picks a
+  notification channel (Slack/email/PagerDuty) and provides its credentials.
+  A fourth, related counter, `rezervno_slot_lock_fallback_total`
+  (`lib/redis.ts:166`, the reservation-lock fail-open path), was found during
+  this pass and is **still completely unwired** — out of round-20's scope.
 - **Full `innerHTML`/`insertAdjacentHTML`/`document.write`/`eval` sink audit
   — done, residual-hardening PR (۲۰۲۶-۰۸-۱۴).** `tools/xss-sink-audit.mjs`
   automatically scans `apps/customer|business|company` + `shared/js`,

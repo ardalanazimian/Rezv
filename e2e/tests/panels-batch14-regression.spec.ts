@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { mockAdminOtpFlag } from './helpers/mock-api';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  رگرسیونِ Batch 14 — سطوحی که «موفقیتِ جعلی» یا «حالتِ خوش‌بینانه» داشتند
@@ -71,6 +72,7 @@ async function mockCompanyApi(page: Page, opts: Opts = {}) {
 }
 
 async function loginCompany(page: Page) {
+  await mockAdminOtpFlag(page);
   await page.goto(CO);
   // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
   // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
@@ -99,6 +101,7 @@ test('حالتِ دمو: دادهٔ ساختگی برچسبِ [DEMO] و بنرِ
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.route('**/api/v1/**', (route) => route.abort());
 
+  await mockAdminOtpFlag(page);
   await page.goto(CO);
   // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
   // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
@@ -246,6 +249,7 @@ test('مودالِ تمدید برایِ پلنِ تمدیدناپذیر چیپ�
   // دقیقاً به همین دلیل تایم‌اوت خورد). دادهٔ نمونه‌ی خودِ پنل رستورانی با
   // پلنِ `basic` دارد — همان کلاسِ «تمدیدناپذیر»ی که starter در آن است.
   await page.route('**/api/v1/**', (route) => route.abort());
+  await mockAdminOtpFlag(page);
   await page.goto(CO);
   // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
   // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.
@@ -270,6 +274,7 @@ test('مودالِ تمدید برایِ پلنِ تمدیدناپذیر چیپ�
 test('جست‌وجویِ تاپ‌بار واقعاً فهرست را فیلتر می‌کند', async ({ page, isMobile }) => {
   test.skip(!!isMobile, 'نوارِ جست‌وجویِ تاپ‌بار رویِ موبایل با CSS پنهان است (.tb-search)');
   await page.route('**/api/v1/**', (route) => route.abort());
+  await mockAdminOtpFlag(page);
   await page.goto(CO);
   // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
   // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.

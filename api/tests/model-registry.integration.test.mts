@@ -130,6 +130,23 @@ describe('فازِ ۶ — نسب‌نامه‌ی مدل از خواندن تا �
     }));
     assert.ok(pred, 'پیش‌بینی باید ثبت شده باشد');
     assert.equal(pred.modelSource, 'learned');
+
+    // مهاجرتِ ۰۸۰ — دفتر و خودِ ردیف باید یک چیز بگویند.
+    // چرا اینجا و نه در تستِ خودِ نسب‌نامه: آن تست فقط ستون و متنِ
+    // برچسب را می‌سنجد؛ اگر کسی خطِ `noShowRiskSource:` را از lib/reservations.ts
+    // حذف کند، ستون همچنان هست و برچسب هم صادق می‌ماند — ولی هر ردیف
+    // NULL می‌شود و کلِ رفع توخالی می‌شود. اینجا تنها جایی است که مسیرِ
+    // واقعیِ ساختِ رزرو با مدلِ فعال اجرا می‌شود.
+    const row = await db.reservation.findUnique({
+      where: { id: resv.id },
+      select: { noShowRiskSource: true, noShowRiskTier: true },
+    });
+    assert.ok(row?.noShowRiskTier, 'ردیفِ رزرو ردهٔ ریسک ندارد — موضوعِ این ادعا غایب است، پس خطاست نه عبور');
+    assert.equal(
+      row.noShowRiskSource,
+      pred.modelSource,
+      'نسب‌نامهٔ روی ردیفِ رزرو با دفترِ پیش‌بینی یکی نیست — مصرف‌کننده ردهٔ بی‌برچسب را به‌عنوانِ واقعیت نشان می‌دهد',
+    );
     assert.equal(pred.modelRunId, runId,
       'این همان حلقه‌ی گمشده‌ی فازِ ۶ است: بدونش دقتِ تولید به هیچ نسخه‌ای قابلِ نسبت‌دادن نبود');
 

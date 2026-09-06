@@ -1,0 +1,58 @@
+{
+  "gate": "rls-policy-honesty",
+  "file": "api/tests/rls-policy-honesty.integration.test.mts",
+  "wired_into": "api/tests/_all.runner.mts (import added — an unimported test file is never run by `npm test`; that exact fake-green is documented in the runner header)",
+  "round": 19,
+  "date": "2026-09-04",
+  "ordered_by": "founder directive 4, order 2b (2026-09-04)",
+  "finding_it_guards": "P0-021",
+  "why": "RLS was enabled on 61 of 73 public tables with ZERO policies while the API connects as the database owner role, so 'RLS is enabled' read as protection in several docs while isolating nothing. This gate stops that reading from returning.",
+  "live_baseline_facts": {
+    "measured_on": "local dev DB (container rezervno-postgres, database `rezervno`) and the CI-faithful test DB (container rezv-test-pg, database `rezervno_test`)",
+    "dev_db": { "public_tables": 73, "rls_enabled": 61, "policies": 0, "force_rls": 0 },
+    "ci_faithful_db": { "public_tables": 72, "rls_enabled": 61, "policies": 0 },
+    "rls_table_lists_identical_across_both": true,
+    "app_role": "rezervno — rolsuper=true, rolbypassrls=true (so RLS is bypassed twice over: superuser AND bypassrls AND owner)",
+    "repo_wide": "grep 'CREATE POLICY' api/prisma/sql/*.sql -> 0 matches; grep 'FORCE ROW LEVEL SECURITY' api/prisma/ -> 0 matches"
+  },
+  "what_the_gate_asserts": [
+    "clause 1 — any table with RLS enabled and zero policies that is NOT in the documented allowlist fails the build (the allowlist is a DISCLOSURE, not an approval)",
+    "clause 2 — any allowlist entry that is no longer 'RLS enabled with zero policies' fails, so the list cannot go stale in either direction",
+    "clause 3 — any table that HAS policies but lacks FORCE ROW LEVEL SECURITY fails, because the owner role would bypass those policies and recreate the same hollow green (vacuous today by construction: zero tables have policies — stated in the test, not hidden)",
+    "rule-5 floors — zero tables found, zero RLS-enabled tables found (apply-sql.sh did not run), or fewer than 55 of the 61 allowlisted tables present all FAIL rather than passing vacuously"
+  ],
+  "falsifiability_proof": {
+    "method": "live mutation against the same DB the suite uses, each reverted immediately; exit code of `npx tsx --test tests/rls-policy-honesty.integration.test.mts` recorded every time",
+    "baseline_exit": 0,
+    "mutations": [
+      {
+        "id": "M1",
+        "clause": 1,
+        "mutation": "CREATE TABLE rls_gate_scratch_m1 (id int); ALTER TABLE rls_gate_scratch_m1 ENABLE ROW LEVEL SECURITY;",
+        "exit_with_mutation": 1,
+        "exit_after_revert": 0
+      },
+      {
+        "id": "M2",
+        "clause": 2,
+        "mutation": "CREATE POLICY rls_gate_scratch_m2 ON coupons FOR SELECT USING (true);  -- an allowlisted table gains a real policy",
+        "exit_with_mutation": 1,
+        "exit_after_revert": 0
+      },
+      {
+        "id": "M3",
+        "clause": 3,
+        "mutation": "CREATE TABLE rls_gate_scratch_m3 (id int); ALTER TABLE ... ENABLE ROW LEVEL SECURITY; CREATE POLICY p ON rls_gate_scratch_m3 FOR SELECT USING (true);  -- policy without FORCE",
+        "exit_with_mutation": 1,
+        "exit_after_revert": 0
+      }
+    ],
+    "post_state_verified_clean": { "leftover_scratch_tables": 0, "policies_in_public": 0 },
+    "raw_summary": "B=0 M1=1 M1R=0 M2=1 M2R=0 M3=1 M3R=0"
+  },
+  "honest_limitations": [
+    "Clause 3 is vacuous until the P0-022 post-launch work introduces the first real policy — declared in the test header rather than left as a silent escape hatch.",
+    "The allowlist was captured from a DB built the production way (db push -> apply-sql.sh -> fixups). If a future migration adds a table WITHOUT RLS, this gate says nothing about it — its scope is 'RLS that pretends to protect', not 'RLS coverage'.",
+    "This proves the gate on the local/CI-shaped DB. It has not been run against a production database, because none exists yet (P0-017 / P0-014)."
+  ]
+}

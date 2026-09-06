@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { mockAdminOtpFlag } from './helpers/mock-api';
 
 // ═══════════════════════════════════════════════════════════
 //  e2e رفتاریِ پنل‌هایِ فازِ ۴ (پنلِ شرکت → تبِ امنیت):
@@ -75,6 +76,7 @@ function mockPhase4SecurityApi(page: Page) {
 }
 
 async function loginAsAdmin(page: Page) {
+  await mockAdminOtpFlag(page);
   await page.goto(CO);
   // [هم‌ترازی با ورودِ جدید ۲۰۲۶-۰۸-۲۶] پیش‌فرضِ ورود حالا «نام کاربری و رمز»
   // است (تصمیمِ محصولیِ merged)؛ فرمِ پیامکی پشتِ این دکمه است.

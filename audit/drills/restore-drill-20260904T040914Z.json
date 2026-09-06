@@ -1,0 +1,12 @@
+{
+  "scope": "local/rezervno_verify",
+  "completed_at": "2026-09-04T04:09:20Z",
+  "exit_code": 0,
+  "source_db": "rezervno_verify",
+  "restored_into": "drill_restore_20260904t040914z (dropped after comparison)",
+  "tables_compared": 72,
+  "row_count_diff": 0,
+  "dump": { "path": "audit/drills/dumps/rezervno_verify-20260904T040914Z.dump", "size_bytes": 294304, "sha256": "185c89ad447403913f666780f507edc3631358835ee44ae3260490988fed93cf" },
+  "off_host": { "verified": true, "kind": "host-filesystem-outside-db-container", "path": "audit/drills/dumps/rezervno_verify-20260904T040914Z.dump" },
+  "note": "یک درِیلِ محلی مجوزِ عملیاتِ مخرب روی تولید نیست — گیت دامنه را تطبیق می‌دهد."
+}

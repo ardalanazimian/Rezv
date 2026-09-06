@@ -68,3 +68,34 @@ spawn نمی‌شود (بند ۱: «Do NOT jump to AI features while foundationa
    که بندهای ۰/۲۴ «rollback strategy» را الزام کرده‌اند و CLAUDE.md برای همین دامنه‌ها
    PR + CI سبز می‌خواهد. **قبل از اولین تغییرِ کد باید کامیتِ baseline زده شود.**
    هیچ ایجنتی خودش git init/commit/push نمی‌کند.
+
+---
+
+## لایه‌ی دوم — عامل‌هایِ ممیزی (audit-layer)، افزوده‌ی ۲۰۲۶-۰۹-۰۴
+
+> این لایه جایگزینِ تیمِ فاز ۲ نیست — مکمّلِ آن است. هیچ عاملِ تکراری ساخته نشد:
+> نقش‌های `backend` / `ui-ux` / `ml` / `loyalty` که در طرحِ اولیه آمده بودند، عمداً **نوشته نشدند**
+> چون `backend-integrity-engineer`، `panels-ui-engineer`، `ai-intelligence-auditor` و
+> `data-trust-engineer` همین زمین را از قبل دارند. allowlistِ spawn در `ceo.md` به همان‌ها اشاره می‌کند.
+
+| نقش | مدل | مسئولیت | ابزار |
+|---|---|---|---|
+| `ceo` | opus | ارکستراسیون، راستی‌آزماییِ ≥۲۰٪، توصیه‌ی GO/NO-GO. **تنها عاملی که اجازه‌ی spawn دارد** | کامل + `Agent(...)` |
+| `census` | sonnet | سرشماریِ واقعیتِ قابلیت‌ها (REAL/PARTIAL/DEMO-ONLY/FAKE/DEAD) | **فقط-خواندنی** |
+| `security` | opus | authz، ماتریسِ جامعِ ایزولاسیونِ tenant، secrets، fail-closed | Read/Grep/Glob/Bash/Edit/Write |
+| `test-integrity` | opus | شکارِ fake-green، اثباتِ falsifiability، mutation، سوئیتِ قرارداد | Read/Grep/Glob/Bash/Edit/Write |
+| `launch-ops` | sonnet | دیپلوی، env، cron، پیامک، بک‌آپ/درِیل، مانیتورینگ، ۴ گیتِ بازِ لانچ | Read/Grep/Glob/Bash/Edit/Write |
+| `sweeper` | haiku | جاروبِ مکانیکی، تولیدِ ماتریس، فهرست‌برداری. قضاوت نمی‌کند | **فقط-خواندنی** |
+
+### دو قاعده‌ی هزینه که از همین فایل می‌آیند
+
+۱. **تعریفِ عامل رایگان است؛ اجرایش نه.** شکستِ `agency/` از ~۲۳ عاملِ **در‌حال‌اجرا** آمد،
+   نه از ~۲۳ فایل. پس افزودنِ تعریف همان خطا نیست — ولی انضباطِ spawn در `ceo.md` §۳ هست.
+۲. **ماندیِ مکانیکی به `sweeper` می‌رود.** عاملِ opus که grep می‌زند، اعتبارِ سوخته است.
+
+### چه چیزی عمداً سیم‌کشی نشد
+
+`mcpServers:` در هیچ عاملی نوشته نشد: این پروژه **`.mcp.json` ندارد** و Supabase/Vercel/
+Sentry/Context7 به‌صورتِ کانکتورِ claude.ai با نامِ `mcp__claude_ai_*` می‌آیند — سروری به
+نامِ `supabase` وجود ندارد. نوشتنِ آن یعنی یک خطِ پیکربندی که بی‌صدا هیچ کاری نمی‌کند —
+دقیقاً همان fake-greenی که این ممیزی برای حذفش وجود دارد. جزئیات: `.claude/README.md`.

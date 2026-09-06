@@ -1,0 +1,143 @@
+# ═══════════════════════════════════════════════════════════
+#  تست واحدِ قوانینِ Prometheus (promtool test rules)
+#
+#  چرا این فایل لازم است: یک قاعده‌ی alert که هرگز firing دیده نشده گیت
+#  نیست (رجوع کن به CLAUDE.md بخشِ ۲ — «سبز بی‌معنا است تا وقتی ثابت
+#  نکرده‌ای قرمز هم می‌شود»). این فایل برایِ سه قاعده‌ی تازه‌ی
+#  round-20 (RateLimitRedisFailOpen, BanCheckFailOpen, RateLimitAutoBanSpike)
+#  هم سناریویِ «باید فایر شود» و هم «باید ساکت بماند» را با یک سری زمانیِ
+#  ساختگی اجرا می‌کند — نه فقط اینکه YAML پارس می‌شود.
+#
+#  اجرا: docker run --rm -v "$(pwd)/observability:/etc/prometheus:ro" \
+#          --entrypoint promtool prom/prometheus:latest \
+#          test rules /etc/prometheus/alerts.test.yml
+#  (همان ایمیجی که docker-compose.observability.yml برایِ خودِ Prometheus
+#  استفاده می‌کند — نه ابزارِ تازه‌ی نصب‌شده روی هاست.)
+#
+#  نکته‌ی مکانیکِ promtool که طراحیِ سری‌ها بر آن تکیه دارد: برایِ یک
+#  شمارنده که فقط **یک‌بار** جهش می‌کند و بعد ثابت می‌ماند،
+#  `increase(metric[W])` فقط به‌اندازه‌ی طولِ پنجره‌ی W بعد از آن جهش
+#  «true» می‌ماند (چون بعدِ آن، هر دو سرِ بازه‌ی W-دقیقه‌ای مقدارِ برابر
+#  دارند و افزایش صفر است). یعنی اگر `for` از W بیشتر باشد، یک رویدادِ
+#  مجزا هرگز به `for` نمی‌رسد و alert ساکت می‌ماند — دقیقاً رفتاری که
+#  سناریوهای «سکوت» زیر آن را اثبات می‌کنند.
+
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ── RateLimitRedisFailOpen: expr = increase(...[2m]) > 0 ، for: 5m ──
+
+  # سناریوی «سکوت»: دقیقاً یک رویدادِ fallback در t=3m (مثلاً یک وقفه‌ی
+  # چندثانیه‌ایِ شبکه که فوراً برطرف شده)، بعدش شمارنده دیگر رشد نمی‌کند.
+  # پنجره‌ی افزایش فقط تا t≈5m «true» می‌ماند — کمتر از for:5m — پس هرگز
+  # نباید فایر شود، حتی خیلی بعدتر (t=13m).
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_rate_limit_fallback_total{prefix="glob",scope="middleware"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 13m
+        alertname: RateLimitRedisFailOpen
+        exp_alerts: []
+
+  # سناریوی «فایر»: Redis واقعاً قطع است — هر دقیقه یک fallbackِ تازه
+  # (شمارنده پیوسته بالا می‌رود). increase(...[2m]) از همان دقیقه‌ی اول
+  # پیوسته مثبت می‌ماند، پس بعد از for:5m باید فایر شود.
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_rate_limit_fallback_total{prefix="glob",scope="middleware"}'
+        values: '0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: RateLimitRedisFailOpen
+        exp_alerts: []   # هنوز pending است، ۵ دقیقه از اولین true نگذشته
+      - eval_time: 9m
+        alertname: RateLimitRedisFailOpen
+        exp_alerts:
+          - exp_labels:
+              alertname: RateLimitRedisFailOpen
+              severity: critical
+            exp_annotations:
+              summary: "ریت‌لیمیت به‌خاطرِ قطعیِ Redis به سقفِ in-memory سقوط کرده"
+              description: >-
+                حداقل ۵ دقیقه fallback به سقفِ per-process ادامه دارد، یعنی Redis
+                در دسترسِ API نیست. سقفِ واقعیِ ریت‌لیمیت الان
+                max × تعدادِ instance شده (lib/ratelimit.ts:293-303)، و همین
+                قطعی رویِ cache و قفلِ رزرو
+                (rezervno_slot_lock_fallback_total، lib/redis.ts:166 — نویسنده‌اش
+                اما هنوز آلارم ندارد) هم اثر می‌گذارد. Redis را چک کن، نه فقط API.
+
+  # ── BanCheckFailOpen: همان شکلِ expr/for، نویسنده‌ی متریکِ جدا ──
+
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_ban_check_fail_open_total'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 13m
+        alertname: BanCheckFailOpen
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_ban_check_fail_open_total'
+        values: '0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: BanCheckFailOpen
+        exp_alerts: []
+      - eval_time: 9m
+        alertname: BanCheckFailOpen
+        exp_alerts:
+          - exp_labels:
+              alertname: BanCheckFailOpen
+              severity: critical
+            exp_annotations:
+              summary: "چکِ بنِ IP fail-open شده — بن‌های فعال اعمال نمی‌شوند"
+              description: >-
+                حداقل ۵ دقیقه isBanned() به‌خاطرِ قطعیِ Redis fail-open می‌شود
+                (lib/ratelimit.ts:221-232، صداشده از middleware.ts:126 روی هر
+                درخواستِ /api/*)؛ یعنی هر IPِ قبلاً بن‌شده الان بدونِ محدودیت رد
+                می‌شود. با قطعِ Redis همزمان رخ می‌دهد؛ رفعِ Redis همین بن‌ها را
+                هم برمی‌گرداند.
+
+  # ── RateLimitAutoBanSpike: expr = increase(...[10m]) > 5 ، for: 2m ──
+  # اینجا برخلافِ دو موردِ بالا، فیلترِ «blip در برابرِ واقعی» با خودِ
+  # آستانه‌ی شمارش (>5) انجام می‌شود، نه با نسبتِ for/window — پس یک
+  # خوشه‌ی کوتاه‌ولی-واقعی (چند بن در چند دقیقه) باید فایر شود.
+
+  # سناریوی «سکوت»: ۳ بنِ خودکار در ۱۰ دقیقه — زیرِ آستانه، نرمال.
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_rate_limit_auto_ban_total'
+        values: '0 0 1 2 3 3 3 3 3 3 3 3 3'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: RateLimitAutoBanSpike
+        exp_alerts: []
+
+  # سناریوی «فایر»: ۷ بنِ خودکار در یک بازه‌ی کوتاه — خوشه‌ی واقعی.
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_rate_limit_auto_ban_total'
+        values: '0 2 5 7 7 7 7 7 7 7 7 7 7'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: RateLimitAutoBanSpike
+        exp_alerts: []   # هنوز pending، for:2m نگذشته
+      - eval_time: 8m
+        alertname: RateLimitAutoBanSpike
+        exp_alerts:
+          - exp_labels:
+              alertname: RateLimitAutoBanSpike
+              severity: warning
+            exp_annotations:
+              summary: "خوشه‌ی بنِ خودکارِ IP در ۱۰ دقیقه"
+              description: >-
+                بیش از ۵ بنِ خودکار در ۱۰ دقیقه (recordViolation،
+                lib/ratelimit.ts:236-248) — یا حمله‌ی واقعی یا بنِ اشتباهیِ یک
+                IPِ به‌اشتراک‌گذاشته‌شده (CGNAT). فهرست را با listBannedIps در
+                پنلِ ادمین/شرکت نگاه کن؛ لغوِ دستی با unbanIp در دسترس است.

@@ -12,10 +12,10 @@ import { redeemGiftCardTx, getClubPointsBalance, ARRIVAL_POINTS } from './loyalt
 import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
 import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
-import { computeRanges, genReservationCode, isConflictError, isSerializationError } from './reservation-helpers';
+import { computeRanges, genReservationCode, isConflictError, isSerializationError, withSerializationRetry } from './reservation-helpers';
 import { invalidateAvailability } from './availability-cache';
 import { transitionReservation } from './lifecycle';
-import { getOccupiedTableNumbers } from './table-occupancy';
+import { blockTailMinutes, getOccupiedTableNumbers, isTableNumberOccupied } from './table-occupancy';
 
 // ⚠️ درسِ تاریخی (باگِ واقعیِ P0 که با تستِ زنده پیدا شد، نه فرض): مقایسه‌ی
 // خامِ `status IN (...)` در $queryRaw بدونِ کستِ صریح با enumِ Postgres شکست
@@ -57,7 +57,10 @@ export type NoShowPredictor = (input: {
 
 const MAX_PARTY_ONLINE = 12;   // سقف رزرو آنلاین (گروه بزرگ‌تر → merge یا تماس)
 const MAX_DAYS_AHEAD = 90;     // حداکثر افق رزرو
-const TX_MAX_RETRIES = 5;      // تلاش مجدد روی تداخل serialization
+// سقفِ تلاشِ مجدد رویِ تداخلِ serialization دیگر این‌جا نیست: به
+// `reservation-helpers.ts` (TX_MAX_RETRIES + withSerializationRetry) منتقل شد
+// تا هر دو نویسنده‌ی رزرو — createReservation و createWalkin — از یک سیاست
+// تغذیه کنند. مقدار و backoff تغییری نکرده‌اند.
 
 export type CreateReservationInput = {
   restaurantId: string;
@@ -86,7 +89,6 @@ type TimingConfig = {
   holdMinutes: number;
 };
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 // ── بررسی اینکه یک میز در بازه‌ی [start, blockEnd) آزاد است (داخل tx) ──
 export async function createReservation(
@@ -242,23 +244,14 @@ export async function createReservation(
   try {
     return await acquireSlotLock(lockKey, 8000, async () => {
       // ── تلاش با retry برای serialization (ترافیک بالا) ──
-      let lastErr: unknown;
-      for (let attempt = 0; attempt < TX_MAX_RETRIES; attempt++) {
-        try {
-          return await placeReservation(
-            input, r, cfg, { start, end, blockEnd, duration, blockBufferMin },
-            candidateTables, manualTableNumber, noShowRisk,
-          );
-        } catch (e) {
-          lastErr = e;
-          if (isSerializationError(e) && attempt < TX_MAX_RETRIES - 1) {
-            await sleep(20 * (attempt + 1) + Math.random() * 30); // backoff تصادفی
-            continue;
-          }
-          throw e;
-        }
-      }
-      throw lastErr ?? Err.concurrencyRetry();
+      // حلقه‌ی درجا به `withSerializationRetry` منتقل شد تا createWalkin هم
+      // دقیقاً همین سیاست را بگیرد، نه یک کپیِ دوم که جدا drift کند.
+      // رفتار عیناً همان است: همان TX_MAX_RETRIES، همان backoff، و همان
+      // «آخرین خطایِ واقعی را بالا بده» که بلوکِ catchِ پایین به آن تکیه دارد.
+      return await withSerializationRetry('reservation', () => placeReservation(
+        input, r, cfg, { start, end, blockEnd, duration, blockBufferMin },
+        candidateTables, manualTableNumber, noShowRisk,
+      ));
     });
   } catch (e) {
     // ⚠️ یافته‌ی واقعیِ ممیزی (۲۰۲۶-۰۸-۱۹) — با تستِ زنده‌ی ۳۰ کاربرِ هم‌زمان
@@ -520,6 +513,15 @@ async function insertReservation(
           // فاز v2: ریسک no-show محاسبه‌شده پیش از تراکنش
           noShowRiskScore: p.noShowRisk.score,
           noShowRiskTier: p.noShowRisk.tier,
+          // مهاجرتِ ۰۸۰ — نسب‌نامه همراهِ خودِ عدد می‌رود. تا پیش از این فقط
+          // score و tier کپی می‌شدند و `source` (که همین‌جا در دست است و در
+          // خطِ ۴۴۸ به دفترِ پیش‌بینی هم نوشته می‌شود) دور ریخته می‌شد — پس
+          // مصرف‌کننده‌ها یک ردهٔ بی‌برچسب را به‌عنوانِ واقعیت نشان می‌دادند.
+          noShowRiskSource: p.noShowRisk.source,
+          // مهاجرتِ ۰۸۰ — نسب‌نامه همراهِ خودِ عدد می‌رود. تا پیش از این فقط
+          // score و tier کپی می‌شدند و `source` (که همین‌جا در دست است و در
+          // خطِ ۴۴۸ به دفترِ پیش‌بینی هم نوشته می‌شود) دور ریخته می‌شد — پس
+          // مصرف‌کننده‌ها یک ردهٔ بی‌برچسب را به‌عنوانِ واقعیت نشان می‌دادند.
         } as any,
       });
       break;
@@ -649,8 +651,34 @@ async function tryMergeTables(
   start: Date,
   blockEnd: Date,
 ): Promise<{ primaryId: string; numbers: number[] } | null> {
+  // ⚠️ رفعِ ۲۰۲۶-۰۹-۰۵ — `state: 'free'` به‌جایِ `state != 'maintenance'`.
+  //
+  // این فیلتر تنها جایی بود که یک تخصیص‌دهنده‌ی میزِ فیزیکی از ستونِ `state`
+  // چشم می‌پوشید. `promoteNext` (waitlist.ts) دقیقاً همین انتخاب را با
+  // `state: 'free'` انجام می‌دهد و `createWalkin` میز را `occupied` می‌کند؛
+  // فقط merge هر چیزی جز `maintenance` را قابلِ‌ترکیب می‌دید.
+  //
+  // چه چیزی از این شکاف رد می‌شد: وقتی صف میزی را به مهمانی آفر می‌دهد،
+  // آن میز `state='reserved'` می‌شود ولی **هیچ ردیفِ رزروی** ندارد — پس نه
+  // `getOccupiedTableNumbers` پایین می‌بیندش (فقط `reservations` را می‌خواند)
+  // و نه این فیلتر. نتیجه: merge همان میزِ فیزیکی را برمی‌داشت در حالی که
+  // مهمانِ صف پیامکِ «میزت آماده است» گرفته بود.
+  //
+  // اندازه‌گیریِ زنده‌ی ۲۰۲۶-۰۹-۰۵ رویِ کدِ پیش از این رفع: حالتِ **ترتیبی**
+  // (اول آفرِ صف، بعد merge) ۶ از ۶ بازتولید شد، و حالتِ **هم‌زمان** ۱۲ از
+  // ۱۲ — و بالابردنِ isolationِ promoteNext به‌تنهایی هیچ‌کدام را نبست، چون
+  // مسئله «خواندنی که دیده نمی‌شود» نبود، «خواندنی که اصلاً انجام نمی‌شد» بود.
+  // این فیلتر آن خواندن را اضافه می‌کند؛ و چون هر دو طرف حالا Serializable
+  // هستند، حالتِ هم‌زمان هم با SSI به abort/retry ختم می‌شود.
+  // گارد: tests/waitlist-merge-occupancy-concurrency.test.mts
+  //
+  // چرا امن است: رزروِ عادی هرگز `state` را تغییر نمی‌دهد (فقط واک‌ین،
+  // QR check-in، تنظیمِ دستیِ پرسنل، و آفرِ صف)، و
+  // `lifecycle.ts:296-302` آن را در وضعیتِ پایانی به `free` برمی‌گرداند. پس
+  // این فیلتر میزهایِ رزروشده‌ی معمولی را از merge حذف نمی‌کند — تداخلِ آن‌ها
+  // همچنان با `getOccupiedTableNumbers` پایین سنجیده می‌شود.
   const tables = await tx.table.findMany({
-    where: { restaurantId, isActive: true, state: { not: 'maintenance' }, isMergeable: true },
+    where: { restaurantId, isActive: true, state: 'free', isMergeable: true },
     select: { id: true, number: true, capacity: true, mergeableWith: true },
     orderBy: { number: 'asc' },
   });
@@ -754,11 +782,42 @@ export async function createWalkin(input: WalkinInput) {
     select: { cleaningMinutes: true, bufferMinutes: true },
   });
   if (!cfgRow) throw Err.notFound('رستوران');
-  const blockBufferMin = (cfgRow.cleaningMinutes ?? 15) + (cfgRow.bufferMinutes ?? 0);
+  // همان تعریفِ واحدی که `computeRanges` هم از آن می‌خواند (۲۰۲۶-۰۹-۰۵) — پیش
+  // از این، این خط سومین transcriptionِ مستقلِ همان جمع بود.
+  const blockBufferMin = blockTailMinutes(cfgRow);
 
   try {
-    return await createWalkinTx(input, blockBufferMin);
+    // ⚠️ اضافه‌شده (۲۰۲۶-۰۹-۰۴، هم‌راه با بالابردنِ isolation به Serializable):
+    // زیرِ Serializable، ابطالِ تراکنش با ۴۰۰۰۱ رفتارِ **عادیِ** SSI است، نه یک
+    // حالتِ لبه. بدونِ retry، بالابردنِ isolation یک double-bookingِ بی‌صدا را به
+    // یک خطایِ کاربری تبدیل می‌کرد — و در این محصول آن *بدتر* است، نه بهتر:
+    // میزبانی که وسطِ نشاندنِ مهمان خطا می‌گیرد مهمان را می‌نشاند و رد می‌شود،
+    // پس رزرو در هیچ ردیفی ثبت نمی‌شود و double-booking فیزیکی این‌بار حتی
+    // قابلِ کشف هم نیست. پس retry نیمه‌ی باربَرِ این رفع است، نه تزئینِ آن.
+    // همان سیاستِ createReservation، از همان تابعِ مشترک — نه یک حلقه‌ی دوم.
+    return await withSerializationRetry('walkin', () => createWalkinTx(input, blockBufferMin));
   } catch (e) {
+    // ── تداخلِ همزمانی که حتی از retry هم رد شد ──────────────────────────
+    // همان انضباطِ createReservation (`:296-306`): **اول ثابت کن پر است، بعد
+    // ادعا کن.** یک ۴۰۰۰۱ به‌تنهایی ثابت نمی‌کند میز گرفته شده — فقط می‌گوید
+    // دو تراکنش هم‌زمان به هم خوردند. اگر مستقیم TABLE_CONFLICT بدهیم، به
+    // میزبان می‌گوییم «این میز رزرو شده» برایِ میزی که ممکن است آزاد باشد و
+    // او را بی‌دلیل دنبالِ میزِ دیگر می‌فرستیم. پس بازخوانی می‌کنیم:
+    //   • ثابت شد اشغال است → ۴۰۹ TABLE_CONFLICT (اقدامِ درست: میزِ دیگر)
+    //   • ثابت نشد          → ۴۰۹ CONCURRENCY_RETRY (اقدامِ درست: دوباره بزن)
+    // این چک باید *پیش از* isConflictError بیاید، چون isConflictError خودش
+    // ۴۰۰۰۱/۴۰P۰۱ را هم در بر می‌گیرد و در غیرِ این صورت همان ادعایِ
+    // اثبات‌نشده را می‌کرد.
+    if (isSerializationError(e)) {
+      const proven = input.tableId
+        ? await provenOccupiedWalkinTable(input, blockBufferMin).catch(() => false)
+        : false;
+      if (proven) {
+        metrics.reservationConflicts.inc();
+        throw Err.tableConflict();
+      }
+      throw Err.concurrencyRetry();
+    }
     // ── لایه‌ی حقیقت: اگر EXCLUDE constraint شلیک کرد، تداخل واقعی بوده ──
     // ⚠️ رفع‌شده: قبلاً هیچ catchی اینجا نبود — یک ریسِ همزمانیِ واقعی (دو
     // پرسنل هم‌زمان همون میز رو walk-in می‌کنن) خطایِ خامِ Postgres رو تا
@@ -772,6 +831,40 @@ export async function createWalkin(input: WalkinInput) {
   }
 }
 
+/** بازخوانیِ تشخیصی پس از مصرف‌شدنِ همه‌ی retryها: آیا میزِ درخواستیِ walk-in
+ *  واقعاً در بازه‌ی خودش اشغال است؟ فقط برایِ *اثباتِ* ادعا پیش از گفتنِ
+ *  «این میز رزرو شده» استفاده می‌شود؛ هیچ رزروی را authorize نمی‌کند. */
+async function provenOccupiedWalkinTable(input: WalkinInput, blockBufferMin: number): Promise<boolean> {
+  const t = await db.table.findUnique({ where: { id: input.tableId! }, select: { number: true } });
+  if (!t) return false;
+  // همان بازه‌ای که createWalkinTx می‌سازد: [now, now + duration + blockBuffer)
+  const now = new Date();
+  const blockEnd = new Date(now.getTime() + ((input.durationMinutes || 90) + blockBufferMin) * 60_000);
+  return isTableNumberOccupied(db, input.restaurantId, t.number, now, blockEnd);
+}
+
+// ⚠️ رفعِ P0 (۲۰۲۶-۰۹-۰۴) — isolation، نه یک چکِ اضافه.
+//
+// این تراکنش تا امروز **بدونِ آپشن** باز می‌شد، یعنی READ COMMITTED، در حالی
+// که مسیرِ رقیبش (placeReservation، `:396`) Serializable است. SSIِ Postgres
+// فقط خواندنِ تراکنش‌هایِ Serializable را ردیابی می‌کند (SIREAD/predicate lock
+// رویِ خواندنِ یک تراکنشِ READ COMMITTED اصلاً گرفته نمی‌شود). نتیجه: چکِ
+// اشغالِ `isTableNumberOccupied` که در همین روز به این مسیر اضافه شد و
+// «تنها محافظِ» میزِ ثانویه‌یِ merge است، خواندنش برایِ SSI **نامرئی** بود؛
+// چرخه‌ی rw-antidependency هرگز کامل نمی‌شد و هر دو تراکنش commit می‌کردند.
+//
+// این یک فرض نبود: بازتولیدِ زنده در ۴ از ۶ تکرار، `occupants: 2` رویِ میزِ
+// ۹۰۲ — یکی با table_id=902 و یکی با table_id=901 و
+// merged_table_numbers=[901,902] — هر دو API موفق، هیچ خطایی به هیچ‌کدام.
+// (tests/walkin-merge-occupancy-concurrency.test.mts)
+//
+// درسِ کلاسی: محافظِ *یکتا* بودن یک ادعا درباره‌ی **دامنه**ی ضمانت است؛
+// شرطِ لازمش این است که خواندنِ آن محافظ در سطحِ ایزولاسیونی انجام شود که
+// آن خواندن را قابلِ‌اتکا کند. گاردِ درست در سطحِ اشتباه = بی‌گارد.
+//
+// retry پیش‌نیازِ جدایی‌ناپذیرِ این خط است و در createWalkin بالا نشسته
+// (withSerializationRetry) — بدونِ آن، این تغییر شکست را از دیتابیس به
+// بیرونِ سیستم منتقل می‌کرد، نه اینکه رفعش کند.
 async function createWalkinTx(input: WalkinInput, blockBufferMin: number) {
   return db.$transaction(async (tx) => {
     // کاربر را پیدا یا بساز (همان الگوی ورود با OTP)
@@ -818,6 +911,33 @@ async function createWalkinTx(input: WalkinInput, blockBufferMin: number) {
     // رزرو walk-in: شروع همین الان، وضعیت seated
     const now = new Date();
     const slotEnd = new Date(now.getTime() + (input.durationMinutes || 90) * 60_000);
+    const blockEnd = new Date(slotEnd.getTime() + blockBufferMin * 60_000);
+
+    // ⚠️ رفع‌شده (۲۰۲۶-۰۹-۰۴): این مسیر **هیچ** چکِ اشغالِ میز نداشت.
+    //
+    // تنها محافظش کانسترینتِ `no_table_overlap` بود، که رویِ یک ستون
+    // (`table_id`) کلید خورده — پس میزِ **ثانویه‌یِ** یک رزروِ ترکیبیِ فعال
+    // (که فقط عددی در `merged_table_numbers` است و ردیفِ رزروِ خودش را
+    // ندارد) ساختاراً برایش نامرئی بود. یعنی پرسنل می‌توانست در مسیرِ کاملاً
+    // عادیِ محصول یک walk-in را سرِ میزی بنشاند که همین حالا گروهِ دیگری
+    // سرش نشسته است — بدونِ همزمانی، بدونِ قطعی، بدونِ مهاجم.
+    //
+    // همان گاردی که مسیرِ createReservation از ۲۰۲۶-۰۸-۱۳ دارد
+    // (placeReservation، بازچکِ داخلِ تراکنش) حالا این‌جا هم هست — از راهِ
+    // همان تابعِ مشترک، نه یک کپیِ دوم.
+    if (input.tableId) {
+      const t = await tx.table.findUnique({
+        where: { id: input.tableId },
+        select: { number: true },
+      });
+      // نبودِ میز نباید بی‌صدا از گارد رد شود؛ createWalkin مالکیت/فعال‌بودن
+      // را قبلاً بررسی کرده، پس این‌جا فقط حالتِ حذفِ هم‌زمان می‌ماند.
+      if (!t) throw Err.notFound('میز');
+      if (await isTableNumberOccupied(tx, input.restaurantId, t.number, now, blockEnd)) {
+        throw Err.tableConflict();
+      }
+    }
+
     const reservation = await tx.reservation.create({
       data: {
         code: genReservationCode(), restaurantId: input.restaurantId, tableId: input.tableId, userId: user.id,
@@ -835,7 +955,15 @@ async function createWalkinTx(input: WalkinInput, blockBufferMin: number) {
     }
 
     return { user, clubCode, enrolledNow, reservation };
-  });
+  },
+  // هم‌ترازِ placeReservation (`:396`) — عمداً هر دو مقدار یکی است، چون دو
+  // نویسنده‌ی رزرو که رویِ یک میزِ فیزیکی رقابت می‌کنند باید زیرِ یک قاعده‌ی
+  // همزمانی باشند؛ همین ناهم‌ترازی بود که این P0 را ساخت.
+  // هم‌ترازِ placeReservation (`:396`) — عمداً هر دو مقدار یکی است، چون دو
+  // نویسنده‌ی رزرو که رویِ یک میزِ فیزیکی رقابت می‌کنند باید زیرِ یک قاعده‌ی
+  // همزمانی باشند؛ همین ناهم‌ترازی بود که این P0 را ساخت.
+  { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 10_000 },
+  );
 }
 
 // ═══════════════════════════════════════════════════════════

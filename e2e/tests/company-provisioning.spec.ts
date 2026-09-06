@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { mockAdminOtpFlag } from './helpers/mock-api';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  SPEC-B — مودالِ «رستورانِ جدید» در پنلِ شرکت (§۹)
@@ -59,6 +60,7 @@ async function fillCommitted(page: Page, sel: string, value: string) {
   await expect(loc).toHaveValue(value);
 }
 async function loginCo(page: Page) {
+  await mockAdminOtpFlag(page);
   await page.goto(CO);
   { const t = page.locator('button:has-text("ورود با پیامک")'); if (await t.isVisible().catch(() => false)) await t.click(); }
   await page.locator('#adminPhone').fill('09120000000');
@@ -140,4 +142,15 @@ test('badgeِ «در انتظارِ فعال‌سازی» در جزئیاتِ ر
   await row.click();
   await expect(page.locator('#v-detail')).toContainText('در انتظارِ فعال‌سازی', { timeout: 10_000 });
   await expect(page.locator('button:has-text("ارسالِ مجددِ دعوت")')).toBeVisible();
+});
+
+test('گیتِ UI: بدونِ otp_login_enabled دکمه‌ی «ورود با پیامک» اصلاً ساخته نمی‌شود (نه display:none)', async ({ page }) => {
+  await mockCo(page);
+  await mockAdminOtpFlag(page, false);
+  await page.goto(CO);
+  await expect(page.locator('#loginOverlay')).toBeVisible();
+  // فرم رندر شده (فیلدِ نام کاربری هست) ولی مسیرِ پیامکی نه در DOM است نه فیلدِ شماره‌اش
+  await expect(page.locator('#adminUser')).toBeVisible();
+  await expect(page.locator('button:has-text("ورود با پیامک")')).toHaveCount(0);
+  await expect(page.locator('#adminPhone')).toHaveCount(0);
 });

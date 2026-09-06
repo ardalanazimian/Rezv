@@ -465,11 +465,13 @@ async function staffPasswordLogin(){
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
   const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
 
-  if (location.protocol === 'file:') { await enterStaffPanel(true); return; }
+  // ۲۰۲۶-۰۹-۰۳ (A2-001): سه فراخوانی به enterStaffPanel بود که هیچ‌جا تعریف نشده — ورود با
+  // رمز از ۰۸-۲۶ (6301ff1) ReferenceError می‌داد و هیچ e2eای این مسیر را نمی‌زد.
+  if (location.protocol === 'file:') { await enterPanel(true); return; }
 
   const res = await API.staffLogin(u, p);
-  if (res.ok && res.data?.access){ await enterStaffPanel(); return; }
-  if (res.offline){ await enterStaffPanel(true); return; }
+  if (res.ok && res.data?.access){ await enterPanel(); return; }
+  if (res.offline){ await enterPanel(true); return; }
   // پیامِ سرور برای «کاربر نیست» و «رمز غلط» عمداً یکسان است؛ اینجا هم
   // نباید دقیق‌تر شود، وگرنه نشتی که سرور بست از سمتِ کلاینت باز می‌شود.
   toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');

@@ -2114,7 +2114,7 @@ function openStatusMenu(i){
 // به بک‌اند بفرستد (به‌جایِ اینکه cancelRes/doCancelRes مسیرِ جدا و
 // ناقصِ خودشان را داشته باشند — رجوع کن به یافته‌ی reservations.js).
 async function changeStatus(i,to,reason){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   closeModal();
   // به‌روزرسانی خوش‌بینانه‌ی UI
   const old=r.status, oldReason=r.cancelReason; r.status=to;
@@ -2707,6 +2707,10 @@ const RES_DEMO = [
   {t:'۱۹:۰۰',name:'سپیده یاری',party:4,table:6,status:'completed',seg:'regular',pre:true,note:'',phone:'۰۹۱۲۸۹۰۱۲۳۴',date:'past',dLabel:'۳ روز پیش'},
 ];
 let RES = RES_DEMO.slice();
+// A2-002 (۲۰۲۶-۰۹-۰۳): آرایه‌ای که renderResList واقعاً رندر کرده (fetch‌شده یا نمونه).
+// دکمه‌های ردیف با index روی همین کار می‌کنند، نه روی RES ی امروز — وگرنه در تب‌های
+// فردا/آینده/گذشته رزروِ اشتباه (یا ردیفِ نمونه‌ی بدونِ code) PATCH می‌خورد.
+let RES_VIEW = null;
 let _resLoaded = false;
 /**
  * رزروهای «امروز» را برایِ داشبورد از سرور می‌گیرد و RES را جایگزین می‌کند.
@@ -3908,6 +3912,7 @@ async function renderResList(){
   // موقتاً جواب نمی‌داد) اسم/شماره‌ی مهمانانِ ساختگی را عینِ رزروهایِ واقعیِ
   // خودش می‌دید.
   const demoNote=isDemo?`<div class="cash-note" style="margin-bottom:14px">${icon('info',{size:13})} این فهرست نمونه است، رزروهایِ واقعیِ تو نیست.</div>`:'';
+  RES_VIEW=source; // A2-002: index ی دکمه‌ها به همین آرایه اشاره می‌کند
   let list=source.map((r,i)=>({r,i}));
   // API از قبل بر اساس تاریخ فیلتر کرده؛ نمونه باید محلی فیلتر شود
   if(resDate!=='all' && !API.online)list=list.filter(x=>x.r.date===resDate);
@@ -4022,7 +4027,7 @@ function resItemHTML(r,i){
 // واقعی + rollback روی خطا) استفاده می‌شه؛ رفتارِ صف‌بندیِ آفلاینِ قبلی
 // (Outbox) هم عیناً حفظ شده چون آن بخش واقعاً درست بود.
 async function markArrived(i){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   if(isOffline() && API.getToken()){
     r.status='checked_in';rReservations();
     Outbox.enqueue({ type:'checkin', path:`/restaurant/reservations/${r.code||r.id||''}/status`, method:'PATCH', body:{ status:'checked_in' }, label:`ثبت ورود ${r.name}` });
@@ -4043,12 +4048,12 @@ async function markSeated(i){
 // no_show وضعیتِ نهایی/برگشت‌ناپذیره (STATUS_TRANSITIONS['no_show']=[]) —
 // طبقِ ماموریت با تأییدِ صریح انجام می‌شه تا لمسِ اشتباه، رزروِ واقعی رو خراب نکنه.
 async function markNoShow(i){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   if(!window.confirm(`${r.name} به‌عنوانِ «نیومد» ثبت بشه؟ این وضعیت برگشت‌پذیر نیست.`))return;
   await changeStatus(i,'no_show');
 }
 function cancelRes(i){
-  openModal(`<div class="modal-title">لغو رزرو</div><div class="modal-sub">${esc(RES[i].name)} — ساعت ${esc(RES[i].t)}</div>
+  openModal(`<div class="modal-title">لغو رزرو</div><div class="modal-sub">${esc((RES_VIEW||RES)[i].name)} — ساعت ${esc((RES_VIEW||RES)[i].t)}</div>
     <div class="field-label">دلیل لغو (الزامی)</div>
     <input class="inp" id="cancelReason" placeholder="مثلاً تماس مشتری، تداخل میز...">
     <div style="display:flex;gap:8px"><button class="btn btn-danger btn-lg" style="flex:1" onclick="doCancelRes(${i})">تأیید لغو</button><button class="btn btn-ghost btn-lg" onclick="closeModal()">انصراف</button></div>`);
@@ -7949,11 +7954,13 @@ async function staffPasswordLogin(){
   if (btn){ btn.disabled = true; btn.textContent = 'در حال بررسی...'; }
   const reset = () => { if (btn){ btn.disabled=false; btn.textContent='ورود به پنل'; } };
 
-  if (location.protocol === 'file:') { await enterStaffPanel(true); return; }
+  // ۲۰۲۶-۰۹-۰۳ (A2-001): سه فراخوانی به enterStaffPanel بود که هیچ‌جا تعریف نشده — ورود با
+  // رمز از ۰۸-۲۶ (6301ff1) ReferenceError می‌داد و هیچ e2eای این مسیر را نمی‌زد.
+  if (location.protocol === 'file:') { await enterPanel(true); return; }
 
   const res = await API.staffLogin(u, p);
-  if (res.ok && res.data?.access){ await enterStaffPanel(); return; }
-  if (res.offline){ await enterStaffPanel(true); return; }
+  if (res.ok && res.data?.access){ await enterPanel(); return; }
+  if (res.offline){ await enterPanel(true); return; }
   // پیامِ سرور برای «کاربر نیست» و «رمز غلط» عمداً یکسان است؛ اینجا هم
   // نباید دقیق‌تر شود، وگرنه نشتی که سرور بست از سمتِ کلاینت باز می‌شود.
   toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');
