@@ -428,7 +428,16 @@ img{display:block;max-width:100%}
 .kpi-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
 .kpi-trend{font-size:11px;font-weight:700;color:var(--t3);background:var(--s-100);padding:3px 9px;border-radius:50px}
 .kpi-trend.up{color:var(--green);background:var(--green-50)}
-.kpi-trend.down{color:var(--red);background:#FEE2E2}
+/* ⚠️ کنتراست: `var(--red)` (#DC2626) رویِ #FEE2E2 نسبتِ **۳٫۹۵** می‌دهد —
+   زیرِ ۴٫۵ی که WCAG AA برایِ متنِ عادی می‌خواهد. متنِ چیپ ۱۱px bold است و
+   «درشت» حساب نمی‌شود (درشت یعنی ≥۱۸٫۶۶px). #B91C1C همان قرمزی است که
+   `.btn-danger` در همین فایل استفاده می‌کند — رنگِ تازه‌ای اختراع نشد —
+   و نسبت را به **۵٫۳۰** می‌رساند.
+   اندازه‌گیری در Chromium واقعی، نه حسابِ دستی: tests/panel-kpi-trend-contrast.spec.ts
+   ⚠️ چرا ممیزیِ کنتراستِ موجود نگرفته بود: چیپِ `.down` فقط وقتی رندر
+   می‌شود که روندی واقعاً نزولی باشد، و دادهٔ mockِ ممیزی هیچ‌وقت آن حالت
+   را نمی‌ساخت. */
+.kpi-trend.down{color:#B91C1C;background:#FEE2E2}
 .kpi-trend.est{color:#A16207;background:#FEF9C3}
 .kpi-card .kpi-val{font-size:30px;font-weight:800;color:var(--ink);line-height:1;letter-spacing:-.5px}
 .kpi-sub{font-size:16px;color:var(--t3);font-weight:600}

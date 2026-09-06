@@ -491,7 +491,7 @@ function viewCustomerHistory(name){
     <div class="ch-stats">
       <div class="ch-stat"><div class="ch-stat-v">${fa(c.visits||0)}</div><div class="ch-stat-l">بازدید</div></div>
       <div class="ch-stat"><div class="ch-stat-v">${c.spent||'۰'}</div><div class="ch-stat-l">خرید</div></div>
-      <div class="ch-stat"><div class="ch-stat-v">${fa(c.ret||0)}٪</div><div class="ch-stat-l">بازگشت</div></div>
+      <div class="ch-stat"><div class="ch-stat-v">${c.ret==null?'—':fa(c.ret)+'٪'}</div><div class="ch-stat-l">بازگشت</div></div>
     </div>
     <div class="ch-hist-title">سابقه‌ی رزرو</div>
     <div class="ch-hist">${history.length?history.map(h=>`<div class="ch-hrow"><span>${icon(STATUS_META[h.status]?.icon||'info',{size:12})} ${h.dLabel||h.date}</span><span class="ch-hmeta">${h.t} · ${fa(h.party)} نفر</span></div>`).join(''):'<div class="snote-empty">سابقه‌ای ثبت نشده</div>'}</div>`);

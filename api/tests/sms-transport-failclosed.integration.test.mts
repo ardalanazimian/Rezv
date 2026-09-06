@@ -83,29 +83,46 @@ async function freshPhone() {
 // اجرا می‌شود، نه بینِ فایل‌ها — پس هر تستی که ترانسپورت را روشن رها کند،
 // همه‌ی فایل‌های بعدی را آلوده می‌کند (دو تستِ fallback دقیقاً همین‌طور
 // قرمز شدند). afterEach تضمینِ per-test است.
-beforeEach(async () => {
-  installSmsStub();
-  // سطلِ ریت‌لیمیت را پاک کن تا تست‌ها همدیگر را نشکنند
-  for (const pat of ['*otp*', '*rl:*']) {
-    const k = await redis.keys(pat);
-    if (k.length) await redis.del(...k);
-  }
-});
-
 after(async () => {
-  globalThis.fetch = REAL_FETCH;
-  process.env.NODE_ENV = ORIG_ENV;
-  for (const [k, v] of [['MELIPAYAMAK_USERNAME', ORIG_U],['MELIPAYAMAK_PASSWORD', ORIG_P],['MELIPAYAMAK_BODYID_OTP', ORIG_B]]) {
-    if (v === undefined) delete process.env[k]; else process.env[k] = v;
-  }
-  if (ORIG_DEV === undefined) delete process.env.OTP_DEV_MODE;
-  else process.env.OTP_DEV_MODE = ORIG_DEV;
   for (const p of made) {
     await db.otpCode.deleteMany({ where: { phone: { contains: p.slice(1) } } }).catch(() => {});
   }
 });
 
 describe('ترانسپورتِ پیامک — fail-closed در تولید', () => {
+  // ⚠️ این دو هوک تا merge در **ریشه‌ی فایل** بودند. کامنتِ بالا درست
+  // تشخیص داده بود که `after`ِ سطحِ فایل فقط در پایانِ کلِ سوئیت اجرا
+  // می‌شود — ولی خودِ هوک‌ها هنوز ریشه‌ای مانده بودند، پس همان مشکل باقی
+  // بود: پاک‌سازیِ `*otp*`/`*rl:*` قبل از **هر تستِ کلِ سوئیت** اجرا می‌شد
+  // (اندازه‌گیری‌شده: ۱۳۸۲ بار در رانِ ۱۳۸۷ تستی) و بازیابیِ env تا انتهای
+  // ران عقب می‌افتاد. گاردِ `root-hook-globals.test.mts` همین را می‌گیرد.
+  // ⚠️ حلِ تعارضِ merge (۲۰۲۶-۰۹-۰۲) — اجتماعِ بهترینِ دو طرف، نه انتخابِ یکی:
+  // main در PR #79 یک stubِ هرمتیکِ fetch اضافه کرد (بهبودِ واقعی: تست دیگر
+  // به شبکه دست نمی‌زند) ولی هوک‌هایش را **ریشه‌ای** گذاشت. این شاخه دقیقاً
+  // همان الگو را قبلاً رفع کرده بود و `root-hook-globals.test.mts` ممنوعش
+  // می‌کند: `globalThis.fetch = …` و پاک‌کردنِ کلیدهای Redis در هوکِ ریشه روی
+  // **کلِ** سوئیتِ تک‌پروسه‌ای اثر می‌گذارد. پس stub نگه داشته شد و هوک‌ها
+  // داخلِ describe ماندند. بازگرداندنِ fetch هم عمداً `afterEach` است نه
+  // `after`ِ ریشه — وگرنه stub تا پایانِ کلِ ران روی جا می‌ماند (همان اشتباهی
+  // که در payments/zarinpal پیدا و رفع شد).
+  beforeEach(async () => {
+    installSmsStub();
+    // سطلِ ریت‌لیمیت را پاک کن تا تست‌ها همدیگر را نشکنند
+    for (const pat of ['*otp*', '*rl:*']) {
+      const k = await redis.keys(pat);
+      if (k.length) await redis.del(...k);
+    }
+  });
+  afterEach(() => {
+    globalThis.fetch = REAL_FETCH;
+    process.env.NODE_ENV = ORIG_ENV;
+    for (const [k, v] of [['MELIPAYAMAK_USERNAME', ORIG_U],['MELIPAYAMAK_PASSWORD', ORIG_P],['MELIPAYAMAK_BODYID_OTP', ORIG_B]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+    if (ORIG_DEV === undefined) delete process.env.OTP_DEV_MODE;
+    else process.env.OTP_DEV_MODE = ORIG_DEV;
+  });
+
   // scoped (نه سطحِ فایل — رجوع به دامِ رانرِ الحاقی): هیچ تستی ترانسپورت را روشن رها نکند.
   afterEach(() => { setMeli(false); });
 

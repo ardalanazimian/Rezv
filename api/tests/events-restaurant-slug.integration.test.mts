@@ -45,20 +45,27 @@ before(async () => {
       { restaurantId, title: '[DEMO] رویدادِ گذشته', emoji: '⏮', startsAt: past, isPublished: true },
     ],
   });
-  // کشِ ۱۲۰ ثانیه‌ای این endpoint نباید پاسخِ اجرای قبلی را برگرداند
-  const stale = await redis.keys('*events*');
-  if (stale.length) await redis.del(...stale);
 });
 
 after(async () => {
   await db.specialEvent.deleteMany({ where: { restaurantId } });
   await db.restaurant.deleteMany({ where: { tenantId } });
   await db.tenant.delete({ where: { id: tenantId } });
-  const stale = await redis.keys('*events*');
-  if (stale.length) await redis.del(...stale);
 });
 
 describe('GET /events — slug و نامِ رستوران', () => {
+  // کشِ ۱۲۰ ثانیه‌ای این endpoint نباید پاسخِ اجرای قبلی را برگرداند.
+  // ⚠️ این پاک‌سازی تا ۲۰۲۶-۰۸-۲۶ در هوکِ **ریشه‌ای** بود — یعنی در ابتدای
+  // کلِ ران اجرا می‌شد، نه قبل از تست‌های همین فایل. تا رسیدنِ نوبتِ این
+  // فایل، فایل‌های دیگر دوباره کش را پر کرده بودند، پس هدفِ خودِ کامنت هم
+  // برآورده نمی‌شد. حالا دقیقاً قبل/بعدِ تست‌های همین describe اجرا می‌شود.
+  const wipeEventsCache = async () => {
+    const stale = await redis.keys('*events*');
+    if (stale.length) await redis.del(...stale);
+  };
+  before(wipeEventsCache);
+  after(wipeEventsCache);
+
   test('رویدادِ منتشرشده restaurant_slug و restaurant_name واقعی دارد', async () => {
     const res = await eventsRoute.GET(new Request(`http://x/api/v1/events?restaurant_id=${restaurantId}`, {
       headers: { 'x-real-ip': testIp() },

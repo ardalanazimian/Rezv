@@ -3144,7 +3144,7 @@ function showAdminLogin(){
     <label class="login-field-label" for="adminPass">رمز عبور</label>
     <input class="login-inp" id="adminPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')adminPasswordLogin()">
     <button class="login-btn" id="adminLoginBtn" onclick="adminPasswordLogin()">ورود به پنل</button>
-    <button class="login-back" onclick="showAdminLoginPhone()">ورود با پیامک</button>
+    <button class="login-back" id="adminSmsLoginBtn" onclick="showAdminLoginPhone()">ورود با پیامک</button>
     <div class="login-foot">فقط مدیران پلتفرم به این پنل دسترسی دارند</div>`;
   setTimeout(()=>document.getElementById('adminUser')?.focus(),200);
 }
@@ -3206,15 +3206,18 @@ async function adminSendOtp(){
 }
 function showAdminLoginCode(devCode, offline){
   setAdminGateLocked(true);
+  // ⚠️ escapeِ صریح (۲۰۲۶-۰۸-۲۷) — همان رفعِ apps/business/js/staff-system.js:
+  // `faD` فقط ارقام را نگاشت می‌کند و بقیه را دست‌نخورده رد می‌کند، و `devCode`
+  // از پاسخِ سرور می‌آید. ترتیب عمدی است: اول faD بعد esc.
   document.getElementById('loginCard').innerHTML = `
     <div class="login-logo">${icon('mail',{size:34})}</div>
     <div class="login-title">کد ورود را وارد کنید</div>
-    <div class="login-sub">کد ورود به شماره‌ی ${faD(_adminPhone)} ارسال شد</div>
+    <div class="login-sub">کد ورود به شماره‌ی ${esc(faD(_adminPhone ?? ''))} ارسال شد</div>
     <label class="login-field-label" for="adminCode">کد ورود</label>
     <input class="login-inp code" id="adminCode" inputmode="numeric" maxlength="6" placeholder="······" onkeydown="if(event.key==='Enter')adminConfirmOtp()">
     <button class="login-btn" id="adminVerifyBtn" onclick="adminConfirmOtp()">ورود به پنل</button>
     <button class="login-back" onclick="showAdminLoginPhone()">تغییر شماره</button>
-    ${devCode ? `<div class="login-hint">${offline?'حالت دمو (بک‌اند متصل نیست):':'حالت توسعه:'} کد ورود <b>${faD(devCode)}</b> است</div>` : ''}`;
+    ${devCode ? `<div class="login-hint">${offline?'حالت دمو (بک‌اند متصل نیست):':'حالت توسعه:'} کد ورود <b>${esc(faD(devCode))}</b> است</div>` : ''}`;
   setTimeout(()=>document.getElementById('adminCode')?.focus(),200);
 }
 async function adminConfirmOtp(){
