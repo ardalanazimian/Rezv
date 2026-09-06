@@ -2,6 +2,7 @@ import { createLogger } from './logger';
 import { enqueue } from './queue';
 import { metrics } from './metrics';
 import { consumeSms } from './sms-balance';
+import { outboundHttpSignal } from './outbound-http';
 const log = createLogger('sms');
 
 export type SmsJob = {
@@ -287,10 +288,15 @@ export async function sendSmsNow(job: SmsJob): Promise<void> {
   }
 
   try {
+    // ⚠️ `signal` الزامی است: بدونِ آن تنها سقف، پیش‌فرضِ ~۳۰۰ ثانیه‌ای undici
+    // بود (اندازه‌گیریِ واقعی در `lib/outbound-http.ts`) — یعنی یک درگاهِ کندِ
+    // ملی‌پیامک می‌توانست workerِ صف را دقایقی ببندد و کلِ batchِ سریالی پشتش
+    // بماند. اجاره‌ی صف هم از همین سقف مشتق می‌شود.
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: outboundHttpSignal(),
     });
     const data = (await res.json().catch(() => null)) as MeliResponse | null;
     if (!res.ok || !meliAccepted(data)) {

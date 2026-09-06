@@ -1,6 +1,7 @@
 import { createLogger } from './logger';
 import { enqueue } from './queue';
 import { metrics } from './metrics';
+import { outboundHttpSignal } from './outbound-http';
 const log = createLogger('notify');
 // ═══════════════════════════════════════════════════════════
 //  اعلان Push و Email — رزرونو
@@ -84,8 +85,11 @@ export async function sendEmail(to: string, subject: string, body: string): Prom
   }
 
   try {
+    // ⚠️ `signal` الزامی است — همان دلیلِ `sendSmsNow`: بدونش سقف، پیش‌فرضِ
+    // ~۳۰۰ ثانیه‌ای undici بود و یک SendGridِ کند workerِ صف را می‌بست.
     const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
+      signal: outboundHttpSignal(),
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: to }] }],
