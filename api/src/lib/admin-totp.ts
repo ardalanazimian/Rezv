@@ -26,7 +26,7 @@ const log = createLogger('admin-totp');
 // ═══════════════════════════════════════════════════════════════════════
 
 /** گامِ زمانیِ استاندارد؛ کدها هر ۳۰ ثانیه عوض می‌شوند. */
-const PERIOD_SECONDS = 30;
+export const PERIOD_SECONDS = 30;
 const DIGITS = 6;
 const ALGORITHM = 'SHA1';
 
@@ -37,7 +37,7 @@ const ALGORITHM = 'SHA1';
  * بیشتر از این، فقط فرصتِ حدس‌زدن را زیاد می‌کند بدونِ اینکه مشکلِ واقعیِ
  * اختلافِ ساعت را بهتر حل کند.
  */
-const WINDOW_STEPS = 1;
+export const WINDOW_STEPS = 1;
 
 /** برچسبِ نمایشی در اپلیکیشنِ احرازِ هویت. */
 export const TOTP_ISSUER = 'Rezervno';
@@ -89,6 +89,34 @@ function replayKey(username: string, step: number): string {
 }
 
 /**
+ * عمرِ کلیدِ ضدِ replay — **مشتق‌شده از پنجره‌ی پذیرش، نه عددِ ثابت.**
+ *
+ * ⚠️ نقصِ رفع‌شده (۲۰۲۶-۰۹-۰۶): این مقدار `PERIOD * (WINDOW_STEPS + 1)` بود،
+ * یعنی ۶۰ ثانیه، و کامنتش ادعا می‌کرد «تا پایانِ پنجره‌ی پذیرشِ همین کد».
+ * نبود — و شکافش قابلِ بهره‌برداری بود.
+ *
+ * ── اشتقاق ──
+ * کدِ گامِ S در گام‌های S−W تا S+W پذیرفته می‌شود (W = WINDOW_STEPS؛ با پروبِ
+ * واقعیِ otpauth تأیید شد که `validate({window:W})` دقیقاً همین بازه است).
+ * کلید باید از **زودترین لحظه‌ای که ممکن است اولین‌بار مصرف شود** تا
+ * **آخرین لحظه‌ای که کد هنوز پذیرفته می‌شود** زنده بماند:
+ *   • زودترین مصرف   = ابتدای گامِ S−W      = (S−W) × PERIOD
+ *   • پایانِ پذیرش    = انتهای گامِ S+W       = (S+W+1) × PERIOD
+ *   • عمرِ لازم       = (S+W+1)−(S−W) گام    = (2W + 1) × PERIOD
+ *
+ * با W=۱ و PERIOD=۳۰ می‌شود ۹۰ ثانیه — دقیقاً همان ۹۰ ثانیه‌ای که کامنتِ
+ * `WINDOW_STEPS` از اول اعلام می‌کرد. TTLِ قبلی (۶۰) یک گامِ کامل کوتاه بود،
+ * پس کدی که نزدیکِ ابتدای پنجره‌اش مصرف می‌شد تا ۳۰ ثانیه پس از پاک‌شدنِ
+ * کلید هنوز پذیرفته می‌شد.
+ *
+ * چرا تابع و نه ثابت: اگر روزی `WINDOW_STEPS` عوض شود، TTL باید **خودکار**
+ * با آن حرکت کند. عددِ ثابتِ ۹۰ همان باگ را با ظاهرِ درست بازتولید می‌کرد.
+ */
+export function replayKeyTtlSeconds(): number {
+  return PERIOD_SECONDS * (2 * WINDOW_STEPS + 1);
+}
+
+/**
  * اعتبارسنجیِ کدِ TOTP به‌همراهِ ضدِ replay.
  *
  * ⚠️ مقایسه‌ی خودِ کد constant-time است: `otpauth` داخلی از `validate` استفاده
@@ -123,8 +151,7 @@ export async function verifyAdminTotp(username: string, token: string): Promise<
   // گامی که کد در آن معتبر بوده = گامِ فعلی + فاصله‌ای که validate گزارش کرد.
   const step = Math.floor(Date.now() / 1000 / PERIOD_SECONDS) + delta;
   const key = replayKey(username, step);
-  // TTL = تا پایانِ پنجره‌ی پذیرشِ همین کد (نه بیشتر، تا کلیدها انباشته نشوند).
-  const ttl = PERIOD_SECONDS * (WINDOW_STEPS + 1);
+  const ttl = replayKeyTtlSeconds();
 
   // `set` با NX: اگر کلید از قبل باشد یعنی همین کد قبلاً مصرف شده.
   const first = await redis.set(key, '1', 'EX', ttl, 'NX');
