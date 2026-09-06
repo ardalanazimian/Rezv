@@ -462,6 +462,15 @@ jobs:
       # بود). تا امروز، ۱۵۷ فایلِ تست فقط با انضباطِ انسانی محافظت می‌شدند.
       - name: Every test file is actually imported by the runner
         run: node tools/check-runner-completeness.mjs
+      # ⚠️ دو بار رخ داده و بارِ اول واقعاً کامیت شد: عاملی که cwdش `api/` است
+      # حافظه‌اش را در `api/.claude/agent-memory/` می‌نویسد. الگوهای `.claude/`ِ
+      # `.gitignore`ِ ریشه مسیرِ **تودرتو** را نمی‌گیرند، پس آن پوشه untracked
+      # ولی ignore‌نشده می‌ماند و یک `git add -A` حافظه‌ی خصوصیِ عامل را واردِ
+      # مخزنِ عمومی می‌کند. `.gitignore` جوابش نیست: ریشه‌ی `.claude/` عمداً
+      # tracked است (۳۸ فایل)، پس نگه‌داشتنی و ردکردنی هم‌نام‌اند — تشخیص لازم
+      # است نه پنهان‌کردن.
+      - name: Agent memory lives only at the repo root
+        run: node tools/check-agent-memory-location.mjs
       # ⚠️ XSSِ ذخیره‌شده‌ی واقعی (۲۰۲۶-۰۸-۲۵): `cardHTML` در فیدِ مشتری فیلدِ
       # `cuisine` را بدونِ esc داخلِ innerHTML می‌گذاشت. آن فیلد را صاحبِ رستوران
       # می‌نویسد (فقط `max(50)`، بدونِ پاک‌سازیِ HTML) و از APIِ عمومی به فیدِ

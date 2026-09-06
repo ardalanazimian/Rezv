@@ -86,6 +86,12 @@ Local environment (verified working):
   outlive the DB they described — a rebuilt DB plus a remembered Redis is an **inconsistent pair**.
 - Full suite baseline on a clean DB: tests 1535 · pass 1535 · fail 0 · exit 0 (~240s).
 - Full suite baseline 2026-09-05 after the walk-in P0: tests 1547 · pass 1547 · fail 0 · exit 0.
+- 🚨 **اجرای تک‌فایلیِ تست بدونِ `--test-force-exit` می‌تواند «test failed» بدهد در حالی که
+  همه‌ی ادعاها پاس شده‌اند.** سنجیده در ۲۰۲۶-۰۹-۰۶: هر ۵ ادعای یک فایل در ۵۰ms پاس شد،
+  بعد پروسه ۲۹۸ ثانیه معلق ماند و `timeout` کشتش — خروجی `exit 124` با `✖ … 'test failed'`.
+  علت: یک فایلِ تنها، teardownِ `_all.runner.mts` را اجرا نمی‌کند. **بدونِ آن فلگ، کدِ خروج
+  به «آیا پروسه تمام شد» جواب می‌دهد، نه «آیا تست‌ها پاس شدند»** — و طبیعی‌ترین کارِ آدم
+  پیش از کامیت، دقیقاً همین چکِ سریعِ تک‌فایلی است. همیشه `--test-force-exit` بگذار.
 - Shell warning: heredocs in this environment MANGLE backslashes. A `\b` written through one
   became a literal backspace byte and silently disabled a guard. Write scripts with the file
   tool, never through a heredoc, whenever they contain regex escapes.
@@ -190,3 +196,30 @@ Start by telling me, in Persian, what you will do first and why — then do it.
     fail-open counter on the reservation-lock path — under investigation in round 20.
 (d) the non-pausing proof — `audit/round-19/non-pausing-proof-design.json`; start P1's idle
     window the day the host exists, since it costs only calendar time
+
+## promtool: روی PATH نیست، از راهِ ایمیجِ CI اجرا می‌شود
+
+`which promtool` روی این هاست `exit 1` می‌دهد و **این جواب گمراه‌کننده است**:
+`.github/workflows/ci.yml` خودش هم باینریِ PATH را استفاده نمی‌کند، ایمیجِ پین‌شده
+را اجرا می‌کند. دو عامل در ۲۰۲۶-۰۹-۰۶ فقط PATH را دیدند و به همین دلیل برای
+قاعده‌های تازه‌شان تستِ آلارم ننوشتند — هزینه‌ی قابلِ‌اجتناب.
+
+```sh
+# check rules  → SUCCESS: N rules found
+docker run --rm -v "$(pwd -W)/observability:/etc/prometheus:ro" --entrypoint promtool prom/prometheus:v3.14.0 check rules /etc/prometheus/alerts.yml
+
+# test rules   → SUCCESS
+docker run --rm -v "$(pwd -W)/observability:/etc/prometheus:ro" -w /etc/prometheus --entrypoint promtool prom/prometheus:v3.14.0 test rules alerts.test.yml
+```
+
+⚠️ **روی Git Bash** باید متغیرِ محیطیِ MSYS2 با نامِ `MSYS_NO_PATHCONV` را برابرِ ۱
+جلوی دستور بگذاری (این یک فلگِ رانتایمِ MSYS2 است، نه پیکربندیِ این پروژه، پس در
+`.env.example` نیست و نباید باشد). بدونش Git Bash مسیرِ **داخلِ کانتینر** را به
+مسیرِ میزبان ترجمه می‌کند و خطای گمراه‌کننده‌ی
+`path 'C:/Program Files/Git/etc/...' does not exist` می‌دهد — که شبیهِ خرابیِ
+فایل به‌نظر می‌رسد و ربطی به فایل ندارد. `$(pwd -W)` معادلِ
+`${{ github.workspace }}`ِ CI است.
+
+⚠️ **قاعده‌ی آلارم هم مثلِ تست باید ابطال‌پذیر اثبات شود:** `for` را سفت کن تا
+`test rules` قرمز شود، بعد برگردان. یک قاعده‌ای که هرگز قرمز نشده، فقط syntax‌چک
+شده است.
