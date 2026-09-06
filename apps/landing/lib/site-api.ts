@@ -8,10 +8,13 @@
 //  SEO_API_BASE نامِ قدیمی است (زمانی که این اپ داخلِ apps/seo بود) و هنوز
 //  به‌عنوانِ fallback خوانده می‌شود تا محیط‌هایی که آن را ست کرده‌اند نشکنند.
 //
-//  «حالتِ امن»: اگر API تنظیم/در دسترس نباشد، محتوا از فایلِ همگام‌شده‌ی
+//  «حالتِ امن»: اگر API **تنظیم نشده باشد**، محتوا از فایلِ همگام‌شده‌ی
 //  content/site-content.json خوانده می‌شود (همان متنی که seed در دیتابیس
-//  می‌کارد). یعنی سایت هیچ‌وقت خالی رندر نمی‌شود — نه در بیلدِ CI، نه هنگامِ
-//  قطعیِ موقتِ API. وقتی API در دسترس است، دیتابیس منبعِ حقیقت است.
+//  می‌کارد). یعنی سایت هیچ‌وقت خالی رندر نمی‌شود — بیلدِ CI عمداً بدونِ
+//  SITE_API_BASE اجرا می‌شود (ci.yml:539). وقتی API در دسترس است، دیتابیس
+//  منبعِ حقیقت است.
+//
+//  ⚠️ ولی حالتِ امن روی **تعهد** اعمال نمی‌شود — ببین UpstreamUnavailableError.
 // ═══════════════════════════════════════════════════════════════════════
 import fallback from '../content/site-content.json';
 import type {
@@ -30,14 +33,65 @@ export function browserApiBase(): string {
 type CollectionName =
   | 'pages' | 'articles' | 'faqs' | 'plans' | 'testimonials' | 'banners' | 'release-notes';
 
-async function getJson<T>(path: string, revalidateSec: number): Promise<T | null> {
-  if (!SERVER_BASE) return null;
+/**
+ * بالادست (api/) در دسترس نیست — شبکه، تایم‌اوت، ۵xx، یا بدنه‌ی خراب.
+ *
+ * ⚠️ چرا این کلاس وجود دارد (یافته‌ی واقعیِ ۲۰۲۶-۰۹-۰۷، directive 028):
+ * `getJson` در **هر** شکستی `null` می‌داد و `getPlans` روی همان به
+ * `fallbackPlans` سقوط می‌کرد — یعنی قیمت‌های ثابتِ کامیت‌شده‌ی
+ * `content/site-content.json` (۱۸/۳۴/۶۵ میلیون).
+ *
+ * قیمتِ زنده از `db.sitePlan` می‌آید و از استودیو ویرایش می‌شود؛ فایلِ
+ * کامیت‌شده فقط با کامیتِ کد عوض می‌شود و **هیچ چیزی این دو را همگام
+ * نمی‌کند**. پس آن fallback تا اولین تغییرِ قیمت درست است و از آن به بعد
+ * برای همیشه بی‌صدا غلط. و چون صفحه‌ها ISR هستند (`/pricing` →
+ * `revalidate = 120`)، آن عدد **کش می‌شود** و بدونِ هیچ خطایی سرو می‌شود.
+ *
+ * این از کلاسِ «نمی‌دانیم را خالی نشان بده» بدتر است: یک بخشِ خالی کاربر را
+ * به رفرش دعوت می‌کند، یک عددِ قاطعِ اشتباه نه.
+ *
+ * الگو عیناً از `apps/seo/lib/api.ts:10-45` گرفته شده (که همین را با استنادِ
+ * مستقیم به راهنمای ISRِ Next.js v16.2.9 حل کرده): throw هنگامِ revalidate
+ * باعث می‌شود **آخرین صفحه‌ی موفق از کش سرو بماند**، در حالی که یک نتیجه‌ی
+ * خالی/جعلی خودش کش می‌شود و می‌ماند.
+ *
+ * دامنه: فقط جایی که مقدار یک **تعهد** است (قیمت). متنِ ویترین fallback
+ * دارد — متنِ کهنه گمراه‌کننده نیست، قیمتِ کهنه هست.
+ */
+export class UpstreamUnavailableError extends Error {
+  constructor(public readonly detail: string) {
+    super(`سرویسِ داده در دسترس نیست (${detail})`);
+    this.name = 'UpstreamUnavailableError';
+  }
+}
+
+/**
+ * `strict = true` یعنی «این مقدار یک تعهد است»: شکستِ زیرساختی throw می‌شود
+ * تا ISR آخرین مقدارِ سالم را نگه دارد، نه اینکه به فایلِ کامیت‌شده سقوط کند.
+ *
+ * `null` در حالتِ strict فقط یک معنا دارد: API اصلاً پیکربندی نشده
+ * (حالتِ امنِ اعلام‌شده). آنجا هیچ دیتابیسی در تصویر نیست که واگرا شده باشد،
+ * پس فایلِ کامیت‌شده تنها مرجع است و دروغی در کار نیست.
+ */
+async function getJson<T>(path: string, revalidateSec: number, strict = false): Promise<T | null> {
+  if (!SERVER_BASE) return null;   // حالتِ امنِ اعلام‌شده (ci.yml:539)
+  let res: Response;
   try {
-    const res = await fetch(`${SERVER_BASE}${path}`, { next: { revalidate: revalidateSec } });
-    if (!res.ok) return null;
+    res = await fetch(`${SERVER_BASE}${path}`, { next: { revalidate: revalidateSec } });
+  } catch (e) {
+    // شبکه/DNS/timeout
+    if (strict) throw new UpstreamUnavailableError(`${path} → ${(e as Error)?.message ?? 'network'}`);
+    return null;
+  }
+  if (!res.ok) {
+    if (strict) throw new UpstreamUnavailableError(`${path} → HTTP ${res.status}`);
+    return null;
+  }
+  try {
     return (await res.json()) as T;
   } catch {
-    // شبکه/DNS/timeout → حالتِ امن. صفحه نباید به‌خاطرِ API پایین بیاید.
+    // بدنه‌ی خراب/غیر-JSON (صفحه‌ی گیت‌وی) هم شکستِ زیرساخت است، نه «داده‌ای نیست»
+    if (strict) throw new UpstreamUnavailableError(`${path} → پاسخِ نامعتبر`);
     return null;
   }
 }
@@ -46,12 +100,17 @@ async function getList<T>(
   collection: CollectionName,
   query: Record<string, string | number | undefined> = {},
   revalidateSec = 300,
+  strict = false,
 ): Promise<T[] | null> {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== '') qs.set(k, String(v));
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
-  const data = await getJson<{ items?: T[] }>(`/api/v1/site/${collection}${suffix}`, revalidateSec);
-  return data && Array.isArray(data.items) ? data.items : null;
+  const path = `/api/v1/site/${collection}${suffix}`;
+  const data = await getJson<{ items?: T[] }>(path, revalidateSec, strict);
+  if (data && Array.isArray(data.items)) return data.items;
+  // پاسخِ ۲۰۰ با شکلِ نامعتبر: در مسیرِ تعهد «نمی‌دانیم» است، نه «خالی».
+  if (strict && data) throw new UpstreamUnavailableError(`${path} → شکلِ نامعتبر`);
+  return null;
 }
 
 // ── صفحه‌ها ─────────────────────────────────────────────────────────────
@@ -63,9 +122,21 @@ export async function getPage(slug: string): Promise<SitePage> {
 
 // ── پلن‌ها ──────────────────────────────────────────────────────────────
 
+/**
+ * قیمت یک **تعهد** است، پس تنها تابعِ مجموعه‌ایِ strict است.
+ *
+ * سه نتیجه‌ی متفاوت که نباید یکی شوند:
+ *   • ۲۰۰ با پلن      → همان پلن‌های زنده
+ *   • ۲۰۰ ولی خالی    → `[]` — مدیر همه را غیرفعال کرده؛ حالتِ خالیِ صادق
+ *                        (قبلاً همین‌جا به قیمتِ کامیت‌شده سقوط می‌کرد)
+ *   • شکستِ زیرساختی  → throw — ISR آخرین قیمتِ سالم را نگه می‌دارد
+ *
+ * `null` فقط یعنی API پیکربندی نشده (حالتِ امنِ بیلدِ CI) — آنجا فایل تنها
+ * مرجع است و چیزی برای واگرایی وجود ندارد.
+ */
 export async function getPlans(): Promise<SitePlan[]> {
-  const plans = await getList<SitePlan>('plans', {}, 120);
-  return plans && plans.length ? plans : fallbackPlans(fallback);
+  const plans = await getList<SitePlan>('plans', {}, 120, true);
+  return plans ?? fallbackPlans(fallback);
 }
 
 // ── پرسش‌های متداول ─────────────────────────────────────────────────────

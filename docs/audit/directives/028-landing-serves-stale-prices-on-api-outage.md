@@ -39,8 +39,23 @@ Directive 023 catalogued "we don't know" rendered as "you have none" — an outa
 This is the same failure with a harder edge: **an outage rendered as a confident, specific, wrong
 number.** An empty section invites a reload. A price does not; a prospect reads it and believes it.
 
-And it is cached. Every landing page carries `export const revalidate = 300`, so a wrong price is
-served for up to five minutes per path, to every visitor, with no error anywhere. The pattern is
+And it is cached. **CORRECTION (2026-09-07):** I wrote that every landing page carries
+`revalidate = 300`. Wrong — `app/pricing/page.tsx:19` is **120** and `app/changelog/page.tsx:13` is
+600. So the wrong price is served for up to **two** minutes on the page that matters, not five. The
+conclusion is unchanged; the number I gave was not measured, it was assumed from the pages I had
+already opened.
+
+**AND A WORSE ADJACENT DEFECT, found while fixing this one and NOT fixed:**
+`app/pricing/page.tsx:24` hardcodes the prices inside a static `export const metadata`:
+
+> «پلن‌های اشتراکِ رزرونو: سه‌ماهه ۱۸ میلیون، شش‌ماهه ۳۴ میلیون و یک‌ساله ۶۵ میلیون تومان…»
+
+That string never reads `db.sitePlan` at all. It is therefore wrong from the first price change
+onward **even when the API is perfectly healthy** — no outage required — and it is the description
+Google shows in search results. The fallback defect needs an outage to bite; this one bites by
+default. Fixing it means converting `metadata` to `generateMetadata`, which changes the page's
+rendering contract, so it was correctly left out of a one-defect change. **Roughly ten lines, no
+schema, no API change.** The pattern is
 exactly the one `apps/seo/lib/api.ts:10-24` documents for its own pages — a transient outage becoming
 a cached lie — except there the consequence was a 404 served to Googlebot, and here it is a price
 served to a buyer.
