@@ -3,7 +3,7 @@ import { dbRead as db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { requireAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
-import { getLedgerHealth, MIN_RESOLVED_FOR_ACCURACY } from '@/lib/prediction-ledger';
+import { getLedgerHealth, getPlatformCalibration, MIN_RESOLVED_FOR_ACCURACY } from '@/lib/prediction-ledger';
 import { getPlatformPerformanceDrift, detectPlatformPerformanceDrift, PERFORMANCE_DRIFT_THRESHOLD } from '@/lib/model-drift';
 
 import { withApiMetrics } from '@/lib/api-metrics';
@@ -29,7 +29,7 @@ async function GET_impl(req: Request) {
     await requireAdmin(req);
 
     const [noShowRows, demandRows, recentRuns, noShowActiveCount, ledgerHealth, drift,
-           platformModel, platformDrift] = await Promise.all([
+           platformModel, platformDrift, calibration] = await Promise.all([
       db.restaurantNoShowModel.findMany({
         select: {
           restaurantId: true, isActive: true, sampleSize: true, positiveCount: true,
@@ -71,6 +71,9 @@ async function GET_impl(req: Request) {
         },
       }),
       detectPlatformPerformanceDrift({ windowDays: 30 }),
+      // فازِ ۵ادامه — منحنیِ کالیبراسیون رویِ دفترِ پیش‌بینی/نتیجه (نه
+      // هولدآوتِ آموزش، که trainAndCalibrateNoShowModel از قبل دارد).
+      getPlatformCalibration({ predictionType: 'no_show', sinceDays: 90 }),
     ]);
 
     const demandActiveCounts = demandRows.reduce(
@@ -146,6 +149,26 @@ async function GET_impl(req: Request) {
           overdue_count: g.overdueCount,
           brier: g.brier,
           mae: g.mae,
+        })),
+      },
+      // ── کالیبراسیونِ تولیدی ──
+      // «وقتی مدل می‌گوید ۷۰٪، واقعاً ۷۰٪ رخ می‌دهد؟» — رویِ همان دفتر، نه
+      // هولدآوتِ آموزش (که trainAndCalibrateNoShowModel از قبل جداگانه دارد).
+      // Brierِ خوب ضامنِ کالیبراسیونِ خوب نیست: مدلی که ریسکِ بالا را
+      // دستِ‌بالا و ریسکِ پایین را دستِ‌پایین می‌زند می‌تواند Brierِ قابلِ‌قبولی
+      // داشته باشد ولی رستوران‌دار را روی «۸۰٪ خطر» به‌اشتباه هدایت کند.
+      calibration: {
+        window_days: 90,
+        min_resolved: MIN_RESOLVED_FOR_ACCURACY,
+        groups: calibration.map((c) => ({
+          prediction_type: c.predictionType,
+          model_source: c.modelSource,
+          resolved_count: c.resolvedCount,
+          // ECE: null با همان کف — نه عددِ ساختگی از رویِ چند نمونه.
+          ece: c.ece,
+          buckets: c.buckets.map((b) => ({
+            from: b.from, to: b.to, n: b.n, predicted: b.predicted, observed: b.observed,
+          })),
         })),
       },
       // ── رانشِ مدل (فازِ ۷) ──

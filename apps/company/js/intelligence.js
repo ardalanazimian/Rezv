@@ -301,6 +301,44 @@ function productionAccuracyPanelHTML(pa){
     }).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز پیش‌بینی‌ای با نتیجه‌ی مشاهده‌شده ثبت نشده — دفتر از لحظه‌ی استقرارِ فازِ ۵ پر می‌شه</div></div>`}
   </div>`;
 }
+// ═══════ کالیبراسیونِ تولید ═══════
+// Brierِ خوب ضامنِ کالیبراسیونِ خوب نیست: مدلی که ریسکِ بالا را دستِ‌بالا و
+// ریسکِ پایین را دستِ‌پایین می‌زند می‌تواند Brierِ قابلِ‌قبولی داشته باشد ولی
+// رستوران‌دار را روی «۸۰٪ خطر» به‌اشتباه هدایت کند. این پنل رویِ همان دفترِ
+// پیش‌بینی/نتیجه است، نه هولدآوتِ آموزش (که trainAndCalibrateNoShowModel
+// جداگانه دارد) — دقیقاً همان تفکیکی که پنلِ «دقتِ واقعی» بالا برایِ Brier کرد.
+function calibrationPanelHTML(cal){
+  if(!cal) return '';
+  const g = cal.groups || [];
+  const pct=(v)=>v==null?'—':fa((v*100).toFixed(1))+'٪';
+  return `<div class="panel" style="margin-top:20px">
+    <div class="panel-head"><div>
+      <div class="panel-title">کالیبراسیونِ تولید — وقتی مدل می‌گه ۷۰٪، واقعاً ۷۰٪ رخ می‌ده؟</div>
+      <div class="panel-sub">${fa(cal.window_days)} روزِ گذشته · ECE = میانگینِ وزنیِ فاصله‌ی پیش‌بینی از نرخِ واقعی؛ صفر یعنی کاملاً کالیبره</div>
+    </div></div>
+    ${g.length?g.map(x=>{
+      const enough = x.resolved_count >= cal.min_resolved && x.buckets.length>0;
+      return `<div class="mini-row" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="mini-info">
+            <div class="mini-name">${PRED_TYPE_FA[x.prediction_type]||esc(x.prediction_type)} · ${MODEL_SOURCE_FA[x.model_source]||esc(x.model_source)}</div>
+            <div class="mini-sub">${fa(x.resolved_count)} نتیجه‌ی مشاهده‌شده</div>
+          </div>
+          ${enough
+            ? `<span class="badge ${x.ece<0.05?'active':'expired'}" title="Expected Calibration Error">ECE ${fa(Math.round(x.ece*1000)/1000)}</span>`
+            : `<span class="badge expired" title="کف: ${cal.min_resolved} نتیجه">دادهٔ کافی نیست</span>`}
+        </div>
+        ${enough?`<div style="display:flex;flex-wrap:wrap;gap:4px">
+          ${x.buckets.map(b=>`<div style="flex:1;min-width:64px;padding:4px 6px;border-radius:6px;background:var(--ink-50);font-size:11px;text-align:center" title="${fa(b.n)} نمونه در بازه‌ی ${pct(b.from)}–${pct(b.to)}">
+            <div style="color:var(--t2)">${pct(b.from)}–${pct(b.to)}</div>
+            <div>پیش‌بینی ${pct(b.predicted)}</div>
+            <div style="color:${Math.abs(b.predicted-b.observed)>0.15?'var(--red-600,#DC2626)':'inherit'}">واقعی ${pct(b.observed)}</div>
+          </div>`).join('')}
+        </div>`:''}
+      </div>`;
+    }).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز پیش‌بینی‌ای با نتیجه‌ی مشاهده‌شده ثبت نشده</div></div>`}
+  </div>`;
+}
 // ═══════ رانشِ مدل (فازِ ۷) ═══════
 // این پنل تنها جایی است که می‌گوید «بازآموزی لازم است» — و عمداً فقط وقتی
 // می‌گوید که شواهد کافی باشد. حکمِ insufficient_data صریحاً نمایش داده
@@ -388,6 +426,7 @@ function rModelHealth(){
           </div>`).join(''):`<div class="empty-state"><div class="empty-state-desc">هنوز هیچ رستورانی آموزش ندیده</div></div>`}
       </div>
       ${productionAccuracyPanelHTML(d.production_accuracy)}
+      ${calibrationPanelHTML(d.calibration)}
       ${driftPanelHTML(d.drift)}
       <div class="panel" style="margin-top:20px">
         <div class="panel-head"><div><div class="panel-title">تاریخچه‌ی آموزش‌ها (append-only)</div><div class="panel-sub">آخرین ${fa(d.recent_runs.length)} اجرا — شاملِ آموزش‌هایی که فعال نشدن</div></div></div>

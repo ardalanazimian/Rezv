@@ -6,7 +6,7 @@ import { createReservation } from '../src/lib/reservations.ts';
 import { transitionReservation } from '../src/lib/lifecycle.ts';
 import {
   recordPrediction, recordOutcome, confidenceFor,
-  getProductionAccuracy, getLedgerHealth, MIN_RESOLVED_FOR_ACCURACY,
+  getProductionAccuracy, getLedgerHealth, getPlatformCalibration, MIN_RESOLVED_FOR_ACCURACY,
   NO_SHOW_FEATURE_VERSION,
 } from '../src/lib/prediction-ledger.ts';
 import { NO_SHOW_FEATURE_NAMES } from '../src/lib/no-show-model.ts';
@@ -26,7 +26,8 @@ import { fixturePhone } from './_phone.helper.mts';
 // ═══════════════════════════════════════════════════════════════════════
 
 const TAG = `pl-${randomUUID().slice(0, 8)}`;
-let tenantId: string, restaurantId: string, userId: string, healthRestaurantId: string;
+let tenantId: string, restaurantId: string, userId: string, healthRestaurantId: string,
+  calibRestaurantId: string;
 const SLOT_DATE = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 10);
 
 /**
@@ -81,6 +82,15 @@ before(async () => {
     select: { id: true },
   });
   healthRestaurantId = r2.id;
+
+  // رستورانِ سومِ ایزوله برایِ تست‌هایِ کالیبراسیون — جدا از دو تایِ بالا،
+  // وگرنه شمارشِ resolvedCount با دادهٔ آن‌ها قاطی می‌شد.
+  const r3 = await db.restaurant.create({
+    data: { tenantId, slug: `${TAG}-c`, name: '[DEMO] رستورانِ کالیبراسیون', timezone: 'Asia/Tehran',
+            clubPrefix: 'PC', isOpen: true, onlineGating: false },
+    select: { id: true },
+  });
+  calibRestaurantId = r3.id;
 });
 
 after(async () => {
@@ -91,7 +101,7 @@ after(async () => {
   await db.clubMember.deleteMany({ where: { restaurantId } }).catch(() => {});
   await db.clubCodeCounter.deleteMany({ where: { restaurantId } }).catch(() => {});
   await db.table.deleteMany({ where: { restaurantId } }).catch(() => {});
-  await db.restaurant.deleteMany({ where: { id: { in: [restaurantId, healthRestaurantId] } } }).catch(() => {});
+  await db.restaurant.deleteMany({ where: { id: { in: [restaurantId, healthRestaurantId, calibRestaurantId] } } }).catch(() => {});
   await db.tenant.deleteMany({ where: { id: tenantId } }).catch(() => {});
   await db.user.deleteMany({ where: { id: userId } }).catch(() => {});
 });
@@ -267,6 +277,109 @@ describe('سلامتِ دفتر — همان چیزی که داشبوردِ شر
     assert.equal(mine[0].resolvedCount, MIN_RESOLVED_FOR_ACCURACY);
     // رستورانِ حلقه‌ی بسته دقیقاً یک نتیجه دارد — نه بیشتر، نه صفر.
     assert.equal(other.reduce((s, g) => s + g.resolvedCount, 0), 1);
+  });
+});
+
+describe('کالیبراسیونِ تولیدی — getPlatformCalibration', () => {
+  /** ثبتِ یک پیش‌بینیِ حل‌شده (افقش همیشه گذشته، چون فقط نتیجه‌ی معلوم اهمیت دارد). */
+  async function seedResolved(opts: {
+    restaurantId: string; predicted: number; observed: number; predictionType?: 'no_show' | 'demand';
+  }): Promise<void> {
+    const entityId = randomUUID();
+    const id = await recordPrediction({
+      restaurantId: opts.restaurantId, predictionType: opts.predictionType ?? 'no_show',
+      entityType: 'reservation', entityId, modelSource: 'heuristic',
+      featureVersion: NO_SHOW_FEATURE_VERSION, predictedValue: opts.predicted,
+      confidence: 'low', horizonAt: new Date(Date.now() - 86_400_000),
+    });
+    assert.ok(id, 'seedِ کالیبراسیون باید موفق باشد');
+    const r = await recordOutcome({
+      entityType: 'reservation', entityId,
+      observedValue: opts.observed, source: 'reservation_status',
+    });
+    assert.equal(r, 'recorded');
+  }
+
+  test('زیرِ کفِ نمونه: buckets خالی و ece برابرِ null — نه یک منحنیِ نصفه‌کاره', async () => {
+    // ⚠️ عمداً predicted=observed=۱ (کاملاً کالیبره)، نه یک مقدارِ اختیاری:
+    // این ردیف در همین رستوران می‌ماند و به‌عنوانِ پایه در تستِ بعدی («کنترلِ
+    // مثبت») هم شمرده می‌شود — اگر اینجا مقدارِ نامیزان می‌گذاشتیم، آن تست
+    // بدونِ اطلاع یک نمونه‌ی آلوده در محاسبه‌ی eceَ‌اش داشت.
+    await seedResolved({ restaurantId: calibRestaurantId, predicted: 1, observed: 1 });
+    const rows = await getPlatformCalibration({ restaurantId: calibRestaurantId });
+    assert.equal(rows.length, 1);
+    assert.ok(rows[0].resolvedCount < MIN_RESOLVED_FOR_ACCURACY, 'پیش‌فرضِ این تست: زیرِ کف');
+    assert.deepEqual(rows[0].buckets, []);
+    assert.equal(rows[0].ece, null);
+  });
+
+  test('کنترلِ مثبت: مدلِ کاملاً کالیبره روی کف، ece نزدیکِ صفر و بادرستی محاسبه می‌شود', async () => {
+    // به کف می‌رسانیم؛ همه با predicted=observed=۱ (سهمِ خطایِ صفر).
+    const before = await getPlatformCalibration({ restaurantId: calibRestaurantId });
+    const need = MIN_RESOLVED_FOR_ACCURACY - before[0].resolvedCount;
+    for (let i = 0; i < need; i++) {
+      await seedResolved({ restaurantId: calibRestaurantId, predicted: 1, observed: 1 });
+    }
+    const rows = await getPlatformCalibration({ restaurantId: calibRestaurantId });
+    assert.equal(rows[0].resolvedCount, MIN_RESOLVED_FOR_ACCURACY);
+    assert.ok(rows[0].buckets.length > 0, 'در کف باید منحنی واقعاً ساخته شود');
+    // همه‌ی ۲۰ نمونه (این تست + تستِ قبلی) predicted=observed=۱ هستند —
+    // خطا باید دقیقاً صفر باشد، نه فقط «نزدیکِ» صفر.
+    assert.equal(rows[0].ece, 0, `مدلِ کاملاً کالیبره باید eceِ دقیقاً صفر بدهد، شد ${rows[0].ece}`);
+  });
+
+  test('عدمِ‌کالیبراسیونِ واقعی کشف می‌شود — این تابع فقط عددِ ساختگی برنمی‌گرداند', async () => {
+    // رستورانِ تازه: مدلی که همیشه ۹۰٪ می‌گوید ولی هیچ‌وقت رخ نمی‌دهد.
+    const r = await db.restaurant.create({
+      data: { tenantId, slug: `${TAG}-miscal`, name: '[DEMO] رستورانِ نامیزان', timezone: 'Asia/Tehran',
+              clubPrefix: 'PM', isOpen: true, onlineGating: false },
+      select: { id: true },
+    });
+    try {
+      for (let i = 0; i < MIN_RESOLVED_FOR_ACCURACY; i++) {
+        await seedResolved({ restaurantId: r.id, predicted: 0.9, observed: 0 });
+      }
+      const rows = await getPlatformCalibration({ restaurantId: r.id });
+      assert.equal(rows[0].resolvedCount, MIN_RESOLVED_FOR_ACCURACY);
+      assert.ok(rows[0].ece! > 0.8, `مدلِ به‌شدت نامیزان باید eceِ بالا بدهد، شد ${rows[0].ece}`);
+      const bucket = rows[0].buckets.find(b => b.from <= 0.9 && 0.9 < b.to);
+      assert.ok(bucket, 'سطلِ ۹۰٪ باید در منحنی باشد');
+      assert.equal(bucket!.observed, 0, 'نرخِ واقعیِ همان سطل باید صفر باشد');
+    } finally {
+      await db.restaurant.deleteMany({ where: { id: r.id } }).catch(() => {});
+    }
+  });
+
+  test('گاردِ ۰..۱: پیش‌بینیِ غیرِاحتمالاتی (مثلِ تعدادِ تقاضا) بی‌صدا کنار گذاشته می‌شود', async () => {
+    // predictionType='demand' با predictedValue=۱۲ (تعدادِ کاور، نه احتمال) —
+    // اگر گاردِ کوئری نبود، این عدد وارد سطل‌هایِ ۰..۱ می‌شد و منحنی را
+    // بی‌معنا می‌کرد.
+    await seedResolved({ restaurantId: calibRestaurantId, predicted: 12, observed: 9, predictionType: 'demand' });
+    const rows = await getPlatformCalibration({ restaurantId: calibRestaurantId, predictionType: 'demand' });
+    assert.equal(rows.length, 0, 'پیش‌بینیِ خارج از بازه‌ی ۰..۱ نباید هیچ گروهی بسازد');
+  });
+
+  test('فیلترِ رستوران واقعاً جدا می‌کند (نشتِ بین‌تنانتی ندارد)', async () => {
+    // ⚠️ عمداً با یک رستورانِ کاملاً تازه مقایسه می‌شود، نه با healthRestaurantId:
+    // آن رستوران در بلوکِ «سلامتِ دفتر» هم به‌طورِ مستقل دقیقاً به همان کفِ
+    // MIN_RESOLVED_FOR_ACCURACY رسانده می‌شود (طراحیِ عامدِ آن تست)، پس
+    // مقایسه‌ی شمارشِ خام با آن یک هم‌صدفاییِ ساختگی است، نه اثباتِ ایزولاسیون.
+    const fresh = await db.restaurant.create({
+      data: { tenantId, slug: `${TAG}-isolation`, name: '[DEMO] رستورانِ بدونِ داده', timezone: 'Asia/Tehran',
+              clubPrefix: 'PI', isOpen: true, onlineGating: false },
+      select: { id: true },
+    });
+    try {
+      const mine = await getPlatformCalibration({ restaurantId: calibRestaurantId, predictionType: 'no_show' });
+      const other = await getPlatformCalibration({ restaurantId: fresh.id, predictionType: 'no_show' });
+      const mineCount = mine.reduce((s, g) => s + g.resolvedCount, 0);
+      // دقیقاً MIN_RESOLVED_FOR_ACCURACY: پیش‌بینیِ demandِ تستِ گارد بالا با
+      // predictionType:'no_show' فیلتر نمی‌شود، پس شمارشِ no_show را عوض نمی‌کند.
+      assert.equal(mineCount, MIN_RESOLVED_FOR_ACCURACY, 'دقیقاً همان تعدادی که در این بلوک ساختیم');
+      assert.equal(other.length, 0, 'رستورانِ بدونِ هیچ پیش‌بینی‌ای نباید هیچ گروهی از رستورانِ دیگر ببیند');
+    } finally {
+      await db.restaurant.deleteMany({ where: { id: fresh.id } }).catch(() => {});
+    }
   });
 });
 
