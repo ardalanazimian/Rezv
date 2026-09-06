@@ -175,10 +175,31 @@ export const metrics = {
   // ضدِ double-booking. رجوع کن به redis.ts.
   slotLockFallback: new Counter('rezervno_slot_lock_fallback_total', 'تعداد دفعاتی که قفلِ Redisِ رزرو به‌خاطرِ قطعیِ Redis fail-open شد (بدونِ قفل ادامه یافت، DB منبعِ حقیقت است)'),
   authFailures: new Counter('rezervno_auth_failures_total', 'تعداد شکست احراز هویت (سیگنال امنیتی)'),
+  // ⚠️ اضافه‌شده ۲۰۲۶-۰۹-۰۶: نوشتنِ audit در DB عمداً best-effort است
+  // (`lib/audit.ts` — از‌دست‌رفتنِ یک رکورد نباید کاربر را بلاک کند) ولی تا
+  // امروز شکستش فقط یک `log.warn` بود: هیچ شمارنده‌ای، هیچ آلارمی. یعنی یک
+  // کنشِ حساس می‌توانست ۲۰۰ برگرداند در حالی که ردِ حسابرسی‌اش هرگز ننشسته
+  // بود، و هیچ‌کس نمی‌فهمید.
+  //
+  // چرا این‌جا فقط «انطباق» نیست: `fraud.listFlaggedAbuseUsers` نسب‌نامه‌ی
+  // فلگ‌ها (چه کسی/چرا/کدام رستوران) را از همین جدول می‌خواند — یعنی
+  // audit_logs یک **مسیرِ خواندنِ محصولی** است، نه صرفاً بایگانی.
+  //
+  // برچسبِ `action` یک unionِ بسته‌ی TS است (~۴۰ مقدار)، پس کاردینالیتی
+  // ساکن و امن است — و «کدام رویدادِ امنیتی ردش را گم کرد» دقیقاً همان
+  // چیزی است که در تحقیق لازم می‌شود.
+  auditWriteFailed: new Counter('rezervno_audit_write_failed_total', 'تعداد رکوردهای audit که در DB ثبت نشدند (کنشِ اصلی موفق بود؛ فقط ردِ حسابرسی گم شد) — label: action'),
   activeRequests: new Gauge('rezervno_active_requests', 'تعداد درخواست‌های در حال پردازش'),
   jobsPending: new Gauge('rezervno_jobs_pending', 'تعداد job‌های در انتظار در صف'),
   jobsDead: new Gauge('rezervno_jobs_dead', 'تعداد job‌های dead-letter (شکست دائمی)'),
   jobsProcessed: new Counter('rezervno_jobs_processed_total', 'تعداد job‌های پردازش‌شده (با label: kind/outcome)'),
+  // ⚠️ اضافه‌شده ۲۰۲۶-۰۹-۰۶: تا این تاریخ کارِ گیرکرده در 'processing' هیچ
+  // نماینده‌ای در متریک‌ها نداشت — فقط pending و dead شمرده می‌شدند. یعنی
+  // workerی که وسطِ کار می‌مرد، jobها را برای همیشه معلق می‌گذاشت و هیچ
+  // داشبورد و هیچ آلارمی خبردار نمی‌شد. هر دو در observability/alerts.yml
+  // (گروهِ rezervno_queue) قاعده دارند.
+  jobsStuck: new Gauge('rezervno_jobs_stuck', 'تعداد job‌هایی که فراتر از اجاره در وضعیت processing مانده‌اند (workerِ مرده)'),
+  jobsReclaimed: new Counter('rezervno_jobs_reclaimed_total', 'تعداد job‌هایی که پس از انقضای اجاره بازپس گرفته شدند (label: kind/outcome=retry|dead)'),
 };
 
 /** خروجی متنی همه‌ی متریک‌ها در فرمت Prometheus. */

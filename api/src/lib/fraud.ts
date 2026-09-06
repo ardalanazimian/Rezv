@@ -214,7 +214,7 @@ export async function runFraudScan(restaurantId: string): Promise<FraudSignal[]>
           restaurantId,
           detail: { fraud: sig.kind, subject: sig.subject, ...sig.metrics },
           success: false,
-        }).catch(() => {}),
+        }),
       ),
   );
   if (all.length > 0) log.warn('سیگنال تقلب', { restaurantId, count: all.length });
@@ -278,7 +278,7 @@ async function flagUserForAbuse(userId: string, sig: FraudSignal, restaurantId: 
     restaurantId,
     detail: { fraud: sig.kind, ...sig.metrics },
     success: true,
-  }).catch(() => {});
+  });
 }
 
 /** اجرایِ اسکنِ restaurant-scoped و اِعمالِ فلگِ سوءاستفاده رویِ کاربرانِ سیگنال‌دارِ high. */
@@ -316,25 +316,51 @@ export async function applyPlatformAbuseFlags(): Promise<{ signals: FraudSignal[
 
 /**
  * پاک‌کردنِ آگاهانه‌ی فلگِ سوءاستفاده (مسیرِ appeal) — فقط با اقدامِ صریحِ
- * کارمند، هرگز خودکار. staffId برایِ ردِ audit ثبت می‌شود.
+ * کارمند، هرگز خودکار. actorId برایِ ردِ audit ثبت می‌شود.
+ *
+ * ⚠️ **دامنه‌ی نوشتن سراسری است، نه رستوران‌محور — و این عمدی است، نه سهو.**
+ * `CustomerEconomyProfile` کلیدش `userId` است (schema.prisma:1916) و
+ * `hasActiveAbuseFlag` طبقِ توضیحِ بالایِ همین فایل عمداً پلتفرم‌محور طراحی
+ * شده. پس `restaurantId` اینجا **فقط برچسبِ ردِ حسابرسی** است و در `where`
+ * نمی‌آید: هر صداکننده‌ای فلگ را در **همه‌ی** رستوران‌ها پاک می‌کند.
+ *
+ * ⚠️ نتیجه‌ی امنیتیِ باز (تصمیمِ محصولی، نه باگِ قابلِ‌رفع در این لایه):
+ * رستورانِ A می‌تواند فلگی را که اسکنِ رستورانِ B زده پاک کند و لایه‌ی ۴ی
+ * `resolvePolicy` (سپرده/تأییدِ خودکار) را برایِ آن کاربر در کلِ پلتفرم
+ * بردارد. «چه کسی حق دارد پاک کند» به مالکِ محصول ارجاع شده است؛ این تابع
+ * تا تعیینِ تکلیف رفتارِ امروز را حفظ می‌کند و فقط آن را **صادقانه مستند و
+ * قابلِ‌ردیابی** می‌کند.
+ *
+ * مقدارِ برگشتی: `cleared` = چند پروفایل تغییر کرد · `audited` = آیا ردِ
+ * حسابرسی واقعاً در `audit_logs` نشست. دومی عمداً به صداکننده برگردانده
+ * می‌شود تا یک نوشتنِ برگشت‌ناپذیرِ سراسری نتواند «موفق» گزارش شود در حالی
+ * که ردش گم شده — همان تفکیکِ `tryPromoteNext` در `lib/waitlist.ts`.
  */
 export async function clearAbuseFlag(
   userId: string, actorId: string, restaurantId: string | null, actorType: 'staff' | 'admin' = 'staff',
-): Promise<void> {
+): Promise<{ cleared: number; audited: boolean }> {
   const result = await db.customerEconomyProfile.updateMany({
     where: { userId },
     data: { hasActiveAbuseFlag: false },
   });
   if (result.count === 0) throw new Error('پروفایلِ اقتصادیِ این کاربر یافت نشد');
-  await audit({
+  // ⚠️ `.catch(() => {})`ِ قبلی اینجا برداشته شد و این **تغییرِ رفتار نیست**:
+  // `audit()` طبقِ طراحی throw نمی‌کند، پس آن catch هرگز چیزی نمی‌گرفت — یک
+  // ایمنیِ ظاهری بود که پنهان می‌کرد نتیجه اصلاً بررسی نمی‌شود. به همین دلیل
+  // سه خواهرِ همان الگو در همین فایل (runFraudScan / flagUserForAbuse /
+  // setAbuseFlagManually) هم برداشته شدند: نگه‌داشتنشان کنارِ این توضیح، به
+  // خواننده‌ی بعدی می‌گفت آنجا خطری گرفته می‌شود که وجود ندارد. اثباتِ
+  // «هرگز throw نمی‌کند» در tests/audit-write-durability.integration.test.mts.
+  const audited = await audit({
     action: 'security.abuse_flag',
     actorType,
     actorId,
     targetId: userId,
     restaurantId,
-    detail: { cleared: true },
+    detail: { cleared: true, scope: 'platform_wide' },
     success: true,
-  }).catch(() => {});
+  });
+  return { cleared: result.count, audited };
 }
 
 /**
@@ -372,7 +398,7 @@ export async function setAbuseFlagManually(userId: string, adminId: string, reas
     restaurantId: null,
     detail: { manual: true, reason },
     success: true,
-  }).catch(() => {});
+  });
 }
 
 /**
