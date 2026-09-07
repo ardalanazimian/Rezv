@@ -162,8 +162,13 @@ means: not yet deep-profiled — see `recon-notes-global.md` for what little was
 48. `profiles/foodism.md` §"Review synthesis" — no individual review (positive or negative) was
     findable anywhere despite multiple differently-worded searches; only the Myket 4/5-over-216-
     reviews aggregate was obtainable, so absence of a reliability incident here is a much weaker
-    signal than for Fidilio/SmartX/Servme, where at least some review volume exists. **Partly
-    superseded: batch 3 obtained the first verbatim Foodism review — see footnote 62.**
+    signal than for Fidilio/Servme, where at least some review volume exists. **Partly
+    superseded: batch 3 obtained the first verbatim Foodism review — see footnote 62.** **Correction
+    (2026-09-07):** SmartX was wrongly included in that comparison in the original wording — the
+    deep-batch corpus pass found **zero** independent, verifiable, verbatim reviews for SmartX in
+    any session, from any platform (`corpus/smartx/store-reviews.md:24,123`). SmartX belongs in the
+    same absence-of-signal category as Foodism itself, not among the competitors where "at least
+    some review volume exists."
 49. `profiles/foodism.md` §"Business model & pricing" — restaurant-side advertising packages are
     described as existing ("with good returns") but no price list or figures were found despite
     targeted searching, mirroring the "contact us" opacity found in Fidilio's and SmartX's pricing.
