@@ -220,32 +220,51 @@ async function doCancelRes(i){
   await changeStatus(i,'cancelled',reason);
 }
 // تولید تاریخ‌های شمسی تا ۱ ماه آینده (نمونه: از پنجشنبه ۱۵ خرداد)
+// ⚠️ رفعِ B-01 (blocker، ۲۰۲۶-۰۹-۰۷): این تابع قبلاً تقویمِ خودش را از یک
+// تاریخِ **ثابتِ هاردکد** می‌ساخت (`day=15, mon=2, wd=5` — پنجشنبه ۱۵ خرداد) با
+// `monthLen[11]` همیشه ۲۹، در حالی که `manualDateToISO` مقدارِ ارسالی را از
+// `new Date()`ِ واقعی می‌ساخت. دو محاسبه‌ی مستقل ⇒ برچسبی که پرسنل می‌بیند با
+// تاریخی که ثبت می‌شود فقط وقتی یکی بود که امروز واقعاً ۱۵ خرداد باشد.
+// اندازه‌گیریِ زنده در روزِ رفع: برچسبِ «سه‌شنبه ۲۰ خرداد» در برابرِ تاریخِ
+// ثبت‌شده‌ی 2026-09-12 («شنبه ۲۱ شهریور») — سه ماه و یک روزِ هفته فاصله.
+//
+// رفع، ریشه‌ای نه ظاهری: هر دو حالا از **یک** منبع می‌آیند (`manualDateFor`)،
+// پس از تعریف نمی‌توانند واگرا شوند. تقویمِ جلالی هم دستی حساب نمی‌شود —
+// `toLocaleDateString('fa-IR')` این کار را با کبیسه‌ی درست انجام می‌دهد، پس
+// جدولِ `monthLen` و مسئله‌ی کبیسه‌ی اسفند کلاً حذف شدند.
 function buildDateOptions(){
-  const weekdays=['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه'];
-  const months=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
-  const monthLen=[31,31,31,31,31,31,30,30,30,30,30,29];
-  // شروع: پنجشنبه ۱۵ خرداد (ماه index 2)، پنجشنبه = index 5 در weekdays
-  let day=15, mon=2, wd=5;
   let opts='';
   for(let i=0;i<=30;i++){
-    const label=`${weekdays[wd]} ${fa(day)} ${months[mon]}`;
     const val=i===0?'today':i===1?'tomorrow':'d'+i;
+    const label=manualDateLabel(val);
     const prefix=i===0?'امروز — ':i===1?'فردا — ':'';
     opts+=`<option value="${val}" data-label="${label}">${prefix}${label}</option>`;
-    // پیش‌رفتن یک روز
-    wd=(wd+1)%7;
-    day++;
-    if(day>monthLen[mon]){day=1;mon=(mon+1)%12}
   }
   return opts;
 }
-// تبدیل مقدار تاریخ پنل (today/tomorrow/dN) و ساعت فارسی به فرمت ISO که بک‌اند می‌خواهد
-function manualDateToISO(dateVal, faTime){
-  const now=new Date();
+
+/**
+ * تنها منبعِ تاریخ برای رزروِ دستی. هم برچسبِ گزینه و هم مقداری که POST می‌شود
+ * از همین می‌آیند — به همین دلیل نمی‌توانند از هم بیفتند.
+ */
+function manualDateFor(dateVal){
   let offset=0;
   if(dateVal==='tomorrow')offset=1;
   else if(/^d\d+$/.test(dateVal))offset=parseInt(dateVal.slice(1))||0;
-  const t=new Date(now); t.setDate(now.getDate()+offset);
+  const t=new Date(); t.setDate(t.getDate()+offset);
+  return t;
+}
+
+/** برچسبِ فارسیِ همان تاریخ — با تقویمِ جلالیِ خودِ محیط، نه حسابِ دستی. */
+function manualDateLabel(dateVal){
+  return manualDateFor(dateVal).toLocaleDateString('fa-IR',{weekday:'long',day:'numeric',month:'long'});
+}
+// تبدیل مقدار تاریخ پنل (today/tomorrow/dN) و ساعت فارسی به فرمت ISO که بک‌اند می‌خواهد
+function manualDateToISO(dateVal, faTime){
+  // ⚠️ B-01: تاریخ اینجا **دوباره حساب نمی‌شود** — از همان `manualDateFor` می‌آید
+  // که برچسبِ گزینه هم از آن ساخته شده. دو محاسبه‌ی جدا دقیقاً همان چیزی بود که
+  // برچسب و مقدار را از هم انداخت.
+  const t=manualDateFor(dateVal);
   const iso=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
   const time=String(faTime||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).trim()||'20:00';
   return {date:iso,time};
