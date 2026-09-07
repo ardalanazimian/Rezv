@@ -578,6 +578,19 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/customer/js/data/discover.js:151', 'ترنریِ icon(...)+رشته یا esc(el.textContent) — هردو امن.'],
   ['apps/customer/js/features/loyalty.js#388c8b826e92', 'perksBlock() از PERKS محلی (shared/js seed) می‌سازه؛ tier فقط esc(b.name) بعدِ رفعِ این PR.'],
   ['apps/customer/js/features/loyalty.js#c31403f24fd3', 'badges.map دیگه esc(b.name) داره (رفع‌شده در همین PR)؛ tier.emoji/tier.name از enumِ ثابتِ سطحِ باشگاهه.'],
+  ['apps/customer/js/features/loyalty.js#bcaa1558aca0',
+   'همان سینکِ #c31403f24fd3، بازبینی‌شده‌ی ۲۰۲۶-۰۹-۰۷ پس از افزودنِ خطِ «امتیاز '
+   + 'منقضی نمی‌شود». کلیدِ قبلی با تغییرِ عبارت باطل شد و همین درست است — بازبینیِ '
+   + 'کهنه نباید ارث برسد. بازبینیِ تازه، با شمارشِ **هر** درجِ پویا در بلاکِ '
+   + ':69-103 (نه نمونه‌برداری): esc() روی tier.name، tier.emoji، b.name، b.emoji، '
+   + 'progress_pct · fmtFa روی points (قالب‌بندِ رقم) · icon() چهار بار با آرگومانِ '
+   + 'literal · nextLine که خودش در :65-67 از esc(next_tier.*) ساخته می‌شود · '
+   + 'p[0..2] از PERKS که ثابتِ محلیِ data/seed.js است نه داده‌ی API · b.earned بولین '
+   + 'در ترنریِ بینِ دو رشته‌ی ثابت. هیچ مقدارِ API‌ای بدونِ esc نمانده. '
+   + '⚠️ چهار مورد از این esc()ها در همین بازبینی **اضافه شدند** (قبلاً خام بودند)، '
+   + 'پس این ورودی صرفاً ثبتِ وضعِ موجود نیست — سینک واقعاً سخت‌تر شد. '
+   + '⚠️ محدودیتِ کلید: به عبارتِ این بلاک بسته است. هر درجِ تازه‌ای در :69-103 '
+   + 'کلید را باطل می‌کند و گیت دوباره بازبینی می‌خواهد — که همان رفتارِ درست است.'],
   ['apps/customer/js/features/notifications.js:73', 'رشته‌هایِ ثابت (concat با +) — بدونِ دیتایِ کاربر.'],
   ['apps/customer/js/features/notifications.js:93', 'Object.entries(CATS) — آبجکتِ محلیِ ثابت.'],
   ['apps/customer/js/features/onboarding.js#650b709cbb1e', 'کارتِ onboarding کاملاً استاتیکه.'],

@@ -745,6 +745,13 @@ img{display:block;max-width:100%}
 .loy-next{font-size:13px;opacity:.85;position:relative}
 .loy-prog{height:8px;background:rgba(255,255,255,.25);border-radius:4px;margin-top:14px;overflow:hidden;position:relative}
 .loy-prog-fill{height:100%;background:#fff;border-radius:4px}
+/* «امتیاز منقضی نمی‌شود» — عمداً بیرونِ کارت و کم‌صدا: یک اطمینانِ آرام، نه
+   یک بنرِ تبلیغاتی. رقبا انقضای امتیاز را پرشکایت‌ترین نقطه‌شان دارند؛ ما
+   خلافش را داریم و تا امروز هیچ‌جا نمی‌گفتیم. */
+.loy-noexpire{display:flex;align-items:center;gap:6px;margin-top:12px;padding:10px 12px;
+  background:var(--surface-2,rgba(0,0,0,.03));border-radius:var(--r-md,10px);
+  font-size:13px;color:var(--t2);line-height:1.6}
+.loy-noexpire svg{flex:none;color:var(--ok,#16A34A)}
 .perks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:20px}
 .perk{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;text-align:center}
 .perk-emoji{font-size:26px;margin-bottom:8px}

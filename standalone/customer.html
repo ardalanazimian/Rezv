@@ -1382,6 +1382,13 @@ img{display:block;max-width:100%}
 .loy-next{font-size:13px;opacity:.85;position:relative}
 .loy-prog{height:8px;background:rgba(255,255,255,.25);border-radius:4px;margin-top:14px;overflow:hidden;position:relative}
 .loy-prog-fill{height:100%;background:#fff;border-radius:4px}
+/* «امتیاز منقضی نمی‌شود» — عمداً بیرونِ کارت و کم‌صدا: یک اطمینانِ آرام، نه
+   یک بنرِ تبلیغاتی. رقبا انقضای امتیاز را پرشکایت‌ترین نقطه‌شان دارند؛ ما
+   خلافش را داریم و تا امروز هیچ‌جا نمی‌گفتیم. */
+.loy-noexpire{display:flex;align-items:center;gap:6px;margin-top:12px;padding:10px 12px;
+  background:var(--surface-2,rgba(0,0,0,.03));border-radius:var(--r-md,10px);
+  font-size:13px;color:var(--t2);line-height:1.6}
+.loy-noexpire svg{flex:none;color:var(--ok,#16A34A)}
 .perks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:20px}
 .perk{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;text-align:center}
 .perk-emoji{font-size:26px;margin-bottom:8px}
@@ -5059,12 +5066,25 @@ async function renderLoyalty(){
   const {points, tier, next_tier, points_to_next, progress_pct, badges}=res.data;
   setPts(points); // برایِ نمایشِ سازگار در بقیه‌ی صفحات (DNA غذایی و ...)
 
+  // ⚠️ esc روی نامِ سطح (۲۰۲۶-۰۹-۰۷): این مقادیر امروز از ثابتِ سمتِ سرور
+  // (LOYALTY_TIERS) می‌آیند و کاربر کنترلشان نمی‌کند، پس این رفعِ یک باگِ
+  // فعلاً واقعی نیست — دفاعِ لایه‌دوم است، همان قاعده‌ای که بقیه‌ی سینک‌های
+  // API-محور در این مخزن رعایت می‌کنند. امنیت **به‌واسطه‌ی منشأ** یک فرض است
+  // که با تغییرِ یک endpoint بی‌صدا می‌شکند؛ esc فرض را حذف می‌کند.
   const nextLine=next_tier
-    ? `${fmtFa(points_to_next)} امتیاز تا سطحِ ${next_tier.name} (${next_tier.emoji})`
+    ? `${fmtFa(points_to_next)} امتیاز تا سطحِ ${esc(next_tier.name)} (${esc(next_tier.emoji)})`
     : 'به بالاترین سطح رسیدی 🎉';
 
   root.innerHTML=`<div class="wrap section">
-    <div class="loy-card"><div class="loy-card-mesh"></div><div class="loy-tier">${tier.emoji} سطح ${tier.name}</div><div class="loy-pts"><span id="loyPts" class="loy-pts-num">${fmtFa(points)}</span> <span style="font-size:20px;font-weight:600;opacity:.9">امتیاز</span></div><div class="loy-next">${nextLine}</div><div class="loy-prog"><div class="loy-prog-fill" style="width:0" data-w="${progress_pct}"></div></div></div>
+    <div class="loy-card"><div class="loy-card-mesh"></div><div class="loy-tier">${esc(tier.emoji)} سطح ${esc(tier.name)}</div><div class="loy-pts"><span id="loyPts" class="loy-pts-num">${fmtFa(points)}</span> <span style="font-size:20px;font-weight:600;opacity:.9">امتیاز</span></div><div class="loy-next">${nextLine}</div><div class="loy-prog"><div class="loy-prog-fill" style="width:0" data-w="${esc(progress_pct)}"></div></div></div>
+
+    <!-- ⚠️ این جمله یک **وعده** است، پس پیش از نوشتنش ساختارِ داده بررسی شد
+         (۲۰۲۶-۰۹-۰۷): مدلِ PointsLedger هیچ ستونِ انقضا ندارد — فقط
+         delta/reason/createdAt و append-only است؛ ClubMember.points هم نه؛ و
+         هیچ کرونی در api/src/app/api/v1/maintenance/ امتیاز را کم نمی‌کند.
+         پس «منقضی نمی‌شود» یک ادعای بازاریابی نیست، خاصیتِ ساختاری است.
+         اگر روزی انقضا اضافه شد، این خط باید هم‌زمان برداشته شود. -->
+    <div class="loy-noexpire reveal">${icon('check',{size:14})} امتیازهات هیچ‌وقت منقضی نمی‌شن — نه بعدِ یک سال، نه هیچ‌وقت.</div>
 
     <!-- دعوت دوستان -->
     <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openReferral()">
@@ -5088,7 +5108,7 @@ async function renderLoyalty(){
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای تو</div></div>
     <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">نشان‌ها</div></div>
-    <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${b.emoji}</div><div class="bdg-name">${esc(b.name)}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
+    <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${esc(b.emoji)}</div><div class="bdg-name">${esc(b.name)}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
   </div>`;
   setTimeout(()=>{const f=document.querySelector('.loy-prog-fill');if(f)f.style.width=f.dataset.w+'%'},300);
   // شمارشِ متحرکِ امتیاز (حسِ دستاورد)

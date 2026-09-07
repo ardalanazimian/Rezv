@@ -214,6 +214,13 @@ const GATES = [
     why: 'شش ترکیبِ payload×سینک باید واقعاً escape شوند — تستِ رفتاری، نه شمارشِ آرتیفکت',
   },
   {
+    id: 'loyalty-promise',
+    area: 'Loyalty promise ↔ mechanism',
+    cmd: 'node',
+    args: ['tools/check-loyalty-promise.mjs'],
+    why: 'وعده‌ی «امتیاز منقضی نمی‌شود» در اپِ مشتری باید با نبودِ انقضا در PointsLedger و مسیرهای نگه‌داری هم‌داستان بماند',
+  },
+  {
     id: 'xss-sink-audit-check',
     area: 'XSS sink audit (--check)',
     cmd: 'node',
