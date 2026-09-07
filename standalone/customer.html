@@ -1183,14 +1183,10 @@ img{display:block;max-width:100%}
 .botnav-item svg{width:22px;height:22px}
 
 /* ─────────── AI STRIP ─────────── */
-.ai-strip{display:flex;align-items:center;gap:14px;color:var(--on-tint);background:linear-gradient(120deg,var(--blue-50),var(--teal-50));
-  border:1px solid var(--blue-100);border-radius:var(--r-lg);padding:14px 18px;margin-top:8px}
-.ai-strip-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--teal));
-  display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;flex-shrink:0;box-shadow:var(--sh)}
-.ai-strip-body{flex:1;min-width:0}
-.ai-strip-label{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
-.ai-strip-text{font-size:13px;color:inherit;line-height:1.5}
-.ai-strip-text b{color:var(--blue-600);font-weight:700}
+/* .ai-strip* حذف شد ۲۰۲۶-۰۹-۰۷ — نوارِ «پیشنهاد هوشمند» جعلی بود و از
+   index.html برداشته شد؛ دلیلِ کاملش آنجا ثبت است.
+   قاعده‌ی ".ai-strip .btn-ghost" در خطِ ~۱۸۰ عمداً دست‌نخورده ماند، چون با
+   ".ai-review" مشترک است — و آن یک فیچرِ جدا و مشروط است (detail.js:225). */
 
 /* ─────────── SHEET (bottom modal) ─────────── */
 .sheet-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.4);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);align-items:flex-end;justify-content:center}
@@ -1949,17 +1945,26 @@ button,[role="button"],.botnav-item,a{min-height:0}
     </div>
   </div>
 
-  <!-- AI recommendation strip -->
-  <div class="wrap">
-    <div class="ai-strip" id="aiStrip">
-      <div class="ai-strip-icon">✦</div>
-      <div class="ai-strip-body">
-        <div class="ai-strip-label">پیشنهاد هوشمند برای تو</div>
-        <div class="ai-strip-text" id="aiStripText">بر اساس رزروهای قبلی‌ات، احتمالاً <b>آوا روف‌تاپ</b> رو دوست داری — جمعه شب میز با ویو داره.</div>
-      </div>
-      <button class="btn btn-sm btn-ghost" onclick="openRest(6)">ببین</button>
-    </div>
-  </div>
+  <!-- ⚠️ حذف‌شده ۲۰۲۶-۰۹-۰۷ — «نوارِ پیشنهادِ هوشمند».
+       اینجا یک نوارِ برجسته بود با برچسبِ «پیشنهاد هوشمند برای تو» و متنِ
+       «بر اساس رزروهای قبلی‌ات، احتمالاً آوا روف‌تاپ رو دوست داری». هر سه
+       بخشش نادرست بود:
+         • هیچ محاسبه‌ای پشتش نبود — `aiStrip`/`aiStripText` صفر ارجاع در کلِ
+           apps/customer/js داشتند، یعنی متن برای **همه‌ی** کاربران ثابت بود.
+         • ادعای «بر اساس رزروهای قبلی‌ات» یعنی ادعای دانستنِ تاریخچه‌ی کاربر،
+           در حالی که هیچ endpointِ توصیه‌ی مشتری‌محوری وجود ندارد
+           (`/restaurant/crm/recommendations` مالِ پنلِ رستوران است؛
+           `/me/incentives` هم `restaurant_id` می‌خواهد، پس «رستورانی برای تو»
+           نمی‌دهد).
+         • دکمه‌اش `openRest(6)` بود — idِ عددیِ داده‌ی نمونه. پس از
+           `syncRestaurants()` که R را با UUIDهای واقعی جایگزین می‌کند،
+           `findR(6)` شکست می‌خورد و کاربر توستِ «این رستوران فعلاً در دسترس
+           نیست» می‌گرفت. یعنی CTAی اولِ صفحه روی دادهٔ واقعی همیشه مرده بود.
+       سه قاعده‌ی مخزن هم‌زمان نقض می‌شد: منشورِ نسل‌ز §۳ (چیزی «هوشمند»
+       نیست مگر مدلی تولیدش کند)، ممنوعیتِ mock/placeholder در مسیرِ تولید،
+       و «دادهٔ جعلی که ادعای واقعی‌بودن دارد».
+       جایگزینِ واقعی نساختم چون منبعِ واقعی وجود ندارد — ساختنش تصمیمِ
+       محصولی است، نه رفعِ باگ. تاریخچه‌ی گیت متنِ قبلی را نگه داشته. -->
 
   <div class="wrap section">
     <div class="section-head">
@@ -2231,8 +2236,20 @@ async function httpJson(url, opts = {}, timeoutMs = 8000) {
 //  شعبه‌ی کهنه، با تاریخچه‌ی P0). ادغامِ آن یعنی یا از دست دادنِ آن رفتار یا
 //  ساختنِ یک انتزاعِ پرشاخه — دقیقاً چیزی که §۷ منع می‌کند.
 //
-//  رفتار عیناً همان قبل است: چند ۴۰۱ِ هم‌زمان یک Promiseِ مشترک می‌گیرند
-//  (بدونِ رقابت)، و refresh هم rotate می‌شود.
+//  چند ۴۰۱ِ هم‌زمان یک Promiseِ مشترک می‌گیرند (بدونِ رقابت)، و refresh هم
+//  rotate می‌شود.
+//
+//  خروجی (سه‌حالته — عمداً نه boolean):
+//    true      → سرور توکنِ تازه داد.
+//    false     → سرور صریحاً رد کرد (۴۰۱/۴۰۳ روی خودِ refresh) ⇒ نشست واقعاً مرده است.
+//    'offline' → **نمی‌دانیم**؛ شبکه/timeout. truthy است تا فراخوان درخواست را یک‌بار
+//                دوباره بزند و خطای شبکه را نشان دهد، نه اینکه نشست را پاک کند.
+//
+//  ⚠️ چرا: قبلاً `catch { return false }` بود، پس یک قطعیِ لحظه‌ایِ شبکه دقیقاً
+//  همان مقداری را برمی‌گرداند که «refresh tokenِ تو باطل است». هر سه پنل روی
+//  همان false مستقیم `_onSessionExpired()` می‌زنند (apps/customer/js/api.js:63،
+//  apps/business/js/data.js:187، apps/company/js/api.js:31) — یعنی توکن‌ها پاک و
+//  کاربر بیرون انداخته می‌شد چون وای‌فای یک ثانیه رفت. «نمی‌دانیم» ≠ «باطل است».
 // ═══════════════════════════════════════════════════════════
 function refreshAccessToken(api) {
   if (api._refreshing) return api._refreshing;
@@ -2249,8 +2266,11 @@ function refreshAccessToken(api) {
         api.setRefresh(data.refresh);   // rotation: refresh هم نو می‌شود
         return true;
       }
+      // پاسخِ واقعیِ سرور رسید ولی توکنِ تازه‌ای نداد → رد شد؛ ولی ۵xx یعنی
+      // «سرور خراب است»، نه «نشستِ تو باطل است» — آن هم offline حساب می‌شود.
+      if (res.status >= 500) return 'offline';
       return false;
-    } catch { return false; }
+    } catch { return 'offline'; }
     finally { api._refreshing = null; }
   })();
   return api._refreshing;

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T08:04:45.223Z",
+  "generated_at": "2026-09-07T08:37:51.896Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -10,13 +10,13 @@
     "demo-mvp",
     "standalone"
   ],
-  "total_hits": 224,
+  "total_hits": 229,
   "by_classification": {
     "review": 20,
     "safe_static": 50,
     "unsafe": 65,
     "escaped": 26,
-    "dom_api_safe": 63
+    "dom_api_safe": 68
   },
   "hits": [
     {
@@ -1385,7 +1385,16 @@
     },
     {
       "file": "apps/business/js/staff-system.js",
-      "line": 446,
+      "line": 361,
+      "kind": "innerHTML",
+      "snippet": "if(btn){ btn.disabled=false; btn.innerHTML=prevHtml; }",
+      "sink_hash": "1f2adc4987cb",
+      "classification": "dom_api_safe",
+      "manual_review_note": "قرینه‌ی restaurant.js#c5a4dbdd770c: prevHtml در staff-system.js:355 از innerHTMLِ همان دکمه خوانده و در :361 به همان عنصر بازگردانده می‌شود؛ تنها نوشتنِ میانی textContent است (:356) که مارک‌آپ نمی‌سازد. ⚠️ ولی آنچه این را امن می‌کند رفت‌وبرگشت **نیست** — بازنویسیِ innerHTML یک parseِ تازه است و هر مارک‌آپِ اجراپذیرِ موجود را دوباره شلیک می‌کند. آنچه بار را می‌برد محتوایِ خودِ دکمه است: staff-system.js:319 فقط icon(check,{size:14}) دارد (نقشه‌ی بسته‌ی PATHS در shared/js/icons.js:83؛ هر دو آرگومان literal) به‌علاوه‌ی یک رشته‌ی ثابتِ فارسی — هیچ فیلدی از GET /restaurant/pricing واردِ دکمه نمی‌شود، و تنها نویسندگانِ دیگرِ آن عنصر (:356، :365) هر دو textContent‌اند. خوانده‌شده ۲۰۲۶-۰۹-۰۷. ⚠️ محدودیتِ کلید: هویت به عبارتِ :361 بسته است نه به قالبِ دکمه در :319. اگر روزی درجِ پویایی به آن دکمه اضافه شود، این override همچنان اعمال می‌شود و شمارش هم عوض نمی‌شود (سینکِ :322 از قبل unsafe است) — یعنی گیت قرمز نمی‌شود. همان محدودیتی که برای bubble()/bizBubble() بالاتر ثبت شده. قالبِ :319 را عوض کردی، این را هم بازبین کن."
+    },
+    {
+      "file": "apps/business/js/staff-system.js",
+      "line": 465,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "95115697e69c",
@@ -1393,7 +1402,7 @@
     },
     {
       "file": "apps/business/js/staff-system.js",
-      "line": 483,
+      "line": 502,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "3869c87ed2f5",
@@ -1401,7 +1410,7 @@
     },
     {
       "file": "apps/business/js/staff-system.js",
-      "line": 518,
+      "line": 537,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "eb0bc02fbed0",
@@ -1418,7 +1427,15 @@
     },
     {
       "file": "apps/business/js/waitlist.js",
-      "line": 145,
+      "line": 142,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('v-floor').innerHTML=`",
+      "sink_hash": "a4fb56db38a4",
+      "classification": "dom_api_safe"
+    },
+    {
+      "file": "apps/business/js/waitlist.js",
+      "line": 158,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-floor').innerHTML=`",
       "sink_hash": "1ddd00b31453",
@@ -1426,7 +1443,7 @@
     },
     {
       "file": "apps/business/js/waitlist.js",
-      "line": 311,
+      "line": 324,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال ساختِ QR…</div>`;",
       "sink_hash": "e94b2593e6be",
@@ -1434,7 +1451,7 @@
     },
     {
       "file": "apps/business/js/waitlist.js",
-      "line": 315,
+      "line": 328,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">",
       "sink_hash": "c256398fba56",
@@ -1442,7 +1459,7 @@
     },
     {
       "file": "apps/business/js/waitlist.js",
-      "line": 326,
+      "line": 339,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "sink_hash": "bf6fc3407fef",
@@ -1450,7 +1467,7 @@
     },
     {
       "file": "apps/business/js/waitlist.js",
-      "line": 368,
+      "line": 381,
       "kind": "innerHTML",
       "snippet": "if(box) box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال ساختِ کدِ تازه…</div>`;",
       "sink_hash": "c070ef6ec33a",
@@ -1458,7 +1475,7 @@
     },
     {
       "file": "apps/business/js/waitlist.js",
-      "line": 373,
+      "line": 386,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">",
       "sink_hash": "0bfebf3a5f41",
@@ -1466,7 +1483,7 @@
     },
     {
       "file": "apps/business/js/waitlist.js",
-      "line": 480,
+      "line": 493,
       "kind": "innerHTML",
       "snippet": "document.getElementById('toastIcon').innerHTML=icon('close',{size:16});",
       "sink_hash": "8e36bc437861",
@@ -1474,7 +1491,7 @@
     },
     {
       "file": "apps/business/js/waitlist.js",
-      "line": 481,
+      "line": 494,
       "kind": "innerHTML",
       "snippet": "document.getElementById('toastMsg').innerHTML=msg+` <button class=\"undo-btn\" onclick=\"${undoFn}();document.getElementById('toast').classList.remove('show')\">باز",
       "sink_hash": "c7ba62d224fe",
@@ -1482,7 +1499,7 @@
     },
     {
       "file": "apps/business/js/waitlist.js",
-      "line": 422,
+      "line": 435,
       "kind": "document.write",
       "snippet": "w.document.write(`<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\">",
       "sink_hash": "a35cc85e253d",
@@ -1548,7 +1565,15 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 22,
+      "line": 24,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('v-customers').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} هوشِ تجار",
+      "sink_hash": "0b48552fed0e",
+      "classification": "dom_api_safe"
+    },
+    {
+      "file": "apps/company/js/intelligence.js",
+      "line": 30,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`",
       "sink_hash": "11f2da47d260",
@@ -1557,7 +1582,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 57,
+      "line": 65,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-billing').innerHTML=`",
       "sink_hash": "bebe02ae44b0",
@@ -1565,7 +1590,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 205,
+      "line": 213,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-support').innerHTML=`",
       "sink_hash": "121f5de6c1d3",
@@ -1573,7 +1598,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 228,
+      "line": 236,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-systemhealth').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "731fb425f2da",
@@ -1581,7 +1606,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 231,
+      "line": 243,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){document.getElementById('v-systemhealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:",
       "sink_hash": "1bb2766262a2",
@@ -1589,7 +1614,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 234,
+      "line": 246,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-systemhealth').innerHTML=`",
       "sink_hash": "5b71e1b7de97",
@@ -1597,7 +1622,15 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 346,
+      "line": 271,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('v-systemhealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} سلامتِ",
+      "sink_hash": "2851c540f172",
+      "classification": "dom_api_safe"
+    },
+    {
+      "file": "apps/company/js/intelligence.js",
+      "line": 362,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-aihealth').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "ce9c42128709",
@@ -1605,7 +1638,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 349,
+      "line": 367,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){document.getElementById('v-aihealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})",
       "sink_hash": "cec2751e6c00",
@@ -1613,7 +1646,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 353,
+      "line": 371,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-aihealth').innerHTML=`",
       "sink_hash": "ed92f456fee0",
@@ -1621,7 +1654,15 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 556,
+      "line": 423,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('v-aihealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} سلامتِ مدل",
+      "sink_hash": "ba5c3c975041",
+      "classification": "dom_api_safe"
+    },
+    {
+      "file": "apps/company/js/intelligence.js",
+      "line": 578,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "fb62ec1f5153",
@@ -1629,7 +1670,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 564,
+      "line": 586,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){document.getElementById('v-security').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})",
       "sink_hash": "f92b9534632f",
@@ -1637,7 +1678,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 584,
+      "line": 606,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=(mqRes.ok&&mqRes.data?moderationQueuePanelHTML(mqRes.data):unavailablePanelHTML('خلاصه‌ی صفِ نظارت خوانده نشد — ",
       "sink_hash": "c8072400bc57",
@@ -1645,7 +1686,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 667,
+      "line": 689,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=unavailablePanelHTML('صفحه‌ی امنیت بارگذاری نشد');",
       "sink_hash": "6f4e9f04c67b",
@@ -1653,7 +1694,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 713,
+      "line": 735,
       "kind": "innerHTML",
       "snippet": "box.innerHTML=`<div style=\"text-align:center;padding:30px;color:var(--t2)\">در حال جست‌وجو...</div>`;",
       "sink_hash": "99aa6bac4c4c",
@@ -1661,7 +1702,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 716,
+      "line": 738,
       "kind": "innerHTML",
       "snippet": "box.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:24px;color:var(--t2)\">${icon('alert',{size:15})} ${esc(res.error?.message||'کاربر پیدا نشد')}",
       "sink_hash": "ab043318f86e",
@@ -1669,7 +1710,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 719,
+      "line": 741,
       "kind": "innerHTML",
       "snippet": "box.innerHTML=renderCustomer360(res.data);",
       "sink_hash": "81333b6eafee",
@@ -1677,7 +1718,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 865,
+      "line": 887,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "1797949972c4",
@@ -1686,7 +1727,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 931,
+      "line": 953,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "61e441d9c9f1",
@@ -1694,7 +1735,7 @@
     },
     {
       "file": "apps/company/js/intelligence.js",
-      "line": 965,
+      "line": 987,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "eefcd7530d92",
@@ -1842,7 +1883,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 2611,
+      "line": 2626,
       "kind": "innerHTML",
       "snippet": "if(n > 0){ el.innerHTML = `${icon('clock',{size:13})} ${fa(n)} عملیات در انتظار همگام‌سازی`; el.style.display='inline-flex'; }",
       "sink_hash": "10027b58cad1",
@@ -1850,7 +1891,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 2646,
+      "line": 2661,
       "kind": "innerHTML",
       "snippet": "bar.innerHTML='<span class=\"net-dot\"></span>حالت آفلاین — کارها محلی ذخیره می‌شوند و با برگشت اینترنت همگام می‌شوند';",
       "sink_hash": "26fc89c17e96",
@@ -1858,7 +1899,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3506,
+      "line": 3549,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML = `",
       "sink_hash": "d7d3cc77c499",
@@ -1866,7 +1907,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3627,
+      "line": 3670,
       "kind": "innerHTML",
       "snippet": "document.getElementById('peakChart').innerHTML=slots.map(h=>{",
       "sink_hash": "ac60d2da51df",
@@ -1874,7 +1915,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3668,
+      "line": 3711,
       "kind": "innerHTML",
       "snippet": "document.getElementById('heatmap').innerHTML=html;",
       "sink_hash": "516bee785341",
@@ -1882,7 +1923,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3674,
+      "line": 3717,
       "kind": "innerHTML",
       "snippet": "document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`",
       "sink_hash": "9c789e95502a",
@@ -1890,7 +1931,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3702,
+      "line": 3745,
       "kind": "innerHTML",
       "snippet": "document.getElementById('insights').innerHTML=insights.slice(0,4).map(i=>`",
       "sink_hash": "dad335d06278",
@@ -1898,7 +1939,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3723,
+      "line": 3766,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=STAFF_NOTES.length?STAFF_NOTES.map((n)=>`",
       "sink_hash": "6b996ae43a03",
@@ -1906,7 +1947,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3875,
+      "line": 3918,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-reservations').innerHTML=`",
       "sink_hash": "aa35a21f49c6",
@@ -1914,7 +1955,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3906,
+      "line": 3949,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div style=\"text-align:center;padding:30px;color:var(--t2)\">در حال بارگذاری رزروها...</div>`;",
       "sink_hash": "eacc6c706e64",
@@ -1922,7 +1963,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3942,
+      "line": 3985,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${resDate==='past'?icon('inbox',{size:40}):icon('search',{size:40})}</div><div style=\"font-",
       "sink_hash": "053d4c292184",
@@ -1930,7 +1971,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3957,
+      "line": 4000,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=demoNote+`",
       "sink_hash": "7f61c39617ce",
@@ -1938,7 +1979,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 3971,
+      "line": 4014,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=demoNote+`<div style=\"font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600\">${fa(list.length)} رزرو · ${fa(seated)} مهمان رسیده${resQu",
       "sink_hash": "93953ea706cf",
@@ -1946,7 +1987,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4468,
+      "line": 4511,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-waitlist').innerHTML=wlDemoNote+`",
       "sink_hash": "0327998ad65e",
@@ -1954,7 +1995,15 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4575,
+      "line": 4615,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('v-floor').innerHTML=`",
+      "sink_hash": "a4fb56db38a4",
+      "classification": "dom_api_safe"
+    },
+    {
+      "file": "standalone/business.html",
+      "line": 4631,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-floor').innerHTML=`",
       "sink_hash": "1ddd00b31453",
@@ -1962,7 +2011,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4741,
+      "line": 4797,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال ساختِ QR…</div>`;",
       "sink_hash": "e94b2593e6be",
@@ -1970,7 +2019,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4745,
+      "line": 4801,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">",
       "sink_hash": "c256398fba56",
@@ -1978,7 +2027,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4756,
+      "line": 4812,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "sink_hash": "bf6fc3407fef",
@@ -1986,7 +2035,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4798,
+      "line": 4854,
       "kind": "innerHTML",
       "snippet": "if(box) box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال ساختِ کدِ تازه…</div>`;",
       "sink_hash": "c070ef6ec33a",
@@ -1994,7 +2043,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4803,
+      "line": 4859,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">",
       "sink_hash": "0bfebf3a5f41",
@@ -2002,7 +2051,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4910,
+      "line": 4966,
       "kind": "innerHTML",
       "snippet": "document.getElementById('toastIcon').innerHTML=icon('close',{size:16});",
       "sink_hash": "8e36bc437861",
@@ -2010,7 +2059,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4911,
+      "line": 4967,
       "kind": "innerHTML",
       "snippet": "document.getElementById('toastMsg').innerHTML=msg+` <button class=\"undo-btn\" onclick=\"${undoFn}();document.getElementById('toast').classList.remove('show')\">باز",
       "sink_hash": "c7ba62d224fe",
@@ -2018,7 +2067,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4927,
+      "line": 4983,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-profile').innerHTML=`",
       "sink_hash": "ed0f840010a3",
@@ -2026,7 +2075,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5046,
+      "line": 5102,
       "kind": "innerHTML",
       "snippet": "if(useImg){swEmoji.style.background='transparent';swEmoji.innerHTML=`<img src=\"${esc(logoPhoto.url)}\" alt=\"\" style=\"width:100%;height:100%;object-fit:cover;bord",
       "sink_hash": "8bee62cf4455",
@@ -2034,7 +2083,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5052,
+      "line": 5108,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-gallery').innerHTML=loadErrorBlock('گالریِ عکس بارگیری نشد','loadGallery().then(profRenderGallery)');",
       "sink_hash": "10fff8cec69d",
@@ -2042,7 +2091,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5056,
+      "line": 5112,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-gallery').innerHTML=`",
       "sink_hash": "12cae07d62d0",
@@ -2050,7 +2099,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5347,
+      "line": 5403,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-reviews').innerHTML=loadErrorBlock('نظرها بارگیری نشد','loadReviews().then(profRenderReviews)');",
       "sink_hash": "dd7a5ecb6671",
@@ -2058,7 +2107,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5361,
+      "line": 5417,
       "kind": "innerHTML",
       "snippet": "document.getElementById('pt-reviews').innerHTML=`",
       "sink_hash": "5cf433540265",
@@ -2066,7 +2115,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5433,
+      "line": 5489,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`",
       "sink_hash": "a5436753ec23",
@@ -2074,7 +2123,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5502,
+      "line": 5558,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "sink_hash": "13f55f337397",
@@ -2082,7 +2131,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5561,
+      "line": 5617,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px\">",
       "sink_hash": "4b0f6a7c387a",
@@ -2090,7 +2139,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5580,
+      "line": 5636,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "sink_hash": "aae5f82f87b7",
@@ -2098,7 +2147,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5633,
+      "line": 5689,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div style=\"text-align:center;padding:50px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "e7c01686e90d",
@@ -2106,7 +2155,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5634,
+      "line": 5690,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در ",
       "sink_hash": "91277828e81a",
@@ -2114,7 +2163,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5636,
+      "line": 5692,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به سرور برقرار نشد.</div>`",
       "sink_hash": "b583cc66aed9",
@@ -2122,7 +2171,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5640,
+      "line": 5696,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "sink_hash": "0f2a21564763",
@@ -2130,7 +2179,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5751,
+      "line": 5807,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حا",
       "sink_hash": "c5a8862829ec",
@@ -2138,7 +2187,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5763,
+      "line": 5819,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "sink_hash": "7018a22c1e1a",
@@ -2146,7 +2195,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5858,
+      "line": 5914,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">ویرایشِ سیاستِ کنسلی به اتصالِ بک‌اند نیاز دارد — د",
       "sink_hash": "82461f7faf2a",
@@ -2154,7 +2203,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 5878,
+      "line": 5934,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "sink_hash": "40c0adb2faf6",
@@ -2162,7 +2211,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6003,
+      "line": 6059,
       "kind": "innerHTML",
       "snippet": "document.getElementById('ct-campaign').innerHTML=`",
       "sink_hash": "97e2a7d4f4c5",
@@ -2170,7 +2219,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6024,
+      "line": 6080,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML='تاریخچه به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست'; return; }",
       "sink_hash": "d3d0673244cb",
@@ -2178,7 +2227,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6026,
+      "line": 6082,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){ el.innerHTML=`<div class=\"error-state\"><div class=\"error-state-icon\">${icon('alert',{size:32})}</div><div>بارگذاری تاریخچه ناموفق بود</div></div>`;",
       "sink_hash": "360203e09f5d",
@@ -2186,7 +2235,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6029,
+      "line": 6085,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=logs.length?`<table class=\"tbl\"><thead><tr><th>سگمنت</th><th>تاریخ</th><th>گیرنده</th><th>پیام</th></tr></thead><tbody>",
       "sink_hash": "c2df83506c8a",
@@ -2194,7 +2243,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6053,
+      "line": 6109,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div style=\"text-align:center;padding:50px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "e7c01686e90d",
@@ -2202,7 +2251,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6054,
+      "line": 6110,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">این بخش به اتصال بک‌اند نیاز دارد — در حالت دمو در ",
       "sink_hash": "91277828e81a",
@@ -2210,7 +2259,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6062,
+      "line": 6118,
       "kind": "innerHTML",
       "snippet": "if(chatHtml){ el.innerHTML=chatHtml+`<div id=\"aiCards\"><div style=\"text-align:center;padding:30px;color:var(--t2)\">در حال بارگذاری پیشنهادها...</div></div>`; }",
       "sink_hash": "a37cd6897045",
@@ -2218,7 +2267,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6067,
+      "line": 6123,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){ cardsEl.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} پیشنهادها بارگیری نشد — دست",
       "sink_hash": "12d1024e7232",
@@ -2226,7 +2275,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6075,
+      "line": 6131,
       "kind": "innerHTML",
       "snippet": "cardsEl.innerHTML=`",
       "sink_hash": "e468ce5cdce3",
@@ -2234,7 +2283,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6158,
+      "line": 6214,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">",
       "sink_hash": "308ce6d3f2c0",
@@ -2242,7 +2291,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6164,
+      "line": 6220,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">در حال بارگیریِ منو…</div>`;",
       "sink_hash": "d5edebee6a68",
@@ -2250,7 +2299,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6170,
+      "line": 6226,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `<div class=\"panel\" style=\"text-align:center;padding:40px\">",
       "sink_hash": "aaa7c0972b2c",
@@ -2258,7 +2307,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6197,
+      "line": 6253,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "sink_hash": "b23b786eae67",
@@ -2266,7 +2315,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6320,
+      "line": 6376,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال بارگیری…</div>`;",
       "sink_hash": "6d108e390f86",
@@ -2274,7 +2323,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6323,
+      "line": 6379,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">${esc(res.offline?'اتصال به سرور برقرار نیست.':(res.error?.message||'بارگیری نشد.",
       "sink_hash": "eea03f2bda8b",
@@ -2282,7 +2331,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6337,
+      "line": 6393,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "sink_hash": "5c695df0744c",
@@ -2290,7 +2339,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6397,
+      "line": 6453,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال ساختِ QR…</div>`;",
       "sink_hash": "e94b2593e6be",
@@ -2298,7 +2347,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6401,
+      "line": 6457,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">",
       "sink_hash": "f933eb07257e",
@@ -2306,7 +2355,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6415,
+      "line": 6471,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "sink_hash": "efd0a31cd21b",
@@ -2314,7 +2363,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6522,
+      "line": 6578,
       "kind": "innerHTML",
       "snippet": "if(box) box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال آپلود…</div>`;",
       "sink_hash": "d65a06a686d7",
@@ -2322,7 +2371,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6528,
+      "line": 6584,
       "kind": "innerHTML",
       "snippet": "if(box) box.innerHTML = `<div style=\"color:var(--red);font-size:13px\">${esc(res.offline?'اتصال به سرور برقرار نیست':(res.error?.message||'آپلود ناموفق بود'))}</",
       "sink_hash": "f7e5328770e6",
@@ -2330,7 +2379,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6790,
+      "line": 6846,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px\">در حال بارگیری…</div>`;",
       "sink_hash": "6d108e390f86",
@@ -2338,7 +2387,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6793,
+      "line": 6849,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t2);font-size:13px;margin-bottom:8px\">${esc(res.offline?'اتصال به سرور برقرار نیست.':(res.error?.message||'بارگیری نشد.",
       "sink_hash": "3264578f2238",
@@ -2346,7 +2395,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6798,
+      "line": 6854,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "sink_hash": "cbbe45f8aea6",
@@ -2354,7 +2403,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6891,
+      "line": 6947,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = `<div class=\"chat-b them\">سلام! یه سؤال درباره‌ی رزروها، مشتری‌ها یا میزهاتون بپرس — مثلاً «امروز چند رزرو داریم؟» یا «کدوم روز شلوغ‌تره؟».</di",
       "sink_hash": "77aeeb2790e0",
@@ -2362,7 +2411,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6940,
+      "line": 6996,
       "kind": "innerHTML",
       "snippet": "if (wrap) wrap.innerHTML = '<span style=\"opacity:.6\">در حال یادگیری…</span>';",
       "sink_hash": "7b5b066885e9",
@@ -2370,7 +2419,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6991,
+      "line": 7047,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-loyalty').innerHTML=`",
       "sink_hash": "bd0a53145f28",
@@ -2378,7 +2427,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7083,
+      "line": 7139,
       "kind": "innerHTML",
       "snippet": "const restore=()=>{ if(btn){ btn.disabled=false; btn.innerHTML=icon('message',{size:13})+' ارسالِ پیامکِ تبریک'; } };",
       "sink_hash": "1d721a653d2b",
@@ -2386,7 +2435,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7136,
+      "line": 7192,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-marketing').innerHTML=`",
       "sink_hash": "6f3fdf0b45f4",
@@ -2394,7 +2443,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7152,
+      "line": 7208,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">مدیریت کوپن‌ها به اتصال بک‌اند نیاز دارد — در حالت ",
       "sink_hash": "9d7e00ce5d31",
@@ -2402,7 +2451,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7153,
+      "line": 7209,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "sink_hash": "65f6940180f4",
@@ -2410,7 +2459,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7202,
+      "line": 7258,
       "kind": "innerHTML",
       "snippet": "if(!API.getToken()){ el.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">اتوماسیون به اتصال بک‌اند نیاز دارد — در حالت دمو د",
       "sink_hash": "ce833c148350",
@@ -2418,7 +2467,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7203,
+      "line": 7259,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`",
       "sink_hash": "b1a3fd0bf87e",
@@ -2426,7 +2475,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7484,
+      "line": 7540,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
       "sink_hash": "f5aaba70154f",
@@ -2434,7 +2483,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7596,
+      "line": 7652,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-staff').innerHTML=(isDemo?`<div class=\"cash-note\">${icon('info',{size:13})} فهرستِ زیر نمونه است، کارکنانِ واقعیِ تو نیست.</div>`:'')",
       "sink_hash": "301d2bc2bc5a",
@@ -2442,7 +2491,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7667,
+      "line": 7723,
       "kind": "innerHTML",
       "snippet": "document.getElementById('modalBody').innerHTML = html;",
       "sink_hash": "1e4e3f6d3e74",
@@ -2450,7 +2499,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7746,
+      "line": 7802,
       "kind": "innerHTML",
       "snippet": "if(!NOTIFS.length){el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('bell',{size:32})}</div><div class=\"empty-state-desc\">اعلانی نیست",
       "sink_hash": "2d4b9773b661",
@@ -2458,7 +2507,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7750,
+      "line": 7806,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=NOTIFS.map((n,i)=>`<div class=\"notif-item ${n.unread?'unread':''}\" onclick=\"readNotif(${i})\">",
       "sink_hash": "8cc487919cb2",
@@ -2466,7 +2515,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7772,
+      "line": 7828,
       "kind": "innerHTML",
       "snippet": "document.getElementById('popupIc').innerHTML=iconName?icon(iconName,{size:18}):'';",
       "sink_hash": "efda3eda4b58",
@@ -2474,7 +2523,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7793,
+      "line": 7849,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-cashback').innerHTML=`",
       "sink_hash": "c8607cff688c",
@@ -2482,7 +2531,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7805,
+      "line": 7861,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-cashback').innerHTML=`",
       "sink_hash": "ef821512f925",
@@ -2490,7 +2539,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7862,
+      "line": 7918,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-pricing').innerHTML=`",
       "sink_hash": "f41a3511ca8a",
@@ -2498,7 +2547,15 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 7986,
+      "line": 7957,
+      "kind": "innerHTML",
+      "snippet": "if(btn){ btn.disabled=false; btn.innerHTML=prevHtml; }",
+      "sink_hash": "1f2adc4987cb",
+      "classification": "review"
+    },
+    {
+      "file": "standalone/business.html",
+      "line": 8061,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "95115697e69c",
@@ -2506,7 +2563,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8023,
+      "line": 8098,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "3869c87ed2f5",
@@ -2514,7 +2571,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8058,
+      "line": 8133,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "eb0bc02fbed0",
@@ -2522,7 +2579,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8189,
+      "line": 8264,
       "kind": "innerHTML",
       "snippet": "view.innerHTML = `<div class=\"panel\"><div class=\"panel-head\"><div class=\"panel-title\">پیام‌های مشتریان</div><div class=\"panel-sub\" id=\"chatInboxSub\">در حال بارگ",
       "sink_hash": "f95106b648ed",
@@ -2530,7 +2587,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8193,
+      "line": 8268,
       "kind": "innerHTML",
       "snippet": "if (!res.ok) { box.innerHTML = `<div class=\"chat-empty\">اتصال برقرار نشد.</div>`; return; }",
       "sink_hash": "8c279beace97",
@@ -2538,7 +2595,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8196,
+      "line": 8271,
       "kind": "innerHTML",
       "snippet": "if (!items.length) { box.innerHTML = `<div class=\"chat-empty\">هنوز پیامی از مشتری نیومده.</div>`; return; }",
       "sink_hash": "f1c332ceeb41",
@@ -2546,7 +2603,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8197,
+      "line": 8272,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = items.map(t => `",
       "sink_hash": "be1d8c440b90",
@@ -2554,7 +2611,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8251,
+      "line": 8326,
       "kind": "innerHTML",
       "snippet": "if (initial && !msgs.length) body.innerHTML = `<div class=\"chat-empty-thread\">هنوز پیامی نیست.</div>`;",
       "sink_hash": "3d8ae2e9e67e",
@@ -2562,7 +2619,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8275,
+      "line": 8350,
       "kind": "innerHTML",
       "snippet": "if (pend) pend.querySelector('.chat-b-t').innerHTML = icon('alert',{size:14});",
       "sink_hash": "0eaf8ea33e13",
@@ -2570,7 +2627,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 6900,
+      "line": 6956,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', html);",
       "sink_hash": "77816159c682",
@@ -2578,7 +2635,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8248,
+      "line": 8323,
       "kind": "insertAdjacentHTML",
       "snippet": "body.insertAdjacentHTML('beforeend', bizBubble(m));",
       "sink_hash": "7dc23113c97a",
@@ -2586,7 +2643,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 8267,
+      "line": 8342,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl?.insertAdjacentHTML('beforeend', `<div class=\"chat-b me pending\"><div>${chatEsc(body)}</div><div class=\"chat-b-t\">…</div></div>`);",
       "sink_hash": "227bc62f1250",
@@ -2594,7 +2651,7 @@
     },
     {
       "file": "standalone/business.html",
-      "line": 4852,
+      "line": 4908,
       "kind": "document.write",
       "snippet": "w.document.write(`<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\">",
       "sink_hash": "a35cc85e253d",
@@ -2610,7 +2667,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 1892,
+      "line": 1914,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML=`",
       "sink_hash": "0137c8f133c9",
@@ -2618,7 +2675,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 1946,
+      "line": 1968,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-restaurants').innerHTML=`",
       "sink_hash": "207e80cdf509",
@@ -2626,7 +2683,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 1979,
+      "line": 2001,
       "kind": "innerHTML",
       "snippet": "if(!list.length){el.innerHTML=`<div style=\"text-align:center;color:var(--t2);padding:40px\">${restQuery?'رستورانی با این نام پیدا نشد':'رستورانی در این دسته نیست",
       "sink_hash": "52535582da8d",
@@ -2634,7 +2691,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 1980,
+      "line": 2002,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=list.map(r=>{",
       "sink_hash": "d8448053170b",
@@ -2642,7 +2699,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2011,
+      "line": 2033,
       "kind": "innerHTML",
       "snippet": "document.getElementById('modalBody').innerHTML = html;",
       "sink_hash": "1e4e3f6d3e74",
@@ -2650,7 +2707,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2149,
+      "line": 2171,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-detail').innerHTML=`",
       "sink_hash": "a229343060d9",
@@ -2658,7 +2715,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2202,
+      "line": 2224,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div class=\"empty-state-title\">فهرست دسترسی‌ها بارگذاری نشد</div>",
       "sink_hash": "86bf21d3fc2e",
@@ -2666,7 +2723,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2214,
+      "line": 2236,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `",
       "sink_hash": "ab5fcf02fab6",
@@ -2674,7 +2731,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2280,
+      "line": 2302,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-analytics').innerHTML=`",
       "sink_hash": "412b45ca6088",
@@ -2682,7 +2739,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2314,
+      "line": 2336,
       "kind": "innerHTML",
       "snippet": "if(btn){ btn.disabled = false; btn.innerHTML = label; }",
       "sink_hash": "c5a4dbdd770c",
@@ -2690,7 +2747,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2330,
+      "line": 2356,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "2b4b476046f1",
@@ -2698,7 +2755,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2336,
+      "line": 2362,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به ",
       "sink_hash": "46d84ab7ccd6",
@@ -2706,7 +2763,15 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2345,
+      "line": 2373,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('v-customers').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} هوشِ تجار",
+      "sink_hash": "0b48552fed0e",
+      "classification": "dom_api_safe"
+    },
+    {
+      "file": "standalone/company.html",
+      "line": 2379,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-customers').innerHTML=`",
       "sink_hash": "11f2da47d260",
@@ -2714,7 +2779,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2380,
+      "line": 2414,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-billing').innerHTML=`",
       "sink_hash": "bebe02ae44b0",
@@ -2722,7 +2787,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2528,
+      "line": 2562,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-support').innerHTML=`",
       "sink_hash": "121f5de6c1d3",
@@ -2730,7 +2795,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2551,
+      "line": 2585,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-systemhealth').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "731fb425f2da",
@@ -2738,7 +2803,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2554,
+      "line": 2592,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){document.getElementById('v-systemhealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:",
       "sink_hash": "1bb2766262a2",
@@ -2746,7 +2811,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2557,
+      "line": 2595,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-systemhealth').innerHTML=`",
       "sink_hash": "5b71e1b7de97",
@@ -2754,7 +2819,15 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2669,
+      "line": 2620,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('v-systemhealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} سلامتِ",
+      "sink_hash": "2851c540f172",
+      "classification": "dom_api_safe"
+    },
+    {
+      "file": "standalone/company.html",
+      "line": 2711,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-aihealth').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "ce9c42128709",
@@ -2762,7 +2835,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2672,
+      "line": 2716,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){document.getElementById('v-aihealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})",
       "sink_hash": "cec2751e6c00",
@@ -2770,7 +2843,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2676,
+      "line": 2720,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-aihealth').innerHTML=`",
       "sink_hash": "ed92f456fee0",
@@ -2778,7 +2851,15 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2879,
+      "line": 2772,
+      "kind": "innerHTML",
+      "snippet": "document.getElementById('v-aihealth').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} سلامتِ مدل",
+      "sink_hash": "ba5c3c975041",
+      "classification": "dom_api_safe"
+    },
+    {
+      "file": "standalone/company.html",
+      "line": 2927,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "fb62ec1f5153",
@@ -2786,7 +2867,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2887,
+      "line": 2935,
       "kind": "innerHTML",
       "snippet": "if(!res.ok){document.getElementById('v-security').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})",
       "sink_hash": "f92b9534632f",
@@ -2794,7 +2875,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2907,
+      "line": 2955,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=(mqRes.ok&&mqRes.data?moderationQueuePanelHTML(mqRes.data):unavailablePanelHTML('خلاصه‌ی صفِ نظارت خوانده نشد — ",
       "sink_hash": "c8072400bc57",
@@ -2802,7 +2883,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 2990,
+      "line": 3038,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-security').innerHTML=unavailablePanelHTML('صفحه‌ی امنیت بارگذاری نشد');",
       "sink_hash": "6f4e9f04c67b",
@@ -2810,7 +2891,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3036,
+      "line": 3084,
       "kind": "innerHTML",
       "snippet": "box.innerHTML=`<div style=\"text-align:center;padding:30px;color:var(--t2)\">در حال جست‌وجو...</div>`;",
       "sink_hash": "99aa6bac4c4c",
@@ -2818,7 +2899,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3039,
+      "line": 3087,
       "kind": "innerHTML",
       "snippet": "box.innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:24px;color:var(--t2)\">${icon('alert',{size:15})} ${esc(res.error?.message||'کاربر پیدا نشد')}",
       "sink_hash": "ab043318f86e",
@@ -2826,7 +2907,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3042,
+      "line": 3090,
       "kind": "innerHTML",
       "snippet": "box.innerHTML=renderCustomer360(res.data);",
       "sink_hash": "81333b6eafee",
@@ -2834,7 +2915,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3188,
+      "line": 3236,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "1797949972c4",
@@ -2843,7 +2924,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3254,
+      "line": 3302,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "61e441d9c9f1",
@@ -2851,7 +2932,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3288,
+      "line": 3336,
       "kind": "innerHTML",
       "snippet": "document.getElementById('loginCard').innerHTML = `",
       "sink_hash": "eefcd7530d92",
@@ -2859,7 +2940,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3409,
+      "line": 3457,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "50f2b5de094c",
@@ -2867,7 +2948,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3415,
+      "line": 3463,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به سرو",
       "sink_hash": "25a6b286b98a",
@@ -2875,7 +2956,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3422,
+      "line": 3470,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-badges').innerHTML=`",
       "sink_hash": "f65ffcf1d105",
@@ -2883,7 +2964,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3543,
+      "line": 3591,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`<div style=\"text-align:center;padding:60px;color:var(--t2)\">در حال بارگذاری...</div>`;",
       "sink_hash": "aa400c6de3e0",
@@ -2891,7 +2972,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3549,
+      "line": 3597,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`<div class=\"panel\" style=\"text-align:center;padding:40px;color:var(--t2)\">${icon('alert',{size:16})} اتصال به س",
       "sink_hash": "65d73975aa4b",
@@ -2899,7 +2980,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3556,
+      "line": 3604,
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-missions').innerHTML=`",
       "sink_hash": "3b88af950f9f",
@@ -2907,7 +2988,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 3749,
+      "line": 3797,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "sink_hash": "55d5bcc59ed3",
@@ -2915,7 +2996,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 4076,
+      "line": 4124,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "sink_hash": "5567fe56a2c4",
@@ -2923,7 +3004,7 @@
     },
     {
       "file": "standalone/company.html",
-      "line": 4305,
+      "line": 4353,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "sink_hash": "9be41221d689",
@@ -2931,7 +3012,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2072,
+      "line": 2077,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = icon('search');",
       "sink_hash": "93bace2713d5",
@@ -2939,7 +3020,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2413,
+      "line": 2433,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "sink_hash": "0f1bad09f5dc",
@@ -2947,7 +3028,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2453,
+      "line": 2473,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "sink_hash": "ce542bc538c1",
@@ -2955,7 +3036,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2465,
+      "line": 2485,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`<div style=\"text-align:center;padding:40px\"><div class=\"spin\" style=\"margin:0 auto 16px\"></div>در حال پیوستن به صف...</div>`;",
       "sink_hash": "d597110110d6",
@@ -2963,7 +3044,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2483,
+      "line": 2503,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "sink_hash": "9c17dfcecf34",
@@ -2971,7 +3052,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2729,
+      "line": 2749,
       "kind": "innerHTML",
       "snippet": "if(b)b.innerHTML=`<div style=\"background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:12.5px;line-h",
       "sink_hash": "ccb17ea95732",
@@ -2979,7 +3060,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2733,
+      "line": 2753,
       "kind": "innerHTML",
       "snippet": "if(b)b.innerHTML='';",
       "sink_hash": "1edca4199168",
@@ -2987,7 +3068,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2741,
+      "line": 2761,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=(r.slots.length?r.slots:FALLBACK_TIMES).map(s=>`<option value=\"${s}\">${s} (نمونه)</option>`).join('');",
       "sink_hash": "59b86129dc43",
@@ -2995,7 +3076,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2759,
+      "line": 2779,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML='<option>در حال بررسی...</option>';",
       "sink_hash": "ed9d29d31642",
@@ -3003,7 +3084,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2764,
+      "line": 2784,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=open.map(s=>`<option value=\"${esc(s.time)}\">${faTime(s.time)}</option>`).join('');",
       "sink_hash": "6f9303546618",
@@ -3011,7 +3092,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2775,
+      "line": 2795,
       "kind": "innerHTML",
       "snippet": "sel.innerHTML=`<option value=\"\">${esc(why)}</option>`;",
       "sink_hash": "10654322f9ce",
@@ -3019,7 +3100,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2954,
+      "line": 2974,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "sink_hash": "ed9d87f890b7",
@@ -3027,7 +3108,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 2984,
+      "line": 3004,
       "kind": "innerHTML",
       "snippet": "sheetBody.innerHTML=`",
       "sink_hash": "f67d5212799b",
@@ -3035,7 +3116,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 3007,
+      "line": 3027,
       "kind": "innerHTML",
       "snippet": "when.innerHTML=dates.map(d=>`<option value=\"${esc(d.iso)}\"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');",
       "sink_hash": "558abc1b14f1",
@@ -3043,7 +3124,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 3008,
+      "line": 3028,
       "kind": "innerHTML",
       "snippet": "party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)",
       "sink_hash": "65a61aed12fa",
@@ -3051,7 +3132,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 3783,
+      "line": 3803,
       "kind": "innerHTML",
       "snippet": "if(box) box.innerHTML = slotsHTML(r);",
       "sink_hash": "8e418de9081d",
@@ -3059,7 +3140,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 3910,
+      "line": 3930,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=`",
       "sink_hash": "0a43595af2a6",
@@ -3067,7 +3148,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 3919,
+      "line": 3939,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(()=>`<div class=\"rc\" style=\"opacity:1;transform:none\"><div class=\"rc-img sk\" style=\"border-radius:0\"></div><div class=\"rc-body\"><div class=",
       "sink_hash": "b4295bb6f116",
@@ -3075,7 +3156,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 3922,
+      "line": 3942,
       "kind": "innerHTML",
       "snippet": "f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);",
       "sink_hash": "c51722f160c4",
@@ -3083,7 +3164,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 3943,
+      "line": 3963,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';",
       "sink_hash": "1f740927b141",
@@ -3091,7 +3172,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 3964,
+      "line": 3984,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,fill:true})+' محبوب امشب':esc(el.textContent.trim());",
       "sink_hash": "ca98a8018979",
@@ -3099,7 +3180,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4009,
+      "line": 4029,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,",
       "sink_hash": "e47b30f52dab",
@@ -3107,7 +3188,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4016,
+      "line": 4036,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=[...R].sort((a,b)=>(b.rt||0)-(a.rt||0)).slice(0,6).map(r=>hCardHTML(r,'')).join('');",
       "sink_hash": "949a0752e4b0",
@@ -3115,7 +3196,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4042,
+      "line": 4062,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=trend.map((r,i)=>hCardHTML(r,i<2?`${icon('flame',{size:12,fill:true})} داغ`:'')).join('');",
       "sink_hash": "1c2a60bc037d",
@@ -3123,7 +3204,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4067,
+      "line": 4087,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('calendar',{size:40})}</div><div class=\"empty-state-title\">فعلاً رویدادِ ویژه‌ای نیس",
       "sink_hash": "1757fda3c7fa",
@@ -3131,7 +3212,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4076,
+      "line": 4096,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=eventsHtml(events,false);",
       "sink_hash": "a05b070ad870",
@@ -3139,7 +3220,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4080,
+      "line": 4100,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('alert',{size:40})}</div><div class=\"empty-state-title\">رویدادها بارگذاری نشد</div><",
       "sink_hash": "e4f79883e3f1",
@@ -3147,7 +3228,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4083,
+      "line": 4103,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=eventsHtml(SAMPLE_EVENTS,true);",
       "sink_hash": "3aa64dcbe5cc",
@@ -3155,7 +3236,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4140,
+      "line": 4160,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';",
       "sink_hash": "1f740927b141",
@@ -3163,7 +3244,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4151,
+      "line": 4171,
       "kind": "innerHTML",
       "snippet": "document.getElementById('feed').innerHTML=`",
       "sink_hash": "5aa973ed05a4",
@@ -3171,7 +3252,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4170,
+      "line": 4190,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=icon('heart',{size:20,fill:on});",
       "sink_hash": "f46ea2cb4e46",
@@ -3179,7 +3260,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4180,
+      "line": 4200,
       "kind": "innerHTML",
       "snippet": "if(el){ el.innerHTML=icon('heart',{size:20,fill:true}); el.setAttribute('aria-pressed','true'); el.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }",
       "sink_hash": "c791371e4332",
@@ -3187,7 +3268,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4195,
+      "line": 4215,
       "kind": "innerHTML",
       "snippet": "btn.innerHTML=icon('heart',{size:22,fill:on});",
       "sink_hash": "cede38b3c38b",
@@ -3195,7 +3276,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4204,
+      "line": 4224,
       "kind": "innerHTML",
       "snippet": "if(btn){ btn.innerHTML=icon('heart',{size:22,fill:true}); btn.setAttribute('aria-pressed','true'); btn.setAttribute('aria-label','حذف از علاقه‌مندی‌ها'); }",
       "sink_hash": "ee6b2b328681",
@@ -3203,7 +3284,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4378,
+      "line": 4398,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-rest').innerHTML=`",
       "sink_hash": "fc4cd3406537",
@@ -3211,7 +3292,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4488,
+      "line": 4508,
       "kind": "innerHTML",
       "snippet": "if(!list.length){grid.innerHTML='';empty.style.display='block';return}",
       "sink_hash": "a04503eb4fdb",
@@ -3219,7 +3300,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4489,
+      "line": 4509,
       "kind": "innerHTML",
       "snippet": "empty.style.display='none';grid.innerHTML=list.map(cardHTML).join('');grid.querySelectorAll('.rc').forEach(c=>c.classList.add('in'));",
       "sink_hash": "f6c7daa26a6e",
@@ -3227,7 +3308,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4595,
+      "line": 4615,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=skTrip.repeat(3);",
       "sink_hash": "4bc072673ab9",
@@ -3235,7 +3316,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4611,
+      "line": 4631,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=`<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('calendar',{size:44})}</div><div class=\"empty-state-title\">هنوز رزروی نداری</div",
       "sink_hash": "049923e36e27",
@@ -3243,7 +3324,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4619,
+      "line": 4639,
       "kind": "innerHTML",
       "snippet": "listEl.innerHTML=summary+trips.map(t=>{",
       "sink_hash": "6f1254cd76c6",
@@ -3251,7 +3332,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4783,
+      "line": 4803,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"color:var(--t3);font-size:12px;text-align:center;padding:16px 8px\">",
       "sink_hash": "3a6ddb49de93",
@@ -3259,7 +3340,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4790,
+      "line": 4810,
       "kind": "innerHTML",
       "snippet": "box.innerHTML = `<div style=\"background:#fff;border-radius:8px;padding:8px;display:inline-block\">",
       "sink_hash": "217a698da1da",
@@ -3267,7 +3348,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4881,
+      "line": 4901,
       "kind": "innerHTML",
       "snippet": "if(errBox) errBox.innerHTML='';",
       "sink_hash": "1a3c2e730414",
@@ -3275,7 +3356,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 4891,
+      "line": 4911,
       "kind": "innerHTML",
       "snippet": "if(errBox) errBox.innerHTML=`<div role=\"alert\" style=\"font-size:12px;line-height:1.7;color:var(--warning-ink);background:var(--warning-soft);border-radius:var(-",
       "sink_hash": "6ea9860e2c7f",
@@ -3283,7 +3364,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5034,
+      "line": 5054,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "sink_hash": "388c8b826e92",
@@ -3291,7 +3372,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5049,
+      "line": 5069,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "sink_hash": "c6e9cd7b5b67",
@@ -3299,7 +3380,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5061,
+      "line": 5081,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\"><div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('alert',{size:44})}</div><div class=\"empty-state-title\">",
       "sink_hash": "f5e9ebbd646f",
@@ -3307,7 +3388,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5078,
+      "line": 5098,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "sink_hash": "bcaa1558aca0",
@@ -3315,7 +3396,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5180,
+      "line": 5200,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "sink_hash": "6b6889c820ff",
@@ -3323,7 +3404,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5193,
+      "line": 5213,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "sink_hash": "240c35d0616d",
@@ -3331,7 +3412,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5206,
+      "line": 5226,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\"><div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('alert',{size:44})}</div><div class=\"empty-state-title\">",
       "sink_hash": "5de74dfd5a5f",
@@ -3339,7 +3420,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5226,
+      "line": 5246,
       "kind": "innerHTML",
       "snippet": "root.innerHTML=`<div class=\"wrap section\">",
       "sink_hash": "15dccaa57a8f",
@@ -3347,7 +3428,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5404,
+      "line": 5424,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"gift-check ${d.valid?'valid':'invalid'}\">",
       "sink_hash": "f937acaf36be",
@@ -3355,7 +3436,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5411,
+      "line": 5431,
       "kind": "innerHTML",
       "snippet": "el.innerHTML=`<div class=\"gift-check invalid\"><div class=\"gc-status\">اتصال به سرور برقرار نشد — موجودی خوانده نشد</div></div>`;",
       "sink_hash": "4e11d52b3c62",
@@ -3363,7 +3444,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5412,
+      "line": 5432,
       "kind": "innerHTML",
       "snippet": "}else{el.innerHTML=`<div class=\"gift-check invalid\"><div class=\"gc-status\">کارت پیدا نشد</div></div>`;}",
       "sink_hash": "fa7256d96080",
@@ -3371,7 +3452,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5553,
+      "line": 5573,
       "kind": "innerHTML",
       "snippet": "document.getElementById('dnaProgress').innerHTML = Array.from({length:nSlides},()=>'<div class=\"dna-progress-bar\"><i></i></div>').join('');",
       "sink_hash": "843d707e0419",
@@ -3379,7 +3460,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5577,
+      "line": 5597,
       "kind": "innerHTML",
       "snippet": "wrap.innerHTML = slides.map((s,i)=>`",
       "sink_hash": "71b128c75f30",
@@ -3387,7 +3468,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5655,
+      "line": 5675,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">",
       "sink_hash": "7b92e97f71dd",
@@ -3395,7 +3476,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5677,
+      "line": 5697,
       "kind": "innerHTML",
       "snippet": "document.getElementById('page-profile').innerHTML=`<div class=\"wrap section\">",
       "sink_hash": "22b6cc0a790c",
@@ -3403,7 +3484,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5830,
+      "line": 5850,
       "kind": "innerHTML",
       "snippet": "page.innerHTML = `<div class=\"chat-list-head\"><button class=\"icon-btn\" onclick=\"go('discover')\" aria-label=\"بازگشت\">${icon('arrowR',{size:20})}</button><h2>پیام",
       "sink_hash": "3d4451c82f6f",
@@ -3411,7 +3492,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5836,
+      "line": 5856,
       "kind": "innerHTML",
       "snippet": "document.getElementById('chatListBody').innerHTML =",
       "sink_hash": "96fb614cb085",
@@ -3419,7 +3500,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5854,
+      "line": 5874,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = `<div class=\"chat-empty\">${msg}</div>`;",
       "sink_hash": "fc7369ef8e7b",
@@ -3427,7 +3508,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5858,
+      "line": 5878,
       "kind": "innerHTML",
       "snippet": "if (!items.length) { body.innerHTML = `<div class=\"chat-empty\">هنوز گفتگویی نداری.<br>از صفحه‌ی هر رستوران می‌تونی پیام بدی.</div>`; return; }",
       "sink_hash": "5d8283d2cff0",
@@ -3435,7 +3516,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5860,
+      "line": 5880,
       "kind": "innerHTML",
       "snippet": "body.innerHTML = items.map(t => `",
       "sink_hash": "218229230a10",
@@ -3443,7 +3524,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5890,
+      "line": 5910,
       "kind": "innerHTML",
       "snippet": "page.innerHTML = `",
       "sink_hash": "e7cdb51c1740",
@@ -3451,7 +3532,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5939,
+      "line": 5959,
       "kind": "innerHTML",
       "snippet": "bodyEl.innerHTML = `<div class=\"empty-state\"><div class=\"empty-state-icon\">${icon('message',{size:40})}</div><div class=\"empty-state-title\">هنوز پیامی نیست</div",
       "sink_hash": "5556d1c498fd",
@@ -3459,7 +3540,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6168,
+      "line": 6188,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
       "sink_hash": "c28b447caa85",
@@ -3467,7 +3548,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6220,
+      "line": 6240,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = _items.length ? _items.map(itemHTML).join('') : '<li class=\"cmdk-empty\">چیزی پیدا نشد</li>';",
       "sink_hash": "47cc0edc3c61",
@@ -3475,7 +3556,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6397,
+      "line": 6417,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
       "sink_hash": "26029e2a3329",
@@ -3483,7 +3564,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6417,
+      "line": 6437,
       "kind": "innerHTML",
       "snippet": "tabs.innerHTML = Object.entries(CATS).map(([k,v])=>`<button class=\"notif-tab ${k===_filter?'on':''}\" role=\"tab\" aria-selected=\"${k===_filter}\" data-k=\"${k}\">${v",
       "sink_hash": "1b2bb0949140",
@@ -3491,7 +3572,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6424,
+      "line": 6444,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = `<div class=\"notif-empty\"><div class=\"notif-empty-ic\">${icon('bell',{size:36})}</div><div>اعلانی نداری</div></div>`;",
       "sink_hash": "d0ee35031d21",
@@ -3499,7 +3580,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6427,
+      "line": 6447,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = items.map(n=>{",
       "sink_hash": "bfeecbd03f2a",
@@ -3507,7 +3588,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6545,
+      "line": 6565,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
       "sink_hash": "650b709cbb1e",
@@ -3515,7 +3596,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6620,
+      "line": 6640,
       "kind": "innerHTML",
       "snippet": "e.innerHTML = '<div class=\"ptr-spin\"></div>';",
       "sink_hash": "7a7fabc9cd3a",
@@ -3523,7 +3604,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6836,
+      "line": 6856,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = out; // موفق+صفر → خالیِ صادق. ناموفق/شبکه → همان خالی، هرگز عددِ جعلی.",
       "sink_hash": "9bc628165d01",
@@ -3531,7 +3612,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 6931,
+      "line": 6951,
       "kind": "innerHTML",
       "snippet": "now.innerHTML = ready",
       "sink_hash": "132d66d70dcb",
@@ -3539,7 +3620,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7236,
+      "line": 7256,
       "kind": "innerHTML",
       "snippet": "document.getElementById('sheetBody').innerHTML=html;",
       "sink_hash": "c3f66162e387",
@@ -3547,7 +3628,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7291,
+      "line": 7311,
       "kind": "innerHTML",
       "snippet": "s.innerHTML='<span class=\"us-msg\"></span><button class=\"us-btn\" type=\"button\">بازگرداندن</button>';",
       "sink_hash": "786f5cd20229",
@@ -3555,7 +3636,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7326,
+      "line": 7346,
       "kind": "innerHTML",
       "snippet": "function updateThemeIcon(){ const k=document.getElementById('themeKnob'); if(k) k.innerHTML=icon(_root.getAttribute('data-theme')==='dark'?'moon':'sun',{size:16",
       "sink_hash": "eb4ace403f91",
@@ -3563,7 +3644,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7384,
+      "line": 7404,
       "kind": "innerHTML",
       "snippet": "b.innerHTML=`",
       "sink_hash": "0a8560de8728",
@@ -3571,7 +3652,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5747,
+      "line": 5767,
       "kind": "outerHTML",
       "snippet": "host.outerHTML =",
       "sink_hash": "a9f9cf0bc7fd",
@@ -3579,7 +3660,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5935,
+      "line": 5955,
       "kind": "insertAdjacentHTML",
       "snippet": "bodyEl.insertAdjacentHTML('beforeend', bubble(m));",
       "sink_hash": "ac1498949c1d",
@@ -3587,7 +3668,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 5958,
+      "line": 5978,
       "kind": "insertAdjacentHTML",
       "snippet": "tempEl.insertAdjacentHTML('beforeend', `<div class=\"chat-bubble mine pending\"><div class=\"chat-bubble-text\">${chatEsc(body)}</div><div class=\"chat-bubble-time\">",
       "sink_hash": "e51d5da043e8",
