@@ -4130,7 +4130,11 @@ function openManual(){
       <div><div class="field-label">میز</div><select class="inp" id="mTable">${TABLES.filter(t=>t.s==='free').map(t=>`<option value="${t.n}">${esc(tableLabel(t))}</option>`).join('')}</select></div>
       <div><div class="field-label">نفر</div><select class="inp" id="mParty"><option>۲</option><option>۳</option><option>۴</option><option>۵</option><option>۶</option><option>۸</option></select></div>
     </div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="saveManual()">ثبت رزرو</button>`);
+    <button class="btn btn-primary btn-lg btn-block" id="mSave" onclick="saveManual()">ثبت رزرو</button>`);
+  // یک کلیدِ idempotency به‌ازای هر بار باز شدنِ مودال = یک «تلاش». تلاشِ
+  // دوباره روی همان مودال همان کلید را می‌برد، پس سرور replay می‌کند.
+  manualIdemKey=genIdempotencyKey();
+  manualSaving=false;
 }
 // ═══ WALK-IN (ورود بدون رزرو) ═══
 async function openWalkin(){
@@ -4286,7 +4290,21 @@ async function walkinNewSave(rawPhone){
   await walkinCheckinReal(rawPhone,fn,ln,(bd&&bm)?[bd,bm]:null);
 }
 
+// ⚠️ رفعِ B-02 (۲۰۲۶-۰۹-۰۷): گاردِ in-flight برای «ثبت رزرو».
+//
+// قبلاً دکمه قفل نمی‌شد و `saveManual` هیچ گاردی نداشت، پس دو کلیکِ هم‌پوشان
+// (شبکه‌ی کند — دقیقاً حالتی که آدم دوباره می‌زند) دو بار وارد تابع می‌شدند.
+// کلیدِ idempotency هم نجات نمی‌داد چون **داخلِ** خودِ تابع ساخته می‌شد: هر
+// کلیک کلیدِ تازه ⇒ سرور آن را دو عملیاتِ متفاوت می‌دید ⇒ دو رزرو.
+// اندازه‌گیریِ زنده پیش از رفع: دو کلیک ⇒ `2` رزرو.
+//
+// کلید حالا هنگامِ **باز شدنِ مودال** ساخته می‌شود، یعنی یک کلید به‌ازای هر
+// «تلاشِ» کاربر. پس حتی اگر گاردِ UI روزی دور زده شود، تلاشِ دوم همان کلید را
+// می‌برد و سرور replay می‌کند نه رزروِ دوم.
+let manualSaving=false;
+let manualIdemKey=null;
 async function saveManual(){
+  if(manualSaving)return;               // کلیکِ دومِ هم‌پوشان — بی‌اثر
   const n=document.getElementById('mName').value.trim();
   if(!n){toast('','نام مهمان رو وارد کن');return}
   const phone=document.getElementById('mPhone').value;
@@ -4302,7 +4320,13 @@ async function saveManual(){
   // درخواستِ آنلاینِ زیر موفق شود چه به مسیرِ آفلاینِ Outbox بیفتد) — تا اگر
   // درخواستِ اول واقعاً به سرور رسیده باشد ولی پاسخش گم شده، retry/صف‌شدنِ
   // بعدی با همون کلید replay شود، نه رزروِ دومی بسازد.
-  const manualIdemKey=genIdempotencyKey();
+  // کلید از openManual می‌آید (یک کلید برای هر تلاش). اگر به هر دلیل ست نشده
+  // بود، همین‌جا ساخته می‌شود تا مسیر هرگز بدونِ کلید نرود.
+  if(!manualIdemKey)manualIdemKey=genIdempotencyKey();
+  manualSaving=true;
+  const saveBtn=document.getElementById('mSave');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='در حال ثبت…';}
+  try{
 
   // اگر توکن staff داریم، رزرو واقعی در دیتابیس ثبت کن
   if(API.getToken()){
@@ -4352,6 +4376,14 @@ async function saveManual(){
   toast('', isOffline()
     ? `رزرو ${dLabel} محلی ثبت شد — با برگشت اینترنت همگام می‌شود`
     : `رزرو ${dLabel} ثبت شد`);
+  }finally{
+    // در `finally` تا اگر مسیر با خطا بیرون بزند، دکمه قفل نماند و پرسنل
+    // نتواند دوباره تلاش کند. کلید عمداً اینجا پاک **نمی‌شود**: تلاشِ دوباره
+    // روی همان مودال باید همان کلید را ببرد تا سرور replay کند، نه رزروِ دوم.
+    manualSaving=false;
+    const b=document.getElementById('mSave');
+    if(b){b.disabled=false;b.textContent='ثبت رزرو';}
+  }
 }
 
 // ═══════════ FLOOR PLAN ═══════════
