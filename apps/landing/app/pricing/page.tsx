@@ -11,20 +11,72 @@ import { SITE } from '@/lib/i18n';
 import {
   graph, webPageJsonLd, breadcrumbJsonLd, siteFaqJsonLd, softwareApplicationJsonLd,
 } from '@/lib/site-schema';
-import { toman, faNum } from '@/lib/format';
+import { toman, faNum, tomanShort } from '@/lib/format';
+import type { SitePlan } from '@/lib/content-types';
 
 // صفحه‌ی قیمت — عمداً صفحه‌ی اختصاصی و نه بلوکِ CMS: اینجا هم کارتِ قیمت،
 // هم مقایسه‌ی پلن‌ها، هم مسیرِ شفافِ خرید و هم پرسش‌های مالی کنارِ هم‌اند.
 
 export const revalidate = 120;
 
-export const metadata: Metadata = buildMetadata({
-  title: 'قیمت‌گذاری رزرونو | پلن‌های ۳، ۶ و ۱۲ ماهه',
-  description:
-    'پلن‌های اشتراکِ رزرونو: سه‌ماهه ۱۸ میلیون، شش‌ماهه ۳۴ میلیون و یک‌ساله ۶۵ میلیون تومان. همه‌ی امکانات در همه‌ی پلن‌ها، بدونِ محدودیتِ کاربر و رزرو. دموی ۳۰ روزه‌ی رایگان.',
-  path: '/pricing',
-  keywords: ['قیمت نرم افزار رستوران', 'اشتراک رزرونو', 'هزینه سیستم رزرو رستوران'],
-});
+/** بخشِ بی‌قیمتِ توضیح — در هر دو حالت یکسان است. */
+const DESCRIPTION_TAIL = 'همه‌ی امکانات در همه‌ی پلن‌ها، بدونِ محدودیتِ کاربر و رزرو. دموی ۳۰ روزه‌ی رایگان.';
+
+/**
+ * پلن‌های زنده برای **ادعای قیمت در متادیتا**، یا `null` اگر قیمتِ واقعی
+ * در دست نیست.
+ *
+ * چرا اینجا و نه در `getPlans`: آن تابع درست است و دست نمی‌خورد. تفاوت در
+ * مصرف‌کننده است — بدنه‌ی صفحه در حالتِ امن (بدونِ API) باید چیزی نشان دهد،
+ * ولی توضیحِ متا چیزی است که **گوگل** نقل می‌کند و کنارش هیچ زمینه‌ای نیست.
+ *
+ * دو حالتِ متفاوت که هر دو به `null` می‌رسند:
+ *   • API پیکربندی نشده → `getPlans` قیمتِ کامیت‌شده‌ی site-content.json را
+ *     می‌دهد (۱۸/۳۴/۶۵) و throw نمی‌کند. پذیرفتنش یعنی همان قیمتِ hardcode
+ *     یک لایه پایین‌تر برگشته، پس پیش از فراخوانی کنار گذاشته می‌شود.
+ *     خواندنِ env در زمانِ فراخوانی عمدی است: همان دو متغیرِ site-api.ts:25،
+ *     و در حالتِ امن حتی یک درخواست هم فرستاده نمی‌شود (صفحه static می‌ماند).
+ *   • API پیکربندی شده ولی خطا داد → `getPlans` طبقِ قرارداد throw می‌کند
+ *     (site-api.ts:137). اینجا گرفته می‌شود چون throwِ `generateMetadata`
+ *     متایِ کلِ صفحه را از بین می‌برد؛ بدنه‌ی صفحه همچنان بلند اعتراض می‌کند
+ *     و ISR آخرین نسخه‌ی سالم را نگه می‌دارد.
+ */
+async function livePlans(): Promise<SitePlan[] | null> {
+  if (!(process.env.SITE_API_BASE || process.env.SEO_API_BASE)) return null;
+  try {
+    return await getPlans();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * توضیحِ متا — قیمت فقط وقتی گفته می‌شود که قیمتِ زنده در دست باشد.
+ *
+ * ⚠️ قبلاً این یک رشته‌ی ثابت بود که «۱۸/۳۴/۶۵ میلیون» را اعلام می‌کرد و هرگز
+ * `db.sitePlan` را نمی‌خواند. برای غلط‌شدنش هیچ قطعی‌ای لازم نبود: از اولین
+ * تغییرِ قیمت در استودیو غلط می‌شد، با APIِ کاملاً سالم. توضیحِ بدونِ قیمت
+ * بی‌ضرر است؛ توضیحِ با قیمتِ غلط نه.
+ */
+async function pricingDescription(): Promise<string> {
+  const plans = await livePlans();
+  if (!plans || plans.length === 0) return `پلن‌های اشتراکِ رزرونو — ${DESCRIPTION_TAIL}`;
+  // همان واژه‌هایی که کارتِ قیمت نشان می‌دهد (PlanCards هم tomanShort است).
+  const priced = plans.map((p) => `${p.name} ${tomanShort(p.price_toman)}`);
+  const list = priced.length > 1
+    ? `${priced.slice(0, -1).join('، ')} و ${priced[priced.length - 1]}`
+    : priced[0];
+  return `پلن‌های اشتراکِ رزرونو: ${list}. ${DESCRIPTION_TAIL}`;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata({
+    title: 'قیمت‌گذاری رزرونو | پلن‌های ۳، ۶ و ۱۲ ماهه',
+    description: await pricingDescription(),
+    path: '/pricing',
+    keywords: ['قیمت نرم افزار رستوران', 'اشتراک رزرونو', 'هزینه سیستم رزرو رستوران'],
+  });
+}
 
 const INCLUDED = [
   'کاربر، میز و رزروِ نامحدود',
