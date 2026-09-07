@@ -15,9 +15,16 @@ let _wlLoaded=false;
 async function loadWaitlist(){
   if(!API.getToken()) return; // آفلاین/دمو → همان داده‌ی دمو
   const [q,a]=await Promise.all([API.waitlistQueue(),API.waitlistAnalytics()]);
-  if(q.ok && Array.isArray(q.data?.queue)) WAITLIST=q.data.queue;
+  // ⚠️ رفع (۲۰۲۶-۰۹-۰۷): `_wlLoaded=true` قبلاً **بی‌قیدوشرط** بود، حتی وقتی
+  // fetch شکست می‌خورد. اثرش این بود که `isDemo` بعدش false می‌شد و نوتِ
+  // «این داده نمونه است» ناپدید می‌شد، در حالی که `WAITLIST` هنوز همان صفِ
+  // ساختگی بود — یعنی یک قطعیِ گذرا، دادهٔ جعلی را برای بقیه‌ی نشست «واقعی»
+  // قفل می‌کرد. حالا پرچم فقط وقتی بالا می‌رود که صفِ واقعی واقعاً آمده باشد.
+  const okQueue = q.ok && Array.isArray(q.data?.queue);
+  if(okQueue) WAITLIST=q.data.queue;
   if(a.ok && a.data) WL_ANALYTICS=a.data;
-  _wlLoaded=true;
+  _wlLoaded=okQueue;
+  return okQueue;
 }
 
 function rWaitlist(){

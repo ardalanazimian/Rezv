@@ -10,6 +10,14 @@ function rOverview(){
   if(!_guestsLoaded && API.getToken()){
     loadTopGuestsForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
   }
+  // ⚠️ رفعِ blocker (۲۰۲۶-۰۹-۰۷): داشبورد هرگز صف را لود نمی‌کرد. `WAITLIST` از
+  // لحظه‌ی بوت `WL_DEMO_QUEUE.slice()` است (waitlist.js:10) و `loadWaitlist`
+  // فقط از `rWaitlist` صدا زده می‌شد — یعنی تنها وقتی کارمند خودش تبِ صف را باز
+  // کند. تا آن لحظه سه مهمانِ ساختگی با بجِ «زنده» و دکمه‌ی «آفر میز» روی
+  // داشبورد بودند و کارمند بر اساسِ صفی تصمیم می‌گرفت که وجود نداشت.
+  if(!_wlLoaded && API.getToken()){
+    loadWaitlist().then(()=>{ if(document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
   if(!_weekdayInsightLoaded && API.getToken()){
     loadWeekdayInsightForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
   }
@@ -116,6 +124,11 @@ function renderDashResvRows(){
 }
 // رندر ردیف‌های لیست انتظار زنده (با اکشن آفر میز)
 function renderDashWaitlist(){
+  // تا وقتی صفِ واقعی نیامده، «نمی‌دانیم» را با نامِ ساختگی پر نمی‌کنیم —
+  // حالتِ درست loading است، نه سه مهمانِ نمونه با بجِ زنده.
+  if(!_wlLoaded && API.getToken()){
+    return `<div class="empty-state"><div class="empty-state-desc">در حال گرفتنِ صف…</div></div>`;
+  }
   const initials = n => (n||'؟').trim().slice(0,2);
   const queue = WAITLIST.filter(w=>w.status==='waiting').sort((a,b)=>(b.priority-a.priority)||(b.waited_minutes-a.waited_minutes)).slice(0,5);
   if(!queue.length) return `<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">صف خالیه — همه سر میزن</div></div>`;
@@ -212,7 +225,7 @@ function renderEnterpriseDashboard(){
         <div id="dashResvRows">${renderDashResvRows()}</div>
       </div>
       <div class="ops-panel">
-        <div class="ops-head"><div class="ops-title"><span class="live-dot" aria-hidden="true"></span> لیست انتظار <span class="count-pill">${fa(WAITLIST.filter(w=>w.status==='waiting').length)} نفر</span></div><button class="ops-link" onclick="nav('waitlist')">مدیریت ${icon('arrowL',{size:13})}</button></div>
+        <div class="ops-head"><div class="ops-title"><span class="live-dot" aria-hidden="true"></span> لیست انتظار <span class="count-pill">${(!_wlLoaded&&API.getToken())?'—':`${fa(WAITLIST.filter(w=>w.status==='waiting').length)} نفر`}</span></div><button class="ops-link" onclick="nav('waitlist')">مدیریت ${icon('arrowL',{size:13})}</button></div>
         <div id="dashWaitlist">${renderDashWaitlist()}</div>
       </div>
     </div>
@@ -468,7 +481,9 @@ async function refreshLiveKPIs(){
 // حسینی، ...) رو با برچسبِ «زنده» می‌دید، انگار واقعاً رزروهایِ همون
 // رستورانه. حالا نشان به وضعیتِ واقعیِ لودشدنِ داده وصل شده.
 function dashboardUsingDemoData(){
-  return !API.getToken() || !_resLoaded || !_tablesLoaded;
+  // ⚠️ `_wlLoaded` اینجا غایب بود: داشبورد صفِ ساختگی را با نشانِ «زنده» نشان
+  // می‌داد چون هیچ‌کس نمی‌پرسید صف واقعاً لود شده یا نه.
+  return !API.getToken() || !_resLoaded || !_tablesLoaded || !_wlLoaded;
 }
 function liveStatusBadge(){
   if (dashboardUsingDemoData()) return `<span class="live-badge demo" id="liveInd">${icon('info',{size:12})} داده‌ی نمونه</span>`;
