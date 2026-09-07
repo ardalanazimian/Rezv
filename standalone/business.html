@@ -2100,7 +2100,7 @@ const STATUS_TRANSITIONS={
 };
 // منوی تغییر وضعیت برای یک رزرو
 function openStatusMenu(i){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   const allowed=STATUS_TRANSITIONS[r.status]||[];
   if(!allowed.length){toast('','این رزرو در وضعیت نهایی است');return;}
   const opts=allowed.map(s=>{const m=STATUS_META[s];return `<button class="status-opt" onclick="changeStatus(${i},'${s}')" style="--c:${m.fg};--bgc:${m.bg}"><span>${icon(m.icon,{size:13})}</span> ${m.label}</button>`;}).join('');
@@ -2164,7 +2164,7 @@ async function changeStatus(i,to,reason){
   }
 }
 async function viewHistory(i){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   // در دمو، تاریخچه‌ی نمونه؛ با بک‌اند واقعی از API می‌آید
   let events=r._events;
   if(!events){
