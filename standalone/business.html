@@ -8032,7 +8032,25 @@ async function staffPasswordLogin(){
   if (location.protocol === 'file:') { await enterPanel(true); return; }
 
   const res = await API.staffLogin(u, p);
-  if (res.ok && res.data?.access){ await enterPanel(); return; }
+  if (res.ok && res.data?.access){
+    // ⚠️ رفع (۲۰۲۶-۰۹-۰۷): این مسیر `STAFF_INFO` را **ست نمی‌کرد** — فقط مسیرِ
+    // OTP (`staffVerify`) این کار را می‌کرد. ولی ورود با رمز مسیرِ **اصلیِ
+    // تولید** است (OTP در پنل‌ها خاموش است)، پس `STAFF_INFO` تا پایانِ نشست
+    // `null` می‌ماند.
+    //
+    // اثرش فقط نامِ رستوران در توستِ خوش‌آمد نبود: بدنه‌ی رزروِ دستی
+    // `restaurant_id: STAFF_INFO?.restaurant_id || undefined` می‌فرستد، و
+    // چون `undefined` در JSON حذف می‌شود، کلید اصلاً نمی‌رفت — در حالی که
+    // شِیمِ سرور (`api/src/app/api/v1/reservations/route.ts:22`) آن را
+    // `zUuid`ِ **الزامی** می‌خواهد. یعنی رزروِ دستی برای هر کارمندی که با
+    // رمز وارد شده بود در `parseBody` رد می‌شد.
+    //
+    // سرور خودش این مقدار را در پاسخِ ورود می‌دهد
+    // (`auth/staff/login/route.ts:54-56`)؛ فقط کلاینت دورش می‌ریخت.
+    STAFF_INFO = res.data.staff || STAFF_INFO;
+    await enterPanel();
+    return;
+  }
   if (res.offline){ await enterPanel(true); return; }
   // پیامِ سرور برای «کاربر نیست» و «رمز غلط» عمداً یکسان است؛ اینجا هم
   // نباید دقیق‌تر شود، وگرنه نشتی که سرور بست از سمتِ کلاینت باز می‌شود.

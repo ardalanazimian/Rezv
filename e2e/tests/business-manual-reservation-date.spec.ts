@@ -17,7 +17,10 @@ import { test, expect, type Page } from '@playwright/test';
 const BIZ = 'http://localhost:8081/';
 const json = (body: unknown, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
-type Captured = { date?: string; time?: string; idem?: string };
+type Captured = { date?: string; time?: string; idem?: string; restaurantId?: string };
+
+/** UUIDِ واقعی: سرور در پاسخِ ورود همین را می‌دهد و شِیمِ رزرو `zUuid` می‌خواهد. */
+const RESTAURANT_UUID = '3f1a7c2e-9b44-4d1e-8a6f-2c5b7e9d0a11';
 
 async function mockBizApi(page: Page, posts: Captured[], reservationDelayMs = 0) {
   await page.route('**/api/v1/**', async (route) => {
@@ -27,12 +30,12 @@ async function mockBizApi(page: Page, posts: Captured[], reservationDelayMs = 0)
     if (path === '/auth/staff/login' && method === 'POST') {
       return route.fulfill(json({
         access: 'demo-access', refresh: 'demo-refresh',
-        staff: { role: 'owner', restaurant_name: 'کافه‌رستوران ویستا [DEMO]', restaurant_id: 'r-1', permissions: null },
+        staff: { role: 'owner', restaurant_name: 'کافه‌رستوران ویستا [DEMO]', restaurant_id: RESTAURANT_UUID, permissions: null },
       }));
     }
     if (path === '/reservations' && method === 'POST') {
-      const body = route.request().postDataJSON() as { date?: string; time?: string };
-      posts.push({ date: body?.date, time: body?.time, idem: route.request().headers()['idempotency-key'] });
+      const body = route.request().postDataJSON() as { date?: string; time?: string; restaurant_id?: string };
+      posts.push({ date: body?.date, time: body?.time, idem: route.request().headers()['idempotency-key'], restaurantId: body?.restaurant_id });
       // ثبت **پیش از** تأخیر انجام می‌شود تا درخواستِ دوم حتی اگر دیر برسد شمرده شود.
       if (reservationDelayMs) await new Promise((r) => setTimeout(r, reservationDelayMs));
       return route.fulfill(json({ reservation: { code: 'MAN1' } }));
@@ -79,6 +82,15 @@ test('B-01: برچسبِ تاریخِ انتخاب‌شده با تاریخی ک
   await expect.poll(() => posts.length, { timeout: 10_000 }).toBeGreaterThan(0);
   const sentDate = posts[0].date;
   expect(sentDate, 'بدنه‌ی POST باید تاریخ داشته باشد').toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+  // ⚠️ ورود با رمز (مسیرِ اصلیِ تولید — OTP در پنل‌ها خاموش است) `STAFF_INFO` را
+  // ست نمی‌کرد، فقط مسیرِ OTP این کار را می‌کرد. پس بدنه
+  // `restaurant_id: STAFF_INFO?.restaurant_id || undefined` می‌فرستاد و چون
+  // `undefined` از JSON حذف می‌شود، کلید اصلاً نمی‌رفت — در حالی که شِیمِ سرور
+  // (`reservations/route.ts:22`) آن را `zUuid`ِ الزامی می‌خواهد. یعنی رزروِ
+  // دستی برای هر کارمندی که با رمز وارد شده بود روی سرور رد می‌شد.
+  expect(posts[0].restaurantId, 'رزروِ دستی بدونِ restaurant_id رفت — سرور آن را رد می‌کند (zUuid)')
+    .toBe(RESTAURANT_UUID);
 
   // قلبِ ادعا: آنچه دیده شد == آنچه ثبت شد.
   expect(shownLabel, `برچسبِ «${shownLabel}» با تاریخِ ثبت‌شده‌ی ${sentDate} نمی‌خواند`)
@@ -152,7 +164,7 @@ test('B-02: تلاشِ دوباره پس از شکست، همان کلیدِ ide
     if (path === '/auth/staff/login' && method === 'POST') {
       return route.fulfill(json({
         access: 'a', refresh: 'r',
-        staff: { role: 'owner', restaurant_name: 'ویستا [DEMO]', restaurant_id: 'r-1', permissions: null },
+        staff: { role: 'owner', restaurant_name: 'ویستا [DEMO]', restaurant_id: RESTAURANT_UUID, permissions: null },
       }));
     }
     if (path === '/reservations' && method === 'POST') {
