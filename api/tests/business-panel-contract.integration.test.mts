@@ -172,8 +172,16 @@ describe('قراردادِ پنلِ business — /restaurant/* در برابرِ
 
     const table = await db.table.create({ data: { restaurantId, number: 7, capacity: 4, isActive: true }, select: { id: true } });
     const start = new Date(Date.now() + 3 * 3600_000);
+    // ⚠️ اسلاتِ رزرو عمداً روی ظهرِ **امروز** پین شده، نه `now + 3h`.
+    // GET /restaurant/reservations پیش‌فرضِ `date=today` دارد و به بازه‌ی
+    // [startToday, endToday) فیلتر می‌کند (route.ts:35-40). با `now + 3h`
+    // هر اجرایی که بعد از ۲۱:۰۰ محلی شروع شود اسلات را به فردا می‌برد و
+    // فهرست خالی برمی‌گردد — گاردِ firstItem درست خطا می‌دهد، ولی علتش
+    // ساعتِ اجراست نه رگرسیونِ کد. دقیقاً همین در CIِ ۲۰۲۶-۰۹-۰۶ ساعتِ
+    // ۲۲:۴۶ UTC رخ داد (run 34064835699). ظهرِ امروز همیشه داخلِ پنجره است.
+    const slot = new Date(); slot.setHours(12, 0, 0, 0);
     await db.reservation.create({ data: {
-      restaurantId, code: `DBC-${SFX}`, partySize: 2, slotStart: start, slotEnd: new Date(+start + 90 * 60_000),
+      restaurantId, code: `DBC-${SFX}`, partySize: 2, slotStart: slot, slotEnd: new Date(+slot + 90 * 60_000),
       status: 'confirmed', userId, tableId: table.id, guestName: '[DEMO] مهمان', guestPhone: fixturePhone('0983'),
     } });
     await db.waitlistEntry.create({ data: { restaurantId, partySize: 3, userId, status: 'waiting' } });

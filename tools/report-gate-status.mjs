@@ -48,7 +48,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
@@ -166,6 +166,60 @@ const GATES = [
     args: ['tools/gate-send.mjs', '--recipients', '1'],
     why: 'فقط شواهدِ audit/sms/transport-proof.json را می‌خواند — هیچ پیامکی نمی‌فرستد',
   },
+  // ── شش گیتی که تا ۲۰۲۶-۰۹-۰۷ در این فهرست نبودند ────────────────────
+  // یافته: این ابزار ده گیت اجرا می‌کرد در حالی که tools/ شانزده گیت دارد، و
+  // docs/audit/FOUNDER-REVIEW-HANDOFF.md:85 ادعا می‌کرد «runs every
+  // evaluation-only gate itself». پنج تای غایب سبز بودند و یکی —
+  // `xss-sink-audit --check` — قرمز بود و همان لحظه jobِ design-systemِ
+  // PR #84 را می‌شکست. یعنی خلاصه‌ی «۷ GREEN · ۵ RED» تنها گیتی را که
+  // واقعاً جلوی merge را گرفته بود نشان نمی‌داد. این دقیقاً الگویِ §۴c
+  // منشور است: شمارش از یک مرجع (آرایه‌ی دستی) و خطر در مرجعی دیگر
+  // (پوشه‌ی tools/). گاردش پایین‌تر است: assertGateCoverage.
+  // هر شش‌تا «فقط‌ارزیابی» بودنشان بررسی شد: پنج تا صفر فراخوانِ
+  // writeFileSync/execSync دارند، و xss-sink-audit در حالتِ --check پیش از
+  // writeFileSyncِ خطِ ۸۵۷ خارج می‌شود.
+  {
+    id: 'runner-completeness',
+    area: 'Test runner completeness',
+    cmd: 'node',
+    args: ['tools/check-runner-completeness.mjs'],
+    why: 'هر فایلِ تست باید در api/tests/_all.runner.mts ایمپورت شده باشد وگرنه npm test هرگز اجرایش نمی‌کند (کلاسِ fake-greenِ ۵)',
+  },
+  {
+    id: 'manifest-assets',
+    area: 'Manifest assets',
+    cmd: 'node',
+    args: ['tools/check-manifest-assets.mjs'],
+    why: 'هر آیکونی که manifest اعلام می‌کند باید روی دیسک باشد',
+  },
+  {
+    id: 'alert-metric-binding',
+    area: 'Alert ↔ metric binding',
+    cmd: 'node',
+    args: ['tools/check-alert-metric-binding.mjs'],
+    why: 'هر متریکی که observability/alerts.yml می‌پاید باید واقعاً در api/src/lib/metrics.ts تولید شود (کلاسِ fake-greenِ ۸)',
+  },
+  {
+    id: 'agent-memory-location',
+    area: 'Agent memory location',
+    cmd: 'node',
+    args: ['tools/check-agent-memory-location.mjs'],
+    why: 'حافظه‌ی عامل‌ها باید زیرِ .claude/agent-memory بماند',
+  },
+  {
+    id: 'xss-escaping-regression',
+    area: 'XSS escaping regression',
+    cmd: 'node',
+    args: ['tools/xss-escaping-regression.mjs'],
+    why: 'شش ترکیبِ payload×سینک باید واقعاً escape شوند — تستِ رفتاری، نه شمارشِ آرتیفکت',
+  },
+  {
+    id: 'xss-sink-audit-check',
+    area: 'XSS sink audit (--check)',
+    cmd: 'node',
+    args: ['tools/xss-sink-audit.mjs', '--check'],
+    why: 'هم تازگیِ آرتیفکت و هم ratchetِ unsafe/review/payload_not_captured را می‌سنجد؛ در حالتِ --check چیزی نمی‌نویسد',
+  },
 ];
 
 // اگر docs/DECISIONS.md هیچ IDی نداشت، این را باید UNKNOWN گزارش کنیم —
@@ -186,6 +240,7 @@ if (DECISION_IDS.length === 0) {
 const EXCLUDED_GATES = [
   {
     area: 'A1 restore drill executor (tools/restore-drill.sh)',
+    scripts: ['tools/restore-drill.sh'],
     reason:
       'اجراکننده است، نه گیت: واقعاً pg_dump/CREATE DATABASE/pg_restore/DROP DATABASE انجام می‌دهد. ' +
       'خودِ فایل هم تصریح می‌کند اجراکننده و تفسیرکننده (gate-destructive.mjs) عمداً جدا نگه داشته شده‌اند. ' +
@@ -193,6 +248,7 @@ const EXCLUDED_GATES = [
   },
   {
     area: 'boot-path (tools/check-boot-path.sh)',
+    scripts: ['tools/check-boot-path.sh'],
     reason:
       'یک Postgresِ کاملاً خالی و دورانداختنی می‌سازد/می‌شکند و برایِ ۹ دقیقه یک سرورِ واقعی روی یک پورت بالا می‌آورد — ' +
       'یک jobِ سنگینِ CI است (ci.yml)، نه یک چکِ سبکِ محلی؛ به‌علاوه cwd را عوض می‌کند و روی وضعیتِ DB اثر می‌گذارد.',
@@ -282,6 +338,45 @@ for (const excluded of EXCLUDED_GATES) {
   rows.push({ area: excluded.area, command: '(اجرا نشد)', exit: '—', state: 'UNKNOWN', note: excluded.reason, log: null });
 }
 
+// ── پوششِ شمارش: خطر در tools/ زندگی می‌کند، نه در آرایه‌ی بالا ────────
+// چرا (یافته‌ی ۲۰۲۶-۰۹-۰۷): تا امروز GATES و EXCLUDED_GATES هر دو دستی
+// بودند و شش گیتِ واقعیِ tools/ در هیچ‌کدام نبودند — از جمله
+// `xss-sink-audit --check` که همان لحظه قرمز بود و jobِ design-system را
+// می‌شکست. خلاصه‌ی «۷ GREEN · ۵ RED» آن را نشان نمی‌داد و کسی متوجه
+// نمی‌شد، چون نبودِ یک ردیف شبیهِ هیچ‌چیز است.
+//
+// منشور §۴c: «گاردی که سوژه‌هایش را از یک مرجع می‌شمارد در حالی که خطر در
+// مرجعِ دیگری است، به دلیلِ ساختاری سبز است نه به دلیلِ امن بودن.» پس فهرست
+// از **دیسک** ساخته می‌شود و هر اسکریپتی که در هیچ‌کدام از دو آرایه نباشد
+// یک ردیفِ UNCOVERED می‌گیرد. این ابزار عمداً همیشه با ۰ خارج می‌شود
+// (گزارش‌گر است نه گیت، بالای همین فایل)، پس محافظ **دیده‌شدن** است نه
+// کدِ خروج: ردیف در همان جدولی می‌نشیند که جای §۴ی سند را گرفته.
+const GATE_FILE_RE = /^(check|gate|xss)-[a-z0-9-]+\.(mjs|sh|py)$/;
+const coveredScripts = new Set();
+for (const g of GATES) for (const a of g.args ?? []) if (a.startsWith('tools/')) coveredScripts.add(a);
+for (const e of EXCLUDED_GATES) for (const s of e.scripts ?? []) coveredScripts.add(s);
+
+const onDisk = readdirSync(join(REPO, 'tools'))
+  .filter((f) => GATE_FILE_RE.test(f))
+  .map((f) => `tools/${f}`)
+  .sort();
+const uncovered = onDisk.filter((s) => !coveredScripts.has(s));
+
+for (const script of uncovered) {
+  rows.push({
+    area: `⚠ UNCOVERED — ${script}`,
+    command: '(هرگز اجرا نشد)',
+    exit: '—',
+    state: 'UNCOVERED',
+    note:
+      'این اسکریپت در tools/ هست ولی نه در GATES و نه در EXCLUDED_GATES ثبت شده. ' +
+      'یعنی این فهرست درباره‌اش هیچ ادعایی ندارد — نه سبز، نه قرمز. ' +
+      'یا به GATES اضافه‌اش کن (اگر فقط‌ارزیابی است) یا با دلیل به EXCLUDED_GATES.',
+    log: null,
+  });
+  process.stderr.write(`⚠ UNCOVERED: ${script} — در هیچ‌کدام از دو فهرست نیست\n`);
+}
+
 // ── خروجیِ ماشین‌خوان کامل ─────────────────────────────────────────────
 const jsonPath = join(OUT_DIR, 'gate-inventory.json');
 writeFileSync(jsonPath, JSON.stringify({ meta: RUN_META, rows }, null, 2), 'utf8');
@@ -314,4 +409,5 @@ const nGreen = rows.filter((r) => r.state === 'GREEN').length;
 const nRed = rows.filter((r) => r.state === 'RED').length;
 const nCNR = rows.filter((r) => r.state === 'COULD_NOT_RUN').length;
 const nUnk = rows.filter((r) => r.state === 'UNKNOWN').length;
-console.error(`\n${rows.length} ردیف — ${nGreen} GREEN · ${nRed} RED · ${nCNR} COULD_NOT_RUN · ${nUnk} UNKNOWN`);
+const nUncov = rows.filter((r) => r.state === 'UNCOVERED').length;
+console.error(`\n${rows.length} ردیف — ${nGreen} GREEN · ${nRed} RED · ${nCNR} COULD_NOT_RUN · ${nUnk} UNKNOWN · ${nUncov} UNCOVERED`);

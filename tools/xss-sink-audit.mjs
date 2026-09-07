@@ -649,6 +649,21 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/business/js/crm.js#dd7a5ecb6671', 'همان loadErrorBlock مثلِ crm.js:132 — آرگومان‌ها literalِ کدند.'],
   ['apps/business/js/menu.js#cbbe45f8aea6', 'گروه/آپشنِ افزودنی‌ها: esc(g.name)/esc(o.name) رویِ متن، jsq(itemId)/jsq(g.id)/jsq(g.name) داخلِ onclick، و fa(min_select)/fa(max_select) رویِ اعداد — هر مسیرِ دیتا پوشش داره.'],
   ['apps/company/js/restaurant.js#c5a4dbdd770c', 'btn.innerHTML = label که خودش چهار خط بالاتر از همان دکمه خوانده شده (ذخیره/بازگرداندنِ برچسبِ دکمه حینِ لودینگ) — رفت‌وبرگشتِ markupِ خودِ عنصر، بدونِ ورودِ هیچ دادهٔ بیرونی.'],
+  ['apps/business/js/staff-system.js#1f2adc4987cb',
+   'قرینه‌ی restaurant.js#c5a4dbdd770c: prevHtml در staff-system.js:355 از innerHTMLِ '
+   + 'همان دکمه خوانده و در :361 به همان عنصر بازگردانده می‌شود؛ تنها نوشتنِ میانی '
+   + 'textContent است (:356) که مارک‌آپ نمی‌سازد. ⚠️ ولی آنچه این را امن می‌کند '
+   + 'رفت‌وبرگشت **نیست** — بازنویسیِ innerHTML یک parseِ تازه است و هر مارک‌آپِ '
+   + 'اجراپذیرِ موجود را دوباره شلیک می‌کند. آنچه بار را می‌برد محتوایِ خودِ دکمه '
+   + 'است: staff-system.js:319 فقط icon(check,{size:14}) دارد (نقشه‌ی بسته‌ی PATHS '
+   + 'در shared/js/icons.js:83؛ هر دو آرگومان literal) به‌علاوه‌ی یک رشته‌ی ثابتِ '
+   + 'فارسی — هیچ فیلدی از GET /restaurant/pricing واردِ دکمه نمی‌شود، و تنها '
+   + 'نویسندگانِ دیگرِ آن عنصر (:356، :365) هر دو textContent‌اند. خوانده‌شده ۲۰۲۶-۰۹-۰۷. '
+   + '⚠️ محدودیتِ کلید: هویت به عبارتِ :361 بسته است نه به قالبِ دکمه در :319. اگر '
+   + 'روزی درجِ پویایی به آن دکمه اضافه شود، این override همچنان اعمال می‌شود و '
+   + 'شمارش هم عوض نمی‌شود (سینکِ :322 از قبل unsafe است) — یعنی گیت قرمز نمی‌شود. '
+   + 'همان محدودیتی که برای bubble()/bizBubble() بالاتر ثبت شده. قالبِ :319 را عوض '
+   + 'کردی، این را هم بازبین کن.'],
 ]);
 
 function scanFile(absPath, relPath) {
