@@ -229,8 +229,11 @@ describe('۳ — حالتِ امنِ بیلدِ CI: بدونِ SITE_API_BASE', (
     try {
       return await fn();
     } finally {
-      process.env.SITE_API_BASE = prevSite;
-      process.env.SEO_API_BASE = prevSeo;
+      // ⚠️ `process.env.X = undefined` رشته‌ی "undefined" می‌گذارد، نه پاک می‌کند —
+      // و چون این helper چند تست صدایش می‌زنند، مقدارِ آلوده به تست‌های بعدی
+      // نشت می‌کرد و `SERVER_BASE` را truthy می‌ساخت.
+      if (prevSite === undefined) delete process.env.SITE_API_BASE; else process.env.SITE_API_BASE = prevSite;
+      if (prevSeo === undefined) delete process.env.SEO_API_BASE; else process.env.SEO_API_BASE = prevSeo;
     }
   };
 

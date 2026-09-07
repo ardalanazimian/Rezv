@@ -192,15 +192,34 @@ describe('حالتِ امنِ اعلام‌شده (بدونِ SITE_API_BASE) ه�
   // در حالتِ امن هم سبز باشد، وگرنه یک قطعیِ API می‌تواند دیپلوی را هم زمین
   // بزند». وقتی هیچ APIای پیکربندی نشده، هیچ دیتابیسی در تصویر نیست که
   // بتواند واگرا شود — فایلِ کامیت‌شده تنها مرجع است، پس دروغی در کار نیست.
+  // ⚠️ بازنویسیِ ۲۰۲۶-۰۹-۰۷: این تست قبلاً با
+  // `await import('../lib/site-api.ts?noplanbase')` نمونه‌ی تازه می‌خواست، یعنی
+  // ادعای رفتاری را به یک **جزئیاتِ loader** گره زده بود. روی Node 24 آن کش‌شکن
+  // کار می‌کند و تست سبز بود؛ روی Node 20 (همان که ci.yml تعیین می‌کند) ماژولِ
+  // کش‌شده با baseِ قدیمی برمی‌گشت، `fetch` واقعی اجرا می‌شد و تست می‌افتاد.
+  // یعنی روی نصفِ محیط‌ها **موضوعش را اصلاً لمس نمی‌کرد**.
+  //
+  // حالا `serverBase()` تنبل است، پس همان نمونه‌ی بالای فایل کافی است و هیچ
+  // کش‌شکنی لازم نیست. و برای اینکه «غیابِ موضوع» خطا باشد نه عبور، صریح
+  // assert می‌کنیم که **هیچ fetchی تلاش نشده** — اگر روزی base دوباره منجمد
+  // شود، این تست از مسیرِ شبکه رد نمی‌شود، می‌افتد.
   test('بدونِ API پیکربندی‌شده → قیمتِ کامیت‌شده، بدونِ throw', async () => {
     const prev = process.env.SITE_API_BASE;
     const prevSeo = process.env.SEO_API_BASE;
-    process.env.SITE_API_BASE = '';
-    process.env.SEO_API_BASE = '';
-    const fresh = await import('../lib/site-api.ts?noplanbase');
-    const plans = await fresh.getPlans();
-    assert.ok(plans.length > 0, 'حالتِ امن باید پلن بدهد وگرنه بیلدِ CI می‌شکند');
-    process.env.SITE_API_BASE = prev;
-    process.env.SEO_API_BASE = prevSeo;
+    const prevFetch = globalThis.fetch;
+    let fetchAttempted = false;
+    globalThis.fetch = (() => { fetchAttempted = true; throw new Error('نباید در حالتِ پیکربندی‌نشده fetch شود'); }) as typeof fetch;
+    try {
+      process.env.SITE_API_BASE = '';
+      process.env.SEO_API_BASE = '';
+      const plans = await getPlans();
+      assert.equal(fetchAttempted, false, 'حالتِ «پیکربندی نشده» باید بدونِ هیچ fetchی جواب دهد — اگر fetch شد یعنی base منجمد مانده');
+      assert.ok(plans.length > 0, 'حالتِ امن باید پلن بدهد وگرنه بیلدِ CI می‌شکند');
+    } finally {
+      globalThis.fetch = prevFetch;
+      // ⚠️ `process.env.X = undefined` رشته‌ی "undefined" می‌گذارد، نه پاک می‌کند.
+      if (prev === undefined) delete process.env.SITE_API_BASE; else process.env.SITE_API_BASE = prev;
+      if (prevSeo === undefined) delete process.env.SEO_API_BASE; else process.env.SEO_API_BASE = prevSeo;
+    }
   });
 });

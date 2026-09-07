@@ -22,12 +22,34 @@ import type {
 } from './content-types';
 import { fallbackPage, fallbackPlans, fallbackFaqs, fallbackArticles, fallbackReleaseNotes } from './content-types';
 
-const SERVER_BASE = (process.env.SITE_API_BASE || process.env.SEO_API_BASE || '').replace(/\/$/, '');
+/**
+ * آدرسِ سرورِ API — **در زمانِ فراخوانی** خوانده می‌شود، نه در زمانِ لودِ ماژول.
+ *
+ * ⚠️ چرا تابع شد و constِ سطحِ ماژول نماند (شکستِ واقعیِ CI، ۲۰۲۶-۰۹-۰۷):
+ * وقتی این یک const بود، مقدارش برای همیشه در لحظه‌ی اولین importِ ماژول قفل
+ * می‌شد. تست‌ها برای ساختنِ حالتِ «API پیکربندی نشده» env را خالی می‌کردند و
+ * با `import('./site-api.ts?noplanbase')` امیدِ نمونه‌ی تازه داشتند — یعنی
+ * ادعای رفتاری را به یک **جزئیاتِ loader** گره زده بودند.
+ *
+ * روی Node 24 آن کش‌شکن کار می‌کند و تست سبز بود؛ روی **Node 20** (همان که
+ * `ci.yml` برای هر هشت jobِ node تعیین می‌کند) کار نمی‌کند: ماژولِ کش‌شده با
+ * baseِ قدیمی برمی‌گردد، `fetch` واقعاً اجرا می‌شود و تست می‌افتد.
+ *
+ * یعنی روی نصفِ محیط‌ها تست **موضوعش را اصلاً لمس نمی‌کرد** و سبز بود — دقیقاً
+ * کلاسِ «تستی که وقتی موضوعش غایب است سبز می‌ماند».
+ *
+ * با خواندنِ تنبل، «پیکربندی نشده» یک حالتِ واقعیِ قابلِ ساخت است و هیچ تستی
+ * به کش‌شکن نیاز ندارد. رفتارِ تولید عوض نمی‌شود: env آنجا در تمامِ عمرِ پروسه
+ * ثابت است، پس خواندنِ هر بار همان مقدار را می‌دهد.
+ */
+function serverBase(): string {
+  return (process.env.SITE_API_BASE || process.env.SEO_API_BASE || '').replace(/\/$/, '');
+}
 
 /** آدرسِ API برای مرورگر (فرم‌ها/استودیو). در سرور به SITE_API_BASE برمی‌گردد. */
 export function browserApiBase(): string {
   const pub = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
-  return pub || SERVER_BASE;
+  return pub || serverBase();
 }
 
 type CollectionName =
@@ -74,10 +96,11 @@ export class UpstreamUnavailableError extends Error {
  * پس فایلِ کامیت‌شده تنها مرجع است و دروغی در کار نیست.
  */
 async function getJson<T>(path: string, revalidateSec: number, strict = false): Promise<T | null> {
-  if (!SERVER_BASE) return null;   // حالتِ امنِ اعلام‌شده (ci.yml:539)
+  const base = serverBase();
+  if (!base) return null;   // حالتِ امنِ اعلام‌شده (ci.yml:539)
   let res: Response;
   try {
-    res = await fetch(`${SERVER_BASE}${path}`, { next: { revalidate: revalidateSec } });
+    res = await fetch(`${base}${path}`, { next: { revalidate: revalidateSec } });
   } catch (e) {
     // شبکه/DNS/timeout
     if (strict) throw new UpstreamUnavailableError(`${path} → ${(e as Error)?.message ?? 'network'}`);
@@ -216,10 +239,11 @@ export type OrderLookup =
 
 /** وضعیتِ سفارش هرگز کش نمی‌شود — کاربر باید حالِ لحظه‌ای را ببیند. */
 export async function getOrderStatus(code: string): Promise<OrderLookup> {
-  if (!SERVER_BASE) return { kind: 'unavailable' };
+  const base = serverBase();
+  if (!base) return { kind: 'unavailable' };
   let res: Response;
   try {
-    res = await fetch(`${SERVER_BASE}/api/v1/site/orders/${encodeURIComponent(code)}`, {
+    res = await fetch(`${base}/api/v1/site/orders/${encodeURIComponent(code)}`, {
       cache: 'no-store',
     });
   } catch {

@@ -65,13 +65,37 @@ describe('پیگیریِ سفارش — سه حالتِ متفاوت قاطی ن
 
 describe('پیکربندیِ غایب (حالتِ امنِ CI) صادقانه اعلام می‌شود', () => {
   test('SITE_API_BASE تنظیم‌نشده → unavailable، نه not_found', async () => {
+    // ⚠️ بازنویسیِ ۲۰۲۶-۰۹-۰۷ — این تست از مسیرِ غلط سبز می‌شد.
+    //
+    // `getOrderStatus` **سه** مسیر دارد که همگی همان شیء را می‌دهند:
+    //   `if (!base)` (پیکربندی نشده — موضوعِ تست) · `catch` (شبکه/DNS) ·
+    //   `if (!res.ok)` (۵xx). پس assert روی `.kind === 'unavailable'` هیچ‌کدام
+    //   را از دیگری تفکیک نمی‌کند و برخلافِ seo هیچ **پیامی** هم برای assert
+    //   وجود ندارد.
+    //
+    // قبلاً با `import('../lib/site-api.ts?nobase')` نمونه‌ی تازه می‌خواست؛ روی
+    // Node 20 آن کش‌شکن کار نمی‌کند، پس base منجمد می‌ماند، fetch به
+    // `http://api.test` می‌خورد، `catch` می‌گیردش و همان `unavailable` را
+    // می‌دهد ⇒ سبز، بی‌آنکه موضوعِ تست هرگز حاضر باشد.
+    //
+    // تنها شاهدِ قابلِ تفکیک این است که **هیچ fetchی تلاش نشده باشد**. حالا
+    // `serverBase()` تنبل است پس کش‌شکن لازم نیست، و اگر روزی دوباره منجمد شود
+    // این تست می‌افتد به‌جای آنکه بی‌صدا رد شود.
     const prev = process.env.SITE_API_BASE;
     const prevSeo = process.env.SEO_API_BASE;
-    process.env.SITE_API_BASE = '';
-    process.env.SEO_API_BASE = '';
-    const fresh = await import('../lib/site-api.ts?nobase');
-    assert.equal((await fresh.getOrderStatus('RZO-AB12CD')).kind, 'unavailable');
-    process.env.SITE_API_BASE = prev;
-    process.env.SEO_API_BASE = prevSeo;
+    const prevFetch = globalThis.fetch;
+    let fetchAttempted = false;
+    globalThis.fetch = (() => { fetchAttempted = true; throw new Error('نباید در حالتِ پیکربندی‌نشده fetch شود'); }) as typeof fetch;
+    try {
+      process.env.SITE_API_BASE = '';
+      process.env.SEO_API_BASE = '';
+      assert.equal((await getOrderStatus('RZO-AB12CD')).kind, 'unavailable');
+      assert.equal(fetchAttempted, false, 'باید از مسیرِ «پیکربندی نشده» رد شود، نه از catchِ شبکه');
+    } finally {
+      globalThis.fetch = prevFetch;
+      // `process.env.X = undefined` رشته‌ی "undefined" می‌گذارد، نه پاک می‌کند.
+      if (prev === undefined) delete process.env.SITE_API_BASE; else process.env.SITE_API_BASE = prev;
+      if (prevSeo === undefined) delete process.env.SEO_API_BASE; else process.env.SEO_API_BASE = prevSeo;
+    }
   });
 });
