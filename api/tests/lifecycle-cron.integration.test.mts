@@ -77,6 +77,24 @@ const eventsOf = (id: string) =>
   db.reservationEvent.findMany({ where: { reservationId: id }, orderBy: { createdAt: 'asc' } });
 
 before(async () => {
+  // ⚠️ پاک‌سازیِ باقی‌ماندهٔ اجراهای قبلی (۲۰۲۶-۰۹-۰۷، هنگامِ رفعِ B-05).
+  // هر اجرا رستورانِ تازه با UUIDِ تازه می‌سازد، پس `beforeEach` فقط ردیف‌های
+  // *همین* اجرا را پاک می‌کند. اجرایی که وسطِ راه بمیرد (یا `--test-force-exit`
+  // پیش از `after` ببندد) رزروهایش را جا می‌گذارد. تا پیش از B-05 بی‌ضرر بود
+  // چون کوئریِ expireStaleHolds آن‌ها را نمی‌دید؛ حالا می‌بیند و شمارشِ
+  // سراسریِ تست‌ها را به‌هم می‌زند (`3 !== 1` دیده شد).
+  //
+  // ادعای هیچ تستی ضعیف نشد — منبعِ نویز حذف شد. کدها همه با `LC` شروع
+  // می‌شوند (nextCode)، پس این پاک‌سازی به همین فایل محدود است.
+  const orphans = await db.reservation.findMany({
+    where: { code: { startsWith: 'LC' } }, select: { id: true },
+  });
+  if (orphans.length) {
+    const ids = orphans.map(o => o.id);
+    await db.reservationEvent.deleteMany({ where: { reservationId: { in: ids } } }).catch(() => {});
+    await db.reservation.deleteMany({ where: { id: { in: ids } } }).catch(() => {});
+  }
+
   const t = await db.tenant.create({ data: { name: `[DEMO] ${TAG}` }, select: { id: true } });
   tenantId = t.id;
   const r = await db.restaurant.create({
@@ -176,6 +194,54 @@ describe('چرخه‌ی حیاتِ خودکار — انقضای هولد (آز�
     assert.equal(await expireStaleHolds(), 0);
     assert.equal(await statusOf(id), 'pending');
     assert.equal((await eventsOf(id)).length, 0, 'رزروِ دست‌نخورده نباید رویداد بگیرد');
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  B-05 — رزروِ منتظرِ تأییدِ دستی هیچ مسیرِ پایانی نداشت
+  //
+  //  وقتی `cancellationPolicy.autoConfirm === false` است، createReservation
+  //  رزرو را `pending` با `holdExpiresAt = null` می‌سازد (reservations.ts:351-352)
+  //  — عمداً، چون منتظرِ اقدامِ رستوران‌دار است نه پرداختِ مشتری. ولی
+  //  `expireStaleHolds` فقط `holdExpiresAt < now` را می‌گرفت، پس NULL هرگز
+  //  مچ نمی‌شد و **هیچ کرونِ دیگری هم pending را نمی‌گیرد** (جست‌وجوی
+  //  ۲۰۲۶-۰۹-۰۷ روی کلِ api/src). نتیجه: اگر پرسنل نه تأیید کند نه رد،
+  //  ردیف تا ابد `pending` می‌ماند — یعنی برای همیشه در
+  //  ACTIVE_RESERVATION_STATUSES و در شرطِ EXCLUDE باقی می‌ماند، میز را تا
+  //  پایانِ بازه‌اش نگه می‌دارد، و مهمان هرگز نمی‌فهمد تأیید نشده.
+  //
+  //  مرزِ انتخاب‌شده **شروعِ سانس** است، نه یک SLAی اختراعی: رزروی که تا
+  //  لحظه‌ی شروعِ خودش تأیید نشده، دیگر قابلِ ارائه نیست. هر مهلتِ کوتاه‌ترِ
+  //  دیگری (مثلاً «۲ ساعت برای تأیید») یک تصمیمِ محصولی است، نه رفعِ باگ —
+  //  و به‌عنوانِ تصمیمِ باز جدا مطرح شده است.
+  // ═══════════════════════════════════════════════════════════════════
+  test('رزروِ منتظرِ تأیید (holdExpiresAt=null) که سانسش گذشته، expired می‌شود', async () => {
+    const { id } = await mkReservation({
+      status: 'pending', minutesAgo: 30,   // سانس ۳۰ دقیقه پیش شروع شده
+      holdExpiresAt: null,                 // منتظرِ تأییدِ دستی، نه هولدِ پرداخت
+    });
+
+    assert.equal(await expireStaleHolds(), 1, 'رزروِ تأییدنشده‌ی گذشته باید منقضی شود');
+    assert.equal(await statusOf(id), 'expired');
+
+    // مثلِ مسیرِ هولد، این هم باید از state machine عبور کند نه updateMany.
+    const ev = await eventsOf(id);
+    assert.equal(ev.length, 1, 'باید دقیقاً یک رویداد ثبت شود');
+    assert.equal(ev[0].fromStatus, 'pending');
+    assert.equal(ev[0].toStatus, 'expired');
+    assert.equal(ev[0].isAutomatic, true);
+    assert.equal(ev[0].actor, 'cron');
+  });
+
+  test('رزروِ منتظرِ تأیید که سانسش هنوز نیامده، دست نمی‌خورد', async () => {
+    // کنترلِ منفی و **ضروری**: بدونِ این، رفعی که هر pendingِ بدونِ هولد را
+    // منقضی کند هم سبز می‌شد — و آن رزروهای آینده‌ی سالم را می‌کشت.
+    const { id } = await mkReservation({
+      status: 'pending', minutesAgo: -120,  // سانس در آینده
+      holdExpiresAt: null,
+    });
+    assert.equal(await expireStaleHolds(), 0, 'رزروِ آینده نباید لمس شود');
+    assert.equal(await statusOf(id), 'pending');
+    assert.equal((await eventsOf(id)).length, 0);
   });
 
   test('کشِ availability پس از آزادسازیِ میز باطل می‌شود', async () => {
