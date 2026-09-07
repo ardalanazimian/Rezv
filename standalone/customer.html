@@ -2236,20 +2236,8 @@ async function httpJson(url, opts = {}, timeoutMs = 8000) {
 //  شعبه‌ی کهنه، با تاریخچه‌ی P0). ادغامِ آن یعنی یا از دست دادنِ آن رفتار یا
 //  ساختنِ یک انتزاعِ پرشاخه — دقیقاً چیزی که §۷ منع می‌کند.
 //
-//  چند ۴۰۱ِ هم‌زمان یک Promiseِ مشترک می‌گیرند (بدونِ رقابت)، و refresh هم
-//  rotate می‌شود.
-//
-//  خروجی (سه‌حالته — عمداً نه boolean):
-//    true      → سرور توکنِ تازه داد.
-//    false     → سرور صریحاً رد کرد (۴۰۱/۴۰۳ روی خودِ refresh) ⇒ نشست واقعاً مرده است.
-//    'offline' → **نمی‌دانیم**؛ شبکه/timeout. truthy است تا فراخوان درخواست را یک‌بار
-//                دوباره بزند و خطای شبکه را نشان دهد، نه اینکه نشست را پاک کند.
-//
-//  ⚠️ چرا: قبلاً `catch { return false }` بود، پس یک قطعیِ لحظه‌ایِ شبکه دقیقاً
-//  همان مقداری را برمی‌گرداند که «refresh tokenِ تو باطل است». هر سه پنل روی
-//  همان false مستقیم `_onSessionExpired()` می‌زنند (apps/customer/js/api.js:63،
-//  apps/business/js/data.js:187، apps/company/js/api.js:31) — یعنی توکن‌ها پاک و
-//  کاربر بیرون انداخته می‌شد چون وای‌فای یک ثانیه رفت. «نمی‌دانیم» ≠ «باطل است».
+//  رفتار عیناً همان قبل است: چند ۴۰۱ِ هم‌زمان یک Promiseِ مشترک می‌گیرند
+//  (بدونِ رقابت)، و refresh هم rotate می‌شود.
 // ═══════════════════════════════════════════════════════════
 function refreshAccessToken(api) {
   if (api._refreshing) return api._refreshing;
@@ -2266,11 +2254,8 @@ function refreshAccessToken(api) {
         api.setRefresh(data.refresh);   // rotation: refresh هم نو می‌شود
         return true;
       }
-      // پاسخِ واقعیِ سرور رسید ولی توکنِ تازه‌ای نداد → رد شد؛ ولی ۵xx یعنی
-      // «سرور خراب است»، نه «نشستِ تو باطل است» — آن هم offline حساب می‌شود.
-      if (res.status >= 500) return 'offline';
       return false;
-    } catch { return 'offline'; }
+    } catch { return false; }
     finally { api._refreshing = null; }
   })();
   return api._refreshing;
