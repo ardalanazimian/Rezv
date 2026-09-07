@@ -478,14 +478,31 @@ async function saveManual(){
   if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='در حال ثبت…';}
   try{
 
+  // ⚠️ رفعِ B-03 (۲۰۲۶-۰۹-۰۷): **یک** بدنه برای هر دو مسیر.
+  //
+  // پیش از این، صفِ آفلاین بدنه‌ی خودش را می‌ساخت و هر سه فیلدِ کلیدی‌اش با
+  // شِیمِ سرور (`api/src/app/api/v1/reservations/route.ts:22-24`) ناسازگار بود:
+  //   restaurant_id:'self'  در برابرِ zUuid
+  //   date:dateKey          (`today|tomorrow|upcoming`) در برابرِ zDateStr
+  //   time:timeVal          (ارقامِ فارسی) در برابرِ zTimeStr
+  // و `notify_sms`/`table_number`/`note` اصلاً فرستاده نمی‌شدند.
+  //
+  // یعنی هر رزروِ آفلاین **قطعاً** در sync رد می‌شد؛ `Outbox.sync` آن را
+  // «تضاد» می‌شمرد، از صف بیرون می‌انداخت و به پرسنل می‌گفت «احتمالاً میز یا
+  // زمان پر شده» — توضیحی که غلط بود. رزروِ مهمان گم می‌شد.
+  //
+  // مثلِ B-01، رفع ساختاری است نه وصله‌ای: دو بدنه به یکی تبدیل شد تا
+  // نتوانند دوباره واگرا شوند.
+  const dt=manualDateToISO(dateVal,timeVal);
+  const reservationBody={
+    restaurant_id:STAFF_INFO?.restaurant_id||undefined,
+    date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
+    guest:{name:n,phone:phone.replace(/\s/g,''),table_number:tableVal,note:'رزرو دستی'},
+  };
+
   // اگر توکن staff داریم، رزرو واقعی در دیتابیس ثبت کن
   if(API.getToken()){
-    const dt=manualDateToISO(dateVal,timeVal);
-    const res=await API.post('/reservations',{
-      restaurant_id:STAFF_INFO?.restaurant_id||undefined,
-      date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
-      guest:{name:n,phone:phone,table_number:tableVal,note:'رزرو دستی'},
-    },{ 'Idempotency-Key': manualIdemKey });
+    const res=await API.post('/reservations',reservationBody,{ 'Idempotency-Key': manualIdemKey });
     if(res.ok){
       // موفق در سرور — به‌علاوه‌ی نمایش محلی
       RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.reservation?.code});
@@ -509,7 +526,7 @@ async function saveManual(){
   if(isOffline() && API.getToken()){
     Outbox.enqueue({
       type:'reservation', path:'/reservations', method:'POST',
-      body:{ restaurant_id:'self', date:dateKey, time:timeVal, party_size:partyVal, guest:{name:n,phone:phone.replace(/\s/g,'')} },
+      body:reservationBody,   // B-03: همان بدنه‌ی مسیرِ آنلاین، نه یک نسخه‌ی دوم
       headers:{ 'Idempotency-Key': manualIdemKey },
       label:`رزرو ${n} · ${dLabel} ${timeVal}`, localRef:localRec,
     });
