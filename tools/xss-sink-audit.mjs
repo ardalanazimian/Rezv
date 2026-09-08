@@ -70,16 +70,35 @@ const SINK_PATTERNS = [
 // همان شکافِ رشته/template که در splitTopLevelArgs حل شده، اینجا هم باید حل
 // شود — وگرنه خودِ payloadهای insertAdjacentHTML (که HTML‌اند) هم قربانیِ
 // همین شمارشِ غلط می‌شوند.
-function matchingParen(text, start, limit) {
+// ⚠️ تعمیمِ ۲۰۲۶-۰۹-۰۷ (نامش از matchingParen به matchingDelim عوض شد):
+// همین پشته‌ی template برایِ openerِ بک‌تیک هم لازم بود. تا امروز فقط وقتی
+// صدا زده می‌شد که RHS با `(` باز شود؛ برایِ `x.innerHTML = \`...\`` یک حلقه‌ی
+// تختِ جدا در grabExpression اجرا می‌شد که سرِ اولین بک‌تیکِ بی‌بک‌اسلش
+// می‌ایستاد و از `${...}` بی‌خبر بود. یعنی هر templateی که داخلش
+// `${arr.map(x => \`...\`)}` داشت، درست سرِ اولین بک‌تیکِ تودرتو بریده می‌شد و
+// هر esc()ی بعد از آن نقطه بیرونِ هم هویتِ هش‌شده و هم دیدِ طبقه‌بند می‌ماند.
+// دو پارسر برایِ یک زبان یعنی یکی‌شان همیشه عقب است — پس یکی شد.
+//
+// نکته‌ی ظریفی که حینِ همین رفع گیر افتاد: `depth === 0` یعنی «پرانتزی که
+// از آن شروع کردیم بسته شد» — و این فقط وقتی معنا دارد که opener خودش `(`
+// باشد. برایِ openerِ بک‌تیک، depth از صفر شروع می‌شود، پس اولین `)`ِ یک
+// فراخوانِ درونی (مثلِ `${icon('arrowR')}`) آن را به ۰ می‌رساند و اسکن را
+// همان‌جا می‌بُرد. بدونِ شرطِ `opener === '('` این رفع، بریدگی را کوتاه‌تر
+// می‌کرد نه بلندتر — و چون بریدگیِ کوتاه‌تر هم بی‌صدا است، سبز می‌ماند.
+function matchingDelim(text, start, limit) {
+  const opener = text[start];
   let depth = 0, i = start;
   const tmpl = [];
+  // openerِ بک‌تیک: فریمِ template را از پیش بنشان و از کاراکترِ بعدی برو.
+  // پایان = خالی‌شدنِ پشته، نه depth.
+  if (opener === '`') { tmpl.push({ inExpr: false, braces: 0 }); i = start + 1; }
   while (i < limit) {
     const c = text[i];
     const top = tmpl.length ? tmpl[tmpl.length - 1] : null;
 
     if (top && !top.inExpr) {
       if (c === '\\') { i += 2; continue; }
-      if (c === '`') { tmpl.pop(); i++; continue; }
+      if (c === '`') { tmpl.pop(); i++; if (opener === '`' && tmpl.length === 0) return i; continue; }
       if (c === '$' && text[i + 1] === '{') { top.inExpr = true; top.braces = 1; i += 2; continue; }
       i++; continue;
     }
@@ -89,14 +108,14 @@ function matchingParen(text, start, limit) {
       if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
       if (c === "'" || c === '"') { i = skipQuoted(text, i); continue; }
       if (c === '(') depth++;
-      else if (c === ')') { depth--; if (depth === 0) return i + 1; }
+      else if (c === ')') { depth--; if (opener === '(' && depth === 0) return i + 1; }
       i++; continue;
     }
 
     if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
     if (c === "'" || c === '"') { i = skipQuoted(text, i); continue; }
     if (c === '(') { depth++; i++; continue; }
-    if (c === ')') { depth--; if (depth === 0) return i + 1; i++; continue; }
+    if (c === ')') { depth--; if (opener === '(' && depth === 0) return i + 1; i++; continue; }
     i++;
   }
   return i;
@@ -136,18 +155,16 @@ function grabExpression(text, matchStart, searchFrom = matchStart) {
     return text.slice(matchStart, i);
   }
   const opener = text[i];
-  if (opener === '(') {
-    return text.slice(matchStart, matchingParen(text, i, n));
+  // پرانتز و بک‌تیک هر دو از یک اسکنرِ تودرتوفهم رد می‌شوند (matchingDelim).
+  // پیش از ۲۰۲۶-۰۹-۰۷ فقط `(` این مسیر را می‌رفت و بک‌تیک به یک حلقه‌ی تختِ
+  // جدا می‌افتاد — رجوع کن به توضیحِ بالایِ matchingDelim.
+  if (opener === '(' || opener === '`') {
+    return text.slice(matchStart, matchingDelim(text, i, n));
   }
-  // backtick یا کوتیشن: تا بستنِ متناظرِ بدونِ backslash قبلش
-  const closer = opener;
-  let j = i + 1;
-  while (j < n) {
-    if (text[j] === '\\') { j += 2; continue; }
-    if (text[j] === closer) { j++; break; }
-    j++;
-  }
-  return text.slice(matchStart, j);
+  // کوتیشنِ تک/دابل: داخلشان interpolation وجود ندارد، پس همان skipQuoted
+  // که splitTopLevelArgs و matchingDelim هم از آن استفاده می‌کنند کافی است —
+  // یک پیاده‌سازیِ کانونی به‌جایِ حلقه‌ی چهارمِ دست‌نویس.
+  return text.slice(matchStart, Math.min(skipQuoted(text, i), n));
 }
 
 // ── شناساییِ interpolationهایِ «قابلِ‌اعتماد» داخلِ یک template literal ──
