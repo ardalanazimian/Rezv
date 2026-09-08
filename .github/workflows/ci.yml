@@ -462,6 +462,14 @@ jobs:
       # بود). تا امروز، ۱۵۷ فایلِ تست فقط با انضباطِ انسانی محافظت می‌شدند.
       - name: Every test file is actually imported by the runner
         run: node tools/check-runner-completeness.mjs
+      # ⚠️ ۲۰۲۶-۰۹-۰۸: ۸ فیکسچرِ تستِ integration یک مقدارِ ساعتِ اجرا
+      # (`Date.now()`) را با `.toISOString().slice(0, 10)` به کلیدِ UTC تبدیل
+      # می‌کردند و به `createReservation` می‌دادند — همان چیزی که
+      # `tests/hours.test.mts:148` آن را ممنوع مستند می‌کند، چون نزدیکِ
+      # نیمه‌شبِ تهران (UTC+۳:۳۰) روزِ اشتباه را هدف می‌گیرد. سه‌تای آن‌ها
+      # گاردِ double-booking بودند.
+      - name: No run-clock value turned into a UTC date key in api/tests
+        run: node tools/check-run-clock-date-keys.mjs
       # ⚠️ XSSِ ذخیره‌شده‌ی واقعی (۲۰۲۶-۰۸-۲۵): `cardHTML` در فیدِ مشتری فیلدِ
       # `cuisine` را بدونِ esc داخلِ innerHTML می‌گذاشت. آن فیلد را صاحبِ رستوران
       # می‌نویسد (فقط `max(50)`، بدونِ پاک‌سازیِ HTML) و از APIِ عمومی به فیدِ

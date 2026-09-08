@@ -11,6 +11,7 @@ import {
 } from '../src/lib/prediction-ledger.ts';
 import { NO_SHOW_FEATURE_NAMES } from '../src/lib/no-show-model.ts';
 import { fixturePhone } from './_phone.helper.mts';
+import { dateKeyInTz } from '../src/lib/hours.ts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  دفترِ پیش‌بینی و نتیجه (فازِ ۵) — تستِ حلقه‌ی بسته
@@ -27,7 +28,7 @@ import { fixturePhone } from './_phone.helper.mts';
 
 const TAG = `pl-${randomUUID().slice(0, 8)}`;
 let tenantId: string, restaurantId: string, userId: string, healthRestaurantId: string;
-const SLOT_DATE = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 10);
+const SLOT_DATE = dateKeyInTz(new Date(Date.now() + 40 * 86_400_000), 'Asia/Tehran');
 
 /**
  * انتظار تا وقتی شرط برقرار شود (یا مهلت تمام شود).

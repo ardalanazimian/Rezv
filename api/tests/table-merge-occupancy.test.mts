@@ -21,14 +21,16 @@ import assert from 'node:assert/strict';
 
 const { db } = await import('../src/lib/db.ts');
 const { createReservation } = await import('../src/lib/reservations.ts');
+const { dateKeyInTz } = await import('../src/lib/hours.ts');
 
 let tenantId: string;
 let restaurantId: string;
 let userId: string;
 // ۳۰ روزِ آینده — به‌اندازه‌ی کافی دور از «گذشته» ولی داخلِ سقفِ MAX_DAYS_AHEAD=۹۰
 // (تاریخِ ثابت اینجا جواب نمی‌داد؛ محاسبه‌ی نسبی به «الان» تا این تست هیچ‌وقت
-// با گذرِ زمان منقضی نشود).
-const SLOT_DATE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+// با گذرِ زمان منقضی نشود). کلیدِ روز به وقتِ تهران محاسبه می‌شود چون
+// createReservation ورودیِ date را با همین تایم‌زون تفسیر می‌کند.
+const SLOT_DATE = dateKeyInTz(new Date(Date.now() + 30 * 86_400_000), 'Asia/Tehran');
 const SLOT_TIME = '20:00';
 
 before(async () => {

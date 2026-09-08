@@ -33,13 +33,14 @@ process.env.JWT_REFRESH_SECRET ??= 'b'.repeat(32);
 
 const { db } = await import('../src/lib/db');
 const { createReservation } = await import('../src/lib/reservations.ts');
+const { dateKeyInTz } = await import('../src/lib/hours.ts');
 
 const SFX = String(Date.now()).slice(-8);
 let tenantId = '';
 let restaurantId = '';
 
 /** فردا — تا هرگز در گذشته نیفتد. */
-const DATE = new Date(Date.now() + 24 * 3600_000).toISOString().slice(0, 10);
+const DATE = dateKeyInTz(new Date(Date.now() + 24 * 3600_000), 'Asia/Tehran');
 
 before(async () => {
   const tenant = await db.tenant.create({ data: { name: `[DEMO] resv-guard ${SFX}` } });

@@ -46,6 +46,7 @@ const { withSlotLock } = await import('../src/lib/redis.ts');
 const { metrics } = await import('../src/lib/metrics.ts');
 const { ACTIVE_RESERVATION_STATUSES } = await import('../src/lib/reservation-status.ts');
 const { Prisma } = await import('@prisma/client');
+const { dateKeyInTz } = await import('../src/lib/hours.ts');
 
 const ACTIVE = [...ACTIVE_RESERVATION_STATUSES];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -107,7 +108,7 @@ async function activeRows(restaurantId: string) {
 //  است — سناریویِ بعدی با برنده‌ی سناریویِ قبلی تداخل می‌کرد و «صفر برنده»
 //  می‌داد که به‌غلط شبیهِ باگِ محصول بود. جداسازیِ کاملِ فیکسچر لازم است.
 const RUN = Math.random().toString(36).slice(2, 8);
-const DATE = new Date(Date.now() + 45 * 86_400_000).toISOString().slice(0, 10);
+const DATE = dateKeyInTz(new Date(Date.now() + 45 * 86_400_000), 'Asia/Tehran');
 const restaurantIds: string[] = [];
 const tenantIds: string[] = [];
 let realFetch: typeof globalThis.fetch;

@@ -22,10 +22,11 @@ import assert from 'node:assert/strict';
 
 const { db } = await import('../src/lib/db.ts');
 const { createReservation } = await import('../src/lib/reservations.ts');
+const { dateKeyInTz } = await import('../src/lib/hours.ts');
 
 let tenantId: string;
 let restaurantId: string;
-const SLOT_DATE = new Date(Date.now() + 31 * 86_400_000).toISOString().slice(0, 10);
+const SLOT_DATE = dateKeyInTz(new Date(Date.now() + 31 * 86_400_000), 'Asia/Tehran');
 
 before(async () => {
   const tenant = await db.tenant.create({ data: { name: '[DEMO] concurrency tenant' } });
