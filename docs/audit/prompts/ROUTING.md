@@ -13,6 +13,7 @@ Last verified: **2026-09-08** by the CEO session itself.
 |---|---|---|
 | **CEO** | `rezv-f8 [4e0f27]` | this session, self-identified via `ListAgents` |
 | **Reviewer** (founder-side) | `rezv-d3 [c8fb22]` | founder confirmed directly; author of directive 033 |
+| **Deputy** | `rezv-b1 [5f3782]` — was `rezv-30 [a7bb03]` before the reboot | self-identified via `ListAgents` 2026-09-08; dispatched by the founder, took ORDER-001 from the CEO |
 
 Directives **032** and **034** were produced by a *subagent* the CEO ran before a Reviewer session
 existed, and carry the same "founder-side reviewer" signature. That ambiguity is resolved: the role
