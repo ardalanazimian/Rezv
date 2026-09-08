@@ -11,7 +11,16 @@
 //  اعمال شود؛ پنلِ بیزنس build ندارد و نمی‌تواند این ماژول را import کند.
 // ═══════════════════════════════════════════════════════════════════════
 
-export const SITE = 'https://rezervno.ir';
+// ⚠️ ۲۰۲۶-۰۹-۰۸ — تنها تعریفِ SITE در این اپ. پیش از این **هفت** کپیِ
+//    hardcode وجود داشت (lib/i18n.ts, lib/schema.ts, app/robots.ts,
+//    app/sitemap.ts, app/city/[city]/page.tsx, app/cuisine/[cuisine]/page.tsx
+//    و همین‌جا) در فایلی که خودش را «منبعِ واحد» می‌نامد. یک حقیقت و چند کپی،
+//    و کپی‌ها نمی‌توانند همه درست بمانند.
+//
+//    حالا از env مشتق می‌شود با apex به‌عنوان پیش‌فرض (تصمیمِ D-004). چرا مهم
+//    است: با hardcode، **هر preview deployment** هم canonical و sitemap را
+//    برای دامنه‌ی تولید اعلام می‌کرد.
+export const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://rezervno.ir').replace(/\/$/, '');
 
 /**
  * صفحه‌ی اصلیِ رستوران — **URLِ canonicalِ اول**.

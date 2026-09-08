@@ -1,6 +1,8 @@
 // پیکربندیِ چندزبانه/چندکشوری + hreflang (آمادگیِ international SEO).
 // فعلاً تک‌زبانه (fa-IR)؛ ساختار طوری است که افزودنِ زبان‌های بعدی فقط یک ردیف است.
-export const SITE = 'https://rezervno.ir';
+// SITE از منبعِ واحد می‌آید (lib/urls.ts) — پیش از ۲۰۲۶-۰۹-۰۸ اینجا hardcode بود.
+import { SITE } from './urls';
+export { SITE };
 
 // برای افزودنِ زبان: یک ردیف اضافه کن، مثلاً { code: 'en', prefix: '/en' }.
 // prefix خالی = زبانِ پیش‌فرض روی ریشه‌ی مسیر.

@@ -6,7 +6,8 @@ import { alternates } from '@/lib/i18n';
 
 export const revalidate = 300;
 
-const SITE = 'https://rezervno.ir';
+// SITE از منبعِ واحد می‌آید (lib/urls.ts) — پیش از ۲۰۲۶-۰۹-۰۸ اینجا hardcode بود.
+import { SITE } from '@/lib/urls';
 // گاردِ کیفیت: صفحه‌ی مکان با کمتر از این تعداد رستوران ساخته نمی‌شود (ضدِّ thin content).
 const MIN_LISTINGS = 1;
 

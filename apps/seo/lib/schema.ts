@@ -2,7 +2,8 @@
 // فقط فیلدهایی که داده دارند emit می‌شوند (بدونِ null/خالی → schemaِ معتبر).
 import type { MenuItem, RestaurantDetail, RestaurantListItem } from './api';
 
-const SITE = 'https://rezervno.ir';
+// SITE از منبعِ واحد می‌آید (lib/urls.ts) — پیش از ۲۰۲۶-۰۹-۰۸ اینجا hardcode بود.
+import { SITE } from './urls';
 
 export function organizationJsonLd(): object {
   return {

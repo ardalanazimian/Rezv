@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { fetchSitemapData } from '@/lib/api';
 
-const SITE = 'https://rezervno.ir';
+// SITE از منبعِ واحد می‌آید (lib/urls.ts) — پیش از ۲۰۲۶-۰۹-۰۸ اینجا hardcode بود.
+import { SITE } from '@/lib/urls';
 
 // sitemap.xml پویا از DB (رستوران/شهر/آشپزی). force-dynamic تا دادهٔ زنده خوانده شود
 // (نه نسخه‌ی خالیِ زمانِ build)؛ کشِ ۱ساعته‌ی fetch در fetchSitemapData بارِ API را می‌گیرد.
