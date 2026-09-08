@@ -31,6 +31,7 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canView
     restaurantId: ctx.restaurant.id,
     staffId: ctx.auth.kind === 'staff' ? ctx.auth.sub : null,
     question: b.message,
+    timezone: ctx.restaurant.timezone,
   });
   return NextResponse.json(result);
 });

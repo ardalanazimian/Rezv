@@ -25,7 +25,10 @@ import { recordHttp, metrics } from './metrics';
 
 export type RestaurantHandlerContext = {
   auth: AccessPayload;
-  restaurant: { id: string; name: string; clubPrefix: string };
+  // ⚠️ `timezone` (رفعِ T2): resolveStaffRestaurant از قبل این ستون را
+  // می‌خواند (staff-helpers.ts:RESTAURANT_SELECT) — اینجا فقط نوع را
+  // منعکس می‌کند، کوئریِ تازه‌ای نیست.
+  restaurant: { id: string; name: string; clubPrefix: string; timezone: string };
 };
 
 type Options = {

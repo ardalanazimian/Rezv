@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { parseQuery, zReservationCode, z } from '@/lib/schemas';
+import { zonedTimeToUtc, dateKeyInTz } from '@/lib/hours';
 
 const querySchema = z.object({
   date: z.enum(['today', 'tomorrow', 'upcoming', 'past', 'all']).default('today'),
@@ -31,10 +32,19 @@ export const GET = withRestaurantAuth(
     const restaurant = ctx.restaurant;
     const { date: filter, limit, cursor } = parseQuery(req, querySchema);
 
+    // ⚠️ رفعِ T2 (۲۰۲۶-۰۹-۰۸): «امروز» باید مرزِ نیمه‌شبِ **رستوران** باشد،
+    // نه ساعتِ محلیِ پروسه‌ی سرور. قبلاً `new Date()` + `setHours(0,0,0,0)`
+    // تایم‌زونِ Nodeِ در حالِ اجرا را می‌خواند — اگر سرور UTC باشد و رستوران
+    // Asia/Tehran (+۳:۳۰، پیش‌فرضِ schema.prisma:164)، از ۲۰:۳۰ تا نیمه‌شبِ
+    // تهران «امروز»ِ پنل هنوز دیروزِ UTC بود (همان کلاسِ ۷۵eb9df).
+    // الگویِ canonical از availability.ts:308-309 عیناً تکرار می‌شود؛ سیستمِ
+    // موازی ساخته نشده. `ctx.restaurant.timezone` بدونِ کوئریِ اضافه در
+    // دسترس است (staff-helpers.ts:RESTAURANT_SELECT از قبل آن را می‌خواند).
+    const tz = restaurant.timezone;
     const now = new Date();
-    const startToday = new Date(now); startToday.setHours(0, 0, 0, 0);
-    const endToday = new Date(startToday); endToday.setDate(endToday.getDate() + 1);
-    const endTomorrow = new Date(endToday); endTomorrow.setDate(endTomorrow.getDate() + 1);
+    const startToday = zonedTimeToUtc(dateKeyInTz(now, tz), '00:00', tz);
+    const endToday = new Date(+startToday + 24 * 3600_000);
+    const endTomorrow = new Date(+endToday + 24 * 3600_000);
 
     let slotWhere: Record<string, unknown> = {};
     if (filter === 'today') slotWhere = { slotStart: { gte: startToday, lt: endToday } };

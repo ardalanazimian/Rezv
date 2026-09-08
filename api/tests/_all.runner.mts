@@ -162,6 +162,8 @@ import './admin-otp-flag.integration.test.mts';
 import './admin-panel-contract.integration.test.mts';
 import './restaurant-staff-tenant-pin.integration.test.mts';
 import './business-panel-contract.integration.test.mts';
+import './reservations-restaurant-timezone.integration.test.mts';
+import './assistant-answers-timezone.test.mts';
 import './telemetry-pipeline.integration.test.mts';
 import './staff-tenant-hijack.integration.test.mts';
 import './incentive-low-demand-date.integration.test.mts';

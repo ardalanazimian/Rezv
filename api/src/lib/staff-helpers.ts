@@ -18,8 +18,14 @@ import type { AccessPayload } from './jwt';
  *    X-Restaurant-Id داده شده باشد → همان شعبه، فقط اگر واقعاً متعلق به
  *    همین تنانت باشد (جلوگیری از دسترسی متقاطع تنانت‌ها — IDOR).
  *  • در غیر این صورت → اولین رستورانِ تنانت (سازگاری با تنانت‌های تک‌شعبه‌ای).
+ *
+ * ⚠️ رفعِ T2 (۲۰۲۶-۰۹-۰۸): `timezone` هم به select اضافه شد تا هر
+ * routeِ restaurant-scoped بتواند از `ctx.restaurant.timezone` برای مرزِ
+ * روزِ محلیِ رستوران استفاده کند (نه ساعتِ محلیِ پروسه‌ی سرور). این تابع
+ * از قبل روی هر درخواست صدا زده می‌شود، پس یک ستونِ بیشتر در همین کوئریِ
+ * موجود = **بدونِ کوئریِ اضافه**.
  */
-const RESTAURANT_SELECT = { id: true, name: true, slug: true, clubPrefix: true, cbBasePct: true, cbPreorderPct: true, cbVipPct: true, cbWinbackPct: true };
+const RESTAURANT_SELECT = { id: true, name: true, slug: true, clubPrefix: true, cbBasePct: true, cbPreorderPct: true, cbVipPct: true, cbWinbackPct: true, timezone: true };
 
 /**
  * «شعبه‌ی پیش‌فرض» یک تنانتِ چندشعبه‌ای — وقتی staff به شعبه‌ی خاصی قفل
