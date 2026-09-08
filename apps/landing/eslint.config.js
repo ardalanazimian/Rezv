@@ -6,26 +6,30 @@
 //
 // ⚠️ `.eslintrc.json` قبلاً کنارِ همین فایل بود و **خوانده نمی‌شد**: ESLint 9
 //    وقتی flat config ببیند نسخه‌ی legacy را نادیده می‌گیرد. حذف شد، چون یک
-//    فایلِ تنظیماتِ بی‌اثر که معتبر به‌نظر می‌رسد خودش تله است — یک بار همان
-//    ویرایشِ بی‌اثر انجام شد و «سبز» به‌نظر رسید.
+//    فایلِ تنظیماتِ بی‌اثر که معتبر به‌نظر می‌رسد خودش تله است.
+//
+// ⚠️ چرا پلاگینِ typescript-eslint را خودمان require نمی‌کنیم:
+//    نسخه‌ی اولِ این رفع `require('@typescript-eslint/eslint-plugin')` داشت —
+//    وابستگی‌ای که در package.json اعلام نشده بود و فقط از راهِ
+//    eslint-config-next → typescript-eslint به ما می‌رسید. اعلامش هم ممکن
+//    نبود: `^8` به 8.70.0 می‌رسد که peerش `parser@^8.70.0` است، ولی درخت
+//    parser@8.65.0 دارد (ERESOLVE). پس به‌جای پین‌کردنِ خودمان به نسخه‌ی
+//    گذرایِ Next، بلاکِ قاعده **بعد از** spreadِ آن می‌آید و از ثبتِ خودش
+//    استفاده می‌کند. یک وابستگیِ کمتر، و بدونِ جفت‌شدن با نسخه.
 module.exports = [
   require('@eslint/js').configs.recommended,
-  // no-undef روی TypeScript همیشه مثبتِ کاذب است؛ تایپ‌چکر پوششش می‌دهد.
+  // no-undef و no-unused-vars پایه روی TypeScript مثبتِ کاذب‌اند؛ تایپ‌چکر و
+  // نسخه‌ی TS-aware پوششش می‌دهند.
   { rules: { 'no-undef': 'off', 'no-unused-vars': 'off' } },
+  ...require('eslint-config-next'),
   {
-    // ⚠️ فقط .ts/.tsx: `--print-config` نشان داد این دو پسوند با
-    //    typescript-eslint/parser تجزیه می‌شوند ولی `.mts` با
-    //    eslint-config-next/parser — و آن یکی importِ type-only را «بی‌استفاده»
-    //    می‌بیند (سه مثبتِ کاذب در test/schema.test.mts که واقعاً در خطوطِ
-    //    ۱۳/۲۰/۳۰/۷۶ استفاده شده‌اند). قاعده‌ی TS-aware فقط جایی اعمال می‌شود
-    //    که پارسرِ TS واقعاً اجرا شود.
-    // ⚠️ شکافِ شناخته‌شده: فایل‌های `.mts` پوششِ unused-vars ندارند. ساکت
-    //    نشده — ثبت شده، چون اصلاحش به یکسان‌کردنِ پارسر نیاز دارد.
+    // ⚠️ فقط .ts/.tsx: `--print-config` دو پارسرِ متفاوت نشان داد —
+    //    typescript-eslint/parser روی این دو، و eslint-config-next/parser روی
+    //    `.mts`، که importِ type-only را «بی‌استفاده» می‌بیند.
+    // ⚠️ شکافِ شناخته‌شده: `.mts` پوششِ unused-vars ندارد. ساکت نشده، ثبت شده.
     files: ['**/*.ts', '**/*.tsx'],
-    plugins: { '@typescript-eslint': require('@typescript-eslint/eslint-plugin') },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
-  ...require('eslint-config-next'),
 ];

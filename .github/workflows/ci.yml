@@ -505,7 +505,17 @@ jobs:
         run: python tools/build-standalone.py --check
 
   # ── اپِ SEO (apps/seo · Next.js SSR/ISR، ADR 0001) — build + typecheck + lint ──
-  # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند. build خودِ Next تایپ‌چک/لینت می‌کند.
+  # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند.
+  #
+  # ⚠️ ۲۰۲۶-۰۹-۰۸ — کامنتِ قبلی می‌گفت «build خودِ Next تایپ‌چک/لینت می‌کند».
+  #    نیمه‌ی تایپ‌چک درست است، نیمه‌ی لینت **نبود**. اندازه‌گیری‌شده، نه خوانده:
+  #
+  #      متغیرِ بی‌استفاده تزریق شد →  npm run build  → exit 0  (هیچ اشاره‌ای)
+  #                                    npm run lint   → exit 1  (no-unused-vars)
+  #
+  #    یعنی این اپ تا امروز **هرگز lint نشده بود** — نه اینجا و نه هیچ‌جای دیگر
+  #    (`npm run lint` فقط در جابِ api و landing صدا زده می‌شد). اسکریپتش وجود
+  #    داشت و هیچ‌کس اجرایش نمی‌کرد. گامِ صریحِ زیر اضافه شد.
   seo:
     runs-on: ubuntu-latest
     defaults:
@@ -523,7 +533,9 @@ jobs:
         run: npm ci || npm install
       - name: Schema unit tests (JSON-LD sanity — پایشِ خودکار)
         run: npm test
-      - name: Build (Next.js — typecheck + lint + build)
+      - name: Lint (eslint:recommended — `next build` این را اجرا نمی‌کند)
+        run: npm run lint
+      - name: Build (Next.js — typecheck + build)
         run: npm run build
 
   # ── وب‌سایتِ عمومی (apps/landing · Next.js SSR/ISR، ADR 0002) ──
