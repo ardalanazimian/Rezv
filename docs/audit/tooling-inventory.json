@@ -8,15 +8,16 @@
     "node": "v20.20.2",
     "npm": "10.8.2",
     "python": "3.12.10",
-    "docker": "29.7.2 (daemon up; docker.exe NOT on PATH - full path required)",
+    "docker": "29.7.2 · daemon up (docker ps exit 0) · ON PATH at /c/Users/Ardalan/AppData/Local/Programs/DockerDesktop/resources/bin/docker",
     "wsl": "2.7.13.0, Ubuntu, version 2, Running",
     "psql_on_host": false,
     "gh_cli": false,
-    "note_gh": "No GitHub CLI: CI run status cannot be read from this session. Any CI claim from here is UNKNOWN."
+    "note_gh": "No GitHub CLI: CI run status cannot be read from this session. Any CI claim from here is UNKNOWN.",
+    "docker_correction": "Corrected 2026-09-08 after the Reviewer rejected the original line. It said 'docker.exe NOT on PATH'. That was true when measured (before the WSL install and reboot) and false when used. A measurement carries a timestamp; quoting it later is quoting a different fact. It also caused a real error: live database questions were reported UNKNOWN in a CEO brief when `docker exec rezv-test-pg psql` could have answered them."
   },
   "mcp_servers": {
     "available_now": [],
-    "note": "Verified by ToolSearch at 2026-09-08: no Supabase, Vercel, Sentry, Context7, Figma, Slack, Postman or graphify tools resolve. MASTER PROMPT §1 directs live-system questions through these; that instruction is NOT EXECUTABLE from this session today.",
+    "note": "Verified by ToolSearch at 2026-09-08: no Supabase, Vercel, Sentry, Context7, Figma, Slack, Postman or graphify tools resolve. MASTER PROMPT §1 directs live-system questions through these; that instruction is NOT EXECUTABLE from this session today. | Reviewer correction 2026-09-08: the absence of MCP did NOT make live DB facts unreachable — the running throwaway Postgres container answers via `docker exec`. Do not conflate 'no MCP' with 'no live data'.",
     "requires_auth_never_connected": [
       "Cloudflare Developer Platform",
       "Control Plane",
