@@ -41,11 +41,16 @@ SITE_API_BASE=http://localhost:3000 NEXT_PUBLIC_API_BASE=http://localhost:3000 n
 | `NEXT_PUBLIC_SITE_URL` | هر دو | دامنه‌ی همین سایت — پایه‌ی canonical و sitemap |
 | `SITE_API_BASE` | سرور | خواندنِ محتوا در SSR/ISR و ساختِ sitemap |
 | `NEXT_PUBLIC_API_BASE` | مرورگر | فرم‌های دمو/خرید/تماس و داشبورد |
+| `NEXT_PUBLIC_APP_URL` | مرورگر | ➖ اختیاری — دکمه‌ی «رزرو میز» و درِ اپِ مشتری در `/login`؛ بدونِ آن از رویِ `NEXT_PUBLIC_SITE_URL` ساخته می‌شود (`app.<دامنه>`, `lib/i18n.ts` `appBase()`, همتایِ `api/src/lib/public-urls.ts`) |
 | `NEXT_PUBLIC_BUSINESS_APP_URL` | مرورگر | دکمه‌ی ورود به پنلِ کسب‌وکار |
-| `NEXT_PUBLIC_CUSTOMER_APP_URL` | مرورگر | دکمه‌ی ورود به اپِ مشتری |
 | `NEXT_PUBLIC_COMPANY_APP_URL` | مرورگر | دکمه‌ی ورود به پنلِ شرکت |
 
 `SEO_API_BASE` نامِ قدیمی است و هنوز به‌عنوانِ fallback خوانده می‌شود.
+
+⚠️ `NEXT_PUBLIC_CUSTOMER_APP_URL` (نامِ قدیمی) در ۲۰۲۶-۰۹-۰۸ حذف شد: هیچ‌کجای
+CI یا Vercel ستش نمی‌کرد، پس درِ اپِ مشتری همیشه به فرمِ تماس می‌افتاد
+(`docs/KNOWN_LIMITATIONS.md:1878-1884` همین کلاسِ اشتباه را در `api/`
+مستند می‌کند). `NEXT_PUBLIC_APP_URL` بالا جایگزینش است.
 
 ⚠️ دامنه‌ی این سایت باید در `ALLOWED_ORIGINS`ِ اپِ `api/` باشد، وگرنه فرم‌ها
 با خطای CORS رد می‌شوند.

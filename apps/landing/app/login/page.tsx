@@ -7,7 +7,7 @@ import { SplitText } from '@/components/site/Kinetic';
 import { DoorPicker, type Door } from '@/components/site/DoorPicker';
 import { HeroLight } from '@/components/sections/Caustics';
 import { buildMetadata } from '@/lib/seo';
-import { SITE } from '@/lib/i18n';
+import { SITE, appBase } from '@/lib/i18n';
 import { graph, webPageJsonLd, breadcrumbJsonLd } from '@/lib/site-schema';
 
 // نقطه‌ی ورود. خودِ ورود در اپ‌های مربوطه انجام می‌شود (یک هویت، یک صفحه‌ی
@@ -30,9 +30,10 @@ const DOORS: Door[] = [
     title: 'اپِ مشتری',
     body: 'کشفِ رستوران، رزروِ میز، و تاریخچه‌ی رزروها.',
     hint: 'ورود با شماره‌ی موبایل',
-    href: process.env.NEXT_PUBLIC_CUSTOMER_APP_URL ?? null,
-    fallbackHref: '/contact',
-    fallbackLabel: 'دریافتِ نشانی',
+    // appBase() همیشه یک مقدار برمی‌گرداند (بدونِ override هم از رویِ SITE
+    // ساخته می‌شود)، پس این در دیگر حالتِ «پیکربندی‌نشده» ندارد و به فرمِ
+    // تماس نمی‌افتد.
+    href: appBase(),
   },
   {
     key: 'business',

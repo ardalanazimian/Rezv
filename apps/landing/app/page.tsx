@@ -1,5 +1,6 @@
 import { CmsPage, cmsMetadata, type CmsPageOptions } from '@/lib/cms-page';
 import { Intro } from '@/components/site/Intro';
+import { HomeGate } from '@/components/site/HomeGate';
 
 // صفحه‌ی اصلی — همان موتورِ CMS، فقط بدونِ مسیرِ راهنما (خودش ریشه است).
 const OPTS: CmsPageOptions = {
@@ -23,6 +24,11 @@ export default function HomePage() {
   return (
     <>
       <Intro />
+      {/* اولین چیزی که مهمان می‌بیند: انتخابِ نقش. تصمیمِ بنیان‌گذار
+          (۲۰۲۶-۰۹-۰۸): «کسی رفت توش گیج نشه و راحت بتونه به پنل کاستومر
+          دسترسی پیدا کنه». محتوایِ CMS زیرِ همین می‌آید و دست‌نخورده
+          می‌ماند — این بخش وابسته به CMS نیست، پس هرگز غایب نمی‌شود. */}
+      <HomeGate />
       <CmsPage {...OPTS} />
     </>
   );

@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { Icon, LogoMark } from './Icon';
 import { ThemeToggle } from './ThemeToggle';
 import { BRAND_NAME } from '@/lib/site-schema';
+import { appBase } from '@/lib/i18n';
 
 interface NavItem { label: string; href: string; children?: { label: string; href: string; desc: string; icon: string }[] }
 
@@ -131,9 +132,13 @@ export function Header() {
 
         <div className="site-header__actions">
           <ThemeToggle compact />
-          <Link href="/login" className="btn btn--ghost btn--sm site-header__login">ورود</Link>
-          <Link href="/demo" className="btn btn--primary btn--sm">
-            دموی رایگان
+          {/* رزرو میز = اپِ مشتری، اولویتِ اصلیِ محصول (تصمیمِ بنیان‌گذار،
+              ۲۰۲۶-۰۹-۰۸). ورود/دموی مالک هنوز هستند، فقط با وزنِ کمتر —
+              صاحبانِ رستوران هم مشتریِ ما هستند و نباید بی‌مسیر بمانند. */}
+          <Link href="/login" className="btn btn--ghost btn--sm site-header__aux">ورود</Link>
+          <Link href="/demo" className="btn btn--ghost btn--sm site-header__aux">دموی رایگان</Link>
+          <Link href={appBase()} className="btn btn--primary btn--sm">
+            رزرو میز
             <Icon name="arrowLeft" size={16} className="btn__arrow" />
           </Link>
           <button
@@ -165,8 +170,12 @@ export function Header() {
             ),
           )}
           <div className="divider" style={{ margin: 'var(--sp-3) 0' }} />
+          <Link href={appBase()} className="btn btn--primary btn--block">
+            رزرو میز در رزرونو
+            <Icon name="arrowLeft" size={17} />
+          </Link>
           <Link href="/login" className="btn btn--ghost btn--block">ورود به حساب</Link>
-          <Link href="/demo" className="btn btn--primary btn--block">شروعِ دموی ۳۰ روزه</Link>
+          <Link href="/demo" className="btn btn--ghost btn--block">شروعِ دموی ۳۰ روزه</Link>
         </nav>
       </div>
     </header>
