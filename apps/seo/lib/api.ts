@@ -151,7 +151,7 @@ export async function fetchRestaurant(slug: string, revalidateSec = 300): Promis
       photos: (d.photos || []).map((p) => ({ ...p, url: resolveMediaUrl(p.url) || p.url })),
       logo_url: resolveMediaUrl(d.logo_url),
     };
-  } catch (e) {
+  } catch {
     // بدنه‌ی خراب/غیر-JSON هم شکستِ زیرساخت است، نه «رستوران نیست».
     throw new UpstreamUnavailableError(`restaurants/${slug} → پاسخِ نامعتبر`);
   }
@@ -210,7 +210,7 @@ export async function fetchRestaurantList(
   try {
     const data = (await res.json()) as { items?: RestaurantListItem[] };
     return Array.isArray(data.items) ? data.items : [];
-  } catch (e) {
+  } catch {
     if (strict) throw new UpstreamUnavailableError(`${what} → پاسخِ نامعتبر`);
     return [];
   }
@@ -270,7 +270,7 @@ export async function fetchPublicMenu(slug: string, revalidateSec = 300): Promis
       ...m, image_url: resolveMediaUrl(m.image_url),
     }));
     return { restaurant: d.restaurant, items };
-  } catch (e) {
+  } catch {
     throw new UpstreamUnavailableError(`${what} → پاسخِ نامعتبر`);
   }
 }
