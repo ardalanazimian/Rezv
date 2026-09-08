@@ -7,11 +7,19 @@ Last verified: **2026-09-08** by the CEO session itself.
 
 ---
 
-## Current CEO session
+## Current roster — confirmed by the founder 2026-09-08
 
-```
-rezv-f8 [4e0f27]
-```
+| Role | Session | Confirmed how |
+|---|---|---|
+| **CEO** | `rezv-f8 [4e0f27]` | this session, self-identified via `ListAgents` |
+| **Reviewer** (founder-side) | `rezv-d3 [c8fb22]` | founder confirmed directly; author of directive 033 |
+
+Directives **032** and **034** were produced by a *subagent* the CEO ran before a Reviewer session
+existed, and carry the same "founder-side reviewer" signature. That ambiguity is resolved: the role
+belongs to `rezv-d3 [c8fb22]`, and the CEO is not running that subagent again. **Two auditors racing
+one working tree is a failure this project already paid for today** — see
+[the git-channel note](#channels-are-files-not-chat) and the duplicated fixture fix in
+`api/tests/business-panel-contract.integration.test.mts`.
 
 ## Previously, and now DEAD — do not send to these
 
