@@ -64,6 +64,9 @@ const MAX_PAYLOAD_BYTES = 8_000;
  * می‌فرستد. پس این هرس بخشی از خودِ همان رفع است، نه یک بهبودِ جانبی.
  */
 function stripNul(s: string): string {
+  // stripNul عمداً بایتِ NUL را حذف می‌کند — کاراکترِ کنترلی خودِ موضوعِ تابع
+  // است، پس no-control-regex اینجا مثبتِ کاذب است نه یافته.
+  // eslint-disable-next-line no-control-regex
   return s.includes('\u0000') ? s.replace(/\u0000/g, '') : s;
 }
 

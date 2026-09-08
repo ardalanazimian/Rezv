@@ -27,7 +27,7 @@ async function POST_impl(req: Request) {
   try {
     let userId: string | undefined;
     let isStaff = false;
-    try { const a = authFromRequest(req); if (a.kind === 'customer') userId = a.sub; else isStaff = true; } catch {}
+    try { const a = authFromRequest(req); if (a.kind === 'customer') userId = a.sub; else isStaff = true; } catch { /* کاربرِ ناشناس — نبودِ توکن حالتِ معتبر است، نه خطا */ }
     // ⚠️ رفع‌شده: بنِ سختِ پلتفرم قبلاً رویِ پیوستن به صف چک نمی‌شد.
     if (userId) await assertUserNotBanned(userId);
     // سوییچِ قابلیت (Company Control Plane، فازِ ۳): فقط پیوستنِ مشتری/مهمان را
