@@ -8,16 +8,34 @@
 
 ## 🚨 گیت‌های اجباری پیش از push (همه در CI هم هستند — merge-on-green)
 
-> ⚠️ این فهرست **زیرمجموعه‌ی اجباریِ محلی** است، نه کلِ گیت‌ها. CI بیش از این‌ها را
-> اجرا می‌کند (گاردهای مخزن در jobِ `design-system`: کهنگیِ اسناد، بایتِ کنترلی،
-> منشورِ عامل‌ها، کاملیِ runnerِ تست، اتصالِ نامِ متریک به کد؛ به‌علاوه jobهای
-> `image-build`, `boot-path`, `observability`, `standalone`, `seo`, `landing`,
-> `base-freshness`). آن‌ها چیزی به کارِ محلیِ تو اضافه نمی‌کنند — ولی فهرستی که
-> کامل به‌نظر برسد و نباشد، خودش همان کلاسِ «ادعا فراتر از آنچه اثبات شده» است.
-> منبعِ حقیقتِ کاملِ گیت‌ها `.github/workflows/ci.yml` است، نه این فهرست.
+> ⚠️ این فهرست **زیرمجموعه‌ی اجباریِ محلی** است، نه کلِ گیت‌ها. منبعِ حقیقتِ کاملِ
+> گیت‌ها `.github/workflows/ci.yml` است، نه این فهرست.
+>
+> **jobِ `design-system` ده گاردِ مخزن را اجرا می‌کند** (شمرده از `ci.yml`، ۲۰۲۶-۰۹-۰۸):
+> `sync-design-system.sh --check` · `check-classic-scripts.sh` · `check-fonts.py` ·
+> `check-doc-staleness.mjs` · `check-control-bytes.mjs` · `check-agent-charter.mjs` ·
+> `check-runner-completeness.mjs` · `check-run-clock-date-keys.mjs` ·
+> `xss-escaping-regression.mjs` · `xss-sink-audit.mjs --check`.
+> به‌علاوه jobهای `image-build`, `boot-path`, `observability`, `standalone`, `seo`,
+> `landing`, `base-freshness`.
+>
+> ⚠️ تصحیحِ ۲۰۲۶-۰۹-۰۸ — این پاراگراف پیش از این در **دو جهت** غلط بود، و هر دو
+> دقیقاً همان چیزی است که خودش دربارهٔ‌اش هشدار می‌دهد:
+> «اتصالِ نامِ متریک به کد» را جزوِ `design-system` می‌شمرد، در حالی که
+> `check-alert-metric-binding.mjs` در jobِ دیگری (`ci.yml:367`) است؛ و **پنج گارد
+> را که واقعاً آنجا اجرا می‌شوند نام نمی‌برد** — از جمله هر دو گیتِ XSS، که
+> بیشترین کارِ ممیزیِ این هفته رویشان بوده. فهرستی که کامل به‌نظر برسد و نباشد،
+> همان کلاسِ «ادعا فراتر از آنچه اثبات شده» است.
 1. `sh tools/sync-design-system.sh --check`
 2. `python tools/build-standalone.py --check` (بعد از هر تغییرِ پنل‌ها: بدونِ `--check` بازتولید کن — خروجیِ commitشده است)
 3. در `api/`: `npx tsc --noEmit` و `npm run lint` و `npm test` (نیازمند Postgres/Redisِ واقعی)
+   - ⚠️ ۲۰۲۶-۰۹-۰۸ — اگر `apps/landing` یا `apps/seo` را دست زدی، **`npm run lint`
+     در همان اپ** را هم بزن. تا امروز آن دو `eslint:recommended` نداشتند و
+     `npm run lint`شان سبز بود و چیزی نمی‌سنجید (کلیدِ تکراری از هر سه اپ رد
+     می‌شد). حالا هر سه اپ آن را دارند، هر سه `--max-warnings 0` دارند، و
+     `apps/seo` تا امروز **اصلاً در CI لینت نمی‌شد** — `next build` تایپ‌چک
+     می‌کند ولی لینت نمی‌کند (اندازه‌گیری‌شده: متغیرِ بی‌استفاده → build صفر،
+     lint یک).
 4. در `e2e/`: `npm test` — هر سه پروفایل (iPhone 13 / Pixel 5 / Desktop) باید سبز باشد
 5. 🚨 قبل از هر `npm install`: `unset NODE_ENV` (اگر production ست باشد کلِ toolchain پاک می‌شود)
 6. `sh tools/check-schema-drift.sh` (jobِ CIِ جداگانه‌ی `schema-drift`، merge-on-green؛ **نیازمندِ `psql` روی PATH و
