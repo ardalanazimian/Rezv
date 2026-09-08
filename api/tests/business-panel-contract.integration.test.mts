@@ -29,6 +29,7 @@ process.env.JWT_REFRESH_SECRET ??= 'b'.repeat(32);
 
 const { db } = await import('../src/lib/db');
 const { signAccess } = await import('../src/lib/jwt');
+const { zonedTimeToUtc, dateKeyInTz } = await import('../src/lib/hours.ts');
 
 const R = {
   reservations: await import('../src/app/api/v1/restaurant/reservations/route'),
@@ -171,7 +172,16 @@ describe('قراردادِ پنلِ business — /restaurant/* در برابرِ
     userId = u.id;
 
     const table = await db.table.create({ data: { restaurantId, number: 7, capacity: 4, isActive: true }, select: { id: true } });
-    const start = new Date(Date.now() + 3 * 3600_000);
+    // ⚠️ رفعِ نقصِ fixture (۲۰۲۶-۰۹-۰۸، جدایِ رفعِ T2 — کامیتِ جداگانه):
+    // قبلاً «۳ ساعت بعدِ همین الان» بود. نزدیکِ نیمه‌شبِ محلی این می‌توانست
+    // به فردایِ تقویمی بیفتد و فیلترِ پیش‌فرضِ «امروز» (روتِ reservations)
+    // این رزرو را حذف کند — تأییدشده: قرمز در اجرایِ ۲۳:۰۶، سبز در ۰۹:۴۸ی
+    // فردا، با عینِ همان کد و همان دیتابیس. روت درست رفتار می‌کرد؛ فرضِ
+    // fixture («۳ ساعت بعد همیشه امروز است») غلط بود. حالا «ظهرِ امروز به
+    // وقتِ رستوران» (این fixture تایم‌زون را صریح نمی‌دهد → پیش‌فرضِ
+    // schema.prisma:164 یعنی Asia/Tehran) — دور از هر مرزِ نیمه‌شبی، برایِ
+    // هر ساعتی که این تست اجرا شود «امروز» می‌ماند.
+    const start = zonedTimeToUtc(dateKeyInTz(new Date(), 'Asia/Tehran'), '12:00', 'Asia/Tehran');
     await db.reservation.create({ data: {
       restaurantId, code: `DBC-${SFX}`, partySize: 2, slotStart: start, slotEnd: new Date(+start + 90 * 60_000),
       status: 'confirmed', userId, tableId: table.id, guestName: '[DEMO] مهمان', guestPhone: fixturePhone('0983'),
