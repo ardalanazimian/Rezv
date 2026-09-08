@@ -89,15 +89,31 @@ function lineOf(src, idx) {
   return line;
 }
 
-// بعد از `)`، عبورِ فضایِ خالی/خطِ جدید و تطبیقِ زنجیره‌ی
-// `.toISOString().slice(0, 10)` یا `.toISOString().substring(0, 10)`.
-const CHAIN_RE = /^\s*\.\s*toISOString\s*\(\s*\)\s*\.\s*(?:slice|substring)\s*\(\s*0\s*,\s*10\s*\)/;
+// بعد از `)`، عبورِ فضایِ خالی/خطِ جدید و تطبیقِ زنجیره‌ی تبدیل به کلیدِ روز.
+//
+// ⚠️ گشاد شد در ۲۰۲۶-۰۹-۰۸ (دستورِ ۰۳۶ بازبین). نسخه‌ی اول فقط
+// `.slice|substring(0,10)` را می‌دید و `.split('T')[0]` از کنارش رد می‌شد —
+// همان تبدیل، نحوِ دیگر. اثبات‌شده با پروب: پیش از این گشادسازی exit 0 می‌داد.
+const CHAIN_RE = /^\s*\.\s*toISOString\s*\(\s*\)\s*\.\s*(?:(?:slice|substring)\s*\(\s*0\s*,\s*10\s*\)|split\s*\(\s*['"`]T['"`]\s*\)\s*\[\s*0\s*\])/;
 
+// نامِ متغیرِ محلی که مقدارش یک `new Date(ساعتِ اجرا)` است.
+// ⚠️ چرا این لازم بود: گاردِ اول شکلِ **عبارت** را می‌دید، نه جریانِ داده. کافی
+// بود کسی خطِ بلند را تمیز کند و Date را در یک متغیر بگذارد تا موردِ گرفته‌شده
+// نگرفته شود — یعنی عادی‌ترین refactor گارد را دور می‌زد. این همان «قاعده‌ی ۵ یک
+// پله بالاتر» است که بازبین نام برد.
+const ASSIGN_RE = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+Date\s*\(/g;
+
+// ⚠️ حدِ شناخته‌شده و مدیریت‌شده، نه شکافِ ناشناخته: این ردیابی فقط یک انتسابِ
+// **محلی و مستقیم** را می‌گیرد. اگر تاریخ از یک تابع برگردد، از پارامتر بیاید،
+// یا دوباره انتساب شود، دیده نمی‌شود — آن نیازِ تحلیلِ جریانِ داده‌ی واقعی است،
+// نه کارِ یک گاردِ متنی. نام‌بردنش اینجا عمدی است: حدی که نوشته شده مدیریت‌شده
+// است، حدی که نوشته نشده تله است.
 const hits = [];
 for (const file of files) {
   const src = readFileSync(file, 'utf8');
   const rel = relative(REPO, file).replace(/\\/g, '/');
 
+  // محورِ ۱ — زنجیره‌ی مستقیم روی خودِ `new Date(...)`.
   const newDateRe = /new\s+Date\s*\(/g;
   let m;
   while ((m = newDateRe.exec(src))) {
@@ -110,7 +126,31 @@ for (const file of files) {
 
     const after = src.slice(closeIdx + 1);
     if (CHAIN_RE.test(after)) {
-      hits.push(`${rel}:${lineOf(src, m.index)} — new Date(${inner.trim() || ''}).toISOString().slice(0, 10) : از dateKeyInTz استفاده کن`);
+      hits.push(`${rel}:${lineOf(src, m.index)} — new Date(${inner.trim() || ''}).toISOString()… : از dateKeyInTz استفاده کن`);
+    }
+  }
+
+  // محورِ ۲ — انتساب به متغیرِ محلی، سپس زنجیره روی همان نام.
+  let a;
+  ASSIGN_RE.lastIndex = 0;
+  while ((a = ASSIGN_RE.exec(src))) {
+    const name = a[1];
+    const openIdx = a.index + a[0].length - 1;
+    const closeIdx = findMatchingParen(src, openIdx);
+    if (closeIdx === -1) continue;
+    const inner = src.slice(openIdx + 1, closeIdx);
+    if (!(inner.trim() === '' || /Date\.now\(\)/.test(inner))) continue;
+
+    // همان نام، جایی پس از انتساب، به زنجیره‌ی کلیدِ روز وصل شود.
+    const rest = src.slice(closeIdx + 1);
+    const useRe = new RegExp('\\b' + name.replace(/\$/g, '\\$') + '\\s*(?=\\.\\s*toISOString)', 'g');
+    let u;
+    while ((u = useRe.exec(rest))) {
+      const tail = rest.slice(u.index + u[0].length);
+      if (CHAIN_RE.test(tail)) {
+        hits.push(`${rel}:${lineOf(src, closeIdx + 1 + u.index)} — ${name}.toISOString()… (${name} از ساعتِ اجرا) : از dateKeyInTz استفاده کن`);
+        break; // یک گزارش برای هر متغیر کافی است
+      }
     }
   }
 }
