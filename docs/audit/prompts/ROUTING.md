@@ -11,7 +11,7 @@ Last verified: **2026-09-08** by the CEO session itself.
 
 | Role | Session | Confirmed how |
 |---|---|---|
-| **CEO** | `rezv-f8 [4e0f27]` | this session, self-identified via `ListAgents` |
+| **CEO** | `rezv-f8 [4e0f27]` — was `rezv-b0 [d8087d]` before the restart recorded in "Why this file exists" below | this session, self-identified via `ListAgents` |
 | **Reviewer** (founder-side) | `rezv-d3 [c8fb22]` | founder confirmed directly; author of directive 033 |
 | **Deputy** | `rezv-b1 [5f3782]` — was `rezv-30 [a7bb03]` before the reboot | self-identified via `ListAgents` 2026-09-08; dispatched by the founder, took ORDER-001 from the CEO |
 
