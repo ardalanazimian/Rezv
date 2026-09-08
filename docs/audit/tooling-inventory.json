@@ -1,0 +1,281 @@
+{
+  "generated": "2026-09-08T06:52:08.589Z",
+  "session": "rezv-b0 [d8087d]",
+  "host": "DESKTOP-I0P8973",
+  "what": "Tooling inventory for the Rezervno CEO session, per MASTER PROMPT Part I §1.",
+  "needs_from_reader": "Treat every \"available: false\" as a capability limit on this session, not as a statement about the project.",
+  "toolchain": {
+    "node": "v20.20.2",
+    "npm": "10.8.2",
+    "python": "3.12.10",
+    "docker": "29.7.2 (daemon up; docker.exe NOT on PATH - full path required)",
+    "wsl": "2.7.13.0, Ubuntu, version 2, Running",
+    "psql_on_host": false,
+    "gh_cli": false,
+    "note_gh": "No GitHub CLI: CI run status cannot be read from this session. Any CI claim from here is UNKNOWN."
+  },
+  "mcp_servers": {
+    "available_now": [],
+    "note": "Verified by ToolSearch at 2026-09-08: no Supabase, Vercel, Sentry, Context7, Figma, Slack, Postman or graphify tools resolve. MASTER PROMPT §1 directs live-system questions through these; that instruction is NOT EXECUTABLE from this session today.",
+    "requires_auth_never_connected": [
+      "Cloudflare Developer Platform",
+      "Control Plane",
+      "Google Calendar",
+      "Google Drive",
+      "Graph of Thought",
+      "HubSpot",
+      "Linear",
+      "Pi Security",
+      "Semrush"
+    ],
+    "failed_to_connect": [
+      {
+        "name": "Unblocked",
+        "error": "account not part of any organization (reported by endpoint; unvalidated)"
+      }
+    ],
+    "disconnected_during_session": [
+      "Canva",
+      "Context7",
+      "dot.",
+      "Figma",
+      "graphify",
+      "LlamaParse",
+      "Mermaid Chart",
+      "Microsoft Learn",
+      "Mobbin",
+      "Postman",
+      "Sentry",
+      "Slack",
+      "Supabase",
+      "Vercel",
+      "Vuetify"
+    ]
+  },
+  "ide": {
+    "attached": "VS Code (native extension host)",
+    "observed_capabilities": [
+      "file selection context",
+      "opened-file notifications"
+    ],
+    "language_server_diagnostics": "UNKNOWN - not exposed as a callable tool to this session",
+    "note": "tsc --noEmit and eslint were run directly instead; both exit 0."
+  },
+  "cross_session": {
+    "ListAgents": true,
+    "SendMessage": true,
+    "note": "Cross-session messaging IS available, so the founder does not have to relay between sessions on this machine. Delivery to Remote Control peers depends on that peer being online; three messages to `robin` are still queued undelivered."
+  },
+  "agents_roster_after_rebalance": {
+    "distribution": {
+      "opus": 4,
+      "sonnet": 8,
+      "haiku": 3,
+      "none": 1
+    },
+    "agents": [
+      {
+        "file": "ai-intelligence-auditor.md",
+        "model": "opus"
+      },
+      {
+        "file": "backend-integrity-engineer.md",
+        "model": "sonnet"
+      },
+      {
+        "file": "census.md",
+        "model": "haiku"
+      },
+      {
+        "file": "ceo.md",
+        "model": "opus"
+      },
+      {
+        "file": "contracts-consolidation-engineer.md",
+        "model": "sonnet"
+      },
+      {
+        "file": "data-trust-engineer.md",
+        "model": "sonnet"
+      },
+      {
+        "file": "ds-token-guardian.md",
+        "model": "haiku"
+      },
+      {
+        "file": "e2e-regression-engineer.md",
+        "model": "sonnet"
+      },
+      {
+        "file": "launch-ops.md",
+        "model": "sonnet"
+      },
+      {
+        "file": "panels-ui-engineer.md",
+        "model": "sonnet"
+      },
+      {
+        "file": "phase2-verifier.md",
+        "model": "sonnet"
+      },
+      {
+        "file": "reviewer.md",
+        "model": "opus"
+      },
+      {
+        "file": "security.md",
+        "model": "opus"
+      },
+      {
+        "file": "sweeper.md",
+        "model": "haiku"
+      },
+      {
+        "file": "test-integrity.md",
+        "model": "sonnet"
+      },
+      {
+        "file": "_TEAM.md",
+        "model": null
+      }
+    ]
+  },
+  "agents_roster_before_rebalance": {
+    "opus": 12,
+    "sonnet": 2,
+    "haiku": 1,
+    "none": 1
+  },
+  "skills": [
+    {
+      "name": "genz-agent-charter",
+      "has_SKILL_md": true,
+      "frontmatter_name": "genz-agent-charter",
+      "frontmatter_description": "The Gen-Z identity every Rezervno agent carries — how to judge product taste, and the four behaviours that make delegated autonomy safe. Loa",
+      "line_count": 50
+    },
+    {
+      "name": "rezervno-audit-constitution",
+      "has_SKILL_md": true,
+      "frontmatter_name": "rezervno-audit-constitution",
+      "frontmatter_description": "The non-negotiable evidence rules for any Rezervno audit or recovery work — zero-trust in every direction, what counts as proof, the fake-gr",
+      "line_count": 159
+    }
+  ],
+  "commands": [],
+  "commands_dir_exists": false,
+  "hooks": {
+    "settings_json_exists": true,
+    "settings_local_json_exists": false,
+    "hooks_in_settings_json": null,
+    "hooks_in_settings_local_json": null
+  },
+  "plugins": [],
+  "gates": [
+    {
+      "name": "admin-hash-password.mjs",
+      "line_count": 98
+    },
+    {
+      "name": "admin-provision.mjs",
+      "line_count": 92
+    },
+    {
+      "name": "admin-totp-secret.mjs",
+      "line_count": 62
+    },
+    {
+      "name": "build-site-preview.py",
+      "line_count": 330
+    },
+    {
+      "name": "build-standalone.py",
+      "line_count": 346
+    },
+    {
+      "name": "check-agent-charter.mjs",
+      "line_count": 183
+    },
+    {
+      "name": "check-alert-metric-binding.mjs",
+      "line_count": 215
+    },
+    {
+      "name": "check-boot-path.sh",
+      "line_count": 113
+    },
+    {
+      "name": "check-classic-scripts.sh",
+      "line_count": 43
+    },
+    {
+      "name": "check-control-bytes.mjs",
+      "line_count": 81
+    },
+    {
+      "name": "check-doc-staleness.mjs",
+      "line_count": 350
+    },
+    {
+      "name": "check-fonts.py",
+      "line_count": 154
+    },
+    {
+      "name": "check-runner-completeness.mjs",
+      "line_count": 150
+    },
+    {
+      "name": "check-schema-drift.sh",
+      "line_count": 303
+    },
+    {
+      "name": "gate-decision.mjs",
+      "line_count": 82
+    },
+    {
+      "name": "gate-deploy.mjs",
+      "line_count": 71
+    },
+    {
+      "name": "gate-destructive.mjs",
+      "line_count": 95
+    },
+    {
+      "name": "gate-send.mjs",
+      "line_count": 117
+    },
+    {
+      "name": "gen-tenant-isolation-matrix.mjs",
+      "line_count": 200
+    },
+    {
+      "name": "graphify-repair-edges.py",
+      "line_count": 257
+    },
+    {
+      "name": "report-gate-status.mjs",
+      "line_count": 318
+    },
+    {
+      "name": "restore-drill.sh",
+      "line_count": 127
+    },
+    {
+      "name": "sync-design-system.sh",
+      "line_count": 174
+    },
+    {
+      "name": "xss-escaping-regression.mjs",
+      "line_count": 167
+    },
+    {
+      "name": "xss-sink-audit.mjs",
+      "line_count": 955
+    }
+  ],
+  "test_runner": {
+    "imported_count": 162,
+    "files_on_disk_count": 162
+  },
+  "redacted_keys": []
+}

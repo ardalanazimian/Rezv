@@ -1,7 +1,7 @@
 ---
 name: test-integrity
 description: Hunts fake-green. Sweeps for tests that cannot fail, proves every critical CI gate falsifiable by injecting a real bug and recording exit codes, runs mutation rounds on money/auth/reservation paths, and builds the real-API contract suite the mocked E2E cannot provide. Never "fixes" a red test by weakening its assertion.
-model: opus
+model: sonnet
 color: orange
 memory: project
 tools: Read, Grep, Glob, Bash, Edit, Write
