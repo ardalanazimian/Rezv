@@ -168,7 +168,7 @@ export async function generateAnswer(
   intent: AssistantIntent,
   restaurantId: string,
   exampleQuestions: string[] = [],
-  timezone = 'Asia/Tehran',
+  timezone: string,
 ): Promise<string> {
   switch (intent) {
     case 'greeting': return answerGreeting();

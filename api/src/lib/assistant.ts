@@ -97,9 +97,9 @@ export async function askAssistant(opts: {
   restaurantId: string;
   staffId?: string | null;
   question: string;
-  timezone?: string;
+  timezone: string;
 }): Promise<AskResult> {
-  const { restaurantId, staffId, question, timezone = 'Asia/Tehran' } = opts;
+  const { restaurantId, staffId, question, timezone } = opts;
   const tokens = tokenize(question);
   const vocab = await loadLearnedVocab(restaurantId);
   const result = classify(tokens, vocab);
@@ -151,9 +151,9 @@ export async function teachAssistant(opts: {
   /** کارمندی که اصلاح را ثبت می‌کند (ممکن است با پرسنده فرق کند). */
   staffId?: string | null;
   /** رفعِ T2 — رجوع کن به askAssistant. */
-  timezone?: string;
+  timezone: string;
 }): Promise<{ answer: string; intent: AssistantIntent }> {
-  const { restaurantId, logId, correctIntent, staffId, timezone = 'Asia/Tehran' } = opts;
+  const { restaurantId, logId, correctIntent, staffId, timezone } = opts;
   if (!isAssistantIntent(correctIntent)) throw Err.validation('نیتِ نامعتبر');
 
   const log = await db.restaurantAssistantLog.findUnique({ where: { id: logId } });
