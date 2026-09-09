@@ -39,6 +39,7 @@ const PANEL_ERROR_ACTIONS = Object.freeze({
   RELOGIN: 'relogin',       // نشست تمام است
   CLEAR_BRANCH: 'clear_branch', // انتخابِ شعبه کهنه است
   REFRESH: 'refresh',       // دادهٔ روی صفحه از سرور عقب افتاده
+  WAIT: 'wait',             // ۴۲۹ — صبر کن، بعد دوباره. هرگز retryِ خودکار
   NONE: 'none',             // کارِ نرم‌افزاری‌ای نیست؛ تصمیم با آدم است
 });
 
@@ -101,19 +102,84 @@ const PANEL_ERROR_MAP = Object.freeze({
   FEATURE_DISABLED:   { staff: null, action: 'none' },
   INVALID_STATUS_TRANSITION: { staff: null, action: 'refresh' },
 
-  // ⚠️ `RATE_LIMITED` عمداً این‌جا **نیست**. پاسخش `details.retryAfterSec`
-  // دارد، پس کارِ درستش «صبر کن، بعد دوباره» است نه «همین حالا دوباره بزن»،
-  // و آن یک تصمیمِ طراحی است (چقدر صبر، با چه بازخوردی، شمارشِ معکوس یا نه)
-  // نه یک رفع. اسپکش از `rezv-f3` خواسته شده. تا آن موقع پیامِ سرور نشان
-  // داده می‌شود، که صادق است — دکمه‌ای که بلافاصله دوباره رد شود نیست.
+  // ⚠️ `RATE_LIMITED` تنها ردیفی است که یک **حالت** لازم دارد، نه یک جمله —
+  // پس متن و کارش از `PANEL_ERROR_MAP` نمی‌آید بلکه از `panelRateLimitPlan`
+  // پایین. دیروز عمداً بیرون ماند تا کسی بی‌سروصدا به `retry` نگاشتش نکند؛
+  // امروز اسپکش رسید (DS-003 §۴‑۵) و پیاده شد.
+  RATE_LIMITED:       { staff: null, action: 'wait' },
 });
+
+// ═══════════ RATE_LIMITED — سه سطح، طبقِ DS-003 §۴‑۵ ═══════════
+//
+// ⚠️ **قاعده‌ی صفر: هرگز retryِ خودکار.** ۴۲۹ یعنی «زیادی زدی»؛ زدنِ خودکار
+// بار را بیشتر می‌کند و علت را از چشمِ کاربر پنهان.
+//
+// ⚠️ چرا حالت روی **دکمه** می‌نشیند و نه در توست: توستِ این پنل ۲۴۰۰ms است
+// (`staff-system.js:163`). برای انتظارِ ۴۵ثانیه‌ای به‌تنهایی بی‌فایده است —
+// پیام می‌رود، پرسنل دوباره می‌زند، دوباره می‌خورد.
+//
+// ⚠️ و چرا عددِ ثابتی درست نیست: بازه‌ی واقعیِ قاعده‌ها ۱ ثانیه تا ۱۵ دقیقه
+// است (`ratelimit.ts`: `qrCheckin` ۳۰/دقیقه ولی `adminTotpLogin` ۵ در **۱۵**
+// دقیقه). مقدار باید از `details.retryAfterSec` بیاید که سرور در
+// `errors.ts:27` می‌فرستد.
+
+const RATE_LIMIT_BRIEF_SEC = 10;    // ≤ این → «چند لحظه صبر کن»
+const RATE_LIMIT_LOCK_SEC = 120;    // > این → قفلِ امنیتی، نه ترافیک
+
+/** ثانیه‌ی انتظار از پاسخِ سرور — یا `null` اگر نداده. */
+function panelRetryAfterSec(err) {
+  const v = err && err.details && err.details.retryAfterSec;
+  return typeof v === 'number' && v > 0 ? Math.ceil(v) : null;
+}
+
+/**
+ * نقشه‌ی نمایش برای یک ۴۲۹. **داده برمی‌گرداند، نه متن** — قالب‌بندیِ ارقام
+ * فارسی با `fa()` در محلِ مصرف می‌ماند تا این ماژول نسخه‌ی دومِ `format.js`
+ * نشود (همان کلاسِ «یک واقعیت، چند رونوشت»).
+ *
+ * `tier`:
+ *   `brief`     — کوتاه یا نامعلوم: دکمه غیرفعال، بدونِ عدد
+ *   `countdown` — ۱۱..۱۲۰ ثانیه: عددِ **زنده**ی کم‌شونده روی دکمه
+ *   `locked`    — >۱۲۰: **قفلِ امنیتی است نه ترافیک.** عددِ ثابتِ دقیقه‌ای،
+ *                 شمارشِ زنده **نه** — شمارنده‌ی ۱۵دقیقه‌ای فقط کاربر را به
+ *                 تماشا وامی‌دارد. و متنش نباید «شلوغه» باشد: `passwordLogin`
+ *                 و `adminTotpLogin` وقتی می‌خورند یعنی رمز اشتباه بوده، و
+ *                 «دوباره بزن» او را به تکرارِ همان کار می‌فرستد.
+ */
+function panelRateLimitPlan(err) {
+  const sec = panelRetryAfterSec(err);
+  // ⚠️ نبودِ عدد → عدد **اختراع نکن**. «چند لحظه» صادق است؛ عددِ حدسیِ غلط نه.
+  if (sec === null || sec <= RATE_LIMIT_BRIEF_SEC) {
+    return { tier: 'brief', sec: sec, countdown: false, holdSec: sec || RATE_LIMIT_BRIEF_SEC };
+  }
+  if (sec <= RATE_LIMIT_LOCK_SEC) {
+    return { tier: 'countdown', sec: sec, countdown: true, holdSec: sec };
+  }
+  return { tier: 'locked', sec: sec, minutes: Math.ceil(sec / 60), countdown: false, holdSec: sec };
+}
+
+/**
+ * متنِ فارسیِ حالت. `faFn` تزریق می‌شود (پیش‌فرض: بدونِ تبدیل) تا تست بتواند
+ * بدونِ `format.js` اجرایش کند و ماژول به ترتیبِ بارگذاری گره نخورد.
+ */
+function panelRateLimitText(err, faFn) {
+  const f = typeof faFn === 'function' ? faFn : function (n) { return String(n); };
+  const p = panelRateLimitPlan(err);
+  if (p.tier === 'brief') return 'چند لحظه صبر کن، بعد دوباره بزن.';
+  if (p.tier === 'countdown') return `${f(p.sec)} ثانیه دیگر دوباره بزن.`;
+  return `به‌خاطرِ تلاش‌های زیاد، ${f(p.minutes)} دقیقه قفل شد. اگر رمز را فراموش کرده‌ای از مدیر بخواه بازنشانی کند.`;
+}
 
 /**
  * متنی که باید به پرسنل نشان داده شود.
  * اگر ردیفِ اختصاصی نداشته باشیم یا `staff === null` باشد، **پیامِ سرور**
  * برمی‌گردد؛ و اگر آن هم نبود، `fallback`.
  */
-function panelErrorText(err, fallback) {
+function panelErrorText(err, fallback, faFn) {
+  // ⚠️ RATE_LIMITED متنش به **مقدار** وابسته است، نه فقط به کد — پس از
+  // نقشه‌ی سه‌سطحی می‌آید. این‌جا delegate می‌شود تا هر صداکننده‌ی موجود
+  // خودکار متنِ درست را بگیرد، نه فقط محلی که خبر دارد.
+  if (err && err.code === 'RATE_LIMITED') return panelRateLimitText(err, faFn);
   const row = err && err.code ? PANEL_ERROR_MAP[err.code] : null;
   if (row && row.staff) return row.staff;
   return (err && err.message) || fallback || 'یک مشکلِ غیرمنتظره پیش آمد';
@@ -140,9 +206,53 @@ function panelErrorAction(err) {
 function panelErrorIcon(err) {
   switch (panelErrorAction(err)) {
     case 'retry':        return '⏳';
+    case 'wait':         return '⏱';
     case 'relogin':      return '🔑';
     case 'clear_branch': return '🏠';
     case 'refresh':      return '↻';
     default:             return '';
   }
+}
+
+/**
+ * دکمه را تا پایانِ انتظار نگه می‌دارد.
+ *
+ * ⚠️ الگویش تازه نیست: `crm.js:258,268` از قبل `btn.disabled=true` +
+ * `btn.textContent` متغیر را دارد و کار می‌کند. این فقط همان را با زمان‌بندی
+ * می‌بندد — و **هرگز خودش درخواست نمی‌زند** (قاعده‌ی صفرِ §۴‑۵).
+ *
+ * ⚠️ شمارنده از عددِ **لحظه‌ی دریافت** می‌شمارد، نه با پرسیدن از سرور.
+ * پرسیدنِ «چقدر مانده؟» خودش یک درخواست است — یعنی گاردِ نرخ را با ابزارِ
+ * نمایشِ گاردِ نرخ می‌شکستیم.
+ *
+ * سطحِ `locked` عمداً شمارنده‌ی زنده ندارد: یک شمارنده‌ی ۱۵دقیقه‌ای فقط کاربر
+ * را به تماشا وامی‌دارد. ولی دکمه در پایانِ مدت آزاد می‌شود — قفلِ همیشگی
+ * یعنی کاربر مجبور به رفرش است، که خودش یک درخواستِ دیگر است.
+ */
+function holdButtonForRetry(btn, err, restoreText, faFn) {
+  if (!btn) return null;
+  const plan = panelRateLimitPlan(err);
+  const f = typeof faFn === 'function' ? faFn : function (n) { return String(n); };
+  btn.disabled = true;
+
+  let timer = null;
+  if (plan.countdown) {
+    let left = plan.sec;
+    btn.textContent = `${f(left)} ثانیه…`;
+    timer = setInterval(function () {
+      left -= 1;
+      if (left > 0) { btn.textContent = `${f(left)} ثانیه…`; return; }
+      clearInterval(timer);
+      btn.disabled = false;
+      btn.textContent = restoreText;
+    }, 1000);
+  } else {
+    btn.textContent = restoreText;
+    timer = setTimeout(function () {
+      btn.disabled = false;
+      btn.textContent = restoreText;
+    }, plan.holdSec * 1000);
+  }
+  // برگرداندنِ handle تا تست/فراخوان بتواند پاکش کند و تایمر نشت نکند.
+  return timer;
 }

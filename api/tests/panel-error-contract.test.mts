@@ -26,13 +26,20 @@ const SRC = readFileSync(
 );
 
 const panel = new Function(`${SRC}
-  return { PANEL_ERROR_MAP, PANEL_ERROR_ACTIONS, panelErrorText, panelErrorAction, panelErrorIcon };`,
+  return { PANEL_ERROR_MAP, PANEL_ERROR_ACTIONS, panelErrorText, panelErrorAction, panelErrorIcon,
+           panelRetryAfterSec, panelRateLimitPlan, panelRateLimitText, holdButtonForRetry };`,
 )() as {
   PANEL_ERROR_MAP: Record<string, { staff: string | null; action: string }>;
   PANEL_ERROR_ACTIONS: Record<string, string>;
-  panelErrorText: (e: unknown, fb?: string) => string;
+  panelErrorText: (e: unknown, fb?: string, fa?: (n: number) => string) => string;
   panelErrorAction: (e: unknown) => string;
   panelErrorIcon: (e: unknown) => string;
+  panelRetryAfterSec: (e: unknown) => number | null;
+  panelRateLimitPlan: (e: unknown) => {
+    tier: string; sec: number | null; minutes?: number; countdown: boolean; holdSec: number;
+  };
+  panelRateLimitText: (e: unknown, fa?: (n: number) => string) => string;
+  holdButtonForRetry: (btn: any, e: unknown, restore: string, fa?: (n: number) => string) => unknown;
 };
 
 describe('قراردادِ خطای پنل — کد به کار وصل است', () => {
@@ -92,13 +99,68 @@ describe('قراردادِ خطای پنل — کد به کار وصل است', 
     assert.equal(panel.panelErrorText(undefined, 'پیش‌فرض'), 'پیش‌فرض');
   });
 
-  test('⚠️ RATE_LIMITED عمداً بیرون است — و این یک تصمیم است نه فراموشی', () => {
-    // `details.retryAfterSec` دارد، پس کارِ درستش «صبر کن، بعد دوباره» است.
-    // دکمه‌ای که بلافاصله دوباره رد شود، از پیامِ سرور بدتر است.
-    // اسپکِ انتظار از `rezv-f3` خواسته شده؛ تا آن موقع این ردیف نباید
-    // بی‌سروصدا به 'retry' نگاشت شود.
-    assert.equal(panel.PANEL_ERROR_MAP.RATE_LIMITED, undefined);
-    assert.equal(panel.panelErrorAction({ code: 'RATE_LIMITED' }), 'none');
+  test('⚠️ RATE_LIMITED حالا حالت دارد — و هرگز به retryِ خودکار نگاشت نمی‌شود', () => {
+    // ⚠️ این تست **وارونه شد** (۲۰۲۶-۰۹-۱۰): دیروز غیابِ ردیف را assert
+    // می‌کرد تا کسی بی‌سروصدا به `retry` نگاشتش نکند. امروز اسپکش رسید
+    // (DS-003 §۴‑۵) و پیاده شد — ولی نکته‌ی اصلی همان است: `wait` است،
+    // **نه** `retry`. `retry` یعنی «همین حالا دوباره بزن» که روی یک ۴۲۹
+    // بار را بیشتر می‌کند و علت را از چشمِ کاربر پنهان.
+    assert.equal(panel.panelErrorAction({ code: 'RATE_LIMITED' }), 'wait');
+    assert.notEqual(panel.panelErrorAction({ code: 'RATE_LIMITED' }), 'retry');
+    assert.ok(Object.values(panel.PANEL_ERROR_ACTIONS).includes('wait'));
+  });
+
+  test('⚠️ سه سطحِ §۴‑۵ با مرزهای دقیقشان', () => {
+    const at = (s: number | null) => panel.panelRateLimitPlan(
+      { code: 'RATE_LIMITED', details: s === null ? {} : { retryAfterSec: s } });
+
+    // مرزها عمداً assert می‌شوند: ۱۰/۱۱ و ۱۲۰/۱۲۱ جایی‌اند که اسپک خط کشیده.
+    assert.equal(at(null).tier, 'brief', 'بدونِ عدد → «چند لحظه»، نه عددِ اختراعی');
+    assert.equal(at(10).tier, 'brief');
+    assert.equal(at(11).tier, 'countdown');
+    assert.equal(at(120).tier, 'countdown');
+    assert.equal(at(121).tier, 'locked');
+
+    // شمارشِ زنده فقط در سطحِ میانی — سطحِ سوم عمداً ندارد.
+    assert.equal(at(45).countdown, true);
+    assert.equal(at(900).countdown, false, 'شمارنده‌ی ۱۵دقیقه‌ای فقط کاربر را به تماشا وامی‌دارد');
+    assert.equal(at(900).minutes, 15);
+  });
+
+  test('⚠️ عددِ نداده اختراع نمی‌شود، و متنِ قفل «شلوغه» نمی‌گوید', () => {
+    const noSec = panel.panelRateLimitText({ code: 'RATE_LIMITED', details: {} });
+    assert.doesNotMatch(noSec, /[0-9۰-۹]/, 'وقتی سرور عددی نداده، عدد نشان نده');
+
+    const locked = panel.panelRateLimitText({ code: 'RATE_LIMITED', details: { retryAfterSec: 900 } });
+    assert.match(locked, /قفل/, 'سطحِ سوم باید بگوید قفل شده');
+    assert.doesNotMatch(locked, /شلوغ/,
+      'passwordLogin وقتی می‌خورد یعنی رمز غلط بوده — «شلوغه» او را به تکرارِ همان کار می‌فرستد');
+
+    // و از مسیرِ عمومیِ قرارداد هم همان متن می‌آید، نه فقط از تابعِ اختصاصی.
+    assert.equal(
+      panel.panelErrorText(
+        { code: 'RATE_LIMITED', details: { retryAfterSec: 900 }, message: 'تعداد درخواست بیش از حد مجاز' }, ''),
+      locked,
+      'هر صداکننده‌ی موجود باید خودکار متنِ درست را بگیرد',
+    );
+  });
+
+  test('⚠️ دکمه نگه داشته می‌شود و سطحِ قفل شمارنده روی دکمه نمی‌گذارد', () => {
+    const btn: any = { disabled: false, textContent: 'ورود به پنل' };
+    const timer = panel.holdButtonForRetry(
+      btn, { code: 'RATE_LIMITED', details: { retryAfterSec: 900 } }, 'ورود به پنل');
+    assert.equal(btn.disabled, true, 'دکمه باید قفل شود');
+    assert.equal(btn.textContent, 'ورود به پنل', 'سطحِ قفل نباید شمارنده روی دکمه بگذارد');
+    clearTimeout(timer as any);   // وگرنه تایمرِ ۱۵دقیقه‌ای رانر را باز نگه می‌دارد
+  });
+
+  test('⚠️ مسیرِ ورودِ پنل واقعاً از این حالت رد می‌شود', () => {
+    // بدونِ این، تست‌های بالا می‌توانند سبز باشند و هیچ‌کس صدایشان نزند.
+    const src = readFileSync(
+      fileURLToPath(new URL('../../apps/business/js/staff-system.js', import.meta.url)), 'utf8',
+    ).split('\n').map((l) => { const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i); }).join('\n');
+    assert.ok(src.includes("res.error?.code === 'RATE_LIMITED'"), 'مسیرِ ورود باید ۴۲۹ را تفکیک کند');
+    assert.ok(src.includes('holdButtonForRetry('), 'و دکمه را نگه دارد');
   });
 
   test('⚠️ مسیرِ تغییرِ وضعیت واقعاً از قرارداد رد می‌شود', () => {
