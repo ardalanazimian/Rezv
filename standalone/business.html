@@ -4185,10 +4185,13 @@ async function walkinLookup(){
     ? `<select class="inp" id="wTable"><option value="">— بعداً تخصیص می‌دم —</option>${tableOptions}</select>`
     : `<select class="inp" id="wTable" disabled><option value="">میز خالی موجود نیست</option></select><div style="font-size:11px;color:var(--t3);margin-top:4px">همه‌ی میزها پرن — می‌تونی بعداً از پلان سالن تخصیص بدی</div>`;
   if(member){
-    // ⚠️ رونوشتِ دومِ همان نقصِ DS-001 — و **گاردِ
-    // tools/check-loyalty-constant-binding.mjs این فایل را نمی‌بیند**
-    // (standalone در فهرستِ اسکنش نیست). پس اگر فقط apps/ رفع می‌شد، گارد سبز
-    // می‌شد در حالی که مهمانِ پلاتینیوم اینجا هنوز `platinum` خام می‌دید.
+    // ⚠️ `platinum` اینجا نبود (یافته‌ی DS-001، نشستِ Designer `rezv-f3`):
+    // `LOYALTY_TIERS` در `api/src/lib/loyalty.ts:114-119` **چهار** سطح دارد و این
+    // نگاشت سه‌تا داشت. یعنی گران‌ترین مهمانِ رستوران، پشتِ میزِ پذیرش با رشته‌ی
+    // خامِ انگلیسیِ `platinum` به پرسنل نشان داده می‌شد.
+    // هرگز دیده نشد چون `||member.tier` یک fallbackِ بی‌صداست: نه استثنا، نه لاگ،
+    // نه صفحه‌ی شکسته — فقط بد.
+    // نام‌ها عمداً با `LOYALTY_TIERS` یکی‌اند، مثلِ `loyalty.js:38` که از قبل کامل بود.
     const tierName={platinum:'پلاتینیوم',gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'}[member.tier]||member.tier;
     openModal(`
       <div style="text-align:center;margin-bottom:6px"><div style="width:56px;height:56px;border-radius:50%;background:var(--teal-50);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">${icon('user',{size:28})}</div></div>
@@ -7822,11 +7825,16 @@ function pushNotif(n){NOTIFS.unshift(n);renderNotifList();popup(n.emoji,n.title,
 
 
 // ═══════════ CASHBACK ═══════════
-// ⚠️ رفعِ RT-02 (۲۰۲۶-۰۹-۰۹) — رونوشتِ دومِ همین منطق است
-// (اصل: apps/business/js/staff-system.js). هر دو با هم عوض می‌شوند.
-// قبلاً `{base:8,pre:12,vip:18,wb:20}` بود؛ پیش‌فرضِ schema ۵·۸·۱۲·۲۰ است،
-// پس سه عدد از چهارتا بی‌منشأ بودند و به‌شکلِ «تنظیماتِ رستوران» نشان داده
-// می‌شدند. حالا null‌اند تا رندرِ عددِ ساختگی ساختاری ناممکن شود.
+// ⚠️ رفعِ RT-02 (۲۰۲۶-۰۹-۰۹): این‌ها قبلاً `{base:8,pre:12,vip:18,wb:20}` بودند —
+// چهار عددِ هاردکد که پیش از هر تماسِ سروری رندر می‌شدند. سه‌تایشان با **هیچ
+// چیزِ سیستم** نمی‌خواند: پیش‌فرضِ schema (`schema.prisma:175-178`) برابرِ
+// ۵·۸·۱۲·۲۰ است و پنل ۸·۱۲·۱۸·۲۰ نشان می‌داد. یعنی حتی رونوشتِ کهنه‌ی
+// پیش‌فرض‌ها هم نبودند؛ اعدادی بی‌منشأ بودند که به‌شکلِ «تنظیماتِ رستوران»
+// به مالکِ پول‌دهنده نشان داده می‌شدند — «مبنای تصمیمِ مالیِ غلط».
+//
+// حالا `null`اند تا رندرِ اعدادِ ساختگی **ساختاری ناممکن** باشد: تنها مسیرِ
+// رسیدن به اسلایدرها از دادهٔ سرور می‌گذرد. همان انضباطی که `loyalty.js:35`
+// از قبل درست رعایت می‌کرد («—» تا وقتی `_cbLoaded` نشده).
 let CB=null;
 let CB_DRAFT=null;
 let _cbLoaded=false;
@@ -7844,8 +7852,10 @@ function cbUnavailable(msg){
 
 async function rCashback(){
   if(!_cbLoaded){
-    // ⚠️ RT-02: گاردِ قبلی (`!_cbLoaded && API.getToken()`) دو راه برای
-    // غلط‌بودن داشت و رفعِ پیشین فقط مسیرِ خطا را می‌پوشاند، نه مسیرِ بی‌توکن.
+    // ⚠️ RT-02: این شرط قبلاً `if(!_cbLoaded && API.getToken())` بود، یعنی
+    // گارد **دو راه برای غلط‌بودن** داشت و رفعِ قبلی فقط یکی را می‌پوشاند.
+    // بدونِ توکن کلِ بلاک رد می‌شد — نه درخواستی، نه حالتِ خطایی — و رندر
+    // روی مقادیرِ هاردکد می‌افتاد. مسیرِ بی‌توکن حالا صریح است.
     if(!API.getToken()){
       cbUnavailable('برای دیدنِ درصدهای واقعیِ این رستوران وارد شوید');
       return;
@@ -7860,6 +7870,8 @@ async function rCashback(){
       return;
     }
   }
+  // گاردِ آخر: هیچ مسیری نباید با CBِ خالی به رندر برسد. اگر روزی رسید،
+  // «نمی‌دانیم» نشان بده — نه یک عدد.
   if(!CB){ cbUnavailable('تنظیماتِ کش‌بک در دسترس نیست'); return; }
   CB_DRAFT={...CB};
   const cards=[['base','کش‌بک پایه','برای تمام رزروها',20],['pre','پیش‌سفارش','رزرو همراه با منو',25],['vip','مشتری VIP','اعضای سطح طلایی و بالاتر',30],['wb','بازگشت (Winback)','مشتری ناراضی یا در خطر ریزش',40]];

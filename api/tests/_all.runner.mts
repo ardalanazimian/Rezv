@@ -208,6 +208,7 @@ import './subscription.test.mts';
 import './table-merge-occupancy-concurrency.test.mts';
 import './slot-lock-failopen-double-booking.test.mts';
 import './tx-timeout-error-contract.test.mts';
+import './standalone-bundle-completeness.test.mts';
 import './db-pool-exhaustion-contract.test.mts';
 import './table-delete-guard.integration.test.mts';
 import './table-release.integration.test.mts';

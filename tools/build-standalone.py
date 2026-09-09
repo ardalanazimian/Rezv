@@ -48,7 +48,13 @@ OUT  = os.path.join(ROOT, 'standalone')
 # چون booking.js از آن offerWaitlist می‌خواهد؛ data/booking.js زود، قبل از
 # auth.js/data/discover.js که از آن faTime/quickBook می‌خواهند).
 CUSTOMER_ORDER = [
-    'js/icons.js', 'js/api-core.js', 'js/data/seed.js', 'js/waitlist.js',
+    # ⚠️ `api-errors.js` باید **پیش از** `data/booking.js` بیاید — booking.js
+    # ازش `bookingErrorKind` می‌خواهد. نبودنش دقیقاً همان کلاسِ خرابی است که
+    # در سرآیندِ بالا مستند شده (`ReferenceError: httpJson is not defined`):
+    # باندل ساخته می‌شود، گیتِ تازگی سبز می‌ماند، و مسیرِ خطای رزرو در
+    # زمانِ اجرا می‌ترکد. ۲۰۲۶-۰۹-۰۹ همین یک‌بار دیگر رخ داد — فایل به
+    # apps/ اضافه شد و به این فهرست نه.
+    'js/icons.js', 'js/api-core.js', 'js/api-errors.js', 'js/data/seed.js', 'js/waitlist.js',
     'js/data/booking.js', 'js/store.js', 'js/actions.js', 'js/api.js',
     'js/analytics.js', 'js/data/discover.js', 'js/data/detail.js',
     'js/reservation.js', 'js/features/trips.js', 'js/features/loyalty.js',
