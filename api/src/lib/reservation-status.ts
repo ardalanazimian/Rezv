@@ -100,3 +100,36 @@ export const DEMAND_STATUSES_SQL = DEMAND_RESERVATION_STATUSES.map((s) => `'${s}
 export function demandStatusList(): string[] {
   return [...DEMAND_RESERVATION_STATUSES];
 }
+
+/**
+ * وضعیت‌هایِ پایانی‌ای که یعنی «وعده‌ی غذایی اتفاق نیفتاد» — پس کش‌بکی که
+ * در **لحظه‌ی ثبتِ رزرو** پرداخت شده باید برگردد.
+ *
+ * چرا این‌جا و نه داخلِ lifecycle.ts: همان دلیلِ وجودِ کلِ این فایل — لیستِ
+ * وضعیت‌هایِ کپی‌شده در چند ماژول همان باگِ C1 بود. اگر فردا وضعیتِ پایانیِ
+ * تازه‌ای اضافه شود، فقط این‌جا عوض می‌شود.
+ *
+ * `completed` عمداً بیرون است (مهمان آمد، کش‌بک حق اوست). وضعیت‌های قدیمیِ
+ * `cancelled_by_user` / `cancelled_by_restaurant` عمداً داخل‌اند — قاعده‌ی
+ * «وضعیتِ قدیمی در هر مجموعه‌ی مرتبط می‌ماند».
+ *
+ * ⚠️ صداقتِ صریح: این مجموعه به وضعیتِ **مبدأ** کاری ندارد. اگر رزروی بعد
+ * از نشستنِ مهمان لغو شود، کش‌بکش هم برمی‌گردد. یک قاعده بهتر از دو قاعده
+ * است؛ اگر مالک رفتارِ دیگری بخواهد، تصمیمش این‌جا اعمال می‌شود.
+ */
+export const CASHBACK_REVERSING_STATUSES = [
+  'no_show',
+  'rejected',
+  'expired',
+  'cancelled',
+  'auto_cancelled',
+  'cancelled_by_user',        // قدیمی
+  'cancelled_by_restaurant',  // قدیمی
+] as const;
+
+export type CashbackReversingStatus = (typeof CASHBACK_REVERSING_STATUSES)[number];
+
+/** آیا رسیدن به این وضعیت باید کش‌بکِ پرداخت‌شده را برگرداند؟ */
+export function isCashbackReversingStatus(status: string): boolean {
+  return (CASHBACK_REVERSING_STATUSES as readonly string[]).includes(status);
+}

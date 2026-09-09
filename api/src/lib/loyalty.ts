@@ -3,6 +3,7 @@ import { db } from './db';
 import { Err } from './errors';
 import { enqueueSms } from './sms';
 import { smsAllowedForCategory, findUserByPhoneForConsent } from './notification-prefs';
+import { isFeatureEnabled, featureFlagLabel } from './feature-flags';
 
 // ═══════════════════════════════════════════════════════════
 //  سرویس وفاداری رزرونو — امتیاز، دعوت، کارت هدیه، پاداش
@@ -18,6 +19,78 @@ const POINTS = {
 
 /** امتیازی که بابتِ حضورِ واقعی (چک‌این) به باشگاهِ همان رستوران داده می‌شود. */
 export const ARRIVAL_POINTS = 50;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  نرخِ کانونیِ امتیاز ⇄ تومان — **یک تعریف، در یک فایل**
+//
+//  تصمیمِ مؤسس (۲۰۲۶-۰۹-۰۹، صریح، هر دو عدد): «۱۰۰۰ تومان خرید = ۲۵ امتیاز»
+//  و «۱ امتیاز = ۲ تومان هنگامِ خرج». این دو با هم و با درصدِ کش‌بکِ موجود
+//  حساب می‌بندند و همین دلیلِ انتخابِ این شکل است:
+//
+//      ۱۰۰۰ تومان × ۵٪ = ۵۰ تومان ارزش ÷ ۲ تومان بر امتیاز = ۲۵ امتیاز ✅
+//
+//  یعنی `cbBasePct` معنایش را نگه می‌دارد و **جایگزینِ نرخِ ثابت نمی‌شود**؛
+//  عددِ مؤسس از قبل با درصدِ قابلِ‌تنظیمِ هر رستوران سازگار است.
+//
+//  ⚠️ چرا یک ثابت و نه دو عدد در دو فایل: تاریخِ همین مخزن استدلال است —
+//  `CUSTOMER_APP_URL` زیرِ سه نام زندگی می‌کرد و نامِ مستندشده هرگز خوانده
+//  نمی‌شد؛ کلیدهای overrideِ XSS به متنی گره خورده بودند که هرکسی می‌توانست
+//  عوضش کند. **یک نرخِ پولی که در دو فایل تکرار شود همان نقص است با
+//  پیامدِ بدتر.** هر «کسب» و هر «خرج» باید از همین دو تابع عبور کند.
+//
+//  ⚠️ صداقتِ صریح: این تغییر، شمارشِ امتیازِ کش‌بک را نصف می‌کند
+//  (۱۰۰۰ تومان: ۵۰ ⇦ ۲۵) ولی **ارزشِ تومانیِ برگشتی را عوض نمی‌کند**
+//  (۵٪ = ۵۰ تومان، قبل و بعد). چیزی که عوض می‌شود واحدِ شمارش است، نه پول.
+//  موجودی‌های تولید که زیرِ «۱ امتیاز = ۱ تومانِ ضمنی» انباشته شده‌اند با
+//  این نرخ **دو برابر** ارزش‌گذاری می‌شوند — به همین دلیل بازخرید پشتِ فلگ
+//  خاموش می‌ماند (رجوع کن به redeemPointsTx).
+// ═══════════════════════════════════════════════════════════════════════
+
+/** تومانی که هر یک امتیاز هنگامِ **خرج** می‌ارزد. تنها تعریفِ این نرخ. */
+export const TOMAN_PER_POINT = 2;
+
+/**
+ * ارزشِ تومانیِ n امتیاز — **دقیق، بدونِ هیچ رندی**.
+ *
+ * جهتِ خرج عمداً ضربِ صحیح است: هیچ کسری تولید نمی‌شود، پس هیچ رندی هم
+ * لازم نیست. تمامِ رندِ سیستم در جهتِ مخالف (کسب) و فقط یک‌بار انجام می‌شود.
+ */
+export function pointsToToman(points: number): number {
+  if (!Number.isInteger(points) || points < 0) {
+    throw Err.validation('امتیاز باید عددِ صحیحِ نامنفی باشد');
+  }
+  return points * TOMAN_PER_POINT;
+}
+
+/**
+ * امتیازِ معادلِ یک ارزشِ تومانی — **رند به پایین (floor)، عمدی**.
+ *
+ * چرا floor و نه round: رفت‌وبرگشت نباید پول خلق کند. با round، ۳ تومان
+ * ارزش ⇦ ۲ امتیاز ⇦ ۴ تومان خروجی؛ یعنی یک تومان از هیچ ساخته شد. با floor
+ * همیشه `pointsToToman(tomanToPoints(v)) ≤ v` — سیستم هرگز بیشتر از آنچه
+ * گرفته پس نمی‌دهد، و روی مضارب دقیقِ نرخ (مثلِ عددِ خودِ مؤسس) تساویِ کامل
+ * برقرار است. رند فقط **یک‌بار** و **در انتهای** محاسبه انجام می‌شود.
+ */
+export function tomanToPoints(valueToman: number): number {
+  if (!Number.isFinite(valueToman) || valueToman < 0) {
+    throw Err.validation('ارزشِ تومانی باید عددِ نامنفی باشد');
+  }
+  return Math.floor(valueToman / TOMAN_PER_POINT);
+}
+
+/**
+ * فرمولِ کسبِ کش‌بک: امتیازی که بابتِ صورت‌حسابِ نهایی با درصدِ رستوران
+ * تعلق می‌گیرد. تنها فرمولِ کسب — `reservations.ts` همین را صدا می‌زند.
+ *
+ * ⚠️ یک floor، در انتها: `floor((final × pct) / (100 × نرخ))`. اگر اول
+ * ارزشِ تومانی رند می‌شد و بعد تقسیم، رندِ دوگانه می‌داشتیم و رفت‌وبرگشت
+ * دیگر مقایسه‌پذیر نبود.
+ */
+export function cashbackPointsFor(finalToman: number, cbPct: number): number {
+  if (!Number.isFinite(finalToman) || finalToman <= 0) return 0;
+  if (!Number.isFinite(cbPct) || cbPct <= 0) return 0;
+  return tomanToPoints((finalToman * cbPct) / 100);
+}
 
 // ═══════════════════════════════════════════════════════════
 //  سطوحِ باشگاه (tier)
@@ -160,10 +233,280 @@ export async function addClubPoints(opts: {
 // از دفتر خوانده می‌شود، نه از ستونِ کش. تفاوتش با getPointsBalance اسکوپ است:
 // آن‌یکی کلِ پلتفرم را جمع می‌زند، این‌یکی فقط همان رستوران را.
 export async function getClubPointsBalance(userId: string, restaurantId: string): Promise<number> {
+  return getPointsBalanceInScope(userId, restaurantId);
+}
+
+/**
+ * موجودیِ امتیاز در یک **اسکوپِ پرداخت‌کننده**.
+ *
+ * `restaurantId = null` عمداً به‌معنایِ «کیفِ پلتفرم» است، نه «همه‌جا»:
+ * اعطاهایِ پلتفرمی (ثبت‌نام، دعوت، تولد، سالگرد) با `restaurantId = null`
+ * نوشته می‌شوند (`loyalty.ts` — createReferral/birthday/anniversary) و
+ * اعطاهایِ رستوران با شناسه‌ی همان رستوران. این تابع همان تفکیک را برایِ
+ * خواندن هم قائل می‌شود.
+ */
+export async function getPointsBalanceInScope(userId: string, restaurantId: string | null): Promise<number> {
   const agg = await db.pointsLedger.aggregate({
     where: { userId, restaurantId }, _sum: { delta: true },
   });
   return agg._sum.delta ?? 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  خرجِ امتیاز (بازخرید) — `reason: 'redemption'`
+//
+//  تا امروز `PointsReason.redemption` در کلِ `api/src` **صفر بار** نوشته
+//  می‌شد و هیچ نرخِ امتیاز→تومانی وجود نداشت؛ یعنی دفتر یک شمارنده‌ی
+//  یک‌طرفه بود. این تابع تنها راهِ خرج است.
+//
+//  ── چرا اسکوپ‌دار و نه یک کیفِ سراسری ────────────────────────────────
+//  قاعده‌ی ۵ («پاداشِ پلتفرمی را پلتفرم می‌پردازد؛ رستوران هرگز بدهکار
+//  نمی‌شود») امروز اجراناپذیر است چون `points_ledger` **ستونِ پرداخت‌کننده
+//  ندارد** — `restaurant_id` فقط نشانگرِ اسکوپ است. تا وقتی آن ستون نیامده،
+//  تنها تفکیکِ صادقانه‌ای که در دست داریم همین `restaurant_id` است. پس:
+//  بازخرید همیشه **داخلِ یک اسکوپ** انجام می‌شود و موجودیِ همان اسکوپ را
+//  می‌سنجد. نتیجه‌ی ثابت: هیچ اسکوپی منفی نمی‌شود ⇒ نه رستورانی بدهکارِ
+//  امتیازِ تولدِ پلتفرم می‌شود، نه پلتفرم بدهکارِ کش‌بکِ رستوران.
+//  (مجموعِ سراسری = جمعِ اسکوپ‌ها، پس آن هم منفی نمی‌شود.)
+//  ⚠️ پیامدِ محصولی که باید به مالک گفته شود: صفحه‌ی مشتری امروز **جمعِ
+//  سراسری** را نشان می‌دهد (`getPointsBalance`) و آن عدد در یک رستوران
+//  کاملاً خرج‌شدنی نیست. رجوع کن به گزارش.
+//
+//  ── چرا قفلِ ردیفِ کاربر، و چرا الگویِ rewards.ts عیناً منتقل نمی‌شود ──
+//  `rewards.ts:158-163` شرطِ موجودی را داخلِ خودِ UPDATE می‌گذارد
+//  (`WHERE … AND wallet_balance >= cost`) و این **کافی** است چون موجودی
+//  یک **ستون رویِ یک ردیف** است: Postgres در READ COMMITTED پشتِ قفلِ همان
+//  ردیف صبر می‌کند و شرط را رویِ نسخه‌ی تازه دوباره می‌سنجد.
+//
+//  اینجا موجودی یک **aggregate رویِ جدولِ append-only** است و هیچ ردیفی
+//  برایِ قفل‌شدن وجود ندارد. دو بازخریدِ هم‌زمان هرکدام snapshotی می‌بینند
+//  که ردیفِ commit‌نشده‌ی دیگری در آن نیست، هر دو شرط را رد می‌کنند و هر دو
+//  می‌نویسند ⇒ موجودی منفی. پس شرطِ داخلِ INSERT لازم است ولی **کافی
+//  نیست**؛ یک نقطه‌ی سریال‌سازی هم می‌خواهد. الگویِ موجودِ همین مخزن برایِ
+//  همین کلاس مسئله: `SELECT … FOR UPDATE` (کارتِ هدیه در همین فایل،
+//  `economy.ts:236`). ردیفِ `users` قفل می‌شود چون طبیعی‌ترین لنگرِ «کیفِ
+//  این کاربر» است و O(۱) است (قفلِ همه‌ی ردیف‌های دفترِ کاربر با تعدادِ
+//  تراکنش‌ها رشد می‌کند).
+//
+//  هر دو لایه اثباتِ falsifiability دارند و هرکدام جدا قرمز می‌شوند —
+//  رجوع کن به tests/points-redemption.integration.test.mts.
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface RedeemPointsResult {
+  pointsSpent: number;
+  /** ارزشِ تومانیِ خرج‌شده، با نرخِ کانونی. */
+  tomanValue: number;
+  /** موجودیِ همان اسکوپ پس از خرج. */
+  balanceAfter: number;
+  /** true یعنی همین کلید قبلاً اعمال شده بود و این فراخوانی چیزی کم نکرد. */
+  alreadyApplied: boolean;
+}
+
+/**
+ * نسخه‌ی tx-aware — برایِ فراخوانی داخلِ تراکنشی که خودِ تخفیف/جایزه را هم
+ * می‌نویسد (همان الگویِ `redeemGiftCardTx`). تنها هسته‌ی خرجِ امتیاز.
+ *
+ * ⚠️ گاردِ فلگ **اینجا** است، نه فقط در روت. بقیه‌ی فلگ‌های این مخزن در
+ * لایه‌ی route اجرا می‌شوند؛ برایِ این یکی عمداً پایین‌تر آمد، چون این تنها
+ * مسیری است که موجودیِ واقعیِ مشتری را خرج می‌کند و امروز اصلاً route ندارد
+ * — پس گاردِ سطحِ route جایی برای نشستن نداشت و «فراموش‌کردنِ گارد در
+ * اولین routeِ آینده» تنها چیزی بود که بینِ تولید و پولِ رایگان می‌ایستاد.
+ */
+export async function redeemPointsTx(tx: any, opts: {
+  userId: string;
+  /** اسکوپِ خرج: شناسه‌ی رستوران، یا null برایِ کیفِ پلتفرم. */
+  restaurantId: string | null;
+  points: number;
+  /** اجباری — بدونِ آن قیدِ یکتاییِ دفتر برایِ این نویسنده بی‌اثر است. */
+  idempotencyKey: string;
+  note?: string;
+}): Promise<RedeemPointsResult> {
+  const { userId, restaurantId, points, idempotencyKey } = opts;
+
+  if (!(await isFeatureEnabled('points_redemption_enabled'))) {
+    throw Err.featureDisabled(featureFlagLabel('points_redemption_enabled'));
+  }
+  if (!Number.isInteger(points) || points <= 0) {
+    throw Err.validation('امتیازِ خرج‌شده باید عددِ صحیحِ مثبت باشد');
+  }
+  if (typeof idempotencyKey !== 'string' || idempotencyKey.length === 0) {
+    throw Err.validation('کلیدِ idempotency برایِ بازخرید اجباری است');
+  }
+
+  // ── (۱) نقطه‌ی سریال‌سازی: قفلِ ردیفِ کاربر تا پایانِ تراکنش ──
+  const locked = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM users WHERE id = ${userId}::uuid FOR UPDATE
+  `;
+  if (locked.length === 0) throw Err.notFound('کاربر');
+
+  // ── (۲) idempotency: زیرِ همان قفل، پس هیچ رقابتی ممکن نیست ──
+  // چرا پیش‌بررسی و نه اتکا به خطای قید: در Postgres یک نقضِ unique کلِ
+  // تراکنش را abort می‌کند، پس «catch کن و ردیفِ قبلی را برگردان» بدونِ
+  // savepoint شدنی نیست. قید همچنان پشتوانه‌ی ساختاری است (اگر این
+  // پیش‌بررسی حذف شود، فراخوانیِ دوم P2002 می‌گیرد — نه کسرِ دوباره).
+  const existing = await tx.$queryRaw<{ delta: number; user_id: string; restaurant_id: string | null; reason: string }[]>`
+    SELECT delta, user_id, restaurant_id, reason::text AS reason
+    FROM points_ledger WHERE idempotency_key = ${idempotencyKey}
+  `;
+  if (existing.length > 0) {
+    // ⚠️ «همان کلید» فقط وقتی «همان بازخرید» است که کاربر، اسکوپ و نوعش هم
+    // یکی باشد. کلیدها را صداکننده می‌سازد؛ اگر کسی یک کلید را برای دو
+    // کاربر/دو اسکوپ به‌کار ببرد، برگرداندنِ «قبلاً انجام شد» یعنی یک خرجِ
+    // واقعی بی‌صدا ناپدید شود. این‌جا بلند می‌شکند، نه بی‌صدا.
+    const e = existing[0];
+    if (e.user_id !== userId || (e.restaurant_id ?? null) !== restaurantId || e.reason !== 'redemption') {
+      throw Err.validation('کلیدِ idempotency قبلاً برای یک ردیفِ دیگر استفاده شده است');
+    }
+    const spent = Math.abs(e.delta);
+    const balAgg = await tx.$queryRaw<{ bal: bigint | number }[]>`
+      SELECT COALESCE(SUM(delta), 0) AS bal FROM points_ledger
+      WHERE user_id = ${userId}::uuid AND restaurant_id IS NOT DISTINCT FROM ${restaurantId}::uuid
+    `;
+    return {
+      pointsSpent: spent, tomanValue: pointsToToman(spent),
+      balanceAfter: Number(balAgg[0]?.bal ?? 0), alreadyApplied: true,
+    };
+  }
+
+  // ── (۳) درج با شرطِ موجودی **داخلِ خودِ همان دستور** ──
+  // نه SELECT جدا و بعد INSERT: یک دستور، یک مقایسه، یک نوشتن.
+  const inserted = await tx.$queryRaw<{ id: string }[]>`
+    INSERT INTO points_ledger (user_id, restaurant_id, delta, reason, note, idempotency_key)
+    SELECT ${userId}::uuid, ${restaurantId}::uuid, ${-points}::int, 'redemption'::points_reason,
+           ${opts.note ?? null}::text, ${idempotencyKey}::text
+    WHERE (
+      SELECT COALESCE(SUM(delta), 0) FROM points_ledger
+      WHERE user_id = ${userId}::uuid AND restaurant_id IS NOT DISTINCT FROM ${restaurantId}::uuid
+    ) >= ${points}
+    RETURNING id
+  `;
+  if (inserted.length === 0) throw Err.validation('موجودیِ امتیازِ شما کافی نیست');
+
+  const after = await tx.$queryRaw<{ bal: bigint | number }[]>`
+    SELECT COALESCE(SUM(delta), 0) AS bal FROM points_ledger
+    WHERE user_id = ${userId}::uuid AND restaurant_id IS NOT DISTINCT FROM ${restaurantId}::uuid
+  `;
+
+  // کشِ مشتق‌شده‌ی `club_members` باید با دفتر هم‌قدم بماند (همان قاعده‌ی
+  // addClubPoints: دفتر مرجع است، ستون فقط کش). اسکوپِ پلتفرم عضویتی ندارد.
+  //
+  // ⚠️ یافته‌ی همین کار، با تستِ واقعی و نه با خواندنِ schema: جدولِ
+  // `club_members` یک قیدِ `CHECK (points >= 0)` به‌نامِ
+  // `club_members_points_nonneg` دارد که **در `schema.prisma` بیان نشده**
+  // (Prisma قیدِ CHECK را بیان نمی‌کند) — یعنی کش، برخلافِ خودِ دفتر،
+  // **نمی‌تواند بدهی را نمایش دهد**. کسرِ خام اولین بار که موجودی منفی شد
+  // با ۲۳۵۱۴ کلِ تراکنش را برگرداند.
+  //
+  // پس `GREATEST(0, …)`: کش تا جایی که قیدش اجازه می‌دهد با دفتر هم‌قدم
+  // می‌ماند و در بدهی روی صفر می‌ایستد. این واگرایی **عمدی و ثبت‌شده** است،
+  // نه بی‌دقتی: مرجع دفتر است (قاعده‌ی ۴) و هیچ مسیرِ خواندنی به این ستون
+  // تکیه نمی‌کند. راهِ حلِ جایگزین (برداشتنِ قید) عمداً انتخاب نشد — این
+  // تغییر نباید قیدی را که کسِ دیگری گذاشته بی‌سروصدا بردارد؛ اگر مالک
+  // بخواهد کش هم بدهی را نشان دهد، آن یک migrationِ جداست.
+  //
+  // چرا SQLِ خام و نه `decrement`: `GREATEST` را Prisma بیان نمی‌کند، و
+  // خواندن-سپس-نوشتنِ یک عددِ مطلق اتمیک نیست.
+  if (restaurantId) {
+    const balance = Number(after[0]?.bal ?? 0);
+    await tx.$executeRaw`
+      UPDATE club_members
+      SET points = GREATEST(0, points - ${points}::int), tier = ${tierFromPoints(balance).key}::text
+      WHERE restaurant_id = ${restaurantId}::uuid AND user_id = ${userId}::uuid
+    `;
+  }
+
+  return {
+    pointsSpent: points, tomanValue: pointsToToman(points),
+    balanceAfter: Number(after[0]?.bal ?? 0), alreadyApplied: false,
+  };
+}
+
+/** بازخریدِ امتیاز در تراکنشِ خودش. */
+export async function redeemPoints(opts: {
+  userId: string; restaurantId: string | null; points: number;
+  idempotencyKey: string; note?: string;
+}): Promise<RedeemPointsResult> {
+  return db.$transaction(async (tx) => redeemPointsTx(tx, opts));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  بازگردانیِ کش‌بک (clawback) — گاردی که بازخرید بدونِ آن نباید روشن شود
+//
+//  یافته‌ی سندِ طراحی (§۶.۱-B): کش‌بک در **لحظه‌ی ثبتِ رزرو** نوشته می‌شود
+//  (`reservations.ts` داخلِ تراکنشِ ساختِ رزرو) و هیچ‌جا برنمی‌گردد —
+//  `lifecycle.ts` امتیازِ حضور و XP می‌دهد ولی کش‌بک را لمس نمی‌کند و هیچ
+//  ردیفِ جبرانیِ منفی در کلِ مخزن وجود ندارد. تا امروز بی‌ضرر بود چون
+//  امتیاز خرج‌شدنی نبود. **با آمدنِ بازخرید این می‌شود پولِ رایگان:**
+//  رزروِ بزرگ بزن، کش‌بک بگیر، خرج کن، لغو کن.
+//
+//  پس این تابع با همان تغییر شیپ می‌شود، نه بعد از آن.
+//
+//  کلیدِ idempotency جداگانه دارد (`cashback-reversal:{id}`) تا لغوِ دوباره
+//  دوبار کسر نکند — همان قیدِ یکتاییِ دفتر، این‌بار رویِ ردیفِ جبرانی.
+//
+//  ⚠️ سه انتخابِ صریح که ثبت می‌شوند، نه پنهان:
+//   • **مقدار از خودِ ردیفِ اصلی خوانده می‌شود** (کلیدِ `cashback:{id}`)، نه
+//     بازمحاسبه از صورت‌حساب: اگر درصدِ رستوران بعد از رزرو عوض شود،
+//     بازمحاسبه عددِ دیگری می‌دهد و اختلافش برایِ همیشه در دفتر می‌ماند.
+//     نبودِ ردیفِ اصلی یعنی چیزی برای برگرداندن نیست (بی‌سروصدا، درست).
+//   • **بدونِ شرطِ موجودی**: اگر مشتری کش‌بک را قبلِ لغو خرج کرده باشد،
+//     اسکوپ منفی می‌شود — و این حسابداریِ درست است (بدهی)، نه خطا. شرطِ
+//     موجودی اینجا یعنی نشتِ ارزش. موجودیِ منفی جلوی خرجِ بعدی را می‌گیرد
+//     چون گاردِ بازخرید `>= points` است.
+//   • **بی‌توجه به وضعیتِ مبدأ**: اگر رزروی بعد از نشستنِ مهمان لغو شود،
+//     کش‌بکش هم برمی‌گردد. یک قاعده، نه دو. (امتیازِ حضور برنمی‌گردد —
+//     آن بابتِ حضورِ واقعی است. ناهماهنگیِ ظاهری عمدی و ثبت‌شده است.)
+// ═══════════════════════════════════════════════════════════════════════
+
+/** پیشوندِ کلیدِ ردیفِ اصلیِ کش‌بک — همان که `reservations.ts` می‌نویسد. */
+export const CASHBACK_KEY_PREFIX = 'cashback:';
+/** پیشوندِ کلیدِ ردیفِ جبرانی. */
+export const CASHBACK_REVERSAL_KEY_PREFIX = 'cashback-reversal:';
+
+export async function reverseReservationCashback(reservationId: string): Promise<{
+  reversed: boolean; points: number; reason: 'reversed' | 'no_cashback' | 'already_reversed';
+}> {
+  return db.$transaction(async (tx) => {
+    const original = await tx.pointsLedger.findUnique({
+      where: { idempotencyKey: `${CASHBACK_KEY_PREFIX}${reservationId}` },
+    });
+    if (!original) return { reversed: false, points: 0, reason: 'no_cashback' as const };
+
+    const reversalKey = `${CASHBACK_REVERSAL_KEY_PREFIX}${reservationId}`;
+    const already = await tx.pointsLedger.findUnique({ where: { idempotencyKey: reversalKey } });
+    if (already) return { reversed: false, points: Math.abs(already.delta), reason: 'already_reversed' as const };
+
+    await tx.pointsLedger.create({
+      data: {
+        userId: original.userId, restaurantId: original.restaurantId,
+        // reason عمداً همان 'cashback' است و نه 'adjustment': ردیفِ جبرانی
+        // باید در **همان سطلِ حسابداری** بنشیند تا
+        // `SUM(delta) WHERE reason='cashback'` عددِ واقعیِ کش‌بکِ پرداخت‌شده
+        // را بدهد. با 'adjustment' آن جمع برایِ همیشه بیش‌برآورد می‌ماند.
+        delta: -original.delta, reason: 'cashback',
+        note: `بازگردانیِ کش‌بکِ رزروِ لغو/عدم‌حضور`,
+        idempotencyKey: reversalKey,
+      },
+    });
+
+    if (original.restaurantId) {
+      const agg = await tx.pointsLedger.aggregate({
+        where: { userId: original.userId, restaurantId: original.restaurantId },
+        _sum: { delta: true },
+      });
+      // GREATEST — به همان دلیلِ توضیح‌داده‌شده در redeemPointsTx: کشِ
+      // `club_members.points` قیدِ `CHECK (points >= 0)` دارد و نمی‌تواند
+      // بدهی را نمایش دهد، در حالی که دفتر می‌تواند.
+      await tx.$executeRaw`
+        UPDATE club_members
+        SET points = GREATEST(0, points - ${original.delta}::int),
+            tier = ${tierFromPoints(agg._sum.delta ?? 0).key}::text
+        WHERE restaurant_id = ${original.restaurantId}::uuid AND user_id = ${original.userId}::uuid
+      `;
+    }
+
+    return { reversed: true, points: original.delta, reason: 'reversed' as const };
+  });
 }
 
 // ═══════════ دعوت دوستان (Referral) ═══════════

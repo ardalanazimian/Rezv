@@ -5,9 +5,9 @@ import { enqueueSms, type SmsJob } from './sms';
 import { processReservationEconomyEvent } from './economy';
 import { createLogger } from './logger';
 import { dateKeyInTz } from './hours';
-import { activeStatusList } from './reservation-status';
+import { activeStatusList, isCashbackReversingStatus } from './reservation-status';
 import { recordOutcome } from './prediction-ledger';
-import { addClubPoints, ARRIVAL_POINTS } from './loyalty';
+import { addClubPoints, ARRIVAL_POINTS, reverseReservationCashback } from './loyalty';
 import {
   RULE_VERSION, holdoutBucket, guestKeyOf, transitionDecisionInputs,
 } from './ml-substrate';
@@ -205,6 +205,33 @@ export async function transitionReservation(opts: {
       }).catch((e) => {
         log.error('ثبتِ امتیازِ حضور در دفتر ناموفق (چک‌این خودش commit شد)', {
           reservationId: result.resv.id, code: result.resv.code, error: (e as Error).message,
+        });
+      });
+    }
+
+    // ── بازگردانیِ کش‌بک وقتی وعده اتفاق نیفتاد ─────────────────────────
+    //
+    // ⚠️ این گارد است، نه یک قابلیت. کش‌بک در **لحظه‌ی ثبتِ رزرو** نوشته
+    // می‌شود (`reservations.ts`، داخلِ تراکنشِ ساختِ رزرو) و تا امروز هیچ‌جا
+    // برنمی‌گشت: `grep "reason: 'cashback'"` فقط همان یک نویسنده را می‌داد و
+    // no_show/cancelled هیچ ردیفِ جبرانی نمی‌ساختند. بی‌ضرر بود چون امتیاز
+    // خرج‌شدنی نبود. با آمدنِ `redeemPointsTx` این می‌شد پولِ رایگان:
+    // «رزروِ بزرگ بزن، کش‌بک بگیر، خرج کن، لغو کن». پس در همان تغییر آمد.
+    //
+    // چرا این‌جا: `transitionReservation` خودش را «تنها نقطه‌ی مجاز تغییر
+    // وضعیت» تعریف کرده و این بلاک زیرِ `result.changed` است — یعنی خروجیِ
+    // همان compare-and-setِ اتمیک. دقیقاً همان استدلالی که امتیازِ حضور را
+    // به این‌جا آورد. لایه‌ی دومِ سطحِ DB هم هست: کلیدِ
+    // `cashback-reversal:{id}` رویِ قیدِ یکتاییِ دفتر می‌نشیند، پس لغوِ
+    // دوباره (از دو مسیر، یا race) دوبار کسر نمی‌کند.
+    //
+    // شکستِ ثبت نباید خودِ لغو را بشکند (رزرو از قبل commit شده) — همان
+    // قاعده‌ی امتیازِ حضور/اعلان در همین تابع.
+    if (isCashbackReversingStatus(result.resv.status)) {
+      await reverseReservationCashback(result.resv.id).catch((e) => {
+        log.error('بازگردانیِ کش‌بک ناموفق (تغییرِ وضعیت خودش commit شد)', {
+          reservationId: result.resv.id, code: result.resv.code,
+          toStatus: result.resv.status, error: (e as Error).message,
         });
       });
     }

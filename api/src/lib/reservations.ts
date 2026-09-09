@@ -8,7 +8,7 @@ import { enqueueSms } from './sms';
 import { emit } from './events';
 import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
-import { redeemGiftCardTx, getClubPointsBalance, ARRIVAL_POINTS } from './loyalty';
+import { redeemGiftCardTx, getClubPointsBalance, ARRIVAL_POINTS, cashbackPointsFor } from './loyalty';
 import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
 import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
@@ -610,7 +610,16 @@ async function insertReservation(
     let cashback = 0;
     if (input.userId && final > 0) {
       const cbPct = r.cbBasePct ?? 0;
-      cashback = Math.round((final * cbPct) / 100);
+      // ⚠️ تا پیش از ۲۰۲۶-۰۹-۰۹ این خط `Math.round((final * cbPct) / 100)`
+      // بود و نتیجه‌اش **مستقیم** به‌عنوانِ امتیاز در دفتر می‌نشست — یعنی
+      // «۱ امتیاز = ۱ تومان» به‌شکلِ ضمنی، بدونِ اینکه هیچ‌جا نوشته شده باشد
+      // و بدونِ اینکه هیچ راهی برایِ خرجش وجود داشته باشد.
+      //
+      // حالا از نرخِ کانونی عبور می‌کند (`lib/loyalty.ts`):
+      //     ۱۰۰۰ تومان × ۵٪ = ۵۰ تومان ÷ ۲ تومان بر امتیاز = ۲۵ امتیاز
+      // که دقیقاً عددِ صریحِ مؤسس است. ارزشِ تومانیِ برگشتی عوض نشده (همان
+      // ۵٪)، فقط واحدِ شمارش. `cbBasePct` معنایش را کامل نگه می‌دارد.
+      cashback = cashbackPointsFor(final, cbPct);
       if (cashback > 0) {
         // فازِ ۱ (§۱۳، تصمیمِ مالک ۲۰۲۶-۰۹-۰۹): کلیدِ صریحِ idempotency روی
         // reservationId — نه روی `note` (متنِ آزادِ فارسی، قابلِ ویرایشِ
