@@ -78,13 +78,68 @@ describe('لایه ۱ — طبقه‌بندیِ خطاهایِ زاده‌ی ر�
     'probe', { code, clientVersion: 'test' },
   );
 
-  test('P2028 خطایِ serialization نیست (پس نباید retry شود) ولی باید ترجمه شود', () => {
+  test('انقضایِ تراکنش خطایِ serialization نیست (پس نباید retry شود) ولی باید ترجمه شود', () => {
     // این تفکیک عمدی است: retryکردنِ تراکنشی که ۱۰ ثانیه صبر کرده یعنی
     // ۵۰ ثانیه انتظار برای مشتری. ترجمه بله، retry نه.
-    assert.equal(isSerializationError(mk('P2028')), false,
-      'P2028 نباید وارد حلقه‌ی retry شود — هر تلاش ۱۰ ثانیه طول می‌کشد');
-    assert.equal(isTransactionTimeoutError(mk('P2028')), true,
-      'P2028 باید به‌عنوانِ انقضایِ تراکنش شناخته شود تا به ۴۰۹ ترجمه شود');
+    //
+    // ⚠️ نسخه‌ی اولِ همین ردیف `mk('P2028')` را با متنِ `'probe'` می‌داد و
+    // انتظارِ `true` داشت — یعنی **خودِ تست هم همان باورِ بیش‌ازحد گسترده را
+    // کدگذاری کرده بود** که فقط کد را کافی می‌دانست. وقتی طبقه‌بند باریک شد
+    // این ردیف قرمز شد، و قرمزی‌اش درست بود: تستی که ادعای غلطِ نویسنده‌اش را
+    // تکرار کند، گاردِ آن ادعا نیست، بازتابش است.
+    const expired = new Prisma.PrismaClientKnownRequestError(
+      'Transaction API error: Transaction already closed: A query cannot be executed '
+      + 'on an expired transaction. The timeout for this transaction was 10000 ms.',
+      { code: 'P2028', clientVersion: 'test' },
+    );
+    assert.equal(isSerializationError(expired), false,
+      'انقضا نباید وارد حلقه‌ی retry شود — هر تلاش ۱۰ ثانیه طول می‌کشد');
+    assert.equal(isTransactionTimeoutError(expired), true,
+      'انقضایِ واقعی باید شناخته شود تا به ۴۰۹ ترجمه شود');
+  });
+
+  test('P2028ی که از باگِ برنامه‌نویسی می‌آید retryable شمرده نمی‌شود', () => {
+    // ⚠️ یافته‌ی بازبین (`rezv-e6`)، چند ساعت پس از نسخه‌ی اولِ همین فایل:
+    // `P2028` کدِ **عمومیِ** Transaction API است. اندازه‌گیری‌شده روی همین
+    // ماشین، هر دو با همین کد و هر دو «Transaction already closed»:
+    //
+    //   انقضا (شلوغی)        → "…on an expired transaction. The timeout…"
+    //   هندلِ بسته (باگ)      → "…on a committed transaction."
+    //
+    // اگر فقط روی کد تفکیک شود، **یک باگِ قطعی به «دوباره تلاش کن» ترجمه
+    // می‌شود**: هر بار یکسان شکست می‌خورد، مشتری بی‌نهایت retry می‌زند، و
+    // هیچ‌کس خبردار نمی‌شود. پیش از وصله، همان باگ ۵۰۰ می‌داد و پیدا می‌شد.
+    // یعنی وصله‌ی نیمه‌کاره از نبودِ وصله بدتر بود.
+    const committed = new Prisma.PrismaClientKnownRequestError(
+      'Invalid `prisma.$queryRaw()` invocation:\n\nTransaction API error: '
+      + 'Transaction already closed: A query cannot be executed on a committed transaction.',
+      { code: 'P2028', clientVersion: 'test' },
+    );
+    assert.equal(isTransactionTimeoutError(committed), false,
+      'استفاده از تراکنشِ بسته یک باگ است، نه شلوغی — نباید به «دوباره تلاش کن» ترجمه شود');
+    assert.equal(isSerializationError(committed), false,
+      'و نباید وارد حلقه‌ی retry هم بشود');
+
+    const notFound = new Prisma.PrismaClientKnownRequestError(
+      'Transaction API error: Transaction not found. Transaction ID is invalid.',
+      { code: 'P2028', clientVersion: 'test' },
+    );
+    assert.equal(isTransactionTimeoutError(notFound), false,
+      '«Transaction not found» هم علتِ دیگری از همان کد است و شلوغی نیست');
+  });
+
+  test('انقضایِ واقعی با متنِ واقعیِ Prisma شناخته می‌شود', () => {
+    // متنِ عینیِ Prisma، از اجرای واقعی روی همین مخزن گرفته شده — نه بازنویسی.
+    // اگر Prisma روزی جمله را عوض کند، لایه‌ی ۲ (که انقضای واقعی را تولید
+    // می‌کند) قرمز می‌شود؛ این ردیف فقط سریع‌تر می‌گوید کجا را نگاه کنی.
+    const real = new Prisma.PrismaClientKnownRequestError(
+      'Invalid `prisma.$queryRaw()` invocation:\n\nTransaction API error: '
+      + 'Transaction already closed: A query cannot be executed on an expired transaction. '
+      + 'The timeout for this transaction was 300 ms, however 1517 ms passed since the start '
+      + 'of the transaction.',
+      { code: 'P2028', clientVersion: 'test' },
+    );
+    assert.equal(isTransactionTimeoutError(real), true);
   });
 
   test('خطاهایِ serialization به‌اشتباه انقضای تراکنش شمرده نمی‌شوند', () => {

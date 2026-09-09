@@ -116,7 +116,32 @@ export function isSerializationError(e: unknown): boolean {
  * پنج‌برابری می‌آورد.
  */
 export function isTransactionTimeoutError(e: unknown): boolean {
-  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2028';
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2028') return false;
+  // ⚠️ کدِ P2028 به‌تنهایی کافی **نیست** — یافته‌ی بازبین (`rezv-e6`)، ۲۰۲۶-۰۹-۰۹،
+  // چند ساعت پس از اینکه نسخه‌ی اولِ همین تابع فقط کد را چک می‌کرد.
+  // `P2028` کدِ **عمومیِ** «Transaction API error»ِ Prisma است و دستِ‌کم دو
+  // علتِ کاملاً متفاوت زیرش می‌نشیند. اندازه‌گیری‌شده روی همین ماشین با
+  // Prismaِ همین مخزن، نه نقل از مستندات:
+  //
+  //   انقضایِ واقعی (شلوغی — باید ۴۰۹ شود):
+  //     "…A query cannot be executed on an expired transaction. The timeout
+  //      for this transaction was 300 ms, however 1517 ms passed…"
+  //
+  //   استفاده از هندلِ تراکنش پس از پایانِ callback (باگِ برنامه‌نویسی):
+  //     "…A query cannot be executed on a committed transaction."
+  //
+  // هر دو `code === 'P2028'` و هر دو «Transaction already closed». اگر فقط
+  // روی کد تفکیک کنیم، **یک باگِ قطعی به «لطفاً دوباره تلاش کنید» ترجمه
+  // می‌شود**: هر بار یکسان شکست می‌خورد، مشتری تا ابد retry می‌زند، و هیچ‌کس
+  // خبردار نمی‌شود. پیش از این تغییر همان باگ ۵۰۰ می‌داد و **پیدا می‌شد** —
+  // یعنی وصله‌ی نیمه‌کاره از نبودِ وصله بدتر بود.
+  //
+  // ⚠️ شکنندگی که عمداً پذیرفته شد: این تطبیق به متنِ انگلیسیِ Prisma وابسته
+  // است و ممکن است در نسخه‌ی بعدی عوض شود. گاردش حدس نیست —
+  // `tests/tx-timeout-error-contract.test.mts` لایه‌ی ۲ یک انقضای **واقعی**
+  // را از مسیرِ محصول تولید می‌کند، پس اگر Prisma جمله را عوض کند آن تست
+  // قرمز می‌شود، نه اینکه بی‌صدا به ۵۰۰ برگردیم.
+  return /expired transaction/i.test(e.message);
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -94,6 +94,27 @@ export const metrics = {
   // رزرو دقیقاً همان چیزی است که «سبزِ توخالی» می‌سازد. صعودِ ناگهانی‌اش یعنی
   // فشارِ همزمانی رویِ یک اسلات؛ صفرِ دائمی‌اش زیرِ بار یعنی retry مرده است.
   serializationRetries: new Counter('rezervno_serialization_retries_total', 'تعداد تلاشِ مجددِ تراکنش پس از تداخلِ serialization/deadlock (۴۰۰۰۱/۴۰P۰۱/P۲۰۳۴)'),
+  // ⚠️ اضافه‌شده ۲۰۲۶-۰۹-۰۹ — یافته‌ی بازبین (`rezv-e6`) روی وصله‌ی P2028 همان
+  // روز. من ادعا کردم «هیچ عددی برای این حادثه تکان نمی‌خورد»؛ آن **غلط** بود
+  // (`httpErrors` روی هر ≥۴۰۰ بالا می‌رود و زنگِ HighErrorRate را می‌زند) ولی
+  // حقیقت بدتر بود:
+  //
+  //   • `reservationConflicts` فقط زیرِ `isConflictError` بالا می‌رود (کانستریتِ
+  //     EXCLUDE) — یعنی تداخلِ *اثبات‌شده*، نه انقضای تراکنش.
+  //   • `serializationRetries` فقط داخلِ حلقه‌ی retry شمرده می‌شود، و P2028
+  //     **عمداً** وارد آن حلقه نشد. پس هرگز به این شمارنده نمی‌رسد.
+  //   • `throw Err.concurrencyRetry()` هیچ‌چیز نمی‌شمرد.
+  //
+  // نتیجه‌اش یک رگرسیونِ رصدپذیری **داخلِ یک رفعِ درست** بود: با رفتن از ۵۰۰
+  // به ۴۰۹ شکلِ 5xx حذف شد بدونِ اینکه جایگزینی بیاید، و آلارمِ
+  // `reservation_conflicts / reservations_created > 0.3` — که دقیقاً برای همین
+  // ساخته شده — در طوفانِ واقعی صورتِ ثابت و مخرجِ **نزولی** می‌گیرد، یعنی
+  // به‌سمتِ «سلامت» حرکت می‌کند در حالی که رزرو از کار افتاده.
+  //
+  // ⚠️ عمداً شمارنده‌ی جدا و نه `reservationConflicts`: آن یکی معنایش
+  // «double-booking جلوگیری‌شده» است و آلوده‌کردنش هم آن معنا را خراب می‌کرد
+  // هم نسبتِ ۰.۳ را مسموم.
+  reservationTxTimeouts: new Counter('rezervno_reservation_tx_timeouts_total', 'تعداد رزروی که به‌خاطرِ انقضایِ تراکنش (P2028ِ expired) رد شد — رقابتِ شدید روی یک اسلات، نه تداخلِ اثبات‌شده'),
   smsQueueDepth: new Gauge('rezervno_sms_queue_depth', 'تعداد پیام‌های در صف SMS'),
   smsSent: new Counter('rezervno_sms_sent_total', 'تعداد پیامک‌های ارسال‌شده'),
   smsFailed: new Counter('rezervno_sms_failed_total', 'تعداد پیامک‌های ناموفق (به دست مشتری نرسید)'),

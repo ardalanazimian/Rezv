@@ -313,6 +313,13 @@ export async function createReservation(
     // retry را هم فعال می‌کند و ۵ تلاشِ ۱۰ ثانیه‌ای یعنی ۵۰ ثانیه انتظارِ
     // مشتری برای همان جواب. ترجمه بله، retry نه.
     if (isSerializationError(e) || isTransactionTimeoutError(e)) {
+      // ⚠️ **بالایِ** بلوک شمرده می‌شود، نه کنارِ `concurrencyRetry` پایین:
+      // حادثه‌ی قابلِ‌رصد «تراکنش منقضی شد» است، مستقل از اینکه در نهایت
+      // TABLE_CONFLICT یا SLOT_FULL یا CONCURRENCY_RETRY برگردد. اگر پایین
+      // شمرده می‌شد، هر انقضایی که اشغالش اثبات می‌شد از آمار می‌افتاد —
+      // یعنی شمارنده در بدترین حالت (اسلاتِ واقعاً پر و پرِ رقابت) کمترین
+      // عدد را می‌داد.
+      if (isTransactionTimeoutError(e)) metrics.reservationTxTimeouts.inc();
       const occupiedNow = await getOccupiedTableNumbers(db, r.id, start, blockEnd).catch(() => null);
       if (occupiedNow) {
         if (manualTableNumber != null) {
