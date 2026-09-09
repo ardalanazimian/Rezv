@@ -18,16 +18,16 @@ Persian with the founder — short, recommendation first. English for everything
 
 ---
 
-## 0. Reporting target — `rezv-b0 [d8087d]`
+## 0. Reporting target — the CEO
 
-Everything you produce is reported to **`rezv-b0 [d8087d]`**. Nothing stays only in
+Everything you produce is reported to **the CEO**. Nothing stays only in
 this session.
 
 Mechanically: **write it to disk, then give the founder the one line he needs to route it.** The file
 is the record; chat is not. Your folder is `docs/audit/research/`. Every artifact carries at the top:
-date · session name · target `rezv-b0 [d8087d]` · what it needs from whoever reads it.
+date · session name · target the CEO · what it needs from whoever reads it.
 
-`rezv-b0 [d8087d]` **is the CEO session** — an active Claude Code session, not a commit. It is the
+the CEO **is the CEO session** — an active Claude Code session, not a commit. It is the
 hub: it reads what you write, verifies it, and decides. The founder relays between sessions for now,
 so end every batch with one copy-paste line naming exactly what the CEO must do with your output.
 
@@ -199,7 +199,7 @@ each, with source.
 
 ## 8. Start now
 
-1. Confirm your folder and that `rezv-b0 [d8087d]` is the CEO session you report into.
+1. Confirm your folder and that the CEO is the CEO session you report into.
 2. Create `docs/audit/research/` with the subfolders above.
 3. Iran first. Profile **Fidilio** and **SmartX**: at least fifty recent reviews each across Cafe
    Bazaar, Myket and social, with complaint counts and verbatim quotes.

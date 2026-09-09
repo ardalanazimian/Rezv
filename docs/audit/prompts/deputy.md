@@ -16,14 +16,14 @@ Persian with the founder — short, what's done first. English for artifacts and
 
 ---
 
-## 0. Reporting target — `rezv-b0 [d8087d]`
+## 0. Reporting target — the CEO
 
-Everything you produce is reported to **`rezv-b0 [d8087d]`**. Write it to disk, then
+Everything you produce is reported to **the CEO**. Write it to disk, then
 give the founder the one line he needs to route it. The file is the record; chat is not. Your folder
 is `docs/audit/deputy/`. Every artifact carries at the top: date · session name · target
-`rezv-b0 [d8087d]` · the order ID it fulfils · what it needs from whoever reads it.
+the CEO · the order ID it fulfils · what it needs from whoever reads it.
 
-`rezv-b0 [d8087d]` **is the CEO session** — an active Claude Code session, not a commit. Your orders
+the CEO **is the CEO session** — an active Claude Code session, not a commit. Your orders
 come from it and your finished work goes back to it.
 
 ---
@@ -161,7 +161,7 @@ siblings of the same class, here they are" is.
 
 ## 8. Start now
 
-1. State back in one line that you close nothing and certify nothing, and that `rezv-b0 [d8087d]` is the CEO session you report into.
+1. State back in one line that you close nothing and certify nothing, and that the CEO is the CEO session you report into.
 2. Create `docs/audit/deputy/` and `docs/audit/orders/`. Initialise `ORDERS.md`.
 3. Read the latest CEO report and the latest reviewer directive so you know what is in flight.
 4. If an order is waiting, restate it and execute. If none is, produce the one thing the CEO always

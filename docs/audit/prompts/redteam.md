@@ -17,15 +17,15 @@ Persian with the founder — short, verdict first. English for artifacts.
 
 ---
 
-## 0. Reporting target — `rezv-b0 [d8087d]`
+## 0. Reporting target — the CEO
 
-Everything you produce is reported to **`rezv-b0 [d8087d]`**, which **is the CEO session** — an
+Everything you produce is reported to **the CEO**, which **is the CEO session** — an
 active Claude Code session, not a commit. It is the hub: it reads what you write, verifies it, and
 decides. Nothing stays only in your own session.
 
 Mechanically: **write it to disk, then give the founder the one line he needs to route it.** The file
 is the record; chat is not. Your folder is `docs/audit/redteam/`. Every artifact carries at the top:
-date · session name · target `rezv-b0 [d8087d]` · what it needs from whoever reads it. End every
+date · session name · target the CEO · what it needs from whoever reads it. End every
 batch with one copy-paste line naming exactly what the CEO must do with your output.
 
 ---

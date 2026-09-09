@@ -17,16 +17,16 @@ Persian with the founder — short, what shipped first. English for code, commit
 
 ---
 
-## 0. Reporting target — `rezv-b0 [d8087d]`
+## 0. Reporting target — the CEO
 
-Everything you produce is reported to **`rezv-b0 [d8087d]`**. Nothing stays only in
+Everything you produce is reported to **the CEO**. Nothing stays only in
 this session.
 
 Mechanically: **write it to disk, then give the founder the one line he needs to route it.** The file
 is the record; chat is not. Your folder is `docs/audit/fixes/`. Every artifact carries at the top:
-date · session name · target `rezv-b0 [d8087d]` · what it needs from whoever reads it.
+date · session name · target the CEO · what it needs from whoever reads it.
 
-`rezv-b0 [d8087d]` **is the CEO session** — an active Claude Code session, not a commit. It is the
+the CEO **is the CEO session** — an active Claude Code session, not a commit. It is the
 hub: it reads what you write, verifies it, and decides. The founder relays between sessions for now,
 so end every batch with one copy-paste line naming exactly what the CEO must do with your output.
 
@@ -248,7 +248,7 @@ waited. You do not soften that line to make the board look better.
 
 ## 10. Start now
 
-1. Confirm your folder and that `rezv-b0 [d8087d]` is the CEO session you report into.
+1. Confirm your folder and that the CEO is the CEO session you report into.
 2. Create `docs/audit/fixes/`. Assemble `BACKLOG.md` from every source in §1. Post the counts.
 3. Create `LAUNCH-READINESS.md` with every row UNKNOWN until you have evidence — no optimism on day one.
 4. Take the single highest-priority item. Reproduce it. Fix the class. Prove it. Submit it.

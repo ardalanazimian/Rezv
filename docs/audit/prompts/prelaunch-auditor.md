@@ -36,7 +36,7 @@ Two exceptions, both narrow and both reverted immediately, with the revert prove
 
 If you find yourself wanting to fix something, that urge is the finding. Write it down.
 
-**Report to `rezv-b0 [d8087d]` — the active CEO session.** Your single report file is what it reads.
+**Report to the CEO — the active CEO session.** Your single report file is what it reads.
 
 ---
 
@@ -190,7 +190,7 @@ in parallel. Report the split at the end of the file: which agent did what, on w
 ## 6. Start now
 
 1. State the read-only constraint back to me in one line so we both know it is in effect, and confirm
-   `rezv-b0 [d8087d]` is the CEO session that receives your report.
+   the CEO is the CEO session that receives your report.
 2. Establish ground truth first: git state, CI status, whether staging exists, whether the database is
    reachable. Everything else is measured against that.
 3. Audit in this order — golden journeys, feature reality, gate integrity, security, money, ops, ML.
