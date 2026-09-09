@@ -4185,7 +4185,11 @@ async function walkinLookup(){
     ? `<select class="inp" id="wTable"><option value="">— بعداً تخصیص می‌دم —</option>${tableOptions}</select>`
     : `<select class="inp" id="wTable" disabled><option value="">میز خالی موجود نیست</option></select><div style="font-size:11px;color:var(--t3);margin-top:4px">همه‌ی میزها پرن — می‌تونی بعداً از پلان سالن تخصیص بدی</div>`;
   if(member){
-    const tierName={gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'}[member.tier]||member.tier;
+    // ⚠️ رونوشتِ دومِ همان نقصِ DS-001 — و **گاردِ
+    // tools/check-loyalty-constant-binding.mjs این فایل را نمی‌بیند**
+    // (standalone در فهرستِ اسکنش نیست). پس اگر فقط apps/ رفع می‌شد، گارد سبز
+    // می‌شد در حالی که مهمانِ پلاتینیوم اینجا هنوز `platinum` خام می‌دید.
+    const tierName={platinum:'پلاتینیوم',gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'}[member.tier]||member.tier;
     openModal(`
       <div style="text-align:center;margin-bottom:6px"><div style="width:56px;height:56px;border-radius:50%;background:var(--teal-50);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">${icon('user',{size:28})}</div></div>
       <div class="modal-title" style="text-align:center">${esc(member.fn)} ${esc(member.ln)} خوش اومدی!</div>

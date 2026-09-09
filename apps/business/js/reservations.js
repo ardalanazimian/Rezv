@@ -320,7 +320,14 @@ async function walkinLookup(){
     ? `<select class="inp" id="wTable"><option value="">— بعداً تخصیص می‌دم —</option>${tableOptions}</select>`
     : `<select class="inp" id="wTable" disabled><option value="">میز خالی موجود نیست</option></select><div style="font-size:11px;color:var(--t3);margin-top:4px">همه‌ی میزها پرن — می‌تونی بعداً از پلان سالن تخصیص بدی</div>`;
   if(member){
-    const tierName={gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'}[member.tier]||member.tier;
+    // ⚠️ `platinum` اینجا نبود (یافته‌ی DS-001، نشستِ Designer `rezv-f3`):
+    // `LOYALTY_TIERS` در `api/src/lib/loyalty.ts:114-119` **چهار** سطح دارد و این
+    // نگاشت سه‌تا داشت. یعنی گران‌ترین مهمانِ رستوران، پشتِ میزِ پذیرش با رشته‌ی
+    // خامِ انگلیسیِ `platinum` به پرسنل نشان داده می‌شد.
+    // هرگز دیده نشد چون `||member.tier` یک fallbackِ بی‌صداست: نه استثنا، نه لاگ،
+    // نه صفحه‌ی شکسته — فقط بد.
+    // نام‌ها عمداً با `LOYALTY_TIERS` یکی‌اند، مثلِ `loyalty.js:38` که از قبل کامل بود.
+    const tierName={platinum:'پلاتینیوم',gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'}[member.tier]||member.tier;
     openModal(`
       <div style="text-align:center;margin-bottom:6px"><div style="width:56px;height:56px;border-radius:50%;background:var(--teal-50);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">${icon('user',{size:28})}</div></div>
       <div class="modal-title" style="text-align:center">${esc(member.fn)} ${esc(member.ln)} خوش اومدی!</div>
