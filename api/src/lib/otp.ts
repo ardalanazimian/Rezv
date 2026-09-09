@@ -1,6 +1,6 @@
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { db } from './db';
-import { enforceRateLimit, RULES } from './ratelimit';
+import { RULES } from './ratelimit';
 import { Err } from './errors';
 import { enqueueSms, smsTransportReady } from './sms';
 import { createLogger } from './logger';
@@ -100,6 +100,59 @@ function breakGlassCodeFor(normalizedPhone: string): string | null {
   return code;
 }
 
+/**
+ * سقفِ «هر شماره چند بار کد بگیرد» — عمداً در Postgres، نه Redis.
+ *
+ * تصمیمِ مالک، ۲۰۲۶-۰۹-۰۹، ذیلِ E-003. سه گزینه روی میز بود و این چهارمی
+ * انتخاب شد چون **سؤال را حذف می‌کند به‌جای اینکه جوابش دهد**:
+ *
+ *   الف) وضعِ فعلی + retry            — بلیپ را جذب می‌کند، قطعیِ پایدار نه
+ *   ب) fail-closed هنگام قطعی        — ورودِ همه قطع می‌شود
+ *   ج) سقفِ سخت‌گیرترِ حالتِ fallback  — نیم‌کاره
+ *   د) شمارنده به Postgres برود       ← این
+ *
+ * چرا (ب) رد شد و ارزشِ نوشتن دارد: در ازای قطعِ ورودِ همه‌ی مشتریان هنگام یک
+ * قطعیِ زیرساخت، **چیزی می‌خرید که از قبل داریم** — سقفِ حدسِ کد
+ * (`verifyOtp`: `attempts >= 5`) از دیرباز در Postgres است و هرگز به Redis
+ * وابسته نبود. آنچه Redis می‌بست «چند بار کد بگیری» بود، نه «چند بار حدس
+ * بزنی»؛ یعنی خطرِ واقعیِ آن ریست، هزینه‌ی پیامک بود نه تصاحبِ حساب. (CEO
+ * ابتدا شدتش را بیش از شواهد گزارش کرد و در همین تاریخ تصحیحش کرد.)
+ *
+ * ⚠️ **یک دستور، اتمیک.** خواندن-سپس-نوشتن این‌جا همان TOCTOUی است که در
+ * مسیرِ رزرو بارها هزینه داده: دو درخواستِ هم‌زمان هر دو «۲ از ۳» می‌خواندند و
+ * هر دو رد می‌شدند. `ON CONFLICT DO UPDATE ... RETURNING` شمارش و تصمیم را در
+ * یک بیانیه‌ی اتمیک نگه می‌دارد.
+ *
+ * ⚠️ رشد در سقف **متوقف** می‌شود (`max + 1`)، عمداً: اگر کوبیدنِ مداوم
+ * شمارنده را بالا می‌برد، مهاجم می‌توانست پنجره را برای کاربرِ واقعی بی‌نهایت
+ * دراز کند. همان انصافی که `rateLimit` با حذفِ عضوِ اضافی رعایت می‌کرد.
+ */
+export async function enforceOtpRequestWindow(phone: string): Promise<void> {
+  const { max, windowMs } = RULES.otpPerPhone;
+  const rows = await db.$queryRaw<Array<{ request_count: number; window_started_at: Date }>>`
+    INSERT INTO otp_request_windows (phone, request_count, window_started_at)
+    VALUES (${phone}, 1, now())
+    ON CONFLICT (phone) DO UPDATE SET
+      request_count = CASE
+        WHEN otp_request_windows.window_started_at < now() - (${windowMs} || ' milliseconds')::interval THEN 1
+        WHEN otp_request_windows.request_count > ${max} THEN otp_request_windows.request_count
+        ELSE otp_request_windows.request_count + 1 END,
+      window_started_at = CASE
+        WHEN otp_request_windows.window_started_at < now() - (${windowMs} || ' milliseconds')::interval THEN now()
+        ELSE otp_request_windows.window_started_at END
+    RETURNING request_count, window_started_at`;
+
+  // نبودِ ردیف غیرممکن است (INSERT ... RETURNING)، ولی اگر روزی شد، **بستن**
+  // درست‌تر از بازگذاشتن است: این مسیر پیامک خرج می‌کند.
+  const row = rows[0];
+  if (!row) throw Err.rateLimited(Math.ceil(windowMs / 1000));
+
+  if (row.request_count > max) {
+    const elapsed = Date.now() - new Date(row.window_started_at).getTime();
+    throw Err.rateLimited(Math.max(1, Math.ceil((windowMs - elapsed) / 1000)));
+  }
+}
+
 export async function requestOtp(rawPhone: string): Promise<{ devCode?: string }> {
   const phone = normalizePhone(rawPhone);
   // سقفِ per-phone — حالا از همان `RULES` مشترک، نه پیاده‌سازیِ دستیِ دوم.
@@ -109,7 +162,7 @@ export async function requestOtp(rawPhone: string): Promise<{ devCode?: string }
   // فراموش می‌شود. ضمناً نسخه‌ی دستی از `rateLimitWithFallback` رد نمی‌شد،
   // پس با Redisِ خاموش بی‌صدا **باز** می‌شد (fail-open) در حالی که مسیرِ
   // مشترک fallbackِ حافظه‌ای دارد.
-  await enforceRateLimit(phone, RULES.otpPerPhone);
+  await enforceOtpRequestWindow(phone);
 
   // ورودِ اضطراری — رجوع کن به توضیحِ کاملِ `breakGlassCodeFor` بالا.
   // ریت‌لیمیتِ per-phone عمداً **بالاتر** از این خط است تا این مسیر هم مثلِ
