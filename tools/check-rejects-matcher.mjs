@@ -1,9 +1,20 @@
 #!/usr/bin/env node
 // ═══════════════════════════════════════════════════════════════════════
-//  گاردِ ماچرِ `assert.rejects` — ratchet روی دیف، نه sweep روی مخزن
+//  گاردِ ماچرِ `assert.rejects` و `assert.throws` — ratchet روی دیف، نه
+//  sweep روی مخزن
 //
-//  مسئله (اندازه‌گیریِ بازبین، دستورِ ۰۴۲ — و در §گزارش زیر بازتولید می‌شود):
-//  نیمی از ادعاهایِ rejection در `api/tests/` **هویتِ شکست را نمی‌سنجند**.
+//  مسئله (اندازه‌گیریِ بازبین برایِ rejects، دستورِ ۰۴۲؛ سمتِ throws با همین
+//  پارسر اندازه گرفته شد و **بدتر** بود):
+//
+//      assert.rejects   ۱۰۴ فراخوانی · ضعیف ۵۶ (۵۴٪)
+//      assert.throws     ۶۸ فراخوانی · ضعیف ۵۶ (۸۲٪)
+//      ──────────────────────────────────────────────
+//      مجموع           ۱۷۲ فراخوانی · ضعیف ۱۱۲ (۶۵٪) در ۱۹ فایل
+//
+//  ⚠️ تفاوتِ «تقریب» و «اندازه‌گیری»، ثبت‌شده چون خودم مرتکبش شدم: پیش از
+//  نوشتنِ پارسر، سمتِ `throws` را با یک heuristic حدود **۱۹** موردِ مشکوک
+//  تخمین زدم. پارسر **۵۶** داد — سه برابر. تخمین در جهتِ امن غلط بود، ولی
+//  «تقریب» هرگز نباید در تحویل جای «اندازه‌گیری» بنشیند.
 //
 //    assert.rejects(fn)                      ← فقط «رد شد» را ثابت می‌کند
 //    assert.rejects(fn, 'پیامِ فارسی')       ← Node این رشته را **پیامِ خطای
@@ -58,7 +69,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TARGET = 'assert.rejects';
+// ⚠️ **یک گارد، نه دو تا.** `assert.throws` و `assert.rejects` دقیقاً همان
+// امضا و همان دام را دارند: آرگومانِ دوم یا ماچر است یا — اگر رشته باشد —
+// پیامِ خودِ assert. ساختنِ ابزارِ دومی برایِ همان کلاس، همان
+// «یک‌فاکت-چند-نسخه»‌ای است که این تیم امروز چهار بار بابتش هزینه داد. پس
+// هدف یک **فهرست** است، نه یک ثابت.
+//
+// `assert.doesNotReject` / `assert.doesNotThrow` عمداً بیرون‌اند: معنایشان
+// وارونه است و ماچرِ نداشتنشان مسئله‌ی دیگری است. ثبت‌شده، نه پوشش‌داده‌شده.
+const TARGETS = ['assert.rejects', 'assert.throws'];
 const TEST_DIR = 'api/tests/';
 
 // ═══ تجزیه ══════════════════════════════════════════════════════════════
@@ -150,24 +169,29 @@ function classify(argText) {
 
 const WEAK = new Set(['absent', 'string']);
 
-/** همه‌ی فراخوانی‌هایِ assert.rejects در یک فایل. */
+/** همه‌ی فراخوانی‌هایِ هر هدف در یک فایل. */
 function findCalls(src) {
   const out = [];
-  let from = 0;
-  for (;;) {
-    const idx = src.indexOf(TARGET, from);
-    if (idx === -1) break;
-    from = idx + TARGET.length;
-    // باید دقیقاً `assert.rejects(` باشد، نه `assert.rejectsFoo`
-    const after = src.slice(idx + TARGET.length).match(/^\s*\(/);
-    if (!after) continue;
-    const openIdx = idx + TARGET.length + after[0].length - 1;
-    const parsed = splitCallArgs(src, openIdx);
-    if (!parsed) continue;
-    const kind = parsed.args.length < 2 ? 'absent' : classify(parsed.args[1].text);
-    out.push({ line: src.slice(0, idx).split('\n').length, kind, argc: parsed.args.length });
+  for (const target of TARGETS) {
+    let from = 0;
+    for (;;) {
+      const idx = src.indexOf(target, from);
+      if (idx === -1) break;
+      from = idx + target.length;
+      // باید دقیقاً `assert.rejects(` باشد، نه `assert.rejectsFoo` — و نه
+      // `assert.doesNotThrow` که زیررشته‌ی «throws» را ندارد ولی محضِ احتیاط
+      // مرزِ چپ هم سنجیده می‌شود.
+      if (/[A-Za-z0-9_$.]/.test(src[idx - 1] ?? '')) continue;
+      const after = src.slice(idx + target.length).match(/^\s*\(/);
+      if (!after) continue;
+      const openIdx = idx + target.length + after[0].length - 1;
+      const parsed = splitCallArgs(src, openIdx);
+      if (!parsed) continue;
+      const kind = parsed.args.length < 2 ? 'absent' : classify(parsed.args[1].text);
+      out.push({ target, line: src.slice(0, idx).split('\n').length, kind, argc: parsed.args.length });
+    }
   }
-  return out;
+  return out.sort((a, b) => a.line - b.line);
 }
 
 // ═══ حالتِ گزارش: کلِ مخزن ══════════════════════════════════════════════
@@ -178,6 +202,7 @@ function listTestFiles() {
 }
 
 function report() {
+  const per = new Map(TARGETS.map((t) => [t, { absent: 0, string: 0, regex: 0, value: 0, object: 0, total: 0, files: new Set() }]));
   const tally = { absent: 0, string: 0, regex: 0, value: 0, object: 0 };
   const weakFiles = new Set();
   let total = 0;
@@ -187,10 +212,20 @@ function report() {
       tally[c.kind] = (tally[c.kind] ?? 0) + 1;
       total++;
       if (WEAK.has(c.kind)) weakFiles.add(rel);
+      const p = per.get(c.target);
+      p[c.kind]++;
+      p.total++;
+      if (WEAK.has(c.kind)) p.files.add(rel);
     }
   }
   const weak = tally.absent + tally.string;
-  console.log(`${total} فراخوانیِ ${TARGET} در ${TEST_DIR} (تجزیه‌شده، نه grep):`);
+  for (const [t, p] of per) {
+    const w = p.absent + p.string;
+    const pct = p.total ? Math.round((w / p.total) * 100) : 0;
+    console.log(`${t.padEnd(15)} ${String(p.total).padStart(3)} فراخوانی · ضعیف ${String(w).padStart(2)} (${pct}٪) = برهنه ${p.absent} + رشته ${p.string} · در ${p.files.size} فایل`);
+  }
+  console.log('');
+  console.log(`مجموعِ هر دو — ${total} فراخوانی در ${TEST_DIR} (تجزیه‌شده، نه grep):`);
   console.log(`  آرگومانِ دومِ regex        ${String(tally.regex).padStart(3)}   می‌سنجد`);
   console.log(`  کلاس/شناسه/شیء            ${String(tally.value + tally.object).padStart(3)}   می‌سنجد`);
   console.log(`  بدونِ آرگومانِ دوم          ${String(tally.absent).padStart(3)}   هیچ نمی‌سنجد`);
@@ -288,7 +323,9 @@ function main() {
       if (WEAK.has(c.kind)) {
         failures.push({
           where: `${rel}:${c.line}`,
-          kind: c.kind,
+          // نامِ هدف داخلِ برچسب می‌آید: در یک دیفِ مخلوط، «کدام‌یک» بخشی از
+          // یافته است، نه چیزی که خواننده باید خودش برود پیدا کند.
+          kind: `${c.target.replace('assert.', '')}/${c.kind}`,
           msg: c.kind === 'absent'
             ? 'آرگومانِ دوم ندارد — فقط «رد شد» را می‌سنجد، نه اینکه **چرا**. اگر هویتِ شکست عوض شود سبز می‌ماند.'
             : 'آرگومانِ دومش یک **رشته** است. Node رشته را پیامِ خطای خودِ assert می‌خواند، نه انتظار — پس هیچ‌چیز سنجیده نمی‌شود، در حالی که خواندنش شبیهِ پوشش است.',
@@ -297,7 +334,7 @@ function main() {
     }
   }
 
-  console.log(`ادعاهایِ ${TARGET}ِ **تازه** در این دیف: ${checked}`);
+  console.log(`ادعاهایِ **تازه**ی ${TARGETS.join(" / ")} در این دیف: ${checked}`);
   console.log('');
 
   if (failures.length > 0) {
@@ -313,7 +350,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`✓ هر ادعایِ ${TARGET}ِ تازه در این دیف هویتِ شکست را می‌سنجد.`);
+  console.log(`✓ هر ادعایِ تازه‌ی ${TARGETS.join(" / ")} در این دیف هویتِ شکست را می‌سنجد.`);
   process.exit(0);
 }
 
