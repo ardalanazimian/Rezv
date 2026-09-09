@@ -56,6 +56,7 @@ const HISTORY = [
   'docs/UI-UX-AUDIT-',             // همان
   'docs/PROJECT-AUDIT-HANDOFF',    // همان
   'docs/KNOWN_LIMITATIONS.md',     // فهرستِ محدودیت‌ها: کارش نام‌بردنِ چیزهای غلط است
+  'docs/audit/redteam/',          // رونوشتِ حمله‌هایِ Red Team: نامِ متغیرهایِ probe عمداً ساختگی‌اند
 ];
 const isHistory = (rel) => HISTORY.some((h) => rel.startsWith(h));
 
