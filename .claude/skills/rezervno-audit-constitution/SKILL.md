@@ -74,6 +74,12 @@ more often than the finding is.** Every one of these produced a confident, wrong
   every step and put the three hashes in the delivery** — baseline, injected, restored-and-equal.
 - A guard's own **scan list can silently resolve to zero files** (a guessed path, a stale glob).
   Empty scope must be an error, never a pass.
+- **An explicit pathspec protects you from other *files*, not from another session's edit to the
+  *same* file.** Measured 2026-09-10: two sessions each added their own row to `ROUTING.md`; the
+  first to commit carried both, and the second got «nothing to commit». Nothing was lost, but one
+  session's work now sits under the other's commit message — and the author who checks
+  `git show --stat` sees only the file they expected. On a shared tree, `git diff --cached` before
+  committing is the check that pathspec cannot give you.
 
 So: read the output text, not just the status. Confirm the tool you ran is the tool you edited.
 And when a result is *inverted* — red where it should be green — suspect the harness first, but
