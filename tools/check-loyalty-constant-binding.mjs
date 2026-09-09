@@ -80,7 +80,24 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
-const DECL_PATH = path.join(REPO_ROOT, 'api', 'src', 'lib', 'loyalty.ts');
+// ═══ منابعِ تعریف ═══════════════════════════════════════════════════════
+//
+//  ⚠️ مرزِ درستِ این گارد **فایل نیست**. حکمِ CEO (۲۰۲۶-۰۹-۰۹): «هر عددی که
+//  UI به کاربر ادعا می‌کند و بک‌اند جای دیگری تعیینش می‌کند.» اینکه آن جا
+//  `loyalty.ts` باشد یا `economy.ts` یا فردا `pricing.ts` ربطی به خطر ندارد.
+//
+//  اگر معیار «ثابت‌هایِ loyalty.ts» می‌ماند، اولین عددی که به فایلِ دیگری
+//  منتقل می‌شد **بی‌صدا از پوشش می‌افتاد** و manifest کوچک‌تر می‌شد در حالی
+//  که سطحِ خطر همان بود — یعنی گارد به خودش تبریک می‌گفت. و §۶ همین سند
+//  «manifestِ خالی = پایانِ کار» را معیارِ پیشرفت گذاشته، پس یک manifestِ
+//  کوچک‌شونده به دلیلِ نابینایی، دقیقاً بدترین حالتِ ممکن است.
+//
+//  پس منابع یک **فهرست**اند، نه یک ثابت. افزودنِ منبعِ تازه = یک ردیف.
+const DECL_SOURCES = {
+  loyalty: path.join(REPO_ROOT, 'api', 'src', 'lib', 'loyalty.ts'),
+  economy: path.join(REPO_ROOT, 'api', 'src', 'lib', 'economy.ts'),
+};
+const DECL_PATH = DECL_SOURCES.loyalty;
 
 const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
@@ -152,7 +169,85 @@ function readDeclarations() {
     arrivalPoints: scalar('ARRIVAL_POINTS'),
     tomanPerPoint: scalar('TOMAN_PER_POINT'),
     tiers,
+    reputationTiers: readReputationTiers(),
   };
+}
+
+/**
+ * سطح‌هایِ **اعتبار** (متفاوت از سطح‌هایِ وفاداری) از `economy.ts`.
+ *
+ * چرا اینجاست با اینکه امروز هیچ عددِ نابسته‌ای در UI ندارد: بررسی شد و
+ * سمتِ فرانت درست است — `freeCancelHours` از سرور می‌آید (`api.js:272`)
+ * و ۳۵/۸۵ فقط در یک **کامنت** است (`booking.js:75`)، نه در متنِ کاربر. ولی
+ * `REPUTATION_BADGE` در `features/economy.js` یک نگاشتِ کلید→نام است و
+ * دقیقاً همان کلاسِ نگاشتِ ناقصی است که در پنلِ رستوران مهمانِ پلاتینیوم را
+ * با رشته‌ی خامِ انگلیسی نشان می‌داد. امروز کامل است؛ فردا اگر کسی سطحِ
+ * پنجمی به `computeReputationTier` اضافه کند، باید همان لحظه قرمز شود.
+ */
+function readReputationTiers() {
+  const p = DECL_SOURCES.economy;
+  if (!existsSync(p)) {
+    console.error(`✗ منبعِ تعریف پیدا نشد: ${path.relative(REPO_ROOT, p)} — DECL_SOURCES را به‌روز کن.`);
+    process.exit(1);
+  }
+  const src = readFileSync(p, 'utf8');
+  // ⚠️ لنگر عمداً تا یک `}` **در ستونِ صفر و در انتهایِ خط** می‌گیرد.
+  // نسخه‌ی اولِ همین regex `\n\}` بود و روی خطِ `}): ReputationTier {` — یعنی
+  // بسته‌شدنِ امضایِ تابع — متوقف می‌شد، پس بدنه قبل از هر `return` بریده
+  // می‌شد و هیچ سطحی پارس نمی‌شد. بلند شکست (exit 1، پیامِ صریح) نه بی‌صدا،
+  // که همان چیزی است که ثابتِ طراحیِ سرصفحه می‌خواهد.
+  const fn = src.match(/export function computeReputationTier[\s\S]*?\n\}\n/);
+  if (!fn) {
+    console.error('✗ `computeReputationTier` در economy.ts پیدا نشد — ساختارِ فایل عوض شده.');
+    console.error('  نیافتن اینجا «رد شد» نیست: یا تابع جابه‌جا شده، یا سطح‌ها جای دیگری تعیین می‌شوند.');
+    process.exit(1);
+  }
+  const keys = [...new Set([...fn[0].matchAll(/return '([a-z]+)'/g)].map((m) => m[1]))];
+  if (keys.length === 0) {
+    console.error('✗ هیچ سطحِ اعتباری از computeReputationTier پارس نشد.');
+    process.exit(1);
+  }
+  return keys;
+}
+
+// ═══ بررسیِ E: نگاشتِ نشانِ اعتبار در اپِ کاستومر ════════════════════════
+//
+//  همان منطقِ بررسیِ C، ولی روی یک شیءِ **چندخطی** — پس نمی‌شود خط‌به‌خط
+//  گشت. لنگر گرفته می‌شود و بلوکِ بینِ آکولادها خوانده می‌شود. نیافتنِ لنگر
+//  خطاست، طبقِ ثابتِ طراحیِ سرصفحه.
+const REPUTATION_BADGE_SITES = [
+  'apps/customer/js/features/economy.js',
+  'standalone/customer.html',
+];
+
+function checkReputationBadgeMap(decl, failures) {
+  for (const rel of REPUTATION_BADGE_SITES) {
+    const abs = path.join(REPO_ROOT, rel);
+    if (!existsSync(abs)) {
+      failures.push({ kind: 'scan-list', where: rel, msg: 'در فهرستِ نشانِ اعتبار هست ولی فایل وجود ندارد.' });
+      continue;
+    }
+    const src = readFileSync(abs, 'utf8');
+    const m = src.match(/const REPUTATION_BADGE = \{([\s\S]*?)\n\};/);
+    if (!m) {
+      failures.push({
+        kind: 'anchor',
+        where: rel,
+        msg: '`const REPUTATION_BADGE = {` پیدا نشد. یا نامش عوض شده و لنگر باید به‌روز شود، یا نگاشت حذف شده و این ردیف باید برداشته شود — نیافتن «رد شد» نیست.',
+      });
+      continue;
+    }
+    const body = m[1];
+    const line = src.slice(0, m.index).split('\n').length;
+    const missing = decl.reputationTiers.filter((k) => !new RegExp(`(^|[{,\\s])${k}\\s*:`).test(body));
+    if (missing.length > 0) {
+      failures.push({
+        kind: 'tier-map',
+        where: `${rel}:${line}`,
+        msg: `نگاشتِ نشانِ اعتبار ${missing.join('، ')} را ندارد در حالی که computeReputationTier در economy.ts برمی‌گرداندش. مقدارِ undefined یعنی نشان بی‌صدا ناپدید می‌شود.`,
+      });
+    }
+  }
 }
 
 // ═══ manifestِ ادعاهایِ UI ═══════════════════════════════════════════════
@@ -426,12 +521,15 @@ function main() {
   }
 
   const tierScanned = checkTierMaps(decl, failures);
+  checkReputationBadgeMap(decl, failures);
   const claimScanned = checkUnregisteredClaims(decl, manifest, failures);
 
   console.log('تعریف‌هایِ خوانده‌شده از api/src/lib/loyalty.ts:');
   console.log(`  POINTS = ${JSON.stringify(decl.points)}`);
   console.log(`  ARRIVAL_POINTS = ${decl.arrivalPoints} · TOMAN_PER_POINT = ${decl.tomanPerPoint}`);
   console.log(`  LOYALTY_TIERS = ${decl.tiers.map((t) => `${t.key}:${t.min}`).join(' · ')}`);
+  console.log(`تعریف‌هایِ خوانده‌شده از api/src/lib/economy.ts:`);
+  console.log(`  computeReputationTier → ${decl.reputationTiers.join(' · ')}`);
   console.log('');
   console.log(
     `ادعاهایِ ثبت‌شده در manifest: ${manifest.length} · فایل‌هایِ اسکنِ نگاشتِ سطح: ${tierScanned.length} · فایل‌هایِ اسکنِ ادعا: ${claimScanned.length}`
