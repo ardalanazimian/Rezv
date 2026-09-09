@@ -193,7 +193,9 @@ sweepِ ۲ به‌خاطرِ ایرادِ درستِ CEO زده شد: sweepِ ا
 
 ### چرا ندیدش
 
-
+```js
+const PANEL = fileURLToPath(new URL('../../apps/business/js/loyalty.js', import.meta.url));
+```
 
 **یک مسیرِ فایلِ هاردکد.** تست `tierName` را در **یک** فایل می‌خوانَد. همان نقص در سه جای دیگر
 بود — `reservations.js`، و دو کپیِ `standalone/business.html` — و تست از نظرِ ساختاری توانِ دیدنشان
