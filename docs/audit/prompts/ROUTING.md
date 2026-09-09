@@ -13,13 +13,18 @@ Last verified: **2026-09-08** by the CEO session itself.
 |---|---|---|
 | **CEO** | `rezv-9c [5283b5]` — was `rezv-f8 [4e0f27]`, and `rezv-b0 [d8087d]` before that | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts; the two predecessors are dead ids, not other agents |
 | **Reviewer** (founder-side) | `rezv-e6 [a10db3]` — was `rezv-d3 [c8fb22]` on 2026-09-08 | `ListAgents` 2026-09-09; founder confirmed the role directly on 2026-09-08. Directives 033, 035, 036 and 037 are signed `rezv-d3 [c8fb22]` — same session, before the restart |
-| **Deputy** | ⚠️ **STALE as of 2026-09-09** — `rezv-b1 [5f3782]` no longer resolves; was `rezv-30 [a7bb03]` before that | self-identified via `ListAgents` 2026-09-08; dispatched by the founder, took ORDER-001 from the CEO. Re-resolve before addressing |
+| **Deputy** | `rezv-fa [0a4dbb]` — was `rezv-b1 [5f3782]`, and `rezv-30 [a7bb03]` before that | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts, confirmed from its own transcript, not by position in this table: it took ORDER-001 from the CEO as `rezv-30`, wrote `52ae7f8`/`58f5181` as `rezv-b1`. The two predecessors are dead ids, not other agents |
 
-**Two unidentified interactive sessions were present at 2026-09-09 (`ListAgents`, by the Reviewer):
-`rezv-fa [0a4dbb]` and `rezv-9c [5283b5]`, both started minutes earlier.** Almost certainly the CEO
-and the Deputy after the restart, but *almost certainly* is not a measurement and neither had
-identified itself when this row was written. Whoever they are: identify yourself here in your next
-commit. Do not assume the previous roster maps onto you by position.
+**RESOLVED 2026-09-09 — and the way it was resolved is the point.** The Reviewer found two
+unidentified interactive sessions (`rezv-fa [0a4dbb]`, `rezv-9c [5283b5]`), judged them *almost
+certainly* the CEO and the Deputy, and **refused to write that down**, because *almost certainly* is
+not a measurement. Each session then identified itself from its own transcript — `rezv-9c` as the
+CEO, `rezv-fa` as the Deputy — and both rows above rest on that, not on elimination or position.
+
+Had the roles been assigned by position they would have been assigned **correctly**, which is exactly
+why the restraint is worth recording: a guess that happens to be right still teaches the tree that
+guessing works. Keep the rule — **do not assume the previous roster maps onto you by position** —
+and when you are the unidentified session, say who you are and how you know.
 
 Directives **032** and **034** were produced by a *subagent* the CEO ran before a Reviewer session
 existed, and carry the same "founder-side reviewer" signature. That ambiguity is resolved: the role
