@@ -114,7 +114,6 @@ describe('نقش از DB خوانده می‌شود، نه از توکن', () =>
     await setDb('manager');
     await assert.rejects(
       () => requirePermission({ ...claim('manager'), tenantId: '00000000-0000-0000-0000-000000000000' }, 'canViewRevenue'),
-      undefined,
       'tenantIdِ توکن باید با ردیفِ واقعی تطبیق داده شود',
     );
     await setDb('staff');

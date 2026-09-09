@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { fixturePhone } from './_phone.helper.mts';
 // [پورتِ ادغام ۲۰۲۶-۰۸-۲۶] ارائه‌دهنده به ملی‌پیامک مهاجرت کرد؛ «کلیدِ ترانسپورت» حالا سه متغیر است.
 const MELI_KEYS = ['MELIPAYAMAK_USERNAME','MELIPAYAMAK_PASSWORD','MELIPAYAMAK_BODYID_OTP','MELIPAYAMAK_BODYID_CAMPAIGN'];
-const setSmsTransport = (on) => { for (const k of MELI_KEYS) { if (on) process.env[k] = k.endsWith('OTP') ? '12345' : 'x'; else delete process.env[k]; } };
+const setSmsTransport = (on: boolean) => { for (const k of MELI_KEYS) { if (on) process.env[k] = k.endsWith('OTP') ? '12345' : 'x'; else delete process.env[k]; } };
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -50,6 +50,15 @@ function newPhone(prefix: string): string {
 }
 
 const ENV = ['BREAK_GLASS_PHONE', 'BREAK_GLASS_CODE', 'NODE_ENV', ...MELI_KEYS] as const;
+// NODE_ENV is `readonly` per Next's global augmentation (next/types/global.d.ts:23)
+// — a rule for app code. Tests must set it. `Object.defineProperty` performs the
+// same mutation and needs no cast, so no `as any` / `@ts-ignore`.
+const setNodeEnv = (v: string): void => {
+  Object.defineProperty(process.env, 'NODE_ENV', {
+    value: v, writable: true, configurable: true, enumerable: true,
+  });
+};
+
 let saved: Record<string, string | undefined> = {};
 
 function counterTotal(name: string): number {
@@ -95,7 +104,7 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
     const bg = newPhone('0922');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     setSmsTransport(false);
 
     const before = counterTotal('breakGlassOtp');
@@ -234,7 +243,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     const other = newPhone('0923');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     setSmsTransport(false);
 
     await assert.rejects(() => requestOtp(other), /پیامک/,

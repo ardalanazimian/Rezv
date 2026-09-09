@@ -151,7 +151,7 @@ describe('همزمانیِ واقعی — رزروِ مستقیمِ میزِ ث�
 //  برنده تضمین می‌کنه، و بازنده یک خطایِ ساختاریافته‌ی ۴۰۹-خانواده می‌گیره
 //  نه یک throwِ خامِ ۵۰۰.
 // ═══════════════════════════════════════════════════════════════════════
-const noSlotLock = async <T>(_key: string, _ttlMs: number, fn: () => Promise<T>): Promise<T> => fn();
+const noSlotLock = async <T,>(_key: string, _ttlMs: number, fn: () => Promise<T>): Promise<T> => fn();
 
 // ⚠️ عنوانِ این describe تا ۲۰۲۶-۰۹-۰۴ می‌گفت «DB به‌تنهایی هنوز محافظت می‌کند»،
 // که بیش از چیزی بود که می‌سنجد. هر دو تستِ اینجا میزِ **اصلی** را می‌گیرند
@@ -248,7 +248,7 @@ describe('صداقتِ خطا — قفل timeout شد ولی اسلات واقع
     const TIME = '14:00';
     // قفلی که دقیقاً رفتارِ «بازنده‌ی ریس» را می‌سازد: تا وقتی ما پشتِ قفل
     // منتظریم برنده commit می‌کند، بعد قفل به ما timeout می‌دهد.
-    const lockThatLosesRace = async <T>(_k: string, _t: number, _fn: () => Promise<T>): Promise<T> => {
+    const lockThatLosesRace = async <T,>(_k: string, _t: number, _fn: () => Promise<T>): Promise<T> => {
       await createReservation(
         {
           restaurantId, date: SLOT_DATE, time: TIME, partySize: 7,
@@ -276,7 +276,7 @@ describe('صداقتِ خطا — قفل timeout شد ولی اسلات واقع
     // بدونِ این تست، رفعِ بالا می‌توانست با «همیشه SLOT_FULL بده» هم پاس شود —
     // که خودش یک دروغِ تازه در جهتِ عکس است (کاربری که واقعاً باید دوباره
     // تلاش کند، بی‌دلیل ناامید می‌شود).
-    const lockAlwaysTimesOut = async <T>(_k: string, _t: number, _fn: () => Promise<T>): Promise<T> => {
+    const lockAlwaysTimesOut = async <T,>(_k: string, _t: number, _fn: () => Promise<T>): Promise<T> => {
       throw Err.lockTimeout();
     };
     await assert.rejects(

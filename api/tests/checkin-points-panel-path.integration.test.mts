@@ -181,7 +181,6 @@ describe('امتیازِ حضور از مسیرِ واقعیِ پنل (§۱۳)',
       new Request('http://x/api', {
         headers: { authorization: `Bearer ${customerToken}`, 'x-real-ip': testIp() },
       }),
-      { params: Promise.resolve({}) } as never,
     );
     assert.equal(res.status, 200);
     const body = await res.json();

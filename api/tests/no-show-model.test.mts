@@ -205,7 +205,7 @@ describe('checkChannelBias — تستِ سادهِ بایاسِ کانالی (ن
   // گیتِ بایاس در تولید به NaN افتاده و **کاملاً خاموش** شده بود.
   // تستی که ورودی‌اش را با عددِ ثابت می‌سازد، فقط همان عدد را می‌سنجد.
   const w0 = () => new Array(NO_SHOW_FEATURE_NAMES.length).fill(0);
-  const at = (name: string, value: number) => {
+  const at = (name: (typeof NO_SHOW_FEATURE_NAMES)[number], value: number) => {
     const w = w0(); w[NO_SHOW_FEATURE_NAMES.indexOf(name)] = value; return w;
   };
 

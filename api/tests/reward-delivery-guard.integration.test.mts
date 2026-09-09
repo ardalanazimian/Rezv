@@ -1,5 +1,6 @@
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import type { RewardItemKind } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
 import { listRewardItems, redeemRewardItem, isDeliverableKind, DELIVERABLE_KINDS } from '../src/lib/rewards.ts';
@@ -48,7 +49,7 @@ async function mkUser(coins: number, tier = 'bronze'): Promise<string> {
 }
 
 async function mkItem(opts: {
-  kind: string; costCoins: number; minTier?: string;
+  kind: RewardItemKind; costCoins: number; minTier?: string;
   stockRemaining?: number | null; restaurant?: 'this' | null;
 }): Promise<string> {
   const it = await db.rewardMarketplaceItem.create({

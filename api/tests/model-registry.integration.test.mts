@@ -119,7 +119,6 @@ describe('فازِ ۶ — نسب‌نامه‌ی مدل از خواندن تا �
   test('رزروِ واقعی، پیش‌بینی را با همان شناسه‌ی نسخه ثبت می‌کند', async () => {
     await createReservation({
       restaurantId, date: SLOT_DATE, time: '19:00', partySize: 2,
-      guestName: '[DEMO] مهمان', guestPhone: '09370000000',
       source: 'app', notifySms: false,
     });
     const resv = await db.reservation.findFirst({ where: { restaurantId }, select: { id: true } });

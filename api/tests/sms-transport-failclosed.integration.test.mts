@@ -62,10 +62,20 @@ function installSmsStub() {
 }
 
 const ORIG_ENV = process.env.NODE_ENV;
+// NODE_ENV is declared `readonly` by Next's global augmentation
+// (next/types/global.d.ts:23) — that rule is aimed at app code. Tests must be
+// able to set it. `Object.defineProperty` performs exactly the same mutation
+// and type-checks without a cast, so no `as any` / `@ts-ignore` is needed.
+const setNodeEnv = (v: string): void => {
+  Object.defineProperty(process.env, 'NODE_ENV', {
+    value: v, writable: true, configurable: true, enumerable: true,
+  });
+};
+
 const ORIG_U = process.env.MELIPAYAMAK_USERNAME;
 const ORIG_P = process.env.MELIPAYAMAK_PASSWORD;
 const ORIG_B = process.env.MELIPAYAMAK_BODYID_OTP;
-const setMeli = (on) => {
+const setMeli = (on: boolean) => {
   for (const [k, v] of [['MELIPAYAMAK_USERNAME','u'],['MELIPAYAMAK_PASSWORD','p'],['MELIPAYAMAK_BODYID_OTP','12345']]) {
     if (on) process.env[k] = v; else delete process.env[k];
   }
@@ -94,8 +104,9 @@ beforeEach(async () => {
 
 after(async () => {
   globalThis.fetch = REAL_FETCH;
-  process.env.NODE_ENV = ORIG_ENV;
-  for (const [k, v] of [['MELIPAYAMAK_USERNAME', ORIG_U],['MELIPAYAMAK_PASSWORD', ORIG_P],['MELIPAYAMAK_BODYID_OTP', ORIG_B]]) {
+  setNodeEnv(ORIG_ENV);
+  const restore: [string, string | undefined][] = [['MELIPAYAMAK_USERNAME', ORIG_U],['MELIPAYAMAK_PASSWORD', ORIG_P],['MELIPAYAMAK_BODYID_OTP', ORIG_B]];
+  for (const [k, v] of restore) {
     if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
   if (ORIG_DEV === undefined) delete process.env.OTP_DEV_MODE;
@@ -113,7 +124,7 @@ describe('ترانسپورتِ پیامک — fail-closed در تولید', () =
   test('⚠️ در production بدونِ اعتبارنامه‌ی ملی‌پیامک، درخواستِ OTP صریحاً شکست می‌خورد', async () => {
     // بدونِ این گارد، این فراخوان بی‌صدا موفق می‌شد و کاربر برای همیشه
     // منتظرِ پیامکی می‌ماند که هرگز فرستاده نشده.
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     setMeli(false);
     delete process.env.OTP_DEV_MODE;
 
@@ -133,7 +144,7 @@ describe('ترانسپورتِ پیامک — fail-closed در تولید', () =
 
   test('کنترلِ منفی: با کلیدِ تنظیم‌شده، درخواستِ OTP کار می‌کند', async () => {
     // بدونِ این، «همیشه ۵۰۳ بده» هم سبز می‌شد و ورود کاملاً می‌مرد.
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     setMeli(true);
     delete process.env.OTP_DEV_MODE;
     const out = await requestOtp(await freshPhone());
@@ -145,7 +156,7 @@ describe('ترانسپورتِ پیامک — fail-closed در تولید', () =
 
   test('کنترلِ منفی: در توسعه بدونِ کلید همچنان کار می‌کند', async () => {
     // محیطِ توسعه/CI نباید به کلیدِ واقعیِ کاوه‌نگار نیاز داشته باشد.
-    process.env.NODE_ENV = 'test';
+    setNodeEnv('test');
     setMeli(false);
     process.env.OTP_DEV_MODE = 'true';
     const out = await requestOtp(await freshPhone());

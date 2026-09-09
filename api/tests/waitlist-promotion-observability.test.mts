@@ -140,7 +140,6 @@ async function withFailingPromotion<T>(mode: FailMode, fn: () => Promise<T>): Pr
   try {
     return await fn();
   } finally {
-    // @ts-expect-error بازگردانیِ delegateِ اصلی
     db.table.findMany = realFindMany;
   }
 }

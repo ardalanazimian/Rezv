@@ -1,5 +1,9 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+// `Prisma` is already bound as a VALUE at :49 (`const { Prisma } = await import(...)`)
+// for TransactionIsolationLevel. The TYPE namespace is a separate thing, so it is
+// imported under an alias rather than shadowing the value binding.
+import type { Prisma as PrismaTypes } from '@prisma/client';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  گاردِ «DB منبعِ حقیقتِ ضدِ double-booking است» — ادعایِ صریحِ redis.ts:163
@@ -61,7 +65,7 @@ const downClient = {
   eval: async () => { throw new Error('connect ECONNREFUSED 127.0.0.1:6379'); },
 } as unknown as Parameters<typeof withSlotLock>[3];
 
-const failOpenLock = <T>(key: string, ttl: number, fn: () => Promise<T>) =>
+const failOpenLock = <T,>(key: string, ttl: number, fn: () => Promise<T>) =>
   withSlotLock(key, ttl, fn, downClient);
 
 function fallbackCount(): number {
@@ -445,7 +449,7 @@ async function writeSkew(tag: string, level: 'Serializable' | 'ReadCommitted') {
     : Prisma.TransactionIsolationLevel.ReadCommitted;
 
   // همان predicateی که getOccupiedTableNumbers می‌زند (هم اصلی هم ثانویه).
-  const readOcc = (tx: Prisma.TransactionClient) => tx.$queryRaw<{ num: number }[]>`
+  const readOcc = (tx: PrismaTypes.TransactionClient) => tx.$queryRaw<{ num: number }[]>`
     SELECT t.number AS num FROM reservations r JOIN tables t ON t.id = r.table_id
     WHERE r.restaurant_id = ${rid}::uuid AND r.status::text = ANY(${ACTIVE}) AND r.table_id IS NOT NULL
       AND tsrange(r.slot_start, r.block_end) && tsrange(${start}::timestamp, ${end}::timestamp)
@@ -455,7 +459,7 @@ async function writeSkew(tag: string, level: 'Serializable' | 'ReadCommitted') {
       AND cardinality(r.merged_table_numbers) > 0
       AND tsrange(r.slot_start, r.block_end) && tsrange(${start}::timestamp, ${end}::timestamp)`;
 
-  const ins = (tx: Prisma.TransactionClient, tableId: string, merged: number[], code: string) => tx.$executeRaw`
+  const ins = (tx: PrismaTypes.TransactionClient, tableId: string, merged: number[], code: string) => tx.$executeRaw`
     INSERT INTO reservations (code, restaurant_id, table_id, party_size, slot_start, slot_end,
                               status, source, merged_table_numbers, block_buffer_minutes)
     VALUES (${code}, ${rid}::uuid, ${tableId}::uuid, 4, ${start}::timestamp, ${end}::timestamp,

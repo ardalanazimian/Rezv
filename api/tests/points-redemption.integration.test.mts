@@ -135,7 +135,7 @@ describe('اقتصادِ امتیاز — نرخِ کانونی، کسب، خر�
     await db.pointsLedger.deleteMany({ where: { userId: { in: ids } } }).catch(() => {});
     await db.reservationItem.deleteMany({ where: { reservation: { restaurantId } } }).catch(() => {});
     await db.reservationEvent.deleteMany({ where: { reservation: { restaurantId } } }).catch(() => {});
-    await db.modelPrediction.deleteMany({ where: { reservation: { restaurantId } } }).catch(() => {});
+    await db.modelPrediction.deleteMany({ where: { restaurantId } }).catch(() => {});
     await db.economyLedgerEntry.deleteMany({ where: { userId: { in: ids } } }).catch(() => {});
     await db.customerEconomyProfile.deleteMany({ where: { userId: { in: ids } } }).catch(() => {});
     await db.reservation.deleteMany({ where: { restaurantId } }).catch(() => {});

@@ -392,7 +392,6 @@ describe('`upd === 0` در برابرِ خطایِ سریال‌سازی — د�
     try {
       res = await promoteNext(fx.restaurantId);
     } finally {
-      // @ts-expect-error بازگردانی
       db.table.findMany = realFindMany;
     }
     const retriesAfter = await waitlistRetryCount();
@@ -425,7 +424,6 @@ describe('`upd === 0` در برابرِ خطایِ سریال‌سازی — د�
     const realTx = db.$transaction.bind(db);
     let thrown = 0;
     const retriesBefore = await waitlistRetryCount();
-    // @ts-expect-error تزریقِ عمدیِ خطایِ سریال‌سازی
     db.$transaction = (...args: unknown[]) => {
       if (thrown === 0) {
         thrown++;
@@ -441,7 +439,6 @@ describe('`upd === 0` در برابرِ خطایِ سریال‌سازی — د�
     try {
       res = await promoteNext(fx.restaurantId);
     } finally {
-      // @ts-expect-error بازگردانی
       db.$transaction = realTx;
     }
     const retriesAfter = await waitlistRetryCount();

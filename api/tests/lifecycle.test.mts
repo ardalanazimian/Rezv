@@ -32,7 +32,7 @@ describe('canTransition — انتقال‌های مجاز', () => {
 
 describe('canTransition — انتقال‌های ممنوع', () => {
   test('وضعیت‌های پایانی هیچ انتقالی ندارند', () => {
-    for (const final of ['completed', 'no_show', 'rejected', 'expired', 'cancelled', 'auto_cancelled']) {
+    for (const final of ['completed', 'no_show', 'rejected', 'expired', 'cancelled', 'auto_cancelled'] as const) {
       assert.equal(canTransition(final, 'confirmed'), false, `${final} باید پایانی باشد`);
     }
   });

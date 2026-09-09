@@ -85,7 +85,7 @@ describe('ستون دیگر ثابتِ صفر نیست، پس گرادیانش �
     // کنترلِ منفی: با تعریفِ قدیمی (`source==='phone'`) همین دیتاست ستونِ
     // کاملاً صفر می‌ساخت و وزن دقیقاً روی مقدارِ اولیه می‌ماند.
     const legacyColumn = rows.map((r) => (r.f.source === 'phone' ? 1 : 0));
-    assert.equal(legacyColumn.reduce((a, b) => a + b, 0), 0,
+    assert.equal(legacyColumn.reduce<number>((a, b) => a + b, 0), 0,
       'اثباتِ خودِ باگ: ستونِ تعریفِ قدیمی روی دادهٔ واقعیِ همین کدبیس همیشه صفر است');
   });
 });

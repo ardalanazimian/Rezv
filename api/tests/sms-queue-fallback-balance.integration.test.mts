@@ -2,7 +2,7 @@ import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 // [پورتِ ادغام ۲۰۲۶-۰۸-۲۶] ارائه‌دهنده به ملی‌پیامک مهاجرت کرد؛ «کلیدِ ترانسپورت» حالا سه متغیر است.
 const MELI_KEYS = ['MELIPAYAMAK_USERNAME','MELIPAYAMAK_PASSWORD','MELIPAYAMAK_BODYID_OTP','MELIPAYAMAK_BODYID_CAMPAIGN'];
-const setSmsTransport = (on) => { for (const k of MELI_KEYS) { if (on) process.env[k] = k.endsWith('OTP') ? '12345' : 'x'; else delete process.env[k]; } };
+const setSmsTransport = (on: boolean) => { for (const k of MELI_KEYS) { if (on) process.env[k] = k.endsWith('OTP') ? '12345' : 'x'; else delete process.env[k]; } };
 
 // ═══════════════════════════════════════════════════════════════════════
 //  رگرسیونِ «سقفِ موجودیِ پیامک در مسیرِ اضطراری» (مسیرِ پول)
@@ -37,7 +37,7 @@ const { renderMetrics } = await import('../src/lib/metrics.ts');
 
 const SFX = Date.now().toString(36).slice(-6);
 const NUL = String.fromCharCode(0);
-const ORIG_MELI = MELI_KEYS.map(k => [k, process.env[k]]);
+const ORIG_MELI: [string, string | undefined][] = MELI_KEYS.map((k) => [k, process.env[k]]);
 const ORIG_FETCH = globalThis.fetch;
 
 let tenantId = '';

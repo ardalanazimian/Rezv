@@ -277,8 +277,6 @@ describe('endpoint و اعمالِ واقعیِ رضایت', () => {
     new Request('http://x/api/v1/me/dna-summary', {
       headers: { authorization: `Bearer ${token}`, 'x-real-ip': testIp() },
     }),
-    // ctxِ Next — این route پارامترِ مسیر ندارد
-    { params: Promise.resolve({}) } as never,
   );
 
   async function seedOneVisit() {
@@ -335,7 +333,6 @@ describe('endpoint و اعمالِ واقعیِ رضایت', () => {
   test('بدونِ توکنِ مشتری بسته است', async () => {
     const res = await dnaRoute.GET(
       new Request('http://x/api/v1/me/dna-summary', { headers: { 'x-real-ip': testIp() } }),
-      { params: Promise.resolve({}) } as never,
     );
     assert.equal(res.status >= 400, true, `باید رد شود، شد: ${res.status}`);
   });
