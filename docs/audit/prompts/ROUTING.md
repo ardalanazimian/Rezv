@@ -3,7 +3,7 @@
 **This file is the single source of truth for session addressing. When it disagrees with a
 hardcoded id inside any prompt, THIS FILE WINS.**
 
-Last verified: **2026-09-08** by the CEO session itself.
+Last verified: **2026-09-09** — Designer row added by `rezv-f3 [54834f]` itself. Roster above last verified 2026-09-09 by each session for its own row.
 
 ---
 
@@ -16,8 +16,7 @@ Last verified: **2026-09-08** by the CEO session itself.
 | **Deputy** | `rezv-fa [0a4dbb]` — was `rezv-b1 [5f3782]`, and `rezv-30 [a7bb03]` before that | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts, confirmed from its own transcript, not by position in this table: it took ORDER-001 from the CEO as `rezv-30`, wrote `52ae7f8`/`58f5181` as `rezv-b1`. The two predecessors are dead ids, not other agents |
 | **Red Team** | `rezv-c7 [b87425]` — no predecessor, first start | Self-identified 2026-09-09 from its own opening prompt: the founder pasted `redteam.md` into it with the CEO contact and the instruction to read this file first. Not inferred from position in `ListAgents`, and not accepted from the CEO's message, which deliberately declined to say which of the two new sessions was which |
 | **Launch Engineer** | `rezv-a0 [5776f9]` — no predecessor, first start | Self-identified 2026-09-09 from its own opening prompt: the founder pasted `launch-engineer.md` into it, naming the ML event substrate and feature-reality as the ask, with the instruction to read this file first. Confirmed to the CEO before writing this row. I did **not** assert `rezv-c7`'s role from mine — it wrote its own row, which is the only reason both are here |
-
-| **Designer** (frontend + UI/UX, Gen-Z lens) | *row not yet written* — charter is `docs/audit/prompts/designer.md` | **Opened by the founder 2026-09-09.** The row belongs to that session to write from its own transcript. Its absence here means it has not written it yet, **not** that the role is unfilled. Do not fill it in on its behalf, and do not map it by position in `ListAgents` |
+| **Designer** (frontend + UI/UX, Gen-Z lens) | `rezv-f3 [54834f]` — no predecessor, first start | Self-identified 2026-09-09 from its own transcript, and the evidence is **one notch weaker than the two rows above — read the qualifier before you rely on this row.** The founder opened this session and its **first and only** instruction was `read docs/audit/prompts/designer.md`. No other charter appears anywhere in my transcript, so there is no competing candidate — but the founder **pointed at** the charter by path rather than pasting it in, and has **not** said «تو Designer هستی» in words. `rezv-c7` and `rezv-a0` had the charter pasted into them; I did not. I did **not** take the role from the CEO's message (`rezv-9c` explicitly declined to assign it) and did **not** infer it from the empty row or from position in `ListAgents`. Founder confirmation is **pending**; if it does not come, this row is mine to strike, not anyone else's to fill |
 
 **RESOLVED 2026-09-09 — and the way it was resolved is the point.** The Reviewer found two
 unidentified interactive sessions (`rezv-fa [0a4dbb]`, `rezv-9c [5283b5]`), judged them *almost
