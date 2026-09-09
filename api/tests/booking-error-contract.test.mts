@@ -47,6 +47,10 @@ function codeOnly(src: string): string {
 const MUST_HANDLE = {
   capacity: ['SLOT_FULL', 'NO_TABLE_FOR_PARTY', 'MERGE_UNAVAILABLE'],
   retry:    ['CONCURRENCY_RETRY', 'SLOT_LOCK_TIMEOUT', 'TABLE_CONFLICT'],
+  // ⚠️ افزوده ۲۰۲۶-۰۹-۰۹: `errorResponse` حالا P2024 (ته‌کشیدنِ استخرِ اتصال) را
+  // به ۵۰۳/`SERVICE_UNAVAILABLE` ترجمه می‌کند به‌جای ۵۰۰/`INTERNAL`. چون رفع در
+  // `errorResponse` است و نه در مسیرِ رزرو، **هر** endpointی می‌تواند بدهدش.
+  transient: ['SERVICE_UNAVAILABLE'],
 };
 
 describe('قراردادِ خطا — کدهای سرور مصرف‌کننده دارند', () => {
@@ -66,7 +70,7 @@ describe('قراردادِ خطا — کدهای سرور مصرف‌کننده 
     }
     assert.ok(real.size > 10, `فقط ${real.size} کد از errors.ts استخراج شد — روشِ استخراج شکسته است`);
 
-    const claimed = [...MUST_HANDLE.capacity, ...MUST_HANDLE.retry];
+    const claimed = [...MUST_HANDLE.capacity, ...MUST_HANDLE.retry, ...MUST_HANDLE.transient];
     const ghosts = claimed.filter((c) => !real.has(c));
     assert.deepEqual(ghosts, [], `اپ کدهایی را مدیریت می‌کند که سرور نمی‌دهد: ${ghosts.join(', ')}`);
   });
@@ -74,7 +78,7 @@ describe('قراردادِ خطا — کدهای سرور مصرف‌کننده 
   test('⚠️ کدهای رقابت و ظرفیت در اپِ کاستومر مصرف‌کننده دارند', () => {
     // این دقیقاً گرپِ CEO است، برعکس‌شده: قبلاً صفر بود.
     const src = codeOnly(read(F.apiErrors));
-    const missing = [...MUST_HANDLE.capacity, ...MUST_HANDLE.retry].filter((c) => !src.includes(c));
+    const missing = [...MUST_HANDLE.capacity, ...MUST_HANDLE.retry, ...MUST_HANDLE.transient].filter((c) => !src.includes(c));
     assert.deepEqual(missing, [], `این کدها در اپ مصرف‌کننده ندارند: ${missing.join(', ')}`);
   });
 
@@ -107,10 +111,14 @@ describe('قراردادِ خطا — کدهای سرور مصرف‌کننده 
   });
 
   test('⚠️ دو رونوشتِ اپ از هم واگرا نشده‌اند', () => {
-    // standalone/customer.html رونوشتِ دستی است؛ هیچ اسکریپتی تولیدش نمی‌کند.
+    // ⚠️ تصحیح: `standalone/customer.html` **تولیدشده** است
+    // (`tools/build-standalone.py`)، نه رونوشتِ دستی — ادعای قبلیِ من غلط بود.
+    // پس این تست دیگر «واگراییِ دستی» را نمی‌سنجد، بلکه چیزِ مفیدترِ دیگری را:
+    // اینکه بازتولید واقعاً کد را به باندل رسانده. اگر ماژولِ تازه به
+    // `CUSTOMER_ORDER` اضافه نشود، همین‌جا قرمز می‌شود — همان‌طور که ۲۰۲۶-۰۹-۰۹ شد.
     const a = codeOnly(read(F.booking));
     const b = codeOnly(read(F.standalone));
-    for (const c of [...MUST_HANDLE.capacity, ...MUST_HANDLE.retry]) {
+    for (const c of [...MUST_HANDLE.capacity, ...MUST_HANDLE.retry, ...MUST_HANDLE.transient]) {
       const inA = a.includes(c) || codeOnly(read(F.apiErrors)).includes(c);
       const inB = b.includes(c);
       assert.equal(inA, inB, `کدِ ${c} فقط در یکی از دو رونوشت مدیریت می‌شود`);

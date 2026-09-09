@@ -2337,14 +2337,34 @@ const RETRYABLE_CONFLICT_CODES = Object.freeze([
 ]);
 
 /**
+ * خطای **زیرساختیِ گذرا** — نه رقابت، نه ظرفیتِ رستوران. تجربه‌ی کاربر همان
+ * «دوباره تلاش کن» است، ولی دسته‌اش عمداً جداست تا نامش دروغ نگوید.
+ *
+ * ⚠️ `SERVICE_UNAVAILABLE` از ۲۰۲۶-۰۹-۰۹ **واقعاً برمی‌گردد**: ته‌کشیدنِ استخرِ
+ * اتصالِ DB (`P2024`) که پیش‌تر ۵۰۰/`INTERNAL` می‌داد، حالا در `errorResponse`
+ * به ۵۰۳ ترجمه می‌شود (یافته‌ی Red Team RT-05، رفعِ CEO). چون رفع در
+ * `errorResponse` نشست و نه در مسیرِ رزرو، **هر** endpointی می‌تواند بدهدش.
+ * بدونِ این ردیف، کاربر برای یک سیگنالِ ظرفیتِ گذرا پیامِ خطای عمومی می‌دید.
+ */
+const TRANSIENT_INFRA_CODES = Object.freeze([
+  'SERVICE_UNAVAILABLE', // errors.ts:29 · errorResponse P2024 → 503
+]);
+
+/**
  * دسته‌ی خطای مسیرِ رزرو: `'capacity' | 'retry' | 'other'`.
  * فقط روی **کد** تصمیم می‌گیرد؛ هرگز روی متنِ پیام.
+ *
+ * ⚠️ `RATE_LIMITED` عمداً اینجا **نیست**: پاسخش `details.retryAfterSec` دارد،
+ * یعنی رفتارِ درستش «چند ثانیه صبر کن» است نه «همین حالا دوباره بزن». تا وقتی
+ * آن انتظار پیاده نشود، توستِ پیامِ سرور صادق‌تر از دکمه‌ی تلاشِ دوباره‌ای است
+ * که بلافاصله دوباره رد می‌شود.
  */
 function bookingErrorKind(error) {
   const code = error?.code;
   if (!code) return 'other';
   if (CAPACITY_CODES.includes(code)) return 'capacity';
   if (RETRYABLE_CONFLICT_CODES.includes(code)) return 'retry';
+  if (TRANSIENT_INFRA_CODES.includes(code)) return 'retry';
   return 'other';
 }
 
