@@ -119,3 +119,42 @@ rather than a worktree was its own error.
 
 **Owed by me right now: nothing.** Next work is the CEO's (cashback tiers, after Phase 1 proves the
 ledger constraint). Not mine, and I have not started it.
+
+---
+
+## Update 2026-09-09 (later) — ORDER-003 and ORDER-004
+
+| ID | Order | Status | Evidence |
+|---|---|---|---|
+| ORDER-003 | Landing promise audit — what `apps/landing` promises vs what the product pays | **SUBMITTED** | `0f99893` — `ORDER-003-landing-promise-audit.md`, 10 rows |
+| ORDER-004 | Reproduce the `otp-break-glass` intermittent failure | **SUBMITTED** | `ff48bf9` + addendum `c8ff47e` |
+
+Both submitted by me; neither closed by me. I still close nothing.
+
+**ORDER-003 result:** two rows fail. `PinnedStory.tsx:37` «رزروِ تازه بدونِ رفرش ظاهر می‌شود» has **no mechanism at all** — no EventSource/WebSocket/SSE, and the three `setInterval`s are chat, an outbound-only heartbeat, and a dashboard-KPI refresh gated on the overview tab. And `apps/customer/index.html:18` points its canonical at the apex, which D-006 gave to the landing — wrong today, not DNS-parked. I edited nothing in `apps/landing`: the *decision* to remove a false promise is not the founder's, but the *hand* is the Launch Engineer's.
+
+**ORDER-004 result:** not reproduced in 4 executed runs (5 with the CEO's). Both CEO hypotheses **refuted by construction** — one counter writer behind a phone-equality guard, and a rate-limit bucket keyed by a phone drawn from 10⁷ values; both were about *interference*. The real mechanism, supplied by `rezv-a0` and then **proven** by injecting a stub at `ratelimit.ts:83`: one transient Redis error makes `rateLimitInMemory` open a fresh bucket, so the 4th request is allowed (`remaining=2` while Redis had counted 3). **No fix made — nothing went red**, and the assertion was deliberately not relaxed to `>= before + 1`.
+
+**Escalated, not decided:** may a Redis blip reset a per-phone OTP limit to zero on an auth path? That is a product/security decision. A retry has since been written for it by another session — **a mitigation is not the decision.**
+
+### Three near-misses in one day, all the same family
+
+Recorded because the pattern matters more than any one of them: **reading an artefact as if it were the behaviour.**
+
+1. `docker-compose.prod.yml` lists only `api` and `caddy` — I was about to report "no cron runs in production". Its own header says `-f docker-compose.yml -f docker-compose.prod.yml`; it is an **override**. One file read as the whole configuration.
+2. `booking-error-contract.test.mts` appeared in a `P2024` grep and I was about to file it as breaking the CEO's assumption. The match was **in a comment**.
+3. `rateLimitFallback` read `0 → 0` while the fallback demonstrably fired. I was about to report "labelled counters do not record" — a serious, false claim against working code. Cause: `'./metrics'` and `'@/lib/metrics'` resolve to **two module instances** under `tsx`. Caught by testing the instrument instead of trusting it.
+
+Only the third would have shipped as a defect report against correct code. **The one habit that caught all three was checking the thing that produced the number, not the number.**
+
+### A misattribution, and how it was settled
+
+`rezv-a0` twice called uncommitted work in `api/src/lib/ratelimit.ts`, `metrics.ts`, `_all.runner.mts` and an untracked `ratelimit-transient-redis-error.test.mts` "your E-003 work", and suggested my write may have carried its injected `MUTANT` lines back into the shared file.
+
+**None of it is mine, and it was settled with evidence rather than denial:** every file I have committed this session is under `docs/` — zero under `api/` or `apps/`, across all commits. And the test file refers to me in the **third person** («معاون در ۴ اجرا بازتولیدش نکرد»), so it is written *about* the Deputy, not by one. `rezv-a0` re-verified independently and withdrew the attribution.
+
+**I did not name the real owner.** By elimination it is one of two sessions, but assigning ownership by elimination is the error the Reviewer refused to make about a roster row, and doing it about *code* is worse. Routing went to the CEO.
+
+**Standing hazard as of this entry:** those ~47 lines are **uncommitted and unpushed** — depth 0 and depth 1 at once. Invisible to the other machine, and destroyable by anyone's `git checkout --` on that path. They survive only because `rezv-a0` removed its mutation with an explicit edit instead of a checkout.
+
+**Carried forward for whoever owns E-003:** the retry absorbs a single transient error, so **both the attempt and the retry must now fail** to exercise the fallback. Any future mutation test that throws once will pass and prove nothing — which is how a guard quietly stops guarding.
