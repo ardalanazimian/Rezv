@@ -12,7 +12,7 @@ import { redeemGiftCardTx, getClubPointsBalance, ARRIVAL_POINTS, cashbackPointsF
 import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
 import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
-import { computeRanges, genReservationCode, isConflictError, isSerializationError, withSerializationRetry } from './reservation-helpers';
+import { computeRanges, genReservationCode, isConflictError, isSerializationError, isTransactionTimeoutError, withSerializationRetry } from './reservation-helpers';
 import { invalidateAvailability } from './availability-cache';
 import { transitionReservation } from './lifecycle';
 import { blockTailMinutes, getOccupiedTableNumbers, isTableNumberOccupied } from './table-occupancy';
@@ -294,7 +294,25 @@ export async function createReservation(
     // اگر بشود اثبات کرد همه‌ی کاندیداها پر شده‌اند، خطای صادقِ
     // SLOT_FULL/TABLE_CONFLICT؛ وگرنه CONCURRENCY_RETRY (۴۰۹) که صادقانه
     // می‌گوید «ترافیک بالا بود، دوباره تلاش کن» — نه ۵۰۰ی بی‌معنا.
-    if (isSerializationError(e)) {
+    //
+    // ⚠️ ۲۰۲۶-۰۹-۰۹ — **نمونه‌ی چهارمِ همین کلاس، و دلیلِ اضافه‌شدنِ P2028:**
+    // این بلوک تا امروز فقط خطاهایِ `isSerializationError` را می‌گرفت. یک
+    // `P2028` (انقضایِ خودِ تراکنشِ ۱۰ ثانیه‌ای) در آن فهرست نبود و از خطِ
+    // آخرِ همین catch **خام** بالا می‌رفت. اندازه‌گیری‌شده روی همین ماشین،
+    // نه استدلال‌شده: ردیفِ commitنشده روی همان میز/بازه نگه داشته شد و
+    // `createReservation` بعد از ۱۲.۹ ثانیه داد
+    // `PrismaClientKnownRequestError code=P2028 status=-` → ۵۰۰ INTERNAL.
+    //
+    // این چهارمین باری است که همین بلوک برایِ همین کلاس وصله می‌خورد
+    // (ioredisِ خام ۰۸-۱۴ · SLOT_LOCK_TIMEOUT ۰۸-۱۹ · 40P01 ۰۸-۲۵ · P2028
+    // امروز). گاردش `tests/tx-timeout-error-contract.test.mts` است و عمداً
+    // روی «کدِ دامنه‌ای دارد یا نه» ادعا می‌کند، نه روی P2028 — تا نمونه‌ی
+    // پنجم را هم بگیرد به‌جای اینکه منتظرِ وصله‌ی پنجم بماند.
+    //
+    // ⚠️ P2028 عمداً وارد `isSerializationError` **نشد**: آن تابع حلقه‌ی
+    // retry را هم فعال می‌کند و ۵ تلاشِ ۱۰ ثانیه‌ای یعنی ۵۰ ثانیه انتظارِ
+    // مشتری برای همان جواب. ترجمه بله، retry نه.
+    if (isSerializationError(e) || isTransactionTimeoutError(e)) {
       const occupiedNow = await getOccupiedTableNumbers(db, r.id, start, blockEnd).catch(() => null);
       if (occupiedNow) {
         if (manualTableNumber != null) {
@@ -825,7 +843,12 @@ export async function createWalkin(input: WalkinInput) {
     // این چک باید *پیش از* isConflictError بیاید، چون isConflictError خودش
     // ۴۰۰۰۱/۴۰P۰۱ را هم در بر می‌گیرد و در غیرِ این صورت همان ادعایِ
     // اثبات‌نشده را می‌کرد.
-    if (isSerializationError(e)) {
+    // ⚠️ `isTransactionTimeoutError` (P2028) به همان دلیلِ createReservation
+    // این‌جا هم می‌آید: تراکنشِ walk-in هم `timeout: 10_000` دارد
+    // (خطِ ۹۸۲ همین فایل) و پرسنلی که پشتِ یک درجِ رقیب بلاک شود، بدونِ این
+    // شرط یک ۵۰۰ی «خطای داخلی» می‌دید. یک سیاست در دو نویسنده، نه یکی —
+    // همان درسی که `reservation-helpers.ts:111` ثبتش کرده.
+    if (isSerializationError(e) || isTransactionTimeoutError(e)) {
       const proven = input.tableId
         ? await provenOccupiedWalkinTable(input, blockBufferMin).catch(() => false)
         : false;

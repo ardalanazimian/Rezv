@@ -98,6 +98,27 @@ export function isSerializationError(e: unknown): boolean {
   return unknownCode === '40001' || unknownCode === '40P01';
 }
 
+/**
+ * تشخیصِ انقضایِ خودِ تراکنش (`P2028`) — **عمداً جدا از `isSerializationError`**.
+ *
+ * تراکنشِ درجِ رزرو `timeout: 10_000` دارد. وقتی رقابتِ واقعی روی یک اسلات آن
+ * ۱۰ ثانیه را مصرف کند، Prisma این را پرتاب می‌کند. اندازه‌گیری‌شده روی همین
+ * ماشین (۲۰۲۶-۰۹-۰۹): یک ردیفِ commitنشده روی همان میز/بازه نگه داشته شد و
+ * `createReservation` بعد از ۱۲.۹ ثانیه این را داد —
+ * `PrismaClientKnownRequestError code=P2028`، **بدونِ `status`** یعنی
+ * `ApiError` نبود، پس `errorResponse` یک ۵۰۰ی عمومی می‌ساخت.
+ *
+ * ⚠️ چرا در `isSerializationError` ادغام نشد، با اینکه هر دو به یک بلوکِ
+ * ترجمه می‌روند: آن تابع **حلقه‌ی retry** را هم فعال می‌کند. یک تراکنشی که
+ * ۱۰ ثانیه صبر کرده و منقضی شده، اگر ۵ بار (`TX_MAX_RETRIES`) دوباره تلاش
+ * شود، مشتری تا ۵۰ ثانیه منتظر می‌ماند تا همان جواب را بگیرد. پس:
+ * **ترجمه بله، retry نه.** ادغام‌کردنشان یک بهبودِ ظاهری است که کندیِ
+ * پنج‌برابری می‌آورد.
+ */
+export function isTransactionTimeoutError(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2028';
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  سیاستِ واحدِ تلاشِ مجدد رویِ تداخلِ serialization
 //
