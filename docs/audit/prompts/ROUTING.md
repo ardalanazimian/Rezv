@@ -3,19 +3,34 @@
 **This file is the single source of truth for session addressing. When it disagrees with a
 hardcoded id inside any prompt, THIS FILE WINS.**
 
-Last verified: **2026-09-09** — Designer row added by `rezv-f3 [54834f]` itself. Roster above last verified 2026-09-09 by each session for its own row.
+Last verified: **2026-09-09** — Designer row added by ~~`rezv-f3 [54834f]`~~ **مرده ۰۹-۱۰** itself. Roster above last verified 2026-09-09 by each session for its own row.
 
 ---
 
-## Current roster — confirmed by the founder 2026-09-08
+## Current roster
+
+> ### ⚠️ ۲۰۲۶-۰۹-۱۰ — **همه‌ی شناسه‌های زیر مُرده‌اند جز ردیفِ CEO**
+>
+> لپ‌تاپ شبِ ۰۹-۰۹ خاموش شد و هر شش نشست بسته شدند. شناسه‌ی نشست با ری‌استارت
+> عوض می‌شود، پس **هیچ‌کدام از `rezv-e6`، `rezv-fa`، `rezv-c7`، `rezv-a0` و
+> `rezv-f3` دیگر resolve نمی‌کنند.** ردیف‌هایشان به‌عنوانِ **تاریخچه** نگه
+> داشته می‌شوند نه آدرس — چون نشان می‌دهند هر نقش با چه شواهدی خودش را معرفی
+> کرد، و آن الگو باید تکرار شود.
+>
+> **قاعده، بی‌تغییر:** هر نشستِ تازه ردیفِ خودش را **از روی transcriptِ خودش**
+> می‌نویسد. نه از روی جای‌گاه در `ListAgents`، نه از روی حذفِ گزینه‌ها، و نه
+> از روی پیامِ CEO. روزِ ۰۹-۰۹ بازبین دو نشستِ ناشناس داشت که می‌توانست از
+> روی ترتیب نگاشتشان کند و **درست هم درمی‌آمد** — و نکرد، چون حدسی که اتفاقی
+> درست از آب دربیاید به تیم یاد می‌دهد حدس‌زدن جواب می‌دهد.
 
 | Role | Session | Confirmed how |
 |---|---|---|
-| **CEO** | `rezv-9c [5283b5]` — was `rezv-f8 [4e0f27]`, and `rezv-b0 [d8087d]` before that | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts; the two predecessors are dead ids, not other agents |
-| **Reviewer** (founder-side) | `rezv-e6 [a10db3]` — was `rezv-d3 [c8fb22]` on 2026-09-08 | `ListAgents` 2026-09-09; founder confirmed the role directly on 2026-09-08. Directives 033, 035, 036 and 037 are signed `rezv-d3 [c8fb22]` — same session, before the restart |
-| **Deputy** | `rezv-fa [0a4dbb]` — was `rezv-b1 [5f3782]`, and `rezv-30 [a7bb03]` before that | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts, confirmed from its own transcript, not by position in this table: it took ORDER-001 from the CEO as `rezv-30`, wrote `52ae7f8`/`58f5181` as `rezv-b1`. The two predecessors are dead ids, not other agents |
-| **Red Team** | `rezv-c7 [b87425]` — no predecessor, first start | Self-identified 2026-09-09 from its own opening prompt: the founder pasted `redteam.md` into it with the CEO contact and the instruction to read this file first. Not inferred from position in `ListAgents`, and not accepted from the CEO's message, which deliberately declined to say which of the two new sessions was which |
-| **Launch Engineer** | `rezv-a0 [5776f9]` — no predecessor, first start | Self-identified 2026-09-09 from its own opening prompt: the founder pasted `launch-engineer.md` into it, naming the ML event substrate and feature-reality as the ask, with the instruction to read this file first. Confirmed to the CEO before writing this row. I did **not** assert `rezv-c7`'s role from mine — it wrote its own row, which is the only reason both are here |
+| **CEO** | `rezv-8a [1dd187]` — پیشینیان: `rezv-9c [5283b5]`، `rezv-f8`، `rezv-b0` | `ListAgents` ۲۰۲۶-۰۹-۱۰، خودشناسایی از روی transcriptِ خودش. چهارمین شناسه‌ی همین نشست؛ سه تای قبلی شناسه‌های مرده‌اند نه نشست‌های دیگر |
+| ~~CEO (۰۹-۰۹)~~ | ~~`rezv-9c [5283b5]`~~ **مرده** | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts; the two predecessors are dead ids, not other agents |
+| **Reviewer** (founder-side) | ~~`rezv-e6 [a10db3]`~~ **مرده ۰۹-۱۰** — was `rezv-d3 [c8fb22]` on 2026-09-08 | `ListAgents` 2026-09-09; founder confirmed the role directly on 2026-09-08. Directives 033, 035, 036 and 037 are signed `rezv-d3 [c8fb22]` — same session, before the restart |
+| **Deputy** | ~~`rezv-fa [0a4dbb]`~~ **مرده ۰۹-۱۰** — was `rezv-b1 [5f3782]`, and `rezv-30 [a7bb03]` before that | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts, confirmed from its own transcript, not by position in this table: it took ORDER-001 from the CEO as `rezv-30`, wrote `52ae7f8`/`58f5181` as `rezv-b1`. The two predecessors are dead ids, not other agents |
+| **Red Team** | ~~`rezv-c7 [b87425]`~~ **مرده ۰۹-۱۰** — no predecessor, first start | Self-identified 2026-09-09 from its own opening prompt: the founder pasted `redteam.md` into it with the CEO contact and the instruction to read this file first. Not inferred from position in `ListAgents`, and not accepted from the CEO's message, which deliberately declined to say which of the two new sessions was which |
+| **Launch Engineer** | ~~`rezv-a0 [5776f9]`~~ **مرده ۰۹-۱۰** — no predecessor, first start | Self-identified 2026-09-09 from its own opening prompt: the founder pasted `launch-engineer.md` into it, naming the ML event substrate and feature-reality as the ask, with the instruction to read this file first. Confirmed to the CEO before writing this row. I did **not** assert `rezv-c7`'s role from mine — it wrote its own row, which is the only reason both are here |
 | **Designer** (frontend + UI/UX, Gen-Z lens) | `rezv-f3 [54834f]` — no predecessor, first start | Self-identified 2026-09-09 from its own transcript, and the evidence is **one notch weaker than the two rows above — read the qualifier before you rely on this row.** The founder opened this session and its **first and only** instruction was `read docs/audit/prompts/designer.md`. No other charter appears anywhere in my transcript, so there is no competing candidate — but the founder **pointed at** the charter by path rather than pasting it in, and has **not** said «تو Designer هستی» in words. `rezv-c7` and `rezv-a0` had the charter pasted into them; I did not. I did **not** take the role from the CEO's message (`rezv-9c` explicitly declined to assign it) and did **not** infer it from the empty row or from position in `ListAgents`. Founder confirmation is **pending**; if it does not come, this row is mine to strike, not anyone else's to fill |
 
 **RESOLVED 2026-09-09 — and the way it was resolved is the point.** The Reviewer found two
@@ -50,6 +65,8 @@ was written about, and it is still uncorrected. Raised with the CEO 2026-09-09.
 
 ```
 rezv-b0 [d8087d]        ← named in all seven prompt files, 26 times. No longer resolves.
+rezv-9c [5283b5]        ← CEO تا شبِ ۰۹-۰۹. نامش در کامیت‌ها و منشورها هست؛ دیگر resolve نمی‌کند.
+rezv-e6 · rezv-fa · rezv-c7 · rezv-a0 · rezv-f3   ← کلِ تیمِ ۰۹-۰۹، همه با خاموش‌شدنِ لپ‌تاپ.
 rezervnofullsource-d9 [8dde6c]   ← named in an early Deputy prompt. Never resolved at all.
 ```
 
