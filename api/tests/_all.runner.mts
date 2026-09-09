@@ -180,6 +180,7 @@ import './rewards.integration.test.mts';
 // اگر باز هم غیبش زد، شمارشِ سوئیت را چک کن، نه رنگِ نتیجه را.
 import './reward-delivery-guard.integration.test.mts';
 import './cashback-panel-honesty.test.mts';
+import './ml-substrate-m0.integration.test.mts';
 import './redis.test.mts';
 import './reminder-sms.integration.test.mts';
 import './reservation-helpers.test.mts';

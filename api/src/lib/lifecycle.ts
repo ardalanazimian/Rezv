@@ -8,6 +8,9 @@ import { dateKeyInTz } from './hours';
 import { activeStatusList } from './reservation-status';
 import { recordOutcome } from './prediction-ledger';
 import { addClubPoints, ARRIVAL_POINTS } from './loyalty';
+import {
+  RULE_VERSION, holdoutBucket, guestKeyOf, transitionDecisionInputs,
+} from './ml-substrate';
 
 const log = createLogger('lifecycle');
 
@@ -89,7 +92,9 @@ export async function transitionReservation(opts: {
   const result = await db.$transaction(async (tx) => {
     const resv = await tx.reservation.findUnique({
       where: { id: reservationId },
-      include: { restaurant: { select: { timezone: true } } },
+      // ⚠️ `tenantId` برای زیرساختِ M0 اضافه شد — ستونِ دیگری روی همان joinِ
+      // موجود است، نه یک کوئریِ اضافه.
+      include: { restaurant: { select: { timezone: true, tenantId: true } } },
     });
     if (!resv) throw Err.notFound('رزرو');
     const from = resv.status as RStatus;
@@ -121,7 +126,14 @@ export async function transitionReservation(opts: {
     }
     const updated = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId } });
 
-    // ثبت در audit log
+    // ثبت در audit log — و از مهاجرتِ ۰۸۲، همچنین زیرساختِ رویدادِ ML (M0).
+    //
+    // ⚠️ چرا همین‌جا و نه یک emitterِ جدا: این نوشتن از قبل **داخلِ همین
+    // تراکنش** و **پشتِ compare-and-set** است، یعنی دقیقاً یک ردیف به ازای هر
+    // انتقالِ واقعی. هر emitterِ بیرون‌تراکنشی (webhook/صف) حالتی می‌سازد که
+    // رزرو عوض شده ولی رویدادش نیامده — و آن شکاف دقیقاً زیرِ بار بزرگ می‌شود،
+    // یعنی همان‌جا که داده بیشترین ارزش را دارد.
+    const holdout = holdoutBucket(guestKeyOf(updated));
     await tx.reservationEvent.create({
       data: {
         reservationId,
@@ -130,6 +142,12 @@ export async function transitionReservation(opts: {
         actor,
         reason: reason ?? null,
         isAutomatic,
+        // — زیرساختِ M0 —
+        restaurantId: updated.restaurantId,
+        tenantId: resv.restaurant.tenantId ?? null,
+        ruleVersion: RULE_VERSION,
+        holdoutBucket: holdout,
+        decisionInputs: transitionDecisionInputs(updated, timezone) as any,
       },
     });
 

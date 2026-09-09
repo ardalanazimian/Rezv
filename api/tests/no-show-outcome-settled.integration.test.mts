@@ -123,10 +123,8 @@ before(async () => {
 });
 
 after(async () => {
-  await db.$executeRaw`
-    DELETE FROM reservation_events WHERE reservation_id IN
-      (SELECT id FROM reservations WHERE restaurant_id = ${restaurantId}::uuid)
-  `.catch(() => 0);
+  // ⚠️ حذفِ صریحِ reservation_events برداشته شد (مهاجرتِ ۰۸۲) — زائد بود و
+  // حالا رد می‌شود: FK با `onDelete: Cascade` است، پس حذفِ رزرو کافی است.
   await db.$executeRaw`DELETE FROM reservations WHERE restaurant_id = ${restaurantId}::uuid`.catch(() => 0);
   await db.restaurant.deleteMany({ where: { id: restaurantId } }).catch(() => {});
   await db.tenant.deleteMany({ where: { id: tenantId } }).catch(() => {});

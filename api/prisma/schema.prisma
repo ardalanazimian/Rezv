@@ -591,7 +591,29 @@ model ReservationEvent {
   reason        String?                                // دلیل (اختیاری)
   isAutomatic   Boolean     @default(false) @map("is_automatic") // انتقال خودکار بود؟
   createdAt     DateTime    @default(now()) @map("created_at")
+
+  // ── زیرساختِ M0 برای ML (مهاجرتِ ۰۸۲) ──
+  // ⚠️ این جدول از **قبل** دفترِ تراکنشیِ انتقال‌ها بود؛ اینها فقط غنی‌سازی‌اند.
+  // طرح و دلیلِ هر ستون: docs/audit/fixes/M0-EVENT-SUBSTRATE-DESIGN.md
+  //
+  // restaurantId/tenantId اینجا **کپی** می‌شوند و از `reservation` خوانده
+  // نمی‌شوند: ویژگیِ point-in-time نباید با join به جدولی ساخته شود که
+  // قابلِ تغییر است.
+  restaurantId  String?     @map("restaurant_id") @db.Uuid
+  tenantId      String?     @map("tenant_id") @db.Uuid
+  /// نسخه‌ی قانونی که این ردیف را ساخت. بدونش، ردیف‌های پیش و پس از تغییرِ
+  /// یک قانون در آموزش قاطی می‌شوند.
+  ruleVersion   String?     @map("rule_version")
+  /// سطلِ ۰..۹۹، پایدار به ازای هر مهمان. NULL = مهمانِ ناشناس (تخصیص‌نیافته)،
+  /// که **«خارج از holdout» نیست**.
+  holdoutBucket Int?        @map("holdout_bucket") @db.SmallInt
+  /// «در لحظه‌ی تصمیم چه می‌دانستیم». هر کلید {value, window} است و window
+  /// اجباری است. NULL = ردیفِ پیش از ۰۸۲ — **هرگز backfill نمی‌شود**، چون
+  /// بازسازیِ گذشته از روی وضعِ امروز همان نشتِ زمانی است.
+  decisionInputs Json?      @map("decision_inputs") @db.JsonB
+
   @@index([reservationId, createdAt])
+  @@index([restaurantId, createdAt])
   @@map("reservation_events")
 }
 

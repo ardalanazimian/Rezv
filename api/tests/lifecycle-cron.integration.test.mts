@@ -150,9 +150,10 @@ async function purgeReservations(ids: string[]) {
   await db.$executeRaw`
     DELETE FROM payments WHERE reservation_id IN
       (SELECT id FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[]))`;
-  await db.$executeRaw`
-    DELETE FROM reservation_events WHERE reservation_id IN
-      (SELECT id FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[]))`;
+  // ⚠️ حذفِ صریحِ reservation_events برداشته شد (مهاجرتِ ۰۸۲): جدول حالا
+  // فقط-افزودنی است و حذفِ **مستقیم** در حالی که رزرو زنده است رد می‌شود.
+  // این خط از اول هم زائد بود — FK با `onDelete: Cascade` است، پس حذفِ رزرو
+  // خودش رویدادهایش را می‌برد. رفتارِ پاک‌سازی عوض نمی‌شود.
   await db.$executeRaw`DELETE FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[])`;
 }
 
