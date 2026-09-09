@@ -134,9 +134,53 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     setSmsTransport(true);
+
+    // ⚠️ تشخیصِ افزوده‌شده (۲۰۲۶-۰۹-۰۹) — و **ادعا شل نشد.**
+    //
+    // این تست در دو اجرا از هشت افتاد، همیشه با `actual: undefined` یعنی
+    // درخواستِ چهارم اصلاً رد نشد. مکانیزمش را Deputy (`rezv-fa`) قطعی
+    // اثبات کرد، بدونِ بار، با تزریق روی `attempt` (`ratelimit.ts:83`):
+    //
+    //     request 3: allowed=true  remaining=0
+    //     [WARN] rate-limit: Redis در دسترس نیست، fallback به سقفِ in-memory
+    //     request 4: allowed=true  remaining=2   ← سطلِ in-memory از صفر
+    //
+    // `rateLimitWithFallback` در خطای Redis fail-open نمی‌کند، به سقفِ
+    // **in-memory** برمی‌گردد که برای کلیدِ ندیده `{count:1, allowed:true}`
+    // می‌سازد. پس یک خطای گذرا وسطِ پنجره، شمارشِ قبلی را دور می‌ریزد.
+    //
+    // ⚠️ چرا شمارنده با importِ **نسبی** خوانده می‌شود و نه `@/lib/metrics`:
+    // زیرِ tsx آن دو به **دو نمونه‌ی جدا** از ماژول resolve می‌شوند، هر کدام
+    // با Counterها و مقادیرِ خودش. مستقل تأیید شد:
+    //     viaRelative === viaAlias            → false
+    //     counterِ هم‌نام در دو نمونه یکی است؟ → false
+    // یعنی خواندن با alias همیشه صفر می‌دهد و این چک را به گاردی تبدیل
+    // می‌کند که **نمی‌تواند بیفتد**. `metrics` بالای همین فایل (خطِ ۴۰) از
+    // مسیرِ نسبی می‌آید، پس درست است. (تله را Deputy پیدا کرد وقتی
+    // دیاگنوستیکِ پیشنهادیِ خودم ۰→۰ داد در حالی که fallback واقعاً شلیک
+    // کرده بود.)
+    const fbBefore = counterTotal('rateLimitFallback');
     for (let i = 0; i < 3; i++) await requestOtp(bg);
-    await assert.rejects(() => requestOtp(bg), /RATE_LIMITED|بیش از حد/,
-      'درخواستِ چهارم روی همان شماره باید ریت‌لیمیت شود');
+
+    let err: unknown;
+    try { await requestOtp(bg); } catch (e) { err = e; }
+    const fbAfter = counterTotal('rateLimitFallback');
+
+    // پیامِ **متمایز** وقتی سقوط رخ داده: گارد دندانش را نگه می‌دارد (تست
+    // همچنان می‌افتد) ولی معما خودش را توضیح می‌دهد به‌جای «rejection نیامد».
+    // ⚠️ عمداً این را به «اشکالی ندارد، fallback شد» تبدیل نمی‌کنیم — آن
+    // یک گاردِ امنیتی را به راوی تبدیل می‌کند.
+    assert.ok(
+      !(err === undefined && fbAfter > fbBefore),
+      `ریت‌لیمیت به سقفِ in-memory سقوط کرد (rateLimitFallback ${fbBefore}→${fbAfter}) و ` +
+      'شمارشِ سه درخواستِ قبلی از دست رفت، پس درخواستِ چهارم اجازه گرفت. ' +
+      'این اجرا نمی‌تواند اعمالِ محدودیت را اثبات کند — و اینکه آیا این پنجره‌ی ' +
+      'fail-open اصلاً باید وجود داشته باشد، یک تصمیمِ محصولی است (به CEO ارجاع شد).',
+    );
+
+    assert.ok(err !== undefined, 'درخواستِ چهارم روی همان شماره باید ریت‌لیمیت شود');
+    assert.match(String((err as Error)?.message ?? err), /RATE_LIMITED|بیش از حد/,
+      'و باید ریت‌لیمیت باشد، نه هر خطای دیگری');
   });
 });
 
