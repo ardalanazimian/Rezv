@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated_at": "2026-09-05T01:26:03.798Z",
+    "generated_at": "2026-09-07T04:53:15.143Z",
     "hostname": "DESKTOP-8DAJNO5",
     "platform": "win32 10.0.26200",
     "node_version": "v24.20.0",
@@ -58,8 +58,8 @@
     {
       "area": "A1 destructive (--scope local/rezervno_verify)",
       "command": "node tools/gate-destructive.mjs --scope local/rezervno_verify",
-      "exit": "0",
-      "state": "GREEN",
+      "exit": "1",
+      "state": "RED",
       "note": null,
       "log": "audit/round-20/gate-inventory/destructive-local_rezervno_verify.log"
     },
@@ -104,12 +104,68 @@
       "log": "audit/round-20/gate-inventory/decision-D-003.log"
     },
     {
+      "area": "A3 decision (--id D-004)",
+      "command": "node tools/gate-decision.mjs --id D-004",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/decision-D-004.log"
+    },
+    {
       "area": "A4 real sends (--recipients 1)",
       "command": "node tools/gate-send.mjs --recipients 1",
       "exit": "1",
       "state": "RED",
       "note": null,
       "log": "audit/round-20/gate-inventory/send.log"
+    },
+    {
+      "area": "Test runner completeness",
+      "command": "node tools/check-runner-completeness.mjs",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/runner-completeness.log"
+    },
+    {
+      "area": "Manifest assets",
+      "command": "node tools/check-manifest-assets.mjs",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/manifest-assets.log"
+    },
+    {
+      "area": "Alert ↔ metric binding",
+      "command": "node tools/check-alert-metric-binding.mjs",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/alert-metric-binding.log"
+    },
+    {
+      "area": "Agent memory location",
+      "command": "node tools/check-agent-memory-location.mjs",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/agent-memory-location.log"
+    },
+    {
+      "area": "XSS escaping regression",
+      "command": "node tools/xss-escaping-regression.mjs",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/xss-escaping-regression.log"
+    },
+    {
+      "area": "XSS sink audit (--check)",
+      "command": "node tools/xss-sink-audit.mjs --check",
+      "exit": "0",
+      "state": "GREEN",
+      "note": null,
+      "log": "audit/round-20/gate-inventory/xss-sink-audit-check.log"
     },
     {
       "area": "A1 restore drill executor (tools/restore-drill.sh)",

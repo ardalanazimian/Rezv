@@ -70,16 +70,35 @@ const SINK_PATTERNS = [
 // همان شکافِ رشته/template که در splitTopLevelArgs حل شده، اینجا هم باید حل
 // شود — وگرنه خودِ payloadهای insertAdjacentHTML (که HTML‌اند) هم قربانیِ
 // همین شمارشِ غلط می‌شوند.
-function matchingParen(text, start, limit) {
+// ⚠️ تعمیمِ ۲۰۲۶-۰۹-۰۷ (نامش از matchingParen به matchingDelim عوض شد):
+// همین پشته‌ی template برایِ openerِ بک‌تیک هم لازم بود. تا امروز فقط وقتی
+// صدا زده می‌شد که RHS با `(` باز شود؛ برایِ `x.innerHTML = \`...\`` یک حلقه‌ی
+// تختِ جدا در grabExpression اجرا می‌شد که سرِ اولین بک‌تیکِ بی‌بک‌اسلش
+// می‌ایستاد و از `${...}` بی‌خبر بود. یعنی هر templateی که داخلش
+// `${arr.map(x => \`...\`)}` داشت، درست سرِ اولین بک‌تیکِ تودرتو بریده می‌شد و
+// هر esc()ی بعد از آن نقطه بیرونِ هم هویتِ هش‌شده و هم دیدِ طبقه‌بند می‌ماند.
+// دو پارسر برایِ یک زبان یعنی یکی‌شان همیشه عقب است — پس یکی شد.
+//
+// نکته‌ی ظریفی که حینِ همین رفع گیر افتاد: `depth === 0` یعنی «پرانتزی که
+// از آن شروع کردیم بسته شد» — و این فقط وقتی معنا دارد که opener خودش `(`
+// باشد. برایِ openerِ بک‌تیک، depth از صفر شروع می‌شود، پس اولین `)`ِ یک
+// فراخوانِ درونی (مثلِ `${icon('arrowR')}`) آن را به ۰ می‌رساند و اسکن را
+// همان‌جا می‌بُرد. بدونِ شرطِ `opener === '('` این رفع، بریدگی را کوتاه‌تر
+// می‌کرد نه بلندتر — و چون بریدگیِ کوتاه‌تر هم بی‌صدا است، سبز می‌ماند.
+function matchingDelim(text, start, limit) {
+  const opener = text[start];
   let depth = 0, i = start;
   const tmpl = [];
+  // openerِ بک‌تیک: فریمِ template را از پیش بنشان و از کاراکترِ بعدی برو.
+  // پایان = خالی‌شدنِ پشته، نه depth.
+  if (opener === '`') { tmpl.push({ inExpr: false, braces: 0 }); i = start + 1; }
   while (i < limit) {
     const c = text[i];
     const top = tmpl.length ? tmpl[tmpl.length - 1] : null;
 
     if (top && !top.inExpr) {
       if (c === '\\') { i += 2; continue; }
-      if (c === '`') { tmpl.pop(); i++; continue; }
+      if (c === '`') { tmpl.pop(); i++; if (opener === '`' && tmpl.length === 0) return i; continue; }
       if (c === '$' && text[i + 1] === '{') { top.inExpr = true; top.braces = 1; i += 2; continue; }
       i++; continue;
     }
@@ -89,14 +108,14 @@ function matchingParen(text, start, limit) {
       if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
       if (c === "'" || c === '"') { i = skipQuoted(text, i); continue; }
       if (c === '(') depth++;
-      else if (c === ')') { depth--; if (depth === 0) return i + 1; }
+      else if (c === ')') { depth--; if (opener === '(' && depth === 0) return i + 1; }
       i++; continue;
     }
 
     if (c === '`') { tmpl.push({ inExpr: false, braces: 0 }); i++; continue; }
     if (c === "'" || c === '"') { i = skipQuoted(text, i); continue; }
     if (c === '(') { depth++; i++; continue; }
-    if (c === ')') { depth--; if (depth === 0) return i + 1; i++; continue; }
+    if (c === ')') { depth--; if (opener === '(' && depth === 0) return i + 1; i++; continue; }
     i++;
   }
   return i;
@@ -136,18 +155,16 @@ function grabExpression(text, matchStart, searchFrom = matchStart) {
     return text.slice(matchStart, i);
   }
   const opener = text[i];
-  if (opener === '(') {
-    return text.slice(matchStart, matchingParen(text, i, n));
+  // پرانتز و بک‌تیک هر دو از یک اسکنرِ تودرتوفهم رد می‌شوند (matchingDelim).
+  // پیش از ۲۰۲۶-۰۹-۰۷ فقط `(` این مسیر را می‌رفت و بک‌تیک به یک حلقه‌ی تختِ
+  // جدا می‌افتاد — رجوع کن به توضیحِ بالایِ matchingDelim.
+  if (opener === '(' || opener === '`') {
+    return text.slice(matchStart, matchingDelim(text, i, n));
   }
-  // backtick یا کوتیشن: تا بستنِ متناظرِ بدونِ backslash قبلش
-  const closer = opener;
-  let j = i + 1;
-  while (j < n) {
-    if (text[j] === '\\') { j += 2; continue; }
-    if (text[j] === closer) { j++; break; }
-    j++;
-  }
-  return text.slice(matchStart, j);
+  // کوتیشنِ تک/دابل: داخلشان interpolation وجود ندارد، پس همان skipQuoted
+  // که splitTopLevelArgs و matchingDelim هم از آن استفاده می‌کنند کافی است —
+  // یک پیاده‌سازیِ کانونی به‌جایِ حلقه‌ی چهارمِ دست‌نویس.
+  return text.slice(matchStart, Math.min(skipQuoted(text, i), n));
 }
 
 // ── شناساییِ interpolationهایِ «قابلِ‌اعتماد» داخلِ یک template literal ──
@@ -578,6 +595,19 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/customer/js/data/discover.js:151', 'ترنریِ icon(...)+رشته یا esc(el.textContent) — هردو امن.'],
   ['apps/customer/js/features/loyalty.js#388c8b826e92', 'perksBlock() از PERKS محلی (shared/js seed) می‌سازه؛ tier فقط esc(b.name) بعدِ رفعِ این PR.'],
   ['apps/customer/js/features/loyalty.js#c31403f24fd3', 'badges.map دیگه esc(b.name) داره (رفع‌شده در همین PR)؛ tier.emoji/tier.name از enumِ ثابتِ سطحِ باشگاهه.'],
+  ['apps/customer/js/features/loyalty.js#bcaa1558aca0',
+   'همان سینکِ #c31403f24fd3، بازبینی‌شده‌ی ۲۰۲۶-۰۹-۰۷ پس از افزودنِ خطِ «امتیاز '
+   + 'منقضی نمی‌شود». کلیدِ قبلی با تغییرِ عبارت باطل شد و همین درست است — بازبینیِ '
+   + 'کهنه نباید ارث برسد. بازبینیِ تازه، با شمارشِ **هر** درجِ پویا در بلاکِ '
+   + ':69-103 (نه نمونه‌برداری): esc() روی tier.name، tier.emoji، b.name، b.emoji، '
+   + 'progress_pct · fmtFa روی points (قالب‌بندِ رقم) · icon() چهار بار با آرگومانِ '
+   + 'literal · nextLine که خودش در :65-67 از esc(next_tier.*) ساخته می‌شود · '
+   + 'p[0..2] از PERKS که ثابتِ محلیِ data/seed.js است نه داده‌ی API · b.earned بولین '
+   + 'در ترنریِ بینِ دو رشته‌ی ثابت. هیچ مقدارِ API‌ای بدونِ esc نمانده. '
+   + '⚠️ چهار مورد از این esc()ها در همین بازبینی **اضافه شدند** (قبلاً خام بودند)، '
+   + 'پس این ورودی صرفاً ثبتِ وضعِ موجود نیست — سینک واقعاً سخت‌تر شد. '
+   + '⚠️ محدودیتِ کلید: به عبارتِ این بلاک بسته است. هر درجِ تازه‌ای در :69-103 '
+   + 'کلید را باطل می‌کند و گیت دوباره بازبینی می‌خواهد — که همان رفتارِ درست است.'],
   ['apps/customer/js/features/notifications.js:73', 'رشته‌هایِ ثابت (concat با +) — بدونِ دیتایِ کاربر.'],
   ['apps/customer/js/features/notifications.js:93', 'Object.entries(CATS) — آبجکتِ محلیِ ثابت.'],
   ['apps/customer/js/features/onboarding.js#650b709cbb1e', 'کارتِ onboarding کاملاً استاتیکه.'],
@@ -649,6 +679,21 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/business/js/crm.js#dd7a5ecb6671', 'همان loadErrorBlock مثلِ crm.js:132 — آرگومان‌ها literalِ کدند.'],
   ['apps/business/js/menu.js#cbbe45f8aea6', 'گروه/آپشنِ افزودنی‌ها: esc(g.name)/esc(o.name) رویِ متن، jsq(itemId)/jsq(g.id)/jsq(g.name) داخلِ onclick، و fa(min_select)/fa(max_select) رویِ اعداد — هر مسیرِ دیتا پوشش داره.'],
   ['apps/company/js/restaurant.js#c5a4dbdd770c', 'btn.innerHTML = label که خودش چهار خط بالاتر از همان دکمه خوانده شده (ذخیره/بازگرداندنِ برچسبِ دکمه حینِ لودینگ) — رفت‌وبرگشتِ markupِ خودِ عنصر، بدونِ ورودِ هیچ دادهٔ بیرونی.'],
+  ['apps/business/js/staff-system.js#1f2adc4987cb',
+   'قرینه‌ی restaurant.js#c5a4dbdd770c: prevHtml در staff-system.js:355 از innerHTMLِ '
+   + 'همان دکمه خوانده و در :361 به همان عنصر بازگردانده می‌شود؛ تنها نوشتنِ میانی '
+   + 'textContent است (:356) که مارک‌آپ نمی‌سازد. ⚠️ ولی آنچه این را امن می‌کند '
+   + 'رفت‌وبرگشت **نیست** — بازنویسیِ innerHTML یک parseِ تازه است و هر مارک‌آپِ '
+   + 'اجراپذیرِ موجود را دوباره شلیک می‌کند. آنچه بار را می‌برد محتوایِ خودِ دکمه '
+   + 'است: staff-system.js:319 فقط icon(check,{size:14}) دارد (نقشه‌ی بسته‌ی PATHS '
+   + 'در shared/js/icons.js:83؛ هر دو آرگومان literal) به‌علاوه‌ی یک رشته‌ی ثابتِ '
+   + 'فارسی — هیچ فیلدی از GET /restaurant/pricing واردِ دکمه نمی‌شود، و تنها '
+   + 'نویسندگانِ دیگرِ آن عنصر (:356، :365) هر دو textContent‌اند. خوانده‌شده ۲۰۲۶-۰۹-۰۷. '
+   + '⚠️ محدودیتِ کلید: هویت به عبارتِ :361 بسته است نه به قالبِ دکمه در :319. اگر '
+   + 'روزی درجِ پویایی به آن دکمه اضافه شود، این override همچنان اعمال می‌شود و '
+   + 'شمارش هم عوض نمی‌شود (سینکِ :322 از قبل unsafe است) — یعنی گیت قرمز نمی‌شود. '
+   + 'همان محدودیتی که برای bubble()/bizBubble() بالاتر ثبت شده. قالبِ :319 را عوض '
+   + 'کردی، این را هم بازبین کن.'],
 ]);
 
 function scanFile(absPath, relPath) {

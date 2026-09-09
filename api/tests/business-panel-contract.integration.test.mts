@@ -181,6 +181,14 @@ describe('قراردادِ پنلِ business — /restaurant/* در برابرِ
     // وقتِ رستوران» (این fixture تایم‌زون را صریح نمی‌دهد → پیش‌فرضِ
     // schema.prisma:164 یعنی Asia/Tehran) — دور از هر مرزِ نیمه‌شبی، برایِ
     // هر ساعتی که این تست اجرا شود «امروز» می‌ماند.
+    // ⚠️ شاهدِ مستقل، از ماشینِ دیگر (کامیتِ `fd56959` روی
+    // `audit/launch-hardening`): همین نقص در CIِ ۲۰۲۶-۰۹-۰۶ ساعتِ ۲۲:۴۶ UTC
+    // واقعاً افتاد — **run 34064835699**. آن تیم مستقل و دو روز زودتر پیدایش
+    // کرد و با `new Date(); setHours(12,0,0,0)` رفعش کرد، یعنی ظهرِ محلیِ
+    // **سرور**. در merge نسخه‌ی زیر (ظهرِ تهران) نگه داشته شد نه آن یکی، چون
+    // `tools/check-run-clock-date-keys.mjs` روی main همین فرم را گارد می‌کند و
+    // فرمِ server-local همان الگویی است که رفعِ T2 از کدِ تولیدی بیرون کشید.
+    // شماره‌ی اجرا اینجا می‌ماند چون سندِ بهتری از «قرمز در ۲۳:۰۶» است.
     const start = zonedTimeToUtc(dateKeyInTz(new Date(), 'Asia/Tehran'), '12:00', 'Asia/Tehran');
     await db.reservation.create({ data: {
       restaurantId, code: `DBC-${SFX}`, partySize: 2, slotStart: start, slotEnd: new Date(+start + 90 * 60_000),

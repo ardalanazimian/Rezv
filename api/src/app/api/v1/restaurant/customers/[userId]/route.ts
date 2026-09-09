@@ -75,23 +75,44 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
 export const PATCH = withRestaurantAuth({ permission: 'canManageSettings', rateLimit: 'auth' }, async (_req, ctx, rawParams: { userId: string }) => {
   const { userId } = parseParams(rawParams, paramsSchema);
 
-  // ⚠️ رفعِ نشتِ دامنه (فازِ ۲، پروتکل §۷/§۸): این handler شناسه‌ی خامِ مسیر را
-  // مستقیم به clearAbuseFlag می‌داد، در حالی که GETِ همین فایل اول رابطه را
-  // اثبات می‌کند. فلگِ سوءاستفاده رویِ CustomerEconomyProfile می‌نشیند که
-  // **سراسری و per-User** است (رجوع کن به توضیحِ خودِ lib/fraud.ts) — یعنی
-  // رستورانِ A می‌توانست فلگی را که اسکنِ رستورانِ B زده بود پاک کند، و از
-  // تفاوتِ ۲۰۰/۴۰۴ برایِ شمارشِ کاربرانِ پلتفرم استفاده کند.
-  // همان چکِ GET، با همان پیامِ خطا تا دو حالت از هم قابلِ‌تشخیص نباشند.
+  // ⚠️ تصحیحِ کامنتِ نادرست (۲۰۲۶-۰۹-۰۶). اینجا قبلاً نوشته بود «رفعِ نشتِ
+  // دامنه» و ادعا می‌کرد رستورانِ A دیگر نمی‌تواند فلگِ اسکنِ رستورانِ B را
+  // پاک کند. **آن ادعا غلط بود و هست.** آنچه واقعاً رفع شد فقط شمارشِ
+  // کاربرانِ پلتفرم از تفاوتِ ۲۰۰/۴۰۴ بود.
+  //
+  // چیزی که گاردِ زیر **اثبات می‌کند**:
+  //   این کاربر دستِ‌کم یک‌بار مشتریِ همین رستوران بوده (ردیفِ customerInsight
+  //   با restaurantId ما دارد) — یعنی یک شناسه‌ی تصادفی/بیگانه رد نمی‌شود.
+  //
+  // چیزی که **اثبات نمی‌کند**:
+  //   اینکه نوشتنِ بعدی به این رستوران محدود می‌ماند. نمی‌ماند.
+  //   `clearAbuseFlag` رویِ `customer_economy_profiles` با کلیدِ `userId`
+  //   می‌نویسد و **هیچ قیدِ رستورانی ندارد** (lib/fraud.ts) — فلگ عمداً
+  //   پلتفرم‌محور است. پس هر رستورانی که این کاربر یک‌بار مهمانش بوده،
+  //   می‌تواند فلگی را که اسکنِ رستورانِ **دیگری** زده بردارد و لایه‌ی ۴ی
+  //   `resolvePolicy` (سپرده/تأییدِ خودکار) را در کلِ پلتفرم خاموش کند.
+  //
+  // «چه کسی حق دارد پاک کند» یک تصمیمِ محصولی است (ادمینِ پلتفرم؟ فقط
+  // رستورانی که فلگ را زده؟) و در بسته‌ی تصمیمِ ۲۰۲۶-۰۹-۰۶ به مالک ارجاع
+  // شده. تا آن تعیینِ تکلیف، رفتار عمداً دست‌نخورده مانده و فقط صادقانه
+  // مستند و قابلِ‌ردیابی شده. یک کامنتی که رفعِ ناموجود را ادعا کند از
+  // نبودِ کامنت بدتر است — همان کلاسی که این مخزن برایش پرونده دارد.
   const rel = await db.customerInsight.findUnique({
     where: { restaurantId_userId: { restaurantId: ctx.restaurant.id, userId } },
     select: { userId: true },
   });
   if (!rel) throw Err.notFound('سابقه‌ی این مشتری برای این رستوران');
 
+  let audited = false;
   try {
-    await clearAbuseFlag(userId, ctx.auth.sub, ctx.restaurant.id);
+    ({ audited } = await clearAbuseFlag(userId, ctx.auth.sub, ctx.restaurant.id));
   } catch (e) {
     throw Err.notFound((e as Error).message || 'پروفایلِ اقتصادیِ این کاربر یافت نشد');
   }
-  return NextResponse.json({ ok: true });
+  // ⚠️ `audited` صریح در پاسخ می‌آید: این یک نوشتنِ **برگشت‌ناپذیر و
+  // پلتفرم‌محور** است، و `ok: true`ِ تنها ادعا می‌کرد ردِ حسابرسی هم نشسته
+  // — چیزی که تضمین‌شده نبود (`audit()` best-effort است). شکست از قبل در
+  // `rezervno_audit_write_failed_total` شمرده شده؛ این فیلد همان حقیقت را
+  // به صداکننده هم می‌گوید، بدونِ اینکه کنشِ انجام‌شده را وارونه کند.
+  return NextResponse.json({ ok: true, audited });
 });

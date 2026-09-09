@@ -470,6 +470,30 @@ jobs:
       # گاردِ double-booking بودند.
       - name: No run-clock value turned into a UTC date key in api/tests
         run: node tools/check-run-clock-date-keys.mjs
+      # ⚠️ دو بار رخ داده و بارِ اول واقعاً کامیت شد: عاملی که cwdش `api/` است
+      # حافظه‌اش را در `api/.claude/agent-memory/` می‌نویسد. الگوهای `.claude/`ِ
+      # `.gitignore`ِ ریشه مسیرِ **تودرتو** را نمی‌گیرند، پس آن پوشه untracked
+      # ولی ignore‌نشده می‌ماند و یک `git add -A` حافظه‌ی خصوصیِ عامل را واردِ
+      # مخزنِ عمومی می‌کند. `.gitignore` جوابش نیست: ریشه‌ی `.claude/` عمداً
+      # tracked است (۳۸ فایل)، پس نگه‌داشتنی و ردکردنی هم‌نام‌اند — تشخیص لازم
+      # است نه پنهان‌کردن.
+      - name: Agent memory lives only at the repo root
+        run: node tools/check-agent-memory-location.mjs
+      # ⚠️ manifestِ اپِ مشتری دو آیکون وعده می‌داد که **هیچ‌کدام وجود نداشتند**،
+      # پس PWA اصلاً نصب نمی‌شد — و تا هفته‌ی انتشار زنده ماند چون هیچ‌چیز خطا
+      # نمی‌داد: faviconِ SVG تب را درست نشان می‌داد، sw این دو را precache
+      # نمی‌کرد، و buildِ standalone تگ‌ها را حذف می‌کند. یک قابلیتِ غایب هیچ
+      # خطایی منتشر نمی‌کند.
+      - name: Every manifest icon exists on disk
+        run: node tools/check-manifest-assets.mjs
+      # ⚠️ وعده‌ی کاربر باید با مکانیزم هم‌داستان بماند (۲۰۲۶-۰۹-۰۷).
+      # صفحه‌ی وفاداریِ اپِ مشتری می‌گوید «امتیازهات هیچ‌وقت منقضی نمی‌شن».
+      # امروز درست است (PointsLedger ستونِ انقضا ندارد، هیچ کرونی امتیاز کم
+      # نمی‌کند)، ولی متن در اپِ وانیلا است و مکانیزم در Prisma/کرون — دو
+      # مرجعِ جدا. بدونِ این گارد، افزودنِ انقضا آن جمله را بی‌صدا به دروغ
+      # تبدیل می‌کرد و هیچ تستِ موجودی نمی‌گرفتش.
+      - name: Loyalty promise matches the mechanism
+        run: node tools/check-loyalty-promise.mjs
       # ⚠️ XSSِ ذخیره‌شده‌ی واقعی (۲۰۲۶-۰۸-۲۵): `cardHTML` در فیدِ مشتری فیلدِ
       # `cuisine` را بدونِ esc داخلِ innerHTML می‌گذاشت. آن فیلد را صاحبِ رستوران
       # می‌نویسد (فقط `max(50)`، بدونِ پاک‌سازیِ HTML) و از APIِ عمومی به فیدِ

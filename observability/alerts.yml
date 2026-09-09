@@ -156,6 +156,45 @@ groups:
             IPِ به‌اشتراک‌گذاشته‌شده (CGNAT). فهرست را با listBannedIps در
             پنلِ ادمین/شرکت نگاه کن؛ لغوِ دستی با unbanIp در دسترس است.
 
+      # ⚠️ چرا این قاعده اضافه شد (۲۰۲۶-۰۹-۰۶): شمارنده‌ی
+      # `rezervno_audit_write_failed_total` همان روز به `lib/audit.ts` اضافه شد
+      # تا شکستِ ثبتِ ردِ حسابرسی از یک `log.warn`ِ نامرئی به یک عددِ قابلِ
+      # اندازه‌گیری تبدیل شود. ولی «قابلِ شمارش» هنوز «دیده‌شده» نیست — و
+      # `tools/check-alert-metric-binding.mjs` هم این شکاف را **نمی‌گیرد**:
+      # آن گارد عمداً یک‌طرفه است (متریکِ بدونِ قاعده فقط warning است و کدِ
+      # خروج را عوض نمی‌کند، طبقِ هدرِ خودش). پس exit 0ِ آن گارد درباره‌ی این
+      # شمارنده هیچ چیزی تصدیق نمی‌کرد. بدونِ این قاعده، دقیقاً همان نقصی که
+      # شمارنده برای رفعش ساخته شد یک لایه بالاتر تکرار می‌شد.
+      #
+      # چرا `for` بلندتر از پنجره‌ی `increase` است: همان استدلالِ
+      # RateLimitRedisFailOpen بالا — آستانه عمداً `> 0` است (حتی یک ردِ
+      # حسابرسیِ گم‌شده یعنی یک کنشِ حساس بدونِ مدرک)، ولی یک شکستِ مجزا
+      # (یک قطعیِ لحظه‌ایِ اتصالِ DB) پیش از رسیدنِ `for` خودش خاموش می‌شود و
+      # فقط شکستِ **مکرر** پیج می‌کند.
+      #
+      # `by (action)` عمدی است: «کدام رویدادِ امنیتی ردش را گم کرد» پاسخِ
+      # عملیاتیِ متفاوتی دارد، و افتِ یک اکشن نباید پشتِ حجمِ اکشنِ دیگر پنهان
+      # شود — همان دلیلی که خودِ برچسب اضافه شد.
+      #
+      # severity=critical و نه warning: `audit_logs` اینجا فقط بایگانیِ انطباق
+      # نیست، یک **مسیرِ خواندنِ محصولی** هم هست — `listFlaggedAbuseUsers`
+      # (api/src/lib/fraud.ts) نسب‌نامه‌ی فلگ‌هایِ سوءاستفاده (چه کسی، چرا،
+      # کدام رستوران) را از همین جدول به پنلِ شرکت می‌دهد. ردیفِ غایب آنجا به
+      # «نسب‌نامه‌ی نادرست» ترجمه می‌شود، نه «کمی لاگِ کمتر».
+      - alert: AuditWriteFailing
+        expr: sum by (action) (increase(rezervno_audit_write_failed_total[5m])) > 0
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "ثبتِ ردِ حسابرسی مکرراً شکست می‌خورد (action={{ $labels.action }})"
+          description: >-
+            دستِ‌کم ۱۰ دقیقه است نوشتنِ ردیف در audit_logs شکست می‌خورد
+            (lib/audit.ts). کنشِ اصلی انجام شده — فقط مدرکش ثبت نشده، پس
+            تحقیقِ امنیتیِ بعدی روی این بازه کور است. چون نویسنده مستقیم روی
+            Postgres می‌نویسد، اول سلامتِ DB را نگاه کن نه API. اگر
+            action=security.abuse_flag باشد، نسب‌نامه‌ی فلگ‌ها در پنلِ شرکت
+            (listFlaggedAbuseUsers) هم همین حالا نادرست است.
+
   - name: rezervno_queue
     rules:
       - alert: SmsQueueBacklog
@@ -173,6 +212,36 @@ groups:
         annotations:
           summary: "رشد صف dead-letter"
           description: "بیش از ۵۰ job در ساعت گذشته به DLQ رفته‌اند — مشکل سیستمی محتمل."
+
+      # ── اجاره‌ی صف (۲۰۲۶-۰۹-۰۶) ────────────────────────────────────────
+      # تا این تاریخ workerی که وسطِ handler می‌مرد، job را برای همیشه در
+      # 'processing' جا می‌گذاشت: نه retry، نه DLQ، و **هیچ متریکی**. این دو
+      # قاعده همان نقطه‌ی کور را می‌بندند.
+      - alert: JobsStuckInProcessing
+        expr: rezervno_jobs_stuck > 0
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "job در وضعیت processing گیر کرده و بازپس گرفته نمی‌شود"
+          description: >-
+            `rezervno_jobs_stuck` تعدادِ سطرهایی است که فراتر از اجاره
+            (`JOB_LEASE_MS` در lib/queue.ts) در 'processing' مانده‌اند.
+            بازپس‌گیری داخلِ `runWorker` هر دقیقه اجرا می‌شود (cron/crontab:19)،
+            پس ماندنِ این عدد بالایِ صفر برای ۱۰ دقیقه یعنی یا هیچ workerی
+            اجرا نمی‌شود، یا خودِ بازپس‌گیری شکست می‌خورد. هر job اینجا یک
+            پیامک/ایمیل/webhookِ تحویل‌نشده است.
+
+      - alert: JobReclaimSpike
+        expr: increase(rezervno_jobs_reclaimed_total[1h]) > 20
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "بازپس‌گیریِ مکررِ job — worker مدام می‌میرد"
+          description: >-
+            بازپس‌گیری یعنی workerی پیش از `completeJob`/`failJob` متوقف شده
+            (OOM، SIGKILL، ری‌استارتِ کانتینر). چند مورد عادی است؛ بیش از ۲۰
+            در ساعت یعنی یک مسئله‌ی سیستمی. برچسبِ `outcome=dead` یعنی سهمیه‌ی
+            تلاش هم تمام شده و کار واقعاً تحویل نشده.
 
   # ── کانالِ ابلاغ به مهمان ─────────────────────────────────────────────
   # `rezervno_sms_failed_total` از ۲۰۲۶-۰۸-۱۴ واقعاً inc می‌شود

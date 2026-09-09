@@ -2,6 +2,7 @@ import { db } from './db';
 import { enqueue } from './queue';
 import { assertPublicHttpUrl } from './security';
 import { createLogger } from './logger';
+import { outboundHttpSignal } from './outbound-http';
 
 const log = createLogger('events');
 
@@ -150,7 +151,9 @@ export async function deliverWebhook(payload: {
   const res = await fetch(payload.url, {
     method: 'POST', headers, body,
     redirect: 'manual',
-    signal: AbortSignal.timeout(10_000),
+    // همان ۱۰ ثانیه‌ی قبلی — فقط حالا از مرجعِ مشترک می‌آید تا سه مسیرِ
+    // خروجی و «اجاره»ی صف به یک عدد گره بخورند، نه به سه کپی.
+    signal: outboundHttpSignal(),
   });
   if (!res.ok && res.type !== 'opaqueredirect') {
     throw new Error(`webhook ${payload.url} پاسخ ${res.status} داد`); // worker retry می‌کند

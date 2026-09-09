@@ -86,7 +86,40 @@ export function maskPhone(raw: string | null | undefined): string | null {
   return s.slice(0, 3) + '*'.repeat(Math.max(1, s.length - 7)) + s.slice(-4);
 }
 
-export async function audit(entry: AuditEntry): Promise<void> {
+/**
+ * ثبتِ رویدادِ حسابرسی. **مقدارِ برگشتی = آیا ردیف واقعاً در `audit_logs`
+ * نشست؟** (نه «آیا لاگ چاپ شد»).
+ *
+ * ⚠️ چرا از `Promise<void>` به `Promise<boolean>` تغییر کرد (۲۰۲۶-۰۹-۰۶):
+ * این تابع طبقِ طراحی هرگز throw نمی‌کند — شکستِ نوشتن در DB داخلِ همین
+ * فایل گرفته و به یک `log.warn` تنزل داده می‌شد. نتیجه‌ی عملی: صداکننده
+ * هیچ راهی نداشت بفهمد ردِ حسابرسی گم شده، و `.catch(() => {})`های
+ * پراکنده‌ی صداکننده‌ها (مثلِ `lib/fraud.ts`) عملاً **بی‌اثر** بودند —
+ * چیزی برایِ گرفتن پرتاب نمی‌شد. یعنی برداشتنِ آن catchها به‌تنهایی هیچ
+ * چیزی را رفع نمی‌کرد؛ سوراخ یک لایه پایین‌تر بود.
+ *
+ * حالا: شکست شمرده می‌شود (`rezervno_audit_write_failed_total`، با آلارمِ
+ * `AuditWriteFailing` در observability/alerts.yml) و در سطحِ `error` لاگ
+ * می‌شود، و صداکننده می‌تواند ماندگاری را ببیند. الگو عمداً همان
+ * `tryPromoteNext` در `lib/waitlist.ts` است — «کنشِ اصلی موفق بود، فقط
+ * اثرِ جانبی نه» به یک سیگنالِ دیدنی تبدیل می‌شود، بدونِ throw.
+ *
+ * ⚠️ **دامنه‌ی این مقدارِ برگشتی را دستِ‌کم نگیر — و فرض نکن کسی چکش می‌کند.**
+ * امروز `await audit(` در `api/src` **۵۴ بار** فراخوانی می‌شود و **فقط یکی**
+ * از آن‌ها نتیجه را می‌خواند: `lib/fraud.ts` در `clearAbuseFlag` (که آن را
+ * به‌صورتِ `audited` تا پاسخِ HTTP بالا می‌برد). یعنی برایِ ۵۳ نقطه‌ی دیگر،
+ * «ردیف نشست یا نه» همچنان **بی‌پاسخ** است؛ فقط متریک/آلارم آن‌ها را
+ * می‌بیند، نه خودِ کد.
+ *
+ * این عمدی و محدود است، نه ناتمام‌ماندنِ کار: سیم‌کشیِ هر ۵۴ نقطه یک تغییرِ
+ * جداست. ولی جمله در همین‌جا نوشته شده چون خطا هم دقیقاً همین‌جا مرتکب
+ * می‌شود — کسی که فراخوانِ ۵۵اُم را اضافه می‌کند، یک boolean می‌بیند و
+ * طبیعتاً نتیجه می‌گیرد جایی دارد بررسی‌اش می‌کند. **ندارد.** اگر ماندگاریِ
+ * ردِ حسابرسیِ کنشِ تو اهمیت دارد (نوشتنِ برگشت‌ناپذیر، کنشِ متقاطعِ تنانت،
+ * هر چیزی که فردا در یک تحقیق لازم می‌شود)، مقدار را **خودت** بخوان و به
+ * صداکننده گزارش بده — الگویش `clearAbuseFlag` است.
+ */
+export async function audit(entry: AuditEntry): Promise<boolean> {
   const traceId = currentTraceId();
   // همیشه لاگ ساختاریافته (برای alerting بلادرنگ حتی اگر DB کند باشد)
   log.info(`audit: ${entry.action}`, {
@@ -123,8 +156,22 @@ export async function audit(entry: AuditEntry): Promise<void> {
         detail: (entry.detail ?? {}) as object,
       },
     });
+    return true;
   } catch (e) {
-    // اگر جدول هنوز migrate نشده یا DB قطع است، فقط لاگ کن — مسیر اصلی را نشکن
-    log.warn('ثبت audit در DB ناموفق (لاگ ساختاریافته ثبت شد)', (e as Error).message);
+    // اگر جدول هنوز migrate نشده یا DB قطع است، مسیر اصلی را نشکن — ولی
+    // بی‌صدا هم نگذر. سطح `error` است نه `warn`: کنشِ حساس انجام شده و ردش
+    // گم شده؛ این دقیقاً همان حالتی است که در تحقیقِ بعدی لازم می‌شود و
+    // وجود ندارد.
+    metrics.auditWriteFailed.inc({ action: entry.action });
+    log.error('ثبت audit در DB ناموفق — کنش انجام شد ولی ردِ حسابرسی ننشست', {
+      event: 'audit.write_failed',
+      action: entry.action,
+      actor: entry.actorId,
+      target: entry.targetId,
+      restaurantId: entry.restaurantId,
+      traceId,
+      error: (e as Error).message,
+    });
+    return false;
   }
 }

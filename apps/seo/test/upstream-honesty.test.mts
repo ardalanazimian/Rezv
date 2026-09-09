@@ -106,11 +106,30 @@ describe('فهرستِ شهر/آشپزی — strict فقط جایی که تصم�
 
 describe('پیکربندیِ غایب صادقانه اعلام می‌شود', () => {
   test('SEO_API_BASE تنظیم‌نشده → خطا، نه «رستوران پیدا نشد»', async () => {
-    // ماژول با base خالی دوباره لود می‌شود (کشِ ESM با query دور زده می‌شود).
+    // ⚠️ کامنتِ قبلی اینجا می‌گفت «کشِ ESM با query دور زده می‌شود» — فرضی که
+    // روی **Node 20** (همان که ci.yml برای jobِ seo تعیین می‌کند) غلط است:
+    // `import('../lib/api.ts?nobase')` همان شیءِ ماژول را برمی‌گرداند. حالا
+    // `apiBase()` تنبل است، پس کش‌شکن لازم نیست و همان نمونه‌ی بالای فایل کافی است.
     const prev = process.env.SEO_API_BASE;
+    const prevFetch = globalThis.fetch;
+    let fetchAttempted = false;
+    globalThis.fetch = (() => { fetchAttempted = true; throw new Error('نباید در حالتِ پیکربندی‌نشده fetch شود'); }) as typeof fetch;
     process.env.SEO_API_BASE = '';
-    const fresh = await import('../lib/api.ts?nobase');
-    await assert.rejects(() => fresh.fetchRestaurant('x'), fresh.UpstreamUnavailableError);
-    process.env.SEO_API_BASE = prev;
+    const fresh = { fetchRestaurant, UpstreamUnavailableError };
+    // ⚠️ assertِ قبلی فقط **کلاسِ** خطا را می‌سنجید — و هر دو مسیر همان کلاس را
+    // می‌دهند: هم `api.ts:136` (پیکربندیِ غایب، مسیرِ موردنظر) هم `api.ts:139`
+    // (fetch به http://api.test می‌خورد و می‌افتد، مسیرِ تصادفی). پس روی Node 20
+    // که کش‌شکنِ import کار نمی‌کند، تست از مسیرِ **شبکه** رد می‌شد و سبز می‌ماند
+    // بی‌آنکه موضوعش («پیکربندی غایب») هرگز حاضر باشد. حالا پیام هم assert می‌شود.
+    await assert.rejects(
+      () => fresh.fetchRestaurant('x'),
+      (e: unknown) => e instanceof fresh.UpstreamUnavailableError
+        && /SEO_API_BASE تنظیم نشده/.test((e as Error).message),
+    );
+    // شاهدِ تفکیک‌کننده: مسیرِ «پیکربندی نشده» نباید اصلاً به شبکه برسد.
+    assert.equal(fetchAttempted, false, 'باید از گاردِ پیکربندی رد شود، نه از catchِ شبکه');
+    globalThis.fetch = prevFetch;
+    // `process.env.X = undefined` رشته‌ی "undefined" می‌گذارد، نه پاک می‌کند.
+    if (prev === undefined) delete process.env.SEO_API_BASE; else process.env.SEO_API_BASE = prev;
   });
 });
