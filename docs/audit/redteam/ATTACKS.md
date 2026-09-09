@@ -67,9 +67,44 @@ count that reads as health.
 **Counter-question:** *if this check went blind to a whole class tomorrow, which printed number
 would change?* If the answer is "none", the number is decoration, not evidence.
 
-## Capabilities this session does not have — so nobody reads absence as HOLDS
+### 21 — The null control
 
-Two permission denials landed mid-session and they remove most of the catalogue from reach:
+**Try:** nothing. This is a rule against yourself, not an attack on a gate.
+
+**The failure it names:** you probe for "X is not counted / not caught / not fired", you get a null
+result, and the **control** — the case that must fire — comes back null too. The correct reading is
+"my instrument is broken". The tempting reading is "the defect is even bigger than I thought".
+
+**Why it bites here specifically:** a null control looks like a *larger* finding rather than a broken
+tool, so the incentive runs the wrong way. It is the neighbour of "an exit code you did not read is
+not a measurement": **a null result whose control is also null is not a measurement.**
+
+**Where it nearly landed:** RT-09, 2026-09-10. The control was the `P2024` branch, which had been
+given a counter the day before. It did not move. That was one step from writing that the CEO had
+shipped a dead counter — the repo's own passing test said otherwise.
+
+**Counter-question:** *before I write this down — did my control fire?* If not there is no finding
+yet, only a broken harness.
+
+## Machine traps — measured, with the wrong guesses left in on purpose
+
+- **`@/lib/…` (alias) versus `./…` (relative)** can give two module instances. That is the real trap
+  in this repo — confirmed by the CEO, and by the Deputy's correction of 2026-09-09.
+- **Extension versus no extension** (`'../src/lib/metrics.ts'` against `'./metrics'`) does **not**
+  split instances. I claimed it did in RT-09 and was wrong; `rezv-8a` measured it — same two
+  specifiers, counter goes `none → 1`. This line exists **because** the guess was wrong: deleting it
+  would let the next session inherit the error from somewhere else. A broader rule would also make
+  the next session flinch at harmless differences, which is worse than no rule.
+- **Four rounds were lost inside my own probe during RT-09 and the cause is still unknown.** The code
+  was fine. Do not build on my guess; build on the control.
+- **stdout and stderr interleave** under `2>&1 | grep`, so log lines cannot be matched to the
+  `console.log` labels printed around them. Write your markers to one stream and filter that stream.
+
+## Capabilities — per session and per day, so measure before repeating any of this
+
+**Measured 2026-09-09 by `rezv-c7 [b87425]`. Re-measured 2026-09-10 by the same session as
+`rezv-03 [d74c7d]`: BOTH ARE NOW OPEN** — `git push --dry-run` exit 0, `docker ps` exit 0. The
+paragraph below is kept as the record of what was true yesterday, **not** as a claim about today:
 
 - **Docker is blocked**, so attacks #6 (wrong process on the port) and #7 (dead dependency) cannot be
   run at all, and every attack needing a database is out — which under my own mandate is the only
