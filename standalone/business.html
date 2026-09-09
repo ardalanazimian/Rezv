@@ -2058,6 +2058,134 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function jsq(v){return esc(JSON.stringify(String(v==null?'':v)))}
 
 </script>
+<script data-src="js/api-errors.js">
+/* ═══════════════════════════════════════════════════════════
+   رزرونو — قراردادِ خطای پنلِ رستوران (کد → متنِ پرسنل + کار)
+
+   اسپک: docs/audit/design/DS-003-panel-error-vocabulary.md §۴‑۳
+   (نشستِ Designer `rezv-f3 [54834f]`). یافته مالِ اوست؛ اجرا مالِ من.
+
+   ⚠️ تصحیحِ جمله‌ای که هر سه‌مان تکرار می‌کردیم: «پرسنل خطای **عمومی**
+   می‌بینند» دقیق نبود. پنل پیامِ فارسیِ سرور را در ۵۳ جا و ۹ فایل نشان
+   می‌دهد؛ متن هست. مشکل این است:
+
+       پنل روی `code` شاخه نمی‌زند، پس هیچ خطایی به یک **کارِ قابلِ انجام**
+       ختم نمی‌شود. هر خطا یک toast است و بن‌بست.
+
+   پس کارِ این فایل «نوشتنِ متن» نیست، «وصل‌کردنِ کد به کار» است.
+
+   ── دو تفاوتِ عمدی با نسخه‌ی اپِ کاستومر ──
+   ۱. **مخاطب پرسنل است، نه مهمان.** متنِ کاتالوگِ سرور برای مشتری نوشته
+      شده. جایی که پیامِ سرور به مهمان می‌گوید چه کند، پنل باید بگوید
+      **پرسنل** چه کند — و آن دو یکی نیستند.
+   ۲. **هر ردیف یک `action` دارد، نه فقط یک جمله.** الگویش از قبل در همین
+      پنل کار می‌کند و فقط گسترش نیافته بود: `۴۰۱ → refresh → retry` و
+      `BRANCH_NOT_ACCESSIBLE → پاک‌کردنِ شعبه + یک retry` (`data.js:168-176`).
+
+   ⚠️ آنچه این فایل **نمی‌کند**: پیامِ سرور را دور نمی‌ریزد. هر جا متنِ
+   اختصاصیِ پرسنل نداریم، `null` برمی‌گرداند و صداکننده همان پیامِ سرور را
+   نشان می‌دهد. سرور دقیق‌ترین متن را دارد؛ چیزی که ندارد، **کار** است.
+   ═══════════════════════════════════════════════════════════ */
+
+// عمداً کلاسیک (نه ماژول): پنلِ business با <script> ساده بار می‌شود و یک
+// `export`ِ سرگردان کلِ فایل را با SyntaxError می‌کشد — رخدادِ واقعیِ PR #77.
+
+/**
+ * کارهایی که پنل واقعاً می‌تواند انجام دهد. هر کدِ خطا به یکی از این‌ها
+ * نگاشت می‌شود؛ اگر کاری وجود نداشته باشد `'none'` است و **این را صادقانه
+ * می‌گوییم** به‌جای اینکه دکمه‌ی بی‌اثر بگذاریم.
+ */
+const PANEL_ERROR_ACTIONS = Object.freeze({
+  RETRY: 'retry',           // همین حالا دوباره بزن — وضعیتِ کاربر عوض نشده
+  RELOGIN: 'relogin',       // نشست تمام است
+  CLEAR_BRANCH: 'clear_branch', // انتخابِ شعبه کهنه است
+  REFRESH: 'refresh',       // دادهٔ روی صفحه از سرور عقب افتاده
+  NONE: 'none',             // کارِ نرم‌افزاری‌ای نیست؛ تصمیم با آدم است
+});
+
+/**
+ * کد → { staff، action }.
+ * `staff === null` یعنی «پیامِ سرور بهتر است» — بازنویسی نمی‌کنیم.
+ */
+const PANEL_ERROR_MAP = Object.freeze({
+  // ── گذرا: وضعیت عوض نشده، تلاشِ دوباره منطقی است ──
+  CONCURRENCY_RETRY:  { staff: 'همین لحظه یک تغییرِ همزمانِ دیگر ثبت شد؛ دوباره بزن.', action: 'retry' },
+  SLOT_LOCK_TIMEOUT:  { staff: 'این بازه همین حالا دستِ کسِ دیگری است؛ چند لحظه بعد دوباره بزن.', action: 'retry' },
+  // ⚠️ P2024 (ته‌کشیدنِ استخرِ اتصالِ DB) از ۲۰۲۶-۰۹-۰۹ به‌جای ۵۰۰/INTERNAL
+  // این را می‌دهد (کامیتِ b0bdfa6، یافته‌ی RT-05 رد تیم). چون رفع در
+  // `errorResponse` نشست و نه در یک مسیرِ خاص، **هر** درخواستِ پنل می‌تواند
+  // بگیردش — پس از روزِ اول این‌جاست، نه به‌عنوانِ وصله‌ی بعدی.
+  SERVICE_UNAVAILABLE:{ staff: 'سرور موقتاً شلوغ است — این خطای تو نیست. چند لحظه بعد دوباره بزن.', action: 'retry' },
+
+  // ── تعارضِ میز: پرسنل باید میزِ دیگری بردارد، نه اینکه دوباره همان را بزند ──
+  TABLE_CONFLICT:     { staff: 'این میز در این بازه رزرو شده؛ میزِ دیگری انتخاب کن.', action: 'refresh' },
+  TABLE_UNAVAILABLE:  { staff: 'این میز غیرفعال یا در حالِ تعمیر است.', action: 'none' },
+  TABLE_TOO_SMALL:    { staff: 'ظرفیتِ این میز برای این تعداد کافی نیست.', action: 'none' },
+  TABLE_NOT_FOUND:    { staff: 'این شماره‌ی میز وجود ندارد — فهرستِ میزها را تازه کن.', action: 'refresh' },
+
+  // ── نشست و دسترسی ──
+  UNAUTHORIZED:       { staff: 'نشستت تمام شده؛ دوباره وارد شو.', action: 'relogin' },
+  FORBIDDEN_TENANT:   { staff: 'به این بخش دسترسی نداری. اگر لازمش داری از مدیر بخواه.', action: 'none' },
+  BRANCH_NOT_ACCESSIBLE: { staff: 'شعبه‌ی انتخاب‌شده دیگر در دسترس نیست؛ شعبه را دوباره انتخاب کن.', action: 'clear_branch' },
+
+  // ── دادهٔ کهنه روی صفحه ──
+  RESERVATION_EXPIRED:{ staff: 'مهلتِ این مورد گذشته — فهرست را تازه کن.', action: 'refresh' },
+
+  // ⚠️ عمداً **بدونِ متنِ اختصاصی**: پیامِ سرور برای این‌ها دقیق‌تر از هر
+  // چیزی است که این‌جا بنویسیم (کدام فیلد، کدام منبع، چه محدودیتی).
+  // فقط `action` اضافه می‌شود.
+  VALIDATION:         { staff: null, action: 'none' },
+  NOT_FOUND:          { staff: null, action: 'refresh' },
+  FEATURE_DISABLED:   { staff: null, action: 'none' },
+  INVALID_STATUS_TRANSITION: { staff: null, action: 'refresh' },
+
+  // ⚠️ `RATE_LIMITED` عمداً این‌جا **نیست**. پاسخش `details.retryAfterSec`
+  // دارد، پس کارِ درستش «صبر کن، بعد دوباره» است نه «همین حالا دوباره بزن»،
+  // و آن یک تصمیمِ طراحی است (چقدر صبر، با چه بازخوردی، شمارشِ معکوس یا نه)
+  // نه یک رفع. اسپکش از `rezv-f3` خواسته شده. تا آن موقع پیامِ سرور نشان
+  // داده می‌شود، که صادق است — دکمه‌ای که بلافاصله دوباره رد شود نیست.
+});
+
+/**
+ * متنی که باید به پرسنل نشان داده شود.
+ * اگر ردیفِ اختصاصی نداشته باشیم یا `staff === null` باشد، **پیامِ سرور**
+ * برمی‌گردد؛ و اگر آن هم نبود، `fallback`.
+ */
+function panelErrorText(err, fallback) {
+  const row = err && err.code ? PANEL_ERROR_MAP[err.code] : null;
+  if (row && row.staff) return row.staff;
+  return (err && err.message) || fallback || 'یک مشکلِ غیرمنتظره پیش آمد';
+}
+
+/** کارِ پیشنهادی برای این خطا — همیشه یکی از `PANEL_ERROR_ACTIONS`. */
+function panelErrorAction(err) {
+  const row = err && err.code ? PANEL_ERROR_MAP[err.code] : null;
+  return (row && row.action) || 'none';
+}
+
+/**
+ * آیکونِ toast بر اساسِ **کار**، نه بر اساسِ کد.
+ *
+ * ⚠️ چرا این تابع وجود دارد و چرا کوچک است: `action` باید **امروز** یک
+ * مصرف‌کننده‌ی واقعی داشته باشد، وگرنه یک فیلدِ مرده است که ادعای قابلیت
+ * می‌کند — همان کلاسی که کلِ این قرارداد درباره‌اش است. `toast(icon, msg)`
+ * از قبل آرگومانِ آیکون دارد، پس این کوچک‌ترین مصرفِ صادقانه است:
+ * «دوباره بزن» از «کاری از دستت برنمی‌آید» با یک نگاه فرق می‌کند.
+ *
+ * این **جایگزینِ** کارِ واقعی نیست. دکمه‌ی «تلاشِ دوباره» داخلِ toast نیاز به
+ * UIِ تازه دارد و آن یک تصمیمِ طراحی است، نه چیزی که این‌جا اختراعش کنم.
+ */
+function panelErrorIcon(err) {
+  switch (panelErrorAction(err)) {
+    case 'retry':        return '⏳';
+    case 'relogin':      return '🔑';
+    case 'clear_branch': return '🏠';
+    case 'refresh':      return '↻';
+    default:             return '';
+  }
+}
+
+</script>
 <script data-src="js/data.js">
 // ═══ رزرونو — پنل business: داده و پیکربندی (Vanilla JS، بدون build، scope مشترک) ═══
 // ═══════════ DATA ═══════════
@@ -2080,6 +2208,16 @@ const STATUS_META={
   no_show:        {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'var(--amber)'},
   noshow:         {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'var(--amber)'}, // alias
   cancelled:      {label:'لغوشده',        icon:'close', bg:'#FEE2E2', fg:'#B91C1C'},
+  // ⚠️ دو وضعیتِ «قدیمی» که گاردِ `check-status-label-binding.mjs` (نشستِ
+  // Designer، DS-003 §۴‑۴) پیدایشان کرد. «قدیمی» یعنی **نوشتنی نیست**، نه
+  // «مرده»: هیچ انتقالی امروز هدفشان نمی‌گیرد، ولی ردیف‌های قدیمیِ دیتابیس
+  // همین مقدار را دارند (`schema.prisma:473-474` عمداً نگه‌شان داشته) و روتِ
+  // پرسنل هم در zod می‌پذیردشان. پس **نمایش‌پذیرند** — و بدونِ این دو خط،
+  // پنل برای آن ردیف‌ها کلیدِ خامِ انگلیسی نشان می‌داد.
+  // برچسب همان معادلِ امروزی‌شان است؛ تفکیکِ «توسطِ مشتری/رستوران» در
+  // `cancelReason` زندگی می‌کند، نه در نامِ وضعیت.
+  cancelled_by_user:       {label:'لغوشده', icon:'close', bg:'#FEE2E2', fg:'#B91C1C'}, // قدیمی
+  cancelled_by_restaurant: {label:'لغوشده', icon:'close', bg:'#FEE2E2', fg:'#B91C1C'}, // قدیمی
   auto_cancelled: {label:'لغو خودکار',    icon:'close', bg:'#FEE2E2', fg:'#B91C1C'},
   rejected:       {label:'ردشده',         icon:'close',  bg:'#FEE2E2', fg:'#991B1B'},
   expired:        {label:'منقضی',         icon:'clock', bg:'#F3F4F6', fg:'#6B7280'},
@@ -2103,6 +2241,10 @@ function statusChangeErrorText(err){
     const to=STATUS_META[err.details?.to]?.label;
     if(from&&to) return `از «${from}» نمی‌شود به «${to}» رفت`;
   }
+  // برای بقیه‌ی کدها قراردادِ پنل (`api-errors.js`) متنِ مخصوصِ **پرسنل** را
+  // می‌دهد و اگر نداشت به پیامِ سرور برمی‌گردد — پس این تابع دیگر فقط
+  // «ترجمه‌ی یک کد» نیست، تنها درِ ورودیِ متنِ خطای این مسیر است.
+  if(typeof panelErrorText==='function') return panelErrorText(err,'تغییر وضعیت ناموفق بود — دوباره تلاش کن');
   return err?.message||'تغییر وضعیت ناموفق بود — دوباره تلاش کن';
 }
 
@@ -2178,7 +2320,7 @@ async function changeStatus(i,to,reason){
       }
     } else {
       r.status=old; r.cancelReason=oldReason; r._events.pop(); renderResList();
-      toast('',statusChangeErrorText(res.error));
+      toast(typeof panelErrorIcon==='function'?panelErrorIcon(res.error):'',statusChangeErrorText(res.error));
     }
   } else {
     // بدونِ کدِ رزرو (ردیفِ نمونه/محلی) هیچ مسیرِ سروری وجود ندارد.

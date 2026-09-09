@@ -19,6 +19,16 @@ const STATUS_META={
   no_show:        {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'var(--amber)'},
   noshow:         {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'var(--amber)'}, // alias
   cancelled:      {label:'لغوشده',        icon:'close', bg:'#FEE2E2', fg:'#B91C1C'},
+  // ⚠️ دو وضعیتِ «قدیمی» که گاردِ `check-status-label-binding.mjs` (نشستِ
+  // Designer، DS-003 §۴‑۴) پیدایشان کرد. «قدیمی» یعنی **نوشتنی نیست**، نه
+  // «مرده»: هیچ انتقالی امروز هدفشان نمی‌گیرد، ولی ردیف‌های قدیمیِ دیتابیس
+  // همین مقدار را دارند (`schema.prisma:473-474` عمداً نگه‌شان داشته) و روتِ
+  // پرسنل هم در zod می‌پذیردشان. پس **نمایش‌پذیرند** — و بدونِ این دو خط،
+  // پنل برای آن ردیف‌ها کلیدِ خامِ انگلیسی نشان می‌داد.
+  // برچسب همان معادلِ امروزی‌شان است؛ تفکیکِ «توسطِ مشتری/رستوران» در
+  // `cancelReason` زندگی می‌کند، نه در نامِ وضعیت.
+  cancelled_by_user:       {label:'لغوشده', icon:'close', bg:'#FEE2E2', fg:'#B91C1C'}, // قدیمی
+  cancelled_by_restaurant: {label:'لغوشده', icon:'close', bg:'#FEE2E2', fg:'#B91C1C'}, // قدیمی
   auto_cancelled: {label:'لغو خودکار',    icon:'close', bg:'#FEE2E2', fg:'#B91C1C'},
   rejected:       {label:'ردشده',         icon:'close',  bg:'#FEE2E2', fg:'#991B1B'},
   expired:        {label:'منقضی',         icon:'clock', bg:'#F3F4F6', fg:'#6B7280'},
@@ -42,6 +52,10 @@ function statusChangeErrorText(err){
     const to=STATUS_META[err.details?.to]?.label;
     if(from&&to) return `از «${from}» نمی‌شود به «${to}» رفت`;
   }
+  // برای بقیه‌ی کدها قراردادِ پنل (`api-errors.js`) متنِ مخصوصِ **پرسنل** را
+  // می‌دهد و اگر نداشت به پیامِ سرور برمی‌گردد — پس این تابع دیگر فقط
+  // «ترجمه‌ی یک کد» نیست، تنها درِ ورودیِ متنِ خطای این مسیر است.
+  if(typeof panelErrorText==='function') return panelErrorText(err,'تغییر وضعیت ناموفق بود — دوباره تلاش کن');
   return err?.message||'تغییر وضعیت ناموفق بود — دوباره تلاش کن';
 }
 
@@ -117,7 +131,7 @@ async function changeStatus(i,to,reason){
       }
     } else {
       r.status=old; r.cancelReason=oldReason; r._events.pop(); renderResList();
-      toast('',statusChangeErrorText(res.error));
+      toast(typeof panelErrorIcon==='function'?panelErrorIcon(res.error):'',statusChangeErrorText(res.error));
     }
   } else {
     // بدونِ کدِ رزرو (ردیفِ نمونه/محلی) هیچ مسیرِ سروری وجود ندارد.

@@ -89,9 +89,18 @@ describe('واژگانِ خطای پنل — INVALID_STATUS_TRANSITION', () => {
     const code = SRC.split('\n').map((l) => {
       const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i);
     }).join('\n');
-    assert.ok(
-      code.includes('toast(\'\',statusChangeErrorText(res.error))'),
-      'مسیرِ ردِ سرور در تغییرِ وضعیت باید از statusChangeErrorText رد شود',
+    // ⚠️ این assert عمداً به **آرگومانِ آیکون** گره نمی‌خورد. نسخه‌ی اولش
+    // رشته‌ی کاملِ `toast('',statusChangeErrorText(res.error))` را پین کرده
+    // بود و وقتی آیکونِ کدمحور اضافه شد قرمز شد — در حالی که کد **بهتر**
+    // شده بود، نه خراب. تستی که شکلِ دقیقِ فراخوان را پین کند، به‌جای رفتار،
+    // جلوی بهبود را می‌گیرد.
+    // ⚠️ و نسخه‌ی دومش هم غلط بود: `[^)]*` نمی‌تواند از رویِ پرانتزِ
+    // `panelErrorIcon(res.error)` رد شود. یک regexِ «هوشمند» که خودش را
+    // نمی‌سنجد، همان‌قدر بد است که assertِ پین‌شده. حالا ساده و صریح:
+    // خطی که هم `toast(` دارد و هم متن را از این تابع می‌گیرد.
+    const wired = code.split('\n').some(
+      (l) => l.includes('toast(') && l.includes('statusChangeErrorText(res.error)'),
     );
+    assert.ok(wired, 'مسیرِ ردِ سرور در تغییرِ وضعیت باید از statusChangeErrorText رد شود');
   });
 });
