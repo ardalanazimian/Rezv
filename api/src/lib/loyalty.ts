@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { db } from './db';
 import { Err } from './errors';
 import { enqueueSms } from './sms';
@@ -312,7 +313,55 @@ export interface RedeemPointsResult {
  * — پس گاردِ سطحِ route جایی برای نشستن نداشت و «فراموش‌کردنِ گارد در
  * اولین routeِ آینده» تنها چیزی بود که بینِ تولید و پولِ رایگان می‌ایستاد.
  */
-export async function redeemPointsTx(tx: any, opts: {
+/**
+ * گاردِ زمانِ اجرا: این تابع واقعاً داخلِ یک تراکنشِ تعاملی است؟
+ *
+ * چرا لازم است و چرا تایپ کافی نبود — **اندازه‌گیری‌شده، نه استدلال‌شده**:
+ * `redeemPointsTx(db, opts)` به‌جای عبور از `$transaction`، زیرِ امضای
+ * `Prisma.TransactionClient` **بدونِ خطا type-check می‌شود** (`tsc` exit 0)،
+ * چون `PrismaClient` از نظرِ ساختاری آن اینترفیس را ارضا می‌کند. یعنی رفعِ
+ * صرفاً تایپی برای این حالت تزئینی بود.
+ *
+ * تشخیص بر پایه‌ی یک تفاوتِ قطعیِ Prisma است، نه heuristic: کلاینتِ تراکنش
+ * `$transaction` را **ندارد** (در `ITXClientDenyList` است)؛ کلاینتِ کامل دارد.
+ *
+ * چرا این‌جا مهم است: کلِ ایمنیِ بازخرید به قفلِ `FOR UPDATE` بند است که فقط
+ * تا پایانِ **تراکنش** نگه داشته می‌شود. با کلاینتِ ساده، قفل در پایانِ همان
+ * statement آزاد می‌شود و دو بازخریدِ هم‌زمان هر دو از شرط رد می‌شوند —
+ * یعنی خرجِ دوباره‌ی همان موجودی.
+ */
+function assertInsideTransaction(tx: Prisma.TransactionClient, fn: string): void {
+  if ('$transaction' in tx) {
+    throw new Error(
+      `${fn} باید داخلِ db.$transaction صدا زده شود؛ کلاینتِ کاملِ Prisma پاس داده شده. `
+      + 'قفلِ FOR UPDATE بیرونِ تراکنش در پایانِ statement آزاد می‌شود و خرجِ دوباره ممکن می‌شود.',
+    );
+  }
+}
+
+// ⚠️ `Prisma.TransactionClient` و نه `any` — یافته‌ی بازبین (`rezv-e6`، دستورِ
+// ۰۴۳)، و شدتش دقیقاً همان‌جایی است که خودش گذاشت: کوچک، نه بلاکر.
+//
+// ⚠️⚠️ **ولی تایپ به‌تنهایی این اشتباه را نمی‌گیرد، و این با اجرا معلوم شد نه
+// با خواندن.** جهشِ ثبت‌شده: `redeemPointsTx(db, opts)` به‌جای عبور از
+// `$transaction` — `tsc` **exit 0** داد. علتش ساختاری است: `PrismaClient`
+// همه‌ی delegateهای مدل را دارد، پس `Prisma.TransactionClient` را ارضا
+// می‌کند. یعنی رفعِ صرفاً تایپی برای همان حالتی که توصیف شده بود **تزئینی**
+// بود — تایپ ارزشِ مستندسازی دارد و تایپ‌های واقعاً بی‌ربط را رد می‌کند، ولی
+// نه این یکی را.
+//
+// پس گاردِ واقعی در زمانِ اجراست، و بر پایه‌ی یک تفاوتِ ساختاریِ قطعی:
+// کلاینتِ تراکنش `$transaction` **ندارد** (در `ITXClientDenyList` است) و
+// کلاینتِ کامل دارد. همان چیزی که تایپ نمی‌بیند، این یک خط می‌بیند.
+//
+// **کلِ استدلالِ ایمنیِ این تابع به این بند است که `tx` یک تراکنشِ تعاملی
+// باشد.** با `any`، اگر روزی کسی کلاینتِ ساده‌ی `db` را پاس بدهد،
+// `FOR UPDATE` در پایانِ همان statement آزاد می‌شود و دو بازخریدِ هم‌زمان
+// می‌توانند هر دو از شرطِ `WHERE` رد شوند. امروز تنها ورودی `redeemPoints`
+// است که درست wrap می‌کند و تستِ همزمانی هم همان مسیر را می‌سنجد — پس این
+// یک نقصِ زنده نیست، **درِ بازی است برای اشتباهِ آینده**. `any` همان چیزی
+// است که آن اشتباه را ممکن می‌کند.
+export async function redeemPointsTx(tx: Prisma.TransactionClient, opts: {
   userId: string;
   /** اسکوپِ خرج: شناسه‌ی رستوران، یا null برایِ کیفِ پلتفرم. */
   restaurantId: string | null;
@@ -322,6 +371,8 @@ export async function redeemPointsTx(tx: any, opts: {
   note?: string;
 }): Promise<RedeemPointsResult> {
   const { userId, restaurantId, points, idempotencyKey } = opts;
+
+  assertInsideTransaction(tx, 'redeemPointsTx');
 
   if (!(await isFeatureEnabled('points_redemption_enabled'))) {
     throw Err.featureDisabled(featureFlagLabel('points_redemption_enabled'));
@@ -680,7 +731,11 @@ export async function redeemGiftCard(code: string, amountToman: number) {
  * کارتِ صادرشده‌ای باطل نمی‌شود (تغییر کاملاً افزایشی است).
  * منطقِ قفل/انقضا/موجودی دست‌نخورده است — فقط یک شرطِ دامنه اضافه شده.
  */
-export async function redeemGiftCardTx(tx: any, code: string, amountToman: number, restaurantId?: string) {
+// ⚠️ همان تغییر، از روی قاعده‌ی خودِ بازبین: «کلاس را رفع کن، نه نمونه را».
+// یافته‌ی ۰۴۳ فقط `redeemPointsTx` را نام برد؛ این تابع همان شکل را داشت و
+// همان مسیرِ پول است (کارتِ هدیه). یافته‌ای که فقط روی نمونه‌ی نام‌برده اعمال
+// شود، خواهرش را برای دورِ بعد جا می‌گذارد.
+export async function redeemGiftCardTx(tx: Prisma.TransactionClient, code: string, amountToman: number, restaurantId?: string) {
   if (!Number.isInteger(amountToman) || amountToman <= 0) {
     throw Err.validation('مبلغ استفاده باید عددی مثبت باشد');
   }
