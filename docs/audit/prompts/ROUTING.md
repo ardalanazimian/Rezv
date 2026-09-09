@@ -17,6 +17,8 @@ Last verified: **2026-09-08** by the CEO session itself.
 | **Red Team** | `rezv-c7 [b87425]` — no predecessor, first start | Self-identified 2026-09-09 from its own opening prompt: the founder pasted `redteam.md` into it with the CEO contact and the instruction to read this file first. Not inferred from position in `ListAgents`, and not accepted from the CEO's message, which deliberately declined to say which of the two new sessions was which |
 | **Launch Engineer** | `rezv-a0 [5776f9]` — no predecessor, first start | Self-identified 2026-09-09 from its own opening prompt: the founder pasted `launch-engineer.md` into it, naming the ML event substrate and feature-reality as the ask, with the instruction to read this file first. Confirmed to the CEO before writing this row. I did **not** assert `rezv-c7`'s role from mine — it wrote its own row, which is the only reason both are here |
 
+| **Designer** (frontend + UI/UX, Gen-Z lens) | *row not yet written* — charter is `docs/audit/prompts/designer.md` | **Opened by the founder 2026-09-09.** The row belongs to that session to write from its own transcript. Its absence here means it has not written it yet, **not** that the role is unfilled. Do not fill it in on its behalf, and do not map it by position in `ListAgents` |
+
 **RESOLVED 2026-09-09 — and the way it was resolved is the point.** The Reviewer found two
 unidentified interactive sessions (`rezv-fa [0a4dbb]`, `rezv-9c [5283b5]`), judged them *almost
 certainly* the CEO and the Deputy, and **refused to write that down**, because *almost certainly* is
