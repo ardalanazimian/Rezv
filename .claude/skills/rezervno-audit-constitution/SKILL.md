@@ -56,6 +56,37 @@ compared artifact staleness rather than counts; the `boot-path` job never ran
 Ask of every gate: *what is the smallest change that breaks this but still passes?* Real
 regressions are partial — nobody deletes an entire escaper at once.
 
+### An exit code you did not read is not a measurement
+
+Added 2026-09-09, after this cost four separate sessions in one day. **The harness is wrong far
+more often than the finding is.** Every one of these produced a confident, wrong result:
+
+- `EXIT=$?` **after a pipe** reads the exit code of the last stage — usually `grep`, not the thing
+  under test. A `grep` that matches nothing returns 1 and reads as a failing test.
+- **`git reset --hard` reverts your tooling too.** A worktree takes the checker from the commit, so
+  a reset restores the *previous* version of the guard you are testing. One session hit this three
+  times in one sitting; on the third, three injections silently ran against the old guard and went
+  green — the opposite of the truth. It caught it only by reading the **text** of the output, which
+  still named the old target.
+- On a **shared tree**, "I changed the file and re-ran" is not a measurement unless you know what
+  was in the file at that moment. Another session's injected mutant sat in the same file and
+  produced an inverted result nobody could explain until it was disclosed. **Take an `md5sum` at
+  every step and put the three hashes in the delivery** — baseline, injected, restored-and-equal.
+- A guard's own **scan list can silently resolve to zero files** (a guessed path, a stale glob).
+  Empty scope must be an error, never a pass.
+
+So: read the output text, not just the status. Confirm the tool you ran is the tool you edited.
+And when a result is *inverted* — red where it should be green — suspect the harness first, but
+**record the anomaly instead of discarding it**. One such anomaly was recoverable hours later
+precisely because it had been written down as unexplained rather than dismissed as noise.
+
+### Count with a parser before you report a number
+
+An approximation reported as a finding is a wrong finding. On 2026-09-09 a session estimated ~19
+weak `assert.throws` assertions by heuristic; a real parser found **56** — three times larger, and
+wrong in the *safe* direction, which is the direction nobody audits. Say "approximate" out loud
+until you have parsed, and never let an approximation cross into a ledger.
+
 ## 4. A test that stays green when its subject is absent is not a test
 
 Every silent escape hatch — `if (x === undefined) return`, `if (!rows.length) return`, a
