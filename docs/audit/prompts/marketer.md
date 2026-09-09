@@ -83,7 +83,10 @@ you do not name them in public copy.
 
 ## Workstream 1 — Positioning and the story
 
-Before any channel, one document: `docs/marketing/POSITIONING.md`.
+Before any channel, one document: `docs/marketing/POSITIONING.md`. **It does not exist yet
+(verified 2026-09-09) — you write it; it is your first deliverable, not an input.** Until it lands
+there is no approved source of public-facing copy, and `launch-engineer.md` says so in its own
+inputs table. Anyone writing customer-visible words before then is inventing claims.
 
 - Who we are for, in one sentence a Gen-Z diner would repeat to a friend. Then one for a restaurant
   owner. Then one for an investor. Three audiences, three sentences, no adjectives that need proof.

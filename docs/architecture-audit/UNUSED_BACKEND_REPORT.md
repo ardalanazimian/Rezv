@@ -11,7 +11,13 @@
 | `GET/PATCH /api/v1/admin/settings` | صفر ارجاع در `apps/` | **Needs Investigation** | تنظیماتِ پلتفرم (مثلِ toggleِ پرداخت) شاید از مسیرِ دیگری خوانده شود |
 
 ## غیرِ-orphan (مصرف‌کننده‌ی غیرِفرانت — بلااستفاده نیستند)
-- `maintenance/*` (۸): مصرف‌کننده = **Vercel Cron** (`api/vercel.json`). فعال.
+- `maintenance/*` (۹): مصرف‌کننده = **سرویسِ cronِ Compose** (`cron/crontab` → `cron/run.sh`
+  → `POST /api/v1/maintenance/<job>` با هدرِ `x-maintenance-key`). فعال.
+  <!-- ⚠️ تصحیحِ ۲۰۲۶-۰۹-۰۹: می‌گفت «مصرف‌کننده = **Vercel Cron** (`api/vercel.json`)».
+       آن فایل در ۲۰۲۶-۰۸-۲۸ حذف شد و `cron/crontab` تنها منبعِ حقیقتِ زمان‌بندی است.
+       نتیجه‌ی «فعال» درست بود؛ **دلیلش** غلط بود — و یک دلیلِ غلط دقیقاً همان‌قدر
+       خطرناک است، چون خواننده‌ای که بخواهد تأییدش کند به فایلِ ناموجود می‌رسد و
+       ممکن است نتیجه بگیرد هیچ زمان‌بندی‌ای وجود ندارد. همین امروز رخ داد. -->
 - `payments/callback`: مصرف‌کننده = **Zarinpal webhook**. فعال.
 - `checkin`: مصرف‌کننده = **اسکنِ QRِ میز** (اپ مشتری، `POST /checkin`). فعال.
 - `health`/`metrics`: مصرف‌کننده = **load-balancer/Prometheus**. فعال.

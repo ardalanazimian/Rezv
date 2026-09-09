@@ -58,7 +58,7 @@ Read all of these before touching code. Build one list.
 | The feature census (`docs/audit/round-*/…census.json`) | Every FAKE and PARTIAL row — each is a feature to make real |
 | The delivery mandate | The four golden journeys and the definition of done |
 | `docs/audit/research/proposals/` | Scout proposals — only those the CEO has marked approved |
-| `docs/marketing/POSITIONING.md` | The only source of public-facing copy |
+| `docs/marketing/POSITIONING.md` | The only source of public-facing copy — **does not exist yet (verified 2026-09-09).** It is the Marketer's first deliverable (`marketer.md` §192) and the Marketer session has been deliberately deferred. Until it lands, there is **no approved source of public copy**: do not invent one, and treat any claim you cannot trace to running code as unapproved. |
 | `docs/DECISIONS.md` | What is deferred by decision, so you do not re-fix it |
 
 Post the assembled backlog as `docs/audit/fixes/BACKLOG.md` **before your first fix**, with a count
