@@ -10,6 +10,7 @@ import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js
 import { findR, invalidateCardSlots } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
 import { genIdempotencyKey } from '../api-core.js';
+import { bookingErrorKind } from '../api-errors.js';
 import { haptic } from '../theme-pwa.js';
 import { icon } from '../icons.js';
 
@@ -351,12 +352,42 @@ export async function confirmBook(id){
       </div>`;
     return;
   } else {
-    // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
-    const isFull = res.error?.code==='SLOT_FULL' || res.error?.code==='NO_TABLE_FOR_PARTY' || /پر|ظرفیت/.test(res.error?.message||'');
-    if(isFull){
+    // خطای واقعی از سرور. تصمیم فقط رویِ **کدِ** خطاست، نه متنِ پیام.
+    // ⚠️ شرطِ قبلی یک `/پر|ظرفیت/.test(res.error?.message||'')` داشت: منطقِ UI
+    // سوارِ متنِ فارسیِ بک‌اند بود، پس عوض‌کردنِ یک کلمه در `errors.ts` بی‌صدا
+    // این شاخه را می‌شکست بدونِ آنکه چیزی قرمز شود.
+    const kind = bookingErrorKind(res.error);
+
+    if(kind==='capacity'){
       offerWaitlist(id, r);
       return;
     }
+
+    if(kind==='retry'){
+      // ظرفیت لزوماً تمام نیست — رزروِ همزمانِ کسِ دیگری جلو افتاد. تلاشِ
+      // دوباره همین حالا اغلب جواب می‌دهد، پس دکمه‌ی تلاشِ دوباره داده می‌شود
+      // و **پیشنهادِ صف داده نمی‌شود** (صف برای وقتی است که جا واقعاً نیست).
+      //
+      // ⚠️ چرا این حالت تازه اهمیت پیدا کرد: کامیتِ `38a9570` مسیرِ رزرو را
+      // صادق‌تر کرد و در شرایطِ رقابت ۴۰۹ `CONCURRENCY_RETRY` می‌دهد. اپ آن
+      // کد را نمی‌شناخت، پس کاربر یک توستِ عمومی می‌دید. قراردادِ بهترشده‌ای
+      // که مصرف‌کننده ندارد، هنوز برای کاربر بهتر نشده.
+      //
+      // ساختارِ شیت عمداً همان شیتِ «ثبت نشد»ِ آفلاین است — الگویِ درست از
+      // قبل در همین فایل بود؛ مکانیزمِ تازه‌ای ساخته نشد.
+      haptic('light');
+      sheetBody.innerHTML=`
+        <div style="text-align:center;padding:24px 16px">
+          <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">⏳</div>
+          <div class="sheet-title" style="text-align:center">این لحظه شلوغ بود</div>
+          <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}</div>
+          <div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:14px 0">${esc(res.error?.message||'همین حالا کسِ دیگری داشت همین زمان را رزرو می‌کرد، پس رزروِ تو ثبت نشد. جا هنوز ممکن است باز باشد — دوباره بزن.')}</div>
+          <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(id))})">تلاش دوباره</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
+        </div>`;
+      return;
+    }
+
     toast('', res.error?.message || 'ثبت رزرو ناموفق بود، دوباره تلاش کن');
     if(confirmBtn){confirmBtn.disabled=false;confirmBtn.textContent='تأیید رزرو';}
     return;

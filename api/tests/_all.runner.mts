@@ -182,6 +182,7 @@ import './rewards.integration.test.mts';
 import './reward-delivery-guard.integration.test.mts';
 import './cashback-panel-honesty.test.mts';
 import './ml-substrate-m0.integration.test.mts';
+import './booking-error-contract.test.mts';
 import './redis.test.mts';
 import './reminder-sms.integration.test.mts';
 import './reservation-helpers.test.mts';

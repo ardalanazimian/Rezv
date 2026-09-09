@@ -2877,6 +2877,21 @@ function bookStep3(r){
     ${cancelPolicyLabel(r)?`<div class="cancel-policy-note" style="font-size:11.5px;color:var(--t3);margin:8px 2px 0;line-height:1.7">${icon('info',{size:13})} ${esc(cancelPolicyLabel(r))}</div>`:''}
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(r.id))})">تأیید رزرو</button>`;
 }
+// ═══ طبقه‌بندیِ کدهای خطای API برای مسیرِ رزرو ═══
+// ⚠️ رونوشتِ دومِ apps/customer/js/api-errors.js — این بسته تک‌فایلی و
+// کلاسیک است و import ندارد. هر دو با هم عوض می‌شوند.
+// تصمیم فقط رویِ **کدِ** خطاست: پیامِ خطا متنِ کاربر است، نه قرارداد، و
+// شاخه‌زدن رویش یعنی عوض‌کردنِ یک کلمه در errors.ts بی‌صدا UI را می‌شکند.
+const CAPACITY_CODES = ['SLOT_FULL','NO_TABLE_FOR_PARTY','MERGE_UNAVAILABLE'];
+const RETRYABLE_CONFLICT_CODES = ['CONCURRENCY_RETRY','SLOT_LOCK_TIMEOUT','TABLE_CONFLICT'];
+function bookingErrorKind(error){
+  const code = error && error.code;
+  if(!code) return 'other';
+  if(CAPACITY_CODES.includes(code)) return 'capacity';
+  if(RETRYABLE_CONFLICT_CODES.includes(code)) return 'retry';
+  return 'other';
+}
+
 async function confirmBook(id){
   const r=findR(id);
   // رزرو نیاز به ورود دارد — بعد از ورود، همین مرحله‌ی تأیید از سر گرفته می‌شود
@@ -2967,10 +2982,25 @@ async function confirmBook(id){
       </div>`;
     return;
   } else {
-    // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
-    const isFull = res.error?.code==='SLOT_FULL' || res.error?.code==='NO_TABLE_FOR_PARTY' || /پر|ظرفیت/.test(res.error?.message||'');
-    if(isFull){
+    // خطای واقعی از سرور. تصمیم فقط رویِ **کدِ** خطاست، نه متنِ پیام.
+    // شرطِ قبلی یک /پر|ظرفیت/ روی متنِ فارسی داشت — منطقِ UI سوارِ متنِ بک‌اند.
+    const kind = bookingErrorKind(res.error);
+    if(kind==='capacity'){
       offerWaitlist(id, r);
+      return;
+    }
+    if(kind==='retry'){
+      // ظرفیت لزوماً تمام نیست — رقابتِ همزمان. صف پیشنهاد نمی‌شود.
+      haptic('light');
+      sheetBody.innerHTML=`
+        <div style="text-align:center;padding:24px 16px">
+          <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">⏳</div>
+          <div class="sheet-title" style="text-align:center">این لحظه شلوغ بود</div>
+          <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}</div>
+          <div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:14px 0">${esc(res.error?.message||'همین حالا کسِ دیگری داشت همین زمان را رزرو می‌کرد، پس رزروِ تو ثبت نشد. جا هنوز ممکن است باز باشد — دوباره بزن.')}</div>
+          <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(id))})">تلاش دوباره</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
+        </div>`;
       return;
     }
     toast('', res.error?.message || 'ثبت رزرو ناموفق بود، دوباره تلاش کن');
