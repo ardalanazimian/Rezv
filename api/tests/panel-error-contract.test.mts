@@ -131,4 +131,47 @@ describe('قراردادِ خطای پنل — کد به کار وصل است', 
     // کلِ فایل را با SyntaxError کشت و همه‌ی توابعش undefined شدند.
     assert.ok(!/^\s*export\s/m.test(SRC), 'api-errors.js پنل نباید export داشته باشد');
   });
+
+  test('⚠️ DS-003 §۵ — پیامِ «با رستوران تماس بگیرید» به کارکنانِ رستوران نمی‌رسد', () => {
+    // ⚠️ این ردیف **تأیید شد، رد نشد.** `rezv-f3` دو مسیرِ پرسنلی را ترِیس
+    // کرد و نرسید؛ مسیرِ سومی هست که ندیده بود: رزروِ دستی از پنل
+    // (`apps/business/js/reservations.js:512` → `POST /reservations` →
+    // شاخه‌ی پرسنلیِ route → `createReservation`).
+    const staffText = panel.panelErrorText({
+      code: 'PARTY_TOO_LARGE', message: Err.partyTooLarge(12).message,
+    });
+    assert.doesNotMatch(staffText, /با رستوران تماس بگیرید/,
+      'به کارکنانِ رستوران نباید گفته شود با رستوران تماس بگیرند');
+    assert.doesNotMatch(staffText, /رزرو آنلاین/,
+      'رزروِ دستیِ پرسنل «رزروِ آنلاین» نیست — سقفش هم به آن‌ها ربط ندارد');
+    // و متنِ سرور واقعاً همان چیزی است که این تست ادعا می‌کند (مبنا).
+    assert.match(Err.partyTooLarge(12).message, /با رستوران تماس بگیرید/);
+
+    const slotText = panel.panelErrorText({ code: 'SLOT_FULL', message: Err.slotFull('20:00').message });
+    assert.notEqual(slotText, Err.slotFull('20:00').message, 'کارِ پرسنل با کارِ مهمان فرق دارد');
+  });
+
+  test('⚠️ RESTAURANT_OFFLINE عمداً ردیف ندارد — چون به پرسنل نمی‌رسد', () => {
+    // تنها موردی از آن سه که `rezv-f3` درباره‌اش درست گفته بود: پرتابش پشتِ
+    // `source === 'app'` است، پس رزروِ دستی مستثناست. ردیف‌دادن به کدی که
+    // نمی‌رسد، همان ادعای بی‌مکانیزم است — فقط در جهتِ مخالف.
+    assert.equal(panel.PANEL_ERROR_MAP.RESTAURANT_OFFLINE, undefined);
+    const src = readFileSync(
+      fileURLToPath(new URL('../src/lib/reservations.ts', import.meta.url)), 'utf8',
+    );
+    const i = src.indexOf('Err.restaurantOffline()');
+    assert.notEqual(i, -1, 'محلِ پرتاب پیدا نشد — کد عوض شده؟');
+    assert.match(src.slice(Math.max(0, i - 400), i), /input\.source === 'app'/,
+      'اگر این گارد برداشته شود، پیام به پرسنل می‌رسد و باید ردیف بگیرد');
+  });
+
+  test('⚠️ فرضِ دسترسی‌پذیری هنوز برقرار است — پنل واقعاً رزروِ دستی می‌سازد', () => {
+    // اگر روزی رزروِ دستی از پنل برداشته شود، دو ردیفِ بالا بی‌مورد می‌شوند.
+    // این assert همان لحظه خبر می‌دهد، به‌جای اینکه ردیف‌ها بی‌صدا بمانند.
+    const panelSrc = readFileSync(
+      fileURLToPath(new URL('../../apps/business/js/reservations.js', import.meta.url)), 'utf8',
+    );
+    assert.match(panelSrc, /API\.post\('\/reservations'/,
+      'پنل دیگر رزروِ دستی نمی‌سازد؟ آن‌وقت ردیف‌های PARTY_TOO_LARGE/SLOT_FULL را بازبینی کن');
+  });
 });
