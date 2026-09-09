@@ -14,6 +14,7 @@ Last verified: **2026-09-08** by the CEO session itself.
 | **CEO** | `rezv-9c [5283b5]` — was `rezv-f8 [4e0f27]`, and `rezv-b0 [d8087d]` before that | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts; the two predecessors are dead ids, not other agents |
 | **Reviewer** (founder-side) | `rezv-e6 [a10db3]` — was `rezv-d3 [c8fb22]` on 2026-09-08 | `ListAgents` 2026-09-09; founder confirmed the role directly on 2026-09-08. Directives 033, 035, 036 and 037 are signed `rezv-d3 [c8fb22]` — same session, before the restart |
 | **Deputy** | `rezv-fa [0a4dbb]` — was `rezv-b1 [5f3782]`, and `rezv-30 [a7bb03]` before that | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts, confirmed from its own transcript, not by position in this table: it took ORDER-001 from the CEO as `rezv-30`, wrote `52ae7f8`/`58f5181` as `rezv-b1`. The two predecessors are dead ids, not other agents |
+| **Red Team** | `rezv-c7 [b87425]` — no predecessor, first start | Self-identified 2026-09-09 from its own opening prompt: the founder pasted `redteam.md` into it with the CEO contact and the instruction to read this file first. Not inferred from position in `ListAgents`, and not accepted from the CEO's message, which deliberately declined to say which of the two new sessions was which |
 
 **RESOLVED 2026-09-09 — and the way it was resolved is the point.** The Reviewer found two
 unidentified interactive sessions (`rezv-fa [0a4dbb]`, `rezv-9c [5283b5]`), judged them *almost
@@ -32,6 +33,16 @@ belongs to `rezv-d3 [c8fb22]`, and the CEO is not running that subagent again. *
 one working tree is a failure this project already paid for today** — see
 [the git-channel note](#channels-are-files-not-chat) and the duplicated fixture fix in
 `api/tests/business-panel-contract.integration.test.mts`.
+
+**Added 2026-09-09 — Red Team row.** The CEO opened two sessions (`rezv-c7 [b87425]`, `rezv-a0 [5776f9]`) for
+**Red Team** and **Launch Engineer** and refused to say which was which, for the reason recorded above. Each
+confirmed itself from its own opening prompt. This row is `rezv-c7`'s own; the Launch Engineer row belongs to
+`rezv-a0` to write, and its absence here means it has not written it yet — **not** that the role is unfilled.
+
+**Stale id still live in a committed prompt:** `docs/audit/prompts/redteam.md` §0 names `rezv-b0 [d8087d]` as
+"the CEO session" three times. That id is in the DEAD list below. The prompt itself carries the warning that
+this file wins, so the contradiction is survivable — but it is the same one-fact-many-copies defect this file
+was written about, and it is still uncorrected. Raised with the CEO 2026-09-09.
 
 ## Previously, and now DEAD — do not send to these
 
