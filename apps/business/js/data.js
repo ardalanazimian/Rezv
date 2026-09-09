@@ -23,6 +23,28 @@ const STATUS_META={
   rejected:       {label:'ردشده',         icon:'close',  bg:'#FEE2E2', fg:'#991B1B'},
   expired:        {label:'منقضی',         icon:'clock', bg:'#F3F4F6', fg:'#6B7280'},
 };
+// ⚠️ DS-003 §۲ (اسپکِ نشستِ Designer `rezv-f3`، ۲۰۲۶-۰۹-۰۹):
+// `Err.invalidTransition` پیامش را از مقادیرِ **خامِ** `RStatus` می‌سازد، پس
+// مسئولِ پذیرش وسطِ شلوغی این را می‌دید:
+//     «تغییر وضعیت از seated به completed مجاز نیست»
+// یک جمله‌ی فارسی با دو کلیدِ انگلیسیِ برنامه‌نویسی.
+//
+// و ترجمه‌اش **در همین فایل، ۹۰ خط بالاتر** بود: `STATUS_META` هفده وضعیت را
+// با برچسبِ فارسی دارد و پنل در `:47`, `:88`, `:102` استفاده‌اش می‌کند. داده هم
+// بود (`details:{from,to}`). فقط کسی وصلشان نکرده بود.
+//
+// ⚠️ اگر برچسب پیدا نشد، عمداً به پیامِ سرور برمی‌گردیم و جمله **نمی‌سازیم**:
+// وضعیتی که پنل نمی‌شناسد یعنی نگاشت عقب افتاده، و ساختنِ جمله‌ی نصفه آن را
+// پنهان می‌کند. پیامِ خام زشت است ولی صادق.
+function statusChangeErrorText(err){
+  if(err?.code==='INVALID_STATUS_TRANSITION'){
+    const from=STATUS_META[err.details?.from]?.label;
+    const to=STATUS_META[err.details?.to]?.label;
+    if(from&&to) return `از «${from}» نمی‌شود به «${to}» رفت`;
+  }
+  return err?.message||'تغییر وضعیت ناموفق بود — دوباره تلاش کن';
+}
+
 // ── انتقال‌های مجاز چرخه‌ی حیات (همگام با بک‌اند lifecycle.ts) ──
 const STATUS_TRANSITIONS={
   pending:['confirmed','rejected','cancelled'],
@@ -95,7 +117,7 @@ async function changeStatus(i,to,reason){
       }
     } else {
       r.status=old; r.cancelReason=oldReason; r._events.pop(); renderResList();
-      toast('',res.error?.message||'تغییر وضعیت ناموفق بود — دوباره تلاش کن');
+      toast('',statusChangeErrorText(res.error));
     }
   } else {
     // بدونِ کدِ رزرو (ردیفِ نمونه/محلی) هیچ مسیرِ سروری وجود ندارد.
