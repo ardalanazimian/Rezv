@@ -27,7 +27,7 @@ configuration is never even a candidate.
 | control | `export REZV_FAKE_GREEN_PROBE=1` in an ` ```sh ` fence | **CAUGHT** — exit 1, with `file:line` |
 | B1 | `REZV_PROBE_ENVFENCE=abc123` in an ` ```env ` fence — a pasted `.env` snippet | **INVISIBLE** |
 | B2 | `REZV_PROBE_NOEXPORT=abc123` in an ` ```sh ` fence, no `export` | **INVISIBLE** |
-| B3 | `` | `REZV_PROBE_TABLEROW` | payment provider key | `` — a settings table | **INVISIBLE** |
+| B3 | a settings table row naming `REZV_PROBE_TABLEROW` with the purpose "payment provider key" | **INVISIBLE** |
 | B4 | "Set `REZV_PROBE_PROSE=abc123` in the production environment" — runbook prose | **INVISIBLE** |
 
 ```
@@ -71,6 +71,38 @@ constitution §4b says a false-positive rate needing an allowlist is a design fa
 add is a *different* one: a variable name appearing in a `.env`/`dotenv`/`ini` fence, or in a
 two-column table row anywhere, is presented-as-configuration regardless of any command on the line.
 That is narrow, and it covers the three shapes measured above.
+
+---
+
+## FG-11 — the loyalty-constant guard accepts a CSS pixel value as proof the UI shows the right number
+
+**Date added:** 2026-09-09 · attacked at `main` @ `00f98cf` · guard is `tools/check-loyalty-constant-binding.mjs` (`rezv-f3`, shipped today in `2d9b0e3` / `e35463f`).
+
+**What looked green.** `node tools/check-loyalty-constant-binding.mjs` → exit 0, «✓ هر ادعایِ ثبت‌شده‌یِ UI با مقدارِ اعلام‌شده‌اش در loyalty.ts می‌خواند». Ten registered claims, nine tier-map files, five claim-scan files.
+
+**This guard is well built, and three attacks bounced off it before this one landed.** A missing anchor is a failure, not a skip — «نیافتن هرگز رد شد نیست» (`:478`), which is constitution §4 satisfied outright. An ambiguous anchor matching twice is a failure (`:486`). Latin digits in a Persian string are a failure even when the value is right (`:495`). It prints its own scope limit on every green run and calls it «این پوششِ کامل نیست». Wrong numbers are caught: changing the referral sheet from «۵۰۰ امتیاز» to «۷۵۰ امتیاز» → **exit 1**, «مقدارِ 500 از POINTS.referralReward در این متن نیست».
+
+**What it was actually measuring.** `digitRunsIn(line)` collects **every** digit run on the source line and the check is `runs.includes(expected)` — set membership, with no requirement that the matched number be the one next to «امتیاز». The line is JS source, so its `style="…"` attribute is in scope. **Any CSS number equal to the expected constant satisfies the check regardless of what the user is shown.**
+
+```
+BASELINE                                          EXIT=0
+ATTACK 1  ۵۰۰ → ۷۵۰ in the visible text           EXIT=1   «مقدارِ 500 … در این متن نیست (اعدادِ موجود: 18، 750)»
+ATTACK 2  same wrong ۷۵۰, plus margin-bottom:500px EXIT=0   ✓ «هر ادعایِ ثبت‌شده‌یِ UI … می‌خواند»
+REVERT    git checkout -- apps/customer/js/features/rewards.js
+                                                  EXIT=0   git status --porcelain → clean
+```
+
+Attack 1's own error message is what gave it away: it listed the numbers it had found as «18، 750» — the `18` is `margin-bottom:18px`. The guard was already reading CSS as claim text; it just happened not to collide.
+
+**Who walks this path by accident — and this is why it is not a curiosity.** The five constants the manifest binds are `signup: 200`, `perReservation: 100`, `referralReward: 500`, `birthday: 1000`, `ARRIVAL_POINTS = 50` (`loyalty.ts:12-21`). **Those are the most common numbers in CSS.** `font-weight` is a 100–900 scale, so `100`, `200` and `500` are literal font weights; `z-index:1000` is the most common z-index written; `50` is `width:50%`. The anchored line in `loyalty.js:70` already carries `font-size:20px;font-weight:600` — one notch away from disarming its own row permanently.
+
+So the accident is not "someone writes `margin-bottom:500px`". It is **a designer setting `font-weight:500` on the referral sheet.** From that commit on, that row is green no matter what number the sheet displays, and nothing announces it — the count of registered claims still reads 10.
+
+**Recommendation (the guard's author decides, not me).** Do not drop the style attribute by regex — stripping `style="…"` invites the next escape. Bind the *position*: require the matched digit run to be the one the anchor itself captured, by making each anchor a capturing group around its number (they are already written with `[۰-۹0-9]+` in exactly the right place — e.g. `:295`) and comparing that capture instead of `runs.includes()`. That is a smaller change than it sounds and it removes the whole class rather than this instance.
+
+**Scope limit.** I attacked one of the ten registered sites. The mechanism is in the shared checker, not in that site, so all ten inherit it — but I measured one, and the other nine are **inferred, not verified**.
+
+---
 
 **Falsifiability note against myself.** This finding rests on one probe file in one location
 (`docs/REDTEAM-PROBE.md`). I did not test whether a different directory changes the result, and
