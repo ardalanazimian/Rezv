@@ -397,6 +397,23 @@ jobs:
       - name: هر وضعیتِ رزرو در پنل برچسبِ فارسی دارد؟ (بایندینگِ وضعیت↔برچسب)
         run: node tools/check-status-label-binding.mjs
 
+      # دستورِ ۰۴۲: ۵۶ از ۱۰۴ ادعایِ `assert.rejects` هویتِ شکست را نمی‌سنجند —
+      # ۳۳ بدونِ آرگومانِ دوم، و ۲۳ با یک **رشته** که Node آن را پیامِ خطای خودِ
+      # assert می‌خواند، نه انتظار. «ضعیف» یعنی غلط نیست: این‌ها واقعاً ثابت
+      # می‌کنند رد شد. نقص باریک‌تر است — سبز می‌مانند اگر **هویتِ** شکست عوض
+      # شود، همان شکلِ «P2028 که ۵۰۰ می‌داد».
+      #
+      # ⚠️ ratchet روی دیف، **نه** sweep روی مخزن. بازنویسیِ ۵۶ ادعا در یک
+      # کامیت دیفی می‌سازد که کسی نمی‌تواند بازبینی کند. فقط ادعاهایِ **تازه**
+      # سنجیده می‌شوند؛ کدِ موجود هنگامِ تماس تنگ می‌شود.
+      #
+      # baseِ دیف عمداً دو حالته است، چون کارِ روزمره‌ی این مخزن **کامیتِ
+      # مستقیم روی main** است نه PR: گیتی که فقط روی pull_request اجرا شود
+      # عملاً هرگز اجرا نمی‌شود. روی push از `event.before` استفاده می‌کنیم و
+      # روی PR از baseِ خودش. baseِ resolve‌نشده خطاست، نه سبز.
+      # (این گیت عمداً در jobِ جداگانه‌ی `rejects-ratchet` است، نه اینجا —
+      #  به یک checkoutِ کامل نیاز دارد و این job عمداً کم‌عمق مانده.)
+
   # ── مرحله ۴: E2E (Playwright، اپ کاستومر — API کاملاً mock می‌شود، بدونِ نیاز به DB/بک‌اند) ──
   e2e:
     runs-on: ubuntu-latest
@@ -644,6 +661,37 @@ jobs:
   # توصیف می‌کند). فقط وقتی قرمز می‌شود که **همپوشانیِ واقعیِ فایل** وجود داشته
   # باشد: یعنی main و این PR هر دو یک فایل را از زمانِ merge-base عوض کرده باشند.
   # این دقیقاً همان شرطی است که هر سه شکستِ آن روز را تولید کرد.
+  # ── ratchetِ ماچرِ assert.rejects (دستورِ ۰۴۲) ──
+  #
+  # چرا jobِ جدا و نه یک stepِ کنارِ بقیه‌ی گیت‌ها: این تنها گیتی است که به
+  # **تاریخچه** نیاز دارد، نه فقط به درختِ کاری. `observability` عمداً
+  # checkoutِ کم‌عمق دارد؛ افزودنِ این step به آن یا کلِ آن job را کند می‌کرد
+  # یا — بدتر — با `merge-base` روی کلونِ عمق‌۱ می‌شکست و CI را برای همه قرمز
+  # می‌کرد بدونِ اینکه ربطی به کیفیتِ تست داشته باشد.
+  #
+  # baseِ دیف دو حالته است، چون کارِ روزمره‌ی این مخزن **کامیتِ مستقیم روی
+  # main** است نه PR: گیتی که فقط روی pull_request اجرا شود عملاً هرگز اجرا
+  # نمی‌شود، و گاردی که اجرا نمی‌شود بدتر از نبودنش است — ظاهرِ پوشش دارد.
+  rejects-ratchet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # لازم: بدونِ تاریخچه، merge-base و event.before هیچ‌کدام resolve
+          # نمی‌شوند و ابزار عمداً خطا می‌دهد به‌جای سبزِ کاذب.
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: fetch base
+        if: github.event_name == 'pull_request'
+        run: git fetch --quiet origin "${{ github.base_ref }}"
+      - name: ادعاهایِ assert.rejectsِ تازه ماچر دارند؟ (ratchet، نه sweep)
+        env:
+          REJECTS_BASE: >-
+            ${{ github.event_name == 'pull_request'
+                && format('origin/{0}', github.base_ref)
+                || github.event.before }}
+        run: node tools/check-rejects-matcher.mjs
+
   base-freshness:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
