@@ -62,6 +62,12 @@ function genCode(prefix: string, len = 8): string {
 // ── افزودن/کسر امتیاز (با ثبت در دفتر) ──
 export async function addPoints(opts: {
   userId: string; delta: number; reason: string; restaurantId?: string; note?: string;
+  // فازِ ۱ (§۱۳، تصمیمِ مالک ۲۰۲۶-۰۹-۰۹): کلیدِ صریحِ idempotency (اختیاری).
+  // هر فراخوانی که رویدادش می‌تواند تکرار شود (retry/race/cron دوباره) باید
+  // کلیدِ پایدار بدهد — مثلاً `referral:${referralId}`. نبودنش یعنی این
+  // insert آگاهانه محافظتِ سطحِ DB ندارد (مثلِ اعطای دستیِ ادمین/adjustment)،
+  // نه یک سوراخِ فراموش‌شده.
+  idempotencyKey?: string;
 }): Promise<number> {
   // ledger الگوی append-only است (فقط insert، هیچ‌وقت update روی مجموع) — پس
   // داده‌ی ذخیره‌شده ذاتاً امن در برابر همزمانی است. اما insert و aggregate را
@@ -72,6 +78,7 @@ export async function addPoints(opts: {
       data: {
         userId: opts.userId, delta: opts.delta, reason: opts.reason as any,
         restaurantId: opts.restaurantId ?? null, note: opts.note ?? null,
+        idempotencyKey: opts.idempotencyKey ?? null,
       },
     });
     const agg = await tx.pointsLedger.aggregate({ where: { userId: opts.userId }, _sum: { delta: true } });
@@ -106,12 +113,15 @@ export async function getPointsHistory(userId: string, limit = 50) {
 // هیچ مسیرِ خواندنی دیگر به آن ستون تکیه نمی‌کند.
 export async function addClubPoints(opts: {
   userId: string; restaurantId: string; delta: number; reason: string; note?: string;
+  // فازِ ۱ (§۱۳) — رجوع کن به توضیحِ همین پارامتر در addPoints بالا.
+  idempotencyKey?: string;
 }): Promise<number> {
   return db.$transaction(async (tx) => {
     await tx.pointsLedger.create({
       data: {
         userId: opts.userId, restaurantId: opts.restaurantId,
         delta: opts.delta, reason: opts.reason as any, note: opts.note ?? null,
+        idempotencyKey: opts.idempotencyKey ?? null,
       },
     });
     const agg = await tx.pointsLedger.aggregate({
@@ -217,9 +227,15 @@ export async function completeReferral(inviteePhone: string, inviteeId: string) 
   });
   if (claimed.count === 0) return null; // کس دیگری زودتر claim کرد
   // پاداش فقط پس از claim موفق
+  //
+  // ⚠️ کلیدِ idempotency روی خودِ ردیفِ referral (نه شماره‌ی دعوت‌شده): آن claim
+  // اتمیکِ بالا از قبل تضمین می‌کند این بلوک برای یک referral فقط یک‌بار اجرا
+  // می‌شود؛ کلید این‌جا لایه‌ی دومِ ساختاری (DB) روی همان تضمین است، دقیقاً
+  // هم‌خانواده‌ی الگویِ checked_in در lifecycle.ts.
   await addPoints({
     userId: ref.referrerId, delta: ref.rewardPoints, reason: 'referral',
     note: `دعوت موفق ${inviteePhone}`,
+    idempotencyKey: `referral:${ref.id}`,
   });
   return { rewarded: true, referrer_id: ref.referrerId, points: ref.rewardPoints };
 }
@@ -410,7 +426,14 @@ export async function grantBirthdayRewards(): Promise<{ birthday: number; annive
   // پس به‌جای ۳ کوئری per user (dedup + addPoints + phone)، فقط addPoints می‌ماند.
   for (const u of birthdayUsers) {
     try {
-      await addPoints({ userId: u.id, delta: POINTS.birthday, reason: 'birthday', note: 'هدیه‌ی تولد 🎂' });
+      // کلیدِ idempotency این‌جا belt-and-suspenders است: dedupِ واقعی از
+      // `uniq_annual_reward` (migration 013، همین سال/reason/کاربر) می‌آید؛
+      // این کلید فقط همان محافظت را در ستونِ عمومیِ idempotency_key هم منعکس
+      // می‌کند تا هیچ نویسنده‌ای بدونِ کلید نماند (تصمیمِ مالک ۲۰۲۶-۰۹-۰۹).
+      await addPoints({
+        userId: u.id, delta: POINTS.birthday, reason: 'birthday', note: 'هدیه‌ی تولد 🎂',
+        idempotencyKey: `annual:${u.id}:birthday:${today.getFullYear()}`,
+      });
       // ── رضایت (§۱۳/§۱۷) — دسته‌ی `loyalty` ─────────────────────────────
       // محتوایِ پیام «فلانی جان، N امتیازِ تولد گرفتی» است و برچسبِ همین کلید
       // در اپِ مشتری دقیقاً «امتیاز و پاداش — وقتی امتیازت به یه پاداش جدید
@@ -437,7 +460,10 @@ export async function grantBirthdayRewards(): Promise<{ birthday: number; annive
   `;
   for (const u of annivUsers) {
     try {
-      await addPoints({ userId: u.id, delta: POINTS.anniversary, reason: 'anniversary', note: 'هدیه‌ی سالگرد 💍' });
+      await addPoints({
+        userId: u.id, delta: POINTS.anniversary, reason: 'anniversary', note: 'هدیه‌ی سالگرد 💍',
+        idempotencyKey: `annual:${u.id}:anniversary:${today.getFullYear()}`,
+      });
     } catch (e: any) {
       if (e?.code !== 'P2002') throw e; // پاداش تکراری از اجرای همزمان را نادیده بگیر
     }

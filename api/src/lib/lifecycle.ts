@@ -172,12 +172,18 @@ export async function transitionReservation(opts: {
     // fire-and-forget: صداکننده‌هایی که بلافاصله موجودی را می‌خوانند (مثلِ
     // پیامکِ خوش‌آمدِ `markArrival`) باید عددِ به‌روز را ببینند.
     if (to === 'checked_in' && result.resv.userId) {
+      // فازِ ۱ (§۱۳، تصمیمِ مالک ۲۰۲۶-۰۹-۰۹): کلیدِ صریحِ idempotency — نه
+      // متکی به `note` (متنِ آزاد، شاملِ کدِ رزرو ولی هرکسی می‌تواند تغییرش
+      // دهد)، بلکه مستقیماً روی reservationId. dedupِ واقعیِ این مسیر همچنان
+      // از `result.changed` (CAS بالای همین تابع) می‌آید؛ این کلید لایه‌ی
+      // دومِ ساختاریِ سطحِ DB است، نه جایگزینِ آن.
       await addClubPoints({
         userId: result.resv.userId,
         restaurantId: result.resv.restaurantId,
         delta: ARRIVAL_POINTS,
         reason: 'reservation',
         note: `حضور در رزرو ${result.resv.code}`,
+        idempotencyKey: `arrival:${result.resv.id}`,
       }).catch((e) => {
         log.error('ثبتِ امتیازِ حضور در دفتر ناموفق (چک‌این خودش commit شد)', {
           reservationId: result.resv.id, code: result.resv.code, error: (e as Error).message,

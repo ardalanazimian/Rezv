@@ -120,6 +120,7 @@ import './lifecycle-guard-enforcement.integration.test.mts';
 import './lifecycle-exclusivity.test.mts';
 import './checkin-points-panel-path.integration.test.mts';
 import './loyalty-club-points.integration.test.mts';
+import './points-ledger-idempotency-key.integration.test.mts';
 import './lifecycle-cron.integration.test.mts';
 import './loyalty-status.test.mts';
 import './loyalty-tier-panel-parity.test.mts';

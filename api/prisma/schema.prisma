@@ -670,14 +670,45 @@ enum PointsReason {
 }
 
 model PointsLedger {
-  id           String       @id @default(uuid()) @db.Uuid
-  userId       String       @map("user_id") @db.Uuid
-  user         User         @relation(fields: [userId], references: [id])
-  restaurantId String?      @map("restaurant_id") @db.Uuid
-  delta        Int          // مثبت = کسب، منفی = خرج
-  reason       PointsReason
-  note         String?
-  createdAt    DateTime     @default(now()) @map("created_at")
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  user           User         @relation(fields: [userId], references: [id])
+  restaurantId   String?      @map("restaurant_id") @db.Uuid
+  delta          Int          // مثبت = کسب، منفی = خرج
+  reason         PointsReason
+  note           String?
+  // فازِ ۱ (پروتکل §۱۳، تصمیمِ مالک ۲۰۲۶-۰۹-۰۹) — کلیدِ صریحِ idempotency.
+  //
+  // چرا کلیدِ صریح و نه کلیدِ طبیعیِ (userId, restaurantId, reason, note):
+  // `note` متنِ آزادِ فارسی است (مثلاً `کش‌بک رزرو ${code}` در reservations.ts)
+  // — یعنی یکتاییِ مبتنی‌بر متنی که هرکسی می‌تواند بدونِ دانستن اینکه یک قید
+  // را می‌شکند ویرایش کند. دقیقاً همان کلاسِ نقصی که این مخزن قبلاً بابتش
+  // هزینه داده (کلیدهای override XSS که به متنِ expression گره خورده بودند و
+  // با حذفِ escaping زنده ماندند).
+  //
+  // nullable **عمدی** است، نه پیش‌فرضِ تنبلانه: هر نویسنده‌ای که خودش را
+  // «تکرارپذیر» می‌داند (retry شبکه، race، cron دوباره) یک کلیدِ پایدار
+  // می‌سازد؛ نوشتنِ دستیِ/ادمینِ یک‌بارمصرف (مثلاً `reason: 'adjustment'`)
+  // می‌تواند null بگذارد چون هر فراخوانیِ آن عمداً یک رویدادِ مستقلِ جدید
+  // است، نه تکرارِ یک رویدادِ قبلی.
+  //
+  // ⚠️ این یعنی قید **اختیاری/داوطلبانه** است، نه اجباری: اولین نویسنده‌ای
+  // که کلید را فراموش کند بی‌صدا از قید رد می‌شود (insert با null موفق
+  // می‌شود، فقط dedup ندارد). نویسنده‌هایی که امروز کلید می‌گیرند: چک‌ینِ
+  // رزرو (`lifecycle.ts`)، referral (`loyalty.ts`)، کش‌بکِ رزرو
+  // (`reservations.ts`)، و تولد/سالگرد (`loyalty.ts` — این دو از قبل هم
+  // ضامنِ مستقلِ `uniq_annual_reward` را دارند). هر نویسنده‌ی آینده باید
+  // خودش تصمیم بگیرد کلید بدهد یا نه — این ستون امضایِ تابع را مجبور
+  // نمی‌کند، فقط اجازه می‌دهد.
+  //
+  // `@unique` رویِ ستونِ nullable در Postgres یعنی یکتاییِ استاندارد
+  // (NULLها با هم برابر شمرده نمی‌شوند، پس چند ردیفِ بی‌کلید مجازند) —
+  // بدونِ نیاز به ایندکسِ جزئیِ دستی. **الگوی از قبل موجود در همین schema:**
+  // `Job.idempotencyKey String? @unique` (بالاتر، مدلِ Job) دقیقاً همین
+  // شکل را دارد. ردیف‌های تاریخیِ پیش از این migration به‌طورِ طبیعی null
+  // می‌گیرند و با قید تداخل نمی‌کنند — نیازی به backfill نیست.
+  idempotencyKey String?      @unique @map("idempotency_key")
+  createdAt      DateTime     @default(now()) @map("created_at")
   @@index([userId, createdAt])
   // NEW-M1: unique partial index روی (user_id, reason, year) برای reason های
   // birthday/anniversary در migration 013 ساخته می‌شود (Prisma بیان expression-based

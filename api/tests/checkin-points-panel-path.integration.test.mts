@@ -48,6 +48,7 @@ const { signAccess } = await import('../src/lib/jwt.ts');
 const { getClubPointsBalance } = await import('../src/lib/loyalty.ts');
 const { markArrival } = await import('../src/lib/reservations.ts');
 const { genReservationCode } = await import('../src/lib/reservation-helpers.ts');
+const { transitionReservation } = await import('../src/lib/lifecycle.ts');
 const statusRoute = await import('../src/app/api/v1/restaurant/reservations/[code]/status/route.ts');
 const membersRoute = await import('../src/app/api/v1/restaurant/members/route.ts');
 const mePointsRoute = await import('../src/app/api/v1/me/points/route.ts');
@@ -327,5 +328,66 @@ describe('سطحِ باشگاه (tier) واقعاً نوشته می‌شود (§
     const b = await import('../src/lib/loyalty-status.ts');
     assert.equal(a.tierFromPoints, b.tierFromPoints, 'دو تابعِ موازی ممنوع');
     assert.equal(a.LOYALTY_TIERS, b.LOYALTY_TIERS, 'دو جدولِ آستانه‌ی موازی ممنوع');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  فازِ ۱ — اثباتِ idempotency در لایه‌ی سرویس (بدونِ HTTP) — PHASE1-LEDGER-EVIDENCE
+//
+//  چرا این‌جا و چرا جدا از تست‌های بالا: تست‌های بالای همین فایل و
+//  `loyalty-club-points.integration.test.mts` idempotency را از پشتِ
+//  روتِ HTTP (`PATCH .../status`) و از `markArrival` اثبات می‌کنند — هر دو
+//  در نهایت `transitionReservation` را صدا می‌زنند. کامنتِ ادعاشده
+//  (`lifecycle.ts:165-172`) صراحتاً می‌گوید ضامن «همان compare-and-setِ
+//  اتمیکِ» خودِ تابع است، نه لایه‌ی HTTP یا هیچ منطقِ اضافه‌ای در روت. پس
+//  دو تستِ زیر عمداً یک لایه پایین‌تر می‌روند و مستقیماً خودِ
+//  `transitionReservation` را — بدونِ Request/Response — دوبار صدا می‌زنند:
+//  یکی به‌ترتیب (شبیه‌سازیِ retry/دو اجرایِ متوالیِ یک cron)، یکی کاملاً
+//  هم‌زمان با Promise.all (شبیه‌سازیِ دو workerِ cron که هم‌زمان همان ردیف
+//  را می‌گیرند). هر دو **شمارِ ردیفِ دفتر** را صریحاً می‌سنجند، نه فقط
+//  موجودی — چون طبقِ قانونِ ۴ی قانون‌اساسیِ ممیزی «تستی که با غیابِ موضوع
+//  هم سبز بماند، تست نیست» و دلتای موجودی به‌تنهایی نمی‌تواند دو ردیفِ
+//  متقابل (مثلاً +۵۰/-۵۰ فرضی) را رد کند.
+// ═══════════════════════════════════════════════════════════════════════
+describe('اثباتِ idempotency — صدا زدنِ مستقیمِ transitionReservation دوبار (§۱۳، فازِ ۱)', () => {
+  test('🔴 دو فراخوانیِ متوالیِ transitionReservation (retry/cronِ دوباره) → دقیقاً یک ردیفِ دفتر', async () => {
+    const resv = await seedConfirmed();
+    const rowsBefore = await db.pointsLedger.count({ where: { userId, restaurantId } });
+    const balanceBefore = await getClubPointsBalance(userId, restaurantId);
+
+    const first = await transitionReservation({
+      reservationId: resv.id, to: 'checked_in', actor: 'cron',
+    });
+    assert.equal(first.changed, true, 'اولین فراخوانی باید واقعاً وضعیت را عوض کند');
+
+    // شبیه‌سازیِ اجرایِ دوباره‌ی همان cron روی همان رزرو (مثلاً بعدِ کرشِ
+    // میانه‌ی راه یا صف‌بندیِ دوباره‌ی همان job).
+    const second = await transitionReservation({
+      reservationId: resv.id, to: 'checked_in', actor: 'cron',
+    });
+    assert.equal(second.changed, false, 'فراخوانیِ دومِ همان cron نباید چیزی عوض کند');
+
+    const rowsAfter = await db.pointsLedger.count({ where: { userId, restaurantId } });
+    const balanceAfter = await getClubPointsBalance(userId, restaurantId);
+    assert.equal(rowsAfter, rowsBefore + 1, 'دقیقاً یک ردیفِ دفتر — نه صفر، نه دو');
+    assert.equal(balanceAfter - balanceBefore, 50, 'موجودی دقیقاً یک‌بار جابه‌جا می‌شود');
+  });
+
+  test('🔴 دو فراخوانیِ کاملاً هم‌زمانِ transitionReservation (رقابتِ دو workerِ cron) → دقیقاً یک ردیفِ دفتر', async () => {
+    const resv = await seedConfirmed();
+    const rowsBefore = await db.pointsLedger.count({ where: { userId, restaurantId } });
+    const balanceBefore = await getClubPointsBalance(userId, restaurantId);
+
+    const [a, b] = await Promise.all([
+      transitionReservation({ reservationId: resv.id, to: 'checked_in', actor: 'cron-worker-1' }),
+      transitionReservation({ reservationId: resv.id, to: 'checked_in', actor: 'cron-worker-2' }),
+    ]);
+    const changedCount = [a.changed, b.changed].filter(Boolean).length;
+    assert.equal(changedCount, 1, 'از دو workerِ هم‌زمان دقیقاً یکی باید برنده شود');
+
+    const rowsAfter = await db.pointsLedger.count({ where: { userId, restaurantId } });
+    const balanceAfter = await getClubPointsBalance(userId, restaurantId);
+    assert.equal(rowsAfter, rowsBefore + 1, `دقیقاً یک ردیفِ دفتر — شد ${rowsAfter - rowsBefore}`);
+    assert.equal(balanceAfter - balanceBefore, 50, `موجودی دقیقاً یک‌بار — دلتا: ${balanceAfter - balanceBefore}`);
   });
 });

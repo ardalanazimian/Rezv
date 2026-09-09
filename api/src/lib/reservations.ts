@@ -612,8 +612,16 @@ async function insertReservation(
       const cbPct = r.cbBasePct ?? 0;
       cashback = Math.round((final * cbPct) / 100);
       if (cashback > 0) {
+        // فازِ ۱ (§۱۳، تصمیمِ مالک ۲۰۲۶-۰۹-۰۹): کلیدِ صریحِ idempotency روی
+        // reservationId — نه روی `note` (متنِ آزادِ فارسی، قابلِ ویرایشِ
+        // بی‌خبر). این تنها نویسنده‌ی ledger است که از addPoints/addClubPoints
+        // عبور نمی‌کند؛ بدونِ این کلید دقیقاً همان نویسنده‌ای بود که «سوراخِ
+        // بی‌کلید» می‌شد.
         await tx.pointsLedger.create({
-          data: { userId: input.userId, restaurantId: r.id, delta: cashback, reason: 'cashback', note: `کش‌بک رزرو ${resv!.code}` },
+          data: {
+            userId: input.userId, restaurantId: r.id, delta: cashback, reason: 'cashback',
+            note: `کش‌بک رزرو ${resv!.code}`, idempotencyKey: `cashback:${resv!.id}`,
+          },
         });
       }
     }
