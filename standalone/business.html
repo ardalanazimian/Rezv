@@ -7818,27 +7818,45 @@ function pushNotif(n){NOTIFS.unshift(n);renderNotifList();popup(n.emoji,n.title,
 
 
 // ═══════════ CASHBACK ═══════════
-let CB={base:8,pre:12,vip:18,wb:20};
-let CB_DRAFT={...CB};
+// ⚠️ رفعِ RT-02 (۲۰۲۶-۰۹-۰۹) — رونوشتِ دومِ همین منطق است
+// (اصل: apps/business/js/staff-system.js). هر دو با هم عوض می‌شوند.
+// قبلاً `{base:8,pre:12,vip:18,wb:20}` بود؛ پیش‌فرضِ schema ۵·۸·۱۲·۲۰ است،
+// پس سه عدد از چهارتا بی‌منشأ بودند و به‌شکلِ «تنظیماتِ رستوران» نشان داده
+// می‌شدند. حالا null‌اند تا رندرِ عددِ ساختگی ساختاری ناممکن شود.
+let CB=null;
+let CB_DRAFT=null;
 let _cbLoaded=false;
+
+/** حالتِ صادقانه‌ی «هنوز نمی‌دانیم» — به‌جای نشان‌دادنِ عددی که از جایی نیامده. */
+function cbUnavailable(msg){
+  document.getElementById('v-cashback').innerHTML=`
+    <div class="error-state">
+      <div class="error-state-icon">${icon('alert',{size:40})}</div>
+      <div class="empty-state-title">تنظیمات کش‌بک بارگذاری نشد</div>
+      <div class="empty-state-desc">${esc(msg)}</div>
+      <button class="btn btn-primary" onclick="_cbLoaded=false;rCashback()">${icon('refresh',{size:16})} تلاش دوباره</button>
+    </div>`;
+}
+
 async function rCashback(){
-  if(!_cbLoaded && API.getToken()){
+  if(!_cbLoaded){
+    // ⚠️ RT-02: گاردِ قبلی (`!_cbLoaded && API.getToken()`) دو راه برای
+    // غلط‌بودن داشت و رفعِ پیشین فقط مسیرِ خطا را می‌پوشاند، نه مسیرِ بی‌توکن.
+    if(!API.getToken()){
+      cbUnavailable('برای دیدنِ درصدهای واقعیِ این رستوران وارد شوید');
+      return;
+    }
     const res=await API.get('/restaurant/cashback');
     if(res.ok){ CB={base:res.data.base_pct,pre:res.data.preorder_pct,vip:res.data.vip_pct,wb:res.data.winback_pct}; _cbLoaded=true; }
     else {
       // مهم: در حالتِ آنلاین هرگز مقادیرِ پیش‌فرض را به‌جای تنظیماتِ واقعی نشان نده.
       // پیش‌تر خطا (از جمله ۴۰۳ مجوز) بی‌صدا بلعیده می‌شد و پنل درصدهای ساختگی
       // را به‌عنوان تنظیماتِ رستوران نمایش می‌داد — مبنای تصمیمِ مالیِ غلط.
-      document.getElementById('v-cashback').innerHTML=`
-        <div class="error-state">
-          <div class="error-state-icon">${icon('alert',{size:40})}</div>
-          <div class="empty-state-title">تنظیمات کش‌بک بارگذاری نشد</div>
-          <div class="empty-state-desc">${esc(res.error?.message||'ارتباط با سرور برقرار نشد')}</div>
-          <button class="btn btn-primary" onclick="_cbLoaded=false;rCashback()">${icon('refresh',{size:16})} تلاش دوباره</button>
-        </div>`;
+      cbUnavailable(res.error?.message||'ارتباط با سرور برقرار نشد');
       return;
     }
   }
+  if(!CB){ cbUnavailable('تنظیماتِ کش‌بک در دسترس نیست'); return; }
   CB_DRAFT={...CB};
   const cards=[['base','کش‌بک پایه','برای تمام رزروها',20],['pre','پیش‌سفارش','رزرو همراه با منو',25],['vip','مشتری VIP','اعضای سطح طلایی و بالاتر',30],['wb','بازگشت (Winback)','مشتری ناراضی یا در خطر ریزش',40]];
   document.getElementById('v-cashback').innerHTML=`

@@ -239,27 +239,54 @@ function pushNotif(n){NOTIFS.unshift(n);renderNotifList();popup(n.emoji,n.title,
 
 
 // ═══════════ CASHBACK ═══════════
-let CB={base:8,pre:12,vip:18,wb:20};
-let CB_DRAFT={...CB};
+// ⚠️ رفعِ RT-02 (۲۰۲۶-۰۹-۰۹): این‌ها قبلاً `{base:8,pre:12,vip:18,wb:20}` بودند —
+// چهار عددِ هاردکد که پیش از هر تماسِ سروری رندر می‌شدند. سه‌تایشان با **هیچ
+// چیزِ سیستم** نمی‌خواند: پیش‌فرضِ schema (`schema.prisma:175-178`) برابرِ
+// ۵·۸·۱۲·۲۰ است و پنل ۸·۱۲·۱۸·۲۰ نشان می‌داد. یعنی حتی رونوشتِ کهنه‌ی
+// پیش‌فرض‌ها هم نبودند؛ اعدادی بی‌منشأ بودند که به‌شکلِ «تنظیماتِ رستوران»
+// به مالکِ پول‌دهنده نشان داده می‌شدند — «مبنای تصمیمِ مالیِ غلط».
+//
+// حالا `null`اند تا رندرِ اعدادِ ساختگی **ساختاری ناممکن** باشد: تنها مسیرِ
+// رسیدن به اسلایدرها از دادهٔ سرور می‌گذرد. همان انضباطی که `loyalty.js:35`
+// از قبل درست رعایت می‌کرد («—» تا وقتی `_cbLoaded` نشده).
+let CB=null;
+let CB_DRAFT=null;
 let _cbLoaded=false;
+
+/** حالتِ صادقانه‌ی «هنوز نمی‌دانیم» — به‌جای نشان‌دادنِ عددی که از جایی نیامده. */
+function cbUnavailable(msg){
+  document.getElementById('v-cashback').innerHTML=`
+    <div class="error-state">
+      <div class="error-state-icon">${icon('alert',{size:40})}</div>
+      <div class="empty-state-title">تنظیمات کش‌بک بارگذاری نشد</div>
+      <div class="empty-state-desc">${esc(msg)}</div>
+      <button class="btn btn-primary" onclick="_cbLoaded=false;rCashback()">${icon('refresh',{size:16})} تلاش دوباره</button>
+    </div>`;
+}
+
 async function rCashback(){
-  if(!_cbLoaded && API.getToken()){
+  if(!_cbLoaded){
+    // ⚠️ RT-02: این شرط قبلاً `if(!_cbLoaded && API.getToken())` بود، یعنی
+    // گارد **دو راه برای غلط‌بودن** داشت و رفعِ قبلی فقط یکی را می‌پوشاند.
+    // بدونِ توکن کلِ بلاک رد می‌شد — نه درخواستی، نه حالتِ خطایی — و رندر
+    // روی مقادیرِ هاردکد می‌افتاد. مسیرِ بی‌توکن حالا صریح است.
+    if(!API.getToken()){
+      cbUnavailable('برای دیدنِ درصدهای واقعیِ این رستوران وارد شوید');
+      return;
+    }
     const res=await API.get('/restaurant/cashback');
     if(res.ok){ CB={base:res.data.base_pct,pre:res.data.preorder_pct,vip:res.data.vip_pct,wb:res.data.winback_pct}; _cbLoaded=true; }
     else {
       // مهم: در حالتِ آنلاین هرگز مقادیرِ پیش‌فرض را به‌جای تنظیماتِ واقعی نشان نده.
       // پیش‌تر خطا (از جمله ۴۰۳ مجوز) بی‌صدا بلعیده می‌شد و پنل درصدهای ساختگی
       // را به‌عنوان تنظیماتِ رستوران نمایش می‌داد — مبنای تصمیمِ مالیِ غلط.
-      document.getElementById('v-cashback').innerHTML=`
-        <div class="error-state">
-          <div class="error-state-icon">${icon('alert',{size:40})}</div>
-          <div class="empty-state-title">تنظیمات کش‌بک بارگذاری نشد</div>
-          <div class="empty-state-desc">${esc(res.error?.message||'ارتباط با سرور برقرار نشد')}</div>
-          <button class="btn btn-primary" onclick="_cbLoaded=false;rCashback()">${icon('refresh',{size:16})} تلاش دوباره</button>
-        </div>`;
+      cbUnavailable(res.error?.message||'ارتباط با سرور برقرار نشد');
       return;
     }
   }
+  // گاردِ آخر: هیچ مسیری نباید با CBِ خالی به رندر برسد. اگر روزی رسید،
+  // «نمی‌دانیم» نشان بده — نه یک عدد.
+  if(!CB){ cbUnavailable('تنظیماتِ کش‌بک در دسترس نیست'); return; }
   CB_DRAFT={...CB};
   const cards=[['base','کش‌بک پایه','برای تمام رزروها',20],['pre','پیش‌سفارش','رزرو همراه با منو',25],['vip','مشتری VIP','اعضای سطح طلایی و بالاتر',30],['wb','بازگشت (Winback)','مشتری ناراضی یا در خطر ریزش',40]];
   document.getElementById('v-cashback').innerHTML=`

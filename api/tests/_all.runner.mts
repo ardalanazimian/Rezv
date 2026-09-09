@@ -179,6 +179,7 @@ import './rewards.integration.test.mts';
 // نمی‌شدند — دقیقاً همان تله‌ای که سرآیندِ همین فایل و دستورِ ۰۱۸ توضیح می‌دهند.
 // اگر باز هم غیبش زد، شمارشِ سوئیت را چک کن، نه رنگِ نتیجه را.
 import './reward-delivery-guard.integration.test.mts';
+import './cashback-panel-honesty.test.mts';
 import './redis.test.mts';
 import './reminder-sms.integration.test.mts';
 import './reservation-helpers.test.mts';
