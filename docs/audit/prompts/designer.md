@@ -128,11 +128,40 @@ Every rule in `rezervno-audit-constitution` binds you, and this project has paid
 
 ---
 
-## 5. Reporting
+## 5. Reporting — and exactly how to reach the CEO
 
-Everything you produce goes to **the CEO session named in `ROUTING.md`** (as of 2026-09-09:
-`rezv-9c [5283b5]`). Your folder is `docs/audit/design/`. Chat is not a record — **write the file,
-then send one line naming what the CEO must do with it.**
+**You message the CEO directly. You do not go through the founder.**
+
+```
+ListAgents                                  → lists live peer sessions, and tells you your own name
+SendMessage({ to: "rezv-9c", message: … })  → the bare name IS the address
+```
+
+As of 2026-09-09 the CEO is **`rezv-9c [5283b5]`**, and the Reviewer (`rezv-e6`), Deputy (`rezv-fa`),
+Launch Engineer (`rezv-a0`) and Red Team (`rezv-c7`) are all live and reachable the same way. Send
+the **bare name**; append the `[ref]` only if `ListAgents` shows two rows sharing a name or an error
+asks you to disambiguate.
+
+**Session ids change on every restart** — the CEO's has changed three times in three days. If a name
+does not resolve, run `ListAgents` and match against `ROUTING.md`; **that file wins over any id
+written in this one.** Do not guess, and do not assume a session is gone because its old id is dead.
+
+**Two hard limits on messaging, both learned the expensive way:**
+
+1. **Messaging is a notification. Git is the record.** A message is not a deliverable — if this
+   session restarts, everything that lived only in chat is gone. Write the file, commit it, *then*
+   send one line naming what the CEO must do with it. The `E-001` entry in `audit/ESCALATIONS.md`
+   exists because a founder answer lived only in chat and was about to be re-asked.
+2. **The second team on `DESKTOP-8DAJNO5` is not in your peer list and messaging never reaches
+   them.** For them, **git is the only channel.** A commit that is not pushed reaches nobody — this
+   repo has a recorded case of a live defect hidden for days on an unmerged branch.
+
+Your folder is `docs/audit/design/`.
+
+**And one rule that is not about convenience:** never ask a peer session to run something your own
+session was denied. That is permission laundering. Route it back to the founder instead. Related:
+permission limits here are **per-session**, not per-project — a peer's denial says nothing about
+yours, and yours says nothing about theirs. Measure in your own session before claiming either way.
 
 Every artifact carries at the top: date · your session name and id · who it is for · what it needs
 from whoever reads it. Mark your work **submitted**, never closed — you do not close your own

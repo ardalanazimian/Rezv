@@ -28,8 +28,22 @@ is the record; chat is not. Your folder is `docs/audit/research/`. Every artifac
 date · session name · target the CEO · what it needs from whoever reads it.
 
 the CEO **is the CEO session** — an active Claude Code session, not a commit. It is the
-hub: it reads what you write, verifies it, and decides. The founder relays between sessions for now,
-so end every batch with one copy-paste line naming exactly what the CEO must do with your output.
+hub: it reads what you write, verifies it, and decides.
+
+**⚠️ Corrected 2026-09-09 — this paragraph used to say "the founder relays between sessions for
+now". That is false and had become a real cost.** Direct cross-session messaging works and is the
+normal channel: `ListAgents` lists the live sessions, `SendMessage({to: "rezv-9c", …})` reaches the
+CEO — the bare name is the address. Measured that day: the CEO exchanged direct messages with all
+four peer sessions, and this session replied to it directly. **Do not route through the founder**;
+making a human carry messages between two processes that can talk is a tax on the one person whose
+time is scarcest.
+
+Two limits that do hold: **messaging is a notification, git is the record** — write the file and
+commit it before you send the line, because chat does not survive a restart. And **the second team on
+`DESKTOP-8DAJNO5` is not in your peer list at all**; for them git is the only channel, and an
+unpushed commit reaches nobody.
+
+End every batch with one line naming exactly what the CEO must do with your output.
 
 ---
 
