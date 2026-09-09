@@ -301,6 +301,27 @@ const known = new Set([
 ].map((m) => m[1]));
 if (known.size === 0) { console.error('❌ هیچ متغیرِ محیطیِ شناخته‌شده‌ای جمع نشد — چکِ ۳ توخالی می‌شد'); process.exit(1); }
 
+// ⚠️ ۲۰۲۶-۰۹-۰۹ — متغیرهای ذاتیِ پوسته هرگز «پیکربندیِ اپ» نیستند؛ خودِ محیط‌اند.
+//    این چک عمداً داخلِ فنسِ `sh` را اسکن می‌کند (`EXEC_TAGS` شاملِ `sh` است، و
+//    قاعده افزایشی است تا نوشتنِ یک تگِ بی‌ضرر روی یک recipeِ واقعی بایپاسِ
+//    یک‌کلمه‌ای نشود) — و آن تصمیم درست است، عوض نشد.
+//    ولی نتیجه‌ی جانبی‌اش این بود که خطِ
+//        export PATH="/c/Program Files/nodejs:$PATH"
+//    یعنی رایج‌ترین خطِ هر رونوشتِ اجرا روی این ماشین، به‌عنوانِ «متغیرِ
+//    پیکربندیِ ناشناس» گیت را قرمز می‌کرد. اولین قربانی‌اش
+//    `docs/audit/deputy/ORDER-001-xss-rereview-queue.md:450` بود که با ادغامِ
+//    ۲۰۲۶-۰۹-۰۹ روی main آمد.
+//    قانونِ §4b: گاردی که با قالبِ شواهدِ اجباریِ ما دشمن است، همان رکوردی را
+//    خراب می‌کند که برای محافظتش ساخته شده — نویسنده مجبور می‌شود شواهدِ خودش
+//    را تحریف کند تا گیت سبز شود.
+//    پس **سیگنال باریک شد، نه allowlist**: این‌ها نام‌های ذاتیِ POSIX/پوسته‌اند
+//    که هیچ‌وقت در `.env.example` نمی‌آیند، نه معافیتِ پروژه‌ای. یک نامِ واقعیِ
+//    پیکربندی همچنان گرفته می‌شود.
+const SHELL_INTRINSIC = new Set([
+  'PATH', 'HOME', 'PWD', 'OLDPWD', 'SHELL', 'TERM', 'USER', 'LOGNAME',
+  'LANG', 'LC_ALL', 'TMPDIR', 'TMP', 'TEMP', 'HOSTNAME', 'EDITOR', 'PAGER',
+]);
+
 let envSeen = 0;
 const ENV_MATRIX = 'docs/ENVIRONMENT.md';
 // eachOutsideFence نه each: خطِ `export FOO=...` داخلِ یک transcript رونوشتِ
@@ -313,7 +334,7 @@ eachOutsideFence((f, n, line) => {
   if (!name && /(?:^|[^A-Za-z])(?:export|npm|npx|node|sh|bash|docker|psql|prisma)(?![A-Za-z])/.test(line)) {
     name = (/(?:^|[\s`$])(?:export\s+)?([A-Z][A-Z0-9_]{2,})=/.exec(line) ?? [])[1] ?? null;
   }
-  if (!name) return;
+  if (!name || SHELL_INTRINSIC.has(name)) return;
   envSeen++;
   if (!known.has(name)) {
     fails.push(`${f}:${n} — متغیرِ «${name}» به‌عنوانِ پیکربندی عرضه شده ولی نه در .env.example است، نه در compose، نه در کد`);
