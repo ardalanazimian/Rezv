@@ -84,6 +84,10 @@ export async function rateLimit(
 //  NoShowPredictor در reservations.ts — تا تستِ واحد بتونه بدونِ Redisِ
 //  واقعی مسیرِ fallback رو با یک stub که throw می‌کنه اجرا کنه.
 // ═══════════════════════════════════════════════════════════════════════
+/** تأخیرِ تلاشِ مجددِ ریت‌لیمیت پیش از fallback (E-003). کوتاه عمداً: مسیرِ
+ *  auth داغ است و یک قطعیِ واقعی نباید به تأخیرِ محسوس برای هر درخواست بدل شود. */
+export const RATE_LIMIT_RETRY_DELAY_MS = 40;
+
 export async function rateLimitWithFallback(
   identifier: string,
   rule: RateLimitRule,
@@ -92,9 +96,63 @@ export async function rateLimitWithFallback(
 ): Promise<RateLimitResult> {
   try {
     return await attempt(identifier, rule);
-  } catch (e) {
-    log.warn('rate-limit: Redis در دسترس نیست، fallback به سقفِ in-memory', {
-      prefix: rule.prefix, scope, error: (e as Error).message,
+  } catch (firstError) {
+    // ⚠️ E-003 (۲۰۲۶-۰۹-۰۹) — **یک تلاشِ مجدد پیش از fallback، و دلیلش امنیتی
+    // است نه پایداری.**
+    //
+    // سیاستِ fallbackِ بالا برای «Redis قطع است» نوشته شد و برای آن حالت درست
+    // است. ولی حالتِ واقعیِ خرابی معمولاً «Redis یک لحظه بلیپ می‌زند» است، و
+    // در آن حالت این مسیر یک **ریستِ شمارنده** می‌سازد نه یک سقفِ جایگزین:
+    // `rateLimitInMemory` نقشه‌ی جداگانه دارد، پس برای کلیدی که هرگز ندیده
+    // `count: 1` می‌سازد و اجازه می‌دهد — در حالی که Redis از قبل سقف را پر
+    // کرده بود. اثباتِ اجراشده (`RULES.otpPerPhone`, max=3، خطا فقط در تلاشِ
+    // چهارم):
+    //
+    //     ۱ allowed r=2 · ۲ allowed r=1 · ۳ allowed r=0 · ۴ allowed r=2
+    //                                                     ↑ باید رد می‌شد
+    //
+    // کشفش هم ارزشِ ثبت دارد: یک تستِ ریت‌لیمیت که «flake» برچسب خورده بود،
+    // در ۸ اجرا دوبار افتاد و بارِ دوم در تستِ **دیگری** از همان خانواده —
+    // دو ادعای مستقل که یکسان می‌افتند به محدودکننده اشاره می‌کنند، نه به
+    // تست‌ها. سه نشستِ مستقل لازم شد تا از «flake» به مکانیزم برسیم.
+    //
+    // چرا **یک** تلاشِ مجدد و نه بیشتر: بلیپِ گذرا با یک retry از بین می‌رود،
+    // ولی قطعیِ واقعی نباید به تأخیرِ چندبرابری برای هر درخواست تبدیل شود —
+    // آن‌وقت سیاستِ در دسترس‌بودن را با کندی جایگزین کرده‌ایم. تأخیرِ کوتاه
+    // است تا مسیرِ داغِ auth را نکشد.
+    //
+    // ⚠️ این **بخشِ کوچک‌ترِ** رفع است و ادعای بستنِ E-003 را ندارد. حالتِ
+    // «Redis واقعاً برای مدتی قطع است» همچنان سقفِ ریست‌شونده می‌دهد. بستنِ
+    // کاملش یک تبادلِ محصولی است (امنیت در برابر در دسترس‌بودن هنگام قطعی)
+    // که در `audit/ESCALATIONS.md` E-003 به مالک ارجاع شده و **تصمیمش گرفته
+    // نشده**. تا آن موقع، این خط بیشترِ سطحِ واقعیِ خطر را می‌بندد بدونِ
+    // اینکه هیچ کاربری را از سرویس محروم کند.
+    try {
+      await new Promise((r) => setTimeout(r, RATE_LIMIT_RETRY_DELAY_MS));
+      const retried = await attempt(identifier, rule);
+      metrics.rateLimitRetryRecovered.inc({ prefix: rule.prefix, scope });
+      return retried;
+    } catch (retryError) {
+      // ⚠️ این `catch` عمداً دیگر خالی نیست، و دلیلش یک ساعتِ گم‌شده است.
+      // نسخه‌ی اولش `catch { }` بود. هنگام اثباتِ همین رفع، یک اجرا نشان داد
+      // retry اصلاً شلیک نمی‌کند (`attempt` چهار بار صدا خورد نه پنج بار) و
+      // خروجی **دقیقاً شبیهِ نبودِ رفع** بود: `allowed=true remaining=2`.
+      // هر خطایی داخلِ این بلوک — از جمله یک `undefined.inc()` اگر شمارنده‌ای
+      // هنوز اعلام نشده باشد — بی‌صدا بلعیده می‌شد و از بیرون «Redis واقعاً
+      // قطع است» خوانده می‌شد. یعنی **یک باگ در خودِ رفع، شبیهِ همان نقصی
+      // می‌شد که رفع برای بستنش نوشته شده بود**، و هیچ ردی نمی‌گذاشت.
+      //
+      // حالا هر شکستِ غیرمنتظره‌ی این مسیر لاگ می‌شود. اگر `attempt` واقعاً
+      // به‌خاطرِ Redis خطا داده، این لاگ هم‌ارزِ همان اخطارِ پایین است و
+      // پرحرفی می‌کند — که قیمتِ ارزانی است برای مسیری که اگر بی‌صدا بشکند،
+      // به‌جای خطا یک **حفره‌ی امنیتی** می‌سازد.
+      log.warn('rate-limit: تلاشِ مجدد هم شکست (E-003) — به fallbackِ in-memory می‌رویم', {
+        prefix: rule.prefix, scope, error: (retryError as Error)?.message,
+      });
+    }
+
+    log.warn('rate-limit: Redis در دسترس نیست (پس از یک تلاشِ مجدد)، fallback به سقفِ in-memory', {
+      prefix: rule.prefix, scope, error: (firstError as Error).message,
     });
     metrics.rateLimitFallback.inc({ prefix: rule.prefix, scope });
     return rateLimitInMemory(identifier, rule);

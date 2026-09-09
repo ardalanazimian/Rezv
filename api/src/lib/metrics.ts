@@ -199,6 +199,11 @@ export const metrics = {
   // ⚠️ سه متریکِ زیر برایِ A3 (سختگیریِ acquisition-grade، ۲۰۲۶-۰۸-۱۴) اضافه
   // شدن — قبلاً fail-open رویِ rate-limit/بن فقط لاگِ ساده (یا هیچی) داشت،
   // بدونِ متریکِ قابلِ‌آلارم‌گذاری. رجوع کن به ratelimit.ts.
+  // ⚠️ E-003 (۲۰۲۶-۰۹-۰۹): تلاشِ مجددِ پیش از fallback، که یک بلیپِ گذرای Redis
+  // را از «ریستِ شمارنده‌ی ریت‌لیمیت» به یک ناروداد تبدیل می‌کند. بدونِ این
+  // شمارنده، تنها اثرِ رفع نامرئی است: rateLimitFallback پایین می‌آید و هیچ عددی
+  // نمی‌گوید چرا. نسبتِ recovered به fallback می‌گوید Redis بلیپ می‌زند یا قطع است.
+  rateLimitRetryRecovered: new Counter('rezervno_rate_limit_retry_recovered_total', 'تعداد دفعاتی که یک خطای گذرای Redis با تلاشِ مجدد جبران شد و به fallback نرسید (E-003) — نسبتش به fallback می‌گوید بلیپ است یا قطعی'),
   rateLimitFallback: new Counter('rezervno_rate_limit_fallback_total', 'تعداد دفعاتی که ریت‌لیمیت به‌خاطرِ قطعیِ Redis به سقفِ in-memory سقوط کرد (label: scope=middleware|route)'),
   rateLimitAutoBan: new Counter('rezervno_rate_limit_auto_ban_total', 'تعداد بن‌هایِ خودکارِ IP به‌خاطرِ عبورِ مکرر از ریت‌لیمیت'),
   banCheckFailOpen: new Counter('rezervno_ban_check_fail_open_total', 'تعداد دفعاتی که چکِ بنِ IP به‌خاطرِ قطعیِ Redis fail-open شد (بن موقتاً اعمال نشد)'),

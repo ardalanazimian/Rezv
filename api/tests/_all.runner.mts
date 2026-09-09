@@ -213,6 +213,7 @@ import './panel-status-error-vocabulary.test.mts';
 import './panel-status-map-single-source.test.mts';
 import './panel-error-contract.test.mts';
 import './db-pool-exhaustion-contract.test.mts';
+import './ratelimit-transient-redis-error.test.mts';
 import './table-delete-guard.integration.test.mts';
 import './table-release.integration.test.mts';
 import './table-merge-occupancy.test.mts';
