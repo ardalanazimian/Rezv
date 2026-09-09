@@ -141,7 +141,11 @@ describe('فروشگاهِ جایزه — فهرست و قفلِ سطح', () => 
 
 describe('فروشگاهِ جایزه — کسرِ سکه و گاردها', () => {
   test('ردیمِ موفق سکه را کم و ردِ redemption را ثبت می‌کند', async () => {
-    const id = await mkItem({ kind: 'free_item', costCoins: 30 });
+    // ⚠️ کیند از `free_item` به `gift_card_credit` عوض شد (۲۰۲۶-۰۹-۰۹، گاردِ
+    // تحویل): این تست مکانیکِ کیفِ پول را می‌سنجد و کیند برایش تصادفی بود —
+    // ولی حالا کیندهایِ بی‌تحویل *پیش از* کسرِ سکه رد می‌شوند. هیچ assertی
+    // عوض نشد، فقط فیکسچر به کیندی رفت که واقعاً چیزی تحویل می‌دهد.
+    const id = await mkItem({ kind: 'gift_card_credit', costCoins: 30, restaurant: 'this' });
     const u = await mkUser(100);
 
     const res = await redeemRewardItem(u, id);
@@ -187,7 +191,8 @@ describe('فروشگاهِ جایزه — کسرِ سکه و گاردها', () =
 describe('فروشگاهِ جایزه — همزمانی (قفلِ ادعایِ TOCTOU-safe)', () => {
   test('موجودیِ محدود زیرِ ردیمِ موازی هرگز منفی نمی‌شود', async () => {
     const STOCK = 3, PARALLEL = 12;
-    const id = await mkItem({ kind: 'free_item', costCoins: 10, stockRemaining: STOCK });
+    // کیند تحویل‌دار لازم است (گاردِ تحویل، ۲۰۲۶-۰۹-۰۹) — assertها دست‌نخورده.
+    const id = await mkItem({ kind: 'gift_card_credit', costCoins: 10, stockRemaining: STOCK, restaurant: 'this' });
     const users = await Promise.all(Array.from({ length: PARALLEL }, () => mkUser(100)));
 
     const out = await Promise.allSettled(users.map(u => redeemRewardItem(u, id)));
@@ -201,7 +206,8 @@ describe('فروشگاهِ جایزه — همزمانی (قفلِ ادعایِ 
   test('یک کاربر با ردیمِ موازی بیش از موجودیِ سکه‌اش خرج نمی‌کند', async () => {
     // ⚠️ همان کلاسِ باگی که در sms-balance و coupons دنبالش بودیم: چکِ موجودی
     // باید داخلِ خودِ UPDATE باشد، نه SELECT-then-check.
-    const id = await mkItem({ kind: 'free_item', costCoins: 40 });
+    // کیند تحویل‌دار لازم است (گاردِ تحویل، ۲۰۲۶-۰۹-۰۹) — assertها دست‌نخورده.
+    const id = await mkItem({ kind: 'gift_card_credit', costCoins: 40, restaurant: 'this' });
     const u = await mkUser(100);           // فقط ۲ تا از ۵ تلاش باید جا شود
 
     const out = await Promise.allSettled(Array.from({ length: 5 }, () => redeemRewardItem(u, id)));
@@ -269,17 +275,28 @@ describe('فروشگاهِ جایزه — تولیدِ جایزه', () => {
     assert.equal(gc.balanceToman, 80, 'موجودیِ اولیه باید کاملِ مبلغ باشد');
   });
 
-  test('کیندهایِ V1ِ بدونِ اثر فقط ردِ redemption ثبت می‌کنند', async () => {
-    // ⚠️ این رفتار عمدی و در خودِ کد مستند است (priority_boost/free_item/
-    // event_access هنوز اثرِ واقعی ندارند). تست آن را *ثبت* می‌کند تا اگر
-    // روزی عوض شد عمدی باشد — و تا کسی آن را با باگِ coupon_grant اشتباه نگیرد.
+  test('کیندهایِ بدونِ تحویل پیش از کسرِ سکه رد می‌شوند', async () => {
+    // ⚠️ این تست **وارونه شد** (۲۰۲۶-۰۹-۰۹). نسخه‌ی قبلی‌اش این را assert
+    // می‌کرد: «سکه خرج می‌شود — این بخشِ عمدیِ طراحی است» — یعنی یک تست
+    // داشت رفتاری را *تبرک* می‌کرد که در آن کاربر سکه می‌داد و هیچ چیز
+    // نمی‌گرفت. مستند بودنِ یک رفتار آن را درست نمی‌کند.
+    //
+    // دقیقاً همان کلاسِ باگی است که دو تست پایین‌تر برایِ coupon_grantِ
+    // بدونِ رستوران گرفته شد (۵۰ سکه رفت، هیچ نیامد) — با این تفاوت که آن
+    // یکی داده‌ی خراب بود و این یکی «طراحیِ V1» نامیده می‌شد.
+    //
+    // پوششِ کاملِ کلاس (هر سه کیند + گاردِ enum + موتورِ پیشنهاد) در
+    // tests/reward-delivery-guard.integration.test.mts است؛ اینجا فقط
+    // ردِ همان ادعایِ قبلی می‌ماند تا کسی از رویِ تاریخچه گمراه نشود.
     const id = await mkItem({ kind: 'priority_boost', costCoins: 15 });
     const u = await mkUser(100);
 
-    const res = await redeemRewardItem(u, id);
-    assert.equal(res.result_coupon_id, null);
-    assert.equal(res.result_gift_card_id, null);
-    assert.equal(await walletOf(u), 85, 'سکه خرج می‌شود — این بخشِ عمدیِ طراحی است');
-    assert.equal(await db.rewardRedemption.count({ where: { itemId: id, userId: u } }), 1);
+    await assert.rejects(
+      () => redeemRewardItem(u, id),
+      (e: any) => e?.code === 'VALIDATION' && e?.status === 422,
+      'باید ردِ عمدی باشد، نه کرش و نه کسرِ بی‌تحویل',
+    );
+    assert.equal(await walletOf(u), 100, 'سکه **نباید** خرج شود');
+    assert.equal(await db.rewardRedemption.count({ where: { itemId: id, userId: u } }), 0);
   });
 });

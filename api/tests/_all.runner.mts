@@ -173,6 +173,12 @@ import './staff-tenant-hijack.integration.test.mts';
 import './incentive-low-demand-date.integration.test.mts';
 import './restaurant-popularity-ranking.integration.test.mts';
 import './rewards.integration.test.mts';
+// ⚠️ این خط در ۲۰۲۶-۰۹-۰۹ **دو بار** از این فایل ناپدید شد (یک‌بار کامنت شد،
+// یک‌بار کاملاً حذف) در حالی که چند نشست هم‌زمان روی همین checkout کار می‌کردند.
+// هر دو بار سوئیت «سبز» گزارش می‌داد در حالی که ۸ تستِ گاردِ تحویل اصلاً اجرا
+// نمی‌شدند — دقیقاً همان تله‌ای که سرآیندِ همین فایل و دستورِ ۰۱۸ توضیح می‌دهند.
+// اگر باز هم غیبش زد، شمارشِ سوئیت را چک کن، نه رنگِ نتیجه را.
+import './reward-delivery-guard.integration.test.mts';
 import './redis.test.mts';
 import './reminder-sms.integration.test.mts';
 import './reservation-helpers.test.mts';
