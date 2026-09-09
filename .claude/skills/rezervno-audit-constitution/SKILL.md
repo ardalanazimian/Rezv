@@ -81,6 +81,15 @@ more often than the finding is.** Every one of these produced a confident, wrong
   `git show --stat` sees only the file they expected. On a shared tree, `git diff --cached` before
   committing is the check that pathspec cannot give you.
 
+- **A null result whose *control* also came back null is not a measurement.** Added 2026-09-10 by
+  the Red Team session, and the asymmetry is the point it made: a dead control looks like a
+  *bigger* finding rather than a broken instrument. It built a probe to show that one error branch
+  increments no counter, using a neighbouring branch that provably does as the control — and the
+  control read flat too. The obvious reading was "the counter shipped yesterday is dead", a serious
+  charge against code already on `main`. **The repo's own passing test disproved it in one command.**
+  When your control dies, you have learned nothing about your subject; you have learned your
+  instrument is broken.
+
 So: read the output text, not just the status. Confirm the tool you ran is the tool you edited.
 And when a result is *inverted* — red where it should be green — suspect the harness first, but
 **record the anomaly instead of discarding it**. One such anomaly was recoverable hours later
