@@ -618,9 +618,37 @@ Ordered by cost of *not* doing it.
 | Streak: current run or record (§4.2) | Whether a visible number may go down |
 | Referral loop depth (§6.1-A) | Founder's plan phase 2 already assigns this to the owner |
 
-### M2 — genuinely blocked on the event substrate
+### M2 — blocked on the event substrate
 
-**State plainly: no mechanic that needs behavioural history can ship before this.**
+> **⚠️ Self-correction, filed before anyone found it (charter behaviour #1).** My first draft of this
+> section asserted that *no* mechanic needing behavioural history can ship. That is too strong, and I
+> reached it by following `emit()`/`platform_events` and stopping there. **Reservation lifecycle
+> history does exist today**, in a different table I did not check before writing:
+> `model ReservationEvent` (`schema.prisma:584-597`, `@@map("reservation_events")`) is written by
+> `lifecycle.ts:124-133` **inside the same transaction as the status change and behind the
+> compare-and-set at `:114-121`** — so there is exactly one append-only row per real transition, with
+> `fromStatus`, `toStatus`, `actor`, `isAutomatic`, `createdAt`. Read path: `lifecycle.ts:399-401`.
+>
+> What it lacks is `userId`/`restaurantId` (reachable only by joining the mutable `Reservation` row),
+> any point-in-time feature snapshot, and any rule version or holdout assignment.
+>
+> **Corrected statement:** the mechanics in §4 that depend on *visit history* — کارتِ مهر, رشتهٔ
+> هفتگی, and the winback lapse trigger in §2-C — read `Reservation` directly and are **not** blocked
+> on any substrate work. What is blocked is anything needing (a) **loyalty-side** events (a points
+> grant, a redemption, a tier change, an expiry — none of which is emitted anywhere) or (b) an
+> unbiased control group and point-in-time features.
+>
+> **Also noted, and it changes this section's urgency:** another session is building exactly this
+> right now. As of this writing the working tree carries untracked
+> `api/src/lib/ml-substrate.ts` and `api/prisma/sql/082-reservation-events-ml-substrate.sql`, both
+> headed *«M0 — زیرساختِ رویداد برای ML … تأیید: CEO `rezv-9c [5283b5]`، ۲۰۲۶-۰۹-۰۹»*, enriching
+> `reservation_events` with `restaurant_id`, `rule_version`, `holdout_bucket` and `decision_inputs`
+> rather than building a second emitter. **Whoever scopes this design's build should read
+> `docs/audit/fixes/M0-EVENT-SUBSTRATE-DESIGN.md` first and coordinate — I did not, because the work
+> landed in the tree while I was writing.** The loyalty-side event gap below is still real and is not
+> covered by that migration.
+
+The loyalty-side gap, unchanged:
 
 - `events.ts:21-24` declares 8 `DomainEvent` values. **Exactly one is ever emitted** —
   `reservation.created` at `reservations.ts:413-417`. The other seven, including
