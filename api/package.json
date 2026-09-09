@@ -22,7 +22,8 @@
     "test:integration": "node --test tests/integration/*.test.mjs",
     "test:e2e": "playwright test",
     "test:load": "k6 run ../loadtest/k6-load-test.js",
-    "test:one": "tsx --test --test-force-exit"
+    "test:one": "tsx --test --test-force-exit",
+    "pretest": "node ../tools/check-runner-completeness.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
