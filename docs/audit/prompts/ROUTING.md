@@ -11,7 +11,7 @@ Last verified: **2026-09-08** by the CEO session itself.
 
 | Role | Session | Confirmed how |
 |---|---|---|
-| **CEO** | ⚠️ **STALE as of 2026-09-09** — `rezv-f8 [4e0f27]` no longer resolves | was self-identified via `ListAgents` 2026-09-08; that session and `rezv-b0 [d8087d]` before it are the same session across two restarts. Re-resolve before addressing |
+| **CEO** | `rezv-9c [5283b5]` — was `rezv-f8 [4e0f27]`, and `rezv-b0 [d8087d]` before that | `ListAgents` 2026-09-09, self-identified. Same session across **three** restarts; the two predecessors are dead ids, not other agents |
 | **Reviewer** (founder-side) | `rezv-e6 [a10db3]` — was `rezv-d3 [c8fb22]` on 2026-09-08 | `ListAgents` 2026-09-09; founder confirmed the role directly on 2026-09-08. Directives 033, 035, 036 and 037 are signed `rezv-d3 [c8fb22]` — same session, before the restart |
 | **Deputy** | ⚠️ **STALE as of 2026-09-09** — `rezv-b1 [5f3782]` no longer resolves; was `rezv-30 [a7bb03]` before that | self-identified via `ListAgents` 2026-09-08; dispatched by the founder, took ORDER-001 from the CEO. Re-resolve before addressing |
 
