@@ -6009,7 +6009,18 @@ async function openCustomerDetail(userId){
   const fnl=n=>n>=1000000?fa(+(n/1000000).toFixed(1))+'م':n>=1000?fa(Math.round(n/1000))+'ک':fa(n||0);
   const SEG_FA={new_customer:'مشتری جدید',active:'فعال',at_risk:'در خطر ریزش',churned:'ازدست‌رفته',vip:'VIP'};
   const dt=s=>{ if(!s)return'—'; try{return new Date(s).toLocaleDateString('fa-IR');}catch{return'—';} };
-  const ST_FA={completed:'انجام‌شده',seated:'نشسته',confirmed:'تأییدشده',cancelled:'لغوشده',no_show:'عدم‌حضور',pending:'در انتظار'};
+  // ⚠️ `ST_FA` حذف شد (DS-003 §۴‑۲، ۲۰۲۶-۰۹-۰۹). شش کلید از هجده مقدارِ
+  // `RStatus` داشت، پس در تایم‌لاینِ پروفایلِ مشتری وضعیت‌هایی مثل
+  // `waitlisted`/`preparing`/`checked_in`/`running_late`/`dining`/`rejected`/
+  // `expired`/`auto_cancelled`/`auto_confirmed` کلیدِ خامِ انگلیسی می‌شدند —
+  // همان کلاسِ نگاشتِ ناقصی که DS-001 پشتِ میزِ پذیرش گرفت.
+  //
+  // ⚠️ و دو برچسب **واگرا** بودند، یعنی یک وضعیت در دو صفحه‌ی همین پنل دو
+  // نامِ فارسیِ متفاوت داشت:
+  //     seated   → «نشسته»    اینجا  ·  «سر میز» در STATUS_META
+  //     no_show  → «عدم‌حضور» اینجا  ·  «نیومد»  در STATUS_META
+  // حالا `STATUS_META` (data.js:5) تنها منبع است — همان‌که فهرستِ رزروها،
+  // Outbox و متنِ خطای تغییرِ وضعیت هم از آن می‌خوانند.
   const tl=(d.timeline||[]);
   openModal(`
     <div class="modal-title">${d.is_vip?icon('crown',{size:16,fill:true})+' ':''}${esc(u.name||'مشتری')}</div>
@@ -6030,7 +6041,7 @@ async function openCustomerDetail(userId){
       ${tl.length?tl.map(r=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
           <div>
-            <div style="font-weight:700;font-size:13px">${esc(ST_FA[r.status]||r.status)} · ${fa(r.party_size)} نفر</div>
+            <div style="font-weight:700;font-size:13px">${esc(STATUS_META[r.status]?.label||r.status)} · ${fa(r.party_size)} نفر</div>
             <div style="font-size:11px;color:var(--t2)">${dt(r.slot_start)}${r.items&&r.items.length?' · '+esc(r.items.join('، ')):''}</div>
           </div>
           <div style="font-weight:800;font-size:13px">${r.spend_toman?fnl(r.spend_toman)+' ت':'—'}</div>

@@ -210,6 +210,7 @@ import './slot-lock-failopen-double-booking.test.mts';
 import './tx-timeout-error-contract.test.mts';
 import './standalone-bundle-completeness.test.mts';
 import './panel-status-error-vocabulary.test.mts';
+import './panel-status-map-single-source.test.mts';
 import './db-pool-exhaustion-contract.test.mts';
 import './table-delete-guard.integration.test.mts';
 import './table-release.integration.test.mts';
