@@ -381,12 +381,19 @@ export async function confirmBook(id){
     ...(preferences?.length ? { preferences } : {}),
   },{ 'Idempotency-Key': genIdempotencyKey() });
 
-  let code;
+  let code, bookedStatus=null;
   if(res.ok && res.data?.code){
     // رزرو واقعی در دیتابیس ثبت شد (بک‌اند code را در سطحِ بالا برمی‌گرداند)
     // ⚠️ هپتیکِ success فقط همین‌جا زده می‌شود — دقیقاً همون شرطی که سرور واقعاً
     // res.ok داد؛ هیچ مسیرِ دیگری (دمو/آفلاین) این الگو را نمی‌گیرد.
     code=res.data.code;
+    // ⚠️ A1-006 (۲۰۲۶-۰۹-۱۰): وضعیتِ **واقعی** هم برداشته می‌شود، نه فقط کد.
+    // سرور `status` را در همان پاسخ می‌دهد (`reservations.ts:481`) و این اپ
+    // تا امروز فقط `code` را می‌خواند و بعد بی‌قیدوشرط «رزرو تأیید شد!»
+    // می‌گفت — در حالی که رستورانی که `auto_confirm` را خاموش کرده، رزرو را
+    // `pending` می‌گیرد (`reservations.ts:375`). یعنی مشتری «تأیید شد» می‌دید
+    // و میزش قطعی نبود.
+    bookedStatus=res.data.status||null;
     haptic('success');
   } else if(res.offline){
     // ⚠️ رفعِ P0-3 (فازِ ۲، پروتکل §۳ — «A customer must NEVER see … fake
@@ -462,12 +469,20 @@ export async function confirmBook(id){
   // امتیازِ محلی جعل نمی‌شود؛ عددِ واقعی از سرور می‌آید (وقتی رزرو «انجام‌شد»
   // علامت بخورد XP واقعی ثبت می‌شود؛ اینجا فقط چیپِ نوارِ بالا همگام می‌شود).
   syncNavPoints();
-  TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
+    // ⚠️ A1-006: ردیفِ سفرها هم وضعیتِ واقعی را می‌برد، وگرنه شیت «در انتظار»
+  // می‌گفت و فهرست «پیش‌رو» — دو صفحه‌ی یک اپ، دو حرف.
+  TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up',awaitingApproval:bookedStatus==='pending'});
   sheetBody.innerHTML=`
     <div class="success">
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
-      <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
-      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}<br>یادآور با پیامک می‌فرستیم</div>
+      <!-- ⚠️ A1-006: عنوان از **وضعیتِ واقعی** مشتق می‌شود، نه ادعا.
+           الگوی درست از قبل در همین اپ بود — `reservation.js:76`
+           (`awaitingApproval`) همین نقص را برای فهرستِ سفرها رفع کرده و
+           کامنتش هم همین را می‌گوید: «مشتری فکر می‌کرد میزش قطعی است در
+           حالی که رستوران هنوز تأیید نکرده». شیتِ موفقیت آن رفع را نگرفته
+           بود. مکانیزمِ تازه‌ای ساخته نشد؛ همان انضباط به این‌جا آمد. -->
+      <div class="sheet-title" style="text-align:center">${bookedStatus==='pending'?'رزرو ثبت شد — در انتظارِ تأیید':'رزرو تأیید شد!'}</div>
+      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}<br>${bookedStatus==='pending'?'این رستوران رزروها را دستی تأیید می‌کند — نتیجه را پیامک می‌کنیم':'یادآور با پیامک می‌فرستیم'}</div>
       <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode(${jsq(code)})" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
       ${(r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
       <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
