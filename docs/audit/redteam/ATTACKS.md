@@ -86,6 +86,31 @@ shipped a dead counter — the repo's own passing test said otherwise.
 **Counter-question:** *before I write this down — did my control fire?* If not there is no finding
 yet, only a broken harness.
 
+### 22 — Source text is not the value
+
+**Try:** find a guard that learns its expected list by **reading another file's source as text** —
+slicing between markers and regexing out string literals. Then put the thing it looks for somewhere
+inside that slice where it is *not* a value: a comment, a docstring, a disabled line. The guard
+counts it. The program never sees it.
+
+**Why it works:** these parsers are written precisely to avoid a hand-copied list — a real
+improvement, and the comment above them usually says so («نه یک رونوشتِ دستی»). But reading the
+source is not reading the value. Everything in the file that *looks* like a value now *is* one, and
+prose is the easiest place for a name to appear innocently.
+
+**Beat:** `api/tests/standalone-bundle-completeness.test.mts`. Removing a genuinely-imported module
+from `CUSTOMER_ORDER` → exit 1. Removing it **and** naming it in a single-quoted comment inside the
+same block → **exit 0**, module still absent from the bundle. Full md5-stamped chain in
+`LEDGER-ADDITIONS.md` → FG-12.
+
+**What makes it likely rather than exotic:** the file already contains that exact sentence about that
+exact module, one line below, written with backticks. The guard's survival depends on which quote
+character an author reaches for mid-sentence.
+
+**Counter-question:** *does this check read the source, or ask the program?* If the program can print
+its own list, the test should read that and let comments, quoting and formatting stop being part of
+the contract.
+
 ## Machine traps — measured, with the wrong guesses left in on purpose
 
 - **`@/lib/…` (alias) versus `./…` (relative)** can give two module instances. That is the real trap

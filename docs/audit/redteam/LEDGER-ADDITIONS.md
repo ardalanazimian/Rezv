@@ -104,6 +104,47 @@ So the accident is not "someone writes `margin-bottom:500px`". It is **a designe
 
 ---
 
+## FG-12 — a comment can enrol a module in the bundle guard's eyes without enrolling it in the bundle
+
+**Date:** 2026-09-10 · attacked at `main` @ `19c82e3` · guard is `api/tests/standalone-bundle-completeness.test.mts` (`rezv-a0`, shipped 2026-09-09 in `26bfb6f`).
+
+**What looked green.** `npx tsx --test tests/standalone-bundle-completeness.test.mts` → exit 0, `# pass 2 / # fail 0`. The guard exists because a module was imported by the customer app but missing from `CUSTOMER_ORDER`, and the bundle shipped a live `ReferenceError` on the booking error path. It is a good guard and it catches that exact regression.
+
+**What it was actually measuring.** `customerOrder()` (`:38-45`) reads `tools/build-standalone.py` **as text**, slices from `CUSTOMER_ORDER = [` to the first `]`, and takes every single-quoted `*.js` string in that slice as a list entry:
+
+```
+const block = src.slice(start, end);
+return [...block.matchAll(/'([^']+\.js)'/g)].map((m) => m[1]);
+```
+
+Python comments live inside that slice. **A module name in a comment is indistinguishable from a module in the list.**
+
+```
+BASELINE                                            EXIT=0  pass 2  md5 3b0dcbcfd6d6
+ATTACK A1  remove 'js/api-errors.js' from the list  EXIT=1  pass 1  md5 93a01d6e575c
+           → «js/api-errors.js ← import شده در data/booking.js»   (the guard works)
+ATTACK A2  same removal + one comment inside the
+           block naming that module in single quotes EXIT=0  pass 2  md5 8ca4e37aa627
+           → real list entries for api-errors: 0     (verified during the run)
+REVERT     git checkout -- tools/build-standalone.py EXIT=0  pass 2  md5 3b0dcbcfd6d6
+           git status --porcelain → clean
+```
+
+**The comment I used is already in the file, one line below, in backticks.** `build-standalone.py:51` reads «⚠️ `api-errors.js` باید **پیش از** `data/booking.js` بیاید». My attack wrote the same sentence about the same module using `'…'` instead of `` `…` ``. **The difference between a working guard and a disarmed one is which quote character an author reaches for while writing a comment in Persian prose** — and the module it disarms is the one whose absence caused the live failure this guard was built after.
+
+**Who walks it by accident.** Whoever documents the ordering constraints, which this block invites: it already carries six lines of commentary explaining why order matters, naming modules. Nothing warns that the naming convention inside those comments is load-bearing.
+
+**Recommendation (the guard's author decides).** Stripping `#` comments before the regex fixes this instance and leaves the class. The stronger fix is to stop parsing source text and **ask the program for its value** — have the builder print its own list (`build-standalone.py --print-order`) and have the test read that. Then comments, quote styles, and formatting stop being part of the contract, and the test measures what the build will actually do rather than what its source looks like.
+
+**Two adjacent gaps I did NOT test — recorded as untested, not as findings.**
+
+- `src.indexOf(']', start)` ends the block at the **first** `]`. A `]` inside a comment would truncate the parse and hide every entry after it. Unmeasured.
+- The regex takes only **single-quoted** strings. Python accepts `"js/foo.js"` equally. A double-quoted entry would be a real bundle member invisible to the guard. Unmeasured — and note this one would fail *noisily*, not silently, so it is the less dangerous of the two.
+
+**Scope.** `CUSTOMER_ORDER` is the only `*_ORDER` list in the builder, and the guard covers only it. `build(app)` at `:232` emits business and company bundles too; **how those get their module lists I did not establish**, so whether they have equivalent coverage is UNKNOWN, not "uncovered".
+
+---
+
 **Falsifiability note against myself.** This finding rests on one probe file in one location
 (`docs/REDTEAM-PROBE.md`). I did not test whether a different directory changes the result, and
 `docs/audit/reports/` is reported by the CEO as possibly outside this check's scope — a scope
