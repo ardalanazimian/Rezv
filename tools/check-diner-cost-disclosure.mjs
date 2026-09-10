@@ -84,12 +84,13 @@ const INVENTORY = [
     kind: 'پول',
     anchor: { file: 'api/prisma/schema.prisma', needle: 'paymentEnabled Boolean' },
     mustDisclose: true,
-    exposedIn: {
-      file: 'api/src/app/api/v1/restaurants/[slug]/route.ts',
-      key: 'online_payment_enabled',
-    },
+    exposedIn: [
+      { file: 'api/src/app/api/v1/restaurants/route.ts', key: 'online_payment_enabled' },
+      { file: 'api/src/app/api/v1/restaurants/[slug]/route.ts', key: 'online_payment_enabled' },
+    ],
     readers: [
       'app/api/v1/reservations/[code]/pay/route.ts',
+      'app/api/v1/restaurants/route.ts',
       'app/api/v1/restaurants/[slug]/route.ts',
     ],
     why:
@@ -103,10 +104,10 @@ const INVENTORY = [
     kind: 'پول',
     anchor: { file: 'api/prisma/schema.prisma', needle: 'depositRequired     Boolean' },
     mustDisclose: true,
-    exposedIn: {
-      file: 'api/src/app/api/v1/restaurants/[slug]/route.ts',
-      key: 'deposit_required',
-    },
+    exposedIn: [
+      { file: 'api/src/app/api/v1/restaurants/route.ts', key: 'deposit_required' },
+      { file: 'api/src/app/api/v1/restaurants/[slug]/route.ts', key: 'deposit_required' },
+    ],
     readers: [
       'app/api/v1/restaurant/cancellation-policy/route.ts',
       'app/api/v1/restaurants/route.ts',
@@ -123,10 +124,10 @@ const INVENTORY = [
     kind: 'اعتبار',
     anchor: { file: 'api/prisma/schema.prisma', needle: 'freeCancelHours     Int' },
     mustDisclose: true,
-    exposedIn: {
-      file: 'api/src/app/api/v1/restaurants/[slug]/route.ts',
-      key: 'free_cancel_hours',
-    },
+    exposedIn: [
+      { file: 'api/src/app/api/v1/restaurants/route.ts', key: 'free_cancel_hours' },
+      { file: 'api/src/app/api/v1/restaurants/[slug]/route.ts', key: 'free_cancel_hours' },
+    ],
     readers: [
       'app/api/v1/me/reservations/route.ts',
       'app/api/v1/restaurant/cancellation-policy/route.ts',
@@ -189,6 +190,35 @@ const SRC = new Map(FILES.map((f) => [relative(API_SRC, f).replace(/\\/g, '/'), 
 const schemaText = readFileSync(SCHEMA, 'utf8');
 const readRepo = (p) => (existsSync(join(REPO, p)) ? readFileSync(join(REPO, p), 'utf8') : null);
 
+// ⚠️ **کلید باید در کد باشد، نه در کامنت** — و این را با یک شکستِ واقعیِ
+// خودم یاد گرفتم (۲۰۲۶-۰۹-۱۰، همان روزِ نوشتنِ گارد).
+//
+// نسخه‌ی اول `text.includes(key)` بود. وقتی برای اثباتِ ابطال‌پذیری خطِ
+// افشا را از `restaurants/route.ts` برداشتم، گارد **سبز ماند** — چون یک
+// کامنت که خودم چند دقیقه قبل نوشته بودم رشته‌ی
+// `booking_policy.online_payment_enabled` را داشت و `includes` آن را مچ کرد.
+//
+// یعنی گارد از همان آغاز با یک کامنت راضی می‌شد. این عیناً همان
+// «طبقه‌بندِ substring» است که منشور §۳ به‌عنوان یکی از سه گاردِ
+// سبزِ-بی‌اندازه‌گیریِ این مخزن نامش را می‌برد — و اگر چرخه‌ی قرمز را
+// نمی‌دواندم، هرگز پیدا نمی‌شد.
+//
+// روشِ جایگزین عمداً خط‌محور است، نه regexِ حذفِ کامنت: حذفِ `/* */` و `//`
+// با regex روی رشته‌هایی که خودشان `//` دارند خطا می‌کند. اینجا فقط خطوطی
+// که با `//` یا `*` شروع می‌شوند کنار گذاشته می‌شوند، و کلید باید به‌شکلِ
+// یک **کلیدِ آبجکت** (`key:`) در یک خطِ کدِ باقی‌مانده بیاید.
+function exposesKeyInCode(text, key) {
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('//') || line.startsWith('*') || line.startsWith('/*')) continue;
+    const at = line.indexOf(key);
+    if (at === -1) continue;
+    const after = line.slice(at + key.length).trimStart();
+    if (after.startsWith(':')) return true;
+  }
+  return false;
+}
+
 const failures = [];
 const notes = [];
 
@@ -209,18 +239,39 @@ for (const item of INVENTORY) {
   }
 
   // ── ب) شرطِ C1: enforced ⇒ exposed ─────────────────────────────────
+  // ⚠️ افشا **یک محل نیست** — و این را با یک اشتباهِ واقعیِ خودم یاد گرفتم
+  // (۲۰۲۶-۰۹-۱۰). نسخه‌ی اولِ این گارد فقط endpointِ **جزئیات** را پین
+  // می‌کرد و سبز بود. ولی کامنتِ خودِ `restaurants/route.ts:57-59` یک
+  // واقعیتِ سنجیده‌شده را ثبت کرده: **اپِ مشتری هرگز `/restaurants/{slug}`
+  // را صدا نمی‌زند** (grepِ کاملِ apps/customer: صفر) — کلِ آرایه‌ی R از
+  // endpointِ فهرست ساخته می‌شود.
+  //
+  // یعنی فیلد «افشا شده» بود و به هیچ مشتری‌ای نمی‌رسید، و گارد آن را
+  // تأیید می‌کرد. **سبزِ صوری، از دستِ همان کسی که گارد را نوشت.**
+  // مهندسِ لانچ (`rezv-a0`) با یک سؤال پیدایش کرد، نه با یک تست.
+  //
+  // پس از این به بعد: هر مسیرِ روبه‌مشتری که قرارداد را می‌سازد باید
+  // کلید را داشته باشد. `restaurants/route.ts` خودش این قرارداد را
+  // «یک شکل، دو مسیر» می‌نامد؛ افشا در یکی و نبودن در دیگری همان
+  // شکافی است که این حلقه می‌بندد.
   if (item.mustDisclose) {
-    if (!item.exposedIn) bail(`«${item.id}» افشا لازم دارد ولی exposedIn ندارد — سیاهه ناسازگار است`);
-    const exposedText = readRepo(item.exposedIn.file);
-    if (exposedText === null) bail(`فایلِ افشای «${item.id}» نیست: ${item.exposedIn.file}`);
-    if (!exposedText.includes(item.exposedIn.key)) {
-      failures.push(
-        `✗ نقضِ C1 — «${item.id}» (${item.kind}) کسر را تعیین می‌کند ولی به مشتری داده نمی‌شود.\n` +
-        `    کلیدِ «${item.exposedIn.key}» در ${item.exposedIn.file} نیست.\n` +
-        `    چرا مهم است: ${item.why}\n` +
-        `    رفع: کلید را به همان payload برگردان. اگر عمداً برداشتی، یعنی ادعای\n` +
-        `    §۱ پوزیشنینگ دیگر راست نیست — آن‌وقت **ادعا** باید برداشته شود، نه این گارد.`,
-      );
+    if (!Array.isArray(item.exposedIn) || item.exposedIn.length === 0) {
+      bail(`«${item.id}» افشا لازم دارد ولی exposedIn خالی است — سیاهه ناسازگار است`);
+    }
+    for (const site of item.exposedIn) {
+      const exposedText = readRepo(site.file);
+      if (exposedText === null) bail(`فایلِ افشای «${item.id}» نیست: ${site.file}`);
+      if (!exposesKeyInCode(exposedText, site.key)) {
+        failures.push(
+          `✗ نقضِ C1 — «${item.id}» (${item.kind}) کسر را تعیین می‌کند ولی در این مسیرِ روبه‌مشتری نیست.\n` +
+          `    کلیدِ «${site.key}» در ${site.file} نیست.\n` +
+          `    ⚠️ اگر در مسیرِ دیگری هست، کافی نیست: اپِ مشتری فقط از endpointِ\n` +
+          `    **فهرست** می‌خواند، پس افشا در جزئیات به هیچ‌کس نمی‌رسد.\n` +
+          `    چرا مهم است: ${item.why}\n` +
+          `    رفع: کلید را به همان payload برگردان. اگر عمداً برداشتی، یعنی ادعای\n` +
+          `    §۱ پوزیشنینگ دیگر راست نیست — آن‌وقت **ادعا** باید برداشته شود، نه این گارد.`,
+        );
+      }
     }
   }
 
