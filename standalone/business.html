@@ -1598,12 +1598,30 @@ img{display:block;max-width:100%}
   font-size: var(--fs-md);
   min-height: var(--touch-min);
   border-radius: var(--radius-md);
-  transition: transform var(--motion-fast) var(--ease-out),
+  /* DS-006 §۴ (۲۰۲۶-۰۹-۱۰): فشارِ دکمه با فنر، نه با ease-out.
+     الگویِ برداشته‌شده: بازخوردِ لمسیِ دکمه در iOS/Instagram — فروترفتنِ
+     محسوس هنگامِ فشار و برگشتِ فنری با کمی overshoot هنگامِ رهاکردن. چرا
+     این و نه چیزِ دیگر: تنها حرکتی است که در هر ضربه‌ی کاربر تکرار می‌شود،
+     پس بیشترین اثر بر «حسِ خوب» را با کمترین سطحِ تغییر دارد.
+     مدت دست‌نخورده (130ms = بازه‌ی short/utility در M3: 50–200ms). فقط منحنیِ
+     transform فنری شد؛ رنگ/سایه/شفافیت همان ease-out می‌مانند تا فنر روی
+     چیزی جز هندسه اعمال نشود.
+     reduced-motion: سیاستِ سراسریِ tokens.css:187 مدت را 0.01ms می‌کند (فنر
+     حذف می‌شود). ⚠️ ولی app.css:534 که می‌خواست transform را هم خنثی کند،
+     زیرِ همین فایل می‌بازد — چون ds-bridge آخر لود می‌شود و `.btn:active`
+     اینجا با همان specificity دیرتر می‌آید. اندازه‌گیری (DS-006 §۴) نشان داد
+     دکمه در reduced-motion هنوز ۴٪ جمع می‌شد، بی‌حرکت ولی جمع. پس نیتِ
+     app.css:534 اینجا، در لایه‌ای که واقعاً برنده است، تکرار می‌شود (پایین). */
+  transition: transform var(--motion-fast) var(--ease-spring),
               background var(--motion-fast) var(--ease-out),
               box-shadow var(--motion-fast) var(--ease-out),
               opacity var(--motion-fast) var(--ease-out);
 }
-.btn:active { transform: scale(.98); }
+.btn:active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) {
+  /* بازخوردِ فشار فقط از رنگ/سایه می‌آید؛ هیچ تغییرِ هندسه‌ای، حتی آنی. */
+  .btn:active { transform: none; }
+}
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 /* ۳۶px زیرِ حداقلِ ۴۴px هر دو پلتفرم بود (WCAG 2.5.5). «کوچک» به عرض و وزنِ
    بصری برمی‌گردد، نه به کوچک‌کردنِ ناحیه‌ی لمس. */
