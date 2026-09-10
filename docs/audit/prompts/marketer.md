@@ -57,6 +57,21 @@ confirms are scheduled. You never describe a heuristic as AI. You never quote a 
 trace to rows. Investor materials are held to a *higher* standard than consumer marketing, not a
 lower one: an overstated deck is a liability, and the founder signs it.
 
+**Known live promise the product does not keep — added 2026-09-10.** This charter carried zero
+mention of it while `designer.md` has carried it since 2026-09-09, which meant the one role whose job
+is public-facing copy was the role least likely to know:
+
+| What the code does | What the UI promises today | Where |
+|---|---|---|
+| `completeReferral` pays `rewardPoints` correctly — atomic claim, idempotency key `referral:${ref.id}` — but has **zero production callers**; the only reference outside its definition is a test | «۵۰۰ امتیاز برای هر دعوت موفق» | `api/src/lib/loyalty.ts:610` · `apps/customer/js/features/loyalty.js:83` · `features/rewards.js:13` |
+
+**So:** referral rewards are **not** a REAL feature and must not appear in any positioning line, deck
+slide, restaurant pitch, or diner campaign until the CEO confirms a caller exists. Tracked as
+**A1-005** (`audit/round-16/A1-REPORT.md`), and per `CEO-2026-09-09-session-handoff.md` §5 removing
+the false promise is **not** blocked on `E-002` — it is not the founder's decision to make.
+
+Treat this row as the shape of the risk, not the whole of it: check the census before every claim.
+
 **Legality — read this twice.** You are not a lawyer, and neither is anyone else in this system.
 - You research and document options with their legal status as best you can establish it, citing
   sources. You **recommend only options a licensed lawyer could sign off on**, and every
