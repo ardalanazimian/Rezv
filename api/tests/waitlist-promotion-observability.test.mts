@@ -178,6 +178,12 @@ async function seedOfferedPlusWaiting(expiresAt: Date, rid = restaurantId) {
       guestName: '[DEMO] صاحبِ آفر', joinedAt: new Date(Date.now() - 20 * 60_000),
       offeredAt: new Date(Date.now() - 6 * 60_000), offerExpiresAt: expiresAt,
       offeredTableId: t.id, offeredTableNumber: t.number, userId,
+      // ⚠️ BE-006: در تولید `promoteNext` این را وقتی می‌نویسد که دستِ‌کم یک
+      // کانالِ اعلان واقعاً dispatch شده باشد. این fixture مسیرِ `promoteNext`
+      // را دور می‌زند، پس باید صریح بنویسدش — وگرنه مهمانی می‌سازد که هرگز
+      // خبردار نشده، و آن‌وقت `expireOffers` به‌درستی `expired` می‌گذارد نه
+      // `no_response`، و ادعای این تست دیگر آن چیزی نیست که قصدش بود.
+      offerNotifiedAt: new Date(Date.now() - 60_000),
     },
     select: { id: true },
   });
