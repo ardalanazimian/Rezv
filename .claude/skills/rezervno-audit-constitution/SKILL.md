@@ -260,6 +260,35 @@ backend half landing alone would have turned the check green while the app kept 
 opposite. Ruling: the two halves reach `main` together or neither does. State in the guard's own
 output — and in `ci.yml`, where the green is actually printed — what its green does **not** mean.
 
+## 4e. Where a mutant survives, CI is scenery — promoted 2026-09-10
+
+**A surviving mutant converts "the tests are green" into "the tests are not watching."** Earlier
+mutation work on `waitlist.ts` established that deleting the expiry condition from `expireOffers`
+turns **no test red**. That fact outlives whatever bug is being fixed there today: any change to that
+function passes CI for a structural reason, not a safe one.
+
+Two consequences, and the second is the one teams skip:
+
+- **A second reader is the substitute for the absent guard.** When a proposed fix lands in a region
+  with a known surviving mutant, hold it for review. This is not caution about the author; it is that
+  the normal safety net has been *measured* to be missing, so the usual reason to trust green is gone.
+- **The surviving mutant is its own row, not a subtask of the bug.** Fix the bug and the hole remains,
+  in the same place, ready to hide the next defect. And usually the test that kills the mutant is the
+  same test that would have caught the bug — which is why it is cheaper than it looks.
+
+**The instance that proved it, and it is a better warning than the rule.** The fix under review would
+have swept rows in state `accepted` with no `reservationCode`, keyed on the offer's expiry. The
+reviewer found that this is not only the stuck state — it is **the normal transient state of every
+successful acceptance**, in the window between the claim (`waitlist.ts:676`, sets `status` and
+`respondedAt`) and the code write (`:722`), which spans a `createReservation` with a 10s transaction
+timeout. A guest accepting one second before TTL while the sweep fires mid-transaction would have had
+their table freed *while the reservation for it was being created* — **a double-booking defect
+arriving inside a data-quality fix**, in a region where no test would have gone red.
+
+The general shape to look for before widening any sweep: **is the state you are about to call "stuck"
+distinguishable from a state the happy path passes through?** If the only difference is time, key on
+dwell time — not on some other clock that happens to be nearby.
+
 ## 5. Every shipped artifact needs a CI job that actually builds it
 
 What is not built is broken and nobody knows. A `postinstall: prisma generate` hook broke
