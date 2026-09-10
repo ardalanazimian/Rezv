@@ -15,7 +15,7 @@
 // ═══════════════════════════════════════════════════════════
 import { toast } from './auth.js';
 import { go } from './data/discover.js';
-import { R_SAMPLE } from './data/seed.js';
+import { R_SAMPLE, normalizeMenuEntry } from './data/seed.js';
 import { R } from './init.js';
 import { httpJson, refreshAccessToken, resolveApiBase } from './api-core.js';
 // آدرسِ پایه‌ی API — قابلِ تنظیم بدونِ build:
@@ -478,12 +478,12 @@ export function applyRestaurantDetail(r, d){
  * این نرمال‌ساز آن را به همان شیءِ بالا تبدیل می‌کند تا رندررها فقط یک شکل
  * بشناسند. شیء را دست‌نخورده عبور می‌دهد.
  */
-export function normalizeMenuEntry(m){
-  if (Array.isArray(m)) {
-    return { id: null, e: m[0] || '🍽️', n: m[1], p: m[2], img: m[3] || null, d: null, catId: null, out: false, tags: [] };
-  }
-  return m;
-}
+// ⚠️ [DS-006 §۴ · ۲۰۲۶-۰۹-۱۰] تعریف به `data/seed.js` منتقل شد و از آنجا
+// import می‌شود. دلیل: مسیرِ **نمونه** هرگز از این‌جا رد نمی‌شد (نه
+// `init.js:12` و نه بازگشتِ آفلاینِ `loadRestaurants`)، پس آیتم‌های نمونه
+// آرایه‌ی خام می‌ماندند و `menuItemHTML` سه‌تا undefined می‌گرفت. نرمال‌سازی
+// حالا در مرزِ seed→R انجام می‌شود؛ این‌جا **همان** تابع مصرف می‌شود، نه یک
+// کپیِ دوم — وگرنه دو شکل از یک قرارداد داشتیم و همین نقص برمی‌گشت.
 
 // ═══════════ DATA ═══════════
 

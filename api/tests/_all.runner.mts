@@ -219,6 +219,8 @@ import './manual-date-tz-parity.test.mts';
 import './referral-promise-honesty.test.mts';
 import './booking-confirmation-honesty.test.mts';
 import './deposit-label-honesty.test.mts';
+import './preorder-step-availability.test.mts';
+import './sample-menu-shape.test.mts';
 import './db-pool-exhaustion-contract.test.mts';
 import './ratelimit-transient-redis-error.test.mts';
 import './otp-request-window-postgres.test.mts';
