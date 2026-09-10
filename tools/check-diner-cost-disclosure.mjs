@@ -207,14 +207,59 @@ const readRepo = (p) => (existsSync(join(REPO, p)) ? readFileSync(join(REPO, p),
 // با regex روی رشته‌هایی که خودشان `//` دارند خطا می‌کند. اینجا فقط خطوطی
 // که با `//` یا `*` شروع می‌شوند کنار گذاشته می‌شوند، و کلید باید به‌شکلِ
 // یک **کلیدِ آبجکت** (`key:`) در یک خطِ کدِ باقی‌مانده بیاید.
-function exposesKeyInCode(text, key) {
+// ⚠️ **نسخه‌ی دوم — و حفره‌ی اولش را یک همتا پیدا کرد، نه من.**
+//
+// نسخه‌ی اول فقط خطی را رد می‌کرد که **با** `//` شروع شود. یعنی یک کامنتِ
+// انتهای خط از فیلتر رد می‌شد:
+//
+//     reviews_count: total, // online_payment_enabled: عمداً برداشته شد
+//
+// با همین یک خط، افشای واقعی برداشته می‌شد و گارد **سبز می‌ماند**. اثباتش
+// اجرا شد (۲۰۲۶-۰۹-۱۰): افشا حذف، کامنت کاشته، `EXIT=0`.
+//
+// `rezv-a0 [e6c5ba]` همان روز عیناً همین کلاس را در `check-loyalty-constant-binding`
+// پیدا کرد، در جهتِ **معکوس**: ادعایی که از UI حذف شده ولی در کامنتی نقل
+// شده بود، لنگرِ آن گارد را سبز نگه می‌داشت. دو گارد، دو جهت، یک ریشه:
+// **کامنت می‌تواند گارد را خلع‌سلاح کند.**
+//
+// ⚠️ و `//`ِ وسطِ خط عمداً وقتی کامنت شمرده می‌شود که **پیش از آن `:` نباشد**
+// — وگرنه `https://…` از همان‌جا بریده می‌شود و هرچه بعدش بیاید از دید
+// می‌افتد. این را هم `rezv-a0` روی گاردِ خودش اندازه گرفت، پیش از آنکه من
+// همین اشتباه را بکنم.
+//
+// شماره‌ی خط لازم نیست حفظ شود (این تابع فقط بله/خیر می‌دهد)، ولی خطوط
+// جداگانه می‌مانند تا یک کلید که در کامنتِ یک خط و کدِ خطِ دیگری است قاطی نشود.
+function codeOnly(text) {
+  const out = [];
+  let inBlock = false;
   for (const raw of text.split('\n')) {
-    const line = raw.trim();
-    if (line.startsWith('//') || line.startsWith('*') || line.startsWith('/*')) continue;
+    let s = raw;
+    if (inBlock) {
+      const end = s.indexOf('*/');
+      if (end === -1) { out.push(''); continue; }
+      s = s.slice(end + 2);
+      inBlock = false;
+    }
+    for (;;) {
+      const a = s.indexOf('/*');
+      if (a === -1) break;
+      const b = s.indexOf('*/', a + 2);
+      if (b === -1) { s = s.slice(0, a); inBlock = true; break; }
+      s = s.slice(0, a) + ' ' + s.slice(b + 2);
+    }
+    for (let j = 0; j + 1 < s.length; j++) {
+      if (s[j] === '/' && s[j + 1] === '/' && s[j - 1] !== ':') { s = s.slice(0, j); break; }
+    }
+    out.push(s);
+  }
+  return out;
+}
+
+function exposesKeyInCode(text, key) {
+  for (const line of codeOnly(text)) {
     const at = line.indexOf(key);
     if (at === -1) continue;
-    const after = line.slice(at + key.length).trimStart();
-    if (after.startsWith(':')) return true;
+    if (line.slice(at + key.length).trimStart().startsWith(':')) return true;
   }
   return false;
 }
