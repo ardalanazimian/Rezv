@@ -4,6 +4,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, dirname, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  بسته‌ی standalone باید هر ماژولی را که اپِ کاستومر import می‌کند داشته باشد
@@ -34,14 +35,36 @@ const ROOT = new URL('../../', import.meta.url);
 const BUILDER = fileURLToPath(new URL('tools/build-standalone.py', ROOT));
 const CUSTOMER_JS = fileURLToPath(new URL('apps/customer/js/', ROOT));
 
-/** ورودی‌های CUSTOMER_ORDER از خودِ اسکریپتِ ساخت — نه یک رونوشتِ دستی. */
+/**
+ * فهرستِ واقعیِ ماژول‌های باندل — **از خودِ برنامه پرسیده می‌شود**، نه از
+ * متنش خوانده.
+ *
+ * ⚠️ FG-12 (یافته‌ی رد تیم، ۲۰۲۶-۰۹-۱۰) — نسخه‌ی قبلی متنِ
+ * `build-standalone.py` را regex می‌زد، و یک **کامنت** می‌توانست ماژولی را
+ * در چشمِ این گارد ثبت کند بدونِ آنکه در باندل باشد. خودم بازتولیدش کردم:
+ *
+ *     حذفِ `'js/api-errors.js'` از فهرست        →  exit 1  (گارد کار می‌کرد)
+ *     همان حذف + کامنتی که نامش را ببرد         →  exit 0  ← **خلع‌سلاح**
+ *
+ * و ماژولی که خلع‌سلاحش می‌کرد همانی است که نبودنش دیروز یک
+ * `ReferenceError`ِ زنده در باندلِ آفلاین ساخت (`FIX-STANDALONE-BUNDLE-REGRESSION`).
+ *
+ * ⚠️ چرا `--print-order` و نه «آن کامنت را پاک کن»: پاک‌کردنِ کامنت فقط
+ * **نمونه** را می‌بست. پرسیدن از برنامه **کلاس** را می‌بندد — کامنت،
+ * کوتیشنِ تک/دوگانه، فهرستِ چندخطی و هر شکلِ دیگرِ نوشتن از قرارداد بیرون
+ * می‌روند. گارد حالا همان مقداری را می‌بیند که باندل واقعاً از آن ساخته
+ * می‌شود.
+ */
 function customerOrder(): string[] {
-  const src = readFileSync(BUILDER, 'utf8');
-  const start = src.indexOf('CUSTOMER_ORDER = [');
-  assert.notEqual(start, -1, 'CUSTOMER_ORDER در build-standalone.py پیدا نشد — نامش عوض شده؟');
-  const end = src.indexOf(']', start);
-  const block = src.slice(start, end);
-  return [...block.matchAll(/'([^']+\.js)'/g)].map((m) => m[1]);
+  const r = spawnSync('python', [BUILDER, '--print-order'], { encoding: 'utf8' });
+  // ⚠️ کدِ خروج **خوانده** می‌شود. اگر اسکریپت بترکد، فهرستِ خالی برمی‌گشت و
+  // این گارد «هیچ ماژولی گم نیست» می‌گفت — یعنی سبزی که نمی‌تواند بیفتد.
+  assert.equal(r.status, 0,
+    `build-standalone.py --print-order شکست خورد (${r.status}): ${r.stderr || r.stdout}`);
+  const list = r.stdout.split('\n').map((l) => l.trim()).filter((l) => l.endsWith('.js'));
+  assert.ok(list.length > 10,
+    `فقط ${list.length} ماژول برگشت — روشِ پرسیدن شکسته است، نه اینکه باندل خالی باشد`);
+  return list;
 }
 
 function walkJs(dir: string): string[] {

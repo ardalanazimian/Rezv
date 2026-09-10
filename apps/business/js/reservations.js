@@ -247,17 +247,64 @@ function buildDateOptions(){
  * تنها منبعِ تاریخ برای رزروِ دستی. هم برچسبِ گزینه و هم مقداری که POST می‌شود
  * از همین می‌آیند — به همین دلیل نمی‌توانند از هم بیفتند.
  */
+/**
+ * تایم‌زونِ رستوران. پنل از قبل لودش می‌کند (`crm.js:797` → `HOURS_STATE`)،
+ * پس هیچ درخواستِ تازه‌ای لازم نیست — فقط کسی وصلش نکرده بود.
+ */
+function manualTz(){
+  return (typeof HOURS_STATE !== 'undefined' && HOURS_STATE && HOURS_STATE.timezone)
+    || 'Asia/Tehran';
+}
+
+/**
+ * تنها منبعِ تاریخ برای رزروِ دستی. هم برچسبِ گزینه و هم مقداری که POST می‌شود
+ * از همین می‌آیند — به همین دلیل نمی‌توانند از هم بیفتند.
+ *
+ * ⚠️ رفعِ دستورِ ۰۴۵ (یافته‌ی بازبین، ۲۰۲۶-۰۹-۱۰): تا پیش از این، «امروز» از
+ * **ساعتِ دستگاهِ پرسنل** می‌آمد (`new Date()` + اجزای محلی + برچسبِ بدونِ
+ * `timeZone`). تبلتی که روی UTC مانده — خیلی محتمل‌تر از کشورِ دوم — ساعتِ
+ * ۰۲:۳۰ تهران را «دیروز» می‌دید و رزروِ تلفنی یک روز غلط ثبت می‌شد.
+ *
+ * ⚠️ و نکته‌ی تیزِ ماجرا: رفعِ قبلی (B-01) **درست** بود — دو محاسبه‌ی یک
+ * واقعیت را به یک منبع رساند — ولی آن یک منبع ساعتِ دستگاه بود. پس برچسب و
+ * مقدار از «واگرا و دیدنی» به **«هم‌خوان و هر دو غلط»** رفتند. توافق شبیهِ
+ * درستی خوانده می‌شود؛ این بدتر از اختلاف است.
+ *
+ * ⚠️ قاعده همان قاعده‌ی سرور است، نه پیاده‌سازیِ دوم: `hours.ts:63-81`
+ * (`dateInTz`/`dateKeyInTz`) روزِ تقویمیِ محلی را با `Intl` و `timeZone`
+ * می‌گیرد. `api/tests/manual-date-tz-parity.test.mts` برابریِ این دو را روی
+ * تایم‌زون‌ها و لحظه‌های مرزی **اثبات** می‌کند — چون کدِ سرور قابلِ import
+ * در پنلِ مرورگر نیست، تنها راهِ «یک قاعده» اثباتِ برابری است.
+ *
+ * لنگر عمداً **ظهرِ UTC** است: روزِ تقویمیِ رستوران را نگه می‌دارد و با
+ * جابه‌جاییِ ساعتِ تابستانی هم از مرزِ روز رد نمی‌شود.
+ */
 function manualDateFor(dateVal){
   let offset=0;
   if(dateVal==='tomorrow')offset=1;
   else if(/^d\d+$/.test(dateVal))offset=parseInt(dateVal.slice(1))||0;
-  const t=new Date(); t.setDate(t.getDate()+offset);
+  const dtf=new Intl.DateTimeFormat('en-CA',{
+    timeZone:manualTz(), year:'numeric', month:'2-digit', day:'2-digit',
+  });
+  const parts={};
+  for(const p of dtf.formatToParts(new Date())) parts[p.type]=p.value;
+  const t=new Date(Date.UTC(+parts.year, +parts.month-1, +parts.day, 12, 0, 0));
+  t.setUTCDate(t.getUTCDate()+offset);
   return t;
 }
 
-/** برچسبِ فارسیِ همان تاریخ — با تقویمِ جلالیِ خودِ محیط، نه حسابِ دستی. */
+/**
+ * برچسبِ فارسیِ همان تاریخ — با تقویمِ جلالیِ خودِ محیط، نه حسابِ دستی.
+ *
+ * ⚠️ `timeZone:'UTC'` عمدی است و تبدیلِ دوباره نیست: `manualDateFor` تاریخ را
+ * روی ظهرِ UTC لنگر می‌اندازد تا **همان روزِ تقویمیِ رستوران** را نمایندگی کند.
+ * پس خواندنش در UTC همان روز را می‌دهد. بدونِ این گزینه، مرورگر دوباره به
+ * تایم‌زونِ دستگاه می‌برد و همان نقص از درِ دیگر برمی‌گشت.
+ */
 function manualDateLabel(dateVal){
-  return manualDateFor(dateVal).toLocaleDateString('fa-IR',{weekday:'long',day:'numeric',month:'long'});
+  return manualDateFor(dateVal).toLocaleDateString('fa-IR',{
+    timeZone:'UTC', weekday:'long', day:'numeric', month:'long',
+  });
 }
 // تبدیل مقدار تاریخ پنل (today/tomorrow/dN) و ساعت فارسی به فرمت ISO که بک‌اند می‌خواهد
 function manualDateToISO(dateVal, faTime){
@@ -265,7 +312,12 @@ function manualDateToISO(dateVal, faTime){
   // که برچسبِ گزینه هم از آن ساخته شده. دو محاسبه‌ی جدا دقیقاً همان چیزی بود که
   // برچسب و مقدار را از هم انداخت.
   const t=manualDateFor(dateVal);
-  const iso=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  // ⚠️ اجزای **UTC** خوانده می‌شوند، نه محلی — به همان دلیلِ `timeZone:'UTC'`
+  // در برچسب: لنگرِ ظهرِ UTC نماینده‌ی روزِ تقویمیِ رستوران است. با
+  // `getFullYear()`ِ محلی، همان باگِ ساعتِ دستگاه از مسیرِ مقدار برمی‌گشت —
+  // این‌بار بی‌صدا، چون برچسب درست می‌ماند و **فقط چیزی که POST می‌شود** غلط
+  // می‌شد. یعنی دقیقاً وارونه‌ی نقصِ اولیه و سخت‌تر برای دیدن.
+  const iso=t.getUTCFullYear()+'-'+String(t.getUTCMonth()+1).padStart(2,'0')+'-'+String(t.getUTCDate()).padStart(2,'0');
   const time=String(faTime||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).trim()||'20:00';
   return {date:iso,time};
 }
