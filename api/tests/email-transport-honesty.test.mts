@@ -69,7 +69,9 @@ function installHooks() {
     globalThis.fetch = savedFetch;
     for (const k of ENV_KEYS) {
       if (saved[k] === undefined) delete process.env[k];
-      else process.env[k] = saved[k]!;
+      else Object.defineProperty(process.env, k, {
+        value: saved[k]!, writable: true, configurable: true, enumerable: true,
+      });
     }
   });
 }

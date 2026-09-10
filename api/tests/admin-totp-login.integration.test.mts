@@ -36,6 +36,7 @@ const STAFF_PASS = 'Str0ng-Staff-Pass!';
 const SECRET = new Secret({ size: 20 }).base32;
 
 let platformTenantId = '';
+const createdStaffIds: string[] = [];
 let bizTenantId = '';
 const saved: Record<string, string | undefined> = {};
 
@@ -81,20 +82,22 @@ describe('ورودِ سه‌عاملیِ مدیرِ پلتفرم (رمز + TOTP)
     const pt = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-plat` }, select: { id: true } });
     platformTenantId = pt.id;
     process.env.PLATFORM_ADMIN_TENANT_ID = pt.id;
-    await db.staff.create({ data: {
+    const adminStaff = await db.staff.create({ data: {
       tenantId: pt.id, phone: fixturePhone('0951'), name: '[DEMO] مدیرِ پلتفرم',
       role: 'owner', isActive: true, username: ADMIN_USER,
       passwordHash: await hashPassword(ADMIN_PASS), passwordUpdatedAt: new Date(),
-    } });
+    }, select: { id: true } });
+    createdStaffIds.push(adminStaff.id);
 
     // کارمندِ عادیِ یک کسب‌وکارِ دیگر — برای اثباتِ «مجوز جدا از احراز».
     const bt = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-biz` }, select: { id: true } });
     bizTenantId = bt.id;
-    await db.staff.create({ data: {
+    const bizStaff = await db.staff.create({ data: {
       tenantId: bt.id, phone: fixturePhone('0952'), name: '[DEMO] کارمند',
       role: 'owner', isActive: true, username: STAFF_USER,
       passwordHash: await hashPassword(STAFF_PASS), passwordUpdatedAt: new Date(),
-    } });
+    }, select: { id: true } });
+    createdStaffIds.push(bizStaff.id);
   });
 
   beforeEach(async () => {
@@ -109,7 +112,12 @@ describe('ورودِ سه‌عاملیِ مدیرِ پلتفرم (رمز + TOTP)
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
     }
     await clearBuckets();
-    await db.auditLog.deleteMany({ where: { tenantId: { in: [platformTenantId, bizTenantId] } } }).catch(() => {});
+    // ⚠️ AuditLog هیچ ستونِ tenantId ندارد (schema.prisma) — فیلترِ قبلی روی
+    // `tenantId` در زمانِ اجرا خطا می‌داد و `.catch(() => {})` می‌بلعیدش، پس این
+    // پاک‌سازی **هیچ‌وقت هیچ ردیفی را پاک نکرد**. حالا با actorId که واقعاً وجود
+    // دارد اسکوپ می‌شود. رزیجوآل: ردیف‌های `auth.failure` اصلاً actorId ندارند
+    // (route:101) و همچنان پاک نمی‌شوند — رجوع کن به گزارشِ ORDER-005.
+    await db.auditLog.deleteMany({ where: { actorId: { in: createdStaffIds } } }).catch(() => {});
     await db.staff.deleteMany({ where: { tenantId: { in: [platformTenantId, bizTenantId] } } });
     await db.tenant.deleteMany({ where: { id: { in: [platformTenantId, bizTenantId] } } });
     await db.$disconnect();

@@ -87,13 +87,19 @@ export interface AskResult {
   suggestions: { intent: AssistantIntent; label: string }[];
 }
 
-/** پرسیدنِ یک سؤالِ آزادمتن — طبقه‌بندی + (اگر مطمئن بودیم) پاسخِ واقعی. */
+/**
+ * پرسیدنِ یک سؤالِ آزادمتن — طبقه‌بندی + (اگر مطمئن بودیم) پاسخِ واقعی.
+ * `timezone` (رفعِ T2) به `generateAnswer` می‌رسد تا «امروز/فردا» به وقتِ
+ * رستوران باشد، نه سرور. اختیاری با پیش‌فرضِ schema.prisma («Asia/Tehran»)
+ * تا صدازننده‌های قدیمی/تستی که این فیلد را نمی‌دهند نشکنند.
+ */
 export async function askAssistant(opts: {
   restaurantId: string;
   staffId?: string | null;
   question: string;
+  timezone: string;
 }): Promise<AskResult> {
-  const { restaurantId, staffId, question } = opts;
+  const { restaurantId, staffId, question, timezone } = opts;
   const tokens = tokenize(question);
   const vocab = await loadLearnedVocab(restaurantId);
   const result = classify(tokens, vocab);
@@ -110,7 +116,7 @@ export async function askAssistant(opts: {
       .slice(0, 3)
       .map((r) => ({ intent: r.intent, label: INTENT_LABELS[r.intent] }));
   } else {
-    answer = await generateAnswer(result.intent, restaurantId, exampleQuestions());
+    answer = await generateAnswer(result.intent, restaurantId, exampleQuestions(), timezone);
   }
 
   const log = await db.restaurantAssistantLog.create({
@@ -144,8 +150,10 @@ export async function teachAssistant(opts: {
   correctIntent: string;
   /** کارمندی که اصلاح را ثبت می‌کند (ممکن است با پرسنده فرق کند). */
   staffId?: string | null;
+  /** رفعِ T2 — رجوع کن به askAssistant. */
+  timezone: string;
 }): Promise<{ answer: string; intent: AssistantIntent }> {
-  const { restaurantId, logId, correctIntent, staffId } = opts;
+  const { restaurantId, logId, correctIntent, staffId, timezone } = opts;
   if (!isAssistantIntent(correctIntent)) throw Err.validation('نیتِ نامعتبر');
 
   const log = await db.restaurantAssistantLog.findUnique({ where: { id: logId } });
@@ -200,7 +208,7 @@ export async function teachAssistant(opts: {
     detectedIntent: log.detectedIntent, tokens: tokens.length,
   });
 
-  const answer = await generateAnswer(correctIntent, restaurantId, exampleQuestions());
+  const answer = await generateAnswer(correctIntent, restaurantId, exampleQuestions(), timezone);
   return { answer, intent: correctIntent };
 }
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { fixturePhone } from './_phone.helper.mts';
 // [پورتِ ادغام ۲۰۲۶-۰۸-۲۶] ارائه‌دهنده به ملی‌پیامک مهاجرت کرد؛ «کلیدِ ترانسپورت» حالا سه متغیر است.
 const MELI_KEYS = ['MELIPAYAMAK_USERNAME','MELIPAYAMAK_PASSWORD','MELIPAYAMAK_BODYID_OTP','MELIPAYAMAK_BODYID_CAMPAIGN'];
-const setSmsTransport = (on) => { for (const k of MELI_KEYS) { if (on) process.env[k] = k.endsWith('OTP') ? '12345' : 'x'; else delete process.env[k]; } };
+const setSmsTransport = (on: boolean) => { for (const k of MELI_KEYS) { if (on) process.env[k] = k.endsWith('OTP') ? '12345' : 'x'; else delete process.env[k]; } };
 
 process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
@@ -50,6 +50,15 @@ function newPhone(prefix: string): string {
 }
 
 const ENV = ['BREAK_GLASS_PHONE', 'BREAK_GLASS_CODE', 'NODE_ENV', ...MELI_KEYS] as const;
+// NODE_ENV is `readonly` per Next's global augmentation (next/types/global.d.ts:23)
+// — a rule for app code. Tests must set it. `Object.defineProperty` performs the
+// same mutation and needs no cast, so no `as any` / `@ts-ignore`.
+const setNodeEnv = (v: string): void => {
+  Object.defineProperty(process.env, 'NODE_ENV', {
+    value: v, writable: true, configurable: true, enumerable: true,
+  });
+};
+
 let saved: Record<string, string | undefined> = {};
 
 function counterTotal(name: string): number {
@@ -95,7 +104,7 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
     const bg = newPhone('0922');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     setSmsTransport(false);
 
     const before = counterTotal('breakGlassOtp');
@@ -134,9 +143,53 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     setSmsTransport(true);
+
+    // ⚠️ تشخیصِ افزوده‌شده (۲۰۲۶-۰۹-۰۹) — و **ادعا شل نشد.**
+    //
+    // این تست در دو اجرا از هشت افتاد، همیشه با `actual: undefined` یعنی
+    // درخواستِ چهارم اصلاً رد نشد. مکانیزمش را Deputy (`rezv-fa`) قطعی
+    // اثبات کرد، بدونِ بار، با تزریق روی `attempt` (`ratelimit.ts:83`):
+    //
+    //     request 3: allowed=true  remaining=0
+    //     [WARN] rate-limit: Redis در دسترس نیست، fallback به سقفِ in-memory
+    //     request 4: allowed=true  remaining=2   ← سطلِ in-memory از صفر
+    //
+    // `rateLimitWithFallback` در خطای Redis fail-open نمی‌کند، به سقفِ
+    // **in-memory** برمی‌گردد که برای کلیدِ ندیده `{count:1, allowed:true}`
+    // می‌سازد. پس یک خطای گذرا وسطِ پنجره، شمارشِ قبلی را دور می‌ریزد.
+    //
+    // ⚠️ چرا شمارنده با importِ **نسبی** خوانده می‌شود و نه `@/lib/metrics`:
+    // زیرِ tsx آن دو به **دو نمونه‌ی جدا** از ماژول resolve می‌شوند، هر کدام
+    // با Counterها و مقادیرِ خودش. مستقل تأیید شد:
+    //     viaRelative === viaAlias            → false
+    //     counterِ هم‌نام در دو نمونه یکی است؟ → false
+    // یعنی خواندن با alias همیشه صفر می‌دهد و این چک را به گاردی تبدیل
+    // می‌کند که **نمی‌تواند بیفتد**. `metrics` بالای همین فایل (خطِ ۴۰) از
+    // مسیرِ نسبی می‌آید، پس درست است. (تله را Deputy پیدا کرد وقتی
+    // دیاگنوستیکِ پیشنهادیِ خودم ۰→۰ داد در حالی که fallback واقعاً شلیک
+    // کرده بود.)
+    const fbBefore = counterTotal('rateLimitFallback');
     for (let i = 0; i < 3; i++) await requestOtp(bg);
-    await assert.rejects(() => requestOtp(bg), /RATE_LIMITED|بیش از حد/,
-      'درخواستِ چهارم روی همان شماره باید ریت‌لیمیت شود');
+
+    let err: unknown;
+    try { await requestOtp(bg); } catch (e) { err = e; }
+    const fbAfter = counterTotal('rateLimitFallback');
+
+    // پیامِ **متمایز** وقتی سقوط رخ داده: گارد دندانش را نگه می‌دارد (تست
+    // همچنان می‌افتد) ولی معما خودش را توضیح می‌دهد به‌جای «rejection نیامد».
+    // ⚠️ عمداً این را به «اشکالی ندارد، fallback شد» تبدیل نمی‌کنیم — آن
+    // یک گاردِ امنیتی را به راوی تبدیل می‌کند.
+    assert.ok(
+      !(err === undefined && fbAfter > fbBefore),
+      `ریت‌لیمیت به سقفِ in-memory سقوط کرد (rateLimitFallback ${fbBefore}→${fbAfter}) و ` +
+      'شمارشِ سه درخواستِ قبلی از دست رفت، پس درخواستِ چهارم اجازه گرفت. ' +
+      'این اجرا نمی‌تواند اعمالِ محدودیت را اثبات کند — و اینکه آیا این پنجره‌ی ' +
+      'fail-open اصلاً باید وجود داشته باشد، یک تصمیمِ محصولی است (به CEO ارجاع شد).',
+    );
+
+    assert.ok(err !== undefined, 'درخواستِ چهارم روی همان شماره باید ریت‌لیمیت شود');
+    assert.match(String((err as Error)?.message ?? err), /RATE_LIMITED|بیش از حد/,
+      'و باید ریت‌لیمیت باشد، نه هر خطای دیگری');
   });
 });
 
@@ -190,7 +243,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     const other = newPhone('0923');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     setSmsTransport(false);
 
     await assert.rejects(() => requestOtp(other), /پیامک/,

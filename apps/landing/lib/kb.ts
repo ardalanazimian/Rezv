@@ -38,7 +38,13 @@ export async function buildKb(): Promise<KbDoc[]> {
   const [faqs, articles, plans] = await Promise.all([
     getFaqs(),          // بدونِ scope = همه‌ی حوزه‌ها
     getArticles({ limit: 40 }),
-    getPlans(),
+    // `getPlans` در قطعیِ بالادست throw می‌کند تا قیمتِ کهنه جعل نشود.
+    // ولی buildKb از **layoutِ ریشه** صدا زده می‌شود (app/layout.tsx:70)، پس
+    // یک throw اینجا کلِ سایت را پایین می‌آورد — نه فقط صفحه‌ی قیمت.
+    // پاسخِ درست «حذفِ سندِ قیمت» است، نه «قیمتِ کامیت‌شده»: kbFrom پایین‌تر
+    // با `if (plans.length)` گارد دارد، پس دستیار به‌جای عددِ اشتباه اصلاً
+    // به سؤالِ قیمت جواب نمی‌دهد. صفحه‌ی /pricing همچنان بلند اعتراض می‌کند.
+    getPlans().catch(() => [] as Awaited<ReturnType<typeof getPlans>>),
   ]);
 
   let pageSlugs: string[] | undefined;

@@ -24,11 +24,11 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 const { db } = await import('../src/lib/db');
 const { createReservation } = await import('../src/lib/reservations.ts');
 const { fixturePhone } = await import('./_phone.helper.mts');
-const { weekdayInTz } = await import('../src/lib/hours');
+const { weekdayInTz, dateKeyInTz } = await import('../src/lib/hours');
 
 const TAG = `pov-${randomUUID().slice(0, 8)}`;
 // دورِ کافی که با هیچ افقِ رزروی برخورد نکند؛ ۲۰:۰۰ به وقتِ تهران.
-const SLOT_DATE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+const SLOT_DATE = dateKeyInTz(new Date(Date.now() + 30 * 86_400_000), 'Asia/Tehran');
 const SLOT_TIME = '20:00';
 
 async function tryCreate(restaurantId: string, userId: string, preorder: { menuItemId: string; qty: number }[]) {

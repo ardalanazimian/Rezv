@@ -1,7 +1,7 @@
 ---
 name: data-trust-engineer
 description: Use this agent — only after the architect declares recovery-order links 1–7 stable — for protocol §§12–19, verifying badge architecture without breaking existing badges (§12, no blockchain implementation), keeping the loyalty points ledger the single server-authoritative source (§13, no second loyalty system, no frontend-only point mutations), hardening client telemetry as untrusted input (§14, event_id / dedup / trust_level / timestamp validation), AI data-poisoning defenses and trust-tier eligibility (§15), keeping Rezervno's intelligence first-party instead of an external-LLM wrapper (§16), building only the AI data foundation without overbuilding (§17), self-learning safety rails (§18), and minimum isolated simulation architecture (§19).
-model: opus
+model: sonnet
 tools: Read, Grep, Glob, Bash, Edit, Write
 skills:
   - rezervno-audit-constitution

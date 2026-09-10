@@ -2058,6 +2058,303 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function jsq(v){return esc(JSON.stringify(String(v==null?'':v)))}
 
 </script>
+<script data-src="js/rate-limit-ui.js">
+/* ═══════════════════════════════════════════════════════════
+   رزرونو — مکانیزمِ مشترکِ نمایشِ ۴۲۹ (RATE_LIMITED)
+   این فایل منبعِ حقیقت است؛ tools/sync-design-system.sh آن را به اپ‌ها می‌سازد.
+
+   اسپک: docs/audit/design/DS-003-panel-error-vocabulary.md §۴‑۵
+   (نشستِ Designer). اجرا: مهندسِ لانچ.
+
+   ⚠️ **چرا مشترک و نه یک رونوشت در هر پنل:** مرزهای سه سطح (۱۰ و ۱۲۰ ثانیه)
+   و قاعده‌ی «هرگز retryِ خودکار» یک **واقعیتِ واحد**اند. دو رونوشت از یک
+   عدد، همان کلاسی است که این مخزن پنج بار در یک روز پرداختش: نگاشتِ سطحِ
+   وفاداری، `STATUS_META`، `ST_FA`، نگاشتِ مرده‌ی `company`، و پوششِ
+   `details.reason`. عددی که در دو جا زندگی کند، بالاخره واگرا می‌شود.
+
+   ⚠️ **و چرا فقط مکانیزم مشترک است، نه متن:** مخاطبِ هر پنل فرق دارد —
+   پرسنلِ رستوران، مدیرِ پلتفرم، مهمان. پس نگاشتِ `code → متن` مالِ خودِ
+   پنل می‌ماند و این فایل هیچ جمله‌ای درباره‌ی «تو کی هستی» نمی‌گوید.
+   یک مکانیزم، چند واژگان.
+
+   ── قاعده‌ی صفر ──
+   **هرگز retryِ خودکار.** ۴۲۹ یعنی «زیادی زدی»؛ زدنِ خودکار بار را بیشتر
+   می‌کند، پنجره را تمدید می‌کند، و علت را از چشمِ کاربر پنهان.
+   ═══════════════════════════════════════════════════════════ */
+
+// ⚠️ چرا عددِ ثابت درست نیست: بازه‌ی واقعیِ قاعده‌ها ۱ ثانیه تا ۱۵ دقیقه است
+// (`api/src/lib/ratelimit.ts`: `qrCheckin` ۳۰ در دقیقه، ولی `adminTotpLogin`
+// ۵ در **۱۵** دقیقه). مقدار باید از `details.retryAfterSec` بیاید که سرور در
+// `errors.ts:27` می‌فرستد.
+const RATE_LIMIT_BRIEF_SEC = 10;   // ≤ این → «چند لحظه صبر کن»
+const RATE_LIMIT_LOCK_SEC = 120;   // > این → قفلِ امنیتی، نه ترافیک
+
+/** ثانیه‌ی انتظار از پاسخِ سرور — یا `null` اگر نداده. */
+function retryAfterSec(err) {
+  const v = err && err.details && err.details.retryAfterSec;
+  return typeof v === 'number' && v > 0 ? Math.ceil(v) : null;
+}
+
+/**
+ * نقشه‌ی نمایش برای یک ۴۲۹. **داده برمی‌گرداند، نه متن** — قالب‌بندیِ ارقامِ
+ * فارسی با `fa()` در محلِ مصرف می‌ماند تا این فایل نسخه‌ی دومِ `format.js`
+ * نشود.
+ *
+ *   `brief`     — کوتاه یا نامعلوم: دکمه قفل، بدونِ عدد
+ *   `countdown` — ۱۱..۱۲۰ ثانیه: عددِ **زنده**ی کم‌شونده روی دکمه
+ *   `locked`    — >۱۲۰: عددِ ثابتِ دقیقه‌ای، شمارشِ زنده **نه**. شمارنده‌ی
+ *                 ۱۵دقیقه‌ای فقط کاربر را به تماشا وامی‌دارد.
+ */
+function rateLimitPlan(err) {
+  const sec = retryAfterSec(err);
+  // ⚠️ نبودِ عدد → عدد **اختراع نکن**. «چند لحظه» صادق است؛ عددِ حدسی نه.
+  if (sec === null || sec <= RATE_LIMIT_BRIEF_SEC) {
+    return { tier: 'brief', sec: sec, countdown: false, holdSec: sec || RATE_LIMIT_BRIEF_SEC };
+  }
+  if (sec <= RATE_LIMIT_LOCK_SEC) {
+    return { tier: 'countdown', sec: sec, countdown: true, holdSec: sec };
+  }
+  return { tier: 'locked', sec: sec, minutes: Math.ceil(sec / 60), countdown: false, holdSec: sec };
+}
+
+/**
+ * دکمه را تا پایانِ انتظار نگه می‌دارد — و **هرگز خودش درخواست نمی‌زند**.
+ *
+ * ⚠️ شمارنده از عددِ **لحظه‌ی دریافت** می‌شمارد، نه با پرسیدن از سرور.
+ * پرسیدنِ «چقدر مانده؟» خودش یک درخواست است — یعنی گاردِ نرخ را با ابزارِ
+ * نمایشِ گاردِ نرخ می‌شکستیم.
+ *
+ * سطحِ `locked` شمارنده‌ی زنده ندارد، ولی دکمه در پایانِ مدت آزاد می‌شود:
+ * قفلِ همیشگی کاربر را مجبور به رفرش می‌کند، که خودش یک درخواستِ دیگر است.
+ *
+ * خروجی: handleِ تایمر، تا صداکننده/تست بتواند پاکش کند و نشت نکند.
+ */
+function holdButtonForRetry(btn, err, restoreText, faFn) {
+  if (!btn) return null;
+  const plan = rateLimitPlan(err);
+  const f = typeof faFn === 'function' ? faFn : function (n) { return String(n); };
+  btn.disabled = true;
+
+  if (plan.countdown) {
+    let left = plan.sec;
+    btn.textContent = `${f(left)} ثانیه…`;
+    const iv = setInterval(function () {
+      left -= 1;
+      if (left > 0) { btn.textContent = `${f(left)} ثانیه…`; return; }
+      clearInterval(iv);
+      btn.disabled = false;
+      btn.textContent = restoreText;
+    }, 1000);
+    return iv;
+  }
+  btn.textContent = restoreText;
+  return setTimeout(function () {
+    btn.disabled = false;
+    btn.textContent = restoreText;
+  }, plan.holdSec * 1000);
+}
+
+</script>
+<script data-src="js/api-errors.js">
+/* ═══════════════════════════════════════════════════════════
+   رزرونو — قراردادِ خطای پنلِ رستوران (کد → متنِ پرسنل + کار)
+
+   اسپک: docs/audit/design/DS-003-panel-error-vocabulary.md §۴‑۳
+   (نشستِ Designer `rezv-f3 [54834f]`). یافته مالِ اوست؛ اجرا مالِ من.
+
+   ⚠️ تصحیحِ جمله‌ای که هر سه‌مان تکرار می‌کردیم: «پرسنل خطای **عمومی**
+   می‌بینند» دقیق نبود. پنل پیامِ فارسیِ سرور را در ۵۳ جا و ۹ فایل نشان
+   می‌دهد؛ متن هست. مشکل این است:
+
+       پنل روی `code` شاخه نمی‌زند، پس هیچ خطایی به یک **کارِ قابلِ انجام**
+       ختم نمی‌شود. هر خطا یک toast است و بن‌بست.
+
+   پس کارِ این فایل «نوشتنِ متن» نیست، «وصل‌کردنِ کد به کار» است.
+
+   ── دو تفاوتِ عمدی با نسخه‌ی اپِ کاستومر ──
+   ۱. **مخاطب پرسنل است، نه مهمان.** متنِ کاتالوگِ سرور برای مشتری نوشته
+      شده. جایی که پیامِ سرور به مهمان می‌گوید چه کند، پنل باید بگوید
+      **پرسنل** چه کند — و آن دو یکی نیستند.
+   ۲. **هر ردیف یک `action` دارد، نه فقط یک جمله.** الگویش از قبل در همین
+      پنل کار می‌کند و فقط گسترش نیافته بود: `۴۰۱ → refresh → retry` و
+      `BRANCH_NOT_ACCESSIBLE → پاک‌کردنِ شعبه + یک retry` (`data.js:168-176`).
+
+   ⚠️ آنچه این فایل **نمی‌کند**: پیامِ سرور را دور نمی‌ریزد. هر جا متنِ
+   اختصاصیِ پرسنل نداریم، `null` برمی‌گرداند و صداکننده همان پیامِ سرور را
+   نشان می‌دهد. سرور دقیق‌ترین متن را دارد؛ چیزی که ندارد، **کار** است.
+   ═══════════════════════════════════════════════════════════ */
+
+// عمداً کلاسیک (نه ماژول): پنلِ business با <script> ساده بار می‌شود و یک
+// `export`ِ سرگردان کلِ فایل را با SyntaxError می‌کشد — رخدادِ واقعیِ PR #77.
+
+/**
+ * کارهایی که پنل واقعاً می‌تواند انجام دهد. هر کدِ خطا به یکی از این‌ها
+ * نگاشت می‌شود؛ اگر کاری وجود نداشته باشد `'none'` است و **این را صادقانه
+ * می‌گوییم** به‌جای اینکه دکمه‌ی بی‌اثر بگذاریم.
+ */
+const PANEL_ERROR_ACTIONS = Object.freeze({
+  RETRY: 'retry',           // همین حالا دوباره بزن — وضعیتِ کاربر عوض نشده
+  RELOGIN: 'relogin',       // نشست تمام است
+  CLEAR_BRANCH: 'clear_branch', // انتخابِ شعبه کهنه است
+  REFRESH: 'refresh',       // دادهٔ روی صفحه از سرور عقب افتاده
+  WAIT: 'wait',             // ۴۲۹ — صبر کن، بعد دوباره. هرگز retryِ خودکار
+  NONE: 'none',             // کارِ نرم‌افزاری‌ای نیست؛ تصمیم با آدم است
+});
+
+/**
+ * کد → { staff، action }.
+ * `staff === null` یعنی «پیامِ سرور بهتر است» — بازنویسی نمی‌کنیم.
+ */
+const PANEL_ERROR_MAP = Object.freeze({
+  // ── گذرا: وضعیت عوض نشده، تلاشِ دوباره منطقی است ──
+  CONCURRENCY_RETRY:  { staff: 'همین لحظه یک تغییرِ همزمانِ دیگر ثبت شد؛ دوباره بزن.', action: 'retry' },
+  SLOT_LOCK_TIMEOUT:  { staff: 'این بازه همین حالا دستِ کسِ دیگری است؛ چند لحظه بعد دوباره بزن.', action: 'retry' },
+  // ⚠️ P2024 (ته‌کشیدنِ استخرِ اتصالِ DB) از ۲۰۲۶-۰۹-۰۹ به‌جای ۵۰۰/INTERNAL
+  // این را می‌دهد (کامیتِ b0bdfa6، یافته‌ی RT-05 رد تیم). چون رفع در
+  // `errorResponse` نشست و نه در یک مسیرِ خاص، **هر** درخواستِ پنل می‌تواند
+  // بگیردش — پس از روزِ اول این‌جاست، نه به‌عنوانِ وصله‌ی بعدی.
+  SERVICE_UNAVAILABLE:{ staff: 'سرور موقتاً شلوغ است — این خطای تو نیست. چند لحظه بعد دوباره بزن.', action: 'retry' },
+
+  // ── تعارضِ میز: پرسنل باید میزِ دیگری بردارد، نه اینکه دوباره همان را بزند ──
+  TABLE_CONFLICT:     { staff: 'این میز در این بازه رزرو شده؛ میزِ دیگری انتخاب کن.', action: 'refresh' },
+  TABLE_UNAVAILABLE:  { staff: 'این میز غیرفعال یا در حالِ تعمیر است.', action: 'none' },
+  TABLE_TOO_SMALL:    { staff: 'ظرفیتِ این میز برای این تعداد کافی نیست.', action: 'none' },
+  TABLE_NOT_FOUND:    { staff: 'این شماره‌ی میز وجود ندارد — فهرستِ میزها را تازه کن.', action: 'refresh' },
+
+  // ── نشست و دسترسی ──
+  UNAUTHORIZED:       { staff: 'نشستت تمام شده؛ دوباره وارد شو.', action: 'relogin' },
+  FORBIDDEN_TENANT:   { staff: 'به این بخش دسترسی نداری. اگر لازمش داری از مدیر بخواه.', action: 'none' },
+  BRANCH_NOT_ACCESSIBLE: { staff: 'شعبه‌ی انتخاب‌شده دیگر در دسترس نیست؛ شعبه را دوباره انتخاب کن.', action: 'clear_branch' },
+
+  // ── دادهٔ کهنه روی صفحه ──
+  RESERVATION_EXPIRED:{ staff: 'مهلتِ این مورد گذشته — فهرست را تازه کن.', action: 'refresh' },
+
+  // ═══ ردیفِ بازِ DS-003 §۵ — **تأیید شد، رد نشد** ═══
+  // فرضیه این بود: سه پیامِ کاتالوگ خواننده را به «تماس با رستوران» هدایت
+  // می‌کنند؛ اگر به پنل برسند، به کارکنانِ رستوران گفته می‌شود با رستوران
+  // تماس بگیرند. `rezv-f3` دو مسیرِ پرسنلی را ترِیس کرد و نرسید — ولی
+  // مسیرِ **رزروِ دستی** را ندیده بود:
+  //     apps/business/js/reservations.js:512  API.post('/reservations', …)
+  //     → api/src/app/api/v1/reservations/route.ts (شاخه‌ی پرسنلی)
+  //     → createReservation()  ← هر سه پیام از همین‌جا می‌آیند
+  //
+  // اندازه‌گیریِ خطِ به خط، چون «قابلِ دسترسی» با «واقعاً می‌رسد» فرق دارد:
+  //   RESTAURANT_OFFLINE (reservations.ts:121) → پشتِ `source === 'app'`
+  //       است، پس رزروِ دستیِ پرسنل **مستثنا**. `rezv-f3` درباره‌ی این یکی
+  //       درست گفته بود و ردیفش این‌جا نیست.
+  //   PARTY_TOO_LARGE (:128)  → **هیچ گاردی ندارد.** پرسنلی که گروهِ ۱۳
+  //       نفره را دستی ثبت کند می‌بیند: «حداکثر ظرفیت رزرو آنلاین ۱۲ نفر
+  //       است؛ برای گروه بزرگ‌تر با رستوران تماس بگیرید» — یعنی به کارکنانِ
+  //       رستوران گفته می‌شود با رستوران تماس بگیرند، درباره‌ی سقفِ «رزروِ
+  //       آنلاین» که اصلاً به رزروِ دستی‌شان ربط ندارد.
+  //   SLOT_FULL (:277 و بعدی‌ها) → گاردِ منبع ندارد؛ ظرفیت ظرفیت است.
+  //       «زمان دیگری انتخاب کنید» توصیه‌ی مهمان است. کارِ پرسنل فرق دارد.
+  PARTY_TOO_LARGE:    { staff: 'گروهِ بزرگ‌تر از سقفِ رزروِ آنلاین است — میزها را ترکیب کن یا رزرو را دستی روی چند میز ببند.', action: 'none' },
+  SLOT_FULL:          { staff: 'این ساعت پر است — لیستِ انتظار یا ساعتِ دیگر.', action: 'refresh' },
+
+  // ⚠️ عمداً **بدونِ متنِ اختصاصی**: پیامِ سرور برای این‌ها دقیق‌تر از هر
+  // چیزی است که این‌جا بنویسیم (کدام فیلد، کدام منبع، چه محدودیتی).
+  // فقط `action` اضافه می‌شود.
+  VALIDATION:         { staff: null, action: 'none' },
+  NOT_FOUND:          { staff: null, action: 'refresh' },
+  FEATURE_DISABLED:   { staff: null, action: 'none' },
+  INVALID_STATUS_TRANSITION: { staff: null, action: 'refresh' },
+
+  // ⚠️ `RATE_LIMITED` تنها ردیفی است که یک **حالت** لازم دارد، نه یک جمله —
+  // پس متن و کارش از `PANEL_ERROR_MAP` نمی‌آید بلکه از `rateLimitPlan`
+  // پایین. دیروز عمداً بیرون ماند تا کسی بی‌سروصدا به `retry` نگاشتش نکند؛
+  // امروز اسپکش رسید (DS-003 §۴‑۵) و پیاده شد.
+  RATE_LIMITED:       { staff: null, action: 'wait' },
+});
+
+// ═══════════ RATE_LIMITED — سه سطح، طبقِ DS-003 §۴‑۵ ═══════════
+//
+// ⚠️ **قاعده‌ی صفر: هرگز retryِ خودکار.** ۴۲۹ یعنی «زیادی زدی»؛ زدنِ خودکار
+// بار را بیشتر می‌کند و علت را از چشمِ کاربر پنهان.
+//
+// ⚠️ چرا حالت روی **دکمه** می‌نشیند و نه در توست: توستِ این پنل ۲۴۰۰ms است
+// (`staff-system.js:163`). برای انتظارِ ۴۵ثانیه‌ای به‌تنهایی بی‌فایده است —
+// پیام می‌رود، پرسنل دوباره می‌زند، دوباره می‌خورد.
+//
+// ⚠️ و چرا عددِ ثابتی درست نیست: بازه‌ی واقعیِ قاعده‌ها ۱ ثانیه تا ۱۵ دقیقه
+// است (`ratelimit.ts`: `qrCheckin` ۳۰/دقیقه ولی `adminTotpLogin` ۵ در **۱۵**
+// دقیقه). مقدار باید از `details.retryAfterSec` بیاید که سرور در
+// `errors.ts:27` می‌فرستد.
+
+// ⚠️ مرزها و نقشه‌ی سه سطح از این‌جا **برداشته شد** و به
+// `shared/js/rate-limit-ui.js` رفت (مهندسِ لانچ، ۲۰۲۶-۰۹-۱۰).
+//
+// چرا: پنلِ شرکت هم همین را لازم داشت، و دو رونوشت از عددهای ۱۰ و ۱۲۰
+// دقیقاً همان کلاسی است که این مخزن پنج بار در یک روز پرداختش — نگاشتِ
+// سطحِ وفاداری، `STATUS_META`، `ST_FA`، نگاشتِ مرده‌ی company، و پوششِ
+// `details.reason`. عددی که در دو جا زندگی کند بالاخره واگرا می‌شود.
+//
+// آنچه **مشترک نشد**: متن. مخاطبِ این پنل پرسنلِ رستوران است و مخاطبِ پنلِ
+// شرکت مدیرِ پلتفرم؛ همان کد در دو پنل دو جمله می‌خواهد. یک مکانیزم، چند
+// واژگان. توابعِ در دسترس از فایلِ مشترک: `retryAfterSec`، `rateLimitPlan`،
+// `holdButtonForRetry`.
+
+/**
+ * متنِ فارسیِ حالت. `faFn` تزریق می‌شود (پیش‌فرض: بدونِ تبدیل) تا تست بتواند
+ * بدونِ `format.js` اجرایش کند و ماژول به ترتیبِ بارگذاری گره نخورد.
+ */
+function panelRateLimitText(err, faFn) {
+  const f = typeof faFn === 'function' ? faFn : function (n) { return String(n); };
+  const p = rateLimitPlan(err);
+  if (p.tier === 'brief') return 'چند لحظه صبر کن، بعد دوباره بزن.';
+  if (p.tier === 'countdown') return `${f(p.sec)} ثانیه دیگر دوباره بزن.`;
+  return `به‌خاطرِ تلاش‌های زیاد، ${f(p.minutes)} دقیقه قفل شد. اگر رمز را فراموش کرده‌ای از مدیر بخواه بازنشانی کند.`;
+}
+
+/**
+ * متنی که باید به پرسنل نشان داده شود.
+ * اگر ردیفِ اختصاصی نداشته باشیم یا `staff === null` باشد، **پیامِ سرور**
+ * برمی‌گردد؛ و اگر آن هم نبود، `fallback`.
+ */
+function panelErrorText(err, fallback, faFn) {
+  // ⚠️ RATE_LIMITED متنش به **مقدار** وابسته است، نه فقط به کد — پس از
+  // نقشه‌ی سه‌سطحی می‌آید. این‌جا delegate می‌شود تا هر صداکننده‌ی موجود
+  // خودکار متنِ درست را بگیرد، نه فقط محلی که خبر دارد.
+  if (err && err.code === 'RATE_LIMITED') return panelRateLimitText(err, faFn);
+  const row = err && err.code ? PANEL_ERROR_MAP[err.code] : null;
+  if (row && row.staff) return row.staff;
+  return (err && err.message) || fallback || 'یک مشکلِ غیرمنتظره پیش آمد';
+}
+
+/** کارِ پیشنهادی برای این خطا — همیشه یکی از `PANEL_ERROR_ACTIONS`. */
+function panelErrorAction(err) {
+  const row = err && err.code ? PANEL_ERROR_MAP[err.code] : null;
+  return (row && row.action) || 'none';
+}
+
+/**
+ * آیکونِ toast بر اساسِ **کار**، نه بر اساسِ کد.
+ *
+ * ⚠️ چرا این تابع وجود دارد و چرا کوچک است: `action` باید **امروز** یک
+ * مصرف‌کننده‌ی واقعی داشته باشد، وگرنه یک فیلدِ مرده است که ادعای قابلیت
+ * می‌کند — همان کلاسی که کلِ این قرارداد درباره‌اش است. `toast(icon, msg)`
+ * از قبل آرگومانِ آیکون دارد، پس این کوچک‌ترین مصرفِ صادقانه است:
+ * «دوباره بزن» از «کاری از دستت برنمی‌آید» با یک نگاه فرق می‌کند.
+ *
+ * این **جایگزینِ** کارِ واقعی نیست. دکمه‌ی «تلاشِ دوباره» داخلِ toast نیاز به
+ * UIِ تازه دارد و آن یک تصمیمِ طراحی است، نه چیزی که این‌جا اختراعش کنم.
+ */
+function panelErrorIcon(err) {
+  switch (panelErrorAction(err)) {
+    case 'retry':        return '⏳';
+    case 'wait':         return '⏱';
+    case 'relogin':      return '🔑';
+    case 'clear_branch': return '🏠';
+    case 'refresh':      return '↻';
+    default:             return '';
+  }
+}
+
+// ⚠️ `holdButtonForRetry` هم به `shared/js/rate-limit-ui.js` رفت — همان دلیل:
+// رفتارِ «دکمه را نگه دار و هرگز خودکار نزن» در هر دو پنل یکی است، و نسخه‌ی
+// دوم بالاخره از اولی واگرا می‌شد. از آن فایل در دسترس است.
+
+</script>
 <script data-src="js/data.js">
 // ═══ رزرونو — پنل business: داده و پیکربندی (Vanilla JS، بدون build، scope مشترک) ═══
 // ═══════════ DATA ═══════════
@@ -2080,10 +2377,46 @@ const STATUS_META={
   no_show:        {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'var(--amber)'},
   noshow:         {label:'نیومد',         icon:'alert', bg:'#FEF3C7', fg:'var(--amber)'}, // alias
   cancelled:      {label:'لغوشده',        icon:'close', bg:'#FEE2E2', fg:'#B91C1C'},
+  // ⚠️ دو وضعیتِ «قدیمی» که گاردِ `check-status-label-binding.mjs` (نشستِ
+  // Designer، DS-003 §۴‑۴) پیدایشان کرد. «قدیمی» یعنی **نوشتنی نیست**، نه
+  // «مرده»: هیچ انتقالی امروز هدفشان نمی‌گیرد، ولی ردیف‌های قدیمیِ دیتابیس
+  // همین مقدار را دارند (`schema.prisma:473-474` عمداً نگه‌شان داشته) و روتِ
+  // پرسنل هم در zod می‌پذیردشان. پس **نمایش‌پذیرند** — و بدونِ این دو خط،
+  // پنل برای آن ردیف‌ها کلیدِ خامِ انگلیسی نشان می‌داد.
+  // برچسب همان معادلِ امروزی‌شان است؛ تفکیکِ «توسطِ مشتری/رستوران» در
+  // `cancelReason` زندگی می‌کند، نه در نامِ وضعیت.
+  cancelled_by_user:       {label:'لغوشده', icon:'close', bg:'#FEE2E2', fg:'#B91C1C'}, // قدیمی
+  cancelled_by_restaurant: {label:'لغوشده', icon:'close', bg:'#FEE2E2', fg:'#B91C1C'}, // قدیمی
   auto_cancelled: {label:'لغو خودکار',    icon:'close', bg:'#FEE2E2', fg:'#B91C1C'},
   rejected:       {label:'ردشده',         icon:'close',  bg:'#FEE2E2', fg:'#991B1B'},
   expired:        {label:'منقضی',         icon:'clock', bg:'#F3F4F6', fg:'#6B7280'},
 };
+// ⚠️ DS-003 §۲ (اسپکِ نشستِ Designer `rezv-f3`، ۲۰۲۶-۰۹-۰۹):
+// `Err.invalidTransition` پیامش را از مقادیرِ **خامِ** `RStatus` می‌سازد، پس
+// مسئولِ پذیرش وسطِ شلوغی این را می‌دید:
+//     «تغییر وضعیت از seated به completed مجاز نیست»
+// یک جمله‌ی فارسی با دو کلیدِ انگلیسیِ برنامه‌نویسی.
+//
+// و ترجمه‌اش **در همین فایل، ۹۰ خط بالاتر** بود: `STATUS_META` هفده وضعیت را
+// با برچسبِ فارسی دارد و پنل در `:47`, `:88`, `:102` استفاده‌اش می‌کند. داده هم
+// بود (`details:{from,to}`). فقط کسی وصلشان نکرده بود.
+//
+// ⚠️ اگر برچسب پیدا نشد، عمداً به پیامِ سرور برمی‌گردیم و جمله **نمی‌سازیم**:
+// وضعیتی که پنل نمی‌شناسد یعنی نگاشت عقب افتاده، و ساختنِ جمله‌ی نصفه آن را
+// پنهان می‌کند. پیامِ خام زشت است ولی صادق.
+function statusChangeErrorText(err){
+  if(err?.code==='INVALID_STATUS_TRANSITION'){
+    const from=STATUS_META[err.details?.from]?.label;
+    const to=STATUS_META[err.details?.to]?.label;
+    if(from&&to) return `از «${from}» نمی‌شود به «${to}» رفت`;
+  }
+  // برای بقیه‌ی کدها قراردادِ پنل (`api-errors.js`) متنِ مخصوصِ **پرسنل** را
+  // می‌دهد و اگر نداشت به پیامِ سرور برمی‌گردد — پس این تابع دیگر فقط
+  // «ترجمه‌ی یک کد» نیست، تنها درِ ورودیِ متنِ خطای این مسیر است.
+  if(typeof panelErrorText==='function') return panelErrorText(err,'تغییر وضعیت ناموفق بود — دوباره تلاش کن');
+  return err?.message||'تغییر وضعیت ناموفق بود — دوباره تلاش کن';
+}
+
 // ── انتقال‌های مجاز چرخه‌ی حیات (همگام با بک‌اند lifecycle.ts) ──
 const STATUS_TRANSITIONS={
   pending:['confirmed','rejected','cancelled'],
@@ -2100,7 +2433,7 @@ const STATUS_TRANSITIONS={
 };
 // منوی تغییر وضعیت برای یک رزرو
 function openStatusMenu(i){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   const allowed=STATUS_TRANSITIONS[r.status]||[];
   if(!allowed.length){toast('','این رزرو در وضعیت نهایی است');return;}
   const opts=allowed.map(s=>{const m=STATUS_META[s];return `<button class="status-opt" onclick="changeStatus(${i},'${s}')" style="--c:${m.fg};--bgc:${m.bg}"><span>${icon(m.icon,{size:13})}</span> ${m.label}</button>`;}).join('');
@@ -2156,7 +2489,7 @@ async function changeStatus(i,to,reason){
       }
     } else {
       r.status=old; r.cancelReason=oldReason; r._events.pop(); renderResList();
-      toast('',res.error?.message||'تغییر وضعیت ناموفق بود — دوباره تلاش کن');
+      toast(typeof panelErrorIcon==='function'?panelErrorIcon(res.error):'',statusChangeErrorText(res.error));
     }
   } else {
     // بدونِ کدِ رزرو (ردیفِ نمونه/محلی) هیچ مسیرِ سروری وجود ندارد.
@@ -2164,7 +2497,7 @@ async function changeStatus(i,to,reason){
   }
 }
 async function viewHistory(i){
-  const r=RES[i]; if(!r)return;
+  const r=(RES_VIEW||RES)[i]; if(!r)return;
   // در دمو، تاریخچه‌ی نمونه؛ با بک‌اند واقعی از API می‌آید
   let events=r._events;
   if(!events){
@@ -3357,6 +3690,14 @@ function rOverview(){
   if(!_guestsLoaded && API.getToken()){
     loadTopGuestsForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
   }
+  // ⚠️ رفعِ blocker (۲۰۲۶-۰۹-۰۷): داشبورد هرگز صف را لود نمی‌کرد. `WAITLIST` از
+  // لحظه‌ی بوت `WL_DEMO_QUEUE.slice()` است (waitlist.js:10) و `loadWaitlist`
+  // فقط از `rWaitlist` صدا زده می‌شد — یعنی تنها وقتی کارمند خودش تبِ صف را باز
+  // کند. تا آن لحظه سه مهمانِ ساختگی با بجِ «زنده» و دکمه‌ی «آفر میز» روی
+  // داشبورد بودند و کارمند بر اساسِ صفی تصمیم می‌گرفت که وجود نداشت.
+  if(!_wlLoaded && API.getToken()){
+    loadWaitlist().then(()=>{ if(document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
+  }
   if(!_weekdayInsightLoaded && API.getToken()){
     loadWeekdayInsightForDashboard().then(ok=>{ if(ok && document.getElementById('v-overview')?.classList.contains('active')) renderEnterpriseDashboard(); });
   }
@@ -3463,6 +3804,11 @@ function renderDashResvRows(){
 }
 // رندر ردیف‌های لیست انتظار زنده (با اکشن آفر میز)
 function renderDashWaitlist(){
+  // تا وقتی صفِ واقعی نیامده، «نمی‌دانیم» را با نامِ ساختگی پر نمی‌کنیم —
+  // حالتِ درست loading است، نه سه مهمانِ نمونه با بجِ زنده.
+  if(!_wlLoaded && API.getToken()){
+    return `<div class="empty-state"><div class="empty-state-desc">در حال گرفتنِ صف…</div></div>`;
+  }
   const initials = n => (n||'؟').trim().slice(0,2);
   const queue = WAITLIST.filter(w=>w.status==='waiting').sort((a,b)=>(b.priority-a.priority)||(b.waited_minutes-a.waited_minutes)).slice(0,5);
   if(!queue.length) return `<div class="empty-state"><div class="empty-state-icon">${icon('checkCircle',{size:36})}</div><div class="empty-state-desc">صف خالیه — همه سر میزن</div></div>`;
@@ -3559,7 +3905,7 @@ function renderEnterpriseDashboard(){
         <div id="dashResvRows">${renderDashResvRows()}</div>
       </div>
       <div class="ops-panel">
-        <div class="ops-head"><div class="ops-title"><span class="live-dot" aria-hidden="true"></span> لیست انتظار <span class="count-pill">${fa(WAITLIST.filter(w=>w.status==='waiting').length)} نفر</span></div><button class="ops-link" onclick="nav('waitlist')">مدیریت ${icon('arrowL',{size:13})}</button></div>
+        <div class="ops-head"><div class="ops-title"><span class="live-dot" aria-hidden="true"></span> لیست انتظار <span class="count-pill">${(!_wlLoaded&&API.getToken())?'—':`${fa(WAITLIST.filter(w=>w.status==='waiting').length)} نفر`}</span></div><button class="ops-link" onclick="nav('waitlist')">مدیریت ${icon('arrowL',{size:13})}</button></div>
         <div id="dashWaitlist">${renderDashWaitlist()}</div>
       </div>
     </div>
@@ -3815,7 +4161,9 @@ async function refreshLiveKPIs(){
 // حسینی، ...) رو با برچسبِ «زنده» می‌دید، انگار واقعاً رزروهایِ همون
 // رستورانه. حالا نشان به وضعیتِ واقعیِ لودشدنِ داده وصل شده.
 function dashboardUsingDemoData(){
-  return !API.getToken() || !_resLoaded || !_tablesLoaded;
+  // ⚠️ `_wlLoaded` اینجا غایب بود: داشبورد صفِ ساختگی را با نشانِ «زنده» نشان
+  // می‌داد چون هیچ‌کس نمی‌پرسید صف واقعاً لود شده یا نه.
+  return !API.getToken() || !_resLoaded || !_tablesLoaded || !_wlLoaded;
 }
 function liveStatusBadge(){
   if (dashboardUsingDemoData()) return `<span class="live-badge demo" id="liveInd">${icon('info',{size:12})} داده‌ی نمونه</span>`;
@@ -4070,33 +4418,104 @@ async function doCancelRes(i){
   await changeStatus(i,'cancelled',reason);
 }
 // تولید تاریخ‌های شمسی تا ۱ ماه آینده (نمونه: از پنجشنبه ۱۵ خرداد)
+// ⚠️ رفعِ B-01 (blocker، ۲۰۲۶-۰۹-۰۷): این تابع قبلاً تقویمِ خودش را از یک
+// تاریخِ **ثابتِ هاردکد** می‌ساخت (`day=15, mon=2, wd=5` — پنجشنبه ۱۵ خرداد) با
+// `monthLen[11]` همیشه ۲۹، در حالی که `manualDateToISO` مقدارِ ارسالی را از
+// `new Date()`ِ واقعی می‌ساخت. دو محاسبه‌ی مستقل ⇒ برچسبی که پرسنل می‌بیند با
+// تاریخی که ثبت می‌شود فقط وقتی یکی بود که امروز واقعاً ۱۵ خرداد باشد.
+// اندازه‌گیریِ زنده در روزِ رفع: برچسبِ «سه‌شنبه ۲۰ خرداد» در برابرِ تاریخِ
+// ثبت‌شده‌ی 2026-09-12 («شنبه ۲۱ شهریور») — سه ماه و یک روزِ هفته فاصله.
+//
+// رفع، ریشه‌ای نه ظاهری: هر دو حالا از **یک** منبع می‌آیند (`manualDateFor`)،
+// پس از تعریف نمی‌توانند واگرا شوند. تقویمِ جلالی هم دستی حساب نمی‌شود —
+// `toLocaleDateString('fa-IR')` این کار را با کبیسه‌ی درست انجام می‌دهد، پس
+// جدولِ `monthLen` و مسئله‌ی کبیسه‌ی اسفند کلاً حذف شدند.
 function buildDateOptions(){
-  const weekdays=['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه'];
-  const months=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
-  const monthLen=[31,31,31,31,31,31,30,30,30,30,30,29];
-  // شروع: پنجشنبه ۱۵ خرداد (ماه index 2)، پنجشنبه = index 5 در weekdays
-  let day=15, mon=2, wd=5;
   let opts='';
   for(let i=0;i<=30;i++){
-    const label=`${weekdays[wd]} ${fa(day)} ${months[mon]}`;
     const val=i===0?'today':i===1?'tomorrow':'d'+i;
+    const label=manualDateLabel(val);
     const prefix=i===0?'امروز — ':i===1?'فردا — ':'';
     opts+=`<option value="${val}" data-label="${label}">${prefix}${label}</option>`;
-    // پیش‌رفتن یک روز
-    wd=(wd+1)%7;
-    day++;
-    if(day>monthLen[mon]){day=1;mon=(mon+1)%12}
   }
   return opts;
 }
-// تبدیل مقدار تاریخ پنل (today/tomorrow/dN) و ساعت فارسی به فرمت ISO که بک‌اند می‌خواهد
-function manualDateToISO(dateVal, faTime){
-  const now=new Date();
+
+/**
+ * تنها منبعِ تاریخ برای رزروِ دستی. هم برچسبِ گزینه و هم مقداری که POST می‌شود
+ * از همین می‌آیند — به همین دلیل نمی‌توانند از هم بیفتند.
+ */
+/**
+ * تایم‌زونِ رستوران. پنل از قبل لودش می‌کند (`crm.js:797` → `HOURS_STATE`)،
+ * پس هیچ درخواستِ تازه‌ای لازم نیست — فقط کسی وصلش نکرده بود.
+ */
+function manualTz(){
+  return (typeof HOURS_STATE !== 'undefined' && HOURS_STATE && HOURS_STATE.timezone)
+    || 'Asia/Tehran';
+}
+
+/**
+ * تنها منبعِ تاریخ برای رزروِ دستی. هم برچسبِ گزینه و هم مقداری که POST می‌شود
+ * از همین می‌آیند — به همین دلیل نمی‌توانند از هم بیفتند.
+ *
+ * ⚠️ رفعِ دستورِ ۰۴۵ (یافته‌ی بازبین، ۲۰۲۶-۰۹-۱۰): تا پیش از این، «امروز» از
+ * **ساعتِ دستگاهِ پرسنل** می‌آمد (`new Date()` + اجزای محلی + برچسبِ بدونِ
+ * `timeZone`). تبلتی که روی UTC مانده — خیلی محتمل‌تر از کشورِ دوم — ساعتِ
+ * ۰۲:۳۰ تهران را «دیروز» می‌دید و رزروِ تلفنی یک روز غلط ثبت می‌شد.
+ *
+ * ⚠️ و نکته‌ی تیزِ ماجرا: رفعِ قبلی (B-01) **درست** بود — دو محاسبه‌ی یک
+ * واقعیت را به یک منبع رساند — ولی آن یک منبع ساعتِ دستگاه بود. پس برچسب و
+ * مقدار از «واگرا و دیدنی» به **«هم‌خوان و هر دو غلط»** رفتند. توافق شبیهِ
+ * درستی خوانده می‌شود؛ این بدتر از اختلاف است.
+ *
+ * ⚠️ قاعده همان قاعده‌ی سرور است، نه پیاده‌سازیِ دوم: `hours.ts:63-81`
+ * (`dateInTz`/`dateKeyInTz`) روزِ تقویمیِ محلی را با `Intl` و `timeZone`
+ * می‌گیرد. `api/tests/manual-date-tz-parity.test.mts` برابریِ این دو را روی
+ * تایم‌زون‌ها و لحظه‌های مرزی **اثبات** می‌کند — چون کدِ سرور قابلِ import
+ * در پنلِ مرورگر نیست، تنها راهِ «یک قاعده» اثباتِ برابری است.
+ *
+ * لنگر عمداً **ظهرِ UTC** است: روزِ تقویمیِ رستوران را نگه می‌دارد و با
+ * جابه‌جاییِ ساعتِ تابستانی هم از مرزِ روز رد نمی‌شود.
+ */
+function manualDateFor(dateVal){
   let offset=0;
   if(dateVal==='tomorrow')offset=1;
   else if(/^d\d+$/.test(dateVal))offset=parseInt(dateVal.slice(1))||0;
-  const t=new Date(now); t.setDate(now.getDate()+offset);
-  const iso=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  const dtf=new Intl.DateTimeFormat('en-CA',{
+    timeZone:manualTz(), year:'numeric', month:'2-digit', day:'2-digit',
+  });
+  const parts={};
+  for(const p of dtf.formatToParts(new Date())) parts[p.type]=p.value;
+  const t=new Date(Date.UTC(+parts.year, +parts.month-1, +parts.day, 12, 0, 0));
+  t.setUTCDate(t.getUTCDate()+offset);
+  return t;
+}
+
+/**
+ * برچسبِ فارسیِ همان تاریخ — با تقویمِ جلالیِ خودِ محیط، نه حسابِ دستی.
+ *
+ * ⚠️ `timeZone:'UTC'` عمدی است و تبدیلِ دوباره نیست: `manualDateFor` تاریخ را
+ * روی ظهرِ UTC لنگر می‌اندازد تا **همان روزِ تقویمیِ رستوران** را نمایندگی کند.
+ * پس خواندنش در UTC همان روز را می‌دهد. بدونِ این گزینه، مرورگر دوباره به
+ * تایم‌زونِ دستگاه می‌برد و همان نقص از درِ دیگر برمی‌گشت.
+ */
+function manualDateLabel(dateVal){
+  return manualDateFor(dateVal).toLocaleDateString('fa-IR',{
+    timeZone:'UTC', weekday:'long', day:'numeric', month:'long',
+  });
+}
+// تبدیل مقدار تاریخ پنل (today/tomorrow/dN) و ساعت فارسی به فرمت ISO که بک‌اند می‌خواهد
+function manualDateToISO(dateVal, faTime){
+  // ⚠️ B-01: تاریخ اینجا **دوباره حساب نمی‌شود** — از همان `manualDateFor` می‌آید
+  // که برچسبِ گزینه هم از آن ساخته شده. دو محاسبه‌ی جدا دقیقاً همان چیزی بود که
+  // برچسب و مقدار را از هم انداخت.
+  const t=manualDateFor(dateVal);
+  // ⚠️ اجزای **UTC** خوانده می‌شوند، نه محلی — به همان دلیلِ `timeZone:'UTC'`
+  // در برچسب: لنگرِ ظهرِ UTC نماینده‌ی روزِ تقویمیِ رستوران است. با
+  // `getFullYear()`ِ محلی، همان باگِ ساعتِ دستگاه از مسیرِ مقدار برمی‌گشت —
+  // این‌بار بی‌صدا، چون برچسب درست می‌ماند و **فقط چیزی که POST می‌شود** غلط
+  // می‌شد. یعنی دقیقاً وارونه‌ی نقصِ اولیه و سخت‌تر برای دیدن.
+  const iso=t.getUTCFullYear()+'-'+String(t.getUTCMonth()+1).padStart(2,'0')+'-'+String(t.getUTCDate()).padStart(2,'0');
   const time=String(faTime||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).trim()||'20:00';
   return {date:iso,time};
 }
@@ -4111,7 +4530,11 @@ function openManual(){
       <div><div class="field-label">میز</div><select class="inp" id="mTable">${TABLES.filter(t=>t.s==='free').map(t=>`<option value="${t.n}">${esc(tableLabel(t))}</option>`).join('')}</select></div>
       <div><div class="field-label">نفر</div><select class="inp" id="mParty"><option>۲</option><option>۳</option><option>۴</option><option>۵</option><option>۶</option><option>۸</option></select></div>
     </div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="saveManual()">ثبت رزرو</button>`);
+    <button class="btn btn-primary btn-lg btn-block" id="mSave" onclick="saveManual()">ثبت رزرو</button>`);
+  // یک کلیدِ idempotency به‌ازای هر بار باز شدنِ مودال = یک «تلاش». تلاشِ
+  // دوباره روی همان مودال همان کلید را می‌برد، پس سرور replay می‌کند.
+  manualIdemKey=genIdempotencyKey();
+  manualSaving=false;
 }
 // ═══ WALK-IN (ورود بدون رزرو) ═══
 async function openWalkin(){
@@ -4147,7 +4570,14 @@ async function walkinLookup(){
     ? `<select class="inp" id="wTable"><option value="">— بعداً تخصیص می‌دم —</option>${tableOptions}</select>`
     : `<select class="inp" id="wTable" disabled><option value="">میز خالی موجود نیست</option></select><div style="font-size:11px;color:var(--t3);margin-top:4px">همه‌ی میزها پرن — می‌تونی بعداً از پلان سالن تخصیص بدی</div>`;
   if(member){
-    const tierName={gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'}[member.tier]||member.tier;
+    // ⚠️ `platinum` اینجا نبود (یافته‌ی DS-001، نشستِ Designer `rezv-f3`):
+    // `LOYALTY_TIERS` در `api/src/lib/loyalty.ts:114-119` **چهار** سطح دارد و این
+    // نگاشت سه‌تا داشت. یعنی گران‌ترین مهمانِ رستوران، پشتِ میزِ پذیرش با رشته‌ی
+    // خامِ انگلیسیِ `platinum` به پرسنل نشان داده می‌شد.
+    // هرگز دیده نشد چون `||member.tier` یک fallbackِ بی‌صداست: نه استثنا، نه لاگ،
+    // نه صفحه‌ی شکسته — فقط بد.
+    // نام‌ها عمداً با `LOYALTY_TIERS` یکی‌اند، مثلِ `loyalty.js:38` که از قبل کامل بود.
+    const tierName={platinum:'پلاتینیوم',gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'}[member.tier]||member.tier;
     openModal(`
       <div style="text-align:center;margin-bottom:6px"><div style="width:56px;height:56px;border-radius:50%;background:var(--teal-50);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">${icon('user',{size:28})}</div></div>
       <div class="modal-title" style="text-align:center">${esc(member.fn)} ${esc(member.ln)} خوش اومدی!</div>
@@ -4267,7 +4697,21 @@ async function walkinNewSave(rawPhone){
   await walkinCheckinReal(rawPhone,fn,ln,(bd&&bm)?[bd,bm]:null);
 }
 
+// ⚠️ رفعِ B-02 (۲۰۲۶-۰۹-۰۷): گاردِ in-flight برای «ثبت رزرو».
+//
+// قبلاً دکمه قفل نمی‌شد و `saveManual` هیچ گاردی نداشت، پس دو کلیکِ هم‌پوشان
+// (شبکه‌ی کند — دقیقاً حالتی که آدم دوباره می‌زند) دو بار وارد تابع می‌شدند.
+// کلیدِ idempotency هم نجات نمی‌داد چون **داخلِ** خودِ تابع ساخته می‌شد: هر
+// کلیک کلیدِ تازه ⇒ سرور آن را دو عملیاتِ متفاوت می‌دید ⇒ دو رزرو.
+// اندازه‌گیریِ زنده پیش از رفع: دو کلیک ⇒ `2` رزرو.
+//
+// کلید حالا هنگامِ **باز شدنِ مودال** ساخته می‌شود، یعنی یک کلید به‌ازای هر
+// «تلاشِ» کاربر. پس حتی اگر گاردِ UI روزی دور زده شود، تلاشِ دوم همان کلید را
+// می‌برد و سرور replay می‌کند نه رزروِ دوم.
+let manualSaving=false;
+let manualIdemKey=null;
 async function saveManual(){
+  if(manualSaving)return;               // کلیکِ دومِ هم‌پوشان — بی‌اثر
   const n=document.getElementById('mName').value.trim();
   if(!n){toast('','نام مهمان رو وارد کن');return}
   const phone=document.getElementById('mPhone').value;
@@ -4283,16 +4727,39 @@ async function saveManual(){
   // درخواستِ آنلاینِ زیر موفق شود چه به مسیرِ آفلاینِ Outbox بیفتد) — تا اگر
   // درخواستِ اول واقعاً به سرور رسیده باشد ولی پاسخش گم شده، retry/صف‌شدنِ
   // بعدی با همون کلید replay شود، نه رزروِ دومی بسازد.
-  const manualIdemKey=genIdempotencyKey();
+  // کلید از openManual می‌آید (یک کلید برای هر تلاش). اگر به هر دلیل ست نشده
+  // بود، همین‌جا ساخته می‌شود تا مسیر هرگز بدونِ کلید نرود.
+  if(!manualIdemKey)manualIdemKey=genIdempotencyKey();
+  manualSaving=true;
+  const saveBtn=document.getElementById('mSave');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='در حال ثبت…';}
+  try{
+
+  // ⚠️ رفعِ B-03 (۲۰۲۶-۰۹-۰۷): **یک** بدنه برای هر دو مسیر.
+  //
+  // پیش از این، صفِ آفلاین بدنه‌ی خودش را می‌ساخت و هر سه فیلدِ کلیدی‌اش با
+  // شِیمِ سرور (`api/src/app/api/v1/reservations/route.ts:22-24`) ناسازگار بود:
+  //   restaurant_id:'self'  در برابرِ zUuid
+  //   date:dateKey          (`today|tomorrow|upcoming`) در برابرِ zDateStr
+  //   time:timeVal          (ارقامِ فارسی) در برابرِ zTimeStr
+  // و `notify_sms`/`table_number`/`note` اصلاً فرستاده نمی‌شدند.
+  //
+  // یعنی هر رزروِ آفلاین **قطعاً** در sync رد می‌شد؛ `Outbox.sync` آن را
+  // «تضاد» می‌شمرد، از صف بیرون می‌انداخت و به پرسنل می‌گفت «احتمالاً میز یا
+  // زمان پر شده» — توضیحی که غلط بود. رزروِ مهمان گم می‌شد.
+  //
+  // مثلِ B-01، رفع ساختاری است نه وصله‌ای: دو بدنه به یکی تبدیل شد تا
+  // نتوانند دوباره واگرا شوند.
+  const dt=manualDateToISO(dateVal,timeVal);
+  const reservationBody={
+    restaurant_id:STAFF_INFO?.restaurant_id||undefined,
+    date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
+    guest:{name:n,phone:phone.replace(/\s/g,''),table_number:tableVal,note:'رزرو دستی'},
+  };
 
   // اگر توکن staff داریم، رزرو واقعی در دیتابیس ثبت کن
   if(API.getToken()){
-    const dt=manualDateToISO(dateVal,timeVal);
-    const res=await API.post('/reservations',{
-      restaurant_id:STAFF_INFO?.restaurant_id||undefined,
-      date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
-      guest:{name:n,phone:phone,table_number:tableVal,note:'رزرو دستی'},
-    },{ 'Idempotency-Key': manualIdemKey });
+    const res=await API.post('/reservations',reservationBody,{ 'Idempotency-Key': manualIdemKey });
     if(res.ok){
       // موفق در سرور — به‌علاوه‌ی نمایش محلی
       RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.reservation?.code});
@@ -4316,7 +4783,7 @@ async function saveManual(){
   if(isOffline() && API.getToken()){
     Outbox.enqueue({
       type:'reservation', path:'/reservations', method:'POST',
-      body:{ restaurant_id:'self', date:dateKey, time:timeVal, party_size:partyVal, guest:{name:n,phone:phone.replace(/\s/g,'')} },
+      body:reservationBody,   // B-03: همان بدنه‌ی مسیرِ آنلاین، نه یک نسخه‌ی دوم
       headers:{ 'Idempotency-Key': manualIdemKey },
       label:`رزرو ${n} · ${dLabel} ${timeVal}`, localRef:localRec,
     });
@@ -4333,6 +4800,14 @@ async function saveManual(){
   toast('', isOffline()
     ? `رزرو ${dLabel} محلی ثبت شد — با برگشت اینترنت همگام می‌شود`
     : `رزرو ${dLabel} ثبت شد`);
+  }finally{
+    // در `finally` تا اگر مسیر با خطا بیرون بزند، دکمه قفل نماند و پرسنل
+    // نتواند دوباره تلاش کند. کلید عمداً اینجا پاک **نمی‌شود**: تلاشِ دوباره
+    // روی همان مودال باید همان کلید را ببرد تا سرور replay کند، نه رزروِ دوم.
+    manualSaving=false;
+    const b=document.getElementById('mSave');
+    if(b){b.disabled=false;b.textContent='ثبت رزرو';}
+  }
 }
 
 // ═══════════ FLOOR PLAN ═══════════
@@ -4394,9 +4869,16 @@ let _wlLoaded=false;
 async function loadWaitlist(){
   if(!API.getToken()) return; // آفلاین/دمو → همان داده‌ی دمو
   const [q,a]=await Promise.all([API.waitlistQueue(),API.waitlistAnalytics()]);
-  if(q.ok && Array.isArray(q.data?.queue)) WAITLIST=q.data.queue;
+  // ⚠️ رفع (۲۰۲۶-۰۹-۰۷): `_wlLoaded=true` قبلاً **بی‌قیدوشرط** بود، حتی وقتی
+  // fetch شکست می‌خورد. اثرش این بود که `isDemo` بعدش false می‌شد و نوتِ
+  // «این داده نمونه است» ناپدید می‌شد، در حالی که `WAITLIST` هنوز همان صفِ
+  // ساختگی بود — یعنی یک قطعیِ گذرا، دادهٔ جعلی را برای بقیه‌ی نشست «واقعی»
+  // قفل می‌کرد. حالا پرچم فقط وقتی بالا می‌رود که صفِ واقعی واقعاً آمده باشد.
+  const okQueue = q.ok && Array.isArray(q.data?.queue);
+  if(okQueue) WAITLIST=q.data.queue;
   if(a.ok && a.data) WL_ANALYTICS=a.data;
-  _wlLoaded=true;
+  _wlLoaded=okQueue;
+  return okQueue;
 }
 
 function rWaitlist(){
@@ -5890,7 +6372,18 @@ async function openCustomerDetail(userId){
   const fnl=n=>n>=1000000?fa(+(n/1000000).toFixed(1))+'م':n>=1000?fa(Math.round(n/1000))+'ک':fa(n||0);
   const SEG_FA={new_customer:'مشتری جدید',active:'فعال',at_risk:'در خطر ریزش',churned:'ازدست‌رفته',vip:'VIP'};
   const dt=s=>{ if(!s)return'—'; try{return new Date(s).toLocaleDateString('fa-IR');}catch{return'—';} };
-  const ST_FA={completed:'انجام‌شده',seated:'نشسته',confirmed:'تأییدشده',cancelled:'لغوشده',no_show:'عدم‌حضور',pending:'در انتظار'};
+  // ⚠️ `ST_FA` حذف شد (DS-003 §۴‑۲، ۲۰۲۶-۰۹-۰۹). شش کلید از هجده مقدارِ
+  // `RStatus` داشت، پس در تایم‌لاینِ پروفایلِ مشتری وضعیت‌هایی مثل
+  // `waitlisted`/`preparing`/`checked_in`/`running_late`/`dining`/`rejected`/
+  // `expired`/`auto_cancelled`/`auto_confirmed` کلیدِ خامِ انگلیسی می‌شدند —
+  // همان کلاسِ نگاشتِ ناقصی که DS-001 پشتِ میزِ پذیرش گرفت.
+  //
+  // ⚠️ و دو برچسب **واگرا** بودند، یعنی یک وضعیت در دو صفحه‌ی همین پنل دو
+  // نامِ فارسیِ متفاوت داشت:
+  //     seated   → «نشسته»    اینجا  ·  «سر میز» در STATUS_META
+  //     no_show  → «عدم‌حضور» اینجا  ·  «نیومد»  در STATUS_META
+  // حالا `STATUS_META` (data.js:5) تنها منبع است — همان‌که فهرستِ رزروها،
+  // Outbox و متنِ خطای تغییرِ وضعیت هم از آن می‌خوانند.
   const tl=(d.timeline||[]);
   openModal(`
     <div class="modal-title">${d.is_vip?icon('crown',{size:16,fill:true})+' ':''}${esc(u.name||'مشتری')}</div>
@@ -5911,7 +6404,7 @@ async function openCustomerDetail(userId){
       ${tl.length?tl.map(r=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px">
           <div>
-            <div style="font-weight:700;font-size:13px">${esc(ST_FA[r.status]||r.status)} · ${fa(r.party_size)} نفر</div>
+            <div style="font-weight:700;font-size:13px">${esc(STATUS_META[r.status]?.label||r.status)} · ${fa(r.party_size)} نفر</div>
             <div style="font-size:11px;color:var(--t2)">${dt(r.slot_start)}${r.items&&r.items.length?' · '+esc(r.items.join('، ')):''}</div>
           </div>
           <div style="font-weight:800;font-size:13px">${r.spend_toman?fnl(r.spend_toman)+' ت':'—'}</div>
@@ -7728,27 +8221,54 @@ function pushNotif(n){NOTIFS.unshift(n);renderNotifList();popup(n.emoji,n.title,
 
 
 // ═══════════ CASHBACK ═══════════
-let CB={base:8,pre:12,vip:18,wb:20};
-let CB_DRAFT={...CB};
+// ⚠️ رفعِ RT-02 (۲۰۲۶-۰۹-۰۹): این‌ها قبلاً `{base:8,pre:12,vip:18,wb:20}` بودند —
+// چهار عددِ هاردکد که پیش از هر تماسِ سروری رندر می‌شدند. سه‌تایشان با **هیچ
+// چیزِ سیستم** نمی‌خواند: پیش‌فرضِ schema (`schema.prisma:175-178`) برابرِ
+// ۵·۸·۱۲·۲۰ است و پنل ۸·۱۲·۱۸·۲۰ نشان می‌داد. یعنی حتی رونوشتِ کهنه‌ی
+// پیش‌فرض‌ها هم نبودند؛ اعدادی بی‌منشأ بودند که به‌شکلِ «تنظیماتِ رستوران»
+// به مالکِ پول‌دهنده نشان داده می‌شدند — «مبنای تصمیمِ مالیِ غلط».
+//
+// حالا `null`اند تا رندرِ اعدادِ ساختگی **ساختاری ناممکن** باشد: تنها مسیرِ
+// رسیدن به اسلایدرها از دادهٔ سرور می‌گذرد. همان انضباطی که `loyalty.js:35`
+// از قبل درست رعایت می‌کرد («—» تا وقتی `_cbLoaded` نشده).
+let CB=null;
+let CB_DRAFT=null;
 let _cbLoaded=false;
+
+/** حالتِ صادقانه‌ی «هنوز نمی‌دانیم» — به‌جای نشان‌دادنِ عددی که از جایی نیامده. */
+function cbUnavailable(msg){
+  document.getElementById('v-cashback').innerHTML=`
+    <div class="error-state">
+      <div class="error-state-icon">${icon('alert',{size:40})}</div>
+      <div class="empty-state-title">تنظیمات کش‌بک بارگذاری نشد</div>
+      <div class="empty-state-desc">${esc(msg)}</div>
+      <button class="btn btn-primary" onclick="_cbLoaded=false;rCashback()">${icon('refresh',{size:16})} تلاش دوباره</button>
+    </div>`;
+}
+
 async function rCashback(){
-  if(!_cbLoaded && API.getToken()){
+  if(!_cbLoaded){
+    // ⚠️ RT-02: این شرط قبلاً `if(!_cbLoaded && API.getToken())` بود، یعنی
+    // گارد **دو راه برای غلط‌بودن** داشت و رفعِ قبلی فقط یکی را می‌پوشاند.
+    // بدونِ توکن کلِ بلاک رد می‌شد — نه درخواستی، نه حالتِ خطایی — و رندر
+    // روی مقادیرِ هاردکد می‌افتاد. مسیرِ بی‌توکن حالا صریح است.
+    if(!API.getToken()){
+      cbUnavailable('برای دیدنِ درصدهای واقعیِ این رستوران وارد شوید');
+      return;
+    }
     const res=await API.get('/restaurant/cashback');
     if(res.ok){ CB={base:res.data.base_pct,pre:res.data.preorder_pct,vip:res.data.vip_pct,wb:res.data.winback_pct}; _cbLoaded=true; }
     else {
       // مهم: در حالتِ آنلاین هرگز مقادیرِ پیش‌فرض را به‌جای تنظیماتِ واقعی نشان نده.
       // پیش‌تر خطا (از جمله ۴۰۳ مجوز) بی‌صدا بلعیده می‌شد و پنل درصدهای ساختگی
       // را به‌عنوان تنظیماتِ رستوران نمایش می‌داد — مبنای تصمیمِ مالیِ غلط.
-      document.getElementById('v-cashback').innerHTML=`
-        <div class="error-state">
-          <div class="error-state-icon">${icon('alert',{size:40})}</div>
-          <div class="empty-state-title">تنظیمات کش‌بک بارگذاری نشد</div>
-          <div class="empty-state-desc">${esc(res.error?.message||'ارتباط با سرور برقرار نشد')}</div>
-          <button class="btn btn-primary" onclick="_cbLoaded=false;rCashback()">${icon('refresh',{size:16})} تلاش دوباره</button>
-        </div>`;
+      cbUnavailable(res.error?.message||'ارتباط با سرور برقرار نشد');
       return;
     }
   }
+  // گاردِ آخر: هیچ مسیری نباید با CBِ خالی به رندر برسد. اگر روزی رسید،
+  // «نمی‌دانیم» نشان بده — نه یک عدد.
+  if(!CB){ cbUnavailable('تنظیماتِ کش‌بک در دسترس نیست'); return; }
   CB_DRAFT={...CB};
   const cards=[['base','کش‌بک پایه','برای تمام رزروها',20],['pre','پیش‌سفارش','رزرو همراه با منو',25],['vip','مشتری VIP','اعضای سطح طلایی و بالاتر',30],['wb','بازگشت (Winback)','مشتری ناراضی یا در خطر ریزش',40]];
   document.getElementById('v-cashback').innerHTML=`
@@ -7959,8 +8479,41 @@ async function staffPasswordLogin(){
   if (location.protocol === 'file:') { await enterPanel(true); return; }
 
   const res = await API.staffLogin(u, p);
-  if (res.ok && res.data?.access){ await enterPanel(); return; }
+  if (res.ok && res.data?.access){
+    // ⚠️ رفع (۲۰۲۶-۰۹-۰۷): این مسیر `STAFF_INFO` را **ست نمی‌کرد** — فقط مسیرِ
+    // OTP (`staffVerify`) این کار را می‌کرد. ولی ورود با رمز مسیرِ **اصلیِ
+    // تولید** است (OTP در پنل‌ها خاموش است)، پس `STAFF_INFO` تا پایانِ نشست
+    // `null` می‌ماند.
+    //
+    // اثرش فقط نامِ رستوران در توستِ خوش‌آمد نبود: بدنه‌ی رزروِ دستی
+    // `restaurant_id: STAFF_INFO?.restaurant_id || undefined` می‌فرستد، و
+    // چون `undefined` در JSON حذف می‌شود، کلید اصلاً نمی‌رفت — در حالی که
+    // شِیمِ سرور (`api/src/app/api/v1/reservations/route.ts:22`) آن را
+    // `zUuid`ِ **الزامی** می‌خواهد. یعنی رزروِ دستی برای هر کارمندی که با
+    // رمز وارد شده بود در `parseBody` رد می‌شد.
+    //
+    // سرور خودش این مقدار را در پاسخِ ورود می‌دهد
+    // (`auth/staff/login/route.ts:54-56`)؛ فقط کلاینت دورش می‌ریخت.
+    STAFF_INFO = res.data.staff || STAFF_INFO;
+    await enterPanel();
+    return;
+  }
   if (res.offline){ await enterPanel(true); return; }
+
+  // ⚠️ ۴۲۹ (DS-003 §۴‑۵): این تنها خطایی است که یک **حالت** لازم دارد نه یک
+  // جمله. توستِ این پنل ۲۴۰۰ms است، پس برای انتظارِ چنددقیقه‌ای به‌تنهایی
+  // بی‌فایده است — پرسنل پیام را می‌بیند، دوباره می‌زند، دوباره می‌خورد، و
+  // هر زدن پنجره را تمدید می‌کند. حالت روی **دکمه** می‌نشیند.
+  //
+  // `passwordLogin` ده در ده دقیقه است، پس اینجا معمولاً سطحِ `locked`
+  // می‌افتد: «قفلِ امنیتی، نه ترافیک». متنش عمداً «شلوغه دوباره بزن» نیست —
+  // کسی که رمزش غلط بوده را به تکرارِ همان کار می‌فرستد.
+  if (res.error?.code === 'RATE_LIMITED') {
+    toast(panelErrorIcon(res.error), panelErrorText(res.error, '', fa));
+    holdButtonForRetry(btn, res.error, 'ورود به پنل', fa);
+    return;   // ⚠️ reset() صدا زده نمی‌شود — وگرنه دکمه فوراً آزاد می‌شود
+  }
+
   // پیامِ سرور برای «کاربر نیست» و «رمز غلط» عمداً یکسان است؛ اینجا هم
   // نباید دقیق‌تر شود، وگرنه نشتی که سرور بست از سمتِ کلاینت باز می‌شود.
   toast('', res.error?.message || 'نام کاربری یا رمز عبور اشتباه است');

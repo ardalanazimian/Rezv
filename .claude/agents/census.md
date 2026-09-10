@@ -1,7 +1,7 @@
 ---
 name: census
 description: Read-only feature-reality census. Traces every interactive element and flow end to end — UI element → JS handler → API route → service → DB read/write → side effect — and classifies it REAL / PARTIAL / DEMO-ONLY / FAKE / DEAD with file:line evidence. Never fixes anything; a census that edits its own subject is worthless.
-model: sonnet
+model: haiku
 color: cyan
 memory: project
 tools: Read, Grep, Glob, Bash

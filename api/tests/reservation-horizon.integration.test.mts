@@ -33,13 +33,20 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 const { db } = await import('../src/lib/db.ts');
 const { createReservation } = await import('../src/lib/reservations.ts');
 const { ApiError } = await import('../src/lib/errors.ts');
+const { dateKeyInTz } = await import('../src/lib/hours.ts');
 
 let tenantId: string;
 let restaurantId: string;
 
-/** 'YYYY-MM-DD' برایِ N روز بعد از الان (UTC — فقط برای ساختنِ رشته). */
+/**
+ * 'YYYY-MM-DD' برایِ N روز بعد از الان — به وقتِ تهران، چون createReservation
+ * تاریخِ ورودی را با `r.timezone ?? 'Asia/Tehran'` تفسیر می‌کند. کلیدِ UTCِ خام
+ * نزدیکِ نیمه‌شبِ تهران با روزِ واقعی فرق می‌کند (رجوع به dateKeyInTz در
+ * src/lib/hours.ts و تستش در hours.test.mts) — دقیقاً همان‌جایی که این تست
+ * مرزِ ۸۹/۹۱ روزه را می‌سنجد و یک خطایِ یک‌روزه، آن مرز را جابه‌جا می‌کند.
+ */
 function dayOffset(n: number): string {
-  return new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  return dateKeyInTz(new Date(Date.now() + n * 86_400_000), 'Asia/Tehran');
 }
 
 /** کدِ خطایِ پرتاب‌شده، یا null اگر چیزی پرتاب نشد. */

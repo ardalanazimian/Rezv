@@ -1,5 +1,6 @@
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import type { TableState } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
 import {
@@ -31,7 +32,7 @@ import { fixturePhone } from './_phone.helper.mts';
 const TAG = `wl-${randomUUID().slice(0, 8)}`;
 let tenantId: string, restaurantId: string, userId: string;
 
-async function mkTable(number: number, state = 'free', capacity = 4) {
+async function mkTable(number: number, state: TableState = 'free', capacity = 4) {
   return db.table.create({
     data: { restaurantId, number, capacity, isActive: true, state },
     select: { id: true, number: true },

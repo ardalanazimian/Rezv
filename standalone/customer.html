@@ -6,6 +6,8 @@
 <!-- آدرسِ پایه‌ی API: خالی = same-origin (دمو). برای اتصال به بک‌اندِ جدا، content را روی دامنهٔ API بگذار، مثلاً https://api.rezervno.ir -->
 <meta name="rz-api-base" content="">
 <title>رزرونو | رزرو آنلاین بهترین رستوران‌های شهر</title>
+<!-- iOS «افزودن به صفحه‌ی خانه» از manifest آیکون نمی‌خواند؛ بدونِ این خط،
+     اسکرین‌شاتِ صفحه را به‌جای نشانِ برند می‌گذارد. -->
 <!-- ── SEO ── -->
 <meta name="description" content="رزرونو — رزرو آنلاین میز در بهترین رستوران‌های شهر در چند ثانیه. کشف رستوران، لیست انتظار هوشمند، باشگاه مشتریان و امتیاز وفاداری.">
 <meta name="keywords" content="رزرو رستوران, رزرو آنلاین میز, رستوران تهران, رزرونو, reservation">
@@ -1181,14 +1183,10 @@ img{display:block;max-width:100%}
 .botnav-item svg{width:22px;height:22px}
 
 /* ─────────── AI STRIP ─────────── */
-.ai-strip{display:flex;align-items:center;gap:14px;color:var(--on-tint);background:linear-gradient(120deg,var(--blue-50),var(--teal-50));
-  border:1px solid var(--blue-100);border-radius:var(--r-lg);padding:14px 18px;margin-top:8px}
-.ai-strip-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--teal));
-  display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;flex-shrink:0;box-shadow:var(--sh)}
-.ai-strip-body{flex:1;min-width:0}
-.ai-strip-label{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
-.ai-strip-text{font-size:13px;color:inherit;line-height:1.5}
-.ai-strip-text b{color:var(--blue-600);font-weight:700}
+/* .ai-strip* حذف شد ۲۰۲۶-۰۹-۰۷ — نوارِ «پیشنهاد هوشمند» جعلی بود و از
+   index.html برداشته شد؛ دلیلِ کاملش آنجا ثبت است.
+   قاعده‌ی ".ai-strip .btn-ghost" در خطِ ~۱۸۰ عمداً دست‌نخورده ماند، چون با
+   ".ai-review" مشترک است — و آن یک فیچرِ جدا و مشروط است (detail.js:225). */
 
 /* ─────────── SHEET (bottom modal) ─────────── */
 .sheet-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.4);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);align-items:flex-end;justify-content:center}
@@ -1380,6 +1378,13 @@ img{display:block;max-width:100%}
 .loy-next{font-size:13px;opacity:.85;position:relative}
 .loy-prog{height:8px;background:rgba(255,255,255,.25);border-radius:4px;margin-top:14px;overflow:hidden;position:relative}
 .loy-prog-fill{height:100%;background:#fff;border-radius:4px}
+/* «امتیاز منقضی نمی‌شود» — عمداً بیرونِ کارت و کم‌صدا: یک اطمینانِ آرام، نه
+   یک بنرِ تبلیغاتی. رقبا انقضای امتیاز را پرشکایت‌ترین نقطه‌شان دارند؛ ما
+   خلافش را داریم و تا امروز هیچ‌جا نمی‌گفتیم. */
+.loy-noexpire{display:flex;align-items:center;gap:6px;margin-top:12px;padding:10px 12px;
+  background:var(--surface-2,rgba(0,0,0,.03));border-radius:var(--r-md,10px);
+  font-size:13px;color:var(--t2);line-height:1.6}
+.loy-noexpire svg{flex:none;color:var(--ok,#16A34A)}
 .perks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:20px}
 .perk{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;text-align:center}
 .perk-emoji{font-size:26px;margin-bottom:8px}
@@ -1940,17 +1945,26 @@ button,[role="button"],.botnav-item,a{min-height:0}
     </div>
   </div>
 
-  <!-- AI recommendation strip -->
-  <div class="wrap">
-    <div class="ai-strip" id="aiStrip">
-      <div class="ai-strip-icon">✦</div>
-      <div class="ai-strip-body">
-        <div class="ai-strip-label">پیشنهاد هوشمند برای تو</div>
-        <div class="ai-strip-text" id="aiStripText">بر اساس رزروهای قبلی‌ات، احتمالاً <b>آوا روف‌تاپ</b> رو دوست داری — جمعه شب میز با ویو داره.</div>
-      </div>
-      <button class="btn btn-sm btn-ghost" onclick="openRest(6)">ببین</button>
-    </div>
-  </div>
+  <!-- ⚠️ حذف‌شده ۲۰۲۶-۰۹-۰۷ — «نوارِ پیشنهادِ هوشمند».
+       اینجا یک نوارِ برجسته بود با برچسبِ «پیشنهاد هوشمند برای تو» و متنِ
+       «بر اساس رزروهای قبلی‌ات، احتمالاً آوا روف‌تاپ رو دوست داری». هر سه
+       بخشش نادرست بود:
+         • هیچ محاسبه‌ای پشتش نبود — `aiStrip`/`aiStripText` صفر ارجاع در کلِ
+           apps/customer/js داشتند، یعنی متن برای **همه‌ی** کاربران ثابت بود.
+         • ادعای «بر اساس رزروهای قبلی‌ات» یعنی ادعای دانستنِ تاریخچه‌ی کاربر،
+           در حالی که هیچ endpointِ توصیه‌ی مشتری‌محوری وجود ندارد
+           (`/restaurant/crm/recommendations` مالِ پنلِ رستوران است؛
+           `/me/incentives` هم `restaurant_id` می‌خواهد، پس «رستورانی برای تو»
+           نمی‌دهد).
+         • دکمه‌اش `openRest(6)` بود — idِ عددیِ داده‌ی نمونه. پس از
+           `syncRestaurants()` که R را با UUIDهای واقعی جایگزین می‌کند،
+           `findR(6)` شکست می‌خورد و کاربر توستِ «این رستوران فعلاً در دسترس
+           نیست» می‌گرفت. یعنی CTAی اولِ صفحه روی دادهٔ واقعی همیشه مرده بود.
+       سه قاعده‌ی مخزن هم‌زمان نقض می‌شد: منشورِ نسل‌ز §۳ (چیزی «هوشمند»
+       نیست مگر مدلی تولیدش کند)، ممنوعیتِ mock/placeholder در مسیرِ تولید،
+       و «دادهٔ جعلی که ادعای واقعی‌بودن دارد».
+       جایگزینِ واقعی نساختم چون منبعِ واقعی وجود ندارد — ساختنش تصمیمِ
+       محصولی است، نه رفعِ باگ. تاریخچه‌ی گیت متنِ قبلی را نگه داشته. -->
 
   <div class="wrap section">
     <div class="section-head">
@@ -2264,6 +2278,94 @@ function genIdempotencyKey() {
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+
+/* ═══ js/api-errors.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — طبقه‌بندیِ کدهای خطای API برای مسیرِ رزرو
+//
+//  ⚠️ چرا این فایل وجود دارد (یافته‌ی CEO، ۲۰۲۶-۰۹-۰۹):
+//  API کدهای دامنه‌ایِ دقیق برمی‌گرداند و اپ عملاً هیچ‌کدام را نمی‌خواند.
+//  اندازه‌گیری‌شده:
+//      grep -rnE "CONCURRENCY_RETRY|SLOT_LOCK_TIMEOUT|TABLE_CONFLICT" apps/  →  ۰
+//  و تنها جایی که روی کد **شاخه** می‌زد، `booking.js` بود که در همان شرط یک
+//  `/پر|ظرفیت/.test(error.message)` هم داشت.
+//
+//  چرا regex روی متنِ فارسی یک نقص است و نه یک سلیقه: پیامِ خطا **متنِ
+//  کاربر** است، نه قرارداد. عوض‌کردنِ یک کلمه در `errors.ts` — یا حتی
+//  اصلاحِ یک نیم‌فاصله — بی‌صدا منطقِ UI را می‌شکند، بدونِ آنکه هیچ تستی
+//  قرمز شود. کد قرارداد است؛ پیام نیست.
+//
+//  ⚠️ تفکیکی که باید نوشته شود: **نمایشِ** `error.message` کاملاً درست است
+//  و در کلِ اپ همین‌طور می‌ماند — سرور بهترین متن را می‌داند. چیزی که غلط
+//  است **شاخه‌زدن** روی آن متن. فقط یک نقطه در کلِ اپِ کاستومر این کار را
+//  می‌کرد و همان‌جا رفع شد.
+//
+//  منبعِ کدها: `api/src/lib/errors.ts` (سازنده‌های `Err.*`).
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * ظرفیت واقعاً تمام است — تلاشِ دوباره همین الان بی‌فایده است، ولی
+ * لیستِ انتظار معنی دارد.
+ */
+const CAPACITY_CODES = Object.freeze([
+  'SLOT_FULL',          // errors.ts:35 — ساعت پر است
+  'NO_TABLE_FOR_PARTY', // errors.ts:34 — میزی با این ظرفیت وجود ندارد
+  // ⚠️ `MERGE_UNAVAILABLE` امروز **هرگز پرتاب نمی‌شود** — اندازه‌گیری‌شده:
+  // در کلِ `api/src` فقط تعریفش در `errors.ts:43` هست و صفر جای پرتاب.
+  // پس حضورش اینجا را کسی به‌عنوانِ «سرور این را برمی‌گرداند» نخواند؛
+  // پیش‌دستی است برای وقتی که مسیرِ ترکیبِ میز واقعاً پیاده شود.
+  // نگه داشته شد و حذف نشد چون اگر آن روز برسد، نبودنش یعنی کاربر به‌جای
+  // پیشنهادِ صف یک توستِ عمومی می‌بیند — و پیامش نه «پر» دارد نه «ظرفیت»،
+  // پس regexِ قبلی هم نمی‌گرفتش.
+  'MERGE_UNAVAILABLE',  // errors.ts:43 — اعلام‌شده، پرتاب‌نشده
+]);
+
+/**
+ * رقابتِ همزمان یا قفل — ظرفیت لزوماً تمام نیست؛ همین حالا دوباره تلاش‌کردن
+ * منطقی است و اغلب جواب می‌دهد.
+ *
+ * ⚠️ `TABLE_CONFLICT` در مسیرِ کاستومر یعنی میزی که سرور **خودش** انتخاب
+ * کرده بین انتخاب و درج گرفته شده — کاربر میز انتخاب نمی‌کند (انتخابِ دستیِ
+ * میز مالِ پنلِ رستوران است). پس برای کاستومر یک رقابت است، نه یک خطای ورودی.
+ */
+const RETRYABLE_CONFLICT_CODES = Object.freeze([
+  'CONCURRENCY_RETRY',  // errors.ts:46 — از کامیتِ 38a9570 به بعد واقعاً برمی‌گردد
+  'SLOT_LOCK_TIMEOUT',  // errors.ts:22 — بازه در حالِ رزرو توسطِ کاربرِ دیگر
+  'TABLE_CONFLICT',     // errors.ts:21
+]);
+
+/**
+ * خطای **زیرساختیِ گذرا** — نه رقابت، نه ظرفیتِ رستوران. تجربه‌ی کاربر همان
+ * «دوباره تلاش کن» است، ولی دسته‌اش عمداً جداست تا نامش دروغ نگوید.
+ *
+ * ⚠️ `SERVICE_UNAVAILABLE` از ۲۰۲۶-۰۹-۰۹ **واقعاً برمی‌گردد**: ته‌کشیدنِ استخرِ
+ * اتصالِ DB (`P2024`) که پیش‌تر ۵۰۰/`INTERNAL` می‌داد، حالا در `errorResponse`
+ * به ۵۰۳ ترجمه می‌شود (یافته‌ی Red Team RT-05، رفعِ CEO). چون رفع در
+ * `errorResponse` نشست و نه در مسیرِ رزرو، **هر** endpointی می‌تواند بدهدش.
+ * بدونِ این ردیف، کاربر برای یک سیگنالِ ظرفیتِ گذرا پیامِ خطای عمومی می‌دید.
+ */
+const TRANSIENT_INFRA_CODES = Object.freeze([
+  'SERVICE_UNAVAILABLE', // errors.ts:29 · errorResponse P2024 → 503
+]);
+
+/**
+ * دسته‌ی خطای مسیرِ رزرو: `'capacity' | 'retry' | 'other'`.
+ * فقط روی **کد** تصمیم می‌گیرد؛ هرگز روی متنِ پیام.
+ *
+ * ⚠️ `RATE_LIMITED` عمداً اینجا **نیست**: پاسخش `details.retryAfterSec` دارد،
+ * یعنی رفتارِ درستش «چند ثانیه صبر کن» است نه «همین حالا دوباره بزن». تا وقتی
+ * آن انتظار پیاده نشود، توستِ پیامِ سرور صادق‌تر از دکمه‌ی تلاشِ دوباره‌ای است
+ * که بلافاصله دوباره رد می‌شود.
+ */
+function bookingErrorKind(error) {
+  const code = error?.code;
+  if (!code) return 'other';
+  if (CAPACITY_CODES.includes(code)) return 'capacity';
+  if (RETRYABLE_CONFLICT_CODES.includes(code)) return 'retry';
+  if (TRANSIENT_INFRA_CODES.includes(code)) return 'retry';
+  return 'other';
 }
 
 
@@ -2616,6 +2718,7 @@ window.leaveWL = leaveWL;
 
 
 
+
 // ═══════════════════════════════════════════════════════════
 //  تاریخ‌های قابلِ رزرو
 //
@@ -2789,7 +2892,7 @@ function quickBook(id,slot){
   setBk({id,date:labelForISO(bookingCtx.date),dateVal:bookingCtx.date,time:slot,
          timeRaw:String(slot).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
          party:`${fmtFa(bookingCtx.party)} نفر`,partyN:bookingCtx.party});
-  openSheet(bookStep2(findR(id)));
+  openBookingFlow(id);
 }
 function startBook(id){
   const t=document.getElementById('bwTime').value;
@@ -2798,7 +2901,69 @@ function startBook(id){
   const partyN=parseInt(document.getElementById('bwParty').value,10)||2;
   setBookingCtx({ date: iso, party: partyN });
   setBk({id,date:labelForISO(iso),dateVal:iso,time:faTime(t),timeRaw:t,party:`${fmtFa(partyN)} نفر`,partyN});
-  openSheet(bookStep2(findR(id)));
+  openBookingFlow(id);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DS-002 §۳‑۱ — گامِ ۲ فقط وقتی رندر شود که چیزی برای تصمیم داشته باشد
+//
+//  ⚠️ استدلالی که این تغییر را توجیه می‌کند **عوض شده**، و اگر کسی سندِ
+//  DS-002 را سرسری بخواند ممکن است این را به دلیلِ غلط پس بگیرد:
+//  نسخه‌ی اولِ اسپک آن را با «فلو از ۳ ضربه به ۲ می‌رسد» توجیه کرد، ولی
+//  مالک در ۲۰۲۶-۰۹-۰۹ حکم داد **«سه ضربه خوب است»**. پس آن استدلال مرده
+//  است و این تغییر **کوتاه‌سازیِ فلو نیست**.
+//
+//  استدلالِ زنده: روی مسیرِ **اصلی** (رستورانی که منویِ id-دار دارد) تعدادِ
+//  ضربه **اصلاً عوض نمی‌شود** — همان سه گام. تغییر فقط جلوی رندرِ گامی را
+//  می‌گیرد که هیچ تصمیمی در آن نیست. و اگر سه عددِ درستی است، هدررفتنِ یکی
+//  از آن سه **گران‌تر** است، نه ارزان‌تر.
+//
+//  ⚠️ و دامنه‌اش از آنچه اسپک گفت **وسیع‌تر** است. اسپک مسیرِ فید را نام برد
+//  (اندپوینتِ فهرست `menu` برنمی‌گرداند — خودم تأیید کردم: `select` در
+//  `api/v1/restaurants/route.ts:62-66` فیلدِ menu ندارد و `discover.js` هم
+//  صفر ارجاع). ولی آیتم‌های **نمونه**ی `seed.js` هم `id` ندارند، و گاردِ
+//  ۰۷۸ فقط آیتمِ id-دار را چیپ می‌کند. پس گامِ ۲ برای دادهٔ نمونه هم خالی
+//  است. شرط روی «چیزی برای تصمیم هست؟» بسته شده، نه روی «از کدام مسیر
+//  آمده‌ای» — وگرنه همین نقص از مسیرِ دوم برمی‌گشت.
+// ═══════════════════════════════════════════════════════════
+
+/** آیتم‌هایی که واقعاً می‌شود پیش‌سفارش داد — تنها منبعِ «گامِ ۲ محتوا دارد؟». */
+function orderableMenu(r){
+  return (r?.menu || []).filter(m => !m.out && m.id);
+}
+
+/** شمارِ واقعیِ گام‌ها برای این رستوران: بی‌منو ۲، با منو ۳. */
+function bookingStepCount(r){
+  return orderableMenu(r).length ? 3 : 2;
+}
+
+/** نوارِ مرحله از شمارِ **واقعی** ساخته می‌شود، نه سه‌تایِ ثابت. */
+function stepBars(total, current){
+  let out = '';
+  for (let i = 1; i <= total; i++) {
+    out += `<div class="step-bar${i < current ? ' done' : i === current ? ' now' : ''}"></div>`;
+  }
+  return `<div class="steps">${out}</div>`;
+}
+
+/**
+ * تنها درِ ورودِ فلو پس از انتخابِ زمان — `quickBook` و `startBook` هر دو
+ * از این‌جا می‌روند. پیش‌تر هر دو عیناً `openSheet(bookStep2(findR(id)))`
+ * داشتند؛ یک منطق در دو جا، که همان کلاسِ «یک واقعیت، چند رونوشت» است.
+ */
+function openBookingFlow(id){
+  const r = findR(id);
+  if (orderableMenu(r).length === 0) {
+    // ⚠️ `bk.preorder` را **صریح** خالی می‌کنیم. `toBookStep3` تنها نویسنده‌اش
+    // بود و با پریدن از گامِ ۲ اصلاً اجرا نمی‌شود. `setBk` شیء را کامل
+    // جایگزین می‌کند پس حالتِ کهنه عملاً ممکن نیست — ولی آن ضمانت در فایلِ
+    // دیگری (`seed.js`) زندگی می‌کند، و یک ثابتِ محلی بهتر از اتکا به
+    // رفتارِ دور است.
+    bk.preorder = [];
+    openSheet(bookStep3(r));
+    return;
+  }
+  openSheet(bookStep2(r));
 }
 function bookStep2(r){
   // ⚠️ رفع‌شده (R1): وقتی رستوران منویی ثبت نکرده (r.menu=[])، قبلاً این
@@ -2809,13 +2974,13 @@ function bookStep2(r){
   // نمی‌شود سفارش داد، همان «موفقیتِ جعلی» است. enforcementِ سروری = فاز ۲.
   // ۰۷۸ — فقط آیتم‌های id-دار (دیتای زنده) چیپ می‌شوند: انتخابِ آیتمِ نمونه
   // (بدونِ id) قابلِ ارسال نیست و نمایشش «موفقیتِ جعلی» می‌شد.
-  const orderable = r.menu.filter(m=>!m.out && m.id);
+  const orderable = orderableMenu(r);
   const preorderBlock = orderable.length
     ? `<div class="field-label">پیش‌سفارش (اختیاری)</div>
     <div class="opt-row">${orderable.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" data-mid="${esc(m.id)}" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m.e)} ${esc(m.n)}</div>`).join('')}</div>`
     : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${esc(bk.date)} · ${esc(bk.time)} · ${bk.party}</div>
-    <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
+    ${stepBars(bookingStepCount(r), 2)}
     ${preorderBlock}
     <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3(${jsq(String(r.id))})">ادامه</button>`;
 }
@@ -2833,7 +2998,7 @@ function bookStep3(r){
   const name = isLoggedIn() ? userName() : '';
   const phone = USER?.phone ? String(USER.phone).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]) : '';
   return `<div class="sheet-title">تأیید اطلاعات</div><div class="sheet-sub">یه قدم تا رزرو</div>
-    <div class="steps"><div class="step-bar done"></div><div class="step-bar done"></div><div class="step-bar now"></div></div>
+    ${stepBars(bookingStepCount(r), bookingStepCount(r))}
     <div class="field-label">نام</div><input class="inp" id="bkName" value="${esc(name)}" placeholder="نامت رو بنویس">
     <div class="field-label">موبایل</div><input class="inp" id="bkPhone" inputmode="tel" value="${esc(phone)}" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
     <!-- ⚠️ اضافه‌شده (فازِ ۲، پروتکل §۹/§۱۰ — جریانِ ایمنیِ غذایی).
@@ -2953,12 +3118,42 @@ async function confirmBook(id){
       </div>`;
     return;
   } else {
-    // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
-    const isFull = res.error?.code==='SLOT_FULL' || res.error?.code==='NO_TABLE_FOR_PARTY' || /پر|ظرفیت/.test(res.error?.message||'');
-    if(isFull){
+    // خطای واقعی از سرور. تصمیم فقط رویِ **کدِ** خطاست، نه متنِ پیام.
+    // ⚠️ شرطِ قبلی یک `/پر|ظرفیت/.test(res.error?.message||'')` داشت: منطقِ UI
+    // سوارِ متنِ فارسیِ بک‌اند بود، پس عوض‌کردنِ یک کلمه در `errors.ts` بی‌صدا
+    // این شاخه را می‌شکست بدونِ آنکه چیزی قرمز شود.
+    const kind = bookingErrorKind(res.error);
+
+    if(kind==='capacity'){
       offerWaitlist(id, r);
       return;
     }
+
+    if(kind==='retry'){
+      // ظرفیت لزوماً تمام نیست — رزروِ همزمانِ کسِ دیگری جلو افتاد. تلاشِ
+      // دوباره همین حالا اغلب جواب می‌دهد، پس دکمه‌ی تلاشِ دوباره داده می‌شود
+      // و **پیشنهادِ صف داده نمی‌شود** (صف برای وقتی است که جا واقعاً نیست).
+      //
+      // ⚠️ چرا این حالت تازه اهمیت پیدا کرد: کامیتِ `38a9570` مسیرِ رزرو را
+      // صادق‌تر کرد و در شرایطِ رقابت ۴۰۹ `CONCURRENCY_RETRY` می‌دهد. اپ آن
+      // کد را نمی‌شناخت، پس کاربر یک توستِ عمومی می‌دید. قراردادِ بهترشده‌ای
+      // که مصرف‌کننده ندارد، هنوز برای کاربر بهتر نشده.
+      //
+      // ساختارِ شیت عمداً همان شیتِ «ثبت نشد»ِ آفلاین است — الگویِ درست از
+      // قبل در همین فایل بود؛ مکانیزمِ تازه‌ای ساخته نشد.
+      haptic('light');
+      sheetBody.innerHTML=`
+        <div style="text-align:center;padding:24px 16px">
+          <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">⏳</div>
+          <div class="sheet-title" style="text-align:center">این لحظه شلوغ بود</div>
+          <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}</div>
+          <div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:14px 0">${esc(res.error?.message||'همین حالا کسِ دیگری داشت همین زمان را رزرو می‌کرد، پس رزروِ تو ثبت نشد. جا هنوز ممکن است باز باشد — دوباره بزن.')}</div>
+          <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(id))})">تلاش دوباره</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
+        </div>`;
+      return;
+    }
+
     toast('', res.error?.message || 'ثبت رزرو ناموفق بود، دوباره تلاش کن');
     if(confirmBtn){confirmBtn.disabled=false;confirmBtn.textContent='تأیید رزرو';}
     return;
@@ -5057,12 +5252,25 @@ async function renderLoyalty(){
   const {points, tier, next_tier, points_to_next, progress_pct, badges}=res.data;
   setPts(points); // برایِ نمایشِ سازگار در بقیه‌ی صفحات (DNA غذایی و ...)
 
+  // ⚠️ esc روی نامِ سطح (۲۰۲۶-۰۹-۰۷): این مقادیر امروز از ثابتِ سمتِ سرور
+  // (LOYALTY_TIERS) می‌آیند و کاربر کنترلشان نمی‌کند، پس این رفعِ یک باگِ
+  // فعلاً واقعی نیست — دفاعِ لایه‌دوم است، همان قاعده‌ای که بقیه‌ی سینک‌های
+  // API-محور در این مخزن رعایت می‌کنند. امنیت **به‌واسطه‌ی منشأ** یک فرض است
+  // که با تغییرِ یک endpoint بی‌صدا می‌شکند؛ esc فرض را حذف می‌کند.
   const nextLine=next_tier
-    ? `${fmtFa(points_to_next)} امتیاز تا سطحِ ${next_tier.name} (${next_tier.emoji})`
+    ? `${fmtFa(points_to_next)} امتیاز تا سطحِ ${esc(next_tier.name)} (${esc(next_tier.emoji)})`
     : 'به بالاترین سطح رسیدی 🎉';
 
   root.innerHTML=`<div class="wrap section">
-    <div class="loy-card"><div class="loy-card-mesh"></div><div class="loy-tier">${tier.emoji} سطح ${tier.name}</div><div class="loy-pts"><span id="loyPts" class="loy-pts-num">${fmtFa(points)}</span> <span style="font-size:20px;font-weight:600;opacity:.9">امتیاز</span></div><div class="loy-next">${nextLine}</div><div class="loy-prog"><div class="loy-prog-fill" style="width:0" data-w="${progress_pct}"></div></div></div>
+    <div class="loy-card"><div class="loy-card-mesh"></div><div class="loy-tier">${esc(tier.emoji)} سطح ${esc(tier.name)}</div><div class="loy-pts"><span id="loyPts" class="loy-pts-num">${fmtFa(points)}</span> <span style="font-size:20px;font-weight:600;opacity:.9">امتیاز</span></div><div class="loy-next">${nextLine}</div><div class="loy-prog"><div class="loy-prog-fill" style="width:0" data-w="${esc(progress_pct)}"></div></div></div>
+
+    <!-- ⚠️ این جمله یک **وعده** است، پس پیش از نوشتنش ساختارِ داده بررسی شد
+         (۲۰۲۶-۰۹-۰۷): مدلِ PointsLedger هیچ ستونِ انقضا ندارد — فقط
+         delta/reason/createdAt و append-only است؛ ClubMember.points هم نه؛ و
+         هیچ کرونی در api/src/app/api/v1/maintenance/ امتیاز را کم نمی‌کند.
+         پس «منقضی نمی‌شود» یک ادعای بازاریابی نیست، خاصیتِ ساختاری است.
+         اگر روزی انقضا اضافه شد، این خط باید هم‌زمان برداشته شود. -->
+    <div class="loy-noexpire reveal">${icon('check',{size:14})} امتیازهات هیچ‌وقت منقضی نمی‌شن — نه بعدِ یک سال، نه هیچ‌وقت.</div>
 
     <!-- دعوت دوستان -->
     <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openReferral()">
@@ -5086,7 +5294,7 @@ async function renderLoyalty(){
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای تو</div></div>
     <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">نشان‌ها</div></div>
-    <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${b.emoji}</div><div class="bdg-name">${esc(b.name)}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
+    <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${esc(b.emoji)}</div><div class="bdg-name">${esc(b.name)}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
   </div>`;
   setTimeout(()=>{const f=document.querySelector('.loy-prog-fill');if(f)f.style.width=f.dataset.w+'%'},300);
   // شمارشِ متحرکِ امتیاز (حسِ دستاورد)
@@ -5142,11 +5350,21 @@ function missionCard(m){
 
 function rewardCard(it){
   const locked = !it.unlocked;
-  const disabled = locked || !it.in_stock;
+  // ⚠️ `deliverable===false` یعنی سرور این کیند را *پیش از کسرِ سکه* رد
+  // می‌کند (rewards.ts، گاردِ تحویل ۲۰۲۶-۰۹-۰۹). آیتم عمداً حذف نمی‌شود —
+  // ولی دکمه‌ی فعالی که کلیکش حتماً خطا می‌دهد، خودش یک دروغِ کوچک است.
+  // مقایسه با `=== false` عمدی است: پاسخِ قدیمیِ کش‌شده این فیلد را ندارد و
+  // `undefined` نباید کلِ فروشگاه را غیرفعال کند.
+  const undeliverable = it.deliverable === false;
+  const disabled = locked || !it.in_stock || undeliverable;
+  const note = undeliverable ? ' — به‌زودی'
+    : !it.in_stock ? ' — موجودی تمام شد'
+    : locked ? ` — نیازِ ${REPUTATION_BADGE[it.min_tier]?.name || 'سطحِ بالاتر'}`
+    : '';
   return `<div class="bdg ${locked?'locked':'earned'}" style="text-align:${locked?'center':'right'}">
     <div class="bdg-emoji">${icon(it.kind==='gift_card_credit'?'creditCard':it.kind==='priority_boost'?'trending':'gift',{size:26})}</div>
     <div class="bdg-name">${it.title}</div>
-    <div class="bdg-desc">${fmtFa(it.cost_coins)} سکه${!it.in_stock?' — موجودی تمام شد':locked?` — نیازِ ${REPUTATION_BADGE[it.min_tier]?.name || 'سطحِ بالاتر'}`:''}</div>
+    <div class="bdg-desc">${fmtFa(it.cost_coins)} سکه${note}</div>
     <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" ${disabled?'disabled':''} onclick="redeemReward(${jsq(it.id)})">خرج کن</button>
   </div>`;
 }

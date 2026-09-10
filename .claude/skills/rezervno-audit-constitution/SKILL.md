@@ -56,6 +56,109 @@ compared artifact staleness rather than counts; the `boot-path` job never ran
 Ask of every gate: *what is the smallest change that breaks this but still passes?* Real
 regressions are partial — nobody deletes an entire escaper at once.
 
+### An exit code you did not read is not a measurement
+
+Added 2026-09-09, after this cost four separate sessions in one day. **The harness is wrong far
+more often than the finding is.** Every one of these produced a confident, wrong result:
+
+- `EXIT=$?` **after a pipe** reads the exit code of the last stage — usually `grep`, not the thing
+  under test. A `grep` that matches nothing returns 1 and reads as a failing test.
+- **`git reset --hard` reverts your tooling too.** A worktree takes the checker from the commit, so
+  a reset restores the *previous* version of the guard you are testing. One session hit this three
+  times in one sitting; on the third, three injections silently ran against the old guard and went
+  green — the opposite of the truth. It caught it only by reading the **text** of the output, which
+  still named the old target.
+- On a **shared tree**, "I changed the file and re-ran" is not a measurement unless you know what
+  was in the file at that moment. Another session's injected mutant sat in the same file and
+  produced an inverted result nobody could explain until it was disclosed. **Take an `md5sum` at
+  every step and put the three hashes in the delivery** — baseline, injected, restored-and-equal.
+- A guard's own **scan list can silently resolve to zero files** (a guessed path, a stale glob).
+  Empty scope must be an error, never a pass.
+- **An explicit pathspec protects you from other *files*, not from another session's edit to the
+  *same* file.** Measured 2026-09-10: two sessions each added their own row to `ROUTING.md`; the
+  first to commit carried both, and the second got «nothing to commit». Nothing was lost, but one
+  session's work now sits under the other's commit message — and the author who checks
+  `git show --stat` sees only the file they expected. On a shared tree, `git diff --cached` before
+  committing is the check that pathspec cannot give you.
+
+- **A null result whose *control* also came back null is not a measurement.** Added 2026-09-10 by
+  the Red Team session, and the asymmetry is the point it made: a dead control looks like a
+  *bigger* finding rather than a broken instrument. It built a probe to show that one error branch
+  increments no counter, using a neighbouring branch that provably does as the control — and the
+  control read flat too. The obvious reading was "the counter shipped yesterday is dead", a serious
+  charge against code already on `main`. **The repo's own passing test disproved it in one command.**
+  When your control dies, you have learned nothing about your subject; you have learned your
+  instrument is broken.
+
+So: read the output text, not just the status. Confirm the tool you ran is the tool you edited.
+And when a result is *inverted* — red where it should be green — suspect the harness first, but
+**record the anomaly instead of discarding it**. One such anomaly was recoverable hours later
+precisely because it had been written down as unexplained rather than dismissed as noise.
+
+### Write in your own worktree — the shared tree is not made safe by care
+
+**Decided 2026-09-10 after two collisions in one day, and the reason care is not the fix:**
+
+```text
+859c115  message: "Designer row"   →  actually carried three sessions' rows
+939bca1  message: "font guard"     →  also carried another session's entire FG-12 work
+```
+
+Nothing was lost either time. The damage was to the record — *someone searching `git log` for FG-12
+finds a commit about fonts.* And on the same day **two sessions deliberately held back** from
+committing a shared file so as not to take each other's lines, while a third that was not holding
+back committed it and took both. The Red Team's sentence is the argument: **two participants being
+careful does not make a shared tree safe; it only makes them slower than whoever is not.**
+
+So: **every session works in its own git worktree.**
+
+```sh
+sh tools/session-worktree.sh <your-session-name>     # e.g. rezv-d6
+```
+
+**The cost objection was real and is now gone — measured, not assumed.** A full worktree would need
+`api` 589M + `landing` 448M + `seo` 447M ≈ 1.5 GB of `node_modules`. The script shares them from the
+main checkout with a Windows junction, so the cost is seconds and ~0 bytes. Proven end to end in a
+probe worktree: `npx tsc --noEmit` → exit 0, and a real database-backed test 4/4 green. **A worktree
+is not just for docs — code work runs fully inside it.**
+
+Two rules that come with it:
+
+- **Never commit to the main checkout from a session that has a worktree.** Push your
+  `session/<name>` branch and hand it to the CEO to merge, or rebase and push it yourself when your
+  paths do not overlap anyone's.
+- **The stash stack is shared across all worktrees.** Bare `git stash` / `git stash pop` can take
+  another session's work. Prefer a throwaway WIP commit; if you must stash, use
+  `git stash push -u -m "<unique-tag>"` and `apply` a captured SHA rather than `pop`.
+
+**When you actually need one — refined 2026-09-10 after the Reviewer pushed back honestly.** It
+said: *"today's work was read-only, and I would rather not hold a worktree I am not using."* That is
+right, and the first version of this rule did not say it. Over-complying is its own failure — a
+session that holds an unused worktree teaches the next one that the rule is ceremony.
+
+The risk is not "writing"; it is **writing a file that is not exclusively yours**:
+
+- **Take a worktree** when you will modify a file other sessions also touch (`ROUTING.md`, a shared
+  guard in `tools/`, `ci.yml`, any product file), or when your tree will be dirty for more than a
+  moment — an injection cycle, a multi-file change, anything you might be interrupted in the middle
+  of.
+- **You do not need one** to create a new, uniquely-named file in your own folder
+  (`docs/audit/<role>/…`, a new directive). Nobody else has it open; there is nothing to collide
+  with.
+
+Both collisions that produced this rule were the first kind. Neither was the second.
+
+Until your worktree exists, the old discipline still binds and is still insufficient on its own:
+`git diff --cached` before every commit — not `git show --stat`, which shows you the file you
+expected and hides that its contents are wider than your change.
+
+### Count with a parser before you report a number
+
+An approximation reported as a finding is a wrong finding. On 2026-09-09 a session estimated ~19
+weak `assert.throws` assertions by heuristic; a real parser found **56** — three times larger, and
+wrong in the *safe* direction, which is the direction nobody audits. Say "approximate" out loud
+until you have parsed, and never let an approximation cross into a ledger.
+
 ## 4. A test that stays green when its subject is absent is not a test
 
 Every silent escape hatch — `if (x === undefined) return`, `if (!rows.length) return`, a

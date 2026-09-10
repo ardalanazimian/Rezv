@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
+import { Err } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 import {
   getOutreachStatsBySource,
@@ -60,6 +61,26 @@ export const GET = withRestaurantAuth({ permission: 'canManageCampaigns' }, asyn
 // POST — ساخت قانون خودکار جدید · بدنه: { name, trigger, trigger_config?, message_template, coupon_id? }
 export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canManageCampaigns' }, async (req, ctx) => {
   const b = await parseBody(req, automationSchema);
+
+  // ⚠️ مالکیتِ coupon_id (رفعِ نشتِ متقاطعِ تنانت، ۲۰۲۶-۰۹-۰۶): شِیما فقط
+  // UUID بودنِ آن را می‌سنجید، پس هر staffیِ دارایِ canManageCampaigns
+  // می‌توانست idِ کوپنِ **رستورانِ دیگری** را بنشاند. `runAutomation` بعداً
+  // آن را باز می‌کرد و `code`ِ کوپنِ آن رستوران را در پیامکِ مهمانِ این
+  // رستوران می‌فرستاد (نشت اثبات‌شده‌ی زنده — tenant-isolation.integration).
+  //
+  // قانونِ CLAUDE.md: `restaurantId` فقط از contextِ احراز. اینجا یعنی
+  // ارجاعِ آمده از body باید در برابرِ `ctx.restaurant.id` اعتبارسنجی شود،
+  // نه در برابرِ هیچ. همان الگویِ `restaurant/staff/route.ts:184`.
+  //
+  // پیام عمداً NOT_FOUND است نه FORBIDDEN: با ۴۰۳، تفاوتِ «کوپن وجود ندارد»
+  // و «هست ولی مالِ تو نیست» به یک اوراکلِ شمارشِ کوپن‌هایِ پلتفرم تبدیل می‌شد.
+  if (b.coupon_id) {
+    const owned = await db.coupon.findFirst({
+      where: { id: b.coupon_id, restaurantId: ctx.restaurant.id },
+      select: { id: true },
+    });
+    if (!owned) throw Err.notFound('کوپن');
+  }
 
   const automation = await db.marketingAutomation.create({
     data: {

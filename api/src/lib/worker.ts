@@ -1,4 +1,7 @@
-import { claimJobs, completeJob, failJob, refreshQueueMetrics } from './queue';
+import {
+  claimJobs, completeJob, failJob, refreshQueueMetrics,
+  reclaimStaleJobs, WORKER_BATCH_MAX,
+} from './queue';
 import { sendSmsNow, type SmsJob } from './sms';
 import { consumeSms } from './sms-balance';
 import { sendEmail, sendPush } from './notify';
@@ -43,9 +46,21 @@ const handlers: Record<string, (payload: any) => Promise<Record<string, unknown>
   // مستقیم به dead-letter می‌رود و در متریک‌ها دیده می‌شود — بدونِ retryِ بی‌فایده.
 };
 
-/** یک batch را پردازش می‌کند. حداکثر `max` کار. خروجی: شمارش نتایج. */
-export async function runWorker(max = 50): Promise<{ processed: number; failed: number; dead: number }> {
-  const jobs = await claimJobs(max);
+/**
+ * یک batch را پردازش می‌کند. حداکثر `max` کار. خروجی: شمارش نتایج.
+ *
+ * ⚠️ `max` به `WORKER_BATCH_MAX` محدود می‌شود و این عمدی است: `JOB_LEASE_MS`
+ * از همان ثابت مشتق شده (اجاره باید کلِ batchِ سریالی را بپوشاند). اگر کسی
+ * روزی `runWorker(500)` صدا بزند، بدونِ این clamp اجاره بی‌صدا ناکافی می‌شد و
+ * workerِ دوم کارِ در حالِ اجرا را بازپس می‌گرفت — یعنی پیامکِ تکراری.
+ */
+export async function runWorker(max = WORKER_BATCH_MAX): Promise<{ processed: number; failed: number; dead: number }> {
+  // پیش از برداشتنِ کارِ تازه، کارهای رهاشده‌ی workerِ کرش‌کرده را برگردان.
+  // این‌جا و نه در یک cronِ جداگانه: هر دقیقه که `jobs-drain` اجرا می‌شود این
+  // هم اجرا می‌شود، بدونِ افزودنِ زمان‌بندیِ تازه‌ای که ممکن است ست نشود.
+  await reclaimStaleJobs(WORKER_BATCH_MAX);
+
+  const jobs = await claimJobs(Math.min(max, WORKER_BATCH_MAX));
   let processed = 0, failed = 0, dead = 0;
 
   for (const job of jobs) {

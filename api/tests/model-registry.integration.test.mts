@@ -7,6 +7,7 @@ import { createReservation } from '../src/lib/reservations.ts';
 import { computeNoShowRisk } from '../src/lib/customer-insights.ts';
 import { getLearnedNoShowModelWithRun, NO_SHOW_FEATURE_VERSION, NO_SHOW_FEATURE_NAMES } from '../src/lib/no-show-model.ts';
 import { getAccuracyByModelRun, recordOutcome } from '../src/lib/prediction-ledger.ts';
+import { dateKeyInTz } from '../src/lib/hours.ts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  فازِ ۶ — رجیستریِ مدل: پیش‌بینی به نسخه‌ی مدلی که ساختش بسته می‌شود
@@ -26,7 +27,7 @@ import { getAccuracyByModelRun, recordOutcome } from '../src/lib/prediction-ledg
 
 const TAG = `mr-${randomUUID().slice(0, 8)}`;
 let tenantId: string, restaurantId: string, runId: string;
-const SLOT_DATE = new Date(Date.now() + 45 * 86_400_000).toISOString().slice(0, 10);
+const SLOT_DATE = dateKeyInTz(new Date(Date.now() + 45 * 86_400_000), 'Asia/Tehran');
 
 /** وزن‌هایی که تستِ بایاسِ کانالی را رد نمی‌کنند و احتمالِ میانه می‌دهند. */
 // ⚠️ وزن‌ها از **طولِ واقعیِ بردار** ساخته می‌شوند، نه با آرایه‌ی ثابت.
@@ -118,7 +119,6 @@ describe('فازِ ۶ — نسب‌نامه‌ی مدل از خواندن تا �
   test('رزروِ واقعی، پیش‌بینی را با همان شناسه‌ی نسخه ثبت می‌کند', async () => {
     await createReservation({
       restaurantId, date: SLOT_DATE, time: '19:00', partySize: 2,
-      guestName: '[DEMO] مهمان', guestPhone: '09370000000',
       source: 'app', notifySms: false,
     });
     const resv = await db.reservation.findFirst({ where: { restaurantId }, select: { id: true } });

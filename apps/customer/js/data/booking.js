@@ -10,6 +10,7 @@ import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js
 import { findR, invalidateCardSlots } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
 import { genIdempotencyKey } from '../api-core.js';
+import { bookingErrorKind } from '../api-errors.js';
 import { haptic } from '../theme-pwa.js';
 import { icon } from '../icons.js';
 
@@ -187,7 +188,7 @@ export function quickBook(id,slot){
   setBk({id,date:labelForISO(bookingCtx.date),dateVal:bookingCtx.date,time:slot,
          timeRaw:String(slot).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),
          party:`${fmtFa(bookingCtx.party)} نفر`,partyN:bookingCtx.party});
-  openSheet(bookStep2(findR(id)));
+  openBookingFlow(id);
 }
 export function startBook(id){
   const t=document.getElementById('bwTime').value;
@@ -196,7 +197,69 @@ export function startBook(id){
   const partyN=parseInt(document.getElementById('bwParty').value,10)||2;
   setBookingCtx({ date: iso, party: partyN });
   setBk({id,date:labelForISO(iso),dateVal:iso,time:faTime(t),timeRaw:t,party:`${fmtFa(partyN)} نفر`,partyN});
-  openSheet(bookStep2(findR(id)));
+  openBookingFlow(id);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DS-002 §۳‑۱ — گامِ ۲ فقط وقتی رندر شود که چیزی برای تصمیم داشته باشد
+//
+//  ⚠️ استدلالی که این تغییر را توجیه می‌کند **عوض شده**، و اگر کسی سندِ
+//  DS-002 را سرسری بخواند ممکن است این را به دلیلِ غلط پس بگیرد:
+//  نسخه‌ی اولِ اسپک آن را با «فلو از ۳ ضربه به ۲ می‌رسد» توجیه کرد، ولی
+//  مالک در ۲۰۲۶-۰۹-۰۹ حکم داد **«سه ضربه خوب است»**. پس آن استدلال مرده
+//  است و این تغییر **کوتاه‌سازیِ فلو نیست**.
+//
+//  استدلالِ زنده: روی مسیرِ **اصلی** (رستورانی که منویِ id-دار دارد) تعدادِ
+//  ضربه **اصلاً عوض نمی‌شود** — همان سه گام. تغییر فقط جلوی رندرِ گامی را
+//  می‌گیرد که هیچ تصمیمی در آن نیست. و اگر سه عددِ درستی است، هدررفتنِ یکی
+//  از آن سه **گران‌تر** است، نه ارزان‌تر.
+//
+//  ⚠️ و دامنه‌اش از آنچه اسپک گفت **وسیع‌تر** است. اسپک مسیرِ فید را نام برد
+//  (اندپوینتِ فهرست `menu` برنمی‌گرداند — خودم تأیید کردم: `select` در
+//  `api/v1/restaurants/route.ts:62-66` فیلدِ menu ندارد و `discover.js` هم
+//  صفر ارجاع). ولی آیتم‌های **نمونه**ی `seed.js` هم `id` ندارند، و گاردِ
+//  ۰۷۸ فقط آیتمِ id-دار را چیپ می‌کند. پس گامِ ۲ برای دادهٔ نمونه هم خالی
+//  است. شرط روی «چیزی برای تصمیم هست؟» بسته شده، نه روی «از کدام مسیر
+//  آمده‌ای» — وگرنه همین نقص از مسیرِ دوم برمی‌گشت.
+// ═══════════════════════════════════════════════════════════
+
+/** آیتم‌هایی که واقعاً می‌شود پیش‌سفارش داد — تنها منبعِ «گامِ ۲ محتوا دارد؟». */
+export function orderableMenu(r){
+  return (r?.menu || []).filter(m => !m.out && m.id);
+}
+
+/** شمارِ واقعیِ گام‌ها برای این رستوران: بی‌منو ۲، با منو ۳. */
+export function bookingStepCount(r){
+  return orderableMenu(r).length ? 3 : 2;
+}
+
+/** نوارِ مرحله از شمارِ **واقعی** ساخته می‌شود، نه سه‌تایِ ثابت. */
+function stepBars(total, current){
+  let out = '';
+  for (let i = 1; i <= total; i++) {
+    out += `<div class="step-bar${i < current ? ' done' : i === current ? ' now' : ''}"></div>`;
+  }
+  return `<div class="steps">${out}</div>`;
+}
+
+/**
+ * تنها درِ ورودِ فلو پس از انتخابِ زمان — `quickBook` و `startBook` هر دو
+ * از این‌جا می‌روند. پیش‌تر هر دو عیناً `openSheet(bookStep2(findR(id)))`
+ * داشتند؛ یک منطق در دو جا، که همان کلاسِ «یک واقعیت، چند رونوشت» است.
+ */
+export function openBookingFlow(id){
+  const r = findR(id);
+  if (orderableMenu(r).length === 0) {
+    // ⚠️ `bk.preorder` را **صریح** خالی می‌کنیم. `toBookStep3` تنها نویسنده‌اش
+    // بود و با پریدن از گامِ ۲ اصلاً اجرا نمی‌شود. `setBk` شیء را کامل
+    // جایگزین می‌کند پس حالتِ کهنه عملاً ممکن نیست — ولی آن ضمانت در فایلِ
+    // دیگری (`seed.js`) زندگی می‌کند، و یک ثابتِ محلی بهتر از اتکا به
+    // رفتارِ دور است.
+    bk.preorder = [];
+    openSheet(bookStep3(r));
+    return;
+  }
+  openSheet(bookStep2(r));
 }
 export function bookStep2(r){
   // ⚠️ رفع‌شده (R1): وقتی رستوران منویی ثبت نکرده (r.menu=[])، قبلاً این
@@ -207,13 +270,13 @@ export function bookStep2(r){
   // نمی‌شود سفارش داد، همان «موفقیتِ جعلی» است. enforcementِ سروری = فاز ۲.
   // ۰۷۸ — فقط آیتم‌های id-دار (دیتای زنده) چیپ می‌شوند: انتخابِ آیتمِ نمونه
   // (بدونِ id) قابلِ ارسال نیست و نمایشش «موفقیتِ جعلی» می‌شد.
-  const orderable = r.menu.filter(m=>!m.out && m.id);
+  const orderable = orderableMenu(r);
   const preorderBlock = orderable.length
     ? `<div class="field-label">پیش‌سفارش (اختیاری)</div>
     <div class="opt-row">${orderable.map(m=>`<div class="opt" role="button" tabindex="0" aria-pressed="false" data-mid="${esc(m.id)}" onclick="this.setAttribute('aria-pressed',String(this.classList.toggle('sel')))">${esc(m.e)} ${esc(m.n)}</div>`).join('')}</div>`
     : '';
   return `<div class="sheet-title">${esc(r.n)}</div><div class="sheet-sub">${esc(bk.date)} · ${esc(bk.time)} · ${bk.party}</div>
-    <div class="steps"><div class="step-bar done"></div><div class="step-bar now"></div><div class="step-bar"></div></div>
+    ${stepBars(bookingStepCount(r), 2)}
     ${preorderBlock}
     <button class="btn btn-primary btn-lg btn-block" onclick="toBookStep3(${jsq(String(r.id))})">ادامه</button>`;
 }
@@ -231,7 +294,7 @@ export function bookStep3(r){
   const name = isLoggedIn() ? userName() : '';
   const phone = USER?.phone ? String(USER.phone).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]) : '';
   return `<div class="sheet-title">تأیید اطلاعات</div><div class="sheet-sub">یه قدم تا رزرو</div>
-    <div class="steps"><div class="step-bar done"></div><div class="step-bar done"></div><div class="step-bar now"></div></div>
+    ${stepBars(bookingStepCount(r), bookingStepCount(r))}
     <div class="field-label">نام</div><input class="inp" id="bkName" value="${esc(name)}" placeholder="نامت رو بنویس">
     <div class="field-label">موبایل</div><input class="inp" id="bkPhone" inputmode="tel" value="${esc(phone)}" placeholder="۰۹۱۲۳۴۵۶۷۸۹">
     <!-- ⚠️ اضافه‌شده (فازِ ۲، پروتکل §۹/§۱۰ — جریانِ ایمنیِ غذایی).
@@ -351,12 +414,42 @@ export async function confirmBook(id){
       </div>`;
     return;
   } else {
-    // خطای واقعی از سرور (مثلاً میز پر شد) → پیشنهاد لیست انتظار
-    const isFull = res.error?.code==='SLOT_FULL' || res.error?.code==='NO_TABLE_FOR_PARTY' || /پر|ظرفیت/.test(res.error?.message||'');
-    if(isFull){
+    // خطای واقعی از سرور. تصمیم فقط رویِ **کدِ** خطاست، نه متنِ پیام.
+    // ⚠️ شرطِ قبلی یک `/پر|ظرفیت/.test(res.error?.message||'')` داشت: منطقِ UI
+    // سوارِ متنِ فارسیِ بک‌اند بود، پس عوض‌کردنِ یک کلمه در `errors.ts` بی‌صدا
+    // این شاخه را می‌شکست بدونِ آنکه چیزی قرمز شود.
+    const kind = bookingErrorKind(res.error);
+
+    if(kind==='capacity'){
       offerWaitlist(id, r);
       return;
     }
+
+    if(kind==='retry'){
+      // ظرفیت لزوماً تمام نیست — رزروِ همزمانِ کسِ دیگری جلو افتاد. تلاشِ
+      // دوباره همین حالا اغلب جواب می‌دهد، پس دکمه‌ی تلاشِ دوباره داده می‌شود
+      // و **پیشنهادِ صف داده نمی‌شود** (صف برای وقتی است که جا واقعاً نیست).
+      //
+      // ⚠️ چرا این حالت تازه اهمیت پیدا کرد: کامیتِ `38a9570` مسیرِ رزرو را
+      // صادق‌تر کرد و در شرایطِ رقابت ۴۰۹ `CONCURRENCY_RETRY` می‌دهد. اپ آن
+      // کد را نمی‌شناخت، پس کاربر یک توستِ عمومی می‌دید. قراردادِ بهترشده‌ای
+      // که مصرف‌کننده ندارد، هنوز برای کاربر بهتر نشده.
+      //
+      // ساختارِ شیت عمداً همان شیتِ «ثبت نشد»ِ آفلاین است — الگویِ درست از
+      // قبل در همین فایل بود؛ مکانیزمِ تازه‌ای ساخته نشد.
+      haptic('light');
+      sheetBody.innerHTML=`
+        <div style="text-align:center;padding:24px 16px">
+          <div style="font-size:34px;line-height:1;margin-bottom:12px" aria-hidden="true">⏳</div>
+          <div class="sheet-title" style="text-align:center">این لحظه شلوغ بود</div>
+          <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}</div>
+          <div style="background:var(--warning-soft);color:var(--warning-ink);border-radius:var(--radius-lg);padding:var(--sp-3);font-size:13px;line-height:1.7;text-align:center;margin:14px 0">${esc(res.error?.message||'همین حالا کسِ دیگری داشت همین زمان را رزرو می‌کرد، پس رزروِ تو ثبت نشد. جا هنوز ممکن است باز باشد — دوباره بزن.')}</div>
+          <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(id))})">تلاش دوباره</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
+        </div>`;
+      return;
+    }
+
     toast('', res.error?.message || 'ثبت رزرو ناموفق بود، دوباره تلاش کن');
     if(confirmBtn){confirmBtn.disabled=false;confirmBtn.textContent='تأیید رزرو';}
     return;

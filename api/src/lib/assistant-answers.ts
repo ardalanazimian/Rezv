@@ -3,6 +3,7 @@ import { ACTIVE_RESERVATION_STATUSES } from './reservation-status';
 import { getManagerInsights, getWeekdayRanking } from './restaurant-manager';
 import { getDemandForecast, tehranTodayIso } from './demand-forecast';
 import { countUpcomingHighRiskByProvenance, provenanceLabel } from './no-show-provenance';
+import { zonedTimeToUtc, dateKeyInTz } from './hours';
 import type { AssistantIntent } from './assistant-nlu';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -18,17 +19,24 @@ import type { AssistantIntent } from './assistant-nlu';
 const DAY_NAMES_FA = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
 function fmt(n: number): string { return n.toLocaleString('fa-IR'); }
 
-function dayRange(offsetDays: number): { start: Date; end: Date } {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() + offsetDays);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
+/**
+ * ⚠️ رفعِ T2 (۲۰۲۶-۰۹-۰۸، همان کلاسِ باگِ روتِ reservations): قبلاً
+ * `new Date()` + `setHours(0,0,0,0)` بود — «امروز/فردا»یِ دستیار به ساعتِ
+ * محلیِ پروسه‌ی سرور می‌رفت، نه تایم‌زونِ رستوران (`Restaurant.timezone`).
+ * همان الگویِ canonical (`zonedTimeToUtc`/`dateKeyInTz`، hours.ts) که
+ * availability.ts و روتِ reservations استفاده می‌کنند، اینجا هم تکرار
+ * می‌شود — سیستمِ موازی ساخته نشده.
+ */
+function dayRange(offsetDays: number, timezone: string): { start: Date; end: Date } {
+  const todayKey = dateKeyInTz(new Date(), timezone);
+  const todayStart = zonedTimeToUtc(todayKey, '00:00', timezone);
+  const start = new Date(+todayStart + offsetDays * 24 * 3600_000);
+  const end = new Date(+start + 24 * 3600_000);
   return { start, end };
 }
 
-async function answerReservationsForDay(restaurantId: string, offsetDays: number, label: string): Promise<string> {
-  const { start, end } = dayRange(offsetDays);
+async function answerReservationsForDay(restaurantId: string, offsetDays: number, label: string, timezone: string): Promise<string> {
+  const { start, end } = dayRange(offsetDays, timezone);
   const count = await db.reservation.count({
     where: { restaurantId, status: { in: ACTIVE_RESERVATION_STATUSES as any }, slotStart: { gte: start, lt: end } },
   });
@@ -149,17 +157,24 @@ function answerHelp(exampleQuestions: string[]): string {
   return `می‌تونم به این‌جور سؤال‌ها جواب بدم:\n${exampleQuestions.map((q) => `• ${q}`).join('\n')}\nهرچی بیشتر ازم بپرسی و جوابِ اشتباه رو اصلاح کنی، بهتر یاد می‌گیرم.`;
 }
 
-/** تولیدِ متنِ پاسخِ فارسی برای یک نیتِ مشخص. exampleQuestions فقط برایِ help لازم است. */
+/**
+ * تولیدِ متنِ پاسخِ فارسی برای یک نیتِ مشخص. exampleQuestions فقط برایِ help
+ * لازم است. `timezone` (پیش‌فرض «Asia/Tehran» — همان پیش‌فرضِ
+ * `Restaurant.timezone` در schema.prisma) فقط مصرف‌کننده‌ی واقعی‌اش
+ * `reservations_today/tomorrow` است؛ بقیه‌ی نیت‌ها یا تایم‌زون‌مستقل‌اند یا
+ * از قبل خودشان (مثلِ demand_tomorrow) تهران را صریح مدیریت می‌کنند.
+ */
 export async function generateAnswer(
   intent: AssistantIntent,
   restaurantId: string,
   exampleQuestions: string[] = [],
+  timezone: string,
 ): Promise<string> {
   switch (intent) {
     case 'greeting': return answerGreeting();
     case 'help': return answerHelp(exampleQuestions);
-    case 'reservations_today': return answerReservationsForDay(restaurantId, 0, 'امروز');
-    case 'reservations_tomorrow': return answerReservationsForDay(restaurantId, 1, 'فردا');
+    case 'reservations_today': return answerReservationsForDay(restaurantId, 0, 'امروز', timezone);
+    case 'reservations_tomorrow': return answerReservationsForDay(restaurantId, 1, 'فردا', timezone);
     case 'busiest_day': return answerBusiestDay(restaurantId);
     case 'slow_day': return answerSlowDay(restaurantId);
     case 'at_risk_customers': return answerAtRiskCustomers(restaurantId);

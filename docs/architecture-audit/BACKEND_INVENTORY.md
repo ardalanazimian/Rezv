@@ -34,7 +34,18 @@
 
 ## Queues / Workers / Cron / Events
 - **Queue:** `lib/queue.ts` (Postgres + FOR UPDATE SKIP LOCKED). **Worker:** `lib/worker.ts`. **Drain:** `maintenance/jobs-drain` (cron هر دقیقه).
-- **Cron (۸):** طبقِ `api/vercel.json` (Vercel Cron).
+- **Cron (۹):** طبقِ `cron/crontab` — **تنها منبعِ حقیقتِ زمان‌بندی**، سرویسِ Compose در
+  `docker-compose.yml:169` با `restart: unless-stopped`. jobها: `waitlist` (هر ۲د)،
+  `jobs-drain` (هر ۱د)، `lifecycle` (هر ۵د)، `expire` (هر ۵د)، `reminders` (هر ۱۵د)،
+  `rewards` (۹:۰۰)، `customer-insights` (۳:۰۰)، `retention` (۴:۰۰)، `ensure-partitions`
+  (اولِ هر ماه).
+  <!-- ⚠️ تصحیحِ ۲۰۲۶-۰۹-۰۹: این خط می‌گفت «**Cron (۸):** طبقِ `api/vercel.json`
+       (Vercel Cron)». هر دو جزء غلط بودند — شمار (۸ در برابر ۹) و منبع.
+       `api/vercel.json` در ۲۰۲۶-۰۸-۲۸ **عمداً حذف شد** چون بک‌اند روی Vercel
+       مستقر نیست (`deploy/caddy/Caddyfile` دامنه‌ی api را به داکر پروکسی می‌کند).
+       هزینه‌ی این کهنگی فرضی نیست: در همین روز نشستِ CEO دنبالِ `vercel.json`
+       گشت، نیافت، و در `audit/ESCALATIONS.md` نوشت «هیچ زمان‌بندی‌ای در مخزن
+       وجود ندارد» — یک ادعای غلط در سندی که مالک می‌خواند. -->
 - **Events:** `lib/events.ts` (`emit`) + `platform-events.ts` (تله‌متری).
 - **WebSockets:** یافت نشد (چت مبتنی بر polling/REST است، نه WS).
 

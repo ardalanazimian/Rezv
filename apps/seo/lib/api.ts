@@ -2,7 +2,24 @@
 // آدرسِ API از env می‌آید (SEO_API_BASE)، مثلِ https://api.rezervno.ir — بدونِ اسلشِ انتهایی.
 // این ماژول در Server Components/Route Handlers استفاده می‌شود (نه در مرورگر).
 
-const API_BASE = (process.env.SEO_API_BASE || '').replace(/\/$/, '');
+/**
+ * آدرسِ API — **در زمانِ فراخوانی** خوانده می‌شود، نه در زمانِ لودِ ماژول.
+ *
+ * ⚠️ چرا تابع شد (خواهرِ همان شکستِ `apps/landing`، ۲۰۲۶-۰۹-۰۷): وقتی const بود،
+ * مقدارش در اولین importِ ماژول قفل می‌شد و تست‌ها برای ساختنِ حالتِ
+ * «پیکربندی نشده» به `import('../lib/api.ts?nobase')` تکیه می‌کردند. آن کش‌شکن
+ * روی Node 24 کار می‌کند و روی **Node 20** (همان که `ci.yml` برای jobِ seo
+ * تعیین می‌کند) نه — ماژولِ کش‌شده با baseِ قدیمی برمی‌گشت.
+ *
+ * در landing نتیجه‌اش قرمزیِ CI بود و دیده شد. اینجا برعکس: تست انتظارِ throw
+ * داشت، و `fetch`ِ ناموفق هم **همان کلاسِ خطا** را می‌داد، پس تست **سبز ماند
+ * در حالی که موضوعش هرگز حاضر نبود** — منشور §۴.
+ *
+ * رفتارِ تولید عوض نمی‌شود: env در تمامِ عمرِ پروسه ثابت است.
+ */
+function apiBase(): string {
+  return (process.env.SEO_API_BASE || '').replace(/\/$/, '');
+}
 
 /**
  * بالادست (api/) در دسترس نیست — شبکه، تایم‌اوت، ۵xx، یا اصلاً پیکربندی‌نشده.
@@ -133,10 +150,11 @@ export interface RestaurantDetail {
  *   • هر شکستِ زیرساختیِ دیگر → `UpstreamUnavailableError` (۵۰۰، کش نمی‌شود)
  */
 export async function fetchRestaurant(slug: string, revalidateSec = 300): Promise<RestaurantDetail | null> {
-  if (!API_BASE) throw new UpstreamUnavailableError('SEO_API_BASE تنظیم نشده');
+  const base = apiBase();
+  if (!base) throw new UpstreamUnavailableError('SEO_API_BASE تنظیم نشده');
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/v1/restaurants/${encodeURIComponent(slug)}`, {
+    res = await fetch(`${base}/api/v1/restaurants/${encodeURIComponent(slug)}`, {
       next: { revalidate: revalidateSec },
     });
   } catch (e) {
@@ -151,7 +169,7 @@ export async function fetchRestaurant(slug: string, revalidateSec = 300): Promis
       photos: (d.photos || []).map((p) => ({ ...p, url: resolveMediaUrl(p.url) || p.url })),
       logo_url: resolveMediaUrl(d.logo_url),
     };
-  } catch (e) {
+  } catch {
     // بدنه‌ی خراب/غیر-JSON هم شکستِ زیرساخت است، نه «رستوران نیست».
     throw new UpstreamUnavailableError(`restaurants/${slug} → پاسخِ نامعتبر`);
   }
@@ -186,7 +204,8 @@ export async function fetchRestaurantList(
    */
   strict = false,
 ): Promise<RestaurantListItem[]> {
-  if (!API_BASE) {
+  const base = apiBase();
+  if (!base) {
     if (strict) throw new UpstreamUnavailableError('SEO_API_BASE تنظیم نشده');
     return [];
   }
@@ -196,7 +215,7 @@ export async function fetchRestaurantList(
   const what = `restaurants?${qs.toString()}`;
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/v1/restaurants?${qs.toString()}`, {
+    res = await fetch(`${base}/api/v1/restaurants?${qs.toString()}`, {
       next: { revalidate: revalidateSec },
     });
   } catch (e) {
@@ -210,7 +229,7 @@ export async function fetchRestaurantList(
   try {
     const data = (await res.json()) as { items?: RestaurantListItem[] };
     return Array.isArray(data.items) ? data.items : [];
-  } catch (e) {
+  } catch {
     if (strict) throw new UpstreamUnavailableError(`${what} → پاسخِ نامعتبر`);
     return [];
   }
@@ -250,11 +269,12 @@ export interface PublicMenu {
  * هیچ‌کدام نباید به «منویِ نمونه» تبدیل شود، و «نمی‌دانیم» نباید «نیست» شود.
  */
 export async function fetchPublicMenu(slug: string, revalidateSec = 300): Promise<PublicMenu | null> {
-  if (!API_BASE) throw new UpstreamUnavailableError('SEO_API_BASE تنظیم نشده');
+  const base = apiBase();
+  if (!base) throw new UpstreamUnavailableError('SEO_API_BASE تنظیم نشده');
   const what = `restaurants/${slug}/menu`;
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/v1/restaurants/${encodeURIComponent(slug)}/menu`, {
+    res = await fetch(`${base}/api/v1/restaurants/${encodeURIComponent(slug)}/menu`, {
       next: { revalidate: revalidateSec },
     });
   } catch (e) {
@@ -270,7 +290,7 @@ export async function fetchPublicMenu(slug: string, revalidateSec = 300): Promis
       ...m, image_url: resolveMediaUrl(m.image_url),
     }));
     return { restaurant: d.restaurant, items };
-  } catch (e) {
+  } catch {
     throw new UpstreamUnavailableError(`${what} → پاسخِ نامعتبر`);
   }
 }
@@ -284,9 +304,12 @@ export interface SitemapData {
 /** دادهٔ خامِ sitemap از API (GET /api/v1/seo/sitemap). نبودِ API → خالی. */
 export async function fetchSitemapData(revalidateSec = 3600): Promise<SitemapData> {
   const empty: SitemapData = { restaurants: [], cities: [], cuisines: [] };
-  if (!API_BASE) return empty;
+  // ⚠️ این گارد عمداً throw نمی‌کند و `empty` می‌دهد — رفتارش با سه گاردِ بالا
+  // فرق دارد و تنبل‌شدنِ خواندن نباید یکدستش کند.
+  const base = apiBase();
+  if (!base) return empty;
   try {
-    const res = await fetch(`${API_BASE}/api/v1/seo/sitemap`, { next: { revalidate: revalidateSec } });
+    const res = await fetch(`${base}/api/v1/seo/sitemap`, { next: { revalidate: revalidateSec } });
     if (!res.ok) return empty;
     const d = (await res.json()) as Partial<SitemapData>;
     return {

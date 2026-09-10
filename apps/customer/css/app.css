@@ -546,14 +546,10 @@ img{display:block;max-width:100%}
 .botnav-item svg{width:22px;height:22px}
 
 /* ─────────── AI STRIP ─────────── */
-.ai-strip{display:flex;align-items:center;gap:14px;color:var(--on-tint);background:linear-gradient(120deg,var(--blue-50),var(--teal-50));
-  border:1px solid var(--blue-100);border-radius:var(--r-lg);padding:14px 18px;margin-top:8px}
-.ai-strip-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--teal));
-  display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;flex-shrink:0;box-shadow:var(--sh)}
-.ai-strip-body{flex:1;min-width:0}
-.ai-strip-label{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
-.ai-strip-text{font-size:13px;color:inherit;line-height:1.5}
-.ai-strip-text b{color:var(--blue-600);font-weight:700}
+/* .ai-strip* حذف شد ۲۰۲۶-۰۹-۰۷ — نوارِ «پیشنهاد هوشمند» جعلی بود و از
+   index.html برداشته شد؛ دلیلِ کاملش آنجا ثبت است.
+   قاعده‌ی ".ai-strip .btn-ghost" در خطِ ~۱۸۰ عمداً دست‌نخورده ماند، چون با
+   ".ai-review" مشترک است — و آن یک فیچرِ جدا و مشروط است (detail.js:225). */
 
 /* ─────────── SHEET (bottom modal) ─────────── */
 .sheet-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.4);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);align-items:flex-end;justify-content:center}
@@ -745,6 +741,13 @@ img{display:block;max-width:100%}
 .loy-next{font-size:13px;opacity:.85;position:relative}
 .loy-prog{height:8px;background:rgba(255,255,255,.25);border-radius:4px;margin-top:14px;overflow:hidden;position:relative}
 .loy-prog-fill{height:100%;background:#fff;border-radius:4px}
+/* «امتیاز منقضی نمی‌شود» — عمداً بیرونِ کارت و کم‌صدا: یک اطمینانِ آرام، نه
+   یک بنرِ تبلیغاتی. رقبا انقضای امتیاز را پرشکایت‌ترین نقطه‌شان دارند؛ ما
+   خلافش را داریم و تا امروز هیچ‌جا نمی‌گفتیم. */
+.loy-noexpire{display:flex;align-items:center;gap:6px;margin-top:12px;padding:10px 12px;
+  background:var(--surface-2,rgba(0,0,0,.03));border-radius:var(--r-md,10px);
+  font-size:13px;color:var(--t2);line-height:1.6}
+.loy-noexpire svg{flex:none;color:var(--ok,#16A34A)}
 .perks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:20px}
 .perk{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;text-align:center}
 .perk-emoji{font-size:26px;margin-bottom:8px}

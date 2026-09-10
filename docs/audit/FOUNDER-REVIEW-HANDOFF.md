@@ -98,23 +98,32 @@ this one will visibly rot the moment `psql` is installed here or a gate changes.
 
 `docs/DECISIONS.md:30-35` describes the A-gates in prose; the rows below are the gates themselves.
 
-> تولیدشده توسطِ `node tools/report-gate-status.mjs` در 2026-09-04T07:33:06.807Z روی DESKTOP-8DAJNO5 (win32 10.0.26200, node v24.20.0). **این جدول یک عکسِ لحظه‌ای است، نه یک ادعای دائمی — دوباره اجرا کن، اعتماد نکن.**
+> تولیدشده توسطِ `node tools/report-gate-status.mjs` در 2026-09-07T04:45:35.326Z روی DESKTOP-8DAJNO5 (win32 10.0.26200, node v24.20.0). **این جدول یک عکسِ لحظه‌ای است، نه یک ادعای دائمی — دوباره اجرا کن، اعتماد نکن.**
 
 | Gate | Command | Exit | State | Note |
 |---|---|---|---|---|
 | Agent charter | `node tools/check-agent-charter.mjs` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/agent-charter.log` |
 | Control bytes | `node tools/check-control-bytes.mjs` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/control-bytes.log` |
-| Doc staleness | `node tools/check-doc-staleness.mjs` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/doc-staleness.log` (this gate's own file is being edited by another agent concurrently — re-run before trusting) |
+| Doc staleness | `node tools/check-doc-staleness.mjs` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/doc-staleness.log` |
 | Classic scripts | `sh tools/check-classic-scripts.sh` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/classic-scripts.log` |
 | Fonts | `python tools/check-fonts.py` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/fonts.log` |
-| Schema drift | `sh tools/check-schema-drift.sh` | **2** | **COULD_NOT_RUN** | `psql` is not on PATH on this machine. Round-20 gave this gate its own preflight (see `tools/check-schema-drift.sh` and `audit/round-20/GATE-HONESTY.md`): exit **2** now means "did not run" unambiguously, distinct from exit 1 ("drift found") — the raw 127 this used to produce was indistinguishable from either. evidence: `audit/round-20/gate-inventory/schema-drift.log` |
-| A1 destructive (`--scope local/rezervno_verify`) | `node tools/gate-destructive.mjs --scope local/rezervno_verify` | 0 | GREEN | green for that scope only. evidence: `audit/round-20/gate-inventory/destructive-local_rezervno_verify.log` |
-| A1 destructive (`--scope production`) | `node tools/gate-destructive.mjs --scope production` | 1 | RED | red, correctly — no drill recorded for production. evidence: `audit/round-20/gate-inventory/destructive-production.log` |
-| A2 deploy/DNS | `node tools/gate-deploy.mjs` | 1 | RED | no staging host, no domain. evidence: `audit/round-20/gate-inventory/deploy.log` |
-| A3 decision (`--id D-001`) | `node tools/gate-decision.mjs --id D-001` | 0 | GREEN | id auto-discovered from `docs/DECISIONS.md`, not hardcoded. evidence: `audit/round-20/gate-inventory/decision-D-001.log` |
-| A3 decision (`--id D-002`) | `node tools/gate-decision.mjs --id D-002` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/decision-D-002.log` |
-| A3 decision (`--id D-003`) | `node tools/gate-decision.mjs --id D-003` | 1 | RED | this row's `c.`/`f.` fields are literal `—` placeholders in the ledger, so the gate correctly denies it — the row was never meant to authorize an A-tier action. evidence: `audit/round-20/gate-inventory/decision-D-003.log` |
-| A4 real sends (`--recipients 1`) | `node tools/gate-send.mjs --recipients 1` | 1 | RED | no transport proof, Melipayamak key not rotated. evidence: `audit/round-20/gate-inventory/send.log` |
+| Schema drift | `sh tools/check-schema-drift.sh` | 2 | COULD_NOT_RUN | خودِ گیت اعلام کرد اجرا نشد (کدِ خروجِ ۲ — پیش‌نیازِ غایب/خراب، مثلِ psql). جزئیات در لاگِ خام. — evidence: `audit/round-20/gate-inventory/schema-drift.log` |
+| A1 destructive (--scope local/rezervno_verify) | `node tools/gate-destructive.mjs --scope local/rezervno_verify` | 1 | RED | evidence: `audit/round-20/gate-inventory/destructive-local_rezervno_verify.log` |
+| A1 destructive (--scope production) | `node tools/gate-destructive.mjs --scope production` | 1 | RED | evidence: `audit/round-20/gate-inventory/destructive-production.log` |
+| A2 deploy/DNS | `node tools/gate-deploy.mjs` | 1 | RED | evidence: `audit/round-20/gate-inventory/deploy.log` |
+| A3 decision (--id D-001) | `node tools/gate-decision.mjs --id D-001` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/decision-D-001.log` |
+| A3 decision (--id D-002) | `node tools/gate-decision.mjs --id D-002` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/decision-D-002.log` |
+| A3 decision (--id D-003) | `node tools/gate-decision.mjs --id D-003` | 1 | RED | evidence: `audit/round-20/gate-inventory/decision-D-003.log` |
+| A4 real sends (--recipients 1) | `node tools/gate-send.mjs --recipients 1` | 1 | RED | evidence: `audit/round-20/gate-inventory/send.log` |
+| Test runner completeness | `node tools/check-runner-completeness.mjs` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/runner-completeness.log` |
+| Manifest assets | `node tools/check-manifest-assets.mjs` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/manifest-assets.log` |
+| Alert ↔ metric binding | `node tools/check-alert-metric-binding.mjs` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/alert-metric-binding.log` |
+| Agent memory location | `node tools/check-agent-memory-location.mjs` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/agent-memory-location.log` |
+| XSS escaping regression | `node tools/xss-escaping-regression.mjs` | 0 | GREEN | evidence: `audit/round-20/gate-inventory/xss-escaping-regression.log` |
+| XSS sink audit (--check) | `node tools/xss-sink-audit.mjs --check` | 1 | RED | evidence: `audit/round-20/gate-inventory/xss-sink-audit-check.log` |
+| A1 restore drill executor (tools/restore-drill.sh) | `(اجرا نشد)` | — | UNKNOWN | اجراکننده است، نه گیت: واقعاً pg_dump/CREATE DATABASE/pg_restore/DROP DATABASE انجام می‌دهد. خودِ فایل هم تصریح می‌کند اجراکننده و تفسیرکننده (gate-destructive.mjs) عمداً جدا نگه داشته شده‌اند. این ابزار طبقِ محدودیتِ صریحِ خودش («فقط ارزیابی») چنین چیزی را اجرا نمی‌کند. |
+| boot-path (tools/check-boot-path.sh) | `(اجرا نشد)` | — | UNKNOWN | یک Postgresِ کاملاً خالی و دورانداختنی می‌سازد/می‌شکند و برایِ ۹ دقیقه یک سرورِ واقعی روی یک پورت بالا می‌آورد — یک jobِ سنگینِ CI است (ci.yml)، نه یک چکِ سبکِ محلی؛ به‌علاوه cwd را عوض می‌کند و روی وضعیتِ DB اثر می‌گذارد. |
+| CI-only jobs (build, test, image-build, security, observability, e2e, design-system, standalone, seo, landing, base-freshness) | `(اجرا نشد)` | — | UNKNOWN | در .github/workflows/ci.yml تعریف شده‌اند، نیازمندِ سرویس‌های Postgres/Redisِ CI، Docker build، یا مرورگرهایِ Playwright‌اند. این‌ها jobِ CI‌اند نه گیتِ محلیِ سبک؛ اجرایشان اینجا محدودیتِ «بدونِ عملِ سنگین/بیرونی» را نقض می‌کند. |
 
 **Deliberately not run, listed rather than silently skipped** (a missing result must never render as a
 pass):

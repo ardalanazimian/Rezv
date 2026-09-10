@@ -8,6 +8,26 @@
 // در Vercel تنظیم کن: NEXT_PUBLIC_SITE_URL=https://rezervno.ir
 export const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://rezervno.ir').replace(/\/$/, '');
 
+/**
+ * دامنه‌ی **اپِ مشتری** — همتایِ `appBase()` در `api/src/lib/public-urls.ts`.
+ *
+ * چرا همان نامِ متغیر (`NEXT_PUBLIC_APP_URL`) و نه یکی تازه: تا ۲۰۲۶-۰۸-۲۲
+ * دقیقاً همین اشتباه در `api/` بود — کد یک متغیر می‌خواند
+ * (`CUSTOMER_APP_URL`) و `.env.example` یکیِ دیگر را مستند می‌کرد
+ * (`NEXT_PUBLIC_CUSTOMER_APP_URL`)، پس متغیرِ مستندشده هیچ‌وقت خوانده
+ * نمی‌شد (`docs/KNOWN_LIMITATIONS.md:1878-1884`). حلِ آنجا تکیه بر یک
+ * منبعِ کانونیک بود؛ اینجا همان یکی است، نه یک نامِ موازیِ تازه.
+ *
+ * بدونِ override همیشه از رویِ SITE ساخته می‌شود (`app.<دامنه>`) — پس دیگر
+ * حالتِ «پیکربندی‌نشده» وجود ندارد و دکمه‌ی ورودِ اپِ مشتری هرگز به فرمِ
+ * تماس نمی‌افتد.
+ */
+export function appBase(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+  if (explicit) return explicit;
+  return SITE.replace(/^(https?:\/\/)/, '$1app.');
+}
+
 // برای افزودنِ زبان: یک ردیف اضافه کن، مثلاً { code: 'en', prefix: '/en' }.
 // prefix خالی = زبانِ پیش‌فرض روی ریشه‌ی مسیر.
 export const LOCALES: { code: string; prefix: string }[] = [

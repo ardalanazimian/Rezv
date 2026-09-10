@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import type { CouponKind, CustomerSegment } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
 import { Prisma } from '@prisma/client';
@@ -40,15 +41,15 @@ async function makeUser(): Promise<string> {
 }
 
 async function makeCoupon(opts: {
-  code: string; kind?: string; value?: number;
+  code: string; kind?: CouponKind; value?: number;
   maxRedemptions?: number | null; perUserLimit?: number;
   isActive?: boolean; validFrom?: Date; validUntil?: Date | null;
-  targetSegment?: string | null;
+  targetSegment?: CustomerSegment | null;
 }): Promise<string> {
   const c = await db.coupon.create({
     data: {
       restaurantId, code: opts.code.toUpperCase(),
-      kind: (opts.kind ?? 'percent') as never, value: opts.value ?? 20,
+      kind: opts.kind ?? 'percent', value: opts.value ?? 20,
       maxRedemptions: opts.maxRedemptions === undefined ? null : opts.maxRedemptions,
       perUserLimit: opts.perUserLimit ?? 1,
       isActive: opts.isActive ?? true,

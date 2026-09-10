@@ -166,7 +166,7 @@ same-origin هم `Origin` می‌فرستد و `middleware.ts` هر مبدأِ �
 | `SITE_API_BASE` | apps/landing (سرور) | خواندنِ محتوا در SSR/ISR و sitemap |
 | `NEXT_PUBLIC_API_BASE` | apps/landing (مرورگر) | فرم‌های دمو/خرید/تماس و استودیو |
 | `NEXT_PUBLIC_BUSINESS_APP_URL` | apps/landing | لینکِ ورود به پنلِ کسب‌وکار |
-| `NEXT_PUBLIC_CUSTOMER_APP_URL` | apps/landing | لینکِ ورود به اپِ مشتری |
+| `NEXT_PUBLIC_APP_URL` (اختیاری) | apps/landing | لینکِ اپِ مشتری («رزرو میز» در هدر و درِ `/login`)؛ بدونِ آن از `NEXT_PUBLIC_SITE_URL` استخراج می‌شود (`app.<دامنه>`) — همتایِ `api/src/lib/public-urls.ts`. جایگزینِ نامِ حذف‌شده‌ی `NEXT_PUBLIC_CUSTOMER_APP_URL` (۲۰۲۶-۰۹-۰۸) |
 | `NEXT_PUBLIC_COMPANY_APP_URL` | apps/landing | لینکِ ورود به پنلِ شرکت |
 | `ALLOWED_ORIGINS` | api | **باید دامنه‌ی سایت را شامل شود** وگرنه فرم‌ها CORS می‌خورند |
 | `SALES_NOTIFY_EMAIL` | api (یا تنظیمِ `sales_notify_email`) | گیرنده‌ی اعلانِ سفارش/پیام |

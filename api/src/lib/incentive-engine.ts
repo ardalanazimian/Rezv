@@ -50,7 +50,7 @@ export interface RankIncentivesInput {
   hasActiveAbuseFlag: boolean;
   lowDemandDay: { date: string; ratio: number } | null;
   missions: { id: string; title: string; kind: string; progress: number; targetCount: number; completed: boolean; claimed: boolean }[];
-  rewardItems: { id: string; title: string; costCoins: number; minTier: string; unlocked: boolean; inStock: boolean }[];
+  rewardItems: { id: string; title: string; costCoins: number; minTier: string; unlocked: boolean; inStock: boolean; deliverable: boolean }[];
 }
 
 /**
@@ -103,8 +103,12 @@ export function rankIncentives(input: RankIncentivesInput): IncentiveSuggestion[
   }
 
   if ((input.reputationTier === 'gold' || input.reputationTier === 'platinum') && input.reliabilityScore >= 85) {
+    // ⚠️ `deliverable` عمداً در همین فیلتر است: تا ۲۰۲۶-۰۹-۰۹ این موتور
+    // گران‌ترین آیتمِ بازشده را پیشنهاد می‌داد حتی اگر آن آیتم هیچ چیزی
+    // تحویل نمی‌داد — یعنی پلتفرم *فعالانه* کاربرِ معتبر را به خریدی هُل
+    // می‌داد که سکه‌اش را می‌گرفت و چیزی نمی‌داد. بدترین نمونه‌ی آن کلاس.
     const bestUnlocked = input.rewardItems
-      .filter((r) => r.unlocked && r.inStock)
+      .filter((r) => r.unlocked && r.inStock && r.deliverable)
       .sort((a, b) => b.costCoins - a.costCoins)[0];
     if (bestUnlocked) {
       out.push({ kind: 'reward', ref_id: bestUnlocked.id, title: bestUnlocked.title, reason: 'به‌عنوانِ مهمانِ معتبر، این جایزه برایِ تو باز شده', priority: 70 });
@@ -195,6 +199,7 @@ export async function getIncentivesForUser(userId: string, restaurantId?: string
     })),
     rewardItems: rewardItems.map((r) => ({
       id: r.id, title: r.title, costCoins: r.cost_coins, minTier: r.min_tier, unlocked: r.unlocked, inStock: r.in_stock,
+      deliverable: r.deliverable,
     })),
   });
 }

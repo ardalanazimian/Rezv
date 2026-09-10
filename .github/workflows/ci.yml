@@ -34,7 +34,25 @@ jobs:
           # «هنوز کامیت نشده» کهنه بود. `npm ci` واقعاً قفل را رعایت می‌کند.
 
       - name: Install dependencies
-        run: npm ci || npm install
+        # ⚠️ `|| npm install` در ۲۰۲۶-۰۹-۱۰ از هر هشت job برداشته شد (یافته‌ی
+        # Red Team، RT-10). `npm ci` عمداً **فقط** lockfile را نصب می‌کند و
+        # شکستش تقریباً همیشه یک معنی دارد: «package.json و package-lock.json
+        # هم‌خوان نیستند». آن fallback **دقیقاً همان سیگنال** را می‌بلعید و job
+        # را روی مجموعه‌ی وابستگیِ حل‌شده‌ی تازه ادامه می‌داد.
+        #
+        # اثباتِ اجراشده، نه استدلال (یک وابستگی که در lockfile نبود تزریق شد):
+        #     npm ci                 →  exit 1  «can only install packages when … in sync»
+        #     npm ci || npm install  →  exit 0  ← پوشاند
+        #     پس از بازگشت           →  exit 0
+        #
+        # گیت نمی‌شکست، پس fake-green نبود — ولی «CI سبز شد» معنایش را از دست
+        # می‌داد: دیگر یعنی «روی وابستگی‌های پین‌شده سبز شد» نبود، و آن تفاوت
+        # فقط روزی معلوم می‌شود که یک وابستگی رفتارش عوض شود.
+        #
+        # ⚠️ و کامنتِ چند خط بالاتر همین را ادعا می‌کرد («`npm ci` واقعاً قفل را
+        # رعایت می‌کند») در حالی که خطِ زیرش خنثی‌اش می‌کرد — سندی که کدِ
+        # بغلش نقضش می‌کند، همان کلاسِ «سندی که دروغ می‌گوید» است.
+        run: npm ci
 
       - name: Generate Prisma client
         run: npx prisma generate
@@ -97,7 +115,7 @@ jobs:
           # «هنوز کامیت نشده» کهنه بود. `npm ci` واقعاً قفل را رعایت می‌کند.
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Run migrations
         run: |
@@ -166,7 +184,7 @@ jobs:
           cache-dependency-path: api/package-lock.json
       - name: Install dependencies
         working-directory: api
-        run: npm ci || npm install
+        run: npm ci
       - name: Generate Prisma client
         working-directory: api
         run: npx prisma generate
@@ -265,7 +283,7 @@ jobs:
           cache-dependency-path: api/package-lock.json
       - name: Install dependencies
         working-directory: api
-        run: npm ci || npm install
+        run: npm ci
       - name: Generate Prisma client
         working-directory: api
         run: npx prisma generate
@@ -309,7 +327,7 @@ jobs:
           # package-lock.json از ۲۰۲۶-۰۷-۲۹ کامیت شده — کامنتِ قبلی که می‌گفت
           # «هنوز کامیت نشده» کهنه بود. `npm ci` واقعاً قفل را رعایت می‌کند.
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
       - name: Audit dependencies
         # ⚠️ فیکسِ حسابرسیِ ۲۰۲۶-۰۷-۱۹ (FINAL-PRODUCTION-AUDIT.md بخشِ ۶): قبلاً اینجا
         # `|| true` بود یعنی حتی یک CVE بحرانی هم build را نمی‌شکست، فقط لاگ می‌شد.
@@ -366,6 +384,54 @@ jobs:
       - name: هر متریکِ استفاده‌شده در alerts.yml در کد اعلام شده؟ (بایندینگِ متریک↔آلارم)
         run: node tools/check-alert-metric-binding.mjs
 
+      # DS-001 (نشستِ Designer): همان تکنیکِ بالا روی جفتِ جدید — ثابت‌هایِ
+      # وفاداری در `api/src/lib/loyalty.ts` اعلام می‌شوند و در چند فایلِ فرانت
+      # **دوباره تایپ** شده‌اند. هیچ تستی این را نمی‌گیرد: هر دو سمت به‌تنهایی
+      # درست‌اند و فقط با هم غلط می‌شوند. زخمش ثبت است — کاربری با ۹۰۰ امتیاز
+      # در یک صفحه «نقره‌ای» و در صفحه‌ی دیگر «طلایی» دید.
+      #
+      # ⚠️ ارقامِ متنِ UI فارسی‌اند. یک گاردِ grepِ لاتین اینجا **سبزِ کاذب**
+      # می‌دهد: روی features/loyalty.js صفر hit و روی features/rewards.js چهار
+      # hit — خروجی شبیهِ پوشش است و کسی دنبالِ آن صفر نمی‌گردد. گارد قبل از
+      # مقایسه normalize می‌کند و رشته‌یِ **کاملِ** رقم را می‌سنجد («۱۰۰»
+      # زیررشته‌ی «۱۰۰۰» است — همان خانواده‌ی باگِ /پر|ظرفیت/).
+      - name: هر ثابتِ وفاداری در UI به تعریفش در کد بسته است؟ (بایندینگِ ثابت↔متن)
+        run: node tools/check-loyalty-constant-binding.mjs
+
+      # DS-003 §۴‑۴: `RStatus` در lifecycle.ts تعریف می‌شود و برچسبِ فارسی‌اش در
+      # `STATUS_META` جدا نگه داشته می‌شود. هیچ تستی این جفت را نمی‌بیند — هر دو
+      # سمت به‌تنهایی درست‌اند. اگر بک‌اند وضعیتی اضافه کند، پنل خطا نمی‌دهد:
+      # `STATUS_META[s]?.label || s` بی‌صدا کلیدِ خامِ انگلیسی را به پرسنل نشان
+      # می‌دهد — همان شکلِ خرابی که مهمانِ پلاتینیوم را پشتِ میزِ پذیرش با رشته‌ی
+      # `platinum` نشان می‌داد.
+      #
+      # مکملِ `api/tests/`‌ی این دامنه است، نه تکرارش: تست می‌پرسد «آیا فقط یک
+      # نگاشت هست؟»، این می‌پرسد «آیا آن یک نگاشت همه را دارد؟». امروز هر دو
+      # حالت واقعاً رخ داده بود.
+      #
+      # ترتیب عمدی بود: گارد تا `93a2ed3` قرمز بود (دو وضعیتِ قدیمی برچسب
+      # نداشتند) و تا سبز نشد کاشته نشد — گاردی که سبزشدنش به کارِ انجام‌نشده
+      # وابسته باشد، آدم‌ها را یاد می‌دهد دورش بزنند.
+      - name: هر وضعیتِ رزرو در پنل برچسبِ فارسی دارد؟ (بایندینگِ وضعیت↔برچسب)
+        run: node tools/check-status-label-binding.mjs
+
+      # دستورِ ۰۴۲: ۵۶ از ۱۰۴ ادعایِ `assert.rejects` هویتِ شکست را نمی‌سنجند —
+      # ۳۳ بدونِ آرگومانِ دوم، و ۲۳ با یک **رشته** که Node آن را پیامِ خطای خودِ
+      # assert می‌خواند، نه انتظار. «ضعیف» یعنی غلط نیست: این‌ها واقعاً ثابت
+      # می‌کنند رد شد. نقص باریک‌تر است — سبز می‌مانند اگر **هویتِ** شکست عوض
+      # شود، همان شکلِ «P2028 که ۵۰۰ می‌داد».
+      #
+      # ⚠️ ratchet روی دیف، **نه** sweep روی مخزن. بازنویسیِ ۵۶ ادعا در یک
+      # کامیت دیفی می‌سازد که کسی نمی‌تواند بازبینی کند. فقط ادعاهایِ **تازه**
+      # سنجیده می‌شوند؛ کدِ موجود هنگامِ تماس تنگ می‌شود.
+      #
+      # baseِ دیف عمداً دو حالته است، چون کارِ روزمره‌ی این مخزن **کامیتِ
+      # مستقیم روی main** است نه PR: گیتی که فقط روی pull_request اجرا شود
+      # عملاً هرگز اجرا نمی‌شود. روی push از `event.before` استفاده می‌کنیم و
+      # روی PR از baseِ خودش. baseِ resolve‌نشده خطاست، نه سبز.
+      # (این گیت عمداً در jobِ جداگانه‌ی `rejects-ratchet` است، نه اینجا —
+      #  به یک checkoutِ کامل نیاز دارد و این job عمداً کم‌عمق مانده.)
+
   # ── مرحله ۴: E2E (Playwright، اپ کاستومر — API کاملاً mock می‌شود، بدونِ نیاز به DB/بک‌اند) ──
   e2e:
     runs-on: ubuntu-latest
@@ -396,7 +462,7 @@ jobs:
           cache-dependency-path: e2e/package-lock.json
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Run E2E tests
         run: npm test
@@ -446,6 +512,14 @@ jobs:
       # تصحیح فقط در تاریخچه‌ی چت زندگی می‌کرد و هیچ گیتی نمی‌دیدش.
       - name: Docs are not stale (repo address, proxy hosts, env vars)
         run: node tools/check-doc-staleness.mjs
+      # ⚠️ گاردِ خواهر، ۲۰۲۶-۰۹-۰۹: آن یکی **محتوای** ادعا را می‌سنجد، این یکی
+      # **مقصدِ ارجاع** را. `api/vercel.json` در ۰۸-۲۸ حذف شد و یازده سندِ زنده
+      # هنوز نامش را می‌بردند؛ هزینه‌اش فرضی نبود — نشستِ CEO دنبالش گشت، نیافت،
+      # و در سندی که مالک می‌خواند نوشت «هیچ زمان‌بندی‌ای وجود ندارد». سه ادعا
+      # از آن یک جمله باطل شد. سندی که خواننده را به نامِ اشتباه می‌فرستد،
+      # همان‌قدر خطرناک است که سندی که دروغ می‌گوید.
+      - name: Live docs do not point at files that no longer exist
+        run: node tools/check-doc-path-refs.mjs
       # ششمین نمونهی fake-green و اولینی که از خواندنِ کد پیدا نمیشد: یک بایتِ
       # backspace که heredoc تولید کرده بود، یک regex را بیصدا از کار انداخت.
       - name: No invisible control bytes in runnable files
@@ -462,6 +536,38 @@ jobs:
       # بود). تا امروز، ۱۵۷ فایلِ تست فقط با انضباطِ انسانی محافظت می‌شدند.
       - name: Every test file is actually imported by the runner
         run: node tools/check-runner-completeness.mjs
+      # ⚠️ ۲۰۲۶-۰۹-۰۸: ۸ فیکسچرِ تستِ integration یک مقدارِ ساعتِ اجرا
+      # (`Date.now()`) را با `.toISOString().slice(0, 10)` به کلیدِ UTC تبدیل
+      # می‌کردند و به `createReservation` می‌دادند — همان چیزی که
+      # `tests/hours.test.mts:148` آن را ممنوع مستند می‌کند، چون نزدیکِ
+      # نیمه‌شبِ تهران (UTC+۳:۳۰) روزِ اشتباه را هدف می‌گیرد. سه‌تای آن‌ها
+      # گاردِ double-booking بودند.
+      - name: No run-clock value turned into a UTC date key in api/tests
+        run: node tools/check-run-clock-date-keys.mjs
+      # ⚠️ دو بار رخ داده و بارِ اول واقعاً کامیت شد: عاملی که cwdش `api/` است
+      # حافظه‌اش را در `api/.claude/agent-memory/` می‌نویسد. الگوهای `.claude/`ِ
+      # `.gitignore`ِ ریشه مسیرِ **تودرتو** را نمی‌گیرند، پس آن پوشه untracked
+      # ولی ignore‌نشده می‌ماند و یک `git add -A` حافظه‌ی خصوصیِ عامل را واردِ
+      # مخزنِ عمومی می‌کند. `.gitignore` جوابش نیست: ریشه‌ی `.claude/` عمداً
+      # tracked است (۳۸ فایل)، پس نگه‌داشتنی و ردکردنی هم‌نام‌اند — تشخیص لازم
+      # است نه پنهان‌کردن.
+      - name: Agent memory lives only at the repo root
+        run: node tools/check-agent-memory-location.mjs
+      # ⚠️ manifestِ اپِ مشتری دو آیکون وعده می‌داد که **هیچ‌کدام وجود نداشتند**،
+      # پس PWA اصلاً نصب نمی‌شد — و تا هفته‌ی انتشار زنده ماند چون هیچ‌چیز خطا
+      # نمی‌داد: faviconِ SVG تب را درست نشان می‌داد، sw این دو را precache
+      # نمی‌کرد، و buildِ standalone تگ‌ها را حذف می‌کند. یک قابلیتِ غایب هیچ
+      # خطایی منتشر نمی‌کند.
+      - name: Every manifest icon exists on disk
+        run: node tools/check-manifest-assets.mjs
+      # ⚠️ وعده‌ی کاربر باید با مکانیزم هم‌داستان بماند (۲۰۲۶-۰۹-۰۷).
+      # صفحه‌ی وفاداریِ اپِ مشتری می‌گوید «امتیازهات هیچ‌وقت منقضی نمی‌شن».
+      # امروز درست است (PointsLedger ستونِ انقضا ندارد، هیچ کرونی امتیاز کم
+      # نمی‌کند)، ولی متن در اپِ وانیلا است و مکانیزم در Prisma/کرون — دو
+      # مرجعِ جدا. بدونِ این گارد، افزودنِ انقضا آن جمله را بی‌صدا به دروغ
+      # تبدیل می‌کرد و هیچ تستِ موجودی نمی‌گرفتش.
+      - name: Loyalty promise matches the mechanism
+        run: node tools/check-loyalty-promise.mjs
       # ⚠️ XSSِ ذخیره‌شده‌ی واقعی (۲۰۲۶-۰۸-۲۵): `cardHTML` در فیدِ مشتری فیلدِ
       # `cuisine` را بدونِ esc داخلِ innerHTML می‌گذاشت. آن فیلد را صاحبِ رستوران
       # می‌نویسد (فقط `max(50)`، بدونِ پاک‌سازیِ HTML) و از APIِ عمومی به فیدِ
@@ -497,7 +603,17 @@ jobs:
         run: python tools/build-standalone.py --check
 
   # ── اپِ SEO (apps/seo · Next.js SSR/ISR، ADR 0001) — build + typecheck + lint ──
-  # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند. build خودِ Next تایپ‌چک/لینت می‌کند.
+  # پروژه‌ی مستقل؛ خرابیِ اینجا به اپ‌های static آسیب نمی‌زند.
+  #
+  # ⚠️ ۲۰۲۶-۰۹-۰۸ — کامنتِ قبلی می‌گفت «build خودِ Next تایپ‌چک/لینت می‌کند».
+  #    نیمه‌ی تایپ‌چک درست است، نیمه‌ی لینت **نبود**. اندازه‌گیری‌شده، نه خوانده:
+  #
+  #      متغیرِ بی‌استفاده تزریق شد →  npm run build  → exit 0  (هیچ اشاره‌ای)
+  #                                    npm run lint   → exit 1  (no-unused-vars)
+  #
+  #    یعنی این اپ تا امروز **هرگز lint نشده بود** — نه اینجا و نه هیچ‌جای دیگر
+  #    (`npm run lint` فقط در جابِ api و landing صدا زده می‌شد). اسکریپتش وجود
+  #    داشت و هیچ‌کس اجرایش نمی‌کرد. گامِ صریحِ زیر اضافه شد.
   seo:
     runs-on: ubuntu-latest
     defaults:
@@ -512,10 +628,12 @@ jobs:
           cache: 'npm'
           cache-dependency-path: apps/seo/package-lock.json
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
       - name: Schema unit tests (JSON-LD sanity — پایشِ خودکار)
         run: npm test
-      - name: Build (Next.js — typecheck + lint + build)
+      - name: Lint (eslint:recommended — `next build` این را اجرا نمی‌کند)
+        run: npm run lint
+      - name: Build (Next.js — typecheck + build)
         run: npm run build
 
   # ── وب‌سایتِ عمومی (apps/landing · Next.js SSR/ISR، ADR 0002) ──
@@ -536,7 +654,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: apps/landing/package-lock.json
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
       - name: Unit tests (JSON-LD، Markdownِ امن، محتوای پیش‌فرض)
         run: npm test
       - name: Type check
@@ -561,6 +679,37 @@ jobs:
   # توصیف می‌کند). فقط وقتی قرمز می‌شود که **همپوشانیِ واقعیِ فایل** وجود داشته
   # باشد: یعنی main و این PR هر دو یک فایل را از زمانِ merge-base عوض کرده باشند.
   # این دقیقاً همان شرطی است که هر سه شکستِ آن روز را تولید کرد.
+  # ── ratchetِ ماچرِ assert.rejects (دستورِ ۰۴۲) ──
+  #
+  # چرا jobِ جدا و نه یک stepِ کنارِ بقیه‌ی گیت‌ها: این تنها گیتی است که به
+  # **تاریخچه** نیاز دارد، نه فقط به درختِ کاری. `observability` عمداً
+  # checkoutِ کم‌عمق دارد؛ افزودنِ این step به آن یا کلِ آن job را کند می‌کرد
+  # یا — بدتر — با `merge-base` روی کلونِ عمق‌۱ می‌شکست و CI را برای همه قرمز
+  # می‌کرد بدونِ اینکه ربطی به کیفیتِ تست داشته باشد.
+  #
+  # baseِ دیف دو حالته است، چون کارِ روزمره‌ی این مخزن **کامیتِ مستقیم روی
+  # main** است نه PR: گیتی که فقط روی pull_request اجرا شود عملاً هرگز اجرا
+  # نمی‌شود، و گاردی که اجرا نمی‌شود بدتر از نبودنش است — ظاهرِ پوشش دارد.
+  rejects-ratchet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # لازم: بدونِ تاریخچه، merge-base و event.before هیچ‌کدام resolve
+          # نمی‌شوند و ابزار عمداً خطا می‌دهد به‌جای سبزِ کاذب.
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: fetch base
+        if: github.event_name == 'pull_request'
+        run: git fetch --quiet origin "${{ github.base_ref }}"
+      - name: ادعاهایِ assert.rejectsِ تازه ماچر دارند؟ (ratchet، نه sweep)
+        env:
+          REJECTS_BASE: >-
+            ${{ github.event_name == 'pull_request'
+                && format('origin/{0}', github.base_ref)
+                || github.event.before }}
+        run: node tools/check-rejects-matcher.mjs
+
   base-freshness:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

@@ -220,33 +220,104 @@ async function doCancelRes(i){
   await changeStatus(i,'cancelled',reason);
 }
 // تولید تاریخ‌های شمسی تا ۱ ماه آینده (نمونه: از پنجشنبه ۱۵ خرداد)
+// ⚠️ رفعِ B-01 (blocker، ۲۰۲۶-۰۹-۰۷): این تابع قبلاً تقویمِ خودش را از یک
+// تاریخِ **ثابتِ هاردکد** می‌ساخت (`day=15, mon=2, wd=5` — پنجشنبه ۱۵ خرداد) با
+// `monthLen[11]` همیشه ۲۹، در حالی که `manualDateToISO` مقدارِ ارسالی را از
+// `new Date()`ِ واقعی می‌ساخت. دو محاسبه‌ی مستقل ⇒ برچسبی که پرسنل می‌بیند با
+// تاریخی که ثبت می‌شود فقط وقتی یکی بود که امروز واقعاً ۱۵ خرداد باشد.
+// اندازه‌گیریِ زنده در روزِ رفع: برچسبِ «سه‌شنبه ۲۰ خرداد» در برابرِ تاریخِ
+// ثبت‌شده‌ی 2026-09-12 («شنبه ۲۱ شهریور») — سه ماه و یک روزِ هفته فاصله.
+//
+// رفع، ریشه‌ای نه ظاهری: هر دو حالا از **یک** منبع می‌آیند (`manualDateFor`)،
+// پس از تعریف نمی‌توانند واگرا شوند. تقویمِ جلالی هم دستی حساب نمی‌شود —
+// `toLocaleDateString('fa-IR')` این کار را با کبیسه‌ی درست انجام می‌دهد، پس
+// جدولِ `monthLen` و مسئله‌ی کبیسه‌ی اسفند کلاً حذف شدند.
 function buildDateOptions(){
-  const weekdays=['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه'];
-  const months=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
-  const monthLen=[31,31,31,31,31,31,30,30,30,30,30,29];
-  // شروع: پنجشنبه ۱۵ خرداد (ماه index 2)، پنجشنبه = index 5 در weekdays
-  let day=15, mon=2, wd=5;
   let opts='';
   for(let i=0;i<=30;i++){
-    const label=`${weekdays[wd]} ${fa(day)} ${months[mon]}`;
     const val=i===0?'today':i===1?'tomorrow':'d'+i;
+    const label=manualDateLabel(val);
     const prefix=i===0?'امروز — ':i===1?'فردا — ':'';
     opts+=`<option value="${val}" data-label="${label}">${prefix}${label}</option>`;
-    // پیش‌رفتن یک روز
-    wd=(wd+1)%7;
-    day++;
-    if(day>monthLen[mon]){day=1;mon=(mon+1)%12}
   }
   return opts;
 }
-// تبدیل مقدار تاریخ پنل (today/tomorrow/dN) و ساعت فارسی به فرمت ISO که بک‌اند می‌خواهد
-function manualDateToISO(dateVal, faTime){
-  const now=new Date();
+
+/**
+ * تنها منبعِ تاریخ برای رزروِ دستی. هم برچسبِ گزینه و هم مقداری که POST می‌شود
+ * از همین می‌آیند — به همین دلیل نمی‌توانند از هم بیفتند.
+ */
+/**
+ * تایم‌زونِ رستوران. پنل از قبل لودش می‌کند (`crm.js:797` → `HOURS_STATE`)،
+ * پس هیچ درخواستِ تازه‌ای لازم نیست — فقط کسی وصلش نکرده بود.
+ */
+function manualTz(){
+  return (typeof HOURS_STATE !== 'undefined' && HOURS_STATE && HOURS_STATE.timezone)
+    || 'Asia/Tehran';
+}
+
+/**
+ * تنها منبعِ تاریخ برای رزروِ دستی. هم برچسبِ گزینه و هم مقداری که POST می‌شود
+ * از همین می‌آیند — به همین دلیل نمی‌توانند از هم بیفتند.
+ *
+ * ⚠️ رفعِ دستورِ ۰۴۵ (یافته‌ی بازبین، ۲۰۲۶-۰۹-۱۰): تا پیش از این، «امروز» از
+ * **ساعتِ دستگاهِ پرسنل** می‌آمد (`new Date()` + اجزای محلی + برچسبِ بدونِ
+ * `timeZone`). تبلتی که روی UTC مانده — خیلی محتمل‌تر از کشورِ دوم — ساعتِ
+ * ۰۲:۳۰ تهران را «دیروز» می‌دید و رزروِ تلفنی یک روز غلط ثبت می‌شد.
+ *
+ * ⚠️ و نکته‌ی تیزِ ماجرا: رفعِ قبلی (B-01) **درست** بود — دو محاسبه‌ی یک
+ * واقعیت را به یک منبع رساند — ولی آن یک منبع ساعتِ دستگاه بود. پس برچسب و
+ * مقدار از «واگرا و دیدنی» به **«هم‌خوان و هر دو غلط»** رفتند. توافق شبیهِ
+ * درستی خوانده می‌شود؛ این بدتر از اختلاف است.
+ *
+ * ⚠️ قاعده همان قاعده‌ی سرور است، نه پیاده‌سازیِ دوم: `hours.ts:63-81`
+ * (`dateInTz`/`dateKeyInTz`) روزِ تقویمیِ محلی را با `Intl` و `timeZone`
+ * می‌گیرد. `api/tests/manual-date-tz-parity.test.mts` برابریِ این دو را روی
+ * تایم‌زون‌ها و لحظه‌های مرزی **اثبات** می‌کند — چون کدِ سرور قابلِ import
+ * در پنلِ مرورگر نیست، تنها راهِ «یک قاعده» اثباتِ برابری است.
+ *
+ * لنگر عمداً **ظهرِ UTC** است: روزِ تقویمیِ رستوران را نگه می‌دارد و با
+ * جابه‌جاییِ ساعتِ تابستانی هم از مرزِ روز رد نمی‌شود.
+ */
+function manualDateFor(dateVal){
   let offset=0;
   if(dateVal==='tomorrow')offset=1;
   else if(/^d\d+$/.test(dateVal))offset=parseInt(dateVal.slice(1))||0;
-  const t=new Date(now); t.setDate(now.getDate()+offset);
-  const iso=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  const dtf=new Intl.DateTimeFormat('en-CA',{
+    timeZone:manualTz(), year:'numeric', month:'2-digit', day:'2-digit',
+  });
+  const parts={};
+  for(const p of dtf.formatToParts(new Date())) parts[p.type]=p.value;
+  const t=new Date(Date.UTC(+parts.year, +parts.month-1, +parts.day, 12, 0, 0));
+  t.setUTCDate(t.getUTCDate()+offset);
+  return t;
+}
+
+/**
+ * برچسبِ فارسیِ همان تاریخ — با تقویمِ جلالیِ خودِ محیط، نه حسابِ دستی.
+ *
+ * ⚠️ `timeZone:'UTC'` عمدی است و تبدیلِ دوباره نیست: `manualDateFor` تاریخ را
+ * روی ظهرِ UTC لنگر می‌اندازد تا **همان روزِ تقویمیِ رستوران** را نمایندگی کند.
+ * پس خواندنش در UTC همان روز را می‌دهد. بدونِ این گزینه، مرورگر دوباره به
+ * تایم‌زونِ دستگاه می‌برد و همان نقص از درِ دیگر برمی‌گشت.
+ */
+function manualDateLabel(dateVal){
+  return manualDateFor(dateVal).toLocaleDateString('fa-IR',{
+    timeZone:'UTC', weekday:'long', day:'numeric', month:'long',
+  });
+}
+// تبدیل مقدار تاریخ پنل (today/tomorrow/dN) و ساعت فارسی به فرمت ISO که بک‌اند می‌خواهد
+function manualDateToISO(dateVal, faTime){
+  // ⚠️ B-01: تاریخ اینجا **دوباره حساب نمی‌شود** — از همان `manualDateFor` می‌آید
+  // که برچسبِ گزینه هم از آن ساخته شده. دو محاسبه‌ی جدا دقیقاً همان چیزی بود که
+  // برچسب و مقدار را از هم انداخت.
+  const t=manualDateFor(dateVal);
+  // ⚠️ اجزای **UTC** خوانده می‌شوند، نه محلی — به همان دلیلِ `timeZone:'UTC'`
+  // در برچسب: لنگرِ ظهرِ UTC نماینده‌ی روزِ تقویمیِ رستوران است. با
+  // `getFullYear()`ِ محلی، همان باگِ ساعتِ دستگاه از مسیرِ مقدار برمی‌گشت —
+  // این‌بار بی‌صدا، چون برچسب درست می‌ماند و **فقط چیزی که POST می‌شود** غلط
+  // می‌شد. یعنی دقیقاً وارونه‌ی نقصِ اولیه و سخت‌تر برای دیدن.
+  const iso=t.getUTCFullYear()+'-'+String(t.getUTCMonth()+1).padStart(2,'0')+'-'+String(t.getUTCDate()).padStart(2,'0');
   const time=String(faTime||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).trim()||'20:00';
   return {date:iso,time};
 }
@@ -261,7 +332,11 @@ function openManual(){
       <div><div class="field-label">میز</div><select class="inp" id="mTable">${TABLES.filter(t=>t.s==='free').map(t=>`<option value="${t.n}">${esc(tableLabel(t))}</option>`).join('')}</select></div>
       <div><div class="field-label">نفر</div><select class="inp" id="mParty"><option>۲</option><option>۳</option><option>۴</option><option>۵</option><option>۶</option><option>۸</option></select></div>
     </div>
-    <button class="btn btn-primary btn-lg btn-block" onclick="saveManual()">ثبت رزرو</button>`);
+    <button class="btn btn-primary btn-lg btn-block" id="mSave" onclick="saveManual()">ثبت رزرو</button>`);
+  // یک کلیدِ idempotency به‌ازای هر بار باز شدنِ مودال = یک «تلاش». تلاشِ
+  // دوباره روی همان مودال همان کلید را می‌برد، پس سرور replay می‌کند.
+  manualIdemKey=genIdempotencyKey();
+  manualSaving=false;
 }
 // ═══ WALK-IN (ورود بدون رزرو) ═══
 async function openWalkin(){
@@ -297,7 +372,14 @@ async function walkinLookup(){
     ? `<select class="inp" id="wTable"><option value="">— بعداً تخصیص می‌دم —</option>${tableOptions}</select>`
     : `<select class="inp" id="wTable" disabled><option value="">میز خالی موجود نیست</option></select><div style="font-size:11px;color:var(--t3);margin-top:4px">همه‌ی میزها پرن — می‌تونی بعداً از پلان سالن تخصیص بدی</div>`;
   if(member){
-    const tierName={gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'}[member.tier]||member.tier;
+    // ⚠️ `platinum` اینجا نبود (یافته‌ی DS-001، نشستِ Designer `rezv-f3`):
+    // `LOYALTY_TIERS` در `api/src/lib/loyalty.ts:114-119` **چهار** سطح دارد و این
+    // نگاشت سه‌تا داشت. یعنی گران‌ترین مهمانِ رستوران، پشتِ میزِ پذیرش با رشته‌ی
+    // خامِ انگلیسیِ `platinum` به پرسنل نشان داده می‌شد.
+    // هرگز دیده نشد چون `||member.tier` یک fallbackِ بی‌صداست: نه استثنا، نه لاگ،
+    // نه صفحه‌ی شکسته — فقط بد.
+    // نام‌ها عمداً با `LOYALTY_TIERS` یکی‌اند، مثلِ `loyalty.js:38` که از قبل کامل بود.
+    const tierName={platinum:'پلاتینیوم',gold:'طلایی',silver:'نقره‌ای',bronze:'برنزی'}[member.tier]||member.tier;
     openModal(`
       <div style="text-align:center;margin-bottom:6px"><div style="width:56px;height:56px;border-radius:50%;background:var(--teal-50);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">${icon('user',{size:28})}</div></div>
       <div class="modal-title" style="text-align:center">${esc(member.fn)} ${esc(member.ln)} خوش اومدی!</div>
@@ -417,7 +499,21 @@ async function walkinNewSave(rawPhone){
   await walkinCheckinReal(rawPhone,fn,ln,(bd&&bm)?[bd,bm]:null);
 }
 
+// ⚠️ رفعِ B-02 (۲۰۲۶-۰۹-۰۷): گاردِ in-flight برای «ثبت رزرو».
+//
+// قبلاً دکمه قفل نمی‌شد و `saveManual` هیچ گاردی نداشت، پس دو کلیکِ هم‌پوشان
+// (شبکه‌ی کند — دقیقاً حالتی که آدم دوباره می‌زند) دو بار وارد تابع می‌شدند.
+// کلیدِ idempotency هم نجات نمی‌داد چون **داخلِ** خودِ تابع ساخته می‌شد: هر
+// کلیک کلیدِ تازه ⇒ سرور آن را دو عملیاتِ متفاوت می‌دید ⇒ دو رزرو.
+// اندازه‌گیریِ زنده پیش از رفع: دو کلیک ⇒ `2` رزرو.
+//
+// کلید حالا هنگامِ **باز شدنِ مودال** ساخته می‌شود، یعنی یک کلید به‌ازای هر
+// «تلاشِ» کاربر. پس حتی اگر گاردِ UI روزی دور زده شود، تلاشِ دوم همان کلید را
+// می‌برد و سرور replay می‌کند نه رزروِ دوم.
+let manualSaving=false;
+let manualIdemKey=null;
 async function saveManual(){
+  if(manualSaving)return;               // کلیکِ دومِ هم‌پوشان — بی‌اثر
   const n=document.getElementById('mName').value.trim();
   if(!n){toast('','نام مهمان رو وارد کن');return}
   const phone=document.getElementById('mPhone').value;
@@ -433,16 +529,39 @@ async function saveManual(){
   // درخواستِ آنلاینِ زیر موفق شود چه به مسیرِ آفلاینِ Outbox بیفتد) — تا اگر
   // درخواستِ اول واقعاً به سرور رسیده باشد ولی پاسخش گم شده، retry/صف‌شدنِ
   // بعدی با همون کلید replay شود، نه رزروِ دومی بسازد.
-  const manualIdemKey=genIdempotencyKey();
+  // کلید از openManual می‌آید (یک کلید برای هر تلاش). اگر به هر دلیل ست نشده
+  // بود، همین‌جا ساخته می‌شود تا مسیر هرگز بدونِ کلید نرود.
+  if(!manualIdemKey)manualIdemKey=genIdempotencyKey();
+  manualSaving=true;
+  const saveBtn=document.getElementById('mSave');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='در حال ثبت…';}
+  try{
+
+  // ⚠️ رفعِ B-03 (۲۰۲۶-۰۹-۰۷): **یک** بدنه برای هر دو مسیر.
+  //
+  // پیش از این، صفِ آفلاین بدنه‌ی خودش را می‌ساخت و هر سه فیلدِ کلیدی‌اش با
+  // شِیمِ سرور (`api/src/app/api/v1/reservations/route.ts:22-24`) ناسازگار بود:
+  //   restaurant_id:'self'  در برابرِ zUuid
+  //   date:dateKey          (`today|tomorrow|upcoming`) در برابرِ zDateStr
+  //   time:timeVal          (ارقامِ فارسی) در برابرِ zTimeStr
+  // و `notify_sms`/`table_number`/`note` اصلاً فرستاده نمی‌شدند.
+  //
+  // یعنی هر رزروِ آفلاین **قطعاً** در sync رد می‌شد؛ `Outbox.sync` آن را
+  // «تضاد» می‌شمرد، از صف بیرون می‌انداخت و به پرسنل می‌گفت «احتمالاً میز یا
+  // زمان پر شده» — توضیحی که غلط بود. رزروِ مهمان گم می‌شد.
+  //
+  // مثلِ B-01، رفع ساختاری است نه وصله‌ای: دو بدنه به یکی تبدیل شد تا
+  // نتوانند دوباره واگرا شوند.
+  const dt=manualDateToISO(dateVal,timeVal);
+  const reservationBody={
+    restaurant_id:STAFF_INFO?.restaurant_id||undefined,
+    date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
+    guest:{name:n,phone:phone.replace(/\s/g,''),table_number:tableVal,note:'رزرو دستی'},
+  };
 
   // اگر توکن staff داریم، رزرو واقعی در دیتابیس ثبت کن
   if(API.getToken()){
-    const dt=manualDateToISO(dateVal,timeVal);
-    const res=await API.post('/reservations',{
-      restaurant_id:STAFF_INFO?.restaurant_id||undefined,
-      date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
-      guest:{name:n,phone:phone,table_number:tableVal,note:'رزرو دستی'},
-    },{ 'Idempotency-Key': manualIdemKey });
+    const res=await API.post('/reservations',reservationBody,{ 'Idempotency-Key': manualIdemKey });
     if(res.ok){
       // موفق در سرور — به‌علاوه‌ی نمایش محلی
       RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.reservation?.code});
@@ -466,7 +585,7 @@ async function saveManual(){
   if(isOffline() && API.getToken()){
     Outbox.enqueue({
       type:'reservation', path:'/reservations', method:'POST',
-      body:{ restaurant_id:'self', date:dateKey, time:timeVal, party_size:partyVal, guest:{name:n,phone:phone.replace(/\s/g,'')} },
+      body:reservationBody,   // B-03: همان بدنه‌ی مسیرِ آنلاین، نه یک نسخه‌ی دوم
       headers:{ 'Idempotency-Key': manualIdemKey },
       label:`رزرو ${n} · ${dLabel} ${timeVal}`, localRef:localRec,
     });
@@ -483,6 +602,14 @@ async function saveManual(){
   toast('', isOffline()
     ? `رزرو ${dLabel} محلی ثبت شد — با برگشت اینترنت همگام می‌شود`
     : `رزرو ${dLabel} ثبت شد`);
+  }finally{
+    // در `finally` تا اگر مسیر با خطا بیرون بزند، دکمه قفل نماند و پرسنل
+    // نتواند دوباره تلاش کند. کلید عمداً اینجا پاک **نمی‌شود**: تلاشِ دوباره
+    // روی همان مودال باید همان کلید را ببرد تا سرور replay کند، نه رزروِ دوم.
+    manualSaving=false;
+    const b=document.getElementById('mSave');
+    if(b){b.disabled=false;b.textContent='ثبت رزرو';}
+  }
 }
 
 // ═══════════ FLOOR PLAN ═══════════

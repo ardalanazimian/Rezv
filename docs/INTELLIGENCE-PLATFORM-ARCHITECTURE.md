@@ -250,7 +250,7 @@ model RestaurantFeatureDaily {
 موتورِ موجود عالی است ولی monolithic. بازآراییِ افزایشی به یک **Rule Registry**:
 
 ```ts
-// api/src/lib/decisions/registry.ts
+// api/src/lib/decisions/registry.ts  ← پیشنهادی، هنوز ساخته نشده (تأیید ۲۰۲۶-۰۹-۰۹)
 export interface Rule {
   id: string;
   evaluate(ctx: RestaurantContext): Promise<Card | null>; // null = صدق نکرد

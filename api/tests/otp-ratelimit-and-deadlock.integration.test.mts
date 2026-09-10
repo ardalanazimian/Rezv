@@ -23,6 +23,7 @@ process.env.OTP_DEV_MODE = 'true';
 // ═══════════════════════════════════════════════════════════════════════
 
 const { redis } = await import('../src/lib/redis');
+const { db } = await import('../src/lib/db');
 const { RULES } = await import('../src/lib/ratelimit');
 const otpRoute = await import('../src/app/api/v1/auth/otp/request/route');
 const { isSerializationError } = await import('../src/lib/reservation-helpers');
@@ -56,6 +57,25 @@ async function clearBuckets() {
     const k = await redis.keys(p);
     if (k.length) await redis.del(...k);
   }
+  // ⚠️ سقفِ per-phone از ۲۰۲۶-۰۹-۱۰ دیگر در Redis نیست — به Postgres منتقل شد
+  // (E-003، تصمیمِ مالک: به‌جای انتخابِ تبادلِ «امنیت یا در دسترس‌بودن هنگام
+  // قطعیِ Redis»، خودِ وابستگی حذف شد). این پاک‌سازی همراهش منتقل نشد، و آن
+  // یک رگرسیونِ **قطعی** ساخت که شبیهِ تناوب به‌نظر می‌رسید:
+  //
+  //   `freshPhone()` شمارنده‌اش هر اجرا از صفر شروع می‌شود، پس شماره‌ها بینِ
+  //   اجراها تکرار می‌شوند. ردیف‌های Postgres — برخلافِ کلیدهای Redis — TTL
+  //   ندارند، پس اجرای بعدی همان شماره را با شمارنده‌ی از قبل پر می‌دید و
+  //   ۴۲۹ در نخستین درخواست می‌گرفت.
+  //
+  //   و «تناوب» توهم بود: پنجره ۱۰ دقیقه است، پس اجرای درونِ ۱۰ دقیقه‌ی
+  //   اجرای قبلی می‌افتاد و بعد از آن سبز می‌شد. اثباتِ کنترل‌شده، بدونِ
+  //   تغییرِ هیچ کدی: ردیف‌ها بمانند → قرمز · DELETE دستی → سبز · دوباره
+  //   بمانند → قرمز.
+  //
+  // 🚫 قاعده برای هرکسی که سقفِ تازه‌ای اضافه می‌کند: **پاک‌سازیِ تست باید
+  //    همان‌جایی برود که حالت زندگی می‌کند.** انتقالِ مکانیزم بدونِ انتقالِ
+  //    ایزوله‌سازی، تستی می‌سازد که به تاریخچه‌ی اجراهای قبلی حساس است.
+  await db.$executeRaw`DELETE FROM otp_request_windows`;
 }
 
 before(clearBuckets);

@@ -29,7 +29,20 @@ const {
  * دور می‌زند. پیش‌فرضِ روشن یعنی «درِ پشتیِ باز»؛ ثبتِ آگاهانه‌ی این استثنا
  * این‌جا همان ردِ انسانی‌ای است که کامنتِ بالا می‌خواهد.
  */
-const DEFAULT_OFF_KEYS: readonly string[] = ['gift_card_purchase_enabled', 'admin_otp_login_enabled'];
+/**
+ * `points_redemption_enabled` (۲۰۲۶-۰۹-۰۹): `redeemPointsTx` در
+ * `lib/loyalty.ts` موجودیِ امتیازِ واقعیِ مشتری را با نرخِ کانونی
+ * (`TOMAN_PER_POINT = 2`) به تومان تبدیل و خرج می‌کند. دو دلیلِ مستقل برایِ
+ * خاموشیِ پیش‌فرض، هر دو ثبت‌شده:
+ *  ۱) موجودی‌های **تولید** UNKNOWN‌اند و زیرِ فرمولِ قدیمی («۱ امتیاز = ۱
+ *     تومانِ ضمنی») انباشته شده‌اند؛ این نرخ آن‌ها را دو برابر ارزش‌گذاری
+ *     می‌کند. شمردنشان پیش‌شرطی است که مالک دارد، نه پیاده‌ساز.
+ *  ۲) بازگردانیِ کش‌بک تازه در همان تغییر آمد؛ تا دیده‌شدن رویِ داده‌ی
+ *     واقعی، روشن‌کردنِ خرج یعنی «بزن، بگیر، خرج کن، لغو کن».
+ */
+const DEFAULT_OFF_KEYS: readonly string[] = [
+  'gift_card_purchase_enabled', 'admin_otp_login_enabled', 'points_redemption_enabled',
+];
 const isDefaultOff = (k: string) => DEFAULT_OFF_KEYS.includes(k);
 const { getPlatformSetting, setPlatformSetting } = await import('../src/lib/platform-settings.ts');
 

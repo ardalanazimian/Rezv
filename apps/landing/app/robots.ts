@@ -15,7 +15,15 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/studio', '/studio/', '/order/'],
       },
     ],
-    sitemap: `${SITE}/sitemap.xml`,
+    // ⚠️ دو sitemap، عمدی (۲۰۲۶-۰۹-۰۸، تصمیمِ D-004):
+    //   • `/sitemap.xml`             — صفحاتِ همین اپ (CMS، بلاگ، قیمت، …)
+    //   • `/sitemap-restaurants.xml` — از `apps/seo` می‌آید و با rewriteِ
+    //     next.config.js زیرِ همین میزبان سرو می‌شود. بدونِ اعلامش، صفحاتِ
+    //     `/r/*` و `/city/*` خزیدنی‌اند ولی هیچ‌وقت به موتور معرفی نمی‌شوند.
+    // هر دو باید روی **همین** میزبان باشند؛ دستورِ Sitemap که به میزبانِ
+    // دیگری اشاره کند نادیده گرفته می‌شود — همان چیزی که در
+    // `apps/customer/robots.txt` غلط بود و همان روز رفع شد.
+    sitemap: [`${SITE}/sitemap.xml`, `${SITE}/sitemap-restaurants.xml`],
     host: SITE,
   };
 }

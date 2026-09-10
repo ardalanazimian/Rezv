@@ -114,8 +114,10 @@
   gap: var(--sp-2);
   margin-inline-start: auto;
 }
-.site-header__login { display: none; }
-@media (min-width: 640px) { .site-header__login { display: inline-flex; } }
+/* دو دکمه‌ی ثانویه (ورود/دموی مالک) — روی موبایلِ باریک جا نمی‌شوند، در منوی
+   تمام‌صفحه هستند. رزرو میز (اکشنِ اصلی) این محدودیت را ندارد. */
+.site-header__aux { display: none; }
+@media (min-width: 640px) { .site-header__aux { display: inline-flex; } }
 .site-header__burger { display: inline-flex; }
 @media (min-width: 940px) { .site-header__burger { display: none; } }
 
@@ -2003,6 +2005,12 @@
 }
 
 .door:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+/* ── بازاستفاده در صفحه‌ی اصلی (HomeGate) ──
+   `.gate__inner` این را با flex+align-items:center وسط می‌چیند؛ این‌جا
+   `.doors` مستقیم زیرِ `.container` است، پس خودش باید وسط بایستد. دو در
+   (نه سه) هم جا دارد یک‌کم جمع‌وجورتر باشد. */
+.home-gate .doors { margin-inline: auto; max-inline-size: 52rem; }
 
 /* ── موبایل و تبلت ──
    «بازشدن با هاور» روی تاچ معنا ندارد و فقط یک لمسِ اضافه تحمیل می‌کند؛

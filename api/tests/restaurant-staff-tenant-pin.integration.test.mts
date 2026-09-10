@@ -81,7 +81,7 @@ describe('restaurant/staff — توکنِ ادمینِ پلتفرم فقط staff
     const body = await res.json();
     assert.ok(Array.isArray(body.items) && body.items.length >= 1, 'باید دستِ‌کم خودِ ادمین را برگرداند');
 
-    const ids = new Set(body.items.map((s: { id: string }) => s.id));
+    const ids = new Set<string>(body.items.map((s: { id: string }) => s.id));
     assert.ok(ids.has(adminId), 'کنترلِ مثبت: خودِ ادمین باید در فهرست باشد');
     assert.ok(!ids.has(otherStaffId),
       'کارکنِ تنانتِ دیگر نباید دیده شود — این تنها چیزی است که این route را از نشتِ cross-tenant جدا می‌کند');

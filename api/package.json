@@ -2,7 +2,9 @@
   "name": "rezervno-api",
   "version": "1.0.0-phase1",
   "private": true,
-  "engines": { "node": "20.x" },
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -20,7 +22,8 @@
     "test:integration": "node --test tests/integration/*.test.mjs",
     "test:e2e": "playwright test",
     "test:load": "k6 run ../loadtest/k6-load-test.js",
-    "test:one": "tsx --test --test-force-exit"
+    "test:one": "tsx --test --test-force-exit",
+    "pretest": "node ../tools/check-runner-completeness.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
@@ -33,6 +36,7 @@
     "react-dom": "^18.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.48.0",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20",

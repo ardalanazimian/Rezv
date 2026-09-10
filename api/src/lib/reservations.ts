@@ -8,11 +8,11 @@ import { enqueueSms } from './sms';
 import { emit } from './events';
 import { metrics } from './metrics';
 import { validateCoupon, calcDiscount, redeemCouponAtomicTx } from './coupons';
-import { redeemGiftCardTx, getClubPointsBalance, ARRIVAL_POINTS } from './loyalty';
+import { redeemGiftCardTx, getClubPointsBalance, ARRIVAL_POINTS, cashbackPointsFor } from './loyalty';
 import { computeNoShowRisk as defaultNoShowPredictor, type NoShowResult } from './customer-insights';
 import { recordPrediction, confidenceFor, NO_SHOW_FEATURE_VERSION } from './prediction-ledger';
 import { type OpeningHours } from './hours';
-import { computeRanges, genReservationCode, isConflictError, isSerializationError, withSerializationRetry } from './reservation-helpers';
+import { computeRanges, genReservationCode, isConflictError, isSerializationError, isTransactionTimeoutError, withSerializationRetry } from './reservation-helpers';
 import { invalidateAvailability } from './availability-cache';
 import { transitionReservation } from './lifecycle';
 import { blockTailMinutes, getOccupiedTableNumbers, isTableNumberOccupied } from './table-occupancy';
@@ -294,7 +294,32 @@ export async function createReservation(
     // اگر بشود اثبات کرد همه‌ی کاندیداها پر شده‌اند، خطای صادقِ
     // SLOT_FULL/TABLE_CONFLICT؛ وگرنه CONCURRENCY_RETRY (۴۰۹) که صادقانه
     // می‌گوید «ترافیک بالا بود، دوباره تلاش کن» — نه ۵۰۰ی بی‌معنا.
-    if (isSerializationError(e)) {
+    //
+    // ⚠️ ۲۰۲۶-۰۹-۰۹ — **نمونه‌ی چهارمِ همین کلاس، و دلیلِ اضافه‌شدنِ P2028:**
+    // این بلوک تا امروز فقط خطاهایِ `isSerializationError` را می‌گرفت. یک
+    // `P2028` (انقضایِ خودِ تراکنشِ ۱۰ ثانیه‌ای) در آن فهرست نبود و از خطِ
+    // آخرِ همین catch **خام** بالا می‌رفت. اندازه‌گیری‌شده روی همین ماشین،
+    // نه استدلال‌شده: ردیفِ commitنشده روی همان میز/بازه نگه داشته شد و
+    // `createReservation` بعد از ۱۲.۹ ثانیه داد
+    // `PrismaClientKnownRequestError code=P2028 status=-` → ۵۰۰ INTERNAL.
+    //
+    // این چهارمین باری است که همین بلوک برایِ همین کلاس وصله می‌خورد
+    // (ioredisِ خام ۰۸-۱۴ · SLOT_LOCK_TIMEOUT ۰۸-۱۹ · 40P01 ۰۸-۲۵ · P2028
+    // امروز). گاردش `tests/tx-timeout-error-contract.test.mts` است و عمداً
+    // روی «کدِ دامنه‌ای دارد یا نه» ادعا می‌کند، نه روی P2028 — تا نمونه‌ی
+    // پنجم را هم بگیرد به‌جای اینکه منتظرِ وصله‌ی پنجم بماند.
+    //
+    // ⚠️ P2028 عمداً وارد `isSerializationError` **نشد**: آن تابع حلقه‌ی
+    // retry را هم فعال می‌کند و ۵ تلاشِ ۱۰ ثانیه‌ای یعنی ۵۰ ثانیه انتظارِ
+    // مشتری برای همان جواب. ترجمه بله، retry نه.
+    if (isSerializationError(e) || isTransactionTimeoutError(e)) {
+      // ⚠️ **بالایِ** بلوک شمرده می‌شود، نه کنارِ `concurrencyRetry` پایین:
+      // حادثه‌ی قابلِ‌رصد «تراکنش منقضی شد» است، مستقل از اینکه در نهایت
+      // TABLE_CONFLICT یا SLOT_FULL یا CONCURRENCY_RETRY برگردد. اگر پایین
+      // شمرده می‌شد، هر انقضایی که اشغالش اثبات می‌شد از آمار می‌افتاد —
+      // یعنی شمارنده در بدترین حالت (اسلاتِ واقعاً پر و پرِ رقابت) کمترین
+      // عدد را می‌داد.
+      if (isTransactionTimeoutError(e)) metrics.reservationTxTimeouts.inc();
       const occupiedNow = await getOccupiedTableNumbers(db, r.id, start, blockEnd).catch(() => null);
       if (occupiedNow) {
         if (manualTableNumber != null) {
@@ -610,10 +635,27 @@ async function insertReservation(
     let cashback = 0;
     if (input.userId && final > 0) {
       const cbPct = r.cbBasePct ?? 0;
-      cashback = Math.round((final * cbPct) / 100);
+      // ⚠️ تا پیش از ۲۰۲۶-۰۹-۰۹ این خط `Math.round((final * cbPct) / 100)`
+      // بود و نتیجه‌اش **مستقیم** به‌عنوانِ امتیاز در دفتر می‌نشست — یعنی
+      // «۱ امتیاز = ۱ تومان» به‌شکلِ ضمنی، بدونِ اینکه هیچ‌جا نوشته شده باشد
+      // و بدونِ اینکه هیچ راهی برایِ خرجش وجود داشته باشد.
+      //
+      // حالا از نرخِ کانونی عبور می‌کند (`lib/loyalty.ts`):
+      //     ۱۰۰۰ تومان × ۵٪ = ۵۰ تومان ÷ ۲ تومان بر امتیاز = ۲۵ امتیاز
+      // که دقیقاً عددِ صریحِ مؤسس است. ارزشِ تومانیِ برگشتی عوض نشده (همان
+      // ۵٪)، فقط واحدِ شمارش. `cbBasePct` معنایش را کامل نگه می‌دارد.
+      cashback = cashbackPointsFor(final, cbPct);
       if (cashback > 0) {
+        // فازِ ۱ (§۱۳، تصمیمِ مالک ۲۰۲۶-۰۹-۰۹): کلیدِ صریحِ idempotency روی
+        // reservationId — نه روی `note` (متنِ آزادِ فارسی، قابلِ ویرایشِ
+        // بی‌خبر). این تنها نویسنده‌ی ledger است که از addPoints/addClubPoints
+        // عبور نمی‌کند؛ بدونِ این کلید دقیقاً همان نویسنده‌ای بود که «سوراخِ
+        // بی‌کلید» می‌شد.
         await tx.pointsLedger.create({
-          data: { userId: input.userId, restaurantId: r.id, delta: cashback, reason: 'cashback', note: `کش‌بک رزرو ${resv!.code}` },
+          data: {
+            userId: input.userId, restaurantId: r.id, delta: cashback, reason: 'cashback',
+            note: `کش‌بک رزرو ${resv!.code}`, idempotencyKey: `cashback:${resv!.id}`,
+          },
         });
       }
     }
@@ -808,7 +850,12 @@ export async function createWalkin(input: WalkinInput) {
     // این چک باید *پیش از* isConflictError بیاید، چون isConflictError خودش
     // ۴۰۰۰۱/۴۰P۰۱ را هم در بر می‌گیرد و در غیرِ این صورت همان ادعایِ
     // اثبات‌نشده را می‌کرد.
-    if (isSerializationError(e)) {
+    // ⚠️ `isTransactionTimeoutError` (P2028) به همان دلیلِ createReservation
+    // این‌جا هم می‌آید: تراکنشِ walk-in هم `timeout: 10_000` دارد
+    // (خطِ ۹۸۲ همین فایل) و پرسنلی که پشتِ یک درجِ رقیب بلاک شود، بدونِ این
+    // شرط یک ۵۰۰ی «خطای داخلی» می‌دید. یک سیاست در دو نویسنده، نه یکی —
+    // همان درسی که `reservation-helpers.ts:111` ثبتش کرده.
+    if (isSerializationError(e) || isTransactionTimeoutError(e)) {
       const proven = input.tableId
         ? await provenOccupiedWalkinTable(input, blockBufferMin).catch(() => false)
         : false;

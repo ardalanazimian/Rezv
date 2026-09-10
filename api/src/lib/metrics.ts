@@ -94,6 +94,41 @@ export const metrics = {
   // رزرو دقیقاً همان چیزی است که «سبزِ توخالی» می‌سازد. صعودِ ناگهانی‌اش یعنی
   // فشارِ همزمانی رویِ یک اسلات؛ صفرِ دائمی‌اش زیرِ بار یعنی retry مرده است.
   serializationRetries: new Counter('rezervno_serialization_retries_total', 'تعداد تلاشِ مجددِ تراکنش پس از تداخلِ serialization/deadlock (۴۰۰۰۱/۴۰P۰۱/P۲۰۳۴)'),
+  // ⚠️ اضافه‌شده ۲۰۲۶-۰۹-۰۹ — یافته‌ی بازبین (`rezv-e6`) روی وصله‌ی P2028 همان
+  // روز. من ادعا کردم «هیچ عددی برای این حادثه تکان نمی‌خورد»؛ آن **غلط** بود
+  // (`httpErrors` روی هر ≥۴۰۰ بالا می‌رود و زنگِ HighErrorRate را می‌زند) ولی
+  // حقیقت بدتر بود:
+  //
+  //   • `reservationConflicts` فقط زیرِ `isConflictError` بالا می‌رود (کانستریتِ
+  //     EXCLUDE) — یعنی تداخلِ *اثبات‌شده*، نه انقضای تراکنش.
+  //   • `serializationRetries` فقط داخلِ حلقه‌ی retry شمرده می‌شود، و P2028
+  //     **عمداً** وارد آن حلقه نشد. پس هرگز به این شمارنده نمی‌رسد.
+  //   • `throw Err.concurrencyRetry()` هیچ‌چیز نمی‌شمرد.
+  //
+  // نتیجه‌اش یک رگرسیونِ رصدپذیری **داخلِ یک رفعِ درست** بود: با رفتن از ۵۰۰
+  // به ۴۰۹ شکلِ 5xx حذف شد بدونِ اینکه جایگزینی بیاید، و آلارمِ
+  // `reservation_conflicts / reservations_created > 0.3` — که دقیقاً برای همین
+  // ساخته شده — در طوفانِ واقعی صورتِ ثابت و مخرجِ **نزولی** می‌گیرد، یعنی
+  // به‌سمتِ «سلامت» حرکت می‌کند در حالی که رزرو از کار افتاده.
+  //
+  // ⚠️ عمداً شمارنده‌ی جدا و نه `reservationConflicts`: آن یکی معنایش
+  // «double-booking جلوگیری‌شده» است و آلوده‌کردنش هم آن معنا را خراب می‌کرد
+  // هم نسبتِ ۰.۳ را مسموم.
+  reservationTxTimeouts: new Counter('rezervno_reservation_tx_timeouts_total', 'تعداد رزروی که به‌خاطرِ انقضایِ تراکنش (P2028ِ expired) رد شد — رقابتِ شدید روی یک اسلات، نه تداخلِ اثبات‌شده'),
+  // ⚠️ اضافه‌شده ۲۰۲۶-۰۹-۰۹ — یافته‌ی رد تیم (`rezv-c7`، RT-05). استدلالش
+  // حسابی بود و بعد اندازه‌گیری شد: `connection_limit=10` و `pool_timeout=10`
+  // (db.ts:52,56) و هر تراکنشِ رزرو تا ۱۰ ثانیه اتصالش را نگه می‌دارد. اجرای
+  // واقعی روی همین ماشین: ۱۰ اتصالِ نگه‌داشته → یازدهمی دقیقاً ۱۰.۰ ثانیه صبر
+  // کرد → `P2024` → `errorResponse` → **HTTP 500 / INTERNAL**.
+  //
+  // جمله‌ی رد تیم که چرا این از P2028 بدتر است: «P2028 یک تراکنشِ کُند لازم
+  // دارد؛ P2024 ده تراکنشِ **عادی**.»
+  //
+  // این شمارنده تنها چیزی است که «ظرفیت کم است» را از «یک چیزی خراب شد» جدا
+  // می‌کند: بدونِ آن، طوفانِ استخر فقط انبوهی ۵۰۳ در لاگ است و هیچ عددی
+  // نمی‌گوید علت اشباعِ استخر بوده. عمداً سطحِ DB است نه سطحِ رزرو — هر
+  // endpointی می‌تواند آن را بالا ببرد.
+  dbPoolTimeouts: new Counter('rezervno_db_pool_timeouts_total', 'تعداد درخواستی که به‌خاطرِ ته‌کشیدنِ استخرِ اتصالِ DB رد شد (P2024) — سیگنالِ ظرفیت، نه خرابی'),
   smsQueueDepth: new Gauge('rezervno_sms_queue_depth', 'تعداد پیام‌های در صف SMS'),
   smsSent: new Counter('rezervno_sms_sent_total', 'تعداد پیامک‌های ارسال‌شده'),
   smsFailed: new Counter('rezervno_sms_failed_total', 'تعداد پیامک‌های ناموفق (به دست مشتری نرسید)'),
@@ -164,6 +199,11 @@ export const metrics = {
   // ⚠️ سه متریکِ زیر برایِ A3 (سختگیریِ acquisition-grade، ۲۰۲۶-۰۸-۱۴) اضافه
   // شدن — قبلاً fail-open رویِ rate-limit/بن فقط لاگِ ساده (یا هیچی) داشت،
   // بدونِ متریکِ قابلِ‌آلارم‌گذاری. رجوع کن به ratelimit.ts.
+  // ⚠️ E-003 (۲۰۲۶-۰۹-۰۹): تلاشِ مجددِ پیش از fallback، که یک بلیپِ گذرای Redis
+  // را از «ریستِ شمارنده‌ی ریت‌لیمیت» به یک ناروداد تبدیل می‌کند. بدونِ این
+  // شمارنده، تنها اثرِ رفع نامرئی است: rateLimitFallback پایین می‌آید و هیچ عددی
+  // نمی‌گوید چرا. نسبتِ recovered به fallback می‌گوید Redis بلیپ می‌زند یا قطع است.
+  rateLimitRetryRecovered: new Counter('rezervno_rate_limit_retry_recovered_total', 'تعداد دفعاتی که یک خطای گذرای Redis با تلاشِ مجدد جبران شد و به fallback نرسید (E-003) — نسبتش به fallback می‌گوید بلیپ است یا قطعی'),
   rateLimitFallback: new Counter('rezervno_rate_limit_fallback_total', 'تعداد دفعاتی که ریت‌لیمیت به‌خاطرِ قطعیِ Redis به سقفِ in-memory سقوط کرد (label: scope=middleware|route)'),
   rateLimitAutoBan: new Counter('rezervno_rate_limit_auto_ban_total', 'تعداد بن‌هایِ خودکارِ IP به‌خاطرِ عبورِ مکرر از ریت‌لیمیت'),
   banCheckFailOpen: new Counter('rezervno_ban_check_fail_open_total', 'تعداد دفعاتی که چکِ بنِ IP به‌خاطرِ قطعیِ Redis fail-open شد (بن موقتاً اعمال نشد)'),
@@ -175,10 +215,31 @@ export const metrics = {
   // ضدِ double-booking. رجوع کن به redis.ts.
   slotLockFallback: new Counter('rezervno_slot_lock_fallback_total', 'تعداد دفعاتی که قفلِ Redisِ رزرو به‌خاطرِ قطعیِ Redis fail-open شد (بدونِ قفل ادامه یافت، DB منبعِ حقیقت است)'),
   authFailures: new Counter('rezervno_auth_failures_total', 'تعداد شکست احراز هویت (سیگنال امنیتی)'),
+  // ⚠️ اضافه‌شده ۲۰۲۶-۰۹-۰۶: نوشتنِ audit در DB عمداً best-effort است
+  // (`lib/audit.ts` — از‌دست‌رفتنِ یک رکورد نباید کاربر را بلاک کند) ولی تا
+  // امروز شکستش فقط یک `log.warn` بود: هیچ شمارنده‌ای، هیچ آلارمی. یعنی یک
+  // کنشِ حساس می‌توانست ۲۰۰ برگرداند در حالی که ردِ حسابرسی‌اش هرگز ننشسته
+  // بود، و هیچ‌کس نمی‌فهمید.
+  //
+  // چرا این‌جا فقط «انطباق» نیست: `fraud.listFlaggedAbuseUsers` نسب‌نامه‌ی
+  // فلگ‌ها (چه کسی/چرا/کدام رستوران) را از همین جدول می‌خواند — یعنی
+  // audit_logs یک **مسیرِ خواندنِ محصولی** است، نه صرفاً بایگانی.
+  //
+  // برچسبِ `action` یک unionِ بسته‌ی TS است (~۴۰ مقدار)، پس کاردینالیتی
+  // ساکن و امن است — و «کدام رویدادِ امنیتی ردش را گم کرد» دقیقاً همان
+  // چیزی است که در تحقیق لازم می‌شود.
+  auditWriteFailed: new Counter('rezervno_audit_write_failed_total', 'تعداد رکوردهای audit که در DB ثبت نشدند (کنشِ اصلی موفق بود؛ فقط ردِ حسابرسی گم شد) — label: action'),
   activeRequests: new Gauge('rezervno_active_requests', 'تعداد درخواست‌های در حال پردازش'),
   jobsPending: new Gauge('rezervno_jobs_pending', 'تعداد job‌های در انتظار در صف'),
   jobsDead: new Gauge('rezervno_jobs_dead', 'تعداد job‌های dead-letter (شکست دائمی)'),
   jobsProcessed: new Counter('rezervno_jobs_processed_total', 'تعداد job‌های پردازش‌شده (با label: kind/outcome)'),
+  // ⚠️ اضافه‌شده ۲۰۲۶-۰۹-۰۶: تا این تاریخ کارِ گیرکرده در 'processing' هیچ
+  // نماینده‌ای در متریک‌ها نداشت — فقط pending و dead شمرده می‌شدند. یعنی
+  // workerی که وسطِ کار می‌مرد، jobها را برای همیشه معلق می‌گذاشت و هیچ
+  // داشبورد و هیچ آلارمی خبردار نمی‌شد. هر دو در observability/alerts.yml
+  // (گروهِ rezervno_queue) قاعده دارند.
+  jobsStuck: new Gauge('rezervno_jobs_stuck', 'تعداد job‌هایی که فراتر از اجاره در وضعیت processing مانده‌اند (workerِ مرده)'),
+  jobsReclaimed: new Counter('rezervno_jobs_reclaimed_total', 'تعداد job‌هایی که پس از انقضای اجاره بازپس گرفته شدند (label: kind/outcome=retry|dead)'),
 };
 
 /** خروجی متنی همه‌ی متریک‌ها در فرمت Prometheus. */

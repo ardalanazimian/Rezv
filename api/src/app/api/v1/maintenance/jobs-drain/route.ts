@@ -14,7 +14,10 @@ async function POST_impl(req: Request) {
   try {
     const denied = guardMaintenance(req);
     if (denied) return denied;
-    const result = await runWorker(50);
+    // بدونِ آرگومان: اندازه‌ی batch تنها یک مرجع دارد (`WORKER_BATCH_MAX` در
+    // lib/queue.ts) و «اجاره»ی صف از همان مشتق می‌شود. عددِ ثابتِ اینجا یک
+    // کپیِ دوم بود که می‌توانست بی‌صدا از اجاره جدا بیفتد.
+    const result = await runWorker();
     return NextResponse.json({ ok: true, ...result });
   } catch (e) { return errorResponse(e); }
 }

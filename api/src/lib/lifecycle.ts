@@ -5,9 +5,12 @@ import { enqueueSms, type SmsJob } from './sms';
 import { processReservationEconomyEvent } from './economy';
 import { createLogger } from './logger';
 import { dateKeyInTz } from './hours';
-import { activeStatusList } from './reservation-status';
+import { activeStatusList, isCashbackReversingStatus } from './reservation-status';
 import { recordOutcome } from './prediction-ledger';
-import { addClubPoints, ARRIVAL_POINTS } from './loyalty';
+import { addClubPoints, ARRIVAL_POINTS, reverseReservationCashback } from './loyalty';
+import {
+  RULE_VERSION, holdoutBucket, guestKeyOf, transitionDecisionInputs,
+} from './ml-substrate';
 
 const log = createLogger('lifecycle');
 
@@ -89,7 +92,9 @@ export async function transitionReservation(opts: {
   const result = await db.$transaction(async (tx) => {
     const resv = await tx.reservation.findUnique({
       where: { id: reservationId },
-      include: { restaurant: { select: { timezone: true } } },
+      // ⚠️ `tenantId` برای زیرساختِ M0 اضافه شد — ستونِ دیگری روی همان joinِ
+      // موجود است، نه یک کوئریِ اضافه.
+      include: { restaurant: { select: { timezone: true, tenantId: true } } },
     });
     if (!resv) throw Err.notFound('رزرو');
     const from = resv.status as RStatus;
@@ -121,7 +126,14 @@ export async function transitionReservation(opts: {
     }
     const updated = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId } });
 
-    // ثبت در audit log
+    // ثبت در audit log — و از مهاجرتِ ۰۸۲، همچنین زیرساختِ رویدادِ ML (M0).
+    //
+    // ⚠️ چرا همین‌جا و نه یک emitterِ جدا: این نوشتن از قبل **داخلِ همین
+    // تراکنش** و **پشتِ compare-and-set** است، یعنی دقیقاً یک ردیف به ازای هر
+    // انتقالِ واقعی. هر emitterِ بیرون‌تراکنشی (webhook/صف) حالتی می‌سازد که
+    // رزرو عوض شده ولی رویدادش نیامده — و آن شکاف دقیقاً زیرِ بار بزرگ می‌شود،
+    // یعنی همان‌جا که داده بیشترین ارزش را دارد.
+    const holdout = holdoutBucket(guestKeyOf(updated));
     await tx.reservationEvent.create({
       data: {
         reservationId,
@@ -130,6 +142,12 @@ export async function transitionReservation(opts: {
         actor,
         reason: reason ?? null,
         isAutomatic,
+        // — زیرساختِ M0 —
+        restaurantId: updated.restaurantId,
+        tenantId: resv.restaurant.tenantId ?? null,
+        ruleVersion: RULE_VERSION,
+        holdoutBucket: holdout,
+        decisionInputs: transitionDecisionInputs(updated, timezone) as any,
       },
     });
 
@@ -172,15 +190,48 @@ export async function transitionReservation(opts: {
     // fire-and-forget: صداکننده‌هایی که بلافاصله موجودی را می‌خوانند (مثلِ
     // پیامکِ خوش‌آمدِ `markArrival`) باید عددِ به‌روز را ببینند.
     if (to === 'checked_in' && result.resv.userId) {
+      // فازِ ۱ (§۱۳، تصمیمِ مالک ۲۰۲۶-۰۹-۰۹): کلیدِ صریحِ idempotency — نه
+      // متکی به `note` (متنِ آزاد، شاملِ کدِ رزرو ولی هرکسی می‌تواند تغییرش
+      // دهد)، بلکه مستقیماً روی reservationId. dedupِ واقعیِ این مسیر همچنان
+      // از `result.changed` (CAS بالای همین تابع) می‌آید؛ این کلید لایه‌ی
+      // دومِ ساختاریِ سطحِ DB است، نه جایگزینِ آن.
       await addClubPoints({
         userId: result.resv.userId,
         restaurantId: result.resv.restaurantId,
         delta: ARRIVAL_POINTS,
         reason: 'reservation',
         note: `حضور در رزرو ${result.resv.code}`,
+        idempotencyKey: `arrival:${result.resv.id}`,
       }).catch((e) => {
         log.error('ثبتِ امتیازِ حضور در دفتر ناموفق (چک‌این خودش commit شد)', {
           reservationId: result.resv.id, code: result.resv.code, error: (e as Error).message,
+        });
+      });
+    }
+
+    // ── بازگردانیِ کش‌بک وقتی وعده اتفاق نیفتاد ─────────────────────────
+    //
+    // ⚠️ این گارد است، نه یک قابلیت. کش‌بک در **لحظه‌ی ثبتِ رزرو** نوشته
+    // می‌شود (`reservations.ts`، داخلِ تراکنشِ ساختِ رزرو) و تا امروز هیچ‌جا
+    // برنمی‌گشت: `grep "reason: 'cashback'"` فقط همان یک نویسنده را می‌داد و
+    // no_show/cancelled هیچ ردیفِ جبرانی نمی‌ساختند. بی‌ضرر بود چون امتیاز
+    // خرج‌شدنی نبود. با آمدنِ `redeemPointsTx` این می‌شد پولِ رایگان:
+    // «رزروِ بزرگ بزن، کش‌بک بگیر، خرج کن، لغو کن». پس در همان تغییر آمد.
+    //
+    // چرا این‌جا: `transitionReservation` خودش را «تنها نقطه‌ی مجاز تغییر
+    // وضعیت» تعریف کرده و این بلاک زیرِ `result.changed` است — یعنی خروجیِ
+    // همان compare-and-setِ اتمیک. دقیقاً همان استدلالی که امتیازِ حضور را
+    // به این‌جا آورد. لایه‌ی دومِ سطحِ DB هم هست: کلیدِ
+    // `cashback-reversal:{id}` رویِ قیدِ یکتاییِ دفتر می‌نشیند، پس لغوِ
+    // دوباره (از دو مسیر، یا race) دوبار کسر نمی‌کند.
+    //
+    // شکستِ ثبت نباید خودِ لغو را بشکند (رزرو از قبل commit شده) — همان
+    // قاعده‌ی امتیازِ حضور/اعلان در همین تابع.
+    if (isCashbackReversingStatus(result.resv.status)) {
+      await reverseReservationCashback(result.resv.id).catch((e) => {
+        log.error('بازگردانیِ کش‌بک ناموفق (تغییرِ وضعیت خودش commit شد)', {
+          reservationId: result.resv.id, code: result.resv.code,
+          toStatus: result.resv.status, error: (e as Error).message,
         });
       });
     }

@@ -212,11 +212,10 @@ const adminReq = () =>
   new Request('http://x/api', {
     headers: { authorization: `Bearer ${adminToken}`, 'x-real-ip': testIp() },
   });
-const noParams = () => ({ params: Promise.resolve({}) });
 
 async function callOverview() {
   return asPlatformAdmin(async () => {
-    const res = await overviewRoute.GET(adminReq(), noParams() as never);
+    const res = await overviewRoute.GET(adminReq());
     const body = await res.json();
     assert.equal(res.status, 200, JSON.stringify(body));
     return body;
@@ -224,7 +223,7 @@ async function callOverview() {
 }
 async function callBi() {
   return asPlatformAdmin(async () => {
-    const res = await biRoute.GET(adminReq(), noParams() as never);
+    const res = await biRoute.GET(adminReq());
     const body = await res.json();
     assert.equal(res.status, 200, JSON.stringify(body));
     return body;

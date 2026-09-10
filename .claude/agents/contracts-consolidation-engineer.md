@@ -1,7 +1,7 @@
 ---
 name: contracts-consolidation-engineer
 description: Use this agent for frontend-side recovery in the three vanilla panels and shared/js — removing client fallbacks that fabricate business success (protocol §3, e.g. an offline "reservation confirmed" with a made-up code), wiring missing contract pieces (consuming the payment endpoint, idempotency headers), mapping and consolidating duplicate API clients, types, helpers and stale contracts (§§20–22), and legacy/dead-code decisions such as apps/business/src-v2 (§§21, 23). Deletions require proof of unreachability, otherwise escalate.
-model: opus
+model: sonnet
 tools: Read, Grep, Glob, Bash, Edit, Write
 skills:
   - rezervno-audit-constitution

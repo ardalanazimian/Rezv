@@ -2,6 +2,9 @@ import { db } from './db';
 import { enqueueSms } from './sms';
 import { smsAllowedForCategory } from './notification-prefs';
 import { recordOutreach } from './outreach-ledger';
+import { createLogger } from './logger';
+
+const log = createLogger('automation');
 
 // ═══════════════════════════════════════════════════════════
 //  Marketing Automation — اجراکننده‌ی trigger ها (توسط cron صدا زده می‌شود)
@@ -151,7 +154,37 @@ export async function runAutomation(automation: {
 
   let coupon: { code: string } | null = null;
   if (automation.couponId) {
-    coupon = await db.coupon.findUnique({ where: { id: automation.couponId }, select: { code: true } });
+    // ⚠️ نشتِ متقاطعِ تنانت (رفع‌شده ۲۰۲۶-۰۹-۰۶، با اجرای زنده اثبات شد نه با
+    // خواندنِ کد): اینجا `findUnique({ where: { id } })` بود — **بدونِ
+    // restaurantId**. و `runAllDueAutomations` ردیف‌هایِ همه‌ی تنانت‌ها را
+    // برمی‌دارد، پس `automation.couponId` می‌توانست به کوپنِ رستورانِ دیگری
+    // اشاره کند و `code`ِ آن مستقیم داخلِ توکنِ پیامکِ مهمانِ این رستوران
+    // می‌نشست. بازتولید (tenant-isolation.integration.test.mts):
+    //   توکن‌هایِ jobِ صف‌شده = ["[DEMO] مهمانِ a","ISO-…-B","[DEMO] رستوران a"]
+    //   یعنی کدِ کوپنِ تنانتِ B به مهمانِ تنانتِ A تحویل شد.
+    //
+    // در محصولی که RLS بی‌اثر است (P0-021/P0-022: ۶۱ جدول با صفر policy و
+    // اتصال با نقشِ owner+BYPASSRLS) هیچ لایه‌ی دومی زیرِ این قید نیست.
+    //
+    // قید در **هر دو سر** بسته شد: مسیرِ نوشتن (`restaurant/automations`
+    // مالکیتِ coupon_id را چک می‌کند) و همین‌جا. فقط نوشتن کافی نبود —
+    // ردیف‌هایِ آلوده‌ی از‌قبل‌موجود روی DBِ تولید می‌مانند.
+    coupon = await db.coupon.findFirst({
+      where: { id: automation.couponId, restaurantId: automation.restaurantId },
+      select: { code: true },
+    });
+    if (!coupon) {
+      // اشاره‌گرِ مرده یا متعلق به تنانتِ دیگر. عمداً throw نمی‌کنیم (ارسال
+      // برایِ بقیه‌ی گیرنده‌ها باید ادامه یابد)، ولی بی‌صدا هم نمی‌ماند:
+      // بدونِ این خط، تنها اثرِ یک ردیفِ آلوده «کدِ WELCOME» در پیامک است و
+      // هیچ‌کس هرگز پیدایش نمی‌کند.
+      log.error('کوپنِ automation قابلِ‌حل نیست (اشاره‌گرِ مرده یا متعلق به تنانتِ دیگر)', {
+        event: 'automation.coupon_unresolved',
+        automationId: automation.id,
+        restaurantId: automation.restaurantId,
+        couponId: automation.couponId,
+      });
+    }
   }
   const restaurant = await db.restaurant.findUnique({ where: { id: automation.restaurantId }, select: { name: true } });
   const template = templateFor(automation.trigger);

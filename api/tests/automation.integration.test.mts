@@ -120,11 +120,16 @@ async function makeNoShow(params: {
     select: { id: true },
   });
   await db.$executeRaw`UPDATE reservations SET created_at = ${params.bookedAt} WHERE id = ${r.id}::uuid`;
-  const ev = await db.reservationEvent.create({
-    data: { reservationId: r.id, fromStatus: 'confirmed', toStatus: 'no_show', actor: 'system', isAutomatic: true },
+  // ⚠️ `createdAt` هنگامِ درج ست می‌شود، نه با UPDATEِ بعدی (مهاجرتِ ۰۸۲):
+  // جدول فقط-افزودنی شد و بازنویسی رد می‌شود. نتیجه یکسان است و یک دستور
+  // کمتر — رویداد از همان اول با زمانِ درستش متولد می‌شود.
+  await db.reservationEvent.create({
+    data: {
+      reservationId: r.id, fromStatus: 'confirmed', toStatus: 'no_show',
+      actor: 'system', isAutomatic: true, createdAt: params.markedAt,
+    },
     select: { id: true },
   });
-  await db.$executeRaw`UPDATE reservation_events SET created_at = ${params.markedAt} WHERE id = ${ev.id}::uuid`;
   return r.id;
 }
 

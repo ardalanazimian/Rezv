@@ -30,9 +30,13 @@ export interface Door {
   body: string;
   hint: string;
   href: string | null;
-  /** وقتی آدرس پیکربندی نشده، به‌جای دکمه‌ی مرده به تماس می‌رود. */
-  fallbackHref: string;
-  fallbackLabel: string;
+  /**
+   * وقتی آدرس پیکربندی نشده، به‌جای دکمه‌ی مرده به تماس می‌رود.
+   * اختیاری است: دری که آدرسش **استخراج‌شده** است (مثلِ اپِ مشتری —
+   * `appBase()`) هرگز null نمی‌شود، پس اصلاً حالتِ «پیکربندی‌نشده» ندارد.
+   */
+  fallbackHref?: string;
+  fallbackLabel?: string;
 }
 
 const FA = ['۰۱', '۰۲', '۰۳', '۰۴'];
@@ -61,8 +65,10 @@ export function DoorPicker({ doors }: { doors: Door[] }) {
   return (
     <div className="doors" ref={wrapRef}>
       {doors.map((d, i) => {
-        const href = d.href ?? d.fallbackHref;
         const external = Boolean(d.href);
+        // فقط دری که هنوز پیکربندی نشده به fallback نیاز دارد؛ نبودنِ
+        // fallback روی درِ همیشه‌پیکربندی‌شده (مثلِ اپِ مشتری) بی‌اثر است.
+        const href = d.href ?? d.fallbackHref ?? '/contact';
         return (
           <Link
             key={d.key}
@@ -85,7 +91,7 @@ export function DoorPicker({ doors }: { doors: Door[] }) {
             <span className="door__foot">
               <span className="door__hint">{d.hint}</span>
               <span className="door__go">
-                {external ? 'ورود' : d.fallbackLabel}
+                {external ? 'ورود' : (d.fallbackLabel ?? 'دریافتِ نشانی')}
                 <Icon name={external ? 'external' : 'arrowLeft'} size={15} />
               </span>
             </span>

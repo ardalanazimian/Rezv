@@ -24,6 +24,7 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canView
     logId: b.log_id,
     correctIntent: b.correct_intent,
     staffId: ctx.auth.kind === 'staff' ? ctx.auth.sub : null,
+    timezone: ctx.restaurant.timezone,
   });
   return NextResponse.json(result);
 });

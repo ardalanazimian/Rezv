@@ -26,8 +26,29 @@ const log = createLogger('reservation-lifecycle-ops');
  * باشه) امن رد می‌شه، نه کرش.
  */
 export async function expireStaleHolds(): Promise<number> {
+  // ⚠️ B-05 (۲۰۲۶-۰۹-۰۷): این کوئری قبلاً فقط `holdExpiresAt < now` بود، و
+  // چون رزروِ منتظرِ **تأییدِ دستی** عمداً `holdExpiresAt = null` می‌گیرد
+  // (reservations.ts:351-352)، هرگز مچ نمی‌شد. جست‌وجوی کلِ `api/src` نشان
+  // داد هیچ کرونِ دیگری هم `status:'pending'` را نمی‌گیرد — یعنی آن رزروها
+  // **هیچ مسیرِ پایانی نداشتند** و اگر پرسنل نه تأیید می‌کرد نه رد، تا ابد
+  // `pending` می‌ماندند: همیشه در ACTIVE_RESERVATION_STATUSES، همیشه در شرطِ
+  // EXCLUDE، میز تا پایانِ بازه‌اش نگه‌داشته، و مهمان بی‌خبر.
+  //
+  // مرز عمداً **شروعِ سانس** است، نه یک مهلتِ اختراعی: رزروی که تا لحظه‌ی
+  // شروعِ خودش تأیید نشده دیگر قابلِ ارائه نیست. انتخابِ مهلتِ کوتاه‌تر
+  // (مثلاً «رستوران ۲ ساعت برای تأیید دارد») یک تصمیمِ محصولی است و اینجا
+  // اختراع نمی‌شود.
+  //
+  // یک `now` برای هر دو شرط تا مرزِ دو شاخه در یک اجرا از هم نلغزد.
+  const now = new Date();
   const stale = await db.reservation.findMany({
-    where: { status: 'pending', holdExpiresAt: { lt: new Date() } },
+    where: {
+      status: 'pending',
+      OR: [
+        { holdExpiresAt: { lt: now } },                  // هولدِ پرداخت که مهلتش گذشته
+        { holdExpiresAt: null, slotStart: { lt: now } }, // منتظرِ تأیید، سانس شروع شده
+      ],
+    },
     select: { id: true, restaurantId: true, slotStart: true },
   });
   if (stale.length === 0) return 0;

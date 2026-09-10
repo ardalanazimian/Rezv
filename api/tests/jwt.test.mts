@@ -50,7 +50,7 @@ describe('امنیت: algorithm confusion و issuer/audience', () => {
     assert.throws(() => verifyAccess(refreshToken));
   });
   test('توکن با header alg=none و بدون امضا رد می‌شود (جلوگیری از الگوریتم confusion)', () => {
-    const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const b64url = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const forged = `${b64url({ alg: 'none', typ: 'JWT' })}.${b64url({ sub: 'attacker', kind: 'staff', tenantId: 't-1', role: 'owner' })}.`;
     assert.throws(() => verifyAccess(forged));
   });

@@ -295,7 +295,7 @@ describe('دفترِ ارتباط‌گیری — گزارشِ صادقانه‌�
     const sentAt = new Date(Date.now() - (ATTRIBUTION_WINDOW_DAYS + 5) * DAY);
     for (let i = 0; i < 3; i++) {
       await makeOutreach({
-        restaurantId: statRid, userId: await makeUser(`g${i}`), sentAt, sourceId,
+        restaurantId: statRid, userId: await makeUser(), sentAt, sourceId,
       });
     }
     await resolveOutreachConversions();
@@ -322,7 +322,7 @@ describe('دفترِ ارتباط‌گیری — گزارشِ صادقانه‌�
     const shouldConvert = 5;
 
     for (let i = 0; i < total; i++) {
-      const userId = await makeUser(`h${i}`);
+      const userId = await makeUser();
       await makeOutreach({ restaurantId: statRid, userId, sentAt, sourceId });
       if (i < shouldConvert) {
         await makeReservation({

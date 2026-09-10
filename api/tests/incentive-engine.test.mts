@@ -12,7 +12,7 @@ const BASE = {
   hasActiveAbuseFlag: false,
   lowDemandDay: null,
   missions: [] as { id: string; title: string; kind: string; progress: number; targetCount: number; completed: boolean; claimed: boolean }[],
-  rewardItems: [] as { id: string; title: string; costCoins: number; minTier: string; unlocked: boolean; inStock: boolean }[],
+  rewardItems: [] as { id: string; title: string; costCoins: number; minTier: string; unlocked: boolean; inStock: boolean; deliverable: boolean }[],
 };
 
 describe('rankIncentives', () => {
@@ -50,7 +50,7 @@ describe('rankIncentives', () => {
         { id: 'done', title: 'کامل‌شده', kind: 'weekly', progress: 1, targetCount: 1, completed: true, claimed: false },
         { id: 'onboarding', title: 'خوش‌آمد', kind: 'onboarding', progress: 0, targetCount: 1, completed: false, claimed: false },
       ],
-      rewardItems: [{ id: 'r1', title: 'جایزه', costCoins: 100, minTier: 'bronze', unlocked: true, inStock: true }],
+      rewardItems: [{ id: 'r1', title: 'جایزه', costCoins: 100, minTier: 'bronze', unlocked: true, inStock: true, deliverable: true }],
     });
     assert.equal(r.length, 1, `فقط ماموریتِ کامل‌شده باید بمونه، گرفتیم: ${JSON.stringify(r)}`);
     assert.equal(r[0].ref_id, 'done');
@@ -100,10 +100,10 @@ describe('rankIncentives', () => {
       reputationTier: 'gold',
       reliabilityScore: 90,
       rewardItems: [
-        { id: 'cheap', title: 'ارزون', costCoins: 100, minTier: 'bronze', unlocked: true, inStock: true },
-        { id: 'expensive', title: 'گرون', costCoins: 500, minTier: 'silver', unlocked: true, inStock: true },
-        { id: 'locked', title: 'قفل', costCoins: 1000, minTier: 'platinum', unlocked: false, inStock: true },
-        { id: 'out_of_stock', title: 'ناموجود', costCoins: 900, minTier: 'silver', unlocked: true, inStock: false },
+        { id: 'cheap', title: 'ارزون', costCoins: 100, minTier: 'bronze', unlocked: true, inStock: true, deliverable: true },
+        { id: 'expensive', title: 'گرون', costCoins: 500, minTier: 'silver', unlocked: true, inStock: true, deliverable: true },
+        { id: 'locked', title: 'قفل', costCoins: 1000, minTier: 'platinum', unlocked: false, inStock: true, deliverable: true },
+        { id: 'out_of_stock', title: 'ناموجود', costCoins: 900, minTier: 'silver', unlocked: true, inStock: false, deliverable: true },
       ],
     });
     const rewardSuggestion = r.find((s) => s.kind === 'reward');
@@ -115,7 +115,7 @@ describe('rankIncentives', () => {
       ...BASE,
       reputationTier: 'gold',
       reliabilityScore: 80,
-      rewardItems: [{ id: 'r1', title: 'جایزه', costCoins: 500, minTier: 'bronze', unlocked: true, inStock: true }],
+      rewardItems: [{ id: 'r1', title: 'جایزه', costCoins: 500, minTier: 'bronze', unlocked: true, inStock: true, deliverable: true }],
     });
     assert.ok(!r.some((s) => s.kind === 'reward'));
   });
@@ -125,7 +125,7 @@ describe('rankIncentives', () => {
       ...BASE,
       reputationTier: 'bronze',
       reliabilityScore: 99,
-      rewardItems: [{ id: 'r1', title: 'جایزه', costCoins: 500, minTier: 'bronze', unlocked: true, inStock: true }],
+      rewardItems: [{ id: 'r1', title: 'جایزه', costCoins: 500, minTier: 'bronze', unlocked: true, inStock: true, deliverable: true }],
     });
     assert.ok(!r.some((s) => s.kind === 'reward'));
   });
@@ -162,7 +162,7 @@ describe('rankIncentives', () => {
       missions: Array.from({ length: 10 }, (_, i) => ({
         id: `m${i}`, title: `ماموریت ${i}`, kind: 'weekly', progress: 1, targetCount: 2 + i, completed: false, claimed: false,
       })),
-      rewardItems: [{ id: 'r1', title: 'جایزه', costCoins: 500, minTier: 'bronze', unlocked: true, inStock: true }],
+      rewardItems: [{ id: 'r1', title: 'جایزه', costCoins: 500, minTier: 'bronze', unlocked: true, inStock: true, deliverable: true }],
     });
     assert.ok(r.length <= 5, `انتظارِ حداکثر ۵ داشتیم، گرفتیم ${r.length}`);
   });
@@ -180,7 +180,7 @@ describe('rankIncentives', () => {
         { id: 'onboarding', title: 'خوش‌آمد', kind: 'onboarding', progress: 0, targetCount: 1, completed: false, claimed: false },
         { id: 'churn', title: 'ریسکِ ریزش', kind: 'weekly', progress: 1, targetCount: 2, completed: false, claimed: false },
       ],
-      rewardItems: [{ id: 'rw', title: 'جایزه', costCoins: 500, minTier: 'bronze', unlocked: true, inStock: true }],
+      rewardItems: [{ id: 'rw', title: 'جایزه', costCoins: 500, minTier: 'bronze', unlocked: true, inStock: true, deliverable: true }],
     });
     const order = r.map((s) => s.ref_id ?? s.kind);
     assert.deepEqual(order, ['ready', 'onboarding', 'churn', 'rw', 'off_peak_nudge']);

@@ -140,6 +140,99 @@ for p in PROXY_CONFIGS:
 if _seen_csp == 0:
     fails.append('هیچ هدرِ CSP در پیکربندیِ پروکسی پیدا نشد — بندِ ۵ چیزی را نسنجیده است')
 
+# ── ۶) سطح‌هایِ Next.js: landing و seo ──
+#
+# چرا این بند لازم بود (شکافی که تا ۲۰۲۶-۰۹-۱۰ باز بود): APPS بالا سه اپِ
+# وانیلا است. ولی **پنج** سطح رابطِ فارسی دارند — `apps/landing` و `apps/seo`
+# هم. یعنی این گارد سه‌پنجم را می‌دید و سبزش «فونت درست است» خوانده می‌شد.
+#
+# و این دقیقاً همان سطحی است که رگرسیونش **قبلاً رخ داده**: کامنتِ
+# `apps/landing/app/layout.tsx:18-22` ثبت کرده که تا ممیزیِ ۲۰۲۶-۰۸-۲۴ از
+# `next/font/google` استفاده می‌شد — که در زمانِ **build** به
+# fonts.googleapis.com وصل می‌شود. یعنی buildِ داخلِ ایران یا می‌شکست یا
+# بی‌صدا بدونِ فونت می‌ماند. رفع شد، و هیچ‌چیز جلویِ برگشتش را نمی‌گرفت.
+#
+# سه سطحِ دیگرِ این فایل با هم فرق دارند و عمداً جدا سنجیده می‌شوند: آن‌ها
+# `@font-face` در CSS دارند، این‌ها `localFont()` در TSX.
+NEXT_SURFACES = ('landing', 'seo')
+
+for app in NEXT_SURFACES:
+    root = 'apps/' + app
+    if not os.path.isdir(root):
+        # همان قاعده‌ی بندِ ۵: نبودِ موضوع خطاست، نه عبور. اگر سطحی حذف/
+        # جابه‌جا شد، این فهرست باید عمداً به‌روز شود — نه اینکه بی‌صدا
+        # صفر فایل بسنجد.
+        fails.append(root + ' — در NEXT_SURFACES هست ولی وجود ندارد؛ فهرست را به‌روز کن')
+        continue
+
+    # الف) فایلِ فونتِ محلی واقعاً هست و فونتِ معتبر است؟
+    found = []
+    for base, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in ('node_modules', '.next')]
+        for f in files:
+            if f.lower().endswith(('.woff2', '.woff', '.ttf', '.otf')):
+                found.append(os.path.join(base, f))
+    if not found:
+        fails.append(root + ' — هیچ فایلِ فونتِ self-hosted ندارد (پس یا CDN است یا بی‌فونت)')
+    for p in found:
+        if not check_magic(p):
+            fails.append(p + ' — بایت‌هایِ آغازین با قالبش نمی‌خواند (فایلِ خراب؟)')
+
+    # ب) هیچ‌جا `next/font/google` نباشد — همان رگرسیونی که یک‌بار رخ داد.
+    #    کامنت‌ها حذف می‌شوند، وگرنه همان کامنتی که می‌گوید «حذفش کردیم»
+    #    خودش گارد را قرمز می‌کند.
+    _seen_localfont = 0
+    for base, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in ('node_modules', '.next')]
+        for f in files:
+            if not f.endswith(('.ts', '.tsx', '.js', '.jsx')):
+                continue
+            p = os.path.join(base, f)
+            try:
+                text = io.open(p, encoding='utf-8').read()
+            except Exception:
+                continue
+            live = re.sub(r'/\*.*?\*/', '', text, flags=re.S)
+            live = re.sub(r'^\s*//.*$', '', live, flags=re.M)
+            if 'next/font/google' in live:
+                fails.append(p + ' — next/font/google برگشته؛ در زمانِ build به fonts.googleapis.com وصل می‌شود و buildِ داخلِ ایران می‌شکند یا بی‌فونت می‌ماند')
+            # ج) هر localFont باید به فایلی اشاره کند که هست.
+            for m in re.finditer(r'''src\s*:\s*['"]([^'"]+\.(?:woff2|woff|ttf|otf))['"]''', live, re.I):
+                _seen_localfont += 1
+                target = os.path.normpath(os.path.join(base, m.group(1)))
+                if not os.path.exists(target):
+                    fails.append(p + ' — localFont به فایلِ ناموجود اشاره می‌کند: ' + m.group(1))
+
+    # د) اعلانِ CSSی — **مکانیزمِ دومِ معتبر**، نه شکلِ خراب.
+    #
+    # ⚠️ نسخه‌ی اولِ همین بند فقط `localFont()` را می‌پذیرفت و `apps/seo` را
+    # قرمز کرد. یافته نبود؛ **گارد غلط بود**: seo فونت را با `@font-face` در
+    # `app/globals.css` اعلام می‌کند که کاملاً درست است. دو سطحِ Next دو
+    # مکانیزمِ متفاوت دارند و هیچ‌کدام اشتباه نیست.
+    #
+    # درسش همان چیزی است که این فایل جای دیگر هم می‌گوید: گاردی که یک شکلِ
+    # پیاده‌سازی را «تنها شکلِ درست» فرض کند، کدِ سالم را قرمز می‌کند — و آن
+    # قرمزِ کاذب بدتر از سبزِ کاذب نیست، ولی همان‌قدر اعتماد را می‌سوزاند.
+    for base, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in ('node_modules', '.next')]
+        for f in files:
+            if not f.endswith('.css'):
+                continue
+            p = os.path.join(base, f)
+            css = io.open(p, encoding='utf-8').read()
+            css_live = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+            for m in re.finditer(r'''url\(\s*['"]?([^)'"]+?\.(?:woff2|woff|ttf|otf))['"]?\s*\)''', css_live, re.I):
+                _seen_localfont += 1
+                ref = m.group(1)
+                # مسیرِ مطلق در Next از `public/` سرو می‌شود، نه از کنارِ CSS.
+                target = os.path.normpath(os.path.join(root, 'public', ref.lstrip('/'))) \
+                    if ref.startswith('/') else os.path.normpath(os.path.join(base, ref))
+                if not os.path.exists(target):
+                    fails.append(p + ' — @font-face به فایلِ ناموجود اشاره می‌کند: ' + ref)
+
+    if _seen_localfont == 0:
+        fails.append(root + ' — نه localFont(src=…) و نه @font-face با url() پیدا نشد؛ یا فونت اصلاً اعلام نمی‌شود یا شکلش عوض شده و این بند چیزی نسنجیده')
+
 # ── گزارش ──
 print()
 for w in warns:

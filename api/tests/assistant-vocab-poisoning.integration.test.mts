@@ -131,7 +131,7 @@ describe('دستیار · مسمومیتِ واژگان مهار می‌شود',
 
   test('کنترلِ مثبت: پیش از هر آموزشی، جواب درست و مطمئن است', async () => {
     // بدونِ این، تستِ «جواب عوض نشد» با یک دستیارِ همیشه-خراب هم سبز می‌شد.
-    const r = await askAssistant({ restaurantId, question: QUESTION });
+    const r = await askAssistant({ restaurantId, question: QUESTION, timezone: 'Asia/Tehran' });
     assert.equal(r.intent, HONEST_INTENT);
     assert.ok(r.understood, 'باید بالای آستانه باشد');
     assert.ok(r.confidence > 0.8, `اطمینانِ پایه باید بالا باشد، بود ${r.confidence}`);
@@ -140,8 +140,8 @@ describe('دستیار · مسمومیتِ واژگان مهار می‌شود',
   test('کنترلِ مثبت: یک اصلاحِ واقعی واقعاً یاد گرفته می‌شود', async () => {
     // یادگیری نباید کشته شده باشد — سقف یعنی «محدود»، نه «خاموش».
     const q = 'میزای خالی چندتان';
-    const asked = await askAssistant({ restaurantId, question: q });
-    await teachAssistant({ restaurantId, logId: asked.log_id, correctIntent: 'tables_now' });
+    const asked = await askAssistant({ restaurantId, question: q, timezone: 'Asia/Tehran' });
+    await teachAssistant({ restaurantId, logId: asked.log_id, correctIntent: 'tables_now', timezone: 'Asia/Tehran' });
     const learned = (await vocabRows()).filter((v) => v.intent === 'tables_now');
     assert.ok(learned.length > 0, 'کلماتِ سؤال باید برایِ نیتِ درست ثبت شوند');
     assert.ok(learned.every((v) => v.count >= 1));
@@ -151,10 +151,10 @@ describe('دستیار · مسمومیتِ واژگان مهار می‌شود',
     // همان حمله‌ی بازتولیدشده: بدونِ سقف، در چرخه‌ی ۱۰ به vip_customers
     // می‌افتاد و در ۵۰ با conf=0.95 آن‌جا می‌ماند.
     for (let i = 0; i < 12; i++) {
-      const asked = await askAssistant({ restaurantId, question: QUESTION });
-      await teachAssistant({ restaurantId, logId: asked.log_id, correctIntent: ATTACK_INTENT });
+      const asked = await askAssistant({ restaurantId, question: QUESTION, timezone: 'Asia/Tehran' });
+      await teachAssistant({ restaurantId, logId: asked.log_id, correctIntent: ATTACK_INTENT, timezone: 'Asia/Tehran' });
     }
-    const after = await askAssistant({ restaurantId, question: QUESTION });
+    const after = await askAssistant({ restaurantId, question: QUESTION, timezone: 'Asia/Tehran' });
     assert.equal(after.intent, HONEST_INTENT,
       `دستیار نباید به نیتِ تحمیلی بیفتد — افتاد به ${after.intent} با اطمینانِ ${after.confidence}`);
   });
@@ -201,13 +201,13 @@ describe('دستیار · مسمومیتِ واژگان مهار می‌شود',
     for (const a of letters) for (const b of letters) words.push(a + b);
     const long = words.join(' ').slice(0, 500);
 
-    const asked = await askAssistant({ restaurantId, question: long });
+    const asked = await askAssistant({ restaurantId, question: long, timezone: 'Asia/Tehran' });
     const distinct = new Set(tokenize(long)).size;
     assert.ok(distinct > MAX_TAUGHT_TOKENS,
       `پیش‌شرطِ سناریو: سؤال باید بیش از ${MAX_TAUGHT_TOKENS} توکنِ یکتا داشته باشد، داشت ${distinct}`);
 
     const before = (await vocabRows()).length;
-    await teachAssistant({ restaurantId, logId: asked.log_id, correctIntent: 'busiest_day' });
+    await teachAssistant({ restaurantId, logId: asked.log_id, correctIntent: 'busiest_day', timezone: 'Asia/Tehran' });
     const created = (await vocabRows()).length - before;
     assert.ok(created > 0, 'کنترلِ مثبت: باید چیزی یاد گرفته باشد');
     assert.ok(created <= MAX_TAUGHT_TOKENS,
@@ -220,7 +220,7 @@ describe('دستیار · مسمومیتِ واژگان مهار می‌شود',
       select: { id: true },
     });
     await assert.rejects(
-      () => teachAssistant({ restaurantId, logId: foreign.id, correctIntent: ATTACK_INTENT }),
+      () => teachAssistant({ restaurantId, logId: foreign.id, correctIntent: ATTACK_INTENT, timezone: 'Asia/Tehran' }),
       /پیدا نشد/,
     );
     const stillOpen = await db.restaurantAssistantLog.findUnique({ where: { id: foreign.id } });

@@ -6,7 +6,8 @@ import { alternates } from '@/lib/i18n';
 
 export const revalidate = 300;
 
-const SITE = 'https://rezervno.ir';
+// SITE از منبعِ واحد می‌آید (lib/urls.ts) — پیش از ۲۰۲۶-۰۹-۰۸ اینجا hardcode بود.
+import { SITE } from '@/lib/urls';
 const MIN_LISTINGS = 1; // گاردِ کیفیت (ضدِّ thin content)
 
 function decode(s: string): string {

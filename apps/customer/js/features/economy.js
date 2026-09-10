@@ -43,11 +43,21 @@ function missionCard(m){
 
 function rewardCard(it){
   const locked = !it.unlocked;
-  const disabled = locked || !it.in_stock;
+  // ⚠️ `deliverable===false` یعنی سرور این کیند را *پیش از کسرِ سکه* رد
+  // می‌کند (rewards.ts، گاردِ تحویل ۲۰۲۶-۰۹-۰۹). آیتم عمداً حذف نمی‌شود —
+  // ولی دکمه‌ی فعالی که کلیکش حتماً خطا می‌دهد، خودش یک دروغِ کوچک است.
+  // مقایسه با `=== false` عمدی است: پاسخِ قدیمیِ کش‌شده این فیلد را ندارد و
+  // `undefined` نباید کلِ فروشگاه را غیرفعال کند.
+  const undeliverable = it.deliverable === false;
+  const disabled = locked || !it.in_stock || undeliverable;
+  const note = undeliverable ? ' — به‌زودی'
+    : !it.in_stock ? ' — موجودی تمام شد'
+    : locked ? ` — نیازِ ${REPUTATION_BADGE[it.min_tier]?.name || 'سطحِ بالاتر'}`
+    : '';
   return `<div class="bdg ${locked?'locked':'earned'}" style="text-align:${locked?'center':'right'}">
     <div class="bdg-emoji">${icon(it.kind==='gift_card_credit'?'creditCard':it.kind==='priority_boost'?'trending':'gift',{size:26})}</div>
     <div class="bdg-name">${it.title}</div>
-    <div class="bdg-desc">${fmtFa(it.cost_coins)} سکه${!it.in_stock?' — موجودی تمام شد':locked?` — نیازِ ${REPUTATION_BADGE[it.min_tier]?.name || 'سطحِ بالاتر'}`:''}</div>
+    <div class="bdg-desc">${fmtFa(it.cost_coins)} سکه${note}</div>
     <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%" ${disabled?'disabled':''} onclick="redeemReward(${jsq(it.id)})">خرج کن</button>
   </div>`;
 }

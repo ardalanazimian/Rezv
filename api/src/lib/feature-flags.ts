@@ -17,6 +17,7 @@ export const FEATURE_FLAG_KEYS = [
   'ai_recommendations_enabled',
   'gift_card_purchase_enabled',
   'admin_otp_login_enabled',
+  'points_redemption_enabled',
 ] as const;
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];
 
@@ -28,6 +29,7 @@ const FLAG_LABEL: Record<FeatureFlagKey, string> = {
   ai_recommendations_enabled: 'پیشنهادهایِ هوشمند',
   gift_card_purchase_enabled: 'خریدِ کارتِ هدیه',
   admin_otp_login_enabled: 'ورودِ پنلِ شرکت با پیامک (OTP)',
+  points_redemption_enabled: 'خرجِ امتیاز (بازخرید)',
 };
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -52,9 +54,25 @@ const FLAG_LABEL: Record<FeatureFlagKey, string> = {
 //  زنده باشد، ورودِ سه‌عاملی یک درِ باز پشتِ سرش دارد.
 //  پس پیش‌فرض **خاموش**: هرکس عمداً روشنش کند، آگاهانه عاملِ سوم را
 //  کنار گذاشته است.
+// ═══════════════════════════════════════════════════════════════════════
+//  points_redemption_enabled (۲۰۲۶-۰۹-۰۹): مسیرِ خرجِ امتیاز
+//  (`redeemPointsTx` در lib/loyalty.ts) موجودیِ واقعیِ مشتری را با نرخِ
+//  کانونی (`TOMAN_PER_POINT`) به تومان تبدیل می‌کند. دو دلیلِ مستقل که
+//  پیش‌فرضش باید خاموش باشد و هر دو ثبت می‌شوند:
+//
+//   ۱) **موجودی‌های تولید UNKNOWN‌اند.** آن‌ها زیرِ فرمولِ قدیمی
+//      (`Math.round(final × pct / 100)` مستقیم به‌عنوانِ امتیاز، یعنی
+//      «۱ امتیاز = ۱ تومانِ ضمنی») انباشته شده‌اند و این نرخ آن‌ها را
+//      **دو برابر** ارزش‌گذاری می‌کند. شمردنشان پیش‌شرطی است که مالک دارد،
+//      نه پیاده‌ساز. کوئری‌اش در گزارشِ همین تغییر آمده.
+//   ۲) بازگردانیِ کش‌بک (`reverseReservationCashback`) تازه در همین تغییر
+//      آمد؛ تا وقتی رویِ داده‌ی واقعی دیده نشده، روشن‌کردنِ خرج یعنی
+//      «رزروِ بزرگ بزن، کش‌بک بگیر، خرج کن، لغو کن».
+// ═══════════════════════════════════════════════════════════════════════
 const DEFAULT_OFF: ReadonlySet<string> = new Set<FeatureFlagKey>([
   'gift_card_purchase_enabled',
   'admin_otp_login_enabled',
+  'points_redemption_enabled',
 ]);
 export function featureFlagLabel(key: FeatureFlagKey): string { return FLAG_LABEL[key]; }
 

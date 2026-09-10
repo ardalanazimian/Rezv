@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createLogger } from './logger';
+import { metrics } from './metrics';
 const log = createLogger('api');
 
 export class ApiError extends Error {
@@ -62,9 +63,44 @@ export const Err = {
     404,
   ),
 };
+/**
+ * ته‌کشیدنِ استخرِ اتصالِ DB (`P2024`) — **سیگنالِ ظرفیت، نه خرابی.**
+ *
+ * یافته‌ی رد تیم (`rezv-c7`، RT-05، ۲۰۲۶-۰۹-۰۹). استدلالش حسابی بود و بعد
+ * اندازه‌گیری شد: `connection_limit=10` و `pool_timeout=10` (`db.ts:52,56`) و هر
+ * تراکنشِ رزرو تا ۱۰ ثانیه اتصالش را نگه می‌دارد. اجرای واقعی روی همین ماشین —
+ * ۱۰ اتصالِ نگه‌داشته، سپس یک کوئریِ ساده:
+ *
+ *     پس از ۱۰.۰ ثانیه → P2024 «Timed out fetching a new connection…»
+ *     errorResponse     → HTTP 500 / INTERNAL
+ *
+ * جمله‌ای که اولویتش را توضیح می‌دهد: **«P2028 یک تراکنشِ کُند لازم دارد؛
+ * P2024 ده تراکنشِ عادی.»**
+ *
+ * ⚠️ چرا این‌جا و نه در بلوکِ catchِ رزرو، برخلافِ P2028: اشباعِ استخر مخصوصِ
+ * رزرو نیست — **هر** مسیری که به DB می‌زند همین را می‌دهد. گذاشتنش در
+ * `reservations.ts` یعنی همان کلاس در ده‌ها مسیرِ دیگر باز می‌ماند، و کسی
+ * خبردار نمی‌شود چون همه‌شان ۵۰۰ی یکسان می‌دهند.
+ *
+ * ⚠️ تطبیق ساختاری است و عمداً `@prisma/client` را import نمی‌کند: این ماژول
+ * را تقریباً همه‌چیز import می‌کند و کشاندنِ Prisma به این‌جا یک وابستگیِ
+ * سنگین به مسیرِ خطای هر درخواست اضافه می‌کرد.
+ */
+function isPoolTimeoutError(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'P2024';
+}
+
 export function errorResponse(e: unknown) {
   if (e instanceof ApiError)
     return NextResponse.json({ error: { code: e.code, message: e.message, details: e.details } }, { status: e.status });
+  if (isPoolTimeoutError(e)) {
+    // شمردن پیش از پاسخ: بدونِ این عدد، طوفانِ استخر فقط انبوهی ۵۰۳ در لاگ
+    // است و هیچ‌چیز نمی‌گوید علتش کمبودِ ظرفیت بوده نه یک باگ.
+    metrics.dbPoolTimeouts.inc();
+    log.error('استخرِ اتصالِ DB ته کشید (P2024) — سیگنالِ ظرفیت', e);
+    const busy = Err.serviceUnavailable('سرویس موقتاً شلوغ است؛ چند لحظه دیگر دوباره تلاش کنید');
+    return NextResponse.json({ error: { code: busy.code, message: busy.message, details: busy.details } }, { status: busy.status });
+  }
   log.error('خطای غیرمنتظره', e);
   return NextResponse.json({ error: { code: 'INTERNAL', message: 'خطای داخلی', details: {} } }, { status: 500 });
 }

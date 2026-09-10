@@ -48,7 +48,13 @@ OUT  = os.path.join(ROOT, 'standalone')
 # چون booking.js از آن offerWaitlist می‌خواهد؛ data/booking.js زود، قبل از
 # auth.js/data/discover.js که از آن faTime/quickBook می‌خواهند).
 CUSTOMER_ORDER = [
-    'js/icons.js', 'js/api-core.js', 'js/data/seed.js', 'js/waitlist.js',
+    # ⚠️ `api-errors.js` باید **پیش از** `data/booking.js` بیاید — booking.js
+    # ازش `bookingErrorKind` می‌خواهد. نبودنش دقیقاً همان کلاسِ خرابی است که
+    # در سرآیندِ بالا مستند شده (`ReferenceError: httpJson is not defined`):
+    # باندل ساخته می‌شود، گیتِ تازگی سبز می‌ماند، و مسیرِ خطای رزرو در
+    # زمانِ اجرا می‌ترکد. ۲۰۲۶-۰۹-۰۹ همین یک‌بار دیگر رخ داد — فایل به
+    # apps/ اضافه شد و به این فهرست نه.
+    'js/icons.js', 'js/api-core.js', 'js/api-errors.js', 'js/data/seed.js', 'js/waitlist.js',
     'js/data/booking.js', 'js/store.js', 'js/actions.js', 'js/api.js',
     'js/analytics.js', 'js/data/discover.js', 'js/data/detail.js',
     'js/reservation.js', 'js/features/trips.js', 'js/features/loyalty.js',
@@ -338,6 +344,25 @@ def check():
 
 
 if __name__ == '__main__':
+    # ⚠️ FG-12 (یافته‌ی رد تیم، ۲۰۲۶-۰۹-۱۰) — چرا این پرچم وجود دارد.
+    #
+    # `api/tests/standalone-bundle-completeness.test.mts` فهرستِ ماژول‌ها را با
+    # **خواندنِ متنِ** همین فایل می‌ساخت (regex روی `'…​.js'`). یعنی یک **کامنت**
+    # می‌توانست ماژولی را در چشمِ گارد ثبت کند بدونِ آنکه در باندل باشد:
+    #
+    #     حذفِ 'js/api-errors.js' از فهرست         →  exit 1  (گارد کار می‌کند)
+    #     همان حذف + کامنتی که نامش را ببرد        →  exit 0  (خلع‌سلاح)
+    #
+    # بازتولید شد و دقیقاً همین شد. و ماژولی که خلع‌سلاحش می‌کند همانی است که
+    # نبودنش دیروز یک `ReferenceError`ِ زنده در باندلِ آفلاین ساخت.
+    #
+    # رفعِ **کلاس** و نه نمونه: گارد به‌جای خواندنِ متن، **از خودِ برنامه
+    # می‌پرسد**. کامنت، کوتیشن، و شکلِ نوشتنِ فهرست از قرارداد بیرون می‌روند.
+    # (حذفِ آن یک کامنت فقط همین نمونه را می‌بست.)
+    if '--print-order' in sys.argv:
+        for rel in CUSTOMER_ORDER:
+            print(rel)
+        sys.exit(0)
     if '--check' in sys.argv:
         sys.exit(check())
     ok = all([build(a) for a in APPS])

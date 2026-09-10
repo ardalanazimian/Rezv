@@ -2,8 +2,17 @@
 // اجرا: npm run lint  (نیاز به نصب: npm i -D eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin)
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
+import js from '@eslint/js';
 
 export default [
+  // ⚠️ ۲۰۲۶-۰۹-۰۸: تا امروز هیچ ruleset پایه‌ای فعال نبود. flat configِ ESLint 9
+  //    به‌صورتِ پیش‌فرض هیچ قاعده‌ای روشن نمی‌کند، پس `npm run lint` سبز بود و
+  //    چیزی نمی‌سنجید جز چند قاعده‌ی دستیِ زیر. اثباتِ زنده: کلیدِ تکراری
+  //    `{ a: 1, a: 2 }` در src/ تزریق شد و lint با exit 0 گذشت.
+  js.configs.recommended,
+  //    no-undef روی TypeScript همیشه مثبتِ کاذب است (typescript-eslint خودش
+  //    همین را توصیه می‌کند) — بدونِ خاموش‌کردنش ۸۷۹ خطای ساختگی می‌دهد.
+  { rules: { 'no-undef': 'off' } },
   {
     files: ['src/**/*.ts', 'src/**/*.tsx', 'prisma/**/*.ts'],  // middleware.ts داخلِ src/ است
     languageOptions: {

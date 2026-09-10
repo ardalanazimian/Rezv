@@ -141,3 +141,49 @@ tests:
                 lib/ratelimit.ts:236-248) — یا حمله‌ی واقعی یا بنِ اشتباهیِ یک
                 IPِ به‌اشتراک‌گذاشته‌شده (CGNAT). فهرست را با listBannedIps در
                 پنلِ ادمین/شرکت نگاه کن؛ لغوِ دستی با unbanIp در دسترس است.
+
+  # ── AuditWriteFailing: expr = increase(...[5m]) > 0 by (action) ، for: 10m ──
+  #
+  # همان جفتِ «سکوت/فایر» که برایِ خانواده‌ی fail-open بالا اجرا می‌شود. بدونِ
+  # سناریویِ سکوت، یک قاعده‌ی «هر چیزی را فایر کن» هم از تستِ فایر سبز رد
+  # می‌شد — و آلارمی که با هر blip پیج کند، ظرفِ یک هفته خاموش می‌شود و بعد
+  # هیچ چیزی را محافظت نمی‌کند.
+
+  # سناریوی «سکوت»: دقیقاً یک شکستِ مجزا در t=3m (یک قطعیِ لحظه‌ایِ اتصالِ
+  # DB که فوراً برطرف شد). پنجره‌ی increase فقط تا t≈8m «true» می‌ماند —
+  # کمتر از for:10m — پس هرگز نباید فایر شود، حتی در t=20m.
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_audit_write_failed_total{action="security.abuse_flag"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: AuditWriteFailing
+        exp_alerts: []
+
+  # سناریوی «فایر»: Postgres واقعاً مشکل دارد — هر دقیقه یک شکستِ تازه، پس
+  # increase(...[5m]) پیوسته مثبت می‌ماند و بعد از for:10m باید فایر شود.
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_audit_write_failed_total{action="security.abuse_flag"}'
+        values: '0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AuditWriteFailing
+        exp_alerts: []   # هنوز pending است، ۱۰ دقیقه از اولین true نگذشته
+      - eval_time: 14m
+        alertname: AuditWriteFailing
+        exp_alerts:
+          - exp_labels:
+              alertname: AuditWriteFailing
+              severity: critical
+              action: security.abuse_flag
+            exp_annotations:
+              summary: "ثبتِ ردِ حسابرسی مکرراً شکست می‌خورد (action=security.abuse_flag)"
+              description: >-
+                دستِ‌کم ۱۰ دقیقه است نوشتنِ ردیف در audit_logs شکست می‌خورد
+                (lib/audit.ts). کنشِ اصلی انجام شده — فقط مدرکش ثبت نشده، پس
+                تحقیقِ امنیتیِ بعدی روی این بازه کور است. چون نویسنده مستقیم روی
+                Postgres می‌نویسد، اول سلامتِ DB را نگاه کن نه API. اگر
+                action=security.abuse_flag باشد، نسب‌نامه‌ی فلگ‌ها در پنلِ شرکت
+                (listFlaggedAbuseUsers) هم همین حالا نادرست است.

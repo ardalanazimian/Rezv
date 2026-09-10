@@ -84,6 +84,13 @@ make_global_format() {
   strip_exports "$SRC/js/format.js"
 }
 
+# نسخه‌ی global از rate-limit-ui.js (export را برمی‌دارد؛ برای <script> کلاسیک).
+# ⚠️ فقط **مکانیزمِ** ۴۲۹ مشترک است (مرزهای سه سطح + قاعده‌ی «هرگز retryِ
+# خودکار»). متنِ هر پنل مالِ خودش می‌ماند، چون مخاطب فرق دارد.
+make_global_ratelimit_ui() {
+  strip_exports "$SRC/js/rate-limit-ui.js"
+}
+
 make_panel_analytics() { # $1=label $2=load-hint $3=source $4=sid-key $5=q-key
   sed \
     -e "s|__LABEL__|$1|" \
@@ -150,6 +157,15 @@ make_global_format > "$TMP/format.global.js"
 assert_no_export "$TMP/format.global.js"
 for app in $GLOBAL_APPS; do
   place "$TMP/format.global.js" "$ROOT/apps/$app/js/format.js"
+done
+
+# rate-limit-ui.js — مکانیزمِ مشترکِ نمایشِ ۴۲۹ (DS-003 §۴‑۵).
+# ⚠️ عمداً به apps/customer **ساخته نمی‌شود**: اپِ مشتری هنوز مصرف‌کننده‌اش
+# نیست و فایلِ بی‌مصرف همان کدِ مرده است. وقتی لازم شد، یک خط این‌جا.
+make_global_ratelimit_ui > "$TMP/rate-limit-ui.global.js"
+assert_no_export "$TMP/rate-limit-ui.global.js"
+for app in $GLOBAL_APPS; do
+  place "$TMP/rate-limit-ui.global.js" "$ROOT/apps/$app/js/rate-limit-ui.js"
 done
 
 # analytics.js پنل‌ها (business/company) — از منبعِ واحدِ shared/js/analytics.panel.js
