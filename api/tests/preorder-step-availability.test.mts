@@ -48,6 +48,16 @@ function orderableMenu(): (r: unknown) => unknown[] {
   return new Function(`${body}; return orderableMenu;`)() as (r: unknown) => unknown[];
 }
 
+/** `bookStepLoading` را با `esc`/`bk`ِ تزریق‌شده **واقعاً اجرا** می‌کند. */
+function loadingHtml(r: unknown, bk: unknown): string {
+  const i = BOOKING.indexOf('function bookStepLoading(r){');
+  assert.notEqual(i, -1, 'bookStepLoading پیدا نشد — نامش عوض شده؟');
+  const body = BOOKING.slice(i, BOOKING.indexOf('\n}', i) + 2);
+  return new Function('esc', 'bk', `${body}; return bookStepLoading(${JSON.stringify(r)});`)(
+    (s: unknown) => String(s ?? ''), bk,
+  ) as string;
+}
+
 describe('A1-007 — گامِ پیش‌سفارش روی دادهٔ نامعلوم حذف نمی‌شود', () => {
 
   test('⚠️ ابهام واقعی است: منوی نبود و منوی خالی یک خروجی می‌دهند', () => {
@@ -87,13 +97,74 @@ describe('A1-007 — گامِ پیش‌سفارش روی دادهٔ نامعلو
     const fn = code.slice(i, code.indexOf('\n}', i));
     // ترتیب مهم است: پرسش باید **قبل از** شمردن باشد، وگرنه بی‌فایده است.
     const ask = fn.indexOf('detailLoaded');
-    const decide = fn.indexOf('orderableMenu');
+    const decide = fn.indexOf('menuUnavailable');
     assert.notEqual(ask, -1,
       'openBookingFlow حالتِ «نمی‌دانم» را تشخیص نمی‌دهد ⇒ نامعلوم را «ندارد» می‌خواند');
     assert.ok(ask < decide,
-      'بارگذاریِ جزئیات باید **پیش از** شمردنِ منو باشد؛ بعد از آن بی‌اثر است');
+      'بارگذاریِ جزئیات باید **پیش از** تصمیم باشد؛ بعد از آن بی‌اثر است');
     assert.match(fn, /await\s+loadRestaurantDetail/,
       'باید واقعاً جزئیات را بگیرد، نه اینکه فقط پرچم را ببیند');
+  });
+
+  test('⚠️ بازخورد پیش از شبکه — چیپِ ساعت نباید مرده به‌نظر برسد', () => {
+    // ⚠️ این ردیف را طراح روی نسخه‌ی اولِ رفعِ من گرفت و حق داشت: مسیرِ فید
+    // **همان مسیرِ سریع** است، و من با `async` کردنِ تابع، بازشدنِ شیت را
+    // پشتِ یک رفت‌وبرگشتِ شبکه بردم. روی شبکه‌ی کند، کاربر می‌زند و هیچ
+    // اتفاقی نمی‌افتد — یعنی یک نقص را با نقصِ دیگری عوض کرده بودم.
+    const code = codeOnly(BOOKING);
+    const i = code.search(/(?:export\s+)?(?:async\s+)?function\s+openBookingFlow\s*\(/);
+    const fn = code.slice(i, code.indexOf('\n}', i));
+    const paint = fn.indexOf('openSheet(');
+    const net = fn.indexOf('await');
+    assert.notEqual(paint, -1, 'هیچ شیتی باز نمی‌شود؟');
+    assert.ok(net === -1 || paint < net,
+      'اولین openSheet باید **پیش از** اولین await باشد، وگرنه زدنِ چیپ بی‌پاسخ می‌ماند');
+  });
+
+  test('⚠️ اسکلت فقط چیزی را می‌پوشاند که نمی‌دانیم', () => {
+    // ⚠️ قاعده‌ی طراح، و نسخه‌ی اولِ من نقضش می‌کرد: شیتِ سراسر-اسکلت خطرِ
+    // «خراب است» خوانده‌شدن دارد، و نامِ رستوران و تاریخ·ساعت·تعداد در این
+    // لحظه **کاملاً معلوم‌اند** (از رکوردِ فید و از `bk` که هر دو صداکننده
+    // پیش از فراخوانی ست می‌کنند). پنهان‌کردنِ دانسته پشتِ shimmer، تأخیرِ
+    // ادراک‌شده را بی‌دلیل بالا می‌برد.
+    const html = loadingHtml(
+      { n: 'کافه تهران' },
+      { date: 'پنجشنبه ۱۹ شهریور', time: '۲۰:۳۰', party: '۴ نفر' },
+    );
+    assert.match(html, /کافه تهران/, 'نامِ رستوران معلوم است و باید فوراً دیده شود');
+    assert.match(html, /پنجشنبه ۱۹ شهریور/, 'تاریخ معلوم است');
+    assert.match(html, /۲۰:۳۰/, 'ساعت معلوم است');
+    assert.match(html, /۴ نفر/, 'تعداد معلوم است');
+    assert.match(html, /class="sk"/, 'بدنه‌ی نامعلوم باید اسکلت باشد');
+    // و آنچه نباید باشد:
+    assert.doesNotMatch(html, /stepBars|step-bar/,
+      'نوارِ مرحله نباید پیش از دانستنِ شمارش رندر شود — جهتِ دیررس از نبودِ جهت بدتر است');
+    assert.doesNotMatch(html, /تأیید اطلاعات/,
+      'عنوانِ مخصوصِ گام باید همراهِ بدنه بیاید، نه در سرتیترِ زودرس');
+  });
+
+  test('⚠️ اگر bk خالی باشد، سرتیتر ادعای جعلی نمی‌سازد', () => {
+    // مسیرهای دیگر ممکن است bk را ست نکرده باشند؛ نباید « · · » یا یک
+    // رشته‌ی نصفه نشان داده شود.
+    const html = loadingHtml({ n: 'کافه تهران' }, {});
+    assert.match(html, /کافه تهران/);
+    assert.doesNotMatch(html, /·/, 'بدونِ داده، جداکننده‌ی خالی هم نباید رندر شود');
+  });
+
+  test('⚠️ وقتی می‌دانیم، هیچ رفت‌وبرگشتی نمی‌رود (مسیرِ سریع سریع می‌ماند)', () => {
+    const code = codeOnly(BOOKING);
+    const i = code.search(/(?:export\s+)?(?:async\s+)?function\s+openBookingFlow\s*\(/);
+    const fn = code.slice(i, code.indexOf('\n}', i));
+    // شرطِ «می‌دانیم» باید کلِ بلوکِ شبکه را در بر بگیرد، نه اینکه await
+    // بی‌قیدوشرط اجرا شود.
+    assert.match(fn, /if\s*\(\s*!known\s*\)/,
+      'بلوکِ بارگذاری باید پشتِ شرطِ «نمی‌دانیم» باشد');
+    assert.ok(fn.indexOf('const known') < fn.indexOf('await'),
+      'تشخیصِ «می‌دانیم» باید پیش از هر awaitی باشد');
+    // و بولینِ فید (اگر روزی بیاید) باید همان‌جا حساب شود.
+    assert.match(fn, /hasOrderableMenu/,
+      'بولینِ فید باید در تشخیصِ «می‌دانیم» دیده شود — وگرنه وقتی سرور بدهدش، ' +
+      'اپ همچنان بی‌دلیل درخواست می‌فرستد');
   });
 
   test('⚠️ رفتارِ «منو ندارد» دست‌نخورده است — این رفع فیچری اضافه نمی‌کند', () => {
