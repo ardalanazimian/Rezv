@@ -103,7 +103,7 @@ const PANEL_ERROR_MAP = Object.freeze({
   INVALID_STATUS_TRANSITION: { staff: null, action: 'refresh' },
 
   // ⚠️ `RATE_LIMITED` تنها ردیفی است که یک **حالت** لازم دارد، نه یک جمله —
-  // پس متن و کارش از `PANEL_ERROR_MAP` نمی‌آید بلکه از `panelRateLimitPlan`
+  // پس متن و کارش از `PANEL_ERROR_MAP` نمی‌آید بلکه از `rateLimitPlan`
   // پایین. دیروز عمداً بیرون ماند تا کسی بی‌سروصدا به `retry` نگاشتش نکند؛
   // امروز اسپکش رسید (DS-003 §۴‑۵) و پیاده شد.
   RATE_LIMITED:       { staff: null, action: 'wait' },
@@ -123,40 +123,18 @@ const PANEL_ERROR_MAP = Object.freeze({
 // دقیقه). مقدار باید از `details.retryAfterSec` بیاید که سرور در
 // `errors.ts:27` می‌فرستد.
 
-const RATE_LIMIT_BRIEF_SEC = 10;    // ≤ این → «چند لحظه صبر کن»
-const RATE_LIMIT_LOCK_SEC = 120;    // > این → قفلِ امنیتی، نه ترافیک
-
-/** ثانیه‌ی انتظار از پاسخِ سرور — یا `null` اگر نداده. */
-function panelRetryAfterSec(err) {
-  const v = err && err.details && err.details.retryAfterSec;
-  return typeof v === 'number' && v > 0 ? Math.ceil(v) : null;
-}
-
-/**
- * نقشه‌ی نمایش برای یک ۴۲۹. **داده برمی‌گرداند، نه متن** — قالب‌بندیِ ارقام
- * فارسی با `fa()` در محلِ مصرف می‌ماند تا این ماژول نسخه‌ی دومِ `format.js`
- * نشود (همان کلاسِ «یک واقعیت، چند رونوشت»).
- *
- * `tier`:
- *   `brief`     — کوتاه یا نامعلوم: دکمه غیرفعال، بدونِ عدد
- *   `countdown` — ۱۱..۱۲۰ ثانیه: عددِ **زنده**ی کم‌شونده روی دکمه
- *   `locked`    — >۱۲۰: **قفلِ امنیتی است نه ترافیک.** عددِ ثابتِ دقیقه‌ای،
- *                 شمارشِ زنده **نه** — شمارنده‌ی ۱۵دقیقه‌ای فقط کاربر را به
- *                 تماشا وامی‌دارد. و متنش نباید «شلوغه» باشد: `passwordLogin`
- *                 و `adminTotpLogin` وقتی می‌خورند یعنی رمز اشتباه بوده، و
- *                 «دوباره بزن» او را به تکرارِ همان کار می‌فرستد.
- */
-function panelRateLimitPlan(err) {
-  const sec = panelRetryAfterSec(err);
-  // ⚠️ نبودِ عدد → عدد **اختراع نکن**. «چند لحظه» صادق است؛ عددِ حدسیِ غلط نه.
-  if (sec === null || sec <= RATE_LIMIT_BRIEF_SEC) {
-    return { tier: 'brief', sec: sec, countdown: false, holdSec: sec || RATE_LIMIT_BRIEF_SEC };
-  }
-  if (sec <= RATE_LIMIT_LOCK_SEC) {
-    return { tier: 'countdown', sec: sec, countdown: true, holdSec: sec };
-  }
-  return { tier: 'locked', sec: sec, minutes: Math.ceil(sec / 60), countdown: false, holdSec: sec };
-}
+// ⚠️ مرزها و نقشه‌ی سه سطح از این‌جا **برداشته شد** و به
+// `shared/js/rate-limit-ui.js` رفت (مهندسِ لانچ، ۲۰۲۶-۰۹-۱۰).
+//
+// چرا: پنلِ شرکت هم همین را لازم داشت، و دو رونوشت از عددهای ۱۰ و ۱۲۰
+// دقیقاً همان کلاسی است که این مخزن پنج بار در یک روز پرداختش — نگاشتِ
+// سطحِ وفاداری، `STATUS_META`، `ST_FA`، نگاشتِ مرده‌ی company، و پوششِ
+// `details.reason`. عددی که در دو جا زندگی کند بالاخره واگرا می‌شود.
+//
+// آنچه **مشترک نشد**: متن. مخاطبِ این پنل پرسنلِ رستوران است و مخاطبِ پنلِ
+// شرکت مدیرِ پلتفرم؛ همان کد در دو پنل دو جمله می‌خواهد. یک مکانیزم، چند
+// واژگان. توابعِ در دسترس از فایلِ مشترک: `retryAfterSec`، `rateLimitPlan`،
+// `holdButtonForRetry`.
 
 /**
  * متنِ فارسیِ حالت. `faFn` تزریق می‌شود (پیش‌فرض: بدونِ تبدیل) تا تست بتواند
@@ -164,7 +142,7 @@ function panelRateLimitPlan(err) {
  */
 function panelRateLimitText(err, faFn) {
   const f = typeof faFn === 'function' ? faFn : function (n) { return String(n); };
-  const p = panelRateLimitPlan(err);
+  const p = rateLimitPlan(err);
   if (p.tier === 'brief') return 'چند لحظه صبر کن، بعد دوباره بزن.';
   if (p.tier === 'countdown') return `${f(p.sec)} ثانیه دیگر دوباره بزن.`;
   return `به‌خاطرِ تلاش‌های زیاد، ${f(p.minutes)} دقیقه قفل شد. اگر رمز را فراموش کرده‌ای از مدیر بخواه بازنشانی کند.`;
@@ -214,45 +192,6 @@ function panelErrorIcon(err) {
   }
 }
 
-/**
- * دکمه را تا پایانِ انتظار نگه می‌دارد.
- *
- * ⚠️ الگویش تازه نیست: `crm.js:258,268` از قبل `btn.disabled=true` +
- * `btn.textContent` متغیر را دارد و کار می‌کند. این فقط همان را با زمان‌بندی
- * می‌بندد — و **هرگز خودش درخواست نمی‌زند** (قاعده‌ی صفرِ §۴‑۵).
- *
- * ⚠️ شمارنده از عددِ **لحظه‌ی دریافت** می‌شمارد، نه با پرسیدن از سرور.
- * پرسیدنِ «چقدر مانده؟» خودش یک درخواست است — یعنی گاردِ نرخ را با ابزارِ
- * نمایشِ گاردِ نرخ می‌شکستیم.
- *
- * سطحِ `locked` عمداً شمارنده‌ی زنده ندارد: یک شمارنده‌ی ۱۵دقیقه‌ای فقط کاربر
- * را به تماشا وامی‌دارد. ولی دکمه در پایانِ مدت آزاد می‌شود — قفلِ همیشگی
- * یعنی کاربر مجبور به رفرش است، که خودش یک درخواستِ دیگر است.
- */
-function holdButtonForRetry(btn, err, restoreText, faFn) {
-  if (!btn) return null;
-  const plan = panelRateLimitPlan(err);
-  const f = typeof faFn === 'function' ? faFn : function (n) { return String(n); };
-  btn.disabled = true;
-
-  let timer = null;
-  if (plan.countdown) {
-    let left = plan.sec;
-    btn.textContent = `${f(left)} ثانیه…`;
-    timer = setInterval(function () {
-      left -= 1;
-      if (left > 0) { btn.textContent = `${f(left)} ثانیه…`; return; }
-      clearInterval(timer);
-      btn.disabled = false;
-      btn.textContent = restoreText;
-    }, 1000);
-  } else {
-    btn.textContent = restoreText;
-    timer = setTimeout(function () {
-      btn.disabled = false;
-      btn.textContent = restoreText;
-    }, plan.holdSec * 1000);
-  }
-  // برگرداندنِ handle تا تست/فراخوان بتواند پاکش کند و تایمر نشت نکند.
-  return timer;
-}
+// ⚠️ `holdButtonForRetry` هم به `shared/js/rate-limit-ui.js` رفت — همان دلیل:
+// رفتارِ «دکمه را نگه دار و هرگز خودکار نزن» در هر دو پنل یکی است، و نسخه‌ی
+// دوم بالاخره از اولی واگرا می‌شد. از آن فایل در دسترس است.

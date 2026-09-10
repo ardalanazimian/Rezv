@@ -214,6 +214,7 @@ import './panel-status-error-vocabulary.test.mts';
 import './panel-status-map-single-source.test.mts';
 import './panel-error-contract.test.mts';
 import './company-provision-reason-coverage.test.mts';
+import './company-error-contract.test.mts';
 import './db-pool-exhaustion-contract.test.mts';
 import './ratelimit-transient-redis-error.test.mts';
 import './otp-request-window-postgres.test.mts';

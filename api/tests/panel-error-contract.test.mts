@@ -25,17 +25,26 @@ const SRC = readFileSync(
   fileURLToPath(new URL('../../apps/business/js/api-errors.js', import.meta.url)), 'utf8',
 );
 
-const panel = new Function(`${SRC}
+// ⚠️ مکانیزمِ ۴۲۹ از ۲۰۲۶-۰۹-۱۰ در `shared/js/rate-limit-ui.js` است، نه در
+// این فایل — چون پنلِ شرکت هم لازمش داشت و دو رونوشت از عددهای ۱۰/۱۲۰
+// بالاخره واگرا می‌شد. پس sandbox **هر دو** را بار می‌کند، دقیقاً همان‌طور
+// که `index.html` می‌کند (rate-limit-ui پیش از api-errors).
+const SHARED = readFileSync(
+  fileURLToPath(new URL('../../apps/business/js/rate-limit-ui.js', import.meta.url)), 'utf8',
+);
+
+const panel = new Function(`${SHARED}
+${SRC}
   return { PANEL_ERROR_MAP, PANEL_ERROR_ACTIONS, panelErrorText, panelErrorAction, panelErrorIcon,
-           panelRetryAfterSec, panelRateLimitPlan, panelRateLimitText, holdButtonForRetry };`,
+           retryAfterSec, rateLimitPlan, panelRateLimitText, holdButtonForRetry };`,
 )() as {
   PANEL_ERROR_MAP: Record<string, { staff: string | null; action: string }>;
   PANEL_ERROR_ACTIONS: Record<string, string>;
   panelErrorText: (e: unknown, fb?: string, fa?: (n: number) => string) => string;
   panelErrorAction: (e: unknown) => string;
   panelErrorIcon: (e: unknown) => string;
-  panelRetryAfterSec: (e: unknown) => number | null;
-  panelRateLimitPlan: (e: unknown) => {
+  retryAfterSec: (e: unknown) => number | null;
+  rateLimitPlan: (e: unknown) => {
     tier: string; sec: number | null; minutes?: number; countdown: boolean; holdSec: number;
   };
   panelRateLimitText: (e: unknown, fa?: (n: number) => string) => string;
@@ -111,7 +120,7 @@ describe('قراردادِ خطای پنل — کد به کار وصل است', 
   });
 
   test('⚠️ سه سطحِ §۴‑۵ با مرزهای دقیقشان', () => {
-    const at = (s: number | null) => panel.panelRateLimitPlan(
+    const at = (s: number | null) => panel.rateLimitPlan(
       { code: 'RATE_LIMITED', details: s === null ? {} : { retryAfterSec: s } });
 
     // مرزها عمداً assert می‌شوند: ۱۰/۱۱ و ۱۲۰/۱۲۱ جایی‌اند که اسپک خط کشیده.
