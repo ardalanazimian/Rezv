@@ -25,6 +25,23 @@ Everything else is either a table-stakes capability our competitors also have (`
 a cell where competitors are `UNKNOWN` — and **`UNKNOWN` is not a differentiator.** "They probably
 don't do this" is not a claim we are allowed to make.
 
+### What `REAL` means in our own column — added 2026-09-10, and it changes how to read every cell below
+
+The founder confirmed and the CEO measured (`044c5bc`) that **there is no production deployment and
+zero real users.** The laptop is the *target* machine, not a running one: no `api/.env`, no deploy
+job, no named volumes, and `deploy/Caddyfile` routes on a domain that was never bought (`E-001`).
+
+Therefore **every `REAL` in the Rezervno column means "verified in source or schema", never "observed
+working in production"** — the matrix says so itself for several cells ("schema-level", "not
+live-tested in any pass"). This is not a weakness to hide; it is the accurate reading, and an
+investor who discovers the gap themselves will discount everything else we said.
+
+**The rule this imposes on every artifact:** we may describe **mechanism** — what the code does, with
+a file:line — and we may **never** describe **behaviour at scale**, reliability, or anything with a
+user in it. "Tenant isolation is enforced in code, here" is allowed. "Our platform reliably protects
+restaurant data" is not, and the difference is not pedantry: the second one is the sentence that
+makes a deck fraudulent without anybody intending to lie.
+
 ---
 
 ## 1. The single true thing
