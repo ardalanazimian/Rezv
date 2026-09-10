@@ -111,6 +111,34 @@ character an author reaches for mid-sentence.
 its own list, the test should read that and let comments, quoting and formatting stop being part of
 the contract.
 
+## The second instance of the absorption class — found 2026-09-10, by being its victim
+
+Yesterday I probed for a **second** commit whose contents were quietly wider than its message and
+[reported that none existed](RETEST-2026-09-09.md) — 13 commits checked, only the known `b0bdfa6`.
+That negative result has expired. **There are now two more, both today, both involving my files, and
+neither was found by probing — they happened to me.**
+
+| Commit | Message says | Also contained |
+|---|---|---|
+| `859c115` | «ROUTING: ردیفِ Designer» | the Launch Engineer's row **and** the Red Team's row |
+| `939bca1` | «گاردِ فونت به دو سطحِ Next تعمیم یافت» | `ATTACKS.md` +25 and `LEDGER-ADDITIONS.md` +41 — the whole of FG-12 |
+
+**No content was lost in either.** FG-12 is intact in `HEAD`, byte-for-byte what I staged. The damage
+is to the record, and it is the damage this repo already understands: **someone looking for FG-12 in
+`git log` finds a commit about fonts.** A message that makes a claim while carrying 66 unrelated
+lines is the failure I was hunting, and the reason it took a day to find is that I was probing for it
+in one narrow shape (a test registered without its file) instead of the general one.
+
+**Both are rule violations, not missing rules.** `git add -A` and `git commit -a` are already
+forbidden in this checkout; a pathspec commit cannot do this. And the mirror case is instructive:
+`rezv-a0` and I each held back from committing `ROUTING.md` to avoid taking the other's line, and a
+third session that was not holding back committed it anyway. **Two participants being careful does
+not make a shared tree safe — it only makes them slower than whoever is not.**
+
+**The general probe, replacing the narrow one:** for each commit, does its diff touch files outside
+the area its subject names? `probe-runner-integrity.mjs` answers a much smaller question than the one
+worth asking.
+
 ## Machine traps — measured, with the wrong guesses left in on purpose
 
 - **`@/lib/…` (alias) versus `./…` (relative)** can give two module instances. That is the real trap
