@@ -3,7 +3,7 @@
 //  جدا شده از data/detail.js (ریفکتور فاز۱: جداسازیِ مسئولیت).
 //  رفتار دقیقاً همان قبل است؛ فقط از یک فایلِ مجزا export می‌شود.
 // ═══════════════════════════════════════════════════════════
-import { API, USER, isLoggedIn, syncNavPoints, userName } from '../api.js';
+import { API, USER, applyRestaurantDetail, isLoggedIn, loadRestaurantDetail, syncNavPoints, userName } from '../api.js';
 import { closeSheet, esc, jsq, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
 import { doSearch, fmtFa } from './discover.js';
 import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js';
@@ -276,8 +276,35 @@ function stepBars(total, current){
  * از این‌جا می‌روند. پیش‌تر هر دو عیناً `openSheet(bookStep2(findR(id)))`
  * داشتند؛ یک منطق در دو جا، که همان کلاسِ «یک واقعیت، چند رونوشت» است.
  */
-export function openBookingFlow(id){
+export async function openBookingFlow(id){
   const r = findR(id);
+  // ⚠️ [۲۰۲۶-۰۹-۱۰] `orderableMenu(r).length === 0` **دو معنیِ متفاوت** داشت و
+  // اپ هر دو را یکی می‌گرفت:
+  //     (الف) این رستوران منویی ثبت نکرده        ← واقعیت
+  //     (ب)  جزئیات هنوز بارگذاری نشده           ← نامعلوم
+  // و نامعلوم را به‌عنوانِ «ندارد» مصرف می‌کرد. همان تمایزِ `null` در برابرِ
+  // `false` که امروز یک لایه پایین‌تر (BE-004/ب) رفع شد.
+  //
+  // ⚠️ چرا این یک نقصِ واقعیِ فیچر بود، نه نظری: `menu` را فقط
+  // `applyRestaurantDetail` می‌نویسد، و آن فقط وقتی اجرا می‌شود که **صفحه‌ی
+  // رستوران** باز شود (`enrichRestPage`). ولی `quickBook` — چیپِ ساعت روی
+  // کارتِ فید — مستقیم به همین‌جا می‌آید. `select`ِ روتِ فهرست هم `menu`
+  // ندارد و برای رستورانِ زنده از دادهٔ نمونه هم قرض گرفته نمی‌شود (`isLive`).
+  // نتیجه: یک رستورانِ زنده **با منوی واقعی** که از چیپِ کارت رزرو شود، گامِ
+  // پیش‌سفارش را هرگز نمی‌دید؛ همان رستوران از صفحه‌ی خودش، می‌دید.
+  // فیچر بی‌صدا به مسیرِ ورود وابسته بود.
+  //
+  // پس پیش از تصمیم، اگر نمی‌دانیم، **می‌پرسیم**. پاسخ کش می‌شود، پس این
+  // برای همان رستوران بیش از یک بار هزینه ندارد.
+  if (r && !r.detailLoaded && r.slug && API.online) {
+    const d = await loadRestaurantDetail(r.slug);
+    if (d) applyRestaurantDetail(r, d);
+  }
+  // ⚠️ اگر درخواست شکست بخورد `detailLoaded` ست نمی‌شود و باز هم نمی‌دانیم.
+  // آن حالت عمداً مثلِ «منو ندارد» رفتار می‌کند — چون بدیلش رندرِ یک بخشِ
+  // پیش‌سفارشِ خالی است که R1 قبلاً ثابت کرد شبیهِ باگِ بارگذاری به نظر
+  // می‌رسد. این یک انتخابِ آگاهانه است، نه غفلت: گامِ رزرو نباید پشتِ شبکه
+  // گروگان بماند. بازشدنِ بعدی دوباره تلاش می‌کند (کشِ شکست نمی‌ماند).
   if (orderableMenu(r).length === 0) {
     // ⚠️ `bk.preorder` را **صریح** خالی می‌کنیم. `toBookStep3` تنها نویسنده‌اش
     // بود و با پریدن از گامِ ۲ اصلاً اجرا نمی‌شود. `setBk` شیء را کامل
