@@ -164,11 +164,24 @@ them before you assume the green is the whole truth:
    a *rate decision* — three founder statements that together imply 125% cashback and cannot all be
    true. The balance-counting queries were already written in `c15362c`; nobody is waiting on them.
 
-   **And the deployment question underneath is genuinely open, so do not answer it by assuming.** The
-   production stack has never run on this machine (`docker ps -a` shows only the two throwaway test
-   containers; no `pgdata` volume; no `.env`). That means **"not here", not "nowhere"** — where
-   production runs, if anywhere, is a question only the founder can answer, and it is recorded as
-   UNKNOWN rather than zero.
+   **The deployment question underneath was open when you asked it. It is now answered — you asked
+   the right question and it changed the row.** Founder, direct, 2026-09-10: **"روی لپ‌تاپ" — the
+   laptop.** Measured the same day: `docker ps -a` shows only the two throwaway test containers, no
+   `pgdata`/`redisdata` volume, no `api/.env`, no deploy job in CI, and `deploy/Caddyfile` routes on a
+   `{$DOMAIN}` that was never bought (`E-001`).
+
+   So the laptop is the **target** machine, not a running deployment — which is exactly what
+   `docs/audit/deputy/QUEUE-STATE-2026-09-09.md` §7 already ruled: the laptop is a **test VPS**, and
+   *"no row is marked green on the basis of a local walk."*
+
+   **Therefore: there is no production today. Zero real users, zero accumulated points** — and that
+   is a *measured* zero (absent `pgdata`), not a failed-search zero. Two consequences you can rely on:
+   the "count the outstanding balance" question is **moot** and has been struck from `E-002`; and the
+   cost-of-delay there is **actually zero, not deferred** — the clock starts at the first real signup.
+
+   **One thing this does not clear.** The argument that fake-reservation exposure is *windowed*
+   depends on the `cron` container firing. That is certain **about the repo** (`cron/crontab`, nine
+   jobs) and has **never been observed running**. Before launch it needs to be watched, not read.
 2. **`completeReferral` has zero production callers** while the customer app promises «۵۰۰ امتیاز
    برای هر دعوت موفق» (`api/src/lib/loyalty.ts:610`). Tracked as `A1-005`, open since round 16. The
    payer is correct — atomic claim, idempotency key — it is simply never called. **Wiring it spends
