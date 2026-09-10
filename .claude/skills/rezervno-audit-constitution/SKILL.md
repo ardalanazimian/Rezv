@@ -95,6 +95,46 @@ And when a result is *inverted* — red where it should be green — suspect the
 **record the anomaly instead of discarding it**. One such anomaly was recoverable hours later
 precisely because it had been written down as unexplained rather than dismissed as noise.
 
+### Write in your own worktree — the shared tree is not made safe by care
+
+**Decided 2026-09-10 after two collisions in one day, and the reason care is not the fix:**
+
+```text
+859c115  message: "Designer row"   →  actually carried three sessions' rows
+939bca1  message: "font guard"     →  also carried another session's entire FG-12 work
+```
+
+Nothing was lost either time. The damage was to the record — *someone searching `git log` for FG-12
+finds a commit about fonts.* And on the same day **two sessions deliberately held back** from
+committing a shared file so as not to take each other's lines, while a third that was not holding
+back committed it and took both. The Red Team's sentence is the argument: **two participants being
+careful does not make a shared tree safe; it only makes them slower than whoever is not.**
+
+So: **every session works in its own git worktree.**
+
+```sh
+sh tools/session-worktree.sh <your-session-name>     # e.g. rezv-d6
+```
+
+**The cost objection was real and is now gone — measured, not assumed.** A full worktree would need
+`api` 589M + `landing` 448M + `seo` 447M ≈ 1.5 GB of `node_modules`. The script shares them from the
+main checkout with a Windows junction, so the cost is seconds and ~0 bytes. Proven end to end in a
+probe worktree: `npx tsc --noEmit` → exit 0, and a real database-backed test 4/4 green. **A worktree
+is not just for docs — code work runs fully inside it.**
+
+Two rules that come with it:
+
+- **Never commit to the main checkout from a session that has a worktree.** Push your
+  `session/<name>` branch and hand it to the CEO to merge, or rebase and push it yourself when your
+  paths do not overlap anyone's.
+- **The stash stack is shared across all worktrees.** Bare `git stash` / `git stash pop` can take
+  another session's work. Prefer a throwaway WIP commit; if you must stash, use
+  `git stash push -u -m "<unique-tag>"` and `apply` a captured SHA rather than `pop`.
+
+Until your worktree exists, the old discipline still binds and is still insufficient on its own:
+`git diff --cached` before every commit — not `git show --stat`, which shows you the file you
+expected and hides that its contents are wider than your change.
+
 ### Count with a parser before you report a number
 
 An approximation reported as a finding is a wrong finding. On 2026-09-09 a session estimated ~19
