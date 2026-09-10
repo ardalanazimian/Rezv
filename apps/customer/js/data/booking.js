@@ -505,8 +505,8 @@ export async function confirmBook(id){
     <div class="success">
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
       <!-- ⚠️ A1-006: عنوان از **وضعیتِ واقعی** مشتق می‌شود، نه ادعا.
-           الگوی درست از قبل در همین اپ بود — `reservation.js:76`
-           (`awaitingApproval`) همین نقص را برای فهرستِ سفرها رفع کرده و
+           الگوی درست از قبل در همین اپ بود — «reservation.js:76»
+           («awaitingApproval») همین نقص را برای فهرستِ سفرها رفع کرده و
            کامنتش هم همین را می‌گوید: «مشتری فکر می‌کرد میزش قطعی است در
            حالی که رستوران هنوز تأیید نکرده». شیتِ موفقیت آن رفع را نگرفته
            بود. مکانیزمِ تازه‌ای ساخته نشد؛ همان انضباط به این‌جا آمد. -->
