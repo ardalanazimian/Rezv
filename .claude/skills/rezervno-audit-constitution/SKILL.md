@@ -289,6 +289,47 @@ The general shape to look for before widening any sweep: **is the state you are 
 distinguishable from a state the happy path passes through?** If the only difference is time, key on
 dwell time — not on some other clock that happens to be nearby.
 
+## 4f. A guard that cannot tell prose from code can be disarmed by a comment
+
+Promoted 2026-09-10. **Two sessions found this class independently, in two different files, on the
+same day — and the first fix each of them wrote was incomplete.** That is what makes it a rule rather
+than two bugs.
+
+It cuts **both ways**, and the second direction is the one that hides:
+
+- **False positive.** A comment *quoting* a claim that was removed — «the 500-point line was deleted»
+  — reads to the scanner as a live claim, and the guard goes red on the author's own explanation of
+  a deletion.
+- **False negative, and worse.** A claim deleted from the UI but still quoted in a comment
+  **satisfies the guard's anchor**, so the check stays green while the artefact no longer says the
+  thing at all. A guard blind from birth: it never went red, so nobody suspected it. The same shape
+  turned up in a brand-new guard the same afternoon, where a trailing end-of-line comment silenced
+  the C1 check.
+
+**The rule is not "strip comments."** An unqualified strip is itself dangerous, and the correct
+treatment depends on what is being pinned:
+
+| Subject | Treatment | Why |
+|---|---|---|
+| `.ts` / `.mts`, string keys, constants | **line-oriented**: exclude comment lines from the scan | The anchor is exact; a missed line is a real gap and precision costs nothing |
+| Persian user-facing copy | **conservative**: keep the text in scope, report and let a human judge | Here **a missed claim is worse than a spurious report** — the failure mode is a promise the product cannot keep |
+
+**Separate prose from code; never forbid it.** A check that punishes verbatim evidence corrupts the
+record it exists to protect (see §4c) — but a check that *accepts* prose as evidence of the thing
+itself is worse, because it fails silent.
+
+**Two method notes from the same day, both cheap and both nearly missed:**
+
+- **"It was already broken" needs a measurement exactly as much as "I broke it."** The first instinct
+  on finding CI red was that it predated the author's commit. A bisect with directly-read exit codes
+  showed the opposite: it began at their own commit. And the first attempt at that bisect read the
+  exit code from the **end of a pipe** — `0` from `tail`, not from `node` — which would have
+  produced the confident, wrong report.
+- **Killing a test run poisons the database, and the resulting red looks exactly like a code
+  regression.** Twelve failures, all `Unique constraint failed on (code)`, all in one file, caused by
+  two runs killed mid-flight seeding fixed values. A fresh database gave 2192/0. "Fresh database for
+  every proof" is what stopped a false report here.
+
 ## 5. Every shipped artifact needs a CI job that actually builds it
 
 What is not built is broken and nobody knows. A `postinstall: prisma generate` hook broke
