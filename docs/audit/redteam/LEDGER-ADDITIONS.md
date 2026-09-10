@@ -100,7 +100,30 @@ So the accident is not "someone writes `margin-bottom:500px`". It is **a designe
 
 **Recommendation (the guard's author decides, not me).** Do not drop the style attribute by regex — stripping `style="…"` invites the next escape. Bind the *position*: require the matched digit run to be the one the anchor itself captured, by making each anchor a capturing group around its number (they are already written with `[۰-۹0-9]+` in exactly the right place — e.g. `:295`) and comparing that capture instead of `runs.includes()`. That is a smaller change than it sounds and it removes the whole class rather than this instance.
 
-**Scope limit.** I attacked one of the ten registered sites. The mechanism is in the shared checker, not in that site, so all ten inherit it — but I measured one, and the other nine are **inferred, not verified**.
+**Scope — closed 2026-09-10. All ten sites are now measured, and none is fake-green today.**
+
+I instrumented the guard in my own worktree to print, for every registered site, the digit runs it
+found on the anchored line against the value it expected, then reverted it (md5 `ef049323882d` before,
+`d45ce4c3f745` instrumented, `ef049323882d` after; guard exit 0, tree clean). Result:
+
+| Exposure | Sites | What the line contains |
+|---|---|---|
+| **Clean — the mechanism cannot fire** | 4 — `referral-loyalty-card` and `birthday-loyalty-card`, each in `apps/` and `standalone/` | The claim number is the **only** digit run on the line. Nothing to collide with unless someone adds a style attribute |
+| **One edit away** | 4 — `referral-sheet` and `birthday-sheet`, each in `apps/` and `standalone/` | Already carry a foreign CSS number: `margin-bottom:18px`. `18` does not collide with `500`/`1000`, so they are bound **today** — but the collision needs only that value to change, or a `font-weight:500` to be added |
+| **Strongest binding of the ten** | 2 — `tier-thresholds-profile` in both locations | The anchored line is real code — `pts>=2000?…:pts>=800?…:pts>=300?…` — and the digit runs are exactly the three expected values. The numbers there *are* the values, not a rendering of them |
+
+**So FG-11 remains a real fake-green path and is currently unexercised.** Eight of ten sites are one
+ordinary styling edit from being disarmed; two are structurally safe because they check code rather
+than copy.
+
+**And a second thing fell out of measuring, which is why "inferred" was worth closing.** The manifest
+reports «ادعاهایِ ثبت‌شده در manifest: 10» on every green run. Those ten are **three distinct product
+claims** — referral `500`, birthday `1000`, tier thresholds `300/800/2000` — spread over five anchors,
+each checked twice because `standalone/customer.html` is a generated copy of `apps/`. Checking both
+copies is right and catches a stale bundle. But **the number a reader sees is 10 and the number of
+product promises covered is 3**, and nothing on the line says so. That is attack #20 in its quieter
+form: not a counter that cannot move, but a counter that counts something other than what its name
+suggests. Worth a word in the guard's own summary line; the fix is one string, not logic.
 
 ---
 
