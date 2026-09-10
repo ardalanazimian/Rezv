@@ -78,9 +78,23 @@ seven sessions by generalising from its own.
 - Seen working in other sessions on 2026-09-10: **Supabase** (live project `rezervno`, eu-central-1),
   **Vercel**, **Context7** (library docs), **graphify** (code-graph navigation), **Figma**,
   `WebSearch` / `WebFetch`. Seen absent in others. **Yours may differ — call one and see.**
-- **Supabase matters most for you.** There is a live production project. Read-only questions about
-  real data are answerable — and `E-002` is blocked on exactly one such number. **Never write to
-  production. If something needs a write, it goes to the founder first.**
+- **⚠️ Corrected 2026-09-10, hours after this file was written — by the first Backend Engineer, and
+  it was right.** This section originally said *"Supabase matters most for you. There is a live
+  production project… `E-002` is blocked on exactly one such number."* **Both halves were false**, and
+  the CEO wrote them by inferring from a project *named* `rezervno` in a `list_projects` result —
+  inference from a name, not a measurement, which is the exact class this repo keeps paying for.
+  Measured instead:
+
+  ```text
+  grep -rln supabase api/src      →  0 files      the product does not use Supabase at all
+  docker-compose.yml:58           →  postgres:5432 (a plain postgres:16-alpine service)
+  Supabase execute_sql            →  28P01 twice, while list_projects said ACTIVE_HEALTHY
+  ```
+
+  So: **Supabase is not this product's database.** Even a working query there would answer a
+  different question. And the control-plane status was green while the data plane refused — which is
+  the documented reason this repo requires a data-plane query for every live-infrastructure claim.
+  **Never write to any production database. If something needs a write, it goes to the founder.**
 - `ACTIVE_HEALTHY` from the control plane is a **cached** field; the same project was reported
   hibernated by another API two days earlier. Cross-check with a real query before you build on it.
 
@@ -144,10 +158,17 @@ them before you assume the green is the whole truth:
 
 ## 6. Open work, ranked — confirm or reshape with the CEO before starting
 
-1. **`E-002` is the highest-value thing you can unblock.** The points economy is decided by the
-   founder, but the decision needs one number nobody has produced: **how many points are outstanding
-   in production, and what they are worth at the current rate.** One read-only query. See
-   `audit/ESCALATIONS.md`.
+1. **⚠️ `E-002` is NOT blocked on a number — corrected 2026-09-10.** This entry originally said the
+   decision "needs one number nobody has produced". `audit/ESCALATIONS.md` says something different
+   and it is the source of truth: **parked at the founder's explicit request.** What it is missing is
+   a *rate decision* — three founder statements that together imply 125% cashback and cannot all be
+   true. The balance-counting queries were already written in `c15362c`; nobody is waiting on them.
+
+   **And the deployment question underneath is genuinely open, so do not answer it by assuming.** The
+   production stack has never run on this machine (`docker ps -a` shows only the two throwaway test
+   containers; no `pgdata` volume; no `.env`). That means **"not here", not "nowhere"** — where
+   production runs, if anywhere, is a question only the founder can answer, and it is recorded as
+   UNKNOWN rather than zero.
 2. **`completeReferral` has zero production callers** while the customer app promises «۵۰۰ امتیاز
    برای هر دعوت موفق» (`api/src/lib/loyalty.ts:610`). Tracked as `A1-005`, open since round 16. The
    payer is correct — atomic claim, idempotency key — it is simply never called. **Wiring it spends
