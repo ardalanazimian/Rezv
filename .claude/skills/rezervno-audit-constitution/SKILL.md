@@ -131,6 +131,23 @@ Two rules that come with it:
   another session's work. Prefer a throwaway WIP commit; if you must stash, use
   `git stash push -u -m "<unique-tag>"` and `apply` a captured SHA rather than `pop`.
 
+**When you actually need one — refined 2026-09-10 after the Reviewer pushed back honestly.** It
+said: *"today's work was read-only, and I would rather not hold a worktree I am not using."* That is
+right, and the first version of this rule did not say it. Over-complying is its own failure — a
+session that holds an unused worktree teaches the next one that the rule is ceremony.
+
+The risk is not "writing"; it is **writing a file that is not exclusively yours**:
+
+- **Take a worktree** when you will modify a file other sessions also touch (`ROUTING.md`, a shared
+  guard in `tools/`, `ci.yml`, any product file), or when your tree will be dirty for more than a
+  moment — an injection cycle, a multi-file change, anything you might be interrupted in the middle
+  of.
+- **You do not need one** to create a new, uniquely-named file in your own folder
+  (`docs/audit/<role>/…`, a new directive). Nobody else has it open; there is nothing to collide
+  with.
+
+Both collisions that produced this rule were the first kind. Neither was the second.
+
 Until your worktree exists, the old discipline still binds and is still insufficient on its own:
 `git diff --cached` before every commit — not `git show --stat`, which shows you the file you
 expected and hides that its contents are wider than your change.
