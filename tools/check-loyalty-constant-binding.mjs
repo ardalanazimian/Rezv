@@ -119,6 +119,45 @@ function digitRunsIn(line) {
   return runs.map(Number);
 }
 
+// ⚠️ [۲۰۲۶-۰۹-۱۰] این گارد نثر را از کد جدا نمی‌کرد، و **هر دو جهتش** غلط بود.
+//
+// جهتِ اول (که رخ داد): کامنتِ A1-005 در loyalty.js جمله‌ی «عددِ ۵۰۰ امتیاز
+// برداشته شد» را نقل می‌کند. اسکنر فقط خطی را رد می‌کرد که **با** `//` شروع
+// شود، و این کامنتِ HTML بود — پس مستنداتِ یک حذف، به‌عنوانِ ادعای زنده‌ی
+// کاربر گزارش شد. گارد به توضیحِ خودم واکنش نشان داد، نه به رفتارِ محصول.
+//
+// جهتِ دوم (که هنوز رخ نداده و مهم‌تر است): لنگرها هم روی متنِ خام مچ می‌شدند.
+// یعنی اگر کسی ادعای «۵۰۰ امتیاز برای هر دعوت موفق» را از UI برمی‌داشت و در
+// یک کامنت **از آن نام می‌برد**، گارد لنگر را پیدا می‌کرد و سبز می‌ماند —
+// یک ادعای حذف‌شده که هنوز «بسته» به نظر می‌رسد. دقیقاً همان کلاسِ FG-12:
+// یک کامنت می‌تواند گاردِ خودم را خلعِ‌سلاح کند.
+//
+// قاعده — همان که سه بار قبل هم به آن رسیدم: **نثر را جدا کن، هرگز ممنوعش
+// نکن.** توضیح‌نوشتن کنارِ یک حذف کارِ درستی است و نباید هزینه داشته باشد.
+//
+// ⚠️ و شماره‌ی خط باید سالم بماند: کامنت‌ها با فاصله **پر** می‌شوند، نه حذف؛
+// وگرنه گارد محلِ اشتباه را گزارش می‌کند و گزارشِ اشتباه از نبودِ گزارش بدتر
+// است. `\n` دست‌نخورده می‌ماند تا شمارش نلغزد.
+//
+// ⚠️ عمداً محافظه‌کار: فقط کامنتِ HTML و بلوکیِ `/* */` و خطی که **کاملاً**
+// کامنت است. `//`ِ وسطِ خط دست نمی‌خورد، چون `https://…` را می‌شکست و آن‌وقت
+// متنِ واقعیِ بعدِ یک لینک از دید می‌افتاد. خطای این سمت «گزارشِ اضافه» است،
+// خطای سمتِ دیگر «ادعای نادیده» — و دومی برای یک گارد به‌مراتب بدتر است.
+function blankComments(src) {
+  const blank = (m) => m.replace(/[^\n]/g, ' ');
+  return src
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .split('\n')
+    .map((l) => (/^\s*\/\//.test(l) ? '' : l))
+    .join('\n');
+}
+
+/** خطوطِ فایل، با نثر پاک‌شده و شماره‌ی خط دست‌نخورده. */
+function codeLines(abs) {
+  return blankComments(readFileSync(abs, 'utf8')).split('\n');
+}
+
 // ═══ سمتِ کد: تعریف‌ها را از loyalty.ts می‌خوانیم، نه از حافظه ═══════════
 
 function readDeclarations() {
@@ -282,22 +321,21 @@ function forEachCopy(pairKey, site) {
 
 function buildManifest(decl) {
   return [
-    ...forEachCopy('loyalty', {
-      id: 'referral-loyalty-card',
-      anchor: /امتیاز برای هر دعوت موفق/,
-      expect: decl.points.referralReward,
-      numerals: 'fa',
-      declaredAt: 'POINTS.referralReward',
-      note: 'کارتِ «دوستات رو دعوت کن» در صفحه‌ی وفاداری',
-    }),
-    ...forEachCopy('rewards', {
-      id: 'referral-sheet',
-      anchor: /اولین رزروش رو انجام بده،\s*[۰-۹0-9]+\s*امتیاز بگیر/,
-      expect: decl.points.referralReward,
-      numerals: 'fa',
-      declaredAt: 'POINTS.referralReward',
-      note: 'شیتِ دعوت دوستان',
-    }),
+    // ⚠️ [A1-005 · ۲۰۲۶-۰۹-۱۰] دو ردیفِ `referral-*` **عمداً** اینجا نیستند.
+    //
+    // `POINTS.referralReward = 500` هنوز در loyalty.ts تعریف است، ولی هیچ متنی
+    // در UI آن را ادعا نمی‌کند: A1-005 عدد را برداشت، چون `completeReferral`
+    // صفر صداکننده دارد و پاداش هرگز پرداخت نمی‌شود. لنگری که متنش وجود ندارد
+    // فقط قرمزِ دائمی می‌دهد — و همان‌طور که پیامِ خودِ این گارد می‌گوید:
+    // «یا متن عوض شده و لنگر باید به‌روز شود، یا ادعا حذف شده و ردیفش باید از
+    // manifest برداشته شود». اینجا حالتِ دوم است.
+    //
+    // ⚠️ ولی حذفِ ساکت خطرِ خودش را دارد: روزی که پرداخت وصل شود و متن برگردد،
+    // **هیچ‌چیز** دوباره عدد را به loyalty.ts نمی‌بندد و ۵۰۰ می‌تواند بی‌صدا از
+    // تعریفش واگرا شود. پس این حذف خود-بازگشتی است، نه فراموشی:
+    // `api/tests/referral-promise-honesty.test.mts` وقتی `completeReferral`
+    // صداکننده پیدا کند قرمز می‌شود و صریحاً می‌گوید این دو ردیف باید برگردند.
+    // یعنی شرطِ بازگشت **اجرا** می‌شود، نه اینکه در یک کامنت آرزو شود.
     ...forEachCopy('loyalty', {
       id: 'birthday-loyalty-card',
       anchor: /امتیاز هدیه در روز خاصت/,
@@ -419,9 +457,8 @@ function checkUnregisteredClaims(decl, manifest, failures) {
     }
     scanned.push(rel);
     const registered = manifest.filter((m) => m.file === rel).map((m) => m.anchor);
-    const lines = readFileSync(abs, 'utf8').split('\n');
+    const lines = codeLines(abs);   // نثر پاک شده؛ شماره‌ی خط دست‌نخورده
     lines.forEach((line, i) => {
-      if (/^\s*\/\//.test(line)) return; // کامنت، نه متنِ کاربر
       if (!line.includes('امتیاز')) return;
       if (registered.some((re) => re.test(line))) return; // ادعایِ ثبت‌شده
       const hits = digitRunsIn(line).filter((n) => pointValues.has(n));
@@ -465,7 +502,9 @@ function main() {
       failures.push({ kind: 'anchor', where: site.file, msg: `فایل وجود ندارد (ادعایِ «${site.id}»).` });
       continue;
     }
-    const lines = readFileSync(abs, 'utf8').split('\n');
+    // ⚠️ نثر پاک می‌شود: کامنتی که ادعای حذف‌شده را **نقل** کند نباید لنگر را
+    // ارضا کند و گارد را سبز نگه دارد. (کلاسِ FG-12 — بالای blankComments)
+    const lines = codeLines(abs);
     const matched = [];
     lines.forEach((line, i) => {
       if (site.anchor.test(line)) matched.push({ line, n: i + 1 });
