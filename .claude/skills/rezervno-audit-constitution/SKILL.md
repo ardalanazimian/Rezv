@@ -330,6 +330,57 @@ itself is worse, because it fails silent.
   two runs killed mid-flight seeding fixed values. A fresh database gave 2192/0. "Fresh database for
   every proof" is what stopped a false report here.
 
+## 4g. One run is a sample, not a measurement — promoted 2026-09-10
+
+**Two sessions reached this independently on the same day, from opposite directions.** That is what
+makes it a rule rather than two anecdotes.
+
+- **The Backend Engineer nearly rewrote a correct design to chase a regression that did not exist.**
+  A seven-file waitlist subset gave 11 failures with their fix and 1 without. Two hypotheses were
+  built and both were falsified by measurement. Only then came the question that should have been
+  first — *is the baseline stable?* Three baseline runs, no change at all: **5, 4, 5 failures, with
+  no failure common to all three.** The "1" was a lucky run, and the entire attribution rested on it.
+- **The Designer retracted a frame-time number after reporting it.** One run said p95 33.4ms, "no
+  long stalls". Five runs said: p95 **50ms** in three of five, ~35% of frames over 33ms, and stalls
+  of **66–83ms in two of five**. The first number was not wrong by a little; it described a different
+  system.
+
+**The rule: before attributing any delta, measure the baseline more than once. Report every timing
+number with N and a distribution, never as a single figure.** A single run of a concurrent or
+timing-sensitive subject tells you almost nothing, and its confident shape is exactly what makes it
+dangerous.
+
+Two corollaries paid for the same day:
+
+- **A subset run can be inherently flaky where the full suite is green.** Those seven waitlist files
+  fail 4–5 at random in isolation and pass 1755/1755 in the full suite. Anyone bisecting with the
+  subset reaches the same dead end. Where that is true, say so **in the file header**, not only in a
+  commit message.
+- **Do not interpret a pattern you have not explained.** Runs 1–3 were worse than 4–5 — browser
+  warm-up, or noise. The Designer recorded the shape and explicitly declined to explain it. That is
+  the correct handling: an unexplained pattern is data; an invented cause is not.
+
+## 4h. Exists is not reachable — promoted 2026-09-10
+
+**Three instances in one day, in three different layers, all with the same shape: the thing was
+present, and the user still could not get it.**
+
+| Layer | Present | Yet |
+|---|---|---|
+| UI | `index.html:85` — a search button calling `openPalette()` | `app.css:825` hides its whole container under `max-width:880px`. **On a phone it does not exist.** |
+| API → app | `paymentEnabled` on the restaurant record | Two references in all of `api/src`, both inside `pay/route.ts`. It never reaches any diner-facing response, while the app asserts "online payment is not collected" |
+| Product | `completeReferral` — a correct, idempotent payer | Zero callers in `src`. The invite is recorded and the reward never fires |
+
+**Why it matters more than each instance:** the natural fix for all three is *"add the thing"* — and
+in all three the thing was already there. A spec written on that assumption produces a second copy
+that is just as unreachable, and everyone then believes it is solved. The UI case would have put a
+new search icon inside the same hidden container.
+
+**So: before adding a capability, prove it is absent — not merely that you did not see it.** And
+before claiming one is available, exercise it the way a user reaches it: render it at the real
+viewport, read it from the real response, call it from the real code path. **A grep proves presence;
+only a traversal proves reach.**
+
 ## 5. Every shipped artifact needs a CI job that actually builds it
 
 What is not built is broken and nobody knows. A `postinstall: prisma generate` hook broke
