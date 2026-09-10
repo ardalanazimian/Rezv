@@ -16,8 +16,8 @@ The reason is us.** Measured facts, from this repo and the CEO's own commits:
 
 | | Fact | Source |
 |---|---|---|
-| Users | **Zero.** No production deployment exists; the laptop is the target machine, not a running one | `044c5bc` |
-| Product | Pre-launch. A live promise in the UI («۵۰۰ امتیاز» referral) is **never paid** by the code | A1-005 |
+| Users | **Unknown — and "unknown" is the honest word.** What is measured is that **no production is reachable**: no `api/.env`, no named volumes, domain NXDOMAIN with a passing control. "Zero users" was asserted, then **retracted the same day** by the Red Team and the Reviewer independently — a 74.7MB Postgres directory in an unnamed volume and a hosted Supabase project are both uncounted | `044c5bc`, corrected by `5a0bd2c` |
+| Product | Pre-launch. The one live UI promise the code never paid (referral points) **was removed 2026-09-10** — the mechanism is still absent, but we are no longer claiming it | A1-005, `82375f3` |
 | Name | Not settled | `E-001` |
 | Domain | Not bought; `rezervno.ir` is NXDOMAIN | `E-001` |
 | Revenue | None. Payment path deliberately off at launch (`paymentEnabled` off by decision) | `marketer.md` §W2 |

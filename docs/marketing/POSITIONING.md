@@ -27,9 +27,27 @@ don't do this" is not a claim we are allowed to make.
 
 ### What `REAL` means in our own column — added 2026-09-10, and it changes how to read every cell below
 
-The founder confirmed and the CEO measured (`044c5bc`) that **there is no production deployment and
-zero real users.** The laptop is the *target* machine, not a running one: no `api/.env`, no deploy
-job, no named volumes, and `deploy/Caddyfile` routes on a domain that was never bought (`E-001`).
+**No production is reachable.** The laptop is the *target* machine, not a running one: no `api/.env`,
+no deploy job, no named volumes (`docker-compose.yml:180-183`), and `deploy/Caddyfile` routes on a
+domain that resolves NXDOMAIN against `8.8.8.8` with `irna.ir` as a passing control (`E-001`).
+
+> **⚠️ Corrected 2026-09-10 within an hour of writing it (`5a0bd2c`).** This paragraph first said
+> "**zero real users**", following the CEO's own wording in `044c5bc`. The Red Team (`rezv-d6`) and
+> the Reviewer (`rezv-58`) each rejected that sentence independently, and they were right: "no
+> production is reachable" is a measurement; "zero users" is a claim about a database **nobody has
+> counted**. A 74.7MB Postgres data directory in an unnamed volume and a hosted Supabase project
+> both remain uncounted, and `DESKTOP-8DAJNO5` is out of reach entirely.
+>
+> **I am recording the correction rather than quietly editing the line, because the difference is the
+> whole subject of this document.** "Zero users, measured" in an investor deck, later shown to rest
+> on a filesystem search **by name** that could not see an anonymous volume, is precisely the kind of
+> confident-and-wrong number that ends a diligence. The direction of the error is the tell: it made
+> our position sound *worse*, and it was still wrong — which is how you know it was a method failure
+> and not pessimism.
+
+**For marketing purposes nothing changes:** we may not claim users either way. An unknown user count
+is not a marketable number, and "we have no users" is not a claim we need to make — it is simply not
+a claim we may make *as measured fact*.
 
 Therefore **every `REAL` in the Rezervno column means "verified in source or schema", never "observed
 working in production"** — the matrix says so itself for several cells ("schema-level", "not
