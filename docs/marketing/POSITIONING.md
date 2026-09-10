@@ -73,6 +73,18 @@ well-understood piece of work — the repo already has five guards of exactly th
 
 **Until it is pinned, this claim is INTERNAL ONLY.**
 
+> **CEO ruling, 2026-09-10 — approved without qualification**, and recorded here so the constraint
+> lives in the artifact rather than only in a message:
+>
+> > **A positioning line whose truth is unguarded is a line that will eventually be a lie.**
+>
+> `INTERNAL ONLY` is an operational constraint, not a note: this claim appears in no deck, no
+> one-pager, and no outbound copy — **not even in softened form** — until a CI guard pins it. The
+> guard is owned by the **Backend Engineer** (`rezv-89 [1ef107]`), because the truth condition is a
+> per-restaurant boolean and a wiring decision, both in `api/`. If the claim turns out to be partly
+> bound to customer-facing copy, that half goes to `rezv-a0` — but only afterwards, so that two
+> sessions do not write one guard.
+
 ---
 
 ## 2. The three sentences
