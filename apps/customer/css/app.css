@@ -115,7 +115,11 @@
 /* کلاس‌های شیشه و حرکت (قابل‌استفاده در کل اپ) */
 .glass{position:relative;background:var(--glass);-webkit-backdrop-filter:blur(22px) saturate(190%);backdrop-filter:blur(22px) saturate(190%);border:1px solid var(--border);box-shadow:var(--sh-md)}
 .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;background:linear-gradient(140deg,var(--glass-hi),transparent 40%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
-.reveal{opacity:0;transform:translateY(24px) scale(.97);transition:opacity .55s var(--ease),transform .55s var(--spring)}
+/* DS-008: reveal کوتاه و بی‌فنر. نسخه‌ی قبل ۵۵۰ms با overshootِ spring و scale(.97)
+   بود — کارت «می‌پرید» داخل. تیک‌تاک/اینستاگرام کارت را نمی‌پرانند؛ ۳۲۰ms ease-out،
+   فقط ۱۴px بالا، بدونِ مقیاس. روی مرورگرهای با animation-timeline، فیدِ کشف به‌جای
+   این از حرکتِ اسکرول‌محورِ foundation استفاده می‌کند (پایین‌تر). */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity var(--motion-slow,320ms) var(--ease-out),transform var(--motion-slow,320ms) var(--ease-out)}
 .reveal.in{opacity:1;transform:none}
 /* ─── بنر نصب اپ (PWA) ─── */
 .install-banner{position:fixed;bottom:16px;left:16px;right:16px;max-width:448px;margin:0 auto;z-index:200;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r-xl);background:var(--glass-2);opacity:0;transform:translateY(20px);transition:opacity .3s var(--ease),transform .3s var(--spring)}
@@ -134,7 +138,14 @@
 @media(prefers-reduced-motion:reduce){.reveal{opacity:1!important;transform:none!important}*{animation:none!important}}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-body{font-family:var(--font-ui);background:var(--mesh),var(--bg);background-attachment:fixed;color:var(--t1);
+/* DS-008 (۲۰۲۶-۰۹-۱۰): مشِ پنج‌رنگِ radial با attachment:fixed برداشته شد.
+   دو دلیل، هر دو خواسته‌ی مالک: (۱) «مینیمال» — پس‌زمینه با کارت‌ها رقابت
+   می‌کرد؛ در تیک‌تاک/اینستاگرام محتوا رنگ است، نه صفحه. (۲) «اسکرولِ زنده» —
+   background-attachment:fixed روی گرادیانِ چندتوقفی یعنی هر فریمِ اسکرول کلِ
+   viewport دوباره رنگ می‌شود؛ یکی از شناخته‌شده‌ترین علت‌های افتِ فریم روی
+   موبایل. اندازه‌گیریِ قبل/بعد در DS-008. --mesh خودش حذف نشد (theme.css و
+   کارت‌های مناسبت ممکن است بخواهندش)؛ فقط از body برداشته شد. */
+body{font-family:var(--font-ui);background:var(--bg);color:var(--t1);
   font-size:15px;line-height:1.6;min-height:100vh;min-height:100svh;overflow-x:hidden;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;transition:color .35s var(--ease)}
 button,input,select,textarea{font-family:inherit;font-size:inherit}
 img{display:block;max-width:100%}
@@ -209,7 +220,7 @@ img{display:block;max-width:100%}
 
 /* ─────────── CONTAINER ─────────── */
 .wrap{max-width:1140px;margin:0 auto;padding:0 20px}
-.section{padding:40px 0}
+.section{padding:28px 0} /* DS-008: ۴۰→۲۸ — هوای بینِ بخش‌ها کمتر، فید پیوسته‌تر */
 .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .section-title{font-size:21px;font-weight:800;letter-spacing:-.03em}
 .section-sub{font-size:14px;color:var(--t2);margin-top:2px}
@@ -276,6 +287,32 @@ img{display:block;max-width:100%}
 
 /* ─────────── RESTAURANT CARD ─────────── */
 .grid{display:grid;grid-template-columns:1fr;gap:18px}
+
+/* ═══ DS-008: فیدِ کشف — اسکرولِ زنده (۲۰۲۶-۰۹-۱۰) ═══
+   سه چیز، همه CSS، هیچ تغییری در مارک‌آپ/JS:
+   ۱) snapِ نرم روی کارت: html وقتی صفحه‌ی کشف فعال است scroll-snap-type:y proximity
+      می‌گیرد. proximity نه mandatory — اینستاگرام اسکرول را نمی‌دزدد، فقط اگر نزدیکِ
+      یک کارت ایستادی رویش «می‌نشیند». تیک‌تاک mandatory است ولی برای فیدِ رزرو
+      (کارت‌های ۲۷۰px، نه تمام‌صفحه) mandatory هر فلیک را یک کارت می‌کند و کلافه‌کننده
+      می‌شود. scroll-padding-top = ارتفاعِ navِ چسبان + نفس.
+   ۲) حرکتِ اسکرول‌محور (foundation.css، .ds-scroll-live): کارت هنگامِ ورود می‌نشیند و
+      پس‌زمینه‌اش پارالاکسِ ملایم دارد. #feed خودش کانتینر است؛ .rc-bg پس‌زمینه.
+      چون کلاس در مارک‌آپ نیست، همان قواعد اینجا روی #feed تکرار می‌شود — منبعِ
+      keyframes همچنان foundation است (یک تعریف).
+   ۳) روی مرورگرِ بدونِ animation-timeline، .reveal (بالا) همچنان کار می‌کند؛ روی
+      مرورگرِ با آن، هر دو فعال‌اند و تداخل ندارند (reveal روی .rc، drift روی .rc-bg،
+      settle روی opacity/translate که reveal.in به none برمی‌گرداند — انیمیشن بعد از
+      transition اعمال می‌شود و برنده است، پس عملاً settle حرف می‌زند). */
+html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:74px}
+#feed>.rc{scroll-snap-align:start;scroll-margin-top:12px}
+@supports (animation-timeline: view()){
+  #feed>.rc{animation:ds-settle-in linear both;animation-timeline:view();animation-range:entry 0% entry 55%}
+  #feed>.rc .rc-bg{animation:ds-bg-drift linear both;animation-timeline:view();animation-range:entry 0% cover 45%}
+}
+@media (prefers-reduced-motion: reduce){
+  #feed>.rc,#feed>.rc .rc-bg{animation:none!important}
+  /* snap حرکت نیست؛ می‌ماند — ولی مقدارِ نرم (proximity) است، نه mandatory */
+}
 /* دکمه‌ی «رستوران‌های بیشتر» فرزندِ مستقیمِ #feed است؛ باید کلِ عرضِ گرید را
    بگیرد نه یک سلول را. min-height برای هدفِ لمسیِ ≥۴۴px. */
 .feed-more{grid-column:1/-1;min-height:48px}

@@ -308,6 +308,48 @@
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
 
+/* ═══════════ حرکتِ اسکرول‌محور (DS-008، ۲۰۲۶-۰۹-۱۰) ═══════════
+   خواسته‌ی مالک: «اسکرولِ زنده با حسِ خوب، مثلِ تیک‌تاک و اینستاگرام».
+   مکانیزمِ آن اپ‌ها این است که حرکت **تابعِ موقعیتِ اسکرول** است، نه تایمر:
+   کارت وقتی واردِ دید می‌شود کمی «می‌نشیند» و با اسکرول جابه‌جا می‌شود — نه
+   اینکه با یک تأخیرِ ثابت بپرد. CSS scroll-driven animations دقیقاً همین را
+   بدونِ JS و روی compositor می‌دهد.
+
+   ⚠️ پیش‌روندهٔ تدریجی، عمداً: پشتِ @supports. مرورگری که animation-timeline
+   ندارد هیچ‌چیز نمی‌بیند و هیچ‌چیز نمی‌شکند — کارت بی‌حرکت ولی کامل است.
+
+   ⚠️ reduced-motion: سیاستِ سراسریِ tokens.css فقط *duration* را صفر می‌کند،
+   و انیمیشنِ timeline‌محور duration ندارد — پس اینجا **صریحاً** خاموش می‌شود.
+   حرکتی که نشود خاموشش کرد، فیچر نیست، مانع است.
+
+   کاربرد: کانتینرِ اسکرول‌شونده کلاسِ .ds-scroll-live بگیرد، هر فرزندِ مستقیم
+   یک آیتم است، و عنصری با .ds-scroll-live-bg داخلِ آیتم پارالاکسِ ملایم
+   می‌گیرد. (اپِ مشتری این را مستقیم روی #feed اعمال می‌کند — app.css.) */
+@keyframes ds-settle-in {
+  from { opacity: .72; transform: translateY(10px); }
+  to   { opacity: 1;   transform: none; }
+}
+@keyframes ds-bg-drift {
+  from { transform: scale(1.06) translateY(-3%); }
+  to   { transform: scale(1)    translateY(0); }
+}
+@supports (animation-timeline: view()) {
+  .ds-scroll-live > * {
+    animation: ds-settle-in linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 55%;
+  }
+  .ds-scroll-live .ds-scroll-live-bg {
+    animation: ds-bg-drift linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 45%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-scroll-live > *,
+  .ds-scroll-live .ds-scroll-live-bg { animation: none !important; }
+}
+
 /* ── دسترسی‌پذیری: focus-ring یکدست روی همه‌ی المان‌های تعاملی ── */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: none;
