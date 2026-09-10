@@ -269,6 +269,14 @@ export function mapApiRestaurant(apiR, sampleFallback){
     // depositRequired یک سیاستِ واقعیِ قابلِ‌تنظیمِ رستوران است. رستورانی که
     // بیعانه را روشن می‌کرد، همچنان به مشتری «رایگان» نشان داده می‌شد.
     depositRequired: apiR.booking_policy?.deposit_required ?? null,
+    // ⚠️ BE-004/ب (۲۰۲۶-۰۹-۱۰): تا امروز `payment_enabled` در **هیچ** پاسخِ
+    // روبه‌مشتری‌ای نبود (نیمه‌ی «الف»، `rezv-89`)، در حالی که `depositLabel()`
+    // می‌گفت «آنلاین دریافت نمی‌شود» — یک ادعای **مثبت** درباره‌ی درگاه که
+    // داده‌اش را نداشت. همان نقصِ P1-3، یک فیلد جلوتر.
+    // `?? null` عمدی است و با `?? false` فرق دارد: اندپوینتِ **فهرست** این
+    // کلید را نمی‌دهد، پس روی مسیرِ فید واقعاً نامعلوم است — و نامعلوم باید
+    // «نمی‌دانم» بماند، نه «خاموش است».
+    onlinePaymentEnabled: apiR.booking_policy?.online_payment_enabled ?? null,
     freeCancelHours: apiR.booking_policy?.free_cancel_hours ?? null,
     lat: apiR.latitude ?? null,
     lng: apiR.longitude ?? null,
