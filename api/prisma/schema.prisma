@@ -649,6 +649,11 @@ model WaitlistEntry {
   joinedAt        DateTime       @default(now()) @map("joined_at")
   offeredAt       DateTime?      @map("offered_at")        // کِی آفر داده شد
   offerExpiresAt  DateTime?      @map("offer_expires_at")  // مهلت پاسخ (تایمر انقضا)
+  // ۰۸۵ — «دستِ‌کم یک کانالِ اعلان واقعاً dispatch شد». NULL یعنی هیچ کانالی
+  // نرفت: مهمانِ بدونِ تلفن/حساب/ایمیل، یا انصراف از رضایتِ `availability`.
+  // ⚠️ **تحویل** را نمی‌گوید و نباید تظاهر کند — این لایه آن را نمی‌داند
+  // (هر سه ترنسپورت به‌طورِ طراحی‌شده هرگز reject نمی‌کنند؛ sms.ts:141-145).
+  offerNotifiedAt DateTime?      @map("offer_notified_at")
   respondedAt     DateTime?      @map("responded_at")
   seatedAt        DateTime?      @map("seated_at")
   // ── تخصیص میز هنگام آفر ──
