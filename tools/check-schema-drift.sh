@@ -91,6 +91,8 @@ cleanup() {
   psql "$ADMIN_URL" -q -c "DROP DATABASE IF EXISTS $PRISMA_DB;" >/dev/null 2>&1 || true
   psql "$ADMIN_URL" -q -c "DROP DATABASE IF EXISTS $PROD_DB;"   >/dev/null 2>&1 || true
   rm -f /tmp/_drift_prisma.txt /tmp/_drift_prod.txt /tmp/_drift_fk_prisma.txt /tmp/_drift_fk_prod.txt /tmp/_drift_fk_diff.txt /tmp/_drift_fk_base.txt
+  rm -f /tmp/_drift_idx_prisma.txt /tmp/_drift_idx_prod.txt /tmp/_drift_idx_diff.txt /tmp/_drift_idx_base.txt
+  rm -f /tmp/_drift_chk_ci.txt /tmp/_drift_chk_prod.txt
 }
 trap cleanup EXIT
 
@@ -235,6 +237,70 @@ fi
 IDX_NEW=$(LC_ALL=C comm -23 /tmp/_drift_idx_diff.txt /tmp/_drift_idx_base.txt)
 IDX_GONE=$(LC_ALL=C comm -13 /tmp/_drift_idx_diff.txt /tmp/_drift_idx_base.txt)
 
+# ⚠️ لایه‌ی چهارم: **قیدهای CHECK** — و مقایسه‌اش عمداً بینِ دو دیتابیسِ
+# دیگر است تا سه لایه‌ی بالا. این را بخوان وگرنه عدد را اشتباه می‌خوانی.
+#
+# سه لایه‌ی بالا می‌پرسند «آیا تولید هرچه Prisma لازم دارد را دارد؟» و
+# برای همین `$PRISMA_DB` را فقط با `db push` می‌سازند. روی محورِ CHECK
+# آن مقایسه بی‌معناست: Prisma قیدِ CHECK را **اصلاً بیان نمی‌کند**، پس
+# `db push` به‌تنهایی صفر قید می‌سازد و هر ۱۳ قید «گم‌شده» به نظر می‌رسند.
+#
+# ⚠️ این فرضیه‌ی اشتباه واقعاً نوشته شد (۲۰۲۶-۰۹-۱۰) و همین گاردِ
+# «صفر یعنی ابزار خراب است» دو خط پایین‌تر جلویش را گرفت. بدونِ آن،
+# این لایه ۱۳ قید را «گم‌شده در CI» گزارش می‌کرد، در حالی که عددِ واقعی ۴
+# است — سه برابر بزرگ‌تر، و در جهتی که خودرا جدی نشان می‌دهد.
+#
+# پس جفتِ درست این است:
+#     دیتابیسِ تستِ CI   = db push + apply-sql        (عیناً ci.yml:120-124)
+#     دیتابیسِ تولید    = migrate deploy + apply-sql
+# و برای ساختنِ اولی، `$PRISMA_DB` را همین‌جا با apply-sql جلو می‌بریم.
+# این امن است چون هر سه لایه‌ی بالا خروجی‌شان را از قبل در فایل ریخته‌اند.
+#
+# چرا این لایه لازم شد (اندازه‌گیریِ واقعی روی دو دیتابیس از همین HEAD):
+#     مسیرِ CI     =  ۹ قیدِ CHECK
+#     مسیرِ تولید =  ۱۳ قیدِ CHECK
+# چهار قیدِ نمره‌ی `reviews` در تولید بودند و در CI نه. سازوکار:
+# ۶۱ جدول در مهاجرت‌ها با `CREATE TABLE IF NOT EXISTS` ساخته می‌شوند و
+# هر ۶۱ در `schema.prisma` هم اعلام شده‌اند — پس در مسیرِ CI، `db push`
+# جدول را جلوتر می‌سازد و آن CREATE TABLE به no-op تبدیل می‌شود؛ هر قیدِ
+# inlineی که درونِ آن نوشته شده باشد بی‌صدا از دست می‌رود.
+# ستون‌ها یکی‌اند، FKها یکی‌اند، ایندکس‌ها یکی‌اند. فقط قید گم می‌شود.
+#
+# ⚠️ جهتِ خطر اینجا **وارونه‌ی** سه لایه‌ی بالاست و همین بدترش می‌کند:
+# آنجا تولید چیزی را کم دارد و در زمانِ اجرا می‌شکند. اینجا تولید
+# **سخت‌گیرتر** است — یعنی کدی که قید را بشکند تمامِ تست‌ها را سبز رد
+# می‌کند و فقط در تولید با ۲۳۵۱۴ می‌میرد.
+#
+# مقایسه عمداً **بدونِ نامِ constraint** است (مثلِ لایه‌های FK و ایندکس) و
+# `sort` بدونِ `-u` است، چون دو قیدِ یکسان روی یک جدول خودش سیگنال است.
+#
+# بدونِ baseline نوشته شد و این عمدی است: پس از مهاجرتِ ۰۸۴ اختلاف در
+# هر دو جهت صفر است، و قاعده‌ی منشور می‌گوید allowlistی که لازم نیست
+# نباید ساخته شود.
+echo "→ رساندنِ دیتابیسِ Prisma به شکلِ دیتابیسِ تستِ CI (apply-sql)..."
+DATABASE_URL="$BASE/$PRISMA_DB" DATABASE_DIRECT_URL="$BASE/$PRISMA_DB" \
+  sh prisma/apply-sql.sh >/dev/null 2>&1
+
+CHKQ="SELECT c.conrelid::regclass::text || ' | ' || pg_get_constraintdef(c.oid)
+      FROM pg_constraint c
+      WHERE c.contype = 'c' AND c.connamespace = 'public'::regnamespace"
+
+psql "$BASE/$PRISMA_DB" -Atc "$CHKQ" | LC_ALL=C sort > /tmp/_drift_chk_ci.txt
+psql "$BASE/$PROD_DB"   -Atc "$CHKQ" | LC_ALL=C sort > /tmp/_drift_chk_prod.txt
+
+# همان گاردِ ضدِ «سبزِ توخالی» — و این‌بار واقعاً یک خطای طراحی را گرفت
+# (بالا را بخوان). این مخزن امروز ۱۳ قیدِ CHECK دارد؛ صفر یعنی کوئری
+# یا apply-sql خراب شده، نه اینکه قیدی نیست.
+if [ ! -s /tmp/_drift_chk_ci.txt ] || [ ! -s /tmp/_drift_chk_prod.txt ]; then
+  echo ""
+  echo "✗ کوئریِ قیدهای CHECK هیچ ردیفی برنگرداند — یعنی خودِ چک خراب است، نه اینکه انحرافی نیست."
+  echo "  ci-db: $(wc -l < /tmp/_drift_chk_ci.txt) ردیف · prod-db: $(wc -l < /tmp/_drift_chk_prod.txt) ردیف"
+  exit 1
+fi
+
+CHK_ONLY_PROD=$(LC_ALL=C comm -13 /tmp/_drift_chk_ci.txt /tmp/_drift_chk_prod.txt)
+CHK_ONLY_CI=$(LC_ALL=C comm -23 /tmp/_drift_chk_ci.txt /tmp/_drift_chk_prod.txt)
+
 MISSING=$(LC_ALL=C comm -23 /tmp/_drift_prisma.txt /tmp/_drift_prod.txt)
 
 if [ -n "$MISSING" ]; then
@@ -285,6 +351,34 @@ if [ -n "$IDX_NEW" ]; then
   exit 1
 fi
 
+if [ -n "$CHK_ONLY_PROD" ]; then
+  echo ""
+  echo "✗ انحرافِ قیدِ CHECK — تولید این‌ها را دارد و دیتابیسِ تستِ CI ندارد."
+  echo "  یعنی تولید **سخت‌گیرتر** از CI است: کدی که این قید را بشکند تمامِ"
+  echo "  تست‌ها را سبز رد می‌کند و فقط در تولید با ۲۳۵۱۴ می‌میرد."
+  echo ""
+  echo "$CHK_ONLY_PROD" | sed 's/^/    /'
+  echo ""
+  echo "  علتِ رایج: قید درونِ یک CREATE TABLE IF NOT EXISTS نوشته شده و آن"
+  echo "  جدول در schema.prisma هم هست — پس db push جلوتر می‌سازدش و آن"
+  echo "  CREATE TABLE به no-op تبدیل می‌شود."
+  echo "  رفع: یک مهاجرتِ SQL جدید در api/prisma/sql/NNN-*.sql با ALTER TABLE ... ADD"
+  echo "  CONSTRAINT بنویس (نه درونِ CREATE TABLE)، idempotent، و **با همان نامی"
+  echo "  که Postgres در تولید خودش ساخته** — وگرنه در تولید قیدِ دوم ساخته می‌شود."
+  echo "  نمونه: api/prisma/sql/084-reviews-rating-checks-ci-parity.sql"
+  exit 1
+fi
+
+if [ -n "$CHK_ONLY_CI" ]; then
+  echo ""
+  echo "✗ انحرافِ قیدِ CHECK — دیتابیسِ تستِ CI این‌ها را دارد و تولید ندارد."
+  echo "  یعنی تست‌ها روی دیتابیسی سبزند که از تولید محافظه‌کارتر است —"
+  echo "  داده‌ی بد در تولید وارد می‌شود بدونِ اینکه هیچ تستی قرمز شود."
+  echo ""
+  echo "$CHK_ONLY_CI" | sed 's/^/    /'
+  exit 1
+fi
+
 if [ -n "$IDX_GONE" ]; then
   echo ""
   echo "ℹ baselineِ ایندکس کهنه شده — این خطوط دیگر انحراف نیستند و باید از"
@@ -299,4 +393,4 @@ if [ -n "$FK_GONE" ]; then
   echo "$FK_GONE" | sed 's/^/    /'
 fi
 
-echo "✓ بدونِ انحراف — تولید هرچه Prisma لازم دارد را دارد ($(wc -l < /tmp/_drift_prisma.txt) ستون، $(wc -l < /tmp/_drift_fk_prisma.txt) کلیدِ خارجی، $(wc -l < /tmp/_drift_idx_prisma.txt) ایندکس · baseline: $(wc -l < /tmp/_drift_fk_base.txt) FK + $(wc -l < /tmp/_drift_idx_base.txt) ایندکس)"
+echo "✓ بدونِ انحراف — تولید هرچه Prisma لازم دارد را دارد ($(wc -l < /tmp/_drift_prisma.txt) ستون، $(wc -l < /tmp/_drift_fk_prisma.txt) کلیدِ خارجی، $(wc -l < /tmp/_drift_idx_prisma.txt) ایندکس، $(wc -l < /tmp/_drift_chk_prod.txt) قیدِ CHECK · baseline: $(wc -l < /tmp/_drift_fk_base.txt) FK + $(wc -l < /tmp/_drift_idx_base.txt) ایندکس)"
