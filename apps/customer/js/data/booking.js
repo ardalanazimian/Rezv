@@ -616,17 +616,33 @@ export function copyCode(c){haptic('light');const done=()=>toast('⧉','کد ک�
 // «کِی» و «چند نفر» پیش از این سه/پنج گزینه‌ی ثابت داشتند که هیچ‌کجا خوانده
 // نمی‌شد؛ کاربر انتخاب می‌کرد و هیچ اتفاقی نمی‌افتاد. حالا همان زمینه‌ی رزرو را
 // می‌نویسند، پس انتخابشان تا شیتِ رزرو و تا رستورانِ بعدی دنبال می‌آید.
-export function initSearchCtx(){
-  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
-  if(!when||!party) return;
+/**
+ * شیتِ «کِی و چند نفر» — جانشینِ دو selectِ هیرو.
+ *
+ * ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] چرا این با رفتنِ هیرو **لازم** شد و یک راحتی
+ * نیست: چیپِ «۱۹:۰۰» روی کارت یعنی «۱۹:۰۰ِ **امروز، ۲ نفر**»، و `quickBook`
+ * مستقیم به گامِ بعد می‌پرد. اگر کاربر پنجشنبه‌ی ۴ نفره می‌خواست و هیچ جایی
+ * برای گفتنش **پیش از** زدنِ چیپ نداشت، چیپ قولی می‌داد برای روزِ اشتباه و
+ * او تا شیتِ تأیید نمی‌فهمید. یعنی برداشتنِ هیرو بدونِ این، یک نقصِ **صحت**
+ * می‌ساخت نه یک تغییرِ چیدمان. (یافته‌ی طراح، پیش از آنکه من دست بزنم.)
+ *
+ * پیش‌فرض همان «امروز · ۲ نفر» می‌ماند برای کسی که فقط می‌خواهد ببیند.
+ */
+export function openSearchCtxSheet(){
   const dates=dateOptions();
   const sel=dates.some(d=>d.iso===bookingCtx.date)?bookingCtx.date:dates[0].iso;
-  when.innerHTML=dates.map(d=>`<option value="${esc(d.iso)}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');
-  party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)
-    .map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('');
+  openSheet(`<div class="sheet-title">کِی و چند نفر؟</div>
+    <div class="sheet-sub">ساعت‌هایِ رویِ کارت‌ها با همین تنظیم حساب می‌شوند</div>
+    <div class="bw-field"><label for="ctxWhen">تاریخ</label><select id="ctxWhen" onchange="syncSearchCtx()">${
+      dates.map(d=>`<option value="${esc(d.iso)}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('')
+    }</select></div>
+    <div class="bw-field"><label for="ctxParty">تعداد نفر</label><select id="ctxParty" onchange="syncSearchCtx()">${
+      Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
+    }</select></div>
+    <button class="btn btn-primary btn-block" onclick="closeSheet()">باشه</button>`);
 }
 export function syncSearchCtx(){
-  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
+  const when=document.getElementById('ctxWhen'), party=document.getElementById('ctxParty');
   setBookingCtx({
     date: when?.value || bookingCtx.date,
     party: parseInt(party?.value,10) || bookingCtx.party,
@@ -637,7 +653,12 @@ export function syncSearchCtx(){
   // کشف روی صفحه نباشد (مثلاً کاربر در صفحه‌ی رستوران است)، doSearch به‌طورِ
   // بی‌خطر روی عنصرهایِ نامعتبر no-op می‌شود (querySelector آن‌ها را پیدا
   // نمی‌کند)، پس نیازی به چک‌کردنِ صفحه‌ی فعلی نیست.
-  if(document.getElementById('sQ')) doSearch();
+  // ⚠️ [DS-007 §۶] شرطِ قبلی `#sQ` بود — ورودیِ هیرو. با رفتنِ هیرو آن شرط
+  // **همیشه غلط** می‌شد و این خط بی‌صدا از کار می‌افتاد: کاربر تاریخ را عوض
+  // می‌کرد و سطرِ «امروز · ۲ نفر» همان می‌ماند. خطایی هم نبود که کسی ببیند.
+  // حالا وجودِ خودِ سطرِ زیرِ فید سنجیده می‌شود — همان چیزی که قرار است
+  // به‌روز شود.
+  if(document.querySelector('#page-discover .section-sub')) doSearch();
   // چیپ‌هایِ ساعتِ کارت‌ها برایِ تاریخ/تعدادِ نفرِ *قبلی* حساب شده‌اند — باطل
   // و دوباره واکشی می‌شوند. بدونِ این، انتخابِ «فردا، ۶ نفر» ساعت‌هایِ «امروز،
   // ۲ نفر» را زیرِ برچسبِ جدید نشان می‌داد.
@@ -654,6 +675,8 @@ window.confirmBook = confirmBook;
 window.copyCode = copyCode;
 window.refreshSlots = refreshSlots;
 window.syncSearchCtx = syncSearchCtx;
-// نوارِ جست‌وجو باید همان اول پر شود، وگرنه دو selectِ خالی دیده می‌شوند.
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSearchCtx);
-else initSearchCtx();
+window.openSearchCtxSheet = openSearchCtxSheet;
+// ⚠️ [DS-007 §۶] قلابِ DOMContentLoaded که `initSearchCtx` را صدا می‌زد
+// برداشته شد: آن تابع دو **selectِ هیرو** را پر می‌کرد و هیرو دیگر نیست.
+// حالا گزینه‌ها هنگامِ بازشدنِ شیت ساخته می‌شوند، یعنی همیشه با
+// `bookingCtx`ِ لحظه می‌خوانند — نه با مقداری که در بوت فریز شده بود.

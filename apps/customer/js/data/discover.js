@@ -418,17 +418,52 @@ export function renderDiscoverSections(){
 function searchCtxLabel(){
   return `${labelForISO(bookingCtx.date)} · ${fmtFa(bookingCtx.party)} نفر`;
 }
-export function doSearch(){
-  const q=document.getElementById('sQ').value.trim();
+// ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] متنِ جست‌وجو دیگر در DOM زندگی نمی‌کند.
+//
+// تا امروز `#sQ` — ورودیِ داخلِ **هیرو** — هم رابط بود و هم **حالت**. با
+// برداشتنِ هیرو (حکمِ مالک: فید اول)، هر صداکننده‌ای `TypeError` می‌گرفت:
+// `document.getElementById('sQ').value` روی null.
+//
+// رفعِ سطحی این بود که `?.` بگذاریم و رد شویم — ولی آن‌وقت جست‌وجو **بی‌صدا
+// همیشه خالی** می‌شد و فید همیشه کامل به‌نظر می‌رسید. یعنی خطا از بین می‌رفت
+// و نادرستی می‌ماند؛ همان معامله‌ای که همه‌ی امروز ردش کردیم.
+//
+// پس حالت به ماژول منتقل شد و ورودی **پارامتر** است. رابط (پالت، یا هر چیزِ
+// بعدی) فقط صدا می‌زند؛ هیچ عنصرِ DOMی صاحبِ حقیقت نیست.
+let _query = '';
+
+/** متنِ جست‌وجوی فعال — برای صداکننده‌هایی که می‌خواهند حالت را بازپخش کنند. */
+export function activeQuery(){ return _query; }
+
+/**
+ * سطرِ زیرِ عنوانِ فید: شمارش + **قرصِ لمس‌پذیرِ زمینه**.
+ *
+ * ⚠️ زمینه («امروز · ۲ نفر») از قبل همین‌جا نوشته می‌شد ولی لمس‌پذیر نبود.
+ * با رفتنِ هیرو، این تنها جایی است که کاربر می‌تواند **پیش از زدنِ چیپِ
+ * ساعت** بگوید کِی و چند نفر — و آن یک نیازِ **صحت** است نه راحتی: چیپِ
+ * «۱۹:۰۰» یعنی «۱۹:۰۰ِ امروز، ۲ نفر»، و `quickBook` مستقیم رد می‌شود، پس
+ * بدونِ این قرص کاربر تا شیتِ تأیید نمی‌فهمید روزِ اشتباه رزرو می‌کند.
+ */
+function renderSub(countText){
   const sub=document.querySelector('#page-discover .section-sub');
-  if(!q){
+  if(!sub) return;
+  sub.innerHTML=`${esc(countText)} · <button type="button" class="ctx-pill" onclick="openSearchCtxSheet()" `
+    +`aria-label="تغییرِ تاریخ و تعدادِ نفرات">${esc(searchCtxLabel())} ▾</button>`;
+}
+
+export function doSearch(q){
+  // پارامتر منبعِ حقیقت است؛ بدونِ آن یعنی «همان جست‌وجوی فعلی را دوباره اعمال کن»
+  // (مثلاً پس از رسیدنِ دادهٔ تازه‌ی سرور، یا تغییرِ زمینه‌ی تاریخ/نفرات).
+  if(q!==undefined) _query=String(q);
+  const query=_query.trim();
+  if(!query){
     document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
-    if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال · ${searchCtxLabel()}`;
+    renderSub(`${fmtFa(R.length)} رستوران فعال`);
     renderFeed(R);return;
   }
-  const list=R.filter(r=>r.n.includes(q)||r.cuisine.includes(q)||r.vibes.some(v=>v.includes(q)));
-  document.getElementById('feedTitle').textContent=`نتایج «${q}»`;
-  if(sub) sub.textContent=(list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد')+` · ${searchCtxLabel()}`;
+  const list=R.filter(r=>r.n.includes(query)||r.cuisine.includes(query)||r.vibes.some(v=>v.includes(query)));
+  document.getElementById('feedTitle').textContent=`نتایج «${query}»`;
+  renderSub(list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد');
   if(list.length){ renderFeed(list); return; }
   // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
   // می‌داد — کاربر شش کارت می‌دید و گمان می‌کرد این‌ها نتیجه‌ی جست‌وجویش‌اند.
@@ -443,8 +478,10 @@ export function doSearch(){
 }
 /** پاک‌کردنِ جست‌وجو و برگشت به فید — از حالتِ خالی صدا زده می‌شود. */
 export function clearSearch(){
-  const q=document.getElementById('sQ'); if(q) q.value='';
-  doSearch();
+  // ⚠️ پاک‌کردن حالا یعنی «پرسِ خالی»، نه «فیلدِ خالی» — چون منبعِ حقیقت
+  // دیگر یک عنصرِ DOM نیست. اگر این `doSearch()`ِ بی‌پارامتر می‌ماند، همان
+  // جست‌وجوی قبلی دوباره اعمال می‌شد و دکمه‌ی «پاک کن» هیچ کاری نمی‌کرد.
+  doSearch('');
 }
 export function toggleFav(id,el){
   id=String(id);   // favs همیشه کلیدِ String نگه می‌دارد (id نمونه عدد، id واقعی UUID)

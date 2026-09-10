@@ -213,6 +213,24 @@ img{display:block;max-width:100%}
 .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .section-title{font-size:21px;font-weight:800;letter-spacing:-.03em}
 .section-sub{font-size:14px;color:var(--t2);margin-top:2px}
+/* ⚠️ [DS-007 §۶] قرصِ زمینه‌ی جست‌وجو — «امروز · ۲ نفر ▾».
+   متنش از قبل همین‌جا نوشته می‌شد ولی لمس‌پذیر نبود؛ با رفتنِ هیرو این تنها
+   جایی است که کاربر می‌تواند **پیش از زدنِ چیپِ ساعت** تاریخ/تعداد را بگوید.
+   ⚠️ **۳۲px نقاشی، ۴۴px هدف.** نسخه‌ی اولِ من ۳۲ بود و در کامنت نوشته بودم
+   «تبادلِ آگاهانه زیرِ `--touch-min`». طراح ردش کرد و درست بود: WCAG 2.5.5
+   درباره‌ی **هدفِ لمس** است، نه جعبه‌ی رنگ‌شده. یعنی آن «تبادل» از اول لازم
+   نبود — من یک محدودیتِ جعلی ساخته بودم و بعد برایش توجیه نوشتم.
+   پس `::before` ناحیه‌ی لمس را عمودی به ۴۴ می‌رساند (۳۲ + ۲×۶) بدونِ اینکه
+   سطرِ متن بشکند. ⚠️ و اندازه‌گیری باید روی **همان ناحیه** باشد نه روی خودِ
+   عنصر، وگرنه عدد ۳۲ می‌دهد و دوباره همان نتیجه‌ی غلط گرفته می‌شود. */
+.ctx-pill{position:relative;display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:4px 10px;margin-inline-start:2px;
+  font:inherit;color:var(--t1);background:var(--s-50,rgba(0,0,0,.04));border:1px solid var(--border);
+  border-radius:999px;cursor:pointer;transition:background var(--t-fast)}
+.ctx-pill::before{content:'';position:absolute;inset:-6px 0;border-radius:inherit}
+.ctx-pill:hover{background:var(--s-100,rgba(0,0,0,.07))}
+.ctx-pill:focus-visible{outline:2px solid var(--blue,#4F8CFF);outline-offset:2px}
+.ctx-pill:active{transform:scale(.96)}
+@media (prefers-reduced-motion: reduce){ .ctx-pill:active{transform:none} }
 .link-more{color:var(--blue);font-weight:600;font-size:14px;cursor:pointer;background:none;border:none;display:flex;align-items:center;gap:4px;transition:gap var(--t-fast)}
 .link-more:hover{gap:8px}
 
@@ -822,7 +840,20 @@ img{display:block;max-width:100%}
 
 @media(max-width:880px){
   .nav-links{display:none}
-  .nav-right{display:none}
+  /* ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] پیش از این کلِ `.nav-right` روی موبایل حذف
+     می‌شد، چون ناوبری به `.botnav` منتقل می‌شود. ولی دکمه‌ی جست‌وجو هم داخلِ
+     همین ظرف بود — یعنی `openPalette()` در DOM وجود داشت و **روی گوشی هرگز
+     دیده نمی‌شد** (اندازه‌گیریِ طراح در ۳۹۰×۸۴۴: `visible:false`). تا امروز
+     بی‌اهمیت بود چون هیرو نوارِ جست‌وجوی خودش را داشت؛ با رفتنِ هیرو، این
+     تنها راهِ رسیدن به جست‌وجو است.
+     پس ظرف نمایان می‌شود ولی **فقط** موارد `nav-keep`:
+       🔍      تنها راهِ جست‌وجو
+       🌙      تنها صداکننده‌ی `toggleTheme` (وگرنه قابلیت حذف می‌شد)
+     زنگِ اعلان و pill امتیاز عمداً مخفی می‌مانند — ناوبری و اعلان روی موبایل
+     کارِ `.botnav` است و شلوغ‌کردنِ نوارِ بالا هدفِ «فید اول» را نقض می‌کند. */
+  .nav-right{display:flex}
+  .nav-right>*{display:none}
+  .nav-right>.nav-keep{display:inline-flex}
   .botnav{display:flex}
   body{padding-bottom:70px}
   .searchbar{flex-wrap:wrap;border-radius:var(--r-xl);padding:6px}
@@ -831,6 +862,22 @@ img{display:block;max-width:100%}
   .search-go{width:100%;border-radius:var(--r);margin-top:6px;height:46px}
   .grid{grid-template-columns:1fr;gap:18px}
   .section{padding:28px 0}
+  /* ⚠️ [DS-007 §۶] ریتمِ عمودیِ **بالای فید** روی موبایل فشرده‌تر شد.
+     اندازه‌گیری پس از برداشتنِ هیرو: اولین کارت در ۴۱۰px بود — یعنی هیرو
+     بزرگ‌ترین مقصر بود (۹۸۲ → ۴۱۰) ولی به‌تنهایی کافی نبود. تفکیکِ باقی‌مانده:
+         nav ۶۲ + occ-wrap ۱۷۰ + chips ۵۶ + پدینگِ بالای section ۲۸ = ۴۱۰
+     این دو قاعده فقط فاصله‌ی **پیش از** فید را می‌گیرند و به خودِ کارت‌ها یا
+     ردیفِ مناسبت‌ها دست نمی‌زنند. ⚠️ عمداً `.section:first-of-type` نیست:
+     همه‌ی سکشن‌های صفحه‌ی کشف پشتِ سرِ هم‌اند و یک قاعده‌ی عمومی، فاصله‌ی
+     میانِ آن‌ها را هم می‌شکست. */
+  #page-discover .occ-q{margin-bottom:8px}
+  /* ⚠️ سکشنی که `#feed` را دارد — با `:has()` به خودِ فید لنگر می‌اندازد، نه
+     به ترتیبِ همسایه‌ها. نسخه‌ی اولِ من `.occ-wrap+.chips+.wrap.section` بود و
+     **هیچ‌چیز را مچ نکرد** (۴۱۰ → ۴۰۶، یعنی فقط قاعده‌ی occ-q اثر کرد): در
+     واقع `occ-wrap` و `chips` هر دو داخلِ یک `.wrap`ِ دیگرند و این سکشن
+     همسایه‌ی آن `.wrap` است، نه همسایه‌ی `chips`. حدسِ ساختار با اندازه‌گیری
+     رد شد — و اگر فقط عددِ نهایی را دیده بودم، «کار کرد» می‌نوشتم. */
+  #page-discover .wrap.section:has(#feed){padding-top:14px}
   .rp-layout{grid-template-columns:1fr;gap:0}
   .book-widget{position:fixed;bottom:70px;left:0;right:0;border-radius:var(--r-xl) var(--r-xl) 0 0;z-index:60;padding:16px 20px;box-shadow:var(--sh-xl)}
   .gallery{grid-template-columns:1fr 1fr;height:280px}
