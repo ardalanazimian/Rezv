@@ -77,10 +77,21 @@ export async function renderLoyalty(){
          اگر روزی انقضا اضافه شد، این خط باید هم‌زمان برداشته شود. -->
     <div class="loy-noexpire reveal">${icon('check',{size:14})} امتیازهات هیچ‌وقت منقضی نمی‌شن — نه بعدِ یک سال، نه هیچ‌وقت.</div>
 
+    <!-- ⚠️ A1-005 (۲۰۲۶-۰۹-۱۰): عددِ «۵۰۰ امتیاز» از این‌جا برداشته شد.
+         `completeReferral` (api/src/lib/loyalty.ts:610) **صفر صداکننده** در
+         `api/src` دارد — خودم شمردم، نه از روی گزارش. پس دعوت ثبت می‌شود
+         ولی پاداش هرگز پرداخت نمی‌شود.
+         این همان کلاسِ `cbVipPct=12` و `MERGE_UNAVAILABLE` است: آرتیفکت
+         قابلیتی را ادعا می‌کند که مکانیزم ندارد. نرم‌کردنِ جمله رفعِ غلط
+         بود؛ عدد باید می‌رفت.
+         ⚠️ جریانِ دعوت **عمداً دست‌نخورده** ماند: `createReferral` ردیفِ
+         `pending` می‌سازد و `completeReferral` روی همان مچ می‌کند، پس
+         دعوت‌های امروز روزی که پرداخت وصل شود قابلِ پرداختِ عقب‌افتاده‌اند.
+         ⚠️ این خط تا وقتی برنگردد که پرداخت **واقعاً** سیم‌کشی شده باشد. -->
     <!-- دعوت دوستان -->
     <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openReferral()">
       <div class="lac-icon" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">${icon('gift',{size:20})}</div>
-      <div class="lac-body"><div class="lac-title">دوستات رو دعوت کن</div><div class="lac-sub">۵۰۰ امتیاز برای هر دعوت موفق</div></div>
+      <div class="lac-body"><div class="lac-title">دوستات رو دعوت کن</div><div class="lac-sub">دعوت‌هات ثبت می‌شن</div></div>
       <span class="lac-arrow">›</span>
     </div>
     <!-- کارت هدیه -->
