@@ -222,6 +222,44 @@ author — auditing us — had to lowercase `EXIT=` to `exit=` and elide a hostn
 recorded evidence** to get the gate green. The gate was editing the record. If a check punishes
 verbatim evidence, the check is wrong, not the evidence.
 
+## 4d. Three promoted 2026-09-10 — all from the Backend Engineer session, all about scope
+
+**Turn the claim into a testable condition BEFORE you write the guard.** Asked to pin the one
+positioning line the brand rests on — *"nothing costs you money or points until you have been shown
+it"* — the engineer deliberately wrote **zero lines of guard** and came back with a finding instead:
+the claim was **narrower than the code**. The only deduction actually enforced today is neither money
+nor points; it is *credit* (`economy.ts` writes a reduced point award and a `strike`, with zero
+references to `points_ledger` in that file). A guard written the day before would have measured the
+wrong thing — and worse, to stay green it would have had to **deliberately ignore a real deduction**,
+which is the exact fake-green shape the guard existed to prevent. A guard cannot be more correct than
+the sentence it pins.
+
+The condition that replaced it is a **transition** rule, not a snapshot:
+
+```text
+for every cost-bearing field f:   enforced(f) ⇒ exposed_to_diner(f)
+```
+
+A snapshot of "everything is off today" stays green through the first wiring that turns something on
+— **the danger is the transition, not the present state.** Any guard whose subject can be switched on
+later must be written against the switch, not against the current position.
+
+**A guard for a temporary condition needs an expiry; a guard for an invariant must not have one.**
+Two guards landed the same afternoon and only one is self-retiring by design. The referral guard
+holds a promise hidden *while* `completeReferral` has no callers — the day it gains one, that guard
+goes red and says "restore the copy and delete this file". Correct: it protects a temporary state,
+and outliving that state turns it into a lock on the very fix it was waiting for. C1 above is the
+opposite: it is an invariant, and self-retiring it would have switched it off **exactly when it
+starts to matter** — at the transition. Before adding an expiry, ask which of the two you are
+holding.
+
+**A green guard beside a false sentence is worse than no guard**, because after it nobody looks. The
+backend half of a fix (put the field in the response) and the frontend half (derive the copy from it)
+were assigned to two sessions; the guard measures *data availability*, not *copy honesty*, so the
+backend half landing alone would have turned the check green while the app kept asserting the
+opposite. Ruling: the two halves reach `main` together or neither does. State in the guard's own
+output — and in `ci.yml`, where the green is actually printed — what its green does **not** mean.
+
 ## 5. Every shipped artifact needs a CI job that actually builds it
 
 What is not built is broken and nobody knows. A `postinstall: prisma generate` hook broke
