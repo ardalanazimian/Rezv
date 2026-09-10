@@ -5,7 +5,7 @@
 
 import { Actions } from './actions.js';
 import { API, hydrateSlots, loadMoreRestaurants, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
-import { doSearch, paintSlots, renderDiscoverSections, renderFeed, renderRestaurantSections } from './data/discover.js';
+import { activeQuery, doSearch, paintSlots, renderDiscoverSections, renderFeed, renderRestaurantSections } from './data/discover.js';
 import { R_SAMPLE, bookingCtx } from './data/seed.js';
 import { runPendingCheckIn } from './features/checkin.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
@@ -57,7 +57,12 @@ export async function syncRestaurants(){
     // renderFeed در data/discover.js). doSearch هم فیلتر را با دادهٔ تازه‌ی
     // سرور دوباره اعمال می‌کند، هم وقتی جست‌وجو خالی است خودش renderFeed(R)
     // را صدا می‌زند — پس هر دو حالت درست می‌ماند.
-    if (document.getElementById('sQ')?.value.trim()) doSearch();
+    // ⚠️ [DS-007 §۶] پیش‌تر این شرط `#sQ`ِ داخلِ هیرو را می‌خواند. با رفتنِ
+    // هیرو، `?.` آن را بی‌صدا به «هیچ جست‌وجویی در کار نیست» تبدیل می‌کرد و
+    // نتیجه‌ی کاربر با فهرستِ کامل بازنویسی می‌شد — همان باگِ رقابتِ رندر که
+    // این خط برای رفعش نوشته شده بود، فقط بی‌صدا. حالا حالت از ماژول خوانده
+    // می‌شود، نه از DOM.
+    if (activeQuery().trim()) doSearch();
     else renderFeed(R);
     // فقط بخش‌هایِ وابسته به R — عمداً renderDiscoverSections نه، چون آن
     // `GET /events` و خواندنِ موقعیت را دوباره می‌فرستد و boot از قبل انجامشان
