@@ -488,6 +488,24 @@ jobs:
           # مرورگرها در مسیرِ خودِ ایمیج‌اند، نه ~/.cache/ms-playwright.
           PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
+      # DS-007 §۶ (حکمِ مالک: A — فید اول؛ حکمِ CEO: سیم‌کشی در همان تحویلی که
+      # سبزش می‌کند). دو شرطِ رفتاری روی باندلِ واقعی در ۳۹۰×۸۴۴:
+      #   ۱) اولین کارتِ رستوران زیرِ 400px — پیش از A: ۹۸۲px، بیش از یک صفحه.
+      #   ۲) جست‌وجو از رابط **نمایان و کارا** — تریگرِ openPalette با offsetParent
+      #      (نه فقط در DOM: index.html:85 دکمه را داشت و app.css:825 روی موبایل
+      #      پنهانش می‌کرد — منشور §۴h، «موجود ≠ نمایان»)، پالت باز شود، و
+      #      doSearch('برگر') فید را فیلتر کند. ⚠️ بدونِ شرطِ ۲، حذفِ کاملِ
+      #      جست‌وجو هم شرطِ ۱ را سبز می‌کند.
+      # چرا اینجا و نه کنارِ گاردهای ایستا: مرورگر لازم دارد؛ آنجا یا exit 2
+      # می‌داد یا بدتر، سبزِ توخالی. اینجا ایمیجِ Playwright و e2e/node_modules
+      # هست و ابزار Playwright را از همان‌جا برمی‌دارد.
+      # standalone/customer.html در checkout هست و jobِ `standalone` تازگی‌اش را
+      # جدا گیت می‌کند؛ اگر کهنه باشد آن job قرمز می‌شود، نه این.
+      - name: صفحه‌ی اولِ اپِ مشتری — فید بالای fold و جست‌وجو نمایان؟ (DS-007)
+        run: node ../tools/measure-home-s1.mjs
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
