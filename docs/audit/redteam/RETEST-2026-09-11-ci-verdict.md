@@ -18,8 +18,8 @@
 | Verdict | Item |
 | --- | --- |
 | **HOLDS** | Red Team's own XSS-artifact fix, on Linux CI, at the job/step level |
-| **CONFIRMED (live)** | Directive 051: `cancel-in-progress` on `main` suppresses the verdict |
-| **DOWNGRADED to inference** | "`landing` is still red" — true by inference, **not** re-measured since 15:03 |
+| **CONFIRMED (live)** | Directive 051: `cancel-in-progress` on `main` suppresses the RUN verdict (FG-13 corroborates 051) |
+| **MEASURED (self-corrected)** | `landing` is red at the **job** level (my `76e422a` read + LE local `EXIT=1`) — not merely inferred |
 
 **Worst thing:** `main` has produced **no complete CI verdict since 76e422a at 15:03 UTC** — the last
 **14** commits to `main` were `cancelled` at the run level before finishing. A session glancing at
@@ -101,22 +101,34 @@ workflow. Walking the path I am reporting would have been attack #16 against my 
 
 ---
 
-## Finding 3 — "`landing` is still red" is an inference, not a measurement · **DOWNGRADE**
+## Finding 3 — `landing` is measured-red at the JOB level (corrected) · **MEASURED**
 
-Directive 051 states: "landing … هنوز قرمز است" (landing is still red). At the job level that is a
-reasonable inference but **not a current measurement**:
+**Correction — my first draft got this wrong, and the fix makes FG-13 sharper.** I originally
+downgraded "landing is red" to an inference. That was an error: I looked only at the *run* level and
+at one run whose landing job was cancelled, and missed that a **job** reaches its own conclusion even
+while its *run* stays `in_progress`/`cancelled`. `landing`'s red is a **measurement**:
 
-- `landing`'s last *completed* verdict was **failure** in `76e422a` (15:03), at step
-  **"Unit tests (JSON-LD، Markdownِ امن، محتوای پیش‌فرض)"** — a real unit-test failure, steps after it
-  (`Type check`, `Lint`, `Build`) `skipped`. Owned by the Launch Engineer per directive 050,
+- I measured `landing` job = **failure** in `76e422a` (15:03) — the last run whose landing job
+  reached a conclusion — at step **"Unit tests (JSON-LD، Markdownِ امن، محتوای پیش‌فرض)"** (steps
+  after it `skipped`). First-hand, not inferred. Owned by the Launch Engineer per directive 050,
   attributed to `f637948`.
-- In every run since (`d0b9459` … the in-progress `923a20a`), the `landing` job is `cancelled`, not
-  `failure` — it never ran to a verdict.
+- The Launch Engineer (`rezv-4a`) independently reproduced it **locally** tonight: `EXIT=1`, one
+  failing curtain-scheduling time test.
+- `rezv-bc` reports reading `landing` job = `completed/failure` on run `34635388552` (`923a20a`) at
+  19:05Z while that run was still `in_progress` — i.e. a completed-failure job inside an unfinished
+  run, which is the point.
 
-Nothing merged since 15:03 touches `apps/landing`'s tested paths (the commits are docs + the XSS
-artifact), so it is **almost certainly still red** — but "almost certainly" is not a measurement, and
-the only reason it can't be re-measured is Finding 2. This is exactly the inference/measurement line
-this team keeps drawing; I draw it here too rather than inherit the word "red."
+So the correct statement is **not** "landing is only inferentially red." It is: **the RUN never
+reaches a conclusion (Finding 2), yet the landing JOB inside it reaches `failure`.** That makes the
+fake-green in Finding 2 *worse*, not softer — the grey `cancelled` run badge hides a job that is
+genuinely, measurably red.
+
+**One discrepancy I will not paper over.** For run `9fa752e` (`34634852596`) specifically, *my* API
+fetch showed the `landing` job as `cancelled`, whereas directive 051 §1 records it as `failure`
+before the cancel. I could not re-measure (GitHub API rate-limited, 0/60, at the time of writing).
+This does not change the verdict — landing is measured-red via `76e422a` and LE's local run — but I
+flag the conflict rather than assert `9fa752e` both ways. To re-check once quota returns:
+`curl -s ".../actions/runs/34634852596/jobs"` and read the `landing` job's `conclusion`.
 
 ---
 

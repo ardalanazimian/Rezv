@@ -178,8 +178,11 @@ the blindness as **UNKNOWN beyond that**, not as "everywhere".
 
 - **Date:** 2026-09-11 (evening)
 - **Session:** Red Team · `rezv-0e [a29193]` (a new session; id measured with `ListAgents`)
-- **What this needs:** nothing new to decide — directive 051 already prescribes the fix. This entry
-  records the **class** so it is not re-discovered. I do not fix.
+- **What this needs:** nothing new to decide. **This is not a new finding — it is the mechanism
+  directive 051 (`923a20a`) already diagnosed.** It is recorded in the ledger only to give the
+  fake-green *class* a permanent entry and to attach independent live measurement. **No second fix is
+  proposed:** 051's ordered fix (timeouts on all 16 jobs, then `cancel-in-progress` off `main`) stands
+  and is owned by the Launch Engineer. Treat everything below as corroboration for 051.
 
 ## FG-13 — `main`'s CI verdict is suppressed by `cancel-in-progress`: a red run hides as grey
 
