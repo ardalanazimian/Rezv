@@ -722,7 +722,42 @@ export async function acceptOffer(entryId: string, _actor = 'customer', auth: { 
     },
     data: { status: 'accepted', respondedAt: now, seatedAt: now },
   });
-  if (claimed.count === 0) throw Err.reservationExpired();
+  if (claimed.count === 0) {
+    // ⚠️ افزوده‌ی ۲۰۲۶-۰۹-۱۲ (بازبینیِ همین شاخه): دو ضربه‌ی **هم‌زمان** روی
+    // یک آفر هر دو پیش از commitِ برنده `offered` را می‌دیدند، پس گاردِ
+    // بازپخشِ بالا هیچ‌کدام را نمی‌گرفت و بازنده دقیقاً همین‌جا می‌رسید و
+    // «مهلتِ تأیید گذشته» می‌گرفت — جمله‌ای که در آن لحظه **دروغ** است: رزرو
+    // همین حالا ساخته شده و مهمان میز دارد. تنها جایی که `reservation_code`
+    // به مهمان می‌رسد همین بدنه است، پس آن خطا کد را برای همیشه می‌برد.
+    //
+    // پس دوباره می‌خوانیم. شرط عیناً همان شرطِ سخت‌گیرانه‌ی بالاست —
+    // `accepted` **و** کدِ ناخالی — چون `accepted`ِ بی‌کد حالتِ گذرای
+    // لحظه‌ای است که `createReservation` در آن نشسته، و «موفق» گفتن در آن
+    // لحظه ادعای رزروی است که هنوز وجود ندارد.
+    //
+    // چرا حلقه و نه یک خواندن: در ضربه‌ی واقعاً هم‌زمان، بازنده معمولاً
+    // *داخلِ* همان پنجره می‌رسد. سه تلاش × ۳۰۰ms سقفِ ۰٫۹ ثانیه است — کمتر
+    // از زمانی که مهمان برای دیدنِ نتیجه صبر می‌کند، و بدونِ آن این رفع
+    // فقط حالتِ retryِ شبکه را می‌گرفت نه دو ضربه‌ی پشتِ‌هم را.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const after = await db.waitlistEntry.findUnique({
+        where: { id: entryId },
+        select: { status: true, reservationCode: true, offeredTableNumber: true },
+      });
+      if (after?.status === 'accepted' && after.reservationCode) {
+        return {
+          status: 'accepted',
+          reservation_code: after.reservationCode,
+          table_number: after.offeredTableNumber,
+        };
+      }
+      // اگر ورودی حتی `accepted` هم نیست (cron منقضی‌اش کرده، یا کسی
+      // لغوش کرده) صبرکردن بی‌فایده است — همان خطای درست را بده.
+      if (after?.status !== 'accepted') break;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    throw Err.reservationExpired();
+  }
 
   // ⚠️ باگِ رفع‌شده #۲ (همان‌جا، با تستِ زنده پیدا شد — این تابع تا امروز هیچ
   // پوششی نداشت): قبلاً این دو خط بودند

@@ -409,9 +409,21 @@ describe('صف — انقضایِ آفر (قفلِ باگِ رقابتِ رفع�
       'هیچ رزروی نباید ساخته شود');
   });
 
-  test('⚠️ پذیرشِ همزمان فقط یک رزرو می‌سازد', async () => {
+  test('⚠️ پذیرشِ همزمان فقط یک رزرو می‌سازد — و هر دو تماس همان کد را می‌گیرند', async () => {
     // ⚠️ چون ادعا حالا *پیش از* ساختِ رزرو و اتمیک است، دو درخواستِ همزمان
     // نمی‌توانند هر دو رزرو بسازند.
+    //
+    // ⚠️ قراردادِ این تست ۲۰۲۶-۰۹-۱۲ عوض شد، و دلیلش مهم است. نسخه‌ی قبلی
+    // `ok === 1` را می‌سنجید — یعنی صریحاً **پین می‌کرد** که بازنده خطا
+    // بگیرد. آن خطا `reservationExpired` بود («مهلتِ تأیید این رزرو گذشته
+    // است») و در این لحظه **دروغ** است: رزرو همین حالا ساخته شده و مهمان
+    // میز دارد. بدتر، `accept` تنها مسیری است که `reservation_code` را به
+    // مهمان می‌دهد، پس آن خطا کد را برای همیشه می‌برد — کافی بود مهمان دوبار
+    // روی «قبول» بزند.
+    //
+    // ناوریانتِ واقعی «یک نفر خطا بگیرد» نبود، «یک رزرو ساخته شود» بود. آن
+    // را سخت‌تر از قبل می‌سنجیم، و علاوه‌اش قراردادِ تازه: هر دو تماس همان
+    // یک کد را می‌گیرند.
     await mkTable(1);
     const j = await joinWaitlist({ restaurantId, partySize: 2, userId });
     await promoteNext(restaurantId);
@@ -420,11 +432,18 @@ describe('صف — انقضایِ آفر (قفلِ باگِ رقابتِ رفع�
       acceptOffer(j.id, 'customer', { callerUserId: userId }),
       acceptOffer(j.id, 'customer', { callerUserId: userId }),
     ]);
-    const ok = out.filter(o => o.status === 'fulfilled').length;
-    assert.equal(ok, 1, `فقط یک پذیرش باید موفق شود، نه ${ok}`);
     assert.equal((await entryOf(j.id)).status, 'accepted');
     assert.equal(await db.reservation.count({ where: { restaurantId } }), 1,
       'دقیقاً یک رزرو باید ساخته شود');
+
+    const fulfilled = out.filter((o) => o.status === 'fulfilled');
+    assert.equal(fulfilled.length, 2, 'هیچ‌کدام از دو تماس نباید خطای «مهلت گذشته» بگیرد');
+    const codes = new Set(fulfilled.map((o) => (o as PromiseFulfilledResult<{ reservation_code?: string }>).value.reservation_code));
+    assert.equal(codes.size, 1, 'هر دو باید همان یک کدِ رزرو را برگردانند');
+    const [only] = [...codes];
+    assert.ok(only, 'کدِ رزرو نباید خالی باشد — تنها جایی که مهمان آن را می‌گیرد همین بدنه است');
+    const resv = await db.reservation.findFirst({ where: { restaurantId }, select: { code: true } });
+    assert.equal(only, resv?.code, 'کدِ برگشتی باید کدِ همان رزروِ واقعی باشد');
   });
 
   test('⚠️ شکستِ ساختِ رزرو، ورودی و میز را دقیقاً به حالتِ قبل برمی‌گرداند', async () => {
