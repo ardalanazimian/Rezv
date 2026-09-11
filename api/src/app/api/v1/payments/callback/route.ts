@@ -93,6 +93,27 @@ async function GET_impl(req: Request) {
         const locked = await tx.$queryRaw<Array<{ id: string; deposit_status: string }>>`
           SELECT id, deposit_status FROM reservations WHERE id = ${payment.reservationId}::uuid FOR UPDATE
         `;
+        // ⚠️ رگرسیونِ بسته‌شده (۲۰۲۶-۰۹-۱۲، بازبینیِ همین شاخه): خروجِ
+        // زودهنگامِ `payment.status === 'success'` بالا **بیرونِ قفل** است. دو
+        // callbackِ هم‌زمان با **همان** authority (رفرشِ دوباره، پری‌فچِ
+        // مرورگر، retryِ درگاه) هر دو آن را `pending` می‌بینند و هر دو verify
+        // می‌کنند — و verifyِ دوم هم موفق است، چون زرین‌پال کدِ ۱۰۱
+        // («قبلاً verify شده») را در `lib/zarinpal.ts` به `success` نگاشت
+        // می‌کند. بعد برنده success+paid می‌نوشت و بازنده، که فقط
+        // `deposit_status` را می‌دید، **ردیفِ خودش** را به `failed` +
+        // REFUND_REQUIRED برمی‌گرداند: یک پرداختِ واقعیِ سالم، با آلارمِ
+        // عودتِ دستی. پیش از پچِ ۰۰۰۵ این حالت بی‌ضرر بود (هر دو عیناً یک
+        // چیز می‌نوشتند)، پس رگرسیونِ تازه بود نه باگِ قدیمی.
+        //
+        // بازخوانیِ خودِ ردیفِ پرداخت **داخلِ** قفل تفکیک را قطعی می‌کند:
+        // اگر همین authority الان success است، این «پرداختِ تکراری» نیست —
+        // همان یک پرداخت است که دو بار callback خورده.
+        const fresh = await tx.payment.findUnique({
+          where: { id: payment.id },
+          select: { status: true },
+        });
+        if (fresh?.status === 'success') return false;
+
         if (locked[0]?.deposit_status === 'paid') {
           // ⚠️ اینجا پولِ واقعی از حسابِ کاربر کم شده و verify هم موفق بوده —
           // پس ردیف نباید بی‌صدا «ناموفق» شود. PaymentStatus مقدارِ «منتظرِ
