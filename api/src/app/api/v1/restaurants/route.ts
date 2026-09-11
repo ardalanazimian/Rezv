@@ -63,6 +63,11 @@ async function GET_impl(req: Request) {
           id: true, slug: true, name: true, cuisine: true, city: true, vibes: true,
           priceBand: true, cbBasePct: true, latitude: true, longitude: true,
           cancellationPolicy: { select: { depositRequired: true, freeCancelHours: true, autoConfirm: true } },
+          // ⚠️ BE-004 §۵ — و دقیقاً به همان دلیلی که کامنتِ بالا برایِ
+          // `cancellationPolicy` می‌گوید: نسخه‌ی اولِ این رفع فیلد را فقط به
+          // endpointِ جزئیات داد، و آن endpoint را اپِ مشتری **هرگز صدا
+          // نمی‌زند**. یعنی داده افشا شده بود و به هیچ مشتری‌ای نمی‌رسید.
+          paymentEnabled: true,
         },
         // ⚠️ رتبه‌بندیِ واقعی (مهاجرتِ ۰۷۳). تا امروز اینجا `{ id: 'desc' }`
         // بود — پایدار (که برایِ cursor لازم است) ولی `id` یک UUID است، پس
@@ -123,13 +128,21 @@ async function GET_impl(req: Request) {
         // cancellationPolicy یک آبجکتِ رابطه‌ای است؛ به‌جایِ نشتِ شکلِ Prisma به
         // پاسخِ عمومی، همان قراردادِ booking_policy را می‌سازیم که endpointِ
         // جزئیات هم می‌دهد — یک شکل، دو مسیر (§۲۰ قراردادِ واحد).
-        const { cancellationPolicy, ...rest } = p;
+        // `paymentEnabled` هم مثلِ `cancellationPolicy` از spread بیرون کشیده
+        // می‌شود: شکلِ خامِ Prisma نباید به پاسخِ عمومی نشت کند؛ فقط کلیدِ
+        // قراردادیِ `booking_policy.online_payment_enabled` بیرون می‌رود.
+        const { cancellationPolicy, paymentEnabled, ...rest } = p;
         return {
           ...rest,
           booking_policy: {
             deposit_required: cancellationPolicy?.depositRequired ?? false,
             free_cancel_hours: cancellationPolicy?.freeCancelHours ?? 24,
             auto_confirm: cancellationPolicy?.autoConfirm ?? true,
+            // «یک شکل، دو مسیر» — همان قراردادی که کامنتِ بالا اعلامش کرده.
+            // این کلید در endpointِ جزئیات هم هست و باید هر دو جا بماند؛
+            // گاردِ tools/check-diner-cost-disclosure.mjs هر دو را پین می‌کند،
+            // چون افشا در یکی و نبودن در دیگری همان سبزِ صوری است.
+            online_payment_enabled: paymentEnabled ?? false,
           },
           rating: rt?.avg ? Math.round(rt.avg * 10) / 10 : null,
           reviews_count: total,

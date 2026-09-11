@@ -82,9 +82,19 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>
       <span class="notif-badge" id="notifBadge" aria-hidden="true"></span>
     </button>
-    <button class="nav-icn" type="button" onclick="openPalette()" aria-label="جست‌وجو و فرمان‌ها">
+    <!-- ⚠️ [DS-007 §۶] `nav-keep` یعنی «روی موبایل هم بماند». این دکمه از قبل
+         وجود داشت و `openPalette()` را صدا می‌زد، ولی `@media(max-width:880px)`
+         کلِ `.nav-right` را مخفی می‌کرد — یعنی **در DOM بود و روی گوشی دیده
+         نمی‌شد**. طراح اندازه‌اش گرفت: `visible:false`. با رفتنِ نوارِ
+         جست‌وجوی هیرو، این تنها راهِ رسیدن به جست‌وجوست، پس باید نمایان شود.
+         موجود ≠ نمایان. -->
+    <button class="nav-icn nav-keep" type="button" onclick="openPalette()" aria-label="جست‌وجو و فرمان‌ها">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
     </button>
+    <!-- ⚠️ [DS-007 §۶] جانشینِ `.theme-fab`. قابلیت حذف نشد، جابه‌جا شد —
+         `toggleTheme` تنها همان یک صداکننده داشت، پس برداشتنش بی‌جانشین یعنی
+         حذفِ یک قابلیت. `nav-keep` چون روی موبایل هم باید برسد. -->
+    <button class="nav-icn nav-keep" type="button" onclick="toggleTheme()" aria-label="تغییر تم روشن/تاریک"><span id="themeKnob">🌙</span></button>
     <div class="nav-pts" role="button" tabindex="0" aria-label="امتیازهای باشگاه" onclick="go('loyalty')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></svg>
       <span id="navPts">—</span>
@@ -96,34 +106,29 @@
 <!-- ═══════════ DISCOVER ═══════════ -->
 <main id="app-main" tabindex="-1">
 <div id="page-discover" class="page active" role="region" aria-label="کشف رستوران‌ها">
-  <button class="theme-fab glass" onclick="toggleTheme()" aria-label="تغییر تم روشن/تاریک"><span id="themeKnob">🌙</span></button>
-  <section class="hero">
-    <div class="wrap">
-      <div class="hero-badge"><span class="dot"></span>هوشمند با AI — رزرو در چند ثانیه</div>
-      <h1>میز رزرو کن،<br><b>ساده مثل پیام دادن.</b></h1>
-      <p>بهترین رستوران‌های شهر، با پیشنهاد هوشمند بر اساس سلیقه‌ی تو.</p>
-      <div class="searchbar">
-        <div class="search-field" onclick="this.querySelector('input').focus()">
-          <label for="sQ">کجا</label>
-          <input id="sQ" placeholder="رستوران، آشپزی، محله..." onkeydown="if(event.key==='Enter')doSearch()">
-        </div>
-        <!-- گزینه‌های این دو از js/data/booking.js پر می‌شوند (تاریخِ واقعیِ ۶۰ روز)
-             و مقدارشان مستقیم در زمینه‌ی رزرو می‌نشیند. پیش از این هر دو ثابت
-             بودند و هیچ‌جا خوانده نمی‌شدند — کنترلی که کار نمی‌کند. -->
-        <div class="search-field">
-          <label for="sWhen">کِی</label>
-          <select id="sWhen" onchange="syncSearchCtx()"></select>
-        </div>
-        <div class="search-field">
-          <label for="sParty">چند نفر</label>
-          <select id="sParty" onchange="syncSearchCtx()"></select>
-        </div>
-        <button class="search-go" onclick="doSearch()" aria-label="جستجو">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        </button>
-      </div>
-    </div>
-  </section>
+  <!-- ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] هیرو از صفحه‌ی اول برداشته شد — حکمِ مالک
+       («A: فید اول، شعارِ برند از داخلِ اپ می‌رود»، به روایتِ rezv-cf).
+       اندازه‌گیریِ طراح: اولین کارتِ رستوران ۹۵۴px پایین‌تر از بالای صفحه بود،
+       یعنی کاربر باید تا حدودِ یک صفحه‌ونیم اسکرول می‌کرد تا **محصول** را
+       ببیند. آنچه اینجا بود — بَجِ AI، شعار، و نوارِ جست‌وجوی سه‌فیلدی —
+       همگی درباره‌ی اپ حرف می‌زدند، نه رستوران‌ها.
+
+       جست‌وجو حذف نشد، **جابه‌جا** شد: دکمه‌ی 🔍 در نوارِ بالا پالتِ موجود را
+       باز می‌کند (`palette.js`، همان که ⌘K باز می‌کرد و کامنتِ سرِ فایلش از
+       اول همین دکمه را پیش‌بینی کرده بود). سطحِ تازه‌ای ساخته نشد.
+
+       ⚠️ و «کِی/چند نفر» **حذف نشد** چون حذفش یک نقصِ صحت می‌ساخت: چیپِ
+       ساعتِ کارت بدونِ آن، برای روزِ پیش‌فرض قول می‌داد. حالا در قرصِ
+       لمس‌پذیرِ زیرِ عنوانِ فید زندگی می‌کند (`renderSub` در discover.js).
+
+       ⚠️ `.theme-fab` از هیرو برداشته شد ولی **حذف نشد** — به نوارِ بالا
+       منتقل شد. نسخه‌ی اولِ همین کامنت نوشته بود «تغییرِ تم از منویِ پروفایل
+       در دسترس است»؛ سنجیدمش و **دروغ بود**: `toggleTheme` تنها یک صداکننده
+       داشت و همین دکمه بود (grep: `theme-pwa.js:11` تعریف، `:93` روی window،
+       و هیچ فراخوانِ دیگری). یعنی داشتم یک قابلیت را حذف می‌کردم و در کامنت
+       ادعا می‌کردم جای دیگری هست — همان کلاسی که کلِ این دو روز دنبالش
+       بودیم، این بار به دستِ خودم و در یک کامنت. -->
+
 
   <div class="wrap">
     <div class="occ-wrap">

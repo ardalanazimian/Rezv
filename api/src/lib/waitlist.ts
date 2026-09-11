@@ -17,6 +17,22 @@ import { createLogger } from './logger';
 
 const log = createLogger('waitlist');
 
+/**
+ * چند دقیقه یک ورودیِ `accepted` **بدونِ کدِ رزرو** اجازه دارد بنشیند پیش از
+ * آنکه جارو رهایش کند.
+ *
+ * ⚠️ این عدد روی **مدتِ ماندگاری** است و نه روی `offerExpiresAt`، و آن
+ * تفاوت یک باگِ رزروِ دوگانه را جلو گرفت (قیدِ بازبین، دستورِ ۰۴۸):
+ * `accepted` + کدِ خالی حالتِ گیرکرده **نیست** — حالتِ گذرای هر پذیرشِ
+ * موفق است، در پنجره‌ای که `createReservation` در آن می‌نشیند. اگر جارو
+ * به انقضای آفر کلید می‌خورد، مهمانی که یک ثانیه پیش از TTL می‌پذیرد
+ * میزش را زیرِ پای رزروی که همان لحظه ساخته می‌شود از دست می‌داد.
+ *
+ * پس عدد باید راحت بلندتر از حداکثر عمرِ آن تراکنش باشد. تایم‌اوتِ
+ * `createReservation` ۱۰ ثانیه است؛ ۵ دقیقه یعنی سی برابر.
+ */
+const ORPHANED_ACCEPT_DWELL_MINUTES = 5;
+
 // ═══════════════════════════════════════════════════════════
 //  سیستم لیست انتظار رزرونو (مدل OpenTable)
 //
@@ -321,7 +337,20 @@ export async function promoteNext(restaurantId: string): Promise<{ promoted: boo
   // ═══════════════════════════════════════════════════════════════════
   const res = await withSerializationRetry('waitlist', () => promoteNextTx(restaurantId));
   if (res.promoted && res.entryId && res.table !== undefined) {
-    await notifyEntry(res.entryId, 'offered', { table: res.table, ttl: OFFER_TTL_MINUTES });
+    const dispatched = await notifyEntry(res.entryId, 'offered', { table: res.table, ttl: OFFER_TTL_MINUTES });
+    // ثبتِ یک واقعیت، نه یک حدس: «دستِ‌کم یک کانال رفت». اگر صفر بود ستون
+    // NULL می‌ماند و `expireOffers` این مهمان را **بی‌پاسخ نمی‌خواند**.
+    if (dispatched > 0) {
+      await db.waitlistEntry.updateMany({
+        where: { id: res.entryId, status: 'offered' },
+        data: { offerNotifiedAt: new Date() },
+      }).catch((err: unknown) => {
+        // ⚠️ عمداً بلعیده نمی‌شود، لاگ می‌شود. و جهتِ شکست امن است: ستون
+        // NULL می‌ماند، یعنی حداکثر یک مهمانِ واقعاً خبردارشده `expired`
+        // ثبت می‌شود به‌جای `no_response` — اتهامِ کمتر، نه بیشتر.
+        log.warn('ثبتِ offerNotifiedAt ناموفق', { entryId: res.entryId, error: (err as Error).message });
+      });
+    }
     await redis.del(`waitlist:${restaurantId}`).catch(() => {});
     metrics.waitlistPromoted.inc();  // متریک: ارتقاء موفق از لیست انتظار
   }
@@ -817,8 +846,11 @@ export async function leaveWaitlist(
  * واقعیتِ متفاوت را جدا حمل می‌کند.
  */
 export interface ExpirySweepResult {
-  /** چند آفرِ بی‌پاسخ واقعاً به `no_response` رفت. */
+  /** چند آفرِ منقضی پردازش شد (`no_response` یا — اگر اعلانی نرفته بود — `expired`). */
   expired: number;
+  /** چند ورودیِ `accepted`ِ بدونِ رزرو رها شد. عددِ غیرِصفر یعنی جبرانِ
+   *  `acceptOffer` واقعاً شکست خورده — ارزشِ نگاه‌کردن دارد، نه نویز. */
+  orphansReleased: number;
   /** چند بار پس از آزادشدنِ میز، ارتقا **تلاش** شد. */
   promotionAttempts: number;
   /** از آن تلاش‌ها چند تا با خطا شکست خورد (نه «کسی نبود» — رجوع کن به `tryPromoteNext`). */
@@ -870,7 +902,13 @@ export async function expireOffers(): Promise<ExpirySweepResult> {
     const applied = await db.$transaction(async (tx) => {
       const res = await tx.waitlistEntry.updateMany({
         where: { id: e.id, status: 'offered' },
-        data: { status: 'no_response' },
+        // ⚠️ جفتِ ۲ (BE-006): `no_response` یک **اتهام** است — می‌گوید مهمان
+        // جواب نداد. ولی اگر هیچ کانالی برایش dispatch نشده باشد، او اصلاً
+        // چیزی برای جواب‌دادن ندیده. `expired` («مهلتِ آفر گذشت») همان
+        // واقعیت را بدونِ نسبت‌دادن به مهمان می‌گوید، و در هیچ‌کدام از دو
+        // سطلِ `getWaitlistAnalytics` نیست — پس نه در `seated` می‌نشیند و
+        // نه در `abandoned`.
+        data: { status: e.offerNotifiedAt ? 'no_response' : 'expired' },
       });
       if (res.count === 1 && e.offeredTableId) {
         await tx.table.update({ where: { id: e.offeredTableId }, data: { state: 'free' } });
@@ -893,7 +931,55 @@ export async function expireOffers(): Promise<ExpirySweepResult> {
     if (attempt.promoted) promotionsMade++;
     n++;
   }
-  return { expired: n, promotionAttempts, promotionFailures, promotionsMade };
+  // ═══════════════════════════════════════════════════════════════════
+  //  جفتِ ۱ (BE-005 §۴) — ورودیِ `accepted` که رزروش هرگز ساخته نشد.
+  //
+  //  `acceptOffer` ورودی را اتمیک `accepted` می‌کند و **بعد** رزرو می‌سازد.
+  //  اگر آن شکست بخورد، یک نوشتنِ جبرانی باید به `offered` برش گرداند — و
+  //  آن نوشتن بلعیده می‌شود. کامنتِ همان‌جا می‌گفت «cron خودش تمیزش می‌کند»،
+  //  ولی حلقه‌ی بالا فقط `offered` را برمی‌دارد و جبران دقیقاً همان چیزی
+  //  است که `accepted` را به `offered` تبدیل می‌کند. یعنی **تنها راهِ نجاتِ
+  //  ورودی همان نوشتنی بود که بلعیده می‌شد.** بازتولید شد، نه استدلال.
+  //
+  //  آسیبِ بازیابی‌ناپذیرش میز نیست (کارمند از نقشه‌ی سالن آزادش می‌کند)،
+  //  بلکه `getWaitlistAnalytics` است: `seated` وضعیتِ `accepted` را می‌شمارد،
+  //  پس ردیفِ گیرکرده تا ابد در عددی که به رستوران نشان داده می‌شود
+  //  «نشسته» است.
+  //
+  //  ⚠️ شرط روی **مدتِ ماندگاری** است نه `offerExpiresAt` — رجوع کن به
+  //  `ORPHANED_ACCEPT_DWELL_MINUTES`. این تفاوت یک رزروِ دوگانه را جلو گرفت.
+  // ═══════════════════════════════════════════════════════════════════
+  const dwellCutoff = new Date(Date.now() - ORPHANED_ACCEPT_DWELL_MINUTES * 60_000);
+  const orphans = await db.waitlistEntry.findMany({
+    where: { status: 'accepted', reservationCode: null, respondedAt: { lt: dwellCutoff } },
+  });
+  let orphansReleased = 0;
+  for (const o of orphans) {
+    // همان گاردِ اتمیکِ حلقه‌ی بالا: اگر رقیبی (یک `acceptOffer`ِ کند که
+    // بالاخره موفق شد، یا اجرای موازیِ همین cron) وضعیت را عوض کرده باشد،
+    // این تراکنش صفر ردیف می‌زند و میز دست‌نخورده می‌ماند.
+    const applied = await db.$transaction(async (tx) => {
+      const res = await tx.waitlistEntry.updateMany({
+        where: { id: o.id, status: 'accepted', reservationCode: null },
+        data: { status: 'expired' },
+      });
+      if (res.count === 1 && o.offeredTableId) {
+        await tx.table.update({ where: { id: o.offeredTableId }, data: { state: 'free' } });
+      }
+      return res.count;
+    });
+    if (applied === 0) continue;
+    orphansReleased++;
+    log.warn('ورودیِ acceptedِ بدونِ رزرو رها شد — جبرانِ acceptOffer شکست خورده بود', {
+      entryId: o.id, restaurantId: o.restaurantId, respondedAt: o.respondedAt,
+    });
+    promotionAttempts++;
+    const attempt = await tryPromoteNext(o.restaurantId, 'expire');
+    if (!attempt.ok) promotionFailures++;
+    if (attempt.promoted) promotionsMade++;
+  }
+
+  return { expired: n, orphansReleased, promotionAttempts, promotionFailures, promotionsMade };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -901,15 +987,20 @@ export async function expireOffers(): Promise<ExpirySweepResult> {
 // ═══════════════════════════════════════════════════════════
 type NotifyKind = 'joined' | 'offered' | 'accepted' | 'expired';
 
-async function notifyEntry(entryId: string, kind: NotifyKind, data: Record<string, any>) {
+/**
+ * @returns چند کانال **واقعاً dispatch شد**. صفر یعنی مهمان از این رویداد
+ *          هیچ خبری نگرفت — و آن، برخلافِ «تحویل»، از همین لایه دانستنی است.
+ */
+async function notifyEntry(entryId: string, kind: NotifyKind, data: Record<string, any>): Promise<number> {
   // ⚠️ `include` به‌جایِ کوئریِ دومِ ترجیحات: خواندنِ رضایت نباید یک رفت‌وبرگشتِ
   // اضافه به حلقه‌هایِ cron (expireStaleOffers / promoteNext) اضافه کند.
   const e = await db.waitlistEntry.findUnique({
     where: { id: entryId },
     include: { user: { select: { notificationPrefs: true } } },
   });
-  if (!e) return;
+  if (!e) return 0;
   const name = e.guestName ?? 'مهمان';
+  let dispatched = 0;
 
   const messages: Record<NotifyKind, { sms?: { template: SmsTpl; tokens: string[] }; push: { title: string; body: string }; email: { subject: string; body: string } }> = {
     joined: {
@@ -992,17 +1083,26 @@ async function notifyEntry(entryId: string, kind: NotifyKind, data: Record<strin
     })) {
       // انصرافِ صریح — push/email زیر همچنان می‌روند (کانالِ جدا، فلگِ جدا).
     } else {
-      await enqueueSms({ to: e.guestPhone, template: m.sms.template, tokens: m.sms.tokens, restaurantId: e.restaurantId }).catch(() => {});
+      await enqueueSms({ to: e.guestPhone, template: m.sms.template, tokens: m.sms.tokens, restaurantId: e.restaurantId })
+        .then(() => { dispatched++; }).catch(() => {});
     }
   }
   // Push
   if (e.notifyPush && e.userId) {
-    await queuePush(e.userId, m.push.title, m.push.body).catch(() => {});
+    await queuePush(e.userId, m.push.title, m.push.body)
+      .then(() => { dispatched++; }).catch(() => {});
   }
   // Email
   if (e.notifyEmail && e.guestEmail) {
-    await queueEmail(e.guestEmail, m.email.subject, m.email.body).catch(() => {});
+    await queueEmail(e.guestEmail, m.email.subject, m.email.body)
+      .then(() => { dispatched++; }).catch(() => {});
   }
+
+  // ⚠️ صفر یعنی **هیچ کانالی نرفت** — نه اینکه ارسال شکست خورد. سه شرطِ
+  // بالا هر کدام می‌توانند رد شوند (تلفن null، حسابِ کاربری نداشتن،
+  // `notifyEmail` که پیش‌فرضش false است، یا انصراف از رضایتِ availability)،
+  // و مهمانِ بدونِ حساب که تلفن نداده هر سه را رد می‌کند.
+  return dispatched;
 }
 
 // نوع قالب SMS (هماهنگ با sms.ts)

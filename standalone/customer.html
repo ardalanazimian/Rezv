@@ -363,6 +363,48 @@
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
 
+/* ═══════════ حرکتِ اسکرول‌محور (DS-008، ۲۰۲۶-۰۹-۱۰) ═══════════
+   خواسته‌ی مالک: «اسکرولِ زنده با حسِ خوب، مثلِ تیک‌تاک و اینستاگرام».
+   مکانیزمِ آن اپ‌ها این است که حرکت **تابعِ موقعیتِ اسکرول** است، نه تایمر:
+   کارت وقتی واردِ دید می‌شود کمی «می‌نشیند» و با اسکرول جابه‌جا می‌شود — نه
+   اینکه با یک تأخیرِ ثابت بپرد. CSS scroll-driven animations دقیقاً همین را
+   بدونِ JS و روی compositor می‌دهد.
+
+   ⚠️ پیش‌روندهٔ تدریجی، عمداً: پشتِ @supports. مرورگری که animation-timeline
+   ندارد هیچ‌چیز نمی‌بیند و هیچ‌چیز نمی‌شکند — کارت بی‌حرکت ولی کامل است.
+
+   ⚠️ reduced-motion: سیاستِ سراسریِ tokens.css فقط *duration* را صفر می‌کند،
+   و انیمیشنِ timeline‌محور duration ندارد — پس اینجا **صریحاً** خاموش می‌شود.
+   حرکتی که نشود خاموشش کرد، فیچر نیست، مانع است.
+
+   کاربرد: کانتینرِ اسکرول‌شونده کلاسِ .ds-scroll-live بگیرد، هر فرزندِ مستقیم
+   یک آیتم است، و عنصری با .ds-scroll-live-bg داخلِ آیتم پارالاکسِ ملایم
+   می‌گیرد. (اپِ مشتری این را مستقیم روی #feed اعمال می‌کند — app.css.) */
+@keyframes ds-settle-in {
+  from { opacity: .72; transform: translateY(10px); }
+  to   { opacity: 1;   transform: none; }
+}
+@keyframes ds-bg-drift {
+  from { transform: scale(1.06) translateY(-3%); }
+  to   { transform: scale(1)    translateY(0); }
+}
+@supports (animation-timeline: view()) {
+  .ds-scroll-live > * {
+    animation: ds-settle-in linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 55%;
+  }
+  .ds-scroll-live .ds-scroll-live-bg {
+    animation: ds-bg-drift linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 45%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-scroll-live > *,
+  .ds-scroll-live .ds-scroll-live-bg { animation: none !important; }
+}
+
 /* ── دسترسی‌پذیری: focus-ring یکدست روی همه‌ی المان‌های تعاملی ── */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: none;
@@ -752,7 +794,11 @@
 /* کلاس‌های شیشه و حرکت (قابل‌استفاده در کل اپ) */
 .glass{position:relative;background:var(--glass);-webkit-backdrop-filter:blur(22px) saturate(190%);backdrop-filter:blur(22px) saturate(190%);border:1px solid var(--border);box-shadow:var(--sh-md)}
 .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;background:linear-gradient(140deg,var(--glass-hi),transparent 40%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
-.reveal{opacity:0;transform:translateY(24px) scale(.97);transition:opacity .55s var(--ease),transform .55s var(--spring)}
+/* DS-008: reveal کوتاه و بی‌فنر. نسخه‌ی قبل ۵۵۰ms با overshootِ spring و scale(.97)
+   بود — کارت «می‌پرید» داخل. تیک‌تاک/اینستاگرام کارت را نمی‌پرانند؛ ۳۲۰ms ease-out،
+   فقط ۱۴px بالا، بدونِ مقیاس. روی مرورگرهای با animation-timeline، فیدِ کشف به‌جای
+   این از حرکتِ اسکرول‌محورِ foundation استفاده می‌کند (پایین‌تر). */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity var(--motion-slow,320ms) var(--ease-out),transform var(--motion-slow,320ms) var(--ease-out)}
 .reveal.in{opacity:1;transform:none}
 /* ─── بنر نصب اپ (PWA) ─── */
 .install-banner{position:fixed;bottom:16px;left:16px;right:16px;max-width:448px;margin:0 auto;z-index:200;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r-xl);background:var(--glass-2);opacity:0;transform:translateY(20px);transition:opacity .3s var(--ease),transform .3s var(--spring)}
@@ -771,7 +817,14 @@
 @media(prefers-reduced-motion:reduce){.reveal{opacity:1!important;transform:none!important}*{animation:none!important}}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-body{font-family:var(--font-ui);background:var(--mesh),var(--bg);background-attachment:fixed;color:var(--t1);
+/* DS-008 (۲۰۲۶-۰۹-۱۰): مشِ پنج‌رنگِ radial با attachment:fixed برداشته شد.
+   دو دلیل، هر دو خواسته‌ی مالک: (۱) «مینیمال» — پس‌زمینه با کارت‌ها رقابت
+   می‌کرد؛ در تیک‌تاک/اینستاگرام محتوا رنگ است، نه صفحه. (۲) «اسکرولِ زنده» —
+   background-attachment:fixed روی گرادیانِ چندتوقفی یعنی هر فریمِ اسکرول کلِ
+   viewport دوباره رنگ می‌شود؛ یکی از شناخته‌شده‌ترین علت‌های افتِ فریم روی
+   موبایل. اندازه‌گیریِ قبل/بعد در DS-008. --mesh خودش حذف نشد (theme.css و
+   کارت‌های مناسبت ممکن است بخواهندش)؛ فقط از body برداشته شد. */
+body{font-family:var(--font-ui);background:var(--bg);color:var(--t1);
   font-size:15px;line-height:1.6;min-height:100vh;min-height:100svh;overflow-x:hidden;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;transition:color .35s var(--ease)}
 button,input,select,textarea{font-family:inherit;font-size:inherit}
 img{display:block;max-width:100%}
@@ -846,10 +899,28 @@ img{display:block;max-width:100%}
 
 /* ─────────── CONTAINER ─────────── */
 .wrap{max-width:1140px;margin:0 auto;padding:0 20px}
-.section{padding:40px 0}
+.section{padding:28px 0} /* DS-008: ۴۰→۲۸ — هوای بینِ بخش‌ها کمتر، فید پیوسته‌تر */
 .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .section-title{font-size:21px;font-weight:800;letter-spacing:-.03em}
 .section-sub{font-size:14px;color:var(--t2);margin-top:2px}
+/* ⚠️ [DS-007 §۶] قرصِ زمینه‌ی جست‌وجو — «امروز · ۲ نفر ▾».
+   متنش از قبل همین‌جا نوشته می‌شد ولی لمس‌پذیر نبود؛ با رفتنِ هیرو این تنها
+   جایی است که کاربر می‌تواند **پیش از زدنِ چیپِ ساعت** تاریخ/تعداد را بگوید.
+   ⚠️ **۳۲px نقاشی، ۴۴px هدف.** نسخه‌ی اولِ من ۳۲ بود و در کامنت نوشته بودم
+   «تبادلِ آگاهانه زیرِ `--touch-min`». طراح ردش کرد و درست بود: WCAG 2.5.5
+   درباره‌ی **هدفِ لمس** است، نه جعبه‌ی رنگ‌شده. یعنی آن «تبادل» از اول لازم
+   نبود — من یک محدودیتِ جعلی ساخته بودم و بعد برایش توجیه نوشتم.
+   پس `::before` ناحیه‌ی لمس را عمودی به ۴۴ می‌رساند (۳۲ + ۲×۶) بدونِ اینکه
+   سطرِ متن بشکند. ⚠️ و اندازه‌گیری باید روی **همان ناحیه** باشد نه روی خودِ
+   عنصر، وگرنه عدد ۳۲ می‌دهد و دوباره همان نتیجه‌ی غلط گرفته می‌شود. */
+.ctx-pill{position:relative;display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:4px 10px;margin-inline-start:2px;
+  font:inherit;color:var(--t1);background:var(--s-50,rgba(0,0,0,.04));border:1px solid var(--border);
+  border-radius:999px;cursor:pointer;transition:background var(--t-fast)}
+.ctx-pill::before{content:'';position:absolute;inset:-6px 0;border-radius:inherit}
+.ctx-pill:hover{background:var(--s-100,rgba(0,0,0,.07))}
+.ctx-pill:focus-visible{outline:2px solid var(--blue,#4F8CFF);outline-offset:2px}
+.ctx-pill:active{transform:scale(.96)}
+@media (prefers-reduced-motion: reduce){ .ctx-pill:active{transform:none} }
 .link-more{color:var(--blue);font-weight:600;font-size:14px;cursor:pointer;background:none;border:none;display:flex;align-items:center;gap:4px;transition:gap var(--t-fast)}
 .link-more:hover{gap:8px}
 
@@ -895,6 +966,32 @@ img{display:block;max-width:100%}
 
 /* ─────────── RESTAURANT CARD ─────────── */
 .grid{display:grid;grid-template-columns:1fr;gap:18px}
+
+/* ═══ DS-008: فیدِ کشف — اسکرولِ زنده (۲۰۲۶-۰۹-۱۰) ═══
+   سه چیز، همه CSS، هیچ تغییری در مارک‌آپ/JS:
+   ۱) snapِ نرم روی کارت: html وقتی صفحه‌ی کشف فعال است scroll-snap-type:y proximity
+      می‌گیرد. proximity نه mandatory — اینستاگرام اسکرول را نمی‌دزدد، فقط اگر نزدیکِ
+      یک کارت ایستادی رویش «می‌نشیند». تیک‌تاک mandatory است ولی برای فیدِ رزرو
+      (کارت‌های ۲۷۰px، نه تمام‌صفحه) mandatory هر فلیک را یک کارت می‌کند و کلافه‌کننده
+      می‌شود. scroll-padding-top = ارتفاعِ navِ چسبان + نفس.
+   ۲) حرکتِ اسکرول‌محور (foundation.css، .ds-scroll-live): کارت هنگامِ ورود می‌نشیند و
+      پس‌زمینه‌اش پارالاکسِ ملایم دارد. #feed خودش کانتینر است؛ .rc-bg پس‌زمینه.
+      چون کلاس در مارک‌آپ نیست، همان قواعد اینجا روی #feed تکرار می‌شود — منبعِ
+      keyframes همچنان foundation است (یک تعریف).
+   ۳) روی مرورگرِ بدونِ animation-timeline، .reveal (بالا) همچنان کار می‌کند؛ روی
+      مرورگرِ با آن، هر دو فعال‌اند و تداخل ندارند (reveal روی .rc، drift روی .rc-bg،
+      settle روی opacity/translate که reveal.in به none برمی‌گرداند — انیمیشن بعد از
+      transition اعمال می‌شود و برنده است، پس عملاً settle حرف می‌زند). */
+html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:74px}
+#feed>.rc{scroll-snap-align:start;scroll-margin-top:12px}
+@supports (animation-timeline: view()){
+  #feed>.rc{animation:ds-settle-in linear both;animation-timeline:view();animation-range:entry 0% entry 55%}
+  #feed>.rc .rc-bg{animation:ds-bg-drift linear both;animation-timeline:view();animation-range:entry 0% cover 45%}
+}
+@media (prefers-reduced-motion: reduce){
+  #feed>.rc,#feed>.rc .rc-bg{animation:none!important}
+  /* snap حرکت نیست؛ می‌ماند — ولی مقدارِ نرم (proximity) است، نه mandatory */
+}
 /* دکمه‌ی «رستوران‌های بیشتر» فرزندِ مستقیمِ #feed است؛ باید کلِ عرضِ گرید را
    بگیرد نه یک سلول را. min-height برای هدفِ لمسیِ ≥۴۴px. */
 .feed-more{grid-column:1/-1;min-height:48px}
@@ -1459,7 +1556,20 @@ img{display:block;max-width:100%}
 
 @media(max-width:880px){
   .nav-links{display:none}
-  .nav-right{display:none}
+  /* ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] پیش از این کلِ `.nav-right` روی موبایل حذف
+     می‌شد، چون ناوبری به `.botnav` منتقل می‌شود. ولی دکمه‌ی جست‌وجو هم داخلِ
+     همین ظرف بود — یعنی `openPalette()` در DOM وجود داشت و **روی گوشی هرگز
+     دیده نمی‌شد** (اندازه‌گیریِ طراح در ۳۹۰×۸۴۴: `visible:false`). تا امروز
+     بی‌اهمیت بود چون هیرو نوارِ جست‌وجوی خودش را داشت؛ با رفتنِ هیرو، این
+     تنها راهِ رسیدن به جست‌وجو است.
+     پس ظرف نمایان می‌شود ولی **فقط** موارد `nav-keep`:
+       🔍      تنها راهِ جست‌وجو
+       🌙      تنها صداکننده‌ی `toggleTheme` (وگرنه قابلیت حذف می‌شد)
+     زنگِ اعلان و pill امتیاز عمداً مخفی می‌مانند — ناوبری و اعلان روی موبایل
+     کارِ `.botnav` است و شلوغ‌کردنِ نوارِ بالا هدفِ «فید اول» را نقض می‌کند. */
+  .nav-right{display:flex}
+  .nav-right>*{display:none}
+  .nav-right>.nav-keep{display:inline-flex}
   .botnav{display:flex}
   body{padding-bottom:70px}
   .searchbar{flex-wrap:wrap;border-radius:var(--r-xl);padding:6px}
@@ -1468,6 +1578,22 @@ img{display:block;max-width:100%}
   .search-go{width:100%;border-radius:var(--r);margin-top:6px;height:46px}
   .grid{grid-template-columns:1fr;gap:18px}
   .section{padding:28px 0}
+  /* ⚠️ [DS-007 §۶] ریتمِ عمودیِ **بالای فید** روی موبایل فشرده‌تر شد.
+     اندازه‌گیری پس از برداشتنِ هیرو: اولین کارت در ۴۱۰px بود — یعنی هیرو
+     بزرگ‌ترین مقصر بود (۹۸۲ → ۴۱۰) ولی به‌تنهایی کافی نبود. تفکیکِ باقی‌مانده:
+         nav ۶۲ + occ-wrap ۱۷۰ + chips ۵۶ + پدینگِ بالای section ۲۸ = ۴۱۰
+     این دو قاعده فقط فاصله‌ی **پیش از** فید را می‌گیرند و به خودِ کارت‌ها یا
+     ردیفِ مناسبت‌ها دست نمی‌زنند. ⚠️ عمداً `.section:first-of-type` نیست:
+     همه‌ی سکشن‌های صفحه‌ی کشف پشتِ سرِ هم‌اند و یک قاعده‌ی عمومی، فاصله‌ی
+     میانِ آن‌ها را هم می‌شکست. */
+  #page-discover .occ-q{margin-bottom:8px}
+  /* ⚠️ سکشنی که `#feed` را دارد — با `:has()` به خودِ فید لنگر می‌اندازد، نه
+     به ترتیبِ همسایه‌ها. نسخه‌ی اولِ من `.occ-wrap+.chips+.wrap.section` بود و
+     **هیچ‌چیز را مچ نکرد** (۴۱۰ → ۴۰۶، یعنی فقط قاعده‌ی occ-q اثر کرد): در
+     واقع `occ-wrap` و `chips` هر دو داخلِ یک `.wrap`ِ دیگرند و این سکشن
+     همسایه‌ی آن `.wrap` است، نه همسایه‌ی `chips`. حدسِ ساختار با اندازه‌گیری
+     رد شد — و اگر فقط عددِ نهایی را دیده بودم، «کار کرد» می‌نوشتم. */
+  #page-discover .wrap.section:has(#feed){padding-top:14px}
   .rp-layout{grid-template-columns:1fr;gap:0}
   .book-widget{position:fixed;bottom:70px;left:0;right:0;border-radius:var(--r-xl) var(--r-xl) 0 0;z-index:60;padding:16px 20px;box-shadow:var(--sh-xl)}
   .gallery{grid-template-columns:1fr 1fr;height:280px}
@@ -1795,17 +1921,53 @@ button,[role="button"],.botnav-item,a{min-height:0}
   font-size: var(--fs-md);
   min-height: var(--touch-min);
   border-radius: var(--radius-md);
-  transition: transform var(--motion-fast) var(--ease-out),
+  /* DS-006 §۴ (۲۰۲۶-۰۹-۱۰): فشارِ دکمه با فنر، نه با ease-out.
+     الگویِ برداشته‌شده: بازخوردِ لمسیِ دکمه در iOS/Instagram — فروترفتنِ
+     محسوس هنگامِ فشار و برگشتِ فنری با کمی overshoot هنگامِ رهاکردن. چرا
+     این و نه چیزِ دیگر: تنها حرکتی است که در هر ضربه‌ی کاربر تکرار می‌شود،
+     پس بیشترین اثر بر «حسِ خوب» را با کمترین سطحِ تغییر دارد.
+     مدت دست‌نخورده (130ms = بازه‌ی short/utility در M3: 50–200ms). فقط منحنیِ
+     transform فنری شد؛ رنگ/سایه/شفافیت همان ease-out می‌مانند تا فنر روی
+     چیزی جز هندسه اعمال نشود.
+     reduced-motion: سیاستِ سراسریِ tokens.css:187 مدت را 0.01ms می‌کند (فنر
+     حذف می‌شود). ⚠️ ولی app.css:534 که می‌خواست transform را هم خنثی کند،
+     زیرِ همین فایل می‌بازد — چون ds-bridge آخر لود می‌شود و `.btn:active`
+     اینجا با همان specificity دیرتر می‌آید. اندازه‌گیری (DS-006 §۴) نشان داد
+     دکمه در reduced-motion هنوز ۴٪ جمع می‌شد، بی‌حرکت ولی جمع. پس نیتِ
+     app.css:534 اینجا، در لایه‌ای که واقعاً برنده است، تکرار می‌شود (پایین). */
+  transition: transform var(--motion-fast) var(--ease-spring),
               background var(--motion-fast) var(--ease-out),
               box-shadow var(--motion-fast) var(--ease-out),
               opacity var(--motion-fast) var(--ease-out);
 }
-.btn:active { transform: scale(.98); }
+.btn:active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) {
+  /* بازخوردِ فشار فقط از رنگ/سایه می‌آید؛ هیچ تغییرِ هندسه‌ای، حتی آنی. */
+  .btn:active { transform: none; }
+}
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 /* ۳۶px زیرِ حداقلِ ۴۴px هر دو پلتفرم بود (WCAG 2.5.5). «کوچک» به عرض و وزنِ
    بصری برمی‌گردد، نه به کوچک‌کردنِ ناحیه‌ی لمس. */
 .btn-sm { min-height: var(--touch-min); font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
 .btn-lg { min-height: 44px; font-size: var(--fs-lg); padding: var(--sp-3) var(--sp-6); }
+
+/* ── ۲ب) هم‌ترازیِ دکمه‌های آیکونیِ نوارِ بالا (.nav-icn) به --touch-min ──
+   DS-007 §۶ (۲۰۲۶-۰۹-۱۰). app.css:482 آن‌ها را ۳۶×۳۶ تعریف می‌کند — زیرِ
+   --touch-min (۴۴px، WCAG 2.5.5)، همان نقصی که برای .btn-sm بسته شد. دو
+   مصرف‌کننده‌ی زنده: زنگِ اعلان و جست‌وجو/فرمان (index.html:81,85).
+   ⚠️ چرا .nav-icn و نه یک .icon-btnِ تازه در foundation: نامِ .icon-btn در
+   اپِ مشتری گرفته است (app.css:631 و :1026 — دو تعریف، هر دو زیرِ ۴۴) و
+   استفاده می‌شود (chat.js)؛ اولیه‌ی هم‌نامِ متفاوت یا شکلِ چت را عوض می‌کرد
+   یا زیرِ app.css بی‌اثر می‌ماند. LE این را پیش از تصادم گرفت.
+   فقط ابعاد و حرکت؛ رنگ/شکلِ خودِ اپ دست‌نخورده. */
+.nav-icn {
+  width: var(--touch-min); height: var(--touch-min);
+  transition: transform var(--motion-fast) var(--ease-spring),
+              background var(--motion-fast) var(--ease-out),
+              color var(--motion-fast) var(--ease-out);
+}
+.nav-icn:active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) { .nav-icn:active { transform: none; } }
 
 /* ── ۳) هم‌ترازیِ .inp (کلاسِ قدیمی) به استانداردِ .field-input ── */
 .inp {
@@ -1867,9 +2029,19 @@ button,[role="button"],.botnav-item,a{min-height:0}
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>
       <span class="notif-badge" id="notifBadge" aria-hidden="true"></span>
     </button>
-    <button class="nav-icn" type="button" onclick="openPalette()" aria-label="جست‌وجو و فرمان‌ها">
+    <!-- ⚠️ [DS-007 §۶] `nav-keep` یعنی «روی موبایل هم بماند». این دکمه از قبل
+         وجود داشت و `openPalette()` را صدا می‌زد، ولی `@media(max-width:880px)`
+         کلِ `.nav-right` را مخفی می‌کرد — یعنی **در DOM بود و روی گوشی دیده
+         نمی‌شد**. طراح اندازه‌اش گرفت: `visible:false`. با رفتنِ نوارِ
+         جست‌وجوی هیرو، این تنها راهِ رسیدن به جست‌وجوست، پس باید نمایان شود.
+         موجود ≠ نمایان. -->
+    <button class="nav-icn nav-keep" type="button" onclick="openPalette()" aria-label="جست‌وجو و فرمان‌ها">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
     </button>
+    <!-- ⚠️ [DS-007 §۶] جانشینِ `.theme-fab`. قابلیت حذف نشد، جابه‌جا شد —
+         `toggleTheme` تنها همان یک صداکننده داشت، پس برداشتنش بی‌جانشین یعنی
+         حذفِ یک قابلیت. `nav-keep` چون روی موبایل هم باید برسد. -->
+    <button class="nav-icn nav-keep" type="button" onclick="toggleTheme()" aria-label="تغییر تم روشن/تاریک"><span id="themeKnob">🌙</span></button>
     <div class="nav-pts" role="button" tabindex="0" aria-label="امتیازهای باشگاه" onclick="go('loyalty')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></svg>
       <span id="navPts">—</span>
@@ -1881,34 +2053,29 @@ button,[role="button"],.botnav-item,a{min-height:0}
 <!-- ═══════════ DISCOVER ═══════════ -->
 <main id="app-main" tabindex="-1">
 <div id="page-discover" class="page active" role="region" aria-label="کشف رستوران‌ها">
-  <button class="theme-fab glass" onclick="toggleTheme()" aria-label="تغییر تم روشن/تاریک"><span id="themeKnob">🌙</span></button>
-  <section class="hero">
-    <div class="wrap">
-      <div class="hero-badge"><span class="dot"></span>هوشمند با AI — رزرو در چند ثانیه</div>
-      <h1>میز رزرو کن،<br><b>ساده مثل پیام دادن.</b></h1>
-      <p>بهترین رستوران‌های شهر، با پیشنهاد هوشمند بر اساس سلیقه‌ی تو.</p>
-      <div class="searchbar">
-        <div class="search-field" onclick="this.querySelector('input').focus()">
-          <label for="sQ">کجا</label>
-          <input id="sQ" placeholder="رستوران، آشپزی، محله..." onkeydown="if(event.key==='Enter')doSearch()">
-        </div>
-        <!-- گزینه‌های این دو از js/data/booking.js پر می‌شوند (تاریخِ واقعیِ ۶۰ روز)
-             و مقدارشان مستقیم در زمینه‌ی رزرو می‌نشیند. پیش از این هر دو ثابت
-             بودند و هیچ‌جا خوانده نمی‌شدند — کنترلی که کار نمی‌کند. -->
-        <div class="search-field">
-          <label for="sWhen">کِی</label>
-          <select id="sWhen" onchange="syncSearchCtx()"></select>
-        </div>
-        <div class="search-field">
-          <label for="sParty">چند نفر</label>
-          <select id="sParty" onchange="syncSearchCtx()"></select>
-        </div>
-        <button class="search-go" onclick="doSearch()" aria-label="جستجو">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        </button>
-      </div>
-    </div>
-  </section>
+  <!-- ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] هیرو از صفحه‌ی اول برداشته شد — حکمِ مالک
+       («A: فید اول، شعارِ برند از داخلِ اپ می‌رود»، به روایتِ rezv-cf).
+       اندازه‌گیریِ طراح: اولین کارتِ رستوران ۹۵۴px پایین‌تر از بالای صفحه بود،
+       یعنی کاربر باید تا حدودِ یک صفحه‌ونیم اسکرول می‌کرد تا **محصول** را
+       ببیند. آنچه اینجا بود — بَجِ AI، شعار، و نوارِ جست‌وجوی سه‌فیلدی —
+       همگی درباره‌ی اپ حرف می‌زدند، نه رستوران‌ها.
+
+       جست‌وجو حذف نشد، **جابه‌جا** شد: دکمه‌ی 🔍 در نوارِ بالا پالتِ موجود را
+       باز می‌کند (`palette.js`، همان که ⌘K باز می‌کرد و کامنتِ سرِ فایلش از
+       اول همین دکمه را پیش‌بینی کرده بود). سطحِ تازه‌ای ساخته نشد.
+
+       ⚠️ و «کِی/چند نفر» **حذف نشد** چون حذفش یک نقصِ صحت می‌ساخت: چیپِ
+       ساعتِ کارت بدونِ آن، برای روزِ پیش‌فرض قول می‌داد. حالا در قرصِ
+       لمس‌پذیرِ زیرِ عنوانِ فید زندگی می‌کند (`renderSub` در discover.js).
+
+       ⚠️ `.theme-fab` از هیرو برداشته شد ولی **حذف نشد** — به نوارِ بالا
+       منتقل شد. نسخه‌ی اولِ همین کامنت نوشته بود «تغییرِ تم از منویِ پروفایل
+       در دسترس است»؛ سنجیدمش و **دروغ بود**: `toggleTheme` تنها یک صداکننده
+       داشت و همین دکمه بود (grep: `theme-pwa.js:11` تعریف، `:93` روی window،
+       و هیچ فراخوانِ دیگری). یعنی داشتم یک قابلیت را حذف می‌کردم و در کامنت
+       ادعا می‌کردم جای دیگری هست — همان کلاسی که کلِ این دو روز دنبالش
+       بودیم، این بار به دستِ خودم و در یک کامنت. -->
+
 
   <div class="wrap">
     <div class="occ-wrap">
@@ -2387,7 +2554,37 @@ function gradFor(id){
   let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
   return GRAD[(h % 6) + 1];
 }
-const R_SAMPLE = [
+// ═══════════════════════════════════════════════════════════
+//  DS-006 §۴ — شکلِ آیتمِ منو: یک قرارداد، نه دو
+//
+//  ⚠️ نقصِ واقعی (بازتولیدشده در DOM توسطِ طراح، ۲۰۲۶-۰۹-۱۰): در باندلِ
+//  آفلاین، هر چهار آیتمِ منویِ اولین رستورانِ نمونه این‌طور رندر می‌شدند —
+//      .menu-emoji ""   ·   .menu-name ""   ·   .menu-price "undefined تومان"
+//  یعنی **هر سه فیلد**، نه فقط قیمت. قیمت تنها چیزی بود که دیده می‌شد، چون
+//  `esc(m.n)` مقدارِ undefined را رشته‌ی خالی می‌کند ولی قیمت خام درج می‌شود.
+//
+//  علت: `menuItemHTML` شیء می‌خواهد (`m.e`/`m.n`/`m.p`) ولی مسیرِ نمونه
+//  آرایه‌ی خام می‌داد. نرمال‌ساز فقط **یک** صداکننده داشت — `mapApiRestaurant`،
+//  یعنی مسیرِ API — و مسیرِ نمونه کاملاً دورش می‌زد:
+//      init.js:12          export let R = R_SAMPLE;            ← خام
+//      loadRestaurants()   offline ⇒ return R_SAMPLE;          ← خام
+//
+//  ⚠️ و رفعِ وسوسه‌انگیز (گارد روی خطِ قیمت در detail.js) **غلط** بود: فقط
+//  نشانه را خفه می‌کرد و آیتم همچنان بی‌نام و بی‌ایموجی می‌ماند. همان کلاسِ
+//  «شکستِ بلعیده‌شده». پس رفع در **مرزِ seed→R** است، جایی که شکل عوض می‌شود.
+//
+//  ⚠️ و چرا اینجا و نه در `api.js`: `api.js` از همین فایل `R_SAMPLE` را
+//  import می‌کند، پس این ماژول پایین‌تر است. تعریف اینجا می‌ماند و `api.js`
+//  همین را می‌گیرد — یک پیاده‌سازی (§۲۲)، نه یک کپیِ دوم.
+// ═══════════════════════════════════════════════════════════
+function normalizeMenuEntry(m){
+  if (Array.isArray(m)) {
+    return { id: null, e: m[0] || '🍽️', n: m[1], p: m[2], img: m[3] || null, d: null, catId: null, out: false, tags: [] };
+  }
+  return m;
+}
+
+const R_SAMPLE_RAW = [
   {id:1,e:'🌿',n:'[DEMO] کافه‌رستوران ویستا',cuisine:'ایتالیایی · فیوژن',price:'$$',rt:4.8,reviews:128,vibes:['رمانتیک','آروم'],cb:8,
    slots:['۱۹:۰۰','۱۹:۳۰','۲۰:۰۰'],badge:'پرطرفدار',ai:false,
    about:'فضایی آرام با نورپردازی ملایم، مناسب شام دونفره و قرارهای کاری. منوی فیوژن ایتالیایی با مواد تازه‌ی روز.',
@@ -2431,6 +2628,20 @@ const R_SAMPLE = [
    good:['کیفیت استیک','صندلی تراس','سرویس سریع'],bad:['پارکینگ','انتظار آخر هفته'],
    revs:[['شیدا ک.','👩','5','منظره‌ش بی‌نظیره! برای تولد عالی بود.','۲ روز پیش'],['پارسا ت.','🧔','5','استیک واگیو معرکه. حتماً رزرو کنید.','هفته پیش']]},
 ];
+
+/**
+ * نمونه‌ها با **همان شکلی** بیرون می‌روند که مسیرِ API می‌دهد.
+ *
+ * ⚠️ این تنها مرزی است که `R_SAMPLE` از آن به `R` می‌رسد — هم `init.js:12`
+ * (پیش‌فرضِ آفلاین) و هم بازگشتِ آفلاینِ `loadRestaurants`. پس نرمال‌سازی
+ * همین‌جا هر دو مسیر را می‌پوشاند، بدونِ اینکه هیچ صداکننده‌ای چیزی بداند.
+ *
+ * ⚠️ `normalizeMenuEntry` **خودتوان** است: آبجکت را دست‌نخورده برمی‌گرداند.
+ * پس `mapApiRestaurant` که دوباره رویش map می‌کند چیزی را خراب نمی‌کند.
+ */
+const R_SAMPLE = R_SAMPLE_RAW.map(r => (
+  Array.isArray(r.menu) ? { ...r, menu: r.menu.map(normalizeMenuEntry) } : r
+));
 const PERKS=[['🎁','کش‌بک','تا ۱۵٪ برگشت پول'],['⚡','رزرو سریع','اولویت در ساعات شلوغ'],['🎂','هدیه تولد','تخفیف ویژه ماه تولد'],['👑','میز VIP','دسترسی به میزهای ویژه']];
 const BADGES=[['🍽️','اولین رزرو',1],['🔥','۵ هفته پیاپی',1],['⭐','گورمه',1],['🌙','شب‌نشین',1],['👑','VIP',0],['🗺️','کاشف',0]];
 let pts=0, favs=new Set(), curRest=null, bk={};
@@ -2769,7 +2980,36 @@ const PARTY_MAX = 12;
 //  حالا همان اطلاعِ واقعی داده می‌شود (رستوران سیاستِ بیعانه دارد) بدونِ ادعای
 //  دریافتِ آنلاین.
 function depositLabel(r){
-  if(r?.depositRequired === true) return 'این رستوران سیاستِ بیعانه دارد — آنلاین دریافت نمی‌شود، هنگامِ حضور هماهنگ کن';
+  if(r?.depositRequired === true){
+    // ⚠️ BE-004/ب (۲۰۲۶-۰۹-۱۰): بندِ «آنلاین دریافت نمی‌شود» **مشتق** می‌شود،
+    // ادعا نمی‌شود. تا امروز یک جمله‌ی ثابت بود در حالی که `payment_enabled`
+    // در هیچ پاسخِ روبه‌مشتری‌ای نبود — یعنی اپ داده‌ی لازم برای راست‌گفتن را
+    // نداشت و با این حال یک ادعای **مثبت** درباره‌ی درگاه می‌کرد. اگر رستورانی
+    // درگاه را روشن می‌کرد، اپ خلافش را می‌گفت.
+    // سه حالت، همان قاعده‌ی بالا — و `null` **سکوت** است نه «خاموش».
+    // ⚠️ دلیلِ `null` در طولِ همین کار **عوض شد** و نسخه‌ی قبلیِ این کامنت
+    // دیگر راست نبود، پس به‌جای ماندن تصحیح شد: اولش نوشته بودم «اندپوینتِ
+    // فهرست این کلید را نمی‌دهد». وقتی پرسیدم آیا فهرست هم باید بدهد،
+    // `rezv-89` سنجید و دید شیتِ رزرو **از فهرست** می‌خواند (`findR` روی فیدِ
+    // در حافظه) — یعنی آن مسیر همیشه نامعلوم بود و حالتِ واقعی هرگز جایی که
+    // اهمیت داشت نشان داده نمی‌شد. فیلد را به هر دو روت اضافه کرد
+    // (`5f58d9f`)، و هر دو `?? false` می‌دهند روی ستونی که
+    // `Boolean @default(false)` است و nullable نیست.
+    // پس `null` **از API نمی‌آید**. آنچه می‌ماند پاسخی است که کلاً
+    // `booking_policy` ندارد — مثلاً کَشِ پیش از این تغییر. آن حالت واقعی است
+    // و سکوت در آن درست است؛ ولی دلیلش دیگر «فهرست کلید را ندارد» نیست.
+    // ⚠️ نزدیک بود همین‌جا **دقیقاً همان نقصی را بسازم که دارم رفعش می‌کنم.**
+    // نسخه‌ی اولِ این خط می‌گفت «پرداختِ آنلاین فعال است». ولی اپِ مشتری
+    // **هیچ‌وقت** مسیرِ پرداخت را صدا نمی‌زند (صفر فراخوان به
+    // `/reservations/:code/pay` — کامنتِ بالای همین تابع از ۲۰۲۶-۰۸-۲۴ همین
+    // را ثبت کرده و خودم دوباره سنجیدمش). پس «فعال است» یک ادعای مثبتِ تازه
+    // درباره‌ی کاری بود که این اپ انجام نمی‌دهد.
+    // `true` یعنی درگاهِ **رستوران** روشن است، نه اینکه اینجا پول گرفته شود —
+    // و هر دو حقیقت گفته می‌شوند، بدونِ وعده.
+    if(r?.onlinePaymentEnabled === true) return 'این رستوران سیاستِ بیعانه دارد — پرداختش از این اپ انجام نمی‌شود، هنگامِ حضور هماهنگ کن';
+    if(r?.onlinePaymentEnabled === false) return 'این رستوران سیاستِ بیعانه دارد — آنلاین دریافت نمی‌شود، هنگامِ حضور هماهنگ کن';
+    return 'این رستوران سیاستِ بیعانه دارد';   // نامعلوم → فقط سیاست، بدونِ ادعای درگاه
+  }
   if(r?.depositRequired === false) return 'رزرو رایگان · بدون پیش‌پرداخت';
   return '';   // نامعلوم → سکوت، نه ادعا
 }
@@ -2937,6 +3177,51 @@ function bookingStepCount(r){
   return orderableMenu(r).length ? 3 : 2;
 }
 
+/**
+ * «گامِ پیش‌سفارش در دسترس نیست» — و این با «منو خالی است» یکی نیست.
+ *
+ * ⚠️ `hasOrderableMenu` یک بولینِ اختیاری از **فیدِ فهرست** است، اگر روزی
+ * سرور بدهدش (پیشنهادِ طراح، لِینِ `api/**`). وقتی باشد، تصمیم **بدونِ هیچ
+ * رفت‌وبرگشتی** گرفته می‌شود و اسکلت اصلاً دیده نمی‌شود. تا آن روز مسیرِ
+ * `detailLoaded` کار می‌کند. هیچ‌کدام کدِ مرده نیست: اولی امروز undefined
+ * است، دومی حتی بعد از آن هم برای پاسخ‌های کَش‌شده‌ی قدیمی لازم می‌ماند.
+ */
+function menuUnavailable(r){
+  if (typeof r?.hasOrderableMenu === 'boolean') return !r.hasOrderableMenu;
+  return orderableMenu(r).length === 0;
+}
+
+/**
+ * حالتِ «هنوز نمی‌دانم» — شیت فوراً باز می‌شود تا زدنِ چیپ بی‌پاسخ نماند.
+ *
+ * ⚠️ قاعده (طراح، ۲۰۲۶-۰۹-۱۰): **فقط چیزی را اسکلت کن که نمی‌دانی.**
+ * نسخه‌ی اولِ من سراسر اسکلت بود و آن اشتباه بود: در این لحظه نامِ رستوران
+ * (`r.n` از رکوردِ فید) و تاریخ·ساعت·تعداد (`bk`، که `quickBook` و
+ * `startBook` هر دو **پیش از** فراخوانی کامل ست می‌کنند) کاملاً معلوم‌اند و
+ * صفر شبکه لازم دارند. نمایشِ فوری‌شان تأخیرِ ادراک‌شده را از هر اسپینری
+ * بیشتر کم می‌کند — و شیتی که سراسر اسکلت باشد این خطر را دارد که «خراب
+ * است» خوانده شود نه «در حالِ آمدن».
+ *
+ * ⚠️ سرتیتر عمداً عینِ `bookStep2` است (نام + تاریخ·ساعت·تعداد)، پس اگر به
+ * گامِ ۲ برسیم **هیچ تکانی** رخ نمی‌دهد. عنوانِ مخصوصِ گام همراهِ بدنه
+ * می‌آید، چون «تأیید اطلاعات» برچسبِ **گام** است نه سرتیترِ صفحه.
+ *
+ * ⚠️ و `stepBars` ندارد — دو دلیل: هنوز نمی‌دانیم دو گام است یا سه (شمارشِ
+ * حدسی یعنی ادعا پیش از دانستن)، و نوارِ جهت‌دهنده‌ای که **بعد از** محتوا
+ * ظاهر شود کارِ خودش را نقض می‌کند: دقیقاً وقتی کاربر شروع به خواندن کرده،
+ * صفحه تکان می‌خورد.
+ *
+ * از `.sk`ِ موجود استفاده می‌کند (که `prefers-reduced-motion` را رعایت
+ * می‌کند) تا کلاسِ تازه‌ای ساخته نشود.
+ */
+function bookStepLoading(r){
+  const facts = [bk?.date, bk?.time, bk?.party].filter(Boolean).map(esc).join(' · ');
+  return `<div class="sheet-title">${esc(r?.n || 'رزرو میز')}</div>
+    ${facts ? `<div class="sheet-sub">${facts}</div>` : ''}
+    <div class="sk" style="height:44px;margin:14px 0 10px"></div>
+    <div class="sk" style="height:44px"></div>`;
+}
+
 /** نوارِ مرحله از شمارِ **واقعی** ساخته می‌شود، نه سه‌تایِ ثابت. */
 function stepBars(total, current){
   let out = '';
@@ -2951,9 +3236,55 @@ function stepBars(total, current){
  * از این‌جا می‌روند. پیش‌تر هر دو عیناً `openSheet(bookStep2(findR(id)))`
  * داشتند؛ یک منطق در دو جا، که همان کلاسِ «یک واقعیت، چند رونوشت» است.
  */
-function openBookingFlow(id){
+async function openBookingFlow(id){
   const r = findR(id);
-  if (orderableMenu(r).length === 0) {
+  // ⚠️ [۲۰۲۶-۰۹-۱۰] `orderableMenu(r).length === 0` **دو معنیِ متفاوت** داشت و
+  // اپ هر دو را یکی می‌گرفت:
+  //     (الف) این رستوران منویی ثبت نکرده        ← واقعیت
+  //     (ب)  جزئیات هنوز بارگذاری نشده           ← نامعلوم
+  // و نامعلوم را به‌عنوانِ «ندارد» مصرف می‌کرد. همان تمایزِ `null` در برابرِ
+  // `false` که امروز یک لایه پایین‌تر (BE-004/ب) رفع شد.
+  //
+  // ⚠️ چرا این یک نقصِ واقعیِ فیچر بود، نه نظری: `menu` را فقط
+  // `applyRestaurantDetail` می‌نویسد، و آن فقط وقتی اجرا می‌شود که **صفحه‌ی
+  // رستوران** باز شود (`enrichRestPage`). ولی `quickBook` — چیپِ ساعت روی
+  // کارتِ فید — مستقیم به همین‌جا می‌آید. `select`ِ روتِ فهرست هم `menu`
+  // ندارد و برای رستورانِ زنده از دادهٔ نمونه هم قرض گرفته نمی‌شود (`isLive`).
+  // نتیجه: یک رستورانِ زنده **با منوی واقعی** که از چیپِ کارت رزرو شود، گامِ
+  // پیش‌سفارش را هرگز نمی‌دید؛ همان رستوران از صفحه‌ی خودش، می‌دید.
+  // فیچر بی‌صدا به مسیرِ ورود وابسته بود.
+  //
+  // پس پیش از تصمیم، اگر نمی‌دانیم، **می‌پرسیم**. پاسخ کش می‌شود، پس این
+  // برای همان رستوران بیش از یک بار هزینه ندارد.
+  //
+  // ⚠️ [DS · ۲۰۲۶-۰۹-۱۰] نسخه‌ی اولِ همین رفع، شیت را **پشتِ شبکه** نگه
+  // می‌داشت — و طراح درست گرفتش: مسیرِ فید **همان مسیرِ سریع** است و کلِ دلیلِ
+  // وجودِ `quickBook` همین بود. روی شبکه‌ی کند کاربر می‌زد و هیچ اتفاقی
+  // نمی‌افتاد؛ از دیدِ او یک **دکمه‌ی مرده**. یعنی داشتم یک نقص را با نقصِ
+  // دیگری عوض می‌کردم. سابقه‌اش هم در همین مخزن هست: `renderFeed` عمداً
+  // اسکلت نشان می‌دهد تا فاصله‌ی «زدم» تا «چیزی دیدم» به شبکه گره نخورد.
+  //
+  // پس ترتیب برعکس شد: **اول بازخورد، بعد داده.**
+  //   می‌دانیم    → فوری تصمیم، صفر تأخیر، هیچ اسکلتی
+  //   نمی‌دانیم   → شیت **بلافاصله** با اسکلت باز می‌شود، بعد پر می‌شود
+  const known = !!r?.detailLoaded || typeof r?.hasOrderableMenu === 'boolean';
+  if (!known) {
+    openSheet(bookStepLoading(r));   // ← پیش از هر await
+    if (r?.slug && API.online) {
+      const d = await loadRestaurantDetail(r.slug);
+      if (d) applyRestaurantDetail(r, d);
+    }
+  }
+  // ⚠️ اگر درخواست شکست بخورد باز هم نمی‌دانیم. آن حالت عمداً مثلِ «منو
+  // ندارد» رفتار می‌کند — چون بدیلش رندرِ یک بخشِ پیش‌سفارشِ خالی است که R1
+  // قبلاً ثابت کرد شبیهِ باگِ بارگذاری به نظر می‌رسد، و چون خودِ UI این گام
+  // را «(اختیاری)» برچسب زده: گروگان‌گرفتنِ هدفِ کاربر پشتِ یک قابلیتِ
+  // اختیاری ترتیبِ اولویت را وارونه می‌کند.
+  // ⚠️ ولی این **تبادل است، نه رایگان**: کاربر در آن حالت بی‌صدا توانِ
+  // پیش‌سفارش را از دست می‌دهد. تفاوتش با سکوت‌هایی که محکوم کرده‌ایم این
+  // است که گذرا و نادر است و مسیرِ صفحه‌ی رستوران همچنان کار می‌کند — نه
+  // اینکه بی‌هزینه باشد.
+  if (menuUnavailable(r)) {
     // ⚠️ `bk.preorder` را **صریح** خالی می‌کنیم. `toBookStep3` تنها نویسنده‌اش
     // بود و با پریدن از گامِ ۲ اصلاً اجرا نمی‌شود. `setBk` شیء را کامل
     // جایگزین می‌کند پس حالتِ کهنه عملاً ممکن نیست — ولی آن ضمانت در فایلِ
@@ -3085,12 +3416,19 @@ async function confirmBook(id){
     ...(preferences?.length ? { preferences } : {}),
   },{ 'Idempotency-Key': genIdempotencyKey() });
 
-  let code;
+  let code, bookedStatus=null;
   if(res.ok && res.data?.code){
     // رزرو واقعی در دیتابیس ثبت شد (بک‌اند code را در سطحِ بالا برمی‌گرداند)
     // ⚠️ هپتیکِ success فقط همین‌جا زده می‌شود — دقیقاً همون شرطی که سرور واقعاً
     // res.ok داد؛ هیچ مسیرِ دیگری (دمو/آفلاین) این الگو را نمی‌گیرد.
     code=res.data.code;
+    // ⚠️ A1-006 (۲۰۲۶-۰۹-۱۰): وضعیتِ **واقعی** هم برداشته می‌شود، نه فقط کد.
+    // سرور `status` را در همان پاسخ می‌دهد (`reservations.ts:481`) و این اپ
+    // تا امروز فقط `code` را می‌خواند و بعد بی‌قیدوشرط «رزرو تأیید شد!»
+    // می‌گفت — در حالی که رستورانی که `auto_confirm` را خاموش کرده، رزرو را
+    // `pending` می‌گیرد (`reservations.ts:375`). یعنی مشتری «تأیید شد» می‌دید
+    // و میزش قطعی نبود.
+    bookedStatus=res.data.status||null;
     haptic('success');
   } else if(res.offline){
     // ⚠️ رفعِ P0-3 (فازِ ۲، پروتکل §۳ — «A customer must NEVER see … fake
@@ -3166,12 +3504,20 @@ async function confirmBook(id){
   // امتیازِ محلی جعل نمی‌شود؛ عددِ واقعی از سرور می‌آید (وقتی رزرو «انجام‌شد»
   // علامت بخورد XP واقعی ثبت می‌شود؛ اینجا فقط چیپِ نوارِ بالا همگام می‌شود).
   syncNavPoints();
-  TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
+    // ⚠️ A1-006: ردیفِ سفرها هم وضعیتِ واقعی را می‌برد، وگرنه شیت «در انتظار»
+  // می‌گفت و فهرست «پیش‌رو» — دو صفحه‌ی یک اپ، دو حرف.
+  TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up',awaitingApproval:bookedStatus==='pending'});
   sheetBody.innerHTML=`
     <div class="success">
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
-      <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
-      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}<br>یادآور با پیامک می‌فرستیم</div>
+      <!-- ⚠️ A1-006: عنوان از **وضعیتِ واقعی** مشتق می‌شود، نه ادعا.
+           الگوی درست از قبل در همین اپ بود — «reservation.js:76»
+           («awaitingApproval») همین نقص را برای فهرستِ سفرها رفع کرده و
+           کامنتش هم همین را می‌گوید: «مشتری فکر می‌کرد میزش قطعی است در
+           حالی که رستوران هنوز تأیید نکرده». شیتِ موفقیت آن رفع را نگرفته
+           بود. مکانیزمِ تازه‌ای ساخته نشد؛ همان انضباط به این‌جا آمد. -->
+      <div class="sheet-title" style="text-align:center">${bookedStatus==='pending'?'رزرو ثبت شد — در انتظارِ تأیید':'رزرو تأیید شد!'}</div>
+      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}<br>${bookedStatus==='pending'?'این رستوران رزروها را دستی تأیید می‌کند — نتیجه را پیامک می‌کنیم':'یادآور با پیامک می‌فرستیم'}</div>
       <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode(${jsq(code)})" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
       ${(r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
       <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
@@ -3185,17 +3531,33 @@ function copyCode(c){haptic('light');const done=()=>toast('⧉','کد کپی ش�
 // «کِی» و «چند نفر» پیش از این سه/پنج گزینه‌ی ثابت داشتند که هیچ‌کجا خوانده
 // نمی‌شد؛ کاربر انتخاب می‌کرد و هیچ اتفاقی نمی‌افتاد. حالا همان زمینه‌ی رزرو را
 // می‌نویسند، پس انتخابشان تا شیتِ رزرو و تا رستورانِ بعدی دنبال می‌آید.
-function initSearchCtx(){
-  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
-  if(!when||!party) return;
+/**
+ * شیتِ «کِی و چند نفر» — جانشینِ دو selectِ هیرو.
+ *
+ * ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] چرا این با رفتنِ هیرو **لازم** شد و یک راحتی
+ * نیست: چیپِ «۱۹:۰۰» روی کارت یعنی «۱۹:۰۰ِ **امروز، ۲ نفر**»، و `quickBook`
+ * مستقیم به گامِ بعد می‌پرد. اگر کاربر پنجشنبه‌ی ۴ نفره می‌خواست و هیچ جایی
+ * برای گفتنش **پیش از** زدنِ چیپ نداشت، چیپ قولی می‌داد برای روزِ اشتباه و
+ * او تا شیتِ تأیید نمی‌فهمید. یعنی برداشتنِ هیرو بدونِ این، یک نقصِ **صحت**
+ * می‌ساخت نه یک تغییرِ چیدمان. (یافته‌ی طراح، پیش از آنکه من دست بزنم.)
+ *
+ * پیش‌فرض همان «امروز · ۲ نفر» می‌ماند برای کسی که فقط می‌خواهد ببیند.
+ */
+function openSearchCtxSheet(){
   const dates=dateOptions();
   const sel=dates.some(d=>d.iso===bookingCtx.date)?bookingCtx.date:dates[0].iso;
-  when.innerHTML=dates.map(d=>`<option value="${esc(d.iso)}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');
-  party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)
-    .map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('');
+  openSheet(`<div class="sheet-title">کِی و چند نفر؟</div>
+    <div class="sheet-sub">ساعت‌هایِ رویِ کارت‌ها با همین تنظیم حساب می‌شوند</div>
+    <div class="bw-field"><label for="ctxWhen">تاریخ</label><select id="ctxWhen" onchange="syncSearchCtx()">${
+      dates.map(d=>`<option value="${esc(d.iso)}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('')
+    }</select></div>
+    <div class="bw-field"><label for="ctxParty">تعداد نفر</label><select id="ctxParty" onchange="syncSearchCtx()">${
+      Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
+    }</select></div>
+    <button class="btn btn-primary btn-block" onclick="closeSheet()">باشه</button>`);
 }
 function syncSearchCtx(){
-  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
+  const when=document.getElementById('ctxWhen'), party=document.getElementById('ctxParty');
   setBookingCtx({
     date: when?.value || bookingCtx.date,
     party: parseInt(party?.value,10) || bookingCtx.party,
@@ -3206,7 +3568,12 @@ function syncSearchCtx(){
   // کشف روی صفحه نباشد (مثلاً کاربر در صفحه‌ی رستوران است)، doSearch به‌طورِ
   // بی‌خطر روی عنصرهایِ نامعتبر no-op می‌شود (querySelector آن‌ها را پیدا
   // نمی‌کند)، پس نیازی به چک‌کردنِ صفحه‌ی فعلی نیست.
-  if(document.getElementById('sQ')) doSearch();
+  // ⚠️ [DS-007 §۶] شرطِ قبلی `#sQ` بود — ورودیِ هیرو. با رفتنِ هیرو آن شرط
+  // **همیشه غلط** می‌شد و این خط بی‌صدا از کار می‌افتاد: کاربر تاریخ را عوض
+  // می‌کرد و سطرِ «امروز · ۲ نفر» همان می‌ماند. خطایی هم نبود که کسی ببیند.
+  // حالا وجودِ خودِ سطرِ زیرِ فید سنجیده می‌شود — همان چیزی که قرار است
+  // به‌روز شود.
+  if(document.querySelector('#page-discover .section-sub')) doSearch();
   // چیپ‌هایِ ساعتِ کارت‌ها برایِ تاریخ/تعدادِ نفرِ *قبلی* حساب شده‌اند — باطل
   // و دوباره واکشی می‌شوند. بدونِ این، انتخابِ «فردا، ۶ نفر» ساعت‌هایِ «امروز،
   // ۲ نفر» را زیرِ برچسبِ جدید نشان می‌داد.
@@ -3223,9 +3590,11 @@ window.confirmBook = confirmBook;
 window.copyCode = copyCode;
 window.refreshSlots = refreshSlots;
 window.syncSearchCtx = syncSearchCtx;
-// نوارِ جست‌وجو باید همان اول پر شود، وگرنه دو selectِ خالی دیده می‌شوند.
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSearchCtx);
-else initSearchCtx();
+window.openSearchCtxSheet = openSearchCtxSheet;
+// ⚠️ [DS-007 §۶] قلابِ DOMContentLoaded که `initSearchCtx` را صدا می‌زد
+// برداشته شد: آن تابع دو **selectِ هیرو** را پر می‌کرد و هیرو دیگر نیست.
+// حالا گزینه‌ها هنگامِ بازشدنِ شیت ساخته می‌شوند، یعنی همیشه با
+// `bookingCtx`ِ لحظه می‌خوانند — نه با مقداری که در بوت فریز شده بود.
 
 
 /* ═══ js/store.js ═══ */
@@ -3612,6 +3981,19 @@ function mapApiRestaurant(apiR, sampleFallback){
     // depositRequired یک سیاستِ واقعیِ قابلِ‌تنظیمِ رستوران است. رستورانی که
     // بیعانه را روشن می‌کرد، همچنان به مشتری «رایگان» نشان داده می‌شد.
     depositRequired: apiR.booking_policy?.deposit_required ?? null,
+    // ⚠️ BE-004/ب (۲۰۲۶-۰۹-۱۰): تا امروز `payment_enabled` در **هیچ** پاسخِ
+    // روبه‌مشتری‌ای نبود (نیمه‌ی «الف»، `rezv-89`)، در حالی که `depositLabel()`
+    // می‌گفت «آنلاین دریافت نمی‌شود» — یک ادعای **مثبت** درباره‌ی درگاه که
+    // داده‌اش را نداشت. همان نقصِ P1-3، یک فیلد جلوتر.
+    // `?? null` عمدی است و با `?? false` فرق دارد: نامعلوم باید «نمی‌دانم»
+    // بماند، نه «خاموش است» — چون «خاموش» یک ادعای قابلِ‌غلط‌بودن است.
+    // ⚠️ دلیلش در طولِ همین کار عوض شد و کامنتِ قبلی دیگر راست نبود: نوشته
+    // بودم «اندپوینتِ فهرست این کلید را نمی‌دهد». حالا **هر دو** روت می‌دهند
+    // (`5f58d9f`) و هر دو `?? false` روی ستونِ non-nullable — پس `null` از API
+    // نمی‌آید. آنچه می‌ماند پاسخی بدونِ `booking_policy` است (کَشِ قدیمی)، و
+    // تستِ `deposit-label-honesty` همین را پین می‌کند: اگر روزی یکی از دو روت
+    // کلید را برنگرداند، سکوتِ اپ آن را نمی‌پوشاند — تست قرمز می‌شود.
+    onlinePaymentEnabled: apiR.booking_policy?.online_payment_enabled ?? null,
     freeCancelHours: apiR.booking_policy?.free_cancel_hours ?? null,
     lat: apiR.latitude ?? null,
     lng: apiR.longitude ?? null,
@@ -3808,12 +4190,12 @@ function applyRestaurantDetail(r, d){
  * این نرمال‌ساز آن را به همان شیءِ بالا تبدیل می‌کند تا رندررها فقط یک شکل
  * بشناسند. شیء را دست‌نخورده عبور می‌دهد.
  */
-function normalizeMenuEntry(m){
-  if (Array.isArray(m)) {
-    return { id: null, e: m[0] || '🍽️', n: m[1], p: m[2], img: m[3] || null, d: null, catId: null, out: false, tags: [] };
-  }
-  return m;
-}
+// ⚠️ [DS-006 §۴ · ۲۰۲۶-۰۹-۱۰] تعریف به `data/seed.js` منتقل شد و از آنجا
+// import می‌شود. دلیل: مسیرِ **نمونه** هرگز از این‌جا رد نمی‌شد (نه
+// `init.js:12` و نه بازگشتِ آفلاینِ `loadRestaurants`)، پس آیتم‌های نمونه
+// آرایه‌ی خام می‌ماندند و `menuItemHTML` سه‌تا undefined می‌گرفت. نرمال‌سازی
+// حالا در مرزِ seed→R انجام می‌شود؛ این‌جا **همان** تابع مصرف می‌شود، نه یک
+// کپیِ دوم — وگرنه دو شکل از یک قرارداد داشتیم و همین نقص برمی‌گشت.
 
 // ═══════════ DATA ═══════════
 
@@ -4319,17 +4701,51 @@ function renderDiscoverSections(){
 function searchCtxLabel(){
   return `${labelForISO(bookingCtx.date)} · ${fmtFa(bookingCtx.party)} نفر`;
 }
-function doSearch(){
-  const q=document.getElementById('sQ').value.trim();
+// ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] متنِ جست‌وجو دیگر در DOM زندگی نمی‌کند.
+//
+// تا امروز `#sQ` — ورودیِ داخلِ **هیرو** — هم رابط بود و هم **حالت**. با
+// برداشتنِ هیرو (حکمِ مالک: فید اول)، هر صداکننده‌ای `TypeError` می‌گرفت:
+// `document.getElementById('sQ').value` روی null.
+//
+// رفعِ سطحی این بود که `?.` بگذاریم و رد شویم — ولی آن‌وقت جست‌وجو **بی‌صدا
+// همیشه خالی** می‌شد و فید همیشه کامل به‌نظر می‌رسید. یعنی خطا از بین می‌رفت
+// و نادرستی می‌ماند؛ همان معامله‌ای که همه‌ی امروز ردش کردیم.
+//
+// پس حالت به ماژول منتقل شد و ورودی **پارامتر** است. رابط (پالت، یا هر چیزِ
+// بعدی) فقط صدا می‌زند؛ هیچ عنصرِ DOMی صاحبِ حقیقت نیست.
+let _query = '';
+
+/** متنِ جست‌وجوی فعال — برای صداکننده‌هایی که می‌خواهند حالت را بازپخش کنند. */
+function activeQuery(){ return _query; }
+
+/**
+ * سطرِ زیرِ عنوانِ فید: شمارش + **قرصِ لمس‌پذیرِ زمینه**.
+ *
+ * ⚠️ زمینه («امروز · ۲ نفر») از قبل همین‌جا نوشته می‌شد ولی لمس‌پذیر نبود.
+ * با رفتنِ هیرو، این تنها جایی است که کاربر می‌تواند **پیش از زدنِ چیپِ
+ * ساعت** بگوید کِی و چند نفر — و آن یک نیازِ **صحت** است نه راحتی: چیپِ
+ * «۱۹:۰۰» یعنی «۱۹:۰۰ِ امروز، ۲ نفر»، و `quickBook` مستقیم رد می‌شود، پس
+ * بدونِ این قرص کاربر تا شیتِ تأیید نمی‌فهمید روزِ اشتباه رزرو می‌کند.
+ */
+function renderSub(countText){
   const sub=document.querySelector('#page-discover .section-sub');
-  if(!q){
+  if(!sub) return;
+  sub.innerHTML=`${esc(countText)} · <button type="button" class="ctx-pill" onclick="openSearchCtxSheet()" `
+    +`aria-label="تغییرِ تاریخ و تعدادِ نفرات">${esc(searchCtxLabel())} ▾</button>`;
+}
+function doSearch(q){
+  // پارامتر منبعِ حقیقت است؛ بدونِ آن یعنی «همان جست‌وجوی فعلی را دوباره اعمال کن»
+  // (مثلاً پس از رسیدنِ دادهٔ تازه‌ی سرور، یا تغییرِ زمینه‌ی تاریخ/نفرات).
+  if(q!==undefined) _query=String(q);
+  const query=_query.trim();
+  if(!query){
     document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
-    if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال · ${searchCtxLabel()}`;
+    renderSub(`${fmtFa(R.length)} رستوران فعال`);
     renderFeed(R);return;
   }
-  const list=R.filter(r=>r.n.includes(q)||r.cuisine.includes(q)||r.vibes.some(v=>v.includes(q)));
-  document.getElementById('feedTitle').textContent=`نتایج «${q}»`;
-  if(sub) sub.textContent=(list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد')+` · ${searchCtxLabel()}`;
+  const list=R.filter(r=>r.n.includes(query)||r.cuisine.includes(query)||r.vibes.some(v=>v.includes(query)));
+  document.getElementById('feedTitle').textContent=`نتایج «${query}»`;
+  renderSub(list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد');
   if(list.length){ renderFeed(list); return; }
   // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
   // می‌داد — کاربر شش کارت می‌دید و گمان می‌کرد این‌ها نتیجه‌ی جست‌وجویش‌اند.
@@ -4344,8 +4760,10 @@ function doSearch(){
 }
 /** پاک‌کردنِ جست‌وجو و برگشت به فید — از حالتِ خالی صدا زده می‌شود. */
 function clearSearch(){
-  const q=document.getElementById('sQ'); if(q) q.value='';
-  doSearch();
+  // ⚠️ پاک‌کردن حالا یعنی «پرسِ خالی»، نه «فیلدِ خالی» — چون منبعِ حقیقت
+  // دیگر یک عنصرِ DOM نیست. اگر این `doSearch()`ِ بی‌پارامتر می‌ماند، همان
+  // جست‌وجوی قبلی دوباره اعمال می‌شد و دکمه‌ی «پاک کن» هیچ کاری نمی‌کرد.
+  doSearch('');
 }
 function toggleFav(id,el){
   id=String(id);   // favs همیشه کلیدِ String نگه می‌دارد (id نمونه عدد، id واقعی UUID)
@@ -5272,10 +5690,21 @@ async function renderLoyalty(){
          اگر روزی انقضا اضافه شد، این خط باید هم‌زمان برداشته شود. -->
     <div class="loy-noexpire reveal">${icon('check',{size:14})} امتیازهات هیچ‌وقت منقضی نمی‌شن — نه بعدِ یک سال، نه هیچ‌وقت.</div>
 
+    <!-- ⚠️ A1-005 (۲۰۲۶-۰۹-۱۰): عددِ «۵۰۰ امتیاز» از این‌جا برداشته شد.
+         «completeReferral» (api/src/lib/loyalty.ts:610) **صفر صداکننده** در
+         «api/src» دارد — خودم شمردم، نه از روی گزارش. پس دعوت ثبت می‌شود
+         ولی پاداش هرگز پرداخت نمی‌شود.
+         این همان کلاسِ «cbVipPct=12» و «MERGE_UNAVAILABLE» است: آرتیفکت
+         قابلیتی را ادعا می‌کند که مکانیزم ندارد. نرم‌کردنِ جمله رفعِ غلط
+         بود؛ عدد باید می‌رفت.
+         ⚠️ جریانِ دعوت **عمداً دست‌نخورده** ماند: «createReferral» ردیفِ
+         «pending» می‌سازد و «completeReferral» روی همان مچ می‌کند، پس
+         دعوت‌های امروز روزی که پرداخت وصل شود قابلِ پرداختِ عقب‌افتاده‌اند.
+         ⚠️ این خط تا وقتی برنگردد که پرداخت **واقعاً** سیم‌کشی شده باشد. -->
     <!-- دعوت دوستان -->
     <div class="loy-action-card reveal" role="button" tabindex="0" onclick="buzz&&buzz();openReferral()">
       <div class="lac-icon" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">${icon('gift',{size:20})}</div>
-      <div class="lac-body"><div class="lac-title">دوستات رو دعوت کن</div><div class="lac-sub">۵۰۰ امتیاز برای هر دعوت موفق</div></div>
+      <div class="lac-body"><div class="lac-title">دوستات رو دعوت کن</div><div class="lac-sub">دعوت‌هات ثبت می‌شن</div></div>
       <span class="lac-arrow">›</span>
     </div>
     <!-- کارت هدیه -->
@@ -5488,13 +5917,27 @@ async function openReferral(){
   openSheet(`<div style="text-align:center;padding:4px 0">
     <div style="margin-bottom:var(--sp-2);color:var(--brand-500)">${icon('gift',{size:40})}</div>
     <div class="sheet-title" style="text-align:center">دوستات رو دعوت کن</div>
-    <div class="sheet-sub" style="text-align:center;margin-bottom:18px">برای هر دوستی که با کد تو ثبت‌نام کنه و اولین رزروش رو انجام بده، ۵۰۰ امتیاز بگیر</div>
+    <!-- ⚠️ A1-005 (۲۰۲۶-۰۹-۱۰): این تیزترین وعده بود — شرطش را دقیق
+         می‌گفت («ثبت‌نام کنه و اولین رزروش رو انجام بده») و همان شرطی است
+         که کامنتِ خودِ «completeReferral» نام می‌برد و **هیچ کدی اجرایش
+         نمی‌کند**. صفر صداکننده در api/src؛ مستقل شمرده شد.
+         عدد و شرط هر دو رفتند. دعوت واقعاً ثبت می‌شود، پس آن نیمه می‌ماند. -->
+    <div class="sheet-sub" style="text-align:center;margin-bottom:18px">کدت رو با دوستات به اشتراک بذار — دعوت‌هات ثبت می‌شن</div>
     <div class="ref-code-box"><div class="ref-code-label">کد دعوت تو</div><div class="ref-code">${esc(stats.code)}</div>
       <button class="ref-copy" onclick="copyCode(${jsq(stats.code)})">کپی</button></div>
     <div class="ref-stats">
       <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.total_invited)}</div><div class="ref-stat-l">دعوت‌شده</div></div>
-      <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.completed)}</div><div class="ref-stat-l">موفق</div></div>
-      <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.points_earned)}</div><div class="ref-stat-l">امتیاز کسب‌شده</div></div>
+      <!-- ⚠️ A1-005: «موفق» و «امتیاز کسب‌شده» هر دو **ساختاراً همیشه صفر**
+           بودند و مخفی شدند. هر دو از «status === 'rewarded'» می‌آیند
+           («loyalty.ts:644,646») و تنها نویسنده‌ی آن وضعیت «loyalty.ts:620»
+           داخلِ «completeReferral» است — که صداکننده ندارد.
+           ⚠️ spec فقط «امتیاز کسب‌شده» را نام برده بود؛ «موفق» هم دقیقاً
+           همان است. خودم شمردم و دومی را اضافه کردم.
+           چرا مخفی و نه صفرِ صادقانه: «دعوت‌شده: ۵ · موفق: ۰» یک **تناقضِ
+           دائمی** روی صفحه‌ی خودِ کاربر است — بدتر از وعده‌ی انجام‌نشده،
+           چون شبیهِ «دوستانت بی‌خیال شدند» خوانده می‌شود نه «ما وصلش
+           نکرده‌ایم».
+           «دعوت‌شده» («total_invited») **واقعی** است و می‌ماند. -->
     </div>
     <div class="ref-invite"><input id="refPhone" class="inp" placeholder="۰۹۱۲۳۴۵۶۷۸۹" style="text-align:center" inputmode="numeric"></div>
     <button class="btn btn-primary btn-lg btn-block" style="margin-top:12px" onclick="sendInvite()">ارسال دعوت با پیامک</button>
@@ -7660,7 +8103,12 @@ async function syncRestaurants(){
     // renderFeed در data/discover.js). doSearch هم فیلتر را با دادهٔ تازه‌ی
     // سرور دوباره اعمال می‌کند، هم وقتی جست‌وجو خالی است خودش renderFeed(R)
     // را صدا می‌زند — پس هر دو حالت درست می‌ماند.
-    if (document.getElementById('sQ')?.value.trim()) doSearch();
+    // ⚠️ [DS-007 §۶] پیش‌تر این شرط `#sQ`ِ داخلِ هیرو را می‌خواند. با رفتنِ
+    // هیرو، `?.` آن را بی‌صدا به «هیچ جست‌وجویی در کار نیست» تبدیل می‌کرد و
+    // نتیجه‌ی کاربر با فهرستِ کامل بازنویسی می‌شد — همان باگِ رقابتِ رندر که
+    // این خط برای رفعش نوشته شده بود، فقط بی‌صدا. حالا حالت از ماژول خوانده
+    // می‌شود، نه از DOM.
+    if (activeQuery().trim()) doSearch();
     else renderFeed(R);
     // فقط بخش‌هایِ وابسته به R — عمداً renderDiscoverSections نه، چون آن
     // `GET /events` و خواندنِ موقعیت را دوباره می‌فرستد و boot از قبل انجامشان

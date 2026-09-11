@@ -17,7 +17,7 @@
 | ۵ Frontend↔Backend | `docs/architecture-audit/FEATURE_COVERAGE_MATRIX.md`, `API_USAGE_MATRIX.md` | 🟠 ۲۰۲۶-۰۷-۳۰ (رفعِ یک ادعای غلط پایین) |
 | ۶ Mock/Demo Honesty | `docs/KNOWN_LIMITATIONS.md` (۱۶۰۲ خط، بخش‌های ۲a–۲t) | ✅ ۲۰۲۶-۰۸-۲۱ |
 | ۷ چرخه‌ی حیاتِ رزرو | `api/src/lib/lifecycle.ts` + تست‌هایش | ✅ زنده |
-| ۹ Waitlist | `docs/KNOWN_LIMITATIONs.md` §۲p (اصلاحِ اخیر) | ✅ ۲۰۲۶-۰۸-۲۰ |
+| ۹ Waitlist | `docs/KNOWN_LIMITATIONS.md` §۲p (اصلاحِ اخیر) | ✅ ۲۰۲۶-۰۸-۲۰ |
 | ۱۹ AI/ML Pipeline | `docs/ML_CONTRACT.md` (۴۷۹ خط، فازِ ۱–۸)، `INTELLIGENCE-PLATFORM-ARCHITECTURE.md` | ✅ ۲۰۲۶-۰۸-۲۰ |
 | ۳۴ دیتابیس | `docs/DATABASE.md`، `api/prisma/sql/README.md` | ✅ ۲۰۲۶-۰۸-۲۰ |
 | ۳۵ امنیت | `docs/SECURITY.md` | 🟡 ۲۰۲۶-۰۸-۱۴ (رفعِ گاردهای اخیر پایین‌تر) |

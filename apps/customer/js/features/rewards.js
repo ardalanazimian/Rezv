@@ -10,13 +10,27 @@ export async function openReferral(){
   openSheet(`<div style="text-align:center;padding:4px 0">
     <div style="margin-bottom:var(--sp-2);color:var(--brand-500)">${icon('gift',{size:40})}</div>
     <div class="sheet-title" style="text-align:center">دوستات رو دعوت کن</div>
-    <div class="sheet-sub" style="text-align:center;margin-bottom:18px">برای هر دوستی که با کد تو ثبت‌نام کنه و اولین رزروش رو انجام بده، ۵۰۰ امتیاز بگیر</div>
+    <!-- ⚠️ A1-005 (۲۰۲۶-۰۹-۱۰): این تیزترین وعده بود — شرطش را دقیق
+         می‌گفت («ثبت‌نام کنه و اولین رزروش رو انجام بده») و همان شرطی است
+         که کامنتِ خودِ «completeReferral» نام می‌برد و **هیچ کدی اجرایش
+         نمی‌کند**. صفر صداکننده در api/src؛ مستقل شمرده شد.
+         عدد و شرط هر دو رفتند. دعوت واقعاً ثبت می‌شود، پس آن نیمه می‌ماند. -->
+    <div class="sheet-sub" style="text-align:center;margin-bottom:18px">کدت رو با دوستات به اشتراک بذار — دعوت‌هات ثبت می‌شن</div>
     <div class="ref-code-box"><div class="ref-code-label">کد دعوت تو</div><div class="ref-code">${esc(stats.code)}</div>
       <button class="ref-copy" onclick="copyCode(${jsq(stats.code)})">کپی</button></div>
     <div class="ref-stats">
       <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.total_invited)}</div><div class="ref-stat-l">دعوت‌شده</div></div>
-      <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.completed)}</div><div class="ref-stat-l">موفق</div></div>
-      <div class="ref-stat"><div class="ref-stat-v">${fmtFa(stats.points_earned)}</div><div class="ref-stat-l">امتیاز کسب‌شده</div></div>
+      <!-- ⚠️ A1-005: «موفق» و «امتیاز کسب‌شده» هر دو **ساختاراً همیشه صفر**
+           بودند و مخفی شدند. هر دو از «status === 'rewarded'» می‌آیند
+           («loyalty.ts:644,646») و تنها نویسنده‌ی آن وضعیت «loyalty.ts:620»
+           داخلِ «completeReferral» است — که صداکننده ندارد.
+           ⚠️ spec فقط «امتیاز کسب‌شده» را نام برده بود؛ «موفق» هم دقیقاً
+           همان است. خودم شمردم و دومی را اضافه کردم.
+           چرا مخفی و نه صفرِ صادقانه: «دعوت‌شده: ۵ · موفق: ۰» یک **تناقضِ
+           دائمی** روی صفحه‌ی خودِ کاربر است — بدتر از وعده‌ی انجام‌نشده،
+           چون شبیهِ «دوستانت بی‌خیال شدند» خوانده می‌شود نه «ما وصلش
+           نکرده‌ایم».
+           «دعوت‌شده» («total_invited») **واقعی** است و می‌ماند. -->
     </div>
     <div class="ref-invite"><input id="refPhone" class="inp" placeholder="۰۹۱۲۳۴۵۶۷۸۹" style="text-align:center" inputmode="numeric"></div>
     <button class="btn btn-primary btn-lg btn-block" style="margin-top:12px" onclick="sendInvite()">ارسال دعوت با پیامک</button>

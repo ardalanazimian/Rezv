@@ -95,6 +95,11 @@ async function POST_impl(req: Request) {
     const body = {
       ok: failures === 0,
       expired_offers: expiry.expired,
+      // ⚠️ عددِ غیرِصفر اینجا «کارِ روزمره» نیست: یعنی جبرانِ `acceptOffer`
+      // واقعاً شکست خورده و ورودی‌هایی روی `accepted` گیر کرده بودند که هیچ
+      // اجرای بعدی نمی‌دیدشان (BE-005 §۴). بی‌صدا نگه‌داشتنش یعنی تنها
+      // نشانه‌ی آن نقص فقط در لاگ بماند.
+      orphans_released: expiry.orphansReleased,
       promoted,
       promotion_attempts: attempts,
       promotion_failures: failures,

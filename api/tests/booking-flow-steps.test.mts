@@ -125,8 +125,17 @@ describe('DS-002 §۳‑۱ — شمارِ گام‌ها از واقعیت می�
     const code = SRC.split('\n').map((l) => {
       const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i);
     }).join('\n');
-    const i = code.indexOf('export function openBookingFlow(id){');
-    assert.notEqual(i, -1);
+    // ⚠️ [A1-007 · ۲۰۲۶-۰۹-۱۰] لنگر از رشته‌ی دقیق به الگو تبدیل شد، و **ادعا
+    // دست‌نخورده ماند**. `openBookingFlow` حالا `async` است چون پیش از تصمیم
+    // درباره‌ی منو، حالتِ «هنوز نمی‌دانم» را می‌پرسد؛ رشته‌ی دقیقِ قبلی
+    // (`export function openBookingFlow(id){`) دیگر مچ نمی‌شد و این تست
+    // قرمز می‌شد **بدونِ اینکه چیزی که می‌سنجد نقض شده باشد** —
+    // `bk.preorder = []` هنوز هست و هنوز پیش از `openSheet(bookStep3` است.
+    // یعنی قرمزیِ آن از امضا می‌آمد نه از رفتار: همان کلاسِ «تست به شکلِ کد
+    // پین شده، نه به معنایش». الگو نامِ تابع را همچنان دقیق می‌خواهد، پس
+    // تغییرِ نام یا حذفِ تابع همچنان درست قرمز می‌کند.
+    const i = code.search(/(?:export\s+)?(?:async\s+)?function\s+openBookingFlow\s*\(/);
+    assert.notEqual(i, -1, 'تعریفِ openBookingFlow پیدا نشد — نامش عوض شده یا تابع رفته؟');
     const body = code.slice(i, code.indexOf('\n}', i));
     assert.match(body, /bk\.preorder\s*=\s*\[\]/,
       'مسیرِ پرش باید bk.preorder را صریح خالی کند');

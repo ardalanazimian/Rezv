@@ -27,9 +27,27 @@ don't do this" is not a claim we are allowed to make.
 
 ### What `REAL` means in our own column — added 2026-09-10, and it changes how to read every cell below
 
-The founder confirmed and the CEO measured (`044c5bc`) that **there is no production deployment and
-zero real users.** The laptop is the *target* machine, not a running one: no `api/.env`, no deploy
-job, no named volumes, and `deploy/Caddyfile` routes on a domain that was never bought (`E-001`).
+**No production is reachable.** The laptop is the *target* machine, not a running one: no `api/.env`,
+no deploy job, no named volumes (`docker-compose.yml:180-183`), and `deploy/Caddyfile` routes on a
+domain that resolves NXDOMAIN against `8.8.8.8` with `irna.ir` as a passing control (`E-001`).
+
+> **⚠️ Corrected 2026-09-10 within an hour of writing it (`5a0bd2c`).** This paragraph first said
+> "**zero real users**", following the CEO's own wording in `044c5bc`. The Red Team (`rezv-d6`) and
+> the Reviewer (`rezv-58`) each rejected that sentence independently, and they were right: "no
+> production is reachable" is a measurement; "zero users" is a claim about a database **nobody has
+> counted**. A 74.7MB Postgres data directory in an unnamed volume and a hosted Supabase project
+> both remain uncounted, and `DESKTOP-8DAJNO5` is out of reach entirely.
+>
+> **I am recording the correction rather than quietly editing the line, because the difference is the
+> whole subject of this document.** "Zero users, measured" in an investor deck, later shown to rest
+> on a filesystem search **by name** that could not see an anonymous volume, is precisely the kind of
+> confident-and-wrong number that ends a diligence. The direction of the error is the tell: it made
+> our position sound *worse*, and it was still wrong — which is how you know it was a method failure
+> and not pessimism.
+
+**For marketing purposes nothing changes:** we may not claim users either way. An unknown user count
+is not a marketable number, and "we have no users" is not a claim we need to make — it is simply not
+a claim we may make *as measured fact*.
 
 Therefore **every `REAL` in the Rezervno column means "verified in source or schema", never "observed
 working in production"** — the matrix says so itself for several cells ("schema-level", "not
@@ -46,14 +64,56 @@ makes a deck fraudulent without anybody intending to lie.
 
 ## 1. The single true thing
 
-> **Nothing costs you money or points until you have been shown it.**
+> **Nothing costs you money, points, or standing until you have been shown it.**
+
+**Widened 2026-09-10 from "money or points" — and it got *stronger*, not softer.** The Backend
+Engineer (`rezv-89 [1ef107]`) found, and I re-measured independently, that **the most reliably
+enforced deduction in the product today is none of the two the original line named**:
+
+```text
+economy.ts:111-114   late cancel → score 35 + addsStrike:true
+                     in-window   → score 85, no strike
+economy.ts:72        platinum requires strikeCount === 0  ⇒ a strike blocks the top tier
+economy.ts           grep -c points_ledger → 0            ⇒ this deduction never touches points
+restaurant/customers/[userId]/route.ts:57   strike_count returned to the restaurant
+```
+
+So a third currency exists — **standing** — it is enforced, it is durable (strikes decay only one
+per 90 clean days, `economy.ts:51-62`), and it is visible to the restaurants a diner books with.
+
+**And the product already discloses it, in more detail than we were claiming.**
+`apps/customer/js/data/booking.js:84` renders, before booking:
+
+> «لغوِ رایگان تا N ساعت پیش از زمانِ رزرو. دیرتر از آن، یک تخلف در سابقه‌ات ثبت می‌شود و نشانِ
+> اعتبارت پایین می‌آید — **این نشان به رستوران‌ها هم نشان داده می‌شود**.»
+
+I traced the disclosure end-to-end rather than trusting it: the API emits
+`booking_policy.free_cancel_hours` (`restaurants/[slug]/route.ts:135`) and the app reads exactly that
+key (`api.js:272`) — **no snake/camel mismatch, the label cannot silently render empty.** Enforcement
+reads the same base policy record the label displays (`economy.ts:154-160`), so the two agree.
+
+**Why the narrow line had to go, and it is the same argument as §1's own recommendation:** if the
+claim said "money or points," the guard pinning it would have to *deliberately not look* at a real
+deduction. **A guard that knows where not to look is the fake-green this whole section exists to
+prevent.** Keeping the narrow wording would have hollowed out the recommendation from the inside.
+
+*(Scope was the CEO's ruling; this wording is mine.)*
+
+**One question I could not close, passed to engineering rather than asserted:** the disclosed window
+is the **base** policy — `restaurants/[slug]/route.ts` says so explicitly, and notes the *resolved*
+policy varies by scarcity, event and the diner's loyalty tier, with the definitive value coming from
+the booking engine. Enforcement in `economy.ts` also reads base, so they agree **today**. Whether
+`computeResolvedPolicy` can ever yield a window that differs from the one displayed is exactly the
+shape of `rezv-89`'s biconditional and should be answered there, not here.
+
+---
 
 This is the one claim that is `REAL` for us and `ABSENT` for four separately-profiled competitors,
 including the only live Iranian one:
 
 | Competitor | Matrix cell | What it actually means |
 |---|---|---|
-| **RSEE / آرسی** (Iran, live) | `ABSENT — structurally the opposite` | The diner buys chair-denominated credits *to be allowed to book*; **50–100% forfeited** on late cancellation⁵⁶ |
+| **RSEE / آرسی** (Iran, live) | `ABSENT — structurally the opposite` | The diner buys chair-denominated credits *to be allowed to book*; **50–100% forfeited** on late cancellation⁵⁶. **Since the claim widened, this is now a head-on collision rather than an adjacent one:** RSEE and we have chosen opposite answers to *the identical question* — what happens to a diner who cancels late. They take a prepaid credit the diner already bought; we record a disclosed mark against standing and take nothing. Same moment, same market, opposite mechanism |
 | **TheFork** | `ABSENT` | Dated 2026 complaint: *"The App did not alert me to the charge, otherwise I wouldn't have cancelled"* — £100⁶⁰ |
 | **OpenTable** | `ABSENT` | No-show fees $25–50/person, reported as a source of adversarial disputes⁹ |
 | **Resy** | `ABSENT` | No-show fees up to $100/person, called "obscene" by a reviewer¹⁰ |
@@ -73,16 +133,34 @@ well-understood piece of work — the repo already has five guards of exactly th
 
 **Until it is pinned, this claim is INTERNAL ONLY.**
 
+> **CEO ruling, 2026-09-10 — approved without qualification**, and recorded here so the constraint
+> lives in the artifact rather than only in a message:
+>
+> > **A positioning line whose truth is unguarded is a line that will eventually be a lie.**
+>
+> `INTERNAL ONLY` is an operational constraint, not a note: this claim appears in no deck, no
+> one-pager, and no outbound copy — **not even in softened form** — until a CI guard pins it. The
+> guard is owned by the **Backend Engineer** (`rezv-89 [1ef107]`), because the truth condition is a
+> per-restaurant boolean and a wiring decision, both in `api/`. If the claim turns out to be partly
+> bound to customer-facing copy, that half goes to `rezv-a0` — but only afterwards, so that two
+> sessions do not write one guard.
+
 ---
 
 ## 2. The three sentences
 
 ### To a Gen-Z diner
 
-> **«جاتو رزرو کن. هیچ چیزی از حسابت کم نمی‌شه مگه اینکه قبلش دیده باشیش.»**
+> **«جاتو رزرو کن. نه از پولت، نه از امتیازت، نه از اعتبارت — هیچی کم نمی‌شه مگه قبلش بهت گفته باشیم.»**
 
 No adjectives. No "بهترین", no "هوشمند", no "انقلاب". It states a mechanism the diner can check in
 five seconds, and it is the thing the incumbents get wrong.
+
+The three-beat list is doing real work, not rhythm: **اعتبار** is the one a diner does not expect to
+be on the list, and naming it is what makes the sentence credible rather than boilerplate. Anyone can
+say "no hidden fees." Volunteering that we keep a reliability mark, that it is shown to restaurants,
+and that we tell you before you book — **that** is a sentence a competitor cannot copy without
+building the same disclosure.
 
 *Eye-roll test:* a 22-year-old in Tehran who has been burned by a forfeited آرسی credit reads this
 and knows immediately what it is about. That is the whole design.
@@ -118,7 +196,7 @@ This section exists so that nobody has to guess. Each row is a claim someone wil
 
 | Do not claim | Why not |
 |---|---|
-| **Referral rewards** — «۵۰۰ امتیاز برای هر دعوت موفق» | The UI promises it; `completeReferral` has **zero production callers**, so it is never paid. **A1-005.** This promise is live in the product *right now* and is the single clearest thing we would be caught on |
+| **Referral rewards** — any earn claim at all | ✅ **The false promise was removed from the product 2026-09-10 (`82375f3`)** — verified: «۵۰۰ امتیاز» no longer renders in `loyalty.js` or `standalone/customer.html`. **The row stays, and the reason changed:** the *mechanism* is still absent — `completeReferral` still has zero production callers — so referral earning remains un-claimable even though we are no longer caught claiming it. Removing a false sentence fixes the honesty problem, not the feature gap. That commit also found two referral **stats** («امتیاز کسب‌شده», «موفق») that are structurally always zero for the same reason |
 | **"Your points never expire"** | True, but by *accident*: `PointsLedger` has no expiry column⁶³. The matrix calls it "an undeclared side-effect, not a policy." It becomes claimable the day it becomes a written policy, not before |
 | **"Your points can't be taken away"** | **We currently permit exactly that.** `PointsReason.adjustment` exists and `note` is **optional**, so a negative row with a NULL reason is a valid write⁶³. This is the same defect that produced TheFork's largest single complaint cluster — 19% of its most recent 1★ reviews⁶⁰ |
 | **"See exactly where every point came from"** | `ABSENT`. The customer app renders an aggregate only; `points_ledger` is queried by exactly one API route and it is the **restaurant** side⁶³ |
