@@ -3,6 +3,9 @@ import { dbRead as db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { parseQuery, parseBody, zPhone, z } from '@/lib/schemas';
 import { enrollMemberByPhone } from '@/lib/club-enroll';
+// همان مبدّلِ تقویمِ موجود در lib/loyalty — با نامِ مستعار، چون اینجا روی یک
+// تاریخِ تولد اجرا می‌شود نه روی «امروز». چیزی در loyalty.ts تغییر نکرده.
+import { jalaliMonthDayToday as jalaliMonthDay } from '@/lib/loyalty';
 
 const querySchema = z.object({
   q: z.string().max(100).trim().optional(),
@@ -77,7 +80,15 @@ export const GET = withRestaurantAuth(
       members: members.map(m => ({
         code: m.code, tier: m.tier, points: pointsByUser.get(m.user.id) ?? 0, joined_at: m.joinedAt,
         first_name: m.user.firstName, last_name: m.user.lastName, phone: m.user.phone,
-        birth_month: m.user.birthDate ? m.user.birthDate.getMonth() + 1 : null,
+        // ⚠️ قراردادِ تقویم (رفعِ ۲۰۲۶-۰۹-۱۱): **ذخیره میلادی، نمایش شمسی**.
+        // فرمِ واک‌ین پیش از ارسال شمسی را به میلادی تبدیل می‌کند
+        // (apps/business/js/reservations.js:453-461) و ستون میلادی است؛ ولی
+        // پنل همین عدد را با `FA_MONTHS[birth_month-1]` برچسب می‌زند و با
+        // `currentMonthFa()` فیلتر می‌کند (apps/business/js/data.js). تا امروز
+        // عددِ خامِ میلادی برمی‌گشت، پس ماهِ تولدِ **هر** عضو حدودِ دو ماه غلط
+        // نشان داده می‌شد و هدف‌گیریِ تولد آدمِ اشتباه را برمی‌داشت.
+        // تبدیل همین‌جا — در مرزِ نمایش — انجام می‌شود، نه در دیتابیس.
+        birth_month: m.user.birthDate ? jalaliMonthDay(m.user.birthDate).mm : null,
       })),
     });
   },
