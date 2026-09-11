@@ -186,11 +186,16 @@ describe('اسکنِ QR — مسیرِ کاملِ مهمان', () => {
     const resv = await makeLiveReservation(A, body.id);
 
     // بدونِ هیچ هدرِ احرازی — دقیقاً همان کاری که اپِ مشتریِ مهمان می‌کند.
+    //
+    // ⚠️ به‌روزشده ۲۰۲۶-۰۹-۱۱: بدونِ توکن هنوز کار می‌کند، ولی `reservation_code`
+    // حالا عاملِ دومِ هویت است (استیکرِ QR رویِ میز چسبیده و به‌تنهایی کافی
+    // نیست). اپِ مشتری هم دقیقاً همین را می‌فرستد، بعد از ۴۰۳ِ
+    // `CHECKIN_IDENTITY_REQUIRED`. قراردادِ کاملش در qr-checkin.integration.
     const res = await checkinRoute.POST(
       new Request('http://x/api/v1/checkin', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
-        body: JSON.stringify({ qr_code: body.qr_code }),
+        body: JSON.stringify({ qr_code: body.qr_code, reservation_code: resv.code }),
       }),
     );
 
