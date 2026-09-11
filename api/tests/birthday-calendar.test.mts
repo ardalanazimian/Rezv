@@ -34,7 +34,11 @@ const { dateInTz } = await import('../src/lib/hours.ts');
 describe('قرارداد: cron میلادیِ تهران مقایسه می‌کند', () => {
   test('🔴 grantBirthdayRewards دیگر jalaliMonthDayToday را صدا نمی‌زند', () => {
     // نبودِ موضوع = خطا: اگر تابع پیدا نشد، تست باید بشکند نه رد شود.
-    const src = readFileSync(new URL('loyalty.ts', SRC), 'utf8');
+    // ⚠️ کامنت‌ها حذف می‌شوند، وگرنه خودِ توضیحِ «قبلاً jalaliMonthDayToday(today)
+    // بود» تست را قرمز می‌کرد — همان الگویِ `stripComments` در
+    // `ratelimit-coverage.test.mts`.
+    const raw = readFileSync(new URL('loyalty.ts', SRC), 'utf8');
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
     const fn = src.slice(src.indexOf('export async function grantBirthdayRewards'));
     assert.ok(fn.length > 200, 'بدنه‌ی grantBirthdayRewards پیدا نشد');
     assert.ok(!/jalaliMonthDayToday\s*\(/.test(fn),

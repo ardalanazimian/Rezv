@@ -387,10 +387,15 @@ let lastSweep = Date.now();
 
 /** rate limit درون‌حافظه‌ای (fallback بدونِ Redis). همان امضای خروجیِ rateLimit.
  *  `pessimistic`: سطلِ تازه را نزدیکِ سقف بذر کن (فقط از مسیرِ قطعیِ Redis). */
+/** ⚠️ نوعِ نام‌دار و نه inline: گاردِ `ratelimit-coverage.test.mts` بلوکِ
+ *  `RULES` را تا آخرِ فایل اسکن می‌کند و هر `  name: {` با دو فاصله تورفتگی
+ *  را یک قانونِ بی‌مصرف‌کننده می‌شمارد. `opts: { … }` دقیقاً همان شکل بود. */
+type InMemoryOpts = { pessimistic?: boolean };
+
 export function rateLimitInMemory(
   ip: string,
   rule: RateLimitRule,
-  opts: { pessimistic?: boolean } = {},
+  opts: InMemoryOpts = {},
 ): RateLimitResult {
   const now = Date.now();
   const key = `${rule.prefix}:${ip}`;

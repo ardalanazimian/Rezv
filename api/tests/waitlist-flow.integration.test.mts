@@ -581,7 +581,12 @@ describe('پذیرشِ آفر — بازپخش و idempotency', () => {
 
     const r2 = await call();
     assert.equal(r2.status, 200, 'بازپخشِ همان کلید باید همان ۲۰۰ را بدهد');
-    assert.equal(await r2.text(), b1, 'بدنه باید بایت‌به‌بایت همان پاسخِ اول باشد');
+    // ⚠️ چرا deepEqual و نه مقایسه‌ی رشته‌ای: پاسخِ کش‌شده در ستونِ `response`
+    // از نوعِ **jsonb** ذخیره می‌شود و jsonb ترتیبِ کلیدها را نگه نمی‌دارد
+    // (کلیدِ کوتاه‌تر اول). پس «بایت‌به‌بایت» با این مخزن اصلاً شدنی نیست؛
+    // همان قراردادی که `idempotency.integration.test.mts:109` هم دارد.
+    assert.deepEqual(JSON.parse(await r2.text()), JSON.parse(b1),
+      'بازپخش باید دقیقاً همان محتوا را بدهد');
 
     assert.equal(await db.reservation.count({ where: { restaurantId } }), 1,
       'بازپخش نباید رزروِ دوم بسازد');

@@ -102,11 +102,11 @@ async function makeLiveReservation(ctx: Ctx, tableId: string) {
 // اعتبارنامه است (۵۰ بیت آنتروپی) — قراردادِ کاملش در
 // `qr-checkin.integration.test.mts`. ادعاهای این فایل — ابطالِ واقعیِ کدِ
 // قدیمی و کارکردنِ کدِ نو — از این تغییر مستقل‌اند.
-const scan = (qrCode: string) =>
+const scan = (qrCode: string, reservationCode?: string) =>
   checkinRoute.POST(new Request('http://x/api/v1/checkin', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
-    body: JSON.stringify({ qr_code: qrCode }),
+    body: JSON.stringify({ qr_code: qrCode, reservation_code: reservationCode }),
   }));
 
 const regenerate = async (ctx: Ctx, tableId: string) => {
@@ -153,15 +153,15 @@ describe('بازتولیدِ کد', () => {
     //    یعنی یک ستونِ DB عوض شد — نه اینکه استیکرِ قدیمی واقعاً مرده باشد.
     const table = await createTable(A);
     const oldCode = table.qr_code!;
-    await makeLiveReservation(A, table.id);
+    const resv = await makeLiveReservation(A, table.id);
 
     // پیش از بازتولید، کدِ قدیمی کار می‌کند (کنترلِ مثبت — وگرنه تستِ بعدی بی‌معناست)
-    const before = await scan(oldCode);
+    const before = await scan(oldCode, resv.code);
     assert.equal(before.status, 200, 'کدِ اولیه باید قبل از بازتولید کار کند');
 
     await regenerate(A, table.id);
 
-    const after = await scan(oldCode);
+    const after = await scan(oldCode, resv.code);
     assert.equal(after.status, 404, 'استیکرِ قدیمی باید از کار افتاده باشد');
   });
 
@@ -172,7 +172,7 @@ describe('بازتولیدِ کد', () => {
     const res = await regenerate(A, table.id);
     const { code } = await res.json() as { code: string };
 
-    const out = await scan(code);
+    const out = await scan(code, resv.code);
     assert.equal(out.status, 200);
     const body = await out.json() as { reservation_code: string | null; status: string; checked_in: boolean };
     // موفقیت از `checked_in` + وضعیتِ واقعیِ DB خوانده می‌شود، نه از
