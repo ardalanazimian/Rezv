@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientIp, rateLimitHeaders, RULES, isBanned, recordViolation, rateLimitWithFallback } from '@/lib/ratelimit';
 import { parseAllowedOrigins, checkMutatingOrigin } from '@/lib/security';
+import { productionSecretProblems } from '@/lib/env';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ این middleware به ioredis (از طریق ratelimit/redis) وابسته است که به
@@ -64,6 +65,33 @@ function assertAllowedOriginsConfigured(): void {
   _originsChecked = true;
 }
 
+// ── خواهرِ گاردِ بالا: رازهای خطرناکِ production ──
+// دقیقاً همان الگو (تنبل + یک‌بار)، و دقیقاً به همان دلیل: `next build` با
+// NODE_ENV=production اجرا می‌شود، پس چکِ سطحِ ماژول buildِ CI را می‌شکست.
+//
+// چرا اصلاً لازم است، در حالی که هر دو متغیر «گارد» داشتند:
+//  • گاردِ OTP_DEV_MODE در `lib/otp.ts` **per-request** است و داخلِ requestOtp
+//    throw می‌کند. یعنی سرور سالم بالا می‌آید، همه‌ی صفحه‌ها کار می‌کنند، و فقط
+//    ورودِ کاربر با یک ۵۰۰ی بی‌توضیح می‌شکند — خطایِ پیکربندی در لباسِ باگ.
+//  • MAINTENANCE_KEY اصلاً گاردی نداشت: `maintenance-auth.ts` مقدارِ نمونه‌ی
+//    `change-me-random-string` را هم مثلِ یک رازِ واقعی می‌پذیرفت.
+// حالا هر دو در نخستین درخواستِ production صریح fail-fast می‌کنند، با پیامی
+// که می‌گوید چه چیزی غلط است و چطور درستش کنند.
+let _secretsChecked = false;
+function assertProductionSecretsSafe(): void {
+  if (_secretsChecked) return;
+  if (process.env.NODE_ENV === 'production') {
+    const problems = productionSecretProblems({
+      OTP_DEV_MODE: process.env.OTP_DEV_MODE,
+      MAINTENANCE_KEY: process.env.MAINTENANCE_KEY,
+    });
+    if (problems.length) {
+      throw new Error('پیکربندیِ ناامن در production:\n  · ' + problems.join('\n  · '));
+    }
+  }
+  _secretsChecked = true;
+}
+
 // پاسخ بلاک استاندارد
 function blocked(message: string, status = 429, retryAfter?: number) {
   const headers: Record<string, string> = {};
@@ -113,6 +141,7 @@ function applySecurityHeaders(res: NextResponse, origin: string | null = null) {
 
 export async function middleware(req: NextRequest) {
   assertAllowedOriginsConfigured();  // fail-fast در نخستین درخواستِ production
+  assertProductionSecretsSafe();     // همان، برای OTP_DEV_MODE و MAINTENANCE_KEY
   const ip = clientIp(req);
   const origin = req.headers.get('origin');
 
