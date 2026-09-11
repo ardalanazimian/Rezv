@@ -768,6 +768,21 @@ jobs:
                 || github.event.before }}
         run: node tools/check-rejects-matcher.mjs
 
+      # DS-010 §۵ (۰۹-۱۱): «اپل» یعنی مقادیرِ کمتر و عمدی — و قاعده بدونِ گیت نثر
+      # است. اندازه‌گیریِ apps/customer/css/app.css: ۲۶۱ font-size با px خام در
+      # برابرِ ۲ توکنی، ۱۵۹ hex، ۹۵ شعاعِ خام؛ کلِ مخزن ۱٬۴۵۶. توکن هست، استفاده
+      # نمی‌شود. همان ratchet: فقط اعلان‌های **افزوده‌شده** در دیف؛ موجودی هنگامِ
+      # تماس تنگ می‌شود. tokens.css خارج از دامنه (تنها جای مقدارِ خام)؛
+      # standalone/ نه (تولید می‌شود). نثر جدا می‌شود؛ .01ms ِ reduced-motion مجاز.
+      # همان jobِ rejects-ratchet چون همان baseِ دیف و همان fetch-depth را می‌خواهد.
+      - name: مقدارِ خامِ تازه در CSS؟ (font-size/hex/radius/duration — ratchet)
+        env:
+          CSS_RAW_BASE: >-
+            ${{ github.event_name == 'pull_request'
+                && format('origin/{0}', github.base_ref)
+                || github.event.before }}
+        run: node tools/check-css-raw-values.mjs
+
   base-freshness:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
