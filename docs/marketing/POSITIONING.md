@@ -145,6 +145,33 @@ well-understood piece of work — the repo already has five guards of exactly th
 > bound to customer-facing copy, that half goes to `rezv-a0` — but only afterwards, so that two
 > sessions do not write one guard.
 
+> **Guard status, measured 2026-09-11 by this session — it exists, and it does not yet pin the whole claim.**
+>
+> - **It exists:** `tools/check-diner-cost-disclosure.mjs` (guard C1, first committed `d3a4545` on 09-10), run in
+>   CI at `.github/workflows/ci.yml:622`, spec in `docs/audit/backend/BE-004-…`. `node tools/check-diner-cost-disclosure.mjs`
+>   → exit 0 today. A search for the word "POSITIONING" misses it because the file says «پوزیشنینگ».
+> - **What it pins:** a list of cost-carrying **fields**: `payment_enabled`, `deposit_required`, `free_cancel_hours`
+>   (money / money / standing), plus `partial_penalty_pct`, which is watched but not enforced today. For each one, if
+>   the field is enforced it must appear in a diner-facing response, and any new code that reads the field turns it red.
+>   It is a real guard: it has already caught three ways it could be fooled.
+> - **What it cannot see:** deductions triggered by a reservation **changing status**, which have no field to list.
+>   Two happen today:
+>   1. **No-show → strike.** `economy.ts:105-106` writes score 0 + `addsStrike`, which blocks platinum and is shown to
+>      restaurants. The late-cancel strike is disclosed through `cancelPolicyLabel()`. **For no-show I found no
+>      diner-facing disclosure.** I searched `apps/customer/js` and `standalone/customer.html` for rendered Persian
+>      phrasings of "not showing up"; the only "no-show" mentions were code comments. That is a search, not proof,
+>      so it went to Backend to confirm.
+>   2. **Cashback reversal → points.** `lifecycle.ts:230-231` calls `reverseReservationCashback` for statuses in
+>      `CASHBACK_REVERSING_STATUSES` (`no_show`, `rejected`, `expired`, …). The diner's balance goes down, the app
+>      shows only a total, and I found no text telling the diner. **Whether taking back a points grant counts as a
+>      "cost" is a CEO ruling, not mine.** Note that `rejected` is the restaurant's action, not the diner's.
+>   - Checked and **not** a live gap: a points `adjustment` with no reason is allowed by the schema, but no code
+>     writes one today (`grep` of `api/src`: comments only). Still on the §3 "do not claim" list.
+>
+> **So the claim stays INTERNAL ONLY.** The guard pins it for fields, but not for status changes, and one
+> status-change deduction appears to be undisclosed. By this section's own acceptance rule, a guard that cannot see a
+> real deduction does not unlock the claim.
+
 ---
 
 ## 2. The three sentences
