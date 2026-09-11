@@ -57,6 +57,7 @@ import './birthday-calendar.test.mts';
 import './admin-branches.integration.test.mts';
 import './admin-create-business.integration.test.mts';
 import './allowed-origins.test.mts';
+import './csrf-origin.test.mts';
 import './availability-bulk.integration.test.mts';
 import './availability-offline-parity.integration.test.mts';
 import './ban.test.mts';

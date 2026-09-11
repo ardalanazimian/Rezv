@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientIp, rateLimitHeaders, RULES, isBanned, recordViolation, rateLimitWithFallback } from '@/lib/ratelimit';
-import { parseAllowedOrigins } from '@/lib/security';
+import { parseAllowedOrigins, checkMutatingOrigin } from '@/lib/security';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ این middleware به ioredis (از طریق ratelimit/redis) وابسته است که به
@@ -131,13 +131,32 @@ export async function middleware(req: NextRequest) {
   // ── لایه ۲: محافظت CSRF برای درخواست‌های تغییردهنده ──
   // API با JWT در هدر Authorization ذاتاً در برابر CSRF مقاوم است (کوکی نیست)،
   // اما چک Origin یک لایه‌ی دفاعی اضافه برای درخواست‌های mutating است.
+  //
+  // ⚠️ رفعِ ممیزی: شرطِ قبلی `origin && !allowed.includes(origin)` بود، یعنی
+  // نبودِ هدرِ Origin = عبور. ساده‌ترین راهِ دور زدنِ گارد «هدر را نفرست» بود.
+  // حالا نبودِ Origin **بی‌اعتماد** است و فقط با یکی از نشانه‌های جایگزین عبور
+  // می‌کند (Sec-Fetch-Site، Referer، یا هدرِ غیرِ ساده مثلِ کرون) — قاعده‌ی
+  // کامل و دلیلِ هر بند در `checkMutatingOrigin` داخلِ lib/security.ts.
+  // منطق عمداً آنجاست تا بدونِ next/server و ioredis تست‌پذیر باشد
+  // (tests/csrf-origin.test.mts).
   const method = req.method;
   if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
     const allowed = parseAllowedOrigins(process.env.ALLOWED_ORIGINS).valid;
-    // اگر لیست مجاز تعریف شده و Origin وجود دارد ولی مجاز نیست → رد.
     // نکته‌ی امنیتی: وقتی ALLOWED_ORIGINS تنظیم نشده، این چک skip می‌شود؛ در
-    // production حتماً باید ALLOWED_ORIGINS ست شود (به docker-compose رجوع کن).
-    if (allowed.length > 0 && origin && !allowed.includes(origin)) {
+    // production حتماً باید ALLOWED_ORIGINS ست شود (assertAllowedOriginsConfigured
+    // بالا همان را fail-fast می‌کند).
+    const verdict = checkMutatingOrigin({
+      origin,
+      secFetchSite: req.headers.get('sec-fetch-site'),
+      referer: req.headers.get('referer'),
+      // هدرهایی که یک فرمِ ساده‌ی cross-site اصلاً نمی‌تواند بگذارد؛ وجودشان
+      // یعنی یا کلاینتِ غیرمرورگری (کرون) یا درخواستی که از preflightِ CORS
+      // گذشته است.
+      hasNonSimpleHeader: Boolean(
+        req.headers.get('authorization') || req.headers.get('x-maintenance-key'),
+      ),
+    }, allowed);
+    if (!verdict.allowed) {
       await recordViolation(ip).catch(() => {});
       return applySecurityHeaders(blocked('منشأ درخواست مجاز نیست.', 403), origin);
     }
