@@ -1612,6 +1612,12 @@ model Payment {
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
   verifiedAt    DateTime?     @map("verified_at") @db.Timestamptz
   @@index([reservationId])
+  // ⚠️ مهاجرتِ ۰۸۶ — ایندکسِ یکتایِ **جزئی** که Prisma نمی‌تواند اعلامش کند:
+  //   CREATE UNIQUE INDEX payments_one_success_per_reservation
+  //     ON payments (reservation_id) WHERE status = 'success'
+  // چند تلاشِ pending/failed برای یک رزرو قانونی است؛ فقط `success` باید یکتا
+  // بماند (کسرِ دوباره‌ی بیعانه از راهِ authorityِ جایگزین‌شده). پوشش در گاردِ
+  // drift: required + ACCEPTED_DRIFT (schema-drift.integration.test.mts).
   @@map("payments")
 }
 

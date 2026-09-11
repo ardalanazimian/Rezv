@@ -18,6 +18,11 @@ const log = createLogger('payments-callback');
 // ندارد) — امنیت از طریق تطبیقِ authority+reservation code+amount تأمین می‌شود،
 // نه توکن. در انتها کاربر به اپِ مشتری ریدایرکت می‌شود.
 
+// نشانه‌ی ماشین‌خوانِ «پولش گرفته شد ولی اعتبار داده نشد؛ باید عودت شود».
+// عمداً پیشوندِ ثابت دارد تا با grep/کوئری روی `fail_reason` پیدا شود، و
+// عمداً فارسی ادامه می‌دهد چون همین متن در پنل به اپراتور نشان داده می‌شود.
+const REFUND_REQUIRED = 'REFUND_REQUIRED: پرداختِ تکراری — بیعانه‌ی این رزرو قبلاً پرداخت شده بود';
+
 const querySchema = z.object({
   code: zReservationCode,
   Authority: z.string().min(1).max(100),
@@ -70,13 +75,52 @@ async function GET_impl(req: Request) {
 
     const result = await verifyPayment({ authority, amountToman: payment.amountToman });
     if (result.success) {
-      await db.$transaction([
-        db.payment.update({
+      // ⚠️ باگِ رفع‌شده (کسرِ دوباره‌ی بیعانه): تنها خروجِ زودهنگامِ بالا
+      // `payment.status === 'success'` بود — یعنی فقط *همین* authority. ولی
+      // `reservations/[code]/pay` هر تلاشِ pendingِ قبلی را «جایگزین‌شده»
+      // (failed) می‌کند و آن authorityِ کهنه در زرین‌پال همچنان قابلِ تکمیل
+      // است. پس مسیرِ واقعی این بود: کاربر تلاشِ ۱ را باز می‌گذارد، تلاشِ ۲ را
+      // می‌سازد و پرداخت می‌کند (رزرو `paid`)، بعد تلاشِ ۱ را هم تمام می‌کند —
+      // این callback با یک ردیفِ `failed` می‌آمد، از خروجِ زودهنگام رد می‌شد،
+      // verify می‌کرد و دوباره `depositStatus='paid'` می‌نوشت. نتیجه: دو
+      // پرداختِ موفقِ واقعی برای یک رزرو، بدونِ هیچ ردی که بگوید کدام اضافه است.
+      //
+      // چرا تراکنشِ تعاملی و نه `$transaction([...])`ِ آرایه‌ای: تصمیم باید
+      // *بعد از* خواندنِ وضعیتِ تازه گرفته شود. قفلِ ردیفِ رزرو (`FOR UPDATE`)
+      // همان نقطه‌ی سریال‌سازیِ الگویِ `redeemPoints` در lib/loyalty.ts است —
+      // دو callbackِ هم‌زمان (دو authority) پشتِ سرِ هم اجرا می‌شوند، نه موازی.
+      const duplicate = await db.$transaction(async (tx) => {
+        const locked = await tx.$queryRaw<Array<{ id: string; deposit_status: string }>>`
+          SELECT id, deposit_status FROM reservations WHERE id = ${payment.reservationId}::uuid FOR UPDATE
+        `;
+        if (locked[0]?.deposit_status === 'paid') {
+          // ⚠️ اینجا پولِ واقعی از حسابِ کاربر کم شده و verify هم موفق بوده —
+          // پس ردیف نباید بی‌صدا «ناموفق» شود. PaymentStatus مقدارِ «منتظرِ
+          // عودت» ندارد (`pending|success|failed|refunded`) و `refunded` دروغ
+          // است چون هنوز چیزی برنگشته؛ پس `failed` + نشانه‌ی ماشین‌خوان در
+          // `failReason` (تنها فیلدِ متنِ آزادِ موجود) + `refId` که اپراتور
+          // بدونش نمی‌تواند عودت بزند. مهاجرتِ تازه عمداً برایِ این حالت
+          // ساخته نشد — رجوع کن به ۰۸۶ که وقوعِ *دومین* successـش را از اساس
+          // غیرممکن می‌کند.
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: { status: 'failed', refId: result.refId, verifiedAt: new Date(), failReason: REFUND_REQUIRED },
+          });
+          return true;
+        }
+        await tx.payment.update({
           where: { id: payment.id },
           data: { status: 'success', refId: result.refId, verifiedAt: new Date() },
-        }),
-        db.reservation.update({ where: { id: payment.reservationId }, data: { depositStatus: 'paid' } }),
-      ]);
+        });
+        await tx.reservation.update({ where: { id: payment.reservationId }, data: { depositStatus: 'paid' } });
+        return false;
+      });
+      if (duplicate) {
+        // سطحِ error و نه warn: این یک وظیفه‌ی عملیاتیِ باز است (عودتِ دستی)،
+        // نه یک رویدادِ گذرا. authority و refId هر دو لازم‌اند تا اپراتور
+        // بتواند تراکنش را در پنلِ زرین‌پال پیدا و برگرداند.
+        log.error('پرداختِ تکراریِ بیعانه — نیازِ عودتِ دستی', { code, authority, refId: result.refId });
+      }
       return redirectToApp(code, 'paid');
     }
 
