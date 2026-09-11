@@ -672,6 +672,24 @@ export async function acceptOffer(entryId: string, _actor = 'customer', auth: { 
   const e = await db.waitlistEntry.findUnique({ where: { id: entryId } });
   if (!e) throw Err.notFound('ورودی لیست انتظار');
   assertCanActOnEntry(e, auth);
+
+  // ── بازپخشِ واقعی: همین ورودی قبلاً پذیرفته شده و رزروش ساخته شده ──
+  //
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۹-۱۱): این حالت با `آفری برای پذیرش وجود ندارد`
+  // (۴۲۲) رد می‌شد. ولی مسیرِ رسیدن به آن کاملاً عادی است: مهمان دکمه را
+  // دوبار می‌زند، یا پاسخ در راه گم می‌شود و کلاینت retry می‌کند. آن‌وقت
+  // رزرو **ساخته شده** ولی مهمان یک خطا می‌بیند — و بدنه‌ی موفقیت، که تنها
+  // جایی است که `reservation_code` برمی‌گردد، برای همیشه از دست می‌رود
+  // (`accept` تنها مسیری است که آن کد را به مهمان می‌دهد).
+  //
+  // شرط عمداً **هر دو** را می‌خواهد: `accepted` *و* کدِ ناخالی. `accepted` با
+  // کدِ خالی حالتِ **گذرای** هر پذیرشِ موفق است (پنجره‌ای که createReservation
+  // در آن می‌نشیند) و برگرداندنِ «موفق» در آن لحظه یعنی ادعای رزروی که هنوز
+  // وجود ندارد — همان جعلِ موفقیت. رجوع کن به ORPHANED_ACCEPT_DWELL_MINUTES.
+  if (e.status === 'accepted' && e.reservationCode) {
+    return { status: 'accepted', reservation_code: e.reservationCode, table_number: e.offeredTableNumber };
+  }
+
   if (e.status !== 'offered') throw Err.validation('آفری برای پذیرش وجود ندارد');
   if (e.offerExpiresAt && e.offerExpiresAt < new Date()) throw Err.reservationExpired();
 
