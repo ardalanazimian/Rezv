@@ -121,12 +121,24 @@ export async function rateLimitWithFallback(
     // آن‌وقت سیاستِ در دسترس‌بودن را با کندی جایگزین کرده‌ایم. تأخیرِ کوتاه
     // است تا مسیرِ داغِ auth را نکشد.
     //
-    // ⚠️ این **بخشِ کوچک‌ترِ** رفع است و ادعای بستنِ E-003 را ندارد. حالتِ
-    // «Redis واقعاً برای مدتی قطع است» همچنان سقفِ ریست‌شونده می‌دهد. بستنِ
-    // کاملش یک تبادلِ محصولی است (امنیت در برابر در دسترس‌بودن هنگام قطعی)
-    // که در `audit/ESCALATIONS.md` E-003 به مالک ارجاع شده و **تصمیمش گرفته
-    // نشده**. تا آن موقع، این خط بیشترِ سطحِ واقعیِ خطر را می‌بندد بدونِ
-    // اینکه هیچ کاربری را از سرویس محروم کند.
+    // ── وضعیتِ امروزِ E-003 (به‌روزشده) ──────────────────────────────────
+    // این retry حالتِ **گذرا** را می‌بندد. حالتِ «Redis واقعاً برای مدتی قطع
+    // است» را بندِ بعدی می‌بندد: سطلی که *به‌خاطرِ خطای Redis* ساخته می‌شود
+    // دیگر از `count: 1` شروع نمی‌کند، بلکه بدبینانه نزدیکِ سقف بذر می‌شود
+    // (`pessimistic: true` پایین) — همین یک درخواست عبور می‌کند و بقیه‌ی
+    // پنجره throttle می‌شود. پس قطعیِ Redis دیگر به هیچ مهاجمی سهمیه‌ی تازه
+    // نمی‌دهد.
+    //
+    // ⚠️ آنچه همچنان پوشیده **نیست** (صادقانه):
+    //  • سطل per-process است. با N اینستنس، سقفِ مؤثر در زمانِ قطعی N×۱ است
+    //    (قبلاً N×max بود) — بهتر، ولی هنوز سراسری نیست.
+    //  • شمارشِ پیش از قطعی منتقل نمی‌شود؛ فقط فرض می‌کنیم «احتمالاً پر بوده».
+    //  • در قطعیِ طولانی این یعنی کاربرِ بی‌گناه هم throttle می‌شود. این
+    //    همان تبادلِ محصولیِ E-003 است و حالا عمداً به سمتِ **امنیت** نشسته،
+    //    نه به سمتِ در دسترس‌بودن — ولی نه fail-closedِ کامل: درخواستِ اول
+    //    همیشه عبور می‌کند، پس سرویس هرگز صفر نمی‌شود.
+    //  • سقفِ per-phoneِ OTP اصلاً به این مسیر وابسته نیست (در Postgres است،
+    //    `lib/otp.ts` + `prisma/sql/083-*.sql`) و مستقل از Redis می‌ایستد.
     try {
       await new Promise((r) => setTimeout(r, RATE_LIMIT_RETRY_DELAY_MS));
       const retried = await attempt(identifier, rule);
@@ -155,7 +167,10 @@ export async function rateLimitWithFallback(
       prefix: rule.prefix, scope, error: (firstError as Error).message,
     });
     metrics.rateLimitFallback.inc({ prefix: rule.prefix, scope });
-    return rateLimitInMemory(identifier, rule);
+    // `pessimistic` فقط از همین مسیر می‌آید — یعنی «سطل را چون Redis خطا داد
+    // می‌سازیم، نه چون واقعاً درخواستِ اول است». صداکردنِ مستقیمِ
+    // rateLimitInMemory (اگر روزی لازم شد) رفتارِ قبلی را دارد.
+    return rateLimitInMemory(identifier, rule, { pessimistic: true });
   }
 }
 
@@ -358,12 +373,25 @@ export function rateLimitHeaders(r: RateLimitResult, rule: RateLimitRule): Recor
 //  محدودیت‌ها (صادقانه): این per-instance است، نه سراسری — با چند instance، سقفِ
 //  واقعی = max × تعدادِ instance. ولی همین هم بی‌نهایت بهتر از «هیچ سقفی» است و
 //  یک حمله‌ی ساده را کند می‌کند تا Redis برگردد. حافظه هم خودش پاک می‌شود (پنجره‌ای).
+//
+//  ⚠️ `pessimistic` (رفعِ E-003، ۲۰۲۶-۰۹-۱۱): سطلی که **به‌خاطرِ خطای Redis**
+//  ساخته می‌شود نباید از `count: 1` شروع کند. دلیلش این است که آن کلید در Redis
+//  تاریخچه داشته و ما آن را از دست داده‌ایم؛ شروع از ۱ یعنی «هر قطعیِ Redis به
+//  هر مهاجمی یک سهمیه‌ی کاملِ تازه می‌دهد» — دقیقاً برعکسِ کاری که یک
+//  محدودکننده باید بکند. با این پرچم، سطلِ تازه نزدیکِ سقف بذر می‌شود: همین
+//  درخواست عبور می‌کند (سرویس صفر نمی‌شود) و بقیه‌ی پنجره throttle است.
+//  وقتی Redis سالم است این مسیر اصلاً صدا زده نمی‌شود، پس رفتارِ عادی دست‌نخورده است.
 // ═══════════════════════════════════════════════════════════
 const memBuckets = new Map<string, { count: number; resetAt: number }>();
 let lastSweep = Date.now();
 
-/** rate limit درون‌حافظه‌ای (fallback بدونِ Redis). همان امضای خروجیِ rateLimit. */
-export function rateLimitInMemory(ip: string, rule: RateLimitRule): RateLimitResult {
+/** rate limit درون‌حافظه‌ای (fallback بدونِ Redis). همان امضای خروجیِ rateLimit.
+ *  `pessimistic`: سطلِ تازه را نزدیکِ سقف بذر کن (فقط از مسیرِ قطعیِ Redis). */
+export function rateLimitInMemory(
+  ip: string,
+  rule: RateLimitRule,
+  opts: { pessimistic?: boolean } = {},
+): RateLimitResult {
   const now = Date.now();
   const key = `${rule.prefix}:${ip}`;
 
@@ -375,8 +403,15 @@ export function rateLimitInMemory(ip: string, rule: RateLimitRule): RateLimitRes
 
   const b = memBuckets.get(key);
   if (!b || b.resetAt <= now) {
-    memBuckets.set(key, { count: 1, resetAt: now + rule.windowMs });
-    return { allowed: true, remaining: rule.max - 1, resetAt: now + rule.windowMs, retryAfterSec: 0 };
+    // سطلِ تازه: در حالتِ عادی از ۱، و در حالتِ بدبینانه از خودِ سقف — یعنی
+    // همین درخواست آخرین مجازِ پنجره است. (`max` و نه `max + 1`، تا سرویس در
+    // قطعی کاملاً بسته نشود.)
+    const count = opts.pessimistic ? rule.max : 1;
+    memBuckets.set(key, { count, resetAt: now + rule.windowMs });
+    return {
+      allowed: true, remaining: Math.max(0, rule.max - count),
+      resetAt: now + rule.windowMs, retryAfterSec: 0,
+    };
   }
   b.count++;
   if (b.count > rule.max) {
