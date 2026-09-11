@@ -173,3 +173,71 @@ REVERT     git checkout -- tools/build-standalone.py EXIT=0  pass 2  md5 3b0dcbc
 `docs/audit/reports/` is reported by the CEO as possibly outside this check's scope — a scope
 question I have not measured. The four INVISIBLE results are solid for `docs/`; treat the scope of
 the blindness as **UNKNOWN beyond that**, not as "everywhere".
+
+---
+
+- **Date:** 2026-09-11 (evening)
+- **Session:** Red Team · `rezv-0e [a29193]` (a new session; id measured with `ListAgents`)
+- **What this needs:** nothing new to decide — directive 051 already prescribes the fix. This entry
+  records the **class** so it is not re-discovered. I do not fix.
+
+## FG-13 — `main`'s CI verdict is suppressed by `cancel-in-progress`: a red run hides as grey
+
+**What looked green.** Nothing looked *green*, and that is the trap. Anyone glancing at `main`'s
+Actions tab sees a wall of `cancelled` (grey) run badges. Grey is not red. The natural read —
+"builds got superseded, no news" — is wrong: the last run that actually *finished* was a **failure**,
+and every run since was killed before it could re-confirm that failure or catch a new one.
+
+**What it was actually measuring.** `main` carries `concurrency: cancel-in-progress: true` (P0-005,
+owner-approved, to bound a 360-minute hang). With nine sessions pushing — mostly **docs** — to `main`,
+each push cancels the previous commit's still-running build. The run-level conclusion becomes
+`cancelled`; jobs that had not started read `cancelled`/nothing, **never `red`**. So the gate whose
+job is to give `main` a verdict returns "no verdict" under normal team activity — and returns it as
+grey, which reads as benign.
+
+**Measured live (GitHub public REST API, read-only, 2026-09-11 ~18:50 UTC):**
+
+```
+last complete verdict on main : 76e422a  FAILURE   15:03Z  runid 34613801508
+                                  landing        -> failure  ("Unit tests (JSON-LD…)")
+                                  design-system  -> failure  ("Check XSS sink audit artifact is fresh")
+runs after it, to HEAD        : 14 consecutive  cancelled   (d0b9459 … 2d19351)
+                                + 923a20a in_progress at time of measurement
+job-level survivor            : 9fa752e run cancelled, yet design-system job finished SUCCESS first
+                                  (the RT XSS fix — a job can be green while its run is grey)
+```
+
+Reproduce (read-only):
+```sh
+curl -s "https://api.github.com/repos/ardalanazimian/Rezv/actions/runs?branch=main&per_page=25"
+```
+
+**Why it is a fake-green and not a flake.** A flake is random and re-runs clean. This is
+**deterministic**: as long as the team keeps pushing to `main` faster than a build completes (~a few
+minutes apart today), `main`'s verdict is *structurally* unobtainable, and the one known-red job
+(`landing`) plus any future blocker are equally invisible. The cancellation is behaving exactly as
+configured; the defect is that "bound the hang" and "never let `main` reach a verdict" were wired to
+the same switch.
+
+**A second-order trap it sets, worth naming.** Because a *job* can finish green while its *run* ends
+grey (see `9fa752e`/`design-system`), the honest way to read `main` becomes "open each cancelled run
+and check job/step conclusions" — which is fragile and easy to get wrong. Reading the run-level badge
+gives grey (benign-looking); reading the wrong job gives a stale green. The only safe statement is
+per-job-per-step, which almost nobody does at a glance.
+
+**Who walks it by accident.** Any session — CEO included — that pushes a doc to `main` and then reads
+"main is not red, so we're fine." It already happened: directive 050 records that `f637948`'s red
+"stayed hidden exactly this way", and directive 051 records that this session's own pushes did it to
+others' runs today.
+
+**Recommendation (owner/CEO decides; directive 051 already states it).** Apply in this order:
+`timeout-minutes` on all 16 jobs first (so P0-005's hang bound survives without the cancel), **then**
+`cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`. Falsifiable acceptance test: push two
+commits to `main` seconds apart; the **first** run must still reach a `success`/`failure` conclusion.
+Do **not** reach for `paths-ignore: docs/**` — directive 051 shows it silently disarms three guards
+(`check-doc-staleness`, `check-doc-path-refs`, and the XSS artifact freshness check), trading one
+fake-green for three.
+
+**Untested, recorded as untested.** I did not apply or test the fix (Red Team does not fix). I did
+not measure whether GitHub's `merge_group`/PR runs share the same suppression — only `push`-to-`main`
+runs were measured.
