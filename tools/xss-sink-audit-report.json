@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-11T09:38:05.977Z",
+  "generated_at": "2026-09-11T09:56:39.371Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -12,11 +12,11 @@
   ],
   "total_hits": 224,
   "by_classification": {
-    "review": 17,
+    "review": 18,
     "safe_static": 50,
     "unsafe": 42,
     "escaped": 25,
-    "dom_api_safe": 90
+    "dom_api_safe": 89
   },
   "hits": [
     {
@@ -1247,8 +1247,7 @@
       "kind": "innerHTML",
       "snippet": "document.getElementById('v-overview').innerHTML = `",
       "sink_hash": "3b20e44a5673",
-      "classification": "dom_api_safe",
-      "manual_review_note": "داشبورد. `liveStatusBadge()` (overview.js:488) و `dashboardUsingDemoData()` (:483) فقط ثابت و icon() برمی‌گردانند؛ بقیه fa() روی KPIهای عددی است."
+      "classification": "review"
     },
     {
       "file": "apps/business/js/overview.js",
@@ -1754,7 +1753,7 @@
       "snippet": "document.getElementById('v-overview').innerHTML=`",
       "sink_hash": "14106012de95",
       "classification": "dom_api_safe",
-      "manual_review_note": "نمای کلیِ شرکت. `r.logo`/`r.grad` هرگز از API نمی‌آیند — `mapAdminRestaurant` (company/js/api.js:137-138) آن‌ها را فقط از ردیفِ نمونه‌ی محلی پر می‌کند و در همان‌جا «تزئینی» علامت خورده‌اند. `healthMeta`/`clvLine` محلی‌اند، نامِ رستوران esc() دارد و بقیه fa()/محاسبه‌ی درصد است."
+      "manual_review_note": "نمای کلیِ شرکت. `r.logo`/`r.grad` هرگز از API نمی‌آیند — `mapAdminRestaurant` (company/js/api.js:137-138) آن‌ها را فقط از ردیفِ نمونه‌ی محلی پر می‌کند و در همان‌جا «تزئینی» علامت خورده‌اند. `healthMeta`/`clvLine` محلی‌اند، نامِ رستوران esc() دارد و بقیه fa()/محاسبه‌ی درصد است. ⚠️ این سینک روی سقفِ ۴۰۰۰ کاراکتری می‌ایستد، پس ۷۸۱ کاراکترِ آخرش را طبقه‌بند اصلاً ندیده و من **مستقیم از فایل** خواندمش: ردیف‌های هشدارِ اشتراک‌اند با `esc(r.name)`، `fa(r.daysLeft)`، `icon()` و `jsq(r.id)` در onclick — هیچ درجِ خامی ندارد."
     },
     {
       "file": "apps/company/js/overview.js",
