@@ -8142,7 +8142,8 @@ let STAFF_LIST=STAFF_DEMO.slice();
 let _staffLoaded=false;
 
 const ROLE_FA={owner:'مالک',manager:'مدیر',staff:'کارمند',admin:'ادمین'};
-// کلیدهای دسترسی — دقیقاً هم‌راستا با schema بک‌اند (/restaurant/staff PATCH)
+// کلیدهای دسترسی — هم‌راستا با schema بک‌اند (/restaurant/staff PATCH)، منهای
+// کلیدهایی که هیچ روتی اجرایشان نمی‌کند.
 const PERM_DEFS=[
   ['canManageReservations','مدیریت رزروها'],
   ['canManageTables','مدیریت میزها'],
@@ -8151,7 +8152,12 @@ const PERM_DEFS=[
   ['canViewRevenue','مشاهده درآمد'],
   ['canManageCampaigns','مدیریت کمپین‌ها'],
   ['canManageCoupons','مدیریت کوپن‌ها'],
-  ['canManageStaff','مدیریت کارکنان'],
+  // ⚠️ `canManageStaff` عمداً اینجا **نیست**: هیچ روتی آن را اجرا نمی‌کند و
+  // مدیریتِ کارکنان با **نقش** گیت می‌شود، نه با مجوز
+  // (api/src/app/api/v1/restaurant/staff/route.ts:54-77 — تفویضش درِ
+  // خودارتقایی باز می‌کرد؛ routing.js هم تب را با VIEW_ROLE گیت می‌کند).
+  // پس این سوییچ فقط یک وعده‌ی توخالی به مدیر بود. اجرایِ سمتِ سرور اضافه
+  // نمی‌شود — این تصمیم ثبت و در rbac-permission-coverage.test.mts قفل شده.
   ['canManageSettings','مدیریت تنظیمات'],
 ];
 
