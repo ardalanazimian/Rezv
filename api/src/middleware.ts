@@ -84,6 +84,8 @@ function assertProductionSecretsSafe(): void {
     const problems = productionSecretProblems({
       OTP_DEV_MODE: process.env.OTP_DEV_MODE,
       MAINTENANCE_KEY: process.env.MAINTENANCE_KEY,
+      JWT_SECRET: process.env.JWT_SECRET,
+      JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
     });
     if (problems.length) {
       throw new Error('پیکربندیِ ناامن در production:\n  · ' + problems.join('\n  · '));
@@ -141,7 +143,7 @@ function applySecurityHeaders(res: NextResponse, origin: string | null = null) {
 
 export async function middleware(req: NextRequest) {
   assertAllowedOriginsConfigured();  // fail-fast در نخستین درخواستِ production
-  assertProductionSecretsSafe();     // همان، برای OTP_DEV_MODE و MAINTENANCE_KEY
+  assertProductionSecretsSafe();     // OTP_DEV_MODE · MAINTENANCE_KEY · کلیدهای JWT
   const ip = clientIp(req);
   const origin = req.headers.get('origin');
 

@@ -50,6 +50,8 @@ describe('productionSecretProblems', () => {
   const SAFE = {
     OTP_DEV_MODE: 'false',
     MAINTENANCE_KEY: '9f2c1d8b4e7a3056c1f9b2d4e8a70536c1f9b2d4e8a70536c1f9b2d4e8a70536',
+    JWT_SECRET: '4b1e9c7d2a8f5036b1e9c7d2a8f5036b1e9c7d2a8f5036b1e9c7d2a8f5036b1e',
+    JWT_REFRESH_SECRET: 'c3a7f1d5b9e2064ac3a7f1d5b9e2064ac3a7f1d5b9e2064ac3a7f1d5b9e2064a',
   };
 
   test('پیکربندیِ سالم هیچ ایرادی ندارد', () => {
@@ -82,8 +84,39 @@ describe('productionSecretProblems', () => {
   });
 
   test('هر دو ایراد با هم گزارش می‌شوند (نه فقط اولی)', () => {
-    const p = productionSecretProblems({ OTP_DEV_MODE: 'true', MAINTENANCE_KEY: 'change-me' });
+    const p = productionSecretProblems({ ...SAFE, OTP_DEV_MODE: 'true', MAINTENANCE_KEY: 'change-me' });
     assert.equal(p.length, 2);
+  });
+
+  // ── کلیدهای JWT (افزوده‌ی ۲۰۲۶-۰۹-۱۲) ──
+  //
+  // ⚠️ چرا طول کافی نبود: تنها گاردِ قبلی `lib/jwt.ts` بود که فقط
+  // «طول ≥ ۳۲» را می‌سنجید، و جانشینِ `api/.env.example` دقیقاً ۳۳ کاراکتر
+  // بود. یعنی یک رشته‌ی عمومیِ داخلِ مخزن، کلیدِ امضای همه‌ی توکن‌ها می‌شد.
+  test('🔴 JWT_SECRETِ جانشین ایراد است — حتی وقتی از ۳۲ کاراکتر بلندتر است', () => {
+    const thirtyThree = 'change-me-very-long-random-string';
+    assert.equal(thirtyThree.length, 33, 'همان طولی که از چکِ jwt.ts عبور می‌کرد');
+    const p = productionSecretProblems({ ...SAFE, JWT_SECRET: thirtyThree });
+    assert.equal(p.length, 1);
+    assert.match(p[0], /JWT_SECRET/);
+    assert.match(p[0], /openssl rand -hex 32/);
+  });
+
+  test('🔴 JWT_SECRET یا JWT_REFRESH_SECRETِ غایب هم ایراد است', () => {
+    assert.equal(productionSecretProblems({ ...SAFE, JWT_SECRET: undefined }).length, 1);
+    assert.equal(productionSecretProblems({ ...SAFE, JWT_REFRESH_SECRET: undefined }).length, 1);
+    assert.equal(
+      productionSecretProblems({ ...SAFE, JWT_SECRET: undefined, JWT_REFRESH_SECRET: undefined }).length, 2,
+      'هر دو کلید جدا گزارش می‌شوند',
+    );
+  });
+
+  test('کلیدِ واقعیِ openssl هرگز ایراد شمرده نمی‌شود (کنترلِ منفی)', () => {
+    assert.deepEqual(productionSecretProblems({
+      ...SAFE,
+      JWT_SECRET: 'a9f3'.repeat(16),
+      JWT_REFRESH_SECRET: '7c2e'.repeat(16),
+    }), []);
   });
 });
 
@@ -98,5 +131,31 @@ describe('`.env.example` خودش مقدارِ خطرناک ندارد', () => {
     assert.equal(val('OTP_DEV_MODE'), 'false');
     assert.equal(isPlaceholderSecret(val('MAINTENANCE_KEY')), true,
       'MAINTENANCE_KEY در نمونه باید «غیرقابلِ استفاده» بماند، نه یک کلیدِ آماده');
+  });
+
+  // ⚠️ افزوده‌ی ۲۰۲۶-۰۹-۱۲ — همان §۴c، یک لایه بیرون‌تر: تستِ بالا فقط
+  // `.env.example`ِ **ریشه** را می‌خواند. مخزن دو تا دارد، و دومی
+  // (`api/.env.example`) همان است که `docs/ENVIRONMENT.md` «فهرستِ مرجعِ
+  // runtimeِ بک‌اند» می‌نامدش و `docs/DEPLOY_API_VERCEL.md` می‌گوید مقادیرِ
+  // Vercel را از آن بردار. تا امروز هیچ تستی بازش نمی‌کرد، و همان فایل
+  // `OTP_DEV_MODE=true` و یک `JWT_SECRET`ِ ۳۳ کاراکتری داشت که از چکِ
+  // «طول ≥ ۳۲»ِ jwt.ts عبور می‌کرد. حالا **هر دو** فایل سنجیده می‌شوند.
+  test('🔴 `api/.env.example` — همان فایلی که runbookِ دیپلوی به آن ارجاع می‌دهد — هیچ کلیدِ آماده‌ای ندارد', async () => {
+    const { readFileSync } = await import('node:fs');
+    const raw = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
+    const val = (k: string) => raw.match(new RegExp(`^${k}=([^#
+]*)`, 'm'))?.[1]?.trim() ?? '';
+    assert.equal(val('OTP_DEV_MODE'), 'false',
+      'این فایل در production کپی می‌شود؛ true یعنی بای‌پسِ احراز هویت');
+    for (const k of ['JWT_SECRET', 'JWT_REFRESH_SECRET']) {
+      assert.equal(isPlaceholderSecret(val(k)), true,
+        `${k} در نمونه نباید مقدارِ قابلِ‌استفاده داشته باشد — با کلیدِ عمومی، جعلِ توکن ممکن است`);
+    }
+    assert.deepEqual(productionSecretProblems({
+      OTP_DEV_MODE: val('OTP_DEV_MODE'),
+      MAINTENANCE_KEY: val('MAINTENANCE_KEY'),
+      JWT_SECRET: val('JWT_SECRET'),
+      JWT_REFRESH_SECRET: val('JWT_REFRESH_SECRET'),
+    }).length, 3, 'کپیِ خامِ این فایل باید در بوتِ production روی هر سه راز قرمز شود، نه سبز');
   });
 });

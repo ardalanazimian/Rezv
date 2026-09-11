@@ -53,6 +53,8 @@ export function isPlaceholderSecret(value: string | undefined | null): boolean {
 export function productionSecretProblems(env: {
   OTP_DEV_MODE?: string;
   MAINTENANCE_KEY?: string;
+  JWT_SECRET?: string;
+  JWT_REFRESH_SECRET?: string;
 }): string[] {
   const problems: string[] = [];
 
@@ -69,6 +71,30 @@ export function productionSecretProblems(env: {
       'همین کلید مسیرهای نگه‌داری (از جمله maintenance/retention که داده پاک می‌کند) ' +
       'را باز می‌کند. یک مقدارِ واقعی بساز:  openssl rand -hex 32',
     );
+  }
+
+  // ⚠️ افزوده‌ی ۲۰۲۶-۰۹-۱۲ — شکافی که پچِ سخت‌سازیِ env نبسته بود:
+  // مخزن **دو** فایلِ `.env.example` دارد و فقط ریشه‌ای‌اش امن شد.
+  // `api/.env.example` همان فایلی است که `docs/ENVIRONMENT.md` «فهرستِ مرجعِ
+  // runtimeِ بک‌اند» می‌نامدش و `docs/DEPLOY_API_VERCEL.md` صریح می‌گوید
+  // مقادیرِ Vercel را از آن بردار — و `JWT_SECRET=change-me-very-long-random-string`
+  // می‌داد. آن رشته **۳۳** کاراکتر است، پس تنها گاردِ موجود
+  // (`lib/jwt.ts`: طول ≥ ۳۲) از آن عبور می‌کرد و هیچ‌جا `isPlaceholderSecret`
+  // روی کلیدهای JWT صدا زده نمی‌شد. نتیجه‌ی عملی: دیپلویی که دقیقاً runbookِ
+  // خودِ این مخزن را اجرا کند، با کلیدِ امضایی بالا می‌آید که در تاریخچه‌ی
+  // گیتِ عمومی هست — یعنی جعلِ توکنِ هر مشتری و هر مالک. **طول، جانشین‌بودن
+  // را رد نمی‌کند.**
+  for (const [name, value] of [
+    ['JWT_SECRET', env.JWT_SECRET],
+    ['JWT_REFRESH_SECRET', env.JWT_REFRESH_SECRET],
+  ] as const) {
+    if (isPlaceholderSecret(value)) {
+      problems.push(
+        `${name} تنظیم نشده یا هنوز مقدارِ نمونه است — با کلیدی که در مخزنِ عمومی ` +
+        'هست هر کسی می‌تواند توکنِ هر کاربری را جعل کند. یک مقدارِ واقعی بساز:  ' +
+        'openssl rand -hex 32',
+      );
+    }
   }
 
   return problems;
