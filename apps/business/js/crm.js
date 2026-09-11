@@ -1077,10 +1077,15 @@ async function custRenderCampaign(){
   // پشتیبانی می‌کند و phone برمی‌گرداند) و ارسالِ phones[]. قابلیتِ رفتاری
   // حفظ شد (§۸) و محدودیتِ ثبت‌شده در KNOWN_LIMITATIONS دیگر صادق نیست.
   if(!_segCounts && API.getToken()){
-    const [atRisk,vip]=await Promise.all([API.customers('segment=at_risk&limit=50'),API.customers('segment=vip&limit=50')]);
+    // ⚠️ `new_customer` اضافه شد: کارتِ سومش همیشه رشته‌ی ثابتِ «—» بود، در
+    // حالی که همین سگمنت هم در بک‌اند وجود دارد
+    // (restaurant/customers/route.ts) و هم previewCamp واقعاً با آن کمپین
+    // می‌فرستد. یعنی کاربر مخاطبی را انتخاب می‌کرد که اندازه‌اش را نمی‌دید.
+    const [atRisk,vip,newCust]=await Promise.all([API.customers('segment=at_risk&limit=50'),API.customers('segment=vip&limit=50'),API.customers('segment=new_customer&limit=50')]);
     _segCounts={
       at_risk: atRisk.ok?(atRisk.data.items?.length||0):null,
       vip: vip.ok?(vip.data.items?.length||0):null,
+      new_customer: newCust.ok?(newCust.data.items?.length||0):null,
     };
   }
   const sc=_segCounts||{};
@@ -1089,7 +1094,7 @@ async function custRenderCampaign(){
   // «۰ نفر» نشان می‌داد در حالی که دو کارتِ کنارش هنگامِ نامعلوم‌بودن صادقانه
   // «—» می‌گفتند. حالا هر سه یک قرارداد دارند: نامعلوم = «—»، نه صفر.
   const cnt=(v,suffix)=>v==null?'—':fa(v)+(v>=50?'+':'')+' '+suffix;
-  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید','—'],['calendar','تولد این ماه',(typeof CLUB!=='undefined'&&CLUB.length)?fa(CLUB.filter(m=>m.bMonth===currentMonthFa()).length)+' نفر':'—']];
+  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید',cnt(sc.new_customer,'نفر')],['calendar','تولد این ماه',(typeof CLUB!=='undefined'&&CLUB.length)?fa(CLUB.filter(m=>m.bMonth===currentMonthFa()).length)+' نفر':'—']];
 
   document.getElementById('ct-campaign').innerHTML=`
     <div class="panel">
