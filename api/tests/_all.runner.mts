@@ -222,6 +222,7 @@ import './deposit-label-honesty.test.mts';
 import './preorder-step-availability.test.mts';
 import './sample-menu-shape.test.mts';
 import './discover-above-fold.test.mts';
+import './landing-mobile-doors-and-intro.test.mts';
 import './db-pool-exhaustion-contract.test.mts';
 import './ratelimit-transient-redis-error.test.mts';
 import './otp-request-window-postgres.test.mts';
