@@ -7850,13 +7850,22 @@ function previewCamp(){
     3:{kind:'birthday',                     label:'تولد این ماه'},
   })[selSeg]||null;
   const rendered=txt.replace(/\{نام\}/g,'کیان');
+  // ⚠️ دو رفع در همین پیش‌نمایش:
+  //  ۱. `rendered` متنِ خامِ textarea است و openModal آن را به `innerHTML`
+  //     می‌دهد (staff-system.js) — یعنی یک sinkِ XSS در مرورگرِ کارکنان.
+  //     از همان `esc()`ِ کانونی رد می‌شود؛ `white-space:pre-wrap` نمایش را
+  //     حفظ می‌کند و متنِ پیامک هم HTML نیست، پس چیزی از دست نمی‌رود.
+  //  ۲. نامِ فرستنده هاردکد «کافه‌رستوران ویستا» بود و پیش‌نمایشِ *هر*
+  //     رستورانی همان را نشان می‌داد — همان نامِ واقعی که pickSeg هم
+  //     استفاده می‌کند، با همان fallback.
+  const restName=(typeof RESTAURANT!=='undefined' && RESTAURANT && RESTAURANT.name) ? RESTAURANT.name : 'ما';
   openModal(`<div class="modal-title">پیش‌نمایش پیام</div><div class="modal-sub">دقیقاً همینطوری برای مشتری ارسال می‌شه</div>
     <div style="background:#0c0c14;border-radius:var(--r-lg);padding:16px;margin-bottom:18px">
       <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">
         <div style="width:34px;height:34px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800">R</div>
-        <div><div style="font-size:13px;font-weight:700;color:#fff">کافه‌رستوران ویستا</div><div style="font-size:10px;color:#666">فرستنده تأییدشده</div></div>
+        <div><div style="font-size:13px;font-weight:700;color:#fff">${esc(restName)}</div><div style="font-size:10px;color:#666">فرستنده تأییدشده</div></div>
       </div>
-      <div style="background:#1c1c28;border-radius:4px 16px 16px 16px;padding:12px 14px;font-size:13px;color:#ddd;line-height:1.8;white-space:pre-wrap">${rendered}</div>
+      <div style="background:#1c1c28;border-radius:4px 16px 16px 16px;padding:12px 14px;font-size:13px;color:#ddd;line-height:1.8;white-space:pre-wrap">${esc(rendered)}</div>
     </div>
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmCamp()">تأیید و ارسال</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">برگشت و ویرایش</button>`);
