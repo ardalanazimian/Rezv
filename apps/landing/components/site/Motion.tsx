@@ -78,10 +78,22 @@ export function Reveal({
 /**
  * نوارِ باریکِ پیشرفتِ اسکرول در بالای صفحه.
  *
- * همین حلقه «سرعتِ اسکرول» را هم به‌صورتِ متغیرِ --vel روی <html> می‌گذارد
- * (بازه‌ی ۱- تا ۱). یک شنودِ اسکرول برای هر دو کار، نه دو تا. CSS از آن
- * برای کِششِ ملایمِ عناصر در حینِ اسکرولِ سریع استفاده می‌کند — همان حسی
- * که اسکرولِ اینرسیایی می‌دهد، بدونِ ربودنِ اسکرولِ مرورگر.
+ * همین حلقه «سرعتِ اسکرول» را هم به‌صورتِ متغیرِ --vel می‌نویسد (بازه‌ی
+ * ۱- تا ۱). یک شنودِ اسکرول برای هر دو کار، نه دو تا. CSS از آن برای کِششِ
+ * ملایمِ عناصر در حینِ اسکرولِ سریع استفاده می‌کند — همان حسی که اسکرولِ
+ * اینرسیایی می‌دهد، بدونِ ربودنِ اسکرولِ مرورگر.
+ *
+ * ⚠️ [L3 · DS-009 §۳ · ۲۰۲۶-۰۹-۱۱] --vel روی **خودِ عنصرهای `.vel`** نوشته
+ * می‌شود، نه روی <html>. تا امروز روی <html> بود و همین علتِ ۳۰fpsِ لندینگ
+ * بود — نه چهار بومِ rAF که سه روز مظنون بودند:
+ *   custom property ارث می‌برد ⇒ بازنویسی‌اش روی ریشه، در هر فریم، style
+ *   **کلِ سند** را باطل می‌کند (trace: ۳۸٪ UpdateLayoutTree، Paint فقط ۴٪)،
+ *   و getBoundingClientRectهای Kinetic همان بازمحاسبه را هم‌زمان اجبار
+ *   می‌کنند — در حالی که فقط دو عنصر مصرف‌کننده‌اند (Blocks.tsx).
+ *   اثباتِ آزمایشی روی buildِ production، موبایل: فقط نوشتنِ ریشه خنثی شد ⇒
+ *   p50 از ۵۰ به ۱۶٫۷ms؛ grain/blur/بوم‌ها به‌تنهایی بی‌اثر بودند.
+ * CSS دست‌نخورده است: `.vel` همان `var(--vel, 0)` را می‌خواند، حالا از خودش؛
+ * و `prefers-reduced-motion` همچنان `transform: none` می‌دهد.
  */
 export function ScrollProgress() {
   const ref = useRef<HTMLDivElement>(null);
@@ -89,12 +101,17 @@ export function ScrollProgress() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const root = document.documentElement;
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     let frame = 0;
     let last = window.scrollY;
     let vel = 0;
     let decay = 0;
+
+    // مصرف‌کننده‌های --vel. فهرست در هر فریمِ اسکرول تازه می‌شود (نه در هر فریمِ
+    // relax) تا عنصری که دیرتر mount شود جا نماند؛ querySelectorAll برای دو
+    // عنصر ارزان است و بسیار ارزان‌تر از بازمحاسبه‌ی style کلِ سند.
+    let velTargets: HTMLElement[] = [];
+    const writeVel = (v: string) => { for (const t of velTargets) t.style.setProperty('--vel', v); };
 
     // پس از توقفِ اسکرول، سرعت باید نرم به صفر برگردد وگرنه کشیدگی «گیر»
     // می‌کند. این حلقه فقط تا وقتی زنده است که مقدارِ قابلِ‌توجهی مانده باشد.
@@ -103,10 +120,10 @@ export function ScrollProgress() {
       if (Math.abs(vel) < 0.004) {
         vel = 0;
         decay = 0;
-        root.style.setProperty('--vel', '0');
+        writeVel('0');
         return;
       }
-      root.style.setProperty('--vel', vel.toFixed(3));
+      writeVel(vel.toFixed(3));
       decay = requestAnimationFrame(relax);
     };
 
@@ -122,7 +139,8 @@ export function ScrollProgress() {
       // ۱۵۰px جابه‌جایی در یک فریم = بیشینه‌ی اثر. با ۹۰ حتی یک نُچِ چرخِ
       // ماوس هم اشباع می‌شد و اثر به‌جای «سرعت» یک آفستِ ثابت به‌نظر می‌رسید.
       vel = Math.max(-1, Math.min(1, dy / 150));
-      root.style.setProperty('--vel', vel.toFixed(3));
+      velTargets = Array.from(document.querySelectorAll<HTMLElement>('.vel'));
+      writeVel(vel.toFixed(3));
       if (!decay) decay = requestAnimationFrame(relax);
     };
     const onScroll = () => {
@@ -137,7 +155,7 @@ export function ScrollProgress() {
       window.removeEventListener('resize', onScroll);
       if (frame) cancelAnimationFrame(frame);
       if (decay) cancelAnimationFrame(decay);
-      root.style.removeProperty('--vel');
+      for (const t of velTargets) t.style.removeProperty('--vel');
     };
   }, []);
 

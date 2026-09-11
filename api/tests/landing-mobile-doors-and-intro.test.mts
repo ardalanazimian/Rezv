@@ -59,6 +59,29 @@ describe('DS-009 L1 — درهای انتخابِ نقش روی موبایل (ن
   });
 });
 
+describe('DS-009 L3 — --vel روی <html> نوشته نمی‌شود (ناوردای منبع)', () => {
+  // ⚠️ **کمتر از ادعای واقعی.** ادعای واقعی «۶۰fps روی buildِ production» است و
+  // فقط `tools/measure-landing-regions.mjs` آن را می‌سنجد. این‌جا فقط مکانیزمِ
+  // سنجیده‌شده پین می‌شود: نوشتنِ یک custom property روی ریشه در هر فریم، style
+  // کلِ سند را باطل می‌کرد (trace: ۳۸٪ UpdateLayoutTree) و p50 را از ۱۶٫۷ به
+  // ۵۰ms می‌رساند. اگر کسی آن را برگرداند، این قرمز می‌شود پیش از آنکه کسی
+  // اندازه بگیرد — ولی سبزش «سریع است» را ثابت نمی‌کند.
+  const motion = read('apps/landing/components/site/Motion.tsx')
+    .replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => { const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i); }).join('\n');
+
+  test('⚠️ هیچ setPropertyای برای --vel روی documentElement/root نیست', () => {
+    assert.doesNotMatch(motion, /(documentElement|root)\.style\.setProperty\(\s*['"]--vel/,
+      'نوشتنِ --vel روی <html> برگشته ⇒ ابطالِ style کلِ سند در هر فریمِ اسکرول (L3)');
+  });
+
+  test('⚠️ --vel روی مصرف‌کننده‌های .vel نوشته می‌شود و CSSِ مصرف‌کننده دست‌نخورده است', () => {
+    assert.match(motion, /querySelectorAll<HTMLElement>\(\s*['"]\.vel['"]\s*\)/, 'باید مصرف‌کننده‌ها را پیدا کند');
+    const css = stripCss(read('apps/landing/app/globals.css'));
+    assert.match(css, /\.vel\s*\{[^}]*var\(--vel,\s*0\)/, '`.vel` باید همچنان از var(--vel) بخواند — قرارداد عوض نشده');
+    assert.match(css, /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.vel\s*\{\s*transform:\s*none/, 'reduced-motion باید کشش را خاموش نگه دارد');
+  });
+});
+
 describe('DS-009 L4 — پرده‌ی ورود: یک دستگیره، ۰٫۴ ثانیه (ناوردای منبع)', () => {
   const css = stripCss(read('apps/landing/app/globals.css'));
   const intro = css.slice(css.indexOf('.intro {'), css.indexOf('html[data-intro='));
