@@ -310,6 +310,18 @@ jobs:
           JWT_REFRESH_SECRET: ci-boot-only-refresh-secret-32-chars
           REDIS_URL: redis://localhost:6379
           ALLOWED_ORIGINS: https://ci.example.invalid
+          # ⚠️ افزوده‌ی ۲۰۲۶-۰۹-۱۲ — وگرنه این job روی همین شاخه قرمز می‌شود.
+          # پچِ سخت‌سازیِ env یک assertionِ بوت اضافه کرد که در production نبودِ
+          # `MAINTENANCE_KEY` (و مقدارِ نمونه‌اش) را ایراد می‌شمارد. `next start`
+          # خودش NODE_ENV=production می‌گذارد، پس assertion در نخستین درخواست
+          # شلیک می‌کند و middleware به هر مسیرِ `/api/*` پاسخِ ۵۰۰ می‌دهد —
+          # از جمله `/api/health`ی که این گارد probe می‌کند. اندازه‌گیری‌شده روی
+          # همان بیلد: بدونِ این متغیر کدِ ۵۰۰، با آن ۲۰۰.
+          # ⚠️ این «تخفیفِ گارد» نیست: تولید همین حالا هم بدونش بالا نمی‌آید،
+          # چون `docker-compose.yml` سرویسِ cron را با `${MAINTENANCE_KEY:?…}`
+          # تعریف کرده و interpolation کلِ فایل را رد می‌کند. این خط فقط همان
+          # پیش‌شرطِ واقعیِ تولید را به هارنسِ تست می‌دهد، مثلِ کلیدهای JWT بالا.
+          MAINTENANCE_KEY: ci-boot-only-maintenance-key-not-a-placeholder
 
   # ── مرحله ۳: چک امنیتی پایه ──
   security:
