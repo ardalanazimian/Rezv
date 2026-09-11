@@ -715,6 +715,12 @@ jobs:
         run: npm run lint
       - name: Build (Next.js)
         run: npm run build
+        env:
+          # فقط برای buildِ CI. TLDِ `.invalid` رزرو است (RFC 2606) و هرگز resolve نمی‌شود،
+          # پس این مقدار نمی‌تواند منتشر شود: استقرارِ واقعی بدونِ SEO_ZONE_URL همچنان در
+          # next.config.js می‌شکند (fail-closed، 59ee280، ۰۹-۰۸). اینجا فقط اجازه می‌دهد CI
+          # ثابت کند build کامپایل می‌شود — این گام از ۰۹-۰۸ در هر اجرا قرمز بود.
+          SEO_ZONE_URL: https://seo.invalid
 
   # ── دروازه‌ی تازگیِ base — «سبزِ CI روی baseِ کهنه دروغ می‌گوید» ──
   #
