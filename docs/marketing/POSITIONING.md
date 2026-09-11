@@ -82,7 +82,7 @@ So a third currency exists — **standing** — it is enforced, it is durable (s
 per 90 clean days, `economy.ts:51-62`), and it is visible to the restaurants a diner books with.
 
 **And the product already discloses it, in more detail than we were claiming.**
-`apps/customer/js/data/booking.js:84` renders, before booking:
+`apps/customer/js/data/booking.js:113` renders, before booking (cited as `:84` on 09-10; the line drifted, corrected 2026-09-11 night):
 
 > «لغوِ رایگان تا N ساعت پیش از زمانِ رزرو. دیرتر از آن، یک تخلف در سابقه‌ات ثبت می‌شود و نشانِ
 > اعتبارت پایین می‌آید — **این نشان به رستوران‌ها هم نشان داده می‌شود**.»
@@ -160,11 +160,20 @@ well-understood piece of work — the repo already has five guards of exactly th
 >      restaurants. The late-cancel strike is disclosed through `cancelPolicyLabel()`. **For no-show I found no
 >      diner-facing disclosure.** I searched `apps/customer/js` and `standalone/customer.html` for rendered Persian
 >      phrasings of "not showing up"; the only "no-show" mentions were code comments. That is a search, not proof,
->      so it went to Backend to confirm.
+>      so it went to Backend to confirm. **Re-searched 2026-09-11 night by `rezv-f7`, with `git grep` on
+>      `origin/main`:** all three «تخلف» strings in `apps/customer/js` are about cancelling (`data/booking.js:113`,
+>      `features/trips.js:182`, `reservation.js:96`), and `reservation.js:29` displays `no_show` as "cancelled".
+>      Routed as R1 in `BRIEF-2026-09-11-2.md`.
 >   2. **Cashback reversal → points.** `lifecycle.ts:230-231` calls `reverseReservationCashback` for statuses in
 >      `CASHBACK_REVERSING_STATUSES` (`no_show`, `rejected`, `expired`, …). The diner's balance goes down, the app
->      shows only a total, and I found no text telling the diner. **Whether taking back a points grant counts as a
->      "cost" is a CEO ruling, not mine.** Note that `rejected` is the restaurant's action, not the diner's.
+>      shows only a total, and I found no text telling the diner. Note that `rejected` is the restaurant's action,
+>      not the diner's. **Corrected 2026-09-11 night by `rezv-f7`:** this line used to say whether a reversal counts
+>      as a "cost" was a CEO ruling still to come. **It is already decided.** The founder's E-002 answer «الف»
+>      (grant at attendance, `audit/ESCALATIONS.md:116`) is recorded as «یک تصمیم، هر دو مسیر», meaning referral
+>      and cashback both (`:123-126`, commit `c8cddcc`). At 22:55 the same night the founder confirmed it for
+>      cashback in their own words, «کش‌بک هنگامِ حضور», selected in `rezv-bc`'s AskUserQuestion. With the grant at
+>      check-in, nothing is granted before attendance, so nothing is reversed. **Not implemented yet:**
+>      `api/src/lib/reservations.ts:657` still writes cashback at booking. Routed as R2 in `BRIEF-2026-09-11-2.md`.
 >   - Checked and **not** a live gap: a points `adjustment` with no reason is allowed by the schema, but no code
 >     writes one today (`grep` of `api/src`: comments only). Still on the §3 "do not claim" list.
 >
