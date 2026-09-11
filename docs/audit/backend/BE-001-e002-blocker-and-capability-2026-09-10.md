@@ -160,7 +160,7 @@ docker-compose.yml:17  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?...}
 | `mcp Context7 resolve-library-id` | **control** — یک MCP سرورِ دیگر | ✅ پاسخِ کامل. یعنی transportِ MCP در این نشست زنده است |
 | `mcp Supabase list_projects` | control-plane | ✅ سه پروژه برگشت |
 | `mcp Supabase execute_sql` | **subject** — data-plane | ❌ `28P01` ×۲ |
-| `docker` | — | ✅ سرور 29.7.2، `ps -a` و `volume ls` هر دو EXIT=0 |
+| `docker` | — | ✅ سرور 29.7.2، `ps -a` و `volume ls` هر دو با کدِ خروجِ ۰ |
 | `git` / worktree | — | ✅ `wt-rezv-89` ساخته شد، `node_modules` هر سه اپ junction شد |
 
 **نتیجه‌گیریِ مجاز:** `28P01` یک واقعیت درباره‌ی **آن پروژه** است، نه درباره‌ی نشستِ من —
