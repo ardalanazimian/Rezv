@@ -870,8 +870,25 @@ button, input, textarea, select {
 
 /* ── ۱) پرده‌ی ورود ─────────────────────────────────────────────────
    کلِ کار با CSS انجام می‌شود و با forwards تمام می‌شود، پس بدونِ JS هم
-   پرده بالا می‌رود. مدتِ کل ۱٫۲s است تا LCP را بلند نکند. */
+   پرده بالا می‌رود.
+
+   ⚠️ [L4 · ۲۰۲۶-۰۹-۱۱ · حکمِ مالک] مدتِ کل از ۱٫۲s به ۰٫۴s رسید — پرده
+   می‌ماند، کوتاه می‌شود. و **یک دستگیره** دارد، نه شش عددِ پراکنده:
+   `--intro-t`. پیش از این، تیغه‌ها (0.40 + 5×0.05 + 0.55 = 1.20s)،
+   محوشدنِ نشان (0.36 + 0.34)، کلمه (0.6)، خط (0.08 + 0.7) و شمارنده
+   (0.06 + 0.62) هر کدام عددِ خودشان را داشتند و فقط با یک کامنت به هم
+   بند بودند. کوتاه‌کردنِ `1.2s` به‌تنهایی پرده را وسطِ کارِ تیغه‌ها بالا
+   می‌برد و نشان را نیمه‌ظاهر قطع می‌کرد — همان «تأخیرِ جفت‌شده»ای که
+   قرار بود از آن پرهیز شود. حالا همه نسبتی از یک زمانِ کل‌اند؛ تغییرِ
+   یک عدد کلِ کورئوگرافی را با هم می‌کشد.
+
+   ⚠️ سنجیده، نه ادعا (tools/measure-landing-lcp.mjs، N=5، همان ماشین):
+   با ۱٫۲s، LCP میانه ۶۷۲ms و بدونِ پرده (reduced-motion) ۵۹۶ms — یعنی
+   پرده روی **متریکِ LCP** نمی‌نشست، برخلافِ کامنتِ قبلیِ همین بلوک؛ آنچه
+   عقب می‌انداخت **دیده‌شدنِ محتوا** بود: پرده در میانه‌ی ۱۸۸۰ms برداشته
+   می‌شد. عددِ «بعد» در پیامِ کامیت. */
 .intro {
+  --intro-t: 0.4s;
   position: fixed;
   inset: 0;
   z-index: 200;
@@ -880,21 +897,32 @@ button, input, textarea, select {
   /* پس از پایانِ انیمیشن، هیچ لایه‌ای روی صفحه نمی‌ماند.
      کارِ اصلی را opacity می‌کند نه visibility: کروم مقدارِ visibility را در
      حالتِ fill-forwards اعمال نمی‌کرد و پرده روی صفحه می‌ماند (در مرورگر
-     دیده شد). opacity همه‌جا قطعی است؛ visibility فقط یک امتیازِ اضافه. */
-  animation: intro-off 10ms linear 1.2s forwards;
+     دیده شد). opacity همه‌جا قطعی است؛ visibility فقط یک امتیازِ اضافه.
+     ⚠️ به‌شکلِ longhand، چون calc() با زمان داخلِ shorthandِ animation در
+     همه‌ی مرورگرها قابلِ اتکا نیست. */
+  animation-name: intro-off;
+  animation-duration: 10ms;
+  animation-timing-function: linear;
+  animation-delay: var(--intro-t);
+  animation-fill-mode: forwards;
 }
 @keyframes intro-off { to { opacity: 0; visibility: hidden; } }
 
 .intro__bar {
-  flex: 1 1 0;
+  /* [L7] `0%` صریح — همان دلیلِ `.door` در site.css: دو باندلر، دو خروجی برای `0`. */
+  flex: 1 1 0%;
   background: var(--bg-sunken);
   transform-origin: 50% 0%;
   will-change: transform;
-  /* هر تیغه ۵۰ms دیرتر از قبلی بالا می‌رود → موجی از راست به چپ در RTL.
-     آخرین تیغه در 0.40 + 5×0.05 + 0.55 = ۱٫۲۰s تمام می‌شود؛ intro-off دقیقاً
-     همان‌جاست تا پرده وسطِ کار قطع نشود. */
-  animation: intro-bar 0.55s cubic-bezier(0.76, 0, 0.24, 1) forwards;
-  animation-delay: calc(0.4s + var(--i) * 0.05s);
+  /* هر تیغه کمی دیرتر از قبلی بالا می‌رود → موجی از راست به چپ در RTL.
+     نسبت‌ها همان نسبت‌های ۱٫۲sِ قبلی‌اند (شروع ⅓، پله ¹⁄₂₄، مدت ¹¹⁄₂₄):
+     آخرین تیغه دقیقاً در ⅓ + 5×¹⁄₂₄ + ¹¹⁄₂₄ = 1 × --intro-t تمام می‌شود، یعنی
+     همان لحظه‌ی intro-off — پرده وسطِ کار قطع نمی‌شود، با هر مقداری از دستگیره. */
+  animation-name: intro-bar;
+  animation-duration: calc(var(--intro-t) * 11 / 24);
+  animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+  animation-fill-mode: forwards;
+  animation-delay: calc(var(--intro-t) / 3 + var(--i) * var(--intro-t) / 24);
 }
 @keyframes intro-bar {
   from { transform: scaleY(1); }
@@ -909,7 +937,12 @@ button, input, textarea, select {
   align-items: center;
   justify-content: center;
   gap: var(--sp-4);
-  animation: intro-mark 0.34s var(--ease) 0.36s forwards;
+  /* نسبت‌های ۱٫۲sِ قبلی: مدت ¹⁷⁄₆₀، تأخیر ³⁄₁₀ — با --intro-t مقیاس می‌گیرد */
+  animation-name: intro-mark;
+  animation-duration: calc(var(--intro-t) * 17 / 60);
+  animation-timing-function: var(--ease);
+  animation-delay: calc(var(--intro-t) * 3 / 10);
+  animation-fill-mode: forwards;
 }
 @keyframes intro-mark {
   to { opacity: 0; transform: translateY(-10px); }
@@ -923,8 +956,11 @@ button, input, textarea, select {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  /* حروف از پشتِ یک ماسک بالا می‌آیند */
-  animation: intro-word 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* حروف از پشتِ یک ماسک بالا می‌آیند — مدت ½ × --intro-t (نسبتِ قبلی) */
+  animation-name: intro-word;
+  animation-duration: calc(var(--intro-t) / 2);
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
 }
 @keyframes intro-word {
   from { opacity: 0; transform: translateY(0.5em) scale(0.97); filter: blur(6px); }
@@ -937,27 +973,17 @@ button, input, textarea, select {
   border-radius: 2px;
   background: linear-gradient(90deg, transparent, var(--ember-500), transparent);
   transform-origin: 50% 50%;
-  animation: intro-line 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+  /* مدت ⁷⁄₁₂، تأخیر ¹⁄₁₅ × --intro-t (نسبت‌های قبلی) */
+  animation-name: intro-line;
+  animation-duration: calc(var(--intro-t) * 7 / 12);
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-delay: calc(var(--intro-t) / 15);
+  animation-fill-mode: both;
 }
 @keyframes intro-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-/* شمارنده‌ی چرخان — نوارِ عمودیِ اعداد که با steps بالا می‌رود.
-   بدونِ @property و بدونِ JS، پس همه‌جا کار می‌کند. */
-.intro__count {
-  block-size: 1.15em;
-  overflow: hidden;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-}
-.intro__roll {
-  display: flex;
-  flex-direction: column;
-  animation: intro-roll 0.62s steps(5, end) 0.06s both;
-}
-.intro__roll b { display: block; block-size: 1.15em; line-height: 1.15em; font-weight: 600; }
-@keyframes intro-roll { to { transform: translateY(-5.75em); } }
+/* شمارنده‌ی «۰→۱۰۰» حذف شد — L4 · DS-010 §۴‑ب (حکمِ طراح): در ۴۰۰ms هر عدد ~۴۰ms
+   بود، زیرِ آستانه‌ی خواندن. توضیحِ کامل در Intro.tsx. */
 
 /* بازگشتِ دوباره در همان نشست → بدونِ پرده. همین‌طور در حالتِ کاهشِ حرکت. */
 html[data-intro='done'] .intro { display: none; }

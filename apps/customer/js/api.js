@@ -15,7 +15,7 @@
 // ═══════════════════════════════════════════════════════════
 import { toast } from './auth.js';
 import { go } from './data/discover.js';
-import { R_SAMPLE } from './data/seed.js';
+import { R_SAMPLE, normalizeMenuEntry } from './data/seed.js';
 import { R } from './init.js';
 import { httpJson, refreshAccessToken, resolveApiBase } from './api-core.js';
 // آدرسِ پایه‌ی API — قابلِ تنظیم بدونِ build:
@@ -269,6 +269,19 @@ export function mapApiRestaurant(apiR, sampleFallback){
     // depositRequired یک سیاستِ واقعیِ قابلِ‌تنظیمِ رستوران است. رستورانی که
     // بیعانه را روشن می‌کرد، همچنان به مشتری «رایگان» نشان داده می‌شد.
     depositRequired: apiR.booking_policy?.deposit_required ?? null,
+    // ⚠️ BE-004/ب (۲۰۲۶-۰۹-۱۰): تا امروز `payment_enabled` در **هیچ** پاسخِ
+    // روبه‌مشتری‌ای نبود (نیمه‌ی «الف»، `rezv-89`)، در حالی که `depositLabel()`
+    // می‌گفت «آنلاین دریافت نمی‌شود» — یک ادعای **مثبت** درباره‌ی درگاه که
+    // داده‌اش را نداشت. همان نقصِ P1-3، یک فیلد جلوتر.
+    // `?? null` عمدی است و با `?? false` فرق دارد: نامعلوم باید «نمی‌دانم»
+    // بماند، نه «خاموش است» — چون «خاموش» یک ادعای قابلِ‌غلط‌بودن است.
+    // ⚠️ دلیلش در طولِ همین کار عوض شد و کامنتِ قبلی دیگر راست نبود: نوشته
+    // بودم «اندپوینتِ فهرست این کلید را نمی‌دهد». حالا **هر دو** روت می‌دهند
+    // (`5f58d9f`) و هر دو `?? false` روی ستونِ non-nullable — پس `null` از API
+    // نمی‌آید. آنچه می‌ماند پاسخی بدونِ `booking_policy` است (کَشِ قدیمی)، و
+    // تستِ `deposit-label-honesty` همین را پین می‌کند: اگر روزی یکی از دو روت
+    // کلید را برنگرداند، سکوتِ اپ آن را نمی‌پوشاند — تست قرمز می‌شود.
+    onlinePaymentEnabled: apiR.booking_policy?.online_payment_enabled ?? null,
     freeCancelHours: apiR.booking_policy?.free_cancel_hours ?? null,
     lat: apiR.latitude ?? null,
     lng: apiR.longitude ?? null,
@@ -465,12 +478,12 @@ export function applyRestaurantDetail(r, d){
  * این نرمال‌ساز آن را به همان شیءِ بالا تبدیل می‌کند تا رندررها فقط یک شکل
  * بشناسند. شیء را دست‌نخورده عبور می‌دهد.
  */
-export function normalizeMenuEntry(m){
-  if (Array.isArray(m)) {
-    return { id: null, e: m[0] || '🍽️', n: m[1], p: m[2], img: m[3] || null, d: null, catId: null, out: false, tags: [] };
-  }
-  return m;
-}
+// ⚠️ [DS-006 §۴ · ۲۰۲۶-۰۹-۱۰] تعریف به `data/seed.js` منتقل شد و از آنجا
+// import می‌شود. دلیل: مسیرِ **نمونه** هرگز از این‌جا رد نمی‌شد (نه
+// `init.js:12` و نه بازگشتِ آفلاینِ `loadRestaurants`)، پس آیتم‌های نمونه
+// آرایه‌ی خام می‌ماندند و `menuItemHTML` سه‌تا undefined می‌گرفت. نرمال‌سازی
+// حالا در مرزِ seed→R انجام می‌شود؛ این‌جا **همان** تابع مصرف می‌شود، نه یک
+// کپیِ دوم — وگرنه دو شکل از یک قرارداد داشتیم و همین نقص برمی‌گشت.
 
 // ═══════════ DATA ═══════════
 

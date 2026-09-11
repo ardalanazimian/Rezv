@@ -3,7 +3,7 @@
 //  جدا شده از data/detail.js (ریفکتور فاز۱: جداسازیِ مسئولیت).
 //  رفتار دقیقاً همان قبل است؛ فقط از یک فایلِ مجزا export می‌شود.
 // ═══════════════════════════════════════════════════════════
-import { API, USER, isLoggedIn, syncNavPoints, userName } from '../api.js';
+import { API, USER, applyRestaurantDetail, isLoggedIn, loadRestaurantDetail, syncNavPoints, userName } from '../api.js';
 import { closeSheet, esc, jsq, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
 import { doSearch, fmtFa } from './discover.js';
 import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js';
@@ -65,7 +65,36 @@ const PARTY_MAX = 12;
 //  حالا همان اطلاعِ واقعی داده می‌شود (رستوران سیاستِ بیعانه دارد) بدونِ ادعای
 //  دریافتِ آنلاین.
 export function depositLabel(r){
-  if(r?.depositRequired === true) return 'این رستوران سیاستِ بیعانه دارد — آنلاین دریافت نمی‌شود، هنگامِ حضور هماهنگ کن';
+  if(r?.depositRequired === true){
+    // ⚠️ BE-004/ب (۲۰۲۶-۰۹-۱۰): بندِ «آنلاین دریافت نمی‌شود» **مشتق** می‌شود،
+    // ادعا نمی‌شود. تا امروز یک جمله‌ی ثابت بود در حالی که `payment_enabled`
+    // در هیچ پاسخِ روبه‌مشتری‌ای نبود — یعنی اپ داده‌ی لازم برای راست‌گفتن را
+    // نداشت و با این حال یک ادعای **مثبت** درباره‌ی درگاه می‌کرد. اگر رستورانی
+    // درگاه را روشن می‌کرد، اپ خلافش را می‌گفت.
+    // سه حالت، همان قاعده‌ی بالا — و `null` **سکوت** است نه «خاموش».
+    // ⚠️ دلیلِ `null` در طولِ همین کار **عوض شد** و نسخه‌ی قبلیِ این کامنت
+    // دیگر راست نبود، پس به‌جای ماندن تصحیح شد: اولش نوشته بودم «اندپوینتِ
+    // فهرست این کلید را نمی‌دهد». وقتی پرسیدم آیا فهرست هم باید بدهد،
+    // `rezv-89` سنجید و دید شیتِ رزرو **از فهرست** می‌خواند (`findR` روی فیدِ
+    // در حافظه) — یعنی آن مسیر همیشه نامعلوم بود و حالتِ واقعی هرگز جایی که
+    // اهمیت داشت نشان داده نمی‌شد. فیلد را به هر دو روت اضافه کرد
+    // (`5f58d9f`)، و هر دو `?? false` می‌دهند روی ستونی که
+    // `Boolean @default(false)` است و nullable نیست.
+    // پس `null` **از API نمی‌آید**. آنچه می‌ماند پاسخی است که کلاً
+    // `booking_policy` ندارد — مثلاً کَشِ پیش از این تغییر. آن حالت واقعی است
+    // و سکوت در آن درست است؛ ولی دلیلش دیگر «فهرست کلید را ندارد» نیست.
+    // ⚠️ نزدیک بود همین‌جا **دقیقاً همان نقصی را بسازم که دارم رفعش می‌کنم.**
+    // نسخه‌ی اولِ این خط می‌گفت «پرداختِ آنلاین فعال است». ولی اپِ مشتری
+    // **هیچ‌وقت** مسیرِ پرداخت را صدا نمی‌زند (صفر فراخوان به
+    // `/reservations/:code/pay` — کامنتِ بالای همین تابع از ۲۰۲۶-۰۸-۲۴ همین
+    // را ثبت کرده و خودم دوباره سنجیدمش). پس «فعال است» یک ادعای مثبتِ تازه
+    // درباره‌ی کاری بود که این اپ انجام نمی‌دهد.
+    // `true` یعنی درگاهِ **رستوران** روشن است، نه اینکه اینجا پول گرفته شود —
+    // و هر دو حقیقت گفته می‌شوند، بدونِ وعده.
+    if(r?.onlinePaymentEnabled === true) return 'این رستوران سیاستِ بیعانه دارد — پرداختش از این اپ انجام نمی‌شود، هنگامِ حضور هماهنگ کن';
+    if(r?.onlinePaymentEnabled === false) return 'این رستوران سیاستِ بیعانه دارد — آنلاین دریافت نمی‌شود، هنگامِ حضور هماهنگ کن';
+    return 'این رستوران سیاستِ بیعانه دارد';   // نامعلوم → فقط سیاست، بدونِ ادعای درگاه
+  }
   if(r?.depositRequired === false) return 'رزرو رایگان · بدون پیش‌پرداخت';
   return '';   // نامعلوم → سکوت، نه ادعا
 }
@@ -233,6 +262,51 @@ export function bookingStepCount(r){
   return orderableMenu(r).length ? 3 : 2;
 }
 
+/**
+ * «گامِ پیش‌سفارش در دسترس نیست» — و این با «منو خالی است» یکی نیست.
+ *
+ * ⚠️ `hasOrderableMenu` یک بولینِ اختیاری از **فیدِ فهرست** است، اگر روزی
+ * سرور بدهدش (پیشنهادِ طراح، لِینِ `api/**`). وقتی باشد، تصمیم **بدونِ هیچ
+ * رفت‌وبرگشتی** گرفته می‌شود و اسکلت اصلاً دیده نمی‌شود. تا آن روز مسیرِ
+ * `detailLoaded` کار می‌کند. هیچ‌کدام کدِ مرده نیست: اولی امروز undefined
+ * است، دومی حتی بعد از آن هم برای پاسخ‌های کَش‌شده‌ی قدیمی لازم می‌ماند.
+ */
+function menuUnavailable(r){
+  if (typeof r?.hasOrderableMenu === 'boolean') return !r.hasOrderableMenu;
+  return orderableMenu(r).length === 0;
+}
+
+/**
+ * حالتِ «هنوز نمی‌دانم» — شیت فوراً باز می‌شود تا زدنِ چیپ بی‌پاسخ نماند.
+ *
+ * ⚠️ قاعده (طراح، ۲۰۲۶-۰۹-۱۰): **فقط چیزی را اسکلت کن که نمی‌دانی.**
+ * نسخه‌ی اولِ من سراسر اسکلت بود و آن اشتباه بود: در این لحظه نامِ رستوران
+ * (`r.n` از رکوردِ فید) و تاریخ·ساعت·تعداد (`bk`، که `quickBook` و
+ * `startBook` هر دو **پیش از** فراخوانی کامل ست می‌کنند) کاملاً معلوم‌اند و
+ * صفر شبکه لازم دارند. نمایشِ فوری‌شان تأخیرِ ادراک‌شده را از هر اسپینری
+ * بیشتر کم می‌کند — و شیتی که سراسر اسکلت باشد این خطر را دارد که «خراب
+ * است» خوانده شود نه «در حالِ آمدن».
+ *
+ * ⚠️ سرتیتر عمداً عینِ `bookStep2` است (نام + تاریخ·ساعت·تعداد)، پس اگر به
+ * گامِ ۲ برسیم **هیچ تکانی** رخ نمی‌دهد. عنوانِ مخصوصِ گام همراهِ بدنه
+ * می‌آید، چون «تأیید اطلاعات» برچسبِ **گام** است نه سرتیترِ صفحه.
+ *
+ * ⚠️ و `stepBars` ندارد — دو دلیل: هنوز نمی‌دانیم دو گام است یا سه (شمارشِ
+ * حدسی یعنی ادعا پیش از دانستن)، و نوارِ جهت‌دهنده‌ای که **بعد از** محتوا
+ * ظاهر شود کارِ خودش را نقض می‌کند: دقیقاً وقتی کاربر شروع به خواندن کرده،
+ * صفحه تکان می‌خورد.
+ *
+ * از `.sk`ِ موجود استفاده می‌کند (که `prefers-reduced-motion` را رعایت
+ * می‌کند) تا کلاسِ تازه‌ای ساخته نشود.
+ */
+function bookStepLoading(r){
+  const facts = [bk?.date, bk?.time, bk?.party].filter(Boolean).map(esc).join(' · ');
+  return `<div class="sheet-title">${esc(r?.n || 'رزرو میز')}</div>
+    ${facts ? `<div class="sheet-sub">${facts}</div>` : ''}
+    <div class="sk" style="height:44px;margin:14px 0 10px"></div>
+    <div class="sk" style="height:44px"></div>`;
+}
+
 /** نوارِ مرحله از شمارِ **واقعی** ساخته می‌شود، نه سه‌تایِ ثابت. */
 function stepBars(total, current){
   let out = '';
@@ -247,9 +321,55 @@ function stepBars(total, current){
  * از این‌جا می‌روند. پیش‌تر هر دو عیناً `openSheet(bookStep2(findR(id)))`
  * داشتند؛ یک منطق در دو جا، که همان کلاسِ «یک واقعیت، چند رونوشت» است.
  */
-export function openBookingFlow(id){
+export async function openBookingFlow(id){
   const r = findR(id);
-  if (orderableMenu(r).length === 0) {
+  // ⚠️ [۲۰۲۶-۰۹-۱۰] `orderableMenu(r).length === 0` **دو معنیِ متفاوت** داشت و
+  // اپ هر دو را یکی می‌گرفت:
+  //     (الف) این رستوران منویی ثبت نکرده        ← واقعیت
+  //     (ب)  جزئیات هنوز بارگذاری نشده           ← نامعلوم
+  // و نامعلوم را به‌عنوانِ «ندارد» مصرف می‌کرد. همان تمایزِ `null` در برابرِ
+  // `false` که امروز یک لایه پایین‌تر (BE-004/ب) رفع شد.
+  //
+  // ⚠️ چرا این یک نقصِ واقعیِ فیچر بود، نه نظری: `menu` را فقط
+  // `applyRestaurantDetail` می‌نویسد، و آن فقط وقتی اجرا می‌شود که **صفحه‌ی
+  // رستوران** باز شود (`enrichRestPage`). ولی `quickBook` — چیپِ ساعت روی
+  // کارتِ فید — مستقیم به همین‌جا می‌آید. `select`ِ روتِ فهرست هم `menu`
+  // ندارد و برای رستورانِ زنده از دادهٔ نمونه هم قرض گرفته نمی‌شود (`isLive`).
+  // نتیجه: یک رستورانِ زنده **با منوی واقعی** که از چیپِ کارت رزرو شود، گامِ
+  // پیش‌سفارش را هرگز نمی‌دید؛ همان رستوران از صفحه‌ی خودش، می‌دید.
+  // فیچر بی‌صدا به مسیرِ ورود وابسته بود.
+  //
+  // پس پیش از تصمیم، اگر نمی‌دانیم، **می‌پرسیم**. پاسخ کش می‌شود، پس این
+  // برای همان رستوران بیش از یک بار هزینه ندارد.
+  //
+  // ⚠️ [DS · ۲۰۲۶-۰۹-۱۰] نسخه‌ی اولِ همین رفع، شیت را **پشتِ شبکه** نگه
+  // می‌داشت — و طراح درست گرفتش: مسیرِ فید **همان مسیرِ سریع** است و کلِ دلیلِ
+  // وجودِ `quickBook` همین بود. روی شبکه‌ی کند کاربر می‌زد و هیچ اتفاقی
+  // نمی‌افتاد؛ از دیدِ او یک **دکمه‌ی مرده**. یعنی داشتم یک نقص را با نقصِ
+  // دیگری عوض می‌کردم. سابقه‌اش هم در همین مخزن هست: `renderFeed` عمداً
+  // اسکلت نشان می‌دهد تا فاصله‌ی «زدم» تا «چیزی دیدم» به شبکه گره نخورد.
+  //
+  // پس ترتیب برعکس شد: **اول بازخورد، بعد داده.**
+  //   می‌دانیم    → فوری تصمیم، صفر تأخیر، هیچ اسکلتی
+  //   نمی‌دانیم   → شیت **بلافاصله** با اسکلت باز می‌شود، بعد پر می‌شود
+  const known = !!r?.detailLoaded || typeof r?.hasOrderableMenu === 'boolean';
+  if (!known) {
+    openSheet(bookStepLoading(r));   // ← پیش از هر await
+    if (r?.slug && API.online) {
+      const d = await loadRestaurantDetail(r.slug);
+      if (d) applyRestaurantDetail(r, d);
+    }
+  }
+  // ⚠️ اگر درخواست شکست بخورد باز هم نمی‌دانیم. آن حالت عمداً مثلِ «منو
+  // ندارد» رفتار می‌کند — چون بدیلش رندرِ یک بخشِ پیش‌سفارشِ خالی است که R1
+  // قبلاً ثابت کرد شبیهِ باگِ بارگذاری به نظر می‌رسد، و چون خودِ UI این گام
+  // را «(اختیاری)» برچسب زده: گروگان‌گرفتنِ هدفِ کاربر پشتِ یک قابلیتِ
+  // اختیاری ترتیبِ اولویت را وارونه می‌کند.
+  // ⚠️ ولی این **تبادل است، نه رایگان**: کاربر در آن حالت بی‌صدا توانِ
+  // پیش‌سفارش را از دست می‌دهد. تفاوتش با سکوت‌هایی که محکوم کرده‌ایم این
+  // است که گذرا و نادر است و مسیرِ صفحه‌ی رستوران همچنان کار می‌کند — نه
+  // اینکه بی‌هزینه باشد.
+  if (menuUnavailable(r)) {
     // ⚠️ `bk.preorder` را **صریح** خالی می‌کنیم. `toBookStep3` تنها نویسنده‌اش
     // بود و با پریدن از گامِ ۲ اصلاً اجرا نمی‌شود. `setBk` شیء را کامل
     // جایگزین می‌کند پس حالتِ کهنه عملاً ممکن نیست — ولی آن ضمانت در فایلِ
@@ -381,12 +501,19 @@ export async function confirmBook(id){
     ...(preferences?.length ? { preferences } : {}),
   },{ 'Idempotency-Key': genIdempotencyKey() });
 
-  let code;
+  let code, bookedStatus=null;
   if(res.ok && res.data?.code){
     // رزرو واقعی در دیتابیس ثبت شد (بک‌اند code را در سطحِ بالا برمی‌گرداند)
     // ⚠️ هپتیکِ success فقط همین‌جا زده می‌شود — دقیقاً همون شرطی که سرور واقعاً
     // res.ok داد؛ هیچ مسیرِ دیگری (دمو/آفلاین) این الگو را نمی‌گیرد.
     code=res.data.code;
+    // ⚠️ A1-006 (۲۰۲۶-۰۹-۱۰): وضعیتِ **واقعی** هم برداشته می‌شود، نه فقط کد.
+    // سرور `status` را در همان پاسخ می‌دهد (`reservations.ts:481`) و این اپ
+    // تا امروز فقط `code` را می‌خواند و بعد بی‌قیدوشرط «رزرو تأیید شد!»
+    // می‌گفت — در حالی که رستورانی که `auto_confirm` را خاموش کرده، رزرو را
+    // `pending` می‌گیرد (`reservations.ts:375`). یعنی مشتری «تأیید شد» می‌دید
+    // و میزش قطعی نبود.
+    bookedStatus=res.data.status||null;
     haptic('success');
   } else if(res.offline){
     // ⚠️ رفعِ P0-3 (فازِ ۲، پروتکل §۳ — «A customer must NEVER see … fake
@@ -462,12 +589,20 @@ export async function confirmBook(id){
   // امتیازِ محلی جعل نمی‌شود؛ عددِ واقعی از سرور می‌آید (وقتی رزرو «انجام‌شد»
   // علامت بخورد XP واقعی ثبت می‌شود؛ اینجا فقط چیپِ نوارِ بالا همگام می‌شود).
   syncNavPoints();
-  TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up'});
+    // ⚠️ A1-006: ردیفِ سفرها هم وضعیتِ واقعی را می‌برد، وگرنه شیت «در انتظار»
+  // می‌گفت و فهرست «پیش‌رو» — دو صفحه‌ی یک اپ، دو حرف.
+  TRIPS.unshift({rid:id,date:bk.date,time:bk.time,party:bk.party,code,status:'up',awaitingApproval:bookedStatus==='pending'});
   sheetBody.innerHTML=`
     <div class="success">
       <div class="success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div>
-      <div class="sheet-title" style="text-align:center">رزرو تأیید شد!</div>
-      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}<br>یادآور با پیامک می‌فرستیم</div>
+      <!-- ⚠️ A1-006: عنوان از **وضعیتِ واقعی** مشتق می‌شود، نه ادعا.
+           الگوی درست از قبل در همین اپ بود — «reservation.js:76»
+           («awaitingApproval») همین نقص را برای فهرستِ سفرها رفع کرده و
+           کامنتش هم همین را می‌گوید: «مشتری فکر می‌کرد میزش قطعی است در
+           حالی که رستوران هنوز تأیید نکرده». شیتِ موفقیت آن رفع را نگرفته
+           بود. مکانیزمِ تازه‌ای ساخته نشد؛ همان انضباط به این‌جا آمد. -->
+      <div class="sheet-title" style="text-align:center">${bookedStatus==='pending'?'رزرو ثبت شد — در انتظارِ تأیید':'رزرو تأیید شد!'}</div>
+      <div class="sheet-sub" style="text-align:center">${esc(r.n)} · ${esc(bk.date)} · ${esc(bk.time)}<br>${bookedStatus==='pending'?'این رستوران رزروها را دستی تأیید می‌کند — نتیجه را پیامک می‌کنیم':'یادآور با پیامک می‌فرستیم'}</div>
       <div class="code-box"><div class="cl">کد رزرو</div><div class="cv">${esc(code)}</div><button class="copy-btn" onclick="copyCode(${jsq(code)})" aria-label="کپی کد رزرو">⧉ کپی کد</button></div>
       ${(r.cb>0)?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
       <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:4px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
@@ -481,17 +616,33 @@ export function copyCode(c){haptic('light');const done=()=>toast('⧉','کد ک�
 // «کِی» و «چند نفر» پیش از این سه/پنج گزینه‌ی ثابت داشتند که هیچ‌کجا خوانده
 // نمی‌شد؛ کاربر انتخاب می‌کرد و هیچ اتفاقی نمی‌افتاد. حالا همان زمینه‌ی رزرو را
 // می‌نویسند، پس انتخابشان تا شیتِ رزرو و تا رستورانِ بعدی دنبال می‌آید.
-export function initSearchCtx(){
-  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
-  if(!when||!party) return;
+/**
+ * شیتِ «کِی و چند نفر» — جانشینِ دو selectِ هیرو.
+ *
+ * ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] چرا این با رفتنِ هیرو **لازم** شد و یک راحتی
+ * نیست: چیپِ «۱۹:۰۰» روی کارت یعنی «۱۹:۰۰ِ **امروز، ۲ نفر**»، و `quickBook`
+ * مستقیم به گامِ بعد می‌پرد. اگر کاربر پنجشنبه‌ی ۴ نفره می‌خواست و هیچ جایی
+ * برای گفتنش **پیش از** زدنِ چیپ نداشت، چیپ قولی می‌داد برای روزِ اشتباه و
+ * او تا شیتِ تأیید نمی‌فهمید. یعنی برداشتنِ هیرو بدونِ این، یک نقصِ **صحت**
+ * می‌ساخت نه یک تغییرِ چیدمان. (یافته‌ی طراح، پیش از آنکه من دست بزنم.)
+ *
+ * پیش‌فرض همان «امروز · ۲ نفر» می‌ماند برای کسی که فقط می‌خواهد ببیند.
+ */
+export function openSearchCtxSheet(){
   const dates=dateOptions();
   const sel=dates.some(d=>d.iso===bookingCtx.date)?bookingCtx.date:dates[0].iso;
-  when.innerHTML=dates.map(d=>`<option value="${esc(d.iso)}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('');
-  party.innerHTML=Array.from({length:PARTY_MAX},(_,i)=>i+1)
-    .map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('');
+  openSheet(`<div class="sheet-title">کِی و چند نفر؟</div>
+    <div class="sheet-sub">ساعت‌هایِ رویِ کارت‌ها با همین تنظیم حساب می‌شوند</div>
+    <div class="bw-field"><label for="ctxWhen">تاریخ</label><select id="ctxWhen" onchange="syncSearchCtx()">${
+      dates.map(d=>`<option value="${esc(d.iso)}"${d.iso===sel?' selected':''}>${esc(d.label)}</option>`).join('')
+    }</select></div>
+    <div class="bw-field"><label for="ctxParty">تعداد نفر</label><select id="ctxParty" onchange="syncSearchCtx()">${
+      Array.from({length:PARTY_MAX},(_,i)=>i+1).map(n=>`<option value="${n}"${n===bookingCtx.party?' selected':''}>${fmtFa(n)} نفر</option>`).join('')
+    }</select></div>
+    <button class="btn btn-primary btn-block" onclick="closeSheet()">باشه</button>`);
 }
 export function syncSearchCtx(){
-  const when=document.getElementById('sWhen'), party=document.getElementById('sParty');
+  const when=document.getElementById('ctxWhen'), party=document.getElementById('ctxParty');
   setBookingCtx({
     date: when?.value || bookingCtx.date,
     party: parseInt(party?.value,10) || bookingCtx.party,
@@ -502,7 +653,12 @@ export function syncSearchCtx(){
   // کشف روی صفحه نباشد (مثلاً کاربر در صفحه‌ی رستوران است)، doSearch به‌طورِ
   // بی‌خطر روی عنصرهایِ نامعتبر no-op می‌شود (querySelector آن‌ها را پیدا
   // نمی‌کند)، پس نیازی به چک‌کردنِ صفحه‌ی فعلی نیست.
-  if(document.getElementById('sQ')) doSearch();
+  // ⚠️ [DS-007 §۶] شرطِ قبلی `#sQ` بود — ورودیِ هیرو. با رفتنِ هیرو آن شرط
+  // **همیشه غلط** می‌شد و این خط بی‌صدا از کار می‌افتاد: کاربر تاریخ را عوض
+  // می‌کرد و سطرِ «امروز · ۲ نفر» همان می‌ماند. خطایی هم نبود که کسی ببیند.
+  // حالا وجودِ خودِ سطرِ زیرِ فید سنجیده می‌شود — همان چیزی که قرار است
+  // به‌روز شود.
+  if(document.querySelector('#page-discover .section-sub')) doSearch();
   // چیپ‌هایِ ساعتِ کارت‌ها برایِ تاریخ/تعدادِ نفرِ *قبلی* حساب شده‌اند — باطل
   // و دوباره واکشی می‌شوند. بدونِ این، انتخابِ «فردا، ۶ نفر» ساعت‌هایِ «امروز،
   // ۲ نفر» را زیرِ برچسبِ جدید نشان می‌داد.
@@ -519,6 +675,8 @@ window.confirmBook = confirmBook;
 window.copyCode = copyCode;
 window.refreshSlots = refreshSlots;
 window.syncSearchCtx = syncSearchCtx;
-// نوارِ جست‌وجو باید همان اول پر شود، وگرنه دو selectِ خالی دیده می‌شوند.
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSearchCtx);
-else initSearchCtx();
+window.openSearchCtxSheet = openSearchCtxSheet;
+// ⚠️ [DS-007 §۶] قلابِ DOMContentLoaded که `initSearchCtx` را صدا می‌زد
+// برداشته شد: آن تابع دو **selectِ هیرو** را پر می‌کرد و هیرو دیگر نیست.
+// حالا گزینه‌ها هنگامِ بازشدنِ شیت ساخته می‌شوند، یعنی همیشه با
+// `bookingCtx`ِ لحظه می‌خوانند — نه با مقداری که در بوت فریز شده بود.

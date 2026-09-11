@@ -115,7 +115,11 @@
 /* کلاس‌های شیشه و حرکت (قابل‌استفاده در کل اپ) */
 .glass{position:relative;background:var(--glass);-webkit-backdrop-filter:blur(22px) saturate(190%);backdrop-filter:blur(22px) saturate(190%);border:1px solid var(--border);box-shadow:var(--sh-md)}
 .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;background:linear-gradient(140deg,var(--glass-hi),transparent 40%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
-.reveal{opacity:0;transform:translateY(24px) scale(.97);transition:opacity .55s var(--ease),transform .55s var(--spring)}
+/* DS-008: reveal کوتاه و بی‌فنر. نسخه‌ی قبل ۵۵۰ms با overshootِ spring و scale(.97)
+   بود — کارت «می‌پرید» داخل. تیک‌تاک/اینستاگرام کارت را نمی‌پرانند؛ ۳۲۰ms ease-out،
+   فقط ۱۴px بالا، بدونِ مقیاس. روی مرورگرهای با animation-timeline، فیدِ کشف به‌جای
+   این از حرکتِ اسکرول‌محورِ foundation استفاده می‌کند (پایین‌تر). */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity var(--motion-slow,320ms) var(--ease-out),transform var(--motion-slow,320ms) var(--ease-out)}
 .reveal.in{opacity:1;transform:none}
 /* ─── بنر نصب اپ (PWA) ─── */
 .install-banner{position:fixed;bottom:16px;left:16px;right:16px;max-width:448px;margin:0 auto;z-index:200;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r-xl);background:var(--glass-2);opacity:0;transform:translateY(20px);transition:opacity .3s var(--ease),transform .3s var(--spring)}
@@ -134,7 +138,14 @@
 @media(prefers-reduced-motion:reduce){.reveal{opacity:1!important;transform:none!important}*{animation:none!important}}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-body{font-family:var(--font-ui);background:var(--mesh),var(--bg);background-attachment:fixed;color:var(--t1);
+/* DS-008 (۲۰۲۶-۰۹-۱۰): مشِ پنج‌رنگِ radial با attachment:fixed برداشته شد.
+   دو دلیل، هر دو خواسته‌ی مالک: (۱) «مینیمال» — پس‌زمینه با کارت‌ها رقابت
+   می‌کرد؛ در تیک‌تاک/اینستاگرام محتوا رنگ است، نه صفحه. (۲) «اسکرولِ زنده» —
+   background-attachment:fixed روی گرادیانِ چندتوقفی یعنی هر فریمِ اسکرول کلِ
+   viewport دوباره رنگ می‌شود؛ یکی از شناخته‌شده‌ترین علت‌های افتِ فریم روی
+   موبایل. اندازه‌گیریِ قبل/بعد در DS-008. --mesh خودش حذف نشد (theme.css و
+   کارت‌های مناسبت ممکن است بخواهندش)؛ فقط از body برداشته شد. */
+body{font-family:var(--font-ui);background:var(--bg);color:var(--t1);
   font-size:15px;line-height:1.6;min-height:100vh;min-height:100svh;overflow-x:hidden;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;transition:color .35s var(--ease)}
 button,input,select,textarea{font-family:inherit;font-size:inherit}
 img{display:block;max-width:100%}
@@ -209,10 +220,28 @@ img{display:block;max-width:100%}
 
 /* ─────────── CONTAINER ─────────── */
 .wrap{max-width:1140px;margin:0 auto;padding:0 20px}
-.section{padding:40px 0}
+.section{padding:28px 0} /* DS-008: ۴۰→۲۸ — هوای بینِ بخش‌ها کمتر، فید پیوسته‌تر */
 .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .section-title{font-size:21px;font-weight:800;letter-spacing:-.03em}
 .section-sub{font-size:14px;color:var(--t2);margin-top:2px}
+/* ⚠️ [DS-007 §۶] قرصِ زمینه‌ی جست‌وجو — «امروز · ۲ نفر ▾».
+   متنش از قبل همین‌جا نوشته می‌شد ولی لمس‌پذیر نبود؛ با رفتنِ هیرو این تنها
+   جایی است که کاربر می‌تواند **پیش از زدنِ چیپِ ساعت** تاریخ/تعداد را بگوید.
+   ⚠️ **۳۲px نقاشی، ۴۴px هدف.** نسخه‌ی اولِ من ۳۲ بود و در کامنت نوشته بودم
+   «تبادلِ آگاهانه زیرِ `--touch-min`». طراح ردش کرد و درست بود: WCAG 2.5.5
+   درباره‌ی **هدفِ لمس** است، نه جعبه‌ی رنگ‌شده. یعنی آن «تبادل» از اول لازم
+   نبود — من یک محدودیتِ جعلی ساخته بودم و بعد برایش توجیه نوشتم.
+   پس `::before` ناحیه‌ی لمس را عمودی به ۴۴ می‌رساند (۳۲ + ۲×۶) بدونِ اینکه
+   سطرِ متن بشکند. ⚠️ و اندازه‌گیری باید روی **همان ناحیه** باشد نه روی خودِ
+   عنصر، وگرنه عدد ۳۲ می‌دهد و دوباره همان نتیجه‌ی غلط گرفته می‌شود. */
+.ctx-pill{position:relative;display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:4px 10px;margin-inline-start:2px;
+  font:inherit;color:var(--t1);background:var(--s-50,rgba(0,0,0,.04));border:1px solid var(--border);
+  border-radius:999px;cursor:pointer;transition:background var(--t-fast)}
+.ctx-pill::before{content:'';position:absolute;inset:-6px 0;border-radius:inherit}
+.ctx-pill:hover{background:var(--s-100,rgba(0,0,0,.07))}
+.ctx-pill:focus-visible{outline:2px solid var(--blue,#4F8CFF);outline-offset:2px}
+.ctx-pill:active{transform:scale(.96)}
+@media (prefers-reduced-motion: reduce){ .ctx-pill:active{transform:none} }
 .link-more{color:var(--blue);font-weight:600;font-size:14px;cursor:pointer;background:none;border:none;display:flex;align-items:center;gap:4px;transition:gap var(--t-fast)}
 .link-more:hover{gap:8px}
 
@@ -258,6 +287,32 @@ img{display:block;max-width:100%}
 
 /* ─────────── RESTAURANT CARD ─────────── */
 .grid{display:grid;grid-template-columns:1fr;gap:18px}
+
+/* ═══ DS-008: فیدِ کشف — اسکرولِ زنده (۲۰۲۶-۰۹-۱۰) ═══
+   سه چیز، همه CSS، هیچ تغییری در مارک‌آپ/JS:
+   ۱) snapِ نرم روی کارت: html وقتی صفحه‌ی کشف فعال است scroll-snap-type:y proximity
+      می‌گیرد. proximity نه mandatory — اینستاگرام اسکرول را نمی‌دزدد، فقط اگر نزدیکِ
+      یک کارت ایستادی رویش «می‌نشیند». تیک‌تاک mandatory است ولی برای فیدِ رزرو
+      (کارت‌های ۲۷۰px، نه تمام‌صفحه) mandatory هر فلیک را یک کارت می‌کند و کلافه‌کننده
+      می‌شود. scroll-padding-top = ارتفاعِ navِ چسبان + نفس.
+   ۲) حرکتِ اسکرول‌محور (foundation.css، .ds-scroll-live): کارت هنگامِ ورود می‌نشیند و
+      پس‌زمینه‌اش پارالاکسِ ملایم دارد. #feed خودش کانتینر است؛ .rc-bg پس‌زمینه.
+      چون کلاس در مارک‌آپ نیست، همان قواعد اینجا روی #feed تکرار می‌شود — منبعِ
+      keyframes همچنان foundation است (یک تعریف).
+   ۳) روی مرورگرِ بدونِ animation-timeline، .reveal (بالا) همچنان کار می‌کند؛ روی
+      مرورگرِ با آن، هر دو فعال‌اند و تداخل ندارند (reveal روی .rc، drift روی .rc-bg،
+      settle روی opacity/translate که reveal.in به none برمی‌گرداند — انیمیشن بعد از
+      transition اعمال می‌شود و برنده است، پس عملاً settle حرف می‌زند). */
+html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:74px}
+#feed>.rc{scroll-snap-align:start;scroll-margin-top:12px}
+@supports (animation-timeline: view()){
+  #feed>.rc{animation:ds-settle-in linear both;animation-timeline:view();animation-range:entry 0% entry 55%}
+  #feed>.rc .rc-bg{animation:ds-bg-drift linear both;animation-timeline:view();animation-range:entry 0% cover 45%}
+}
+@media (prefers-reduced-motion: reduce){
+  #feed>.rc,#feed>.rc .rc-bg{animation:none!important}
+  /* snap حرکت نیست؛ می‌ماند — ولی مقدارِ نرم (proximity) است، نه mandatory */
+}
 /* دکمه‌ی «رستوران‌های بیشتر» فرزندِ مستقیمِ #feed است؛ باید کلِ عرضِ گرید را
    بگیرد نه یک سلول را. min-height برای هدفِ لمسیِ ≥۴۴px. */
 .feed-more{grid-column:1/-1;min-height:48px}
@@ -822,7 +877,20 @@ img{display:block;max-width:100%}
 
 @media(max-width:880px){
   .nav-links{display:none}
-  .nav-right{display:none}
+  /* ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] پیش از این کلِ `.nav-right` روی موبایل حذف
+     می‌شد، چون ناوبری به `.botnav` منتقل می‌شود. ولی دکمه‌ی جست‌وجو هم داخلِ
+     همین ظرف بود — یعنی `openPalette()` در DOM وجود داشت و **روی گوشی هرگز
+     دیده نمی‌شد** (اندازه‌گیریِ طراح در ۳۹۰×۸۴۴: `visible:false`). تا امروز
+     بی‌اهمیت بود چون هیرو نوارِ جست‌وجوی خودش را داشت؛ با رفتنِ هیرو، این
+     تنها راهِ رسیدن به جست‌وجو است.
+     پس ظرف نمایان می‌شود ولی **فقط** موارد `nav-keep`:
+       🔍      تنها راهِ جست‌وجو
+       🌙      تنها صداکننده‌ی `toggleTheme` (وگرنه قابلیت حذف می‌شد)
+     زنگِ اعلان و pill امتیاز عمداً مخفی می‌مانند — ناوبری و اعلان روی موبایل
+     کارِ `.botnav` است و شلوغ‌کردنِ نوارِ بالا هدفِ «فید اول» را نقض می‌کند. */
+  .nav-right{display:flex}
+  .nav-right>*{display:none}
+  .nav-right>.nav-keep{display:inline-flex}
   .botnav{display:flex}
   body{padding-bottom:70px}
   .searchbar{flex-wrap:wrap;border-radius:var(--r-xl);padding:6px}
@@ -831,6 +899,22 @@ img{display:block;max-width:100%}
   .search-go{width:100%;border-radius:var(--r);margin-top:6px;height:46px}
   .grid{grid-template-columns:1fr;gap:18px}
   .section{padding:28px 0}
+  /* ⚠️ [DS-007 §۶] ریتمِ عمودیِ **بالای فید** روی موبایل فشرده‌تر شد.
+     اندازه‌گیری پس از برداشتنِ هیرو: اولین کارت در ۴۱۰px بود — یعنی هیرو
+     بزرگ‌ترین مقصر بود (۹۸۲ → ۴۱۰) ولی به‌تنهایی کافی نبود. تفکیکِ باقی‌مانده:
+         nav ۶۲ + occ-wrap ۱۷۰ + chips ۵۶ + پدینگِ بالای section ۲۸ = ۴۱۰
+     این دو قاعده فقط فاصله‌ی **پیش از** فید را می‌گیرند و به خودِ کارت‌ها یا
+     ردیفِ مناسبت‌ها دست نمی‌زنند. ⚠️ عمداً `.section:first-of-type` نیست:
+     همه‌ی سکشن‌های صفحه‌ی کشف پشتِ سرِ هم‌اند و یک قاعده‌ی عمومی، فاصله‌ی
+     میانِ آن‌ها را هم می‌شکست. */
+  #page-discover .occ-q{margin-bottom:8px}
+  /* ⚠️ سکشنی که `#feed` را دارد — با `:has()` به خودِ فید لنگر می‌اندازد، نه
+     به ترتیبِ همسایه‌ها. نسخه‌ی اولِ من `.occ-wrap+.chips+.wrap.section` بود و
+     **هیچ‌چیز را مچ نکرد** (۴۱۰ → ۴۰۶، یعنی فقط قاعده‌ی occ-q اثر کرد): در
+     واقع `occ-wrap` و `chips` هر دو داخلِ یک `.wrap`ِ دیگرند و این سکشن
+     همسایه‌ی آن `.wrap` است، نه همسایه‌ی `chips`. حدسِ ساختار با اندازه‌گیری
+     رد شد — و اگر فقط عددِ نهایی را دیده بودم، «کار کرد» می‌نوشتم. */
+  #page-discover .wrap.section:has(#feed){padding-top:14px}
   .rp-layout{grid-template-columns:1fr;gap:0}
   .book-widget{position:fixed;bottom:70px;left:0;right:0;border-radius:var(--r-xl) var(--r-xl) 0 0;z-index:60;padding:16px 20px;box-shadow:var(--sh-xl)}
   .gallery{grid-template-columns:1fr 1fr;height:280px}

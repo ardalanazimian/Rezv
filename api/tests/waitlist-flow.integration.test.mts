@@ -55,6 +55,12 @@ async function seedOffer(table: { id: string; number: number }, expiresAt: Date,
       joinedAt: new Date(Date.now() - joinedMinutesAgo * 60_000),
       offeredAt: new Date(Date.now() - 60_000), offerExpiresAt: expiresAt,
       offeredTableId: table.id, offeredTableNumber: table.number,
+      // ⚠️ BE-006: در تولید `promoteNext` این را وقتی می‌نویسد که دستِ‌کم یک
+      // کانالِ اعلان واقعاً dispatch شده باشد. این fixture مسیرِ `promoteNext`
+      // را دور می‌زند، پس باید صریح بنویسدش — وگرنه مهمانی می‌سازد که هرگز
+      // خبردار نشده، و آن‌وقت `expireOffers` به‌درستی `expired` می‌گذارد نه
+      // `no_response`، و ادعای این تست دیگر آن چیزی نیست که قصدش بود.
+      offerNotifiedAt: new Date(Date.now() - 60_000),
     },
     select: { id: true },
   });

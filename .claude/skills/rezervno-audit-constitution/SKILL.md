@@ -222,6 +222,165 @@ author — auditing us — had to lowercase `EXIT=` to `exit=` and elide a hostn
 recorded evidence** to get the gate green. The gate was editing the record. If a check punishes
 verbatim evidence, the check is wrong, not the evidence.
 
+## 4d. Three promoted 2026-09-10 — all from the Backend Engineer session, all about scope
+
+**Turn the claim into a testable condition BEFORE you write the guard.** Asked to pin the one
+positioning line the brand rests on — *"nothing costs you money or points until you have been shown
+it"* — the engineer deliberately wrote **zero lines of guard** and came back with a finding instead:
+the claim was **narrower than the code**. The only deduction actually enforced today is neither money
+nor points; it is *credit* (`economy.ts` writes a reduced point award and a `strike`, with zero
+references to `points_ledger` in that file). A guard written the day before would have measured the
+wrong thing — and worse, to stay green it would have had to **deliberately ignore a real deduction**,
+which is the exact fake-green shape the guard existed to prevent. A guard cannot be more correct than
+the sentence it pins.
+
+The condition that replaced it is a **transition** rule, not a snapshot:
+
+```text
+for every cost-bearing field f:   enforced(f) ⇒ exposed_to_diner(f)
+```
+
+A snapshot of "everything is off today" stays green through the first wiring that turns something on
+— **the danger is the transition, not the present state.** Any guard whose subject can be switched on
+later must be written against the switch, not against the current position.
+
+**A guard for a temporary condition needs an expiry; a guard for an invariant must not have one.**
+Two guards landed the same afternoon and only one is self-retiring by design. The referral guard
+holds a promise hidden *while* `completeReferral` has no callers — the day it gains one, that guard
+goes red and says "restore the copy and delete this file". Correct: it protects a temporary state,
+and outliving that state turns it into a lock on the very fix it was waiting for. C1 above is the
+opposite: it is an invariant, and self-retiring it would have switched it off **exactly when it
+starts to matter** — at the transition. Before adding an expiry, ask which of the two you are
+holding.
+
+**A green guard beside a false sentence is worse than no guard**, because after it nobody looks. The
+backend half of a fix (put the field in the response) and the frontend half (derive the copy from it)
+were assigned to two sessions; the guard measures *data availability*, not *copy honesty*, so the
+backend half landing alone would have turned the check green while the app kept asserting the
+opposite. Ruling: the two halves reach `main` together or neither does. State in the guard's own
+output — and in `ci.yml`, where the green is actually printed — what its green does **not** mean.
+
+## 4e. Where a mutant survives, CI is scenery — promoted 2026-09-10
+
+**A surviving mutant converts "the tests are green" into "the tests are not watching."** Earlier
+mutation work on `waitlist.ts` established that deleting the expiry condition from `expireOffers`
+turns **no test red**. That fact outlives whatever bug is being fixed there today: any change to that
+function passes CI for a structural reason, not a safe one.
+
+Two consequences, and the second is the one teams skip:
+
+- **A second reader is the substitute for the absent guard.** When a proposed fix lands in a region
+  with a known surviving mutant, hold it for review. This is not caution about the author; it is that
+  the normal safety net has been *measured* to be missing, so the usual reason to trust green is gone.
+- **The surviving mutant is its own row, not a subtask of the bug.** Fix the bug and the hole remains,
+  in the same place, ready to hide the next defect. And usually the test that kills the mutant is the
+  same test that would have caught the bug — which is why it is cheaper than it looks.
+
+**The instance that proved it, and it is a better warning than the rule.** The fix under review would
+have swept rows in state `accepted` with no `reservationCode`, keyed on the offer's expiry. The
+reviewer found that this is not only the stuck state — it is **the normal transient state of every
+successful acceptance**, in the window between the claim (`waitlist.ts:676`, sets `status` and
+`respondedAt`) and the code write (`:722`), which spans a `createReservation` with a 10s transaction
+timeout. A guest accepting one second before TTL while the sweep fires mid-transaction would have had
+their table freed *while the reservation for it was being created* — **a double-booking defect
+arriving inside a data-quality fix**, in a region where no test would have gone red.
+
+The general shape to look for before widening any sweep: **is the state you are about to call "stuck"
+distinguishable from a state the happy path passes through?** If the only difference is time, key on
+dwell time — not on some other clock that happens to be nearby.
+
+## 4f. A guard that cannot tell prose from code can be disarmed by a comment
+
+Promoted 2026-09-10. **Two sessions found this class independently, in two different files, on the
+same day — and the first fix each of them wrote was incomplete.** That is what makes it a rule rather
+than two bugs.
+
+It cuts **both ways**, and the second direction is the one that hides:
+
+- **False positive.** A comment *quoting* a claim that was removed — «the 500-point line was deleted»
+  — reads to the scanner as a live claim, and the guard goes red on the author's own explanation of
+  a deletion.
+- **False negative, and worse.** A claim deleted from the UI but still quoted in a comment
+  **satisfies the guard's anchor**, so the check stays green while the artefact no longer says the
+  thing at all. A guard blind from birth: it never went red, so nobody suspected it. The same shape
+  turned up in a brand-new guard the same afternoon, where a trailing end-of-line comment silenced
+  the C1 check.
+
+**The rule is not "strip comments."** An unqualified strip is itself dangerous, and the correct
+treatment depends on what is being pinned:
+
+| Subject | Treatment | Why |
+|---|---|---|
+| `.ts` / `.mts`, string keys, constants | **line-oriented**: exclude comment lines from the scan | The anchor is exact; a missed line is a real gap and precision costs nothing |
+| Persian user-facing copy | **conservative**: keep the text in scope, report and let a human judge | Here **a missed claim is worse than a spurious report** — the failure mode is a promise the product cannot keep |
+
+**Separate prose from code; never forbid it.** A check that punishes verbatim evidence corrupts the
+record it exists to protect (see §4c) — but a check that *accepts* prose as evidence of the thing
+itself is worse, because it fails silent.
+
+**Two method notes from the same day, both cheap and both nearly missed:**
+
+- **"It was already broken" needs a measurement exactly as much as "I broke it."** The first instinct
+  on finding CI red was that it predated the author's commit. A bisect with directly-read exit codes
+  showed the opposite: it began at their own commit. And the first attempt at that bisect read the
+  exit code from the **end of a pipe** — `0` from `tail`, not from `node` — which would have
+  produced the confident, wrong report.
+- **Killing a test run poisons the database, and the resulting red looks exactly like a code
+  regression.** Twelve failures, all `Unique constraint failed on (code)`, all in one file, caused by
+  two runs killed mid-flight seeding fixed values. A fresh database gave 2192/0. "Fresh database for
+  every proof" is what stopped a false report here.
+
+## 4g. One run is a sample, not a measurement — promoted 2026-09-10
+
+**Two sessions reached this independently on the same day, from opposite directions.** That is what
+makes it a rule rather than two anecdotes.
+
+- **The Backend Engineer nearly rewrote a correct design to chase a regression that did not exist.**
+  A seven-file waitlist subset gave 11 failures with their fix and 1 without. Two hypotheses were
+  built and both were falsified by measurement. Only then came the question that should have been
+  first — *is the baseline stable?* Three baseline runs, no change at all: **5, 4, 5 failures, with
+  no failure common to all three.** The "1" was a lucky run, and the entire attribution rested on it.
+- **The Designer retracted a frame-time number after reporting it.** One run said p95 33.4ms, "no
+  long stalls". Five runs said: p95 **50ms** in three of five, ~35% of frames over 33ms, and stalls
+  of **66–83ms in two of five**. The first number was not wrong by a little; it described a different
+  system.
+
+**The rule: before attributing any delta, measure the baseline more than once. Report every timing
+number with N and a distribution, never as a single figure.** A single run of a concurrent or
+timing-sensitive subject tells you almost nothing, and its confident shape is exactly what makes it
+dangerous.
+
+Two corollaries paid for the same day:
+
+- **A subset run can be inherently flaky where the full suite is green.** Those seven waitlist files
+  fail 4–5 at random in isolation and pass 1755/1755 in the full suite. Anyone bisecting with the
+  subset reaches the same dead end. Where that is true, say so **in the file header**, not only in a
+  commit message.
+- **Do not interpret a pattern you have not explained.** Runs 1–3 were worse than 4–5 — browser
+  warm-up, or noise. The Designer recorded the shape and explicitly declined to explain it. That is
+  the correct handling: an unexplained pattern is data; an invented cause is not.
+
+## 4h. Exists is not reachable — promoted 2026-09-10
+
+**Three instances in one day, in three different layers, all with the same shape: the thing was
+present, and the user still could not get it.**
+
+| Layer | Present | Yet |
+|---|---|---|
+| UI | `index.html:85` — a search button calling `openPalette()` | `app.css:825` hides its whole container under `max-width:880px`. **On a phone it does not exist.** |
+| API → app | `paymentEnabled` on the restaurant record | Two references in all of `api/src`, both inside `pay/route.ts`. It never reaches any diner-facing response, while the app asserts "online payment is not collected" |
+| Product | `completeReferral` — a correct, idempotent payer | Zero callers in `src`. The invite is recorded and the reward never fires |
+
+**Why it matters more than each instance:** the natural fix for all three is *"add the thing"* — and
+in all three the thing was already there. A spec written on that assumption produces a second copy
+that is just as unreachable, and everyone then believes it is solved. The UI case would have put a
+new search icon inside the same hidden container.
+
+**So: before adding a capability, prove it is absent — not merely that you did not see it.** And
+before claiming one is available, exercise it the way a user reaches it: render it at the real
+viewport, read it from the real response, call it from the real code path. **A grep proves presence;
+only a traversal proves reach.**
+
 ## 5. Every shipped artifact needs a CI job that actually builds it
 
 What is not built is broken and nobody knows. A `postinstall: prisma generate` hook broke

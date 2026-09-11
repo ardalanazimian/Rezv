@@ -171,3 +171,99 @@ Every "four surfaces" row has been UNKNOWN because staging does not exist. The f
 ## 10. One line for the CEO
 
 > Queue state at `410d376`, submitted. Top row by the founder's reframe: **three cashback percentages defaulted to 8/12/20 in `schema.prisma:176-178` with zero calculation sites — every restaurant is shown numbers that can never pay out.** Your unpark message's perk data is superseded by 039 (`5158083`): peak-hour priority is **PARTIAL, not FAKE** — `waitlist.ts:133-153` is real and running, and calling it FAKE would get a second priority mechanism built beside it. Two depth-3 rows **close on measurement**: `round-21` and `launch-hardening` are both `ahead=0`, so the other machine has no unmerged work; only `doc-audit` has one 13-day-old commit, likely stale. And there is a **fourth invisibility depth live right now** — 36 of Scout's files are **staged** in the shared index, which is worse than the other three because it misattributes rather than hides: use `git commit -- <path>`, never `git add -A`, until Scout commits. Five rows have **no owner**, including both feature-reality rows.
+
+---
+
+# ADDENDUM 2026-09-10 — "no users yet" RE-RANKS this queue; it does not relax it
+
+**Added by:** Deputy `rezv-0f [7ef389]` (was `rezv-fa [0a4dbb]` when the body above was written).
+**Trigger:** the founder answered "where does production run?" with **"on the laptop"**; the CEO
+measured the machine instead of recording the sentence (`044c5bc`); the Reviewer then bounded the
+conclusion (directive 047 §3).
+
+## A1. What is measured, and — the part that matters — what is not
+
+Reproduced independently in my session, all four of the CEO's observations:
+
+```text
+docker volume ls | grep pgdata                 → 0    (no production data volume)
+test -f api/.env                               → NO   (no production env file)
+docker ps -a | grep cron                       → 0    (cron container never created)
+grep -E '^\s+deploy:|compose .* up -d' ci.yml  → 0    (CI has no deploy job)
+```
+
+And the Reviewer's second leg, re-measured here **with a control**, because a resolver that answers
+nothing for everything proves nothing:
+
+```text
+nslookup rezervno.ir 8.8.8.8  → "can't find rezervno.ir: Non-existent domain"
+nslookup irna.ir     8.8.8.8  → 185.143.233.238        ← control: the resolver works
+```
+
+**I am adopting the Reviewer's narrowing verbatim rather than the flat claim**, because it is right
+and it costs nothing:
+
+> **Zero real users *reachable*.** Measured: no deployment on this machine, and the apex does not
+> resolve. **Not measured:** the hosted Supabase project `zmyuvtpbchytqvtgyewt` (reported
+> `ACTIVE_HEALTHY` today), and the second machine `DESKTOP-8DAJNO5`.
+
+That hosted database is **the only place a real user could be hiding**, and no laptop measurement can
+see it. **I could not query it even if it were mine to query:** every MCP in my session is
+disconnected — measured today, ToolSearch confirmed working first. And it is a founder decision
+regardless, since the project reported *hibernated* on 09-08 and a query wakes it — a state change on
+his infrastructure to settle an audit question.
+
+**The apex leg is the stronger of the two** and worth ranking that way: absence of a `pgdata` volume
+is a fact about one filesystem; a domain that does not resolve is a fact about the world.
+
+## A2. §7 of this document held under test — in the direction that costs us
+
+§7 ended: **"No row in this queue is marked green on the basis of a local walk, and none will be."**
+That sentence is what kept *"production runs on the laptop"* from being written down as *"production
+exists."* **A local stack and a deployment are the same bytes and different facts.**
+
+## A3. ⚠️ A sentence of my own that overstates — corrected
+
+§2's 🥇 row is titled *"Three cashback percentages **are shown to** paying restaurants."* With zero
+tenants, **nobody is being shown anything today.** The accurate claim is about the mechanism, not the
+audience: `schema.prisma:176-178` defaults `cbPreorderPct`/`cbVipPct`/`cbWinbackPct` to 8/12/20 while
+`reservations.ts:612` reads only `cbBasePct` — so **the first restaurant to sign up will be shown
+numbers that can never pay out.** Present tense was wrong. The finding is unchanged; it is a launch
+blocker, not a live harm.
+
+## A4. The re-rank — the axis changes, the standard does not
+
+The CEO's retraction of the E-002 line ("delay cost is not zero, only deferred") is correct: that
+sentence assumed a real user. With none, **today's cost of delay genuinely is zero**, and the clock
+starts at the first real signup.
+
+**But "no cost today" is not "less important" — it is a different axis, and this is precisely the
+moment a team defers everything and calls it prioritisation.** Every row in §2–§4 was ranked by
+harm-in-progress. That input is now zero for *all* of them, so it discriminates nothing. The axis
+that still discriminates is the founder's own reframe — **rank by what becomes expensive after
+launch**:
+
+| Row | Harm now | Cost after launch | Net |
+|---|---|---|---|
+| **F-1** cashback percentages | 0 | A number the product **asserts** to a paying customer. Wrong from the first signup; credibility and refunds are not recoverable | **unchanged — still first** |
+| **F-2** perk copy ahead of behaviour | 0 | Copy is the **cheapest** thing to change before launch and a **withdrawn promise** after | drops, but **must land before the first user** |
+| **F-3** slot-lock guard flaking | 0 | A concurrency guard is worth least when nobody is concurrent and most on day one — and cannot be validated once the load has arrived | **rises** |
+| **Gate (c)** nobody is paged | 0 | Rises at launch; worthless before | **correctly deferred** |
+| **B-2** 15 un-re-derived ORDER-001 rows | 0 | XSS is user-input-shaped; the population does not shrink with zero users, it is merely unmeasured | **unchanged — still unowned** |
+
+**The only row that genuinely relaxes is Gate (c). The only one that genuinely tightens is F-3.**
+
+## A5. Carried, and explicitly not verified by me
+
+- **BE-002 / `ef2df7b`,`458546e`:** CI builds **nine** CHECK constraints, production builds
+  **thirteen** — and the Reviewer adds that `db push` alone produces **zero**, so the guard is what
+  creates them at all. **The danger runs backwards:** bad code passes every test and dies only in
+  production. Same shape as ORDER-005's finding — a gate blind to the class it exists for — on the
+  schema axis instead of the type axis. Not mine, not verified here.
+- **`rezv-fb [64564e]` holds no role** — self-reported: no charter pasted, zero files written, waiting
+  on the founder. So today is **eight interactive sessions, seven roles**, and that gap is
+  **measured, not forgotten**. Recorded because this is exactly where the next session guesses. A
+  teammate cannot grant write permission, and none was given.
+- **A report from `rezv-fb` to the CEO (`msg_id 5bd2b893`) never arrived.** Cross-session messaging
+  dropped it silently — fresh evidence for the standing rule that **git is the channel and chat is
+  only a notification.** It is why this addendum is a commit rather than a reply.

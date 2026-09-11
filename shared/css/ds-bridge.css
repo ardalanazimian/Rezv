@@ -42,17 +42,53 @@
   font-size: var(--fs-md);
   min-height: var(--touch-min);
   border-radius: var(--radius-md);
-  transition: transform var(--motion-fast) var(--ease-out),
+  /* DS-006 §۴ (۲۰۲۶-۰۹-۱۰): فشارِ دکمه با فنر، نه با ease-out.
+     الگویِ برداشته‌شده: بازخوردِ لمسیِ دکمه در iOS/Instagram — فروترفتنِ
+     محسوس هنگامِ فشار و برگشتِ فنری با کمی overshoot هنگامِ رهاکردن. چرا
+     این و نه چیزِ دیگر: تنها حرکتی است که در هر ضربه‌ی کاربر تکرار می‌شود،
+     پس بیشترین اثر بر «حسِ خوب» را با کمترین سطحِ تغییر دارد.
+     مدت دست‌نخورده (130ms = بازه‌ی short/utility در M3: 50–200ms). فقط منحنیِ
+     transform فنری شد؛ رنگ/سایه/شفافیت همان ease-out می‌مانند تا فنر روی
+     چیزی جز هندسه اعمال نشود.
+     reduced-motion: سیاستِ سراسریِ tokens.css:187 مدت را 0.01ms می‌کند (فنر
+     حذف می‌شود). ⚠️ ولی app.css:534 که می‌خواست transform را هم خنثی کند،
+     زیرِ همین فایل می‌بازد — چون ds-bridge آخر لود می‌شود و `.btn:active`
+     اینجا با همان specificity دیرتر می‌آید. اندازه‌گیری (DS-006 §۴) نشان داد
+     دکمه در reduced-motion هنوز ۴٪ جمع می‌شد، بی‌حرکت ولی جمع. پس نیتِ
+     app.css:534 اینجا، در لایه‌ای که واقعاً برنده است، تکرار می‌شود (پایین). */
+  transition: transform var(--motion-fast) var(--ease-spring),
               background var(--motion-fast) var(--ease-out),
               box-shadow var(--motion-fast) var(--ease-out),
               opacity var(--motion-fast) var(--ease-out);
 }
-.btn:active { transform: scale(.98); }
+.btn:active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) {
+  /* بازخوردِ فشار فقط از رنگ/سایه می‌آید؛ هیچ تغییرِ هندسه‌ای، حتی آنی. */
+  .btn:active { transform: none; }
+}
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 /* ۳۶px زیرِ حداقلِ ۴۴px هر دو پلتفرم بود (WCAG 2.5.5). «کوچک» به عرض و وزنِ
    بصری برمی‌گردد، نه به کوچک‌کردنِ ناحیه‌ی لمس. */
 .btn-sm { min-height: var(--touch-min); font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); }
 .btn-lg { min-height: 44px; font-size: var(--fs-lg); padding: var(--sp-3) var(--sp-6); }
+
+/* ── ۲ب) هم‌ترازیِ دکمه‌های آیکونیِ نوارِ بالا (.nav-icn) به --touch-min ──
+   DS-007 §۶ (۲۰۲۶-۰۹-۱۰). app.css:482 آن‌ها را ۳۶×۳۶ تعریف می‌کند — زیرِ
+   --touch-min (۴۴px، WCAG 2.5.5)، همان نقصی که برای .btn-sm بسته شد. دو
+   مصرف‌کننده‌ی زنده: زنگِ اعلان و جست‌وجو/فرمان (index.html:81,85).
+   ⚠️ چرا .nav-icn و نه یک .icon-btnِ تازه در foundation: نامِ .icon-btn در
+   اپِ مشتری گرفته است (app.css:631 و :1026 — دو تعریف، هر دو زیرِ ۴۴) و
+   استفاده می‌شود (chat.js)؛ اولیه‌ی هم‌نامِ متفاوت یا شکلِ چت را عوض می‌کرد
+   یا زیرِ app.css بی‌اثر می‌ماند. LE این را پیش از تصادم گرفت.
+   فقط ابعاد و حرکت؛ رنگ/شکلِ خودِ اپ دست‌نخورده. */
+.nav-icn {
+  width: var(--touch-min); height: var(--touch-min);
+  transition: transform var(--motion-fast) var(--ease-spring),
+              background var(--motion-fast) var(--ease-out),
+              color var(--motion-fast) var(--ease-out);
+}
+.nav-icn:active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) { .nav-icn:active { transform: none; } }
 
 /* ── ۳) هم‌ترازیِ .inp (کلاسِ قدیمی) به استانداردِ .field-input ── */
 .inp {

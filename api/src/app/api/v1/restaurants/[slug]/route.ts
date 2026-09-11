@@ -27,6 +27,10 @@ async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: str
         where: { slug },
         select: {
           id: true, slug: true, name: true, cuisine: true, vibes: true, priceBand: true,
+          // ⚠️ BE-004 / C1 — این ستون به مشتری داده می‌شود چون بدونش اپ
+          // **نمی‌تواند** درباره‌ی پرداختِ آنلاین راست بگوید. جزئیات در
+          // booking_policy پایین.
+          paymentEnabled: true,
           address: true, city: true, district: true, postalCode: true, country: true,
           latitude: true, longitude: true, openingHours: true, timezone: true,
           // ترتیبِ نمایشِ منو = خواستِ رستوران‌دار (sortOrder)، نه آمارِ فروش.
@@ -134,6 +138,25 @@ async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: str
           deposit_required: r.cancellationPolicy?.depositRequired ?? false,
           free_cancel_hours: r.cancellationPolicy?.freeCancelHours ?? 24,
           auto_confirm: r.cancellationPolicy?.autoConfirm ?? true,
+          // ⚠️ BE-004 §۵ — همان نقصِ P1-3، یک فیلد جلوتر.
+          //
+          // اپِ مشتری در حالتِ بیعانه می‌گوید «آنلاین دریافت نمی‌شود». آن یک
+          // ادعا درباره‌ی **درگاه** است، نه درباره‌ی سیاستِ رستوران — و تا
+          // امروز فقط به این دلیل راست بود که `payment_enabled` پیش‌فرضش
+          // false است و اپ هرگز `/reservations/:code/pay` را صدا نمی‌زند.
+          // هیچ‌کدام پین نشده بود، و بدتر: این ستون در **هیچ** پاسخِ
+          // روبه‌مشتری‌ای نبود، پس اگر رستورانی روشنش می‌کرد اپ نه
+          // می‌توانست راست بگوید و نه می‌توانست ساکت بماند (جمله ادعای
+          // مثبت است).
+          //
+          // عیناً همان چیزی که P1-3 برای `deposit_required` حل کرد و
+          // کامنتش بالاتر در همین فایل هست: فیلد را بده تا فرانت بتواند
+          // حقیقت را بگوید. گاردِ C1 (`tools/check-diner-cost-disclosure.mjs`)
+          // از این به بعد قرمز می‌شود اگر این کلید برداشته شود.
+          //
+          // ⚠️ افشا **کافی نیست** — رندرِ صادقانه‌اش کارِ `apps/customer` است.
+          // این کلید فقط داده را در دسترس می‌گذارد.
+          online_payment_enabled: r.paymentEnabled ?? false,
         },
       };
     });

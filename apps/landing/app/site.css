@@ -1850,7 +1850,12 @@
 
 .door {
   position: relative;
-  flex: 1 1 0;
+  /* ⚠️ [L7 · DS-009 §۶‑ب] `0%` نه `0`. پایه‌ی بی‌واحد را webpack (postcss-flexbugs-fixes،
+     پیش‌فرضِ Next) به `0%` و Turbopack (Lightning CSS، بدونِ آن پلاگین) به `0px` می‌رساند —
+     یک منبع، دو خروجی. در ردیف هر دو یکی‌اند (عرضِ معین)، پس صریح‌کردنش هیچ چیز را
+     عوض نمی‌کند جز اینکه خروجیِ ساخت دیگر به ابزار وابسته نیست. رفعِ ستون (موبایل)
+     همچنان `auto` در بلوکِ 900px است و روی این تکیه ندارد. */
+  flex: 1 1 0%;
   min-inline-size: 0;
   display: flex;
   flex-direction: column;
@@ -2017,9 +2022,20 @@
    هر سه در باز و هم‌اندازه می‌مانند. */
 @media (max-width: 900px) {
   .doors { flex-direction: column; max-inline-size: 34rem; }
+  /* ⚠️ [L1 · DS-009 §۷ · ۲۰۲۶-۰۹-۱۱] `flex: 0 0 auto`، نه `flex-grow: 1`.
+     پایه‌ی `.door` روی دسکتاپ `flex: 1 1 0` است — درست، چون در ردیف pایه روی
+     **عرض** می‌نشیند. اما همین قاعده در ستون روی **ارتفاع** می‌نشیند، و ظرف
+     ارتفاعِ معینی ندارد. آن‌وقت همه‌چیز به این بند است که «۰» چطور به مرورگر
+     برسد:
+        webpack   → flex-basis: 0%   → درصد در برابرِ ارتفاعِ نامعین ⇒ content  → ۲۸۶px، سالم
+        Turbopack → flex-basis: 0px  → صفرِ معین                        ⇒ فقط پدینگ → ۴۲px، متنِ بریده
+     هر دو از **یک** منبع، سنجیده‌شده با getComputedStyle روی دو سرور (۳۹۰px).
+     Next 16 پیش‌فرض Turbopack است و هیچ اسکریپتی عوضش نمی‌کند، پس آنچه به
+     کاربر می‌رسید ۴۲px بود: دو درِ مسیرِ اصلیِ مهمان (تصمیمِ مالک D-006)
+     روی گوشی له. `auto` در هر دو مسیر یک معنا دارد: ارتفاع از محتوا. */
   .door, .doors:hover .door, .doors:focus-within .door,
   .doors:hover .door:hover, .doors:focus-within .door:focus-visible,
-  .doors:not(:hover):not(:focus-within) .door:first-child { opacity: 1; flex-grow: 1; transform: none; }
+  .doors:not(:hover):not(:focus-within) .door:first-child { opacity: 1; flex: 0 0 auto; transform: none; }
   .gate { min-block-size: auto; }
 }
 @media (hover: none) {
