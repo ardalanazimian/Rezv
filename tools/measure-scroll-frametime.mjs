@@ -27,12 +27,20 @@ const N = Number(process.argv[2] || 5);
 const URL = process.argv[3] || pathToFileURL(path.join(ROOT, 'standalone', 'customer.html')).href;
 
 const browser = await chromium.launch();
-const runs = [];
+const runs = []; let evidence;
 for (let i = 0; i < N; i++) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'fa-IR' });
   const page = await ctx.newPage(); await page.goto(URL); await page.waitForTimeout(1200);
   await page.evaluate(() => { const o = document.getElementById('onb'); const b = o && [...o.querySelectorAll('button')].find((x) => /رد/.test(x.textContent)); b ? b.click() : o?.remove(); });
   await page.waitForTimeout(500);
+  // شاهدِ hydration (۰۹-۱۱، یافته‌ی LE): با 127.0.0.1 محافظِ dev-originِ Next چانک‌های کلاینت را 403 می‌دهد؛
+  // HTML می‌آید، JS نه، بوم‌ها 300×150 می‌مانند و صفحه‌ی ایستا «۶۰fps» می‌دهد. آن عدد بی‌معناست.
+  if (i === 0) evidence = await page.evaluate(() => {
+    const next = !!document.querySelector('script[src*="/_next/"]');
+    let fiber = false; for (const el of document.querySelectorAll('body *')) { if (Object.keys(el).some((k) => k.startsWith('__reactFiber'))) { fiber = true; break; } }
+    const canvases = [...document.querySelectorAll('canvas')].map((c) => `${c.width}x${c.height}`);
+    return { next, fiber, canvases };
+  });
   await page.evaluate(() => { window.__ft = []; let last = performance.now(); const tick = (t) => { window.__ft.push(t - last); last = t; if (window.__go) requestAnimationFrame(tick); }; window.__go = true; requestAnimationFrame(tick); });
   for (let k = 0; k < 12; k++) { await page.mouse.wheel(0, 250); await page.waitForTimeout(90); }
   await page.waitForTimeout(400);
@@ -44,6 +52,8 @@ await browser.close();
 const col = (k) => runs.map((r) => r[k]);
 const med = (arr) => { const s = [...arr].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 console.log(`هدف: ${URL}`);
+console.log(`hydration: ${evidence.next ? `next=true fiber=${evidence.fiber}` : 'next=false (بدونِ React)'} · canvases ${evidence.canvases.length}${evidence.canvases.length ? ' (' + evidence.canvases.join(', ') + ')' : ''}`);
+if (evidence.next && !evidence.fiber) console.log('⚠️ صفحه hydrate نشده (fiber=false) — این توزیع مالِ HTMLِ ایستا است، نه صفحه‌ی واقعی. 127.0.0.1 زده‌ای؟ localhost بزن.');
 console.log('run  frames  p50   p95   max   >33  >50');
 runs.forEach((r, i) => console.log(`${String(i + 1).padStart(3)}  ${String(r.frames).padStart(6)}  ${String(r.p50).padStart(4)}  ${String(r.p95).padStart(4)}  ${String(r.max).padStart(5)}  ${String(r.over33).padStart(3)}  ${String(r.over50).padStart(3)}`));
 console.log(`median over ${N}: p95 ${med(col('p95'))} · max ${med(col('max'))} · >33ms ${med(col('over33'))} · >50ms ${med(col('over50'))}   |  worst max ${Math.max(...col('max'))}`);
