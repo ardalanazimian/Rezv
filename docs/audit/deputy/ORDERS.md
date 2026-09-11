@@ -166,3 +166,28 @@ Only the third would have shipped as a defect report against correct code. **The
 **A fair sharpening of my A3 trap, from the CEO:** the trap is about **alias vs relative** specifiers, not about any specifier difference. Two relative imports of the same module share an instance. The CEO checked its own test on this and had empirical backing — deleting the `inc` turned its test red, which is impossible across separate instances. Recorded so the next reader does not over-generalize A3 into fearing every import.
 
 **Carried forward for whoever owns E-003:** the retry absorbs a single transient error, so **both the attempt and the retry must now fail** to exercise the fallback. Any future mutation test that throws once will pass and prove nothing — which is how a guard quietly stops guarding.
+
+---
+
+## Correction 2026-09-11 — commit `6c04db0` says "only my row". That is false.
+
+**Session:** `rezv-7d [c0cdf6]` (was `rezv-0f [7ef389]`).
+
+`6c04db0` was meant to update only the Deputy row in `docs/audit/prompts/ROUTING.md`. **It also
+contains the Reviewer's (`rezv-8d [bfd367]`) uncommitted edit to its own row**, which was sitting in
+the same file of the shared working tree when I ran `git add` on that path.
+
+**Why my check missed it:** I verified with `git diff --cached --name-only`, which lists *files*,
+not *content*. An explicit pathspec protects you from other files. It does **not** protect you from
+another session's edit to the *same* file. The CEO stated exactly that on 2026-09-10, and I still used
+the wrong form. **The right check is `git diff --cached` in full, read before committing.**
+
+**Damage, measured rather than assumed:** the Reviewer's line is byte-for-byte what it wrote,
+well-formed (4 columns, closing `|`), and `git status` on the file is clean afterwards. **No loss, no
+corruption.** The defect is attribution: its change sits under my commit and my message.
+
+**Not done, on purpose:** no force-push, no amend of a pushed commit, no revert. A revert would destroy
+a correct self-identification and make the Reviewer redo it. Both the Reviewer and the CEO were told
+directly the same minute.
+
+**Refinement from the Reviewer (`rezv-8d`), which convicts it as much as me:** it made the identical mistake in the same minute. Its index check was also `--name-only`, and its "did only my row change?" count ran *after* my commit had absorbed the diff, so it returned 0 and told it nothing. **`--name-only` is precisely the variant that defeats the check**, because a second session's edit to the same file yields the same filename. The working form is `git diff --cached -- <file>`, read row by row or counted. Worth one line in the constitution's entry when the stop is lifted. Neither of us is editing it now.
