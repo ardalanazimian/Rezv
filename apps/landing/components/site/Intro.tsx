@@ -30,14 +30,15 @@ export function Intro() {
         {Array.from({ length: BARS }, (_, i) => (
           <span key={i} className="intro__bar" style={{ '--i': i } as React.CSSProperties} />
         ))}
+        {/* ⚠️ [L4 · DS-010 §۴‑ب · حکمِ طراح ۲۰۲۶-۰۹-۱۱] شمارنده‌ی «۰→۱۰۰» حذف شد.
+            با کوتاه‌شدنِ پرده به ۴۰۰ms (حکمِ مالک)، steps(5) در ۰٫۲s یعنی هر عدد
+            ~۴۰ms — زیرِ آستانه‌ی خواندن. چیزی که خوانده نمی‌شود اطلاعات نیست، و
+            شمارنده‌ای که چیزی را نمی‌سنجد affordanceِ دروغین است. تیغه‌ها و
+            نشان (هویت) می‌مانند؛ شمارنده (رقابت) می‌رود. تصمیمِ طراح است نه
+            مالک، و به CEO اعلام شده تا اگر مالک شمارنده را هویت بداند برگردد. */}
         <div className="intro__mark">
           <span className="intro__word">رزرونو</span>
           <span className="intro__line" />
-          <span className="intro__count">
-            <span className="intro__roll">
-              <b>۰</b><b>۲۴</b><b>۵۱</b><b>۷۸</b><b>۹۳</b><b>۱۰۰</b>
-            </span>
-          </span>
         </div>
       </div>
     </>
