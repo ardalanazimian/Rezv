@@ -251,6 +251,7 @@ import './waitlist-promotion-observability.test.mts';
 import './waitlist-merge-occupancy-concurrency.test.mts';
 import './waitlist-promotion-horizon.test.mts';
 import './waitlist-orphaned-accepted-entry.test.mts';
+import './waitlist-route-tenant.integration.test.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ یافته‌ی واقعیِ دوم (۲۰۲۶-۰۸-۱۴، همون ممیزی): table-merge-occupancy.test.mts
