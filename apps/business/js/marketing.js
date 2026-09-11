@@ -211,7 +211,10 @@ async function doSendCampaign(){
     // را به مخاطبِ اشتباه می‌فرستاد).
     let phones=[];
     if(aud.kind==='birthday'){
-      if(!CLUB.length){ await (typeof loadClubMembers==='function'?loadClubMembers():Promise.resolve()); }
+      // ⚠️ نتیجه‌ی loadClubMembers باید در CLUB بنشیند — قبلاً دور ریخته می‌شد و
+      // اگر کاربر مستقیم از تبِ «کمپین» می‌آمد، CLUB خالی می‌ماند ⇒ هیچ‌کس مخاطبِ
+      // تولد نمی‌شد. بقیه‌ی فراخوان‌ها (loyalty.js، reservations.js) هم assign می‌کنند.
+      if(!CLUB.length){ CLUB = await (typeof loadClubMembers==='function'?loadClubMembers():Promise.resolve(CLUB)); }
       phones=(CLUB||[]).filter(m=>m.bMonth===currentMonthFa()&&m.phone).map(m=>String(m.phone));
     }else{
       const cs=await API.customers('segment='+encodeURIComponent(aud.value)+'&limit=500');
