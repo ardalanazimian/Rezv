@@ -97,9 +97,14 @@ describe('ورودِ کارکنان — قدیمی‌ترین ثبت برنده 
     }
   });
 
-  test('✓ کنترلِ منفی — اگر مهاجم زودتر ثبت کرده باشد، همان برنده است', async () => {
-    // یعنی قاعده واقعاً «قدیمی‌ترین» است، نه «هرچه به قربانی می‌خورد».
+  test('✓ کنترلِ منفی — ترتیبِ پایه واقعاً بر `created_at` است', async () => {
+    // یعنی قاعده‌ی پایه واقعاً «قدیمی‌ترین» است، نه «هرچه به قربانی می‌خورد».
     // گاردی که فقط سخت‌گیرتر شده باشد اینجا می‌افتد.
+    //
+    // ⚠️ به‌روزشده ۲۰۲۶-۰۹-۱۱: «قدیمی‌ترین» دیگر **تنها** قاعده نیست — ردیفِ
+    // `owner` بر هر ردیفِ دیگری مقدم شد (describeِ پایینِ همین فایل). این
+    // ادعا عمداً سرِ جایش ماند چون لایه‌ی زیرین را می‌سنجد: ترتیبِ بینِ
+    // ردیف‌های هم‌رده هنوز زمانی است، نه heap.
     const older = await db.staff.findFirst({
       where: { phone: normalizePhone(PHONE) },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -123,5 +128,117 @@ describe('ورودِ کارکنان — قدیمی‌ترین ثبت برنده 
     `;
     assert.equal(rows.length, 2, 'هر دو ردیف باید باشند');
     for (const r of rows) assert.ok(r.created_at instanceof Date, 'created_at نباید NULL باشد');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  squattingِ شماره — «قدیمی‌ترین» به‌تنهایی کافی نبود (۲۰۲۶-۰۹-۱۱)
+//
+//  ⚠️ آنچه مهاجرتِ ۰۷۲ رفع کرد **قطعیت** بود، نه **درستی**: اگر مهاجم شماره
+//  را *پیش از* قربانی ثبت کند، «قدیمی‌ترین برنده است» دقیقاً همان چیزی است
+//  که ردیفِ مهاجم را برنده می‌کند. و ثبتِ زودتر هیچ هزینه‌ای ندارد —
+//  `POST /restaurant/staff` اثباتِ مالکیتِ شماره نمی‌خواهد.
+//
+//  دو آسیبِ همزمان که این بلوک هر دو را پین می‌کند:
+//   ۱. مالکِ واقعیِ آینده هرگز نمی‌توانست وارد شود (OTPش به ردیفِ مهاجم
+//      می‌رسید).
+//   ۲. provisioningِ همان شماره هم برای همیشه با `duplicate_owner_phone`
+//      بسته می‌ماند، چون چکِ تعارض **هر** ردیفِ staff را می‌دید.
+//
+//  قاعده‌ی تازه: ردیفِ `owner` مقدم است؛ بینِ بقیه همان «قدیمی‌ترین».
+// ═══════════════════════════════════════════════════════════════════════
+describe('ورودِ کارکنان — ردیفِ owner بر squatterِ قدیمی‌تر مقدم است', () => {
+  const SQ_PHONE = fixturePhone('0926');
+  let squatterTenant = '';
+  let ownerTenant = '';
+  let squatterStaffId = '';
+  let ownerStaffId = '';
+
+  before(async () => {
+    const s = Date.now().toString(36);
+    const st = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-squatter-${s}` }, select: { id: true } });
+    squatterTenant = st.id;
+    // ⚠️ ثبتِ مهاجم عمداً **قدیمی‌تر** است — دقیقاً حالتی که قاعده‌ی قبلی
+    //    به او می‌باخت. بدونِ این backdate، تست روی کدِ آسیب‌پذیر هم سبز
+    //    می‌ماند و هیچ‌چیزی را قفل نمی‌کند.
+    const squatter = await db.staff.create({
+      data: {
+        tenantId: squatterTenant, phone: normalizePhone(SQ_PHONE), name: '[DEMO] squatter',
+        role: 'staff', isActive: true, createdAt: new Date('2020-01-01T00:00:00Z'),
+      },
+      select: { id: true },
+    });
+    squatterStaffId = squatter.id;
+
+    const ot = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-owner-${s}` }, select: { id: true } });
+    ownerTenant = ot.id;
+    const owner = await db.staff.create({
+      data: {
+        tenantId: ownerTenant, phone: normalizePhone(SQ_PHONE), name: '[DEMO] مالکِ واقعی',
+        role: 'owner', isActive: true,
+      },
+      select: { id: true },
+    });
+    ownerStaffId = owner.id;
+  });
+
+  after(async () => {
+    await db.staff.deleteMany({ where: { phone: normalizePhone(SQ_PHONE) } }).catch(() => {});
+    await db.tenant.deleteMany({ where: { id: { in: [squatterTenant, ownerTenant] } } }).catch(() => {});
+  });
+
+  test('🔴 ردیفِ owner برنده است، هرچند سال‌ها دیرتر ثبت شده', async () => {
+    const found = await findStaffForLogin(normalizePhone(SQ_PHONE));
+    assert.ok(found, 'کارمند باید پیدا شود');
+    assert.equal(found.id, ownerStaffId, 'ردیفِ owner باید برنده باشد، نه squatterِ قدیمی‌تر');
+    assert.equal(found.tenantId, ownerTenant, 'توکن باید برایِ تنانتِ مالکِ واقعی صادر شود');
+    assert.equal(found.role, 'owner');
+  });
+
+  test('✓ کنترلِ مثبت — squatter واقعاً قدیمی‌تر است (قاعده‌ی قبلی به او می‌باخت)', async () => {
+    // بدونِ این، «owner برنده شد» می‌توانست فقط تصادفِ ترتیبِ زمانی باشد و
+    // تستِ بالا هیچ‌چیزِ تازه‌ای را قفل نمی‌کرد.
+    const rows = await db.staff.findMany({
+      where: { phone: normalizePhone(SQ_PHONE) },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true },
+    });
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].id, squatterStaffId, 'قدیمی‌ترین ردیف باید مالِ squatter باشد');
+  });
+
+  test('⚠️ باقی‌مانده‌ی صادقانه — بدونِ هیچ ردیفِ owner، قدیمی‌ترینِ اثبات‌نشده برنده است', async () => {
+    // این حالت **رفع نشده** و عمداً هم ثبت می‌شود، نه پنهان: هیچ سیگنالِ
+    // «این شماره اثبات شد» به‌ازای ردیفِ staff وجود ندارد
+    // (`POST /restaurant/staff` اصلاً StaffInvite نمی‌سازد؛ تنها سازنده‌اش
+    // provisioning است). محدودکردنِ جست‌وجو به «دعوتِ پذیرفته‌شده» ورودِ
+    // همه‌ی کارکنانِ عادی را می‌کشت. رفعِ کامل = فلوی دعوت برای staff هم.
+    //
+    // اگر روزی آن فلو ساخته شد، این تست باید **بشکند** و ادعایش برعکس شود.
+    const noOwnerPhone = fixturePhone('0926');
+    const t1 = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-nownr-a` }, select: { id: true } });
+    const t2 = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-nownr-b` }, select: { id: true } });
+    try {
+      const first = await db.staff.create({
+        data: {
+          tenantId: t1.id, phone: normalizePhone(noOwnerPhone), role: 'staff', isActive: true,
+          name: '[DEMO] اثبات‌نشده‌ی قدیمی', createdAt: new Date('2021-01-01T00:00:00Z'),
+        },
+        select: { id: true },
+      });
+      await db.staff.create({
+        data: {
+          tenantId: t2.id, phone: normalizePhone(noOwnerPhone), role: 'staff', isActive: true,
+          name: '[DEMO] اثبات‌نشده‌ی تازه',
+        },
+        select: { id: true },
+      });
+
+      const found = await findStaffForLogin(normalizePhone(noOwnerPhone));
+      assert.equal(found?.id, first.id, 'بدونِ ردیفِ owner، قاعده همان «قدیمی‌ترین» می‌ماند');
+    } finally {
+      await db.staff.deleteMany({ where: { phone: normalizePhone(noOwnerPhone) } }).catch(() => {});
+      await db.tenant.deleteMany({ where: { id: { in: [t1.id, t2.id] } } }).catch(() => {});
+    }
   });
 });

@@ -202,6 +202,7 @@ import './shell-scripts-lf.test.mts';
 import './sms-balance.integration.test.mts';
 import './sms-melipayamak.test.mts';
 import './sms-unparsable-response.test.mts';
+import './provision-staff-phone-squat.integration.test.mts';
 import './provision-username-conflict.integration.test.mts';
 import './provision-slug-validation.integration.test.mts';
 import './staff-invite-flow.integration.test.mts';

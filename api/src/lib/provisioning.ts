@@ -107,7 +107,18 @@ export async function provisionBusiness(
   // ضمانتِ واقعی ایندکسِ یکتایِ جزئیِ ۰۷۹ (staff_owner_phone_unique_idx)
   // است که بازنده را داخلِ تراکنش می‌کشد؛ نگاشتِ آن خطا پایین، دورِ خودِ
   // تراکنش است.
-  const existing = await db.staff.findFirst({ where: { phone }, select: { id: true } });
+  // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۹-۱۱): این چک `where: { phone }` بود — **هر** ردیفِ
+  // staff با آن شماره، با هر نقشی و در هر تنانتی. و `POST /restaurant/staff`
+  // هیچ اثباتِ مالکیتِ شماره نمی‌خواهد. یعنی هرکس با یک حسابِ کسب‌وکارِ معمولی
+  // می‌توانست شماره‌ی یک مالکِ آینده را به‌عنوانِ «کارمند» ثبت کند و از آن لحظه
+  // provisioningِ آن شماره **برای همیشه** با `duplicate_owner_phone` بسته
+  // می‌شد — بدونِ هیچ مسیرِ خودآزادسازی‌ای. انکارِ سرویس با هزینه‌ی یک POST.
+  //
+  // حالا فقط تعارضِ واقعی: یک ownerِ دیگر با همین شماره. یکتاییِ ownerها را
+  // ایندکسِ یکتایِ جزئیِ سراسریِ ۰۷۹ (`staff (phone) WHERE role='owner'`)
+  // تضمین می‌کند — این چک فقط fast-pathِ UXِ همان قید است، نه خودِ قید؛ پس
+  // باریک‌کردنش هیچ ضمانتی را کم نمی‌کند.
+  const existing = await db.staff.findFirst({ where: { phone, role: 'owner' }, select: { id: true } });
   if (existing) {
     throw Err.conflict(
       'duplicate_owner_phone',
