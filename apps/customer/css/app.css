@@ -303,15 +303,120 @@ img{display:block;max-width:100%}
       مرورگرِ با آن، هر دو فعال‌اند و تداخل ندارند (reveal روی .rc، drift روی .rc-bg،
       settle روی opacity/translate که reveal.in به none برمی‌گرداند — انیمیشن بعد از
       transition اعمال می‌شود و برنده است، پس عملاً settle حرف می‌زند). */
-html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:74px}
-#feed>.rc{scroll-snap-align:start;scroll-margin-top:12px}
+/* ⚠️ بازتصمیمِ DS-011 (۲۰۲۶-۰۹-۱۲) — فید موزاییکِ Explore شد و تایل‌ها **همچنان کلاسِ
+   rc دارند**، پس انتخابگرهای DS-008 بی‌صدا از کار نمی‌افتند؛ هر سه صریحاً تصمیم
+   گرفته شدند، نه رها (این مخزن برای «انتخابگری که بی‌صدا مچ نکرد» زخم دارد):
+   ۱) snapِ صفحه‌ای: **خاموش**. Explore snap نمی‌کند؛ snap کردنِ گریدِ ۳تایی به مرزِ
+      ردیف با کاربر می‌جنگد. snap فقط در نمای تمام‌صفحه (.im-feed، mandatory) زندگی
+      می‌کند — جایی که یک آیتم صاحبِ viewport است و کلِ معنایِ آن نما همین است.
+      scroll-padding-top می‌ماند: scrollIntoView (مناسبت‌ها) زیرِ navِ چسبان نمی‌رود.
+   ۲) settle-inِ اسکرول‌محور رویِ تایل: **می‌ماند** — همان #feed>.rc، همان keyframes.
+   ۳) پارالاکسِ پس‌زمینه (.rc-bg) رویِ تایل: **خاموش** — رویِ تایلِ ۱۳۰px فقط هزینه‌ی
+      paint است و دیده نمی‌شود؛ به نمای تمام‌صفحه (.im-bg، رسانه‌ی لبه‌به‌لبه) رفت.
+   reduced-motion: صریحاً animation:none — صفرکردنِ سراسریِ مدت، انیمیشنِ timeline‌محور
+   را خاموش نمی‌کند (DS-008 همین را اندازه گرفت). */
+html:has(#page-discover.active){scroll-padding-top:74px}
+#feed>.rc{scroll-margin-top:12px}
 @supports (animation-timeline: view()){
   #feed>.rc{animation:ds-settle-in linear both;animation-timeline:view();animation-range:entry 0% entry 55%}
-  #feed>.rc .rc-bg{animation:ds-bg-drift linear both;animation-timeline:view();animation-range:entry 0% cover 45%}
 }
 @media (prefers-reduced-motion: reduce){
   #feed>.rc,#feed>.rc .rc-bg{animation:none!important}
-  /* snap حرکت نیست؛ می‌ماند — ولی مقدارِ نرم (proximity) است، نه mandatory */
+}
+/* ═══ DS-011 (۲۰۲۶-۰۹-۱۲): کشف = Explore — موزاییکِ ۳ستونه، هر هفتمی ۲×۲ ═══
+   اندازه‌گیریِ پیش از این در ۳۹۰×۸۴۴: کارتِ ۲۷۰px تمام‌عرض → ۲ رستوران در هر صفحه.
+   تایل کلاسِ rc را نگه می‌دارد (گیتِ CIِ DS-007 و e2e با #feed .rc می‌شمارند)، پس
+   قواعدِ کارتِ قدیمی که به تایل نمی‌خورند (ارتفاعِ ۲۷۰، شعاعِ ۲۶، لیفتِ hover) همین‌جا
+   صریحاً خنثی می‌شوند. رنگ‌های رویِ تصویر (متن/اسکریم) از تم مستقل‌اند — عکس عکس
+   است — و به‌صورتِ توکنِ محلی تعریف شده‌اند تا یک‌جا عوض شوند. */
+/* ⚠️ لبه‌به‌لبه بودن از خودِ ظرف می‌آید: `.section{padding:28px 0}` (پایین‌تر در cascade،
+   shorthand) پدینگِ افقیِ `.wrap.section` را صفر می‌کند — محاسبه‌شده‌اش در ۳۹۰px صفر
+   است (اندازه‌گیری‌شده). نسخه‌ی اولِ این قاعده یک margin-inline منفی هم می‌داد و
+   گرید ۴۳۰px می‌شد: در RTL سرریزِ چپ، viewportِ چیدمان را به ۴۱۰ باز می‌کرد و کلِ
+   صفحه ۲۰px جابه‌جا می‌شد. با اندازه‌گیری گرفته شد، نه با نگاه به اسکرین‌شات. */
+.xgrid{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-flow:row dense;gap:calc(var(--sp-1) / 2);
+  --xt-ink:rgba(255,255,255,.96);--xt-ink-2:rgba(255,255,255,.8);--xt-scrim:rgba(8,6,20,.78)}
+@media(min-width:640px){.xgrid{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:1000px){.xgrid{grid-template-columns:repeat(5,1fr)}}
+.xgrid>.xt{position:relative;display:block;height:auto;aspect-ratio:1;overflow:hidden;border-radius:0;cursor:pointer;background:var(--s-100);transition:none}
+.xgrid>.xt.xt-hero{grid-column:span 2;grid-row:span 2}
+.xgrid>.xt:hover{transform:none;box-shadow:none}
+.xgrid>.xt:active{transform:scale(.985)}
+.xgrid>.feed-more{margin-block-start:var(--sp-3)}
+#feed.xgrid>.rc .rc-bg{animation:none;transition:none}
+.xt-photo,.im-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity var(--motion-slow) var(--ease-out)}
+.xt-photo.in,.im-photo.in{opacity:1}
+.xt-emoji{position:absolute;inset:0;z-index:1;display:grid;place-items:center;font-size:var(--fs-4xl);opacity:.55;pointer-events:none;filter:drop-shadow(0 4px 12px rgba(0,0,0,.35))}
+.xt-hero .xt-emoji{font-size:calc(var(--fs-4xl) * 1.8)}
+.has-photo .xt-emoji,.has-photo .im-emoji{display:none}
+/* دکمه‌ی کشیده: کلِ تایل یک دکمه‌ی واقعی است (فوکوسِ کیبورد، :focus-visible). زیرِ
+   قلبِ هیرو (۴) و بالای پس‌زمینه؛ کپشن (۳) pointer-events ندارد و لمس به دکمه می‌رسد. */
+.xt-tap{position:absolute;inset:0;z-index:2;border:none;background:none;padding:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+.xt-tap:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
+.xt-cap{position:absolute;inset-inline:0;inset-block-end:0;z-index:3;pointer-events:none;min-width:0;display:flex;flex-direction:column;gap:var(--sp-1);
+  padding:var(--sp-6) var(--sp-2) var(--sp-2);background:linear-gradient(to top,var(--xt-scrim),transparent);color:var(--xt-ink)}
+.xt-hero .xt-cap{padding:var(--sp-10) var(--sp-3) var(--sp-3)}
+.xt-name{font-size:var(--fs-sm);font-weight:var(--weight-emphasis);line-height:var(--lh-snug);letter-spacing:var(--ls-snug);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xt-hero .xt-name{font-size:var(--fs-xl);font-weight:var(--weight-display);line-height:var(--lh-tight);letter-spacing:var(--ls-tight)}
+.xt-row{display:flex;align-items:center;gap:var(--sp-2);min-width:0}
+.xt-hero .xt-row{flex-wrap:wrap;row-gap:var(--sp-1)}
+.xt-hero .rc-meta{flex-basis:100%}   /* سطرِ خودش، وگرنه «۸٪ کش‌بک» پشتِ امتیاز و چیپ بریده می‌شد (دیده‌شده در رندر) */
+.xt .rc-rating{font-size:var(--fs-xs);gap:2px}
+.xt .rc-rating-new{font-size:var(--fs-2xs)}
+.xt .rc-meta{font-size:var(--fs-xs);margin-top:0;color:var(--xt-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.xt-social{font-size:var(--fs-2xs);color:var(--xt-ink-2)}
+.xt-social b{color:var(--xt-ink)}
+.xt .rc-fav{z-index:4}
+.xt-badge{position:absolute;inset-block-start:var(--sp-2);inset-inline-start:var(--sp-2);z-index:3;pointer-events:none;display:inline-flex;align-items:center;gap:2px;
+  font-size:var(--fs-2xs);font-weight:var(--weight-display);color:var(--xt-ink);padding:2px var(--sp-2);border-radius:var(--radius-pill);background:linear-gradient(135deg,var(--warning),var(--danger))}
+.xt-badge.ai{background:var(--grad)}
+.xt-sk{background:var(--s-100)}
+
+/* ═══ DS-011: نمای تمام‌صفحه (immersive) — یک رستوران، یک صفحه؛ snapِ mandatory ═══
+   z-index ۱۱۰: بالای nav (۱۰۰) و botnav (۹۰)، زیرِ undo-snack (۱۲۰)، شیتِ رزرو (۲۰۰) و
+   toast (۳۰۰) — رزرو از داخلِ همین نما باز می‌شود و باید رویش بنشیند.
+   پس‌زمینه از تم مستقل است (تیک‌تاک در هر دو تم سیاه است). RTL: فقط inset-inline-*. */
+#page-immersive{position:fixed;inset:0;z-index:110;--im-bg:rgb(11,8,24);--xt-ink:rgba(255,255,255,.96);--xt-ink-2:rgba(255,255,255,.8);
+  background:var(--im-bg);color:var(--xt-ink)}
+.im-feed{position:relative;height:100vh;height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.im-feed::-webkit-scrollbar{display:none}
+.im-item{position:relative;height:100vh;height:100dvh;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;outline:none}
+.im-item:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
+.im-bg{position:absolute;inset:0;z-index:0}
+.im-emoji{position:absolute;inset:0;z-index:1;display:grid;place-items:center;font-size:calc(var(--fs-4xl) * 3);opacity:.5;pointer-events:none;filter:drop-shadow(0 12px 32px rgba(0,0,0,.45))}
+.im-scrim{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(to top,rgba(8,6,20,.94) 0%,rgba(8,6,20,.6) 34%,transparent 62%),linear-gradient(to bottom,rgba(8,6,20,.55),transparent 24%)}
+.im-info{position:absolute;inset-inline-start:0;inset-inline-end:calc(var(--touch-min) + var(--sp-6));inset-block-end:0;z-index:3;min-width:0;
+  display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-2);padding:var(--sp-4) var(--sp-5) calc(var(--sp-6) + env(safe-area-inset-bottom,0px))}
+.im-info .xt-badge{position:static}
+.im-name{font-size:var(--fs-2xl);font-weight:var(--weight-display);line-height:var(--lh-tight);letter-spacing:var(--ls-tight);display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2);margin:0}
+.im-line{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);font-size:var(--fs-sm);font-weight:var(--weight-emphasis);color:var(--xt-ink-2)}
+.im-line .rc-rating{font-size:var(--fs-sm)}
+.im-meta:empty,.im-social:empty{display:none}
+.im-social{font-size:var(--fs-xs);color:var(--xt-ink-2)}
+.im-item:not(.im-demo) .demo-chip{display:none}
+.im-item:not(.im-hot) .im-hotbadge{display:none}
+.im-item.im-no-cb .im-cb{display:none}
+.im-item .rc-slots{flex-wrap:wrap;margin-top:var(--sp-1)}
+.im-open{display:inline-flex;align-items:center;gap:var(--sp-2);min-height:var(--touch-min);padding:0 var(--sp-4);margin-top:var(--sp-1);cursor:pointer;
+  border-radius:var(--radius-pill);border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.14);color:var(--xt-ink);font-family:inherit;font-size:var(--fs-sm);font-weight:var(--weight-emphasis);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.im-open:focus-visible,.im-rail-btn:focus-visible,.im-close:focus-visible,.im-rail .rc-fav:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.im-rail{position:absolute;inset-inline-end:var(--sp-3);inset-block-end:calc(var(--sp-16) + var(--sp-8) + env(safe-area-inset-bottom,0px));z-index:4;display:flex;flex-direction:column;align-items:center;gap:var(--sp-3)}
+.im-rail .rc-fav{position:static;background:rgba(0,0,0,.38)}
+.im-rail-btn,.im-close{width:var(--touch-min);height:var(--touch-min);border-radius:50%;border:none;cursor:pointer;display:grid;place-items:center;color:var(--xt-ink);background:rgba(0,0,0,.38);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.im-close{position:absolute;inset-block-start:calc(var(--sp-3) + env(safe-area-inset-top,0px));inset-inline-start:var(--sp-3);z-index:5}
+.im-count{position:absolute;inset-block-start:calc(var(--sp-3) + env(safe-area-inset-top,0px));inset-inline-end:var(--sp-4);z-index:5;pointer-events:none;
+  font-size:var(--fs-xs);font-weight:var(--weight-emphasis);font-variant-numeric:tabular-nums;color:var(--xt-ink-2);padding:var(--sp-1) var(--sp-3);border-radius:var(--radius-pill);background:rgba(0,0,0,.35)}
+.im-count:empty{display:none}
+/* پارالاکسِ DS-008 اینجا زندگی می‌کند (رسانه‌ی تمام‌صفحه)؛ اسکرولر همان .im-feed است. */
+@supports (animation-timeline: view()){
+  .im-feed .im-bg{animation:ds-bg-drift linear both;animation-timeline:view();animation-range:entry 0% cover 45%}
+}
+@media (prefers-reduced-motion: reduce){
+  .im-feed .im-bg{animation:none!important}   /* صریح: صفرکردنِ مدت، timeline را خاموش نمی‌کند */
+  .xt-photo,.im-photo{transition:none}
 }
 /* دکمه‌ی «رستوران‌های بیشتر» فرزندِ مستقیمِ #feed است؛ باید کلِ عرضِ گرید را
    بگیرد نه یک سلول را. min-height برای هدفِ لمسیِ ≥۴۴px. */

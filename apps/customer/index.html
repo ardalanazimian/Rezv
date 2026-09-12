@@ -192,7 +192,8 @@
     </div>
     <!-- نوارِ زنده: با دادهٔ واقعی از /restaurants/live-stats پر می‌شود (features/live-strip.js). -->
     <div class="live-strip" id="liveStrip" aria-live="polite"></div>
-    <div class="grid" id="feed"></div>
+    <!-- DS-011: موزاییکِ Explore — کلاسِ `.grid` مالِ علاقه‌مندی‌هاست و دست نخورده می‌ماند. -->
+    <div class="xgrid" id="feed"></div>
   </div>
 
   <!-- نزدیک تو -->
@@ -214,6 +215,15 @@
     <div class="section-head"><div><div class="section-title">🎉 رویدادهای ویژه</div><div class="section-sub">شب‌های خاص رستوران‌ها</div></div></div>
     <div class="events-list" id="eventsList"></div>
   </div>
+</div>
+
+<!-- ═══════════ IMMERSIVE (DS-011: اسکرولِ تمام‌صفحه‌ی تیک‌تاکی؛ features/immersive.js) ═══════════ -->
+<div id="page-immersive" class="page" role="region" aria-label="مرورِ تمام‌صفحه‌ی رستوران‌ها">
+  <button type="button" class="im-close" onclick="closeImmersive()" aria-label="بستنِ مرورِ تمام‌صفحه">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="im-count" id="imCount" aria-live="polite"></div>
+  <div class="im-feed" id="imFeed"></div>
 </div>
 
 <!-- ═══════════ RESTAURANT PROFILE (Airbnb-style) ═══════════ -->
