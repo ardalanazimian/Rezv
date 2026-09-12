@@ -32,7 +32,10 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
     // «باارزش‌ترین‌ها» می‌نشستند.
     : { predictedClvToman: { sort: 'desc' as const, nulls: 'last' as const } };
 
-  const data = await cached(cacheKey('customers', ctx.restaurant.id, segment, sort, cursor), 60, async () => {
+  // ⚠️ `limit` بخشی از کلید است (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): پیش‌تر
+  // نبود، پس ظرفِ ۶۰ ثانیه پاسخِ `sort=visits&limit=5`ِ داشبورد به تبِ پروفایل‌ها
+  // با `limit=20` داده می‌شد (و برعکس) — فهرستِ کوتاه‌شده یا بلندتر از درخواست.
+  const data = await cached(cacheKey('customers', ctx.restaurant.id, segment, sort, `l${limit}`, cursor), 60, async () => {
     const rows = await db.customerInsight.findMany({
       where: {
         restaurantId: ctx.restaurant.id,
@@ -62,7 +65,12 @@ export const GET = withRestaurantAuth({ permission: 'canViewAnalytics' }, async 
       is_vip: r.isVip,
       last_visit_at: r.lastVisitAt,
     }));
-    return { items, next_cursor: hasMore ? rows[limit].userId : null };
+    // ⚠️ مکان‌نما = آخرین آیتمِ **برگردانده‌شده** (rows[limit-1])، نه ردیفِ اضافه.
+    // کوئریِ صفحه‌ی بعد `cursor + skip:1` است، یعنی خودِ ردیفِ مکان‌نما را رد
+    // می‌کند؛ پیش‌تر `rows[limit]` بود و در هر مرزِ صفحه یک مشتری هرگز برنگشت
+    // (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳ — کمپینِ پیامکِ سگمنت روی همین
+    // صفحه‌بندی سوار است). reservations و restaurants از قبل درست بودند.
+    return { items, next_cursor: hasMore ? rows[limit - 1].userId : null };
   });
 
   return NextResponse.json(data);

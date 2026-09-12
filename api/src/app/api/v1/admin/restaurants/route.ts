@@ -28,6 +28,9 @@ async function GET_impl(req: Request) {
         const sub = computeSubscriptionStatus(r.tenant.planExpiresAt, r.tenant.trialEndsAt);
         return {
           id: r.id, name: r.name, slug: r.slug, cuisine: r.cuisine,
+          // پنلِ شرکت ستونِ «شهر» و جست‌وجو بر اساسِ شهر دارد؛ تا ۲۰۲۶-۰۹-۱۳ این
+          // فیلد فرستاده نمی‌شد و پنل cuisine را جای شهر نشان می‌داد.
+          city: r.city,
           tenant_id: r.tenant.id, plan: r.tenant.plan, is_open: r.isOpen,
           members: r._count.members, reservations: r._count.reservations,
           sms_balance: r.smsBalance, sms_total_sent: r.smsTotalSent,

@@ -68,6 +68,7 @@ import './coupons.integration.test.mts';
 import './crm-recommendations.test.mts';
 import './crm-feedback-loop.integration.test.mts';
 import './customer-intelligence.test.mts';
+import './customers-cache-limit.integration.test.mts';
 import './intelligence-formula-parity.integration.test.mts';
 import './demand-forecast.test.mts';
 import './demand-forecast-calendar.integration.test.mts';
