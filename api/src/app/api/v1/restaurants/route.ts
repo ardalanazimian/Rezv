@@ -6,6 +6,7 @@ import { parseQuery, zUuid, z } from '@/lib/schemas';
 import { visitedStatusList } from '@/lib/reservation-status';
 
 import { withApiMetrics } from '@/lib/api-metrics';
+import { DEMO_NAME_PREFIX } from '@/lib/demo-content';
 
 // ═══════════════════════════════════════════════════════════
 //  GET /api/v1/restaurants — لیست رستوران‌ها
@@ -17,19 +18,38 @@ import { withApiMetrics } from '@/lib/api-metrics';
 
 const PAGE_SIZE = 24; // اندازه‌ی صفحه (مناسب grid موبایل)
 
+// ═══════════════════════════════════════════════════════════
+//  حالتِ `directory=1` — فهرستِ دایرکتوری برای صفحاتِ SEO (apps/seo شهر/آشپزی)
+//
+//  ⚠️ چرا (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): apps/seo همین endpoint را
+//  برای /city/{c} و /cuisine/{c} می‌خواند و وقتی فهرست خالی است `notFound()`
+//  می‌دهد (ISR، ۳۰۰ ثانیه). ولی این فهرست برای **اپِ مشتری** ساخته شده و
+//  رستورانی را که پنلش در ۹۰ ثانیه‌ی اخیر heartbeat نزده پنهان می‌کند. نتیجه:
+//  - صفحه‌ی شهر وقتی هیچ پنلی روشن نیست (مثلاً شب) ۴۰۴ِ کش‌شده به خزنده می‌داد،
+//    در حالی که sitemap همان شهر را فهرست کرده بود؛
+//  - «۲۴ رستوران در …» فقط صفحه‌ی اول بود؛
+//  - رستورانِ `[DEMO]` روی صفحه‌ی عمومی می‌آمد (sitemap فیلترش می‌کند).
+//  پیش‌فرض (اپِ مشتری) دست‌نخورده است؛ فقط در حالتِ directory: isOpen بله،
+//  heartbeat نه، دمو نه، صفحه‌ی بزرگ‌تر.
+// ═══════════════════════════════════════════════════════════
+const DIRECTORY_PAGE_SIZE = 100;
+
 const querySchema = z.object({
   vibe: z.string().min(1).max(50).optional(),
   city: z.string().min(1).max(100).optional(),      // فیلترِ شهر (صفحاتِ SEO /city/{c})
   cuisine: z.string().min(1).max(100).optional(),   // فیلترِ آشپزی (صفحاتِ SEO /cuisine/{c})
   cursor: zUuid.optional(),
+  directory: z.enum(['1']).optional(),
 });
 
 async function GET_impl(req: Request) {
   try {
-    const { vibe, city, cuisine, cursor } = parseQuery(req, querySchema);
+    const { vibe, city, cuisine, cursor, directory } = parseQuery(req, querySchema);
+    const isDirectory = directory === '1';
+    const pageSize = isDirectory ? DIRECTORY_PAGE_SIZE : PAGE_SIZE;
 
-    // کلید cache بر اساس فیلترها و صفحه
-    const key = cacheKey('restaurants', vibe || 'all', city || 'all', cuisine || 'all', cursor || 'first');
+    // کلید cache بر اساس فیلترها، صفحه و حالت (فهرستِ مشتری و دایرکتوری هرگز کشِ هم را نمی‌گیرند)
+    const key = cacheKey('restaurants', isDirectory ? 'dir' : 'live', vibe || 'all', city || 'all', cuisine || 'all', cursor || 'first');
 
     // cache 60 ثانیه — لیست رستوران‌ها لحظه‌ای تغییر نمی‌کند
     // (تغییر وضعیت آنلاین/آفلاین حداکثر ظرف ۶۰ ثانیه در اپ مشتری دیده می‌شود)
@@ -45,10 +65,13 @@ async function GET_impl(req: Request) {
           // اتصال: یا gating خاموش است، یا اخیراً heartbeat داشته (آنلاین است).
           // رستورانی که اینترنتش قطع شده از لیست مشتری پنهان می‌شود تا رزرو آنلاینِ
           // متضاد با ثبت حضوریِ آفلاین پیش نیاید.
-          OR: [
-            { onlineGating: false },
-            { lastSeenAt: { gte: onlineThreshold } },
-          ],
+          // حالتِ directory (SEO): گاردِ لحظه‌ای نه، دمو هم نه — شرح بالای فایل.
+          ...(isDirectory
+            ? { NOT: { name: { startsWith: DEMO_NAME_PREFIX } } }
+            : { OR: [
+                { onlineGating: false },
+                { lastSeenAt: { gte: onlineThreshold } },
+              ] }),
         },
         // latitude/longitude لازم‌اند تا اپ مشتری فاصله را واقعاً حساب کند؛
         // پیش از این عددِ «۰٫۷ کیلومتر» در فرانت ساخته می‌شد و هیچ ربطی به
@@ -77,12 +100,12 @@ async function GET_impl(req: Request) {
         // پس نمی‌توانست مبنایِ مرتب‌سازی باشد.
         // `id` به‌عنوانِ شکنندهٔ تساوی می‌ماند تا ترتیب قطعی و cursor سالم بماند.
         orderBy: [{ visits7d: 'desc' }, { id: 'desc' }],
-        take: PAGE_SIZE + 1,                // یکی بیشتر بگیر تا بفهمی صفحه‌ی بعد هست
+        take: pageSize + 1,                 // یکی بیشتر بگیر تا بفهمی صفحه‌ی بعد هست
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });
 
-      const hasMore = items.length > PAGE_SIZE;
-      const page = hasMore ? items.slice(0, PAGE_SIZE) : items;
+      const hasMore = items.length > pageSize;
+      const page = hasMore ? items.slice(0, pageSize) : items;
       const nextCursor = hasMore ? page[page.length - 1].id : null;
 
       // ── سیگنال‌های اجتماعی، همه از دادهٔ واقعی ──

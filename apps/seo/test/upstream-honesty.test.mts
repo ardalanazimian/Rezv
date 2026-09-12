@@ -97,6 +97,27 @@ describe('فهرستِ شهر/آشپزی — strict فقط جایی که تصم�
     restore();
   });
 
+  test('حالتِ directory درخواست می‌شود و next_cursor دنبال می‌شود (۲۰۲۶-۰۹-۱۳)', async () => {
+    // فهرستِ پیش‌فرضِ API رستورانِ آفلاین را پنهان می‌کند ⇒ صفحه‌ی شهر شبانه
+    // ۴۰۴ می‌داد. این تست قفل می‌کند که SEO حالتِ directory را می‌خواهد و از
+    // صفحه‌ی اول فراتر می‌رود.
+    const urls: string[] = [];
+    const pages = [
+      { items: [{ id: 'a', slug: 'a', name: 'A', cuisine: null, city: 'تهران', vibes: [], rating: null, reviews_count: 0 }], next_cursor: 'a' },
+      { items: [{ id: 'b', slug: 'b', name: 'B', cuisine: null, city: 'تهران', vibes: [], rating: null, reviews_count: 0 }], next_cursor: null },
+    ];
+    globalThis.fetch = (async (u: string | URL) => {
+      urls.push(String(u));
+      return new Response(JSON.stringify(pages[urls.length - 1] ?? { items: [] }), { status: 200 });
+    }) as typeof fetch;
+    const got = await fetchRestaurantList({ city: 'تهران' }, 300, true);
+    restore();
+    assert.deepEqual(got.map(r => r.id), ['a', 'b']);
+    assert.equal(urls.length, 2, 'بعد از next_cursor=null نباید درخواستِ دیگری برود');
+    assert.ok(urls.every(u => new URL(u).searchParams.get('directory') === '1'), `همه‌ی درخواست‌ها directory=1: ${urls.join(' , ')}`);
+    assert.equal(new URL(urls[1]).searchParams.get('cursor'), 'a');
+  });
+
   test('strict + ۲۰۰ِ واقعاً خالی → [] (نبودِ واقعی، نه شکست)', async () => {
     stubStatus(200, { items: [] });
     assert.deepEqual(await fetchRestaurantList({ city: 'شهرِ خالی' }, 300, true), []);

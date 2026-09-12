@@ -188,9 +188,18 @@ export interface RestaurantListItem {
   reviews_count: number;
 }
 
+/** سقفِ صفحه‌هایی که فهرستِ دایرکتوری دنبال می‌کند (هر صفحه ۱۰۰ ردیف در API). */
+const DIRECTORY_MAX_PAGES = 3;
+
 /**
- * لیستِ رستوران‌ها با فیلترِ اختیاریِ شهر/آشپزی (GET /api/v1/restaurants?city=&cuisine=).
+ * لیستِ رستوران‌ها با فیلترِ اختیاریِ شهر/آشپزی (GET /api/v1/restaurants?directory=1&city=&cuisine=).
  * برای صفحاتِ /city/{c} و /cuisine/{c}. نبودِ API → آرایه‌ی خالی (صفحه گاردِ کیفیت را اعمال می‌کند).
+ *
+ * ⚠️ `directory=1` (۲۰۲۶-۰۹-۱۳، ممیزیِ قراردادِ فرانت↔بک): فهرستِ پیش‌فرض برای
+ * اپِ مشتری است و رستورانی را که پنلش در ۹۰ ثانیه‌ی اخیر روشن نبوده پنهان
+ * می‌کند — پس صفحه‌ی شهر شبانه ۴۰۴ِ کش‌شده می‌داد، فقط ۲۴ ردیفِ اول را می‌شمرد و
+ * رستورانِ [DEMO] را نشان می‌داد. حالتِ directory هیچ‌کدام را ندارد، و این تابع
+ * `next_cursor` را تا DIRECTORY_MAX_PAGES دنبال می‌کند.
  */
 export async function fetchRestaurantList(
   filter: { city?: string; cuisine?: string },
@@ -209,30 +218,39 @@ export async function fetchRestaurantList(
     if (strict) throw new UpstreamUnavailableError('SEO_API_BASE تنظیم نشده');
     return [];
   }
-  const qs = new URLSearchParams();
-  if (filter.city) qs.set('city', filter.city);
-  if (filter.cuisine) qs.set('cuisine', filter.cuisine);
-  const what = `restaurants?${qs.toString()}`;
-  let res: Response;
-  try {
-    res = await fetch(`${base}/api/v1/restaurants?${qs.toString()}`, {
-      next: { revalidate: revalidateSec },
-    });
-  } catch (e) {
-    if (strict) throw new UpstreamUnavailableError(`${what} → ${(e as Error)?.message ?? 'network'}`);
-    return [];
+  const all: RestaurantListItem[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < DIRECTORY_MAX_PAGES; page++) {
+    const qs = new URLSearchParams({ directory: '1' });
+    if (filter.city) qs.set('city', filter.city);
+    if (filter.cuisine) qs.set('cuisine', filter.cuisine);
+    if (cursor) qs.set('cursor', cursor);
+    const what = `restaurants?${qs.toString()}`;
+    let res: Response;
+    try {
+      res = await fetch(`${base}/api/v1/restaurants?${qs.toString()}`, {
+        next: { revalidate: revalidateSec },
+      });
+    } catch (e) {
+      if (strict) throw new UpstreamUnavailableError(`${what} → ${(e as Error)?.message ?? 'network'}`);
+      return [];
+    }
+    if (!res.ok) {
+      if (strict) throw new UpstreamUnavailableError(`${what} → HTTP ${res.status}`);
+      return [];
+    }
+    let data: { items?: RestaurantListItem[]; next_cursor?: string | null };
+    try {
+      data = (await res.json()) as typeof data;
+    } catch {
+      if (strict) throw new UpstreamUnavailableError(`${what} → پاسخِ نامعتبر`);
+      return [];
+    }
+    if (Array.isArray(data.items)) all.push(...data.items);
+    cursor = typeof data.next_cursor === 'string' ? data.next_cursor : null;
+    if (!cursor) break;
   }
-  if (!res.ok) {
-    if (strict) throw new UpstreamUnavailableError(`${what} → HTTP ${res.status}`);
-    return [];
-  }
-  try {
-    const data = (await res.json()) as { items?: RestaurantListItem[] };
-    return Array.isArray(data.items) ? data.items : [];
-  } catch {
-    if (strict) throw new UpstreamUnavailableError(`${what} → پاسخِ نامعتبر`);
-    return [];
-  }
+  return all;
 }
 
 /**

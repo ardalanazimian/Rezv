@@ -175,6 +175,7 @@ import './telemetry-pipeline.integration.test.mts';
 import './staff-tenant-hijack.integration.test.mts';
 import './incentive-low-demand-date.integration.test.mts';
 import './restaurant-popularity-ranking.integration.test.mts';
+import './restaurants-directory-mode.integration.test.mts';
 import './rewards.integration.test.mts';
 // ⚠️ این خط در ۲۰۲۶-۰۹-۰۹ **دو بار** از این فایل ناپدید شد (یک‌بار کامنت شد،
 // یک‌بار کاملاً حذف) در حالی که چند نشست هم‌زمان روی همین checkout کار می‌کردند.

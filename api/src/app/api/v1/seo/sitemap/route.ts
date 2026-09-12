@@ -4,6 +4,7 @@ import { cached, cacheKey } from '@/lib/cache';
 import { errorResponse } from '@/lib/errors';
 
 import { withApiMetrics } from '@/lib/api-metrics';
+import { DEMO_NAME_PREFIX } from '@/lib/demo-content';
 
 // ═══════════════════════════════════════════════════════════
 //  GET /api/v1/seo/sitemap — دادهٔ خامِ sitemap برای وب‌سایتِ عمومی (apps/seo).
@@ -30,9 +31,8 @@ const MAX_RESTAURANTS = 50_000; // سقفِ ایمنی؛ فراتر از آن ن
  *
  * تنها نشانه‌ی «دمو» در اسکیما پیشوندِ `[DEMO]` در نام است (فیلدِ boolean وجود
  * ندارد) — پس همان مبناست. اگر روزی فیلدِ `isDemo` اضافه شد، اینجا باید به آن
- * تکیه کند، نه به رشته. **(follow-up)**
+ * تکیه کند، نه به رشته. **(follow-up)** — ثابت حالا در lib/demo-content.ts است.
  */
-const DEMO_NAME_PREFIX = '[DEMO]';
 
 async function GET_impl() {
   try {
