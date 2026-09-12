@@ -383,7 +383,32 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .im-item{position:relative;height:100vh;height:100dvh;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;outline:none}
 .im-item:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
 .im-bg{position:absolute;inset:0;z-index:0}
-.im-emoji{position:absolute;inset:0;z-index:1;display:grid;place-items:center;font-size:calc(var(--fs-4xl) * 3);opacity:.5;pointer-events:none;filter:drop-shadow(0 12px 32px rgba(0,0,0,.45))}
+/* ── پرکردنِ صادقانه‌ی میانه‌ی صفحه وقتی عکسی نیست (حالتِ رایج: فهرستِ عمومی فیلدِ تصویر
+   ندارد) — فقط دادهٔ واقعیِ همین رکورد: ایموجیِ هویت، vibeها، تا سه قلمِ واقعیِ منو
+   (اگر جزئیات رسیده)، نشانی/فاصله (فقط اگر واقعاً می‌دانیم)، و در پنلِ پایین همان
+   اثباتِ اجتماعیِ کارت. هر بلوکِ بی‌داده اصلاً نیست — نه صفر، نه «—»، نه اسکلت.
+   با آمدنِ عکس کلِ این لایه کنار می‌رود: عکس خودش محتواست. رنگِ زمینه‌ی چیپ/کارت تیره
+   است نه سفیدِ شیشه‌ای، چون رویِ روشن‌ترین گرادیانِ پالت متنِ سفید باید خوانا بماند. */
+.im-fill{position:absolute;inset-inline:0;inset-block-start:calc(var(--touch-min) + var(--sp-8) + env(safe-area-inset-top,0px));inset-block-end:40%;z-index:3;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;gap:var(--sp-3);padding:0 var(--sp-6);pointer-events:none;text-align:center;overflow:hidden}
+.has-photo .im-fill{display:none}
+.im-emoji{font-size:calc(var(--fs-4xl) * 1.6);line-height:1;filter:drop-shadow(0 8px 24px rgba(0,0,0,.35))}
+.im-vibes{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--sp-2)}
+.im-vibes:empty{display:none}
+.im-vibe{font-size:var(--fs-xs);font-weight:var(--weight-emphasis);color:var(--xt-ink);padding:var(--sp-1) var(--sp-3);border-radius:var(--radius-pill);
+  background:rgba(8,6,20,.4);border:1px solid rgba(255,255,255,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.im-menu{width:100%;max-width:320px;text-align:start;padding:var(--sp-3) var(--sp-4);border-radius:var(--radius-surface);background:rgba(8,6,20,.48);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.im-item:not(.im-has-menu) .im-menu{display:none}
+.im-menu-h{font-size:var(--fs-2xs);font-weight:var(--weight-emphasis);color:var(--xt-ink-2);margin-block-end:var(--sp-2)}
+.im-menu-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--sp-2)}
+.im-menu-item{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-sm);color:var(--xt-ink)}
+.im-menu-e{font-size:var(--fs-lg);line-height:1;flex:none}
+.im-menu-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:var(--weight-emphasis)}
+.im-menu-p{flex:none;font-size:var(--fs-xs);color:var(--xt-ink-2);font-variant-numeric:tabular-nums}
+.im-addr{display:inline-flex;align-items:center;gap:var(--sp-1);font-size:var(--fs-xs);color:var(--xt-ink);padding:var(--sp-1) var(--sp-3);border-radius:var(--radius-pill);background:rgba(8,6,20,.4)}
+.im-item:not(.im-has-addr) .im-addr{display:none}
+.im-item .rc-social{margin-top:0}
+.im-item:not(.im-has-social) .im-social{display:none}
 .im-scrim{position:absolute;inset:0;z-index:2;pointer-events:none;
   background:linear-gradient(to top,rgba(8,6,20,.94) 0%,rgba(8,6,20,.6) 34%,transparent 62%),linear-gradient(to bottom,rgba(8,6,20,.55),transparent 24%)}
 .im-info{position:absolute;inset-inline-start:0;inset-inline-end:calc(var(--touch-min) + var(--sp-6));inset-block-end:0;z-index:3;min-width:0;

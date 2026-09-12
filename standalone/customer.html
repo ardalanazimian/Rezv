@@ -1095,7 +1095,32 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .im-item{position:relative;height:100vh;height:100dvh;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;outline:none}
 .im-item:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
 .im-bg{position:absolute;inset:0;z-index:0}
-.im-emoji{position:absolute;inset:0;z-index:1;display:grid;place-items:center;font-size:calc(var(--fs-4xl) * 3);opacity:.5;pointer-events:none;filter:drop-shadow(0 12px 32px rgba(0,0,0,.45))}
+/* ── پرکردنِ صادقانه‌ی میانه‌ی صفحه وقتی عکسی نیست (حالتِ رایج: فهرستِ عمومی فیلدِ تصویر
+   ندارد) — فقط دادهٔ واقعیِ همین رکورد: ایموجیِ هویت، vibeها، تا سه قلمِ واقعیِ منو
+   (اگر جزئیات رسیده)، نشانی/فاصله (فقط اگر واقعاً می‌دانیم)، و در پنلِ پایین همان
+   اثباتِ اجتماعیِ کارت. هر بلوکِ بی‌داده اصلاً نیست — نه صفر، نه «—»، نه اسکلت.
+   با آمدنِ عکس کلِ این لایه کنار می‌رود: عکس خودش محتواست. رنگِ زمینه‌ی چیپ/کارت تیره
+   است نه سفیدِ شیشه‌ای، چون رویِ روشن‌ترین گرادیانِ پالت متنِ سفید باید خوانا بماند. */
+.im-fill{position:absolute;inset-inline:0;inset-block-start:calc(var(--touch-min) + var(--sp-8) + env(safe-area-inset-top,0px));inset-block-end:40%;z-index:3;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;gap:var(--sp-3);padding:0 var(--sp-6);pointer-events:none;text-align:center;overflow:hidden}
+.has-photo .im-fill{display:none}
+.im-emoji{font-size:calc(var(--fs-4xl) * 1.6);line-height:1;filter:drop-shadow(0 8px 24px rgba(0,0,0,.35))}
+.im-vibes{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--sp-2)}
+.im-vibes:empty{display:none}
+.im-vibe{font-size:var(--fs-xs);font-weight:var(--weight-emphasis);color:var(--xt-ink);padding:var(--sp-1) var(--sp-3);border-radius:var(--radius-pill);
+  background:rgba(8,6,20,.4);border:1px solid rgba(255,255,255,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.im-menu{width:100%;max-width:320px;text-align:start;padding:var(--sp-3) var(--sp-4);border-radius:var(--radius-surface);background:rgba(8,6,20,.48);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.im-item:not(.im-has-menu) .im-menu{display:none}
+.im-menu-h{font-size:var(--fs-2xs);font-weight:var(--weight-emphasis);color:var(--xt-ink-2);margin-block-end:var(--sp-2)}
+.im-menu-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--sp-2)}
+.im-menu-item{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-sm);color:var(--xt-ink)}
+.im-menu-e{font-size:var(--fs-lg);line-height:1;flex:none}
+.im-menu-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:var(--weight-emphasis)}
+.im-menu-p{flex:none;font-size:var(--fs-xs);color:var(--xt-ink-2);font-variant-numeric:tabular-nums}
+.im-addr{display:inline-flex;align-items:center;gap:var(--sp-1);font-size:var(--fs-xs);color:var(--xt-ink);padding:var(--sp-1) var(--sp-3);border-radius:var(--radius-pill);background:rgba(8,6,20,.4)}
+.im-item:not(.im-has-addr) .im-addr{display:none}
+.im-item .rc-social{margin-top:0}
+.im-item:not(.im-has-social) .im-social{display:none}
 .im-scrim{position:absolute;inset:0;z-index:2;pointer-events:none;
   background:linear-gradient(to top,rgba(8,6,20,.94) 0%,rgba(8,6,20,.6) 34%,transparent 62%),linear-gradient(to bottom,rgba(8,6,20,.55),transparent 24%)}
 .im-info{position:absolute;inset-inline-start:0;inset-inline-end:calc(var(--touch-min) + var(--sp-6));inset-block-end:0;z-index:3;min-width:0;
@@ -4680,9 +4705,13 @@ function upgradeTile(tile, r){
 //  اومدن» فنی درست ولی گمراه‌کننده است.
 // ═══════════════════════════════════════════════════════════
 
+/** تعدادِ آواتارِ تزئینی برایِ n رزرو — یک فرمول، دو رندرکننده (کارت: HTML، immersive: DOM). */
+function avatarCount(n, max = 4){
+  return Math.min(max, Math.max(1, Math.ceil(n / 4)));
+}
 /** آواتارهای تزئینی — تعدادشان بر پایه‌ی عددِ واقعی، خودشان aria-hidden. */
 function avatarStack(n, max = 4){
-  const count = Math.min(max, Math.max(1, Math.ceil(n / 4)));
+  const count = avatarCount(n, max);
   return `<div class="rc-avas" aria-hidden="true">${Array.from({length:count},()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>`;
 }
 function detailSocialProof(r){
@@ -4845,6 +4874,16 @@ function haversineKm(a,b){
   return 2*Rk*Math.asin(Math.sqrt(s));
 }
 const hasCoords=r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng);
+/** برچسبِ فاصله — یک قالب برایِ «نزدیک تو» و نمای تمام‌صفحه. */
+function kmLabel(km){
+  return km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`;
+}
+/** فاصله‌ی واقعی تا رستوران، یا null — بدونِ موقعیتِ کاربر (اجازه‌ی از قبل داده‌شده)
+ *  یا بدونِ مختصاتِ رستوران، هیچ عددی ساخته نمی‌شود. */
+function distanceLabel(r){
+  if(!userPos||!r||!hasCoords(r)) return null;
+  return kmLabel(haversineKm(userPos,{lat:r.lat,lng:r.lng}));
+}
 function renderNearby(){
   const el=document.getElementById('nearbyScroll');if(!el)return;
   const title=document.getElementById('nearbyTitle');
@@ -4855,8 +4894,7 @@ function renderNearby(){
       .sort((a,b)=>a.km-b.km).slice(0,6);
     if(withDist.length){
       if(title)title.textContent='نزدیک تو';
-      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,
-        km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`)).join('');
+      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,kmLabel(km))).join('');
       return;
     }
   }
@@ -7812,13 +7850,18 @@ function imItemEl(r, i, n){
   const on = favHas(r.id);
   const meta = [r.cuisine, r.price].filter(Boolean).join(' · ');
   const cb = Number.isFinite(r.cb) && r.cb > 0 ? `${fmtFa(r.cb)}٪ کش‌بک` : '';
-  const social = Number.isFinite(r.visits7d) && r.visits7d > 0 ? `${fmtFa(r.visits7d)} رزرو در هفته‌ی گذشته` : '';
   // ⚠️ هیچ شرطی داخلِ قالب نیست — عمداً. هر ${…} یا esc/jsq است یا icon/fmtFa/gradFor؛
-  // حالت‌های شرطی (نمونه، داغ، کش‌بک) با کلاس رویِ آیتم روشن/خاموش می‌شوند.
+  // حالت‌های شرطی (نمونه، داغ، کش‌بک) با کلاس رویِ آیتم روشن/خاموش می‌شوند و بلوک‌های
+  // داده‌ای (vibe، منو، نشانی، اثباتِ اجتماعی) با DOM API پر می‌شوند — imFill.
   el.innerHTML = `
     <div class="im-bg" style="background:${gradFor(r.id)}"></div>
-    <span class="im-emoji" aria-hidden="true">${esc(r.e)}</span>
     <div class="im-scrim"></div>
+    <div class="im-fill">
+      <span class="im-emoji" aria-hidden="true">${esc(r.e)}</span>
+      <div class="im-vibes"></div>
+      <div class="im-menu"><div class="im-menu-h">از منو</div><ul class="im-menu-list"></ul></div>
+      <div class="im-addr">${icon('pin',{size:12})}<span class="im-addr-t"></span></div>
+    </div>
     <div class="im-rail">
       <button type="button" class="rc-fav" aria-pressed="false" aria-label="افزودن به علاقه‌مندی‌ها" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:22,fill:on})}</button>
       <button type="button" class="im-rail-btn" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${jsq(String(r.id))})">${icon('info',{size:22})}</button>
@@ -7831,7 +7874,7 @@ function imItemEl(r, i, n){
         <span class="im-meta">${esc(meta)}</span>
         <span class="rc-cb im-cb">${icon('wallet',{size:12})} ${esc(cb)}</span>
       </div>
-      <div class="im-social">${esc(social)}</div>
+      <div class="rc-social im-social"><div class="rc-avas im-avas" aria-hidden="true"></div><div class="rc-social-t"><b class="im-social-n"></b> هفته‌ی گذشته</div></div>
       <div class="rc-slots"></div>
       <button type="button" class="im-open" onclick="openRest(${jsq(String(r.id))})">صفحه‌ی رستوران ${icon('arrowL',{size:16})}</button>
     </div>`;
@@ -7841,9 +7884,68 @@ function imItemEl(r, i, n){
   const fav = el.querySelector('.rc-fav');
   fav.setAttribute('aria-pressed', String(on));
   fav.setAttribute('aria-label', on ? 'حذف از علاقه‌مندی‌ها' : 'افزودن به علاقه‌مندی‌ها');
+  imFill(el, r);
   const url = photoUrl(r);
   if (url) mountPhoto(el.querySelector('.im-bg'), url, 'im-photo');
   return el;
+}
+
+/** یک گره‌ی متنی می‌سازد — همه‌ی دادهٔ این بلوک‌ها از textContent می‌گذرد، نه HTML. */
+function imText(tag, cls, text){
+  const n = document.createElement(tag);
+  n.className = cls;
+  n.textContent = text;
+  return n;
+}
+
+/**
+ * بلوک‌های داده‌ایِ آیتم — همه با DOM API و فقط وقتی مقدار **واقعاً** معلوم است.
+ *
+ * چرا این تابع هست: بدونِ عکس (حالتِ رایج — فهرستِ عمومی هیچ فیلدِ تصویری ندارد)
+ * یک آیتمِ تمام‌صفحه ~۶۰٪ گرادیانِ خالی بود و کمتر از کارتِ ۲۷۰pxِ قدیمی می‌گفت.
+ * این‌ها همان چیزهایی‌اند که payload از قبل می‌آورد و این صفحه دور می‌ریخت:
+ *   • r.vibes            → چیپ‌های آرام (بدونِ رفتار)
+ *   • r.menu             → تا سه قلمِ واقعیِ موجود، فقط اگر جزئیات رسیده (پیش‌واکشیِ ±۲)
+ *   • r.address / فاصله  → فقط نشانیِ رسیده از جزئیات و فاصله‌ی واقعی (distanceLabel)
+ *   • r.visits7d         → همان قاعده‌ی cardHTML: null یعنی هیچ، صفر هم هیچ
+ * بلوکِ بی‌داده اصلاً در صفحه نیست (کلاسِ im-has-* / :empty) — نه صفر، نه «—»، نه اسکلت.
+ * خودتوان است: با رسیدنِ جزئیات دوباره صدا زده می‌شود و از نو پر می‌کند.
+ */
+function imFill(el, r){
+  const vibes = (Array.isArray(r.vibes) ? r.vibes : []).filter(v => typeof v === 'string' && v.trim()).slice(0, 5);
+  const vb = el.querySelector('.im-vibes');
+  vb.textContent = '';
+  vibes.forEach(v => vb.appendChild(imText('span', 'im-vibe', v)));
+
+  // قلمِ ناموجود (out) نشان داده نمی‌شود؛ قیمتِ ناشناخته/صفر هم — نام بدونِ قیمت می‌ماند.
+  const items = (Array.isArray(r.menu) ? r.menu : []).filter(m => m && m.n && !m.out).slice(0, 3);
+  const ul = el.querySelector('.im-menu-list');
+  ul.textContent = '';
+  for (const m of items) {
+    const li = document.createElement('li');
+    li.className = 'im-menu-item';
+    if (m.e) li.appendChild(imText('span', 'im-menu-e', m.e));
+    li.appendChild(imText('span', 'im-menu-n', m.n));
+    if (m.p && m.p !== '۰') li.appendChild(imText('span', 'im-menu-p', `${m.p} تومان`));
+    ul.appendChild(li);
+  }
+  el.classList.toggle('im-has-menu', items.length > 0);
+
+  const where = [];
+  if (typeof r.address === 'string' && r.address.trim()) where.push(r.address.trim());
+  const dist = distanceLabel(r);
+  if (dist) where.push(dist);
+  el.querySelector('.im-addr-t').textContent = where.join(' · ');
+  el.classList.toggle('im-has-addr', where.length > 0);
+
+  const n = Number.isFinite(r.visits7d) && r.visits7d > 0 ? r.visits7d : 0;
+  const avas = el.querySelector('.im-avas');
+  avas.textContent = '';
+  if (n) {
+    for (let k = 0; k < avatarCount(n, 3); k++) avas.appendChild(imText('span', 'avatar avatar-sm', ''));
+    el.querySelector('.im-social-n').textContent = `${fmtFa(n)} رزرو`;
+  }
+  el.classList.toggle('im-has-social', n > 0);
 }
 
 function imBuild(list){
@@ -7881,8 +7983,10 @@ function imPrefetch(r, k){
   if (known) { mountPhoto(item.querySelector('.im-bg'), known, 'im-photo'); return; }
   if (r.detailLoaded) return;
   requestDetail(r).then(ok => {
-    const url = ok ? photoUrl(r) : null;
-    if (url && item.isConnected) mountPhoto(item.querySelector('.im-bg'), url, 'im-photo');
+    if (!ok || !item.isConnected) return;
+    imFill(item, r);                       // منو/نشانی حالا معلوم‌اند — همان آیتم، بدونِ رندرِ دوباره
+    const url = photoUrl(r);
+    if (url) mountPhoto(item.querySelector('.im-bg'), url, 'im-photo');
   });
 }
 

@@ -20,7 +20,7 @@
 import { esc, jsq, toast } from '../auth.js';
 import { favHas, gradFor } from '../data/seed.js';
 import { findR } from '../init.js';
-import { feedList, fmtFa, go, isHot, mountPhoto, paintSlots, photoUrl, requestDetail } from '../data/discover.js';
+import { avatarCount, distanceLabel, feedList, fmtFa, go, isHot, mountPhoto, paintSlots, photoUrl, requestDetail } from '../data/discover.js';
 import { icon } from '../icons.js';
 
 let imList = [];
@@ -44,13 +44,18 @@ function imItemEl(r, i, n){
   const on = favHas(r.id);
   const meta = [r.cuisine, r.price].filter(Boolean).join(' · ');
   const cb = Number.isFinite(r.cb) && r.cb > 0 ? `${fmtFa(r.cb)}٪ کش‌بک` : '';
-  const social = Number.isFinite(r.visits7d) && r.visits7d > 0 ? `${fmtFa(r.visits7d)} رزرو در هفته‌ی گذشته` : '';
   // ⚠️ هیچ شرطی داخلِ قالب نیست — عمداً. هر ${…} یا esc/jsq است یا icon/fmtFa/gradFor؛
-  // حالت‌های شرطی (نمونه، داغ، کش‌بک) با کلاس رویِ آیتم روشن/خاموش می‌شوند.
+  // حالت‌های شرطی (نمونه، داغ، کش‌بک) با کلاس رویِ آیتم روشن/خاموش می‌شوند و بلوک‌های
+  // داده‌ای (vibe، منو، نشانی، اثباتِ اجتماعی) با DOM API پر می‌شوند — imFill.
   el.innerHTML = `
     <div class="im-bg" style="background:${gradFor(r.id)}"></div>
-    <span class="im-emoji" aria-hidden="true">${esc(r.e)}</span>
     <div class="im-scrim"></div>
+    <div class="im-fill">
+      <span class="im-emoji" aria-hidden="true">${esc(r.e)}</span>
+      <div class="im-vibes"></div>
+      <div class="im-menu"><div class="im-menu-h">از منو</div><ul class="im-menu-list"></ul></div>
+      <div class="im-addr">${icon('pin',{size:12})}<span class="im-addr-t"></span></div>
+    </div>
     <div class="im-rail">
       <button type="button" class="rc-fav" aria-pressed="false" aria-label="افزودن به علاقه‌مندی‌ها" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:22,fill:on})}</button>
       <button type="button" class="im-rail-btn" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${jsq(String(r.id))})">${icon('info',{size:22})}</button>
@@ -63,7 +68,7 @@ function imItemEl(r, i, n){
         <span class="im-meta">${esc(meta)}</span>
         <span class="rc-cb im-cb">${icon('wallet',{size:12})} ${esc(cb)}</span>
       </div>
-      <div class="im-social">${esc(social)}</div>
+      <div class="rc-social im-social"><div class="rc-avas im-avas" aria-hidden="true"></div><div class="rc-social-t"><b class="im-social-n"></b> هفته‌ی گذشته</div></div>
       <div class="rc-slots"></div>
       <button type="button" class="im-open" onclick="openRest(${jsq(String(r.id))})">صفحه‌ی رستوران ${icon('arrowL',{size:16})}</button>
     </div>`;
@@ -73,9 +78,68 @@ function imItemEl(r, i, n){
   const fav = el.querySelector('.rc-fav');
   fav.setAttribute('aria-pressed', String(on));
   fav.setAttribute('aria-label', on ? 'حذف از علاقه‌مندی‌ها' : 'افزودن به علاقه‌مندی‌ها');
+  imFill(el, r);
   const url = photoUrl(r);
   if (url) mountPhoto(el.querySelector('.im-bg'), url, 'im-photo');
   return el;
+}
+
+/** یک گره‌ی متنی می‌سازد — همه‌ی دادهٔ این بلوک‌ها از textContent می‌گذرد، نه HTML. */
+function imText(tag, cls, text){
+  const n = document.createElement(tag);
+  n.className = cls;
+  n.textContent = text;
+  return n;
+}
+
+/**
+ * بلوک‌های داده‌ایِ آیتم — همه با DOM API و فقط وقتی مقدار **واقعاً** معلوم است.
+ *
+ * چرا این تابع هست: بدونِ عکس (حالتِ رایج — فهرستِ عمومی هیچ فیلدِ تصویری ندارد)
+ * یک آیتمِ تمام‌صفحه ~۶۰٪ گرادیانِ خالی بود و کمتر از کارتِ ۲۷۰pxِ قدیمی می‌گفت.
+ * این‌ها همان چیزهایی‌اند که payload از قبل می‌آورد و این صفحه دور می‌ریخت:
+ *   • r.vibes            → چیپ‌های آرام (بدونِ رفتار)
+ *   • r.menu             → تا سه قلمِ واقعیِ موجود، فقط اگر جزئیات رسیده (پیش‌واکشیِ ±۲)
+ *   • r.address / فاصله  → فقط نشانیِ رسیده از جزئیات و فاصله‌ی واقعی (distanceLabel)
+ *   • r.visits7d         → همان قاعده‌ی cardHTML: null یعنی هیچ، صفر هم هیچ
+ * بلوکِ بی‌داده اصلاً در صفحه نیست (کلاسِ im-has-* / :empty) — نه صفر، نه «—»، نه اسکلت.
+ * خودتوان است: با رسیدنِ جزئیات دوباره صدا زده می‌شود و از نو پر می‌کند.
+ */
+function imFill(el, r){
+  const vibes = (Array.isArray(r.vibes) ? r.vibes : []).filter(v => typeof v === 'string' && v.trim()).slice(0, 5);
+  const vb = el.querySelector('.im-vibes');
+  vb.textContent = '';
+  vibes.forEach(v => vb.appendChild(imText('span', 'im-vibe', v)));
+
+  // قلمِ ناموجود (out) نشان داده نمی‌شود؛ قیمتِ ناشناخته/صفر هم — نام بدونِ قیمت می‌ماند.
+  const items = (Array.isArray(r.menu) ? r.menu : []).filter(m => m && m.n && !m.out).slice(0, 3);
+  const ul = el.querySelector('.im-menu-list');
+  ul.textContent = '';
+  for (const m of items) {
+    const li = document.createElement('li');
+    li.className = 'im-menu-item';
+    if (m.e) li.appendChild(imText('span', 'im-menu-e', m.e));
+    li.appendChild(imText('span', 'im-menu-n', m.n));
+    if (m.p && m.p !== '۰') li.appendChild(imText('span', 'im-menu-p', `${m.p} تومان`));
+    ul.appendChild(li);
+  }
+  el.classList.toggle('im-has-menu', items.length > 0);
+
+  const where = [];
+  if (typeof r.address === 'string' && r.address.trim()) where.push(r.address.trim());
+  const dist = distanceLabel(r);
+  if (dist) where.push(dist);
+  el.querySelector('.im-addr-t').textContent = where.join(' · ');
+  el.classList.toggle('im-has-addr', where.length > 0);
+
+  const n = Number.isFinite(r.visits7d) && r.visits7d > 0 ? r.visits7d : 0;
+  const avas = el.querySelector('.im-avas');
+  avas.textContent = '';
+  if (n) {
+    for (let k = 0; k < avatarCount(n, 3); k++) avas.appendChild(imText('span', 'avatar avatar-sm', ''));
+    el.querySelector('.im-social-n').textContent = `${fmtFa(n)} رزرو`;
+  }
+  el.classList.toggle('im-has-social', n > 0);
 }
 
 function imBuild(list){
@@ -113,8 +177,10 @@ function imPrefetch(r, k){
   if (known) { mountPhoto(item.querySelector('.im-bg'), known, 'im-photo'); return; }
   if (r.detailLoaded) return;
   requestDetail(r).then(ok => {
-    const url = ok ? photoUrl(r) : null;
-    if (url && item.isConnected) mountPhoto(item.querySelector('.im-bg'), url, 'im-photo');
+    if (!ok || !item.isConnected) return;
+    imFill(item, r);                       // منو/نشانی حالا معلوم‌اند — همان آیتم، بدونِ رندرِ دوباره
+    const url = photoUrl(r);
+    if (url) mountPhoto(item.querySelector('.im-bg'), url, 'im-photo');
   });
 }
 

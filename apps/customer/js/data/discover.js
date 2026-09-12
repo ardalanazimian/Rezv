@@ -247,9 +247,13 @@ function upgradeTile(tile, r){
 //  اومدن» فنی درست ولی گمراه‌کننده است.
 // ═══════════════════════════════════════════════════════════
 
+/** تعدادِ آواتارِ تزئینی برایِ n رزرو — یک فرمول، دو رندرکننده (کارت: HTML، immersive: DOM). */
+export function avatarCount(n, max = 4){
+  return Math.min(max, Math.max(1, Math.ceil(n / 4)));
+}
 /** آواتارهای تزئینی — تعدادشان بر پایه‌ی عددِ واقعی، خودشان aria-hidden. */
 function avatarStack(n, max = 4){
-  const count = Math.min(max, Math.max(1, Math.ceil(n / 4)));
+  const count = avatarCount(n, max);
   return `<div class="rc-avas" aria-hidden="true">${Array.from({length:count},()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>`;
 }
 
@@ -414,6 +418,16 @@ function haversineKm(a,b){
   return 2*Rk*Math.asin(Math.sqrt(s));
 }
 const hasCoords=r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng);
+/** برچسبِ فاصله — یک قالب برایِ «نزدیک تو» و نمای تمام‌صفحه. */
+function kmLabel(km){
+  return km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`;
+}
+/** فاصله‌ی واقعی تا رستوران، یا null — بدونِ موقعیتِ کاربر (اجازه‌ی از قبل داده‌شده)
+ *  یا بدونِ مختصاتِ رستوران، هیچ عددی ساخته نمی‌شود. */
+export function distanceLabel(r){
+  if(!userPos||!r||!hasCoords(r)) return null;
+  return kmLabel(haversineKm(userPos,{lat:r.lat,lng:r.lng}));
+}
 
 export function renderNearby(){
   const el=document.getElementById('nearbyScroll');if(!el)return;
@@ -425,8 +439,7 @@ export function renderNearby(){
       .sort((a,b)=>a.km-b.km).slice(0,6);
     if(withDist.length){
       if(title)title.textContent='نزدیک تو';
-      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,
-        km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`)).join('');
+      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,kmLabel(km))).join('');
       return;
     }
   }
