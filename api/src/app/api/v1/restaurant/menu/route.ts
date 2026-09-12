@@ -6,6 +6,7 @@ import { parseBody, zUuid, z } from '@/lib/schemas';
 import { publicMenuUrl } from '@/lib/public-urls';
 import { invalidatePublicMenu } from '@/lib/menu-cache';
 import { resolveCategory } from '@/lib/menu-category';
+import { parseAvailability } from '@/lib/menu-availability';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  مدیریتِ منو — پنلِ بیزنس
@@ -43,6 +44,12 @@ const createSchema = z.object({
   is_active: z.boolean().optional(),
   description: z.string().max(300).trim().optional(),
   sort_order: z.number().int().min(0).max(100_000).optional(),
+  // ۰۷۸ — پنجره‌ی سرو، همان شکلِ PATCH (شکل در parseAvailability سنجیده می‌شود).
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): پنل (menu.js) این کلید
+  // را در «افزودن» هم می‌فرستد، ولی این schema نداشتش و `z.object` کلیدِ
+  // ناشناخته را بی‌صدا دور می‌ریزد ⇒ آیتمِ تازه «همیشه در دسترس» ذخیره می‌شد و
+  // toastِ موفقیت هم می‌آمد. فقط ویرایشِ بعدی درستش می‌کرد.
+  availability: z.record().nullable().optional(),
 });
 
 
@@ -96,6 +103,8 @@ export const GET = withRestaurantAuth({ permission: 'canManageSettings' }, async
 /** POST — افزودنِ آیتمِ تازه به منو */
 export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canManageSettings' }, async (req, ctx) => {
   const b = await parseBody(req, createSchema);
+  // شکلِ بد پیش از هر کوئری ۴۲۲ می‌شود؛ null/غایب = «همیشه» (پیش‌فرضِ ستون).
+  const availability = parseAvailability(b.availability);
 
   // نامِ تکراری در همان رستوران جلوگیری می‌شود: دو آیتمِ هم‌نام در منو یعنی
   // رستوران‌دار نمی‌فهمد کدام را ویرایش می‌کند و گزارشِ پرفروش‌ها هم دوپاره می‌شود.
@@ -120,10 +129,11 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
       description: b.description || null,
       // imageUrl عمداً اینجا ست نمی‌شود — فقط روتِ آپلودِ عکس آن را می‌نویسد.
       sortOrder: b.sort_order ?? 0,
+      ...(availability ? { availability } : {}),
     },
     select: {
       id: true, name: true, priceToman: true, category: true, categoryId: true,
-      isOutOfStock: true, isActive: true,
+      isOutOfStock: true, isActive: true, availability: true,
       description: true, imageUrl: true, sortOrder: true,
     },
   });
@@ -134,5 +144,6 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
     category: item.category, category_id: item.categoryId,
     is_out_of_stock: item.isOutOfStock, is_active: item.isActive,
     description: item.description, image_url: item.imageUrl, sort_order: item.sortOrder,
+    availability: item.availability,
   }, { status: 201 });
 });

@@ -122,6 +122,32 @@ describe('CRUDِ منو', () => {
     createdId = body.id;
   });
 
+  test('POST — پنجره‌ی سرو در «افزودن» ذخیره می‌شود، نه فقط در ویرایش', async () => {
+    // ⚠️ قفلِ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): menu.js همین
+    // بدنه را برای «افزودن» می‌فرستد؛ schemaِ POST کلید را نداشت و `z.object`
+    // بی‌صدا دورش می‌ریخت ⇒ آیتمِ صبحانه «همیشه در دسترس» ذخیره می‌شد.
+    const availability = { days: [6, 0], start_min: 480, end_min: 660 };
+    const res = await menuRoute.POST(json(tokenA, { name: '[DEMO] املت صبحانه', price_toman: 90_000, availability }));
+    const raw = await res.text();
+    assert.equal(res.status, 201, raw.slice(0, 200));
+    const body = JSON.parse(raw);
+    const row = await db.menuItem.findUnique({ where: { id: body.id }, select: { availability: true } });
+    assert.deepEqual(row?.availability, { days: [0, 6], start_min: 480, end_min: 660 },
+      'ستونِ DB باید پنجره را داشته باشد (مرتب‌شده توسطِ parseAvailability)');
+    assert.deepEqual(body.availability, { days: [0, 6], start_min: 480, end_min: 660 });
+
+    // کنترلِ منفی: شکلِ بد ۴۲۲ است و چیزی ساخته نمی‌شود — نه اینکه بی‌صدا «همیشه» شود.
+    const bad = await menuRoute.POST(json(tokenA, { name: '[DEMO] پنجره‌ی بد', price_toman: 1000, availability: { days: [], start_min: 0, end_min: 10 } }));
+    assert.equal(bad.status, 422);
+    assert.equal(await db.menuItem.count({ where: { restaurantId: restA, name: '[DEMO] پنجره‌ی بد' } }), 0);
+
+    // کنترلِ مثبت: null و غایب هر دو یعنی «همیشه» (ستونِ null).
+    const always = await menuRoute.POST(json(tokenA, { name: '[DEMO] همیشه', price_toman: 1000, availability: null }));
+    assert.equal(always.status, 201);
+    const alwaysRow = await db.menuItem.findUnique({ where: { id: (await always.json()).id }, select: { availability: true } });
+    assert.equal(alwaysRow?.availability, null);
+  });
+
   test('POST — نامِ تکراری رد می‌شود', async () => {
     const res = await menuRoute.POST(json(tokenA, { name: '[DEMO] پاستا', price_toman: 1000 }));
     assert.notEqual(res.status, 201, 'آیتمِ هم‌نام نباید ساخته شود');
