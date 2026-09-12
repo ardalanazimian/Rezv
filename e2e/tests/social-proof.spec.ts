@@ -67,8 +67,13 @@ test('جست‌وجوی بی‌نتیجه، حالتِ خالی نشان می‌
   await mockApi(page);
   await gotoApp(page);
 
-  await page.fill('#sQ', 'یک‌چیزی‌که‌قطعاً‌نیست');
-  await page.getByRole('button', { name: 'جستجو' }).click();
+  // ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] ورودیِ جست‌وجوی هیرو (#sQ) با هیرو رفت
+  // و جانشینش پالت شد — ولی پالت مستقیم به صفحه‌ی رستوران می‌رود و
+  // فید را فیلتر نمی‌کند. یعنی امروز هیچ مسیرِ رابطی به فیلترِ متنیِ فید
+  // نمی‌رسد (به مالک گزارش شد). قرارداد اما زنده است و گیتِ CI
+  // (tools/measure-home-s1.mjs) هم دقیقاً همین‌طور doSearch را صدا می‌زند.
+  await page.evaluate(() =>
+    (window as unknown as { doSearch?: (q: string) => void }).doSearch?.('یک‌چیزی‌که‌قطعاً‌نیست'));
 
   const feed = page.locator('#feed');
   await expect(feed).toContainText('پیدا نشد');

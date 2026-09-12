@@ -363,7 +363,7 @@ export function pickOccasion(occ, el){
   if(already){
     document.querySelector('.chip')?.classList.add('active');
     document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
-    const sub=document.querySelector('.section-sub'); if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+    renderSub(`${fmtFa(R.length)} رستوران فعال`);
     renderFeed(R);
     return;
   }
@@ -374,7 +374,7 @@ export function pickOccasion(occ, el){
                    .sort((a,b)=>(b.rt||0)-(a.rt||0));
   const list = matched.length ? matched : R;
   document.getElementById('feedTitle').textContent = m.title;
-  const sub=document.querySelector('.section-sub'); if(sub) sub.textContent = m.sub;
+  renderSub(m.sub);
   renderFeed(list);
   // اسکرول نرم به فید تا نتیجه دیده بشه
   document.getElementById('feed')?.scrollIntoView({behavior:'smooth',block:'start'});
@@ -535,8 +535,12 @@ export function renderRestaurantSections(){
   renderNearby();
   renderTrending();
   // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
-  const sub=document.querySelector('#page-discover .section-sub');
-  if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال · ${searchCtxLabel()}`;
+  // ⚠️ [۲۰۲۶-۰۹-۱۲] اینجا `textContent` بود و **قرصِ زمینه را پاک می‌کرد**: این
+  // تابع در هر بوت/سینک اجرا می‌شود، پس روی بارِ سرد قرص هرگز روی صفحه نبود و
+  // کاربر هیچ راهی به «کِی و چند نفر» نداشت — همان نقصِ صحتی که DS-007 §۶ گفته
+  // بود این قرص جلویش را می‌گیرد (چیپِ «۱۹:۰۰» یعنی امروزِ ۲ نفره و quickBook
+  // مستقیم رد می‌شود). حالا این سطر **یک نقاش** دارد: renderSub.
+  if(Array.isArray(R) && R.length) renderSub(`${fmtFa(R.length)} رستوران فعال`);
   // چیپِ امتیاز عمداً اینجا نوشته نمی‌شود: منبعِ واحدش syncNavPoints در
   // api.js است که مقدار را از /me/loyalty می‌گیرد. نوشتنِ ptsِ محلی اینجا
   // باعث می‌شد مهمانِ ناشناس عددِ ساختگی ببیند (باگِ ۳۴۰).

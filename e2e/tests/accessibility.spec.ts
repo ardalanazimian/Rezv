@@ -49,25 +49,36 @@ test('toast ناحیه‌ی زنده (aria-live) برای screen reader دارد
 test('کارت رستوران و چیپ‌های ساعت با کیبورد قابلِ استفاده‌اند', async ({ page }) => {
   await gotoApp(page);
 
-  const open = page.locator('.rc .rc-open').first();
-  await expect(open).toBeVisible();
+  // ⚠️ DS-011 (۲۰۲۶-۰۹-۱۲): مسیر عوض شد، ادعا نه. فید موزاییکِ Explore است و
+  // تایلِ ۱۲۸px جای کنترلِ ۴۴px ندارد، پس چیپ‌های ساعت به نمای تمام‌صفحه رفتند.
+  // همان سه چیزی که این تست از اول می‌سنجید، روی مسیرِ تازه: کنترلِ بازکردن
+  // فوکوس‌پذیر و برچسب‌دار است، چیپِ ساعت دکمه‌ی واقعیِ ساعت‌گو است، و کیبورد
+  // به صفحه‌ی رستوران می‌رسد.
+  const tap = page.locator('#feed .rc .xt-tap').first();
+  await expect(tap).toBeVisible();
   // ⚠️ مقاوم در برابرِ ری‌رندرِ فید (۲۰۲۶-۰۸-۲۵): فید پس از رسیدنِ دادهٔ API
   // دوباره رندر می‌شود و می‌تواند عنصرِ فوکوس‌شده را جایگزین کند (فوکوس می‌پرد)؛
   // زیرِ بارِ چند-worker فلیک می‌داد. اگر پرید، دوباره فوکوس می‌کنیم.
   await expect(async () => {
-    await open.focus();
-    await expect(open).toBeFocused({ timeout: 1000 });
+    await tap.focus();
+    await expect(tap).toBeFocused({ timeout: 1000 });
   }).toPass({ timeout: 10000 });
   // نامِ رستوران باید در نامِ دسترس‌پذیر باشد، وگرنه صفحه‌خوان فقط «دکمه» می‌گوید
-  await expect(open).toHaveAttribute('aria-label', /\S/);
+  await expect(tap).toHaveAttribute('aria-label', /\S/);
+
+  // Enter روی تایل باید نمای تمام‌صفحه را باز کند
+  await tap.press('Enter');
+  await expect(page.locator('#page-immersive')).toBeVisible();
 
   // چیپِ ساعت باید دکمه‌ی واقعی باشد (نه span با onclick) و نامش ساعت را بگوید
-  const slot = page.locator('.rc .rc-slot').first();
+  const slot = page.locator('#imFeed .im-item .rc-slot').first();
   await expect(slot).toBeVisible();
   expect(await slot.evaluate((n) => n.tagName)).toBe('BUTTON');
   await expect(slot).toHaveAttribute('aria-label', /\d|[۰-۹]/);
 
-  // Enter روی کارت باید صفحه‌ی رستوران را باز کند
+  // Enter روی «صفحه‌ی رستوران» باید صفحه‌ی رستوران را باز کند
+  const open = page.locator('#imFeed .im-item .im-open').first();
+  await expect(open).toBeVisible();
   await open.press('Enter');
   await expect(page.locator('#page-rest')).toBeVisible();
 });

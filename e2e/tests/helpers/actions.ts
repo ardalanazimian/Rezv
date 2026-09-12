@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Locator, Page, expect } from '@playwright/test';
 
 // ═══════════════════════════════════════════════════════════
 //  Helperهای مشترکِ E2E — کارهای تکراری در یک جا
@@ -14,19 +14,84 @@ export async function gotoApp(page: Page) {
   await expect(page.locator('#page-discover')).toBeVisible();
 }
 
-/** بازکردنِ اولین رستوران از فید. */
-export async function openFirstRestaurant(page: Page) {
-  // ⚠️ مقاوم‌سازی در برابرِ ری‌رندرِ فید (۲۰۲۶-۰۸-۲۵): فید اول اسکلت می‌سازد و
-  // بعد (۲۸۰ms) با کارت جایگزین می‌کند و دوباره پس از رسیدنِ دادهٔ API
-  // (syncRestaurants) رندر می‌شود — پس یک .rc-openِ ظاهراً پایدار می‌تواند دقیقاً
-  // حینِ کلیک detach شود و کلیک گم شود (زیرِ بارِ چند-worker فلیک می‌داد، در
-  // ایزوله همیشه سبز). حالا اگر صفحه باز نشد، کلیک را روی کارتِ نشسته تکرار می‌کنیم.
-  const firstCard = page.locator('.rc .rc-open').first();
-  await expect(firstCard).toBeVisible();
+/** نمای تمام‌صفحه را روی تایلِ nاُمِ فید باز می‌کند و همان آیتم را برمی‌گرداند.
+ *
+ * ⚠️ مسیر از DS-011 (۲۰۲۶-۰۹-۱۲) دو گامی شد. فید دیگر کارتِ ۲۷۰pxِ دارای دکمه‌ی
+ * `.rc-open` نیست؛ موزاییکِ Explore است و هر تایل یک دکمه‌ی کشیده (`.xt-tap`)
+ * دارد که نمای تمام‌صفحه را باز می‌کند. چیپ‌های ساعت هم به همین نما رفتند —
+ * تایلِ ۱۲۸px جای کنترلِ ۴۴px ندارد.
+ *
+ * ⚠️ مقاوم‌سازی در برابرِ ری‌رندرِ فید (۲۰۲۶-۰۸-۲۵، هنوز برقرار): فید اول اسکلت
+ * می‌سازد، بعد (۲۸۰ms) تایل، و دوباره پس از رسیدنِ دادهٔ API (syncRestaurants)
+ * رندر می‌شود — پس یک تایلِ ظاهراً پایدار می‌تواند دقیقاً حینِ کلیک detach شود
+ * و کلیک گم شود (زیرِ بارِ چند-worker فلیک می‌داد، در ایزوله همیشه سبز).
+ */
+export async function openImmersiveTile(page: Page, index = 0): Promise<Locator> {
+  const tap = page.locator('#feed .rc .xt-tap').nth(index);
+  await expect(tap).toBeVisible();
   await expect(async () => {
-    await firstCard.click({ timeout: 3000 });
+    await tap.click({ timeout: 3000 });
+    await expect(page.locator('#page-immersive')).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
+  // ترتیبِ آیتم‌های نما همان ترتیبِ فید است (imBuild از همان فهرست می‌سازد).
+  return page.locator('#imFeed .im-item').nth(index);
+}
+
+/** از نمای تمام‌صفحه به صفحه‌ی رستوران («صفحه‌ی رستوران» داخلِ همان آیتم). */
+export async function openRestFromImmersive(page: Page, item: Locator) {
+  const open = item.locator('.im-open');
+  await expect(async () => {
+    await open.click({ timeout: 3000 });
     await expect(page.locator('#page-rest')).toBeVisible({ timeout: 2000 });
-  }).toPass({ timeout: 15000 });
+  }).toPass({ timeout: 15_000 });
+}
+
+/** بازکردنِ رستورانِ nاُمِ فید تا صفحه‌ی رستوران (تایل → تمام‌صفحه → صفحه). */
+export async function openRestaurantTile(page: Page, index = 0) {
+  const item = await openImmersiveTile(page, index);
+  await openRestFromImmersive(page, item);
+}
+
+/** بازکردنِ اولین رستوران از فید — قراردادش دست‌نخورده: بعد از صدا زدنش
+ *  `#page-rest` باز است. (۹ اسپکِ مصرف‌کننده به همین تکیه دارند.) */
+export async function openFirstRestaurant(page: Page) {
+  await openRestaurantTile(page, 0);
+}
+
+/** بازکردنِ رستوران با نامش — تایلِ متناظر، بعد صفحه‌ی رستوران. */
+export async function openRestaurantByName(page: Page, name: string) {
+  const tile = page.locator('#feed .rc').filter({ hasText: name }).first();
+  await expect(tile).toBeVisible({ timeout: 15_000 });
+  const rid = await tile.getAttribute('data-rid');
+  await expect(async () => {
+    await tile.locator('.xt-tap').click({ timeout: 3000 });
+    await expect(page.locator('#page-immersive')).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
+  // با rid آدرس می‌دهیم نه با ترتیب — فیلترِ نام ممکن است تایلِ nاُم نباشد.
+  await openRestFromImmersive(page, page.locator(`#imFeed .im-item[data-rid="${rid}"]`));
+}
+
+/** شیتِ «کِی و چند نفر؟» را باز می‌کند.
+ *  ⚠️ [DS-007 §۶ · ۲۰۲۶-۰۹-۱۰] دو selectِ هیرو (`#sWhen`/`#sParty`) با خودِ هیرو
+ *  رفتند و جایشان این شیت نشست (`#ctxWhen`/`#ctxParty`)، که از چیپِ زیرِ فید باز
+ *  می‌شود. تست‌هایی که هنوز idهای هیرو را می‌خواندند از آن روز بی‌صدا قرمز بودند. */
+export async function openSearchCtxSheet(page: Page) {
+  await page.locator('#page-discover .section-sub .ctx-pill').click();
+  await expect(page.locator('#ctxWhen')).toBeVisible();
+}
+
+/** بستنِ شیتِ «کِی و چند نفر؟». */
+export async function closeSearchCtxSheet(page: Page) {
+  await page.getByRole('button', { name: /^باشه$/ }).click();
+  await expect(page.locator('#sheet')).not.toHaveClass(/show/);
+}
+
+/** تاریخ/تعدادِ نفرِ زمینه را تنظیم می‌کند و شیت را می‌بندد. */
+export async function setSearchCtx(page: Page, opts: { date?: string; party?: string }) {
+  await openSearchCtxSheet(page);
+  if (opts.date) await page.selectOption('#ctxWhen', opts.date);
+  if (opts.party) await page.selectOption('#ctxParty', opts.party);
+  await closeSearchCtxSheet(page);
 }
 
 /** ورود مستقل از UI و موتورِ مرورگر.
