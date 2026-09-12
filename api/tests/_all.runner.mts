@@ -153,6 +153,7 @@ import './outreach-ledger.integration.test.mts';
 import './zarinpal.test.mts';
 import './payments.integration.test.mts';
 import './permissions.test.mts';
+import './persian-digits-input.test.mts';
 import './photo-moderation.test.mts';
 import './pricing.test.mts';
 import './queue.test.mts';

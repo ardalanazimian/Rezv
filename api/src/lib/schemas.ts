@@ -32,13 +32,14 @@ export type { Schema };
 // در lib/otp.ts است — دو لایه، نه یکی.
 export const zPhone = z
   .string()
+  .asciiDigits()
   .min(8)
   .max(20)
   .trim()
   .regex(/^(?=(?:\D*\d){8,15}\D*$)\+?[\d][\d\s().-]*$/, 'شماره‌ی تماس معتبر نیست');
 
 /** کد OTP — بین اپ‌ها ۴ رقمی (دمو) و ۶ رقمی (واقعی) هر دو پذیرفته می‌شوند. */
-export const zOtpCode = z.string().regex(/^\d{4,6}$/, 'کد باید ۴ تا ۶ رقم باشد');
+export const zOtpCode = z.string().asciiDigits().regex(/^\d{4,6}$/, 'کد باید ۴ تا ۶ رقم باشد');
 
 export const zUuid = z.string().uuid();
 
@@ -50,9 +51,9 @@ export const zUuid = z.string().uuid();
 export const zUsername = z.string().trim().min(3).max(32);
 export const zPassword = z.string().min(1).max(128);
 
-export const zDateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'تاریخ باید به‌فرمت YYYY-MM-DD باشد');
+export const zDateStr = z.string().asciiDigits().regex(/^\d{4}-\d{2}-\d{2}$/, 'تاریخ باید به‌فرمت YYYY-MM-DD باشد');
 
-export const zTimeStr = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'زمان باید به‌فرمت HH:mm باشد');
+export const zTimeStr = z.string().asciiDigits().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'زمان باید به‌فرمت HH:mm باشد');
 
 export const zPartySize = z.number().int().min(1).max(30);
 

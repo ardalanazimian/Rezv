@@ -2,6 +2,7 @@ import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { db } from './db';
 import { RULES } from './ratelimit';
 import { Err } from './errors';
+import { toAsciiDigits } from './validate';
 import { enqueueSms, smsTransportReady } from './sms';
 import { createLogger } from './logger';
 import { metrics } from './metrics';
@@ -21,6 +22,8 @@ function hashEquals(a: string, b: string): boolean {
 }
 
 export function normalizePhone(raw: string): string {
+  // ارقامِ فارسی پیش از `\D` — وگرنه «۰۹۱۲…» کلاً پاک و «نامعتبر» می‌شد.
+  raw = toAsciiDigits(raw);
   const d = raw.replace(/\D/g, '');
   if (/^09\d{9}$/.test(d)) return '+98' + d.slice(1);
   if (/^989\d{9}$/.test(d)) return '+' + d;
