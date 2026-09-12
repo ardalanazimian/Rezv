@@ -3331,6 +3331,15 @@ async function loadHeatmapForDashboard(){
 //     را با `value="${i+1}"` می‌فرستد (فروردین=۱ … اسفند=۱۲). بک‌اند همان
 //     عدد را نگه می‌دارد و /restaurant/members همان را برمی‌گرداند. پس
 //     ایندکس‌کردنش در نام‌هایِ ماهِ شمسی round-tripِ درست است.
+//
+//     ⚠️ به‌روزرسانیِ ۲۰۲۶-۰۹-۱۱ — استدلالِ بالا دیگر صادق نیست، **ولی نتیجه‌اش
+//     هست**: فرمِ واک‌ین از ۲۰۲۶-۰۸-۲۵ پیش از ارسال شمسی را به میلادی تبدیل
+//     می‌کند (reservations.js:453-461) و ستونِ دیتابیس میلادی است. در فاصله‌ی
+//     آن رفع تا امروز، /restaurant/members عددِ **میلادی** برمی‌گرداند و همین
+//     خطوط آن را شمسی برچسب می‌زدند ⇒ ماهِ تولدِ همه حدودِ دو ماه غلط.
+//     قرارداد از امروز صریح است: **ذخیره میلادی، نمایش شمسی** — تبدیل در
+//     خودِ API انجام می‌شود (members/route.ts). پس FA_MONTHS و currentMonthFa
+//     همچنان درست‌اند و دست نخورده‌اند.
 // ═══════════════════════════════════════════════════════════════════════
 let CLUB=[];
 // نامِ ماه‌هایِ **شمسی** — هم‌راستا با آنچه فرمِ واک‌ین می‌فرستد (بالا را بخوان).
@@ -3343,25 +3352,35 @@ function currentMonthFa(){
 }
 // بارگذاری اعضای باشگاه از API (با fallback به CLUB نمونه)
 async function loadClubMembers(){
-  const res=await API.get('/restaurant/members?limit=100');
-  if(res.ok && Array.isArray(res.data?.members)){
-    API.online=true;
-    return res.data.members.map(m=>({
-      fn:m.first_name||'',
-      ln:m.last_name||'',
-      phone:m.phone||'',
-      code:m.code,
-      tier:m.tier,
-      points:m.points,
-      bMonth:m.birth_month?FA_MONTHS[m.birth_month-1]:'—',
-      joined:m.joined_at?faRelative(m.joined_at):'',
-    }));
+  // ⚠️ رفعِ بریدنِ بی‌صدا: قبلاً فقط یک صفحه (`limit=100`) خوانده می‌شد و هر
+  // باشگاهِ بزرگ‌تر از ۱۰۰ نفر **همه‌جا** کم گزارش می‌شد — هدف‌گیریِ تولد،
+  // شمارشِ سطوح و خودِ فهرستِ اعضا. بک‌اند `offset` دارد
+  // (restaurant/members/route.ts) و سقفِ `limit` همان ۱۰۰ است، پس تا صفحه‌ای
+  // که کمتر از ۱۰۰ ردیف بدهد جلو می‌رویم. سقفِ ۵۰ صفحه یک گاردِ ساده است تا
+  // یک باگِ بک‌اند (مثلاً بی‌اثر بودنِ offset) حلقه را تا ابد نچرخاند.
+  const PAGE=100, MAX_PAGES=50;
+  let rows=[];
+  for(let page=0;page<MAX_PAGES;page++){
+    const res=await API.get('/restaurant/members?limit='+PAGE+'&offset='+(page*PAGE));
+    // ⚠️ رفعِ §۳: قبلاً در مسیرِ خطا `return CLUB` بود و آرایه‌ی جعلیِ بالا را
+    // به‌عنوانِ اعضایِ واقعیِ رستوران برمی‌گرداند. حالا خالی — صفحه حالتِ
+    // خالی/خطا را نشان می‌دهد، نه ردیف‌هایِ ساختگی. شکستِ هر صفحه همین مسیر را
+    // می‌رود — فهرستِ نیمه‌کاره هم کم‌گزارشیِ خاموش است.
+    if(!(res.ok && Array.isArray(res.data?.members))){ API.online=false; return []; }
+    rows=rows.concat(res.data.members);
+    if(res.data.members.length<PAGE) break; // آخرین صفحه
   }
-  API.online=false;
-  // ⚠️ رفعِ §۳: قبلاً اینجا `return CLUB` بود و آرایه‌ی جعلیِ بالا را به‌عنوانِ
-  // اعضایِ واقعیِ رستوران برمی‌گرداند. حالا خالی — صفحه حالتِ خالی/خطا را
-  // نشان می‌دهد، نه ردیف‌هایِ ساختگی.
-  return [];
+  API.online=true;
+  return rows.map(m=>({
+    fn:m.first_name||'',
+    ln:m.last_name||'',
+    phone:m.phone||'',
+    code:m.code,
+    tier:m.tier,
+    points:m.points,
+    bMonth:m.birth_month?FA_MONTHS[m.birth_month-1]:'—',
+    joined:m.joined_at?faRelative(m.joined_at):'',
+  }));
 }
 // تبدیل تاریخ ISO به نمایش نسبی فارسی ساده
 function faRelative(iso){
@@ -3726,6 +3745,7 @@ async function selectBranch(id){
   API.setActiveRestaurant(id);
   // همه‌ی کش‌های سطح-شعبه را باطل کن تا صفحات دوباره از سرور بخوانند
   if(typeof _wlLoaded!=='undefined') _wlLoaded=false;
+  if(typeof _wlAnalyticsLoaded!=='undefined') _wlAnalyticsLoaded=false;
   if(typeof _staffLoaded!=='undefined') _staffLoaded=false;
   if(typeof _notesLoaded!=='undefined') _notesLoaded=false;
   if(typeof _segCounts!=='undefined') _segCounts=null;
@@ -4497,7 +4517,10 @@ async function markArrived(i){
   await changeStatus(i,'checked_in');
   // ارسال پیامکِ خوش‌آمد فقط بعد از تأییدِ واقعیِ تغییرِ وضعیت (نه قبلش)
   if(API.getToken() && phone){
-    const res=await API.sendSms({kind:'campaign',phones:[phone.replace(/\s/g,'')],message:'welcome'});
+    // ⚠️ مهاجرت: قبلاً `{kind:'campaign',message:'welcome'}` می‌رفت و فقط با
+    // نامِ مستعارِ کهنه‌ی سرور (restaurant/sms/route.ts) به مسیرِ تراکنشی
+    // می‌افتاد — با یک warning در لاگ. حالا صریح `kind:'welcome'`.
+    const res=await API.sendSms({kind:'welcome',phones:[phone.replace(/\s/g,'')]});
     if(res.ok)toast('',`پیامکِ خوش‌آمد برایِ ${r.name} ارسال شد`);
   }
 }
@@ -4975,6 +4998,12 @@ const WL_DEMO_ANALYTICS={total_entries:142,seated:98,abandoned:31,conversion_rat
 let WAITLIST=WL_DEMO_QUEUE.slice();
 let WL_ANALYTICS={...WL_DEMO_ANALYTICS};
 let _wlLoaded=false;
+// ⚠️ رفعِ دادهٔ جعلی: `_wlLoaded` فقط وضعیتِ فراخوانیِ **صف** را می‌گفت، پس اگر
+// فقط فراخوانیِ آمار می‌افتاد، اعدادِ دموی WL_DEMO_ANALYTICS (۱۴۲ ورودی،
+// تبدیلِ ۶۹٪، ۲۲ دقیقه) به‌عنوانِ آمارِ واقعیِ رستوران رندر می‌شدند و نوتِ
+// «نمونه» هم — چون صف واقعاً آمده بود — ناپدید می‌شد. حالا آمار پرچمِ خودش
+// را دارد و بدونِ آن، کارت‌ها «—» می‌شوند نه عددِ ساختگی.
+let _wlAnalyticsLoaded=false;
 
 // بارگذاری صف + آمار واقعی از بک‌اند (موازی). در صورت خطا، fallback به دمو می‌ماند.
 async function loadWaitlist(){
@@ -4987,8 +5016,10 @@ async function loadWaitlist(){
   // قفل می‌کرد. حالا پرچم فقط وقتی بالا می‌رود که صفِ واقعی واقعاً آمده باشد.
   const okQueue = q.ok && Array.isArray(q.data?.queue);
   if(okQueue) WAITLIST=q.data.queue;
-  if(a.ok && a.data) WL_ANALYTICS=a.data;
+  const okAnalytics = a.ok && !!a.data;
+  if(okAnalytics) WL_ANALYTICS=a.data;
   _wlLoaded=okQueue;
+  _wlAnalyticsLoaded=okAnalytics;
   return okQueue;
 }
 
@@ -4996,6 +5027,8 @@ function rWaitlist(){
   // اولین ورود به صفحه با توکن → داده‌ی واقعی بگیر و دوباره رندر کن
   if(!_wlLoaded && API.getToken()){ loadWaitlist().then(()=>rWaitlist()); }
   const A=WL_ANALYTICS;
+  // آمار فقط وقتی عدد می‌شود که واقعاً از سرور آمده باشد؛ وگرنه «—».
+  const wlNum=(v,suffix)=>_wlAnalyticsLoaded?fa(v)+(suffix||''):'—';
   const queue=WAITLIST.filter(w=>w.status==='waiting'||w.status==='offered');
   // ⚠️ رفعِ باگ: badgeِ سایدبارِ #wlBadge با اینکه id داشت هیچ‌جا آپدیت نمی‌شد —
   // همیشه مقدارِ استاتیکِ HTML («۳») می‌ماند حتی وقتی صفِ واقعی خالی بود
@@ -5010,10 +5043,10 @@ function rWaitlist(){
   document.getElementById('v-waitlist').innerHTML=wlDemoNote+`
     <!-- آمار لیست انتظار -->
     <div class="wl-stats-grid">
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--blue-50)">${icon('inbox',{size:16})}</div><div><div class="wl-stat-num">${fa(A.current_queue_size)}</div><div class="wl-stat-lbl">در صف الان</div></div></div>
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--green-50)">${icon('check',{size:16})}</div><div><div class="wl-stat-num">${fa(A.conversion_rate)}٪</div><div class="wl-stat-lbl">نرخ تبدیل</div></div></div>
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:#FEF3C7">${icon('clock',{size:16})}</div><div><div class="wl-stat-num">${fa(A.avg_wait_minutes)}<span style="font-size:13px"> دق</span></div><div class="wl-stat-lbl">میانگین انتظار</div></div></div>
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:#Fce7f3">${icon('star',{size:16,fill:true})}</div><div><div class="wl-stat-num">${fa(A.vip_entries)}</div><div class="wl-stat-lbl">مهمان VIP</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--blue-50)">${icon('inbox',{size:16})}</div><div><div class="wl-stat-num">${wlNum(A.current_queue_size)}</div><div class="wl-stat-lbl">در صف الان</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--green-50)">${icon('check',{size:16})}</div><div><div class="wl-stat-num">${wlNum(A.conversion_rate,'٪')}</div><div class="wl-stat-lbl">نرخ تبدیل</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:#FEF3C7">${icon('clock',{size:16})}</div><div><div class="wl-stat-num">${wlNum(A.avg_wait_minutes,'<span style="font-size:13px"> دق</span>')}</div><div class="wl-stat-lbl">میانگین انتظار</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:#Fce7f3">${icon('star',{size:16,fill:true})}</div><div><div class="wl-stat-num">${wlNum(A.vip_entries)}</div><div class="wl-stat-lbl">مهمان VIP</div></div></div>
     </div>
 
     <div class="wl-q-head">
@@ -6539,10 +6572,15 @@ async function custRenderCampaign(){
   // پشتیبانی می‌کند و phone برمی‌گرداند) و ارسالِ phones[]. قابلیتِ رفتاری
   // حفظ شد (§۸) و محدودیتِ ثبت‌شده در KNOWN_LIMITATIONS دیگر صادق نیست.
   if(!_segCounts && API.getToken()){
-    const [atRisk,vip]=await Promise.all([API.customers('segment=at_risk&limit=50'),API.customers('segment=vip&limit=50')]);
+    // ⚠️ `new_customer` اضافه شد: کارتِ سومش همیشه رشته‌ی ثابتِ «—» بود، در
+    // حالی که همین سگمنت هم در بک‌اند وجود دارد
+    // (restaurant/customers/route.ts) و هم previewCamp واقعاً با آن کمپین
+    // می‌فرستد. یعنی کاربر مخاطبی را انتخاب می‌کرد که اندازه‌اش را نمی‌دید.
+    const [atRisk,vip,newCust]=await Promise.all([API.customers('segment=at_risk&limit=50'),API.customers('segment=vip&limit=50'),API.customers('segment=new_customer&limit=50')]);
     _segCounts={
       at_risk: atRisk.ok?(atRisk.data.items?.length||0):null,
       vip: vip.ok?(vip.data.items?.length||0):null,
+      new_customer: newCust.ok?(newCust.data.items?.length||0):null,
     };
   }
   const sc=_segCounts||{};
@@ -6551,7 +6589,7 @@ async function custRenderCampaign(){
   // «۰ نفر» نشان می‌داد در حالی که دو کارتِ کنارش هنگامِ نامعلوم‌بودن صادقانه
   // «—» می‌گفتند. حالا هر سه یک قرارداد دارند: نامعلوم = «—»، نه صفر.
   const cnt=(v,suffix)=>v==null?'—':fa(v)+(v>=50?'+':'')+' '+suffix;
-  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید','—'],['calendar','تولد این ماه',(typeof CLUB!=='undefined'&&CLUB.length)?fa(CLUB.filter(m=>m.bMonth===currentMonthFa()).length)+' نفر':'—']];
+  const segs=[['alert','در خطر ریزش',cnt(sc.at_risk,'نفر')],['crown','VIP',cnt(sc.vip,'نفر')],['sparkle','مشتری جدید',cnt(sc.new_customer,'نفر')],['calendar','تولد این ماه',(typeof CLUB!=='undefined'&&CLUB.length)?fa(CLUB.filter(m=>m.bMonth===currentMonthFa()).length)+' نفر':'—']];
 
   document.getElementById('ct-campaign').innerHTML=`
     <div class="panel">
@@ -7829,13 +7867,22 @@ function previewCamp(){
     3:{kind:'birthday',                     label:'تولد این ماه'},
   })[selSeg]||null;
   const rendered=txt.replace(/\{نام\}/g,'کیان');
+  // ⚠️ دو رفع در همین پیش‌نمایش:
+  //  ۱. `rendered` متنِ خامِ textarea است و openModal آن را به `innerHTML`
+  //     می‌دهد (staff-system.js) — یعنی یک sinkِ XSS در مرورگرِ کارکنان.
+  //     از همان `esc()`ِ کانونی رد می‌شود؛ `white-space:pre-wrap` نمایش را
+  //     حفظ می‌کند و متنِ پیامک هم HTML نیست، پس چیزی از دست نمی‌رود.
+  //  ۲. نامِ فرستنده هاردکد «کافه‌رستوران ویستا» بود و پیش‌نمایشِ *هر*
+  //     رستورانی همان را نشان می‌داد — همان نامِ واقعی که pickSeg هم
+  //     استفاده می‌کند، با همان fallback.
+  const restName=(typeof RESTAURANT!=='undefined' && RESTAURANT && RESTAURANT.name) ? RESTAURANT.name : 'ما';
   openModal(`<div class="modal-title">پیش‌نمایش پیام</div><div class="modal-sub">دقیقاً همینطوری برای مشتری ارسال می‌شه</div>
     <div style="background:#0c0c14;border-radius:var(--r-lg);padding:16px;margin-bottom:18px">
       <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">
         <div style="width:34px;height:34px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800">R</div>
-        <div><div style="font-size:13px;font-weight:700;color:#fff">کافه‌رستوران ویستا</div><div style="font-size:10px;color:#666">فرستنده تأییدشده</div></div>
+        <div><div style="font-size:13px;font-weight:700;color:#fff">${esc(restName)}</div><div style="font-size:10px;color:#666">فرستنده تأییدشده</div></div>
       </div>
-      <div style="background:#1c1c28;border-radius:4px 16px 16px 16px;padding:12px 14px;font-size:13px;color:#ddd;line-height:1.8;white-space:pre-wrap">${rendered}</div>
+      <div style="background:#1c1c28;border-radius:4px 16px 16px 16px;padding:12px 14px;font-size:13px;color:#ddd;line-height:1.8;white-space:pre-wrap">${esc(rendered)}</div>
     </div>
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmCamp()">تأیید و ارسال</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">برگشت و ویرایش</button>`);
@@ -7861,7 +7908,10 @@ async function doSendCampaign(){
     // را به مخاطبِ اشتباه می‌فرستاد).
     let phones=[];
     if(aud.kind==='birthday'){
-      if(!CLUB.length){ await (typeof loadClubMembers==='function'?loadClubMembers():Promise.resolve()); }
+      // ⚠️ نتیجه‌ی loadClubMembers باید در CLUB بنشیند — قبلاً دور ریخته می‌شد و
+      // اگر کاربر مستقیم از تبِ «کمپین» می‌آمد، CLUB خالی می‌ماند ⇒ هیچ‌کس مخاطبِ
+      // تولد نمی‌شد. بقیه‌ی فراخوان‌ها (loyalty.js، reservations.js) هم assign می‌کنند.
+      if(!CLUB.length){ CLUB = await (typeof loadClubMembers==='function'?loadClubMembers():Promise.resolve(CLUB)); }
       phones=(CLUB||[]).filter(m=>m.bMonth===currentMonthFa()&&m.phone).map(m=>String(m.phone));
     }else{
       const cs=await API.customers('segment='+encodeURIComponent(aud.value)+'&limit=500');
@@ -8101,7 +8151,8 @@ let STAFF_LIST=STAFF_DEMO.slice();
 let _staffLoaded=false;
 
 const ROLE_FA={owner:'مالک',manager:'مدیر',staff:'کارمند',admin:'ادمین'};
-// کلیدهای دسترسی — دقیقاً هم‌راستا با schema بک‌اند (/restaurant/staff PATCH)
+// کلیدهای دسترسی — هم‌راستا با schema بک‌اند (/restaurant/staff PATCH)، منهای
+// کلیدهایی که هیچ روتی اجرایشان نمی‌کند.
 const PERM_DEFS=[
   ['canManageReservations','مدیریت رزروها'],
   ['canManageTables','مدیریت میزها'],
@@ -8110,7 +8161,12 @@ const PERM_DEFS=[
   ['canViewRevenue','مشاهده درآمد'],
   ['canManageCampaigns','مدیریت کمپین‌ها'],
   ['canManageCoupons','مدیریت کوپن‌ها'],
-  ['canManageStaff','مدیریت کارکنان'],
+  // ⚠️ `canManageStaff` عمداً اینجا **نیست**: هیچ روتی آن را اجرا نمی‌کند و
+  // مدیریتِ کارکنان با **نقش** گیت می‌شود، نه با مجوز
+  // (api/src/app/api/v1/restaurant/staff/route.ts:54-77 — تفویضش درِ
+  // خودارتقایی باز می‌کرد؛ routing.js هم تب را با VIEW_ROLE گیت می‌کند).
+  // پس این سوییچ فقط یک وعده‌ی توخالی به مدیر بود. اجرایِ سمتِ سرور اضافه
+  // نمی‌شود — این تصمیم ثبت و در rbac-permission-coverage.test.mts قفل شده.
   ['canManageSettings','مدیریت تنظیمات'],
 ];
 

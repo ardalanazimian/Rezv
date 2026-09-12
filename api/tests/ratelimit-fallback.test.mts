@@ -48,19 +48,38 @@ describe('rateLimitInMemory — سقفِ per-process بدونِ Redis', () => {
 
 describe('rateLimitWithFallback — fail-open وقتی Redis (شبیه‌سازی‌شده) قطع است', () => {
   test('وقتی attempt throw می‌کند، به rateLimitInMemory سقوط می‌کند و همچنان allowed برمی‌گرداند', async () => {
+    // سیاستِ در دسترس‌بودن دست‌نخورده است: قطعیِ Redis هیچ کاربری را با ۴۲۹
+    // مواجه نمی‌کند در **اولین** درخواستش. سخت‌گیری از درخواستِ دوم شروع می‌شود.
     const failing = async () => { throw new Error('ECONNREFUSED (شبیه‌سازیِ قطعیِ Redis)'); };
     const ip = 'fallback-ip-' + Math.random();
     const r = await rateLimitWithFallback(ip, RULE, 'route', failing);
     assert.equal(r.allowed, true);
   });
-  test('بعدِ رسیدن به سقفِ in-memory (با همون fallback مکرر)، درخواستِ بعدی رد می‌شود', async () => {
+  test('🔴 E-003: سطلی که به‌خاطرِ قطعیِ Redis ساخته می‌شود بدبینانه بذر می‌شود', async () => {
+    // قبلاً این حلقه `RULE.max` بار مجاز می‌گرفت: یعنی هر قطعیِ Redis به هر
+    // کلیدی یک سهمیه‌ی **کاملِ تازه** می‌داد. حالا فقط درخواستِ اول عبور
+    // می‌کند (سرویس صفر نمی‌شود) و بقیه‌ی پنجره throttle است.
     const failing = async () => { throw new Error('ECONNREFUSED'); };
     const ip = 'fallback-ip2-' + Math.random();
-    let last;
-    for (let i = 0; i < RULE.max; i++) last = await rateLimitWithFallback(ip, RULE, 'route', failing);
-    assert.equal(last!.allowed, true);
-    const over = await rateLimitWithFallback(ip, RULE, 'route', failing);
-    assert.equal(over.allowed, false);
+
+    const first = await rateLimitWithFallback(ip, RULE, 'route', failing);
+    assert.equal(first.allowed, true, 'درخواستِ اول در قطعی باید عبور کند');
+    assert.equal(first.remaining, 0, 'ولی باید بگوید سهمیه‌ای نمانده');
+
+    const second = await rateLimitWithFallback(ip, RULE, 'route', failing);
+    assert.equal(second.allowed, false,
+      'درخواستِ دوم در همان پنجره‌ی قطعی نباید سهمیه‌ی تازه بگیرد');
+    assert.ok(second.retryAfterSec > 0);
+  });
+
+  test('رفتارِ مستقیمِ rateLimitInMemory (بدونِ پرچم) دست‌نخورده مانده', () => {
+    // ⚠️ کنترلِ منفی: اگر بذرِ بدبینانه اشتباهاً به مسیرِ عادی هم نشت کند،
+    // هر مصرف‌کننده‌ی دیگری بی‌صدا به سقفِ ۱ می‌افتد. این تست همان را می‌گیرد.
+    const ip = 'plain-ip-' + Math.random();
+    for (let i = 0; i < RULE.max; i++) {
+      assert.equal(rateLimitInMemory(ip, RULE).allowed, true, `درخواستِ ${i + 1} باید مجاز باشد`);
+    }
+    assert.equal(rateLimitInMemory(ip, RULE).allowed, false);
   });
   test('وقتی attempt موفق می‌شود (بدونِ Redisِ واقعی، فقط شبیه‌سازیِ نتیجه)، مستقیم همون نتیجه برمی‌گردد، نه fallback', async () => {
     const succeeding = async () => ({ allowed: true, remaining: 3, resetAt: Date.now() + 1000, retryAfterSec: 0 });

@@ -7,6 +7,8 @@ import {
   joinWaitlist, promoteNext, acceptOffer, declineOffer, leaveWaitlist, expireOffers, getPosition,
 } from '../src/lib/waitlist.ts';
 import { fixturePhone } from './_phone.helper.mts';
+import { testIp } from './helpers/test-ip.mts';
+import * as acceptRoute from '../src/app/api/v1/waitlist/[id]/accept/route.ts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  لیستِ انتظار — هسته‌ی نویسنده، تستِ زنده رویِ Postgresِ واقعی
@@ -99,6 +101,9 @@ beforeEach(async () => {
 });
 
 after(async () => {
+  // کلیدهایِ idempotencyِ ساخته‌شده‌ی همین فایل (بلوکِ «بازپخش») — بدونِ این،
+  // ردیف‌ها تا انقضایِ ۲۴ساعته در DBِ تست می‌مانند.
+  await db.idempotencyKey.deleteMany({ where: { scope: 'waitlist-accept' } }).catch(() => {});
   await db.waitlistEntry.deleteMany({ where: { restaurantId } }).catch(() => {});
   await db.$executeRaw`DELETE FROM reservations WHERE restaurant_id = ${restaurantId}::uuid`.catch(() => 0);
   await db.table.deleteMany({ where: { restaurantId } }).catch(() => {});
@@ -404,9 +409,21 @@ describe('صف — انقضایِ آفر (قفلِ باگِ رقابتِ رفع�
       'هیچ رزروی نباید ساخته شود');
   });
 
-  test('⚠️ پذیرشِ همزمان فقط یک رزرو می‌سازد', async () => {
+  test('⚠️ پذیرشِ همزمان فقط یک رزرو می‌سازد — و هر دو تماس همان کد را می‌گیرند', async () => {
     // ⚠️ چون ادعا حالا *پیش از* ساختِ رزرو و اتمیک است، دو درخواستِ همزمان
     // نمی‌توانند هر دو رزرو بسازند.
+    //
+    // ⚠️ قراردادِ این تست ۲۰۲۶-۰۹-۱۲ عوض شد، و دلیلش مهم است. نسخه‌ی قبلی
+    // `ok === 1` را می‌سنجید — یعنی صریحاً **پین می‌کرد** که بازنده خطا
+    // بگیرد. آن خطا `reservationExpired` بود («مهلتِ تأیید این رزرو گذشته
+    // است») و در این لحظه **دروغ** است: رزرو همین حالا ساخته شده و مهمان
+    // میز دارد. بدتر، `accept` تنها مسیری است که `reservation_code` را به
+    // مهمان می‌دهد، پس آن خطا کد را برای همیشه می‌برد — کافی بود مهمان دوبار
+    // روی «قبول» بزند.
+    //
+    // ناوریانتِ واقعی «یک نفر خطا بگیرد» نبود، «یک رزرو ساخته شود» بود. آن
+    // را سخت‌تر از قبل می‌سنجیم، و علاوه‌اش قراردادِ تازه: هر دو تماس همان
+    // یک کد را می‌گیرند.
     await mkTable(1);
     const j = await joinWaitlist({ restaurantId, partySize: 2, userId });
     await promoteNext(restaurantId);
@@ -415,11 +432,18 @@ describe('صف — انقضایِ آفر (قفلِ باگِ رقابتِ رفع�
       acceptOffer(j.id, 'customer', { callerUserId: userId }),
       acceptOffer(j.id, 'customer', { callerUserId: userId }),
     ]);
-    const ok = out.filter(o => o.status === 'fulfilled').length;
-    assert.equal(ok, 1, `فقط یک پذیرش باید موفق شود، نه ${ok}`);
     assert.equal((await entryOf(j.id)).status, 'accepted');
     assert.equal(await db.reservation.count({ where: { restaurantId } }), 1,
       'دقیقاً یک رزرو باید ساخته شود');
+
+    const fulfilled = out.filter((o) => o.status === 'fulfilled');
+    assert.equal(fulfilled.length, 2, 'هیچ‌کدام از دو تماس نباید خطای «مهلت گذشته» بگیرد');
+    const codes = new Set(fulfilled.map((o) => (o as PromiseFulfilledResult<{ reservation_code?: string }>).value.reservation_code));
+    assert.equal(codes.size, 1, 'هر دو باید همان یک کدِ رزرو را برگردانند');
+    const [only] = [...codes];
+    assert.ok(only, 'کدِ رزرو نباید خالی باشد — تنها جایی که مهمان آن را می‌گیرد همین بدنه است');
+    const resv = await db.reservation.findFirst({ where: { restaurantId }, select: { code: true } });
+    assert.equal(only, resv?.code, 'کدِ برگشتی باید کدِ همان رزروِ واقعی باشد');
   });
 
   test('⚠️ شکستِ ساختِ رزرو، ورودی و میز را دقیقاً به حالتِ قبل برمی‌گرداند', async () => {
@@ -476,5 +500,144 @@ describe('صف — انقضایِ آفر (قفلِ باگِ رقابتِ رفع�
         'ورودیِ با آفرِ زنده نباید میزی داشته باشد که free علامت خورده');
     }
     assert.equal((await entryOf(first)).status, 'no_response');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  پذیرشِ آفر — بازپخش (replay) و idempotency
+//
+//  ⚠️ باگی که این بلوک از آن زاده شد (۲۰۲۶-۰۹-۱۱): `accept` یک **رزروِ واقعی**
+//  می‌سازد و تنها جایی است که `reservation_code` را به مهمان می‌دهد — ولی نه
+//  `Idempotency-Key` می‌گرفت و نه `acceptOffer` بازپخش را می‌شناخت. پس یک
+//  retryِ شبکه‌ای یا دوبار زدنِ دکمه این را می‌داد:
+//    رزرو **ساخته شده** · مهمان یک ۴۲۲ می‌بیند · بدنه‌ی موفقیت (تنها حاملِ
+//    کدِ رزرو) برای همیشه از دست رفته.
+//
+//  دو لایه‌ی مستقل رفعش می‌کنند و هر دو اینجا جدا سنجیده می‌شوند:
+//   ۱. لایه‌ی lib — ورودیِ `accepted` **با** کدِ رزرو همان پاسخِ موفق را
+//      برمی‌گرداند (بازپخشِ واقعی). بدونِ کد نه: آن حالتِ **گذرای** یک پذیرشِ
+//      در حالِ انجام است و «موفق» گفتنش جعلِ موفقیت است.
+//   ۲. لایه‌ی HTTP — `withIdempotency` با scopeِ `waitlist-accept`، همان
+//      قراردادِ `POST /reservations`.
+// ═══════════════════════════════════════════════════════════════════════
+describe('پذیرشِ آفر — بازپخش و idempotency', () => {
+  test('🔴 پذیرشِ دوباره‌ی همان ورودی، همان پاسخِ موفق را می‌دهد نه ۴۲۲', async () => {
+    await mkTable(1);
+    const j = await joinWaitlist({ restaurantId, partySize: 2, userId });
+    await promoteNext(restaurantId);
+
+    const first = await acceptOffer(j.id, 'customer', { callerUserId: userId });
+    assert.ok(first.reservation_code, 'کنترلِ مثبت: پذیرشِ اول باید کد بدهد');
+
+    const replay = await acceptOffer(j.id, 'customer', { callerUserId: userId });
+    assert.deepEqual(replay, first, 'بازپخش باید دقیقاً همان بدنه باشد');
+
+    // ⚠️ ادعای واقعیِ یکپارچگی: بازپخش نباید رزروِ دوم بسازد.
+    assert.equal(await db.reservation.count({ where: { restaurantId } }), 1,
+      'بازپخش نباید رزروِ دوم بسازد');
+  });
+
+  test('⚠️ کنترلِ منفی — `accepted` بدونِ کدِ رزرو هنوز رد می‌شود', async () => {
+    // این مرزِ دقیقِ رفع است. `accepted` + کدِ خالی حالتِ **گذرای** هر پذیرشِ
+    // موفق است (پنجره‌ای که createReservation در آن می‌نشیند). اگر آن هم
+    // «موفق» گزارش شود، به مهمانی که رزروش هنوز ساخته نشده کدِ خالی می‌دهیم
+    // و ادعای رزروی می‌کنیم که وجود ندارد — همان جعلِ موفقیتِ ممنوع.
+    const t1 = await mkTable(1);
+    const e = await db.waitlistEntry.create({
+      data: {
+        restaurantId, userId, partySize: 2, status: 'accepted', priority: 0,
+        joinedAt: new Date(Date.now() - 5 * 60_000), respondedAt: new Date(), seatedAt: new Date(),
+        offeredTableId: t1.id, offeredTableNumber: t1.number, reservationCode: null,
+      },
+      select: { id: true },
+    });
+
+    await assert.rejects(
+      () => acceptOffer(e.id, 'customer', { callerUserId: userId }),
+      // ماچرِ واقعی، نه رشته: هویتِ شکست باید سنجیده شود، وگرنه **هر** خطایی
+      // (حتی یک TypeErrorِ بی‌ربط) تست را سبز نگه می‌دارد.
+      (err: any) => {
+        assert.equal(err?.code, 'VALIDATION',
+          `باید همان ۴۲۲ِ «آفری برای پذیرش وجود ندارد» باشد — گرفت: ${err?.code}`);
+        assert.equal(err?.status, 422);
+        return true;
+      },
+      'پذیرشِ ورودیِ accepted بدونِ کد نباید «موفق» گزارش شود',
+    );
+    assert.equal(await db.reservation.count({ where: { restaurantId } }), 0);
+  });
+
+  test('🔴 روت: همان Idempotency-Key دوبار → همان بدنه، حتی وقتی lib دیگر موفق نمی‌شود', async () => {
+    // ⚠️ چرا ادعا این شکل را دارد: بعد از پذیرشِ اول، ورودی `accepted` با کد
+    // است و لایه‌ی ۱ هم همان بدنه را می‌دهد — یعنی یک تستِ ساده‌ی «دوبار
+    // بفرست، بدنه یکی است» حتی با **حذفِ کاملِ** withIdempotency سبز می‌ماند.
+    // پس بینِ دو فراخوان، ورودی عمداً به وضعیتی برده می‌شود که لایه‌ی ۱ در
+    // آن throw می‌کند. اگر پاسخِ دوم باز هم همان بدنه باشد، تنها توضیحش کشِ
+    // idempotency است.
+    await mkTable(1);
+    const j = await joinWaitlist({
+      restaurantId, partySize: 2, guest: { name: '[DEMO] مهمانِ بازپخش' },
+    });
+    assert.ok(j.guest_token, 'کنترلِ مثبت: ورودیِ مهمان باید توکن بگیرد');
+    await promoteNext(restaurantId);
+
+    const key = randomUUID();
+    const call = () => acceptRoute.POST(
+      new Request(`http://x/api/v1/waitlist/${j.id}/accept?token=${j.guest_token}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-real-ip': testIp(), 'idempotency-key': key },
+      }),
+      { params: Promise.resolve({ id: j.id }) },
+    );
+
+    const r1 = await call();
+    assert.equal(r1.status, 200, 'پذیرشِ اول باید موفق باشد');
+    const b1 = await r1.text();
+    assert.match(b1, /reservation_code/, 'کنترلِ مثبت: بدنه باید کدِ رزرو داشته باشد');
+
+    // لایه‌ی ۱ را عمداً از کار بینداز: حالا هر مسیرِ غیرکش‌شده‌ای throw می‌کند.
+    await db.waitlistEntry.update({ where: { id: j.id }, data: { status: 'no_response' } });
+
+    const r2 = await call();
+    assert.equal(r2.status, 200, 'بازپخشِ همان کلید باید همان ۲۰۰ را بدهد');
+    // ⚠️ چرا deepEqual و نه مقایسه‌ی رشته‌ای: پاسخِ کش‌شده در ستونِ `response`
+    // از نوعِ **jsonb** ذخیره می‌شود و jsonb ترتیبِ کلیدها را نگه نمی‌دارد
+    // (کلیدِ کوتاه‌تر اول). پس «بایت‌به‌بایت» با این مخزن اصلاً شدنی نیست؛
+    // همان قراردادی که `idempotency.integration.test.mts:109` هم دارد.
+    assert.deepEqual(JSON.parse(await r2.text()), JSON.parse(b1),
+      'بازپخش باید دقیقاً همان محتوا را بدهد');
+
+    assert.equal(await db.reservation.count({ where: { restaurantId } }), 1,
+      'بازپخش نباید رزروِ دوم بسازد');
+  });
+
+  test('⚠️ کنترلِ منفی — بدونِ هدرِ Idempotency-Key هیچ کشی درکار نیست', async () => {
+    // بدونِ این، یک پیاده‌سازیِ «همیشه کش کن» هم تستِ بالا را پاس می‌کرد و
+    // رفتارِ ثبت‌شده‌ی lib/idempotency.ts (نبودِ کلید = بدونِ محافظت) بی‌صدا
+    // عوض می‌شد.
+    await mkTable(1);
+    const j = await joinWaitlist({
+      restaurantId, partySize: 2, guest: { name: '[DEMO] مهمانِ بی‌کلید' },
+    });
+    await promoteNext(restaurantId);
+
+    const res = await acceptRoute.POST(
+      new Request(`http://x/api/v1/waitlist/${j.id}/accept?token=${j.guest_token}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
+      }),
+      { params: Promise.resolve({ id: j.id }) },
+    );
+    assert.equal(res.status, 200);
+
+    await db.waitlistEntry.update({ where: { id: j.id }, data: { status: 'no_response' } });
+    const again = await acceptRoute.POST(
+      new Request(`http://x/api/v1/waitlist/${j.id}/accept?token=${j.guest_token}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-real-ip': testIp() },
+      }),
+      { params: Promise.resolve({ id: j.id }) },
+    );
+    assert.notEqual(again.status, 200, 'بدونِ کلید نباید بازپخشی درکار باشد');
   });
 });

@@ -25,9 +25,18 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 //  الفبایِ ۳۲تاییِ خوانا. `256 % 32 === 0` پس modulo bias صفر است ⇒ دقیقاً
 //  ۵۰ بیت (اندازه‌گیریِ تجربی رویِ ۲M نویسه: ۴٫۹۹۹۹۸۵ بیت به‌ازای نویسه).
 //  سه لایه‌ی جبرانی که هر سه اینجا تست می‌شوند:
-//    ۱. ریت‌لیمیتِ اختصاصیِ per-IP (`RULES.qrCheckin`, ۳۰/دقیقه).
+//    ۱. ریت‌لیمیتِ اختصاصیِ per-IP (`RULES.qrCheckin`) — سقفِ عددی را از خودِ
+//       قاعده بخوان، نه از این کامنت؛ ۲۰۲۶-۰۹-۱۲ از ۳۰ به ۶۰ رفت چون عاملِ
+//       دومِ هویت هر چک‌اینِ ناشناس را دو درخواست کرد.
 //    ۲. `reservation_code` فقط به صاحبِ همان رزرو (ضدِ نشت).
 //    ۳. کدِ ناموجود و کدِ میزِ رستورانِ دیگر پاسخِ **بایت‌به‌بایت یکسان**.
+//
+//  ⚠️ به‌روزشده ۲۰۲۶-۰۹-۱۱ — عاملِ دومِ هویت (describeِ ۶): آن سه لایه
+//  «جبرانی» بودند، نه کافی. استیکرِ QR **رویِ میز چسبیده** است، پس ۵۰ بیتِ
+//  آنتروپی فقط حدس‌زدن را می‌بندد و هر رهگذری می‌توانست رزروِ فردِ دیگری را
+//  بنشاند. حالا برای نشاندنِ یک رزروِ فعال یکی از این دو لازم است: توکنِ
+//  مشتریِ صاحبِ رزرو، یا `reservation_code` در بدنه. اسکنِ میزِ **بی‌رزرو**
+//  عمداً دست‌نخورده مانده (walk-in).
 //
 //  مکمل‌ها (تکرارشان نکن):
 //    • `table-qr-checkin.integration.test.mts` → کلِ زنجیره: ساخت میز → کد →
@@ -78,14 +87,18 @@ async function clearOwnCheckinBucket() {
  * فراخوانِ واقعیِ route. `token` اختیاری است — نبودنش یعنی مهمانِ ناشناس.
  * `ip` پیش‌فرض یکتاست تا هر تست سطلِ ریت‌لیمیتِ خودش را داشته باشد؛ فقط تستِ
  * خودِ ریت‌لیمیت عمداً یک IPِ ثابت می‌دهد.
+ *
+ * ⚠️ `resvCode` (۲۰۲۶-۰۹-۱۱): عاملِ دومِ هویت. از وقتی کدِ QR به‌تنهایی کافی
+ * نیست، هر اسکنی که واقعاً باید بنشاند یا باید توکنِ صاحبِ رزرو بدهد یا این
+ * را. اسکنِ بدونِ هیچ‌کدام عمداً در چند تستِ زیر نگه داشته شده تا ۴۰۳ را پین کند.
  */
-function scan(qrCode: string, token?: string, ip: string = testIp()) {
+function scan(qrCode: string, token?: string, ip: string = testIp(), resvCode?: string) {
   const headers: Record<string, string> = { 'content-type': 'application/json', 'x-real-ip': ip };
   if (token) headers.authorization = `Bearer ${token}`;
   return checkinRoute.POST(new Request('http://x/api/v1/checkin', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ qr_code: qrCode }),
+    body: JSON.stringify(resvCode ? { qr_code: qrCode, reservation_code: resvCode } : { qr_code: qrCode }),
   }));
 }
 
@@ -156,9 +169,14 @@ after(async () => {
 
 // ─────────────────────────────────────────────────────────────────────
 describe('۱) مهمانِ بدونِ هیچ توکنی — قابلیت واقعاً زنده است', () => {
-  test('🔴 اسکنِ ناشناس ۲۰۰ می‌دهد و رزرو در DB واقعاً seated می‌شود', async () => {
+  test('🔴 اسکنِ ناشناسِ دارایِ کدِ رزرو ۲۰۰ می‌دهد و رزرو در DB واقعاً seated می‌شود', async () => {
     // 🔴 قفلِ اصلیِ این فایل. پیش از رفع، همین درخواست ۴۰۱ می‌گرفت و هیچ
     //    وضعیتی جهش نمی‌کرد — قابلیت شیپ‌شده ولی غیرقابلِ‌دسترس.
+    //
+    // ⚠️ به‌روزشده ۲۰۲۶-۰۹-۱۱: «بدونِ توکن» هنوز کار می‌کند (همان چیزی که
+    // این فایل از آن زاده شد)، ولی دیگر «بدونِ هیچ اعتبارنامه‌ی هویتی» نه —
+    // کدِ رزرو عاملِ دوم است. ادعا عمداً هر دو نیمه را دارد تا نه رگرسیونِ
+    // «دوباره ۴۰۱/۴۰۳ برای مهمانِ واقعی» از دستش برود و نه حذفِ عاملِ دوم.
     const t = await makeTable(A);
     const resv = await makeLiveReservation(A, t.id);
 
@@ -166,8 +184,8 @@ describe('۱) مهمانِ بدونِ هیچ توکنی — قابلیت واق�
     const pre = await db.reservation.findUnique({ where: { id: resv.id }, select: { status: true } });
     assert.equal(pre?.status, 'confirmed', 'کنترلِ مثبت: باید از confirmed شروع کند');
 
-    const res = await scan(t.qr);
-    assert.equal(res.status, 200, 'مهمانِ ناشناس باید بتواند ثبتِ ورود کند');
+    const res = await scan(t.qr, undefined, undefined, resv.code);
+    assert.equal(res.status, 200, 'مهمانِ ناشناسِ دارایِ کدِ رزرو باید بتواند ثبتِ ورود کند');
 
     const out = await res.json() as { table_number: number; status: string; checked_in: boolean };
     assert.equal(out.checked_in, true);
@@ -188,7 +206,7 @@ describe('۱) مهمانِ بدونِ هیچ توکنی — قابلیت واق�
     // پاسخ همچنان seated می‌شود ولی این تست قرمز می‌شود (پروتکل §۴).
     const t = await makeTable(A);
     const resv = await makeLiveReservation(A, t.id);
-    await scan(t.qr);
+    await scan(t.qr, undefined, undefined, resv.code);
 
     const events = await db.reservationEvent.findMany({
       where: { reservationId: resv.id },
@@ -208,7 +226,10 @@ describe('۲) نشتِ `reservation_code` بسته است', () => {
 
     const t1 = await makeTable(A);
     const r1 = await makeLiveReservation(A, t1.id, ownerId);
-    const anon = await (await scan(t1.qr)).json() as { reservation_code: string | null; checked_in: boolean };
+    // ⚠️ کد اینجا فقط **عاملِ دومِ هویت** است، نه مجوزِ دیدن: حتی وقتی
+    // فراخوان خودش کد را فرستاده، پاسخ آن را پس نمی‌دهد مگر با توکنِ مالک.
+    const anon = await (await scan(t1.qr, undefined, undefined, r1.code)).json() as
+      { reservation_code: string | null; checked_in: boolean };
     assert.equal(anon.checked_in, true, 'ثبتِ ورود باید انجام شده باشد');
     assert.equal(anon.reservation_code, null, 'فراخوانِ ناشناس نباید کدِ رزرو ببیند');
 
@@ -223,8 +244,13 @@ describe('۲) نشتِ `reservation_code` بسته است', () => {
 
   test('کاربرِ لاگین‌کرده‌ی بی‌ربط کدِ رزروِ دیگری را نمی‌بیند', async () => {
     const t = await makeTable(A);
-    await makeLiveReservation(A, t.id, ownerId);
-    const out = await (await scan(t.qr, strangerToken)).json() as { reservation_code: string | null; checked_in: boolean };
+    const resv = await makeLiveReservation(A, t.id, ownerId);
+    // ⚠️ به‌روزشده ۲۰۲۶-۰۹-۱۱: توکنِ بی‌ربط دیگر به‌تنهایی اجازه‌ی ثبتِ ورود
+    // هم نمی‌دهد (تستِ ۶ آن را پین می‌کند). ادعای **این** تست جداست و باید
+    // جدا بماند: حتی وقتی فراخوان از عاملِ دوم رد شده، پاسخ کد را پس نمی‌دهد
+    // مگر با توکنِ خودِ مالک.
+    const out = await (await scan(t.qr, strangerToken, undefined, resv.code)).json() as
+      { reservation_code: string | null; checked_in: boolean };
     assert.equal(out.checked_in, true);
     assert.equal(out.reservation_code, null, 'توکنِ کاربرِ دیگر نباید کد بدهد');
   });
@@ -234,13 +260,13 @@ describe('۲) نشتِ `reservation_code` بسته است', () => {
     // فراخوانِ ناشناس (userId=undefined) روی رزروِ مهمان (userId=null)
     // می‌توانست کد بگیرد.
     const t = await makeTable(A);
-    await makeLiveReservation(A, t.id, null);
-    const anon = await (await scan(t.qr)).json() as { reservation_code: string | null };
+    const g1 = await makeLiveReservation(A, t.id, null);
+    const anon = await (await scan(t.qr, undefined, undefined, g1.code)).json() as { reservation_code: string | null };
     assert.equal(anon.reservation_code, null);
 
     const t2 = await makeTable(A);
-    await makeLiveReservation(A, t2.id, null);
-    const withToken = await (await scan(t2.qr, ownerToken)).json() as { reservation_code: string | null };
+    const g2 = await makeLiveReservation(A, t2.id, null);
+    const withToken = await (await scan(t2.qr, ownerToken, undefined, g2.code)).json() as { reservation_code: string | null };
     assert.equal(withToken.reservation_code, null, 'رزروِ مهمان مالکِ احرازپذیر ندارد');
   });
 
@@ -248,8 +274,8 @@ describe('۲) نشتِ `reservation_code` بسته است', () => {
     // مسیر عمداً برای فراخوانِ بدونِ توکن باز است؛ توکنِ نامعتبر نباید
     // ۴۰۱ بدهد، چون اصلاً شرطِ ورود نیست.
     const t = await makeTable(A);
-    await makeLiveReservation(A, t.id, ownerId);
-    const res = await scan(t.qr, 'this.is.not.a.jwt');
+    const resv = await makeLiveReservation(A, t.id, ownerId);
+    const res = await scan(t.qr, 'this.is.not.a.jwt', undefined, resv.code);
     assert.equal(res.status, 200);
     const out = await res.json() as { reservation_code: string | null; checked_in: boolean };
     assert.equal(out.checked_in, true);
@@ -294,7 +320,7 @@ describe('۳) کدِ ناموجود و کدِ رستورانِ دیگر تفکی
     // اشتباه گرفته نشود؛ فراخوان هیچ‌جا شعبه‌ای انتخاب نمی‌کند.
     const tB = await makeTable(B);
     const resv = await makeLiveReservation(B, tB.id);
-    const res = await scan(tB.qr);
+    const res = await scan(tB.qr, undefined, undefined, resv.code);
     assert.equal(res.status, 200);
     const row = await db.reservation.findUnique({ where: { id: resv.id }, select: { status: true } });
     assert.equal(row?.status, 'seated');
@@ -378,6 +404,80 @@ describe('۴) میزِ بدونِ رزروِ فعال و idempotency', () => {
       where: { id: resv.id }, select: { status: true },
     });
     assert.equal(row.status, 'seated', 'اسکنِ دوم نباید وضعیتِ رزرو را جهش بدهد');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+describe('۶) عاملِ دومِ هویت — استیکرِ QR به‌تنهایی کافی نیست', () => {
+  test('🔴 غریبه‌ای که فقط کدِ QR دارد ۴۰۳ می‌گیرد؛ صاحبِ رزرو موفق می‌شود', async () => {
+    // 🔴 باگی که پین می‌شود: کدِ QR **رویِ میز چسبیده** است. ۵۰ بیت آنتروپی
+    //    فقط حدس‌زدن را می‌بندد، نه دیدن. تا پیش از این، هر رهگذری که استیکر
+    //    را می‌دید می‌توانست رزروِ فردِ دیگری را بنشاند — انتقالِ واقعیِ چرخه‌ی
+    //    حیات، اعلان، و میزِ occupied، به‌نامِ کسی که هنوز نرسیده بود.
+    //
+    // هر دو نیمه در یک تست، چون جدا از هم هرکدام با یک پیاده‌سازیِ تقلبی پاس
+    // می‌شوند (همیشه-۴۰۳ یا همیشه-۲۰۰).
+    const t = await makeTable(A);
+    const resv = await makeLiveReservation(A, t.id, ownerId);
+
+    // ── نیمه‌ی اول: غریبه، فقط با کدِ QR ──
+    const denied = await scan(t.qr, strangerToken);
+    assert.equal(denied.status, 403, 'دارنده‌ی استیکر بدونِ عاملِ دوم نباید بنشاند');
+    const body = await denied.json() as { error?: { code?: string } };
+    assert.equal(body.error?.code, 'CHECKIN_IDENTITY_REQUIRED',
+      'کد باید متمایز باشد تا اپ بتواند فرمِ کدِ رزرو را باز کند، نه فقط خطا نشان دهد');
+
+    // ⚠️ کنترلِ روی خودِ DB: بدونِ این، یک هندلر که ۴۰۳ برگرداند **ولی
+    //    وضعیت را هم جهش بدهد** از تست رد می‌شد.
+    const mid = await db.reservation.findUnique({ where: { id: resv.id }, select: { status: true } });
+    assert.equal(mid?.status, 'confirmed', 'ردِ درخواست نباید هیچ وضعیتی را جهش داده باشد');
+    const midTbl = await db.table.findUnique({ where: { id: t.id }, select: { state: true } });
+    assert.notEqual(midTbl?.state, 'occupied', 'میز نباید با یک اسکنِ ردشده اشغال شود');
+
+    // ── نیمه‌ی دوم: همان میز، همان لحظه، با توکنِ صاحبِ رزرو ──
+    const ok = await scan(t.qr, ownerToken);
+    assert.equal(ok.status, 200, 'صاحبِ رزرو باید بدونِ واردکردنِ کد هم موفق شود');
+    const out = await ok.json() as { checked_in: boolean; reservation_code: string | null };
+    assert.equal(out.checked_in, true);
+    assert.equal(out.reservation_code, resv.code);
+
+    const post = await db.reservation.findUnique({ where: { id: resv.id }, select: { status: true } });
+    assert.equal(post?.status, 'seated', 'رزرو واقعاً باید seated شده باشد');
+  });
+
+  test('مهمانِ بدونِ حساب با کدِ رزرو موفق می‌شود (نرمال‌سازیِ حروفِ کوچک/فاصله)', async () => {
+    // کد از پیامک کپی یا با صفحه‌کلیدِ موبایل تایپ می‌شود؛ همان قاعده‌ی
+    // `normalizeGiftCode` در lib/loyalty.ts (trim + uppercase) اعمال می‌شود.
+    const t = await makeTable(A);
+    const resv = await makeLiveReservation(A, t.id, null);
+    const res = await scan(t.qr, undefined, undefined, `  ${resv.code.toLowerCase()} `);
+    assert.equal(res.status, 200, 'کدِ درست با حروفِ کوچک/فاصله باید پذیرفته شود');
+    const out = await res.json() as { checked_in: boolean };
+    assert.equal(out.checked_in, true);
+  });
+
+  test('کدِ رزروِ غلط همان ۴۰۳ را می‌دهد، نه ۴۲۲ یا پیامِ متفاوت', async () => {
+    // اگر کدِ بدشکل ۴۲۲ بگیرد و کدِ خوش‌شکلِ اشتباه ۴۰۳، خودِ پاسخ می‌گوید
+    // «شکلت درست بود» — یک اوراکلِ کوچک ولی واقعی.
+    const t = await makeTable(A);
+    await makeLiveReservation(A, t.id, ownerId);
+    const wrongShape = await scan(t.qr, undefined, undefined, 'not-a-code');
+    const wrongValue = await scan(t.qr, undefined, undefined, 'RZAAAAAAA');
+    assert.equal(wrongShape.status, 403);
+    assert.equal(wrongValue.status, 403);
+    assert.equal(await wrongShape.text(), await wrongValue.text(), 'بدنه باید بایت‌به‌بایت یکی باشد');
+  });
+
+  test('میزِ بدونِ رزروِ فعال هنوز بدونِ هیچ عاملِ دومی ۲۰۰ می‌دهد', async () => {
+    // ⚠️ مرزِ عمدیِ این تغییر: چیزی که برای مهمانِ walk-in کار می‌کرد نباید
+    //    بشکند. ضمناً همین است که تفاوتِ ۲۰۰/۴۰۳ را به یک نشتِ کوچک تبدیل
+    //    می‌کند (وجودِ رزروِ فعال روی این میز) — معامله‌ی آگاهانه‌ای که در
+    //    docblockِ route ثبت شده است.
+    const t = await makeTable(A);
+    const res = await scan(t.qr);
+    assert.equal(res.status, 200);
+    const out = await res.json() as { checked_in: boolean };
+    assert.equal(out.checked_in, false);
   });
 });
 

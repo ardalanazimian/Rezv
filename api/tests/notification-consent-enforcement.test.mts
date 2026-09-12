@@ -502,14 +502,17 @@ describe('رضایت · دسته‌ی availability (لیستِ انتظار)', (
 //  ۵) دسته‌ی loyalty — امتیازِ تولد
 // ═══════════════════════════════════════════════════════════════════════
 describe('رضایت · دسته‌ی loyalty (امتیازِ تولد)', () => {
-  /** تاریخِ تولدی که `grantBirthdayRewards` امروز می‌بیند (ظرفِ ماه/روزِ شمسی). */
+  /** تاریخِ تولدی که `grantBirthdayRewards` امروز می‌بیند.
+   *  ⚠️ میلادیِ تهران — همان قراردادی که همه‌ی نقاطِ نوشتنِ birth_date دارند
+   *  (رجوع کن به بلوکِ «یک قرارداد» در grantBirthdayRewards). پیش از
+   *  ۲۰۲۶-۰۹-۱۱ این‌جا ماه/روزِ شمسی ساخته می‌شد، هم‌راستا با cronِ آن‌موقع. */
   async function birthdayUser(prefs: Record<string, boolean>) {
-    const { jalaliMonthDayToday } = await import('../src/lib/loyalty.ts');
-    const { mm, dd } = jalaliMonthDayToday(new Date());
+    const { dateInTz } = await import('../src/lib/hours.ts');
+    const { m, day } = dateInTz(new Date(), 'Asia/Tehran');
     const u = await makeUser(prefs);
     await db.user.update({
       where: { id: u.id },
-      data: { birthDate: new Date(Date.UTC(1990, mm - 1, dd)) },
+      data: { birthDate: new Date(Date.UTC(1990, m - 1, day)) },
     });
     return u;
   }

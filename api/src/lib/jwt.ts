@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import { Err } from './errors';
 
 // ═══════════════════════════════════════════════════════════
@@ -50,8 +51,24 @@ export function signRefresh(principal: AccessPayload | string) {
   const p: AccessPayload = typeof principal === 'string'
     ? { sub: principal, kind: 'customer' }
     : principal;
-  // jti: شناسه‌ی یکتای توکن — برای امکان revocation (لیست سیاه)
-  const jti = `${p.sub}.${Date.now()}.${Math.random().toString(36).slice(2, 10)}`;
+  // jti: شناسه‌ی یکتای توکن — برای امکان revocation (لیست سیاه).
+  //
+  // ⚠️ چرا randomUUID و نه Math.random (رفعِ ممیزیِ امنیتی): نسخه‌ی قبلی
+  // `${sub}.${Date.now()}.${Math.random().toString(36).slice(2,10)}` بود —
+  // یعنی کلِ بخشِ غیرقابلِ‌حدسِ jti فقط ~۸ نویسه‌ی base36 از یک PRNGِ
+  // **غیرِ رمزنگارانه** بود؛ sub عمومی است و Date.now() هم تقریباً معلوم.
+  // خروجیِ Math.random در V8 (xorshift128+) از روی چند نمونه قابلِ بازسازی
+  // است، پس jtiِ توکن‌های دیگر قابلِ پیش‌بینی می‌شد. همین jti تنها ورودیِ
+  // لیستِ سیاهِ revocation است (`revoked:${jti}` در security.ts، که logout و
+  // refresh رویش می‌نویسند/می‌خوانند): با jtiِ قابلِ‌حدس می‌شد توکنِ کاربرِ
+  // دیگر را پیشاپیش باطل کرد (DoSِ نشست) یا برخوردِ jti ساخت.
+  // حالا آنتروپی از CSPRNG می‌آید (۱۲۲ بیت).
+  //
+  // پیشوندِ `${sub}.` عمداً حفظ شد: هیچ‌جا jti را parse نمی‌کند (تنها
+  // مصرف‌کننده‌ها security.ts و مسیرهای auth/logout و auth/refresh‌اند که آن
+  // را رشته‌ی مات می‌بینند)، ولی در لاگ/Redis دیدنِ صاحبِ کلید بدونِ باز کردنِ
+  // توکن ارزشِ عملیاتی دارد.
+  const jti = `${p.sub}.${randomUUID()}`;
   const claims = p.kind === 'staff'
     ? { sub: p.sub, jti, kind: 'staff' as const, tenantId: p.tenantId, role: p.role }
     : { sub: p.sub, jti, kind: 'customer' as const };

@@ -862,6 +862,15 @@ async function loadHeatmapForDashboard(){
 //     را با `value="${i+1}"` می‌فرستد (فروردین=۱ … اسفند=۱۲). بک‌اند همان
 //     عدد را نگه می‌دارد و /restaurant/members همان را برمی‌گرداند. پس
 //     ایندکس‌کردنش در نام‌هایِ ماهِ شمسی round-tripِ درست است.
+//
+//     ⚠️ به‌روزرسانیِ ۲۰۲۶-۰۹-۱۱ — استدلالِ بالا دیگر صادق نیست، **ولی نتیجه‌اش
+//     هست**: فرمِ واک‌ین از ۲۰۲۶-۰۸-۲۵ پیش از ارسال شمسی را به میلادی تبدیل
+//     می‌کند (reservations.js:453-461) و ستونِ دیتابیس میلادی است. در فاصله‌ی
+//     آن رفع تا امروز، /restaurant/members عددِ **میلادی** برمی‌گرداند و همین
+//     خطوط آن را شمسی برچسب می‌زدند ⇒ ماهِ تولدِ همه حدودِ دو ماه غلط.
+//     قرارداد از امروز صریح است: **ذخیره میلادی، نمایش شمسی** — تبدیل در
+//     خودِ API انجام می‌شود (members/route.ts). پس FA_MONTHS و currentMonthFa
+//     همچنان درست‌اند و دست نخورده‌اند.
 // ═══════════════════════════════════════════════════════════════════════
 let CLUB=[];
 // نامِ ماه‌هایِ **شمسی** — هم‌راستا با آنچه فرمِ واک‌ین می‌فرستد (بالا را بخوان).
@@ -874,25 +883,35 @@ function currentMonthFa(){
 }
 // بارگذاری اعضای باشگاه از API (با fallback به CLUB نمونه)
 async function loadClubMembers(){
-  const res=await API.get('/restaurant/members?limit=100');
-  if(res.ok && Array.isArray(res.data?.members)){
-    API.online=true;
-    return res.data.members.map(m=>({
-      fn:m.first_name||'',
-      ln:m.last_name||'',
-      phone:m.phone||'',
-      code:m.code,
-      tier:m.tier,
-      points:m.points,
-      bMonth:m.birth_month?FA_MONTHS[m.birth_month-1]:'—',
-      joined:m.joined_at?faRelative(m.joined_at):'',
-    }));
+  // ⚠️ رفعِ بریدنِ بی‌صدا: قبلاً فقط یک صفحه (`limit=100`) خوانده می‌شد و هر
+  // باشگاهِ بزرگ‌تر از ۱۰۰ نفر **همه‌جا** کم گزارش می‌شد — هدف‌گیریِ تولد،
+  // شمارشِ سطوح و خودِ فهرستِ اعضا. بک‌اند `offset` دارد
+  // (restaurant/members/route.ts) و سقفِ `limit` همان ۱۰۰ است، پس تا صفحه‌ای
+  // که کمتر از ۱۰۰ ردیف بدهد جلو می‌رویم. سقفِ ۵۰ صفحه یک گاردِ ساده است تا
+  // یک باگِ بک‌اند (مثلاً بی‌اثر بودنِ offset) حلقه را تا ابد نچرخاند.
+  const PAGE=100, MAX_PAGES=50;
+  let rows=[];
+  for(let page=0;page<MAX_PAGES;page++){
+    const res=await API.get('/restaurant/members?limit='+PAGE+'&offset='+(page*PAGE));
+    // ⚠️ رفعِ §۳: قبلاً در مسیرِ خطا `return CLUB` بود و آرایه‌ی جعلیِ بالا را
+    // به‌عنوانِ اعضایِ واقعیِ رستوران برمی‌گرداند. حالا خالی — صفحه حالتِ
+    // خالی/خطا را نشان می‌دهد، نه ردیف‌هایِ ساختگی. شکستِ هر صفحه همین مسیر را
+    // می‌رود — فهرستِ نیمه‌کاره هم کم‌گزارشیِ خاموش است.
+    if(!(res.ok && Array.isArray(res.data?.members))){ API.online=false; return []; }
+    rows=rows.concat(res.data.members);
+    if(res.data.members.length<PAGE) break; // آخرین صفحه
   }
-  API.online=false;
-  // ⚠️ رفعِ §۳: قبلاً اینجا `return CLUB` بود و آرایه‌ی جعلیِ بالا را به‌عنوانِ
-  // اعضایِ واقعیِ رستوران برمی‌گرداند. حالا خالی — صفحه حالتِ خالی/خطا را
-  // نشان می‌دهد، نه ردیف‌هایِ ساختگی.
-  return [];
+  API.online=true;
+  return rows.map(m=>({
+    fn:m.first_name||'',
+    ln:m.last_name||'',
+    phone:m.phone||'',
+    code:m.code,
+    tier:m.tier,
+    points:m.points,
+    bMonth:m.birth_month?FA_MONTHS[m.birth_month-1]:'—',
+    joined:m.joined_at?faRelative(m.joined_at):'',
+  }));
 }
 // تبدیل تاریخ ISO به نمایش نسبی فارسی ساده
 function faRelative(iso){
