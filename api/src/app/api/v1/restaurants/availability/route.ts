@@ -3,6 +3,8 @@ import { cached, cacheKey } from '@/lib/cache';
 import { errorResponse } from '@/lib/errors';
 import { parseQuery, zDateStr, z } from '@/lib/schemas';
 import { withApiMetrics } from '@/lib/api-metrics';
+import { db } from '@/lib/db';
+import { bookableStatus, type BookableStatus } from '@/lib/restaurant-bookable';
 
 import {
   BULK_AVAILABILITY_MAX,
@@ -69,9 +71,25 @@ async function GET_impl(req: Request) {
         )
       : {};
 
-    const restaurants: Record<string, { available_slots: string[]; has_schedule: boolean }> = {};
-    for (const [id, entry] of bulkEntriesFromRaw(raw, date)) {
-      restaurants[id] = { available_slots: entry.open, has_schedule: entry.hasSchedule };
+    // گاردِ «الان رزرو می‌پذیرد؟» **بیرون از کش** — heartbeat هر چند ثانیه عوض
+    // می‌شود و کشِ ۳۰ثانیه‌ای نباید رستورانِ تازه‌آفلاین را «آزاد» نشان دهد.
+    // همان شرطِ مسیرِ تکی و گاردِ ثبتِ رزرو (lib/restaurant-bookable.ts).
+    const entries = [...bulkEntriesFromRaw(raw, date)];
+    const gate = entries.length
+      ? new Map((await db.restaurant.findMany({
+          where: { id: { in: entries.map(([id]) => id) } },
+          select: { id: true, isOpen: true, onlineGating: true, lastSeenAt: true },
+        })).map(r => [r.id, bookableStatus(r)]))
+      : new Map<string, BookableStatus>();
+
+    const restaurants: Record<string, { available_slots: string[]; has_schedule: boolean; restaurant_status: BookableStatus }> = {};
+    for (const [id, entry] of entries) {
+      const status = gate.get(id) ?? 'closed';
+      restaurants[id] = {
+        available_slots: status === 'online' ? entry.open : [],
+        has_schedule: entry.hasSchedule,
+        restaurant_status: status,
+      };
     }
 
     return NextResponse.json({

@@ -41,6 +41,7 @@ async function makeRestaurant(suffix: string, opts: {
   openingHours?: unknown;
   slotMinutes?: number; cleaningMinutes?: number; bufferMinutes?: number;
   timezone?: string;
+  isOpen?: boolean; onlineGating?: boolean; lastSeenAt?: Date | null;
 } = {}): Promise<Rest> {
   const r = await db.restaurant.create({
     data: {
@@ -49,6 +50,9 @@ async function makeRestaurant(suffix: string, opts: {
       slotMinutes: opts.slotMinutes ?? 90,
       cleaningMinutes: opts.cleaningMinutes ?? 15,
       bufferMinutes: opts.bufferMinutes ?? 0,
+      ...(opts.isOpen !== undefined ? { isOpen: opts.isOpen } : {}),
+      ...(opts.onlineGating !== undefined ? { onlineGating: opts.onlineGating } : {}),
+      ...(opts.lastSeenAt !== undefined ? { lastSeenAt: opts.lastSeenAt } : {}),
       ...(opts.openingHours !== undefined ? { openingHours: opts.openingHours as never } : {}),
       tables: { create: (opts.tables ?? [{ number: 1, capacity: 4 }]) as never },
     },
@@ -239,7 +243,10 @@ describe('روتِ HTTP', () => {
     }));
 
   test('پاسخ نگاشتِ id→سانس است و رستورانِ واقعی ساعت می‌گیرد', async () => {
-    const r = await makeRestaurant('http-ok');
+    // ⚠️ ۲۰۲۶-۰۹-۱۳: پیش‌تر این fixture onlineGatingِ پیش‌فرض (true) و بدونِ هیچ
+    // heartbeat بود — رستورانی که گاردِ ثبتِ رزرو **رد** می‌کند — و تست برایش
+    // ساعتِ آزاد می‌خواست. همین همان بن‌بست بود؛ حالا پنلش «آنلاین» است.
+    const r = await makeRestaurant('http-ok', { lastSeenAt: new Date() });
     const res = await call(`ids=${r.id}&date=${DATE}&party=2`);
     assert.equal(res.status, 200);
     const body = await res.json();
@@ -249,6 +256,27 @@ describe('روتِ HTTP', () => {
     assert.ok(body.restaurants[r.id].available_slots.length > 0,
       'رستورانِ آزاد باید ساعت بگیرد — این همان چیزی است که کارت نمایش می‌دهد');
     assert.equal(body.restaurants[r.id].has_schedule, true);
+  });
+
+  test('⚠️ رستورانِ آفلاین/بسته روی کارت ساعت نمی‌گیرد — همان گاردِ مسیرِ تکی و ثبتِ رزرو', async () => {
+    // بن‌بستِ ممیزیِ قراردادِ فرانت↔بک (۲۰۲۶-۰۹-۱۳): چیپِ کارت «آزاد» نشان
+    // می‌داد، quickBook مستقیم به ثبت می‌رفت و POST /reservations با
+    // RESTAURANT_OFFLINE رد می‌شد. مسیرِ تکی این گارد را از ۰۸-۲۵ داشت.
+    const offline = await makeRestaurant('http-offline', { lastSeenAt: new Date(Date.now() - 10 * 60_000) });
+    const never = await makeRestaurant('http-never', { lastSeenAt: null });
+    const closed = await makeRestaurant('http-closed', { isOpen: false, onlineGating: false });
+    const ungated = await makeRestaurant('http-ungated', { onlineGating: false, lastSeenAt: null });
+    const res = await call(`ids=${[offline.id, never.id, closed.id, ungated.id].join(',')}&date=${DATE}&party=2`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    for (const [r, status] of [[offline, 'offline'], [never, 'offline'], [closed, 'closed']] as const) {
+      assert.ok(body.restaurants[r.id], `رستوران باید در پاسخ باشد (نه غایب — «نمی‌شناسیم» ≠ «جا ندارد»)`);
+      assert.deepEqual(body.restaurants[r.id].available_slots, [], `${status}: هیچ ساعتِ آزادی نباید اعلام شود`);
+      assert.equal(body.restaurants[r.id].restaurant_status, status);
+    }
+    // کنترلِ مثبت: بدونِ onlineGating، نبودنِ heartbeat مانع نیست.
+    assert.ok(body.restaurants[ungated.id].available_slots.length > 0, 'onlineGating=false باید ساعت بگیرد');
+    assert.equal(body.restaurants[ungated.id].restaurant_status, 'online');
   });
 
   test('شناسه‌ی بدشکل بی‌صدا حذف می‌شود و بقیه را از بین نمی‌برد', async () => {
