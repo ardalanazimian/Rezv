@@ -173,3 +173,46 @@ REVERT     git checkout -- tools/build-standalone.py EXIT=0  pass 2  md5 3b0dcbc
 `docs/audit/reports/` is reported by the CEO as possibly outside this check's scope — a scope
 question I have not measured. The four INVISIBLE results are solid for `docs/`; treat the scope of
 the blindness as **UNKNOWN beyond that**, not as "everywhere".
+
+---
+
+# Added 2026-09-12 — `rezv-25 [2f4e5c]` · target `fix/verified-findings-2026-09` @ `5ea7631`
+
+## FG-13 — the loyalty-promise guard reads 2 of 17 directories
+
+- **What looked green:** `node tools/check-loyalty-promise.mjs` exit **0**, printing
+  «وعده‌ی «امتیاز منقضی نمی‌شود» با مکانیزم هم‌داستان است», with a live points-expiry route sitting
+  in `api/src/app/api/v1/admin/expire-points/route.ts` deducting points older than a year.
+- **What it was actually measuring:** whether a time-based deduction exists inside exactly two
+  directories — `api/src/app/api/v1/maintenance` and `api/src/lib` — out of the 17 under
+  `api/src/app/api/v1/`.
+- **What made it invisible:** the guard's own success message prints the two directories it
+  searched, which reads as thoroughness rather than as scope. Nothing compares that list against
+  where a points writer can legally live. The classification logic downstream is careful and
+  well-built — the gap is entirely in the input set, so reviewing the guard's *logic* finds nothing.
+- **Proof it is a real gap, not a weak payload:** the byte-identical file at `api/src/lib/` exits
+  **1** with the correct message. Only the location changed.
+- **Who walks it by accident:** any session implementing "admin clears stale points". CI green,
+  customer app still promising «امتیازها منقضی نمی‌شن».
+
+## FG-14 — a documented detection query that the shipping code made unmatchable
+
+This one is not a green gate; it is the rarer thing — **a true green with an invisible failure
+behind it**. Recorded here because the ledger's purpose is "things everyone believes are handled".
+
+- **What looked green:** migration `086`'s header tells the operator to run
+  `SELECT … FROM payments WHERE status='success' GROUP BY reservation_id HAVING count(*)>1` and
+  record it empty. It returns `(0 rows)`. The tests pass, 20/20. The index fires. Everything reads
+  as closed.
+- **What it was actually measuring:** whether two `success` rows exist — a state that (a) the
+  patched callback no longer writes, since it records the duplicate as `failed` +
+  `REFUND_REQUIRED`, and (b) migration `086`'s own unique index now makes **impossible**. The query
+  is sound as the one-time pre-deploy check its header describes, and dead for everything after.
+- **What made it invisible:** the check, the fix, and the index all live in the same file and all
+  look mutually reinforcing. Nothing in the repo consumes `REFUND_REQUIRED` (verified by
+  `git grep` with a positive control), the route writes no `audit()` row, and the only payment alert
+  keys on 4xx/5xx while the duplicate path returns **302** — so the one signal that a guest was
+  charged twice is a single `log.error`.
+- **Why it belongs in this ledger and not only in the retest:** the failure mode is identical to
+  every other entry here — *someone will read a passing check and conclude the class is handled*.
+  The difference is that no gate is wrong, so no gate can be fixed. Only the detection can be added.

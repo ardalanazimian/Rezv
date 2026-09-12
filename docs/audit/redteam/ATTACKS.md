@@ -167,3 +167,59 @@ paragraph below is kept as the record of what was true yesterday, **not** as a c
 
 The static, no-database gates in `tools/*.mjs` remain fully attackable, and that is where FG-10 came
 from. **Whoever picks this up next should start from the `not yet` rows, not from a clean slate.**
+
+---
+
+# Added 2026-09-12 — `rezv-25 [2f4e5c]`
+
+## 19. Directory scope gap — beat a guard by writing the violation one directory over
+
+**The technique.** Many guards in this repo walk a hardcoded list of directories. Read that list
+first. If it is a subset of where the violation could legally live, you do not need to defeat the
+guard's logic at all — you write the real violation somewhere it never looks.
+
+**Beat:** `tools/check-loyalty-promise.mjs` (in CI at `.github/workflows/ci.yml:619`). Its
+`SCAN_DIRS` is 2 entries; `api/src/app/api/v1/` has 17 directories. A byte-identical time-based
+points expirer is exit **1** in `api/src/lib/` and exit **0** in `api/src/app/api/v1/admin/`. All 16
+`check-*.mjs` stayed green with it in the tree. Full evidence: `RETEST-2026-09-12.md` RT-14.
+
+**Always pair it with the positive control.** Place the identical payload inside a scanned directory
+first and watch the guard go red. Without that, exit 0 is ambiguous — it could mean your payload was
+weak. With it, exit 0 can only mean scope.
+
+**Generalise before you move on:** grep every guard for its directory list and compare against where
+the thing it protects can actually be written.
+
+```sh
+grep -n "SCAN_DIRS\|SCAN_ROOTS\|const DIRS\|walk(" tools/check-*.mjs
+```
+
+## 20. Detection that cannot fire — attack the observability, not the gate
+
+**The technique.** When a fix deliberately *allows* a residual case and records it instead of
+blocking it, do not attack the block. Attack the record. Ask: what query, alert, or audit row would
+a human actually see? Then check whether the shape the code writes can match it.
+
+**Beat:** patch `0005` + migration `086`. The prevention holds; the documented detection query is
+structurally incapable of matching the state the patched code writes, and the one alert on the route
+measures 4xx/5xx while the path returns 302. See RT-13.
+
+**Why this is worth its own row:** every other technique in this table produces a *false green*. This
+one produces a true green with an invisible failure behind it, which no gate will ever catch, because
+no gate is wrong.
+
+## Capabilities — re-measured 2026-09-12 by `rezv-25 [2f4e5c]`
+
+Per the standing rule that these are per-session and per-day, measured, not assumed:
+
+- **Docker: available, but the daemon was not running at session start.** `docker info` exit **1**
+  with `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`. Docker
+  Desktop was installed and simply not started; launching it made `docker info` exit **0**.
+  ⚠️ **Do not read "docker exit 1" as "docker is blocked"** — a stopped daemon and a blocked
+  capability produce the same error and have opposite fixes.
+- **`psql` is not on PATH** on this machine. `tools/test-env-up.sh` already works around this by
+  running SQL through `docker exec`; ad-hoc queries must do the same.
+- **`tools/test-env-up.sh` exists only on `fix/verified-findings-2026-09`, not on `main`.** A session
+  that checks out `main` to reproduce anything will not find the documented way to stand up the
+  test environment.
+- **`git push`: not measured this session.** Recorded as unmeasured rather than guessed.
