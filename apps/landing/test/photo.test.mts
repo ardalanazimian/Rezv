@@ -1,6 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  سیستمِ عکس
@@ -10,7 +12,7 @@ import { readFileSync } from 'node:fs';
 //  بیندازد و نباید چیزِ نصفه‌کاره را «عکسِ معتبر» اعلام کند.
 // ═══════════════════════════════════════════════════════════════════════
 
-const { photo } = await import('../components/site/Photo.tsx');
+const { photo, Photo } = await import('../components/site/Photo.tsx');
 
 describe('خواندنِ عکس از محتوا', () => {
   test('عکسِ کامل خوانده می‌شود', () => {
@@ -38,6 +40,22 @@ describe('خواندنِ عکس از محتوا', () => {
 
   test('فاصله‌ی اضافه‌ی src حذف می‌شود', () => {
     assert.equal(photo({ src: '  /photos/x.jpg  ' })?.src, '/photos/x.jpg');
+  });
+});
+
+describe('عکسی که نیست، روی سایتِ زنده هیچ‌چیز است', () => {
+  // باگِ واقعی (۲۰۲۶-۰۹-۱۲): صفحه‌ی اصلی جمله‌ی «عکسِ تمام‌عرضِ سالن در ساعتِ
+  // شلوغی — افقی، دستِ‌کم ۲۴۰۰px» را در یک قابِ خاکستری به بازدیدکننده نشان
+  // می‌داد — برچسبِ جای‌عکسی که ممیزیِ ۰۸-۲۴ فقط در گالری رفع کرده بود.
+  test('Photo بدونِ عکس هیچ‌چیز رندر نمی‌کند — نه قاب، نه برچسب', () => {
+    assert.equal(renderToStaticMarkup(createElement(Photo, { data: null })), '');
+  });
+
+  test('هیچ بلوکِ عکس‌محوری برچسبِ جای‌عکس نمی‌سازد و CSSِ آن هم نیست', () => {
+    const blocks = readFileSync(new URL('../components/sections/PhotoBlocks.tsx', import.meta.url), 'utf8');
+    assert.doesNotMatch(blocks, /sec\.placeholder|placeholderLabel/);
+    const site = readFileSync(new URL('../app/site.css', import.meta.url), 'utf8');
+    assert.doesNotMatch(site, /ph--empty|ph__label/);
   });
 });
 

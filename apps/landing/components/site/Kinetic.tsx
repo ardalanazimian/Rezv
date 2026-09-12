@@ -184,6 +184,10 @@ export function Ambient({ density = 1 }: { density?: number }) {
     const ctx = cv.getContext('2d');
     if (!ctx) return;
     if (reducedMotion()) return;
+    // روی صفحه‌ی باریک بوم اصلاً روشن نمی‌شود (DS-010 §۴: ≤ ۱ بومِ متحرک روی
+    // موبایل). CSS همان‌جا پنهانش می‌کند، ولی ناظرِ دیدِ این حلقه روی *والد*
+    // است؛ بدونِ این خط، rAF روی یک بومِ display:none همچنان می‌کشید.
+    if (window.matchMedia('(max-width: 720px)').matches) return;
 
     let W = 0, H = 0, dpr = 1;
     let pts: { x: number; y: number; vx: number; vy: number; r: number }[] = [];

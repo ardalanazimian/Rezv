@@ -220,7 +220,17 @@
   font-size: var(--fs-sm);
   font-weight: 600;
 }
-.hero__bullets li { display: inline-flex; align-items: center; gap: var(--sp-2); }
+/* چیپ به‌جای متنِ خام: همان سه ادعا، فشرده‌تر و هم‌زبان با موزاییکِ کشف */
+.hero__bullets li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-block-size: 32px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
 .hero__bullets svg { color: var(--success); }
 
 /* ═══════════════ نمایشگرِ بصریِ هیرو ═══════════════ */
@@ -437,15 +447,26 @@
   box-shadow: var(--sh-lg);
   border-color: color-mix(in srgb, var(--brand) 28%, var(--border));
 }
-.app-card__points { list-style: none; display: grid; gap: var(--sp-3); }
+/* نکته‌ها چیپ‌اند نه فهرستِ عمودی: پنج ادعا در سه خط به‌جای پنج خط */
+.app-card__points { list-style: none; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .app-card__points li {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-3);
-  font-size: var(--fs-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-block-size: 32px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
   color: var(--text-2);
 }
-.app-card__points svg { color: var(--brand); margin-top: 3px; flex: 0 0 auto; }
+.app-card__points svg { color: var(--brand); flex: 0 0 auto; }
+/* صحنه‌ی «جریانِ زنده» بالای دو کارت — روی موبایل رندر نمی‌شود: یک بومِ
+   ۴/۳ (۳۵۰px) که ادعایش («یک دادهٔ واحد») در زیرعنوانِ همین بخش هست و
+   DS-010 §۴ روی موبایل ≤ ۱ بومِ متحرک می‌خواهد. */
+.apps__flow { margin-block-end: var(--sp-10); }
+@media (max-width: 720px) { .apps__flow { display: none; } }
 
 /* بخشِ دوستونیِ split */
 .split {
@@ -696,7 +717,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--sp-4);
-  padding: clamp(var(--sp-10), 6vw, var(--sp-16));
+  padding: clamp(var(--sp-6), 6vw, var(--sp-16));
   border-radius: var(--r-xl);
   border: 1px dashed var(--border-strong);
   background: var(--surface-2);
@@ -716,7 +737,7 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--r-2xl);
-  padding: clamp(var(--sp-10), 6vw, var(--sp-20));
+  padding: clamp(var(--sp-8), 6vw, var(--sp-20));
   background: linear-gradient(135deg, var(--ember-600), var(--brass-500) 55%, var(--ember-500));
   color: #fff;
   text-align: center;
@@ -924,16 +945,16 @@
 /* ═══════════════ فوتر ═══════════════ */
 
 .site-footer {
-  margin-top: clamp(var(--sp-16), 8vw, var(--sp-24));
+  margin-top: clamp(var(--sp-10), 8vw, var(--sp-24));
   border-top: 1px solid var(--border);
   background: var(--bg-subtle);
-  padding-block: clamp(var(--sp-12), 6vw, var(--sp-16)) var(--sp-8);
+  padding-block: clamp(var(--sp-8), 6vw, var(--sp-16)) var(--sp-6);
 }
 
 .site-footer__top {
   display: grid;
-  gap: clamp(var(--sp-8), 5vw, var(--sp-16));
-  padding-bottom: var(--sp-10);
+  gap: clamp(var(--sp-6), 5vw, var(--sp-16));
+  padding-bottom: var(--sp-8);
 }
 @media (min-width: 900px) { .site-footer__top { grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr); } }
 
@@ -1170,9 +1191,13 @@
 }
 .night__lbl { font-size: var(--fs-2xs); color: var(--text-3); letter-spacing: .02em; }
 
+/* موبایل: سه آمار در یک ردیف و بومِ کوتاه‌تر — صحنه ~۲۲۰px است نه ۴۴۰px، و
+   همچنان با اسکرول جلو می‌رود. (۰۹-۱۲؛ قبلاً 4/5 + سه ردیفِ آمار) */
 @media (max-width: 620px) {
-  .night__hud { grid-template-columns: 1fr; }
-  .night__canvas { aspect-ratio: 4 / 5; }
+  .night__hud { grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
+  .night__stat { padding: var(--sp-2) var(--sp-3); }
+  .night__num { font-size: var(--fs-base); }
+  .night__canvas { aspect-ratio: 16 / 10; }
 }
 
 /* ═══════════════ صحنه‌ی «جریانِ زنده» ═══════════════ */
@@ -1311,6 +1336,68 @@
 @media (prefers-reduced-motion: reduce) {
   .askbot { animation: none; }
   .askbot__fab:hover { transform: none; }
+}
+
+/* ═══════════════ تراکمِ موبایل ═══════════════
+   ۰۹-۱۲: صفحه‌ی اصلی روی ۳۹۰px ۱۶٫۲ صفحه بود؛ هدف ≤ ۱۰ بدونِ حذفِ هیچ
+   ادعایی. هر قاعده‌ی زیر فقط «هوای عمودی» را می‌گیرد: دوستونی به‌جای ستونِ
+   بلند، چیپ به‌جای فهرست، ردیفِ لغزان به‌جای کارت‌های روی‌هم. دسکتاپ دست
+   نمی‌خورد. */
+@media (max-width: 640px) {
+  .metric { padding: var(--sp-4); gap: 2px; }
+  .metric__value { font-size: 1.6rem; }
+  .grid--dense { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+  .grid--dense .card { padding: var(--sp-4); border-radius: var(--r-lg); }
+  .grid--dense .icon-tile { width: 36px; height: 36px; border-radius: var(--r-sm); }
+  .grid--dense .feature { gap: var(--sp-2); }
+  .grid--dense .feature__title { font-size: var(--fs-base); }
+  .grid--dense .feature__body { font-size: var(--fs-sm); line-height: 1.6; }
+  .faq-item summary { padding: var(--sp-3) var(--sp-4); font-size: var(--fs-md); }
+  .faq-item__body { padding: 0 var(--sp-4) var(--sp-4); }
+  .cta-band h2 { font-size: clamp(1.5rem, 6.4vw, 2rem); }
+  /* کارتِ پلن: همان شش ادعا، با فاصله‌ی کمتر — بلندترین کارت ارتفاعِ ردیفِ
+     لغزان را تعیین می‌کند */
+  .plan { gap: var(--sp-4); padding: var(--sp-5); }
+  .plan__features { gap: var(--sp-2); }
+  .plan__features li { font-size: var(--fs-sm); }
+  .plan__amount { font-size: 1.75rem; }
+  /* فوتر: پیوندها از قبل ۴۴px بلندند (pointer: coarse)، فاصله‌ی بینشان اضافه است */
+  .site-footer__links { gap: var(--sp-5) var(--sp-6); }
+  .site-footer__top { padding-bottom: var(--sp-6); }
+}
+@media (max-width: 640px) and (pointer: coarse) {
+  .site-footer__links .stack-2 { gap: 0; }
+}
+@media (max-width: 720px) {
+  /* جدولِ مقایسه در ۳۹۰px جا می‌شود: ستونِ «رزرونو» — همان نقطه‌ی جدول — پشتِ
+     اسکرولِ افقی پنهان بود. چهار ستون در عرضِ ۳۵۰px با متنِ ریزتر جا می‌گیرند. */
+  .table { min-width: 0; font-size: var(--fs-xs); }
+  .table th, .table td { padding: var(--sp-2); }
+}
+
+/* ── ردیفِ لغزان ──
+   کارت‌هایی که روی دسکتاپ کنارِ هم می‌نشینند (دو اپ، سه پلن)، روی موبایل
+   به‌جای ستونِ ۲٫۵صفحه‌ای یک ردیفِ لمس‌پیما با snap می‌شوند — الگوی فیدِ
+   افقیِ اینستاگرام. هیچ کارتی حذف نمی‌شود؛ لبه‌ی کارتِ بعدی پیداست تا
+   لغزیدن معلوم باشد، و ناحیه با role/tabindex برای کیبورد هم پیمایش‌پذیر است.
+   عرضِ کارت «۸۴٪ ولی نه بیشتر از ۲۲rem» است تا روی تبلت هم دو کارت کنارِ هم
+   جا شوند و ردیف عملاً همان گرید باشد. */
+@media (max-width: 860px) {
+  .snap-row {
+    display: flex;
+    gap: var(--sp-3);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin-inline: calc(-1 * var(--sp-5));
+    padding-inline: var(--sp-5);
+    padding-block: var(--sp-2) var(--sp-4);
+    scroll-padding-inline: var(--sp-5);
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .snap-row::-webkit-scrollbar { display: none; }
+  .snap-row > * { flex: 0 0 min(84%, 22rem); scroll-snap-align: start; }
+  .snap-row > * > *, .snap-row .app-card { block-size: 100%; }
 }
 
 /* ═══════════════ لایه‌ی حرکت (Kinetic) ═══════════════ */
@@ -1487,7 +1574,7 @@
 
 @media (max-width: 900px) {
   .pin { block-size: auto !important; }
-  .pin__stage { position: static; block-size: auto; padding-block: var(--sp-16); }
+  .pin__stage { position: static; block-size: auto; padding-block: var(--sp-10); }
   .pin__grid { grid-template-columns: 1fr; gap: var(--sp-8); }
   .pin__rail {
     display: flex; overflow-x: auto; gap: var(--sp-3);
@@ -1604,37 +1691,28 @@
   filter: drop-shadow(0 40px 80px light-dark(rgba(90,50,20,.22), rgba(0,0,0,.6)));
 }
 @media (max-width: 720px) {
-  /* روی موبایل چرخشِ سه‌بعدی فقط ارتفاع می‌خورد و چیزی اضافه نمی‌کند */
-  .hero__stage-inner { transform: none; }
-  .hero--stage { min-block-size: auto; }
+  /* ۰۹-۱۲: هیرو دیگر تمام‌قد نیست — درها و موزاییکِ کشف بالای آن‌اند و این
+     بلوک «صدای صاحبِ رستوران» است: تیتر، یک جمله، دو دکمه‌ی کنارِ هم، چیپ‌ها،
+     و صحنه‌ی شبِ سرویس در نسبتِ کوتاه‌تر (۱٫۶۱ صفحه → زیرِ یک صفحه). چرخشِ
+     سه‌بعدی روی موبایل فقط ارتفاع می‌خورد. بوم‌های تزئینی (کاستیک، ذره،
+     شبکه) روی صفحه‌ی باریک نمی‌آیند — DS-010 §۴: ≤ ۱ بومِ متحرک روی موبایل؛
+     شبِ سرویس می‌ماند چون اسکرول‌محور است و خودِ محصول را نشان می‌دهد. */
+  .hero--stage { min-block-size: auto; padding-block: var(--sp-8) 0; }
+  .hero--stage .display { font-size: clamp(2rem, 8.4vw, 2.6rem); }
+  .hero--stage .hero__content { gap: var(--sp-4); }
+  .hero--stage .lead { font-size: var(--fs-md); }
+  /* دو دکمه کنارِ هم. فرزندِ مستقیمِ ردیف برای دکمه‌ی اصلی پوسته‌ی Magnetic است
+     نه خودِ .btn، پس قاعده روی «هر فرزند» می‌نشیند و .btn پوسته را پر می‌کند. */
+  .hero--stage .cta-row > * { flex: 1 1 40%; }
+  .hero--stage .cta-row .btn { inline-size: 100%; padding-inline: var(--sp-4); font-size: var(--fs-md); }
+  .hero__stage { margin-block-start: var(--sp-6); }
+  .hero__stage-inner { transform: none; filter: none; }
+  .hero .caustics, .hero .flowfield, .hero .kx-ambient, .hero .grid-bg { display: none; }
 }
 
-/* ── نشانگرِ اسکرول ── */
-.hero__scroll {
-  position: absolute;
-  inset-block-end: var(--sp-6);
-  inset-inline-start: 50%;
-  translate: -50% 0;
-  z-index: 2;
-  inline-size: 1px;
-  block-size: 46px;
-  overflow: hidden;
-  background: var(--border);
-  pointer-events: none;
-}
-.hero__scroll-line {
-  display: block;
-  inline-size: 100%;
-  block-size: 45%;
-  background: linear-gradient(to bottom, transparent, var(--brand));
-  animation: heroScroll 2.1s var(--ease) infinite;
-}
-@keyframes heroScroll {
-  0%   { transform: translateY(-100%); }
-  100% { transform: translateY(230%); }
-}
+/* نشانگرِ اسکرول (خطِ نبض‌دارِ بی‌پایان) حذف شد — ۰۹-۱۲: هیرو دیگر تمام‌قد
+   نیست که «پایین چیزی هست» یادآوری بخواهد، و یک حلقه‌ی تایمری بود. */
 @media (prefers-reduced-motion: reduce) {
-  .hero__scroll-line { animation: none; }
   .hero__stage-inner { transform: none; }
 }
 
@@ -1668,25 +1746,8 @@
 }
 :root[data-theme='dark'] .ph--grade::after { mix-blend-mode: screen; opacity: .45; }
 
-/* حالتِ خالی — صادقانه برچسب می‌خورد، نه یک قابِ شکسته و نه تصویرِ ساختگی */
-.ph--empty {
-  display: grid;
-  place-items: center;
-  border: 1px dashed var(--border-strong, var(--border));
-  background:
-    repeating-linear-gradient(135deg,
-      var(--surface-2) 0 12px,
-      var(--surface-3) 12px 24px);
-}
-.ph__label {
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  color: var(--text-3);
-  padding: var(--sp-2) var(--sp-4);
-  border-radius: 50px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
+/* حالتِ خالی ندارد: عکسی که نیست رندر نمی‌شود (Photo.tsx، تصمیمِ ۴). قابِ
+   خاکستریِ برچسب‌دارِ قبلی روی سایتِ زنده دیده می‌شد. */
 .ph__cap {
   position: absolute;
   inset-inline: 0;
@@ -1754,6 +1815,17 @@
 .scene .btn--primary { align-self: center; }
 .scene--start .btn--primary { align-self: flex-start; }
 
+/* بدونِ عکس: نوارِ متنیِ فشرده روی زمینه‌ی تیره‌ی برند — نه قابِ خالیِ
+   برچسب‌دار (تا ۰۹-۱۲ روی سایتِ زنده بود)، نه تصویرِ ساختگی. ارتفاع از
+   محتوا می‌آید، نه ۸۴vh. */
+.scene--text {
+  min-block-size: auto;
+  background:
+    radial-gradient(90% 80% at 85% 0%, color-mix(in srgb, var(--ember-500) 38%, transparent), transparent 62%),
+    linear-gradient(160deg, var(--ember-900), var(--ember-700));
+}
+.scene--text .scene__body { padding-block: clamp(var(--sp-10), 7vw, var(--sp-16)); }
+
 /* ═══════════════ gallery — شبکه‌ی تحریریه ═══════════════ */
 .gal {
   display: grid;
@@ -1793,6 +1865,9 @@
 @media (min-width: 900px) {
   .psplit { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr); }
   .psplit--reverse .psplit__media { order: 2; }
+  /* بدونِ عکس، متن تمام‌عرض است — نه نیمه‌ی خالی */
+  .psplit--text { grid-template-columns: minmax(0, 1fr); }
+  .psplit--text .psplit__body { max-inline-size: 52rem; }
 }
 
 /* زاویه‌ی حلقه‌ی نورانیِ درِ باز. بدونِ @property این یک رشته‌ی ساده است و
@@ -2011,11 +2086,231 @@
 
 .door:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 
-/* ── بازاستفاده در صفحه‌ی اصلی (HomeGate) ──
-   `.gate__inner` این را با flex+align-items:center وسط می‌چیند؛ این‌جا
-   `.doors` مستقیم زیرِ `.container` است، پس خودش باید وسط بایستد. دو در
-   (نه سه) هم جا دارد یک‌کم جمع‌وجورتر باشد. */
+/* ═══════════════════════════════════════════════════════════════════
+   صفحه‌ی اصلی — دروازه‌ی محصول‌اول (HomeGate + موزاییکِ کشف)
+   ───────────────────────────────────────────────────────────────────
+   ۰۹-۱۲ · مالک: «مثلِ اینستاگرام/تیک‌تاک — محصول‌اول، فشرده، زنده». اولین
+   قاب سه چیز است و بس: تیترِ دوصدایی (DS-010 §۴‑ب)، موزاییکِ کشف (همان فیدِ
+   اپِ مشتری، بازسازی‌شده)، و دو در. روی ۳۹۰px هر دو در با جمله‌شان زیرِ
+   خطِ تا می‌مانند — قیدِ سنجش‌پذیرِ همان سند.
+   `.doors` این‌جا مستقیم زیرِ `.container` است (نه `.gate__inner`)، پس خودش
+   باید وسط بایستد.
+   ═══════════════════════════════════════════════════════════════════ */
+.home-gate {
+  position: relative;
+  padding-block: clamp(var(--sp-4), 3vw, var(--sp-12)) clamp(var(--sp-8), 4vw, var(--sp-16));
+}
+.home-gate__inner { display: grid; gap: var(--sp-4); }
+.home-gate__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--sp-3);
+}
+.home-gate__title {
+  font-size: clamp(1.7rem, 6.4vw, 3.6rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  max-inline-size: 20ch;
+}
 .home-gate .doors { margin-inline: auto; max-inline-size: 52rem; }
+
+@media (min-width: 980px) {
+  .home-gate { padding-block: clamp(var(--sp-10), 5vw, var(--sp-16)); }
+  .home-gate__inner {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-areas: 'head product' 'doors product';
+    align-items: center;
+    column-gap: clamp(var(--sp-8), 4vw, var(--sp-16));
+    row-gap: var(--sp-6);
+  }
+  .home-gate__head { grid-area: head; align-items: flex-start; text-align: start; }
+  .home-gate__product { grid-area: product; }
+  .home-gate__doors { grid-area: doors; }
+  .home-gate .doors { margin-block-start: 0; max-inline-size: none; }
+}
+
+/* ── موزاییکِ کشف ──
+   شبکه‌ی سه‌ستونیِ کاشی‌های گرادیانی — همان `.rc`ِ اپِ مشتری در مقیاسِ کوچک.
+   حرکت فقط اسکرول‌محور است: هر ستون با اسکرولِ صفحه (۰ تا ۶۴۰px) با سرعتِ
+   خودش بالا می‌رود (animation-timeline: scroll). تایمر ندارد؛ در حالتِ
+   کاهشِ حرکت (بلوکِ آخرِ همین فایل) کاملاً ثابت است؛ مرورگرِ بدونِ
+   scroll-timeline موزاییکِ ثابت می‌بیند، نه شکسته. */
+@property --drift {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+.mosaic {
+  position: relative;
+  display: block;
+  block-size: clamp(14rem, 58vw, 26rem);
+  border-radius: var(--r-2xl);
+  overflow: hidden;
+  background: var(--bg-sunken);
+  isolation: isolate;
+}
+.mosaic:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.mosaic__grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  /* پایینِ قاب محو می‌شود: فید «ادامه دارد» */
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+}
+.mosaic__col { display: grid; gap: var(--sp-2); align-content: start; }
+.mosaic__col--1 { --drift: -3.5rem; }
+.mosaic__col--2 { --drift: -7rem; margin-block-start: -3.25rem; }
+.mosaic__col--3 { --drift: -5rem; margin-block-start: -1.5rem; }
+@supports (animation-timeline: scroll()) {
+  .mosaic__col {
+    animation: mosaicDrift linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0px 640px;
+  }
+}
+@keyframes mosaicDrift {
+  from { transform: translateY(0); }
+  to { transform: translateY(var(--drift)); }
+}
+
+.mtile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  aspect-ratio: 4 / 5;
+  padding: var(--sp-2);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  color: #fff;
+  box-shadow: var(--sh-md);
+}
+.mtile--1 { background: var(--tile-1); }
+.mtile--2 { background: var(--tile-2); }
+.mtile--3 { background: var(--tile-3); }
+.mtile--4 { background: var(--tile-4); }
+.mtile--5 { background: var(--tile-5); }
+.mtile--6 { background: var(--tile-6); }
+.mtile__emoji {
+  position: absolute;
+  inset-block-start: var(--sp-2);
+  inset-inline-end: var(--sp-2);
+  font-size: clamp(1.5rem, 5.4vw, 2.4rem);
+  line-height: 1;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.35));
+}
+.mtile__hot {
+  position: absolute;
+  inset-block-start: var(--sp-2);
+  inset-inline-start: var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-2xs);
+  font-weight: 800;
+  background: var(--tile-hot);
+}
+/* همان پنلِ اپ با همان آلفا (آن‌جا برای کنتراست روی هر شش گرادیان حل شده)؛
+   بدونِ backdrop-blur — DS-010 §۲‑۲ شیشه را به دو نوار محدود می‌کند. */
+.mtile__panel {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--tile-panel);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.mtile__name {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mtile__meta {
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  opacity: 0.82;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mtile__slots { display: flex; gap: 4px; margin-block-start: 4px; }
+.mtile__slot {
+  flex: 1 1 0%;
+  padding: 4px 0;
+  border-radius: var(--r-xs);
+  text-align: center;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.mtile__slot.is-go { background: var(--tile-go); border-color: transparent; }
+.mosaic__label {
+  position: absolute;
+  inset-block-end: var(--sp-3);
+  inset-inline-start: var(--sp-3);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-block-size: 36px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-full);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  box-shadow: var(--sh-md);
+}
+.mosaic__label svg { color: var(--brand); }
+
+/* ── درها روی موبایل: فشرده ──
+   درِ تمام‌قد (شماره‌ی بزرگ، آیکنِ ۴۶px، متنِ چندخطی) ۲۸۶px بود؛ دو تا یعنی
+   بیش از نیمی از صفحه پیش از هر محتوایی. این‌جا هر در یک ردیفِ آیکن + سه خطِ
+   متن است و هر دو با جمله‌شان بالای خطِ تا می‌مانند. متنِ درها دست نخورده. */
+@media (max-width: 900px) {
+  .home-gate .doors { gap: var(--sp-2); margin-block-start: 0; max-inline-size: none; }
+  .home-gate .door {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-areas: 'ic title' 'ic body' 'ic foot';
+    align-items: center;
+    column-gap: var(--sp-3);
+    row-gap: 2px;
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--r-xl);
+  }
+  .home-gate .door__num { display: none; }
+  .home-gate .door__ic { grid-area: ic; inline-size: 44px; block-size: 44px; }
+  .home-gate .door__title { grid-area: title; font-size: var(--fs-base); }
+  .home-gate .door__body { grid-area: body; font-size: var(--fs-sm); line-height: 1.6; }
+  .home-gate .door__foot {
+    grid-area: foot;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-1);
+  }
+  /* راهنما می‌شکند، «ورود / شروعِ دمو» هرگز — پیکان کنارِ متنش می‌ماند */
+  .home-gate .door__hint { flex: 1 1 auto; }
+  .home-gate .door__go { flex: 0 0 auto; white-space: nowrap; }
+}
 
 /* ── موبایل و تبلت ──
    «بازشدن با هاور» روی تاچ معنا ندارد و فقط یک لمسِ اضافه تحمیل می‌کند؛
@@ -2040,6 +2335,9 @@
 }
 @media (hover: none) {
   .doors:hover .door, .doors:focus-within .door { opacity: 1; }
+  /* روی لمس، حلقه‌ی چرخانِ درِ اول یک حلقه‌ی تایمریِ بی‌پایان بود بدونِ هیچ
+     بازخوردی (اشاره‌گری در کار نیست) — ثابت می‌ماند. */
+  .door__edge { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2051,4 +2349,7 @@
      کاهشِ حرکت می‌بازد (اندازه‌گیری شد: animationName=doorSpin). */
   .door__edge { animation: none; }
   .door__ic { transform: none; }
+  /* موزاییکِ کشف: قاعده‌ی سراسریِ globals فقط duration را صفر می‌کند و
+     timelineِ اسکرول duration ندارد — پس صریح: هیچ حرکتی، هیچ جابه‌جایی. */
+  .mosaic__col { animation: none !important; transform: none !important; }
 }

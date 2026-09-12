@@ -165,11 +165,6 @@ function Hero({ sec }: { sec: Section }) {
         </div>
       )}
 
-      {stage && (
-        <span className="hero__scroll" aria-hidden="true">
-          <span className="hero__scroll-line" />
-        </span>
-      )}
     </section>
   );
 }
@@ -219,10 +214,12 @@ function Apps({ sec }: { sec: Section }) {
         <Head eyebrow={s(sec.eyebrow)} title={s(sec.title)} subtitle={s(sec.subtitle)} />
         {/* ادعای «یک دادهٔ واحد بینِ دو اپ» را نشان می‌دهد، نه فقط می‌گوید:
             رزروها از سمتِ اپِ مشتری حرکت می‌کنند و در پنل می‌نشینند. */}
-        <Reveal>
-          <div style={{ marginBlockEnd: 'var(--sp-10)' }}><LiveFlow /></div>
+        <Reveal className="apps__flow">
+          <LiveFlow />
         </Reveal>
-        <div className="grid grid-2">
+        {/* روی موبایل ردیفِ لغزان (snap-row) به‌جای دو کارتِ روی‌هم؛ ناحیه‌ی
+            نام‌دار و فوکوس‌پذیر تا با کیبورد هم پیمایش شود. */}
+        <div className="grid grid-2 snap-row" role="region" aria-label={s(sec.title) ?? 'دو اپ'} tabIndex={0}>
           {cards.map((card, i) => (
             <Reveal key={card.title ?? i} delay={i * 100}>
               <Tilt><article className="app-card">
@@ -257,18 +254,20 @@ function Apps({ sec }: { sec: Section }) {
 function Ticker({ sec }: { sec: Section }) {
   const items = list<string>(sec.items);
   if (!items.length) return null;
-  // دو بار تکرار می‌شود چون انیمیشن تا ۵۰٪ می‌رود و بی‌درز حلقه می‌زند.
-  const row = [...items, ...items];
+  // ۰۹-۱۲: دیگر marquee نیست (حلقه‌ی ۳۴ثانیه‌ایِ تایمری که نیمی از قابلیت‌ها
+  // را همیشه بیرونِ قاب داشت). روی موبایل یک نوارِ چیپِ لمس‌پیماست و روی
+  // دسکتاپ همه‌ی چیپ‌ها می‌شکنند و یک‌جا دیده می‌شوند — هیچ قابلیتی پشتِ
+  // حرکت یا بریدگی نمی‌ماند، و هیچ تایمری در کار نیست.
   return (
-    <div className="kx-ticker" aria-label={s(sec.title) ?? 'قابلیت‌ها'}>
-      <div className="kx-ticker__row">
-        {row.map((it, i) => (
-          <span className="kx-ticker__item" key={i} aria-hidden={i >= items.length}>
+    <div className="kx-ticker">
+      <ul className="kx-ticker__row" aria-label={s(sec.title) ?? 'قابلیت‌ها'}>
+        {items.map((it) => (
+          <li className="kx-ticker__item" key={it}>
             <Icon name="sparkle" size={15} />
             {it}
-          </span>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -284,7 +283,8 @@ function Features({ sec }: { sec: Section }) {
     <section className="section">
       <div className="container">
         <Head eyebrow={s(sec.eyebrow)} title={s(sec.title)} subtitle={s(sec.subtitle)} />
-        <div className="grid grid-3 vel">
+        {/* grid--dense: روی موبایل دوستونی و فشرده — شش کارتِ روی‌هم ۱٫۹۵ صفحه بود */}
+        <div className="grid grid-3 grid--dense vel">
           {items.map((f, i) => (
             <Reveal key={f.title ?? i} delay={(i % 3) * 80}>
               <article className="card card--hover feature">

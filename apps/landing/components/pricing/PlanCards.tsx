@@ -27,7 +27,9 @@ export function PlanCards({ plans, note }: { plans: SitePlan[]; note?: string | 
 
   return (
     <>
-      <div className="plans">
+      {/* روی موبایل ردیفِ لغزان با snap (site.css › .snap-row): سه کارتِ روی‌هم
+          ۲٫۵ صفحه بود. ناحیه نام‌دار و فوکوس‌پذیر است تا با کیبورد هم پیمایش شود. */}
+      <div className="plans snap-row" role="region" aria-label="پلن‌های اشتراک" tabIndex={0}>
         {plans.map((plan, i) => (
           <Reveal key={plan.key} delay={i * 90}>
             <article className={`plan${plan.highlight ? ' plan--highlight' : ''}`}>

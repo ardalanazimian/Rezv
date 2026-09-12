@@ -14,9 +14,15 @@
 //  ۳) گریدِ برند. یک لایه‌ی گرمِ خیلی ملایم روی همه‌ی عکس‌ها می‌نشیند تا
 //     عکس‌هایی که در نور و دوربینِ متفاوت گرفته شده‌اند مثلِ یک مجموعه
 //     دیده شوند. این همان کاری است که تیمِ هنریِ یک برند انجام می‌دهد.
-//  ۴) حالتِ خالیِ صادق. تا وقتی عکسِ واقعی نیامده، جای عکس با برچسبِ روشن
-//     نشان داده می‌شود — نه یک قابِ شکسته و نه یک تصویرِ ساختگی که وانمود
-//     کند عکسِ واقعی است.
+//  ۴) عکسی که نیست، جایی هم ندارد. نسخه‌ی اول جای عکسِ نیامده را با یک قابِ
+//     خاکستری و برچسب نشان می‌داد و آن را «حالتِ خالیِ صادق» می‌نامید. صادق
+//     نبود: هیچ مکانیزمِ پیش‌نمایشی وجود ندارد که برچسب را فقط در استودیو
+//     نگه دارد، پس همان قاب روی سایتِ زنده رندر می‌شد. ممیزیِ ۲۰۲۶-۰۸-۲۴ آن
+//     را در گالری گرفت، ولی دو بلوکِ دیگرِ همان فایل جا ماندند و تا
+//     ۲۰۲۶-۰۹-۱۲ صفحه‌ی اصلی جمله‌ی «عکسِ تمام‌عرضِ سالن در ساعتِ شلوغی…» را
+//     به بازدیدکننده نشان می‌داد. حالا رفع در ریشه است: بدونِ src هیچ‌چیز
+//     رندر نمی‌شود، و بلوکِ والد تصمیم می‌گیرد بدونِ رسانه چه شکلی باشد
+//     (PhotoBlocks.tsx). تصویرِ ساختگی هم هرگز جایگزین نمی‌شود.
 // ═══════════════════════════════════════════════════════════════════════
 
 import NextImage from 'next/image';
@@ -67,7 +73,6 @@ export function Photo({
   sizes = '100vw',
   grade = true,
   className,
-  placeholderLabel = 'جای عکس',
 }: {
   data: PhotoData | null;
   ratio?: PhotoRatio;
@@ -76,17 +81,11 @@ export function Photo({
   sizes?: string;
   grade?: boolean;
   className?: string;
-  placeholderLabel?: string;
 }) {
-  const style = { aspectRatio: RATIO[ratio] } as React.CSSProperties;
+  // بدونِ عکس، هیچ‌چیز — نه قاب، نه برچسب (تصمیمِ ۴ در سرآیند).
+  if (!data) return null;
 
-  if (!data) {
-    return (
-      <div className={`ph ph--empty${className ? ` ${className}` : ''}`} style={style}>
-        <span className="ph__label">{placeholderLabel}</span>
-      </div>
-    );
-  }
+  const style = { aspectRatio: RATIO[ratio] } as React.CSSProperties;
 
   return (
     <figure className={`ph${grade ? ' ph--grade' : ''}${className ? ` ${className}` : ''}`} style={style}>

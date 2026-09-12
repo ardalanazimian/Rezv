@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  انتخابِ نقش — بالای صفحه‌ی اصلی
+//  دروازه‌ی صفحه‌ی اصلی — محصول و انتخابِ نقش، در همان قابِ اول
 //
 //  چرا این‌جا لازم بود: صفحه‌ی اصلی قبلِ این تغییر هیچ مسیری به اپِ مشتری
 //  نداشت — هیرو و کلِ بدنه‌ی CMS مخاطبش صاحبِ رستوران بود («شروعِ دموی
 //  ۳۰ روزه»)، و تنها درِ اپِ مشتری در `/login` بود که هیچ مهمانی به آن سر
 //  نمی‌زند. مهمانی که به `rezervno.ir` می‌رسد باید در **همین صفحه**، بدونِ
-//  خواندنِ چیزی، بفهمد کجا برود.
+//  خواندنِ چیزی، بفهمد کجا برود (تصمیمِ بنیان‌گذار D-006).
 //
 //  چرا از DoorPicker استفاده شد نه یک ویجتِ تازه: آن کامپوننت از قبل بدونِ
 //  جاوااسکریپت کار می‌کند، با کیبورد قابلِ‌پیمایش است و RTL را درست رعایت
@@ -14,9 +14,20 @@
 //
 //  چرا فقط دو در (بدونِ «پنلِ شرکت»): پنلِ شرکت مخصوصِ کارکنانِ داخلیِ
 //  رزرونوست، نه بازدیدکنندهٔ سایت؛ نمایشش این‌جا خودش یک منبعِ گیجی است.
+//
+//  ۲۰۲۶-۰۹-۱۲ — محصول‌اول (DS-010 §۴‑ب + دستورِ مالک «مثلِ اینستاگرام/تیک‌تاک»):
+//   • تیترِ دوصدایی به‌جای پرسش + جمله‌ی راهنما: دو صدا، یک بلوک. کپیِ تیتر
+//     همان پیشنهادِ طراح در آن سند است؛ واژه‌ی نهایی با مالک.
+//   • موزاییکِ کشف (ExploreMosaic) بینِ تیتر و درها: اولین چیزی که مهمان
+//     می‌بیند خودِ محصول است، نه متن.
+//   • درها روی موبایل فشرده (site.css › `.home-gate .door`): پیش از این دو درِ
+//     تمام‌قد ۵۷۰px بودند؛ حالا هر دو با جمله‌شان زیرِ ۸۴۴px می‌مانند — قیدِ
+//     سنجش‌پذیرِ همان سند. متنِ درها دست نخورده است.
+//  این بخش وابسته به CMS نیست، پس هرگز غایب نمی‌شود.
 // ═══════════════════════════════════════════════════════════════════════
 
 import { DoorPicker, type Door } from './DoorPicker';
+import { ExploreMosaic } from './ExploreMosaic';
 import { appBase } from '@/lib/i18n';
 
 const HOME_DOORS: Door[] = [
@@ -44,14 +55,20 @@ const HOME_DOORS: Door[] = [
 
 export function HomeGate() {
   return (
-    <section className="section section--tight home-gate" aria-labelledby="home-gate-title">
-      <div className="container">
-        <div className="section-head section-head--center">
+    <section className="home-gate" aria-labelledby="home-gate-title">
+      <div className="container home-gate__inner">
+        <div className="home-gate__head">
           <span className="eyebrow">رزرونو برایِ هر دو طرفِ میز است</span>
-          <h2 id="home-gate-title" className="h2">مهمانید یا صاحبِ رستوران؟</h2>
-          <p className="lead">هرکدام هستید، مسیرِ درست همین‌جاست — نه در فرمِ تماس.</p>
+          <h2 id="home-gate-title" className="home-gate__title">
+            میزت را رزرو کن — <span className="text-gradient">یا میزهایت را پر کن.</span>
+          </h2>
         </div>
-        <DoorPicker doors={HOME_DOORS} />
+        <div className="home-gate__product">
+          <ExploreMosaic />
+        </div>
+        <div className="home-gate__doors">
+          <DoorPicker doors={HOME_DOORS} />
+        </div>
       </div>
     </section>
   );

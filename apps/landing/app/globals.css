@@ -78,6 +78,7 @@
      دو رنگِ گرمِ هم‌خانواده کار می‌کنند — اخرا (آتشِ آشپزخانه) و برنجی (نورِ
      گرمِ سرویس) — نه یک رنگِ نئونِ تنها روی مشکی.
      فیروزه‌ای عمداً رنگِ برند نیست: فقط معنای «زنده/آزاد» را حمل می‌کند. */
+  --ember-900: #3a1a0f;   /* زمینه‌ی تیره‌ی صحنه‌ی بدونِ عکس (scene--text) */
   --ember-700: #a83c14;
   --ember-600: #c74d1e;
   --ember-500: #e2612c;   /* اخرا — رنگِ اصلیِ کنش */
@@ -96,6 +97,21 @@
   --live-400: #45c99a;
 
   --clay-500: #8c6a52;    /* خنثیِ گرمِ میانی، برای خط و جداکننده */
+
+  /* ── Primitive: زبانِ کارتِ اپِ مشتری — فقط برای موزاییکِ کشف ──
+     عیناً `GRAD` در apps/customer/js/data/seed.js و `--grad-cta` / نشانِ داغ در
+     apps/customer/css/app.css. موزاییکِ صفحه‌ی اصلی *همان محصول* را نشان
+     می‌دهد، پس رنگش هم همان است؛ رنگِ برندِ سایت نیست و جای دیگری استفاده
+     نمی‌شود. مثلِ خودِ اپ در هر دو تم ثابت است. */
+  --tile-1: linear-gradient(135deg, #34d399, #059669);
+  --tile-2: linear-gradient(135deg, #fb923c, #ea580c);
+  --tile-3: linear-gradient(135deg, #fbbf24, #d97706);
+  --tile-4: linear-gradient(135deg, #22d3ee, #0891b2);
+  --tile-5: linear-gradient(135deg, #f87171, #dc2626);
+  --tile-6: linear-gradient(160deg, #818cf8, #4f46e5 60%, #1e1b4b);
+  --tile-go: linear-gradient(135deg, #6a4bff, #9b2fe0 50%, #d93560);
+  --tile-hot: linear-gradient(135deg, #c2410c, #be185d);
+  --tile-panel: rgba(14, 10, 26, 0.66);
 
   --container: 1200px;
   --container-narrow: 760px;
@@ -262,11 +278,13 @@ button, input, textarea, select {
   padding-inline: var(--sp-5);
 }
 
+/* کفِ فاصله‌ی بخش‌ها ۳۲px است نه ۶۴: روی ۳۹۰px، ۱۲ بخش × ۲×۶۴px یعنی ۱٫۸
+   صفحه هوای خالی بود (اندازه‌گیریِ ۰۹-۱۲). دسکتاپ (۹vw) دست نمی‌خورد. */
 .section {
   position: relative;
-  padding-block: clamp(var(--sp-16), 9vw, var(--sp-32));
+  padding-block: clamp(var(--sp-8), 9vw, var(--sp-32));
 }
-.section--tight { padding-block: clamp(var(--sp-12), 6vw, var(--sp-20)); }
+.section--tight { padding-block: clamp(var(--sp-8), 6vw, var(--sp-20)); }
 .section--subtle { background: var(--bg-subtle); }
 .section--sunken { background: var(--bg-sunken); }
 
@@ -291,6 +309,11 @@ button, input, textarea, select {
 .grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .grid-3 { grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); }
 .grid-4 { grid-template-columns: repeat(auto-fit, minmax(206px, 1fr)); }
+/* روی صفحه‌ی باریک، چهارتایی دوستونی می‌شود نه یک ستونِ بلند (چهار کارتِ
+   روی‌هم = ۰٫۷۵ صفحه برای چهار عدد؛ اندازه‌گیریِ ۰۹-۱۲). */
+@media (max-width: 640px) {
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+}
 
 /* ═══════════════ تایپوگرافی ═══════════════ */
 
@@ -348,9 +371,9 @@ button, input, textarea, select {
 .section-head {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
   max-width: 46rem;
-  margin-bottom: clamp(var(--sp-8), 4vw, var(--sp-12));
+  margin-bottom: clamp(var(--sp-6), 4vw, var(--sp-12));
 }
 .section-head--center {
   align-items: center;
