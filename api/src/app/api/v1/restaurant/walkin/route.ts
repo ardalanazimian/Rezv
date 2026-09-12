@@ -36,17 +36,24 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
   const idem = await withIdempotency<any>(idemKey, 'walkin', `restaurant:${ctx.restaurant.id}`);
   if (idem.replayed) return NextResponse.json(idem.response, { status: 201 });
 
-  const result = await createWalkin({
-    restaurantId: ctx.restaurant.id,
-    clubPrefix: ctx.restaurant.clubPrefix,
-    phone,
-    partySize: b.party_size,
-    firstName: b.first_name?.trim() || null,
-    lastName: b.last_name?.trim() || null,
-    tableId: b.table_id || null,
-    birthDay: b.birth_day ?? null,
-    birthMonth: b.birth_month ?? null,
-  });
+  let result: Awaited<ReturnType<typeof createWalkin>>;
+  try {
+    result = await createWalkin({
+      restaurantId: ctx.restaurant.id,
+      clubPrefix: ctx.restaurant.clubPrefix,
+      phone,
+      partySize: b.party_size,
+      firstName: b.first_name?.trim() || null,
+      lastName: b.last_name?.trim() || null,
+      tableId: b.table_id || null,
+      birthDay: b.birth_day ?? null,
+      birthMonth: b.birth_month ?? null,
+    });
+  } catch (e) {
+    // ردِ ۴xx (میزِ اشغال، ظرفیت…) کلید را آزاد می‌کند — رجوع کن به lib/idempotency.ts.
+    await idem.release(e);
+    throw e;
+  }
 
   const payload = {
     reservation_code: result.reservation.code,

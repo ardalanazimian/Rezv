@@ -19,7 +19,27 @@ const log = createLogger('idempotency');
 
 type IdempotentResult<T> =
   | { replayed: true; response: T }
-  | { replayed: false; commit: (response: T) => Promise<void> };
+  | { replayed: false; commit: (response: T) => Promise<void>; release: (err: unknown) => Promise<void> };
+
+/**
+ * آیا شکستِ handler «ردِ قطعی بدونِ اثرِ جانبی» است؟ فقط ApiErrorِ ۴xx.
+ *
+ * ⚠️ چرا لازم شد (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): کلید قبل از
+ * اعتبارسنجی/منطقِ دامنه claim می‌شد و وقتی handler خطا می‌داد **هرگز آزاد
+ * نمی‌شد**. پنل‌ها عمداً همان کلید را برای تلاشِ بعدیِ همان فرم نگه می‌دارند
+ * (پنلِ شرکت: overview.js `_provIdemKey`؛ پنلِ رستوران: رزروِ دستی)، پس
+ * «slug گرفته شده ← اصلاح ← ارسالِ دوباره» تا ۶۰ ثانیه ۴۰۹
+ * IDEMPOTENCY_CONFLICT می‌گرفت، در حالی که هیچ‌چیز ساخته نشده بود.
+ *
+ * چرا فقط ۴xx و نه هر خطا: ۴xxهای این مسیرها (validation، SLOT_FULL،
+ * TABLE_CONFLICT، slug_unavailable، forbidden) پیش از commit یا داخلِ تراکنشِ
+ * rollbackشده پرتاب می‌شوند. خطای ناشناخته/۵xx ممکن است **بعد از** اثرِ جانبی
+ * رخ داده باشد؛ آزادکردنش یعنی retry دوباره می‌سازد. آنجا همان قفلِ ۶۰ثانیه‌ایِ
+ * قبلی می‌ماند.
+ */
+function isCleanRejection(err: unknown): boolean {
+  return err instanceof ApiError && err.status >= 400 && err.status < 500;
+}
 
 // اگر یک کلید بیش از این مدت in_progress بماند (مثلاً process وسط کار مرد یا
 // commit شکست خورد)، «کهنه» تلقی و قابل‌بازپس‌گیری می‌شود تا 409 دائمی نشود.
@@ -43,8 +63,8 @@ export async function withIdempotency<T>(
   actor: string,
 ): Promise<IdempotentResult<T>> {
   if (!clientKey) {
-    // بدون کلید → بدون محافظت؛ commit کاری نمی‌کند
-    return { replayed: false, commit: async () => {} };
+    // بدون کلید → بدون محافظت؛ commit/release کاری نمی‌کنند
+    return { replayed: false, commit: async () => {}, release: async () => {} };
   }
 
   // ⚠️ باگِ رفع‌شده (۲۰۲۶-۰۸-۲۰) — با اجرای زنده اثبات شد، نه از رویِ کد:
@@ -98,6 +118,19 @@ export async function withIdempotency<T>(
     }
   };
 
+  // هرگز throw نمی‌کند: خطای اصلیِ handler همان است که باید به کلاینت برسد.
+  // شکستِ آزادسازی فقط رفتارِ قبلی (قفلِ ۶۰ثانیه‌ای) را برمی‌گرداند و لاگ می‌شود.
+  const makeRelease = () => async (err: unknown) => {
+    if (!isCleanRejection(err)) return;
+    try {
+      // فقط ردیفِ هنوز in_progress — اگر رقیبی همان لحظه done کرده باشد، پاسخِ او
+      // برای replay می‌ماند.
+      await db.$executeRaw`DELETE FROM idempotency_keys WHERE key = ${key} AND status = 'in_progress'`;
+    } catch (e) {
+      log.warn('آزادسازیِ کلیدِ idempotency پس از ردِ ۴xx ناموفق؛ قفلِ کهنگی می‌ماند', (e as Error).message);
+    }
+  };
+
   // تلاش برای claim اتمیک (insert با ON CONFLICT DO NOTHING)
   const claimed = await db.$queryRaw<{ key: string }[]>`
     INSERT INTO idempotency_keys (key, scope, status, expires_at)
@@ -107,7 +140,7 @@ export async function withIdempotency<T>(
   `;
 
   if (claimed.length > 0) {
-    return { replayed: false, commit: makeCommit() };
+    return { replayed: false, commit: makeCommit(), release: makeRelease() };
   }
 
   // کلید تکراری — وضعیتش را بخوان
@@ -130,7 +163,7 @@ export async function withIdempotency<T>(
       `;
       if (reclaimed.length > 0) {
         log.warn('کلید idempotency کهنه بازپس‌گرفته شد', { scope, ageMs: age });
-        return { replayed: false, commit: makeCommit() };
+        return { replayed: false, commit: makeCommit(), release: makeRelease() };
       }
       // اگر بازپس‌گیری نشد یعنی رقیب همین لحظه done کرد → دوباره بخوان.
       const after = await db.idempotencyKey.findUnique({ where: { key } });
