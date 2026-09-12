@@ -310,6 +310,36 @@ describe('قراردادِ پنلِ business — /restaurant/* در برابرِ
     assertConsumed(await ok(await R.pricing.GET(req()), 'pricing'), PRICING, 'pricing');
     assertConsumed(await ok(await R.cashback.GET(req()), 'cashback'), CASHBACK, 'cashback');
   });
+  test('pricing PUT → GET — برچسبِ قاعده دور ریخته نمی‌شود (staff-system.js:372)', async () => {
+    const rule = { dows: [4, 5], from: '19:00', to: '23:00', min_toman: 650_000, label: '[DEMO] شب‌های آخر هفته' };
+    const put = await R.pricing.PUT(req('PUT', { rules: [rule], base_min_spend_toman: 0 }));
+    assert.equal(put.status, 200, (await put.clone().text()).slice(0, 200));
+    const g = await ok(await R.pricing.GET(req()), 'pricing');
+    assert.equal(g.current_rules[0]?.label, rule.label, 'z.object کلیدِ ناشناخته را دور می‌ریزد — label باید در schema باشد');
+    assert.equal(g.current_rules[0]?.min_toman, 650_000, 'کنترلِ مثبت: خودِ قاعده ذخیره شده');
+  });
+  test('coupons POST — valid_until تاریخ‌خالی = پایانِ همان روز به وقتِ رستوران (marketing.js:97)', async () => {
+    // ⚠️ پیش‌تر `new Date('2026-09-20')` = نیمه‌شبِ UTCِ آغازِ روز ⇒ کوپن از
+    // ۰۳:۳۰ِ تهرانِ همان «آخرین روز» منقضی بود. مقدار دقیق سنجیده می‌شود تا
+    // تست به ساعتِ اجرا وابسته نباشد.
+    const mk = async (valid_until: string) => {
+      const res = await R.coupons.POST(req('POST', { kind: 'percent', value: 10, code: `VU${SFX}${valid_until.replace(/\D/g, '').slice(-4)}`, valid_until }));
+      const raw = await res.text();
+      return { status: res.status, body: raw ? JSON.parse(raw) : null, raw };
+    };
+    const r1 = await mk('2026-09-20');
+    assert.equal(r1.status, 201, r1.raw.slice(0, 200));
+    const row = await db.coupon.findUnique({ where: { id: r1.body.id }, select: { validUntil: true } });
+    assert.equal(row?.validUntil?.toISOString(), '2026-09-20T20:29:59.999Z', 'پایانِ ۲۰ سپتامبر به وقتِ تهران (+03:30)');
+
+    // ارقامِ فارسی هم (همان مسیرِ asciiDigits)
+    const r2 = await mk('۲۰۲۶-۰۹-۲۱');
+    assert.equal(r2.status, 201, r2.raw.slice(0, 200));
+
+    // کنترلِ منفی: بدشکل ⇒ ۴۲۲ (پیش‌تر Invalid Date ⇒ ۵۰۰ از Prisma)
+    const bad = await mk('not-a-date');
+    assert.equal(bad.status, 422, bad.raw.slice(0, 200));
+  });
   test('crm/recommendations — items, effectiveness (نه cards — آن مالِ /ai است)', async () => {
     assertConsumed(await ok(await R.crm.GET(req()), 'crm'), CRM_TOP, 'crm');
   });

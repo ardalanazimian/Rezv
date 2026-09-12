@@ -4,6 +4,33 @@ import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { genCouponCode } from '@/lib/coupons';
 import { Err } from '@/lib/errors';
 import { parseBody, zUuid, z } from '@/lib/schemas';
+import { toAsciiDigits } from '@/lib/validate';
+import { zonedTimeToUtc } from '@/lib/hours';
+
+/**
+ * پایانِ اعتبارِ کوپن.
+ *
+ * ⚠️ رفعِ P2 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): پنل (marketing.js:97)
+ * مقدارِ `<input type=date>` یعنی `YYYY-MM-DD` را می‌فرستد و این‌جا
+ * `new Date('2026-09-20')` ذخیره می‌شد = نیمه‌شبِ **UTC**ِ آغازِ همان روز.
+ * `validateCoupon` با `validUntil < now` رد می‌کند ⇒ کوپن از ۰۳:۳۰ِ صبحِ
+ * تهران در همان روزی که مالک «آخرین روزِ اعتبار» انتخاب کرده بود، منقضی می‌شد.
+ * حالا تاریخِ خالی = پایانِ همان روز به وقتِ رستوران. مقدارِ بدشکل پیش‌تر
+ * `Invalid Date` به Prisma می‌داد (۵۰۰)؛ حالا ۴۲۲.
+ */
+function couponValidUntil(raw: string | undefined, timezone: string): Date | null {
+  if (!raw) return null;
+  const v = toAsciiDigits(raw.trim());
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const next = new Date(Date.parse(`${v}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+    const end = zonedTimeToUtc(next, '00:00', timezone).getTime() - 1;
+    if (Number.isFinite(end)) return new Date(end);
+  } else {
+    const d = new Date(v);
+    if (Number.isFinite(d.getTime())) return d;
+  }
+  throw Err.validation('valid_until: تاریخ نامعتبر است');
+}
 
 const SEGMENTS = ['new_customer', 'active', 'at_risk', 'churned', 'vip'] as const;
 
@@ -41,6 +68,7 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
   if (b.kind !== 'free_item' && (!b.value || b.value <= 0)) throw Err.validation('مقدار تخفیف نامعتبر است');
   if (b.kind === 'percent' && b.value! > 100) throw Err.validation('درصد تخفیف نمی‌تواند بیش از ۱۰۰ باشد');
 
+  const validUntil = couponValidUntil(b.valid_until, ctx.restaurant.timezone || 'Asia/Tehran');
   const code = (b.code || genCouponCode(ctx.restaurant.name.slice(0, 4))).toUpperCase().slice(0, 30);
   const coupon = await db.coupon.create({
     data: {
@@ -50,7 +78,7 @@ export const POST = withRestaurantAuth({ rateLimit: 'auth', permission: 'canMana
       maxRedemptions: b.max_redemptions ?? null,
       perUserLimit: b.per_user_limit ?? 1,
       targetSegment: b.target_segment || null,
-      validUntil: b.valid_until ? new Date(b.valid_until) : null,
+      validUntil,
     },
   });
   return NextResponse.json({ id: coupon.id, code: coupon.code }, { status: 201 });
