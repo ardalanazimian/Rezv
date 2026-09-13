@@ -3,7 +3,7 @@ import { API, applyRestaurantDetail, loadRestaurantDetail, resolveMediaUrl } fro
 import { esc, jsq, toast, undoSnack } from '../auth.js';
 import { openRest } from './detail.js';
 import { labelForISO, quickBook } from './booking.js';
-import { bookingCtx, favHas, favs, gradFor, saveFavs, pts } from './seed.js';
+import { bookingCtx, dishLen, dishWord, favHas, favs, gradFor, saveFavs, pts } from './seed.js';
 import { renderProfile } from '../features/food-dna.js';
 import { renderLoyalty } from '../features/loyalty.js';
 import { renderEconomy } from '../features/economy.js';
@@ -139,14 +139,13 @@ export function tileHTML(r, i){
   // تایلِ کوچک هیچ دکمه‌ای جز خودش ندارد (Explore هم ندارد — کنترلِ ۴۴px داخلِ
   // ۱۳۰px شلوغی است). قلب فقط رویِ هیروی ۲×۲؛ چیپِ ساعت و بقیه در نمای تمام‌صفحه.
   return `<article class="rc xt${hero?' xt-hero':''}" data-rid="${esc(String(r.id))}">
-    <div class="rc-bg" style="background:${gradFor(r.id)}"></div>
-    <span class="xt-emoji" aria-hidden="true">${esc(r.e)}</span>
+    <div class="rc-bg" style="background:${gradFor(r.id)}"><span class="xt-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</span></div>
     <button type="button" class="xt-tap" aria-label="دیدنِ ${esc(r.n)}" onclick="openImmersive(${jsq(String(r.id))})"></button>
     ${badge}
     ${hero?`<button class="rc-fav" type="button" aria-pressed="${on}" aria-label="${on?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:20,fill:on})}</button>`:''}
     <div class="xt-cap">
       <div class="xt-name">${esc(r.n)}</div>
-      <div class="xt-row">${hasRt?`<span class="rc-rating">${icon('star',{size:12,fill:true,class:'star'})}${fmtFa(r.rt)}</span>`:'<span class="rc-rating rc-rating-new">تازه‌وارد</span>'}${r.slug?'':'<span class="demo-chip">نمونه</span>'}${hero?`<span class="rc-meta">${esc(r.cuisine)}${r.price?` · ${esc(r.price)}`:''}${r.cb>0?` · <span class="rc-cb">${fmtFa(r.cb)}٪ کش‌بک</span>`:''}</span>`:''}</div>
+      <div class="xt-row">${hasRt?`<span class="rc-rating">${icon('star',{size:12,fill:true,class:'star'})}${fmtFa(r.rt)}</span>`:'<span class="rc-rating rc-rating-new">تازه‌وارد</span>'}${hero?`<span class="rc-meta">${esc(r.cuisine)}${r.price?` · ${esc(r.price)}`:''}${r.cb>0?` · <span class="rc-cb">${fmtFa(r.cb)}٪ کش‌بک</span>`:''}</span>`:''}</div>
       ${hero&&Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="xt-social"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div>`:''}
     </div>
   </article>`;
@@ -362,7 +361,7 @@ export function pickOccasion(occ, el){
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
   if(already){
     document.querySelector('.chip')?.classList.add('active');
-    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
+    document.getElementById('feedTitle').textContent='محبوب امشب';
     renderSub(`${fmtFa(R.length)} رستوران فعال`);
     renderFeed(R);
     return;
@@ -383,7 +382,7 @@ export function filterVibe(v,el){
   document.querySelectorAll('.occ-card').forEach(c=>c.classList.remove('on'));
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');
   const list=v==='all'?R:R.filter(r=>r.vibes.includes(v));
-  document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,fill:true})+' محبوب امشب':esc(el.textContent.trim());
+  document.getElementById('feedTitle').textContent=v==='all'?'محبوب امشب':el.textContent.trim();
   renderFeed(list);
 }
 // ── نزدیک تو (کارت افقی کوچک) ──
@@ -391,7 +390,7 @@ export function hCardHTML(r,extra){
   // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
   const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${jsq(String(r.id))})">
-    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e?esc(r.e):icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
+    <div class="hcard-img" style="background:${gradFor(r.id)}"><span class="hcard-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</span>${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
@@ -608,7 +607,7 @@ export function doSearch(q){
   if(q!==undefined) _query=String(q);
   const query=_query.trim();
   if(!query){
-    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
+    document.getElementById('feedTitle').textContent='محبوب امشب';
     renderSub(`${fmtFa(R.length)} رستوران فعال`);
     renderFeed(R);return;
   }

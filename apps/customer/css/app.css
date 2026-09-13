@@ -8,21 +8,25 @@
 */
 :root{
   /* brand — گرادیانِ امضا و رنگ‌های ثابت (مستقل از تم) */
-  --blue:#6A4BFF; --blue-600:#5B3BE0; --blue-50:#EEF0FE; --blue-100:#E0E2FC;
+  /* ۲۰۲۶-۰۹-۱۳ — «اپل + تیک‌تاک + اکسپلور» (دستورِ مالک): بنفشِ برند جای خود را به
+     همان اخرایِ لندینگ داد تا سایت و اپ یک محصول دیده شوند — گوشیِ صفحه‌ی اصلیِ
+     لندینگ همین اپ را نشان می‌دهد، پس رنگش هم باید همین باشد. نام‌های --blue*
+     تاریخی‌اند و دست نخوردند (صدها مصرف). #C8430F با متنِ سفید ۴٫۹:۱ است. */
+  --blue:#C8430F; --blue-600:#B23A0C; --blue-50:#FDF2EC; --blue-100:#FCE3D6;
   /* `--brand` در ۵ جا با var(--brand, …) مصرف می‌شد ولی **هیچ‌جا تعریف نشده بود**
      (ممیزیِ ۲۰۲۶-۰۸-۲۴). یعنی همیشه fallback اجرا می‌شد — و fallbackها یکی
      نبودند: `#2563EB` در یک‌جا و `#7c5cff` در چهار جایِ دیگر. پس کدی که
      توکنیزه به‌نظر می‌رسید، عملاً سه رنگِ متفاوت رندر می‌کرد. حالا تعریف شد و
      همه به همان بنفشِ برند می‌رسند. */
-  --brand:#6A4BFF;
+  --brand:#C8430F;
   /* ⚠️ رنگِ برند برایِ **متن** ≠ رنگِ برند برایِ **پُرکردن**. اندازه‌گیریِ واقعی:
      `--blue` به‌عنوانِ متن ۲٫۸۹:۱ رویِ نوارِ پایینِ تیره و ۳٫۹۱:۱ رویِ زمینه‌ی
      تیره می‌داد — زیرِ ۴٫۵ در WCAG 1.4.3 AA (متنِ ۱۰ تا ۱۲٫۵ پیکسل، یعنی
      دقیقاً جایی که خوانایی بیشترین اهمیت را دارد). خودِ `--blue` برایِ دکمه و
      آیکونِ پُر دست‌نخورده می‌ماند؛ فقط متن این نسخه را می‌گیرد.
      مقدارِ تمِ روشن رنگِ تازه‌ای نیست، همان `--blue-600`ِ موجود است. */
-  --blue-text:#5B3BE0;
-  --teal:#FF8A4B; --teal-600:#FF6A2B; --teal-50:#FDF3EC;
+  --blue-text:#B23A0C;
+  --teal:#E0791A; --teal-600:#B85F0E; --teal-50:#FDF5EB;
   /* ⚠️ سطحِ «تینتِ روشنِ ثابت» (--blue-50/--teal-50) عمداً مستقل از تم است، پس در
      تمِ تیره هم روشن می‌ماند. هر متنی که رویش می‌نشیند باید رنگِ **ثابتِ تیره**
      داشته باشد، نه توکنِ تم‌آگاه. باگِ واقعیِ رفع‌شده (۲۰۲۶-۰۸-۲۴): نوارِ
@@ -30,13 +34,27 @@
      تیره سفید است → سفید رویِ تینتِ روشن، نسبتِ ۱٫۱۳:۱ یعنی عملاً نامرئی؛ و
      چون تمِ پیش‌فرض تاریک است، این حالتِ عادیِ کاربر بود. */
   --on-tint:#160F26;
-  --grad:linear-gradient(135deg,#6A4BFF,#B23BFF 50%,#FF4B7A);
+  --grad:linear-gradient(135deg,#C8430F,#E0791A);
   /* `--grad` امضایِ بصریِ برند است و برایِ پُرکردنِ تزئینی و متنِ گرادیانی
      می‌ماند. ولی وقتی **متنِ سفید** رویش می‌نشیند، ایستگاهِ صورتیِ آخر
      (#FF4B7A) فقط ۳٫۲۱:۱ می‌دهد — زیرِ ۴٫۵. این نسخه همان مسیرِ رنگی با
      ایستگاه‌های عمیق‌تر است: ۵٫۱۷ / ۵٫۴۲ / ۴٫۵۴ — هر سه قبول.
      (کلِ --grad عوض نشد تا ظاهرِ برند در جاهای تزئینی دست‌نخورده بماند.) */
-  --grad-cta:linear-gradient(135deg,#6A4BFF,#9B2FE0 50%,#D93560);
+  /* دکمه‌ی کنش تخت است (اپل)؛ «گرادیانِ» یک‌رنگ تا هر background-imageی که این
+     توکن را می‌خواند معتبر بماند. */
+  --grad-cta:linear-gradient(#C8430F,#C8430F);
+  /* رنگِ محتوا — همان هشت «غذا»ی لندینگ (apps/landing/app/globals.css). روی
+     کاشیِ کشف، کارت و نمای تمام‌صفحه می‌نشیند؛ رنگِ برند نیست و در هر دو تم ثابت
+     است. gradFor (seed.js) به همین‌ها اشاره می‌کند. هر ایستگاه با متنِ سفید ≥ ۳٫۳:۱
+     (AA ِ متنِ درشت) — ممیزیِ «بدترین ایستگاه» در theme-contrast-audit همین را می‌سنجد. */
+  --dish-saffron:radial-gradient(120% 90% at 85% 8%,#C07F00 0%,transparent 58%),radial-gradient(90% 80% at 10% 100%,#B4380A 0%,transparent 62%),#D77011;
+  --dish-pomegranate:radial-gradient(110% 90% at 80% 0%,#FF465C 0%,transparent 55%),radial-gradient(100% 90% at 0% 100%,#5C0A1E 0%,transparent 65%),#A3132F;
+  --dish-pistachio:radial-gradient(120% 90% at 90% 10%,#739912 0%,transparent 55%),radial-gradient(90% 90% at 0% 100%,#1F4D19 0%,transparent 65%),#5A8F2A;
+  --dish-turquoise:radial-gradient(110% 90% at 85% 5%,#0B9BA6 0%,transparent 55%),radial-gradient(100% 90% at 5% 100%,#083F55 0%,transparent 65%),#0E7C93;
+  --dish-rosewater:radial-gradient(110% 90% at 80% 5%,#FF3B88 0%,transparent 55%),radial-gradient(100% 90% at 0% 100%,#7A1446 0%,transparent 65%),#D44B8A;
+  --dish-eggplant:radial-gradient(110% 90% at 85% 0%,#9874FF 0%,transparent 55%),radial-gradient(100% 90% at 0% 100%,#1C0B3D 0%,transparent 65%),#4B2A97;
+  --dish-charcoal:radial-gradient(90% 70% at 20% 100%,#FF4B0A 0%,transparent 55%),radial-gradient(100% 90% at 90% 0%,#3A3A3C 0%,transparent 60%),#111112;
+  --dish-tea:radial-gradient(110% 90% at 85% 5%,#CE760D 0%,transparent 55%),radial-gradient(100% 90% at 0% 100%,#3D1A05 0%,transparent 65%),#8A4412;
   --grad-warm:linear-gradient(135deg,#FF9A3B,#FF4B7A);
   --green:#12A150; --amber:#FF8A4B; --red:#FF4B6A;
   /* radius */
@@ -54,15 +72,17 @@
      لیستِ بازشده‌ی «کِی»/«چند نفر» با پس‌زمینه‌ی سفیدِ بومی رندر می‌شد
      (نه توکن‌های خودِ اپ) — دقیقاً چیزی که select/option در R5 اشاره کرده.*/
   color-scheme: dark;
-  --bg:#08050F; --white:rgba(255,255,255,.07);
+  --bg:#000000; --white:rgba(255,255,255,.07);
   /* `--t3` (متنِ کم‌رنگ) در تمِ تیره ۴٫۳۸:۱ رویِ نوارِ پایین می‌داد — زیرِ ۴٫۵،
      و برچسبِ نوارِ پایین فقط ۱۰ پیکسل است. یک پله روشن‌تر شد: حالا ۵٫۰۶:۱ رویِ
      نوار، ۶٫۸۶:۱ رویِ زمینه و ۶٫۲۹:۱ رویِ کارت. بی‌خطر است چون این توکن در هر
      ۳۰ مصرفش فقط `color:` است (نه پس‌زمینه/حاشیه)، پس روشن‌ترشدن صرفاً
      کنتراست را بالا می‌برد. قرینه‌ی همان تنظیمی که تمِ روشن قبلاً گرفته بود. */
-  --t1:#FFFFFF; --t2:#CBBEF2; --t3:#9A90C0;
+  /* ۰۹-۱۳: خاکستریِ خنثی به‌جای یاسیِ #CBBEF2 — رنگ از محتوا می‌آید، نه از متن.
+     هر دو روی مشکی بالای ۶:۱ (t2 ۷٫۸، t3 ۶٫۱). */
+  --t1:#FFFFFF; --t2:#A1A1A6; --t3:#8E8E93;
   --s-50:rgba(255,255,255,.04); --s-100:rgba(255,255,255,.07); --s-200:rgba(255,255,255,.10);
-  --s-300:rgba(255,255,255,.14); --s-400:#8F84B8; --s-500:#CBBEF2; --s-600:#E4DDF7; --s-700:#F2EEFB; --s-900:#FFFFFF;
+  --s-300:rgba(255,255,255,.14); --s-400:#8E8E93; --s-500:#A1A1A6; --s-600:#D1D1D6; --s-700:#E5E5EA; --s-900:#FFFFFF;
   /* ⚠️ باگِ واقعیِ رفع‌شده (ممیزیِ کنتراست ۲۰۲۶-۰۸-۲۴): `--s-900` انتهایِ
      پرکنتراستِ مقیاس است، پس بین دو تم **جا عوض می‌کند** (اینجا سفید، در تمِ
      روشن تقریباً سیاه). هرجا از آن به‌عنوانِ پس‌زمینه استفاده شده بود، رنگِ متن
@@ -71,46 +91,38 @@
      دو قربانی: چیپِ فیلترِ فعال و **متنِ toast** (تأیید/خطا).
      راه‌حل، جفتِ معناییِ گمشده است نه وصله‌ی موردی: هر سطحی رنگِ متنِ خودش را
      دارد و هر دو با هم می‌چرخند. */
-  --on-s-900:#160F26;
-  --blue-text:#9B86FF;   /* ۶٫۹۸:۱ روی زمینه، ۶٫۴۰:۱ روی کارت، ۵٫۱۵:۱ روی نوارِ پایین */
+  --on-s-900:#1D1D1F;
+  --blue-text:#FF8552;   /* اخرایِ روشن برای متن روی مشکی — همان --brand-ink ِ لندینگ */
   --border:rgba(255,255,255,.10); --border-strong:rgba(255,255,255,.16);
   /* شیشه‌ی مایع */
   --glass:rgba(255,255,255,.08); --glass-2:rgba(255,255,255,.13); --glass-edge:rgba(255,255,255,.24); --glass-hi:rgba(255,255,255,.55);
-  --card:rgba(255,255,255,.06); --card-solid:#141026;
+  --card:rgba(255,255,255,.07); --card-solid:#1C1C1E;
   /* سایه‌ها */
   --sh-sm:0 2px 8px rgba(0,0,0,.4); --sh:0 4px 14px rgba(0,0,0,.4); --sh-md:0 12px 34px rgba(0,0,0,.45);
-  --sh-lg:0 16px 42px rgba(0,0,0,.5); --sh-xl:0 24px 60px rgba(0,0,0,.55); --sh-blue:0 10px 26px rgba(106,75,255,.5);
-  /* پس‌زمینه‌ی مِش شبِ شهر */
-  --mesh:
-    radial-gradient(44% 38% at 84% 6%,#7C2BFF 0%,transparent 60%),
-    radial-gradient(48% 42% at 10% 2%,#2E5BFF 0%,transparent 62%),
-    radial-gradient(54% 50% at 90% 84%,#FF2E86 0%,transparent 60%),
-    radial-gradient(46% 44% at 6% 94%,#FF6A2B 0%,transparent 58%),
-    radial-gradient(70% 65% at 50% 45%,#170D3A 0%,transparent 72%);
+  --sh-lg:0 16px 42px rgba(0,0,0,.5); --sh-xl:0 24px 60px rgba(0,0,0,.55); --sh-blue:0 0 0 0 transparent;
+  /* مِشِ پنج‌رنگِ «شبِ شهر» (بنفش/آبی/صورتی) برداشته شد؛ مصرف‌کننده‌های باقی‌مانده
+     یک نورِ خنثیِ ملایم می‌گیرند. */
+  --mesh:radial-gradient(70% 60% at 50% 0%,#1C1C1E 0%,transparent 72%);
 }
 /* ═══════════ تمِ روشن ═══════════ */
 [data-theme="light"]{
   color-scheme: light; /* رجوع به توضیحِ همینِ تگ در بلوکِ [data-theme="dark"] */
-  --bg:#EEE9FA; --white:#FFFFFF;
+  --bg:#F5F5F7; --white:#FFFFFF;
   /* --t3 در تمِ روشن ۲٫۶۷:۱ بود (اندازه‌گیری‌شده روی .hcard-meta، .event-desc و
      برچسبِ .botnav-item) — زیرِ آستانه‌ی ۴٫۵ در WCAG 1.4.3 AA. همان رنگ‌مایه با
      ۷۳٪ روشنایی: حالا ۴٫۶۰:۱ روی زمینه‌ی صفحه و ۵٫۴۷:۱ روی کارتِ سفید.
      تمِ تاریک دست نخورد چون از قبل ۵٫۹۳:۱ بود. */
-  --t1:#160F26; --t2:#5A5182; --t3:#6C6585;
-  --s-50:#FBFAFF; --s-100:#F4F1FC; --s-200:#ECE7F8; --s-300:#E0DAF0;
-  --s-400:#948BB6; --s-500:#5A5182; --s-600:#433C66; --s-700:#2B2547; --s-900:#160F26;
+  /* ۰۹-۱۳: خاکستریِ خنثیِ اپل به‌جای یاسی. t2 و t3 روی #F5F5F7 هر دو ≥ ۴٫۶:۱ (سنجیده). */
+  --t1:#1D1D1F; --t2:#5E5E63; --t3:#646469;
+  --s-50:#FAFAFA; --s-100:#F2F2F4; --s-200:#E8E8ED; --s-300:#D2D2D7;
+  --s-400:#8E8E93; --s-500:#5E5E63; --s-600:#48484A; --s-700:#2C2C2E; --s-900:#1D1D1F;
   --on-s-900:#FFFFFF;   /* رجوع به توضیحِ همین توکن در بلوکِ تمِ تیره */
-  --border:rgba(22,15,38,.08); --border-strong:rgba(22,15,38,.14);
+  --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.14);
   --glass:rgba(255,255,255,.6); --glass-2:rgba(255,255,255,.78); --glass-edge:rgba(255,255,255,.92); --glass-hi:rgba(255,255,255,.95);
   --card:#FFFFFF; --card-solid:#FFFFFF;
-  --sh-sm:0 2px 8px rgba(124,43,255,.08); --sh:0 4px 14px rgba(124,43,255,.1); --sh-md:0 12px 30px rgba(124,43,255,.13);
-  --sh-lg:0 16px 40px rgba(124,43,255,.15); --sh-xl:0 24px 56px rgba(124,43,255,.16); --sh-blue:0 10px 26px rgba(106,75,255,.28);
-  --mesh:
-    radial-gradient(44% 38% at 84% 6%,#D9C2FF 0%,transparent 60%),
-    radial-gradient(48% 42% at 10% 2%,#C2D4FF 0%,transparent 62%),
-    radial-gradient(54% 50% at 90% 84%,#FFC7E0 0%,transparent 60%),
-    radial-gradient(46% 44% at 6% 94%,#FFDCC2 0%,transparent 58%),
-    radial-gradient(70% 65% at 50% 45%,#F6F1FF 0%,transparent 74%);
+  --sh-sm:0 2px 8px rgba(0,0,0,.05); --sh:0 4px 14px rgba(0,0,0,.06); --sh-md:0 12px 30px rgba(0,0,0,.08);
+  --sh-lg:0 16px 40px rgba(0,0,0,.1); --sh-xl:0 24px 56px rgba(0,0,0,.12); --sh-blue:0 0 0 0 transparent;
+  --mesh:radial-gradient(70% 60% at 50% 0%,#FFFFFF 0%,transparent 72%);
 }
 /* کلاس‌های شیشه و حرکت (قابل‌استفاده در کل اپ) */
 .glass{position:relative;background:var(--glass);-webkit-backdrop-filter:blur(22px) saturate(190%);backdrop-filter:blur(22px) saturate(190%);border:1px solid var(--border);box-shadow:var(--sh-md)}
@@ -334,10 +346,11 @@ html:has(#page-discover.active){scroll-padding-top:74px}
    است (اندازه‌گیری‌شده). نسخه‌ی اولِ این قاعده یک margin-inline منفی هم می‌داد و
    گرید ۴۳۰px می‌شد: در RTL سرریزِ چپ، viewportِ چیدمان را به ۴۱۰ باز می‌کرد و کلِ
    صفحه ۲۰px جابه‌جا می‌شد. با اندازه‌گیری گرفته شد، نه با نگاه به اسکرین‌شات. */
+/* ۰۹-۱۳: همیشه ۳ ستون. با ۴ و ۵ ستون، شش رستوران (یک ۲×۲ + پنج) در دسکتاپ یک خانه‌ی
+   خالی می‌گذاشت (اسکرین‌شاتِ ۱۴۴۰px)؛ ۴+۵=۹ فقط در ۳ ستون مستطیلِ کامل است. اکسپلورِ
+   اینستاگرام روی وب هم ۳ستونه است و عرضش را محدود می‌کند — پایین‌تر، #page-discover. */
 .xgrid{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-flow:row dense;gap:calc(var(--sp-1) / 2);
-  --xt-ink:rgba(255,255,255,.96);--xt-ink-2:rgba(255,255,255,.8);--xt-scrim:rgba(8,6,20,.78)}
-@media(min-width:640px){.xgrid{grid-template-columns:repeat(4,1fr)}}
-@media(min-width:1000px){.xgrid{grid-template-columns:repeat(5,1fr)}}
+  --xt-ink:rgba(255,255,255,.96);--xt-ink-2:rgba(255,255,255,.82);--xt-scrim:rgba(0,0,0,.66)}
 .xgrid>.xt{position:relative;display:block;height:auto;aspect-ratio:1;overflow:hidden;border-radius:0;cursor:pointer;background:var(--s-100);transition:none}
 .xgrid>.xt.xt-hero{grid-column:span 2;grid-row:span 2}
 .xgrid>.xt:hover{transform:none;box-shadow:none}
@@ -346,9 +359,19 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 #feed.xgrid>.rc .rc-bg{animation:none;transition:none}
 .xt-photo,.im-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity var(--motion-slow) var(--ease-out)}
 .xt-photo.in,.im-photo.in{opacity:1}
-.xt-emoji{position:absolute;inset:0;z-index:1;display:grid;place-items:center;font-size:var(--fs-4xl);opacity:.55;pointer-events:none;filter:drop-shadow(0 4px 12px rgba(0,0,0,.35))}
-.xt-hero .xt-emoji{font-size:calc(var(--fs-4xl) * 1.8)}
-.has-photo .xt-emoji,.has-photo .im-emoji{display:none}
+/* ۰۹-۱۳: نامِ غذا (اولین بخشِ cuisine) با وزنِ ۹۰۰ به‌جای ایموجیِ کم‌رنگ. ایموجی روی هر
+   سیستم‌عامل شکلِ دیگری دارد و روی ویندوز تخت و کارتونی دیده شد؛ واژه همه‌جا یکی است و
+   همان زبانِ کاشی‌های لندینگ است. اندازه از طولِ واژه (--len) می‌آید و به عرضِ خودِ کاشی
+   (cqi) بسته است، پس در کاشیِ ۲×۲ خودبه‌خود دو برابر می‌شود و هیچ واژه‌ای بریده نمی‌شود.
+   ⚠️ واژه **داخلِ** `.rc-bg` است نه کنارش: ممیزیِ کنتراست پس‌زمینه را از جدِ DOM می‌خواند؛
+   کنارِ لایه‌ی گرادیان، زمینه‌ی خاکستریِ خودِ کاشی دیده می‌شد و سفید روی آن ۱٫۱۱:۱ گزارش
+   می‌شد (e2e، ۰۹-۱۳). داخلش، با ایستگاه‌های واقعیِ گرادیان سنجیده می‌شود. عکس هم در
+   همان لایه append می‌شود و `.has-photo` واژه را پنهان می‌کند. */
+.xgrid>.xt{container-type:inline-size}
+.xt-word{position:absolute;z-index:1;inset-inline:var(--sp-2);inset-block-start:34%;translate:0 -50%;pointer-events:none;white-space:nowrap;
+  font-size:min(24cqi,calc(96cqi / var(--len,4)));font-weight:var(--weight-display);line-height:var(--lh-tight);letter-spacing:var(--ls-normal);color:var(--xt-ink);text-shadow:0 2px 18px rgba(0,0,0,.22)}
+.xt-hero .xt-word{inset-block-start:38%}
+.has-photo .xt-word,.has-photo .im-word{display:none}
 /* دکمه‌ی کشیده: کلِ تایل یک دکمه‌ی واقعی است (فوکوسِ کیبورد، :focus-visible). زیرِ
    قلبِ هیرو (۴) و بالای پس‌زمینه؛ کپشن (۳) pointer-events ندارد و لمس به دکمه می‌رسد. */
 .xt-tap{position:absolute;inset:0;z-index:2;border:none;background:none;padding:0;cursor:pointer;-webkit-appearance:none;appearance:none}
@@ -376,7 +399,7 @@ html:has(#page-discover.active){scroll-padding-top:74px}
    z-index ۱۱۰: بالای nav (۱۰۰) و botnav (۹۰)، زیرِ undo-snack (۱۲۰)، شیتِ رزرو (۲۰۰) و
    toast (۳۰۰) — رزرو از داخلِ همین نما باز می‌شود و باید رویش بنشیند.
    پس‌زمینه از تم مستقل است (تیک‌تاک در هر دو تم سیاه است). RTL: فقط inset-inline-*. */
-#page-immersive{position:fixed;inset:0;z-index:110;--im-bg:rgb(11,8,24);--xt-ink:rgba(255,255,255,.96);--xt-ink-2:rgba(255,255,255,.8);
+#page-immersive{position:fixed;inset:0;z-index:110;--im-bg:rgb(0,0,0);--xt-ink:rgba(255,255,255,.96);--xt-ink-2:rgba(255,255,255,.8);
   background:var(--im-bg);color:var(--xt-ink)}
 .im-feed{position:relative;height:100vh;height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .im-feed::-webkit-scrollbar{display:none}
@@ -392,7 +415,7 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .im-fill{position:absolute;inset-inline:0;inset-block-start:calc(var(--touch-min) + var(--sp-8) + env(safe-area-inset-top,0px));inset-block-end:40%;z-index:3;
   display:flex;flex-direction:column;justify-content:center;align-items:center;gap:var(--sp-3);padding:0 var(--sp-6);pointer-events:none;text-align:center;overflow:hidden}
 .has-photo .im-fill{display:none}
-.im-emoji{font-size:calc(var(--fs-4xl) * 1.6);line-height:1;filter:drop-shadow(0 8px 24px rgba(0,0,0,.35))}
+.im-word{max-width:100%;white-space:nowrap;font-size:clamp(var(--fs-4xl),calc(78vw / var(--len,4)),calc(var(--fs-4xl) * 2.6));font-weight:var(--weight-display);line-height:var(--lh-tight);letter-spacing:var(--ls-normal);color:var(--xt-ink);text-shadow:0 4px 30px rgba(0,0,0,.25)}
 .im-vibes{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--sp-2)}
 .im-vibes:empty{display:none}
 .im-vibe{font-size:var(--fs-xs);font-weight:var(--weight-emphasis);color:var(--xt-ink);padding:var(--sp-1) var(--sp-3);border-radius:var(--radius-pill);
@@ -540,6 +563,9 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .hscroll::-webkit-scrollbar{display:none}
 .hcard{flex:0 0 160px;scroll-snap-align:start;cursor:pointer}
 .hcard-img{height:110px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:44px;position:relative;margin-bottom:8px}
+/* ۰۹-۱۳: همان واژه‌ی غذا روی کارتِ افقی (به‌جای ایموجیِ ۴۴px) */
+.hcard-img{container-type:inline-size;justify-content:flex-start;align-items:flex-end;overflow:hidden}
+.hcard-word{margin:var(--sp-3);white-space:nowrap;font-size:min(22cqi,calc(88cqi / var(--len,4)));font-weight:var(--weight-display);line-height:var(--lh-tight);color:rgba(255,255,255,.96);text-shadow:0 2px 14px rgba(0,0,0,.22)}
 .hcard-tag{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:50px;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 .hcard-name{font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hcard-meta{font-size:12px;color:var(--t3);margin-top:2px}
@@ -1154,6 +1180,8 @@ html:has(#page-discover.active){scroll-padding-top:74px}
    ۰٫۵۰ کمینه‌ای است که بدترین حالت را به ۴٫۶۱:۱ می‌رساند. */
 /* محتوا باید بالای اسکریمِ ::after بنشیند، وگرنه خودِ متن هم کم‌جان می‌شود. */
 .occ-card > *{position:relative;z-index:1}
+/* ۰۹-۱۳: ایموجیِ بالای کارتِ مناسبت رفت؛ برچسب به پایینِ کارت می‌نشیند (مثلِ کاشی). */
+.occ-card{justify-content:flex-end}
 .occ-card:active{transform:scale(.96)}
 .occ-card.on{outline:3px solid var(--t1);outline-offset:2px}
 /* اسکریمِ خوانایی. قبلاً «transparent 40% → rgba(0,0,0,.28)» بود و متنِ سفیدِ
@@ -1325,3 +1353,17 @@ button,[role="button"],.botnav-item,a{min-height:0}
 .rp-gallery-item figcaption{font-size:11.5px;color:var(--t3);margin-top:4px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp-address{font-size:13px;color:var(--t2);display:flex;align-items:center;gap:6px;margin-top:8px}
 .menu-thumb{width:44px;height:44px;border-radius:11px;object-fit:cover;display:block}
+
+/* ═══ ۰۹-۱۳: کشف روی دسکتاپ — یک ستونِ هم‌عرض، نه نوارهای راست‌چینِ نیمه‌پر ═══
+   پیش از این در ۱۴۴۰px ردیفِ مناسبت‌ها (۶ × ۱۰۴px) و چیپ‌ها به راست چسبیده بودند و
+   نیمه‌ی چپِ صفحه خالی بود، در حالی که شبکه ۱۱۴۰px عرض داشت (اسکرین‌شاتِ ۰۹-۱۳).
+   حالا همه‌ی صفحه‌ی کشف در عرضِ اکسپلورِ وبِ اینستاگرام (۹۳۵px) می‌نشیند: مناسبت‌ها
+   شش ستونِ برابر، چیپ‌ها می‌شکنند، شبکه همان سه ستون. */
+@media(min-width:880px){
+  #page-discover .wrap{max-width:975px}
+  #page-discover .occ-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));overflow:visible}
+  #page-discover .occ-card{width:auto}
+  #page-discover .chips{flex-wrap:wrap;overflow:visible}
+  /* بخشِ فید پدینگِ افقی ندارد (لبه‌به‌لبه روی موبایل)؛ روی دسکتاپ با ردیف‌های بالا هم‌لبه می‌شود */
+  #page-discover .wrap.section{padding-inline:var(--sp-5)}
+}

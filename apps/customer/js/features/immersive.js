@@ -18,7 +18,7 @@
 //     بستن به همان جایی برمی‌گردد که کاربر بود (go() خودش به بالا می‌رود).
 // ═══════════════════════════════════════════════════════════
 import { esc, jsq, toast } from '../auth.js';
-import { favHas, gradFor } from '../data/seed.js';
+import { dishLen, dishWord, favHas, gradFor } from '../data/seed.js';
 import { findR } from '../init.js';
 import { avatarCount, distanceLabel, feedList, fmtFa, go, isHot, mountPhoto, paintSlots, photoUrl, requestDetail } from '../data/discover.js';
 import { icon } from '../icons.js';
@@ -51,7 +51,7 @@ function imItemEl(r, i, n){
     <div class="im-bg" style="background:${gradFor(r.id)}"></div>
     <div class="im-scrim"></div>
     <div class="im-fill">
-      <span class="im-emoji" aria-hidden="true">${esc(r.e)}</span>
+      <span class="im-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</span>
       <div class="im-vibes"></div>
       <div class="im-menu"><div class="im-menu-h">از منو</div><ul class="im-menu-list"></ul></div>
       <div class="im-addr">${icon('pin',{size:12})}<span class="im-addr-t"></span></div>
