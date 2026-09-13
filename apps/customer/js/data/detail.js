@@ -84,7 +84,10 @@ export async function openRestBySlug(id, slug){
   if (!d) { toast('','این رستوران فعلاً در دسترس نیست'); return; }
   // رکوردِ کمینه با همان شکلی که mapApiRestaurant می‌سازد (رستورانِ زنده:
   // فیلدهای روایی خالی می‌مانند، هیچ‌چیز از نمونه قرض گرفته نمی‌شود).
-  const r = mapApiRestaurant({ id: d.id, slug: d.slug, name: d.name, cuisine: d.cuisine, vibes: d.vibes, priceBand: d.price_band });
+  // booking_policy هم پاس داده می‌شود (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): بدونش depositRequired/
+  // freeCancelHours تهی می‌ماندند و شیتِ رزرو برچسبِ بیعانه و هشدارِ کنسلیِ دیر را
+  // بی‌صدا حذف می‌کرد — در حالی که `/restaurants/{slug}` آن را برمی‌گرداند.
+  const r = mapApiRestaurant({ id: d.id, slug: d.slug, name: d.name, cuisine: d.cuisine, vibes: d.vibes, priceBand: d.price_band, booking_policy: d.booking_policy });
   applyRestaurantDetail(r, d);
   R.push(r);
   openRest(r.id);

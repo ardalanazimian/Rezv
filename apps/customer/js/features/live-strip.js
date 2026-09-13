@@ -36,7 +36,8 @@ export async function refreshLiveStrip(){
         if(Number(d.openRestaurants) > 0)
           out += pill(`<b>${fmtFa(d.openRestaurants)} رستوران</b> باز و آنلاین`);
         if(Number(d.activeReservations) > 0)
-          out += pill(`🔥 <b>${fmtFa(d.activeReservations)} رزرو</b> فعالِ امروز`);
+          // live-stats/route.ts پنجره‌ی «الان تا ۶ ساعت بعد» را می‌شمارد، نه کلِ امروز.
+          out += pill(`🔥 <b>${fmtFa(d.activeReservations)} رزرو</b> برای چند ساعتِ آینده`);
       }
     } else {
       // ناموفق (۴xx/۵xx یا پاسخِ ناسالم) — بی‌صدا نه: لاگ کن، ولی چیزی جعل نکن.

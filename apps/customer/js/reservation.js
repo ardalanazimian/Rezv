@@ -165,7 +165,10 @@ export async function renderTrips(){
     const acts=t.status==='up'
       ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR(${jsq(t.code)},${jsq(name)})">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},${jsq(t.slotStartIso||'')})">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},'apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip(${jsq(t.code)},this)">لغو</button>`
       : t.status==='cancelled' ? ''
-      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation(${jsq(String(t.rid))})">رزرو مجدد</button>${(t.serverRestaurantId&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="buzz&&buzz();openReviewSheet(${jsq(t.serverRestaurantId)},${jsq(t.serverReservationId)},${jsq(name)})">ثبت نظر</button>`:''}`:''}`;
+      : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation(${jsq(String(t.rid))})">رزرو مجدد</button>`:''}${(t.serverRestaurantId&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="buzz&&buzz();openReviewSheet(${jsq(t.serverRestaurantId)},${jsq(t.serverReservationId)},${jsq(name)})">ثبت نظر</button>`:''}`;
+    // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: «ثبت نظر» داخلِ شرطِ `t.rid` بود (رستوران در فیدِ
+    // بارگذاری‌شده باشد)، در حالی که POST /me/reviews فقط idهای سرور را می‌خواهد.
+    // فید رستورانِ آفلاین و صفحه‌های بعد از ۲۴تای اول را ندارد ⇒ آن سفرها دکمه نداشتند.
     return `<div class="trip-card reveal ${t.status}${swipe?' has-swipe':''}">
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
       <div class="trip-card-inner">

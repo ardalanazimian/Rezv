@@ -92,7 +92,14 @@ export async function buyGiftCard(){
   const recipient_name=document.getElementById('giftName')?.value.trim();
   const recipient_phone=document.getElementById('giftPhone')?.value.trim();
   const message=document.getElementById('giftMsg')?.value.trim();
-  const res=await API.post('/gift-cards',{amount_toman:giftAmt,recipient_name,recipient_phone,message});
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: `''` برای فیلدِ اختیاری «غایب» نیست
+  // (`recipient_name: min(1)`، `recipient_phone: zPhone`) ⇒ خریدِ بدونِ نام یا
+  // شماره‌ی گیرنده همیشه ۴۲۲ می‌گرفت. فقط فیلدهای پُر فرستاده می‌شوند.
+  const giftBody={amount_toman:giftAmt};
+  if(recipient_name) giftBody.recipient_name=recipient_name;
+  if(recipient_phone) giftBody.recipient_phone=recipient_phone;
+  if(message) giftBody.message=message;
+  const res=await API.post('/gift-cards',giftBody);
   // ⚠️ نقضِ §۳ که تا Batch 17 زنده مانده بود: در حالتِ آفلاین یک کدِ کاملاً
   // ساختگی با Math.random ساخته می‌شد و شیتِ «کارت هدیه ساخته شد!» با همان کد
   // و جمله‌ی «کد برای گیرنده پیامک شد» باز می‌شد. هیچ کارتی وجود نداشت، هیچ
