@@ -1,70 +1,106 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 // ═══════════════════════════════════════════════════════════════════════
-//  رگرسیونِ «هدیه‌ی تولد در روزِ اشتباه» (فازِ ۲، پروتکل §۱۱)
+//  تقویمِ هدیه‌ی تولد — «یک قرارداد» (ممیزیِ ۲۰۲۶-۰۹-۱۱)
 //
-//  زنجیره‌ی باگ (ردیابی‌شده از فرم تا cron):
-//   ۱. فرمِ واک‌ینِ پنلِ رستوران ماه‌هایِ **شمسی** را با value=1..12 می‌فرستد
-//      (فروردین=۱ … اسفند=۱۲) — apps/business/js/reservations.js.
-//   ۲. createWalkinTx آن را `new Date(Date.UTC(1990, birthMonth-1, birthDay))`
-//      ذخیره می‌کند، یعنی عددِ ماهِ شمسی در جایگاهِ ماهِ میلادی می‌نشیند.
-//   ۳. grantBirthdayRewards قبلاً `today.getMonth()+1` (میلادی) را با همان
-//      ستون مقایسه می‌کرد — دو مقیاسِ متفاوت.
+//  تاریخچه‌ی این فایل خودش درسِ ماجراست:
 //
-//  نتیجه: متولدِ ۱ فروردین هدیه‌اش را اولِ ژانویه می‌گرفت (~۸۰ روز زودتر)،
-//  و چون هدیه واقعاً ارسال می‌شد، هیچ‌کس متوجه نمی‌شد.
+//  مرحله‌ی ۱ — فرمِ واک‌ینِ پنل ماهِ **شمسی** را خام می‌فرستاد و
+//  `createWalkinTx` آن را در `Date.UTC(1990, m-1, d)` می‌نشاند. ستون یک
+//  «ظرفِ ماه/روزِ شمسی» بود، پس cron هم شمسی مقایسه می‌کرد و درست بود.
 //
-//  این تست خودِ تابعِ تبدیل را می‌سنجد (خالص، بدونِ DB).
+//  مرحله‌ی ۲ — در ۲۰۲۶-۰۸-۲۵ تبدیل به **مرزِ فرم** منتقل شد
+//  (`apps/business/js/reservations.js`، jalaliMdToGregMd): از آن روز واک‌ین
+//  میلادی می‌فرستد. ولی cron به‌روز نشد و همچنان شمسی مقایسه می‌کرد — یعنی
+//  رفعِ مرحله‌ی ۱ به باگِ تازه بدل شد، و این بار در جهتِ مخالف.
+//
+//  مرحله‌ی ۳ (امروز) — هر سه نقطه‌ی نوشتن میلادی‌اند (واک‌ین پس از تبدیل،
+//  `POST /restaurant/members`، `PATCH /me`)، `lib/automation.ts` از اول
+//  میلادی مقایسه می‌کرد، پس cron هم میلادیِ **تهران** مقایسه می‌کند. نمایشِ
+//  شمسی فقط در مرزِ پنل می‌ماند.
+//
+//  ⚠️ پس این فایل دیگر «jalaliMonthDayToday را می‌سنجم» نیست؛ **قرارداد** را
+//  می‌سنجد. تستِ قبلی می‌توانست سبز بماند در حالی که cron روزِ غلط شلیک
+//  می‌کرد، چون فقط خودِ تابعِ تبدیل را وارسی می‌کرد نه اینکه cron کدام را
+//  صدا می‌زند.
 // ═══════════════════════════════════════════════════════════════════════
 
+const SRC = new URL('../src/lib/', import.meta.url);
 const { jalaliMonthDayToday } = await import('../src/lib/loyalty.ts');
+const { dateInTz } = await import('../src/lib/hours.ts');
 
-describe('jalaliMonthDayToday — مقیاسِ تقویم (§۱۱)', () => {
-  test('نوروز: ۲۱ مارس ۲۰۲۶ → ۱ فروردین', () => {
-    // نوروزِ ۱۴۰۵ برابرِ ۲۱ مارس ۲۰۲۶ است. ظهرِ UTC انتخاب شده تا اختلافِ
-    // +۳:۳۰ تهران روز را جابه‌جا نکند.
-    const { mm, dd } = jalaliMonthDayToday(new Date(Date.UTC(2026, 2, 21, 9, 0, 0)));
-    assert.equal(mm, 1, 'ماه باید فروردین (۱) باشد');
-    assert.equal(dd, 1, 'روز باید ۱ باشد');
+describe('قرارداد: cron میلادیِ تهران مقایسه می‌کند', () => {
+  test('🔴 grantBirthdayRewards دیگر jalaliMonthDayToday را صدا نمی‌زند', () => {
+    // نبودِ موضوع = خطا: اگر تابع پیدا نشد، تست باید بشکند نه رد شود.
+    // ⚠️ کامنت‌ها حذف می‌شوند، وگرنه خودِ توضیحِ «قبلاً jalaliMonthDayToday(today)
+    // بود» تست را قرمز می‌کرد — همان الگویِ `stripComments` در
+    // `ratelimit-coverage.test.mts`.
+    const raw = readFileSync(new URL('loyalty.ts', SRC), 'utf8');
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const fn = src.slice(src.indexOf('export async function grantBirthdayRewards'));
+    assert.ok(fn.length > 200, 'بدنه‌ی grantBirthdayRewards پیدا نشد');
+    assert.ok(!/jalaliMonthDayToday\s*\(/.test(fn),
+      'cron نباید ماه/روزِ شمسی را با ستونِ میلادیِ birth_date مقایسه کند');
+    assert.match(fn, /dateInTz\(\s*today\s*,\s*'Asia\/Tehran'\s*\)/,
+      'cron باید میلادیِ تهران بخواند (نه UTC، نه ساعتِ محلیِ سرور)');
   });
 
-  test('همان تاریخ با منطقِ قدیمیِ میلادی عددِ متفاوتی می‌داد (اثباتِ باگ)', () => {
+  test('هر سه نقطه‌ی نوشتن میلادی‌اند — نه فقط یکی', () => {
+    // §۴c: اگر فقط cron را می‌سنجیدیم، برگشتنِ هر نویسنده به شمسی دوباره
+    // همان ناهماهنگی را می‌ساخت بدونِ اینکه چیزی قرمز شود.
+    const walkinForm = readFileSync(
+      new URL('../../../apps/business/js/reservations.js', SRC), 'utf8');
+    assert.match(walkinForm, /jalaliMdToGregMd\(/,
+      'فرمِ واک‌ین باید پیش از ارسال به میلادی تبدیل کند');
+
+    const automation = readFileSync(new URL('automation.ts', SRC), 'utf8');
+    assert.match(automation, /birthDate\.getMonth\(\)/,
+      'automation.ts هم باید میلادی مقایسه کند (همان قرارداد)');
+  });
+});
+
+describe('dateInTz — همان چیزی که cron می‌خواند', () => {
+  test('میلادیِ تهران برمی‌گرداند، نه شمسی', () => {
+    // ۲۱ مارس ۲۰۲۶ = نوروز. میلادی باید ۳/۲۱ بدهد، نه ۱/۱.
+    const { m, day } = dateInTz(new Date(Date.UTC(2026, 2, 21, 9, 0, 0)), 'Asia/Tehran');
+    assert.equal(m, 3);
+    assert.equal(day, 21);
+  });
+
+  test('⚠️ کنترلِ تمایز: شمسی و میلادی همان روز عددِ متفاوتی می‌دهند', () => {
+    // بدونِ این، تستِ بالا با یک تابعِ «همیشه میلادی» *و* یک تابعِ «همیشه
+    // شمسی» هردو می‌توانست پاس شود اگر تصادفاً برابر می‌شدند.
     const d = new Date(Date.UTC(2026, 2, 21, 9, 0, 0));
-    const legacyMm = d.getUTCMonth() + 1;      // ۳ (مارس)
-    const { mm } = jalaliMonthDayToday(d);      // ۱ (فروردین)
-    assert.notEqual(
-      legacyMm, mm,
-      'اگر این دو برابر شوند یعنی فرضِ این رگرسیون عوض شده — تست را بازبینی کن',
-    );
+    assert.notEqual(jalaliMonthDayToday(d).mm, dateInTz(d, 'Asia/Tehran').m);
   });
 
-  test('میانه‌ی سال: ۲۳ اوت ۲۰۲۶ → شهریور', () => {
-    const { mm } = jalaliMonthDayToday(new Date(Date.UTC(2026, 7, 23, 9, 0, 0)));
-    assert.equal(mm, 6, 'اوت باید در شهریور (۶) بیفتد');
+  test('نیمه‌شبِ تهران: UTC یک روز عقب است و تهران درست می‌ماند', () => {
+    // ۲۱:۰۰ UTC = ۰۰:۳۰ روزِ بعد در تهران. اگر cron از UTC می‌خواند، هدیه
+    // یک روز دیر می‌رسید.
+    const d = new Date(Date.UTC(2026, 5, 10, 21, 0, 0));
+    assert.equal(d.getUTCDate(), 10);
+    assert.equal(dateInTz(d, 'Asia/Tehran').day, 11, 'باید روزِ تهران باشد، نه UTC');
   });
 
   test('همیشه بازه‌ی معتبر برمی‌گرداند (نمونه‌برداریِ کلِ سال)', () => {
-    // هیچ روزی از سال نباید مقدارِ خارج از بازه یا NaN بدهد.
     for (let i = 0; i < 365; i += 7) {
       const d = new Date(Date.UTC(2026, 0, 1, 9, 0, 0) + i * 86_400_000);
-      const { mm, dd } = jalaliMonthDayToday(d);
-      assert.ok(Number.isInteger(mm) && mm >= 1 && mm <= 12, `ماهِ نامعتبر ${mm} برایِ ${d.toISOString()}`);
-      assert.ok(Number.isInteger(dd) && dd >= 1 && dd <= 31, `روزِ نامعتبر ${dd} برایِ ${d.toISOString()}`);
+      const { m, day } = dateInTz(d, 'Asia/Tehran');
+      assert.ok(Number.isInteger(m) && m >= 1 && m <= 12, `ماهِ نامعتبر ${m}`);
+      assert.ok(Number.isInteger(day) && day >= 1 && day <= 31, `روزِ نامعتبر ${day}`);
     }
   });
+});
 
-  test('round-trip با همان قالبی که واک‌ین می‌نویسد', () => {
-    // واک‌ین (ماهِ شمسی m، روزِ d) را چنین ذخیره می‌کند:
-    //   new Date(Date.UTC(1990, m-1, d))
-    // پس EXTRACT(MONTH) روی آن ستون دوباره همان m را می‌دهد. این تست تضمین
-    // می‌کند مقایسه‌ی cron با خروجیِ jalaliMonthDayToday هم‌مقیاس است.
-    const jalaliMonth = 6, jalaliDay = 1;              // ۱ شهریور
-    const stored = new Date(Date.UTC(1990, jalaliMonth - 1, jalaliDay));
-    assert.equal(stored.getUTCMonth() + 1, jalaliMonth, 'ستون باید همان عددِ ماهِ شمسی را نگه دارد');
-
-    // و امروزِ متناظر (۲۳ اوت ۲۰۲۶ = ۱ شهریور ۱۴۰۵) باید همان ۶ را بدهد.
-    const { mm } = jalaliMonthDayToday(new Date(Date.UTC(2026, 7, 23, 9, 0, 0)));
-    assert.equal(mm, stored.getUTCMonth() + 1, 'مقایسه‌ی cron و ستون باید هم‌مقیاس باشد');
+describe('jalaliMonthDayToday — فقط مرزِ نمایش', () => {
+  test('هنوز export است (پنلِ رستوران تاریخ را شمسی نشان می‌دهد)', () => {
+    // حذفش یعنی همان تبدیل جای دیگری دوباره نوشته شود — همان تکثیری که
+    // کلِ این زنجیره‌ی باگ را ساخت.
+    assert.equal(typeof jalaliMonthDayToday, 'function');
+    const { mm, dd } = jalaliMonthDayToday(new Date(Date.UTC(2026, 2, 21, 9, 0, 0)));
+    assert.equal(mm, 1, 'نوروز باید ۱ فروردین باشد');
+    assert.equal(dd, 1);
   });
 });

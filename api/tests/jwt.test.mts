@@ -69,6 +69,19 @@ describe('signRefresh / verifyRefresh', () => {
     const t2 = verifyRefresh(signRefresh({ sub: 'u', kind: 'customer' }));
     assert.notEqual(t1.jti, t2.jti);
   });
+  test('بخشِ تصادفیِ jti یک UUIDِ v4 است (نه Math.random)', () => {
+    // ⚠️ قفلِ رگرسیون: jti قبلاً `${sub}.${Date.now()}.${Math.random()…}` بود —
+    // یکتا بود (تستِ بالا پاس می‌شد) ولی **قابلِ پیش‌بینی**، و همین jti تنها
+    // ورودیِ لیستِ سیاهِ revocation است. یکتایی به‌تنهایی این را نمی‌گیرد؛
+    // شکلِ خروجیِ CSPRNG را باید صریح قفل کرد.
+    const { jti } = verifyRefresh(signRefresh({ sub: 'u', kind: 'customer' }));
+    assert.ok(jti.startsWith('u.'), 'پیشوندِ sub باید حفظ شود');
+    assert.match(
+      jti.slice('u.'.length),
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      'بخشِ تصادفی باید randomUUID باشد',
+    );
+  });
   test('signRefresh با ورودی رشته‌ای (sub خام) را customer در نظر می‌گیرد (سازگاری قدیمی)', () => {
     const token = signRefresh('legacy-user-id');
     const payload = verifyRefresh(token);

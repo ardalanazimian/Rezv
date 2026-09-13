@@ -54,9 +54,12 @@ import './dna-summary.integration.test.mts';
 import './email-transport-honesty.test.mts';
 import './helpers/test-env.mts';
 import './birthday-calendar.test.mts';
+import './birthday-gregorian-selection.integration.test.mts';
 import './admin-branches.integration.test.mts';
 import './admin-create-business.integration.test.mts';
 import './allowed-origins.test.mts';
+import './csrf-origin.test.mts';
+import './env-secrets.test.mts';
 import './availability-bulk.integration.test.mts';
 import './availability-offline-parity.integration.test.mts';
 import './ban.test.mts';
@@ -199,6 +202,7 @@ import './shell-scripts-lf.test.mts';
 import './sms-balance.integration.test.mts';
 import './sms-melipayamak.test.mts';
 import './sms-unparsable-response.test.mts';
+import './provision-staff-phone-squat.integration.test.mts';
 import './provision-username-conflict.integration.test.mts';
 import './provision-slug-validation.integration.test.mts';
 import './staff-invite-flow.integration.test.mts';
@@ -249,6 +253,7 @@ import './waitlist-promotion-observability.test.mts';
 import './waitlist-merge-occupancy-concurrency.test.mts';
 import './waitlist-promotion-horizon.test.mts';
 import './waitlist-orphaned-accepted-entry.test.mts';
+import './waitlist-route-tenant.integration.test.mts';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  ⚠️ یافته‌ی واقعیِ دوم (۲۰۲۶-۰۸-۱۴، همون ممیزی): table-merge-occupancy.test.mts
