@@ -21,7 +21,7 @@ import { COLLECTIONS, collectionByKey } from './fields';
 import { toman, faNum, faDate, faRelative, fa } from '@/lib/format';
 import { ApiError } from '@/lib/client-api';
 import {
-  studio, getToken, setToken, studioApiConfigured, revalidateSite,
+  studio, getToken, setSession, studioApiConfigured, revalidateSite, STUDIO_SESSION_ENDED,
   type CollectionListResponse, type OverviewResponse, type OrderRow, type InquiryRow,
 } from '@/lib/studio-api';
 
@@ -47,12 +47,43 @@ function useInitialLoad(load: () => void | Promise<unknown>): void {
 // ═══════════════ ورود ═══════════════
 
 function Login({ onDone }: { onDone: () => void }) {
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: ورودِ اصلی با نام کاربری/رمز است — همان مسیرِ پنلِ
+  // شرکت. مسیرِ پیامکی فقط وقتی نشان داده می‌شود که سرور بگوید روشن است؛ پیش‌تر
+  // تنها راهِ ورود بود و با پیش‌فرضِ خاموشِ `admin_otp_login_enabled` همیشه ۴۰۴ می‌داد.
+  const [mode, setMode] = useState<'password' | 'otp'>('password');
+  const [totpRequired, setTotpRequired] = useState(false);
+  const [otpEnabled, setOtpEnabled] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [totp, setTotp] = useState('');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
+
+  useInitialLoad(useCallback(async () => {
+    try {
+      const m = await studio.loginMode();
+      setTotpRequired(Boolean(m?.totp_required));
+      setOtpEnabled(Boolean(m?.otp_login_enabled));
+    } catch {
+      // نامعلوم ⇒ فرمِ رمز بدونِ فیلدِ TOTP؛ اگر سرور TOTP بخواهد، پیامِ خطای خودش را می‌دهد.
+    }
+  }, []));
+
+  const loginWithPassword = async () => {
+    setBusy(true); setError(null);
+    try {
+      const res = await studio.passwordLogin(username.trim(), password, totpRequired ? totp.trim() : undefined);
+      setSession({ access: res.access, refresh: res.refresh });
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'ورود ناموفق بود.');
+      setBusy(false);
+    }
+  };
 
   const sendCode = async () => {
     setBusy(true); setError(null);
@@ -69,7 +100,7 @@ function Login({ onDone }: { onDone: () => void }) {
     setBusy(true); setError(null);
     try {
       const res = await studio.verifyOtp(phone.trim(), code.trim());
-      setToken(res.access);
+      setSession({ access: res.access, refresh: res.refresh });
       onDone();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'کد نامعتبر است.');
@@ -77,11 +108,16 @@ function Login({ onDone }: { onDone: () => void }) {
     }
   };
 
+  const submit = () => {
+    if (mode === 'password') return loginWithPassword();
+    return step === 'phone' ? sendCode() : verify();
+  };
+
   return (
     <div className="container-narrow section">
       <form
         className="form-card"
-        onSubmit={(e) => { e.preventDefault(); step === 'phone' ? sendCode() : verify(); }}
+        onSubmit={(e) => { e.preventDefault(); void submit(); }}
         noValidate
       >
         <div className="stack stack-2">
@@ -90,11 +126,38 @@ function Login({ onDone }: { onDone: () => void }) {
           </span>
           <h1 className="h3">ورودِ مدیرِ پلتفرم</h1>
           <p className="small muted">
-            این بخش فقط برای تیمِ رزرونو است. ورود با همان شماره‌ای که در پنلِ شرکت استفاده می‌کنید.
+            این بخش فقط برای تیمِ رزرونو است. ورود با همان حسابی که در پنلِ شرکت استفاده می‌کنید.
           </p>
         </div>
 
-        {step === 'phone' ? (
+        {mode === 'password' ? (
+          <>
+            <div className="field">
+              <label className="label" htmlFor="st-user">نام کاربری</label>
+              <input
+                id="st-user" className="input input--ltr" value={username}
+                onChange={(e) => setUsername(e.target.value)} autoComplete="username" required
+              />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="st-pass">رمز عبور</label>
+              <input
+                id="st-pass" className="input input--ltr" type="password" value={password}
+                onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required
+              />
+            </div>
+            {totpRequired && (
+              <div className="field">
+                <label className="label" htmlFor="st-totp">کدِ برنامه‌ی احرازِ هویت</label>
+                <input
+                  id="st-totp" className="input input--ltr" value={totp}
+                  onChange={(e) => setTotp(e.target.value)} inputMode="numeric"
+                  autoComplete="one-time-code" placeholder="------" required
+                />
+              </div>
+            )}
+          </>
+        ) : step === 'phone' ? (
           <div className="field">
             <label className="label" htmlFor="st-phone">شماره‌ی موبایل</label>
             <input
@@ -120,6 +183,15 @@ function Login({ onDone }: { onDone: () => void }) {
           </div>
         )}
 
+        {otpEnabled && (
+          <button
+            type="button" className="btn btn--quiet btn--sm"
+            onClick={() => { setError(null); setMode(mode === 'password' ? 'otp' : 'password'); }}
+          >
+            {mode === 'password' ? 'ورود با پیامک' : 'ورود با نام کاربری و رمز'}
+          </button>
+        )}
+
         {error && (
           <div className="notice notice--error" role="alert">
             <Icon name="x" size={18} /><span>{error}</span>
@@ -134,7 +206,7 @@ function Login({ onDone }: { onDone: () => void }) {
         )}
 
         <button type="submit" className="btn btn--primary btn--block" disabled={busy}>
-          {busy ? <><span className="spinner" />لطفاً صبر کنید…</> : step === 'phone' ? 'ارسالِ کد' : 'ورود'}
+          {busy ? <><span className="spinner" />لطفاً صبر کنید…</> : mode === 'password' ? 'ورود' : step === 'phone' ? 'ارسالِ کد' : 'ورود'}
         </button>
       </form>
     </div>
@@ -646,6 +718,13 @@ export function Studio() {
   // microtask تا رندرِ نخست (اسکلتِ بارگذاری) آبشاری نشود.
   useInitialLoad(useCallback(() => { setAuthed(Boolean(getToken())); }, []));
 
+  // نشستی که تمدیدش هم شکست خورد، از هر نمایی (نه فقط نمای کلی) به فرمِ ورود برمی‌گردد.
+  useEffect(() => {
+    const onEnded = () => setAuthed(false);
+    window.addEventListener(STUDIO_SESSION_ENDED, onEnded);
+    return () => window.removeEventListener(STUDIO_SESSION_ENDED, onEnded);
+  }, []);
+
   const loadOverview = useCallback(async () => {
     if (!getToken()) return;
     try {
@@ -681,7 +760,7 @@ export function Studio() {
           </Link>
           <button
             type="button" className="btn btn--quiet btn--sm"
-            onClick={() => { setToken(null); setAuthed(false); }}
+            onClick={() => { setSession(null); setAuthed(false); }}
           >
             خروج
           </button>
