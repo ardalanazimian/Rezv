@@ -2797,12 +2797,30 @@ const API = {
    * از `request()` (که همیشه `res.json()` می‌زند) عبور کند. شکلِ خروجی عمداً
    * همان قراردادِ بقیه است تا فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
    */
+  /**
+   * fetchِ احرازشده برای پاسخِ غیرِJSON (SVGِ QR) — همان دو قاعده‌ی `request()`:
+   * هدرِ `X-Restaurant-Id` و ۴۰۱ → refresh → یک تلاشِ دوباره.
+   *
+   * ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): دو fetchِ QR فقط
+   * `Authorization` می‌فرستادند. بدونِ هدرِ شعبه، سرور شعبه‌ی پیش‌فرضِ تنانت را
+   * برمی‌دارد ⇒ QRِ میزِ شعبه‌ی دیگر ۴۰۴ «میز» می‌داد، و QRِ منو آدرسِ منویِ
+   * **شعبه‌ی دیگری** را چاپ می‌کرد در حالی که کارت آدرسِ درست را نشان می‌داد.
+   * بعد از ۱۵ دقیقه (عمرِ access) هم هر دو ۴۰۱ می‌دادند.
+   */
+  async _authedRaw(path, _retried = false){
+    const headers = { Authorization: 'Bearer ' + this._token };
+    if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
+    const res = await fetch(this.base + '/api/v1' + path, { headers });
+    if (res.status === 401 && this._refresh && !_retried) {
+      if (await this._doRefresh()) return this._authedRaw(path, true);
+      this._onSessionExpired();
+    }
+    return res;
+  },
   async tableQrSvg(id, size){
     if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
     try{
-      const res = await fetch(this.base + `/api/v1/restaurant/tables/${encodeURIComponent(id)}/qr?size=` + encodeURIComponent(size||512), {
-        headers: { Authorization: 'Bearer ' + this._token },
-      });
+      const res = await this._authedRaw(`/restaurant/tables/${encodeURIComponent(id)}/qr?size=` + encodeURIComponent(size||512));
       if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
       return { ok:true, data:{
         svg: await res.text(),
@@ -2880,7 +2898,10 @@ const API = {
   menuItemPhotoUpload(id, file){
     const fd = new FormData();
     fd.append('file', file);
-    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'POST', body: fd });
+    // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: از `request` (سقفِ ۸ ثانیه) می‌رفت در حالی که سرور تا ۸MB
+    // می‌پذیرد و گالری از قبل `requestRaw` با ۶۰ ثانیه دارد ⇒ روی موبایل «زمان
+    // درخواست تمام شد» در حالی که عکس شاید ذخیره شده بود.
+    return this.requestRaw('/restaurant/menu/' + encodeURIComponent(id) + '/photo', fd, 60000);
   },
   menuItemPhotoDelete(id){
     return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'DELETE' });
@@ -2896,9 +2917,7 @@ const API = {
   async menuQrSvg(size){
     if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
     try{
-      const res = await fetch(this.base + '/api/v1/restaurant/menu/qr?size=' + encodeURIComponent(size||512), {
-        headers: { Authorization: 'Bearer ' + this._token },
-      });
+      const res = await this._authedRaw('/restaurant/menu/qr?size=' + encodeURIComponent(size||512));
       if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
       return { ok:true, data:{ svg: await res.text(), url: decodeURI(res.headers.get('X-Menu-Url') || '') } };
     }catch{
@@ -3206,12 +3225,20 @@ async function loadTables(){
   const res = await API.listTables();
   if (res.ok && Array.isArray(res.data?.items)) {
     TABLES = res.data.items.map(mapApiTable);
-  } else if (!TABLES.length) {
-    // بک‌اند در دسترس نیست → میزهای نمونه (مثل بقیه‌ی داده‌های دمو) تا پلان سالن و
-    // KPI اشغال خالی نمانند
-    TABLES = DEMO_TABLES.map(t=>({...t}));
+    _tablesLoaded = true;
+  } else if (!API.getToken()) {
+    // دمو (بدونِ نشست) → میزهای نمونه تا پلان سالن و KPI اشغال خالی نمانند
+    if (!TABLES.length) TABLES = DEMO_TABLES.map(t=>({...t}));
+    _tablesLoaded = true;
+  } else {
+    // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): با نشستِ واقعی هم شکستِ لود (۴۰۳،
+    // قطعی) میزهای نمونه می‌ساخت و `_tablesLoaded` را بالا می‌برد. آن میزها به
+    // انتخاب‌گرِ واک‌این (`table_id:'demo-t1'` ⇒ ۴۲۲) و رزروِ دستی (شماره‌ی میزِ
+    // نمونه، که شاید در رستورانِ واقعی میزِ دیگری باشد) می‌رفتند. حالا فهرست
+    // همان است که بود (در شروع خالی) و پرچم پایین می‌ماند تا دفعه‌ی بعد دوباره
+    // تلاش شود؛ پلانِ خالی «نمی‌دانیم» را نشان می‌دهد، نه میزِ ساختگی.
+    _tablesLoaded = false;
   }
-  _tablesLoaded = true;
   return TABLES;
 }
 // ⚠️ رفعِ باگ (همان الگویِ RES): این آرایه قبلاً «const GUESTS» بود — یعنی
@@ -3936,6 +3963,13 @@ function renderDashWaitlist(){
 // اکشن ثبت ورود از داشبورد — به منطق موجود markArrived وصل می‌شود
 function dashCheckIn(idx){
   const r = RES[idx]; if(!r) return;
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `idx` اندیسِ `RES` است،
+  // ولی markArrived/changeStatus ردیف را از `(RES_VIEW||RES)[i]` برمی‌دارند و
+  // `RES_VIEW` آخرین فهرستِ تبِ «رزروها» است (مثلاً «فردا») و هرگز پاک نمی‌شد.
+  // پس بعد از یک بار باز کردنِ آن تب، «ثبت ورود»ِ داشبورد وضعیتِ **مهمانِ
+  // دیگری** را PATCH می‌کرد و پیامکِ خوش‌آمد را به شماره‌ی او می‌فرستاد.
+  // RES_VIEW فقط مالِ همان تب است و با رندرِ بعدیِ آن دوباره ست می‌شود.
+  RES_VIEW = null;
   if(typeof markArrived==='function'){ markArrived(idx); }
   else { r.status='arrived'; }
   renderEnterpriseDashboard();
@@ -4127,6 +4161,14 @@ function renderHeatmap(){
 
 // ── مشتریان برتر ──
 function renderTopCustomers(){
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `/restaurant/customers` به canViewAnalytics
+  // نیاز دارد که staff پیش‌فرض ندارد؛ شکست (۴۰۳/قطعی) GUESTS_DEMO را روی داشبوردِ
+  // «زنده» می‌گذاشت (نشانِ زنده `_guestsLoaded` را نمی‌پرسد). با نشستِ واقعی و
+  // بدونِ دادهٔ واقعی، هیچ اسمی نشان داده نمی‌شود.
+  if(API.getToken() && !_guestsLoaded){
+    document.getElementById('topCustomers').innerHTML=`<div class="dr-empty">فهرستِ مشتریانِ برتر در دسترس نیست</div>`;
+    return;
+  }
   const top=[...GUESTS].sort((a,b)=>b.visits-a.visits).slice(0,5);
   document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`
     <div class="top-cust" onclick="viewCustomerHistory(${jsq(c.name)})">
@@ -4639,7 +4681,7 @@ function openManual(){
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
       <div><div class="field-label">ساعت</div><select class="inp" id="mTime"><option>۱۲:۳۰</option><option>۱۳:۰۰</option><option>۱۸:۰۰</option><option>۱۹:۰۰</option><option>۲۰:۰۰</option><option>۲۱:۰۰</option></select></div>
       <div><div class="field-label">میز</div><select class="inp" id="mTable">${TABLES.filter(t=>t.s==='free').map(t=>`<option value="${t.n}">${esc(tableLabel(t))}</option>`).join('')}</select></div>
-      <div><div class="field-label">نفر</div><select class="inp" id="mParty"><option>۲</option><option>۳</option><option>۴</option><option>۵</option><option>۶</option><option>۸</option></select></div>
+      <div><div class="field-label">نفر</div><select class="inp" id="mParty">${[2,3,4,5,6,8].map(n=>`<option value="${n}">${fa(n)}</option>`).join('')}</select></div>
     </div>
     <button class="btn btn-primary btn-lg btn-block" id="mSave" onclick="saveManual()">ثبت رزرو</button>`);
   // یک کلیدِ idempotency به‌ازای هر بار باز شدنِ مودال = یک «تلاش». تلاشِ
@@ -4672,7 +4714,11 @@ async function walkinLookup(){
     await loadTables();
     if(btn){btn.disabled=false;btn.textContent='بررسی شماره';}
   }
-  const member=CLUB.find(m=>normalizePhone(m.phone)===ph);
+  // ⚠️ ۲۰۲۶-۰۹-۱۳: اعضا از سرور `+98912…` می‌آیند و پرسنل `0912…` تایپ می‌کند؛
+  // normalizePhoneِ پنل فقط رقم‌ها را فارسی می‌کند، پس هیچ عضوی هرگز پیدا نمی‌شد
+  // و مشتریِ قدیمی فرمِ «مهمانِ جدید» می‌گرفت. ده رقمِ آخرِ ASCII مقایسه می‌شود.
+  const last10=p=>String(p||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'').slice(-10);
+  const member=CLUB.find(m=>m.phone&&last10(m.phone)===last10(raw));
   const freeTables=TABLES.filter(t=>t.s==='free');
   const tableOptions=freeTables.length
     ? freeTables.map(t=>`<option value="${t.id}">${esc(tableLabel(t))} (${fa(t.c)} نفره)</option>`).join('')
@@ -4832,8 +4878,14 @@ async function saveManual(){
   const dLabel=opt.dataset.label||opt.text.replace(/^(امروز|فردا)\s*—\s*/,'').trim();
   const dateKey=(dateVal==='today'||dateVal==='tomorrow')?dateVal:'upcoming';
   const timeVal=document.getElementById('mTime').value;
-  const partyVal=+document.getElementById('mParty').value.replace(/[^\d]/g,'')||2;
-  const tableVal=+document.getElementById('mTable').value.replace(/[^\d]/g,'')||1;
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): گزینه‌های «نفر» بدونِ
+  // value بودند، پس `.value` متنِ فارسیِ «۴» بود و `[^\d]` (فقط ASCII) همه‌اش را
+  // پاک می‌کرد ⇒ `party_size` **همیشه ۲** و چکِ ظرفیتِ میز هرگز فعال نمی‌شد.
+  // حالا گزینه‌ها valueِ ASCII دارند؛ ارقامِ فارسی هم برای احتیاط تبدیل می‌شوند.
+  // میزِ نامشخص (هیچ میزِ آزادی نبود) دیگر بی‌صدا «میزِ ۱» نمی‌شود.
+  const asciiNum=v=>+String(v||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[^\d]/g,'');
+  const partyVal=asciiNum(document.getElementById('mParty').value)||2;
+  const tableVal=asciiNum(document.getElementById('mTable')?.value)||null;
   // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): یک کلید برایِ کلِ تلاش (چه
   // درخواستِ آنلاینِ زیر موفق شود چه به مسیرِ آفلاینِ Outbox بیفتد) — تا اگر
   // درخواستِ اول واقعاً به سرور رسیده باشد ولی پاسخش گم شده، retry/صف‌شدنِ
@@ -4862,10 +4914,21 @@ async function saveManual(){
   // مثلِ B-01، رفع ساختاری است نه وصله‌ای: دو بدنه به یکی تبدیل شد تا
   // نتوانند دوباره واگرا شوند.
   const dt=manualDateToISO(dateVal,timeVal);
+  // ⚠️ ۲۰۲۶-۰۹-۱۳ (ممیزیِ قراردادِ فرانت↔بک):
+  //  - `restaurant_id` از شعبه‌ی **فعال** است، نه فقط `STAFF_INFO` (که فقط لاگین
+  //    پرش می‌کند: پس از بازیابیِ نشست خالی و پس از تعویضِ شعبه کهنه بود ⇒
+  //    ۴۲۲/۴۰۳). سرور برای staff رستوران را از contextِ احراز می‌گیرد؛ این
+  //    مقدار فقط صفِ آفلاین را به شعبه‌ای که در آن ساخته شد قفل می‌کند.
+  //  - تلفنِ خالی **فرستاده نمی‌شود**: `''` برای zPhoneِ اختیاری «غایب» نیست و
+  //    هر رزروِ بدونِ شماره ۴۲۲ می‌گرفت، در حالی که فرم آن را اختیاری نشان می‌دهد.
+  const phoneClean=phone.replace(/\s/g,'');
+  const guest={name:n,note:'رزرو دستی'};
+  if(phoneClean) guest.phone=phoneClean;
+  if(tableVal) guest.table_number=tableVal;
   const reservationBody={
-    restaurant_id:STAFF_INFO?.restaurant_id||undefined,
-    date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
-    guest:{name:n,phone:phone.replace(/\s/g,''),table_number:tableVal,note:'رزرو دستی'},
+    restaurant_id:API.getActiveRestaurant()||STAFF_INFO?.restaurant_id||undefined,
+    date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phoneClean,
+    guest,
   };
 
   // اگر توکن staff داریم، رزرو واقعی در دیتابیس ثبت کن
@@ -4873,7 +4936,10 @@ async function saveManual(){
     const res=await API.post('/reservations',reservationBody,{ 'Idempotency-Key': manualIdemKey });
     if(res.ok){
       // موفق در سرور — به‌علاوه‌ی نمایش محلی
-      RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.reservation?.code});
+      RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.code});
+      // ⚠️ کدِ رزرو در سطحِ بالای پاسخ است (lib/reservations.ts → `{code, status, …}`)؛
+      // `res.data.reservation.code` همیشه undefined بود ⇒ ردیف بی‌کد می‌ماند و تغییرِ
+      // وضعیتش مسیرِ «بدونِ کد» را می‌رفت: پیامِ موفقیت بدونِ هیچ تماسی با سرور.
       const clubBefore=CLUB.length;
       CLUB=await loadClubMembers(); // وضعیت واقعی باشگاه رو از سرور بگیر، حدس نزن
       const newlyEnrolled=CLUB.length>clubBefore;
@@ -4987,7 +5053,12 @@ async function loadWaitlist(){
   // قفل می‌کرد. حالا پرچم فقط وقتی بالا می‌رود که صفِ واقعی واقعاً آمده باشد.
   const okQueue = q.ok && Array.isArray(q.data?.queue);
   if(okQueue) WAITLIST=q.data.queue;
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): تبِ صف فقط canManageWaitlist می‌خواهد ولی
+  // `/waitlist/analytics` به canViewAnalytics نیاز دارد. کارمندِ بدونِ آن ۴۰۳
+  // می‌گرفت، WL_ANALYTICS همان نمونه‌ی «۶۹٪ تبدیل / ۲۲ دقیقه» می‌ماند و چون صف
+  // واقعاً لود شده بود نوتِ «نمونه» هم نمی‌آمد. حالا: نامعلوم = «—».
   if(a.ok && a.data) WL_ANALYTICS=a.data;
+  else if(okQueue) WL_ANALYTICS={current_queue_size:q.data.queue.filter(w=>w.status==='waiting').length,conversion_rate:null,avg_wait_minutes:null,vip_entries:null};
   _wlLoaded=okQueue;
   return okQueue;
 }
@@ -4996,6 +5067,7 @@ function rWaitlist(){
   // اولین ورود به صفحه با توکن → داده‌ی واقعی بگیر و دوباره رندر کن
   if(!_wlLoaded && API.getToken()){ loadWaitlist().then(()=>rWaitlist()); }
   const A=WL_ANALYTICS;
+  const wlNum=(v,suffix='')=>v==null?'—':fa(v)+suffix;
   const queue=WAITLIST.filter(w=>w.status==='waiting'||w.status==='offered');
   // ⚠️ رفعِ باگ: badgeِ سایدبارِ #wlBadge با اینکه id داشت هیچ‌جا آپدیت نمی‌شد —
   // همیشه مقدارِ استاتیکِ HTML («۳») می‌ماند حتی وقتی صفِ واقعی خالی بود
@@ -5010,10 +5082,10 @@ function rWaitlist(){
   document.getElementById('v-waitlist').innerHTML=wlDemoNote+`
     <!-- آمار لیست انتظار -->
     <div class="wl-stats-grid">
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--blue-50)">${icon('inbox',{size:16})}</div><div><div class="wl-stat-num">${fa(A.current_queue_size)}</div><div class="wl-stat-lbl">در صف الان</div></div></div>
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--green-50)">${icon('check',{size:16})}</div><div><div class="wl-stat-num">${fa(A.conversion_rate)}٪</div><div class="wl-stat-lbl">نرخ تبدیل</div></div></div>
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:#FEF3C7">${icon('clock',{size:16})}</div><div><div class="wl-stat-num">${fa(A.avg_wait_minutes)}<span style="font-size:13px"> دق</span></div><div class="wl-stat-lbl">میانگین انتظار</div></div></div>
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:#Fce7f3">${icon('star',{size:16,fill:true})}</div><div><div class="wl-stat-num">${fa(A.vip_entries)}</div><div class="wl-stat-lbl">مهمان VIP</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--blue-50)">${icon('inbox',{size:16})}</div><div><div class="wl-stat-num">${wlNum(A.current_queue_size)}</div><div class="wl-stat-lbl">در صف الان</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--green-50)">${icon('check',{size:16})}</div><div><div class="wl-stat-num">${wlNum(A.conversion_rate,'٪')}</div><div class="wl-stat-lbl">نرخ تبدیل</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:#FEF3C7">${icon('clock',{size:16})}</div><div><div class="wl-stat-num">${wlNum(A.avg_wait_minutes)}${A.avg_wait_minutes==null?'':'<span style="font-size:13px"> دق</span>'}</div><div class="wl-stat-lbl">میانگین انتظار</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:#Fce7f3">${icon('star',{size:16,fill:true})}</div><div><div class="wl-stat-num">${wlNum(A.vip_entries)}</div><div class="wl-stat-lbl">مهمان VIP</div></div></div>
     </div>
 
     <div class="wl-q-head">
@@ -5106,7 +5178,7 @@ async function removeWL(id){
 }
 let _tablesLoaded=false;
 async function rFloor(){
-  if(!_tablesLoaded && API.getToken()){ await loadTables(); _tablesLoaded=true; }
+  if(!_tablesLoaded && API.getToken()){ await loadTables(); }
   syncTablesFromReservations();
   // ⚠️ فازِ ۲ (§۶): cleaning/maintenance به شمارنده اضافه شدند. پیش از این
   // `occ[t.s]++` رویِ کلیدِ ناموجود NaN تولید می‌کرد و نرخِ اشغال را خراب می‌کرد.
@@ -5994,7 +6066,7 @@ function setCustTab(t){
   document.querySelectorAll('#v-customers .itab').forEach((b,i)=>b.classList.toggle('active',['overview','profiles','campaign','ai'][i]===t));
   document.querySelectorAll('#v-customers .isub').forEach(s=>s.classList.toggle('active',s.id==='ct-'+t));
 }
-const RFM_LABEL_FA={champions:'قهرمانان',loyal:'وفادار',potential:'بالقوه',at_risk:'در خطر ریزش',new:'جدید',hibernating:'غیرفعال',lost:'از دست‌رفته',unknown:'نامشخص'};
+const RFM_LABEL_FA={champions:'قهرمانان',loyal:'وفادار',potential:'بالقوه',new_promising:'تازه و امیدبخش',needs_attention:'نیازمندِ توجه',at_risk:'در خطر ریزش',cant_lose:'نباید از دست داد',new:'جدید',hibernating:'غیرفعال',lost:'از دست‌رفته',unknown:'نامشخص'};
 
 // ─── تب ۱: نمای کلی (واقعی، از /restaurant/rfm + /restaurant/ai) ───
 // نگاشت رنگ و نام هر سگمنت RFM
@@ -6002,6 +6074,11 @@ const RFM_META={
   champions:{fa:'قهرمانان',c:'#12A150',d:'بهترین مشتری‌ها — زیاد و تازه'},
   loyal:{fa:'وفادار',c:'#4F46E5',d:'مرتب برمی‌گردن'},
   potential:{fa:'بالقوه',c:'#7C6FF0',d:'پتانسیل وفادار شدن'},
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: بک‌اند (api/src/lib/rfm.ts) `new_promising` و
+  // `needs_attention` می‌سازد و این دو کلید اینجا نبودند ⇒ هر دو سگمنت به
+  // `unknown` می‌افتادند و دو خانه‌ی خاکستریِ یکسانِ «نامشخص» دیده می‌شد.
+  new_promising:{fa:'تازه و امیدبخش',c:'#0EA5E9',d:'تازه آمده‌اند، هنوز کم‌تکرار'},
+  needs_attention:{fa:'نیازمندِ توجه',c:'#F59E0B',d:'مدتی است کم‌پیدا شده‌اند'},
   promising:{fa:'امیدبخش',c:'#0EA5E9',d:'تازه‌وارد فعال'},
   new_customer:{fa:'جدید',c:'#06B6D4',d:'اولین بازدیدها'},
   at_risk:{fa:'در خطر ریزش',c:'#E8925A',d:'مدتیه نیامدن'},
@@ -6249,6 +6326,7 @@ const HOURS_SAVE_LABEL='ارسالِ پیشنهاد برای تأیید';
 async function loadHours(){
   if(!API.getToken()) return;
   const res=await API.hoursGet();
+  markLoad('hours', !!(res.ok && res.data));
   if(res.ok && res.data){
     const d=res.data;
     HOURS_STATE={
@@ -6291,6 +6369,12 @@ function hoursStatusBannerHTML(){
 function profRenderHours(){
   const el=document.getElementById('pt-hours'); if(!el) return;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): فرم پیش از رسیدنِ دادهٔ واقعی (و پس از
+  // شکستِ آن) با پیش‌فرض‌ها (`closures:[]`) رندر می‌شد؛ «افزودنِ یک تعطیلی +
+  // ارسال» همه‌ی تعطیلی‌های آینده‌ی ذخیره‌شده را **پاک** می‌کرد، چون PUT آن‌ها
+  // را فوراً جایگزین می‌کند. تا دادهٔ واقعی نیامده، فرمی نیست.
+  if(loadFailed('hours')){ el.innerHTML=loadErrorBlock('ساعتِ کاری بارگیری نشد','loadHours().then(profRenderHours)'); return; }
+  if(!_hoursLoaded){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">در حالِ بارگیریِ ساعتِ کاری…</div>`; return; }
   const oh=HOURS_STATE.draft||{};
   // ⚠️ رفعِ از‌دست‌رفتنِ بی‌صدای داده (۲۰۲۶-۰۸-۲۶):
   // `_hoursDirty` در ۶ جا **نوشته** می‌شد و در کلِ ریپو در هیچ‌جا **خوانده**
@@ -6370,6 +6454,7 @@ function addClosure(){
 function removeClosure(i){ HOURS_STATE.closures.splice(i,1); _hoursDirty=true; profRenderHours(); }
 async function saveHours(){
   if(!API.getToken()){ toast('','برای ذخیره باید وارد شده باشی'); return; }
+  if(!_hoursLoaded){ toast('','ساعتِ فعلی هنوز بارگیری نشده — ذخیره روی دادهٔ ناقص انجام نمی‌شود'); return; }
   // ⚠️ Part 3: این دیگر «ذخیره‌ی زنده» نیست — پیشنهاد می‌فرستد. بک‌اند
   // (PUT /restaurant/hours) خودش pending می‌سازد، اینجا فقط draft را می‌فرستد.
   const res=await API.hoursSave({opening_hours:HOURS_STATE.draft, closures:HOURS_STATE.closures});
@@ -6392,12 +6477,16 @@ let _cancelPolicyDirty=false;
 async function loadCancellationPolicy(){
   if(!API.getToken()) return;
   const res=await API.cancellationPolicyGet();
+  markLoad('cancellation', !!(res.ok && res.data));
   if(res.ok && res.data){ CANCEL_POLICY_STATE={...res.data}; _cancelPolicyDirty=false; }
 }
 
 function profRenderCancellationPolicy(){
   const el=document.getElementById('pt-cancellation'); if(!el) return;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایشِ سیاستِ کنسلی به اتصالِ بک‌اند نیاز دارد — در حالتِ دمو در دسترس نیست.</div>`; return; }
+  // همان رفعِ ساعتِ کاری: ذخیره روی پیش‌فرضِ ۲۴/۲/۵۰ سیاستِ اختصاصیِ رستوران را بازنویسی می‌کرد.
+  if(loadFailed('cancellation')){ el.innerHTML=loadErrorBlock('سیاستِ کنسلی بارگیری نشد','loadCancellationPolicy().then(profRenderCancellationPolicy)'); return; }
+  if(loadPending('cancellation')){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">در حالِ بارگیریِ سیاستِ کنسلی…</div>`; return; }
   const s=CANCEL_POLICY_STATE;
   // ═══════════════════════════════════════════════════════════
   //  ⚠️ صداقتِ اجرا (پروتکل §۳/§۹/§۱۰)
@@ -6460,6 +6549,7 @@ function updateCancelPolicyField(key,val){ CANCEL_POLICY_STATE[key]=Number(val)|
 function toggleCancelPolicyField(key){ CANCEL_POLICY_STATE[key]=!CANCEL_POLICY_STATE[key]; _cancelPolicyDirty=true; profRenderCancellationPolicy(); }
 async function saveCancellationPolicy(){
   if(!API.getToken()){ toast('','برای ذخیره باید وارد شده باشی'); return; }
+  if(LOAD_STATE.cancellation!=='ok'){ toast('','سیاستِ فعلی هنوز بارگیری نشده — ذخیره انجام نمی‌شود'); return; }
   const s=CANCEL_POLICY_STATE;
   if(Number(s.partial_penalty_hours)>Number(s.free_cancel_hours)){ toast('','آستانه‌ی جریمه‌ی جزئی نمی‌تونه از پنجره‌ی آزاد بزرگ‌تر باشه'); return; }
   const res=await API.cancellationPolicySave({
@@ -7474,7 +7564,10 @@ async function sendAssistantMessage(){
   if (send) send.disabled = false;
 
   if (!res.ok){
-    assistantAppend(`<div class="chat-b them">اتصال به سرور برقرار نشد — دوباره امتحان کن.</div>`);
+    // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: هر شکستی «اتصال برقرار نشد» گفته می‌شد، از جمله
+    // ۴۰۳ (بدونِ دسترسی)، ۴۲۹ (سقفِ ۲۰ در دقیقه) و ۴۲۲.
+    const msg = res.offline ? 'اتصال به سرور برقرار نشد — دوباره امتحان کن.' : (res.error?.message || 'پاسخ گرفته نشد — دوباره امتحان کن.');
+    assistantAppend(`<div class="chat-b them">${esc(msg)}</div>`);
     return;
   }
   const d = res.data;
@@ -7493,7 +7586,7 @@ async function assistantTeach(logId, intent, btnEl){
   if (wrap) wrap.innerHTML = '<span style="opacity:.6">در حال یادگیری…</span>';
   const res = await API.assistantFeedback(logId, intent);
   if (wrap) wrap.remove();
-  if (!res.ok){ toast('', 'یادگیری انجام نشد'); return; }
+  if (!res.ok){ toast('', res.offline ? 'یادگیری انجام نشد — اتصال برقرار نیست' : (res.error?.message || 'یادگیری انجام نشد')); return; }
   assistantAppend(`<div class="chat-b them">${esc(res.data.answer)}</div>`);
   toast('', 'یاد گرفتم — دفعه‌ی بعد بهتر تشخیص می‌دم');
 }
@@ -7634,7 +7727,12 @@ async function sendBirthdayGreetings(){
   if(!API.getToken()){ toast('','برای ارسالِ پیامک باید وارد شده باشی'); return; }
   if(btn){ btn.disabled=true; btn.textContent='در حال ارسال…'; }
   const restore=()=>{ if(btn){ btn.disabled=false; btn.innerHTML=icon('message',{size:13})+' ارسالِ پیامکِ تبریک'; } };
-  const res=await API.sendSms({ kind:'campaign', phones:targets.map(m=>String(m.phone)), message:'تبریکِ تولد' });
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: `message` در کمپین **خودِ متنِ پیامک** است
+  // (restaurant/sms/route.ts: `text: customText.replace(/\{نام\}/g, …)`)، نه
+  // انتخابِ قالب. پیش‌تر `'تبریکِ تولد'` بود ⇒ مهمان فقط همین دو کلمه را می‌گرفت.
+  const rName=STAFF_INFO?.restaurant_name||'';
+  const message=`سلام {نام}! تولدت مبارک 🎉${rName?' — '+rName:''}`;
+  const res=await API.sendSms({ kind:'campaign', phones:targets.map(m=>String(m.phone)), message });
   if(res.ok){
     // عددِ صف از خودِ سرور می‌آید — نه شمارشِ خوش‌بینانه‌ی کلاینت.
     toast('',`پیامکِ تبریک برای ${fa(res.data?.queued||0)} نفر در صفِ ارسال قرار گرفت`);
@@ -7677,9 +7775,14 @@ function automationConversionFa(a){
              :'نرخِ تبدیل هنوز اندازه‌پذیر نیست';
 }
 
+let COUPONS_ERROR=null;
 async function loadMarketing(){
   if(!API.getToken()) return;
   const [c,a]=await Promise.all([API.couponsList(),API.automationsList()]);
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: تبِ بازاریابی canManageCampaigns می‌خواهد ولی
+  // `/restaurant/coupons` canManageCoupons؛ ۴۰۳ (یا قطعی) بی‌صدا «هنوز کوپنی
+  // ساخته نشده» نشان می‌داد. حالا علتِ واقعی گفته می‌شود.
+  COUPONS_ERROR = c.ok ? null : (c.offline ? 'اتصال به سرور برقرار نشد' : (c.error?.message || 'کوپن‌ها بارگیری نشد'));
   if(c.ok) COUPONS=c.data?.items||[];
   if(a.ok){ AUTOMATIONS=a.data?.items||[]; AUTOMATION_ATTRIBUTION=a.data?.attribution||null; }
   _mktLoaded=true;
@@ -7723,8 +7826,8 @@ function renderCoupons(){
       <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="createCoupon()">ساخت کوپن</button>
     </div>
     <div class="panel">
-      <div class="panel-head"><div class="panel-title">کوپن‌های فعال</div><div class="panel-sub">${fa(COUPONS.length)} کوپن</div></div>
-      ${COUPONS.length?COUPONS.map(c=>`
+      <div class="panel-head"><div class="panel-title">کوپن‌های فعال</div><div class="panel-sub">${COUPONS_ERROR?'—':fa(COUPONS.length)+' کوپن'}</div></div>
+      ${COUPONS_ERROR?`<div style="text-align:center;color:var(--t2);padding:30px">${esc(COUPONS_ERROR)}</div>`:COUPONS.length?COUPONS.map(c=>`
         <div class="staff-row">
           <div style="flex:1">
             <div style="font-size:14px;font-weight:700;direction:ltr;text-align:right">${esc(c.code)}</div>
@@ -7861,16 +7964,28 @@ async function doSendCampaign(){
     // را به مخاطبِ اشتباه می‌فرستاد).
     let phones=[];
     if(aud.kind==='birthday'){
-      if(!CLUB.length){ await (typeof loadClubMembers==='function'?loadClubMembers():Promise.resolve()); }
+      // ⚠️ ۲۰۲۶-۰۹-۱۳: نتیجه‌ی loadClubMembers پیش‌تر دور ریخته می‌شد (CLUB فقط در
+      // loyalty/reservations پر می‌شود) ⇒ «شماره‌ی معتبری نیست» با وجودِ عضو.
+      if(!CLUB.length && typeof loadClubMembers==='function'){ CLUB=await loadClubMembers(); }
       phones=(CLUB||[]).filter(m=>m.bMonth===currentMonthFa()&&m.phone).map(m=>String(m.phone));
     }else{
-      const cs=await API.customers('segment='+encodeURIComponent(aud.value)+'&limit=500');
-      if(!cs.ok){
-        toast('', (cs.error&&cs.error.message)||'فهرستِ مخاطب بارگیری نشد — کمپین ارسال نشد');
+      // ⚠️ رفعِ P0 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `limit=500` بود و
+      // سرور `limit` را حداکثر ۵۰ می‌پذیرد ⇒ **هر** کمپینِ سگمنتیِ «در خطر /
+      // VIP / مشتریِ جدید» ۴۲۲ «limit: حداکثر 50» می‌گرفت و هیچ پیامکی نمی‌رفت.
+      // حالا صفحه‌به‌صفحه با next_cursor تا سقفِ ۵۰۰ شماره‌ی روتِ پیامک.
+      let cursor=null, failed=null;
+      do{
+        const cs=await API.customers('segment='+encodeURIComponent(aud.value)+'&limit=50'+(cursor?'&cursor='+encodeURIComponent(cursor):''));
+        if(!cs.ok){ failed=cs; break; }
+        phones.push(...(cs.data.items||[]).map(x=>x.phone).filter(Boolean).map(String));
+        cursor=cs.data.next_cursor||null;
+      }while(cursor && phones.length<500);
+      if(failed){
+        toast('', (failed.error&&failed.error.message)||'فهرستِ مخاطب بارگیری نشد — کمپین ارسال نشد');
         if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';}
         return;
       }
-      phones=(cs.data.items||[]).map(x=>x.phone).filter(Boolean).map(String);
+      phones=[...new Set(phones)].slice(0,500);
     }
     if(!phones.length){
       toast('','در سگمنتِ «'+aud.label+'» شماره‌ی معتبری برای ارسال نیست');
@@ -8114,12 +8229,18 @@ const PERM_DEFS=[
   ['canManageSettings','مدیریت تنظیمات'],
 ];
 
+let _staffLoadError=null;
 async function loadStaff(){
   if(!API.getToken()) return; // آفلاین/دمو
   const res=await API.staffList();
-  if(res.ok && Array.isArray(res.data?.items)) STAFF_LIST=res.data.items;
-  _staffLoaded=true;
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `_staffLoaded=true` بی‌قیدوشرط بود. نقشِ
+  // staff از `/restaurant/staff` ۴۰۳ می‌گیرد و پس از رفرش (نقش هنوز نامعلوم) تب
+  // دیده می‌شود ⇒ دو کارمندِ نمونه بدونِ نوتِ «نمونه» به‌عنوانِ کارکنانِ واقعی، و
+  // ذخیره‌ی دسترسیِ `staff_id:'demo2'` ⇒ ۴۲۲. حالا شکست خطای صریح است.
+  if(res.ok && Array.isArray(res.data?.items)){ STAFF_LIST=res.data.items; _staffLoaded=true; _staffLoadError=null; }
+  else _staffLoadError=res.offline?'اتصال به سرور برقرار نشد':(res.error?.message||'فهرستِ کارکنان بارگیری نشد');
 }
+function retryStaff(){ _staffLoadError=null; rStaff(); }
 
 // ═══════════ تغییرِ رمزِ خود (مهاجرتِ ۰۷۴) ═══════════
 // ⚠️ چرا اینجا و نه در پنلِ شرکت: رمزِ اولیه را شرکت می‌سازد، ولی از آن
@@ -8143,9 +8264,16 @@ async function submitPasswordChange(){
 }
 
 function rStaff(){
-  if(!_staffLoaded && API.getToken()){ loadStaff().then(()=>rStaff()); }
+  // `_staffLoadError` جلوی حلقه‌ی «شکست → رندر → دوباره fetch» را می‌گیرد؛ تلاشِ
+  // دوباره فقط با دکمه.
+  if(!_staffLoaded && !_staffLoadError && API.getToken()){ loadStaff().then(()=>rStaff()); }
   const avatar=s=>(s.name||s.phone||'?').toString().trim().charAt(0);
-  const isDemo=!API.getToken()||!_staffLoaded;
+  const isDemo=!API.getToken();
+  const staffRows=API.getToken()&&!_staffLoaded
+    ? (_staffLoadError
+        ? `<div class="empty-state"><div class="empty-state-desc">${esc(_staffLoadError)}</div><button class="btn btn-ghost btn-sm" onclick="retryStaff()">تلاش دوباره</button></div>`
+        : `<div class="empty-state"><div class="empty-state-desc">در حال بارگیریِ کارکنان…</div></div>`)
+    : null;
   document.getElementById('v-staff').innerHTML=(isDemo?`<div class="cash-note">${icon('info',{size:13})} فهرستِ زیر نمونه است، کارکنانِ واقعیِ تو نیست.</div>`:'')+`
     <div class="panel">
       <div class="panel-head"><div>
@@ -8163,8 +8291,8 @@ function rStaff(){
       </div>
     </div>`+`
     <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">کارکنان</div><div class="panel-sub">${fa(STAFF_LIST.length)} نفر · مدیریت دسترسی</div></div></div>
-      ${STAFF_LIST.map(s=>`<div class="staff-row">
+      <div class="panel-head"><div><div class="panel-title">کارکنان</div><div class="panel-sub">${staffRows?'مدیریت دسترسی':`${fa(STAFF_LIST.length)} نفر · مدیریت دسترسی`}</div></div></div>
+      ${staffRows||STAFF_LIST.map(s=>`<div class="staff-row">
         <div class="staff-ava">${esc(avatar(s))}</div>
         <div style="flex:1"><div style="font-size:14px;font-weight:700">${esc(s.name||toFaDigits(s.phone||''))}</div><div style="font-size:12px;color:var(--t2)">${esc(toFaDigits(s.phone||''))}</div></div>
         <span class="role-tag ${esc(s.role)}">${esc(ROLE_FA[s.role]||s.role)}</span>
@@ -8856,8 +8984,9 @@ async function bizPoll(initial){
   if (!body) { if(_chatPollTimer){clearInterval(_chatPollTimer);_chatPollTimer=null;} return; }
   let appended = false;
   for (const m of msgs){
+    _chatLastTime = m.created_at;          // مکان‌نما فقط از پاسخِ poll جلو می‌رود
     if (_chatRendered.has(m.id)) continue;
-    _chatRendered.add(m.id); _chatLastTime = m.created_at;
+    _chatRendered.add(m.id);
     body.insertAdjacentHTML('beforeend', bizBubble(m));
     appended = true;
   }
@@ -8882,7 +9011,10 @@ async function sendBizChat(){
   const res = await API.post(`/restaurant/chats/${_chatActiveThread}`, { body });
   const pend = bodyEl?.querySelector('.chat-b.pending');
   if (res.ok && res.data?.id){
-    _chatRendered.add(res.data.id); _chatLastTime = res.data.created_at;
+    // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: مکان‌نما دیگر از پاسخِ ارسال جلو نمی‌رود. poll
+    // `createdAt > after` می‌پرسد، پس پیامِ مهمان که در همان چند ثانیه‌ی پیش از
+    // پاسخِ کارمند رسیده بود هرگز نشان داده نمی‌شد تا بازکردنِ دوباره‌ی گفت‌وگو.
+    _chatRendered.add(res.data.id);
     if (pend){ pend.classList.remove('pending'); pend.querySelector('.chat-b-t').textContent = chatTime(res.data.created_at); }
   } else {
     if (pend) pend.querySelector('.chat-b-t').innerHTML = icon('alert',{size:14});

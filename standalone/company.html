@@ -1948,7 +1948,9 @@ function mapAdminRestaurant(apiR, fallback){
     // (و چون fallback در نبودِ تطابقِ id به RESTAURANTS_SAMPLE[0] می‌افتاد،
     // این برایِ هر رستورانِ واقعیِ خارج از نمونه رخ می‌داد). logo/grad عمداً
     // fallback دارند چون واقعاً تزئینی‌اند؛ شهر یک واقعیتِ کسب‌وکار است.
-    city: apiR.cuisine || '—',
+    // ⚠️ ۲۰۲۶-۰۹-۱۳: پیش‌تر `apiR.cuisine` بود — سرور `city` نمی‌فرستاد، پس ستونِ
+    // «شهر» و جست‌وجوی شهر (overview.js:123) رویِ نوعِ غذا کار می‌کردند.
+    city: apiR.city || '—',
     plan: apiR.plan || 'free',
     // وضعیت واقعی اشتراک — از بک‌اند (tenant.plan_expires_at / trial_ends_at)
     status: apiR.subscription_status,
@@ -2405,7 +2407,8 @@ function openProvisionModal(){
 }
 // نگاشتِ details.reason → پیامِ فارسیِ قابلِ‌فهم (§۹ spec)
 const PROV_REASON_FA = {
-  duplicate_owner_phone: 'این شماره قبلاً مالکِ یک رستوران است — برای شعبه‌ی جدید از صفحه‌ی همان رستوران «افزودنِ شعبه» را بزن.',
+  // سرور (provisioning.ts) هر کارمندِ فعال با این شماره را می‌گیرد، نه فقط مالک.
+  duplicate_owner_phone: 'این شماره قبلاً به یک کسب‌وکار (مالک یا کارمند) وصل است — برای شعبه‌ی جدیدِ همان مالک از صفحه‌ی رستوران «افزودنِ شعبه» را بزن.',
   slug_unavailable: 'این slug قبلاً گرفته شده؛ یکی دیگر انتخاب کن یا خالی بگذار تا خودکار ساخته شود.',
   username_taken: 'این نامِ کاربری قبلاً گرفته شده است.',
   branch_limit_reached: 'سقفِ شعبه‌های این تنانت پر است.',
@@ -2454,7 +2457,7 @@ async function submitProvision(){
         <div class="modal-title" style="text-align:center">رستوران ساخته شد</div>
         <div class="modal-sub" style="text-align:center">دعوتِ اولین‌ورود به <b dir="ltr">${esc(d.invite_sent_to||'')}</b> ارسال شد</div>
         <div style="margin:12px 0;font-size:13px">slug: <span class="code-pill" dir="ltr">${esc(d.restaurant?.slug||'')}</span></div>
-        <button class="btn btn-primary btn-block" onclick="closeModal();loadAdminRestaurants().then(rRestaurants)">باشه</button>
+        <button class="btn btn-primary btn-block" onclick="closeModal();loadAdminRestaurants().then(l=>{RESTAURANTS=l;rRestaurants();})">باشه</button>
       </div>`);
     return;
   }
@@ -3114,13 +3117,21 @@ const FEATURE_FLAG_LABEL_FA = {
   // تنها سوییچی که جلویِ ساختِ اعتبارِ *بدونِ پرداخت* را می‌گیرد (POST /gift-cards)
   // از رابطِ اضطراری نه دیده می‌شد نه قابلِ تغییر بود. پیش‌فرضش در بک‌اند خاموش است.
   gift_card_purchase_enabled: 'خریدِ کارتِ هدیه',
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: در `FEATURE_FLAG_KEYS`ِ بک‌اند هست، پیش‌فرض خاموش،
+  // و lib/loyalty.ts خرجِ امتیاز را با آن می‌بندد — ولی اینجا نبود، پس هرگز
+  // رندر نمی‌شد و بدونِ فراخوانیِ مستقیمِ API روشن‌شدنی نبود.
+  points_redemption_enabled: 'خرجِ امتیاز (بازخرید)',
 };
 function featureFlagsPanelHTML(flags){
   flags = flags || {};   // دفاعِ لایه‌دوم: ردیف‌ها «نامعلوم» می‌شوند، نه throw
   return `<div class="panel" style="margin-bottom:20px">
     <div class="panel-head"><div><div class="panel-title">${icon('alert',{size:16})} سوییچ‌هایِ اضطراری</div><div class="panel-sub">خاموش/روشن‌کردنِ سریعِ یک قابلیت برایِ کلِ پلتفرم — بدونِ دیپلوی</div></div></div>
     <div class="mini-list">
-      ${Object.entries(FEATURE_FLAG_LABEL_FA).map(([key,label])=>{
+      ${[...new Set([...Object.keys(FEATURE_FLAG_LABEL_FA), ...Object.keys(flags)])].map((key)=>{
+        // حلقه از اجتماعِ کلیدهای نقشه و **پاسخِ سرور** است: کلیدِ تازه‌ی سرور بدونِ
+        // ترجمه هم دیده و قابلِ تغییر است (برچسب = خودِ کلید) — همان باگی که دو بار
+        // (A3-001 و ۲۰۲۶-۰۹-۱۳) با «فراموش‌کردنِ یک ردیفِ نقشه» تکرار شد.
+        const label = FEATURE_FLAG_LABEL_FA[key] || key;
         // وضعیتِ *غایب* دیگر «فعال» خوانده نمی‌شود. `raw !== false` برایِ کلیدی
         // که اصلاً در پاسخ نیست true می‌داد — همان fail-openی که این پنل نباید داشته باشد.
         const raw = flags[key];
@@ -3422,7 +3433,7 @@ function renderCustomer360(d){
       <div class="panel-head"><div><div class="panel-title">ماموریت‌ها</div><div class="panel-sub">${fa(d.missions.length)} مورد</div></div></div>
       ${d.missions.map(ms=>`<div class="mini-row">
         <div class="mini-info"><div class="mini-name">${esc(ms.title||ms.mission?.title||'')}</div><div class="mini-sub">${fa(ms.progress||0)} از ${fa(ms.targetCount||ms.target_count||0)}</div></div>
-        ${ms.completedAt||ms.completed_at?'<span class="badge badge-warning">تکمیل</span>':''}
+        ${ms.completed||ms.completedAt||ms.completed_at?'<span class="badge badge-warning">تکمیل</span>':''}
       </div>`).join('')}
     </div>`:''}`;
 }
@@ -3945,7 +3956,11 @@ function openMissionModal(id){
 }
 async function submitMission(id){
   const title=(document.getElementById('msTitle')?.value||'').trim();
-  const description=(document.getElementById('msDesc')?.value||'').trim()||undefined;
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: در ویرایش، توضیحِ خالی `undefined` می‌شد و از JSON
+  // حذف ⇒ سرور «دست‌نخورده» می‌خواند و توضیحِ قبلی می‌ماند، با toastِ «به‌روز شد».
+  // PATCH توضیح را nullable می‌پذیرد؛ خالی در ویرایش = null (پاک‌کردنِ عمدی).
+  const descRaw=(document.getElementById('msDesc')?.value||'').trim();
+  const description=descRaw || (id ? null : undefined);
   const target_count=+((document.getElementById('msTarget')?.value)||1);
   const xp_reward=+((document.getElementById('msXp')?.value)||0);
   const wallet_reward=+((document.getElementById('msWallet')?.value)||0);
@@ -4133,7 +4148,8 @@ function renderSalesOrders() {
   return `<div class="mini-list">${SALES_ORDERS.map((o) => {
     const st = SALES_STATUS[o.status] || { label: o.status, cls: 'trial' };
     const isPurchase = o.kind === 'purchase';
-    const canAct = isPurchase && o.status !== 'activated' && o.status !== 'rejected';
+    // `cancelled` هم نهایی است (site-orders.ts ⇒ ۴۲۲)؛ پیش‌تر دکمه‌ها برایش می‌آمدند.
+    const canAct = isPurchase && !['activated', 'rejected', 'cancelled'].includes(o.status);
     const tenantHint = o.tenant_id
       ? 'کسب‌وکار متصل است'
       : (o.suggested_tenant ? `پیشنهاد: ${esc(o.suggested_tenant.tenantName)}` : 'بدونِ کسب‌وکارِ متصل');
@@ -4219,7 +4235,7 @@ function openSalesOrder(id) {
 
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">بستن</button>
-      ${o.status !== 'activated' && o.status !== 'rejected' ? `
+      ${!['activated', 'rejected', 'cancelled'].includes(o.status) ? `
         <button class="btn btn-ghost" onclick="rejectSalesOrder(${jsq(o.id)})">رد کردن</button>
         ${o.status === 'pending' ? `<button class="btn btn-ghost" onclick="contactSalesOrder(${jsq(o.id)})">تماس گرفتم</button>` : ''}
         ${o.kind === 'purchase' ? `<button class="btn btn-primary" onclick="activateSalesOrder(${jsq(o.id)})">فعال‌سازیِ اشتراک</button>` : ''}
@@ -4372,7 +4388,7 @@ const PHOTO_STATUS = {
   rejected: { label: 'ردشده', cls: 'expired' },
 };
 const PHOTO_CATEGORY = {
-  food: 'غذا', interior: 'فضا', drink: 'نوشیدنی', event: 'رویداد', other: 'سایر',
+  food: 'غذا', interior: 'فضا', drink: 'نوشیدنی', event: 'رویداد', logo: 'لوگو', other: 'سایر',
 };
 
 /** حجم به کیلو/مگابایت با ارقامِ فارسی. */

@@ -688,6 +688,9 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/business/js/crm.js#10fff8cec69d', 'loadErrorBlock(title, retry) — هر دو آرگومان literalِ خودِ کدند؛ title با esc() می‌گذره و retry عمداً یک رشته‌ی **کد** برایِ onclick است (نه دیتا).'],
   ['apps/business/js/crm.js#12cae07d62d0', 'کارتِ هویت: RESTAURANT.name با esc() می‌گذره (تنها فیلدِ API)؛ logoEmoji/logoGradient فقط از پیکرِ محلی ست می‌شن (crm.js:274-275 ← pickLogoEmoji/pickLogoGrad)، هرگز از پاسخِ سرور؛ logoPhoto.url و statusLabel هم esc دارن؛ GALLERY.indexOf عدد است.'],
   ['apps/business/js/crm.js#dd7a5ecb6671', 'همان loadErrorBlock مثلِ crm.js:132 — آرگومان‌ها literalِ کدند.'],
+  // ۲۰۲۶-۰۹-۱۳ — ساعتِ کاری و سیاستِ کنسلی حالتِ «بارگیری نشد» گرفتند (ممیزیِ قراردادِ فرانت↔بک).
+  ['apps/business/js/crm.js#bfc803478b08', 'همان loadErrorBlock مثلِ crm.js:132 (ساعتِ کاری) — title و retry هر دو literalِ کدند؛ title با esc() درون loadErrorBlock می‌گذرد.'],
+  ['apps/business/js/crm.js#bfad793050ee', 'همان loadErrorBlock مثلِ crm.js:132 (سیاستِ کنسلی) — title و retry هر دو literalِ کدند؛ title با esc() درون loadErrorBlock می‌گذرد.'],
   ['apps/business/js/menu.js#cbbe45f8aea6', 'گروه/آپشنِ افزودنی‌ها: esc(g.name)/esc(o.name) رویِ متن، jsq(itemId)/jsq(g.id)/jsq(g.name) داخلِ onclick، و fa(min_select)/fa(max_select) رویِ اعداد — هر مسیرِ دیتا پوشش داره.'],
   ['apps/company/js/restaurant.js#c5a4dbdd770c', 'btn.innerHTML = label که خودش چهار خط بالاتر از همان دکمه خوانده شده (ذخیره/بازگرداندنِ برچسبِ دکمه حینِ لودینگ) — رفت‌وبرگشتِ markupِ خودِ عنصر، بدونِ ورودِ هیچ دادهٔ بیرونی.'],
   ['apps/business/js/staff-system.js#1f2adc4987cb',
@@ -765,10 +768,13 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
   ['apps/business/js/crm.js#6cb12248d3bf',
    'کارتِ پیشنهادهای هوشمند. `URG_FA` نگاشتِ ثابتِ درون‌فایل است (crm.js:1165) و '
    + '`crmEffectivenessFa` خروجیِ عددی می‌دهد؛ عنوان و متنِ کارت esc() دارند.'],
-  ['apps/business/js/marketing.js#34e7aa149670',
+  ['apps/business/js/marketing.js#53bf186c70c6',
    'کوپن‌ها. `COUPON_KIND_FA[c.kind]||c.kind` و `COUPON_SEG_FA[...]` روی enumهای دیتابیس‌اند '
    + '— `CouponKind` = percent|fixed|free_item (schema.prisma:1133)، پس شاخه‌ی fallback هم فقط '
-   + 'یک شناسه‌ی ثابت می‌دهد. کدِ کوپن esc() دارد و بقیه fa() است.'],
+   + 'یک شناسه‌ی ثابت می‌دهد. کدِ کوپن esc() دارد و بقیه fa() است. '
+   + 'بازخوانیِ ۲۰۲۶-۰۹-۱۳ (کلیدِ قبلی 34e7aa149670): تنها درجِ تازه `COUPONS_ERROR` است که '
+   + 'پیامِ خطای سرور (`c.error?.message`) را حمل می‌کند و **با esc()** درج می‌شود؛ '
+   + 'زیرعنوان فقط «—» یا fa(طول) است.'],
   ['apps/business/js/marketing.js#d96ef285af55',
    'قانونِ خودکار. `AUTOMATION_TRIGGER_FA[a.trigger]||a.trigger` روی enumِ '
    + '`AutomationTrigger` (schema.prisma:1186) است — پنج مقدارِ شناسه‌ای. `${k}`/`${v}` از '
