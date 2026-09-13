@@ -6,7 +6,14 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 import { withApiMetrics } from '@/lib/api-metrics';
 
-const schema = z.object({ qr_code: z.string().min(1).max(200) });
+// ⚠️ `reservation_code` عمداً با `zReservationCode` (شکلِ سختِ `RZ`+۷) اعتبار
+// سنجی **نمی‌شود**: کدِ اشتباه/بدشکل باید دقیقاً همان ۴۰۳ِ
+// `CHECKIN_IDENTITY_REQUIRED` را بگیرد، نه یک ۴۲۲ِ متفاوت — وگرنه پاسخ خودش
+// می‌گوید «شکلِ کدت درست بود ولی مالِ این میز نبود» و یک اوراکل می‌سازد.
+const schema = z.object({
+  qr_code: z.string().min(1).max(200),
+  reservation_code: z.string().min(1).max(64).optional(),
+});
 
 /**
  * `userId` فراخوان، **فقط اگر** توکنِ مشتریِ معتبر داشته باشد. توکنِ خراب/
@@ -28,7 +35,7 @@ function callerCustomerId(req: Request): string | undefined {
 /**
  * POST /api/v1/checkin — مهمان استیکرِ QRِ رویِ میز را اسکن می‌کند؛ رزروِ
  * فعالِ همان میز از مسیرِ چرخه‌ی حیات `checked_in` و سپس `seated` می‌شود.
- * بدنه: `{ qr_code }`.
+ * بدنه: `{ qr_code, reservation_code? }`.
  *
  * ── مدلِ اعتبارسنجی: «بدونِ احراز هویتِ کاربر، با اعتبارنامه‌ی QR» ──
  *
@@ -63,22 +70,34 @@ function callerCustomerId(req: Request): string | undefined {
  *     (از قبل در `qrCheckIn` بود و دست نخورد).
  *  ۳. `reservation_code` فقط به صاحبِ همان رزرو برمی‌گردد؛ برای بقیه `null`.
  *
- * ── چه چیزی هنوز باز است (صادقانه، پنهان نشده) ──
- * کسی که یک کدِ معتبر را واقعاً در اختیار دارد (عکسِ استیکر) می‌تواند رزروِ
- * همان میز را در همان پنجره‌ی زمانی بنشاند. بستنش عاملِ دوم می‌خواهد
- * (`guest_token` روی رزرو یا QRِ رزرو-محور). امروز **هیچ‌کدام در اسکیما وجود
- * ندارند** — `reservations` ستونِ `guest_token` ندارد (تأییدشده روی DBِ زنده)؛
- * الگویِ موجود فقط رویِ `waitlist_entries` است (مهاجرت‌های ۰۴۱/۰۴۴). این
- * دقیقاً همان شاخه‌ی احتیاطیِ ثبت‌شده در `docs/recovery/PHASE-2-PLAN.md`
- * (بندِ «وابستگی» در P0-2) است: «اگر توکن در دسترس نبود، لایه‌ی ۱ و ۳ فوراً
- * اعمال و لایه‌ی ۲ … به‌عنوانِ موردِ فازِ ۳ ثبت شود، به‌جایِ شکستنِ محصول».
+ * ── عاملِ دومِ هویت (۲۰۲۶-۰۹-۱۱) — جایگزینِ بندِ «چه چیزی هنوز باز است» ──
+ *
+ * کدِ QR روی میز **چسبیده** است؛ ۵۰ بیت آنتروپی فقط جلوی حدس‌زدن را می‌گیرد،
+ * نه جلوی کسی که استیکر را می‌بیند. پس تا امروز هر رهگذری می‌توانست رزروِ
+ * فردِ دیگری را بنشاند. حالا `qrCheckIn` علاوه بر کدِ QR یکی از این دو را
+ * می‌خواهد، وگرنه `403 CHECKIN_IDENTITY_REQUIRED`:
+ *   • توکنِ مشتریِ صاحبِ همان رزرو، یا
+ *   • `reservation_code` در بدنه (کدی که مهمان از پیامک/صفحه‌ی رزرو دارد).
+ *
+ * ⚠️ بهایِ صادقانه‌ی این انتخاب: پاسخِ ۴۰۳ فاش می‌کند که رویِ آن میز **یک
+ * رزروِ فعال هست** (میزِ بی‌رزرو همان ۲۰۰ِ `checked_in:false` قبلی را می‌دهد).
+ * این یک معامله‌ی **آگاهانه و پذیرفته‌شده** با قابلیتِ استفاده است: بستنش
+ * یعنی پاسخِ یکسان برای هر دو حالت، و آن‌وقت مهمانِ واقعی هیچ‌وقت نمی‌فهمد
+ * باید کدش را وارد کند. نشتِ اطلاعات محدود به «فعال بودن/نبودنِ رزرو روی این
+ * میزِ فیزیکی، همین حالا» است — نه هویت، نه کد، نه زمان.
+ *
+ * ⚠️ و رفعِ قوی‌تر همچنان همان است که قبلاً ثبت شده بود: `guest_token`
+ * به‌ازایِ هر رزرو (الگویِ موجود روی `waitlist_entries`، مهاجرت‌های ۰۴۱/۰۴۴).
+ * کدِ رزرو یک رازِ **نیمه‌**محرمانه است (کلیدِ `GET/PATCH /reservations/:code`)
+ * و ممکن است روی رسید/چت دیده شود؛ توکنِ اختصاصیِ check-in این را هم می‌بندد.
+ * انجامش مهاجرتِ اسکیما می‌خواهد و عمداً در این تغییر نیامده.
  */
 async function POST_impl(req: Request) {
   try {
     // اول ریت‌لیمیت، بعد پارسِ بدنه: بدنه‌ی درخواستِ مردود اصلاً خوانده نشود.
     await enforceRateLimit(clientIp(req), RULES.qrCheckin);
 
-    const { qr_code } = await parseBody(req, schema);
+    const { qr_code, reservation_code } = await parseBody(req, schema);
 
     // رستوران از خودِ اعتبارنامه مشتق می‌شود، نه از توکنِ فراخوان.
     const table = await resolveQrTable(qr_code);
@@ -88,7 +107,10 @@ async function POST_impl(req: Request) {
     // وجودِ کد می‌سازد.
     if (!table) throw Err.notFound('میز');
 
-    const result = await qrCheckIn(qr_code, table.restaurantId, { userId: callerCustomerId(req) });
+    const result = await qrCheckIn(qr_code, table.restaurantId, {
+      userId: callerCustomerId(req),
+      reservationCode: reservation_code,
+    });
     return NextResponse.json(result);
   } catch (e) {
     return errorResponse(e);

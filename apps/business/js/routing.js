@@ -146,6 +146,7 @@ async function selectBranch(id){
   API.setActiveRestaurant(id);
   // همه‌ی کش‌های سطح-شعبه را باطل کن تا صفحات دوباره از سرور بخوانند
   if(typeof _wlLoaded!=='undefined') _wlLoaded=false;
+  if(typeof _wlAnalyticsLoaded!=='undefined') _wlAnalyticsLoaded=false;
   if(typeof _staffLoaded!=='undefined') _staffLoaded=false;
   if(typeof _notesLoaded!=='undefined') _notesLoaded=false;
   if(typeof _segCounts!=='undefined') _segCounts=null;

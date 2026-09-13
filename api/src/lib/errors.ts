@@ -49,6 +49,20 @@ export const Err = {
   // ── بن سختِ پلتفرم (کاملاً جدا از فلگِ نرمِ abuse) ──
   userBanned: (reason?: string | null) => new ApiError('USER_BANNED', 'دسترسیِ این حساب توسطِ رزرونو مسدود شده است', 403, reason ? { reason } : {}),
 
+  // ── check-inِ QR: عاملِ دومِ هویت لازم است ──
+  //
+  // چرا کدِ اختصاصی و نه `forbidden()`: `FORBIDDEN_TENANT` یعنی «تو اجازه
+  // نداری» و کلاینت کارِ دیگری با آن ندارد جز نمایشِ خطا. این حالت برعکس
+  // است — یک **درخواستِ ورودی**: اپ باید فرمِ «کدِ رزروت را وارد کن» را باز
+  // کند و همان درخواست را با `reservation_code` دوباره بفرستد. بدونِ کدِ
+  // متمایز، تنها مصرف‌کننده (apps/customer/js/features/checkin.js) نمی‌تواند
+  // این را از یک ۴۰۳ِ واقعی تشخیص بدهد.
+  checkinIdentityRequired: () => new ApiError(
+    'CHECKIN_IDENTITY_REQUIRED',
+    'برای ثبتِ ورود، کدِ رزروت را وارد کن (یا با حسابی که رزرو با آن ثبت شده وارد شو).',
+    403,
+  ),
+
   // ── سوییچ‌هایِ قابلیت (kill-switch سطحِ پلتفرم) ──
   featureDisabled: (label: string) => new ApiError('FEATURE_DISABLED', `«${label}» موقتاً غیرفعال است`, 503),
 

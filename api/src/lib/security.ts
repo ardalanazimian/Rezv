@@ -171,3 +171,88 @@ export function parseAllowedOrigins(raw: string | undefined | null): OriginsPars
   }
   return { valid, problems };
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CSRF — تصمیمِ خالصِ «این درخواستِ تغییردهنده مجاز است؟»
+//
+//  چرا اینجا و نه داخلِ middleware: middleware به next/server و ioredis گره
+//  خورده و در تستِ واحد قابلِ صدا زدن نیست. همان الگویِ parseAllowedOrigins
+//  بالا — منطق اینجا خالص و تست‌پذیر، و middleware فقط هدرها را می‌خواند.
+//
+//  ⚠️ باگِ رفع‌شده: شرطِ قبلی `allowed.length > 0 && origin && !allowed.includes(origin)`
+//  بود — یعنی درخواستِ mutating **بدونِ** هدرِ Origin همیشه رد نمی‌شد و بی‌صدا
+//  عبور می‌کرد. دقیقاً همان حالتی که یک POSTِ فرمِ ساده‌ی cross-site می‌سازد.
+//  (auth با Bearer است پس این لایه دفاع در عمق است، ولی گاردی که ساده‌ترین
+//  راهِ دور زدنش «هدر را نفرست» باشد اصلاً گارد نیست.)
+//
+//  قاعده‌ی جدید، صادقانه — به ترتیب:
+//   ۱. Origin هست  → باید در ALLOWED_ORIGINS باشد، وگرنه رد.
+//   ۲. Origin نیست ولی `Sec-Fetch-Site: same-origin|same-site` → مجاز.
+//      این هدر را خودِ مرورگر می‌گذارد و JSِ صفحه نمی‌تواند جعلش کند
+//      (forbidden header name)، پس ادعایِ «هم‌مبدأ» قابلِ اتکاست.
+//   ۳. Origin نیست ولی `Referer` داریم که originش در فهرست است → مجاز.
+//      (پستِ فرمِ same-origin در مرورگرهای قدیمی‌تر Origin نمی‌فرستد ولی
+//      Referer می‌فرستد.)
+//   ۴. Origin نیست ولی درخواست هدرِ «غیرِ ساده» دارد (Authorization یا
+//      x-maintenance-key) → مجاز. استدلال: فرمِ ساده‌ی cross-site اصلاً
+//      نمی‌تواند هدرِ سفارشی بگذارد؛ هر کلاینتی که می‌گذارد یا مرورگر است
+//      (که آن‌وقت preflight خورده و CORS بالا سنجیدش) یا اصلاً مرورگر نیست
+//      و CSRF برایش بی‌معناست. این بند عمداً هست چون کرونِ واقعی همین است:
+//      `cron/run.sh` با curl و هدرِ x-maintenance-key POST می‌زند، بدونِ
+//      Origin — بدونِ این بند، کلِ کرونِ نگه‌داری بی‌صدا ۴۰۳ می‌شد
+//      (curl -sf هیچ خطایی چاپ نمی‌کند).
+//   ۵. هیچ‌کدام → رد. یعنی درخواستِ بی‌نشانه دیگر عبور نمی‌کند.
+//
+//  آنچه این لایه **نمی‌پوشاند** (صریح): وقتی ALLOWED_ORIGINS خالی است، هیچ
+//  چکی انجام نمی‌شود — گاردِ production در middleware جلوی آن حالت را
+//  می‌گیرد، نه این تابع.
+// ═══════════════════════════════════════════════════════════════════════
+
+export type CsrfSignals = {
+  origin: string | null;
+  secFetchSite: string | null;
+  referer: string | null;
+  /** آیا هدری دارد که وجودش یعنی درخواست «ساده» نبوده (Authorization / x-maintenance-key)؟ */
+  hasNonSimpleHeader: boolean;
+};
+
+export type CsrfVerdict = {
+  allowed: boolean;
+  /** دلیلِ ماشین‌خوان — برای لاگ و برای تست، تا «چرا» هم قفل شود نه فقط «چه». */
+  reason:
+    | 'no_allowlist'          // ALLOWED_ORIGINS تنظیم نشده → این لایه خاموش است
+    | 'origin_allowed'
+    | 'origin_rejected'
+    | 'sec_fetch_same_site'
+    | 'referer_allowed'
+    | 'non_simple_header'     // کلاینتِ غیرمرورگری/preflight-شده (مثلِ کرون)
+    | 'no_trusted_signal';    // هیچ نشانه‌ای نداشت → رد
+};
+
+/** تصمیمِ CSRF برای یک درخواستِ **تغییردهنده** (POST/PATCH/PUT/DELETE). */
+export function checkMutatingOrigin(s: CsrfSignals, allowed: string[]): CsrfVerdict {
+  if (allowed.length === 0) return { allowed: true, reason: 'no_allowlist' };
+
+  if (s.origin) {
+    return allowed.includes(s.origin)
+      ? { allowed: true, reason: 'origin_allowed' }
+      : { allowed: false, reason: 'origin_rejected' };
+  }
+
+  const site = s.secFetchSite?.trim().toLowerCase();
+  if (site === 'same-origin' || site === 'same-site') {
+    return { allowed: true, reason: 'sec_fetch_same_site' };
+  }
+
+  if (s.referer) {
+    try {
+      if (allowed.includes(new URL(s.referer).origin)) {
+        return { allowed: true, reason: 'referer_allowed' };
+      }
+    } catch { /* Referer بدفرم = هیچ نشانه‌ای؛ به بندِ بعد برو */ }
+  }
+
+  if (s.hasNonSimpleHeader) return { allowed: true, reason: 'non_simple_header' };
+
+  return { allowed: false, reason: 'no_trusted_signal' };
+}

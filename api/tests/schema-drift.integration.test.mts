@@ -46,7 +46,9 @@ const { db } = await import('../src/lib/db.ts');
 // **جزئی** است (WHERE role='owner') که Prisma در schema نمی‌تواند بیانش کند،
 // پس migrate diff همیشه قصدِ DROPش را دارد. حضورِ اجباری‌اش را تستِ «required»
 // همین فایل تضمین می‌کند؛ این regex فقط جلوی قرمزیِ کاذبِ diff را می‌گیرد.
-const ACCEPTED_DRIFT = /ALTER TABLE "reservations" DROP COLUMN "block_end"|(ALTER TABLE "[a-z_]+" )?ALTER COLUMN "id" DROP DEFAULT|DROP INDEX "(public"\.")?staff_owner_phone_unique_idx"/;
+// پذیرفته‌ی چهارم (مهاجرتِ ۰۸۶): payments_one_success_per_reservation هم به
+// همان دلیل جزئی است (WHERE status='success') و همان رفتار را دارد.
+const ACCEPTED_DRIFT = /ALTER TABLE "reservations" DROP COLUMN "block_end"|(ALTER TABLE "[a-z_]+" )?ALTER COLUMN "id" DROP DEFAULT|DROP INDEX "(public"\.")?(staff_owner_phone_unique_idx|payments_one_success_per_reservation)"/;
 
 describe('انحرافِ اسکیما بینِ schema.prisma و DBِ اعمال‌شده (§۲۴)', () => {
   test('هیچ دو ایندکسی با تعریفِ یکسان وجود ندارد', async () => {
@@ -86,6 +88,11 @@ describe('انحرافِ اسکیما بینِ schema.prisma و DBِ اعمال�
       // provisioning/trial. جزئی است و Prisma نمی‌تواند اعلامش کند، پس فقط
       // همین‌جا و در SQL زندگی می‌کند (کامنتِ مدلِ Staff در schema).
       'staff_owner_phone_unique_idx',
+      // migration 086 — حداکثر یک پرداختِ موفق به‌ازای هر رزرو؛ ضامنِ ساختاریِ
+      // ضدِ کسرِ دوباره‌ی بیعانه از راهِ authorityِ جایگزین‌شده. جزئی است
+      // (WHERE status='success') و Prisma نمی‌تواند اعلامش کند، پس فقط
+      // همین‌جا و در SQL زندگی می‌کند (کامنتِ مدلِ Payment در schema).
+      'payments_one_success_per_reservation',
     ];
     const rows = await db.$queryRaw<Array<{ indexname: string }>>`
       SELECT indexname FROM pg_indexes WHERE schemaname = 'public'

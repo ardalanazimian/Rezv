@@ -6675,6 +6675,13 @@ window.renderChats = renderChats;
 //  رمزنگارانه از `genQrToken` در `api/src/lib/tables.ts`) به‌علاوه‌ی
 //  ریت‌لیمیتِ اختصاصیِ per-IP روی همان مسیر.
 //
+//  ⚠️ از ۲۰۲۶-۰۹-۱۱ کدِ QR به‌تنهایی کافی **نیست**: استیکر رویِ میز چسبیده،
+//  پس هر کسی که ببیندش می‌توانست رزروِ فردِ دیگری را بنشاند. سرور حالا عاملِ
+//  دوم می‌خواهد — یا توکنِ صاحبِ رزرو، یا `reservation_code` در بدنه — و اگر
+//  نداشته باشد `403 CHECKIN_IDENTITY_REQUIRED` می‌دهد. این کد **خطا نیست**،
+//  یک درخواستِ ورودی است: فرمِ کدِ رزرو باز می‌شود و همان درخواست دوباره
+//  می‌رود (`askReservationCode` / `submitCheckInCode` پایین‌تر).
+//
 //  ⚠️ اگر لاگین باشی، توکنت هم فرستاده می‌شود — نه برای اجازه‌ی check-in،
 //  بلکه فقط تا سرور بتواند `reservation_code` را نشان دهد. برای فراخوانِ
 //  ناشناس آن فیلد همیشه `null` است (نشتِ کدِ رزروِ فردِ دیگر). پس **هرگز**
@@ -6734,7 +6741,55 @@ async function runPendingCheckIn() {
   // صفحه را رفرش کند، نباید دوباره اجرا شود.
   clearCheckInParam();
 
-  const res = await API.post('/checkin', { qr_code: code });
+  await submitCheckIn(code);
+}
+
+/**
+ * فرمِ «کدِ رزروت رو وارد کن» — وقتی سرور `CHECKIN_IDENTITY_REQUIRED` داد.
+ *
+ * ⚠️ چرا این فرم لازم شد: از ۲۰۲۶-۰۹-۱۱ خودِ کدِ QR دیگر کافی نیست. استیکر
+ * رویِ میز چسبیده و هر رهگذری می‌دیدش، پس می‌توانست رزروِ فردِ دیگری را
+ * بنشاند. حالا سرور یا توکنِ صاحبِ رزرو می‌خواهد یا کدِ رزرو.
+ *
+ * کدِ میز در یک متغیرِ ماژول نگه داشته می‌شود چون onclickِ inline (الگویِ
+ * همین اپ) نمی‌تواند آرگومان ببرد — همان کاری که rewards.js با
+ * `saveRewardDates` می‌کند.
+ */
+let pendingQrCode = null;
+
+function askReservationCode() {
+  openSheet(`<div style="padding:4px 0">
+    <div style="font-size:44px;line-height:1;text-align:center">🎫</div>
+    <div class="sheet-title" style="text-align:center;margin-top:8px">کدِ رزروت رو وارد کن</div>
+    <div class="sheet-sub" style="text-align:center;margin-bottom:18px">برای اینکه مطمئن بشیم این رزرو مالِ خودته. کد رو در پیامکِ تأیید یا صفحه‌ی رزروت می‌بینی.</div>
+    <input id="checkinResvCode" class="inp" type="text" inputmode="latin" autocomplete="off" placeholder="RZXXXXXXX" style="direction:ltr;text-align:center;font-family:monospace">
+    <button class="btn btn-primary btn-lg btn-block" style="margin-top:16px" onclick="submitCheckInCode()">ثبتِ ورود</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
+  </div>`);
+}
+
+/** دکمه‌ی فرمِ بالا — همان درخواست را با `reservation_code` دوباره می‌فرستد. */
+async function submitCheckInCode() {
+  const input = document.getElementById('checkinResvCode');
+  const typed = input?.value.trim();
+  if (!typed) { toast('', 'کدِ رزروت رو وارد کن'); return; }
+  if (!pendingQrCode) { toast('', 'کدِ میز پیدا نشد؛ دوباره اسکن کن'); return; }
+
+  const btn = document.querySelector('#sheetBody .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'در حال ثبت...'; }
+
+  await submitCheckIn(pendingQrCode, typed);
+}
+
+/**
+ * ارسالِ واقعیِ درخواست + نمایشِ نتیجه. `reservationCode` فقط در تلاشِ دوم
+ * (بعد از `CHECKIN_IDENTITY_REQUIRED`) پر است.
+ */
+async function submitCheckIn(code, reservationCode) {
+  pendingQrCode = code;
+  const res = await API.post('/checkin', reservationCode
+    ? { qr_code: code, reservation_code: reservationCode }
+    : { qr_code: code });
 
   if (res.offline) {
     resultSheet('📶', 'اتصال برقرار نشد',
@@ -6743,6 +6798,14 @@ async function runPendingCheckIn() {
   }
 
   if (!res.ok) {
+    // سرور می‌گوید عاملِ دومِ هویت لازم است ⇒ خطا نیست، یک **درخواستِ ورودی**
+    // است: فرم را باز کن و همان درخواست را با کدِ رزرو دوباره بفرست. اگر کدِ
+    // واردشده هم غلط باشد، سرور دوباره همین را می‌دهد و فرم باز می‌ماند.
+    if (res.error?.code === 'CHECKIN_IDENTITY_REQUIRED') {
+      if (reservationCode) toast('', 'این کد با رزروِ این میز نمی‌خوانَد');
+      askReservationCode();
+      return;
+    }
     // ۴۰۴ = کدِ ناشناس (استیکرِ قدیمی/مالِ رستورانِ دیگر). بقیه = خطایِ واقعی.
     const notFound = res.status === 404;
     resultSheet('⚠️',
@@ -6789,6 +6852,7 @@ async function runPendingCheckIn() {
 
 // پنل/اکشن‌های سراسری این اپ از `window` استفاده می‌کنند (onclickهای inline).
 window.closeSheet = window.closeSheet || closeSheet;
+window.submitCheckInCode = submitCheckInCode;
 
 
 /* ═══ js/features/palette.js ═══ */

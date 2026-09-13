@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
+import { isPlaceholderSecret } from './env';
 
 // ═══════════════════════════════════════════════════════════
 //  احراز هویت endpointهای نگهداری (cron)
@@ -28,7 +29,15 @@ export function guardMaintenance(req: Request): NextResponse | null {
   const key = req.headers.get('x-maintenance-key');
   const expected = process.env.MAINTENANCE_KEY;
   // روش ۱: هدر x-maintenance-key (فراخوانی دستی/کران خارجی)
-  if (expected && key && safeEqual(key, expected)) return null;
+  //
+  // ⚠️ رفعِ ممیزی: قبلاً فقط `expected` بودنِ مقدار کافی بود، پس اگر کسی
+  // `.env.example` را کپی می‌کرد و `MAINTENANCE_KEY=change-me-random-string`
+  // می‌ماند، همین در باز بود — با کلیدی که در مخزن نوشته شده. حالا مقادیرِ
+  // جانشین به‌جای «مقایسه با آن‌ها» صریح **رد** می‌شوند: یعنی حتی اگر مهاجم
+  // دقیقاً همان رشته را بفرستد، مقایسه‌ای انجام نمی‌شود.
+  // (گاردِ production در middleware اصلاً نمی‌گذارد سرویس با چنین مقداری بالا
+  //  بیاید؛ این خط همان محافظت را در محیط‌های غیرِ production هم نگه می‌دارد.)
+  if (expected && !isPlaceholderSecret(expected) && key && safeEqual(key, expected)) return null;
   // روش ۲: Vercel Cron — هدر Authorization: Bearer ${CRON_SECRET}
   // Vercel این هدر را خودکار به درخواست‌های cron اضافه می‌کند.
   //
@@ -42,9 +51,10 @@ export function guardMaintenance(req: Request): NextResponse | null {
   // در `/api/metrics` (PR #58) و `setAbuseFlagManually` (PR #59) هم دیده شد.
   // و اینجا کلیدِ پشتِ در، مسیرهایی مثلِ `maintenance/retention` را باز
   // می‌کند که داده پاک می‌کنند.
+  // همان قاعده‌ی جانشین اینجا هم اعمال می‌شود — درِ دومِ همین اتاق است.
   const cronSecret = process.env.CRON_SECRET;
   const authz = req.headers.get('authorization');
-  if (cronSecret && authz && safeEqual(authz, `Bearer ${cronSecret}`)) return null;
+  if (cronSecret && !isPlaceholderSecret(cronSecret) && authz && safeEqual(authz, `Bearer ${cronSecret}`)) return null;
   // هیچ‌کدام معتبر نبود
   return NextResponse.json(
     { ok: false, error: { code: 'UNAUTHORIZED', message: 'دسترسی غیرمجاز' } },
