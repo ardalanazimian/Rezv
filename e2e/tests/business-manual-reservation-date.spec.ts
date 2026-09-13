@@ -61,53 +61,85 @@ function expectedLabel(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('fa-IR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-test('B-01: برچسبِ تاریخِ انتخاب‌شده با تاریخی که POST می‌شود یکی است', async ({ page }) => {
-  const posts: Captured[] = [];
-  await mockBizApi(page, posts);
-  await login(page);
-  await page.evaluate(() => (window as unknown as { openManual: () => void }).openManual());
+/**
+ * ⚠️ ساعتِ صفحه روی **مرزِ روز** ثابت می‌شود: ۰۰:۳۰ِ تهران = ۲۱:۰۰ِ UTCِ روزِ قبل.
+ *
+ * چرا (۲۰۲۶-۰۹-۱۳، اجرای کاملِ e2e روی 923a20a — هر سه پروژه قرمز): مرجعِ تست
+ * `toISOString()` بود، یعنی روزِ **UTC**ِ ماشینِ تست، در حالی که اپ — درست، طبقِ
+ * رفعِ B-01 در دستورِ ۰۴۵ — روزِ تقویمیِ **رستوران** (Asia/Tehran) را می‌فرستد.
+ * این دو فقط میانِ نیمه‌شبِ تهران و نیمه‌شبِ UTC از هم جدا می‌شوند؛ پس تست
+ * هر شب سه ساعت و نیم قرمز بود (اجرای من ۰۲:۳۵–۰۳:۱۷ تهران)، و بقیه‌ی روز —
+ * بدتر — **نمی‌توانست** برگشتِ اپ به روزِ UTC را بگیرد، چون دو ساعت یکی بودند.
+ * با ساعتِ ثابت روی مرز، همان ادعا در هر ساعتی از روز واقعاً سنجیده می‌شود.
+ *
+ * و دستگاهِ پرسنل روی UTC اجرا می‌شود (describe پایین)، چون نقصِ اصلیِ ۰۴۵
+ * «تبلتی که روی UTC مانده» بود؛ با دستگاهِ تهران، اپی که به ساعتِ دستگاه
+ * برگردد همان روز را می‌دهد و تست سبز می‌ماند — اندازه‌گیری شد، نه فرض.
+ */
+const BOUNDARY = new Date('2026-09-12T21:00:00Z');
+// پیش‌فرضِ HOURS_STATE.timezone در apps/business/js/crm.js — این mock ساعاتِ کاری را لود نمی‌کند
+const RESTAURANT_TZ = 'Asia/Tehran';
 
-  const sel = page.locator('#mDate');
-  await expect(sel).toBeVisible();
+/** روزِ تقویمیِ رستوران در لحظه‌ی BOUNDARY، به‌علاوه‌ی n روز — مستقل از TZِ ماشینِ تست. */
+function restaurantDay(n: number): string {
+  const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: RESTAURANT_TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(BOUNDARY).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n, 12)).toISOString().slice(0, 10);
+}
 
-  // یک روزِ **غیرِ امروز** انتخاب می‌شود تا offset هم سنجیده شود، نه فقط مبدأ.
-  await sel.selectOption('d5');
-  const shownLabel = (await sel.locator('option[value="d5"]').innerText()).trim();
-  expect(shownLabel.length, 'گزینه‌ی d5 باید وجود داشته باشد — نبودش خطاست، نه عبور').toBeGreaterThan(0);
+test.describe('B-01 — تبلتِ پرسنل روی UTC، رستوران در تهران (دستورِ ۰۴۵)', () => {
+  // دستگاه عمداً **غیرِ** تایم‌زونِ رستوران است: پیکربندیِ پروژه‌ها Asia/Tehran است و با
+  // آن، برگشتِ اپ به «ساعتِ دستگاه» (خودِ نقصِ ۰۴۵) از این تست دیده نمی‌شد.
+  test.use({ timezoneId: 'UTC' });
 
-  await page.locator('#mName').fill('مهمانِ آزمایشی');
-  await page.locator('#mPhone').fill('۰۹۱۲۰۰۰۰۰۰۰');
-  await page.locator('button.btn-primary.btn-lg.btn-block').click();
+  test('B-01: برچسبِ تاریخِ انتخاب‌شده با تاریخی که POST می‌شود یکی است', async ({ page }) => {
+    const posts: Captured[] = [];
+    await page.clock.setFixedTime(BOUNDARY);
+    // کنترلِ مثبتِ روش: اگر این دو برابر باشند، BOUNDARY دیگر روی مرز نیست و ادعای پایین تهی است.
+    expect(restaurantDay(0), 'BOUNDARY باید روزِ تهران را از روزِ UTC جدا کند')
+      .not.toBe(BOUNDARY.toISOString().slice(0, 10));
+    await mockBizApi(page, posts);
+    await login(page);
+    await page.evaluate(() => (window as unknown as { openManual: () => void }).openManual());
 
-  await expect.poll(() => posts.length, { timeout: 10_000 }).toBeGreaterThan(0);
-  const sentDate = posts[0].date;
-  expect(sentDate, 'بدنه‌ی POST باید تاریخ داشته باشد').toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const sel = page.locator('#mDate');
+    await expect(sel).toBeVisible();
 
-  // ⚠️ ورود با رمز (مسیرِ اصلیِ تولید — OTP در پنل‌ها خاموش است) `STAFF_INFO` را
-  // ست نمی‌کرد، فقط مسیرِ OTP این کار را می‌کرد. پس بدنه
-  // `restaurant_id: STAFF_INFO?.restaurant_id || undefined` می‌فرستاد و چون
-  // `undefined` از JSON حذف می‌شود، کلید اصلاً نمی‌رفت — در حالی که شِیمِ سرور
-  // (`reservations/route.ts:22`) آن را `zUuid`ِ الزامی می‌خواهد. یعنی رزروِ
-  // دستی برای هر کارمندی که با رمز وارد شده بود روی سرور رد می‌شد.
-  expect(posts[0].restaurantId, 'رزروِ دستی بدونِ restaurant_id رفت — سرور آن را رد می‌کند (zUuid)')
-    .toBe(RESTAURANT_UUID);
+    // یک روزِ **غیرِ امروز** انتخاب می‌شود تا offset هم سنجیده شود، نه فقط مبدأ.
+    await sel.selectOption('d5');
+    const shownLabel = (await sel.locator('option[value="d5"]').innerText()).trim();
+    expect(shownLabel.length, 'گزینه‌ی d5 باید وجود داشته باشد — نبودش خطاست، نه عبور').toBeGreaterThan(0);
 
-  // قلبِ ادعا: آنچه دیده شد == آنچه ثبت شد.
-  expect(shownLabel, `برچسبِ «${shownLabel}» با تاریخِ ثبت‌شده‌ی ${sentDate} نمی‌خواند`)
-    .toBe(expectedLabel(sentDate!));
+    await page.locator('#mName').fill('مهمانِ آزمایشی');
+    await page.locator('#mPhone').fill('۰۹۱۲۰۰۰۰۰۰۰');
+    await page.locator('button.btn-primary.btn-lg.btn-block').click();
 
-  // ⚠️ assertِ بالا فقط **توافق** را می‌سنجد. جهشی که برچسب و مقدار را با هم
-  // جابه‌جا کند (مثلاً offset را یک‌واحد زیاد کند) از آن رد می‌شود، چون هر دو
-  // با هم می‌لغزند. پس مبدأ و گام هم جدا پین می‌شوند:
-  const expectDay = (n: number) => {
-    const d = new Date(); d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
-  };
-  expect(sentDate, 'گزینه‌ی d5 باید دقیقاً پنج روز بعد از امروز باشد').toBe(expectDay(5));
+    await expect.poll(() => posts.length, { timeout: 10_000 }).toBeGreaterThan(0);
+    const sentDate = posts[0].date;
+    expect(sentDate, 'بدنه‌ی POST باید تاریخ داشته باشد').toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
-  const todayLabel = (await sel.locator('option[value="today"]').innerText()).trim();
-  expect(todayLabel, 'برچسبِ «امروز» باید تاریخِ واقعیِ امروز را نشان دهد')
-    .toBe(`امروز — ${expectedLabel(expectDay(0))}`);
+    // ⚠️ ورود با رمز (مسیرِ اصلیِ تولید — OTP در پنل‌ها خاموش است) `STAFF_INFO` را
+    // ست نمی‌کرد، فقط مسیرِ OTP این کار را می‌کرد. پس بدنه
+    // `restaurant_id: STAFF_INFO?.restaurant_id || undefined` می‌فرستاد و چون
+    // `undefined` از JSON حذف می‌شود، کلید اصلاً نمی‌رفت — در حالی که شِیمِ سرور
+    // (`reservations/route.ts:22`) آن را `zUuid`ِ الزامی می‌خواهد. یعنی رزروِ
+    // دستی برای هر کارمندی که با رمز وارد شده بود روی سرور رد می‌شد.
+    expect(posts[0].restaurantId, 'رزروِ دستی بدونِ restaurant_id رفت — سرور آن را رد می‌کند (zUuid)')
+      .toBe(RESTAURANT_UUID);
+
+    // قلبِ ادعا: آنچه دیده شد == آنچه ثبت شد.
+    expect(shownLabel, `برچسبِ «${shownLabel}» با تاریخِ ثبت‌شده‌ی ${sentDate} نمی‌خواند`)
+      .toBe(expectedLabel(sentDate!));
+
+    // ⚠️ assertِ بالا فقط **توافق** را می‌سنجد. جهشی که برچسب و مقدار را با هم
+    // جابه‌جا کند (مثلاً offset را یک‌واحد زیاد کند) از آن رد می‌شود، چون هر دو
+    // با هم می‌لغزند. پس مبدأ و گام هم جدا پین می‌شوند:
+    expect(sentDate, 'گزینه‌ی d5 باید دقیقاً پنج روز بعد از امروزِ رستوران باشد').toBe(restaurantDay(5));
+
+    const todayLabel = (await sel.locator('option[value="today"]').innerText()).trim();
+    expect(todayLabel, 'برچسبِ «امروز» باید تاریخِ واقعیِ امروزِ رستوران را نشان دهد')
+      .toBe(`امروز — ${expectedLabel(restaurantDay(0))}`);
+  });
 });
 
 /**
