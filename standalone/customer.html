@@ -731,6 +731,8 @@
      توکنیزه به‌نظر می‌رسید، عملاً سه رنگِ متفاوت رندر می‌کرد. حالا تعریف شد و
      همه به همان بنفشِ برند می‌رسند. */
   --brand:#C8430F;
+  /* سفید روی برند، عکس و سطحِ تیره — همتای --brand-contrast ِ لندینگ؛ در هر دو تم ثابت */
+  --on-brand:#FFFFFF;
   /* ⚠️ رنگِ برند برایِ **متن** ≠ رنگِ برند برایِ **پُرکردن**. اندازه‌گیریِ واقعی:
      `--blue` به‌عنوانِ متن ۲٫۸۹:۱ رویِ نوارِ پایینِ تیره و ۳٫۹۱:۱ رویِ زمینه‌ی
      تیره می‌داد — زیرِ ۴٫۵ در WCAG 1.4.3 AA (متنِ ۱۰ تا ۱۲٫۵ پیکسل، یعنی
@@ -1322,10 +1324,10 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .lac-body{flex:1}.lac-title{font-size:15px;font-weight:700;color:var(--t1)}.lac-sub{font-size:12.5px;color:var(--t3);margin-top:2px}
 .lac-arrow{font-size:22px;color:var(--t3)}
 /* ── دعوت دوستان ── */
-.ref-code-box{background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px dashed #A78BFA;border-radius:16px;padding:16px;text-align:center;position:relative}
-.ref-code-label{font-size:12px;color:#7C3AED;margin-bottom:6px}
-.ref-code{font-size:26px;font-weight:800;letter-spacing:3px;color:#5B21B6;font-family:monospace}
-.ref-copy{position:absolute;top:14px;left:14px;background:#7C3AED;color:#fff;border:none;padding:5px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.ref-code-box{background:var(--blue-50);border:2px dashed var(--blue);border-radius:var(--radius-lg);padding:16px;text-align:center;position:relative}
+.ref-code-label{font-size:var(--fs-xs);color:var(--blue-text);margin-bottom:6px}
+.ref-code{font-size:var(--fs-2xl);font-weight:800;letter-spacing:3px;color:var(--on-tint);font-family:monospace}
+.ref-copy{position:absolute;top:14px;left:14px;background:var(--blue);color:var(--on-brand);border:none;padding:5px 14px;border-radius:var(--radius-xs);font-size:var(--fs-xs);font-weight:700;cursor:pointer;font-family:inherit}
 .ref-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
 .ref-stat{background:var(--s-50,#f8fafc);border-radius:12px;padding:12px;text-align:center}
 .ref-stat-v{font-size:20px;font-weight:800;color:var(--t1)}.ref-stat-l{font-size:11px;color:var(--t3);margin-top:2px}
@@ -1442,7 +1444,7 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .onb-card{position:relative;width:100%;max-width:380px;background:var(--card,#12131a);border:1px solid var(--s-200,rgba(255,255,255,.08));border-radius:24px;padding:36px 24px 24px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.5);transform:translateY(12px) scale(.98);transition:transform .2s var(--spring,cubic-bezier(.34,1.56,.64,1))}
 .onb-overlay.show .onb-card{transform:none}
 .onb-skip{position:absolute;top:14px;left:16px;background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:6px 8px;min-height:24px}
-.onb-emoji{font-size:64px;line-height:1;margin:8px 0 18px}
+.onb-emoji{display:flex;align-items:center;justify-content:center;width:72px;height:72px;margin:4px auto 18px;border-radius:50%;background:var(--blue);color:var(--on-brand)}
 .onb-title{font-size:21px;font-weight:800;color:var(--t1);margin-bottom:10px}
 .onb-text{font-size:14px;color:var(--t2);line-height:1.8;margin-bottom:22px}
 .onb-dots{display:flex;gap:7px;justify-content:center;margin-bottom:22px}
@@ -1479,8 +1481,8 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .sheet-overlay.show{display:flex;animation:fadeUp .2s}
 .sheet{background:var(--white);border-radius:var(--r-2xl) var(--r-2xl) 0 0;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;
   padding:10px 22px 30px;animation:slideUp var(--t-slow) var(--ease);box-shadow:var(--sh-xl)}
-.sheet-handle{width:38px;height:4px;border-radius:2px;background:var(--s-300);margin:8px auto 18px}
-.sheet-title{font-size:20px;font-weight:800;letter-spacing:-.03em;margin-bottom:4px}
+.sheet-handle{width:36px;height:5px;border-radius:var(--radius-full);background:var(--s-300);margin:8px auto 18px}
+.sheet-title{font-size:var(--fs-2xl);font-weight:900;letter-spacing:0;margin-bottom:4px}
 .sheet-sub{font-size:13px;color:var(--t2);margin-bottom:20px}
 
 /* booking: stepper */
@@ -1514,18 +1516,18 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .sum-row+.sum-row{border-top:1px solid var(--border)}
 .sum-row .k{color:var(--t2)}.sum-row .v{font-weight:700}
 .reward-row{display:flex;gap:10px;margin-bottom:18px}
-.reward{flex:1;background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:13px;text-align:center}
+.reward{flex:1;background:var(--s-50);border:none;border-radius:var(--r-lg);padding:13px;text-align:center}
 .reward .rv{font-size:18px;font-weight:800}
 .reward .rv.blue{color:var(--blue)}.reward .rv.teal{color:var(--teal-600)}
 .reward .rl{font-size:11px;color:var(--t2);margin-top:1px}
 
 /* success */
 .success{text-align:center;padding:8px 0}
-.success-check{width:72px;height:72px;border-radius:50%;background:var(--teal-50);display:flex;align-items:center;justify-content:center;
+.success-check{width:72px;height:72px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;
   margin:0 auto 18px;animation:pop .5s var(--spring)}
-.success-check svg{width:38px;height:38px;color:var(--teal-600)}
-.code-box{background:var(--s-50);border:1px dashed var(--border-strong);border-radius:var(--r);padding:16px;margin:18px 0;text-align:center}
-.code-box .cl{font-size:11px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.success-check svg{width:38px;height:38px;color:var(--on-brand)}
+.code-box{background:var(--s-50);border:none;border-radius:var(--r-lg);padding:16px;margin:18px 0;text-align:center}
+.code-box .cl{font-size:var(--fs-xs);color:var(--t2);font-weight:600;text-transform:none;letter-spacing:0}
 .code-box .cv{font-size:26px;font-weight:800;letter-spacing:.12em;color:var(--t1);margin-top:4px}
 .copy-btn{margin-top:10px;background:var(--white);border:1px solid var(--border);border-radius:var(--r-xs);padding:7px 14px;
   font-size:12px;font-weight:700;color:var(--blue);cursor:pointer;transition:all var(--t-fast)}
@@ -1554,38 +1556,41 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .icon-btn{width:40px;height:40px;border-radius:50%;background:var(--white);border:1px solid var(--border);cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:all var(--t-fast)}
 .icon-btn:hover{background:var(--s-50);border-color:var(--border-strong)}
-.rp-section{padding:22px 0;border-bottom:1px solid var(--border)}
-.rp-section h3{font-size:18px;font-weight:800;letter-spacing:-.02em;margin-bottom:14px}
+.rp-section{padding:28px 0 6px}
+.rp-section h3{font-size:var(--fs-2xl);font-weight:900;letter-spacing:0;margin-bottom:14px}
+/* کاشیِ تخت — جانشینِ .glass روی سطوحِ محتوایی (DS-010 §۲‑۲: شیشه فقط دو نوار) */
+.tile{background:var(--s-50);border-radius:var(--r-lg);padding:16px}
 .rp-about{color:var(--t2);line-height:1.7;font-size:15px}
 /* وضعیتِ خالیِ صادقانه برایِ بخش‌های درباره/منو/نظرها — وقتی رستورانِ زنده
    این فیلدها را ندارد (رجوع کن به mapApiRestaurant در api.js) */
 .rp-empty{color:var(--t3);font-size:13.5px;line-height:1.7;padding:4px 0}
 .feat-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.feat{display:flex;align-items:center;gap:7px;padding:8px 13px;background:var(--s-50);border-radius:var(--r-sm);font-size:13px;font-weight:600;color:var(--t1)}
+.feat{display:flex;align-items:center;gap:7px;min-height:36px;padding:6px 14px;background:var(--s-100);border-radius:var(--radius-full);font-size:var(--fs-sm);font-weight:600;color:var(--t1)}
+.feat svg{color:var(--blue-text)}
 /* menu preview */
 .menu-list{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.menu-item{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--border);border-radius:var(--r);transition:all var(--t-fast)}
-.menu-item:hover{border-color:var(--border-strong);box-shadow:var(--sh-sm)}
+.menu-item{display:flex;align-items:center;gap:11px;padding:14px 16px;background:var(--s-50);border:none;border-radius:var(--r-lg);transition:background-color var(--t-fast)}
+.menu-item:hover{background:var(--s-100);box-shadow:none;transform:none}
 .menu-emoji{width:44px;height:44px;border-radius:11px;background:var(--s-50);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
 .menu-info{flex:1;min-width:0}
-.menu-name{font-size:14px;font-weight:700}
-.menu-price{font-size:12px;color:var(--t2);margin-top:1px}
+.menu-name{font-size:var(--fs-lg);font-weight:700}
+.menu-price{font-size:var(--fs-sm);color:var(--t2);margin-top:2px;font-variant-numeric:tabular-nums}
 /* ratings breakdown */
 .rb-grid{display:grid;grid-template-columns:auto 1fr;gap:14px 20px;align-items:center;margin-bottom:20px}
 .rb-overall{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px 0 4px;border-left:1px solid var(--border)}
-.rb-big{font-size:46px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.rb-big{font-size:var(--fs-4xl);font-weight:900;letter-spacing:0;line-height:1}
 .rb-stars{color:var(--amber);font-size:14px;margin-top:4px}
 .rb-count{font-size:12px;color:var(--t2);margin-top:3px}
 .rb-bars{display:flex;flex-direction:column;gap:9px}
 .rb-bar-row{display:flex;align-items:center;gap:10px;font-size:13px}
 .rb-bar-row .rl{width:64px;color:var(--t2);font-weight:600}
 .rb-track{flex:1;height:7px;background:var(--s-100);border-radius:4px;overflow:hidden}
-.rb-fill{height:100%;border-radius:4px;background:var(--s-900);transition:width 1s var(--ease)}
+.rb-fill{height:100%;border-radius:var(--radius-full);background:var(--t1);transition:width var(--motion-sheet) var(--ease)}
 .rb-bar-row .rv{width:28px;text-align:left;font-weight:700;font-size:12px}
 /* AI review summary */
-.ai-review{color:var(--on-tint);background:linear-gradient(120deg,var(--blue-50),var(--teal-50));border:1px solid var(--blue-100);border-radius:var(--r-lg);padding:18px;margin-bottom:20px}
+.ai-review{color:var(--t1);background:var(--s-50);border:none;border-radius:var(--r-lg);padding:18px;margin-bottom:20px}
 .ai-review-head{display:flex;align-items:center;gap:9px;margin-bottom:14px}
-.ai-review-head .icn{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px}
+.ai-review-head .icn{width:30px;height:30px;border-radius:var(--radius-xs);background:var(--blue);display:flex;align-items:center;justify-content:center;color:var(--on-brand);font-size:var(--fs-md)}
 .ai-review-head .ttl{font-size:14px;font-weight:800}
 .ai-review-head .tag{margin-right:auto;font-size:10px;font-weight:700;color:var(--blue);background:var(--white);padding:3px 9px;border-radius:50px}
 .ai-col{margin-bottom:12px}
@@ -1596,40 +1601,36 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .ai-point .ic.bad{background:#FEE2E2;color:#DC2626}
 /* review card */
 .review{padding:16px 0;border-top:1px solid var(--border);display:flex;gap:12px}
-.review-ava{width:42px;height:42px;border-radius:50%;background:var(--s-100);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.review-ava{width:42px;height:42px;border-radius:50%;background:var(--s-900);color:var(--on-s-900);display:flex;align-items:center;justify-content:center;font-size:var(--fs-lg);font-weight:800;flex-shrink:0}
 .review-body{flex:1}
 .review-top{display:flex;align-items:center;justify-content:space-between}
-.review-name{font-size:14px;font-weight:700}
+.review-name{font-size:var(--fs-lg);font-weight:700}
 .review-date{font-size:12px;color:var(--t3)}
 .review-stars{color:var(--amber);font-size:13px;margin:3px 0 6px}
 .review-text{font-size:14px;color:var(--t2);line-height:1.6}
 /* booking widget (sticky) */
 .book-widget{background:var(--white);border:1px solid var(--border);border-radius:var(--r-xl);padding:22px;box-shadow:var(--sh-lg);position:sticky;top:130px}
 /* ─── Hero صفحه رستوران ─── */
-.rp-hero{position:relative;height:340px;display:flex;align-items:flex-end;overflow:hidden}
-.rp-hero .rp-hero-bg{position:absolute;inset:0;z-index:0;transition:transform 8s var(--ease)}
-.rp-hero.loaded .rp-hero-bg{transform:scale(1.08)}
-.rp-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.16),transparent 60%);pointer-events:none;z-index:1}
+/* ۰۹-۱۳: هیرو = همان کاشیِ کشف در مقیاسِ بزرگ — رنگِ غذا، واژه‌ی درشت، بدونِ مِشِ متحرک و
+   ایموجیِ شناور (DS-010 §۲‑۳: حلقه‌ی تزئینی ممنوع). container-type تا واژه با عرضِ هیرو مقیاس بگیرد. */
+.rp-hero{position:relative;height:clamp(340px,42vw,460px);display:flex;align-items:flex-end;overflow:hidden;container-type:inline-size}
+.rp-hero .rp-hero-bg{position:absolute;inset:0;z-index:0}
+.rp-hero-word{position:absolute;z-index:1;inset-inline-start:5cqi;inset-block-start:26%;pointer-events:none;white-space:nowrap;
+  font-size:min(22cqi,calc(88cqi / var(--len,4)),calc(var(--fs-4xl) * 5));font-weight:var(--weight-display);line-height:var(--lh-tight);color:rgba(255,255,255,.96);text-shadow:0 4px 30px rgba(0,0,0,.25)}
+@media(min-width:880px){.rp-hero-word{inset-block-start:18%}}
 .rp-hero-back{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:15px;background:rgba(0,0,0,.32);-webkit-backdrop-filter:blur(14px) saturate(180%);backdrop-filter:blur(14px) saturate(180%);border:1px solid rgba(255,255,255,.18);font-size:20px;font-weight:800;cursor:pointer;z-index:3;display:flex;align-items:center;justify-content:center;color:#fff;transition:transform .2s var(--spring)}
 .rp-hero-back:active{transform:scale(.88)}
 .rp-hero-actions{position:absolute;top:16px;left:16px;display:flex;gap:8px;z-index:3}
 .rp-hero-icon{width:44px;height:44px;border-radius:15px;background:rgba(0,0,0,.32);-webkit-backdrop-filter:blur(14px) saturate(180%);backdrop-filter:blur(14px) saturate(180%);border:1px solid rgba(255,255,255,.18);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;transition:transform .2s var(--spring)}
 .rp-hero-icon:active{transform:scale(.88)}
-.rp-hero-emoji{position:absolute;top:44%;left:50%;transform:translate(-50%,-58%);font-size:96px;filter:drop-shadow(0 10px 30px rgba(0,0,0,.4));z-index:1;animation:rpFloat 5s ease-in-out infinite}
-@keyframes rpFloat{0%,100%{transform:translate(-50%,-58%)}50%{transform:translate(-50%,-64%)}}
-.rp-hero-mesh{position:absolute;inset:0;z-index:1;pointer-events:none;background:
-  radial-gradient(40% 55% at 78% 18%,rgba(255,255,255,.28),transparent 60%),
-  radial-gradient(45% 50% at 20% 25%,rgba(255,138,75,.35),transparent 62%),
-  radial-gradient(50% 60% at 60% 80%,rgba(106,75,255,.32),transparent 60%);
-  mix-blend-mode:screen;animation:rpMesh 12s ease-in-out infinite alternate}
-@keyframes rpMesh{0%{opacity:.7;transform:scale(1)}100%{opacity:1;transform:scale(1.15)}}
 .rp-hero-badges{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .rp-hero-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;padding:6px 12px;border-radius:100px;background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.24);color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.3)}
 .rp-hero-badge.live{background:rgba(18,161,80,.28);border-color:rgba(52,211,153,.5)}
 /* صداقتِ داده: رستوران/رزروی که از دادهٔ نمونه/آفلاین می‌آید (نه بک‌اندِ واقعی) */
 .rp-hero-badge.demo{background:rgba(194,65,12,.34);border-color:rgba(251,146,60,.55)}
-.rp-hero-overlay{position:relative;z-index:2;width:100%;padding:60px 20px 22px;background:linear-gradient(to top,rgba(4,3,10,.85),rgba(4,3,10,.25) 60%,transparent);color:#fff}
-.rp-hero-name{font-size:32px;font-weight:900;letter-spacing:-.03em;margin-bottom:8px;text-shadow:0 2px 16px rgba(0,0,0,.5);line-height:1.05}
+.rp-hero-overlay{position:relative;z-index:2;width:100%;padding:60px 20px 22px;background:linear-gradient(to top,rgba(0,0,0,.72),rgba(0,0,0,.2) 60%,transparent);color:var(--on-brand)}
+@media(min-width:880px){.rp-hero-overlay{padding-inline:max(20px,calc((100% - 1100px)/2))}}
+.rp-hero-name{font-size:clamp(var(--fs-3xl),7.5vw,var(--fs-4xl));font-weight:900;letter-spacing:0;margin-bottom:8px;text-shadow:0 2px 16px rgba(0,0,0,.4);line-height:1.15}
 .rp-hero-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;opacity:.96;text-shadow:0 1px 8px rgba(0,0,0,.5);font-weight:600}
 .rp-hero-rate{display:inline-flex;align-items:center;gap:4px;font-weight:800}
 .rp-hero-dot{opacity:.5}
@@ -1638,23 +1639,25 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 /* ─── نوار رزرو پایین (شناور) ─── */
 .rp-bookbar{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:95;box-shadow:0 -4px 20px rgba(0,0,0,.08);max-width:480px;margin:0 auto}
 .rp-bookbar-info{flex:1;min-width:0}
-.rp-bookbar-cb{font-size:15px;font-weight:800;color:var(--teal)}
+.rp-bookbar-cb{font-size:var(--fs-md);font-weight:800;color:var(--blue-text)}
 .rp-bookbar-sub{font-size:12px;color:var(--t3);margin-top:2px}
 .rp-bookbar-btn{padding:14px 32px;font-size:15px;font-weight:700;white-space:nowrap;flex-shrink:0}
 .bs-head{margin-bottom:18px}
-.bs-title{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.bs-title{font-size:var(--fs-2xl);font-weight:900;letter-spacing:0}
 .bs-rest{font-size:14px;color:var(--t2);margin-top:2px}
 .bw-price{display:flex;align-items:baseline;gap:6px;margin-bottom:4px}
 .bw-cb{font-size:13px;font-weight:700;color:var(--teal-600);margin-bottom:18px;display:flex;align-items:center;gap:5px}
-.bw-field{border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;margin-bottom:10px;cursor:pointer;transition:border-color var(--t-fast)}
-.bw-field:hover{border-color:var(--border-strong)}
-.bw-field label{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:2px}
+/* ۰۹-۱۳: فیلدهای شیت مثلِ فهرستِ گروهیِ iOS — کاشیِ خاکستریِ بدونِ حاشیه، برچسبِ ریز، مقدارِ ۱۷px.
+   همان <select>ها می‌مانند (رفتار و تست‌ها به #bwDate/#bwParty/#bwTime بسته‌اند)؛ فقط پوسته عوض شد. */
+.bw-field{background:var(--s-50);border:none;border-radius:var(--r-lg);padding:10px 16px;margin-bottom:8px;cursor:pointer;transition:background-color var(--t-fast)}
+.bw-field:hover{background:var(--s-100)}
+.bw-field label{font-size:var(--fs-xs);font-weight:600;color:var(--t2);text-transform:none;letter-spacing:0;display:block;margin-bottom:0}
 /* اندازه‌گیری شده بود ۱۷px ارتفاع — روی ورودی‌های خودِ قیفِ رزرو، یعنی جایی که
    خطای لمس مستقیماً تبدیل را از دست می‌دهد. کادرِ کلیک به ۴۴px می‌رسد بدونِ
    اینکه ارتفاعِ بصریِ فیلد عوض شود (label بالای آن است، مجموع همچنان جمع‌وجور). */
-.bw-field select,.bw-field input{border:none;outline:none;width:100%;font-size:14px;font-weight:600;color:var(--t1);background:none;cursor:pointer;
+.bw-field select,.bw-field input{border:none;outline:none;width:100%;font-size:var(--fs-lg);font-weight:600;color:var(--t1);background:none;cursor:pointer;
   min-block-size:var(--touch-min);font-family:inherit}
-.bw-field:focus-within{border-color:var(--blue)}
+.bw-field:focus-within{box-shadow:0 0 0 2px color-mix(in srgb,var(--blue) 55%,transparent)}
 
 /* ─────────── LOYALTY ─────────── */
 .loy-card{background:linear-gradient(125deg,var(--blue),var(--teal));border-radius:var(--r-2xl);padding:28px;color:#fff;position:relative;overflow:hidden;box-shadow:var(--sh-lg)}
@@ -1672,8 +1675,8 @@ html:has(#page-discover.active){scroll-padding-top:74px}
   font-size:13px;color:var(--t2);line-height:1.6}
 .loy-noexpire svg{flex:none;color:var(--ok,#16A34A)}
 .perks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:20px}
-.perk{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;text-align:center}
-.perk-emoji{font-size:26px;margin-bottom:8px}
+.perk{background:var(--s-50);border:none;border-radius:var(--r-lg);padding:18px 16px;text-align:center}
+.perk-emoji{display:flex;justify-content:center;color:var(--blue-text);margin-bottom:10px}
 .perk-name{font-size:13px;font-weight:700;margin-bottom:2px}
 .perk-desc{font-size:11px;color:var(--t2)}
 .badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
@@ -1797,13 +1800,13 @@ html:has(#page-discover.active){scroll-padding-top:74px}
    جسور، تیره، گرادیانی، قابل‌اسکرین‌شات
    ═══════════════════════════════════════════════ */
 .dna-entry{margin:0 0 16px;border-radius:var(--r-xl);padding:22px 20px;cursor:pointer;position:relative;overflow:hidden;
-  background:linear-gradient(135deg,#4F46E5 0%,#7C3AED 55%,#E8925A 130%);color:#fff;transition:transform var(--t) var(--spring)}
+  background:var(--dish-eggplant);color:var(--on-brand);transition:transform var(--t) var(--spring)}
 .dna-entry:active{transform:scale(.98)}
 .dna-entry::after{content:"";position:absolute;top:-30%;right:-10%;width:180px;height:180px;background:radial-gradient(circle,rgba(255,255,255,.25),transparent 70%)}
 .dna-entry-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;background:rgba(255,255,255,.18);padding:5px 12px;border-radius:20px;margin-bottom:14px;position:relative}
 .dna-entry-title{font-size:22px;font-weight:900;letter-spacing:-.03em;line-height:1.15;position:relative;margin-bottom:6px}
 .dna-entry-sub{font-size:13.5px;opacity:.9;position:relative;line-height:1.6}
-.dna-entry-cta{margin-top:14px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;background:#fff;color:#4F46E5;padding:9px 16px;border-radius:12px;position:relative}
+.dna-entry-cta{margin-top:14px;display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);font-weight:700;background:var(--on-brand);color:var(--on-tint);padding:9px 16px;border-radius:var(--radius-md);position:relative}
 
 /* صفحه‌ی تمام‌قد DNA (اسلایدهای Wrapped) */
 .dna-overlay{position:fixed;inset:0;z-index:2000;background:#0B1020;display:none;flex-direction:column;overflow:hidden}
@@ -1828,12 +1831,12 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .dna-tap{position:absolute;inset:0;display:flex;z-index:8}
 .dna-tap>div{flex:1}
 /* اسلاید نهایی: کارت اشتراک */
-.dna-share-card{background:linear-gradient(150deg,#4F46E5,#7C3AED 60%,#E8925A);border-radius:var(--r-2xl);padding:28px 24px;width:100%;max-width:320px;box-shadow:0 24px 64px rgba(0,0,0,.5)}
+.dna-share-card{background:var(--dish-eggplant);border-radius:var(--r-2xl);padding:28px 24px;width:100%;max-width:320px;box-shadow:0 24px 64px rgba(0,0,0,.5)}
 .dna-share-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.18)}
 .dna-share-row:last-child{border-bottom:none}
 .dna-share-k{font-size:13.5px;color:rgba(255,255,255,.85);font-weight:600}
 .dna-share-v{font-size:16px;font-weight:800;color:#fff}
-.dna-share-btn{margin-top:22px;width:100%;background:#fff;color:#4F46E5;border:none;border-radius:14px;padding:15px;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.dna-share-btn{margin-top:22px;width:100%;background:var(--on-brand);color:var(--on-tint);border:none;border-radius:var(--radius-lg);padding:15px;font-family:inherit;font-size:var(--fs-md);font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
 .dna-badge-persona{display:inline-block;background:rgba(255,255,255,.2);color:#fff;font-size:13px;font-weight:700;padding:6px 14px;border-radius:20px;margin-top:10px}
 /* ═══ اثبات اجتماعی امن (فعالیت گذشته، نه موقعیت زنده) ═══ */
 .rc-social{display:flex;align-items:center;gap:7px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border)}
@@ -1908,29 +1911,28 @@ html:has(#page-discover.active){scroll-padding-top:74px}
 .occ-sub{font-size:11px;color:rgba(255,255,255,.9);position:relative;margin-top:2px;font-weight:600}
 
 /* ═══ Trips: گالریِ خاطراتِ سینمایی (نسل‌Z) ═══ */
-.trips-summary{display:flex;align-items:center;justify-content:space-around;background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:var(--r-xl);padding:16px 8px;margin-bottom:20px}
+.trips-summary{display:flex;align-items:center;justify-content:space-around;background:var(--s-50);border:none;border-radius:var(--r-xl);padding:18px 8px;margin-bottom:20px}
 .ts-stat{text-align:center;flex:1}
-.ts-v{font-size:24px;font-weight:900;color:var(--t1);line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.ts-v{font-size:var(--fs-2xl);font-weight:900;color:var(--t1);line-height:1}
 .ts-l{font-size:11px;color:var(--t3);margin-top:5px;font-weight:600}
-.ts-div{width:1px;height:32px;background:var(--glass-brd)}
-.trip-card{background:var(--s-50);border:1px solid var(--glass-brd);border-radius:var(--r-2xl);overflow:hidden;margin-bottom:16px;box-shadow:var(--sh-sm);transition:transform .3s var(--spring),box-shadow .3s var(--ease)}
+.ts-div{width:1px;height:32px;background:var(--border)}
+.trip-card{background:var(--card-solid);border:none;border-radius:var(--r-2xl);overflow:hidden;margin-bottom:16px;box-shadow:none;transition:transform var(--motion-slow) var(--spring),box-shadow var(--motion-slow) var(--ease)}
 .trip-card:active{transform:scale(.98)}
-.trip-card.up{box-shadow:0 0 0 1.5px var(--blue-a,rgba(106,75,255,.3)),var(--sh-md)}
-.trip-card-hero{position:relative;height:96px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.trip-card-mesh{position:absolute;inset:0;background:radial-gradient(50% 60% at 75% 20%,rgba(255,255,255,.28),transparent 60%),radial-gradient(55% 60% at 20% 80%,rgba(255,138,75,.32),transparent 62%);mix-blend-mode:screen;animation:rpMesh 12s ease-in-out infinite alternate}
-.trip-card-emoji{font-size:52px;filter:drop-shadow(0 6px 16px rgba(0,0,0,.35));z-index:1;animation:rpFloat 5s ease-in-out infinite}
+.trip-card.up{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--blue) 40%,transparent)}
+.trip-card-hero{position:relative;height:104px;display:flex;align-items:flex-end;justify-content:flex-start;overflow:hidden;container-type:inline-size}
+.trip-card-word{margin:12px 16px;white-space:nowrap;font-size:min(11cqi,calc(44cqi / var(--len,4)));font-weight:var(--weight-display);line-height:var(--lh-tight);color:rgba(255,255,255,.96);text-shadow:0 2px 14px rgba(0,0,0,.22)}
 .trip-card-status{position:absolute;top:12px;right:12px;z-index:1;font-size:11px;font-weight:800;padding:5px 11px;border-radius:100px;background:rgba(255,255,255,.2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.28);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.3)}
 .trip-card-status.up{background:rgba(18,161,80,.32);border-color:rgba(52,211,153,.5)}
 .trip-card-status.cancelled{background:rgba(0,0,0,.28)}
 .trip-card-body{padding:16px}
-.trip-card-name{font-size:17px;font-weight:800;color:var(--t1);margin-bottom:8px}
+.trip-card-name{font-size:var(--fs-xl);font-weight:800;color:var(--t1);margin-bottom:8px}
 .trip-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--t2);margin-bottom:6px}
 .tcm-dot{color:var(--t4)}
 .trip-card-code{font-size:12px;color:var(--t3)}
 .trip-card-code b{color:var(--t1);letter-spacing:.5px}
 .trip-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .trips-empty{text-align:center;padding:60px 20px}
-.trips-empty-emoji{font-size:64px;margin-bottom:16px;animation:rpFloat 5s ease-in-out infinite}
+.trips-empty-emoji{font-size:var(--fs-4xl);margin-bottom:16px}
 .trips-empty-title{font-size:18px;font-weight:800;color:var(--t1)}
 .trips-empty-sub{font-size:14px;color:var(--t3);margin-top:4px}
 
@@ -1952,7 +1954,7 @@ button,[role="button"],.botnav-item,a{min-height:0}
 /* ═══ Waitlist: تجربه‌ی سینمایی (نسل‌Z) ═══ */
 .wl-join-hero{position:relative;height:88px;border-radius:var(--r-2xl);overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:linear-gradient(135deg,#6A4BFF,#9D4EDD)}
 .wl-join-mesh{position:absolute;inset:0;background:radial-gradient(50% 60% at 78% 20%,rgba(255,255,255,.3),transparent 60%),radial-gradient(55% 60% at 18% 82%,rgba(255,138,75,.35),transparent 62%);mix-blend-mode:screen;animation:rpMesh 11s ease-in-out infinite alternate}
-.wl-join-emoji{font-size:46px;z-index:1;filter:drop-shadow(0 6px 16px rgba(0,0,0,.3));animation:rpFloat 5s ease-in-out infinite}
+.wl-join-emoji{font-size:var(--fs-4xl);z-index:1;filter:drop-shadow(0 6px 16px rgba(0,0,0,.3))}
 .wl-join .wl-benefits{display:flex;flex-direction:column;gap:10px}
 .wl-benefit{display:flex;align-items:center;gap:12px;text-align:right;background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:var(--r-lg);padding:12px 14px}
 .wl-bene-ic{font-size:22px;flex-shrink:0}
@@ -1961,7 +1963,7 @@ button,[role="button"],.botnav-item,a{min-height:0}
 /* بنر آفر (میز آماده شد) — سینمایی */
 .wl-offer-banner{position:relative;overflow:hidden;background:linear-gradient(135deg,#12A150,#16A34A);border-radius:var(--r-2xl);padding:24px 16px;box-shadow:0 12px 40px rgba(18,161,80,.35)}
 .wl-offer-mesh{position:absolute;inset:0;background:radial-gradient(50% 60% at 75% 15%,rgba(255,255,255,.32),transparent 60%),radial-gradient(50% 55% at 20% 85%,rgba(255,255,255,.18),transparent 62%);mix-blend-mode:screen;animation:rpMesh 8s ease-in-out infinite alternate}
-.wl-offer-emoji{display:block;text-align:center;font-size:44px;position:relative;animation:rpFloat 3s ease-in-out infinite}
+.wl-offer-emoji{display:block;text-align:center;font-size:var(--fs-4xl);position:relative}
 .wl-timer{text-align:center;font-size:30px;font-weight:900;color:#fff;letter-spacing:2px;margin:10px 0 4px;position:relative;font-variant-numeric:tabular-nums}
 /* حلقه‌ی موقعیت در صف — با پالسِ زنده */
 .wl-position-ring{position:relative;width:132px;height:132px;margin:8px auto;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--grad);box-shadow:0 10px 34px rgba(106,75,255,.4)}
@@ -2029,7 +2031,8 @@ button,[role="button"],.botnav-item,a{min-height:0}
 
 /* Swipe-actions روی کارت‌های رزرو (C16) */
 .trip-card.has-swipe{position:relative}
-.trip-card-inner{position:relative;z-index:1;background:var(--s-50);border-radius:inherit;
+/* ۰۹-۱۳: سطحِ مات. با var(--s-50) (۴٪ سفید در تمِ تاریک) پدِ قرمزِ swipe از پشتِ کارت دیده می‌شد (اسکرین‌شات). */
+.trip-card-inner{position:relative;z-index:1;background:var(--card-solid);border-radius:inherit;
   transition:transform .3s var(--spring);will-change:transform}
 .trip-card.swiping .trip-card-inner{transition:none}
 .trip-swipe-pad{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;
@@ -2064,7 +2067,7 @@ button,[role="button"],.botnav-item,a{min-height:0}
 .rp-gallery-item img{width:210px;height:140px;object-fit:cover;border-radius:var(--radius-lg,14px);display:block;background:var(--s-100,#222)}
 .rp-gallery-item figcaption{font-size:11.5px;color:var(--t3);margin-top:4px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp-address{font-size:13px;color:var(--t2);display:flex;align-items:center;gap:6px;margin-top:8px}
-.menu-thumb{width:44px;height:44px;border-radius:11px;object-fit:cover;display:block}
+.menu-thumb{width:44px;height:44px;border-radius:var(--radius-sm);object-fit:cover;display:block}
 
 /* ═══ ۰۹-۱۳: کشف روی دسکتاپ — یک ستونِ هم‌عرض، نه نوارهای راست‌چینِ نیمه‌پر ═══
    پیش از این در ۱۴۴۰px ردیفِ مناسبت‌ها (۶ × ۱۰۴px) و چیپ‌ها به راست چسبیده بودند و
@@ -5325,7 +5328,7 @@ const MENU_TAG_FA = {
 /** کارتِ یک آیتمِ منو — همه‌ی متن‌های سرورساخته esc می‌شوند (انضباطِ 7ecd0d6). */
 function menuItemHTML(m){
   return `<div class="menu-item glass"${m.out?' style="opacity:.62"':''}>
-    <div class="menu-emoji">${m.img?`<img class="menu-thumb" src="${esc(resolveMediaUrl(m.img))}" alt="" loading="lazy">`:esc(m.e)}</div>
+    ${m.img?`<div class="menu-emoji"><img class="menu-thumb" src="${esc(resolveMediaUrl(m.img))}" alt="" loading="lazy"></div>`:''}
     <div class="menu-info">
       <div class="menu-name">${esc(m.n)}${m.out?' <span style="font-size:10px;background:var(--amber,#d97706);color:#fff;border-radius:6px;padding:1px 6px;white-space:nowrap">ناموجود</span>':''}</div>
       ${m.d?`<div style="font-size:11px;color:var(--t2);margin:1px 0 2px;line-height:1.7">${esc(m.d)}</div>`:''}
@@ -5362,13 +5365,12 @@ function renderRestPage(r){
     :`background:${gradFor(id)}`;
   document.getElementById('page-rest').innerHTML=`
     <div class="rp-hero${heroPhoto?' rp-hero--photo':''}" style="${heroBg}">
-      <div class="rp-hero-mesh"${heroPhoto?' style="display:none"':''}></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
         <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant(${jsq(String(r.id))})" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
         <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav(${jsq(String(r.id))})" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
       </div>
-      ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-emoji">${esc(r.e)}</div>`}
+      ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</div>`}
       <div class="rp-hero-overlay">
         <div class="rp-hero-badges">
           ${r.now?`<span class="rp-hero-badge live"><span class="live-dot" aria-hidden="true"></span> الان باز</span>`:''}
@@ -5418,25 +5420,25 @@ function renderRestPage(r){
             // می‌گفت در حالی که hero «۵ نظر» نشان می‌داد؛ تناقضِ داده. حالا اگر
             // امتیازِ تجمیعیِ واقعی هست، همان را صادقانه خلاصه می‌کنیم.
             if (Number.isFinite(r.reviews) && r.reviews > 0) {
-              return `<div class="rb-overall glass" style="text-align:center"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">میانگینِ ${fmtFa(r.reviews)} نظر — متنِ نظرها به‌زودی این‌جا</div></div>`;
+              return `<div class="rb-overall tile" style="text-align:center"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">میانگینِ ${fmtFa(r.reviews)} نظر — متنِ نظرها به‌زودی این‌جا</div></div>`;
             }
             return `<p class="rp-empty">هنوز نظری برای این رستوران ثبت نشده.</p>`;
           }
           return `
-        ${hasRatingBars?`<div class="rb-grid glass">
+        ${hasRatingBars?`<div class="rb-grid tile">
           <div class="rb-overall">${r.rt!=null?`<div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">${fmtFa(r.reviews)} نظر</div>`:'<div class="rb-count">هنوز نظری ثبت نشده</div>'}</div>
           <div class="rb-bars">${[['غذا',r.rb.food],['سرویس',r.rb.service],['فضا',r.rb.atmo],['ارزش',r.rb.value]].map(([l,v])=>`<div class="rb-bar-row"><span class="rl">${l}</span><div class="rb-track"><div class="rb-fill" style="width:0" data-w="${v/5*100}"></div></div><span class="rv">${fmtFa(v)}</span></div>`).join('')}</div>
         </div>`:''}
-        ${hasAiSummary?`<div class="ai-review glass">
+        ${hasAiSummary?`<div class="ai-review tile">
           <div class="ai-review-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">خلاصه‌ی هوشمند نظرها</div><span class="tag">AI</span></div>
           ${r.good.length?`<div class="ai-col"><div class="ai-col-label">${icon('thumbsUp',{size:14})} مهمان‌ها تعریف می‌کنن از:</div>${r.good.map(g=>`<div class="ai-point"><span class="ic good">${icon('check',{size:12})}</span>${esc(g)}</div>`).join('')}</div>`:''}
           ${r.bad.length?`<div class="ai-col"><div class="ai-col-label">${icon('thumbsDown',{size:14})} گاهی گله دارن از:</div>${r.bad.map(b=>`<div class="ai-point"><span class="ic bad">!</span>${esc(b)}</div>`).join('')}</div>`:''}
         </div>`:''}
-        ${r.revs.map(rv=>`<div class="review reveal"><div class="review-ava">${rv[1]}</div><div class="review-body"><div class="review-top"><span class="review-name">${esc(rv[0])}</span><span class="review-date">${esc(rv[4])}</span></div><div class="review-stars">${Array.from({length:+rv[2]},()=>icon('star',{size:12,fill:true})).join('')}</div><div class="review-text">${esc(rv[3])}</div></div></div>`).join('')}`;
+        ${r.revs.map(rv=>`<div class="review reveal"><div class="review-ava" aria-hidden="true">${esc(String(rv[0]||'').trim().slice(0,1))}</div><div class="review-body"><div class="review-top"><span class="review-name">${esc(rv[0])}</span><span class="review-date">${esc(rv[4])}</span></div><div class="review-stars">${Array.from({length:+rv[2]},()=>icon('star',{size:12,fill:true})).join('')}</div><div class="review-text">${esc(rv[3])}</div></div></div>`).join('')}`;
         })()}
       </div>
     </div>
-    <div class="rp-bookbar glass">
+    <div class="rp-bookbar">
       <div class="rp-bookbar-info">
         <div class="rp-bookbar-cb">${icon('wallet',{size:13})} ${fmtFa(r.cb)}٪ کش‌بک</div>
         <div class="rp-bookbar-sub">${depositLabel(r)}</div>
@@ -5622,8 +5624,7 @@ async function renderTrips(){
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
       <div class="trip-card-inner">
         <div class="trip-card-hero" style="background:${gradFor(gradId)}">
-          <div class="trip-card-mesh"></div>
-          <span class="trip-card-emoji">${esc(emoji)}</span>
+          <span class="trip-card-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r||{n:name}))))}">${esc(dishWord(r||{n:name}))}</span>
           <span class="trip-card-status ${t.status}">${statusLabel}</span>
         </div>
         <div class="trip-card-body">
@@ -6003,12 +6004,14 @@ window.submitReview = submitReview;
 
 
 
+// ۰۹-۱۳: مزایا با آیکنِ خطی به‌جای ایموجیِ PERKS[i][0] (کش‌بک، رزروِ سریع، هدیه‌ی تولد، میزِ VIP)
+const PERK_ICON = ['wallet', 'clock', 'gift', 'crown'];
 
 
 
 function perksBlock(){
   return `<div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای باشگاه مشتریان</div></div>
-    <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>`;
+    <div class="perks reveal">${PERKS.map((p,i)=>`<div class="perk"><div class="perk-emoji" aria-hidden="true">${icon(PERK_ICON[i]||'gift',{size:22})}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>`;
 }
 async function renderLoyalty(){
   const root=document.getElementById('page-loyalty');
@@ -6102,7 +6105,7 @@ async function renderLoyalty(){
     </div>
 
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای تو</div></div>
-    <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
+    <div class="perks reveal">${PERKS.map((p,i)=>`<div class="perk"><div class="perk-emoji" aria-hidden="true">${icon(PERK_ICON[i]||'gift',{size:22})}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">نشان‌ها</div></div>
     <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${esc(b.emoji)}</div><div class="bdg-name">${esc(b.name)}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
   </div>`;
@@ -7529,11 +7532,12 @@ else setTimeout(upgrade, 0);
 //  reduced-motion. تست‌های e2e با ست‌کردنِ rz_onboarded این را رد می‌کنند.
 // ═══════════════════════════════════════════════════════════
 
+
 const KEY = 'rz_onboarded';
 const SLIDES = [
-  { emoji:'🍽️', title:'بهترین رستوران‌های شهر', text:'کشف کن، ببین کجا شلوغه و چی محبوبه — با پیشنهادِ هوشمند بر اساس سلیقه‌ات.' },
-  { emoji:'⚡', title:'رزرو، ساده مثل پیام دادن', text:'میز رزرو کن در چند ثانیه — بدون تماس، بدون معطلی.' },
-  { emoji:'🎁', title:'امتیاز بگیر، کش‌بک ببر', text:'با هر رزرو امتیاز جمع کن و از باشگاهِ مشتریان کش‌بک بگیر.' },
+  { icon:'utensils', title:'بهترین رستوران‌های شهر', text:'کشف کن، ببین کجا شلوغه و چی محبوبه — با پیشنهادِ هوشمند بر اساس سلیقه‌ات.' },
+  { icon:'clock', title:'رزرو، ساده مثل پیام دادن', text:'میز رزرو کن در چند ثانیه — بدون تماس، بدون معطلی.' },
+  { icon:'gift', title:'امتیاز بگیر، کش‌بک ببر', text:'با هر رزرو امتیاز جمع کن و از باشگاهِ مشتریان کش‌بک بگیر.' },
 ];
 let _i = 0;
 
@@ -7548,7 +7552,8 @@ function done(){
 function paint(){
   const s = SLIDES[_i];
   const ov = document.getElementById('onb'); if(!ov) return;
-  ov.querySelector('.onb-emoji').textContent = s.emoji;
+  // آیکنِ خطی (icons.js — SVGِ ثابت، نه دادهٔ کاربر) به‌جای ایموجی؛ کلاس تاریخی ماند.
+  ov.querySelector('.onb-emoji').innerHTML = icon(s.icon, { size: 40 });
   ov.querySelector('.onb-title').textContent = s.title;
   ov.querySelector('.onb-text').textContent = s.text;
   ov.querySelectorAll('.onb-dot').forEach((d,i)=>d.classList.toggle('on', i===_i));

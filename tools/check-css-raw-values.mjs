@@ -114,14 +114,20 @@ function main() {
   if (process.argv.includes('--report')) return report();
   const base = resolveBase();
   let mb; try { mb = git(['merge-base', base.sha, 'HEAD']); } catch { mb = base.sha; }
-  const changed = git(['diff', '--name-only', '--diff-filter=ACMR', mb, 'HEAD']).split('\n').filter(IN_SCOPE);
+  // ⚠️ دیف در برابرِ **درختِ کاری**، نه HEAD (رفعِ ۰۹-۱۳). نسخه‌ی پیشین `mb..HEAD` را دیف
+  // می‌کرد ولی اعلان‌ها را از فایلِ روی دیسک می‌خواند؛ با هر ویرایشِ کامیت‌نشده شماره‌ی
+  // خط‌ها جابه‌جا می‌شد. تزریق‌شده و دیده‌شده: یک `.zz-inject{font-size:14px}` ِ کامیت‌نشده
+  // در خطِ ۱ اصلاً در دیف نبود و **سبز** می‌گذشت، در حالی که سه خطِ **موجود** (شیفت‌خورده،
+  // خطِ ۵۶۶) قرمز می‌شدند — هم false-green هم false-red. گاردِ پیش از push باید همان
+  // چیزی را بسنجد که push می‌شود؛ روی checkoutِ تمیزِ CI درختِ کاری و HEAD یکی‌اند.
+  const changed = git(['diff', '--name-only', '--diff-filter=ACMR', mb, '--', '.']).split('\n').filter(IN_SCOPE);
   console.log(`base: ${base.ref} (${mb.slice(0, 7)}) · فایل‌های CSSِ تغییرکرده در دامنه: ${changed.length}`);
   if (!changed.length) { console.log('هیچ CSSِ در دامنه‌ای در این دیف عوض نشده — **هیچ اعلانِ تازه‌ای بررسی نشد.** «چیزی برای سنجیدن نبود»، نه «همه‌چیز خوب است».'); process.exit(0); }
 
   const failures = []; let checked = 0;
   for (const rel of changed) {
     const abs = path.join(REPO_ROOT, rel); if (!existsSync(abs)) continue;
-    const patch = git(['diff', '-U0', mb, 'HEAD', '--', rel]);
+    const patch = git(['diff', '-U0', mb, '--', rel]);
     const added = new Set(); let n = 0;
     for (const l of patch.split('\n')) {
       const h = l.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
