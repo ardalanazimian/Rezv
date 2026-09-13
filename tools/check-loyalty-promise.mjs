@@ -13,8 +13,8 @@
 //  مرجعِ دیگری است، به دلیلِ ساختاری سبز است نه به دلیلِ امن بودن.» پس این
 //  گارد **هر دو طرف** را می‌خواند و به هم می‌بندد:
 //     طرفِ ادعا  → apps/customer/js/features/loyalty.js (و باندلِ standalone)
-//     طرفِ خطر   → api/prisma/schema.prisma  +  api/src/app/api/v1/maintenance/
-//                  +  api/src/lib/
+//     طرفِ خطر   → api/prisma/schema.prisma  +  کلِ api/src (از ۲۰۲۶-۰۹-۱۳، RT-14 —
+//                  پیش‌تر فقط maintenance/ و lib/)
 //
 //  ⚠️ گشادسازیِ ۲۰۲۶-۰۹-۱۱ — و اینکه چرا لازم بود: تا امروز فقط مسیرِ
 //  `maintenance/**` اسکن می‌شد. ولی routeهای maintenance خودشان امتیاز کم
@@ -42,6 +42,7 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => (existsSync(join(REPO, p)) ? readFileSync(join(REPO, p), 'utf8') : null);
@@ -50,12 +51,23 @@ const read = (p) => (existsSync(join(REPO, p)) ? readFileSync(join(REPO, p), 'ut
 // عمداً روی یک عبارتِ کوتاه و پایدار مچ می‌شود، نه کلِ جمله: اگر کسی متن را
 // بازنویسی کند ولی وعده را نگه دارد، گارد باید هنوز فعال بماند.
 const PROMISE = 'منقضی نمی‌شن';
-const CLAIM_FILES = [
-  'apps/customer/js/features/loyalty.js',
-  'standalone/customer.html',
-];
+// ⚠️ ۲۰۲۶-۰۹-۱۳ (هم‌خانواده‌ی RT-14 در طرفِ ادعا): تا امروز فهرستِ ثابتِ دو فایل بود
+// (loyalty.js و باندلِ standalone). اگر جمله به فایلِ دیگری می‌رفت — rewards.js، یک
+// کامپوننتِ لندینگ — گارد «وعده‌ای نیست» می‌گفت و با خروجِ ۰ کنار می‌کشید، حتی با
+// کرونِ انقضای زنده. پس ادعاکننده‌ها از **هر فایلِ ردیابی‌شده‌ی سطحِ کاربر** کشف
+// می‌شوند. `git ls-files` و نه پیمایشِ دیسک: node_modules و .nextِ محلی وارد نمی‌شوند
+// و CI همان مجموعه را می‌بیند. تست‌ها بیرون‌اند — عبارت در fixture ادعا نیست.
+const CLAIM_ROOT = /^(apps|standalone|shared)\//;
+const CLAIM_EXT = /\.(js|mjs|ts|tsx|html|json)$/;
+const tracked = execSync('git ls-files', { cwd: REPO, encoding: 'utf8', maxBuffer: 1e8 })
+  .split('\n')
+  .filter((f) => CLAIM_ROOT.test(f) && CLAIM_EXT.test(f) && !/(^|\/)(test|tests|__tests__)\//.test(f));
+if (tracked.length === 0) {
+  console.error('✗ هیچ فایلِ سطحِ کاربرِ ردیابی‌شده‌ای پیدا نشد — کشفِ ادعا چیزی نسنجید.');
+  process.exit(1);
+}
 
-const claimants = CLAIM_FILES.filter((f) => (read(f) ?? '').includes(PROMISE));
+const claimants = tracked.filter((f) => (read(f) ?? '').includes(PROMISE));
 
 if (claimants.length === 0) {
   console.log('✓ وعده‌ی «امتیاز منقضی نمی‌شود» در هیچ سطحِ کاربری نیست — چیزی برای پاسداری نمانده.');
@@ -103,12 +115,26 @@ function walk(dir, out = []) {
   for (const e of readdirSync(abs)) {
     const rel = `${dir}/${e}`;
     if (statSync(join(REPO, rel)).isDirectory()) walk(rel, out);
-    else if (rel.endsWith('.ts')) out.push(rel);
+    else if (/\.(ts|tsx|mts)$/.test(rel)) out.push(rel);
   }
   return out;
 }
 
-const SCAN_DIRS = ['api/src/app/api/v1/maintenance', 'api/src/lib'];
+// ⚠️ RT-14 (Red Team، RETEST-2026-09-12): تا ۲۰۲۶-۰۹-۱۳ این فهرست
+// `['api/src/app/api/v1/maintenance', 'api/src/lib']` بود — ۲ پوشه از ۱۷ پوشه‌ی
+// routeها. همان payloadِ انقضا که در `api/src/lib/` خروجِ ۱ می‌داد، بایت‌به‌بایت در
+// `api/src/app/api/v1/admin/expire-points/route.ts` خروجِ ۰ می‌داد، و در ریشه‌ی
+// `api/src/` هم. فهرستِ پوشه همان خطای «مرجعِ اشتباه» است که سرِ همین فایل درباره‌اش
+// هشدار می‌دهد، فقط یک لایه بالاتر: هر پوشه‌ی تازه بیرون می‌ماند. پس مرز خودِ
+// `api/src` است، نه فهرستی از زیرپوشه‌هایش.
+const SCAN_DIRS = ['api/src'];
+const SCANNED = SCAN_DIRS.flatMap((d) => walk(d));
+// نبودِ موضوع = خطا، نه عبور: اگر مسیر عوض شود و صفر فایل اسکن شود — یا routeها دیگر
+// زیرِ این ریشه نباشند — گارد باید قرمز شود، نه «هیچ کسری نیست» بگوید.
+if (SCANNED.length === 0 || !SCANNED.some((f) => f.startsWith('api/src/app/api/v1/'))) {
+  console.error(`✗ اسکنِ طرفِ خطر تهی است (${SCANNED.length} فایل، بی‌route) — این گارد چیزی نسنجید.`);
+  process.exit(1);
+}
 
 // شکل‌های نوشتنِ دلتایِ منفی روی دفترِ امتیاز.
 const DEDUCTION_SHAPES = [
@@ -156,7 +182,7 @@ function enclosingFn(src, idx) {
 const allowed = [];   // نویسنده‌های منفیِ **سنجیده و مشروع** — در خروجی نام‌برده می‌شوند
 
 for (const dir of SCAN_DIRS) {
-  for (const f of walk(dir)) {
+  for (const f of SCANNED.filter((p) => p.startsWith(dir))) {
     const src = read(f) ?? '';
     const isMaintenance = f.startsWith('api/src/app/api/v1/maintenance');
     const hits = [];
@@ -221,7 +247,7 @@ if (violations.length) {
 
 console.log(`✓ وعده‌ی «امتیاز منقضی نمی‌شود» با مکانیزم هم‌داستان است (${claimants.length} محلِ ادعا).`);
 console.log('  PointsLedger و ClubMember هیچ فیلدِ انقضا ندارند؛ هیچ کسرِ سن/زمان‌محوری در');
-console.log(`  ${SCAN_DIRS.join(' و ')} نیست.`);
+console.log(`  ${SCAN_DIRS.join(' و ')} نیست (${SCANNED.length} فایل اسکن شد).`);
 if (allowed.length) {
   // ⚠️ عمداً چاپ می‌شود: «هیچ کسری نبود» و «کسرهایی بود و همه سنجیده شدند» دو
   // حکمِ متفاوت‌اند. سکوت درباره‌شان همان سبزیِ بی‌دلیل است.
