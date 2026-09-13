@@ -106,15 +106,19 @@ async function makeQrTableWithLiveReservation(state: string, prefix: string) {
     select: { id: true, qrCode: true },
   });
   const now = new Date();
-  await db.reservation.create({
+  // ⚠️ کد را برمی‌گردانیم چون از ۲۰۲۶-۰۹-۱۱ خودِ کدِ QR برای نشاندنِ مهمان
+  // کافی نیست: `qrCheckIn` کدِ رزرو (یا کاربرِ صاحبِ رزرو) را به‌عنوانِ عاملِ
+  // دوم می‌خواهد. قراردادش در `qr-checkin.integration.test.mts`.
+  const resv = await db.reservation.create({
     data: {
       code: `TBLQ${++codeSeq}${Date.now().toString(36).slice(-4)}`.toUpperCase(),
       restaurantId: A.restaurantId, tableId: tbl.id, partySize: 2,
       slotStart: new Date(+now - 10 * 60_000), slotEnd: new Date(+now + 80 * 60_000),
       status: 'confirmed' as never, blockBufferMinutes: 15,
     },
+    select: { code: true },
   });
-  return tbl;
+  return { ...tbl, reservationCode: resv.code };
 }
 
 /*
@@ -226,7 +230,7 @@ describe('ماشینِ وضعیتِ میز — هیچ مسیری دورش نمی
     // [merge ۰۸-۲۴] آرگومانِ دوم: qrCheckIn در سخت‌سازیِ P0-2 (خطِ ممیزی)
     // tenant-scoped شد — بدونِ restaurantId کدِ میز در «هیچ» رستورانی resolve
     // نمی‌شود (جلوگیری از اسکنِ برون‌تنانتی). گاردش: checkin-auth.integration.
-    await qrCheckIn(tbl.qrCode!, A.restaurantId);
+    await qrCheckIn(tbl.qrCode!, A.restaurantId, { reservationCode: tbl.reservationCode });
 
     const after = await db.table.findUnique({ where: { id: tbl.id }, select: { state: true } });
     assert.equal(after?.state, 'maintenance', 'میزِ در تعمیر نباید بی‌صدا اشغال شود');
@@ -236,9 +240,18 @@ describe('ماشینِ وضعیتِ میز — هیچ مسیری دورش نمی
     // بدونِ این، رفعی که *هرگز* میز را occupied نکند هم تستِ بالا را پاس می‌کرد.
     const tbl = await makeQrTableWithLiveReservation('reserved', 'OK');
 
-    const out = await qrCheckIn(tbl.qrCode!, A.restaurantId);
+    const out = await qrCheckIn(tbl.qrCode!, A.restaurantId, { reservationCode: tbl.reservationCode });
 
     assert.equal(out.status, 'seated');
+
+    // ⚠️ کنترلِ منفیِ همین مسیر: بدونِ عاملِ دوم، همین اسکن باید رد شود —
+    // وگرنه «کدِ رزرو را پاس دادیم» صرفاً یک آرگومانِ بی‌اثر می‌شد.
+    const tbl2 = await makeQrTableWithLiveReservation('reserved', 'NOC');
+    await assert.rejects(
+      () => qrCheckIn(tbl2.qrCode!, A.restaurantId),
+      (e: { code?: string }) => e.code === 'CHECKIN_IDENTITY_REQUIRED',
+      'اسکنِ خالیِ استیکر نباید رزروِ کسِ دیگری را بنشاند',
+    );
     const after = await db.table.findUnique({ where: { id: tbl.id }, select: { state: true } });
     assert.equal(after?.state, 'occupied', 'مسیرِ مشروع باید همچنان کار کند');
   });

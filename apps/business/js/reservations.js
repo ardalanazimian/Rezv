@@ -188,7 +188,10 @@ async function markArrived(i){
   await changeStatus(i,'checked_in');
   // ارسال پیامکِ خوش‌آمد فقط بعد از تأییدِ واقعیِ تغییرِ وضعیت (نه قبلش)
   if(API.getToken() && phone){
-    const res=await API.sendSms({kind:'campaign',phones:[phone.replace(/\s/g,'')],message:'welcome'});
+    // ⚠️ مهاجرت: قبلاً `{kind:'campaign',message:'welcome'}` می‌رفت و فقط با
+    // نامِ مستعارِ کهنه‌ی سرور (restaurant/sms/route.ts) به مسیرِ تراکنشی
+    // می‌افتاد — با یک warning در لاگ. حالا صریح `kind:'welcome'`.
+    const res=await API.sendSms({kind:'welcome',phones:[phone.replace(/\s/g,'')]});
     if(res.ok)toast('',`پیامکِ خوش‌آمد برایِ ${r.name} ارسال شد`);
   }
 }

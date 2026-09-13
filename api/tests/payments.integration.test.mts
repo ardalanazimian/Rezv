@@ -30,8 +30,22 @@ const { signAccess } = await import('../src/lib/jwt');
 const { fixturePhone } = await import('./_phone.helper.mts');
 const payRoute = await import('../src/app/api/v1/reservations/[code]/pay/route');
 const callbackRoute = await import('../src/app/api/v1/payments/callback/route');
+const { renderMetrics } = await import('../src/lib/metrics');
 
 const TAG = 'pay';
+
+/**
+ * مقدارِ فعلیِ `rezervno_payment_refund_required_total` از خروجیِ واقعیِ Prometheus.
+ * نبودنِ سری = ۰ — پس پیش از رفعِ RT-13 هر «+۱» قرمز می‌شود، نه اینکه رد شود.
+ */
+function refundRequiredCount(): number {
+  let total = 0;
+  for (const line of renderMetrics().split('\n')) {
+    const m = line.match(/^rezervno_payment_refund_required_total(?:\{[^}]*\})?\s+(-?[\d.]+)$/);
+    if (m) total += Number(m[1]);
+  }
+  return total;
+}
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function resvCode(): string {
@@ -152,7 +166,7 @@ async function makeReservation(o: ResvOverrides = {}) {
       depositAmountToman: o.depositAmountToman ?? null,
       depositStatus: o.depositStatus ?? 'none',
     },
-    select: { id: true, code: true },
+    select: { id: true, code: true, restaurantId: true },
   });
 }
 
@@ -343,6 +357,121 @@ describe('GET /payments/callback', () => {
 
     const payment = await db.payment.findUnique({ where: { authority } });
     assert.equal(payment?.refId, 'REF-OLD', 'رکورد نباید تغییر کند');
+  });
+
+  test('⚠️ دو callbackِ هم‌زمان با همان authority → همان یک پرداخت می‌ماند، نه REFUND_REQUIRED', async () => {
+    // رگرسیونی که بازبینیِ ۲۰۲۶-۰۹-۱۲ پیدا کرد: خروجِ زودهنگامِ
+    // `payment.status === 'success'` بیرونِ قفل است، پس دو callbackِ هم‌زمان
+    // با همان authority هر دو `pending` می‌بینند و هر دو verify می‌کنند
+    // (زرین‌پال کدِ ۱۰۱ = «قبلاً verify شده» را success می‌داند). بازنده بعد
+    // فقط `deposit_status` را می‌دید و ردیفِ **خودش** را به failed +
+    // REFUND_REQUIRED برمی‌گرداند — آلارمِ عودتِ دستی روی یک پرداختِ سالم.
+    const resv = await makeReservation({ depositRequested: true, depositAmountToman: 80_000 });
+    const authority = `AUTH-${TAG}-race-${randomUUID()}`;
+    await db.payment.create({ data: { reservationId: resv.id, authority, amountToman: 80_000, status: 'pending' } });
+    const refundBefore = refundRequiredCount();
+
+    // سدِ هم‌زمانی: پاسخِ verify تا وقتی **هر دو** درخواست نرسیده‌اند برنمی‌گردد.
+    // بدونش تست می‌توانست اتفاقی سریال شود و رگرسیون را نبیند. مهلتِ ۵ ثانیه
+    // هست تا اگر یکی از درخواست‌ها اصلاً به verify نرسید، تست **هنگ نکند** و
+    // به‌جایش روی assertionِ `verifyCalls === 2` صریح قرمز شود.
+    let arrived = 0;
+    let release!: () => void;
+    const bothArrived = new Promise<void>((r) => { release = r; });
+    const gate = Promise.race([bothArrived, new Promise<void>((r) => setTimeout(r, 5_000))]);
+    let verifyCalls = 0;
+    globalThis.fetch = (async (url: unknown) => {
+      const u = String(url);
+      if (u.includes('/payment/verify.json')) {
+        verifyCalls++;
+        const mine = ++arrived;
+        if (mine === 2) release();
+        await gate;
+        return {
+          ok: true, status: 200,
+          json: async () => ({ data: { code: mine === 1 ? 100 : 101, ref_id: 'REF-RACE' } }),
+        } as unknown as Response;
+      }
+      return {
+        ok: true, status: 200,
+        json: async () => ({ data: { code: 100, authority: `AUTH-${TAG}-${++authoritySeq}` } }),
+      } as unknown as Response;
+    }) as unknown as typeof fetch;
+
+    const [r1, r2] = await Promise.all([
+      callbackRoute.GET(callbackReq(`?code=${resv.code}&Authority=${authority}&Status=OK`)),
+      callbackRoute.GET(callbackReq(`?code=${resv.code}&Authority=${authority}&Status=OK`)),
+    ]);
+    assert.equal(verifyCalls, 2, 'هر دو درخواست باید از خروجِ زودهنگام رد شده باشند، وگرنه این تست چیزی را نمی‌سنجد');
+    assert.match(r1.headers.get('location') ?? '', /payment=paid/);
+    assert.match(r2.headers.get('location') ?? '', /payment=paid/);
+
+    const payment = await db.payment.findUnique({ where: { authority } });
+    assert.equal(payment?.status, 'success', 'پرداختِ سالم نباید به failed برگردد');
+    assert.equal(payment?.failReason, null, 'REFUND_REQUIRED اینجا دروغ است — فقط یک پرداخت انجام شده');
+    const after = await db.reservation.findUnique({ where: { id: resv.id }, select: { depositStatus: true } });
+    assert.equal(after?.depositStatus, 'paid');
+    assert.equal(
+      await db.payment.count({ where: { reservationId: resv.id, status: 'success' } }), 1,
+      'مهاجرتِ ۰۸۶ هم همین را ضمانت می‌کند: حداکثر یک successـ به‌ازای هر رزرو',
+    );
+    // کنترلِ منفیِ RT-13: سیگنالِ «عودت لازم است» روی یک پرداختِ سالم آلارمِ دروغ است.
+    assert.equal(refundRequiredCount(), refundBefore, 'یک پرداخت با دو callback نباید «عودت لازم» بشمارد');
+    assert.equal(
+      await db.auditLog.count({ where: { action: 'payment.refund_required', targetId: payment!.id } }), 0,
+      'و نباید ردِ حسابرسیِ عودت بسازد',
+    );
+  });
+
+  test('⚠️ دو authorityِ متفاوتِ واقعاً پرداخت‌شده → دومی REFUND_REQUIRED می‌گیرد و رزرو paid می‌ماند', async () => {
+    // همان حالتی که پچِ ۰۰۰۵ برایش نوشته شد، ولی تستِ خودش را نداشت: تلاشِ
+    // اول در درگاه باز می‌ماند، `reservations/[code]/pay` آن را «جایگزین‌شده»
+    // می‌کند، تلاشِ دوم پرداخت می‌شود، و بعد تلاشِ اول هم تمام می‌شود.
+    const resv = await makeReservation({ depositRequested: true, depositAmountToman: 80_000 });
+    const authA = `AUTH-${TAG}-dupA-${randomUUID()}`;
+    const authB = `AUTH-${TAG}-dupB-${randomUUID()}`;
+    await db.payment.create({
+      data: { reservationId: resv.id, authority: authA, amountToman: 80_000, status: 'failed', failReason: 'جایگزین‌شده با تلاشِ پرداختِ جدید' },
+    });
+    await db.payment.create({ data: { reservationId: resv.id, authority: authB, amountToman: 80_000, status: 'pending' } });
+
+    stubFetch({ verifyJson: { data: { code: 100, ref_id: 'REF-B' } } });
+    const rB = await callbackRoute.GET(callbackReq(`?code=${resv.code}&Authority=${authB}&Status=OK`));
+    assert.match(rB.headers.get('location') ?? '', /payment=paid/);
+
+    stubFetch({ verifyJson: { data: { code: 100, ref_id: 'REF-A' } } });
+    const refundBefore = refundRequiredCount();
+    const rA = await callbackRoute.GET(callbackReq(`?code=${resv.code}&Authority=${authA}&Status=OK`));
+    assert.match(rA.headers.get('location') ?? '', /payment=paid/, 'پولِ کاربر رفته — صفحه‌ی failed به او دروغ می‌گفت');
+
+    const pA = await db.payment.findUnique({ where: { authority: authA } });
+    assert.equal(pA?.status, 'failed');
+    assert.match(pA?.failReason ?? '', /^REFUND_REQUIRED/);
+
+    // RT-13 (Red Team، RETEST-2026-09-12): پولِ واقعی دو بار رفته و ردیف `failed` است.
+    // کوئریِ هدرِ مهاجرتِ ۰۸۶ (دو success) این حالت را ساختاراً نمی‌بیند، آلارمِ
+    // PaymentEndpointErrors روی ۳۰۲ فایر نمی‌شود، و audit نبود — تنها رد یک log.error.
+    // پس دو سیگنالِ مستقل باید وجود داشته باشند: متریکِ آلارم‌پذیر و ردِ ماندگارِ حسابرسی.
+    assert.equal(refundRequiredCount(), refundBefore + 1,
+      'پرداختِ تکراریِ واقعی باید دقیقاً یک بار در rezervno_payment_refund_required_total شمرده شود');
+    const trail = await db.auditLog.findMany({
+      where: { action: 'payment.refund_required', targetId: pA!.id },
+      select: { success: true, restaurantId: true, detail: true },
+    });
+    assert.equal(trail.length, 1, 'دقیقاً یک ردِ حسابرسیِ «عودت لازم» برای همان ردیفِ پرداخت');
+    assert.equal(trail[0].success, false, 'این یک وظیفه‌ی باز است، نه کنشِ موفق');
+    assert.equal(trail[0].restaurantId, resv.restaurantId, 'اپراتورِ رستوران باید بتواند ردش را پیدا کند');
+    const detail = trail[0].detail as Record<string, unknown>;
+    assert.equal(detail.ref_id, 'REF-A', 'بدونِ refId عودت در پنلِ زرین‌پال ممکن نیست');
+    assert.equal(detail.authority, authA);
+    assert.equal(detail.amount_toman, 80_000);
+    assert.equal(pA?.refId, 'REF-A', 'refId لازم است، وگرنه اپراتور نمی‌تواند عودت بزند');
+    assert.ok(pA?.verifiedAt, 'زمانِ verify باید ثبت شود');
+    const pB = await db.payment.findUnique({ where: { authority: authB } });
+    assert.equal(pB?.status, 'success');
+    const after = await db.reservation.findUnique({ where: { id: resv.id }, select: { depositStatus: true } });
+    assert.equal(after?.depositStatus, 'paid');
+    assert.equal(await db.payment.count({ where: { reservationId: resv.id, status: 'success' } }), 1);
   });
 
   test('⚠️ ریدایرکت‌ها رویِ appBase() (NEXT_PUBLIC_APP_URL) هستند، نه دامنه‌ی هاردکد', async () => {

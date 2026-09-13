@@ -187,3 +187,63 @@ tests:
                 Postgres می‌نویسد، اول سلامتِ DB را نگاه کن نه API. اگر
                 action=security.abuse_flag باشد، نسب‌نامه‌ی فلگ‌ها در پنلِ شرکت
                 (listFlaggedAbuseUsers) هم همین حالا نادرست است.
+
+  # ── PaymentRefundRequired: expr = sum(increase(...[1h])) > 0 ، بدونِ for (RT-13) ──
+  #
+  # برعکسِ خانواده‌ی بالا، این‌جا **یک** رویداد باید فایر کند — هر رویداد یک عودتِ
+  # بدهکار است. پس سناریوی سکوت «یک blip» نیست، «هیچ رویدادِ تازه‌ای» است: شمارنده‌ی
+  # صفر، و شمارنده‌ای که از رویدادهای خیلی قدیمی‌تر از پنجره ثابت مانده.
+
+  # سناریوی «سکوت ۱»: هیچ پرداختِ تکراری‌ای رخ نداده.
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_payment_refund_required_total'
+        values: '0x90'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: PaymentRefundRequired
+        exp_alerts: []
+      - eval_time: 90m
+        alertname: PaymentRefundRequired
+        exp_alerts: []
+
+  # سناریوی «سکوت ۲»: شمارنده از پیش ۳ است (رویدادهای قبل از پنجره) و رشد نمی‌کند —
+  # آلارم نباید برای بدهی‌ای که یک ساعت پیش دیده شده دوباره تا ابد روشن بماند.
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_payment_refund_required_total'
+        values: '3x90'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: PaymentRefundRequired
+        exp_alerts: []
+
+  # سناریوی «فایر»: دقیقاً یک پرداختِ تکراری در t=10m. باید فوراً فایر کند (بدونِ for)
+  # و پس از گذشتنِ پنجره‌ی ۱ ساعته خاموش شود.
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_payment_refund_required_total'
+        values: '0x9 1x80'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: PaymentRefundRequired
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: PaymentRefundRequired
+        exp_alerts:
+          - exp_labels:
+              alertname: PaymentRefundRequired
+              severity: critical
+            exp_annotations:
+              summary: "پرداختِ تکراریِ بیعانه — پولِ مهمان دو بار رفته، عودتِ دستی لازم است"
+              description: >-
+                callbackِ زرین‌پال پرداختی را verify کرد که رزروش از قبل paid بود (payments/callback).
+                ردیف با status=failed و fail_reason با پیشوندِ REFUND_REQUIRED و ref_idِ واقعی
+                ثبت شده؛ رزرو سالم است. پیدا کردن:
+                SELECT id, reservation_id, authority, ref_id, amount_toman, verified_at FROM payments
+                WHERE status = 'failed' AND fail_reason LIKE 'REFUND_REQUIRED%' ORDER BY verified_at DESC;
+                همان در audit_logs با action='payment.refund_required'. عودت را در پنلِ زرین‌پال
+                با ref_id بزن. ⚠️ کوئریِ هدرِ مهاجرتِ ۰۸۶ (دو success) این حالت را نشان نمی‌دهد.
+      - eval_time: 80m
+        alertname: PaymentRefundRequired
+        exp_alerts: []

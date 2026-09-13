@@ -122,8 +122,10 @@ export const WORKER_BATCH_MAX = 50;
 
 /**
  * سقفِ انتظار برای گرفتنِ اتصال از pool — از همان envی که `lib/db.ts` می‌خواند
- * (`pool_timeout`). دو رفت‌وبرگشتِ DB در بدترین حالت برای هر job: یک
- * `consumeSms` و یک `completeJob`/`failJob`.
+ * (`pool_timeout`). سه رفت‌وبرگشتِ DB در بدترین حالت برای هر job: چکِ موجودیِ
+ * پیامک، کسرِ پس از ارسال (`sendSmsCharged`)، و `completeJob`/`failJob`.
+ * ⚠️ تا ۲۰۲۶-۰۹-۱۳ این «دو» بود (`consumeSms` + complete)؛ رفعِ ۰۴۹ کسر را به
+ * پس از ارسال برد و یک رفت‌وبرگشت افزود، پس اجاره هم با آن بزرگ شد.
  *
  * ⚠️ صادقانه: هیچ `statement_timeout` در این مخزن ست نشده (grep، کدِ خروجِ ۱)،
  * پس زمانِ **اجرای** یک کوئری رسماً بی‌کران است و این جمله فقط زمانِ
@@ -132,13 +134,13 @@ export const WORKER_BATCH_MAX = 50;
  */
 const DB_POOL_TIMEOUT_MS = Number(process.env.DB_POOL_TIMEOUT || '10') * 1000;
 
-/** بدترین حالتِ یک job: یک فراخوانیِ HTTPِ خروجی + دو رفت‌وبرگشتِ DB. */
-export const JOB_WORST_CASE_MS = OUTBOUND_HTTP_TIMEOUT_MS + 2 * DB_POOL_TIMEOUT_MS;
+/** بدترین حالتِ یک job: یک فراخوانیِ HTTPِ خروجی + سه رفت‌وبرگشتِ DB. */
+export const JOB_WORST_CASE_MS = OUTBOUND_HTTP_TIMEOUT_MS + 3 * DB_POOL_TIMEOUT_MS;
 
 /**
  * اجاره = بدترین حالتِ **کلِ batch**، چون کلِ batch یک `locked_at` مشترک دارد.
  *
- * با مقادیرِ امروز: ۵۰ × (۱۰s + ۲×۱۰s) = ۱۵۰۰ ثانیه ≈ ۲۵ دقیقه.
+ * با مقادیرِ امروز: ۵۰ × (۱۰s + ۳×۱۰s) = ۲۰۰۰ ثانیه ≈ ۳۳ دقیقه.
  * هیچ‌کدام از این سه عدد اینجا اختراع نشده‌اند — به‌ترتیب از
  * `lib/outbound-http.ts`، `lib/db.ts` (`DB_POOL_TIMEOUT`) و `WORKER_BATCH_MAX`
  * می‌آیند.

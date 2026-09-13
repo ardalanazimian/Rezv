@@ -184,13 +184,16 @@ export type QrCheckInResult = {
 // امروز: خودِ لایه‌ی سرویس دست‌نخورده و tenant-scoped مانده؛ *route* است که
 // `restaurantId` را از خودِ کدِ QR مشتق می‌کند (`resolveQrTable` بالا).
 //
-// `viewer` فقط تعیین می‌کند چه کسی حق دارد `reservation_code` را ببیند —
-// هیچ اثری بر انجام‌شدن یا نشدنِ check-in ندارد (پارامترِ پیش‌فرض‌دار است تا
-// امضایِ اجباریِ دوپارامتریِ تابع، که گاردِ تنانت را قفل می‌کند، نشکند).
+// `opts` دو کار می‌کند (پارامترِ پیش‌فرض‌دار است تا امضایِ اجباریِ دوپارامتری،
+// که گاردِ تنانت را قفل می‌کند، نشکند):
+//   • `userId`          — صاحبِ رزرو، اگر با حسابِ خودش آمده باشد.
+//   • `reservationCode` — کدی که مهمانِ بدونِ حساب دستی وارد کرده.
+// هر دو **عاملِ دومِ هویت** هستند: از ۰۹-۱۱ نبودشان یعنی check-in انجام
+// نمی‌شود (قبلاً `viewer` فقط تعیین می‌کرد چه کسی کدِ رزرو را *ببیند*).
 export async function qrCheckIn(
   qrCode: string,
   restaurantId: string,
-  viewer: { userId?: string | null } = {},
+  opts: { userId?: string | null; reservationCode?: string | null } = {},
 ): Promise<QrCheckInResult> {
   const table = await db.table.findUnique({ where: { qrCode } });
   // محدوده‌ی تنانت: میزِ رستورانِ دیگر باید دقیقاً مثلِ میزِ ناموجود دیده شود
@@ -233,8 +236,28 @@ export async function qrCheckIn(
   // (`userId === null`) به **هیچ‌کس** کد نمی‌دهد — نه به فراخوانِ ناشناس و نه
   // به یک کاربرِ لاگین‌کرده‌ی بی‌ربط (بدونِ این سخت‌گیری،
   // `null === undefined`ِ سهوی یا مقایسه‌ی نال با نال درِ نشت را باز می‌کرد).
-  const ownsReservation = Boolean(viewer.userId) && resv.userId === viewer.userId;
+  const ownsReservation = Boolean(opts.userId) && resv.userId === opts.userId;
   const visibleCode = ownsReservation ? resv.code : null;
+
+  // ── عاملِ دومِ هویت (۲۰۲۶-۰۹-۱۱) ──
+  //
+  // باگی که بسته می‌شود: تا امروز تنها اعتبارنامه، خودِ کدِ QRِ رویِ میز بود.
+  // آن کد **روی میز چسبیده** و ۵۰ بیت آنتروپی‌اش فقط جلوی *حدس‌زدن* را
+  // می‌گیرد، نه جلوی کسی که واقعاً می‌بیندش (عکسِ استیکر، مهمانِ میزِ قبلی،
+  // هر رهگذر). نتیجه: هر دارنده‌ی استیکر می‌توانست رزروِ **فردِ دیگری** را
+  // در همان پنجره‌ی زمانی بنشاند — انتقالِ واقعیِ چرخه‌ی حیات، اعلان، و
+  // میزِ occupied، همه به‌نامِ کسی که هنوز نرسیده.
+  //
+  // عاملِ دوم عمداً `guest_token` **نیست**: ستونش روی `reservations` وجود
+  // ندارد و افزودنش مهاجرت می‌خواهد. چیزی که *همین حالا* در اختیارِ مهمان
+  // است و مهاجرت نمی‌خواهد، کدِ رزروِ خودش است (پیامکِ تأیید/صفحه‌ی رزرو).
+  //
+  // نرمال‌سازی همان قاعده‌ی `normalizeGiftCode` در lib/loyalty.ts است
+  // (trim + uppercase): کدها همیشه Base32ِ بزرگ ذخیره می‌شوند و مهمان از
+  // صفحه‌کلیدِ موبایل اغلب با فاصله/حروفِ کوچک تایپ می‌کند.
+  const typedCode = String(opts.reservationCode ?? '').trim().toUpperCase();
+  const knowsCode = typedCode.length > 0 && typedCode === resv.code.trim().toUpperCase();
+  if (!ownsReservation && !knowsCode) throw Err.checkinIdentityRequired();
 
   // ⚠️ باگ M4: قبلاً وضعیت رزرو مستقیم seated نوشته می‌شد و state machine را دور
   // می‌زد (نه audit، نه اعلان، و پرش confirmed→seated بدون checked_in). حالا از

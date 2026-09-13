@@ -1426,6 +1426,9 @@ model SmsTransaction {
   balanceAfter Int        @map("balance_after")
   actorId      String?    @map("actor_id") @db.Uuid
   note         String?
+  // کلیدِ یکتاییِ کسر به‌ازای job صف (مهاجرتِ ۰۸۷، دستورِ ۰۴۹): اجرای دوباره‌ی
+  // همان job — retry یا reclaim — نمی‌تواند دوبار کسر کند. شارژ و مسیرِ اضطراری null.
+  jobId        String?    @unique @map("job_id") @db.Uuid
   createdAt    DateTime   @default(now()) @map("created_at")
   @@index([restaurantId, createdAt(sort: Desc)])
   @@map("sms_transactions")
@@ -1612,6 +1615,12 @@ model Payment {
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
   verifiedAt    DateTime?     @map("verified_at") @db.Timestamptz
   @@index([reservationId])
+  // ⚠️ مهاجرتِ ۰۸۶ — ایندکسِ یکتایِ **جزئی** که Prisma نمی‌تواند اعلامش کند:
+  //   CREATE UNIQUE INDEX payments_one_success_per_reservation
+  //     ON payments (reservation_id) WHERE status = 'success'
+  // چند تلاشِ pending/failed برای یک رزرو قانونی است؛ فقط `success` باید یکتا
+  // بماند (کسرِ دوباره‌ی بیعانه از راهِ authorityِ جایگزین‌شده). پوشش در گاردِ
+  // drift: required + ACCEPTED_DRIFT (schema-drift.integration.test.mts).
   @@map("payments")
 }
 
