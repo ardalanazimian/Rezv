@@ -62,7 +62,10 @@ async function sendAssistantMessage(){
   if (send) send.disabled = false;
 
   if (!res.ok){
-    assistantAppend(`<div class="chat-b them">اتصال به سرور برقرار نشد — دوباره امتحان کن.</div>`);
+    // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: هر شکستی «اتصال برقرار نشد» گفته می‌شد، از جمله
+    // ۴۰۳ (بدونِ دسترسی)، ۴۲۹ (سقفِ ۲۰ در دقیقه) و ۴۲۲.
+    const msg = res.offline ? 'اتصال به سرور برقرار نشد — دوباره امتحان کن.' : (res.error?.message || 'پاسخ گرفته نشد — دوباره امتحان کن.');
+    assistantAppend(`<div class="chat-b them">${esc(msg)}</div>`);
     return;
   }
   const d = res.data;
@@ -81,7 +84,7 @@ async function assistantTeach(logId, intent, btnEl){
   if (wrap) wrap.innerHTML = '<span style="opacity:.6">در حال یادگیری…</span>';
   const res = await API.assistantFeedback(logId, intent);
   if (wrap) wrap.remove();
-  if (!res.ok){ toast('', 'یادگیری انجام نشد'); return; }
+  if (!res.ok){ toast('', res.offline ? 'یادگیری انجام نشد — اتصال برقرار نیست' : (res.error?.message || 'یادگیری انجام نشد')); return; }
   assistantAppend(`<div class="chat-b them">${esc(res.data.answer)}</div>`);
   toast('', 'یاد گرفتم — دفعه‌ی بعد بهتر تشخیص می‌دم');
 }

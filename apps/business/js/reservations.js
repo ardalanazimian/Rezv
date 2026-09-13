@@ -330,7 +330,7 @@ function openManual(){
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
       <div><div class="field-label">ساعت</div><select class="inp" id="mTime"><option>۱۲:۳۰</option><option>۱۳:۰۰</option><option>۱۸:۰۰</option><option>۱۹:۰۰</option><option>۲۰:۰۰</option><option>۲۱:۰۰</option></select></div>
       <div><div class="field-label">میز</div><select class="inp" id="mTable">${TABLES.filter(t=>t.s==='free').map(t=>`<option value="${t.n}">${esc(tableLabel(t))}</option>`).join('')}</select></div>
-      <div><div class="field-label">نفر</div><select class="inp" id="mParty"><option>۲</option><option>۳</option><option>۴</option><option>۵</option><option>۶</option><option>۸</option></select></div>
+      <div><div class="field-label">نفر</div><select class="inp" id="mParty">${[2,3,4,5,6,8].map(n=>`<option value="${n}">${fa(n)}</option>`).join('')}</select></div>
     </div>
     <button class="btn btn-primary btn-lg btn-block" id="mSave" onclick="saveManual()">ثبت رزرو</button>`);
   // یک کلیدِ idempotency به‌ازای هر بار باز شدنِ مودال = یک «تلاش». تلاشِ
@@ -363,7 +363,11 @@ async function walkinLookup(){
     await loadTables();
     if(btn){btn.disabled=false;btn.textContent='بررسی شماره';}
   }
-  const member=CLUB.find(m=>normalizePhone(m.phone)===ph);
+  // ⚠️ ۲۰۲۶-۰۹-۱۳: اعضا از سرور `+98912…` می‌آیند و پرسنل `0912…` تایپ می‌کند؛
+  // normalizePhoneِ پنل فقط رقم‌ها را فارسی می‌کند، پس هیچ عضوی هرگز پیدا نمی‌شد
+  // و مشتریِ قدیمی فرمِ «مهمانِ جدید» می‌گرفت. ده رقمِ آخرِ ASCII مقایسه می‌شود.
+  const last10=p=>String(p||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'').slice(-10);
+  const member=CLUB.find(m=>m.phone&&last10(m.phone)===last10(raw));
   const freeTables=TABLES.filter(t=>t.s==='free');
   const tableOptions=freeTables.length
     ? freeTables.map(t=>`<option value="${t.id}">${esc(tableLabel(t))} (${fa(t.c)} نفره)</option>`).join('')
@@ -523,8 +527,14 @@ async function saveManual(){
   const dLabel=opt.dataset.label||opt.text.replace(/^(امروز|فردا)\s*—\s*/,'').trim();
   const dateKey=(dateVal==='today'||dateVal==='tomorrow')?dateVal:'upcoming';
   const timeVal=document.getElementById('mTime').value;
-  const partyVal=+document.getElementById('mParty').value.replace(/[^\d]/g,'')||2;
-  const tableVal=+document.getElementById('mTable').value.replace(/[^\d]/g,'')||1;
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): گزینه‌های «نفر» بدونِ
+  // value بودند، پس `.value` متنِ فارسیِ «۴» بود و `[^\d]` (فقط ASCII) همه‌اش را
+  // پاک می‌کرد ⇒ `party_size` **همیشه ۲** و چکِ ظرفیتِ میز هرگز فعال نمی‌شد.
+  // حالا گزینه‌ها valueِ ASCII دارند؛ ارقامِ فارسی هم برای احتیاط تبدیل می‌شوند.
+  // میزِ نامشخص (هیچ میزِ آزادی نبود) دیگر بی‌صدا «میزِ ۱» نمی‌شود.
+  const asciiNum=v=>+String(v||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[^\d]/g,'');
+  const partyVal=asciiNum(document.getElementById('mParty').value)||2;
+  const tableVal=asciiNum(document.getElementById('mTable')?.value)||null;
   // ⚠️ اضافه‌شده (شکاف‌سنجی لانچ، ۲۰۲۶-۰۸-۱۵): یک کلید برایِ کلِ تلاش (چه
   // درخواستِ آنلاینِ زیر موفق شود چه به مسیرِ آفلاینِ Outbox بیفتد) — تا اگر
   // درخواستِ اول واقعاً به سرور رسیده باشد ولی پاسخش گم شده، retry/صف‌شدنِ
@@ -553,10 +563,21 @@ async function saveManual(){
   // مثلِ B-01، رفع ساختاری است نه وصله‌ای: دو بدنه به یکی تبدیل شد تا
   // نتوانند دوباره واگرا شوند.
   const dt=manualDateToISO(dateVal,timeVal);
+  // ⚠️ ۲۰۲۶-۰۹-۱۳ (ممیزیِ قراردادِ فرانت↔بک):
+  //  - `restaurant_id` از شعبه‌ی **فعال** است، نه فقط `STAFF_INFO` (که فقط لاگین
+  //    پرش می‌کند: پس از بازیابیِ نشست خالی و پس از تعویضِ شعبه کهنه بود ⇒
+  //    ۴۲۲/۴۰۳). سرور برای staff رستوران را از contextِ احراز می‌گیرد؛ این
+  //    مقدار فقط صفِ آفلاین را به شعبه‌ای که در آن ساخته شد قفل می‌کند.
+  //  - تلفنِ خالی **فرستاده نمی‌شود**: `''` برای zPhoneِ اختیاری «غایب» نیست و
+  //    هر رزروِ بدونِ شماره ۴۲۲ می‌گرفت، در حالی که فرم آن را اختیاری نشان می‌دهد.
+  const phoneClean=phone.replace(/\s/g,'');
+  const guest={name:n,note:'رزرو دستی'};
+  if(phoneClean) guest.phone=phoneClean;
+  if(tableVal) guest.table_number=tableVal;
   const reservationBody={
-    restaurant_id:STAFF_INFO?.restaurant_id||undefined,
-    date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phone,
-    guest:{name:n,phone:phone.replace(/\s/g,''),table_number:tableVal,note:'رزرو دستی'},
+    restaurant_id:API.getActiveRestaurant()||STAFF_INFO?.restaurant_id||undefined,
+    date:dt.date,time:dt.time,party_size:partyVal,notify_sms:!!phoneClean,
+    guest,
   };
 
   // اگر توکن staff داریم، رزرو واقعی در دیتابیس ثبت کن
@@ -564,7 +585,10 @@ async function saveManual(){
     const res=await API.post('/reservations',reservationBody,{ 'Idempotency-Key': manualIdemKey });
     if(res.ok){
       // موفق در سرور — به‌علاوه‌ی نمایش محلی
-      RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.reservation?.code});
+      RES.push({t:timeVal,name:n,party:partyVal,table:tableVal,status:'confirmed',seg:'new',pre:false,note:'رزرو دستی',phone,date:dateKey,dLabel,code:res.data?.code});
+      // ⚠️ کدِ رزرو در سطحِ بالای پاسخ است (lib/reservations.ts → `{code, status, …}`)؛
+      // `res.data.reservation.code` همیشه undefined بود ⇒ ردیف بی‌کد می‌ماند و تغییرِ
+      // وضعیتش مسیرِ «بدونِ کد» را می‌رفت: پیامِ موفقیت بدونِ هیچ تماسی با سرور.
       const clubBefore=CLUB.length;
       CLUB=await loadClubMembers(); // وضعیت واقعی باشگاه رو از سرور بگیر، حدس نزن
       const newlyEnrolled=CLUB.length>clubBefore;

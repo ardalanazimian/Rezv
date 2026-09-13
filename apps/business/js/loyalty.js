@@ -132,7 +132,12 @@ async function sendBirthdayGreetings(){
   if(!API.getToken()){ toast('','برای ارسالِ پیامک باید وارد شده باشی'); return; }
   if(btn){ btn.disabled=true; btn.textContent='در حال ارسال…'; }
   const restore=()=>{ if(btn){ btn.disabled=false; btn.innerHTML=icon('message',{size:13})+' ارسالِ پیامکِ تبریک'; } };
-  const res=await API.sendSms({ kind:'campaign', phones:targets.map(m=>String(m.phone)), message:'تبریکِ تولد' });
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: `message` در کمپین **خودِ متنِ پیامک** است
+  // (restaurant/sms/route.ts: `text: customText.replace(/\{نام\}/g, …)`)، نه
+  // انتخابِ قالب. پیش‌تر `'تبریکِ تولد'` بود ⇒ مهمان فقط همین دو کلمه را می‌گرفت.
+  const rName=STAFF_INFO?.restaurant_name||'';
+  const message=`سلام {نام}! تولدت مبارک 🎉${rName?' — '+rName:''}`;
+  const res=await API.sendSms({ kind:'campaign', phones:targets.map(m=>String(m.phone)), message });
   if(res.ok){
     // عددِ صف از خودِ سرور می‌آید — نه شمارشِ خوش‌بینانه‌ی کلاینت.
     toast('',`پیامکِ تبریک برای ${fa(res.data?.queued||0)} نفر در صفِ ارسال قرار گرفت`);

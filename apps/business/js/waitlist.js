@@ -22,7 +22,12 @@ async function loadWaitlist(){
   // قفل می‌کرد. حالا پرچم فقط وقتی بالا می‌رود که صفِ واقعی واقعاً آمده باشد.
   const okQueue = q.ok && Array.isArray(q.data?.queue);
   if(okQueue) WAITLIST=q.data.queue;
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): تبِ صف فقط canManageWaitlist می‌خواهد ولی
+  // `/waitlist/analytics` به canViewAnalytics نیاز دارد. کارمندِ بدونِ آن ۴۰۳
+  // می‌گرفت، WL_ANALYTICS همان نمونه‌ی «۶۹٪ تبدیل / ۲۲ دقیقه» می‌ماند و چون صف
+  // واقعاً لود شده بود نوتِ «نمونه» هم نمی‌آمد. حالا: نامعلوم = «—».
   if(a.ok && a.data) WL_ANALYTICS=a.data;
+  else if(okQueue) WL_ANALYTICS={current_queue_size:q.data.queue.filter(w=>w.status==='waiting').length,conversion_rate:null,avg_wait_minutes:null,vip_entries:null};
   _wlLoaded=okQueue;
   return okQueue;
 }
@@ -31,6 +36,7 @@ function rWaitlist(){
   // اولین ورود به صفحه با توکن → داده‌ی واقعی بگیر و دوباره رندر کن
   if(!_wlLoaded && API.getToken()){ loadWaitlist().then(()=>rWaitlist()); }
   const A=WL_ANALYTICS;
+  const wlNum=(v,suffix='')=>v==null?'—':fa(v)+suffix;
   const queue=WAITLIST.filter(w=>w.status==='waiting'||w.status==='offered');
   // ⚠️ رفعِ باگ: badgeِ سایدبارِ #wlBadge با اینکه id داشت هیچ‌جا آپدیت نمی‌شد —
   // همیشه مقدارِ استاتیکِ HTML («۳») می‌ماند حتی وقتی صفِ واقعی خالی بود
@@ -45,10 +51,10 @@ function rWaitlist(){
   document.getElementById('v-waitlist').innerHTML=wlDemoNote+`
     <!-- آمار لیست انتظار -->
     <div class="wl-stats-grid">
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--blue-50)">${icon('inbox',{size:16})}</div><div><div class="wl-stat-num">${fa(A.current_queue_size)}</div><div class="wl-stat-lbl">در صف الان</div></div></div>
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--green-50)">${icon('check',{size:16})}</div><div><div class="wl-stat-num">${fa(A.conversion_rate)}٪</div><div class="wl-stat-lbl">نرخ تبدیل</div></div></div>
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:#FEF3C7">${icon('clock',{size:16})}</div><div><div class="wl-stat-num">${fa(A.avg_wait_minutes)}<span style="font-size:13px"> دق</span></div><div class="wl-stat-lbl">میانگین انتظار</div></div></div>
-      <div class="wl-stat"><div class="wl-stat-ic" style="background:#Fce7f3">${icon('star',{size:16,fill:true})}</div><div><div class="wl-stat-num">${fa(A.vip_entries)}</div><div class="wl-stat-lbl">مهمان VIP</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--blue-50)">${icon('inbox',{size:16})}</div><div><div class="wl-stat-num">${wlNum(A.current_queue_size)}</div><div class="wl-stat-lbl">در صف الان</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:var(--green-50)">${icon('check',{size:16})}</div><div><div class="wl-stat-num">${wlNum(A.conversion_rate,'٪')}</div><div class="wl-stat-lbl">نرخ تبدیل</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:#FEF3C7">${icon('clock',{size:16})}</div><div><div class="wl-stat-num">${wlNum(A.avg_wait_minutes)}${A.avg_wait_minutes==null?'':'<span style="font-size:13px"> دق</span>'}</div><div class="wl-stat-lbl">میانگین انتظار</div></div></div>
+      <div class="wl-stat"><div class="wl-stat-ic" style="background:#Fce7f3">${icon('star',{size:16,fill:true})}</div><div><div class="wl-stat-num">${wlNum(A.vip_entries)}</div><div class="wl-stat-lbl">مهمان VIP</div></div></div>
     </div>
 
     <div class="wl-q-head">
@@ -141,7 +147,7 @@ async function removeWL(id){
 }
 let _tablesLoaded=false;
 async function rFloor(){
-  if(!_tablesLoaded && API.getToken()){ await loadTables(); _tablesLoaded=true; }
+  if(!_tablesLoaded && API.getToken()){ await loadTables(); }
   syncTablesFromReservations();
   // ⚠️ فازِ ۲ (§۶): cleaning/maintenance به شمارنده اضافه شدند. پیش از این
   // `occ[t.s]++` رویِ کلیدِ ناموجود NaN تولید می‌کرد و نرخِ اشغال را خراب می‌کرد.

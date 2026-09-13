@@ -70,8 +70,9 @@ async function bizPoll(initial){
   if (!body) { if(_chatPollTimer){clearInterval(_chatPollTimer);_chatPollTimer=null;} return; }
   let appended = false;
   for (const m of msgs){
+    _chatLastTime = m.created_at;          // مکان‌نما فقط از پاسخِ poll جلو می‌رود
     if (_chatRendered.has(m.id)) continue;
-    _chatRendered.add(m.id); _chatLastTime = m.created_at;
+    _chatRendered.add(m.id);
     body.insertAdjacentHTML('beforeend', bizBubble(m));
     appended = true;
   }
@@ -96,7 +97,10 @@ async function sendBizChat(){
   const res = await API.post(`/restaurant/chats/${_chatActiveThread}`, { body });
   const pend = bodyEl?.querySelector('.chat-b.pending');
   if (res.ok && res.data?.id){
-    _chatRendered.add(res.data.id); _chatLastTime = res.data.created_at;
+    // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: مکان‌نما دیگر از پاسخِ ارسال جلو نمی‌رود. poll
+    // `createdAt > after` می‌پرسد، پس پیامِ مهمان که در همان چند ثانیه‌ی پیش از
+    // پاسخِ کارمند رسیده بود هرگز نشان داده نمی‌شد تا بازکردنِ دوباره‌ی گفت‌وگو.
+    _chatRendered.add(res.data.id);
     if (pend){ pend.classList.remove('pending'); pend.querySelector('.chat-b-t').textContent = chatTime(res.data.created_at); }
   } else {
     if (pend) pend.querySelector('.chat-b-t').innerHTML = icon('alert',{size:14});
