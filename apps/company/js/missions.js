@@ -62,7 +62,11 @@ function openMissionModal(id){
 }
 async function submitMission(id){
   const title=(document.getElementById('msTitle')?.value||'').trim();
-  const description=(document.getElementById('msDesc')?.value||'').trim()||undefined;
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: در ویرایش، توضیحِ خالی `undefined` می‌شد و از JSON
+  // حذف ⇒ سرور «دست‌نخورده» می‌خواند و توضیحِ قبلی می‌ماند، با toastِ «به‌روز شد».
+  // PATCH توضیح را nullable می‌پذیرد؛ خالی در ویرایش = null (پاک‌کردنِ عمدی).
+  const descRaw=(document.getElementById('msDesc')?.value||'').trim();
+  const description=descRaw || (id ? null : undefined);
   const target_count=+((document.getElementById('msTarget')?.value)||1);
   const xp_reward=+((document.getElementById('msXp')?.value)||0);
   const wallet_reward=+((document.getElementById('msWallet')?.value)||0);

@@ -46,7 +46,7 @@ const PHOTO_STATUS = {
   rejected: { label: 'ردشده', cls: 'expired' },
 };
 const PHOTO_CATEGORY = {
-  food: 'غذا', interior: 'فضا', drink: 'نوشیدنی', event: 'رویداد', other: 'سایر',
+  food: 'غذا', interior: 'فضا', drink: 'نوشیدنی', event: 'رویداد', logo: 'لوگو', other: 'سایر',
 };
 
 /** حجم به کیلو/مگابایت با ارقامِ فارسی. */

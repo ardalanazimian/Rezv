@@ -461,13 +461,21 @@ const FEATURE_FLAG_LABEL_FA = {
   // تنها سوییچی که جلویِ ساختِ اعتبارِ *بدونِ پرداخت* را می‌گیرد (POST /gift-cards)
   // از رابطِ اضطراری نه دیده می‌شد نه قابلِ تغییر بود. پیش‌فرضش در بک‌اند خاموش است.
   gift_card_purchase_enabled: 'خریدِ کارتِ هدیه',
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: در `FEATURE_FLAG_KEYS`ِ بک‌اند هست، پیش‌فرض خاموش،
+  // و lib/loyalty.ts خرجِ امتیاز را با آن می‌بندد — ولی اینجا نبود، پس هرگز
+  // رندر نمی‌شد و بدونِ فراخوانیِ مستقیمِ API روشن‌شدنی نبود.
+  points_redemption_enabled: 'خرجِ امتیاز (بازخرید)',
 };
 function featureFlagsPanelHTML(flags){
   flags = flags || {};   // دفاعِ لایه‌دوم: ردیف‌ها «نامعلوم» می‌شوند، نه throw
   return `<div class="panel" style="margin-bottom:20px">
     <div class="panel-head"><div><div class="panel-title">${icon('alert',{size:16})} سوییچ‌هایِ اضطراری</div><div class="panel-sub">خاموش/روشن‌کردنِ سریعِ یک قابلیت برایِ کلِ پلتفرم — بدونِ دیپلوی</div></div></div>
     <div class="mini-list">
-      ${Object.entries(FEATURE_FLAG_LABEL_FA).map(([key,label])=>{
+      ${[...new Set([...Object.keys(FEATURE_FLAG_LABEL_FA), ...Object.keys(flags)])].map((key)=>{
+        // حلقه از اجتماعِ کلیدهای نقشه و **پاسخِ سرور** است: کلیدِ تازه‌ی سرور بدونِ
+        // ترجمه هم دیده و قابلِ تغییر است (برچسب = خودِ کلید) — همان باگی که دو بار
+        // (A3-001 و ۲۰۲۶-۰۹-۱۳) با «فراموش‌کردنِ یک ردیفِ نقشه» تکرار شد.
+        const label = FEATURE_FLAG_LABEL_FA[key] || key;
         // وضعیتِ *غایب* دیگر «فعال» خوانده نمی‌شود. `raw !== false` برایِ کلیدی
         // که اصلاً در پاسخ نیست true می‌داد — همان fail-openی که این پنل نباید داشته باشد.
         const raw = flags[key];
@@ -769,7 +777,7 @@ function renderCustomer360(d){
       <div class="panel-head"><div><div class="panel-title">ماموریت‌ها</div><div class="panel-sub">${fa(d.missions.length)} مورد</div></div></div>
       ${d.missions.map(ms=>`<div class="mini-row">
         <div class="mini-info"><div class="mini-name">${esc(ms.title||ms.mission?.title||'')}</div><div class="mini-sub">${fa(ms.progress||0)} از ${fa(ms.targetCount||ms.target_count||0)}</div></div>
-        ${ms.completedAt||ms.completed_at?'<span class="badge badge-warning">تکمیل</span>':''}
+        ${ms.completed||ms.completedAt||ms.completed_at?'<span class="badge badge-warning">تکمیل</span>':''}
       </div>`).join('')}
     </div>`:''}`;
 }

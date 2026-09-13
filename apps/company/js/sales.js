@@ -161,7 +161,8 @@ function renderSalesOrders() {
   return `<div class="mini-list">${SALES_ORDERS.map((o) => {
     const st = SALES_STATUS[o.status] || { label: o.status, cls: 'trial' };
     const isPurchase = o.kind === 'purchase';
-    const canAct = isPurchase && o.status !== 'activated' && o.status !== 'rejected';
+    // `cancelled` هم نهایی است (site-orders.ts ⇒ ۴۲۲)؛ پیش‌تر دکمه‌ها برایش می‌آمدند.
+    const canAct = isPurchase && !['activated', 'rejected', 'cancelled'].includes(o.status);
     const tenantHint = o.tenant_id
       ? 'کسب‌وکار متصل است'
       : (o.suggested_tenant ? `پیشنهاد: ${esc(o.suggested_tenant.tenantName)}` : 'بدونِ کسب‌وکارِ متصل');
@@ -247,7 +248,7 @@ function openSalesOrder(id) {
 
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">بستن</button>
-      ${o.status !== 'activated' && o.status !== 'rejected' ? `
+      ${!['activated', 'rejected', 'cancelled'].includes(o.status) ? `
         <button class="btn btn-ghost" onclick="rejectSalesOrder(${jsq(o.id)})">رد کردن</button>
         ${o.status === 'pending' ? `<button class="btn btn-ghost" onclick="contactSalesOrder(${jsq(o.id)})">تماس گرفتم</button>` : ''}
         ${o.kind === 'purchase' ? `<button class="btn btn-primary" onclick="activateSalesOrder(${jsq(o.id)})">فعال‌سازیِ اشتراک</button>` : ''}

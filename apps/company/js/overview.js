@@ -233,7 +233,8 @@ function openProvisionModal(){
 }
 // نگاشتِ details.reason → پیامِ فارسیِ قابلِ‌فهم (§۹ spec)
 const PROV_REASON_FA = {
-  duplicate_owner_phone: 'این شماره قبلاً مالکِ یک رستوران است — برای شعبه‌ی جدید از صفحه‌ی همان رستوران «افزودنِ شعبه» را بزن.',
+  // سرور (provisioning.ts) هر کارمندِ فعال با این شماره را می‌گیرد، نه فقط مالک.
+  duplicate_owner_phone: 'این شماره قبلاً به یک کسب‌وکار (مالک یا کارمند) وصل است — برای شعبه‌ی جدیدِ همان مالک از صفحه‌ی رستوران «افزودنِ شعبه» را بزن.',
   slug_unavailable: 'این slug قبلاً گرفته شده؛ یکی دیگر انتخاب کن یا خالی بگذار تا خودکار ساخته شود.',
   username_taken: 'این نامِ کاربری قبلاً گرفته شده است.',
   branch_limit_reached: 'سقفِ شعبه‌های این تنانت پر است.',
@@ -282,7 +283,7 @@ async function submitProvision(){
         <div class="modal-title" style="text-align:center">رستوران ساخته شد</div>
         <div class="modal-sub" style="text-align:center">دعوتِ اولین‌ورود به <b dir="ltr">${esc(d.invite_sent_to||'')}</b> ارسال شد</div>
         <div style="margin:12px 0;font-size:13px">slug: <span class="code-pill" dir="ltr">${esc(d.restaurant?.slug||'')}</span></div>
-        <button class="btn btn-primary btn-block" onclick="closeModal();loadAdminRestaurants().then(rRestaurants)">باشه</button>
+        <button class="btn btn-primary btn-block" onclick="closeModal();loadAdminRestaurants().then(l=>{RESTAURANTS=l;rRestaurants();})">باشه</button>
       </div>`);
     return;
   }

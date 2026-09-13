@@ -142,7 +142,9 @@ function mapAdminRestaurant(apiR, fallback){
     // (و چون fallback در نبودِ تطابقِ id به RESTAURANTS_SAMPLE[0] می‌افتاد،
     // این برایِ هر رستورانِ واقعیِ خارج از نمونه رخ می‌داد). logo/grad عمداً
     // fallback دارند چون واقعاً تزئینی‌اند؛ شهر یک واقعیتِ کسب‌وکار است.
-    city: apiR.cuisine || '—',
+    // ⚠️ ۲۰۲۶-۰۹-۱۳: پیش‌تر `apiR.cuisine` بود — سرور `city` نمی‌فرستاد، پس ستونِ
+    // «شهر» و جست‌وجوی شهر (overview.js:123) رویِ نوعِ غذا کار می‌کردند.
+    city: apiR.city || '—',
     plan: apiR.plan || 'free',
     // وضعیت واقعی اشتراک — از بک‌اند (tenant.plan_expires_at / trial_ends_at)
     status: apiR.subscription_status,
