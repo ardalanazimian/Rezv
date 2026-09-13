@@ -8,6 +8,8 @@ import { parseQuery, zReservationCode, z } from '@/lib/schemas';
 import { appBase } from '@/lib/public-urls';
 
 import { withApiMetrics } from '@/lib/api-metrics';
+import { metrics } from '@/lib/metrics';
+import { audit } from '@/lib/audit';
 
 const log = createLogger('payments-callback');
 
@@ -53,7 +55,7 @@ async function GET_impl(req: Request) {
 
     const payment = await db.payment.findUnique({
       where: { authority },
-      select: { id: true, amountToman: true, status: true, reservationId: true, reservation: { select: { code: true } } },
+      select: { id: true, amountToman: true, status: true, reservationId: true, reservation: { select: { code: true, restaurantId: true } } },
     });
     if (!payment || payment.reservation.code !== code) {
       log.warn('callback با authority/code نامنطبق یا ناموجود', { code, authority });
@@ -141,6 +143,26 @@ async function GET_impl(req: Request) {
         // نه یک رویدادِ گذرا. authority و refId هر دو لازم‌اند تا اپراتور
         // بتواند تراکنش را در پنلِ زرین‌پال پیدا و برگرداند.
         log.error('پرداختِ تکراریِ بیعانه — نیازِ عودتِ دستی', { code, authority, refId: result.refId });
+        // ⚠️ RT-13: یک خطِ لاگ تنها ردِ این حالت بود. دو سیگنالِ مستقل، هر دو پس از
+        // commitِ تراکنش (ردیفِ failed + REFUND_REQUIRED واقعاً نشسته):
+        //  • متریک → آلارمِ PaymentRefundRequired (observability/alerts.yml)، که روی
+        //    **یک** رویداد فایر می‌شود — هر رویداد یک عودتِ بدهکار است.
+        //  • ردِ حسابرسی → ماندگار؛ متریک با ری‌استارتِ process صفر می‌شود، این نه.
+        //    مقدارِ برگشتی خوانده می‌شود چون این ردِ یک بدهیِ پولی است (الگوی
+        //    clearAbuseFlag در lib/audit.ts).
+        metrics.paymentRefundRequired.inc();
+        const audited = await audit({
+          action: 'payment.refund_required',
+          actorType: 'anonymous',
+          targetId: payment.id,
+          restaurantId: payment.reservation.restaurantId,
+          ip: clientIp(req),
+          success: false,
+          detail: { reservation_code: code, authority, ref_id: result.refId, amount_toman: payment.amountToman },
+        });
+        if (!audited) {
+          log.error('ردِ حسابرسیِ پرداختِ تکراری ننشست — ردیفِ payments با REFUND_REQUIRED تنها مدرک است', { code, authority });
+        }
       }
       return redirectToApp(code, 'paid');
     }

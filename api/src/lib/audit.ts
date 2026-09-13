@@ -32,6 +32,10 @@ export type AuditAction =
   // SPEC-B (C12): نامِ canonical از spec — 'admin.business_created' قبلی rename شد (تنها مصرف‌کننده: route ادمین)
   | 'restaurant.provision' | 'restaurant.invite_resent' | 'restaurant.branch_created' | 'staff.invite_accepted'
   | 'giftcard.redeem' | 'coupon.redeem' | 'coupon.created'
+  // ── RT-13: پرداختِ تکراریِ واقعیِ بیعانه — پول دو بار رفته، عودتِ دستی لازم است.
+  //    success=false چون وظیفه‌ی باز است؛ detail همان چیزی است که اپراتور برای عودت
+  //    در پنلِ زرین‌پال لازم دارد (authority، ref_id، مبلغ).
+  | 'payment.refund_required'
   | 'reservation.cancel' | 'admin.action'
   | 'restaurant.activated' | 'restaurant.deactivated'
   | 'plan.changed' | 'subscription.cancelled'

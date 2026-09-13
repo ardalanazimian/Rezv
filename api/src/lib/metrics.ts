@@ -129,6 +129,11 @@ export const metrics = {
   // نمی‌گوید علت اشباعِ استخر بوده. عمداً سطحِ DB است نه سطحِ رزرو — هر
   // endpointی می‌تواند آن را بالا ببرد.
   dbPoolTimeouts: new Counter('rezervno_db_pool_timeouts_total', 'تعداد درخواستی که به‌خاطرِ ته‌کشیدنِ استخرِ اتصالِ DB رد شد (P2024) — سیگنالِ ظرفیت، نه خرابی'),
+  // ⚠️ RT-13 (Red Team، ۲۰۲۶-۰۹-۱۲): پرداختِ تکراریِ **واقعی** بیعانه — پولِ مهمان دو
+  // بار رفته و ردیفِ دوم `failed` + REFUND_REQUIRED است. پیش از این شمارنده هیچ آلارمی
+  // نمی‌توانست ببیندش: PaymentEndpointErrors روی ۴xx/۵xx است و این مسیر ۳۰۲ برمی‌گرداند،
+  // و کوئریِ هدرِ مهاجرتِ ۰۸۶ (دو success) پس از همان ایندکس ساختاراً خالی است.
+  paymentRefundRequired: new Counter('rezervno_payment_refund_required_total', 'پرداخت‌های تکراریِ واقعیِ بیعانه که عودتِ دستی لازم دارند'),
   smsQueueDepth: new Gauge('rezervno_sms_queue_depth', 'تعداد پیام‌های در صف SMS'),
   smsSent: new Counter('rezervno_sms_sent_total', 'تعداد پیامک‌های ارسال‌شده'),
   smsFailed: new Counter('rezervno_sms_failed_total', 'تعداد پیامک‌های ناموفق (به دست مشتری نرسید)'),

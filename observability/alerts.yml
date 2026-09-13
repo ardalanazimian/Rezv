@@ -290,6 +290,25 @@ groups:
             بیش از ۵٪ درخواست‌های شروعِ پرداخت یا بازگشت از درگاه خطا می‌دهند.
             کاربر پول داده و رزروش تأیید نشده — بالاترین اولویتِ رسیدگی.
 
+      # ⚠️ RT-13 (Red Team، RETEST-2026-09-12): PaymentEndpointErrors بالا **نمی‌تواند** پرداختِ
+      # تکراریِ واقعی را ببیند — آن مسیر با ۳۰۲ به اپ برمی‌گردد، نه ۴xx/۵xx. و کوئریِ هدرِ
+      # مهاجرتِ ۰۸۶ دنبالِ دو ردیفِ success است که همان ایندکس دیگر غیرممکنش کرده.
+      # بدونِ `for`: هر رویداد یک عودتِ بدهکار به یک مهمانِ واقعی است، نه نرخی که باید پایدار شود.
+      # پنجره‌ی ۱ ساعته یعنی آلارم یک ساعت روشن می‌ماند تا کسی ببیند، نه یک scrape.
+      - alert: PaymentRefundRequired
+        expr: sum(increase(rezervno_payment_refund_required_total[1h])) > 0
+        labels: { severity: critical }
+        annotations:
+          summary: "پرداختِ تکراریِ بیعانه — پولِ مهمان دو بار رفته، عودتِ دستی لازم است"
+          description: >-
+            callbackِ زرین‌پال پرداختی را verify کرد که رزروش از قبل paid بود (payments/callback).
+            ردیف با status=failed و fail_reason با پیشوندِ REFUND_REQUIRED و ref_idِ واقعی
+            ثبت شده؛ رزرو سالم است. پیدا کردن:
+            SELECT id, reservation_id, authority, ref_id, amount_toman, verified_at FROM payments
+            WHERE status = 'failed' AND fail_reason LIKE 'REFUND_REQUIRED%' ORDER BY verified_at DESC;
+            همان در audit_logs با action='payment.refund_required'. عودت را در پنلِ زرین‌پال
+            با ref_id بزن. ⚠️ کوئریِ هدرِ مهاجرتِ ۰۸۶ (دو success) این حالت را نشان نمی‌دهد.
+
       - alert: PaymentCallbackLatency
         expr: |
           histogram_quantile(0.95, sum(rate(rezervno_http_request_duration_seconds_bucket{route="/api/v1/payments/callback"}[10m])) by (le)) > 3

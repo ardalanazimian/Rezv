@@ -30,8 +30,22 @@ const { signAccess } = await import('../src/lib/jwt');
 const { fixturePhone } = await import('./_phone.helper.mts');
 const payRoute = await import('../src/app/api/v1/reservations/[code]/pay/route');
 const callbackRoute = await import('../src/app/api/v1/payments/callback/route');
+const { renderMetrics } = await import('../src/lib/metrics');
 
 const TAG = 'pay';
+
+/**
+ * مقدارِ فعلیِ `rezervno_payment_refund_required_total` از خروجیِ واقعیِ Prometheus.
+ * نبودنِ سری = ۰ — پس پیش از رفعِ RT-13 هر «+۱» قرمز می‌شود، نه اینکه رد شود.
+ */
+function refundRequiredCount(): number {
+  let total = 0;
+  for (const line of renderMetrics().split('\n')) {
+    const m = line.match(/^rezervno_payment_refund_required_total(?:\{[^}]*\})?\s+(-?[\d.]+)$/);
+    if (m) total += Number(m[1]);
+  }
+  return total;
+}
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function resvCode(): string {
@@ -152,7 +166,7 @@ async function makeReservation(o: ResvOverrides = {}) {
       depositAmountToman: o.depositAmountToman ?? null,
       depositStatus: o.depositStatus ?? 'none',
     },
-    select: { id: true, code: true },
+    select: { id: true, code: true, restaurantId: true },
   });
 }
 
@@ -355,6 +369,7 @@ describe('GET /payments/callback', () => {
     const resv = await makeReservation({ depositRequested: true, depositAmountToman: 80_000 });
     const authority = `AUTH-${TAG}-race-${randomUUID()}`;
     await db.payment.create({ data: { reservationId: resv.id, authority, amountToman: 80_000, status: 'pending' } });
+    const refundBefore = refundRequiredCount();
 
     // سدِ هم‌زمانی: پاسخِ verify تا وقتی **هر دو** درخواست نرسیده‌اند برنمی‌گردد.
     // بدونش تست می‌توانست اتفاقی سریال شود و رگرسیون را نبیند. مهلتِ ۵ ثانیه
@@ -400,6 +415,12 @@ describe('GET /payments/callback', () => {
       await db.payment.count({ where: { reservationId: resv.id, status: 'success' } }), 1,
       'مهاجرتِ ۰۸۶ هم همین را ضمانت می‌کند: حداکثر یک successـ به‌ازای هر رزرو',
     );
+    // کنترلِ منفیِ RT-13: سیگنالِ «عودت لازم است» روی یک پرداختِ سالم آلارمِ دروغ است.
+    assert.equal(refundRequiredCount(), refundBefore, 'یک پرداخت با دو callback نباید «عودت لازم» بشمارد');
+    assert.equal(
+      await db.auditLog.count({ where: { action: 'payment.refund_required', targetId: payment!.id } }), 0,
+      'و نباید ردِ حسابرسیِ عودت بسازد',
+    );
   });
 
   test('⚠️ دو authorityِ متفاوتِ واقعاً پرداخت‌شده → دومی REFUND_REQUIRED می‌گیرد و رزرو paid می‌ماند', async () => {
@@ -419,12 +440,31 @@ describe('GET /payments/callback', () => {
     assert.match(rB.headers.get('location') ?? '', /payment=paid/);
 
     stubFetch({ verifyJson: { data: { code: 100, ref_id: 'REF-A' } } });
+    const refundBefore = refundRequiredCount();
     const rA = await callbackRoute.GET(callbackReq(`?code=${resv.code}&Authority=${authA}&Status=OK`));
     assert.match(rA.headers.get('location') ?? '', /payment=paid/, 'پولِ کاربر رفته — صفحه‌ی failed به او دروغ می‌گفت');
 
     const pA = await db.payment.findUnique({ where: { authority: authA } });
     assert.equal(pA?.status, 'failed');
     assert.match(pA?.failReason ?? '', /^REFUND_REQUIRED/);
+
+    // RT-13 (Red Team، RETEST-2026-09-12): پولِ واقعی دو بار رفته و ردیف `failed` است.
+    // کوئریِ هدرِ مهاجرتِ ۰۸۶ (دو success) این حالت را ساختاراً نمی‌بیند، آلارمِ
+    // PaymentEndpointErrors روی ۳۰۲ فایر نمی‌شود، و audit نبود — تنها رد یک log.error.
+    // پس دو سیگنالِ مستقل باید وجود داشته باشند: متریکِ آلارم‌پذیر و ردِ ماندگارِ حسابرسی.
+    assert.equal(refundRequiredCount(), refundBefore + 1,
+      'پرداختِ تکراریِ واقعی باید دقیقاً یک بار در rezervno_payment_refund_required_total شمرده شود');
+    const trail = await db.auditLog.findMany({
+      where: { action: 'payment.refund_required', targetId: pA!.id },
+      select: { success: true, restaurantId: true, detail: true },
+    });
+    assert.equal(trail.length, 1, 'دقیقاً یک ردِ حسابرسیِ «عودت لازم» برای همان ردیفِ پرداخت');
+    assert.equal(trail[0].success, false, 'این یک وظیفه‌ی باز است، نه کنشِ موفق');
+    assert.equal(trail[0].restaurantId, resv.restaurantId, 'اپراتورِ رستوران باید بتواند ردش را پیدا کند');
+    const detail = trail[0].detail as Record<string, unknown>;
+    assert.equal(detail.ref_id, 'REF-A', 'بدونِ refId عودت در پنلِ زرین‌پال ممکن نیست');
+    assert.equal(detail.authority, authA);
+    assert.equal(detail.amount_toman, 80_000);
     assert.equal(pA?.refId, 'REF-A', 'refId لازم است، وگرنه اپراتور نمی‌تواند عودت بزند');
     assert.ok(pA?.verifiedAt, 'زمانِ verify باید ثبت شود');
     const pB = await db.payment.findUnique({ where: { authority: authB } });
