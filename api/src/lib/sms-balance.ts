@@ -63,30 +63,79 @@ export async function consumeSms(
   // *افزایش* می‌دهد و شرطِ `sms_balance >= -5` هم همیشه درست است — یعنی هم
   // گارد بی‌اثر می‌شود هم اعتبارِ رایگان ساخته می‌شود.
   //
-  // ⚠️ صداقت: امروز قابلِ‌دسترس **نیست** — تنها صداکننده (worker.ts:27) عددِ
-  // ثابتِ ۱ می‌فرستد. این دفاعِ در عمق است برای صداکننده‌ی بعدی، نه رفعِ نشتی
-  // که در حالِ رخ‌دادن باشد. throw می‌کند و false برنمی‌گرداند چون «۱ـ منفی»
-  // یک شرطِ کسب‌وکار نیست، یک خطای برنامه‌نویسی است — همان رفتارِ topupSms.
+  // ⚠️ صداقت: امروز قابلِ‌دسترس **نیست** — هر صداکننده (`sendSmsCharged` در
+  // sms.ts) عددِ ثابتِ ۱ می‌فرستد. این دفاعِ در عمق است برای صداکننده‌ی بعدی،
+  // نه رفعِ نشتی که در حالِ رخ‌دادن باشد. throw می‌کند و false برنمی‌گرداند چون
+  // «۱ـ منفی» یک شرطِ کسب‌وکار نیست، یک خطای برنامه‌نویسی است — همان رفتارِ
+  // topupSms. (خودِ چک حالا در `debitSms` است، تنها مسیرِ SQLِ کسر.)
+  return (await debitSms(restaurantId, count, reason, null)) === 'charged';
+}
+
+/**
+ * آیا رستوران دستِ‌کم `count` پیامک اعتبار دارد؟ فقط خواندن — چیزی کسر نمی‌کند.
+ *
+ * برای «چک ← ارسال ← کسر» (`sendSmsCharged` در `sms.ts`): اگر اعتبار نیست
+ * ارسال نمی‌شود، ولی کسر تا پذیرشِ ارائه‌دهنده صبر می‌کند. اتمیک نیست و عمداً
+ * نیست — تنها ضامنِ «موجودی منفی نمی‌شود» همان `UPDATE … WHERE sms_balance >= n`
+ * در `debitSms` است، نه این چک.
+ */
+export async function hasSmsBalance(restaurantId: string, count = 1): Promise<boolean> {
+  const r = await db.restaurant.findUnique({ where: { id: restaurantId }, select: { smsBalance: true } });
+  return !!r && r.smsBalance >= count;
+}
+
+/**
+ * کسرِ یک پیامکِ **ارسال‌شده** به‌ازای یک job — حداکثر یک‌بار، هر چند بار که
+ * همان job اجرا شود.
+ *
+ * ⚠️ دستورِ ۰۴۹ §۳: handlerِ `sms` پیش از ارسال و بدونِ کلیدِ job کسر می‌کرد، پس
+ * retryِ پس از شکستِ شبکه و reclaimِ پس از کرشِ worker هر کدام یک اعتبارِ دیگر
+ * می‌سوزاندند. ایندکسِ یکتای `sms_transactions.job_id` (مهاجرتِ ۰۸۷) کلیدِ
+ * یکتایی است؛ پیش‌بررسیِ داخلِ تراکنش فقط راهِ ارزان است و ضامن نیست.
+ */
+export async function chargeSmsForJob(
+  restaurantId: string, jobId: string, reason: string,
+): Promise<DebitOutcome> {
+  return debitSms(restaurantId, 1, reason, jobId);
+}
+
+export type DebitOutcome = 'charged' | 'already_charged' | 'insufficient';
+
+/** تنها مسیرِ SQLِ کسرِ پیامک — `consumeSms` و `chargeSmsForJob` هر دو از این‌جا می‌روند. */
+async function debitSms(
+  restaurantId: string, count: number, reason: string, jobId: string | null,
+): Promise<DebitOutcome> {
   if (!Number.isInteger(count) || count <= 0) {
     throw Err.validation('تعداد پیامک باید عددی صحیح و مثبت باشد');
   }
-  return db.$transaction(async (tx) => {
-    // کاهش اتمیک فقط اگر موجودی کافی است
-    const rows = await tx.$queryRaw<{ sms_balance: number }[]>`
-      UPDATE restaurants
-      SET sms_balance = sms_balance - ${count}, sms_total_sent = sms_total_sent + ${count}
-      WHERE id = ${restaurantId}::uuid AND sms_balance >= ${count}
-      RETURNING sms_balance
-    `;
-    if (rows.length === 0) {
-      log.warn('موجودی SMS کافی نیست', { restaurantId, count });
-      return false;
-    }
-    await tx.smsTransaction.create({
-      data: { restaurantId, delta: -count, reason, balanceAfter: rows[0].sms_balance },
+  try {
+    return await db.$transaction(async (tx) => {
+      if (jobId) {
+        const prior = await tx.smsTransaction.findUnique({ where: { jobId }, select: { id: true } });
+        if (prior) return 'already_charged';
+      }
+      // کاهش اتمیک فقط اگر موجودی کافی است
+      const rows = await tx.$queryRaw<{ sms_balance: number }[]>`
+        UPDATE restaurants
+        SET sms_balance = sms_balance - ${count}, sms_total_sent = sms_total_sent + ${count}
+        WHERE id = ${restaurantId}::uuid AND sms_balance >= ${count}
+        RETURNING sms_balance
+      `;
+      if (rows.length === 0) {
+        log.warn('موجودی SMS کافی نیست', { restaurantId, count });
+        return 'insufficient';
+      }
+      await tx.smsTransaction.create({
+        data: { restaurantId, delta: -count, reason, balanceAfter: rows[0].sms_balance, jobId },
+      });
+      return 'charged';
     });
-    return true;
-  });
+  } catch (e) {
+    // دو اجرای هم‌زمانِ همان job که هر دو از پیش‌بررسی رد شدند: دومی روی ایندکسِ
+    // یکتا می‌افتد و کلِ تراکنشش — همراهِ کاهشِ موجودی — برمی‌گردد. پول یک‌بار رفته.
+    if (jobId && (e as { code?: string })?.code === 'P2002') return 'already_charged';
+    throw e;
+  }
 }
 
 /** موجودی و تاریخچه‌ی اخیر SMS یک رستوران. */

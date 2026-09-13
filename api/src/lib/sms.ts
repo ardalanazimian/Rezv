@@ -1,7 +1,7 @@
 import { createLogger } from './logger';
 import { enqueue } from './queue';
 import { metrics } from './metrics';
-import { consumeSms } from './sms-balance';
+import { consumeSms, hasSmsBalance, chargeSmsForJob, type DebitOutcome } from './sms-balance';
 import { outboundHttpSignal } from './outbound-http';
 const log = createLogger('sms');
 
@@ -134,10 +134,10 @@ export function toLocalNumber(phone: string): string {
  *    عادی بود.
  *
  * قاعده‌ی این‌جا عیناً همان قاعده‌ی worker است (پیاده‌سازیِ دوم نیست — همان
- * `consumeSms`): اول کسر، بعد ارسال؛ اگر کسر ممکن نبود **ارسال نمی‌شود**.
- * fail-closed عمدی است (CLAUDE.md §۹): علتِ شکستِ `enqueue` معمولاً خودِ
- * دیتابیس است، و اگر نتوانیم موجودی را کم کنیم یعنی نمی‌دانیم اجازه‌ی ارسال
- * داریم یا نه — «نمی‌دانم» باید بسته باشد، نه باز.
+ * `sendSmsCharged`): چک، ارسال، و کسر فقط پس از پذیرشِ ارائه‌دهنده؛ اگر اعتبار
+ * نبود **ارسال نمی‌شود**. fail-closed عمدی است (CLAUDE.md §۹): علتِ شکستِ
+ * `enqueue` معمولاً خودِ دیتابیس است، و اگر نتوانیم موجودی را بخوانیم یعنی
+ * نمی‌دانیم اجازه‌ی ارسال داریم یا نه — «نمی‌دانم» باید بسته باشد، نه باز.
  *
  * تابع عمداً throw نمی‌کند: `enqueueSms` از روزِ اول void و بی‌استثنا بوده و
  * چند صداکننده‌اش (مثلاً `createReservation` بعد از commit) خطا را
@@ -145,27 +145,9 @@ export function toLocalNumber(phone: string): string {
  * به‌جایش هر شکست **صریحاً** لاگ و متریک می‌شود.
  */
 async function sendDirectFallback(job: SmsJob): Promise<void> {
-  if (job.restaurantId) {
-    let charged = false;
-    try {
-      charged = await consumeSms(job.restaurantId, 1, 'queue_fallback');
-    } catch (e) {
-      log.error('کسرِ موجودیِ پیامک در مسیرِ اضطراری ناموفق — ارسال انجام نشد', {
-        template: job.template, restaurantId: job.restaurantId, error: (e as Error).message,
-      });
-      metrics.smsFailed.inc({ template: job.template, reason: 'balance_check_failed' });
-      return;
-    }
-    if (!charged) {
-      log.error('موجودیِ پیامکِ رستوران کافی نیست — مسیرِ اضطراری ارسال نکرد', {
-        template: job.template, restaurantId: job.restaurantId,
-      });
-      metrics.smsFailed.inc({ template: job.template, reason: 'insufficient_balance' });
-      return;
-    }
-  }
+  let outcome: SmsChargedOutcome;
   try {
-    await sendSmsNow(job);
+    outcome = await sendSmsCharged(job, { jobId: null, reason: 'queue_fallback' });
   } catch (e) {
     // ⚠️ اینجا عمداً «بی‌صدا» نیست. متریکِ جدا از `network` است چون معنایش
     // فرق دارد: در مسیرِ عادی، شکستِ ارسال را worker با retry جبران می‌کند؛
@@ -174,7 +156,86 @@ async function sendDirectFallback(job: SmsJob): Promise<void> {
       template: job.template, restaurantId: job.restaurantId ?? null, error: (e as Error).message,
     });
     metrics.smsFailed.inc({ template: job.template, reason: 'fallback_failed' });
+    return;
   }
+  if (outcome.status === 'balance_unknown') {
+    log.error('خواندنِ موجودیِ پیامک در مسیرِ اضطراری ناموفق — ارسال انجام نشد', {
+      template: job.template, restaurantId: job.restaurantId, error: outcome.error,
+    });
+    metrics.smsFailed.inc({ template: job.template, reason: 'balance_check_failed' });
+  } else if (outcome.status === 'insufficient_balance') {
+    log.error('موجودیِ پیامکِ رستوران کافی نیست — مسیرِ اضطراری ارسال نکرد', {
+      template: job.template, restaurantId: job.restaurantId,
+    });
+    metrics.smsFailed.inc({ template: job.template, reason: 'insufficient_balance' });
+  }
+}
+
+export type SmsChargedOutcome =
+  | { status: 'balance_unknown'; error: string }
+  | { status: 'insufficient_balance' }
+  | { status: 'not_accepted'; reason: SmsNotAcceptedReason }
+  | { status: 'sent'; charge: DebitOutcome | 'not_applicable' | 'charge_failed' };
+
+/**
+ * تنها قاعده‌ی پولِ پیامکِ رستوران: **چک ← ارسال ← کسر، و کسر فقط پس از پذیرشِ ارائه‌دهنده.**
+ * worker و مسیرِ اضطراری هر دو از همین‌جا می‌روند — دو نسخه از یک قاعده همان
+ * نقصی بود که `sendDirectFallback` یک‌بار با آن بی‌صورت‌حساب ارسال می‌کرد.
+ *
+ * ⚠️ چرا کسر پس از ارسال (دستورِ ۰۴۹ §۳ — پیش از این، کسر پیش از ارسال بود):
+ *  • شکستِ شبکه throw می‌کند و retry می‌خورد؛ هیچ اعتباری نگرفته‌ایم، پس
+ *    retry هم دوباره نمی‌گیرد. قبلاً هر تلاش یک اعتبار بود — تا ۵ برای یک پیام.
+ *  • ردِ ارائه‌دهنده و «پیکربندی‌نشده» throw نمی‌کنند و job کامل می‌شود؛ قبلاً
+ *    رستوران برای پیامی که هرگز پذیرفته نشد پول می‌داد.
+ *  • `jobId` کسر را به‌ازای job یکتا می‌کند (`chargeSmsForJob`)، پس reclaimِ
+ *    jobی که ارسال و کسرش انجام شده ولی completed نشده، دوباره کسر نمی‌کند.
+ *
+ * ⚠️ هزینه‌ی این ترتیب، گفته‌شده: چک اتمیک نیست. اگر workerِ هم‌زمان آخرین
+ * اعتبار را میانِ چک و کسر خرج کند، پیام رفته و کسر ممکن نیست (موجودی منفی
+ * نمی‌شود — CHECKِ مهاجرتِ ۰۶۴). آن پیام هزینه‌ی پلتفرم است نه رستوران، و
+ * بی‌صدا نیست: `rezervno_sms_uncharged_total`. عکسش — کسرِ اول و بازپرداخت —
+ * برای هر jobی که با reclaim به dead برسد اعتبار را بی‌بازگشت می‌سوزاند.
+ *
+ * شکستِ **خودِ کسر** پس از ارسالِ موفق هم throw نمی‌کند: throw یعنی retry و
+ * retry یعنی پیامِ تکراری به مهمان. شمرده می‌شود و job کامل می‌شود.
+ */
+export async function sendSmsCharged(
+  job: SmsJob, charge: { jobId: string | null; reason: string },
+): Promise<SmsChargedOutcome> {
+  const rid = job.restaurantId;
+  if (rid) {
+    let allowed: boolean;
+    try {
+      allowed = await hasSmsBalance(rid);
+    } catch (e) {
+      return { status: 'balance_unknown', error: (e as Error).message };
+    }
+    if (!allowed) return { status: 'insufficient_balance' };
+  }
+
+  const sent = await sendSmsNow(job);
+  if (!sent.accepted) return { status: 'not_accepted', reason: sent.reason };
+  if (!rid) return { status: 'sent', charge: 'not_applicable' };
+
+  let result: DebitOutcome;
+  try {
+    result = charge.jobId
+      ? await chargeSmsForJob(rid, charge.jobId, charge.reason)
+      : ((await consumeSms(rid, 1, charge.reason)) ? 'charged' : 'insufficient');
+  } catch (e) {
+    log.error('پیامک ارسال شد ولی کسرِ اعتبار شکست خورد', {
+      template: job.template, restaurantId: rid, jobId: charge.jobId, error: (e as Error).message,
+    });
+    metrics.smsUncharged.inc({ template: job.template, reason: 'charge_failed' });
+    return { status: 'sent', charge: 'charge_failed' };
+  }
+  if (result === 'insufficient') {
+    log.error('پیامک ارسال شد ولی موجودی در میانه‌ی ارسال تمام شد — بی‌کسر', {
+      template: job.template, restaurantId: rid, jobId: charge.jobId,
+    });
+    metrics.smsUncharged.inc({ template: job.template, reason: 'insufficient_balance' });
+  }
+  return { status: 'sent', charge: result };
 }
 
 export async function enqueueSms(job: SmsJob): Promise<void> {
@@ -241,7 +302,18 @@ export const MAX_SMS_TOKENS = 3;
  *     چیزی که کاوه‌نگار اصلاً نداشت، و به همین دلیل متنِ کمپینِ رستوران‌دار
  *     بی‌صدا دور ریخته می‌شد.
  */
-export async function sendSmsNow(job: SmsJob): Promise<void> {
+export type SmsNotAcceptedReason = 'not_configured' | 'no_sender_line' | 'missing_bodyid' | 'rejected';
+
+/**
+ * ⚠️ خروجی از ۲۰۲۶-۰۹-۱۳ دیگر `void` نیست: «پذیرفته شد یا نه» را برمی‌گرداند.
+ * چهار راهِ «نرفت» (پیکربندی‌نشده، بی‌خط، بی‌bodyId، ردِ ارائه‌دهنده) عمداً
+ * throw نمی‌کنند — retryشان بی‌فایده است — ولی تا امروز از «رفت» قابلِ تشخیص
+ * هم نبودند، و handlerِ worker برای هر چهار اعتبارِ رستوران را کسر می‌کرد
+ * (دستورِ ۰۴۹ و هم‌خانواده‌اش). شکستِ شبکه همچنان throw می‌کند تا retry بخورد.
+ */
+export type SmsSendResult = { accepted: true } | { accepted: false; reason: SmsNotAcceptedReason };
+
+export async function sendSmsNow(job: SmsJob): Promise<SmsSendResult> {
   const username = process.env.MELIPAYAMAK_USERNAME;
   const password = process.env.MELIPAYAMAK_PASSWORD;
   if (!username || !password) {
@@ -255,7 +327,7 @@ export async function sendSmsNow(job: SmsJob): Promise<void> {
     } else {
       log.debug(`(dev) SMS → ${job.to}`, { template: job.template });
     }
-    return;
+    return { accepted: false, reason: 'not_configured' };
   }
   const receptor = toLocalNumber(job.to);
 
@@ -271,7 +343,7 @@ export async function sendSmsNow(job: SmsJob): Promise<void> {
       // مصرف‌کننده «ارسال شد» نگوید.
       log.error('ارسالِ متنِ آزاد بدونِ MELIPAYAMAK_FROM ممکن نیست', { template: job.template });
       metrics.smsFailed.inc({ template: job.template, reason: 'no_sender_line' });
-      return;
+      return { accepted: false, reason: 'no_sender_line' };
     }
     url = `${MELI_BASE}/SendSMS`;
     body = { username, password, to: receptor, from, text: freeText, isFlash: 'false' };
@@ -281,7 +353,7 @@ export async function sendSmsNow(job: SmsJob): Promise<void> {
       // نبودِ bodyId یعنی الگو در پنل تعریف/تأیید نشده. حدس‌زدن ممنوع.
       log.error('bodyIdِ الگو تنظیم نشده — پیامک ارسال نشد', { template: job.template });
       metrics.smsFailed.inc({ template: job.template, reason: 'missing_bodyid' });
-      return;
+      return { accepted: false, reason: 'missing_bodyid' };
     }
     url = `${MELI_BASE}/BaseServiceNumber`;
     body = { username, password, to: receptor, bodyId, text: job.tokens.join(tokenSep()) };
@@ -310,10 +382,11 @@ export async function sendSmsNow(job: SmsJob): Promise<void> {
         value: data?.Value,
       });
       metrics.smsFailed.inc({ template: job.template, reason: 'rejected' });
-      return;
+      return { accepted: false, reason: 'rejected' };
     }
     log.info(`ارسال شد → ${receptor}`, { template: job.template, recId: data?.Value });
     metrics.smsSent.inc({ template: job.template });
+    return { accepted: true };
   } catch (e) {
     log.error(`خطای شبکه → ${receptor}`, { template: job.template, error: (e as Error).message });
     metrics.smsFailed.inc({ template: job.template, reason: 'network' });

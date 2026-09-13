@@ -57,6 +57,16 @@ function smsFailed(reason: string): number {
   return total;
 }
 
+/** مقدارِ فعلیِ کلِ `rezervno_sms_sent_total` (همه‌ی برچسب‌ها). */
+function smsSent(): number {
+  let total = 0;
+  for (const line of renderMetrics().split('\n')) {
+    const m = line.match(/^rezervno_sms_sent_total(?:\{[^}]*\})?\s+(-?[\d.]+)$/);
+    if (m) total += Number(m[1]);
+  }
+  return total;
+}
+
 async function balanceOf(): Promise<number> {
   const r = await db.restaurant.findUnique({ where: { id: restaurantId }, select: { smsBalance: true } });
   return r!.smsBalance;
@@ -127,12 +137,26 @@ describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ 
       'این پیامک نباید در صف نشسته باشد — وگرنه شاخه‌ی اضطراری اصلاً اجرا نشده');
   });
 
-  test('🔴 صف که بیفتد، مسیرِ اضطراری دقیقاً یک اعتبار کسر می‌کند', async () => {
+  test('🔴 صف که بیفتد، مسیرِ اضطراری برای پیامِ پذیرفته‌شده دقیقاً یک اعتبار کسر می‌کند', async () => {
+    // ⚠️ بازنویسی ۲۰۲۶-۰۹-۱۳ (دستورِ ۰۴۹): نسخه‌ی قبلی «پیکربندی‌نشده» را نشانه‌ی
+    // «تلاش به ارسال» می‌گرفت و کسر را روی همان تأیید می‌کرد — یعنی **خودِ نقص**
+    // را پین می‌کرد: اعتبار برای پیامی که هرگز نرفت. حالا ارائه‌دهنده واقعاً
+    // می‌پذیرد (stubِ محلی، بدونِ شبکه) و کسر فقط پس از آن ادعا می‌شود.
     await setBalance(3);
+    setSmsTransport(true);
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({ RetStatus: 1, StrRetStatus: 'Ok', Value: '9876543210' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )) as typeof fetch;
     const txBefore = await db.smsTransaction.count({ where: { restaurantId } });
-    const sentBefore = smsFailed('not_configured');
+    const sentBefore = smsSent();
 
-    await enqueueSms(unqueueableJob());
+    try {
+      await enqueueSms(unqueueableJob());
+    } finally {
+      globalThis.fetch = ORIG_FETCH;
+      setSmsTransport(false);
+    }
 
     assert.equal(await balanceOf(), 2, 'موجودی باید دقیقاً ۱ کم شود (قبلاً اصلاً کم نمی‌شد)');
     const tx = await db.smsTransaction.findMany({
@@ -143,7 +167,30 @@ describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ 
     assert.equal(tx[0].delta, -1);
     assert.equal(tx[0].reason, 'queue_fallback', 'مصرفِ مسیرِ اضطراری باید از مسیرِ عادی قابلِ تفکیک باشد');
     assert.equal(tx[0].balanceAfter, 2);
-    assert.equal(smsFailed('not_configured'), sentBefore + 1, 'و پیام واقعاً تلاش به ارسال شده');
+    assert.equal(smsSent(), sentBefore + 1, 'و پیام واقعاً پذیرفته شده');
+  });
+
+  test('🔴 ارائه‌دهنده رد کند → مسیرِ اضطراری هیچ اعتباری کسر نمی‌کند', async () => {
+    // هم‌خانواده‌ی ۰۴۹: ردِ ارائه‌دهنده throw نمی‌کند، پس «اول کسر، بعد ارسال»
+    // برای هر ردی یک اعتبار می‌سوزاند.
+    await setBalance(3);
+    setSmsTransport(true);
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({ RetStatus: 0, StrRetStatus: '[DEMO] rejected', Value: '11' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )) as typeof fetch;
+    const txBefore = await db.smsTransaction.count({ where: { restaurantId } });
+    const rejectedBefore = smsFailed('rejected');
+    try {
+      await enqueueSms(unqueueableJob());
+    } finally {
+      globalThis.fetch = ORIG_FETCH;
+      setSmsTransport(false);
+    }
+    assert.equal(smsFailed('rejected'), rejectedBefore + 1, 'موضوعِ تست غایب است: ارائه‌دهنده صدا زده نشد');
+    assert.equal(await balanceOf(), 3, 'پیامِ ردشده نباید اعتباری بسوزاند');
+    assert.equal(await db.smsTransaction.count({ where: { restaurantId } }), txBefore,
+      'پیامِ ردشده نباید کسری در دفتر بگذارد');
   });
 
   test('🔴 با موجودیِ صفر، مسیرِ اضطراری اصلاً ارسال نمی‌کند', async () => {
@@ -177,6 +224,8 @@ describe('موجودیِ پیامک در مسیرِ اضطراریِ صف (§۳ 
     }
     assert.equal(smsFailed('fallback_failed'), swallowedBefore + 1,
       'شکستِ ارسالِ بدونِ retry باید صریحاً شمرده شود (قبلاً `.catch(()=>{})` بود)');
+    assert.equal(await balanceOf(), 4,
+      'پیامی که به‌خاطرِ شبکه قطعاً از دست رفت نباید اعتبار بسوزاند (دستورِ ۰۴۹)');
   });
 
   test('پیامکِ بدونِ رستوران (سطحِ پلتفرم) هنوز از مسیرِ اضطراری می‌رود', async () => {

@@ -1,9 +1,8 @@
 import {
   claimJobs, completeJob, failJob, refreshQueueMetrics,
-  reclaimStaleJobs, WORKER_BATCH_MAX,
+  reclaimStaleJobs, WORKER_BATCH_MAX, type ClaimedJob,
 } from './queue';
-import { sendSmsNow, type SmsJob } from './sms';
-import { consumeSms } from './sms-balance';
+import { sendSmsCharged, type SmsJob } from './sms';
 import { sendEmail, sendPush } from './notify';
 import { deliverWebhook } from './events';
 import { createLogger } from './logger';
@@ -21,19 +20,21 @@ const log = createLogger('worker');
 // ═══════════════════════════════════════════════════════════════════════
 
 // هر نوع job چطور پردازش می‌شود
-const handlers: Record<string, (payload: any) => Promise<Record<string, unknown> | void>> = {
-  sms: async (p: SmsJob) => {
-    // اگر پیامک به یک رستوران تعلق دارد، اول از موجودی کم کن.
-    // اگر موجودی کافی نبود، ارسال نکن (ضد ارسال بدون اعتبار).
-    // OTP و پیامک‌های سطح پلتفرم restaurantId ندارند → بدون چک ارسال می‌شوند.
-    if (p.restaurantId) {
-      const ok = await consumeSms(p.restaurantId, 1, 'campaign');
-      if (!ok) {
-        // موجودی تمام شده — job را به‌جای retry بی‌پایان، با پیام واضح رها کن
-        throw new Error(`موجودی پیامک رستوران ${p.restaurantId} کافی نیست`);
-      }
+const handlers: Record<string, (payload: any, job: ClaimedJob) => Promise<Record<string, unknown> | void>> = {
+  sms: async (p: SmsJob, job) => {
+    // قاعده‌ی پول در `sendSmsCharged` است: چک ← ارسال ← کسر پس از پذیرش، و
+    // کسر به‌ازای `job.id` یکتا — پس retry و reclaimِ همان job دوباره کسر نمی‌کنند
+    // (دستورِ ۰۴۹). OTP و پیامک‌های سطح پلتفرم restaurantId ندارند → بدون چک.
+    const outcome = await sendSmsCharged(p, { jobId: job.id, reason: 'campaign' });
+    if (outcome.status === 'insufficient_balance') {
+      // موجودی تمام شده — ارسال نشد؛ failJob تا سقفِ تلاش‌ها retry و بعد DLQ می‌کند
+      throw new Error(`موجودی پیامک رستوران ${p.restaurantId} کافی نیست`);
     }
-    await sendSmsNow(p);
+    if (outcome.status === 'balance_unknown') {
+      // نمی‌دانیم اجازه‌ی ارسال داریم یا نه → ارسال نکن، retry
+      throw new Error(`خواندنِ موجودیِ پیامکِ رستوران ${p.restaurantId} ناموفق: ${outcome.error}`);
+    }
+    return outcome;
   },
   email: async (p: { to: string; subject: string; body: string }) => {
     await sendEmail(p.to, p.subject, p.body);
@@ -73,7 +74,7 @@ export async function runWorker(max = WORKER_BATCH_MAX): Promise<{ processed: nu
       continue;
     }
     try {
-      const result = await handler(job.payload);
+      const result = await handler(job.payload, job);
       await completeJob(job.id, result ?? undefined);
       processed++;
       metrics.jobsProcessed.inc({ kind: job.kind, outcome: 'success' });

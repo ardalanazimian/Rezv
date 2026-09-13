@@ -203,6 +203,7 @@ import './provision-username-conflict.integration.test.mts';
 import './provision-slug-validation.integration.test.mts';
 import './staff-invite-flow.integration.test.mts';
 import './sms-queue-fallback-balance.integration.test.mts';
+import './sms-worker-charge-once.integration.test.mts';
 import './sms-welcome-arrival-proof.integration.test.mts';
 import './site-orders.test.mts';
 import './subscription.test.mts';
