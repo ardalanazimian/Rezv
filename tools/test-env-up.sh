@@ -70,6 +70,23 @@ BASE="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$BASE/api"
 
 echo "── اسکیما (همان سه دستورِ ci.yml) ──"
+# ⚠️ RT-21 (رد تیم، ۲۰۲۶-۰۹-۱۳) — `prisma generate` اینجا اضافه شد و دلیلش یک
+# شکستِ واقعیِ همین امروز است، نه احتیاط.
+#
+# در CI این خط لازم نیست: هر job از نو `npm ci` می‌زند و هوکِ
+# `postinstall: prisma generate` clientِ تازه می‌سازد. ولی روی ماشینِ محلی
+# `node_modules` بینِ شاخه‌ها می‌ماند. اگر با یک شاخه `npm ci` بزنی و بعد به
+# شاخه‌ای بروی که `schema.prisma` را عوض کرده (مثلاً ۰۸۷ که
+# `sms_transactions.job_id @unique` را افزود)، `db push` دیتابیس را درست
+# می‌سازد ولی client **کهنه** می‌ماند.
+#
+# چرا این حالت خطرناک است و نه صرفاً آزاردهنده: شکست در مسیرِ پول **باز**
+# می‌شکند. `sendSmsCharged` پیام را می‌فرستد، بعد کسر با
+# `Invalid tx.smsTransaction.findUnique() invocation` خطا می‌دهد، خطا گرفته
+# می‌شود و خروجی `sent/charge_failed` است. نتیجه‌ی دیدنی: پیامک رفته، موجودی
+# دست‌نخورده — دقیقاً شکلِ یک باگِ نشتِ درآمد. دو بار امروز این تشخیص داده شد
+# و هر دو بار غلط بود؛ بارِ دوم فقط چون خطای Prisma خوانده شد کشف شد.
+npx prisma generate
 npx prisma db push --skip-generate
 sh prisma/apply-sql.sh
 # ci.yml اینجا psql دارد؛ روی این ماشین psql نصب نیست، پس همان فایل را از
