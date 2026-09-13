@@ -1426,6 +1426,9 @@ model SmsTransaction {
   balanceAfter Int        @map("balance_after")
   actorId      String?    @map("actor_id") @db.Uuid
   note         String?
+  // کلیدِ یکتاییِ کسر به‌ازای job صف (مهاجرتِ ۰۸۷، دستورِ ۰۴۹): اجرای دوباره‌ی
+  // همان job — retry یا reclaim — نمی‌تواند دوبار کسر کند. شارژ و مسیرِ اضطراری null.
+  jobId        String?    @unique @map("job_id") @db.Uuid
   createdAt    DateTime   @default(now()) @map("created_at")
   @@index([restaurantId, createdAt(sort: Desc)])
   @@map("sms_transactions")

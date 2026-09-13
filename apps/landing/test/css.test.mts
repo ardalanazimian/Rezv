@@ -45,15 +45,23 @@ describe('پرده‌ی ورود', () => {
   });
 
   // تیغه‌ها باید پیش از بسته‌شدنِ پرده تمام شده باشند وگرنه وسطِ کار قطع می‌شود.
+  // ⚠️ ۰۹-۱۲: از ۰۹-۱۱ همه‌ی زمان‌ها کسری از یک دستگیره (--intro-t) و به‌شکلِ
+  // longhand هستند؛ این تست هنوز shorthandِ ثانیه‌ای را می‌خواند و قرمز بود
+  // (regex هیچ‌چیز پیدا نمی‌کرد — «قابلِ‌خواندن باشد» می‌افتاد). حالا همان کسرها
+  // را می‌خواند و به واحدِ --intro-t جمع می‌زند — همان ادعا، روی CSSِ واقعی.
   test('زمان‌بندی: آخرین تیغه نباید بعد از intro-off تمام شود', () => {
-    const bar = /\.intro__bar\s*\{[\s\S]*?animation:\s*intro-bar\s+([\d.]+)s[\s\S]*?animation-delay:\s*calc\(([\d.]+)s\s*\+\s*var\(--i\)\s*\*\s*([\d.]+)s\)/.exec(globals);
-    const off = /\.intro\s*\{[\s\S]*?animation:\s*intro-off\s+[\d.]+m?s\s+\w+\s+([\d.]+)s/.exec(globals);
+    const bar = /\.intro__bar\s*\{[\s\S]*?animation-duration:\s*calc\(var\(--intro-t\)\s*\*\s*(\d+)\s*\/\s*(\d+)\)[\s\S]*?animation-delay:\s*calc\(var\(--intro-t\)\s*\/\s*(\d+)\s*\+\s*var\(--i\)\s*\*\s*var\(--intro-t\)\s*\/\s*(\d+)\)/.exec(globals);
+    const off = /\.intro\s*\{[\s\S]*?animation-name:\s*intro-off[\s\S]*?animation-delay:\s*var\(--intro-t\)/.exec(globals);
     assert.ok(bar && off, 'زمان‌بندیِ تیغه و پرده باید قابلِ‌خواندن باشد');
     const bars = 6; // با BARS در components/site/Intro.tsx یکی است
-    const lastEnds = Number(bar[2]) + (bars - 1) * Number(bar[3]) + Number(bar[1]);
+    const duration = Number(bar[1]) / Number(bar[2]);
+    const start = 1 / Number(bar[3]);
+    const step = 1 / Number(bar[4]);
+    // همه به واحدِ --intro-t؛ پرده دقیقاً در ۱× بسته می‌شود
+    const lastEnds = start + (bars - 1) * step + duration;
     assert.ok(
-      lastEnds <= Number(off[1]) + 0.001,
-      `آخرین تیغه در ${lastEnds.toFixed(2)}s تمام می‌شود ولی پرده در ${off[1]}s بسته می‌شود`,
+      lastEnds <= 1 + 0.001,
+      `آخرین تیغه در ${lastEnds.toFixed(3)}× --intro-t تمام می‌شود ولی پرده در ۱× بسته می‌شود`,
     );
   });
 });

@@ -10,14 +10,22 @@ on:
 # P0-005 / A6-002 (۲۰۲۶-۰۹-۰۳، تصویبِ مالک): یک hang در npm test تا سقفِ ۳۶۰ دقیقه‌ی GitHub
 # زنده ماند و push ی بعدی اجرای قبلی را لغو نمی‌کرد. push ی تازه روی همان ref اجرای در حالِ
 # انجام را لغو می‌کند.
+#
+# ⚠️ دستورِ ۰۵۱ (۲۰۲۶-۰۹-۱۳): روی `main` دیگر لغو نمی‌شود. با نه نشست که سند push می‌کنند،
+# هر pushِ سند اجرای کدِ قبلی را می‌کشت و `main` تقریباً هیچ‌وقت حکم نمی‌گرفت — قرمزِ ۰۵۰
+# دقیقاً پشتِ همین «cancelled» پنهان ماند. تصمیمِ P0-005 («hang نباید ۳۶۰ دقیقه بماند»)
+# سر جایش است، ولی اجرایش حالا `timeout-minutes`ِ **هر** job است، نه لغو؛ و ترتیب مهم
+# بود: اول سقفِ هر job، بعد این خط — وگرنه jobهای بی‌سقف دوباره تا ۳۶۰ دقیقه می‌ماندند.
+# شاخه‌ها و PRها همچنان لغو می‌شوند، چون صرفه‌جویی آن‌جاست.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # ── مرحله ۱: type-check + build ──
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: api
@@ -162,6 +170,7 @@ jobs:
   # «CI سبز، تولید خراب» دقیقاً همان چیزی است که این job جلویش را می‌گیرد.
   schema-drift:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17
@@ -207,6 +216,7 @@ jobs:
   # چون خواندنشان از Dockerfile اثبات نیست.
   image-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -251,6 +261,7 @@ jobs:
   # ایمیج (کاربرِ non-root، dumb-init) را نمی‌سنجد؛ آن نیازِ ساختِ داکر است.
   boot-path:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17
@@ -326,6 +337,7 @@ jobs:
   # ── مرحله ۳: چک امنیتی پایه ──
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: api
@@ -368,6 +380,7 @@ jobs:
   # digestِ :latest یکی بود (sha256:5ce7540c...) — این یک downgrade نیست.
   observability:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -477,6 +490,16 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.62.1-noble
     timeout-minutes: 25
+    # ⚠️ یک job به‌ازای هر پروژه‌ی Playwright (۲۰۲۶-۰۹-۱۳). اندازه‌گیری روی 923a20a، محلی،
+    # ۲ worker، بی‌retry: ۵۸۲ تست در ۴۱٫۸ دقیقه — و فقط تست‌های سبز ~۲۲ دقیقه. یعنی حتی
+    # سوئیتِ کاملاً سبز لبه‌ی سقفِ ۲۵ دقیقه بود، و با retryِ CI (۲) هر شکست سه بار اجرا
+    # می‌شد؛ jobِ e2e در هر اجرای اخیر cancelled بود و هیچ‌وقت حکم نداد. سه سرورِ استاتیکِ
+    # جدا هم بارِ `npx serve` را پخش می‌کند (دلیلِ workers: 2 در playwright.config.ts).
+    # fail-fast: false تا شکستِ یک پروژه حکمِ دو پروژه‌ی دیگر را نکشد.
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [mobile-safari, mobile-chrome, desktop-chrome]
     defaults:
       run:
         working-directory: e2e
@@ -494,7 +517,7 @@ jobs:
         run: npm ci
 
       - name: Run E2E tests
-        run: npm test
+        run: npm test -- --project=${{ matrix.project }}
         env:
           CI: true
           # مرورگرها در مسیرِ خودِ ایمیج‌اند، نه ~/.cache/ms-playwright.
@@ -516,6 +539,8 @@ jobs:
       # standalone/customer.html در checkout هست و jobِ `standalone` تازگی‌اش را
       # جدا گیت می‌کند؛ اگر کهنه باشد آن job قرمز می‌شود، نه این.
       - name: صفحه‌ی اولِ اپِ مشتری — فید بالای fold و جست‌وجو نمایان؟ (DS-007)
+        # یک بار کافی است: ابزار مرورگر و viewportِ ۳۹۰×۸۴۴ِ خودش را می‌سازد و به پروژه بسته نیست.
+        if: matrix.project == 'mobile-chrome'
         run: node ../tools/measure-home-s1.mjs
         env:
           PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
@@ -524,13 +549,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: e2e/playwright-report/
           retention-days: 14
 
   # ── مرحله ۵: هماهنگیِ دیزاین‌سیستم (بدونِ drift بین shared/ و اپ‌ها) ──
   design-system:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Check design-system in sync with shared/
@@ -658,6 +684,7 @@ jobs:
   # گیتی که فقط در یک فایلِ markdown زندگی می‌کند، گیت نیست.
   standalone:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -680,6 +707,7 @@ jobs:
   #    داشت و هیچ‌کس اجرایش نمی‌کرد. گامِ صریحِ زیر اضافه شد.
   seo:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: apps/seo
@@ -706,6 +734,7 @@ jobs:
   # هم سبز باشد، وگرنه یک قطعیِ API می‌تواند دیپلوی را هم زمین بزند.
   landing:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/landing
@@ -762,6 +791,7 @@ jobs:
   # نمی‌شود، و گاردی که اجرا نمی‌شود بدتر از نبودنش است — ظاهرِ پوشش دارد.
   rejects-ratchet:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -798,6 +828,7 @@ jobs:
   base-freshness:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
