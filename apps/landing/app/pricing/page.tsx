@@ -117,10 +117,6 @@ export default async function PricingPage() {
       />
 
       <section className="hero hero--compact hero--center">
-        <div className="aurora" aria-hidden="true">
-          <span className="aurora__blob" /><span className="aurora__blob" /><span className="aurora__blob" />
-        </div>
-        <div className="grid-bg" aria-hidden="true" />
         <div className="container hero__inner">
           <div className="hero__content">
             <Reveal><span className="eyebrow"><Icon name="ticket" size={14} />قیمت‌گذاری</span></Reveal>

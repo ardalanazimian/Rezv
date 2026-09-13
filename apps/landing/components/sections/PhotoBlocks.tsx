@@ -22,7 +22,6 @@
 import Link from 'next/link';
 import { Icon } from '../site/Icon';
 import { Reveal } from '../site/Motion';
-import { Parallax } from '../site/Kinetic';
 import { Photo, photo, type PhotoData } from '../site/Photo';
 import type { Section, Cta } from '@/lib/content-types';
 
@@ -49,18 +48,16 @@ export function Scene({ sec }: { sec: Section }) {
   const align = s(sec.align) === 'start' ? 'start' : 'center';
   // «tall» فقط با عکس معنا دارد؛ نوارِ متنی ارتفاعش را از محتوا می‌گیرد.
   const height = img && s(sec.height) === 'tall' ? ' scene--tall' : '';
-  const mode = img ? '' : ' scene--text';
+  const mode = img ? '' : ' scene--text is-night';
   const primary = cta(sec.primary);
 
   return (
     <section className={`scene scene--${align}${height}${mode}`}>
       {img && (
         <>
-          {/* پارالاکسِ ملایم: عکس کمی کندتر از صفحه حرکت می‌کند و همین کافی
-              است تا بخش «زنده» حس شود بدونِ اینکه حواس را پرت کند. */}
-          <Parallax speed={0.14} className="scene__media">
+          <div className="scene__media">
             <Photo data={img} ratio="ultra" sizes="100vw" grade={false} className="scene__img" />
-          </Parallax>
+          </div>
           {/* پرده‌ی خوانایی: متنِ سفید روی عکسِ روشن بدونِ این ناخواناست. شدتش
               از سمتِ متن بیشتر است تا خودِ عکس زیرِ یک لایه‌ی یکنواخت دفن نشود. */}
           <span className="scene__scrim" aria-hidden="true" />
@@ -68,17 +65,14 @@ export function Scene({ sec }: { sec: Section }) {
       )}
 
       <div className="container scene__body">
-        <Reveal>
+        <div className="scene__stack">
           {s(sec.eyebrow) && <span className="eyebrow eyebrow--on-photo">{s(sec.eyebrow)}</span>}
           {s(sec.title) && <h2 className="scene__title">{s(sec.title)}</h2>}
           {s(sec.subtitle) && <p className="scene__lead">{s(sec.subtitle)}</p>}
           {primary && (
-            <Link href={primary.href} className="btn btn--primary btn--lg">
-              {primary.label}
-              <Icon name="arrowLeft" size={18} className="btn__arrow" />
-            </Link>
+            <Link href={primary.href} className="btn btn--primary btn--lg">{primary.label}</Link>
           )}
-        </Reveal>
+        </div>
       </div>
     </section>
   );

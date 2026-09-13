@@ -1,34 +1,34 @@
 /* ═══════════════════════════════════════════════════════════════════════
    استایلِ کامپوننت‌های وب‌سایت — روی سیستمِ طراحیِ globals.css سوار می‌شود.
-   هیچ مقدارِ رنگ/فاصله‌ی سختی اینجا نیست؛ همه از توکن‌ها می‌آید تا هر دو تم
-   خودبه‌خود درست باشند.
+   هیچ مقدارِ رنگ/فاصله‌ی سختی اینجا نیست جز رنگِ محتوای گوشی/کاشی‌ها؛ همه از
+   توکن‌ها می‌آید تا هر دو تم خودبه‌خود درست باشند.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ═══════════════ هدر ═══════════════ */
+/* ═══════════════ هدر ═══════════════
+   نوارِ ۵۲پیکسلیِ شیشه‌ای از همان ابتدا (نه فقط بعد از اسکرول) — ناوبری وسط،
+   متنِ ۱۳px با وزنِ عادی، و فقط یک دکمه‌ی رنگی: «رزرو میز». */
 
 .site-header {
   position: sticky;
   inset-block-start: 0;
   z-index: 50;
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--t-base) var(--ease), background-color var(--t-base) var(--ease),
-    backdrop-filter var(--t-base) var(--ease);
-}
-
-.site-header.is-scrolled {
   background: var(--glass-bg);
-  border-bottom-color: var(--border);
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border-bottom: 1px solid transparent;
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  transition: border-color var(--t-base) var(--ease);
 }
+.site-header.is-scrolled { border-bottom-color: var(--border); }
+/* روی بخشِ «شب»: `.is-night` توکن‌ها را تیره می‌کند (globals.css)، این‌جا فقط
+   زمینه‌ی مشکیِ خودِ آن کلاس با شیشه جایگزین می‌شود. */
+.site-header.is-night { background: var(--glass-bg); }
 @supports not (backdrop-filter: blur(1px)) {
-  .site-header.is-scrolled { background: var(--surface); }
+  .site-header { background: var(--bg); }
 }
 
 .site-header__inner {
   display: flex;
   align-items: center;
-  gap: var(--sp-5);
+  gap: var(--sp-3);
   min-height: var(--header-h);
 }
 
@@ -37,19 +37,19 @@
   align-items: center;
   gap: var(--sp-2);
   font-weight: 800;
-  font-size: var(--fs-lg);
-  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-base);
   color: var(--text-1);
   flex: 0 0 auto;
 }
-.brand:hover { color: var(--brand-ink); }
+.brand:hover { opacity: 0.8; }
 .brand__name { line-height: 1; }
 
 .site-nav {
   display: none;
+  flex: 1 1 auto;
+  justify-content: center;
   align-items: center;
-  gap: var(--sp-1);
-  margin-inline-end: auto;
+  gap: 2px;
 }
 @media (min-width: 940px) { .site-nav { display: flex; } }
 
@@ -58,29 +58,30 @@
 .site-nav__link {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-1);
-  padding: 0.5rem 0.75rem;
+  gap: 2px;
+  padding: 0.375rem 0.75rem;
   border-radius: var(--r-full);
   border: 0;
   background: transparent;
-  color: var(--text-2);
-  font-size: var(--fs-md);
-  font-weight: 600;
+  color: var(--text-1);
+  opacity: 0.8;
+  font-size: var(--fs-sm);
+  font-weight: 400;
   cursor: pointer;
-  transition: color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
+  transition: opacity var(--t-fast) var(--ease);
 }
-.site-nav__link:hover { color: var(--text-1); background: var(--surface-2); }
-.site-nav__link[aria-current='page'] { color: var(--brand-ink); }
+.site-nav__link:hover { opacity: 1; }
+.site-nav__link[aria-current='page'] { opacity: 1; font-weight: 600; }
 
 /* منوی بازشوی محصول/منابع */
 .mega {
   position: absolute;
-  inset-block-start: calc(100% + 8px);
+  inset-block-start: calc(100% + 10px);
   inset-inline-start: 50%;
-  transform: translateX(50%) translateY(-6px);
-  width: min(24rem, 88vw);
-  padding: var(--sp-3);
-  border-radius: var(--r-xl);
+  transform: translateX(50%) translateY(-4px);
+  width: min(22rem, 88vw);
+  padding: var(--sp-2);
+  border-radius: var(--r-lg);
   box-shadow: var(--sh-xl);
   display: grid;
   gap: 2px;
@@ -100,42 +101,45 @@
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3);
-  border-radius: var(--r-md);
+  border-radius: var(--r-control);
   transition: background-color var(--t-fast) var(--ease);
 }
 .mega__item:hover { background: var(--surface-2); }
-.mega__label { font-weight: 700; font-size: var(--fs-md); color: var(--text-1); display: block; }
+.mega .icon-tile { background: var(--surface-2); }
+.mega__label { font-weight: 600; font-size: var(--fs-md); color: var(--text-1); display: block; }
 .mega__desc { font-size: var(--fs-xs); color: var(--text-3); display: block; }
 .stack-1 { display: flex; flex-direction: column; gap: 2px; }
 
 .site-header__actions {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-1);
   margin-inline-start: auto;
 }
-/* دو دکمه‌ی ثانویه (ورود/دموی مالک) — روی موبایلِ باریک جا نمی‌شوند، در منوی
-   تمام‌صفحه هستند. رزرو میز (اکشنِ اصلی) این محدودیت را ندارد. */
+@media (min-width: 940px) { .site-header__actions { margin-inline-start: 0; } }
+/* ورود/دموی مالک پیوندِ متنی‌اند، نه دکمه‌ی حاشیه‌دار — روی موبایلِ باریک در
+   منوی تمام‌صفحه هستند. «رزرو میز» (کنشِ اصلی) این محدودیت را ندارد. */
 .site-header__aux { display: none; }
 @media (min-width: 640px) { .site-header__aux { display: inline-flex; } }
+.site-header .btn--ghost { --btn-border: transparent; }
 .site-header__burger { display: inline-flex; }
 @media (min-width: 940px) { .site-header__burger { display: none; } }
 
-.theme-toggle { width: 38px; padding-inline: 0; }
+.theme-toggle { width: 34px; padding-inline: 0; }
 /* آیکنِ کلیدِ تم را CSS انتخاب می‌کند، نه Reactِ سمتِ کلاینت: ThemeScript همیشه
    data-theme را صریح می‌نویسد، پس این دو قاعده همیشه دقیقاً یکی را نشان می‌دهند. */
 .theme-toggle__sun { display: none; }
 :root[data-theme='dark'] .theme-toggle__moon { display: none; }
 :root[data-theme='dark'] .theme-toggle__sun { display: block; }
 
-/* منوی موبایل */
+/* منوی موبایل — تیترهای درشت، مثلِ منوی سراسریِ اپل روی گوشی */
 .mobile-menu {
   position: fixed;
   inset: var(--header-h) 0 0;
   z-index: 45;
   /* مات، نه شیشه‌ای: منوی تمام‌صفحه باید کاملاً خوانا باشد */
   background: var(--bg);
-  padding-block: var(--sp-6);
+  padding-block: var(--sp-4) var(--sp-8);
   overflow-y: auto;
   animation: menuIn var(--t-base) var(--ease-out);
 }
@@ -148,18 +152,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--sp-4);
-  border-radius: var(--r-md);
-  font-size: var(--fs-lg);
-  font-weight: 600;
+  padding: var(--sp-3) var(--sp-1);
+  font-size: var(--fs-xl);
+  font-weight: 700;
   color: var(--text-1);
-  border: 1px solid transparent;
 }
-.mobile-menu__link:hover { background: var(--surface-2); }
-.mobile-menu__link[aria-current='page'] {
-  color: var(--brand-ink);
-  background: var(--brand-soft);
-}
+.mobile-menu__link svg { color: var(--text-3); }
+.mobile-menu__link:hover { color: var(--brand-ink); }
+.mobile-menu__link[aria-current='page'] { color: var(--brand-ink); }
 
 /* ═══════════════ بنرِ اطلاعیه ═══════════════ */
 
@@ -168,18 +168,18 @@
   z-index: 55;
   padding: var(--sp-3) 0;
   font-size: var(--fs-sm);
-  font-weight: 600;
   text-align: center;
-  background: linear-gradient(100deg, var(--ember-500), var(--brass-500));
-  color: #fff;
+  background: var(--bg-subtle);
+  color: var(--text-1);
 }
-.announce--success { background: var(--success); }
-.announce--warning { background: var(--warning); }
-.announce--info { background: var(--info); }
+.announce--success { background: var(--success-soft); color: var(--success); }
+.announce--warning { background: var(--warning-soft); color: var(--warning); }
+.announce--info { background: var(--info-soft); color: var(--info); }
 .announce a {
+  color: var(--brand-ink);
   text-decoration: underline;
   text-underline-offset: 3px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 /* ═══════════════ هیرو ═══════════════ */
@@ -187,9 +187,9 @@
 .hero {
   position: relative;
   overflow: hidden;
-  padding-block: clamp(var(--sp-16), 10vw, var(--sp-32)) clamp(var(--sp-12), 8vw, var(--sp-24));
+  padding-block: clamp(var(--sp-12), 9vw, var(--sp-24)) clamp(var(--sp-10), 7vw, var(--sp-20));
 }
-.hero--compact { padding-block: clamp(var(--sp-12), 7vw, var(--sp-20)) clamp(var(--sp-10), 5vw, var(--sp-16)); }
+.hero--compact { padding-block: clamp(var(--sp-10), 6vw, var(--sp-16)) clamp(var(--sp-8), 5vw, var(--sp-12)); }
 
 .hero__inner {
   position: relative;
@@ -202,7 +202,7 @@
   .hero__inner--split { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
 }
 
-.hero__content { display: flex; flex-direction: column; gap: var(--sp-6); align-items: flex-start; }
+.hero__content { display: flex; flex-direction: column; gap: var(--sp-5); align-items: flex-start; }
 .hero--center .hero__content { align-items: center; text-align: center; margin-inline: auto; max-width: 52rem; }
 
 /* روی صفحه‌ی باریک، دکمه‌های فراخوان به‌جای شکستنِ نامرتب، تمام‌عرض روی هم
@@ -211,6 +211,7 @@
   .cta-row > .btn { flex: 1 1 100%; }
 }
 
+/* سه ادعای کوتاه زیرِ دکمه‌ها — فهرستِ ساده با تیک، نه چیپ‌های حاشیه‌دار */
 .hero__bullets {
   display: flex;
   flex-wrap: wrap;
@@ -218,43 +219,27 @@
   list-style: none;
   color: var(--text-2);
   font-size: var(--fs-sm);
-  font-weight: 600;
 }
-/* چیپ به‌جای متنِ خام: همان سه ادعا، فشرده‌تر و هم‌زبان با موزاییکِ کشف */
 .hero__bullets li {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
-  min-block-size: 32px;
-  padding: 0 var(--sp-3);
-  border-radius: var(--r-full);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  gap: var(--sp-1);
 }
-.hero__bullets svg { color: var(--success); }
+.hero__bullets svg { color: var(--brand-ink); }
 
 /* ═══════════════ نمایشگرِ بصریِ هیرو ═══════════════ */
 
 .viz {
   position: relative;
-  border-radius: var(--r-2xl);
+  border-radius: var(--r-tile);
   border: 1px solid var(--border);
   background: var(--surface);
-  box-shadow: var(--sh-xl);
+  box-shadow: var(--sh-lg);
   padding: var(--sp-5);
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
   overflow: hidden;
-}
-.viz::after {
-  /* بازتابِ ملایمِ بالای پنل — عمقِ بصری بدونِ هزینه‌ی تصویر */
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 40%;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 7%, transparent), transparent);
-  pointer-events: none;
 }
 
 .viz__bar {
@@ -279,7 +264,6 @@
   border: 1px solid transparent;
   transition: border-color var(--t-base) var(--ease), transform var(--t-base) var(--ease-out);
 }
-.viz__row:hover { border-color: var(--border); transform: translateX(-3px); }
 .viz__row--accent { background: var(--brand-soft); }
 
 .viz__avatar {
@@ -336,7 +320,7 @@
 .viz__chart span {
   flex: 1;
   border-radius: var(--r-xs) var(--r-xs) 2px 2px;
-  background: linear-gradient(180deg, var(--ember-400), var(--ember-500));
+  background: var(--brand);
   opacity: 0.85;
   transform-origin: bottom;
   animation: growBar 0.9s var(--ease-out) backwards;
@@ -373,7 +357,7 @@
   overflow: hidden;
   position: relative;
 }
-:root[data-theme='dark'] .phone-frame { border-color: #2a2f40; }
+:root[data-theme='dark'] .phone-frame { border-color: #2c2c2e; }
 .phone-frame__notch {
   position: absolute;
   inset-block-start: 0;
@@ -385,7 +369,7 @@
   background: var(--surface-inverse);
   z-index: 2;
 }
-:root[data-theme='dark'] .phone-frame__notch { background: #2a2f40; }
+:root[data-theme='dark'] .phone-frame__notch { background: #2c2c2e; }
 .phone-frame__screen { padding: var(--sp-8) var(--sp-4) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-3); }
 
 .slotgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
@@ -402,71 +386,64 @@
 .slot[data-state='full'] { opacity: 0.4; text-decoration: line-through; }
 .slot[data-state='picked'] { background: var(--brand); color: #fff; border-color: transparent; }
 
-/* ═══════════════ کارت‌های محتوایی ═══════════════ */
+
+/* ═══════════════ کارت‌های محتوایی ═══════════════
+   هیچ کارتی حاشیه، سایه یا حرکتِ hover ندارد. جداشدن از زمینه با تغییرِ
+   رنگِ سطح است: کاشیِ خاکستری روی بخشِ سفید، کاشیِ سفید روی بخشِ خاکستری. */
+
+/* عددهای بزرگ — ردیفِ مشخصاتِ صفحه‌ی محصولِ اپل: بدونِ کارت، فقط عدد و برچسب */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-10) var(--sp-5);
+}
+@media (min-width: 900px) { .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 .metric {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--sp-1);
-  padding: var(--sp-5);
-  border-radius: var(--r-lg);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  text-align: center;
 }
 .metric__value {
-  font-size: clamp(1.75rem, 3.4vw, 2.5rem);
-  font-weight: 800;
+  font-size: clamp(2.75rem, 7vw, 4.75rem);
+  font-weight: 900;
   line-height: 1;
-  letter-spacing: var(--ls-tight);
   color: var(--text-1);
 }
-.metric__suffix { font-size: 0.5em; font-weight: 700; color: var(--text-3); margin-inline-start: 4px; }
-.metric__label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); }
-.metric__hint { font-size: var(--fs-xs); color: var(--text-3); }
+.metric__suffix { font-size: 0.36em; font-weight: 700; color: var(--text-2); margin-inline-start: 6px; }
+.metric__label { margin-top: var(--sp-2); font-size: var(--fs-base); font-weight: 600; color: var(--text-1); }
+.metric__hint { font-size: var(--fs-sm); color: var(--text-2); }
 
 .feature { display: flex; flex-direction: column; gap: var(--sp-3); height: 100%; }
+.feature .icon-tile { inline-size: auto; block-size: auto; place-items: start; background: none; }
 .feature__title { font-size: var(--fs-lg); font-weight: 700; }
-.feature__body { color: var(--text-2); font-size: var(--fs-md); line-height: var(--lh-normal); }
+.feature__body { color: var(--text-2); font-size: var(--fs-base); line-height: var(--lh-normal); }
 
-/* دو کارتِ بزرگِ «اپ مشتری / اپ کسب‌وکار» */
+/* دو کاشیِ بزرگِ «اپ مشتری / اپ کسب‌وکار» */
 .app-card {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
-  padding: clamp(var(--sp-6), 3vw, var(--sp-8));
-  border-radius: var(--r-2xl);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  gap: var(--sp-4);
+  padding: clamp(var(--sp-6), 4vw, var(--sp-12));
+  border-radius: var(--r-tile);
+  background: var(--surface-2);
   overflow: hidden;
   position: relative;
-  transition: transform var(--t-base) var(--ease-out), box-shadow var(--t-base) var(--ease),
-    border-color var(--t-base) var(--ease);
+  min-block-size: 100%;
 }
-.app-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--sh-lg);
-  border-color: color-mix(in srgb, var(--brand) 28%, var(--border));
-}
-/* نکته‌ها چیپ‌اند نه فهرستِ عمودی: پنج ادعا در سه خط به‌جای پنج خط */
-.app-card__points { list-style: none; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.section--subtle .app-card { background: var(--surface); }
+.app-card__points { list-style: none; display: grid; gap: var(--sp-2); }
 .app-card__points li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-block-size: 32px;
-  padding: 0 var(--sp-3);
-  border-radius: var(--r-full);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  font-size: var(--fs-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  font-size: var(--fs-base);
   color: var(--text-2);
 }
-.app-card__points svg { color: var(--brand); flex: 0 0 auto; }
-/* صحنه‌ی «جریانِ زنده» بالای دو کارت — روی موبایل رندر نمی‌شود: یک بومِ
-   ۴/۳ (۳۵۰px) که ادعایش («یک دادهٔ واحد») در زیرعنوانِ همین بخش هست و
-   DS-010 §۴ روی موبایل ≤ ۱ بومِ متحرک می‌خواهد. */
-.apps__flow { margin-block-end: var(--sp-10); }
-@media (max-width: 720px) { .apps__flow { display: none; } }
+.app-card__points svg { color: var(--brand-ink); flex: 0 0 auto; margin-top: 5px; }
+.app-card .link-more { margin-top: auto; align-self: flex-start; }
 
 /* بخشِ دوستونیِ split */
 .split {
@@ -481,37 +458,32 @@
 .split__content { display: flex; flex-direction: column; gap: var(--sp-5); align-items: flex-start; }
 .split__list { list-style: none; display: grid; gap: var(--sp-3); }
 .split__list li { display: flex; gap: var(--sp-3); color: var(--text-2); }
-.split__list svg { color: var(--brand); flex: 0 0 auto; margin-top: 3px; }
+.split__list svg { color: var(--brand-ink); flex: 0 0 auto; margin-top: 3px; }
 
 /* گام‌ها */
-.steps { counter-reset: step; display: grid; gap: var(--sp-5); }
-@media (min-width: 720px) { .steps { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); } }
+.steps { counter-reset: step; display: grid; gap: var(--sp-3); }
+@media (min-width: 720px) { .steps { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--sp-5); } }
 
 .step {
   position: relative;
   counter-increment: step;
   padding: var(--sp-6);
   border-radius: var(--r-xl);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-2);
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
 }
+.section--subtle .step { background: var(--surface); }
 .step::before {
   content: counter(step, persian);
-  display: grid;
-  place-items: center;
-  width: 34px; height: 34px;
-  border-radius: var(--r-full);
-  background: var(--brand);
-  color: #fff;
-  font-weight: 800;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-2xl);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--brand-ink);
 }
-:root[data-theme='dark'] .step::before { color: #0b1020; background: var(--ember-400); }
 .step__title { font-weight: 700; font-size: var(--fs-lg); }
-.step__body { color: var(--text-2); font-size: var(--fs-md); }
+.step__body { color: var(--text-2); font-size: var(--fs-base); }
 
 /* ─ نمایشگرِ زبانه‌دار (داخلِ پنل) ─ */
 .showcase { display: grid; gap: var(--sp-6); }
@@ -534,8 +506,8 @@
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--r-md);
-  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  border: 0;
   background: transparent;
   color: var(--text-2);
   font-weight: 600;
@@ -543,19 +515,17 @@
   cursor: pointer;
   white-space: nowrap;
   text-align: start;
-  transition: all var(--t-base) var(--ease);
+  transition: background-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
 }
-.showcase__tab:hover { background: var(--surface-2); color: var(--text-1); }
+.showcase__tab:hover { color: var(--text-1); }
 .showcase__tab[aria-selected='true'] {
-  background: var(--brand-soft);
-  color: var(--brand-ink);
-  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
 }
 
 .showcase__panel {
-  padding: clamp(var(--sp-6), 3vw, var(--sp-8));
-  border-radius: var(--r-xl);
-  border: 1px solid var(--border);
+  padding: clamp(var(--sp-6), 3vw, var(--sp-10));
+  border-radius: var(--r-tile);
   background: var(--surface);
   display: flex;
   flex-direction: column;
@@ -566,126 +536,107 @@
 
 .showcase__list { list-style: none; display: grid; gap: var(--sp-3); }
 @media (min-width: 640px) { .showcase__list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.showcase__list li { display: flex; gap: var(--sp-3); color: var(--text-2); font-size: var(--fs-md); }
-.showcase__list svg { color: var(--brand); flex: 0 0 auto; margin-top: 3px; }
+.showcase__list li { display: flex; gap: var(--sp-3); color: var(--text-2); font-size: var(--fs-base); }
+.showcase__list svg { color: var(--brand-ink); flex: 0 0 auto; margin-top: 3px; }
 
-/* ═══════════════ قیمت‌گذاری ═══════════════ */
+/* ═══════════════ قیمت‌گذاری ═══════════════
+   سه کاشیِ هم‌قد. پلنِ پیشنهادی **مشکی** است، نه بزرگ‌تر و نه با حلقه‌ی
+   گرادیانی — تفاوت با تُن، نه با تزئین. */
 
 .plans {
   display: grid;
-  gap: var(--sp-5);
+  gap: var(--sp-3);
   align-items: stretch;
 }
-@media (min-width: 860px) { .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 860px) { .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-5); } }
 
 .plan {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
-  padding: clamp(var(--sp-6), 2.5vw, var(--sp-8));
-  border-radius: var(--r-2xl);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  transition: transform var(--t-base) var(--ease-out), box-shadow var(--t-base) var(--ease),
-    border-color var(--t-base) var(--ease);
+  padding: clamp(var(--sp-6), 2.6vw, var(--sp-10));
+  border-radius: var(--r-tile);
+  background: var(--surface-2);
 }
-.plan:hover { transform: translateY(-4px); box-shadow: var(--sh-lg); }
+.section--subtle .plan { background: var(--surface); }
 
-.plan--highlight {
-  border-color: color-mix(in srgb, var(--brand) 42%, transparent);
-  box-shadow: var(--sh-lg);
+.plan--highlight,
+.section--subtle .plan--highlight {
+  background: #000;
+  color: var(--text-1);
+  border: 1px solid var(--border);
 }
-.plan--highlight::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(160deg, var(--ember-500), var(--brass-500), transparent 65%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-@media (min-width: 860px) { .plan--highlight { transform: scale(1.025); } .plan--highlight:hover { transform: scale(1.025) translateY(-4px); } }
 
 .plan__badge {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 50%;
-  transform: translate(50%, -50%);
-  padding: 0.3125rem 0.875rem;
+  align-self: flex-start;
+  padding: 0.1875rem 0.75rem;
   border-radius: var(--r-full);
-  background: linear-gradient(135deg, var(--ember-500), var(--brass-500));
+  background: var(--brand);
   color: #fff;
   font-size: var(--fs-xs);
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
-  box-shadow: var(--sh-md);
 }
 
 .plan__name { font-size: var(--fs-xl); font-weight: 800; }
-.plan__tagline { font-size: var(--fs-sm); color: var(--text-3); }
+.plan__tagline { font-size: var(--fs-sm); color: var(--text-2); }
 
 .plan__price { display: flex; flex-direction: column; gap: var(--sp-1); }
 .plan__amount {
-  font-size: clamp(1.875rem, 4vw, 2.5rem);
-  font-weight: 800;
-  letter-spacing: var(--ls-tight);
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 900;
   line-height: 1.1;
   color: var(--text-1);
 }
-.plan__period { font-size: var(--fs-sm); color: var(--text-3); font-weight: 600; }
+.plan__period { font-size: var(--fs-sm); color: var(--text-2); font-weight: 600; }
 .plan__monthly { font-size: var(--fs-sm); color: var(--text-2); }
 .plan__compare { text-decoration: line-through; color: var(--text-3); font-size: var(--fs-sm); }
 
 .plan__features { list-style: none; display: grid; gap: var(--sp-3); flex: 1; }
-.plan__features li { display: flex; gap: var(--sp-3); font-size: var(--fs-md); color: var(--text-2); }
-.plan__features svg { color: var(--success); flex: 0 0 auto; margin-top: 3px; }
+.plan__features li { display: flex; gap: var(--sp-3); font-size: var(--fs-base); color: var(--text-2); }
+.plan__features svg { color: var(--text-1); flex: 0 0 auto; margin-top: 4px; }
 
 /* ═══════════════ مقایسه ═══════════════ */
 
 .compare-cell { display: grid; place-items: center; }
-.compare-cell svg { color: var(--success); }
+.compare-cell svg { color: var(--text-1); }
 .compare-cell--no svg { color: var(--text-3); opacity: 0.6; }
-.compare-cell--partial { font-size: var(--fs-xs); color: var(--warning); font-weight: 700; }
-.table th.is-brand { color: var(--brand-ink); background: var(--brand-soft); }
+.compare-cell--partial { font-size: var(--fs-xs); color: var(--text-2); font-weight: 600; }
+.table th.is-brand { color: var(--brand-ink); }
 
-/* ═══════════════ آکاردئونِ پرسش‌ها ═══════════════ */
+/* ═══════════════ آکاردئونِ پرسش‌ها ═══════════════
+   بدونِ جعبه: فقط خطِ مویی بینِ پرسش‌ها. */
 
-.faq-list { display: grid; gap: var(--sp-3); }
+.faq-list { display: grid; border-top: 1px solid var(--border); }
 
 .faq-item {
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   overflow: hidden;
-  transition: border-color var(--t-base) var(--ease), background-color var(--t-base) var(--ease);
 }
-.faq-item[open] { border-color: color-mix(in srgb, var(--brand) 30%, var(--border)); }
 
 .faq-item summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  padding: var(--sp-5);
+  padding: var(--sp-5) 0;
   cursor: pointer;
-  font-weight: 700;
-  font-size: var(--fs-base);
+  font-weight: 600;
+  font-size: var(--fs-lg);
   color: var(--text-1);
   list-style: none;
 }
 .faq-item summary::-webkit-details-marker { display: none; }
-.faq-item summary:hover { background: var(--surface-2); }
+.faq-item summary:hover { color: var(--brand-ink); }
 .faq-item summary svg { flex: 0 0 auto; color: var(--text-3); transition: transform var(--t-base) var(--ease); }
-.faq-item[open] summary svg { transform: rotate(180deg); color: var(--brand); }
+.faq-item[open] summary svg { transform: rotate(180deg); color: var(--text-1); }
 
 .faq-item__body {
-  padding: 0 var(--sp-5) var(--sp-5);
+  padding: 0 0 var(--sp-6);
   color: var(--text-2);
   line-height: var(--lh-normal);
+  max-inline-size: 64ch;
   animation: faqIn var(--t-base) var(--ease-out);
 }
 @keyframes faqIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
@@ -698,18 +649,18 @@
   gap: var(--sp-4);
   height: 100%;
 }
-.quote__text { font-size: var(--fs-base); line-height: var(--lh-normal); color: var(--text-1); flex: 1; }
+.quote__text { font-size: var(--fs-lg); line-height: var(--lh-normal); color: var(--text-1); flex: 1; }
 .quote__who { display: flex; align-items: center; gap: var(--sp-3); }
 .quote__avatar {
   width: 40px; height: 40px;
   border-radius: 50%;
   display: grid; place-items: center;
-  background: var(--brand-soft);
-  color: var(--brand-ink);
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
   font-weight: 800;
   flex: 0 0 auto;
 }
-.quote__stars { display: flex; gap: 2px; color: var(--brass-500); }
+.quote__stars { display: flex; gap: 2px; color: var(--text-1); }
 
 /* حالتِ خالی — وقتی هنوز محتوایی منتشر نشده */
 .empty-state {
@@ -717,52 +668,37 @@
   flex-direction: column;
   align-items: center;
   gap: var(--sp-4);
-  padding: clamp(var(--sp-6), 6vw, var(--sp-16));
-  border-radius: var(--r-xl);
-  border: 1px dashed var(--border-strong);
+  padding: clamp(var(--sp-8), 6vw, var(--sp-16));
+  border-radius: var(--r-tile);
   background: var(--surface-2);
   text-align: center;
 }
+.section--subtle .empty-state { background: var(--surface); }
 .empty-state__icon {
   display: grid; place-items: center;
   width: 52px; height: 52px;
   border-radius: var(--r-full);
-  background: var(--surface-3);
-  color: var(--text-3);
+  background: var(--bg-subtle);
+  color: var(--text-2);
 }
 
-/* ═══════════════ نوارِ فراخوان ═══════════════ */
+/* ═══════════════ نوارِ فراخوان ═══════════════
+   کاشیِ مشکی با تیترِ سفید — همان «پایانِ صفحه‌ی محصول». color-scheme محلی
+   دکمه‌ی حاشیه‌دار و متنِ ثانوی را روی مشکی درست می‌کند. */
 
 .cta-band {
   position: relative;
   overflow: hidden;
-  border-radius: var(--r-2xl);
-  padding: clamp(var(--sp-8), 6vw, var(--sp-20));
-  background: linear-gradient(135deg, var(--ember-600), var(--brass-500) 55%, var(--ember-500));
-  color: #fff;
+  border-radius: var(--r-tile);
+  border: 1px solid var(--border);
+  padding: clamp(var(--sp-12), 8vw, var(--sp-24)) clamp(var(--sp-6), 5vw, var(--sp-16));
+  background: #000;
+  color: var(--text-1);
   text-align: center;
-  box-shadow: var(--sh-xl);
 }
-.cta-band::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(60rem circle at 20% -20%, rgba(255, 255, 255, 0.22), transparent 55%);
-  pointer-events: none;
-}
-.cta-band > * { position: relative; z-index: 1; }
-.cta-band h2 { color: #fff; }
-.cta-band p { color: rgba(255, 255, 255, 0.9); }
-.cta-band .btn--primary {
-  --btn-bg: #fff;
-  --btn-fg: var(--ember-600);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
-}
-.cta-band .btn--ghost {
-  --btn-border: rgba(255, 255, 255, 0.5);
-  --btn-fg: #fff;
-}
-.cta-band .btn--ghost:hover:not(:disabled) { --btn-bg: rgba(255, 255, 255, 0.12); --btn-border: #fff; }
+.cta-band h2 { color: var(--text-1); }
+.cta-band p { color: var(--text-2); }
+.cta-band__note { margin-top: var(--sp-5); }
 
 /* ═══════════════ بلاگ ═══════════════ */
 
@@ -773,16 +709,10 @@
   height: 100%;
   padding: var(--sp-6);
   border-radius: var(--r-xl);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  transition: transform var(--t-base) var(--ease-out), box-shadow var(--t-base) var(--ease),
-    border-color var(--t-base) var(--ease);
+  background: var(--surface-2);
+  transition: background-color var(--t-base) var(--ease);
 }
-.article-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--sh-lg);
-  border-color: color-mix(in srgb, var(--brand) 26%, var(--border));
-}
+.article-card:hover { background: var(--surface-3); }
 .article-card__title { font-size: var(--fs-lg); font-weight: 700; line-height: var(--lh-snug); }
 .article-card__meta { display: flex; gap: var(--sp-3); font-size: var(--fs-xs); color: var(--text-3); margin-top: auto; }
 .article-card__tags { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
@@ -821,10 +751,9 @@
 
 .form-card {
   padding: clamp(var(--sp-6), 3vw, var(--sp-8));
-  border-radius: var(--r-2xl);
+  border-radius: var(--r-tile);
   border: 1px solid var(--border);
   background: var(--surface);
-  box-shadow: var(--sh-md);
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
@@ -929,31 +858,26 @@
   flex-direction: column;
   gap: var(--sp-4);
   padding: clamp(var(--sp-6), 3vw, var(--sp-8));
-  border-radius: var(--r-2xl);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border-radius: var(--r-tile);
+  background: var(--surface-2);
   height: 100%;
-  transition: transform var(--t-base) var(--ease-out), box-shadow var(--t-base) var(--ease),
-    border-color var(--t-base) var(--ease);
+  transition: background-color var(--t-base) var(--ease);
 }
-.entry-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--sh-lg);
-  border-color: color-mix(in srgb, var(--brand) 28%, var(--border));
-}
+.entry-card:hover { background: var(--surface-3); }
 
-/* ═══════════════ فوتر ═══════════════ */
+
+/* ═══════════════ فوتر ═══════════════
+   خاکستریِ روشن، متنِ ریز، ستون‌های پیوند — پایین‌ترین و آرام‌ترین لایه. */
 
 .site-footer {
-  margin-top: clamp(var(--sp-10), 8vw, var(--sp-24));
-  border-top: 1px solid var(--border);
+  margin-top: clamp(var(--sp-10), 6vw, var(--sp-20));
   background: var(--bg-subtle);
-  padding-block: clamp(var(--sp-8), 6vw, var(--sp-16)) var(--sp-6);
+  padding-block: clamp(var(--sp-10), 5vw, var(--sp-16)) var(--sp-6);
 }
 
 .site-footer__top {
   display: grid;
-  gap: clamp(var(--sp-6), 5vw, var(--sp-16));
+  gap: clamp(var(--sp-8), 5vw, var(--sp-16));
   padding-bottom: var(--sp-8);
 }
 @media (min-width: 900px) { .site-footer__top { grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr); } }
@@ -965,12 +889,11 @@
 }
 .site-footer__title {
   font-size: var(--fs-sm);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-1);
-  letter-spacing: 0;
 }
 .site-footer__link { font-size: var(--fs-sm); color: var(--text-2); }
-.site-footer__link:hover { color: var(--brand-ink); }
+.site-footer__link:hover { color: var(--text-1); text-decoration: underline; text-underline-offset: 3px; }
 
 .site-footer__bottom {
   display: flex;
@@ -1156,18 +1079,17 @@
   }
 }
 
-/* ═══════════════ صحنه‌ی «شبِ سرویس» ═══════════════ */
-.night { position: relative; display: grid; gap: var(--sp-4); }
+/* ═══════════════ صحنه‌ی «شبِ سرویس» ═══════════════
+   بومِ نقشه‌ی سالن زیرِ هیروی صاحبِ رستوران — در یک قابِ مشکیِ ثابت (هر دو تم)،
+   مثلِ اسکرین‌شاتِ محصول روی صفحه‌ی اپل. */
+.night { position: relative; display: grid; gap: var(--sp-3); }
 .night__canvas {
   position: relative;
-  aspect-ratio: 16 / 11;
-  border-radius: var(--r-xl);
-  border: 1px solid var(--border);
-  background:
-    radial-gradient(120% 90% at 70% 0%, var(--aurora-1), transparent 60%),
-    var(--bg-sunken);
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-tile);
+  background: #0b0b0c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
-  box-shadow: var(--sh-xl);
 }
 .night__canvas canvas { display: block; inline-size: 100%; block-size: 100%; }
 .night__hud {
@@ -1178,54 +1100,24 @@
 .night__stat {
   display: grid; gap: 2px;
   padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--surface);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  text-align: center;
 }
 .night__num {
   font-size: var(--fs-xl);
-  font-weight: 800;
-  letter-spacing: var(--ls-tight);
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
-  color: var(--accent);
+  color: var(--text-1);
 }
-.night__lbl { font-size: var(--fs-2xs); color: var(--text-3); letter-spacing: .02em; }
+.night__lbl { font-size: var(--fs-xs); color: var(--text-2); }
 
-/* موبایل: سه آمار در یک ردیف و بومِ کوتاه‌تر — صحنه ~۲۲۰px است نه ۴۴۰px، و
-   همچنان با اسکرول جلو می‌رود. (۰۹-۱۲؛ قبلاً 4/5 + سه ردیفِ آمار) */
+/* موبایل: سه آمار در یک ردیف و بومِ کوتاه‌تر (۰۹-۱۲؛ قبلاً 4/5 + سه ردیفِ آمار) */
 @media (max-width: 620px) {
-  .night__hud { grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
-  .night__stat { padding: var(--sp-2) var(--sp-3); }
+  .night__hud { gap: var(--sp-2); }
+  .night__stat { padding: var(--sp-2); }
   .night__num { font-size: var(--fs-base); }
-  .night__canvas { aspect-ratio: 16 / 10; }
-}
-
-/* ═══════════════ صحنه‌ی «جریانِ زنده» ═══════════════ */
-.flow { display: grid; gap: var(--sp-4); }
-.flow__canvas {
-  position: relative;
-  aspect-ratio: 16 / 7;
-  min-block-size: 220px;
-  border-radius: var(--r-xl);
-  border: 1px solid var(--border);
-  background:
-    radial-gradient(90% 120% at 85% 50%, var(--aurora-1), transparent 55%),
-    radial-gradient(90% 120% at 10% 50%, rgba(69, 201, 154, .1), transparent 55%),
-    var(--bg-sunken);
-  overflow: hidden;
-}
-.flow__canvas canvas { display: block; inline-size: 100%; block-size: 100%; }
-.flow__cap {
-  display: flex; align-items: baseline; gap: var(--sp-2);
-  font-size: var(--fs-md); color: var(--text-2); margin: 0;
-}
-.flow__num {
-  font-size: var(--fs-2xl); font-weight: 800; color: var(--accent);
-  font-variant-numeric: tabular-nums; letter-spacing: var(--ls-tight);
-}
-@media (max-width: 620px) {
-  .flow__canvas { aspect-ratio: 4 / 3; }
-  .flow__cap { flex-direction: column; gap: 2px; }
+  .night__canvas { aspect-ratio: 16 / 10; border-radius: var(--r-xl); }
 }
 
 /* ═══════════════ دستیارِ سایت ═══════════════ */
@@ -1338,30 +1230,23 @@
   .askbot__fab:hover { transform: none; }
 }
 
+
 /* ═══════════════ تراکمِ موبایل ═══════════════
-   ۰۹-۱۲: صفحه‌ی اصلی روی ۳۹۰px ۱۶٫۲ صفحه بود؛ هدف ≤ ۱۰ بدونِ حذفِ هیچ
-   ادعایی. هر قاعده‌ی زیر فقط «هوای عمودی» را می‌گیرد: دوستونی به‌جای ستونِ
-   بلند، چیپ به‌جای فهرست، ردیفِ لغزان به‌جای کارت‌های روی‌هم. دسکتاپ دست
-   نمی‌خورد. */
+   ۰۹-۱۲: صفحه‌ی اصلی روی ۳۹۰px ۱۶٫۲ صفحه بود؛ هر قاعده‌ی زیر فقط «هوای
+   عمودی» را می‌گیرد: دوستونی به‌جای ستونِ بلند، ردیفِ لغزان به‌جای کارت‌های
+   روی‌هم. دسکتاپ دست نمی‌خورد. */
 @media (max-width: 640px) {
-  .metric { padding: var(--sp-4); gap: 2px; }
-  .metric__value { font-size: 1.6rem; }
-  .grid--dense { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+  .grid--dense { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
   .grid--dense .card { padding: var(--sp-4); border-radius: var(--r-lg); }
-  .grid--dense .icon-tile { width: 36px; height: 36px; border-radius: var(--r-sm); }
   .grid--dense .feature { gap: var(--sp-2); }
   .grid--dense .feature__title { font-size: var(--fs-base); }
-  .grid--dense .feature__body { font-size: var(--fs-sm); line-height: 1.6; }
-  .faq-item summary { padding: var(--sp-3) var(--sp-4); font-size: var(--fs-md); }
-  .faq-item__body { padding: 0 var(--sp-4) var(--sp-4); }
-  .cta-band h2 { font-size: clamp(1.5rem, 6.4vw, 2rem); }
-  /* کارتِ پلن: همان شش ادعا، با فاصله‌ی کمتر — بلندترین کارت ارتفاعِ ردیفِ
-     لغزان را تعیین می‌کند */
-  .plan { gap: var(--sp-4); padding: var(--sp-5); }
+  .grid--dense .feature__body { font-size: var(--fs-sm); line-height: 1.7; }
+  .faq-item summary { padding: var(--sp-4) 0; font-size: var(--fs-base); }
+  .cta-band h2 { font-size: clamp(1.75rem, 8vw, 2.25rem); }
+  .plan { gap: var(--sp-4); padding: var(--sp-6); }
   .plan__features { gap: var(--sp-2); }
   .plan__features li { font-size: var(--fs-sm); }
-  .plan__amount { font-size: 1.75rem; }
-  /* فوتر: پیوندها از قبل ۴۴px بلندند (pointer: coarse)، فاصله‌ی بینشان اضافه است */
+  .plan__amount { font-size: 2rem; }
   .site-footer__links { gap: var(--sp-5) var(--sp-6); }
   .site-footer__top { padding-bottom: var(--sp-6); }
 }
@@ -1372,7 +1257,7 @@
   /* جدولِ مقایسه در ۳۹۰px جا می‌شود: ستونِ «رزرونو» — همان نقطه‌ی جدول — پشتِ
      اسکرولِ افقی پنهان بود. چهار ستون در عرضِ ۳۵۰px با متنِ ریزتر جا می‌گیرند. */
   .table { min-width: 0; font-size: var(--fs-xs); }
-  .table th, .table td { padding: var(--sp-2); }
+  .table th, .table td { padding: var(--sp-3) var(--sp-1); }
 }
 
 /* ── ردیفِ لغزان ──
@@ -1400,88 +1285,42 @@
   .snap-row > * > *, .snap-row .app-card { block-size: 100%; }
 }
 
-/* ═══════════════ لایه‌ی حرکت (Kinetic) ═══════════════ */
 
-/* SplitText — هر کلمه از پایین بالا می‌آید. overflow روی پوسته تا کلمه
-   واقعاً از «زیرِ خط» بیرون بیاید، نه اینکه فقط محو شود. */
-.kx-word { display: inline-block; overflow: hidden; vertical-align: bottom; padding-block-end: .08em; }
-.kx-word__in {
-  display: inline-block;
-  transform: translateY(110%) rotate(2deg);
-  opacity: 0;
-  animation: kxWord .82s cubic-bezier(.16,1,.3,1) forwards;
+/* ═══════════════ نوارِ قابلیت‌ها ═══════════════
+   ۰۹-۱۳: دیگر marquee نیست و آیکنِ ستاره ندارد. روی دسکتاپ همه‌ی چیپ‌ها
+   وسط‌چین می‌شکنند؛ روی موبایل یک ردیفِ لمس‌پیما — هیچ قابلیتی پشتِ حرکت یا
+   بریدگیِ ماسک نمی‌ماند، و هیچ تایمری در کار نیست. */
+.kx-ticker { padding-block: var(--sp-4) var(--sp-8); }
+.kx-ticker__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2);
+  list-style: none;
+  max-inline-size: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--sp-5);
 }
-@keyframes kxWord { to { transform: translateY(0) rotate(0); opacity: 1; } }
-
-/* گرادیانِ عنوان باید روی خودِ کلمه بنشیند، نه روی پوسته.
-   دلیل: .kx-word__in یک transform دارد و transform لایه‌ی رنگ‌آمیزیِ جدا
-   می‌سازد؛ پس‌زمینه‌ی برش‌خورده‌ی والد (background-clip: text) به داخلِ آن
-   نمی‌رسد و چون رنگِ متن transparent است، کلمه کاملاً نامرئی می‌شود.
-   در مرورگر دیده شد: نیمی از تیترِ هیرو غیب شده بود. */
-.text-gradient .kx-word__in {
-  background: linear-gradient(100deg, var(--brand) 0%, var(--brass-500) 55%, var(--accent) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-:root[data-theme='dark'] .text-gradient .kx-word__in {
-  background: linear-gradient(100deg, var(--ember-300) 0%, var(--brass-400) 55%, var(--brass-300) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-
-/* Magnetic — خودِ جابه‌جایی با JS است؛ اینجا فقط لایه‌ی رندر تثبیت می‌شود */
-.kx-mag { display: inline-block; will-change: transform; }
-
-/* Tilt — کارتِ سه‌بعدی با هاله‌ای که اشاره‌گر را دنبال می‌کند */
-.kx-tilt {
-  position: relative;
-  transition: transform .42s cubic-bezier(.16,1,.3,1);
-  transform-style: preserve-3d;
-}
-.kx-tilt::after {
-  content: '';
-  position: absolute; inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(320px circle at var(--kx-mx, 50%) var(--kx-my, 50%),
-    var(--brand-soft), transparent 62%);
-  opacity: 0; transition: opacity .3s var(--ease);
-  pointer-events: none;
-}
-.kx-tilt:hover::after { opacity: 1; }
-
-/* Ambient — میدانِ ذره پشتِ محتوا */
-.kx-ambient {
-  position: absolute; inset: 0;
-  inline-size: 100%; block-size: 100%;
-  pointer-events: none; z-index: 0;
-}
-.hero > .container, .section > .container { position: relative; z-index: 1; }
-
-/* نوارِ متحرکِ قابلیت‌ها */
-.kx-ticker {
-  position: relative; overflow: hidden;
-  border-block: 1px solid var(--border);
-  background: var(--bg-subtle);
-  padding-block: var(--sp-4);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-          mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-}
-.kx-ticker__row { display: flex; inline-size: max-content; animation: kxSlide 34s linear infinite; }
-.kx-ticker:hover .kx-ticker__row { animation-play-state: paused; }
 .kx-ticker__item {
-  display: inline-flex; align-items: center; gap: var(--sp-2);
-  padding-inline: var(--sp-6);
-  font-size: var(--fs-md); font-weight: 600; color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 36px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-1);
   white-space: nowrap;
 }
-.kx-ticker__item svg { color: var(--brand); }
-@keyframes kxSlide { to { transform: translateX(50%); } }
-
-@media (prefers-reduced-motion: reduce) {
-  .kx-word__in { transform: none; opacity: 1; animation: none; }
-  .kx-ticker__row { animation: none; }
-  .kx-tilt { transition: none; }
+@media (max-width: 720px) {
+  .kx-ticker__row {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .kx-ticker__row::-webkit-scrollbar { display: none; }
 }
 
 /* ═══════════════ صحنه‌ی سنجاق‌شده ═══════════════ */
@@ -1495,13 +1334,6 @@
   display: flex; align-items: center;
   overflow: hidden;
 }
-.pin__stage::before {
-  content: ''; position: absolute; inset: 0;
-  background:
-    radial-gradient(70% 60% at 20% 30%, var(--aurora-1), transparent 62%),
-    radial-gradient(60% 55% at 85% 70%, var(--aurora-2), transparent 60%);
-  pointer-events: none;
-}
 .pin__grid {
   position: relative;
   display: grid;
@@ -1511,16 +1343,16 @@
 }
 
 /* ── ریلِ فصل‌ها ── */
-.pin__rail { position: relative; display: grid; gap: var(--sp-5); padding-inline-start: var(--sp-5); }
+.pin__rail { position: relative; display: grid; gap: var(--sp-4); padding-inline-start: var(--sp-5); }
 .pin__bar {
   position: absolute; inset-block: 6px; inset-inline-start: 0;
   inline-size: 2px; background: var(--border); border-radius: 2px; overflow: hidden;
 }
-.pin__bar-fill { display: block; inline-size: 100%; background: var(--brand); border-radius: 2px; }
+.pin__bar-fill { display: block; inline-size: 100%; background: var(--text-1); border-radius: 2px; }
 .pin__step {
   display: flex; align-items: center; gap: var(--sp-3);
   border: 0; background: transparent; cursor: pointer;
-  font: inherit; font-size: var(--fs-md); color: var(--text-3);
+  font: inherit; font-size: var(--fs-base); color: var(--text-3);
   padding: 0; text-align: start; min-block-size: var(--touch-min);
   transition: color var(--t-base) var(--ease);
 }
@@ -1529,69 +1361,65 @@
 .pin__dot {
   display: inline-flex; align-items: center; justify-content: center;
   inline-size: 36px; block-size: 36px; flex: 0 0 36px;
-  border-radius: 50%; border: 1px solid var(--border);
-  background: var(--surface); color: var(--text-3);
-  transition: transform var(--t-base) var(--ease-spring),
-              background-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
+  border-radius: 50%;
+  background: var(--surface-2); color: var(--text-2);
+  transition: background-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
 }
-.pin__step.is-on .pin__dot {
-  background: var(--brand); color: var(--brand-contrast);
-  border-color: transparent; transform: scale(1.14);
-  box-shadow: var(--sh-brand);
-}
-.pin__step.is-done .pin__dot { border-color: var(--brand); color: var(--brand); }
+.pin__step.is-on .pin__dot { background: var(--surface-inverse); color: var(--text-inverse); }
+.pin__step.is-done .pin__dot { color: var(--text-1); }
 
 /* ── پنلِ فصل ── */
-.pin__panel { position: relative; min-block-size: 340px; }
+.pin__panel { position: relative; min-block-size: 360px; }
 .pin__chapter {
   position: absolute; inset-block-start: 0; inset-inline: 0;
   display: grid; gap: var(--sp-4);
-  opacity: 0; transform: translateY(28px) scale(.985);
-  filter: blur(6px);
-  transition: opacity .55s var(--ease-out), transform .55s var(--ease-out), filter .55s var(--ease-out);
+  opacity: 0; transform: translateY(20px);
+  transition: opacity .5s var(--ease-out), transform .5s var(--ease-out);
   pointer-events: none;
 }
-.pin__chapter.is-on { opacity: 1; transform: none; filter: none; pointer-events: auto; }
+.pin__chapter.is-on { opacity: 1; transform: none; pointer-events: auto; }
 .pin__num {
-  font-size: var(--fs-sm); font-weight: 800; letter-spacing: .08em;
-  color: var(--brand); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-md); font-weight: 700;
+  color: var(--brand-ink); font-variant-numeric: tabular-nums;
 }
 .pin__num-of { color: var(--text-3); }
 .pin__title {
-  font-size: clamp(1.9rem, 4.2vw, 3.1rem); font-weight: 800;
-  line-height: 1.12; letter-spacing: var(--ls-tight); margin: 0;
+  font-size: clamp(2rem, 4.6vw, 3.75rem); font-weight: 900;
+  line-height: 1.1; margin: 0;
   text-wrap: balance;
 }
-.pin__body { font-size: var(--fs-lg); color: var(--text-2); margin: 0; max-inline-size: 46ch; }
+.pin__body { font-size: var(--fs-lg); color: var(--text-2); margin: 0; max-inline-size: 42ch; }
 .pin__points { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
 .pin__points li {
   display: flex; align-items: flex-start; gap: var(--sp-3);
-  font-size: var(--fs-md); color: var(--text-2);
+  font-size: var(--fs-base); color: var(--text-2);
 }
-.pin__points li svg { color: var(--brand); flex: 0 0 auto; margin-block-start: 3px; }
+.pin__points li svg { color: var(--brand-ink); flex: 0 0 auto; margin-block-start: 4px; }
 
 .pin__plain { display: grid; gap: var(--sp-3); }
 
 @media (max-width: 900px) {
   .pin { block-size: auto !important; }
-  .pin__stage { position: static; block-size: auto; padding-block: var(--sp-10); }
-  .pin__grid { grid-template-columns: 1fr; gap: var(--sp-8); }
+  .pin__stage { position: static; block-size: auto; padding-block: var(--sp-12); }
+  .pin__grid { grid-template-columns: 1fr; gap: var(--sp-6); }
   .pin__rail {
-    display: flex; overflow-x: auto; gap: var(--sp-3);
+    display: flex; overflow-x: auto; gap: var(--sp-2);
     padding-inline-start: 0; scrollbar-width: none;
   }
   .pin__rail::-webkit-scrollbar { display: none; }
   .pin__bar { display: none; }
+  .pin__step { padding-inline-end: var(--sp-3); border-radius: var(--r-full); background: var(--surface-2); }
+  .pin__step.is-on { background: var(--surface-inverse); color: var(--text-inverse); }
+  .pin__step.is-on .pin__dot { background: transparent; color: inherit; }
+  .pin__dot { background: transparent; }
   .pin__step-label { white-space: nowrap; }
   .pin__panel { min-block-size: 0; }
-  .pin__chapter { position: static; opacity: 1; transform: none; filter: none; pointer-events: auto; }
+  .pin__chapter { position: static; opacity: 1; transform: none; pointer-events: auto; }
   .pin__chapter:not(.is-on) { display: none; }
 }
 
 /* کاهشِ حرکت: صحنه از حالتِ سنجاق‌شده به فهرستِ ساده تبدیل می‌شود و همه‌ی
-   فصل‌ها هم‌زمان دیده می‌شوند — هیچ محتوایی پشتِ انیمیشن پنهان نمی‌ماند.
-   عمداً در CSS و نه با شاخه‌ی جداگانه در JS، تا دو نسخه‌ی موازیِ markup
-   نداشته باشیم که از هم واگرا شوند. */
+   فصل‌ها هم‌زمان دیده می‌شوند — هیچ محتوایی پشتِ انیمیشن پنهان نمی‌ماند. */
 @media (prefers-reduced-motion: reduce) {
   .pin { block-size: auto !important; }
   .pin__stage { position: static; block-size: auto; padding-block: var(--sp-16); }
@@ -1599,55 +1427,24 @@
   .pin__rail, .pin__bar { display: none; }
   .pin__panel { min-block-size: 0; display: grid; gap: var(--sp-16); }
   .pin__chapter {
-    position: static; opacity: 1; transform: none; filter: none;
+    position: static; opacity: 1; transform: none;
     pointer-events: auto; transition: none;
   }
   .pin__chapter[aria-hidden='true'] { display: grid; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   هیروِ تمام‌قد (hero--stage)
+   هیروِ صحنه (hero--stage) — تیترِ درشتِ وسط‌چین، صحنه‌ی محصول زیرش
    ───────────────────────────────────────────────────────────────────
-   سه تفاوتِ عمدی با هیروِ معمولی:
-   ۱) مقیاس. تیتر تا ۹vw می‌رود، نه ۶٫۲vw. «heroic» بیش از هر چیز یعنی
-      اندازه؛ تیترِ محتاط همیشه معمولی به‌نظر می‌رسد.
-   ۲) چیدمان. کارتِ کنارِ متن حذف شد. صحنه زیرِ تیتر می‌نشیند و از لبه‌ی
-      پایین بیرون می‌زند — همان بریدگی است که عمق می‌سازد.
-   ۳) نور. پس‌زمینه یک شیدرِ زنده است (کاستیک)، نه گرادیانِ ثابت.
+   ۰۹-۱۳: شیدرِ کاستیک، لایه‌ی یکدست‌کننده، چرخشِ سه‌بعدیِ صحنه و ماسکِ
+   محوشونده رفتند. صحنه یک قابِ مشکیِ تخت زیرِ تیتر است؛ عمق از تضادِ سفید و
+   مشکی می‌آید، نه از نورِ متحرک.
    ═══════════════════════════════════════════════════════════════════ */
 .hero--stage {
-  min-block-size: min(100svh, 60rem);
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding-block: clamp(var(--sp-16), 12vh, var(--sp-32)) 0;
-  isolation: isolate;
-}
-
-/* بومِ شیدر — پشتِ همه‌چیز، بیرون از جریانِ چیدمان */
-.caustics {
-  position: absolute;
-  inset: 0;
-  inline-size: 100%;
-  block-size: 100%;
-  z-index: 0;
-  pointer-events: none;
-  /* بومِ کم‌رزولوشن بزرگ می‌شود؛ نرمیِ کاستیک این را پنهان می‌کند */
-  image-rendering: auto;
-  mask-image: linear-gradient(to bottom, #000 62%, transparent 98%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 98%);
-}
-
-/* لایه‌ی یکدست‌کننده زیرِ نور: بدونِ آن، تیغه‌های روشن روی متن می‌افتند و
-   کنتراست را می‌شکنند. */
-.hero__wash {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  /* فقط پایینِ قاب یکدست می‌شود تا صحنه از نور بیرون بیاید. نسخه‌ی قبلی
-     لبه‌ها را هم می‌پوشاند و در تمِ روشن کاستیک را کاملاً می‌خورد. */
-  background: linear-gradient(to bottom, transparent 46%, var(--bg) 96%);
+  padding-block: clamp(var(--sp-16), 10vw, var(--sp-32)) clamp(var(--sp-8), 4vw, var(--sp-12));
 }
 
 .hero--stage .hero__inner { justify-items: center; }
@@ -1659,61 +1456,35 @@
   gap: var(--sp-5);
 }
 .hero--stage .display {
-  font-size: clamp(2.6rem, 9vw, 7.5rem);
-  line-height: 0.98;
-  letter-spacing: -0.035em;
-  /* تیترِ درشت روی نورِ متحرک به یک هاله‌ی نازک نیاز دارد تا لبه‌هایش گم نشود */
-  text-shadow: light-dark(none, 0 2px 40px rgba(0,0,0,.5));
+  font-size: clamp(2.6rem, 9vw, 7rem);
+  line-height: 1.06;
 }
 .hero--stage .lead {
-  max-width: 46ch !important;
-  font-size: clamp(1rem, 1.9vw, 1.3rem);
+  max-width: 44ch !important;
+  font-size: clamp(var(--fs-body), 1.9vw, 1.375rem);
 }
 .hero--stage .hero__bullets { justify-content: center; }
 
-/* ── صحنه: پنل زیرِ تیتر، بریده از لبه‌ی پایین ── */
+/* ── صحنه: پنل زیرِ تیتر ── */
 .hero__stage {
   position: relative;
   z-index: 1;
-  /* فاصله‌ی سخاوتمندانه: با مقدارِ کم، گوشه‌های صحنه‌ی کج‌شده روی ردیفِ
-     ویژگی‌ها می‌افتادند (در مرورگر دیده شد). */
-  margin-block-start: clamp(var(--sp-12), 9vh, var(--sp-24));
+  margin-block-start: clamp(var(--sp-10), 6vw, var(--sp-20));
   margin-inline: auto;
-  inline-size: min(100%, 78rem);
+  inline-size: min(100%, 72rem);
   padding-inline: var(--sp-5);
-  /* بریدگی: پایینِ صحنه محو می‌شود تا حس کند ادامه دارد */
-  mask-image: linear-gradient(to bottom, #000 74%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 74%, transparent 100%);
-}
-.hero__stage-inner {
-  transform: perspective(1800px) rotateX(5deg);
-  transform-origin: 50% 0%;
-  filter: drop-shadow(0 40px 80px light-dark(rgba(90,50,20,.22), rgba(0,0,0,.6)));
 }
 @media (max-width: 720px) {
-  /* ۰۹-۱۲: هیرو دیگر تمام‌قد نیست — درها و موزاییکِ کشف بالای آن‌اند و این
-     بلوک «صدای صاحبِ رستوران» است: تیتر، یک جمله، دو دکمه‌ی کنارِ هم، چیپ‌ها،
-     و صحنه‌ی شبِ سرویس در نسبتِ کوتاه‌تر (۱٫۶۱ صفحه → زیرِ یک صفحه). چرخشِ
-     سه‌بعدی روی موبایل فقط ارتفاع می‌خورد. بوم‌های تزئینی (کاستیک، ذره،
-     شبکه) روی صفحه‌ی باریک نمی‌آیند — DS-010 §۴: ≤ ۱ بومِ متحرک روی موبایل؛
-     شبِ سرویس می‌ماند چون اسکرول‌محور است و خودِ محصول را نشان می‌دهد. */
-  .hero--stage { min-block-size: auto; padding-block: var(--sp-8) 0; }
-  .hero--stage .display { font-size: clamp(2rem, 8.4vw, 2.6rem); }
+  /* بلوکِ «صدای صاحبِ رستوران» روی موبایل: تیتر، یک جمله، دو دکمه‌ی کنارِ هم،
+     سه ادعا، و صحنه‌ی شبِ سرویس در نسبتِ کوتاه‌تر. */
+  .hero--stage { padding-block: var(--sp-12) var(--sp-4); }
+  .hero--stage .display { font-size: clamp(2.25rem, 10vw, 3rem); }
   .hero--stage .hero__content { gap: var(--sp-4); }
-  .hero--stage .lead { font-size: var(--fs-md); }
-  /* دو دکمه کنارِ هم. فرزندِ مستقیمِ ردیف برای دکمه‌ی اصلی پوسته‌ی Magnetic است
-     نه خودِ .btn، پس قاعده روی «هر فرزند» می‌نشیند و .btn پوسته را پر می‌کند. */
-  .hero--stage .cta-row > * { flex: 1 1 40%; }
-  .hero--stage .cta-row .btn { inline-size: 100%; padding-inline: var(--sp-4); font-size: var(--fs-md); }
+  .hero--stage .lead { font-size: var(--fs-base); }
+  .hero--stage .cta-row { inline-size: 100%; flex-wrap: nowrap; }
+  .hero--stage .cta-row > * { flex: 1 1 0%; min-inline-size: 0; }
+  .hero--stage .cta-row .btn { padding-inline: var(--sp-3); font-size: var(--fs-md); }
   .hero__stage { margin-block-start: var(--sp-6); }
-  .hero__stage-inner { transform: none; filter: none; }
-  .hero .caustics, .hero .flowfield, .hero .kx-ambient, .hero .grid-bg { display: none; }
-}
-
-/* نشانگرِ اسکرول (خطِ نبض‌دارِ بی‌پایان) حذف شد — ۰۹-۱۲: هیرو دیگر تمام‌قد
-   نیست که «پایین چیزی هست» یادآوری بخواهد، و یک حلقه‌ی تایمری بود. */
-@media (prefers-reduced-motion: reduce) {
-  .hero__stage-inner { transform: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1760,6 +1531,7 @@
 }
 .ph__credit { display: block; font-size: var(--fs-xs); opacity: .72; margin-block-start: 2px; }
 
+
 /* ═══════════════ scene — عکسِ تمام‌عرض با متن روی آن ═══════════════ */
 .scene {
   position: relative;
@@ -1783,48 +1555,34 @@
   z-index: 1;
   pointer-events: none;
   background:
-    linear-gradient(to top, rgba(12,8,6,.86) 0%, rgba(12,8,6,.42) 45%, rgba(12,8,6,.12) 100%),
-    radial-gradient(120% 80% at 50% 100%, rgba(12,8,6,.5), transparent 70%);
+    linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.4) 45%, rgba(0,0,0,.1) 100%),
+    radial-gradient(120% 80% at 50% 100%, rgba(0,0,0,.45), transparent 70%);
 }
 .scene__body {
   position: relative;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
   padding-block: var(--sp-16);
   color: #fff;
 }
-.scene--center .scene__body { align-items: center; text-align: center; }
-.scene--center .scene__body > * { max-width: 46rem; }
+.scene__stack { display: flex; flex-direction: column; gap: var(--sp-5); align-items: flex-start; }
+.scene--center .scene__stack { align-items: center; text-align: center; }
+.scene--center .scene__stack > * { max-width: 48rem; }
 .scene__title {
-  font-size: clamp(1.9rem, 5vw, 3.6rem);
-  font-weight: 800;
-  line-height: 1.06;
-  letter-spacing: -0.03em;
+  font-size: clamp(2.25rem, 6.4vw, 5rem);
+  font-weight: 900;
+  line-height: 1.1;
   color: #fff;
 }
-.scene__lead { font-size: clamp(1rem, 1.7vw, 1.25rem); color: rgba(255,255,255,.86); line-height: 1.85; }
-.eyebrow--on-photo {
-  background: rgba(255,255,255,.14);
-  border-color: rgba(255,255,255,.26);
-  color: #fff;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
-.scene .btn--primary { align-self: center; }
-.scene--start .btn--primary { align-self: flex-start; }
+.scene__lead { font-size: clamp(var(--fs-body), 1.8vw, 1.375rem); color: rgba(255,255,255,.72); line-height: 1.8; }
+.eyebrow--on-photo { color: var(--ember-300); }
 
-/* بدونِ عکس: نوارِ متنیِ فشرده روی زمینه‌ی تیره‌ی برند — نه قابِ خالیِ
-   برچسب‌دار (تا ۰۹-۱۲ روی سایتِ زنده بود)، نه تصویرِ ساختگی. ارتفاع از
-   محتوا می‌آید، نه ۸۴vh. */
+/* بدونِ عکس: بخشِ مشکیِ تمام‌عرض با تیترِ سفید — جمله‌ای که روی سکوت می‌نشیند.
+   نه قابِ خالیِ برچسب‌دار، نه تصویرِ ساختگی. ارتفاع از محتوا می‌آید. */
 .scene--text {
   min-block-size: auto;
-  background:
-    radial-gradient(90% 80% at 85% 0%, color-mix(in srgb, var(--ember-500) 38%, transparent), transparent 62%),
-    linear-gradient(160deg, var(--ember-900), var(--ember-700));
+  background: #000;
 }
-.scene--text .scene__body { padding-block: clamp(var(--sp-10), 7vw, var(--sp-16)); }
+.scene--text .scene__body { padding-block: clamp(var(--sp-16), 11vw, var(--sp-32)); }
 
 /* ═══════════════ gallery — شبکه‌ی تحریریه ═══════════════ */
 .gal {
@@ -1870,6 +1628,652 @@
   .psplit--text .psplit__body { max-inline-size: 52rem; }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   صفحه‌ی اصلی — اکسپلور + اسکرولِ زنده (۲۰۲۶-۰۹-۱۳)
+   ───────────────────────────────────────────────────────────────────
+   جای «HomeGate + موزاییکِ کشف + دو در» را گرفت. توضیحِ طراحی در
+   components/home/ExploreHero.tsx و LiveScroll.tsx؛ این‌جا فقط مکانیک.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── رنگِ محتوا — هشت «غذا» ──
+   روی کاشیِ اکسپلور، ریلِ هیرو و صفحه‌های گوشی مشترک است. */
+.xt--saffron     { background: var(--dish-saffron); }
+.xt--pomegranate { background: var(--dish-pomegranate); }
+.xt--pistachio   { background: var(--dish-pistachio); }
+.xt--turquoise   { background: var(--dish-turquoise); }
+.xt--rosewater   { background: var(--dish-rosewater); }
+.xt--eggplant    { background: var(--dish-eggplant); }
+.xt--charcoal    { background: var(--dish-charcoal); }
+.xt--tea         { background: var(--dish-tea); }
+
+/* ═══════════════ هیرو ═══════════════ */
+.xh { padding-block: clamp(var(--sp-10), 6vw, var(--sp-20)) 0; }
+
+.xh__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: clamp(var(--sp-6), 3vw, var(--sp-10));
+  margin-block-end: clamp(var(--sp-10), 5vw, var(--sp-16));
+}
+
+/* تیترِ دوصدایی: هر صدا یک خط. اندازه روی ۳۹۰px طوری است که «یا میزهایت را
+   پر کن.» در یک خط بماند (سنجیده در مرورگر، نه تخمین). */
+.xh__title {
+  font-size: clamp(2.125rem, 9vw, 6.5rem);
+  font-weight: 900;
+  line-height: 1.15;
+}
+.xh__voice { display: block; }
+.xh__voice--2 { color: var(--text-2); }
+
+.xh__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-3);
+}
+@media (max-width: 480px) {
+  .xh__cta { inline-size: 100%; flex-wrap: nowrap; }
+  .xh__cta .btn { flex: 1 1 0%; min-inline-size: 0; padding-inline: var(--sp-3); }
+}
+
+/* ── شبکه‌ی اکسپلور ──
+   ۳ ستون روی موبایل، ۶ ستون از ۹۰۰px؛ کاشیِ ۲×۲ با dense جا می‌افتد. لبه‌به‌لبه
+   تا ۱۴۴۰px، بعد از آن گوشه‌گرد در وسط. */
+.xh__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  gap: 2px;
+  max-inline-size: var(--container-wide);
+  margin-inline: auto;
+  isolation: isolate;
+}
+.xh__grid:focus-visible { outline-offset: -4px; }
+@media (min-width: 900px) {
+  .xh__grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
+}
+@media (min-width: 1480px) {
+  .xh__grid { border-radius: var(--r-tile); overflow: hidden; }
+}
+
+.xt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  aspect-ratio: 1;
+  overflow: hidden;
+  color: #fff;
+  container-type: inline-size;
+}
+/* فاصله‌ی داخلی روی فرزندهاست، نه padding ِ خودِ کاشی: واحدِ cqi به نزدیک‌ترین
+   container ِ **والد** اشاره می‌کند و عنصر نمی‌تواند خودش را بسنجد — padding
+   با cqi روی `.xt` به اندازه‌ی viewport برمی‌گشت. */
+.xt__tag,
+.xt__word { position: relative; margin: 7cqi; }
+.xt__tag {
+  font-size: max(0.6875rem, 8.5cqi);
+  font-weight: 600;
+  line-height: 1.3;
+  opacity: 0.94;
+}
+/* اندازه‌ی واژه از طولش می‌آید (--len از ExploreHero): واژه‌ی ۴حرفی ۳۰cqi،
+   «روف‌تاپ» کوچک‌تر — هیچ واژه‌ای از لبه‌ی کاشی بریده نمی‌شود (در ۳۹۰px دیده شد). */
+.xt__word {
+  margin-block-start: auto;
+  font-size: min(30cqi, calc(128cqi / var(--len, 4)));
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.18);
+}
+/* ساعت: چپ‌به‌راست، بدونِ tabular-nums — ارقامِ هم‌عرض در اندازه‌ی نمایشی
+   «۲ ۰:۳ ۰» می‌شدند. */
+.xt--numeric .xt__word {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: right;   /* هم‌تراز با واژه‌های فارسیِ کاشی‌های کناری */
+  font-size: 27cqi;
+}
+
+/* ── کاشیِ ریل (۲×۲) ── */
+.xt--reel {
+  grid-column: span 2;
+  grid-row: span 2;
+  aspect-ratio: auto;
+  background: #000;
+}
+.xr {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.xr__page {
+  position: relative;
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+}
+.xr__word {
+  margin-inline: 7cqi;
+  font-size: 26cqi;
+  font-weight: 900;
+  line-height: 1.1;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.2);
+}
+.xr__chrome {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 5cqi;
+  pointer-events: none;
+}
+.xr__bars { display: flex; gap: 1.4cqi; }
+.xr__bars i {
+  position: relative;
+  flex: 1 1 0%;
+  block-size: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.38);
+  overflow: hidden;
+}
+.xr__bars i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  transform-origin: 100% 50%;
+  transform: scaleX(0);
+}
+.xr__bars i:first-child::after { transform: scaleX(0.35); }
+.xr__slots { display: flex; gap: 2cqi; }
+.xr__slots span {
+  padding: 1.8cqi 3.6cqi;
+  border-radius: var(--r-full);
+  background: rgba(0, 0, 0, 0.34);
+  font-size: max(0.6875rem, 4.2cqi);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.xr__slots .is-on { background: var(--brand); }
+
+/* ریل با اسکرولِ خودِ صفحه ورق می‌خورد — سه صفحه در ۶۰vhِ اول. تایمر ندارد؛
+   بدونِ scroll-timeline یا با کاهشِ حرکت صفحه‌ی اول ثابت می‌ماند. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .xr,
+    .xr__bars i::after {
+      animation-duration: auto;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 60vh;
+    }
+    .xr { animation-name: xrFlip; }
+    .xr__bars i:nth-child(1)::after { animation-name: xrBar1; }
+    .xr__bars i:nth-child(2)::after { animation-name: xrBar2; }
+    .xr__bars i:nth-child(3)::after { animation-name: xrBar3; }
+  }
+}
+@keyframes xrFlip {
+  0%, 22%   { transform: translateY(0); }
+  38%, 58%  { transform: translateY(-100%); }
+  74%, 100% { transform: translateY(-200%); }
+}
+@keyframes xrBar1 { 0% { transform: scaleX(0.35); } 30%, 100% { transform: scaleX(1); } }
+@keyframes xrBar2 { 0%, 30% { transform: scaleX(0); } 66%, 100% { transform: scaleX(1); } }
+@keyframes xrBar3 { 0%, 66% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+
+/* ═══════════════ اسکرولِ زنده ═══════════════ */
+.ls {
+  position: relative;
+  margin-block-start: clamp(var(--sp-12), 7vw, var(--sp-24));
+  padding-block: clamp(var(--sp-16), 10vw, var(--sp-32)) clamp(var(--sp-12), 8vw, var(--sp-24));
+}
+.ls__head { text-align: center; margin-block-end: clamp(var(--sp-10), 5vw, var(--sp-16)); }
+.ls__title {
+  font-size: clamp(2.25rem, 8vw, 5.5rem);
+  font-weight: 900;
+  line-height: 1.12;
+  max-inline-size: 16ch;
+  margin-inline: auto;
+}
+.ls__foot { display: flex; justify-content: center; margin-block-start: clamp(var(--sp-10), 5vw, var(--sp-16)); }
+
+.ls__grid {
+  display: grid;
+  gap: var(--sp-10);
+  justify-items: center;
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .ls__grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: clamp(var(--sp-12), 8vw, var(--sp-32));
+    justify-items: stretch;
+  }
+}
+
+/* ── مراحل ── */
+.ls__steps {
+  list-style: none;
+  counter-reset: ls;
+  display: grid;
+  gap: var(--sp-8);
+  inline-size: 100%;
+  max-inline-size: 30rem;
+}
+.ls__step { counter-increment: ls; display: grid; gap: var(--sp-2); }
+.ls__step-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  font-size: clamp(1.875rem, 3.8vw, 3.25rem);
+  font-weight: 900;
+  line-height: 1.15;
+}
+.ls__step-title::before {
+  content: counter(ls, persian);
+  font-size: 0.5em;
+  font-weight: 700;
+  color: var(--brand-ink);
+}
+.ls__step-body { font-size: var(--fs-lg); color: var(--text-2); max-inline-size: 32ch; }
+
+/* ── گوشی ──
+   --pw عرضِ گوشی است و همه‌چیزِ داخلِ صفحه با cqi نسبت به همان مقیاس می‌گیرد،
+   پس گوشی در هر ارتفاعِ قاب یک تصویر است، نه یک چیدمانِ شکسته. */
+.ls__device {
+  --pw: min(78vw, 21rem);
+  inline-size: var(--pw);
+  aspect-ratio: 390 / 844;
+  padding: calc(var(--pw) * 0.028);
+  border-radius: calc(var(--pw) * 0.16);
+  background: #1c1c1e;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 50px 120px rgba(255, 107, 53, 0.13);
+}
+.ls__screen {
+  position: relative;
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: calc(var(--pw) * 0.135);
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  container-type: inline-size;
+  isolation: isolate;
+}
+/* جزیره‌ی بالای صفحه */
+.ls__screen::before {
+  content: '';
+  position: absolute;
+  z-index: 9;
+  inset-block-start: 2.6cqi;
+  inset-inline-start: 50%;
+  translate: 50% 0;
+  inline-size: 30cqi;
+  block-size: 8.4cqi;
+  border-radius: var(--r-full);
+  background: #000;
+}
+
+/* ریل‌ها — حالتِ ثابت: صفحه‌ی سوم (همان رستورانِ مراحلِ بعد) */
+.ls__reels {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(-200%);
+}
+.ls__reel {
+  position: relative;
+  flex: 0 0 100%;
+  overflow: hidden;
+}
+.ls__reel::after {
+  content: '';
+  position: absolute;
+  inset: 48% 0 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.62));
+}
+.ls__word {
+  position: absolute;
+  inset-inline-start: 7cqi;
+  inset-block-start: 24%;
+  font-size: 30cqi;
+  font-weight: 900;
+  line-height: 1.1;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.2);
+}
+.ls__rail {
+  position: absolute;
+  z-index: 1;
+  inset-inline-end: 4cqi;
+  inset-block-end: 40%;
+  display: flex;
+  flex-direction: column;
+  gap: 4cqi;
+}
+.ls__rail > span {
+  display: grid;
+  place-items: center;
+  inline-size: 11cqi;
+  block-size: 11cqi;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.26);
+}
+.ls__rail svg { inline-size: 5.4cqi; block-size: 5.4cqi; }
+.ls__info {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 6cqi;
+  inset-block-end: 7cqi;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2cqi;
+}
+.ls__name { font-size: 6.4cqi; font-weight: 800; line-height: 1.3; }
+.ls__meta { font-size: 4.1cqi; opacity: 0.86; }
+.ls__chips { display: flex; gap: 2cqi; margin-block-start: 2.4cqi; }
+.ls__chips span {
+  padding: 1.8cqi 3.2cqi;
+  border-radius: var(--r-full);
+  background: rgba(0, 0, 0, 0.32);
+  font-size: 3.9cqi;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ls__chips .ls__book { margin-inline-start: auto; background: var(--brand); padding-inline: 5cqi; }
+
+/* نوارِ استوری */
+.ls__bars {
+  position: absolute;
+  z-index: 8;
+  inset-block-start: 13.5cqi;
+  inset-inline: 5cqi;
+  display: flex;
+  gap: 1.4cqi;
+}
+.ls__bar {
+  flex: 1 1 0%;
+  block-size: max(2px, 0.8cqi);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.32);
+  overflow: hidden;
+}
+.ls__bar b {
+  display: block;
+  block-size: 100%;
+  background: #fff;
+  transform-origin: 100% 50%;
+}
+.ls__bar--4 b { transform: scaleX(0); }
+
+/* مرحله‌ی ۲ — روی ریل */
+.ls__peek {
+  position: absolute;
+  z-index: 2;
+  inset-inline: 6cqi;
+  inset-block-start: 46%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3cqi;
+  opacity: 0;
+}
+.ls__vibes { display: flex; gap: 2cqi; }
+.ls__vibes span {
+  padding: 1.5cqi 3.4cqi;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 3.7cqi;
+  font-weight: 600;
+}
+.ls__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6cqi;
+  inline-size: 70%;
+  padding: 4cqi 5cqi;
+  border-radius: 5cqi;
+  background: rgba(0, 0, 0, 0.48);
+}
+.ls__menu-h { font-size: 3.4cqi; opacity: 0.7; }
+.ls__menu-i { font-size: 4.5cqi; font-weight: 600; }
+
+/* مرحله‌ی ۳ — شیتِ ساعت (رنگ‌هایش رنگِ خودِ اپ روی گوشی است، نه توکنِ سایت) */
+.ls__sheet {
+  position: absolute;
+  z-index: 7;
+  inset-inline: 0;
+  inset-block-end: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3.4cqi;
+  padding: 3cqi 6cqi 8cqi;
+  border-radius: 8cqi 8cqi 0 0;
+  background: #fff;
+  color: #1d1d1f;
+}
+.ls__grab {
+  align-self: center;
+  inline-size: 11cqi;
+  block-size: 1.2cqi;
+  border-radius: var(--r-full);
+  background: #d2d2d7;
+}
+.ls__sheet-h { font-size: 6.4cqi; font-weight: 800; }
+.ls__seg { display: flex; padding: 1cqi; border-radius: var(--r-full); background: #f2f2f7; }
+.ls__seg span {
+  flex: 1 1 0%;
+  padding: 1.8cqi 0;
+  border-radius: var(--r-full);
+  text-align: center;
+  font-size: 3.9cqi;
+  font-weight: 600;
+  color: #6e6e73;
+}
+.ls__seg .is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
+.ls__party { display: flex; justify-content: space-between; align-items: center; font-size: 4.1cqi; color: #6e6e73; }
+.ls__party b { color: #1d1d1f; font-weight: 700; }
+.ls__slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.4cqi; }
+.ls__slot {
+  padding: 2.8cqi 0;
+  border-radius: 3cqi;
+  text-align: center;
+  background: #f2f2f7;
+  font-size: 4.3cqi;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ls__slot.is-full { background: transparent; color: #aeaeb2; text-decoration: line-through; box-shadow: inset 0 0 0 1px #e5e5ea; }
+.ls__slot.is-pick { background: var(--brand); color: #fff; }
+.ls__confirm {
+  margin-block-start: 1cqi;
+  padding: 3.6cqi 0;
+  border-radius: var(--r-full);
+  text-align: center;
+  background: #1d1d1f;
+  color: #fff;
+  font-size: 4.5cqi;
+  font-weight: 700;
+}
+
+/* مرحله‌ی ۴ — تمام */
+.ls__done {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.4cqi;
+  padding: 10cqi;
+  background: #fff;
+  color: #1d1d1f;
+  text-align: center;
+  opacity: 0;
+}
+.ls__check { inline-size: 22cqi; block-size: 22cqi; margin-block-end: 3cqi; }
+.ls__check circle { fill: var(--brand); }
+.ls__check path {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 40;
+}
+.ls__done-h { font-size: 8cqi; font-weight: 900; }
+.ls__done-p { font-size: 4.5cqi; color: #6e6e73; }
+.ls__done-s {
+  margin-block-start: 2cqi;
+  padding: 1.8cqi 4.4cqi;
+  border-radius: var(--r-full);
+  background: #f2f2f7;
+  font-size: 3.9cqi;
+  font-weight: 600;
+}
+
+/* ── حالتِ زنده: سنجاق + حرکت با پیشرفتِ اسکرول ──
+   فقط وقتی مرورگر view-timeline دارد و کاربر کاهشِ حرکت نخواسته. بیرون از
+   این بلوک همه‌چیز همان چیدمانِ ثابتِ بالاست. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ls__track {
+      block-size: 420vh;
+      block-size: 420svh;
+      view-timeline: --ls block;
+    }
+    .ls__stage {
+      position: sticky;
+      inset-block-start: 0;
+      block-size: 100vh;
+      block-size: 100svh;
+      display: flex;
+      align-items: center;
+      padding-block: calc(var(--header-h) + var(--sp-4)) var(--sp-4);
+    }
+    .ls__grid { inline-size: 100%; }
+
+    /* ارتفاعِ قاب تعیین‌کننده است: گوشی باید همراهِ مراحل در یک قاب جا شود */
+    .ls__device { --pw: min(76vw, 21rem, calc((100svh - var(--header-h) - 13rem) * 0.462)); }
+
+    .ls__reels, .ls__bar b, .ls__peek, .ls__sheet, .ls__slot.is-pick,
+    .ls__confirm, .ls__done, .ls__check path, .ls__step {
+      animation-duration: auto;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: --ls;
+      animation-range: contain 0% contain 100%;
+    }
+    .ls__reels { animation-name: lsReels; }
+    .ls__bar--1 b { animation-name: lsBar1; }
+    .ls__bar--2 b { animation-name: lsBar2; }
+    .ls__bar--3 b { animation-name: lsBar3; }
+    .ls__bar--4 b { animation-name: lsBar4; }
+    .ls__peek { animation-name: lsPeek; }
+    .ls__sheet { animation-name: lsSheet; }
+    .ls__slot.is-pick { animation-name: lsPick; }
+    .ls__confirm { animation-name: lsPress; }
+    .ls__done { animation-name: lsDone; }
+    .ls__check path { animation-name: lsCheck; }
+
+    /* موبایل: فقط مرحله‌ی جاری، روی هم، بالای گوشی */
+    .ls__steps { position: relative; block-size: 8.5rem; gap: 0; }
+    .ls__step { position: absolute; inset: 0; align-content: start; }
+    .ls__step-title { font-size: clamp(1.75rem, 8vw, 2.25rem); }
+    .ls__step-body { font-size: var(--fs-base); }
+    .ls__step--1 { animation-name: lsStep1; }
+    .ls__step--2 { animation-name: lsStep2; }
+    .ls__step--3 { animation-name: lsStep3; }
+    .ls__step--4 { animation-name: lsStep4; }
+    .ls__grid { gap: var(--sp-4); align-content: center; }
+
+    @media (min-width: 900px) {
+      .ls__device { --pw: min(21rem, calc((100svh - var(--header-h) - 5rem) * 0.462)); }
+      /* دسکتاپ: هر چهار مرحله دیده می‌شوند؛ مرحله‌ی جاری پررنگ */
+      .ls__steps { block-size: auto; gap: var(--sp-8); }
+      .ls__step { position: static; }
+      .ls__step-title { font-size: clamp(1.875rem, 3.8vw, 3.25rem); }
+      .ls__step-body { font-size: var(--fs-lg); }
+      .ls__step--1 { animation-name: lsStepD1; }
+      .ls__step--2 { animation-name: lsStepD2; }
+      .ls__step--3 { animation-name: lsStepD3; }
+      .ls__step--4 { animation-name: lsStepD4; }
+    }
+  }
+}
+
+/* مرزِ مراحل: ۱ = ۰–۲۵ · ۲ = ۲۵–۵۰ · ۳ = ۵۰–۷۵ · ۴ = ۷۵–۱۰۰ */
+@keyframes lsReels {
+  0%, 4%    { transform: translateY(0); }
+  10%, 14%  { transform: translateY(-100%); }
+  20%, 100% { transform: translateY(-200%); }
+}
+@keyframes lsBar1 { 0% { transform: scaleX(0); } 25%, 100% { transform: scaleX(1); } }
+@keyframes lsBar2 { 0%, 25% { transform: scaleX(0); } 50%, 100% { transform: scaleX(1); } }
+@keyframes lsBar3 { 0%, 50% { transform: scaleX(0); } 75%, 100% { transform: scaleX(1); } }
+@keyframes lsBar4 { 0%, 75% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+@keyframes lsPeek {
+  0%, 27%   { opacity: 0; transform: translateY(8cqi); }
+  34%, 100% { opacity: 1; transform: none; }
+}
+@keyframes lsSheet {
+  0%, 51%   { transform: translateY(105%); }
+  58%, 100% { transform: translateY(0); }
+}
+@keyframes lsPick {
+  0%, 62%   { background: #f2f2f7; color: #1d1d1f; transform: scale(1); }
+  65%       { background: var(--brand); color: #fff; transform: scale(0.9); }
+  68%, 100% { background: var(--brand); color: #fff; transform: scale(1); }
+}
+@keyframes lsPress {
+  0%, 70%   { transform: scale(1); }
+  73%       { transform: scale(0.94); }
+  76%, 100% { transform: scale(1); }
+}
+@keyframes lsDone {
+  0%, 76%   { opacity: 0; transform: scale(1.04); }
+  81%, 100% { opacity: 1; transform: none; }
+}
+@keyframes lsCheck {
+  0%, 80%   { stroke-dashoffset: 40; }
+  88%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes lsStep1 {
+  0%, 21%   { opacity: 1; transform: none; }
+  25%, 100% { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes lsStep2 {
+  0%, 25%   { opacity: 0; transform: translateY(10px); }
+  29%, 46%  { opacity: 1; transform: none; }
+  50%, 100% { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes lsStep3 {
+  0%, 50%   { opacity: 0; transform: translateY(10px); }
+  54%, 71%  { opacity: 1; transform: none; }
+  75%, 100% { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes lsStep4 {
+  0%, 75%   { opacity: 0; transform: translateY(10px); }
+  79%, 100% { opacity: 1; transform: none; }
+}
+@keyframes lsStepD1 { 0%, 21% { opacity: 1; } 25%, 100% { opacity: 0.28; } }
+@keyframes lsStepD2 { 0%, 25% { opacity: 0.28; } 29%, 46% { opacity: 1; } 50%, 100% { opacity: 0.28; } }
+@keyframes lsStepD3 { 0%, 50% { opacity: 0.28; } 54%, 71% { opacity: 1; } 75%, 100% { opacity: 0.28; } }
+@keyframes lsStepD4 { 0%, 75% { opacity: 0.28; } 79%, 100% { opacity: 1; } }
+
 /* زاویه‌ی حلقه‌ی نورانیِ درِ باز. بدونِ @property این یک رشته‌ی ساده است و
    انیمیشن نمی‌گیرد؛ در مرورگرهای قدیمی‌تر حلقه ثابت می‌ماند (نه شکسته). */
 @property --door-angle {
@@ -1905,9 +2309,8 @@
 }
 .gate__title {
   font-size: clamp(2.4rem, 8vw, 6rem);
-  font-weight: 800;
-  line-height: 0.98;
-  letter-spacing: -0.035em;
+  font-weight: 900;
+  line-height: 1.08;
 }
 .gate__lead { font-size: clamp(1rem, 1.7vw, 1.2rem); color: var(--text-2); max-width: 42ch; }
 .gate__foot { font-size: var(--fs-sm); color: var(--text-3); max-width: 52ch; line-height: 2; }
@@ -1936,11 +2339,9 @@
   flex-direction: column;
   gap: var(--sp-3);
   padding: clamp(var(--sp-5), 2.4vw, var(--sp-8));
-  border-radius: var(--r-2xl);
-  border: 1px solid var(--border);
-  background: var(--glass-bg, var(--surface));
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  border-radius: var(--r-tile);
+  border: 1px solid transparent;
+  background: var(--surface-2);
   color: inherit;
   text-align: start;
   overflow: hidden;
@@ -1989,9 +2390,8 @@
   --open: 1;
   flex-grow: 1.75;
   opacity: 1;
-  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
-  transform: translateY(-6px);
-  box-shadow: 0 26px 60px light-dark(rgba(90,50,20,.16), rgba(0,0,0,.5));
+  border-color: transparent;
+  transform: none;
 }
 
 /* حاشیه‌ی چرخانِ درِ باز.
@@ -2010,9 +2410,8 @@
   transition: opacity 340ms var(--ease);
   background: conic-gradient(from var(--door-angle, 0deg),
     transparent 0deg,
-    var(--ember-500) 60deg,
-    var(--brass-400) 120deg,
-    transparent 200deg,
+    var(--brand) 70deg,
+    transparent 160deg,
     transparent 360deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -2033,7 +2432,6 @@
   font-size: clamp(2rem, 4vw, 3.2rem);
   font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.04em;
   color: transparent;
   -webkit-text-stroke: 1.5px color-mix(in srgb,
     var(--brand) calc(var(--open) * 70%), var(--border-strong, var(--border)));
@@ -2054,11 +2452,11 @@
 .doors:hover .door:hover .door__ic,
 .doors:focus-within .door:focus-visible .door__ic,
 .doors:not(:hover):not(:focus-within) .door:first-child .door__ic {
-  background: linear-gradient(135deg, var(--ember-500), var(--brass-500));
+  background: var(--brand);
   color: #fff;
 }
 
-.door__title { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.015em; }
+.door__title { font-size: var(--fs-xl); font-weight: 800; }
 .door__body {
   font-size: var(--fs-sm);
   color: var(--text-2);
@@ -2080,237 +2478,13 @@
   gap: calc(6px + 6px * var(--open));
   font-weight: 700;
   font-size: var(--fs-sm);
-  color: var(--brand);
+  color: var(--brand-ink);
   transition: gap 320ms var(--ease);
 }
 
 .door:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 
-/* ═══════════════════════════════════════════════════════════════════
-   صفحه‌ی اصلی — دروازه‌ی محصول‌اول (HomeGate + موزاییکِ کشف)
-   ───────────────────────────────────────────────────────────────────
-   ۰۹-۱۲ · مالک: «مثلِ اینستاگرام/تیک‌تاک — محصول‌اول، فشرده، زنده». اولین
-   قاب سه چیز است و بس: تیترِ دوصدایی (DS-010 §۴‑ب)، موزاییکِ کشف (همان فیدِ
-   اپِ مشتری، بازسازی‌شده)، و دو در. روی ۳۹۰px هر دو در با جمله‌شان زیرِ
-   خطِ تا می‌مانند — قیدِ سنجش‌پذیرِ همان سند.
-   `.doors` این‌جا مستقیم زیرِ `.container` است (نه `.gate__inner`)، پس خودش
-   باید وسط بایستد.
-   ═══════════════════════════════════════════════════════════════════ */
-.home-gate {
-  position: relative;
-  padding-block: clamp(var(--sp-4), 3vw, var(--sp-12)) clamp(var(--sp-8), 4vw, var(--sp-16));
-}
-.home-gate__inner { display: grid; gap: var(--sp-4); }
-.home-gate__head {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: var(--sp-3);
-}
-.home-gate__title {
-  font-size: clamp(1.7rem, 6.4vw, 3.6rem);
-  line-height: 1.12;
-  letter-spacing: -0.03em;
-  max-inline-size: 20ch;
-}
-.home-gate .doors { margin-inline: auto; max-inline-size: 52rem; }
 
-@media (min-width: 980px) {
-  .home-gate { padding-block: clamp(var(--sp-10), 5vw, var(--sp-16)); }
-  .home-gate__inner {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    grid-template-areas: 'head product' 'doors product';
-    align-items: center;
-    column-gap: clamp(var(--sp-8), 4vw, var(--sp-16));
-    row-gap: var(--sp-6);
-  }
-  .home-gate__head { grid-area: head; align-items: flex-start; text-align: start; }
-  .home-gate__product { grid-area: product; }
-  .home-gate__doors { grid-area: doors; }
-  .home-gate .doors { margin-block-start: 0; max-inline-size: none; }
-}
-
-/* ── موزاییکِ کشف ──
-   شبکه‌ی سه‌ستونیِ کاشی‌های گرادیانی — همان `.rc`ِ اپِ مشتری در مقیاسِ کوچک.
-   حرکت فقط اسکرول‌محور است: هر ستون با اسکرولِ صفحه (۰ تا ۶۴۰px) با سرعتِ
-   خودش بالا می‌رود (animation-timeline: scroll). تایمر ندارد؛ در حالتِ
-   کاهشِ حرکت (بلوکِ آخرِ همین فایل) کاملاً ثابت است؛ مرورگرِ بدونِ
-   scroll-timeline موزاییکِ ثابت می‌بیند، نه شکسته. */
-@property --drift {
-  syntax: '<length>';
-  inherits: false;
-  initial-value: 0px;
-}
-.mosaic {
-  position: relative;
-  display: block;
-  block-size: clamp(14rem, 58vw, 26rem);
-  border-radius: var(--r-2xl);
-  overflow: hidden;
-  background: var(--bg-sunken);
-  isolation: isolate;
-}
-.mosaic:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
-.mosaic__grid {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-2);
-  padding: var(--sp-2);
-  /* پایینِ قاب محو می‌شود: فید «ادامه دارد» */
-  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
-          mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
-}
-.mosaic__col { display: grid; gap: var(--sp-2); align-content: start; }
-.mosaic__col--1 { --drift: -3.5rem; }
-.mosaic__col--2 { --drift: -7rem; margin-block-start: -3.25rem; }
-.mosaic__col--3 { --drift: -5rem; margin-block-start: -1.5rem; }
-@supports (animation-timeline: scroll()) {
-  .mosaic__col {
-    animation: mosaicDrift linear both;
-    animation-timeline: scroll(root block);
-    animation-range: 0px 640px;
-  }
-}
-@keyframes mosaicDrift {
-  from { transform: translateY(0); }
-  to { transform: translateY(var(--drift)); }
-}
-
-.mtile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  aspect-ratio: 4 / 5;
-  padding: var(--sp-2);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  color: #fff;
-  box-shadow: var(--sh-md);
-}
-.mtile--1 { background: var(--tile-1); }
-.mtile--2 { background: var(--tile-2); }
-.mtile--3 { background: var(--tile-3); }
-.mtile--4 { background: var(--tile-4); }
-.mtile--5 { background: var(--tile-5); }
-.mtile--6 { background: var(--tile-6); }
-.mtile__emoji {
-  position: absolute;
-  inset-block-start: var(--sp-2);
-  inset-inline-end: var(--sp-2);
-  font-size: clamp(1.5rem, 5.4vw, 2.4rem);
-  line-height: 1;
-  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.35));
-}
-.mtile__hot {
-  position: absolute;
-  inset-block-start: var(--sp-2);
-  inset-inline-start: var(--sp-2);
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 7px;
-  border-radius: var(--r-full);
-  font-size: var(--fs-2xs);
-  font-weight: 800;
-  background: var(--tile-hot);
-}
-/* همان پنلِ اپ با همان آلفا (آن‌جا برای کنتراست روی هر شش گرادیان حل شده)؛
-   بدونِ backdrop-blur — DS-010 §۲‑۲ شیشه را به دو نوار محدود می‌کند. */
-.mtile__panel {
-  position: relative;
-  display: grid;
-  gap: 2px;
-  padding: var(--sp-2);
-  border-radius: var(--r-sm);
-  background: var(--tile-panel);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-}
-.mtile__name {
-  font-size: var(--fs-sm);
-  font-weight: 800;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mtile__meta {
-  font-size: var(--fs-2xs);
-  font-weight: 600;
-  opacity: 0.82;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mtile__slots { display: flex; gap: 4px; margin-block-start: 4px; }
-.mtile__slot {
-  flex: 1 1 0%;
-  padding: 4px 0;
-  border-radius: var(--r-xs);
-  text-align: center;
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-.mtile__slot.is-go { background: var(--tile-go); border-color: transparent; }
-.mosaic__label {
-  position: absolute;
-  inset-block-end: var(--sp-3);
-  inset-inline-start: var(--sp-3);
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-block-size: 36px;
-  padding: 0 var(--sp-3);
-  border-radius: var(--r-full);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  color: var(--text-1);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  box-shadow: var(--sh-md);
-}
-.mosaic__label svg { color: var(--brand); }
-
-/* ── درها روی موبایل: فشرده ──
-   درِ تمام‌قد (شماره‌ی بزرگ، آیکنِ ۴۶px، متنِ چندخطی) ۲۸۶px بود؛ دو تا یعنی
-   بیش از نیمی از صفحه پیش از هر محتوایی. این‌جا هر در یک ردیفِ آیکن + سه خطِ
-   متن است و هر دو با جمله‌شان بالای خطِ تا می‌مانند. متنِ درها دست نخورده. */
-@media (max-width: 900px) {
-  .home-gate .doors { gap: var(--sp-2); margin-block-start: 0; max-inline-size: none; }
-  .home-gate .door {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr);
-    grid-template-areas: 'ic title' 'ic body' 'ic foot';
-    align-items: center;
-    column-gap: var(--sp-3);
-    row-gap: 2px;
-    padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-xl);
-  }
-  .home-gate .door__num { display: none; }
-  .home-gate .door__ic { grid-area: ic; inline-size: 44px; block-size: 44px; }
-  .home-gate .door__title { grid-area: title; font-size: var(--fs-base); }
-  .home-gate .door__body { grid-area: body; font-size: var(--fs-sm); line-height: 1.6; }
-  .home-gate .door__foot {
-    grid-area: foot;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    margin-block-start: var(--sp-1);
-  }
-  /* راهنما می‌شکند، «ورود / شروعِ دمو» هرگز — پیکان کنارِ متنش می‌ماند */
-  .home-gate .door__hint { flex: 1 1 auto; }
-  .home-gate .door__go { flex: 0 0 auto; white-space: nowrap; }
-}
 
 /* ── موبایل و تبلت ──
    «بازشدن با هاور» روی تاچ معنا ندارد و فقط یک لمسِ اضافه تحمیل می‌کند؛
@@ -2349,7 +2523,4 @@
      کاهشِ حرکت می‌بازد (اندازه‌گیری شد: animationName=doorSpin). */
   .door__edge { animation: none; }
   .door__ic { transform: none; }
-  /* موزاییکِ کشف: قاعده‌ی سراسریِ globals فقط duration را صفر می‌کند و
-     timelineِ اسکرول duration ندارد — پس صریح: هیچ حرکتی، هیچ جابه‌جایی. */
-  .mosaic__col { animation: none !important; transform: none !important; }
 }

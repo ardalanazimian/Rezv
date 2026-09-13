@@ -284,7 +284,7 @@ export function ServiceNight() {
 
   return (
     <div className="night">
-      <div className="night__canvas" ref={wrapRef}>
+      <div className="night__canvas is-night" ref={wrapRef}>
         <canvas ref={canvasRef} aria-hidden="true" />
       </div>
       <div className="night__hud">

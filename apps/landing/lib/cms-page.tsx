@@ -29,12 +29,16 @@ export interface CmsPageOptions {
   crumbs: Crumb[];
 }
 
+/** سطحِ تیترِ بلوکِ hero. پیش‌فرض h1؛ صفحه‌ای که h1ِ خودش را بیرون از CMS
+ *  دارد (صفحه‌ی اصلی) h2 می‌دهد تا صفحه یک h1 داشته باشد. */
+export type HeroHeading = 'h1' | 'h2';
+
 export async function cmsMetadata(opts: CmsPageOptions): Promise<Metadata> {
   const page = await getPage(opts.slug);
   return metadataFromCms(page.seo, opts.fallbackTitle, opts.fallbackDescription, opts.path);
 }
 
-export async function CmsPage({ slug, path, crumbs }: CmsPageOptions) {
+export async function CmsPage({ slug, path, crumbs, heroHeading = 'h1' }: CmsPageOptions & { heroHeading?: HeroHeading }) {
   const page = await getPage(slug);
   // صفحه‌ای که نه در CMS هست و نه در حالتِ امن → ۴۰۴ واقعی (نه صفحه‌ی خالی).
   if (!page.sections.length) notFound();
@@ -78,7 +82,7 @@ export async function CmsPage({ slug, path, crumbs }: CmsPageOptions) {
   return (
     <>
       <JsonLd data={graph(nodes)} id={`page-${slug}`} />
-      <SectionRenderer sections={page.sections} data={data} />
+      <SectionRenderer sections={page.sections} data={data} heroHeading={heroHeading} />
     </>
   );
 }

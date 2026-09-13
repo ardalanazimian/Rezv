@@ -37,17 +37,16 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
 /**
  * اسکریپتی که پیش از نخستین رنگ‌آمیزی اجرا می‌شود.
  *
- * دو کار: (۱) تمِ مؤثر را به‌صورتِ صریح روی <html data-theme> می‌نشاند — چه
- * ذخیره‌شده باشد چه از ترجیحِ سیستم — تا هم پرشِ تم نباشد و هم CSS بتواند
- * بدونِ ابهام آیکنِ درست را انتخاب کند. (۲) js-reveal را ست می‌کند تا
- * انیمیشنِ ورود فقط وقتی فعال شود که جاوااسکریپت واقعاً در دسترس است.
+ * تمِ مؤثر را به‌صورتِ صریح روی <html data-theme> می‌نشاند — چه ذخیره‌شده
+ * باشد چه از ترجیحِ سیستم — تا هم پرشِ تم نباشد و هم CSS بتواند بدونِ ابهام
+ * آیکنِ درست را انتخاب کند. (کلاسِ js-reveal ِ آشکارسازیِ اسکرول‌محور ۰۹-۱۳
+ * با خودِ آن حرکت رفت — Motion.tsx.)
  */
 export function ThemeScript() {
   const code = `(function(){try{
     var s=localStorage.getItem('${THEME_KEY}');
     var t=(s==='dark'||s==='light')?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
     document.documentElement.dataset.theme=t;
-    document.documentElement.classList.add('js-reveal');
   }catch(e){}})();`;
   return <script dangerouslySetInnerHTML={{ __html: code }} />;
 }
