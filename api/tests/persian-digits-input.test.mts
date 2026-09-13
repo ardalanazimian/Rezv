@@ -40,7 +40,7 @@ describe('zPhone / normalizePhone با ارقامِ فارسی', () => {
     assert.throws(() => zPhone.parse('۱۲۳'));
     assert.throws(() => zPhone.parse('<b>۰۹۱۲۳۴۵۶۷۸۹</b>'));
   });
-  test('normalizePhone شماره‌ی فارسی را به +98 می‌رساند (پیش‌تر `\D` همه را پاک می‌کرد)', () => {
+  test('normalizePhone شماره‌ی فارسی را به +98 می‌رساند (پیش‌تر حذفِ «غیرِرقم» همه را پاک می‌کرد)', () => {
     assert.equal(normalizePhone('۰۹۱۲۳۴۵۶۷۸۹'), '+989123456789');
     assert.equal(normalizePhone('09123456789'), '+989123456789');
     assert.throws(() => normalizePhone('۰۹۱۲'));
