@@ -142,6 +142,43 @@ if (!constraintDef) {
     );
   }
 }
+// ── طرفِ خطر ۱ج: فقط-افزودنی بودنِ دفتر (مهاجرتِ ۰۸۹ — RT-22/RT-25، حکمِ FP-009) ──
+// CHECKِ ۰۸۸ فقط **شکلِ ردیفِ نوشته‌شده** را می‌بندد. کم‌کردنِ موجودی از راهِ حذف،
+// صفرکردن یا TRUNCATE هیچ ردیفِ منفی نمی‌نویسد و از آن رد می‌شود. این سه تریگر
+// ضامنِ آن سمت‌اند؛ این‌جا فقط می‌سنجیم که در مهاجرت‌ها **هستند** و بعداً بی‌صدا
+// برداشته نشده‌اند (DROPِ کنارِ CREATEِ خودشان طبیعی است و شمرده نمی‌شود).
+const LEDGER_TRIGGERS = ['points_ledger_no_delete', 'points_ledger_no_truncate', 'points_ledger_no_update'];
+for (const trg of LEDGER_TRIGGERS) {
+  const created = sqlFiles.filter((f) => new RegExp(`CREATE\\s+TRIGGER\\s+${trg}\\b`, 'i').test((read(f) ?? '')));
+  if (created.length === 0) {
+    violations.push(`تریگرِ ${trg} در هیچ مهاجرتی ساخته نمی‌شود — دفترِ امتیاز فقط-افزودنی نیست (مهاجرتِ ۰۸۹).`);
+    continue;
+  }
+  const last = created[created.length - 1];
+  for (const f of sqlFiles) {
+    if (f <= last) continue; // DROPِ پیش از CREATEِ خودش، بخشِ idempotent بودنِ همان فایل است
+    const sql = (read(f) ?? '').replace(/--[^\n]*/g, '');
+    if (new RegExp(`DROP\\s+TRIGGER\\s+(IF\\s+EXISTS\\s+)?${trg}\\b`, 'i').test(sql)
+      && !new RegExp(`CREATE\\s+TRIGGER\\s+${trg}\\b`, 'i').test(sql)) {
+      violations.push(`${f} تریگرِ ${trg} را برمی‌دارد و دوباره نمی‌سازد — راهِ کم‌کردنِ موجودی بازمی‌شود.`);
+    }
+  }
+}
+// و کلیدِ خارجی: یک خطِ `ON DELETE CASCADE` کافی است تا «حذفِ کاربر» کلِ ردِ مالی را
+// ببرد — و آن تغییر معمولاً به‌عنوانِ «رفعِ حذفِ کاربر» بازبینی می‌شود، نه تغییرِ پول
+// (پیشنهادِ رد تیم، RT-24 §۳؛ حکمِ FP-009: RESTRICT می‌ماند).
+for (const f of sqlFiles) {
+  const sql = (read(f) ?? '').replace(/--[^\n]*/g, '');
+  const m = sql.match(/ADD\s+CONSTRAINT\s+points_ledger_user_id_fkey[\s\S]{0,200}?;/i);
+  if (m && /ON\s+DELETE\s+CASCADE/i.test(m[0])) {
+    violations.push(`${f}: FKِ points_ledger_user_id_fkey را CASCADE می‌کند — حذفِ کاربر ردِ مالی‌اش را هم می‌برد (FP-009: RESTRICT می‌ماند).`);
+  }
+}
+const ledgerModel = schema.match(/model\s+PointsLedger\b[^{]*\{([\s\S]*?)\n\}/);
+if (ledgerModel && /@relation\([^)]*onDelete:\s*Cascade/i.test(ledgerModel[1])) {
+  violations.push('schema.prisma: رابطه‌ی PointsLedger.user با onDelete: Cascade — همان درِ حذف از راهِ والد (FP-009: RESTRICT می‌ماند).');
+}
+
 // و خودِ enum: reasonی که اسمش انقضاست، وعده را پیش از هر کدی نقض می‌کند.
 const reasonEnum = schema.match(/enum\s+PointsReason\s*\{([\s\S]*?)\n\}/);
 if (!reasonEnum) {

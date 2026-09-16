@@ -126,7 +126,7 @@ before(async () => {
 });
 
 after(async () => {
-  await db.pointsLedger.deleteMany({ where: { userId } }).catch(() => {});
+  // ⚠️ ۰۸۹/FP-009: دفترِ امتیاز فقط-افزودنی است — پاک‌سازیِ ردیف‌هایش ممکن نیست و تلاش برایش رد می‌شود. ردیف‌های [DEMO] در دیتابیسِ هر اجرا (که تازه ساخته می‌شود) می‌مانند.
   await db.reservationEvent.deleteMany({
     where: { reservation: { restaurantId } },
   }).catch(() => {});
