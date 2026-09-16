@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { gotoApp } from './helpers/actions';
+import { gotoApp, openFirstRestaurant, openImmersiveTile } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  رگرسیونِ P0 — شناسه‌ی رستوران با شکلِ **واقعیِ تولید** (فازِ ۲، Batch 17)
@@ -83,10 +83,9 @@ test('کارتِ رستوران با شناسه‌ی UUID باز می‌شود (
   await mockUuidApi(page);
   await gotoApp(page);
 
-  const card = page.locator('.rc .rc-open').first();
-  await expect(card).toBeVisible({ timeout: 15_000 });
-  await card.click();
-
+  // مسیرِ DS-011: تایل ← نمای تمام‌صفحه ← «صفحه‌ی رستوران». هر دو گام idِ UUID
+  // را از همان قالب می‌خوانند، پس این تست همچنان تزریقِ id را می‌سنجد.
+  await openFirstRestaurant(page);
   await expect(page.locator('#page-rest'), 'صفحه‌ی جزئیات باید باز شود').toBeVisible();
   expect(
     errors.filter(e => /SyntaxError|is not defined/.test(e)),
@@ -113,7 +112,8 @@ test('چیپِ ساعت با شناسه‌ی UUID شیتِ رزرو را باز 
   await mockUuidApi(page);
   await gotoApp(page);
 
-  const slot = page.locator('.rc .rc-slot').first();
+  await openImmersiveTile(page, 0);
+  const slot = page.locator('#imFeed .im-item .rc-slot').first();
   await expect(slot).toBeVisible({ timeout: 15_000 });
   await slot.click();
 

@@ -34,7 +34,6 @@ export default async function ChangelogPage() {
       />
 
       <section className="hero hero--compact hero--center">
-        <div className="grid-bg" aria-hidden="true" />
         <div className="container hero__inner">
           <div className="hero__content">
             <Reveal><span className="eyebrow"><Icon name="rocket" size={14} />تغییرات محصول</span></Reveal>

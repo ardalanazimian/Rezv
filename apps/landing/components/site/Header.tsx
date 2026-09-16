@@ -42,18 +42,33 @@ const NAV: NavItem[] = [
 export function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
+  const [onDark, setOnDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    // هدرِ شیشه‌ای روی بخشِ مشکی («شب») خودش تیره می‌شود — مثلِ نوارِ سراسریِ
+    // اپل. شیشه‌ی سفید روی مشکی خاکستریِ کدر دیده می‌شد (اسکرین‌شاتِ ۰۹-۱۳).
+    // چه چیزی زیرِ لبه‌ی پایینِ هدر است؟ یک elementFromPoint در هر فریمِ اسکرول،
+    // نه در هر رویداد؛ state فقط وقتی مقدار عوض شود رندر می‌سازد.
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      setScrolled(window.scrollY > 8);
+      const y = (document.querySelector('.site-header')?.getBoundingClientRect().bottom ?? 52) + 1;
+      const under = document.elementFromPoint(window.innerWidth / 2, y);
+      setOnDark(Boolean(under?.closest('.is-night')));
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
     // مقدارِ اولیه در فریمِ بعد خوانده می‌شود (نه همزمان با افکت): مرورگر ممکن
     // است اسکرولِ قبلی را بازیابی کرده باشد، ولی این نباید رندرِ آبشاری بسازد.
-    const raf = requestAnimationFrame(onScroll);
+    frame = requestAnimationFrame(update);
     window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
     return () => {
-      cancelAnimationFrame(raf);
+      if (frame) cancelAnimationFrame(frame);
       window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
     };
   }, []);
 
@@ -77,7 +92,7 @@ export function Header() {
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className={`site-header ${scrolled ? 'is-scrolled' : ''}`}>
+    <header className={`site-header${scrolled ? ' is-scrolled' : ''}${onDark && !menuOpen ? ' is-night' : ''}`}>
       <div className="container site-header__inner">
         <Link href="/" className="brand" aria-label={`${BRAND_NAME} — صفحه‌ی اصلی`}>
           <LogoMark size={30} />
@@ -137,10 +152,7 @@ export function Header() {
               صاحبانِ رستوران هم مشتریِ ما هستند و نباید بی‌مسیر بمانند. */}
           <Link href="/login" className="btn btn--ghost btn--sm site-header__aux">ورود</Link>
           <Link href="/demo" className="btn btn--ghost btn--sm site-header__aux">دموی رایگان</Link>
-          <Link href={appBase()} className="btn btn--primary btn--sm">
-            رزرو میز
-            <Icon name="arrowLeft" size={16} className="btn__arrow" />
-          </Link>
+          <Link href={appBase()} className="btn btn--primary btn--sm">رزرو میز</Link>
           <button
             type="button"
             className="btn btn--ghost btn--sm site-header__burger"
@@ -170,10 +182,7 @@ export function Header() {
             ),
           )}
           <div className="divider" style={{ margin: 'var(--sp-3) 0' }} />
-          <Link href={appBase()} className="btn btn--primary btn--block">
-            رزرو میز در رزرونو
-            <Icon name="arrowLeft" size={17} />
-          </Link>
+          <Link href={appBase()} className="btn btn--primary btn--block">رزرو میز در رزرونو</Link>
           <Link href="/login" className="btn btn--ghost btn--block">ورود به حساب</Link>
           <Link href="/demo" className="btn btn--ghost btn--block">شروعِ دموی ۳۰ روزه</Link>
         </nav>

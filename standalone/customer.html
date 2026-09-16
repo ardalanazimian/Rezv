@@ -345,7 +345,7 @@
 
 /* ── پلِ تم: اپ مشتری (دارک) — نگاشتِ semantic به توکن‌های موجود ── */
 :root {
-  --surface: var(--card-solid, #141026);
+  --surface: var(--card-solid, #1C1C1E);
   --surface-2: rgba(255,255,255,.05);
   --surface-hover: rgba(255,255,255,.06);
   --text-1: rgba(255,255,255,.95);
@@ -353,8 +353,8 @@
   --text-3: rgba(255,255,255,.45);
   --skeleton-base: rgba(255,255,255,.06);
   --skeleton-hi: rgba(255,255,255,.12);
-  --brand-500: #6A4BFF;
-  --brand-600: #5a3fe0;
+  --brand-500: #C8430F;
+  --brand-600: #B23A0C;
 }
 
 /* ⚠️ رفعِ رگرسیونِ merge (اندازه‌گیری‌شده ۲۰۲۶-۰۸-۲۴): این پل زمانی نوشته شد
@@ -368,9 +368,9 @@
   --surface: var(--card-solid, #FFFFFF);
   --surface-2: rgba(22, 15, 38, .05);
   --surface-hover: rgba(22, 15, 38, .06);
-  --text-1: var(--t1, #160F26);
-  --text-2: var(--t2, #5A5182);
-  --text-3: var(--t3, #6C6585);
+  --text-1: var(--t1, #1D1D1F);
+  --text-2: var(--t2, #5E5E63);
+  --text-3: var(--t3, #646469);
   --skeleton-base: rgba(22, 15, 38, .06);
   --skeleton-hi: rgba(22, 15, 38, .12);
 }
@@ -720,21 +720,27 @@
 */
 :root{
   /* brand — گرادیانِ امضا و رنگ‌های ثابت (مستقل از تم) */
-  --blue:#6A4BFF; --blue-600:#5B3BE0; --blue-50:#EEF0FE; --blue-100:#E0E2FC;
+  /* ۲۰۲۶-۰۹-۱۳ — «اپل + تیک‌تاک + اکسپلور» (دستورِ مالک): بنفشِ برند جای خود را به
+     همان اخرایِ لندینگ داد تا سایت و اپ یک محصول دیده شوند — گوشیِ صفحه‌ی اصلیِ
+     لندینگ همین اپ را نشان می‌دهد، پس رنگش هم باید همین باشد. نام‌های --blue*
+     تاریخی‌اند و دست نخوردند (صدها مصرف). #C8430F با متنِ سفید ۴٫۹:۱ است. */
+  --blue:#C8430F; --blue-600:#B23A0C; --blue-50:#FDF2EC; --blue-100:#FCE3D6;
   /* `--brand` در ۵ جا با var(--brand, …) مصرف می‌شد ولی **هیچ‌جا تعریف نشده بود**
      (ممیزیِ ۲۰۲۶-۰۸-۲۴). یعنی همیشه fallback اجرا می‌شد — و fallbackها یکی
      نبودند: `#2563EB` در یک‌جا و `#7c5cff` در چهار جایِ دیگر. پس کدی که
      توکنیزه به‌نظر می‌رسید، عملاً سه رنگِ متفاوت رندر می‌کرد. حالا تعریف شد و
      همه به همان بنفشِ برند می‌رسند. */
-  --brand:#6A4BFF;
+  --brand:#C8430F;
+  /* سفید روی برند، عکس و سطحِ تیره — همتای --brand-contrast ِ لندینگ؛ در هر دو تم ثابت */
+  --on-brand:#FFFFFF;
   /* ⚠️ رنگِ برند برایِ **متن** ≠ رنگِ برند برایِ **پُرکردن**. اندازه‌گیریِ واقعی:
      `--blue` به‌عنوانِ متن ۲٫۸۹:۱ رویِ نوارِ پایینِ تیره و ۳٫۹۱:۱ رویِ زمینه‌ی
      تیره می‌داد — زیرِ ۴٫۵ در WCAG 1.4.3 AA (متنِ ۱۰ تا ۱۲٫۵ پیکسل، یعنی
      دقیقاً جایی که خوانایی بیشترین اهمیت را دارد). خودِ `--blue` برایِ دکمه و
      آیکونِ پُر دست‌نخورده می‌ماند؛ فقط متن این نسخه را می‌گیرد.
      مقدارِ تمِ روشن رنگِ تازه‌ای نیست، همان `--blue-600`ِ موجود است. */
-  --blue-text:#5B3BE0;
-  --teal:#FF8A4B; --teal-600:#FF6A2B; --teal-50:#FDF3EC;
+  --blue-text:#B23A0C;
+  --teal:#E0791A; --teal-600:#B85F0E; --teal-50:#FDF5EB;
   /* ⚠️ سطحِ «تینتِ روشنِ ثابت» (--blue-50/--teal-50) عمداً مستقل از تم است، پس در
      تمِ تیره هم روشن می‌ماند. هر متنی که رویش می‌نشیند باید رنگِ **ثابتِ تیره**
      داشته باشد، نه توکنِ تم‌آگاه. باگِ واقعیِ رفع‌شده (۲۰۲۶-۰۸-۲۴): نوارِ
@@ -742,13 +748,27 @@
      تیره سفید است → سفید رویِ تینتِ روشن، نسبتِ ۱٫۱۳:۱ یعنی عملاً نامرئی؛ و
      چون تمِ پیش‌فرض تاریک است، این حالتِ عادیِ کاربر بود. */
   --on-tint:#160F26;
-  --grad:linear-gradient(135deg,#6A4BFF,#B23BFF 50%,#FF4B7A);
+  --grad:linear-gradient(135deg,#C8430F,#E0791A);
   /* `--grad` امضایِ بصریِ برند است و برایِ پُرکردنِ تزئینی و متنِ گرادیانی
      می‌ماند. ولی وقتی **متنِ سفید** رویش می‌نشیند، ایستگاهِ صورتیِ آخر
      (#FF4B7A) فقط ۳٫۲۱:۱ می‌دهد — زیرِ ۴٫۵. این نسخه همان مسیرِ رنگی با
      ایستگاه‌های عمیق‌تر است: ۵٫۱۷ / ۵٫۴۲ / ۴٫۵۴ — هر سه قبول.
      (کلِ --grad عوض نشد تا ظاهرِ برند در جاهای تزئینی دست‌نخورده بماند.) */
-  --grad-cta:linear-gradient(135deg,#6A4BFF,#9B2FE0 50%,#D93560);
+  /* دکمه‌ی کنش تخت است (اپل)؛ «گرادیانِ» یک‌رنگ تا هر background-imageی که این
+     توکن را می‌خواند معتبر بماند. */
+  --grad-cta:linear-gradient(#C8430F,#C8430F);
+  /* رنگِ محتوا — همان هشت «غذا»ی لندینگ (apps/landing/app/globals.css). روی
+     کاشیِ کشف، کارت و نمای تمام‌صفحه می‌نشیند؛ رنگِ برند نیست و در هر دو تم ثابت
+     است. gradFor (seed.js) به همین‌ها اشاره می‌کند. هر ایستگاه با متنِ سفید ≥ ۳٫۳:۱
+     (AA ِ متنِ درشت) — ممیزیِ «بدترین ایستگاه» در theme-contrast-audit همین را می‌سنجد. */
+  --dish-saffron:radial-gradient(120% 90% at 85% 8%,#C07F00 0%,transparent 58%),radial-gradient(90% 80% at 10% 100%,#B4380A 0%,transparent 62%),#D77011;
+  --dish-pomegranate:radial-gradient(110% 90% at 80% 0%,#FF465C 0%,transparent 55%),radial-gradient(100% 90% at 0% 100%,#5C0A1E 0%,transparent 65%),#A3132F;
+  --dish-pistachio:radial-gradient(120% 90% at 90% 10%,#739912 0%,transparent 55%),radial-gradient(90% 90% at 0% 100%,#1F4D19 0%,transparent 65%),#5A8F2A;
+  --dish-turquoise:radial-gradient(110% 90% at 85% 5%,#0B9BA6 0%,transparent 55%),radial-gradient(100% 90% at 5% 100%,#083F55 0%,transparent 65%),#0E7C93;
+  --dish-rosewater:radial-gradient(110% 90% at 80% 5%,#FF3B88 0%,transparent 55%),radial-gradient(100% 90% at 0% 100%,#7A1446 0%,transparent 65%),#D44B8A;
+  --dish-eggplant:radial-gradient(110% 90% at 85% 0%,#9874FF 0%,transparent 55%),radial-gradient(100% 90% at 0% 100%,#1C0B3D 0%,transparent 65%),#4B2A97;
+  --dish-charcoal:radial-gradient(90% 70% at 20% 100%,#FF4B0A 0%,transparent 55%),radial-gradient(100% 90% at 90% 0%,#3A3A3C 0%,transparent 60%),#111112;
+  --dish-tea:radial-gradient(110% 90% at 85% 5%,#CE760D 0%,transparent 55%),radial-gradient(100% 90% at 0% 100%,#3D1A05 0%,transparent 65%),#8A4412;
   --grad-warm:linear-gradient(135deg,#FF9A3B,#FF4B7A);
   --green:#12A150; --amber:#FF8A4B; --red:#FF4B6A;
   /* radius */
@@ -766,15 +786,17 @@
      لیستِ بازشده‌ی «کِی»/«چند نفر» با پس‌زمینه‌ی سفیدِ بومی رندر می‌شد
      (نه توکن‌های خودِ اپ) — دقیقاً چیزی که select/option در R5 اشاره کرده.*/
   color-scheme: dark;
-  --bg:#08050F; --white:rgba(255,255,255,.07);
+  --bg:#000000; --white:rgba(255,255,255,.07);
   /* `--t3` (متنِ کم‌رنگ) در تمِ تیره ۴٫۳۸:۱ رویِ نوارِ پایین می‌داد — زیرِ ۴٫۵،
      و برچسبِ نوارِ پایین فقط ۱۰ پیکسل است. یک پله روشن‌تر شد: حالا ۵٫۰۶:۱ رویِ
      نوار، ۶٫۸۶:۱ رویِ زمینه و ۶٫۲۹:۱ رویِ کارت. بی‌خطر است چون این توکن در هر
      ۳۰ مصرفش فقط `color:` است (نه پس‌زمینه/حاشیه)، پس روشن‌ترشدن صرفاً
      کنتراست را بالا می‌برد. قرینه‌ی همان تنظیمی که تمِ روشن قبلاً گرفته بود. */
-  --t1:#FFFFFF; --t2:#CBBEF2; --t3:#9A90C0;
+  /* ۰۹-۱۳: خاکستریِ خنثی به‌جای یاسیِ #CBBEF2 — رنگ از محتوا می‌آید، نه از متن.
+     هر دو روی مشکی بالای ۶:۱ (t2 ۷٫۸، t3 ۶٫۱). */
+  --t1:#FFFFFF; --t2:#A1A1A6; --t3:#8E8E93;
   --s-50:rgba(255,255,255,.04); --s-100:rgba(255,255,255,.07); --s-200:rgba(255,255,255,.10);
-  --s-300:rgba(255,255,255,.14); --s-400:#8F84B8; --s-500:#CBBEF2; --s-600:#E4DDF7; --s-700:#F2EEFB; --s-900:#FFFFFF;
+  --s-300:rgba(255,255,255,.14); --s-400:#8E8E93; --s-500:#A1A1A6; --s-600:#D1D1D6; --s-700:#E5E5EA; --s-900:#FFFFFF;
   /* ⚠️ باگِ واقعیِ رفع‌شده (ممیزیِ کنتراست ۲۰۲۶-۰۸-۲۴): `--s-900` انتهایِ
      پرکنتراستِ مقیاس است، پس بین دو تم **جا عوض می‌کند** (اینجا سفید، در تمِ
      روشن تقریباً سیاه). هرجا از آن به‌عنوانِ پس‌زمینه استفاده شده بود، رنگِ متن
@@ -783,46 +805,38 @@
      دو قربانی: چیپِ فیلترِ فعال و **متنِ toast** (تأیید/خطا).
      راه‌حل، جفتِ معناییِ گمشده است نه وصله‌ی موردی: هر سطحی رنگِ متنِ خودش را
      دارد و هر دو با هم می‌چرخند. */
-  --on-s-900:#160F26;
-  --blue-text:#9B86FF;   /* ۶٫۹۸:۱ روی زمینه، ۶٫۴۰:۱ روی کارت، ۵٫۱۵:۱ روی نوارِ پایین */
+  --on-s-900:#1D1D1F;
+  --blue-text:#FF8552;   /* اخرایِ روشن برای متن روی مشکی — همان --brand-ink ِ لندینگ */
   --border:rgba(255,255,255,.10); --border-strong:rgba(255,255,255,.16);
   /* شیشه‌ی مایع */
   --glass:rgba(255,255,255,.08); --glass-2:rgba(255,255,255,.13); --glass-edge:rgba(255,255,255,.24); --glass-hi:rgba(255,255,255,.55);
-  --card:rgba(255,255,255,.06); --card-solid:#141026;
+  --card:rgba(255,255,255,.07); --card-solid:#1C1C1E;
   /* سایه‌ها */
   --sh-sm:0 2px 8px rgba(0,0,0,.4); --sh:0 4px 14px rgba(0,0,0,.4); --sh-md:0 12px 34px rgba(0,0,0,.45);
-  --sh-lg:0 16px 42px rgba(0,0,0,.5); --sh-xl:0 24px 60px rgba(0,0,0,.55); --sh-blue:0 10px 26px rgba(106,75,255,.5);
-  /* پس‌زمینه‌ی مِش شبِ شهر */
-  --mesh:
-    radial-gradient(44% 38% at 84% 6%,#7C2BFF 0%,transparent 60%),
-    radial-gradient(48% 42% at 10% 2%,#2E5BFF 0%,transparent 62%),
-    radial-gradient(54% 50% at 90% 84%,#FF2E86 0%,transparent 60%),
-    radial-gradient(46% 44% at 6% 94%,#FF6A2B 0%,transparent 58%),
-    radial-gradient(70% 65% at 50% 45%,#170D3A 0%,transparent 72%);
+  --sh-lg:0 16px 42px rgba(0,0,0,.5); --sh-xl:0 24px 60px rgba(0,0,0,.55); --sh-blue:0 0 0 0 transparent;
+  /* مِشِ پنج‌رنگِ «شبِ شهر» (بنفش/آبی/صورتی) برداشته شد؛ مصرف‌کننده‌های باقی‌مانده
+     یک نورِ خنثیِ ملایم می‌گیرند. */
+  --mesh:radial-gradient(70% 60% at 50% 0%,#1C1C1E 0%,transparent 72%);
 }
 /* ═══════════ تمِ روشن ═══════════ */
 [data-theme="light"]{
   color-scheme: light; /* رجوع به توضیحِ همینِ تگ در بلوکِ [data-theme="dark"] */
-  --bg:#EEE9FA; --white:#FFFFFF;
+  --bg:#F5F5F7; --white:#FFFFFF;
   /* --t3 در تمِ روشن ۲٫۶۷:۱ بود (اندازه‌گیری‌شده روی .hcard-meta، .event-desc و
      برچسبِ .botnav-item) — زیرِ آستانه‌ی ۴٫۵ در WCAG 1.4.3 AA. همان رنگ‌مایه با
      ۷۳٪ روشنایی: حالا ۴٫۶۰:۱ روی زمینه‌ی صفحه و ۵٫۴۷:۱ روی کارتِ سفید.
      تمِ تاریک دست نخورد چون از قبل ۵٫۹۳:۱ بود. */
-  --t1:#160F26; --t2:#5A5182; --t3:#6C6585;
-  --s-50:#FBFAFF; --s-100:#F4F1FC; --s-200:#ECE7F8; --s-300:#E0DAF0;
-  --s-400:#948BB6; --s-500:#5A5182; --s-600:#433C66; --s-700:#2B2547; --s-900:#160F26;
+  /* ۰۹-۱۳: خاکستریِ خنثیِ اپل به‌جای یاسی. t2 و t3 روی #F5F5F7 هر دو ≥ ۴٫۶:۱ (سنجیده). */
+  --t1:#1D1D1F; --t2:#5E5E63; --t3:#646469;
+  --s-50:#FAFAFA; --s-100:#F2F2F4; --s-200:#E8E8ED; --s-300:#D2D2D7;
+  --s-400:#8E8E93; --s-500:#5E5E63; --s-600:#48484A; --s-700:#2C2C2E; --s-900:#1D1D1F;
   --on-s-900:#FFFFFF;   /* رجوع به توضیحِ همین توکن در بلوکِ تمِ تیره */
-  --border:rgba(22,15,38,.08); --border-strong:rgba(22,15,38,.14);
+  --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.14);
   --glass:rgba(255,255,255,.6); --glass-2:rgba(255,255,255,.78); --glass-edge:rgba(255,255,255,.92); --glass-hi:rgba(255,255,255,.95);
   --card:#FFFFFF; --card-solid:#FFFFFF;
-  --sh-sm:0 2px 8px rgba(124,43,255,.08); --sh:0 4px 14px rgba(124,43,255,.1); --sh-md:0 12px 30px rgba(124,43,255,.13);
-  --sh-lg:0 16px 40px rgba(124,43,255,.15); --sh-xl:0 24px 56px rgba(124,43,255,.16); --sh-blue:0 10px 26px rgba(106,75,255,.28);
-  --mesh:
-    radial-gradient(44% 38% at 84% 6%,#D9C2FF 0%,transparent 60%),
-    radial-gradient(48% 42% at 10% 2%,#C2D4FF 0%,transparent 62%),
-    radial-gradient(54% 50% at 90% 84%,#FFC7E0 0%,transparent 60%),
-    radial-gradient(46% 44% at 6% 94%,#FFDCC2 0%,transparent 58%),
-    radial-gradient(70% 65% at 50% 45%,#F6F1FF 0%,transparent 74%);
+  --sh-sm:0 2px 8px rgba(0,0,0,.05); --sh:0 4px 14px rgba(0,0,0,.06); --sh-md:0 12px 30px rgba(0,0,0,.08);
+  --sh-lg:0 16px 40px rgba(0,0,0,.1); --sh-xl:0 24px 56px rgba(0,0,0,.12); --sh-blue:0 0 0 0 transparent;
+  --mesh:radial-gradient(70% 60% at 50% 0%,#FFFFFF 0%,transparent 72%);
 }
 /* کلاس‌های شیشه و حرکت (قابل‌استفاده در کل اپ) */
 .glass{position:relative;background:var(--glass);-webkit-backdrop-filter:blur(22px) saturate(190%);backdrop-filter:blur(22px) saturate(190%);border:1px solid var(--border);box-shadow:var(--sh-md)}
@@ -1015,15 +1029,156 @@ img{display:block;max-width:100%}
       مرورگرِ با آن، هر دو فعال‌اند و تداخل ندارند (reveal روی .rc، drift روی .rc-bg،
       settle روی opacity/translate که reveal.in به none برمی‌گرداند — انیمیشن بعد از
       transition اعمال می‌شود و برنده است، پس عملاً settle حرف می‌زند). */
-html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:74px}
-#feed>.rc{scroll-snap-align:start;scroll-margin-top:12px}
+/* ⚠️ بازتصمیمِ DS-011 (۲۰۲۶-۰۹-۱۲) — فید موزاییکِ Explore شد و تایل‌ها **همچنان کلاسِ
+   rc دارند**، پس انتخابگرهای DS-008 بی‌صدا از کار نمی‌افتند؛ هر سه صریحاً تصمیم
+   گرفته شدند، نه رها (این مخزن برای «انتخابگری که بی‌صدا مچ نکرد» زخم دارد):
+   ۱) snapِ صفحه‌ای: **خاموش**. Explore snap نمی‌کند؛ snap کردنِ گریدِ ۳تایی به مرزِ
+      ردیف با کاربر می‌جنگد. snap فقط در نمای تمام‌صفحه (.im-feed، mandatory) زندگی
+      می‌کند — جایی که یک آیتم صاحبِ viewport است و کلِ معنایِ آن نما همین است.
+      scroll-padding-top می‌ماند: scrollIntoView (مناسبت‌ها) زیرِ navِ چسبان نمی‌رود.
+   ۲) settle-inِ اسکرول‌محور رویِ تایل: **می‌ماند** — همان #feed>.rc، همان keyframes.
+   ۳) پارالاکسِ پس‌زمینه (.rc-bg) رویِ تایل: **خاموش** — رویِ تایلِ ۱۳۰px فقط هزینه‌ی
+      paint است و دیده نمی‌شود؛ به نمای تمام‌صفحه (.im-bg، رسانه‌ی لبه‌به‌لبه) رفت.
+   reduced-motion: صریحاً animation:none — صفرکردنِ سراسریِ مدت، انیمیشنِ timeline‌محور
+   را خاموش نمی‌کند (DS-008 همین را اندازه گرفت). */
+html:has(#page-discover.active){scroll-padding-top:74px}
+#feed>.rc{scroll-margin-top:12px}
 @supports (animation-timeline: view()){
   #feed>.rc{animation:ds-settle-in linear both;animation-timeline:view();animation-range:entry 0% entry 55%}
-  #feed>.rc .rc-bg{animation:ds-bg-drift linear both;animation-timeline:view();animation-range:entry 0% cover 45%}
 }
 @media (prefers-reduced-motion: reduce){
   #feed>.rc,#feed>.rc .rc-bg{animation:none!important}
-  /* snap حرکت نیست؛ می‌ماند — ولی مقدارِ نرم (proximity) است، نه mandatory */
+}
+/* ═══ DS-011 (۲۰۲۶-۰۹-۱۲): کشف = Explore — موزاییکِ ۳ستونه، هر هفتمی ۲×۲ ═══
+   اندازه‌گیریِ پیش از این در ۳۹۰×۸۴۴: کارتِ ۲۷۰px تمام‌عرض → ۲ رستوران در هر صفحه.
+   تایل کلاسِ rc را نگه می‌دارد (گیتِ CIِ DS-007 و e2e با #feed .rc می‌شمارند)، پس
+   قواعدِ کارتِ قدیمی که به تایل نمی‌خورند (ارتفاعِ ۲۷۰، شعاعِ ۲۶، لیفتِ hover) همین‌جا
+   صریحاً خنثی می‌شوند. رنگ‌های رویِ تصویر (متن/اسکریم) از تم مستقل‌اند — عکس عکس
+   است — و به‌صورتِ توکنِ محلی تعریف شده‌اند تا یک‌جا عوض شوند. */
+/* ⚠️ لبه‌به‌لبه بودن از خودِ ظرف می‌آید: `.section{padding:28px 0}` (پایین‌تر در cascade،
+   shorthand) پدینگِ افقیِ `.wrap.section` را صفر می‌کند — محاسبه‌شده‌اش در ۳۹۰px صفر
+   است (اندازه‌گیری‌شده). نسخه‌ی اولِ این قاعده یک margin-inline منفی هم می‌داد و
+   گرید ۴۳۰px می‌شد: در RTL سرریزِ چپ، viewportِ چیدمان را به ۴۱۰ باز می‌کرد و کلِ
+   صفحه ۲۰px جابه‌جا می‌شد. با اندازه‌گیری گرفته شد، نه با نگاه به اسکرین‌شات. */
+/* ۰۹-۱۳: همیشه ۳ ستون. با ۴ و ۵ ستون، شش رستوران (یک ۲×۲ + پنج) در دسکتاپ یک خانه‌ی
+   خالی می‌گذاشت (اسکرین‌شاتِ ۱۴۴۰px)؛ ۴+۵=۹ فقط در ۳ ستون مستطیلِ کامل است. اکسپلورِ
+   اینستاگرام روی وب هم ۳ستونه است و عرضش را محدود می‌کند — پایین‌تر، #page-discover. */
+.xgrid{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-flow:row dense;gap:calc(var(--sp-1) / 2);
+  --xt-ink:rgba(255,255,255,.96);--xt-ink-2:rgba(255,255,255,.82);--xt-scrim:rgba(0,0,0,.66)}
+.xgrid>.xt{position:relative;display:block;height:auto;aspect-ratio:1;overflow:hidden;border-radius:0;cursor:pointer;background:var(--s-100);transition:none}
+.xgrid>.xt.xt-hero{grid-column:span 2;grid-row:span 2}
+.xgrid>.xt:hover{transform:none;box-shadow:none}
+.xgrid>.xt:active{transform:scale(.985)}
+.xgrid>.feed-more{margin-block-start:var(--sp-3)}
+#feed.xgrid>.rc .rc-bg{animation:none;transition:none}
+.xt-photo,.im-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity var(--motion-slow) var(--ease-out)}
+.xt-photo.in,.im-photo.in{opacity:1}
+/* ۰۹-۱۳: نامِ غذا (اولین بخشِ cuisine) با وزنِ ۹۰۰ به‌جای ایموجیِ کم‌رنگ. ایموجی روی هر
+   سیستم‌عامل شکلِ دیگری دارد و روی ویندوز تخت و کارتونی دیده شد؛ واژه همه‌جا یکی است و
+   همان زبانِ کاشی‌های لندینگ است. اندازه از طولِ واژه (--len) می‌آید و به عرضِ خودِ کاشی
+   (cqi) بسته است، پس در کاشیِ ۲×۲ خودبه‌خود دو برابر می‌شود و هیچ واژه‌ای بریده نمی‌شود.
+   ⚠️ واژه **داخلِ** `.rc-bg` است نه کنارش: ممیزیِ کنتراست پس‌زمینه را از جدِ DOM می‌خواند؛
+   کنارِ لایه‌ی گرادیان، زمینه‌ی خاکستریِ خودِ کاشی دیده می‌شد و سفید روی آن ۱٫۱۱:۱ گزارش
+   می‌شد (e2e، ۰۹-۱۳). داخلش، با ایستگاه‌های واقعیِ گرادیان سنجیده می‌شود. عکس هم در
+   همان لایه append می‌شود و `.has-photo` واژه را پنهان می‌کند. */
+.xgrid>.xt{container-type:inline-size}
+.xt-word{position:absolute;z-index:1;inset-inline:var(--sp-2);inset-block-start:34%;translate:0 -50%;pointer-events:none;white-space:nowrap;
+  font-size:min(24cqi,calc(96cqi / var(--len,4)));font-weight:var(--weight-display);line-height:var(--lh-tight);letter-spacing:var(--ls-normal);color:var(--xt-ink);text-shadow:0 2px 18px rgba(0,0,0,.22)}
+.xt-hero .xt-word{inset-block-start:38%}
+.has-photo .xt-word,.has-photo .im-word{display:none}
+/* دکمه‌ی کشیده: کلِ تایل یک دکمه‌ی واقعی است (فوکوسِ کیبورد، :focus-visible). زیرِ
+   قلبِ هیرو (۴) و بالای پس‌زمینه؛ کپشن (۳) pointer-events ندارد و لمس به دکمه می‌رسد. */
+.xt-tap{position:absolute;inset:0;z-index:2;border:none;background:none;padding:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+.xt-tap:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
+.xt-cap{position:absolute;inset-inline:0;inset-block-end:0;z-index:3;pointer-events:none;min-width:0;display:flex;flex-direction:column;gap:var(--sp-1);
+  padding:var(--sp-6) var(--sp-2) var(--sp-2);background:linear-gradient(to top,var(--xt-scrim),transparent);color:var(--xt-ink)}
+.xt-hero .xt-cap{padding:var(--sp-10) var(--sp-3) var(--sp-3)}
+.xt-name{font-size:var(--fs-sm);font-weight:var(--weight-emphasis);line-height:var(--lh-snug);letter-spacing:var(--ls-snug);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xt-hero .xt-name{font-size:var(--fs-xl);font-weight:var(--weight-display);line-height:var(--lh-tight);letter-spacing:var(--ls-tight)}
+.xt-row{display:flex;align-items:center;gap:var(--sp-2);min-width:0}
+.xt-hero .xt-row{flex-wrap:wrap;row-gap:var(--sp-1)}
+.xt-hero .rc-meta{flex-basis:100%}   /* سطرِ خودش، وگرنه «۸٪ کش‌بک» پشتِ امتیاز و چیپ بریده می‌شد (دیده‌شده در رندر) */
+.xt .rc-rating{font-size:var(--fs-xs);gap:2px}
+.xt .rc-rating-new{font-size:var(--fs-2xs)}
+.xt .rc-meta{font-size:var(--fs-xs);margin-top:0;color:var(--xt-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.xt-social{font-size:var(--fs-2xs);color:var(--xt-ink-2)}
+.xt-social b{color:var(--xt-ink)}
+.xt .rc-fav{z-index:4}
+.xt-badge{position:absolute;inset-block-start:var(--sp-2);inset-inline-start:var(--sp-2);z-index:3;pointer-events:none;display:inline-flex;align-items:center;gap:2px;
+  font-size:var(--fs-2xs);font-weight:var(--weight-display);color:var(--xt-ink);padding:2px var(--sp-2);border-radius:var(--radius-pill);background:linear-gradient(135deg,var(--warning),var(--danger))}
+.xt-badge.ai{background:var(--grad)}
+.xt-sk{background:var(--s-100)}
+
+/* ═══ DS-011: نمای تمام‌صفحه (immersive) — یک رستوران، یک صفحه؛ snapِ mandatory ═══
+   z-index ۱۱۰: بالای nav (۱۰۰) و botnav (۹۰)، زیرِ undo-snack (۱۲۰)، شیتِ رزرو (۲۰۰) و
+   toast (۳۰۰) — رزرو از داخلِ همین نما باز می‌شود و باید رویش بنشیند.
+   پس‌زمینه از تم مستقل است (تیک‌تاک در هر دو تم سیاه است). RTL: فقط inset-inline-*. */
+#page-immersive{position:fixed;inset:0;z-index:110;--im-bg:rgb(0,0,0);--xt-ink:rgba(255,255,255,.96);--xt-ink-2:rgba(255,255,255,.8);
+  background:var(--im-bg);color:var(--xt-ink)}
+.im-feed{position:relative;height:100vh;height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.im-feed::-webkit-scrollbar{display:none}
+.im-item{position:relative;height:100vh;height:100dvh;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;outline:none}
+.im-item:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
+.im-bg{position:absolute;inset:0;z-index:0}
+/* ── پرکردنِ صادقانه‌ی میانه‌ی صفحه وقتی عکسی نیست (حالتِ رایج: فهرستِ عمومی فیلدِ تصویر
+   ندارد) — فقط دادهٔ واقعیِ همین رکورد: ایموجیِ هویت، vibeها، تا سه قلمِ واقعیِ منو
+   (اگر جزئیات رسیده)، نشانی/فاصله (فقط اگر واقعاً می‌دانیم)، و در پنلِ پایین همان
+   اثباتِ اجتماعیِ کارت. هر بلوکِ بی‌داده اصلاً نیست — نه صفر، نه «—»، نه اسکلت.
+   با آمدنِ عکس کلِ این لایه کنار می‌رود: عکس خودش محتواست. رنگِ زمینه‌ی چیپ/کارت تیره
+   است نه سفیدِ شیشه‌ای، چون رویِ روشن‌ترین گرادیانِ پالت متنِ سفید باید خوانا بماند. */
+.im-fill{position:absolute;inset-inline:0;inset-block-start:calc(var(--touch-min) + var(--sp-8) + env(safe-area-inset-top,0px));inset-block-end:40%;z-index:3;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;gap:var(--sp-3);padding:0 var(--sp-6);pointer-events:none;text-align:center;overflow:hidden}
+.has-photo .im-fill{display:none}
+.im-word{max-width:100%;white-space:nowrap;font-size:clamp(var(--fs-4xl),calc(78vw / var(--len,4)),calc(var(--fs-4xl) * 2.6));font-weight:var(--weight-display);line-height:var(--lh-tight);letter-spacing:var(--ls-normal);color:var(--xt-ink);text-shadow:0 4px 30px rgba(0,0,0,.25)}
+.im-vibes{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--sp-2)}
+.im-vibes:empty{display:none}
+.im-vibe{font-size:var(--fs-xs);font-weight:var(--weight-emphasis);color:var(--xt-ink);padding:var(--sp-1) var(--sp-3);border-radius:var(--radius-pill);
+  background:rgba(8,6,20,.4);border:1px solid rgba(255,255,255,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.im-menu{width:100%;max-width:320px;text-align:start;padding:var(--sp-3) var(--sp-4);border-radius:var(--radius-surface);background:rgba(8,6,20,.48);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.im-item:not(.im-has-menu) .im-menu{display:none}
+.im-menu-h{font-size:var(--fs-2xs);font-weight:var(--weight-emphasis);color:var(--xt-ink-2);margin-block-end:var(--sp-2)}
+.im-menu-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--sp-2)}
+.im-menu-item{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-sm);color:var(--xt-ink)}
+.im-menu-e{font-size:var(--fs-lg);line-height:1;flex:none}
+.im-menu-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:var(--weight-emphasis)}
+.im-menu-p{flex:none;font-size:var(--fs-xs);color:var(--xt-ink-2);font-variant-numeric:tabular-nums}
+.im-addr{display:inline-flex;align-items:center;gap:var(--sp-1);font-size:var(--fs-xs);color:var(--xt-ink);padding:var(--sp-1) var(--sp-3);border-radius:var(--radius-pill);background:rgba(8,6,20,.4)}
+.im-item:not(.im-has-addr) .im-addr{display:none}
+.im-item .rc-social{margin-top:0}
+.im-item:not(.im-has-social) .im-social{display:none}
+.im-scrim{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(to top,rgba(8,6,20,.94) 0%,rgba(8,6,20,.6) 34%,transparent 62%),linear-gradient(to bottom,rgba(8,6,20,.55),transparent 24%)}
+.im-info{position:absolute;inset-inline-start:0;inset-inline-end:calc(var(--touch-min) + var(--sp-6));inset-block-end:0;z-index:3;min-width:0;
+  display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-2);padding:var(--sp-4) var(--sp-5) calc(var(--sp-6) + env(safe-area-inset-bottom,0px))}
+.im-info .xt-badge{position:static}
+.im-name{font-size:var(--fs-2xl);font-weight:var(--weight-display);line-height:var(--lh-tight);letter-spacing:var(--ls-tight);display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2);margin:0}
+.im-line{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);font-size:var(--fs-sm);font-weight:var(--weight-emphasis);color:var(--xt-ink-2)}
+.im-line .rc-rating{font-size:var(--fs-sm)}
+.im-meta:empty,.im-social:empty{display:none}
+.im-social{font-size:var(--fs-xs);color:var(--xt-ink-2)}
+.im-item:not(.im-demo) .demo-chip{display:none}
+.im-item:not(.im-hot) .im-hotbadge{display:none}
+.im-item.im-no-cb .im-cb{display:none}
+.im-item .rc-slots{flex-wrap:wrap;margin-top:var(--sp-1)}
+.im-open{display:inline-flex;align-items:center;gap:var(--sp-2);min-height:var(--touch-min);padding:0 var(--sp-4);margin-top:var(--sp-1);cursor:pointer;
+  border-radius:var(--radius-pill);border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.14);color:var(--xt-ink);font-family:inherit;font-size:var(--fs-sm);font-weight:var(--weight-emphasis);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.im-open:focus-visible,.im-rail-btn:focus-visible,.im-close:focus-visible,.im-rail .rc-fav:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.im-rail{position:absolute;inset-inline-end:var(--sp-3);inset-block-end:calc(var(--sp-16) + var(--sp-8) + env(safe-area-inset-bottom,0px));z-index:4;display:flex;flex-direction:column;align-items:center;gap:var(--sp-3)}
+.im-rail .rc-fav{position:static;background:rgba(0,0,0,.38)}
+.im-rail-btn,.im-close{width:var(--touch-min);height:var(--touch-min);border-radius:50%;border:none;cursor:pointer;display:grid;place-items:center;color:var(--xt-ink);background:rgba(0,0,0,.38);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.im-close{position:absolute;inset-block-start:calc(var(--sp-3) + env(safe-area-inset-top,0px));inset-inline-start:var(--sp-3);z-index:5}
+.im-count{position:absolute;inset-block-start:calc(var(--sp-3) + env(safe-area-inset-top,0px));inset-inline-end:var(--sp-4);z-index:5;pointer-events:none;
+  font-size:var(--fs-xs);font-weight:var(--weight-emphasis);font-variant-numeric:tabular-nums;color:var(--xt-ink-2);padding:var(--sp-1) var(--sp-3);border-radius:var(--radius-pill);background:rgba(0,0,0,.35)}
+.im-count:empty{display:none}
+/* پارالاکسِ DS-008 اینجا زندگی می‌کند (رسانه‌ی تمام‌صفحه)؛ اسکرولر همان .im-feed است. */
+@supports (animation-timeline: view()){
+  .im-feed .im-bg{animation:ds-bg-drift linear both;animation-timeline:view();animation-range:entry 0% cover 45%}
+}
+@media (prefers-reduced-motion: reduce){
+  .im-feed .im-bg{animation:none!important}   /* صریح: صفرکردنِ مدت، timeline را خاموش نمی‌کند */
+  .xt-photo,.im-photo{transition:none}
 }
 /* دکمه‌ی «رستوران‌های بیشتر» فرزندِ مستقیمِ #feed است؛ باید کلِ عرضِ گرید را
    بگیرد نه یک سلول را. min-height برای هدفِ لمسیِ ≥۴۴px. */
@@ -1122,6 +1277,9 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 .hscroll::-webkit-scrollbar{display:none}
 .hcard{flex:0 0 160px;scroll-snap-align:start;cursor:pointer}
 .hcard-img{height:110px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:44px;position:relative;margin-bottom:8px}
+/* ۰۹-۱۳: همان واژه‌ی غذا روی کارتِ افقی (به‌جای ایموجیِ ۴۴px) */
+.hcard-img{container-type:inline-size;justify-content:flex-start;align-items:flex-end;overflow:hidden}
+.hcard-word{margin:var(--sp-3);white-space:nowrap;font-size:min(22cqi,calc(88cqi / var(--len,4)));font-weight:var(--weight-display);line-height:var(--lh-tight);color:rgba(255,255,255,.96);text-shadow:0 2px 14px rgba(0,0,0,.22)}
 .hcard-tag{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:50px;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 .hcard-name{font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hcard-meta{font-size:12px;color:var(--t3);margin-top:2px}
@@ -1166,10 +1324,10 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 .lac-body{flex:1}.lac-title{font-size:15px;font-weight:700;color:var(--t1)}.lac-sub{font-size:12.5px;color:var(--t3);margin-top:2px}
 .lac-arrow{font-size:22px;color:var(--t3)}
 /* ── دعوت دوستان ── */
-.ref-code-box{background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px dashed #A78BFA;border-radius:16px;padding:16px;text-align:center;position:relative}
-.ref-code-label{font-size:12px;color:#7C3AED;margin-bottom:6px}
-.ref-code{font-size:26px;font-weight:800;letter-spacing:3px;color:#5B21B6;font-family:monospace}
-.ref-copy{position:absolute;top:14px;left:14px;background:#7C3AED;color:#fff;border:none;padding:5px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.ref-code-box{background:var(--blue-50);border:2px dashed var(--blue);border-radius:var(--radius-lg);padding:16px;text-align:center;position:relative}
+.ref-code-label{font-size:var(--fs-xs);color:var(--blue-text);margin-bottom:6px}
+.ref-code{font-size:var(--fs-2xl);font-weight:800;letter-spacing:3px;color:var(--on-tint);font-family:monospace}
+.ref-copy{position:absolute;top:14px;left:14px;background:var(--blue);color:var(--on-brand);border:none;padding:5px 14px;border-radius:var(--radius-xs);font-size:var(--fs-xs);font-weight:700;cursor:pointer;font-family:inherit}
 .ref-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
 .ref-stat{background:var(--s-50,#f8fafc);border-radius:12px;padding:12px;text-align:center}
 .ref-stat-v{font-size:20px;font-weight:800;color:var(--t1)}.ref-stat-l{font-size:11px;color:var(--t3);margin-top:2px}
@@ -1286,7 +1444,7 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 .onb-card{position:relative;width:100%;max-width:380px;background:var(--card,#12131a);border:1px solid var(--s-200,rgba(255,255,255,.08));border-radius:24px;padding:36px 24px 24px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.5);transform:translateY(12px) scale(.98);transition:transform .2s var(--spring,cubic-bezier(.34,1.56,.64,1))}
 .onb-overlay.show .onb-card{transform:none}
 .onb-skip{position:absolute;top:14px;left:16px;background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:6px 8px;min-height:24px}
-.onb-emoji{font-size:64px;line-height:1;margin:8px 0 18px}
+.onb-emoji{display:flex;align-items:center;justify-content:center;width:72px;height:72px;margin:4px auto 18px;border-radius:50%;background:var(--blue);color:var(--on-brand)}
 .onb-title{font-size:21px;font-weight:800;color:var(--t1);margin-bottom:10px}
 .onb-text{font-size:14px;color:var(--t2);line-height:1.8;margin-bottom:22px}
 .onb-dots{display:flex;gap:7px;justify-content:center;margin-bottom:22px}
@@ -1323,8 +1481,8 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 .sheet-overlay.show{display:flex;animation:fadeUp .2s}
 .sheet{background:var(--white);border-radius:var(--r-2xl) var(--r-2xl) 0 0;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;
   padding:10px 22px 30px;animation:slideUp var(--t-slow) var(--ease);box-shadow:var(--sh-xl)}
-.sheet-handle{width:38px;height:4px;border-radius:2px;background:var(--s-300);margin:8px auto 18px}
-.sheet-title{font-size:20px;font-weight:800;letter-spacing:-.03em;margin-bottom:4px}
+.sheet-handle{width:36px;height:5px;border-radius:var(--radius-full);background:var(--s-300);margin:8px auto 18px}
+.sheet-title{font-size:var(--fs-2xl);font-weight:900;letter-spacing:0;margin-bottom:4px}
 .sheet-sub{font-size:13px;color:var(--t2);margin-bottom:20px}
 
 /* booking: stepper */
@@ -1358,18 +1516,18 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 .sum-row+.sum-row{border-top:1px solid var(--border)}
 .sum-row .k{color:var(--t2)}.sum-row .v{font-weight:700}
 .reward-row{display:flex;gap:10px;margin-bottom:18px}
-.reward{flex:1;background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:13px;text-align:center}
+.reward{flex:1;background:var(--s-50);border:none;border-radius:var(--r-lg);padding:13px;text-align:center}
 .reward .rv{font-size:18px;font-weight:800}
 .reward .rv.blue{color:var(--blue)}.reward .rv.teal{color:var(--teal-600)}
 .reward .rl{font-size:11px;color:var(--t2);margin-top:1px}
 
 /* success */
 .success{text-align:center;padding:8px 0}
-.success-check{width:72px;height:72px;border-radius:50%;background:var(--teal-50);display:flex;align-items:center;justify-content:center;
+.success-check{width:72px;height:72px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;
   margin:0 auto 18px;animation:pop .5s var(--spring)}
-.success-check svg{width:38px;height:38px;color:var(--teal-600)}
-.code-box{background:var(--s-50);border:1px dashed var(--border-strong);border-radius:var(--r);padding:16px;margin:18px 0;text-align:center}
-.code-box .cl{font-size:11px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.success-check svg{width:38px;height:38px;color:var(--on-brand)}
+.code-box{background:var(--s-50);border:none;border-radius:var(--r-lg);padding:16px;margin:18px 0;text-align:center}
+.code-box .cl{font-size:var(--fs-xs);color:var(--t2);font-weight:600;text-transform:none;letter-spacing:0}
 .code-box .cv{font-size:26px;font-weight:800;letter-spacing:.12em;color:var(--t1);margin-top:4px}
 .copy-btn{margin-top:10px;background:var(--white);border:1px solid var(--border);border-radius:var(--r-xs);padding:7px 14px;
   font-size:12px;font-weight:700;color:var(--blue);cursor:pointer;transition:all var(--t-fast)}
@@ -1398,38 +1556,41 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 .icon-btn{width:40px;height:40px;border-radius:50%;background:var(--white);border:1px solid var(--border);cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:all var(--t-fast)}
 .icon-btn:hover{background:var(--s-50);border-color:var(--border-strong)}
-.rp-section{padding:22px 0;border-bottom:1px solid var(--border)}
-.rp-section h3{font-size:18px;font-weight:800;letter-spacing:-.02em;margin-bottom:14px}
+.rp-section{padding:28px 0 6px}
+.rp-section h3{font-size:var(--fs-2xl);font-weight:900;letter-spacing:0;margin-bottom:14px}
+/* کاشیِ تخت — جانشینِ .glass روی سطوحِ محتوایی (DS-010 §۲‑۲: شیشه فقط دو نوار) */
+.tile{background:var(--s-50);border-radius:var(--r-lg);padding:16px}
 .rp-about{color:var(--t2);line-height:1.7;font-size:15px}
 /* وضعیتِ خالیِ صادقانه برایِ بخش‌های درباره/منو/نظرها — وقتی رستورانِ زنده
    این فیلدها را ندارد (رجوع کن به mapApiRestaurant در api.js) */
 .rp-empty{color:var(--t3);font-size:13.5px;line-height:1.7;padding:4px 0}
 .feat-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.feat{display:flex;align-items:center;gap:7px;padding:8px 13px;background:var(--s-50);border-radius:var(--r-sm);font-size:13px;font-weight:600;color:var(--t1)}
+.feat{display:flex;align-items:center;gap:7px;min-height:36px;padding:6px 14px;background:var(--s-100);border-radius:var(--radius-full);font-size:var(--fs-sm);font-weight:600;color:var(--t1)}
+.feat svg{color:var(--blue-text)}
 /* menu preview */
 .menu-list{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.menu-item{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--border);border-radius:var(--r);transition:all var(--t-fast)}
-.menu-item:hover{border-color:var(--border-strong);box-shadow:var(--sh-sm)}
+.menu-item{display:flex;align-items:center;gap:11px;padding:14px 16px;background:var(--s-50);border:none;border-radius:var(--r-lg);transition:background-color var(--t-fast)}
+.menu-item:hover{background:var(--s-100);box-shadow:none;transform:none}
 .menu-emoji{width:44px;height:44px;border-radius:11px;background:var(--s-50);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
 .menu-info{flex:1;min-width:0}
-.menu-name{font-size:14px;font-weight:700}
-.menu-price{font-size:12px;color:var(--t2);margin-top:1px}
+.menu-name{font-size:var(--fs-lg);font-weight:700}
+.menu-price{font-size:var(--fs-sm);color:var(--t2);margin-top:2px;font-variant-numeric:tabular-nums}
 /* ratings breakdown */
 .rb-grid{display:grid;grid-template-columns:auto 1fr;gap:14px 20px;align-items:center;margin-bottom:20px}
 .rb-overall{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px 0 4px;border-left:1px solid var(--border)}
-.rb-big{font-size:46px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.rb-big{font-size:var(--fs-4xl);font-weight:900;letter-spacing:0;line-height:1}
 .rb-stars{color:var(--amber);font-size:14px;margin-top:4px}
 .rb-count{font-size:12px;color:var(--t2);margin-top:3px}
 .rb-bars{display:flex;flex-direction:column;gap:9px}
 .rb-bar-row{display:flex;align-items:center;gap:10px;font-size:13px}
 .rb-bar-row .rl{width:64px;color:var(--t2);font-weight:600}
 .rb-track{flex:1;height:7px;background:var(--s-100);border-radius:4px;overflow:hidden}
-.rb-fill{height:100%;border-radius:4px;background:var(--s-900);transition:width 1s var(--ease)}
+.rb-fill{height:100%;border-radius:var(--radius-full);background:var(--t1);transition:width var(--motion-sheet) var(--ease)}
 .rb-bar-row .rv{width:28px;text-align:left;font-weight:700;font-size:12px}
 /* AI review summary */
-.ai-review{color:var(--on-tint);background:linear-gradient(120deg,var(--blue-50),var(--teal-50));border:1px solid var(--blue-100);border-radius:var(--r-lg);padding:18px;margin-bottom:20px}
+.ai-review{color:var(--t1);background:var(--s-50);border:none;border-radius:var(--r-lg);padding:18px;margin-bottom:20px}
 .ai-review-head{display:flex;align-items:center;gap:9px;margin-bottom:14px}
-.ai-review-head .icn{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px}
+.ai-review-head .icn{width:30px;height:30px;border-radius:var(--radius-xs);background:var(--blue);display:flex;align-items:center;justify-content:center;color:var(--on-brand);font-size:var(--fs-md)}
 .ai-review-head .ttl{font-size:14px;font-weight:800}
 .ai-review-head .tag{margin-right:auto;font-size:10px;font-weight:700;color:var(--blue);background:var(--white);padding:3px 9px;border-radius:50px}
 .ai-col{margin-bottom:12px}
@@ -1440,40 +1601,36 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 .ai-point .ic.bad{background:#FEE2E2;color:#DC2626}
 /* review card */
 .review{padding:16px 0;border-top:1px solid var(--border);display:flex;gap:12px}
-.review-ava{width:42px;height:42px;border-radius:50%;background:var(--s-100);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.review-ava{width:42px;height:42px;border-radius:50%;background:var(--s-900);color:var(--on-s-900);display:flex;align-items:center;justify-content:center;font-size:var(--fs-lg);font-weight:800;flex-shrink:0}
 .review-body{flex:1}
 .review-top{display:flex;align-items:center;justify-content:space-between}
-.review-name{font-size:14px;font-weight:700}
+.review-name{font-size:var(--fs-lg);font-weight:700}
 .review-date{font-size:12px;color:var(--t3)}
 .review-stars{color:var(--amber);font-size:13px;margin:3px 0 6px}
 .review-text{font-size:14px;color:var(--t2);line-height:1.6}
 /* booking widget (sticky) */
 .book-widget{background:var(--white);border:1px solid var(--border);border-radius:var(--r-xl);padding:22px;box-shadow:var(--sh-lg);position:sticky;top:130px}
 /* ─── Hero صفحه رستوران ─── */
-.rp-hero{position:relative;height:340px;display:flex;align-items:flex-end;overflow:hidden}
-.rp-hero .rp-hero-bg{position:absolute;inset:0;z-index:0;transition:transform 8s var(--ease)}
-.rp-hero.loaded .rp-hero-bg{transform:scale(1.08)}
-.rp-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.16),transparent 60%);pointer-events:none;z-index:1}
+/* ۰۹-۱۳: هیرو = همان کاشیِ کشف در مقیاسِ بزرگ — رنگِ غذا، واژه‌ی درشت، بدونِ مِشِ متحرک و
+   ایموجیِ شناور (DS-010 §۲‑۳: حلقه‌ی تزئینی ممنوع). container-type تا واژه با عرضِ هیرو مقیاس بگیرد. */
+.rp-hero{position:relative;height:clamp(340px,42vw,460px);display:flex;align-items:flex-end;overflow:hidden;container-type:inline-size}
+.rp-hero .rp-hero-bg{position:absolute;inset:0;z-index:0}
+.rp-hero-word{position:absolute;z-index:1;inset-inline-start:5cqi;inset-block-start:26%;pointer-events:none;white-space:nowrap;
+  font-size:min(22cqi,calc(88cqi / var(--len,4)),calc(var(--fs-4xl) * 5));font-weight:var(--weight-display);line-height:var(--lh-tight);color:rgba(255,255,255,.96);text-shadow:0 4px 30px rgba(0,0,0,.25)}
+@media(min-width:880px){.rp-hero-word{inset-block-start:18%}}
 .rp-hero-back{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:15px;background:rgba(0,0,0,.32);-webkit-backdrop-filter:blur(14px) saturate(180%);backdrop-filter:blur(14px) saturate(180%);border:1px solid rgba(255,255,255,.18);font-size:20px;font-weight:800;cursor:pointer;z-index:3;display:flex;align-items:center;justify-content:center;color:#fff;transition:transform .2s var(--spring)}
 .rp-hero-back:active{transform:scale(.88)}
 .rp-hero-actions{position:absolute;top:16px;left:16px;display:flex;gap:8px;z-index:3}
 .rp-hero-icon{width:44px;height:44px;border-radius:15px;background:rgba(0,0,0,.32);-webkit-backdrop-filter:blur(14px) saturate(180%);backdrop-filter:blur(14px) saturate(180%);border:1px solid rgba(255,255,255,.18);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;transition:transform .2s var(--spring)}
 .rp-hero-icon:active{transform:scale(.88)}
-.rp-hero-emoji{position:absolute;top:44%;left:50%;transform:translate(-50%,-58%);font-size:96px;filter:drop-shadow(0 10px 30px rgba(0,0,0,.4));z-index:1;animation:rpFloat 5s ease-in-out infinite}
-@keyframes rpFloat{0%,100%{transform:translate(-50%,-58%)}50%{transform:translate(-50%,-64%)}}
-.rp-hero-mesh{position:absolute;inset:0;z-index:1;pointer-events:none;background:
-  radial-gradient(40% 55% at 78% 18%,rgba(255,255,255,.28),transparent 60%),
-  radial-gradient(45% 50% at 20% 25%,rgba(255,138,75,.35),transparent 62%),
-  radial-gradient(50% 60% at 60% 80%,rgba(106,75,255,.32),transparent 60%);
-  mix-blend-mode:screen;animation:rpMesh 12s ease-in-out infinite alternate}
-@keyframes rpMesh{0%{opacity:.7;transform:scale(1)}100%{opacity:1;transform:scale(1.15)}}
 .rp-hero-badges{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .rp-hero-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;padding:6px 12px;border-radius:100px;background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.24);color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.3)}
 .rp-hero-badge.live{background:rgba(18,161,80,.28);border-color:rgba(52,211,153,.5)}
 /* صداقتِ داده: رستوران/رزروی که از دادهٔ نمونه/آفلاین می‌آید (نه بک‌اندِ واقعی) */
 .rp-hero-badge.demo{background:rgba(194,65,12,.34);border-color:rgba(251,146,60,.55)}
-.rp-hero-overlay{position:relative;z-index:2;width:100%;padding:60px 20px 22px;background:linear-gradient(to top,rgba(4,3,10,.85),rgba(4,3,10,.25) 60%,transparent);color:#fff}
-.rp-hero-name{font-size:32px;font-weight:900;letter-spacing:-.03em;margin-bottom:8px;text-shadow:0 2px 16px rgba(0,0,0,.5);line-height:1.05}
+.rp-hero-overlay{position:relative;z-index:2;width:100%;padding:60px 20px 22px;background:linear-gradient(to top,rgba(0,0,0,.72),rgba(0,0,0,.2) 60%,transparent);color:var(--on-brand)}
+@media(min-width:880px){.rp-hero-overlay{padding-inline:max(20px,calc((100% - 1100px)/2))}}
+.rp-hero-name{font-size:clamp(var(--fs-3xl),7.5vw,var(--fs-4xl));font-weight:900;letter-spacing:0;margin-bottom:8px;text-shadow:0 2px 16px rgba(0,0,0,.4);line-height:1.15}
 .rp-hero-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;opacity:.96;text-shadow:0 1px 8px rgba(0,0,0,.5);font-weight:600}
 .rp-hero-rate{display:inline-flex;align-items:center;gap:4px;font-weight:800}
 .rp-hero-dot{opacity:.5}
@@ -1482,23 +1639,25 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 /* ─── نوار رزرو پایین (شناور) ─── */
 .rp-bookbar{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:95;box-shadow:0 -4px 20px rgba(0,0,0,.08);max-width:480px;margin:0 auto}
 .rp-bookbar-info{flex:1;min-width:0}
-.rp-bookbar-cb{font-size:15px;font-weight:800;color:var(--teal)}
+.rp-bookbar-cb{font-size:var(--fs-md);font-weight:800;color:var(--blue-text)}
 .rp-bookbar-sub{font-size:12px;color:var(--t3);margin-top:2px}
 .rp-bookbar-btn{padding:14px 32px;font-size:15px;font-weight:700;white-space:nowrap;flex-shrink:0}
 .bs-head{margin-bottom:18px}
-.bs-title{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.bs-title{font-size:var(--fs-2xl);font-weight:900;letter-spacing:0}
 .bs-rest{font-size:14px;color:var(--t2);margin-top:2px}
 .bw-price{display:flex;align-items:baseline;gap:6px;margin-bottom:4px}
 .bw-cb{font-size:13px;font-weight:700;color:var(--teal-600);margin-bottom:18px;display:flex;align-items:center;gap:5px}
-.bw-field{border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;margin-bottom:10px;cursor:pointer;transition:border-color var(--t-fast)}
-.bw-field:hover{border-color:var(--border-strong)}
-.bw-field label{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:2px}
+/* ۰۹-۱۳: فیلدهای شیت مثلِ فهرستِ گروهیِ iOS — کاشیِ خاکستریِ بدونِ حاشیه، برچسبِ ریز، مقدارِ ۱۷px.
+   همان <select>ها می‌مانند (رفتار و تست‌ها به #bwDate/#bwParty/#bwTime بسته‌اند)؛ فقط پوسته عوض شد. */
+.bw-field{background:var(--s-50);border:none;border-radius:var(--r-lg);padding:10px 16px;margin-bottom:8px;cursor:pointer;transition:background-color var(--t-fast)}
+.bw-field:hover{background:var(--s-100)}
+.bw-field label{font-size:var(--fs-xs);font-weight:600;color:var(--t2);text-transform:none;letter-spacing:0;display:block;margin-bottom:0}
 /* اندازه‌گیری شده بود ۱۷px ارتفاع — روی ورودی‌های خودِ قیفِ رزرو، یعنی جایی که
    خطای لمس مستقیماً تبدیل را از دست می‌دهد. کادرِ کلیک به ۴۴px می‌رسد بدونِ
    اینکه ارتفاعِ بصریِ فیلد عوض شود (label بالای آن است، مجموع همچنان جمع‌وجور). */
-.bw-field select,.bw-field input{border:none;outline:none;width:100%;font-size:14px;font-weight:600;color:var(--t1);background:none;cursor:pointer;
+.bw-field select,.bw-field input{border:none;outline:none;width:100%;font-size:var(--fs-lg);font-weight:600;color:var(--t1);background:none;cursor:pointer;
   min-block-size:var(--touch-min);font-family:inherit}
-.bw-field:focus-within{border-color:var(--blue)}
+.bw-field:focus-within{box-shadow:0 0 0 2px color-mix(in srgb,var(--blue) 55%,transparent)}
 
 /* ─────────── LOYALTY ─────────── */
 .loy-card{background:linear-gradient(125deg,var(--blue),var(--teal));border-radius:var(--r-2xl);padding:28px;color:#fff;position:relative;overflow:hidden;box-shadow:var(--sh-lg)}
@@ -1516,8 +1675,8 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
   font-size:13px;color:var(--t2);line-height:1.6}
 .loy-noexpire svg{flex:none;color:var(--ok,#16A34A)}
 .perks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:20px}
-.perk{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;text-align:center}
-.perk-emoji{font-size:26px;margin-bottom:8px}
+.perk{background:var(--s-50);border:none;border-radius:var(--r-lg);padding:18px 16px;text-align:center}
+.perk-emoji{display:flex;justify-content:center;color:var(--blue-text);margin-bottom:10px}
 .perk-name{font-size:13px;font-weight:700;margin-bottom:2px}
 .perk-desc{font-size:11px;color:var(--t2)}
 .badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
@@ -1641,13 +1800,13 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
    جسور، تیره، گرادیانی، قابل‌اسکرین‌شات
    ═══════════════════════════════════════════════ */
 .dna-entry{margin:0 0 16px;border-radius:var(--r-xl);padding:22px 20px;cursor:pointer;position:relative;overflow:hidden;
-  background:linear-gradient(135deg,#4F46E5 0%,#7C3AED 55%,#E8925A 130%);color:#fff;transition:transform var(--t) var(--spring)}
+  background:var(--dish-eggplant);color:var(--on-brand);transition:transform var(--t) var(--spring)}
 .dna-entry:active{transform:scale(.98)}
 .dna-entry::after{content:"";position:absolute;top:-30%;right:-10%;width:180px;height:180px;background:radial-gradient(circle,rgba(255,255,255,.25),transparent 70%)}
 .dna-entry-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;background:rgba(255,255,255,.18);padding:5px 12px;border-radius:20px;margin-bottom:14px;position:relative}
 .dna-entry-title{font-size:22px;font-weight:900;letter-spacing:-.03em;line-height:1.15;position:relative;margin-bottom:6px}
 .dna-entry-sub{font-size:13.5px;opacity:.9;position:relative;line-height:1.6}
-.dna-entry-cta{margin-top:14px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;background:#fff;color:#4F46E5;padding:9px 16px;border-radius:12px;position:relative}
+.dna-entry-cta{margin-top:14px;display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);font-weight:700;background:var(--on-brand);color:var(--on-tint);padding:9px 16px;border-radius:var(--radius-md);position:relative}
 
 /* صفحه‌ی تمام‌قد DNA (اسلایدهای Wrapped) */
 .dna-overlay{position:fixed;inset:0;z-index:2000;background:#0B1020;display:none;flex-direction:column;overflow:hidden}
@@ -1672,12 +1831,12 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 .dna-tap{position:absolute;inset:0;display:flex;z-index:8}
 .dna-tap>div{flex:1}
 /* اسلاید نهایی: کارت اشتراک */
-.dna-share-card{background:linear-gradient(150deg,#4F46E5,#7C3AED 60%,#E8925A);border-radius:var(--r-2xl);padding:28px 24px;width:100%;max-width:320px;box-shadow:0 24px 64px rgba(0,0,0,.5)}
+.dna-share-card{background:var(--dish-eggplant);border-radius:var(--r-2xl);padding:28px 24px;width:100%;max-width:320px;box-shadow:0 24px 64px rgba(0,0,0,.5)}
 .dna-share-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.18)}
 .dna-share-row:last-child{border-bottom:none}
 .dna-share-k{font-size:13.5px;color:rgba(255,255,255,.85);font-weight:600}
 .dna-share-v{font-size:16px;font-weight:800;color:#fff}
-.dna-share-btn{margin-top:22px;width:100%;background:#fff;color:#4F46E5;border:none;border-radius:14px;padding:15px;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.dna-share-btn{margin-top:22px;width:100%;background:var(--on-brand);color:var(--on-tint);border:none;border-radius:var(--radius-lg);padding:15px;font-family:inherit;font-size:var(--fs-md);font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
 .dna-badge-persona{display:inline-block;background:rgba(255,255,255,.2);color:#fff;font-size:13px;font-weight:700;padding:6px 14px;border-radius:20px;margin-top:10px}
 /* ═══ اثبات اجتماعی امن (فعالیت گذشته، نه موقعیت زنده) ═══ */
 .rc-social{display:flex;align-items:center;gap:7px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border)}
@@ -1736,6 +1895,8 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
    ۰٫۵۰ کمینه‌ای است که بدترین حالت را به ۴٫۶۱:۱ می‌رساند. */
 /* محتوا باید بالای اسکریمِ ::after بنشیند، وگرنه خودِ متن هم کم‌جان می‌شود. */
 .occ-card > *{position:relative;z-index:1}
+/* ۰۹-۱۳: ایموجیِ بالای کارتِ مناسبت رفت؛ برچسب به پایینِ کارت می‌نشیند (مثلِ کاشی). */
+.occ-card{justify-content:flex-end}
 .occ-card:active{transform:scale(.96)}
 .occ-card.on{outline:3px solid var(--t1);outline-offset:2px}
 /* اسکریمِ خوانایی. قبلاً «transparent 40% → rgba(0,0,0,.28)» بود و متنِ سفیدِ
@@ -1750,29 +1911,28 @@ html:has(#page-discover.active){scroll-snap-type:y proximity;scroll-padding-top:
 .occ-sub{font-size:11px;color:rgba(255,255,255,.9);position:relative;margin-top:2px;font-weight:600}
 
 /* ═══ Trips: گالریِ خاطراتِ سینمایی (نسل‌Z) ═══ */
-.trips-summary{display:flex;align-items:center;justify-content:space-around;background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:var(--r-xl);padding:16px 8px;margin-bottom:20px}
+.trips-summary{display:flex;align-items:center;justify-content:space-around;background:var(--s-50);border:none;border-radius:var(--r-xl);padding:18px 8px;margin-bottom:20px}
 .ts-stat{text-align:center;flex:1}
-.ts-v{font-size:24px;font-weight:900;color:var(--t1);line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.ts-v{font-size:var(--fs-2xl);font-weight:900;color:var(--t1);line-height:1}
 .ts-l{font-size:11px;color:var(--t3);margin-top:5px;font-weight:600}
-.ts-div{width:1px;height:32px;background:var(--glass-brd)}
-.trip-card{background:var(--s-50);border:1px solid var(--glass-brd);border-radius:var(--r-2xl);overflow:hidden;margin-bottom:16px;box-shadow:var(--sh-sm);transition:transform .3s var(--spring),box-shadow .3s var(--ease)}
+.ts-div{width:1px;height:32px;background:var(--border)}
+.trip-card{background:var(--card-solid);border:none;border-radius:var(--r-2xl);overflow:hidden;margin-bottom:16px;box-shadow:none;transition:transform var(--motion-slow) var(--spring),box-shadow var(--motion-slow) var(--ease)}
 .trip-card:active{transform:scale(.98)}
-.trip-card.up{box-shadow:0 0 0 1.5px var(--blue-a,rgba(106,75,255,.3)),var(--sh-md)}
-.trip-card-hero{position:relative;height:96px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.trip-card-mesh{position:absolute;inset:0;background:radial-gradient(50% 60% at 75% 20%,rgba(255,255,255,.28),transparent 60%),radial-gradient(55% 60% at 20% 80%,rgba(255,138,75,.32),transparent 62%);mix-blend-mode:screen;animation:rpMesh 12s ease-in-out infinite alternate}
-.trip-card-emoji{font-size:52px;filter:drop-shadow(0 6px 16px rgba(0,0,0,.35));z-index:1;animation:rpFloat 5s ease-in-out infinite}
+.trip-card.up{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--blue) 40%,transparent)}
+.trip-card-hero{position:relative;height:104px;display:flex;align-items:flex-end;justify-content:flex-start;overflow:hidden;container-type:inline-size}
+.trip-card-word{margin:12px 16px;white-space:nowrap;font-size:min(11cqi,calc(44cqi / var(--len,4)));font-weight:var(--weight-display);line-height:var(--lh-tight);color:rgba(255,255,255,.96);text-shadow:0 2px 14px rgba(0,0,0,.22)}
 .trip-card-status{position:absolute;top:12px;right:12px;z-index:1;font-size:11px;font-weight:800;padding:5px 11px;border-radius:100px;background:rgba(255,255,255,.2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.28);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.3)}
 .trip-card-status.up{background:rgba(18,161,80,.32);border-color:rgba(52,211,153,.5)}
 .trip-card-status.cancelled{background:rgba(0,0,0,.28)}
 .trip-card-body{padding:16px}
-.trip-card-name{font-size:17px;font-weight:800;color:var(--t1);margin-bottom:8px}
+.trip-card-name{font-size:var(--fs-xl);font-weight:800;color:var(--t1);margin-bottom:8px}
 .trip-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--t2);margin-bottom:6px}
 .tcm-dot{color:var(--t4)}
 .trip-card-code{font-size:12px;color:var(--t3)}
 .trip-card-code b{color:var(--t1);letter-spacing:.5px}
 .trip-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .trips-empty{text-align:center;padding:60px 20px}
-.trips-empty-emoji{font-size:64px;margin-bottom:16px;animation:rpFloat 5s ease-in-out infinite}
+.trips-empty-emoji{font-size:var(--fs-4xl);margin-bottom:16px}
 .trips-empty-title{font-size:18px;font-weight:800;color:var(--t1)}
 .trips-empty-sub{font-size:14px;color:var(--t3);margin-top:4px}
 
@@ -1794,7 +1954,7 @@ button,[role="button"],.botnav-item,a{min-height:0}
 /* ═══ Waitlist: تجربه‌ی سینمایی (نسل‌Z) ═══ */
 .wl-join-hero{position:relative;height:88px;border-radius:var(--r-2xl);overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:linear-gradient(135deg,#6A4BFF,#9D4EDD)}
 .wl-join-mesh{position:absolute;inset:0;background:radial-gradient(50% 60% at 78% 20%,rgba(255,255,255,.3),transparent 60%),radial-gradient(55% 60% at 18% 82%,rgba(255,138,75,.35),transparent 62%);mix-blend-mode:screen;animation:rpMesh 11s ease-in-out infinite alternate}
-.wl-join-emoji{font-size:46px;z-index:1;filter:drop-shadow(0 6px 16px rgba(0,0,0,.3));animation:rpFloat 5s ease-in-out infinite}
+.wl-join-emoji{font-size:var(--fs-4xl);z-index:1;filter:drop-shadow(0 6px 16px rgba(0,0,0,.3))}
 .wl-join .wl-benefits{display:flex;flex-direction:column;gap:10px}
 .wl-benefit{display:flex;align-items:center;gap:12px;text-align:right;background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:var(--r-lg);padding:12px 14px}
 .wl-bene-ic{font-size:22px;flex-shrink:0}
@@ -1803,7 +1963,7 @@ button,[role="button"],.botnav-item,a{min-height:0}
 /* بنر آفر (میز آماده شد) — سینمایی */
 .wl-offer-banner{position:relative;overflow:hidden;background:linear-gradient(135deg,#12A150,#16A34A);border-radius:var(--r-2xl);padding:24px 16px;box-shadow:0 12px 40px rgba(18,161,80,.35)}
 .wl-offer-mesh{position:absolute;inset:0;background:radial-gradient(50% 60% at 75% 15%,rgba(255,255,255,.32),transparent 60%),radial-gradient(50% 55% at 20% 85%,rgba(255,255,255,.18),transparent 62%);mix-blend-mode:screen;animation:rpMesh 8s ease-in-out infinite alternate}
-.wl-offer-emoji{display:block;text-align:center;font-size:44px;position:relative;animation:rpFloat 3s ease-in-out infinite}
+.wl-offer-emoji{display:block;text-align:center;font-size:var(--fs-4xl);position:relative}
 .wl-timer{text-align:center;font-size:30px;font-weight:900;color:#fff;letter-spacing:2px;margin:10px 0 4px;position:relative;font-variant-numeric:tabular-nums}
 /* حلقه‌ی موقعیت در صف — با پالسِ زنده */
 .wl-position-ring{position:relative;width:132px;height:132px;margin:8px auto;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--grad);box-shadow:0 10px 34px rgba(106,75,255,.4)}
@@ -1871,7 +2031,8 @@ button,[role="button"],.botnav-item,a{min-height:0}
 
 /* Swipe-actions روی کارت‌های رزرو (C16) */
 .trip-card.has-swipe{position:relative}
-.trip-card-inner{position:relative;z-index:1;background:var(--s-50);border-radius:inherit;
+/* ۰۹-۱۳: سطحِ مات. با var(--s-50) (۴٪ سفید در تمِ تاریک) پدِ قرمزِ swipe از پشتِ کارت دیده می‌شد (اسکرین‌شات). */
+.trip-card-inner{position:relative;z-index:1;background:var(--card-solid);border-radius:inherit;
   transition:transform .3s var(--spring);will-change:transform}
 .trip-card.swiping .trip-card-inner{transition:none}
 .trip-swipe-pad{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;
@@ -1906,7 +2067,21 @@ button,[role="button"],.botnav-item,a{min-height:0}
 .rp-gallery-item img{width:210px;height:140px;object-fit:cover;border-radius:var(--radius-lg,14px);display:block;background:var(--s-100,#222)}
 .rp-gallery-item figcaption{font-size:11.5px;color:var(--t3);margin-top:4px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp-address{font-size:13px;color:var(--t2);display:flex;align-items:center;gap:6px;margin-top:8px}
-.menu-thumb{width:44px;height:44px;border-radius:11px;object-fit:cover;display:block}
+.menu-thumb{width:44px;height:44px;border-radius:var(--radius-sm);object-fit:cover;display:block}
+
+/* ═══ ۰۹-۱۳: کشف روی دسکتاپ — یک ستونِ هم‌عرض، نه نوارهای راست‌چینِ نیمه‌پر ═══
+   پیش از این در ۱۴۴۰px ردیفِ مناسبت‌ها (۶ × ۱۰۴px) و چیپ‌ها به راست چسبیده بودند و
+   نیمه‌ی چپِ صفحه خالی بود، در حالی که شبکه ۱۱۴۰px عرض داشت (اسکرین‌شاتِ ۰۹-۱۳).
+   حالا همه‌ی صفحه‌ی کشف در عرضِ اکسپلورِ وبِ اینستاگرام (۹۳۵px) می‌نشیند: مناسبت‌ها
+   شش ستونِ برابر، چیپ‌ها می‌شکنند، شبکه همان سه ستون. */
+@media(min-width:880px){
+  #page-discover .wrap{max-width:975px}
+  #page-discover .occ-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));overflow:visible}
+  #page-discover .occ-card{width:auto}
+  #page-discover .chips{flex-wrap:wrap;overflow:visible}
+  /* بخشِ فید پدینگِ افقی ندارد (لبه‌به‌لبه روی موبایل)؛ روی دسکتاپ با ردیف‌های بالا هم‌لبه می‌شود */
+  #page-discover .wrap.section{padding-inline:var(--sp-5)}
+}
 
 </style>
 <style data-src="css/ds-bridge.css">
@@ -2112,36 +2287,36 @@ button,[role="button"],.botnav-item,a{min-height:0}
 
   <div class="wrap">
     <div class="occ-wrap">
-      <div class="occ-q">امشب چه خبره؟ 🎉</div>
+      <div class="occ-q">امشب چه خبره؟</div>
       <div class="occ-row" id="occRow">
-        <div class="occ-card" style="background:linear-gradient(135deg,#f093fb,#f5576c)" onclick="pickOccasion('date',this)">
-          <div class="occ-emoji">💕</div><div><div class="occ-label">قرار عاشقانه</div><div class="occ-sub">دنج و رمانتیک</div></div>
+        <div class="occ-card" style="background:var(--dish-pomegranate)" onclick="pickOccasion('date',this)">
+          <div><div class="occ-label">قرار عاشقانه</div><div class="occ-sub">دنج و رمانتیک</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#4facfe,#00f2fe)" onclick="pickOccasion('friends',this)">
-          <div class="occ-emoji">🎊</div><div><div class="occ-label">با رفقا</div><div class="occ-sub">شلوغ و باحال</div></div>
+        <div class="occ-card" style="background:var(--dish-turquoise)" onclick="pickOccasion('friends',this)">
+          <div><div class="occ-label">با رفقا</div><div class="occ-sub">شلوغ و باحال</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#fa709a,#fee140)" onclick="pickOccasion('birthday',this)">
-          <div class="occ-emoji">🎂</div><div><div class="occ-label">تولد</div><div class="occ-sub">خاص و به‌یادموندنی</div></div>
+        <div class="occ-card" style="background:var(--dish-rosewater)" onclick="pickOccasion('birthday',this)">
+          <div><div class="occ-label">تولد</div><div class="occ-sub">خاص و به‌یادموندنی</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#667eea,#764ba2)" onclick="pickOccasion('business',this)">
-          <div class="occ-emoji">💼</div><div><div class="occ-label">قرار کاری</div><div class="occ-sub">آروم و رسمی</div></div>
+        <div class="occ-card" style="background:var(--dish-charcoal)" onclick="pickOccasion('business',this)">
+          <div><div class="occ-label">قرار کاری</div><div class="occ-sub">آروم و رسمی</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#30cfd0,#330867)" onclick="pickOccasion('solo',this)">
-          <div class="occ-emoji">🧘</div><div><div class="occ-label">تنهایی</div><div class="occ-sub">یه جای دنج</div></div>
+        <div class="occ-card" style="background:var(--dish-eggplant)" onclick="pickOccasion('solo',this)">
+          <div><div class="occ-label">تنهایی</div><div class="occ-sub">یه جای دنج</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#f6d365,#fda085)" onclick="pickOccasion('family',this)">
-          <div class="occ-emoji">👨‍👩‍👧</div><div><div class="occ-label">خانواده</div><div class="occ-sub">راحت برای همه</div></div>
+        <div class="occ-card" style="background:var(--dish-saffron)" onclick="pickOccasion('family',this)">
+          <div><div class="occ-label">خانواده</div><div class="occ-sub">راحت برای همه</div></div>
         </div>
       </div>
     </div>
     <div class="chips" id="chips">
-      <button class="chip active" onclick="filterVibe('all',this)">✨ همه</button>
-      <button class="chip" onclick="filterVibe('رمانتیک',this)">💫 رمانتیک</button>
-      <button class="chip" onclick="filterVibe('آروم',this)">🌿 آروم</button>
-      <button class="chip" onclick="filterVibe('لوکس',this)">👑 لوکس</button>
-      <button class="chip" onclick="filterVibe('ویو',this)">🌆 ویو</button>
-      <button class="chip" onclick="filterVibe('سریع',this)">⚡ سریع</button>
-      <button class="chip" onclick="filterVibe('خانوادگی',this)">👨‍👩‍👧 خانوادگی</button>
+      <button class="chip active" onclick="filterVibe('all',this)">همه</button>
+      <button class="chip" onclick="filterVibe('رمانتیک',this)">رمانتیک</button>
+      <button class="chip" onclick="filterVibe('آروم',this)">آروم</button>
+      <button class="chip" onclick="filterVibe('لوکس',this)">لوکس</button>
+      <button class="chip" onclick="filterVibe('ویو',this)">ویو</button>
+      <button class="chip" onclick="filterVibe('سریع',this)">سریع</button>
+      <button class="chip" onclick="filterVibe('خانوادگی',this)">خانوادگی</button>
     </div>
   </div>
 
@@ -2168,11 +2343,12 @@ button,[role="button"],.botnav-item,a{min-height:0}
 
   <div class="wrap section">
     <div class="section-head">
-      <div><div class="section-title" id="feedTitle">🔥 محبوب امشب</div><div class="section-sub">رستوران‌های فعال</div></div>
+      <div><div class="section-title" id="feedTitle">محبوب امشب</div><div class="section-sub">رستوران‌های فعال</div></div>
     </div>
     <!-- نوارِ زنده: با دادهٔ واقعی از /restaurants/live-stats پر می‌شود (features/live-strip.js). -->
     <div class="live-strip" id="liveStrip" aria-live="polite"></div>
-    <div class="grid" id="feed"></div>
+    <!-- DS-011: موزاییکِ Explore — کلاسِ `.grid` مالِ علاقه‌مندی‌هاست و دست نخورده می‌ماند. -->
+    <div class="xgrid" id="feed"></div>
   </div>
 
   <!-- نزدیک تو -->
@@ -2185,15 +2361,24 @@ button,[role="button"],.botnav-item,a{min-height:0}
 
   <!-- ترند هفته -->
   <div class="wrap section">
-    <div class="section-head"><div><div class="section-title">📈 ترند این هفته</div><div class="section-sub">پرطرفدارترین‌های اخیر</div></div></div>
+    <div class="section-head"><div><div class="section-title">ترند این هفته</div><div class="section-sub">پرطرفدارترین‌های اخیر</div></div></div>
     <div class="hscroll" id="trendingScroll"></div>
   </div>
 
   <!-- رویدادهای ویژه -->
   <div class="wrap section" id="eventsSection">
-    <div class="section-head"><div><div class="section-title">🎉 رویدادهای ویژه</div><div class="section-sub">شب‌های خاص رستوران‌ها</div></div></div>
+    <div class="section-head"><div><div class="section-title">رویدادهای ویژه</div><div class="section-sub">شب‌های خاص رستوران‌ها</div></div></div>
     <div class="events-list" id="eventsList"></div>
   </div>
+</div>
+
+<!-- ═══════════ IMMERSIVE (DS-011: اسکرولِ تمام‌صفحه‌ی تیک‌تاکی؛ features/immersive.js) ═══════════ -->
+<div id="page-immersive" class="page" role="region" aria-label="مرورِ تمام‌صفحه‌ی رستوران‌ها">
+  <button type="button" class="im-close" onclick="closeImmersive()" aria-label="بستنِ مرورِ تمام‌صفحه">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="im-count" id="imCount" aria-live="polite"></div>
+  <div class="im-feed" id="imFeed"></div>
 </div>
 
 <!-- ═══════════ RESTAURANT PROFILE (Airbnb-style) ═══════════ -->
@@ -2571,10 +2756,13 @@ function bookingErrorKind(error) {
 
 /* ═══ js/data/seed.js ═══ */
 // ═══ رزرونو — داده‌های نمونه: رستوران‌ها، گرادیان، مزایا، نشان‌ها (بخشی از اپ کاستومر) ═══
+// ۰۹-۱۳: به‌جای شش گرادیانِ خطیِ Tailwind، به هشت «غذا»ی مشترکِ اپ و لندینگ اشاره
+// می‌کند (--dish-* در css/app.css). همان کلیدهای ۱..۶ و همان خانواده‌ی رنگ (سبز،
+// نارنجی، کهربایی، فیروزه‌ای، قرمز، بنفش) تا هیچ رستورانی رنگش را عوض‌شده نبیند.
 const GRAD = {
-  1:'linear-gradient(135deg,#34D399,#059669)', 2:'linear-gradient(135deg,#FB923C,#EA580C)',
-  3:'linear-gradient(135deg,#FBBF24,#D97706)', 4:'linear-gradient(135deg,#22D3EE,#0891B2)',
-  5:'linear-gradient(135deg,#F87171,#DC2626)', 6:'linear-gradient(160deg,#818CF8,#4F46E5 60%,#1E1B4B)'
+  1:'var(--dish-pistachio)', 2:'var(--dish-saffron)',
+  3:'var(--dish-tea)', 4:'var(--dish-turquoise)',
+  5:'var(--dish-pomegranate)', 6:'var(--dish-eggplant)'
 };
 // گرادیانِ پس‌زمینه برای هر رستوران — GRAD با کلیدِ عددیِ ۱..۶ ساخته شده بود،
 // ولی idِ رستورانِ واقعی UUID است؛ GRAD[uuid] همیشه undefined می‌شد و کارت/هیرو
@@ -2586,6 +2774,20 @@ function gradFor(id){
   const k = String(id ?? '');
   let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
   return GRAD[(h % 6) + 1];
+}
+/**
+ * واژه‌ی درشتِ کاشی/کارت/نمای تمام‌صفحه (۰۹-۱۳، جانشینِ ایموجی): اولین بخشِ `cuisine`
+ * («ایتالیایی · فیوژن» → «ایتالیایی»)، وگرنه اولین واژه‌ی نام بدونِ «[DEMO]». فقط متن
+ * است و در قالب همیشه از esc می‌گذرد. مثلِ gradFor تزئینی است و ادعای داده‌ای ندارد.
+ */
+function dishWord(r){
+  const c = String(r?.cuisine || '').split(/[·،,/]/)[0].trim();
+  if (c) return c;
+  return String(r?.n || '').replace(/\[DEMO\]/g, '').trim().split(/\s+/)[0] || '';
+}
+/** طولِ دیداریِ واژه برای اندازه‌ی فونت (--len) — نیم‌فاصله حرف نیست. */
+function dishLen(w){
+  return Math.max(2, String(w).replace(/\u200c/g, '').length);
 }
 // ═══════════════════════════════════════════════════════════
 //  DS-006 §۴ — شکلِ آیتمِ منو: یک قرارداد، نه دو
@@ -4337,9 +4539,10 @@ function go(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('[data-nav]').forEach(n=>n.classList.toggle('active',n.dataset.nav===p));
-  // در صفحه‌ی رستوران، نوار ناوبری مخفی می‌شود تا نوار رزرو پایین بنشیند
+  // در صفحه‌ی رستوران، نوار ناوبری مخفی می‌شود تا نوار رزرو پایین بنشیند؛
+  // در نمای تمام‌صفحه (immersive) هم — آنجا یک رستوران کلِ صفحه را دارد.
   const botnav=document.querySelector('.botnav');
-  if(botnav)botnav.style.display=(p==='rest'||p==='chat')?'none':'';
+  if(botnav)botnav.style.display=(p==='rest'||p==='chat'||p==='immersive')?'none':'';
   window.scrollTo({top:0,behavior:'instant'});
   if(p==='favorites')renderFavs();
   if(p==='trips')renderTrips();
@@ -4377,7 +4580,9 @@ function slotsHTML(r){
  */
 function paintSlots(list){
   const byId = new Map((list||[]).map(r=>[String(r.id), r]));
-  document.querySelectorAll('#feed .rc[data-rid]').forEach(card=>{
+  // دو مصرف‌کننده، یک نقاش: کارت‌های فید (اگر جایی برای چیپ داشته باشند) و
+  // آیتم‌های نمای تمام‌صفحه (features/immersive.js) که همین چیپ‌ها را می‌خواهند.
+  document.querySelectorAll('#feed .rc[data-rid], #imFeed .im-item[data-rid]').forEach(card=>{
     const r = byId.get(card.dataset.rid);
     if(!r) return;
     const box = card.querySelector('.rc-slots');
@@ -4421,6 +4626,131 @@ function cardHTML(r){
     </div>
   </article>`;
 }
+// ═══ DS-011 (۲۰۲۶-۰۹-۱۲): کشف = Explore ═══════════════════════════════
+//  حکمِ مالک: صفحه‌ی کشف باید مثلِ Explore اینستاگرام باشد (موزاییکِ متراکم) و
+//  لمسِ هر تایل مثلِ اسکرولِ زنده‌ی تیک‌تاک (تمام‌صفحه، یک رستوران در هر صفحه —
+//  features/immersive.js). اندازه‌گیریِ پیش از این: کارتِ ۲۷۰px تمام‌عرض یعنی
+//  **۲ رستوران در هر صفحه‌ی ۳۹۰×۸۴۴**؛ و هیچ عکسی در فید نبود.
+//
+//  `cardHTML` دست نخورده می‌ماند — علاقه‌مندی‌ها (reservation.js) هنوز همان را
+//  می‌کشد. `tileHTML` رندرِ تازه‌ی فید است.
+//
+//  ⚠️ تایل کلاسِ `rc` را نگه می‌دارد: `tools/measure-home-s1.mjs` (گیتِ CI،
+//  DS-007) «کارتِ رستوران در فید» را با `#feed .rc` می‌شمارد و e2e هم همین را
+//  می‌خواند. تایل یک کارتِ رستوران است؛ کلاس دروغ نمی‌گوید. قواعدِ CSSِ کارتِ
+//  قدیمی که به تایل نمی‌خورند (ارتفاعِ ۲۷۰، شعاعِ ۲۶، لیفتِ hover) در app.css
+//  صریحاً برایِ `.xgrid>.xt` خنثی شده‌اند.
+//
+//  عکس: فهرستِ عمومی (/restaurants) هیچ فیلدِ تصویری ندارد؛ عکس فقط از
+//  جزئیات (loadRestaurantDetail → applyRestaurantDetail → r.photos) می‌آید.
+//  پس تایل با گرادیانِ هویتی (gradFor) رندر می‌شود و وقتی دیده شد، جزئیات
+//  را می‌خواهد و اگر عکسی بود رویِ گرادیان محو می‌شود. رستورانِ نمونه slug
+//  ندارد، پس هرگز عکس نمی‌گیرد — درست و صادقانه؛ هیچ تصویری اختراع نمی‌شود.
+let FEED_LIST = [];
+/** فهرستی که فید همین الان از آن رندر شده (بعد از فیلترِ چیپ/مناسبت/جست‌وجو). */
+function feedList(){ return FEED_LIST; }
+function tileHTML(r, i){
+  const hero = i % 7 === 0;             // ریتمِ Explore: هر هفتمی ۲×۲؛ dense بقیه را پر می‌کند
+  const hasRt = Number.isFinite(r.rt) && r.rt > 0;
+  const on = favHas(r.id);
+  const badge = isHot(r)
+    ? `<span class="xt-badge">${icon('flame',{size:12,fill:true})} داغ</span>`
+    : r.ai ? `<span class="xt-badge ai">${icon('sparkle',{size:12,fill:true})} AI</span>` : '';
+  // تایلِ کوچک هیچ دکمه‌ای جز خودش ندارد (Explore هم ندارد — کنترلِ ۴۴px داخلِ
+  // ۱۳۰px شلوغی است). قلب فقط رویِ هیروی ۲×۲؛ چیپِ ساعت و بقیه در نمای تمام‌صفحه.
+  return `<article class="rc xt${hero?' xt-hero':''}" data-rid="${esc(String(r.id))}">
+    <div class="rc-bg" style="background:${gradFor(r.id)}"><span class="xt-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</span></div>
+    <button type="button" class="xt-tap" aria-label="دیدنِ ${esc(r.n)}" onclick="openImmersive(${jsq(String(r.id))})"></button>
+    ${badge}
+    ${hero?`<button class="rc-fav" type="button" aria-pressed="${on}" aria-label="${on?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:20,fill:on})}</button>`:''}
+    <div class="xt-cap">
+      <div class="xt-name">${esc(r.n)}</div>
+      <div class="xt-row">${hasRt?`<span class="rc-rating">${icon('star',{size:12,fill:true,class:'star'})}${fmtFa(r.rt)}</span>`:'<span class="rc-rating rc-rating-new">تازه‌وارد</span>'}${hero?`<span class="rc-meta">${esc(r.cuisine)}${r.price?` · ${esc(r.price)}`:''}${r.cb>0?` · <span class="rc-cb">${fmtFa(r.cb)}٪ کش‌بک</span>`:''}</span>`:''}</div>
+      ${hero&&Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="xt-social"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div>`:''}
+    </div>
+  </article>`;
+}
+
+// ── صفِ جزئیات: حداکثر ۳ درخواستِ هم‌زمان ────────────────────────────
+//  تایل‌ها با اسکرول به‌سرعت وارد دید می‌شوند؛ بدونِ سقف، یک فلیک ده‌ها GET
+//  می‌فرستد. درخواستِ در جریان برایِ یک slug به اشتراک گذاشته می‌شود (بدونِ
+//  GETِ دوم). شکست کش نمی‌شود (loadRestaurantDetail)، ولی تا رندرِ بعدیِ فید
+//  دوباره تلاش نمی‌کنیم — وگرنه آفلاین هر بار که تایل وارد دید شود یک درخواستِ
+//  محکوم می‌رود. رندرِ تازه (pull-to-refresh، دادهٔ سرور) فرصتِ تازه است.
+const DETAIL_MAX = 3;
+const _detailQ = [];
+const _detailPending = new Map();
+const _photoFailed = new Set();
+let _detailInFlight = 0;
+/** جزئیاتِ یک رستوران را (با سقفِ هم‌زمانی) می‌گیرد و رویِ رکورد می‌نشاند. true = جزئیات هست. */
+function requestDetail(r){
+  return new Promise(resolve=>{ _detailQ.push({r,resolve}); pumpDetail(); });
+}
+function pumpDetail(){
+  while(_detailInFlight < DETAIL_MAX && _detailQ.length){
+    const {r,resolve} = _detailQ.shift();
+    if(!r){ resolve(false); continue; }
+    if(r.detailLoaded){ resolve(true); continue; }
+    if(!r.slug || !API.online || _photoFailed.has(r.slug)){ resolve(false); continue; }
+    let p = _detailPending.get(r.slug);
+    if(!p){
+      _detailInFlight++;
+      p = loadRestaurantDetail(r.slug).catch(()=>null)
+        .finally(()=>{ _detailInFlight--; _detailPending.delete(r.slug); pumpDetail(); });
+      _detailPending.set(r.slug, p);
+    }
+    p.then(d=>{
+      if(d){ applyRestaurantDetail(r, d); resolve(true); }
+      else { _photoFailed.add(r.slug); resolve(false); }
+    });
+  }
+}
+/** آدرسِ اولین عکسِ واقعی، یا null اگر (هنوز) نمی‌دانیم/نداریم. */
+function photoUrl(r){
+  return r?.photos?.length ? resolveMediaUrl(r.photos[0].url) : null;
+}
+/** عکس را فقط بعد از بارگذاریِ موفق رویِ گرادیان می‌نشاند و محو می‌کند.
+ *  شکستِ بارگذاری عمداً بی‌صداست: هیچ <img>ِ شکسته، هیچ توست — «نمی‌دانیم»
+ *  هرگز «وجود ندارد» رندر نمی‌شود؛ گرادیان، که همیشه درست است، می‌ماند. */
+function mountPhoto(host, url, cls){
+  if(!host || !url || host.dataset.photo) return;
+  host.dataset.photo = '1';
+  const img = new Image();
+  img.alt = '';
+  img.decoding = 'async';
+  img.className = cls;
+  img.addEventListener('load', ()=>{
+    host.appendChild(img);
+    host.closest('[data-rid]')?.classList.add('has-photo');
+    requestAnimationFrame(()=>img.classList.add('in'));
+  });
+  img.src = url;
+}
+// ── ارتقایِ تنبلِ تایل: فقط تایلی که دیده می‌شود جزئیات می‌خواهد ──
+let TILE_IO = null;
+function armTilePhotos(root, list){
+  if(TILE_IO) TILE_IO.disconnect();
+  const byId = new Map(list.map(r=>[String(r.id), r]));
+  TILE_IO = new IntersectionObserver(es=>{
+    for(const e of es){
+      if(!e.isIntersecting) continue;
+      TILE_IO.unobserve(e.target);
+      upgradeTile(e.target, byId.get(e.target.dataset.rid));
+    }
+  },{rootMargin:'240px 0px'});
+  root.querySelectorAll('.xt[data-rid]').forEach(t=>TILE_IO.observe(t));
+}
+function upgradeTile(tile, r){
+  if(!r) return;
+  const bg = tile.querySelector('.rc-bg');
+  const known = photoUrl(r);
+  if(known){ mountPhoto(bg, known, 'xt-photo'); return; }
+  if(r.detailLoaded) return;      // جزئیات آمده و عکسی نبود — گرادیان حقیقت است، نه جای خالی
+  requestDetail(r).then(ok=>{
+    const url = ok ? photoUrl(r) : null;
+    if(url && tile.isConnected) mountPhoto(bg, url, 'xt-photo');
+  });
+}
 // ═══════════════════════════════════════════════════════════
 //  اثباتِ اجتماعی — فقط از دادهٔ واقعیِ بک‌اند
 //
@@ -4436,9 +4766,13 @@ function cardHTML(r){
 //  اومدن» فنی درست ولی گمراه‌کننده است.
 // ═══════════════════════════════════════════════════════════
 
+/** تعدادِ آواتارِ تزئینی برایِ n رزرو — یک فرمول، دو رندرکننده (کارت: HTML، immersive: DOM). */
+function avatarCount(n, max = 4){
+  return Math.min(max, Math.max(1, Math.ceil(n / 4)));
+}
 /** آواتارهای تزئینی — تعدادشان بر پایه‌ی عددِ واقعی، خودشان aria-hidden. */
 function avatarStack(n, max = 4){
-  const count = Math.min(max, Math.max(1, Math.ceil(n / 4)));
+  const count = avatarCount(n, max);
   return `<div class="rc-avas" aria-hidden="true">${Array.from({length:count},()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>`;
 }
 function detailSocialProof(r){
@@ -4503,6 +4837,7 @@ function invalidateFeed(){ return ++FEED_TOKEN; }
 function renderFeed(list){
   const f=document.getElementById('feed');
   const token=invalidateFeed();
+  FEED_LIST = list;   // نمای تمام‌صفحه از همین فهرست ساخته می‌شود — فیلترها با کاربر می‌آیند
   // ⚠️ فهرستِ خالی باید **حالتِ خالیِ صادق** بدهد، نه صفحه‌ی سفید.
   // این مسیر از وقتی زنده شد که loadRestaurants دیگر روی پاسخِ موفقِ
   // `200 {items:[]}` دادهٔ نمونه برنمی‌گرداند (توضیحِ کامل در js/api.js).
@@ -4517,12 +4852,15 @@ function renderFeed(list){
     </div>`;
     return;
   }
-  f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
+  // اسکلت با همان ریتمِ موزاییک (هر هفتمی ۲×۲) تا چیدمان هنگامِ جایگزینی نپرد.
+  f.innerHTML=list.map((_,i)=>`<div class="xt xt-sk sk${i%7===0?' xt-hero':''}" aria-hidden="true"></div>`).join('');
   setTimeout(()=>{
     if(token!==FEED_TOKEN) return;   // رندرِ تازه‌تری از راه رسیده — این یکی کهنه است
-    f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);
-    const io=new IntersectionObserver(es=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);io.unobserve(e.target)}}),{threshold:.05});
-    f.querySelectorAll('.rc').forEach(c=>io.observe(c));
+    f.innerHTML=list.map(tileHTML).join('') + moreBtnHTML(list);
+    _photoFailed.clear();            // رندرِ تازه = فرصتِ تازه برایِ عکس‌هایی که بارِ قبل نرسیدند
+    armTilePhotos(f, list);
+    // نمای تمام‌صفحه اگر باز است، از فهرستِ تازه دوباره ساخته می‌شود (immersive.js گوش می‌دهد).
+    document.dispatchEvent(new CustomEvent('rz:feed',{detail:{list}}));
   },280);
 }
 // کشف بر اساس موقعیت — هر موقعیت به چند vibe نگاشت می‌شود (منطق واقعی روی داده)
@@ -4541,8 +4879,8 @@ function pickOccasion(occ, el){
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
   if(already){
     document.querySelector('.chip')?.classList.add('active');
-    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
-    const sub=document.querySelector('.section-sub'); if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+    document.getElementById('feedTitle').textContent='محبوب امشب';
+    renderSub(`${fmtFa(R.length)} رستوران فعال`);
     renderFeed(R);
     return;
   }
@@ -4553,7 +4891,7 @@ function pickOccasion(occ, el){
                    .sort((a,b)=>(b.rt||0)-(a.rt||0));
   const list = matched.length ? matched : R;
   document.getElementById('feedTitle').textContent = m.title;
-  const sub=document.querySelector('.section-sub'); if(sub) sub.textContent = m.sub;
+  renderSub(m.sub);
   renderFeed(list);
   // اسکرول نرم به فید تا نتیجه دیده بشه
   document.getElementById('feed')?.scrollIntoView({behavior:'smooth',block:'start'});
@@ -4562,7 +4900,7 @@ function filterVibe(v,el){
   document.querySelectorAll('.occ-card').forEach(c=>c.classList.remove('on'));
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');
   const list=v==='all'?R:R.filter(r=>r.vibes.includes(v));
-  document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,fill:true})+' محبوب امشب':esc(el.textContent.trim());
+  document.getElementById('feedTitle').textContent=v==='all'?'محبوب امشب':el.textContent.trim();
   renderFeed(list);
 }
 // ── نزدیک تو (کارت افقی کوچک) ──
@@ -4570,7 +4908,7 @@ function hCardHTML(r,extra){
   // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
   const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${jsq(String(r.id))})">
-    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e?esc(r.e):icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
+    <div class="hcard-img" style="background:${gradFor(r.id)}"><span class="hcard-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</span>${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
@@ -4597,6 +4935,16 @@ function haversineKm(a,b){
   return 2*Rk*Math.asin(Math.sqrt(s));
 }
 const hasCoords=r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng);
+/** برچسبِ فاصله — یک قالب برایِ «نزدیک تو» و نمای تمام‌صفحه. */
+function kmLabel(km){
+  return km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`;
+}
+/** فاصله‌ی واقعی تا رستوران، یا null — بدونِ موقعیتِ کاربر (اجازه‌ی از قبل داده‌شده)
+ *  یا بدونِ مختصاتِ رستوران، هیچ عددی ساخته نمی‌شود. */
+function distanceLabel(r){
+  if(!userPos||!r||!hasCoords(r)) return null;
+  return kmLabel(haversineKm(userPos,{lat:r.lat,lng:r.lng}));
+}
 function renderNearby(){
   const el=document.getElementById('nearbyScroll');if(!el)return;
   const title=document.getElementById('nearbyTitle');
@@ -4607,8 +4955,7 @@ function renderNearby(){
       .sort((a,b)=>a.km-b.km).slice(0,6);
     if(withDist.length){
       if(title)title.textContent='نزدیک تو';
-      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,
-        km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`)).join('');
+      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,kmLabel(km))).join('');
       return;
     }
   }
@@ -4704,8 +5051,12 @@ function renderRestaurantSections(){
   renderNearby();
   renderTrending();
   // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
-  const sub=document.querySelector('#page-discover .section-sub');
-  if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال · ${searchCtxLabel()}`;
+  // ⚠️ [۲۰۲۶-۰۹-۱۲] اینجا `textContent` بود و **قرصِ زمینه را پاک می‌کرد**: این
+  // تابع در هر بوت/سینک اجرا می‌شود، پس روی بارِ سرد قرص هرگز روی صفحه نبود و
+  // کاربر هیچ راهی به «کِی و چند نفر» نداشت — همان نقصِ صحتی که DS-007 §۶ گفته
+  // بود این قرص جلویش را می‌گیرد (چیپِ «۱۹:۰۰» یعنی امروزِ ۲ نفره و quickBook
+  // مستقیم رد می‌شود). حالا این سطر **یک نقاش** دارد: renderSub.
+  if(Array.isArray(R) && R.length) renderSub(`${fmtFa(R.length)} رستوران فعال`);
   // چیپِ امتیاز عمداً اینجا نوشته نمی‌شود: منبعِ واحدش syncNavPoints در
   // api.js است که مقدار را از /me/loyalty می‌گیرد. نوشتنِ ptsِ محلی اینجا
   // باعث می‌شد مهمانِ ناشناس عددِ ساختگی ببیند (باگِ ۳۴۰).
@@ -4772,7 +5123,7 @@ function doSearch(q){
   if(q!==undefined) _query=String(q);
   const query=_query.trim();
   if(!query){
-    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
+    document.getElementById('feedTitle').textContent='محبوب امشب';
     renderSub(`${fmtFa(R.length)} رستوران فعال`);
     renderFeed(R);return;
   }
@@ -4977,7 +5328,7 @@ const MENU_TAG_FA = {
 /** کارتِ یک آیتمِ منو — همه‌ی متن‌های سرورساخته esc می‌شوند (انضباطِ 7ecd0d6). */
 function menuItemHTML(m){
   return `<div class="menu-item glass"${m.out?' style="opacity:.62"':''}>
-    <div class="menu-emoji">${m.img?`<img class="menu-thumb" src="${esc(resolveMediaUrl(m.img))}" alt="" loading="lazy">`:esc(m.e)}</div>
+    ${m.img?`<div class="menu-emoji"><img class="menu-thumb" src="${esc(resolveMediaUrl(m.img))}" alt="" loading="lazy"></div>`:''}
     <div class="menu-info">
       <div class="menu-name">${esc(m.n)}${m.out?' <span style="font-size:10px;background:var(--amber,#d97706);color:#fff;border-radius:6px;padding:1px 6px;white-space:nowrap">ناموجود</span>':''}</div>
       ${m.d?`<div style="font-size:11px;color:var(--t2);margin:1px 0 2px;line-height:1.7">${esc(m.d)}</div>`:''}
@@ -5014,13 +5365,12 @@ function renderRestPage(r){
     :`background:${gradFor(id)}`;
   document.getElementById('page-rest').innerHTML=`
     <div class="rp-hero${heroPhoto?' rp-hero--photo':''}" style="${heroBg}">
-      <div class="rp-hero-mesh"${heroPhoto?' style="display:none"':''}></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
         <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant(${jsq(String(r.id))})" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
         <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav(${jsq(String(r.id))})" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
       </div>
-      ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-emoji">${esc(r.e)}</div>`}
+      ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</div>`}
       <div class="rp-hero-overlay">
         <div class="rp-hero-badges">
           ${r.now?`<span class="rp-hero-badge live"><span class="live-dot" aria-hidden="true"></span> الان باز</span>`:''}
@@ -5070,25 +5420,25 @@ function renderRestPage(r){
             // می‌گفت در حالی که hero «۵ نظر» نشان می‌داد؛ تناقضِ داده. حالا اگر
             // امتیازِ تجمیعیِ واقعی هست، همان را صادقانه خلاصه می‌کنیم.
             if (Number.isFinite(r.reviews) && r.reviews > 0) {
-              return `<div class="rb-overall glass" style="text-align:center"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">میانگینِ ${fmtFa(r.reviews)} نظر — متنِ نظرها به‌زودی این‌جا</div></div>`;
+              return `<div class="rb-overall tile" style="text-align:center"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">میانگینِ ${fmtFa(r.reviews)} نظر — متنِ نظرها به‌زودی این‌جا</div></div>`;
             }
             return `<p class="rp-empty">هنوز نظری برای این رستوران ثبت نشده.</p>`;
           }
           return `
-        ${hasRatingBars?`<div class="rb-grid glass">
+        ${hasRatingBars?`<div class="rb-grid tile">
           <div class="rb-overall">${r.rt!=null?`<div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">${fmtFa(r.reviews)} نظر</div>`:'<div class="rb-count">هنوز نظری ثبت نشده</div>'}</div>
           <div class="rb-bars">${[['غذا',r.rb.food],['سرویس',r.rb.service],['فضا',r.rb.atmo],['ارزش',r.rb.value]].map(([l,v])=>`<div class="rb-bar-row"><span class="rl">${l}</span><div class="rb-track"><div class="rb-fill" style="width:0" data-w="${v/5*100}"></div></div><span class="rv">${fmtFa(v)}</span></div>`).join('')}</div>
         </div>`:''}
-        ${hasAiSummary?`<div class="ai-review glass">
+        ${hasAiSummary?`<div class="ai-review tile">
           <div class="ai-review-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">خلاصه‌ی هوشمند نظرها</div><span class="tag">AI</span></div>
           ${r.good.length?`<div class="ai-col"><div class="ai-col-label">${icon('thumbsUp',{size:14})} مهمان‌ها تعریف می‌کنن از:</div>${r.good.map(g=>`<div class="ai-point"><span class="ic good">${icon('check',{size:12})}</span>${esc(g)}</div>`).join('')}</div>`:''}
           ${r.bad.length?`<div class="ai-col"><div class="ai-col-label">${icon('thumbsDown',{size:14})} گاهی گله دارن از:</div>${r.bad.map(b=>`<div class="ai-point"><span class="ic bad">!</span>${esc(b)}</div>`).join('')}</div>`:''}
         </div>`:''}
-        ${r.revs.map(rv=>`<div class="review reveal"><div class="review-ava">${rv[1]}</div><div class="review-body"><div class="review-top"><span class="review-name">${esc(rv[0])}</span><span class="review-date">${esc(rv[4])}</span></div><div class="review-stars">${Array.from({length:+rv[2]},()=>icon('star',{size:12,fill:true})).join('')}</div><div class="review-text">${esc(rv[3])}</div></div></div>`).join('')}`;
+        ${r.revs.map(rv=>`<div class="review reveal"><div class="review-ava" aria-hidden="true">${esc(String(rv[0]||'').trim().slice(0,1))}</div><div class="review-body"><div class="review-top"><span class="review-name">${esc(rv[0])}</span><span class="review-date">${esc(rv[4])}</span></div><div class="review-stars">${Array.from({length:+rv[2]},()=>icon('star',{size:12,fill:true})).join('')}</div><div class="review-text">${esc(rv[3])}</div></div></div>`).join('')}`;
         })()}
       </div>
     </div>
-    <div class="rp-bookbar glass">
+    <div class="rp-bookbar">
       <div class="rp-bookbar-info">
         <div class="rp-bookbar-cb">${icon('wallet',{size:13})} ${fmtFa(r.cb)}٪ کش‌بک</div>
         <div class="rp-bookbar-sub">${depositLabel(r)}</div>
@@ -5274,8 +5624,7 @@ async function renderTrips(){
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
       <div class="trip-card-inner">
         <div class="trip-card-hero" style="background:${gradFor(gradId)}">
-          <div class="trip-card-mesh"></div>
-          <span class="trip-card-emoji">${esc(emoji)}</span>
+          <span class="trip-card-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r||{n:name}))))}">${esc(dishWord(r||{n:name}))}</span>
           <span class="trip-card-status ${t.status}">${statusLabel}</span>
         </div>
         <div class="trip-card-body">
@@ -5655,12 +6004,14 @@ window.submitReview = submitReview;
 
 
 
+// ۰۹-۱۳: مزایا با آیکنِ خطی به‌جای ایموجیِ PERKS[i][0] (کش‌بک، رزروِ سریع، هدیه‌ی تولد، میزِ VIP)
+const PERK_ICON = ['wallet', 'clock', 'gift', 'crown'];
 
 
 
 function perksBlock(){
   return `<div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای باشگاه مشتریان</div></div>
-    <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>`;
+    <div class="perks reveal">${PERKS.map((p,i)=>`<div class="perk"><div class="perk-emoji" aria-hidden="true">${icon(PERK_ICON[i]||'gift',{size:22})}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>`;
 }
 async function renderLoyalty(){
   const root=document.getElementById('page-loyalty');
@@ -5754,7 +6105,7 @@ async function renderLoyalty(){
     </div>
 
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای تو</div></div>
-    <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
+    <div class="perks reveal">${PERKS.map((p,i)=>`<div class="perk"><div class="perk-emoji" aria-hidden="true">${icon(PERK_ICON[i]||'gift',{size:22})}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">نشان‌ها</div></div>
     <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${esc(b.emoji)}</div><div class="bdg-name">${esc(b.name)}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
   </div>`;
@@ -6690,6 +7041,7 @@ window.renderChats = renderChats;
 // ═══════════════════════════════════════════════════════════════════════
 
 
+
 /** پارامترِ کدِ میز در URL. اگر نبود، `null`. */
 function pendingCheckInCode() {
   try {
@@ -6759,7 +7111,7 @@ let pendingQrCode = null;
 
 function askReservationCode() {
   openSheet(`<div style="padding:4px 0">
-    <div style="font-size:44px;line-height:1;text-align:center">🎫</div>
+    <div style="display:flex;justify-content:center;color:var(--blue-text)" aria-hidden="true">${icon('ticket',{size:40})}</div>
     <div class="sheet-title" style="text-align:center;margin-top:8px">کدِ رزروت رو وارد کن</div>
     <div class="sheet-sub" style="text-align:center;margin-bottom:18px">برای اینکه مطمئن بشیم این رزرو مالِ خودته. کد رو در پیامکِ تأیید یا صفحه‌ی رزروت می‌بینی.</div>
     <input id="checkinResvCode" class="inp" type="text" inputmode="latin" autocomplete="off" placeholder="RZXXXXXXX" style="direction:ltr;text-align:center;font-family:monospace">
@@ -7245,11 +7597,12 @@ else setTimeout(upgrade, 0);
 //  reduced-motion. تست‌های e2e با ست‌کردنِ rz_onboarded این را رد می‌کنند.
 // ═══════════════════════════════════════════════════════════
 
+
 const KEY = 'rz_onboarded';
 const SLIDES = [
-  { emoji:'🍽️', title:'بهترین رستوران‌های شهر', text:'کشف کن، ببین کجا شلوغه و چی محبوبه — با پیشنهادِ هوشمند بر اساس سلیقه‌ات.' },
-  { emoji:'⚡', title:'رزرو، ساده مثل پیام دادن', text:'میز رزرو کن در چند ثانیه — بدون تماس، بدون معطلی.' },
-  { emoji:'🎁', title:'امتیاز بگیر، کش‌بک ببر', text:'با هر رزرو امتیاز جمع کن و از باشگاهِ مشتریان کش‌بک بگیر.' },
+  { icon:'utensils', title:'بهترین رستوران‌های شهر', text:'کشف کن، ببین کجا شلوغه و چی محبوبه — با پیشنهادِ هوشمند بر اساس سلیقه‌ات.' },
+  { icon:'clock', title:'رزرو، ساده مثل پیام دادن', text:'میز رزرو کن در چند ثانیه — بدون تماس، بدون معطلی.' },
+  { icon:'gift', title:'امتیاز بگیر، کش‌بک ببر', text:'با هر رزرو امتیاز جمع کن و از باشگاهِ مشتریان کش‌بک بگیر.' },
 ];
 let _i = 0;
 
@@ -7264,7 +7617,8 @@ function done(){
 function paint(){
   const s = SLIDES[_i];
   const ov = document.getElementById('onb'); if(!ov) return;
-  ov.querySelector('.onb-emoji').textContent = s.emoji;
+  // آیکنِ خطی (icons.js — SVGِ ثابت، نه دادهٔ کاربر) به‌جای ایموجی؛ کلاس تاریخی ماند.
+  ov.querySelector('.onb-emoji').innerHTML = icon(s.icon, { size: 40 });
   ov.querySelector('.onb-title').textContent = s.title;
   ov.querySelector('.onb-text').textContent = s.text;
   ov.querySelectorAll('.onb-dot').forEach((d,i)=>d.classList.toggle('on', i===_i));
@@ -7580,6 +7934,263 @@ try{
 }catch(e){}
 
 try{ window.refreshLiveStrip = refreshLiveStrip; }catch(e){}
+
+
+/* ═══ js/features/immersive.js ═══ */
+// ═══════════════════════════════════════════════════════════
+//  رزرونو — مرورِ تمام‌صفحه (immersive): «اسکرولِ زنده‌ی تیک‌تاک» برایِ کشف
+//
+//  حکمِ مالک (DS-011، ۲۰۲۶-۰۹-۱۲): لمسِ یک تایلِ Explore باید به نمایی برسد که
+//  هر رستوران **کلِ صفحه** را دارد و هر فلیک یک رستوران جلو می‌رود.
+//
+//  قراردادها:
+//   • فهرست همان فهرستِ فیلترشده‌ی فید است (feedList) — چیپ/مناسبت/جست‌وجو
+//     از فید به این نما منتقل می‌شوند؛ نمای تازه‌ای با فهرستِ خودش نیست.
+//   • هر آیتم با DOM API ساخته می‌شود و تنها sinkِ HTMLش قالبی است که همه‌ی
+//     درج‌هایش از esc/jsq/icon/fmtFa/gradFor می‌گذرند (گیتِ xss-sink-audit
+//     آن را «escaped» می‌شمارد). چیپ‌های ساعت را همان `paintSlots`ِ فید
+//     می‌کشد — یک منبع، نه یک کپی.
+//   • عکس فقط بعد از load رویِ گرادیان می‌نشیند (mountPhoto)؛ شکست بی‌صداست.
+//   • پیش‌واکشیِ جزئیات برایِ آیتمِ فعلی ±۲ تا عکس پیش از رسیدن آماده باشد.
+//   • RTL: فقط خواصِ منطقی (inset-inline-*) — در CSS.
+//   • بستن: دکمه، Escape؛ حرکت: فلیک/اسکرول، ↑/↓. اسکرولِ صفحه‌ی کشف بعد از
+//     بستن به همان جایی برمی‌گردد که کاربر بود (go() خودش به بالا می‌رود).
+// ═══════════════════════════════════════════════════════════
+
+
+
+
+
+let imList = [];
+let imCur = -1;
+let imIO = null;
+let imReturn = { y: 0, focus: null };
+
+const imFeedEl = () => document.getElementById('imFeed');
+const imActive = () => !!document.getElementById('page-immersive')?.classList.contains('active');
+const imReduced = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
+/** اورلی‌هایی که رویِ این نما باز می‌شوند و Escape را خودشان صاحب‌اند. */
+const imOverlayOpen = () => !!document.querySelector('#sheet.show, #dnaOverlay.open, #cmdk.show, #notif.show');
+
+function imItemEl(r, i, n){
+  const el = document.createElement('article');
+  el.className = 'im-item';
+  el.dataset.rid = String(r.id);
+  el.tabIndex = -1;
+  el.setAttribute('aria-label', `${r.n}، ${fmtFa(i + 1)} از ${fmtFa(n)}`);
+  const hasRt = Number.isFinite(r.rt) && r.rt > 0;
+  const on = favHas(r.id);
+  const meta = [r.cuisine, r.price].filter(Boolean).join(' · ');
+  const cb = Number.isFinite(r.cb) && r.cb > 0 ? `${fmtFa(r.cb)}٪ کش‌بک` : '';
+  // ⚠️ هیچ شرطی داخلِ قالب نیست — عمداً. هر ${…} یا esc/jsq است یا icon/fmtFa/gradFor؛
+  // حالت‌های شرطی (نمونه، داغ، کش‌بک) با کلاس رویِ آیتم روشن/خاموش می‌شوند و بلوک‌های
+  // داده‌ای (vibe، منو، نشانی، اثباتِ اجتماعی) با DOM API پر می‌شوند — imFill.
+  el.innerHTML = `
+    <div class="im-bg" style="background:${gradFor(r.id)}"></div>
+    <div class="im-scrim"></div>
+    <div class="im-fill">
+      <span class="im-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</span>
+      <div class="im-vibes"></div>
+      <div class="im-menu"><div class="im-menu-h">از منو</div><ul class="im-menu-list"></ul></div>
+      <div class="im-addr">${icon('pin',{size:12})}<span class="im-addr-t"></span></div>
+    </div>
+    <div class="im-rail">
+      <button type="button" class="rc-fav" aria-pressed="false" aria-label="افزودن به علاقه‌مندی‌ها" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:22,fill:on})}</button>
+      <button type="button" class="im-rail-btn" aria-label="صفحه‌ی ${esc(r.n)}" onclick="openRest(${jsq(String(r.id))})">${icon('info',{size:22})}</button>
+    </div>
+    <div class="im-info">
+      <span class="xt-badge im-hotbadge">${icon('flame',{size:12,fill:true})} داغ</span>
+      <h2 class="im-name">${esc(r.n)} <span class="demo-chip">نمونه</span></h2>
+      <div class="im-line">
+        <span class="rc-rating">${icon(hasRt ? 'star' : 'sparkle',{size:14,fill:true,class:'star'})}${esc(hasRt ? fmtFa(r.rt) : 'تازه‌وارد')}</span>
+        <span class="im-meta">${esc(meta)}</span>
+        <span class="rc-cb im-cb">${icon('wallet',{size:12})} ${esc(cb)}</span>
+      </div>
+      <div class="rc-social im-social"><div class="rc-avas im-avas" aria-hidden="true"></div><div class="rc-social-t"><b class="im-social-n"></b> هفته‌ی گذشته</div></div>
+      <div class="rc-slots"></div>
+      <button type="button" class="im-open" onclick="openRest(${jsq(String(r.id))})">صفحه‌ی رستوران ${icon('arrowL',{size:16})}</button>
+    </div>`;
+  el.classList.toggle('im-demo', !r.slug);
+  el.classList.toggle('im-hot', isHot(r));
+  el.classList.toggle('im-no-cb', !cb);
+  const fav = el.querySelector('.rc-fav');
+  fav.setAttribute('aria-pressed', String(on));
+  fav.setAttribute('aria-label', on ? 'حذف از علاقه‌مندی‌ها' : 'افزودن به علاقه‌مندی‌ها');
+  imFill(el, r);
+  const url = photoUrl(r);
+  if (url) mountPhoto(el.querySelector('.im-bg'), url, 'im-photo');
+  return el;
+}
+
+/** یک گره‌ی متنی می‌سازد — همه‌ی دادهٔ این بلوک‌ها از textContent می‌گذرد، نه HTML. */
+function imText(tag, cls, text){
+  const n = document.createElement(tag);
+  n.className = cls;
+  n.textContent = text;
+  return n;
+}
+
+/**
+ * بلوک‌های داده‌ایِ آیتم — همه با DOM API و فقط وقتی مقدار **واقعاً** معلوم است.
+ *
+ * چرا این تابع هست: بدونِ عکس (حالتِ رایج — فهرستِ عمومی هیچ فیلدِ تصویری ندارد)
+ * یک آیتمِ تمام‌صفحه ~۶۰٪ گرادیانِ خالی بود و کمتر از کارتِ ۲۷۰pxِ قدیمی می‌گفت.
+ * این‌ها همان چیزهایی‌اند که payload از قبل می‌آورد و این صفحه دور می‌ریخت:
+ *   • r.vibes            → چیپ‌های آرام (بدونِ رفتار)
+ *   • r.menu             → تا سه قلمِ واقعیِ موجود، فقط اگر جزئیات رسیده (پیش‌واکشیِ ±۲)
+ *   • r.address / فاصله  → فقط نشانیِ رسیده از جزئیات و فاصله‌ی واقعی (distanceLabel)
+ *   • r.visits7d         → همان قاعده‌ی cardHTML: null یعنی هیچ، صفر هم هیچ
+ * بلوکِ بی‌داده اصلاً در صفحه نیست (کلاسِ im-has-* / :empty) — نه صفر، نه «—»، نه اسکلت.
+ * خودتوان است: با رسیدنِ جزئیات دوباره صدا زده می‌شود و از نو پر می‌کند.
+ */
+function imFill(el, r){
+  const vibes = (Array.isArray(r.vibes) ? r.vibes : []).filter(v => typeof v === 'string' && v.trim()).slice(0, 5);
+  const vb = el.querySelector('.im-vibes');
+  vb.textContent = '';
+  vibes.forEach(v => vb.appendChild(imText('span', 'im-vibe', v)));
+
+  // قلمِ ناموجود (out) نشان داده نمی‌شود؛ قیمتِ ناشناخته/صفر هم — نام بدونِ قیمت می‌ماند.
+  const items = (Array.isArray(r.menu) ? r.menu : []).filter(m => m && m.n && !m.out).slice(0, 3);
+  const ul = el.querySelector('.im-menu-list');
+  ul.textContent = '';
+  for (const m of items) {
+    const li = document.createElement('li');
+    li.className = 'im-menu-item';
+    if (m.e) li.appendChild(imText('span', 'im-menu-e', m.e));
+    li.appendChild(imText('span', 'im-menu-n', m.n));
+    if (m.p && m.p !== '۰') li.appendChild(imText('span', 'im-menu-p', `${m.p} تومان`));
+    ul.appendChild(li);
+  }
+  el.classList.toggle('im-has-menu', items.length > 0);
+
+  const where = [];
+  if (typeof r.address === 'string' && r.address.trim()) where.push(r.address.trim());
+  const dist = distanceLabel(r);
+  if (dist) where.push(dist);
+  el.querySelector('.im-addr-t').textContent = where.join(' · ');
+  el.classList.toggle('im-has-addr', where.length > 0);
+
+  const n = Number.isFinite(r.visits7d) && r.visits7d > 0 ? r.visits7d : 0;
+  const avas = el.querySelector('.im-avas');
+  avas.textContent = '';
+  if (n) {
+    for (let k = 0; k < avatarCount(n, 3); k++) avas.appendChild(imText('span', 'avatar avatar-sm', ''));
+    el.querySelector('.im-social-n').textContent = `${fmtFa(n)} رزرو`;
+  }
+  el.classList.toggle('im-has-social', n > 0);
+}
+
+function imBuild(list){
+  const feed = imFeedEl(); if (!feed) return;
+  feed.textContent = '';
+  const frag = document.createDocumentFragment();
+  list.forEach((r, i) => frag.appendChild(imItemEl(r, i, list.length)));
+  feed.appendChild(frag);
+  imList = list;
+  imCur = -1;
+  paintSlots(list);          // چیپ‌های ساعتِ واقعی — همان تابعی که فید را می‌کشد
+  imArm();
+}
+
+function imArm(){
+  if (imIO) imIO.disconnect();
+  const feed = imFeedEl(); if (!feed) return;
+  imIO = new IntersectionObserver(es => {
+    for (const e of es) { if (e.isIntersecting) imEnter([...feed.children].indexOf(e.target)); }
+  }, { root: feed, threshold: .6 });
+  [...feed.children].forEach(it => imIO.observe(it));
+}
+
+function imEnter(idx){
+  if (idx < 0 || idx === imCur) return;
+  imCur = idx;
+  const c = document.getElementById('imCount');
+  if (c) c.textContent = `${fmtFa(idx + 1)} / ${fmtFa(imList.length)}`;
+  for (let k = idx - 2; k <= idx + 2; k++) { const r = imList[k]; if (r) imPrefetch(r, k); }
+}
+
+function imPrefetch(r, k){
+  const item = imFeedEl()?.children[k]; if (!item) return;
+  const known = photoUrl(r);
+  if (known) { mountPhoto(item.querySelector('.im-bg'), known, 'im-photo'); return; }
+  if (r.detailLoaded) return;
+  requestDetail(r).then(ok => {
+    if (!ok || !item.isConnected) return;
+    imFill(item, r);                       // منو/نشانی حالا معلوم‌اند — همان آیتم، بدونِ رندرِ دوباره
+    const url = photoUrl(r);
+    if (url) mountPhoto(item.querySelector('.im-bg'), url, 'im-photo');
+  });
+}
+
+function imJump(rid){
+  const feed = imFeedEl(); if (!feed) return;
+  const items = [...feed.children];
+  const idx = Math.max(0, items.findIndex(it => it.dataset.rid === String(rid)));
+  const el = items[idx]; if (!el) return;
+  feed.scrollTop = el.offsetTop;   // بدونِ انیمیشن — کاربر از تایل «به داخل» می‌آید، نه به آنجا اسکرول می‌کند
+  imEnter(idx);
+  el.focus({ preventScroll: true });
+}
+
+function imStep(d){
+  const feed = imFeedEl(); if (!feed) return;
+  const next = Math.min(imList.length - 1, Math.max(0, (imCur < 0 ? 0 : imCur) + d));
+  const el = feed.children[next]; if (!el) return;
+  feed.scrollTo({ top: el.offsetTop, behavior: imReduced() ? 'instant' : 'smooth' });
+}
+function openImmersive(id){
+  const key = String(id);
+  const src = feedList();
+  const hit = findR(id);
+  const list = src.some(r => String(r.id) === key) ? src : (hit ? [hit] : []);
+  if (!list.length) { toast('', 'این رستوران فعلاً در دسترس نیست'); return; }
+  imReturn = { y: window.scrollY, focus: document.activeElement };
+  imBuild(list);
+  go('immersive');
+  imJump(key);
+}
+function closeImmersive(){
+  if (!imActive()) return;
+  go('discover');
+  window.scrollTo({ top: imReturn.y, behavior: 'instant' });
+  imSyncTileFavs();
+  const f = imReturn.focus;
+  if (f && f.isConnected && typeof f.focus === 'function') f.focus({ preventScroll: true });
+}
+
+/** قلبِ تایل‌های هیرو را با favs همگام می‌کند — تغییری که در نمای تمام‌صفحه رخ داد
+ *  نباید پشتِ سرِ کاربر گم شود. (فید و این نما هر کدام دکمه‌ی خودشان را دارند.) */
+function imSyncTileFavs(){
+  document.querySelectorAll('#feed .xt .rc-fav').forEach(b => {
+    const on = favHas(b.closest('[data-rid]')?.dataset.rid);
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', on ? 'حذف از علاقه‌مندی‌ها' : 'افزودن به علاقه‌مندی‌ها');
+    b.innerHTML = icon('heart', { size: 20, fill: on });
+  });
+}
+
+// فازِ capture: پیش از Actions/پالت/اعلان‌ها اجرا می‌شود، پس تا وقتی اورلی‌ای رویِ
+// این نما باز است (imOverlayOpen) دست به Escape نمی‌زنیم — آن اورلی خودش می‌بندد.
+document.addEventListener('keydown', e => {
+  if (!imActive() || imOverlayOpen()) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeImmersive(); }
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); imStep(e.key === 'ArrowDown' ? 1 : -1); }
+}, { capture: true });
+
+// فید دوباره رندر شد (دادهٔ سرور رسید، صفحه‌ی بعدی، pull-to-refresh) در حالی که این
+// نما باز است: آیتم‌ها از فهرستِ تازه ساخته می‌شوند تا «صفحه‌ی رستوران» به رکوردی
+// اشاره نکند که دیگر در R نیست. جای فعلی با id حفظ می‌شود.
+document.addEventListener('rz:feed', e => {
+  if (!imActive()) return;
+  const list = e.detail?.list;
+  if (!Array.isArray(list) || !list.length) return;
+  const cur = imList[imCur]?.id;
+  imBuild(list);
+  imJump(cur ?? list[0].id);
+});
+
+window.openImmersive = openImmersive;
+window.closeImmersive = closeImmersive;
 
 
 /* ═══ js/user-profile.js ═══ */
@@ -8316,6 +8927,7 @@ if (document.readyState === 'loading') {
 
 
 // رزرو و امکانات
+
 
 
 

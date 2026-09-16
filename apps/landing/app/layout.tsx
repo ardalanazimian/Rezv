@@ -8,8 +8,6 @@ import { Footer } from '@/components/site/Footer';
 import { AskBot } from '@/components/site/AskBot';
 import { AnnounceBanner } from '@/components/site/AnnounceBanner';
 import { ThemeScript } from '@/components/site/ThemeToggle';
-import { ScrollProgress } from '@/components/site/Motion';
-import { Cursor } from '@/components/site/Cursor';
 import { buildKb } from '@/lib/kb';
 import { JsonLd } from '@/components/site/JsonLd';
 import { getBanner } from '@/lib/site-api';
@@ -58,7 +56,7 @@ export const viewport: Viewport = {
   // رنگِ نوارِ مرورگر با تمِ فعال هماهنگ می‌شود
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#08090f' },
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
   ],
 };
 
@@ -71,7 +69,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   return (
     // suppressHydrationWarning لازم است چون ThemeScript پیش از hydration
-    // عمداً data-theme و کلاسِ js-reveal را روی <html> می‌گذارد (برای حذفِ
+    // عمداً data-theme را روی <html> می‌گذارد (برای حذفِ
     // پرشِ تم). این تنها اختلافِ سرور/کلاینت است و آگاهانه ایجاد شده.
     <html lang="fa" dir="rtl" className={vazirmatn.variable} suppressHydrationWarning>
       <head>
@@ -82,10 +80,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <JsonLd data={graph([organizationJsonLd(), websiteJsonLd()])} id="site-graph" />
 
         <a href="#main" className="skip-link">پرش به محتوای اصلی</a>
-        {/* دانه‌ی فیلم روی کلِ صفحه — یک لایه‌ی composite، بدونِ کارِ هر فریم */}
-        <div className="grain" aria-hidden="true" />
-        <Cursor />
-        <ScrollProgress />
         {banner && <AnnounceBanner banner={banner} />}
         <Header />
         <main id="main">{children}</main>

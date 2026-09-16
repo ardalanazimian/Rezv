@@ -9,7 +9,7 @@ import { isOfflineDemo } from './api-core.js';
 import { esc, faNum, jsq } from './auth.js';
 import { openRest } from './data/detail.js';
 import { cardHTML, fmtFa, go } from './data/discover.js';
-import { TRIPS, favHas, gradFor, setMyTrips } from './data/seed.js';
+import { TRIPS, dishLen, dishWord, favHas, gradFor, setMyTrips } from './data/seed.js';
 import { addToCalendar, addToWallet, cancelTrip, isLateCancel, openReviewSheet, repeatReservation, showCheckInQR } from './features/trips.js';
 import { R, findR } from './init.js';
 import { armReveals, buzz } from './theme-pwa.js';
@@ -170,8 +170,7 @@ export async function renderTrips(){
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
       <div class="trip-card-inner">
         <div class="trip-card-hero" style="background:${gradFor(gradId)}">
-          <div class="trip-card-mesh"></div>
-          <span class="trip-card-emoji">${esc(emoji)}</span>
+          <span class="trip-card-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r||{n:name}))))}">${esc(dishWord(r||{n:name}))}</span>
           <span class="trip-card-status ${t.status}">${statusLabel}</span>
         </div>
         <div class="trip-card-body">

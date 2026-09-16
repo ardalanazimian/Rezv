@@ -27,10 +27,12 @@ export function PlanCards({ plans, note }: { plans: SitePlan[]; note?: string | 
 
   return (
     <>
-      <div className="plans">
+      {/* روی موبایل ردیفِ لغزان با snap (site.css › .snap-row): سه کارتِ روی‌هم
+          ۲٫۵ صفحه بود. ناحیه نام‌دار و فوکوس‌پذیر است تا با کیبورد هم پیمایش شود. */}
+      <div className="plans snap-row" role="region" aria-label="پلن‌های اشتراک" tabIndex={0}>
         {plans.map((plan, i) => (
           <Reveal key={plan.key} delay={i * 90}>
-            <article className={`plan${plan.highlight ? ' plan--highlight' : ''}`}>
+            <article className={`plan${plan.highlight ? ' plan--highlight is-night' : ''}`}>
               {plan.badge && <span className="plan__badge">{plan.badge}</span>}
 
               <header className="stack stack-2">
@@ -69,7 +71,6 @@ export function PlanCards({ plans, note }: { plans: SitePlan[]; note?: string | 
                   onClick={() => setSelected(plan)}
                 >
                   انتخابِ {plan.name}
-                  <Icon name="arrowLeft" size={17} className="btn__arrow" />
                 </button>
                 <Link href="/demo" className="btn btn--quiet btn--sm btn--block">
                   اول ۳۰ روز رایگان امتحان می‌کنم

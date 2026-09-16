@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Icon, LogoMark } from './Icon';
+import { LogoMark } from './Icon';
 import { BRAND_NAME } from '@/lib/site-schema';
 
 // فوتر: هم نقشه‌ی سایت برای کاربر است و هم شبکه‌ی لینک‌سازیِ داخلی برای خزنده.
@@ -60,7 +60,6 @@ export function Footer() {
             </p>
             <Link href="/demo" className="btn btn--soft btn--sm" style={{ alignSelf: 'flex-start' }}>
               شروعِ دموی رایگان
-              <Icon name="arrowLeft" size={15} className="btn__arrow" />
             </Link>
           </div>
 

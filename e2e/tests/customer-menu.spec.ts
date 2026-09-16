@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockApi, captured, DEMO_MENU } from './helpers/mock-api';
-import { gotoApp, login } from './helpers/actions';
+import { gotoApp, login, openRestaurantByName } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  SPEC-A فاز ۱ — بخشِ منو در صفحه‌ی رستورانِ اپِ مشتری
@@ -14,7 +14,7 @@ test('منویِ دسته‌دار: سکشن‌ها + توضیح + برچسبِ 
   await mockApi(page);
   await gotoApp(page);
 
-  await page.locator('.rc', { hasText: 'کافه گل‌ها' }).first().click();
+  await openRestaurantByName(page, 'کافه گل‌ها');
   const rest = page.locator('#page-rest');
   await expect(rest).toBeVisible();
 
@@ -32,7 +32,7 @@ test('رستورانِ بدونِ منو → حالتِ خالیِ صادق، ن
   await mockApi(page);
   await gotoApp(page);
 
-  await page.locator('.rc', { hasText: 'برگر لب' }).first().click();
+  await openRestaurantByName(page, 'برگر لب');
   const rest = page.locator('#page-rest');
   await expect(rest).toBeVisible();
   await expect(rest).toContainText('این رستوران هنوز منویی ثبت نکرده');
@@ -43,7 +43,7 @@ test('رستورانِ بدونِ منو → حالتِ خالیِ صادق، ن
 test('برچسب‌های فارسی روی کارتِ آیتم دیده می‌شوند (۰۷۸)', async ({ page }) => {
   await mockApi(page);
   await gotoApp(page);
-  await page.locator('.rc', { hasText: 'کافه گل‌ها' }).first().click();
+  await openRestaurantByName(page, 'کافه گل‌ها');
   const rest = page.locator('#page-rest');
   await expect(rest).toContainText('پرفروش');   // POPULAR → label فارسی
   await expect(rest).toContainText('تند');      // SPICY (روی آیتمِ ناموجود — دیده می‌شود، حذف نه)
@@ -53,7 +53,7 @@ test('سیم‌کشیِ pre-order: انتخابِ چیپ → payloadِ رزرو 
   await mockApi(page);
   await gotoApp(page);
   await login(page);
-  await page.locator('.rc', { hasText: 'کافه گل‌ها' }).first().click();
+  await openRestaurantByName(page, 'کافه گل‌ها');
 
   await page.getByRole('button', { name: /رزرو میز/ }).click();
   await expect(page.locator('#sheet')).toBeVisible();

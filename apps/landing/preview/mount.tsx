@@ -18,13 +18,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { createRoot } from 'react-dom/client';
-import { FlowField } from '../components/sections/FlowField';
 import { ServiceNight } from '../components/sections/ServiceNight';
-import { LiveFlow } from '../components/sections/LiveFlow';
 import { PinnedStory } from '../components/sections/PinnedStory';
-import { Ambient } from '../components/site/Kinetic';
-import { Cursor } from '../components/site/Cursor';
-import { ScrollProgress } from '../components/site/Motion';
 import { Header } from '../components/site/Header';
 import { AskBot } from '../components/site/AskBot';
 import { kbFrom } from '../lib/kb';
@@ -70,7 +65,7 @@ function swap(scope: ParentNode, selector: string, node: React.ReactNode, tag = 
   });
 }
 
-/** ریشه‌ای که در markup وجود ندارد و باید ساخته شود (مثلِ نشانگر). */
+/** ریشه‌ای که در markup وجود ندارد و باید ساخته شود (مثلِ دستیار). */
 function append(node: React.ReactNode) {
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -86,36 +81,19 @@ function mountPage() {
   pageRoots = [];
 
   const main = document.getElementById('rz-host') ?? document.body;
-  swap(main, 'canvas.flowfield', <FlowField />);
-  swap(main, 'canvas.kx-ambient', <Ambient />);
   swap(main, '.night', <ServiceNight />);
-  swap(main, '.flow', <LiveFlow />);
   swap(main, '.pin', <PinnedStory />, 'section');
   // آکاردئونِ پرسش‌ها با <details>/<summary> بومی کار می‌کند و به React نیاز
-  // ندارد — عمداً دست‌نخورده می‌ماند.
-
-  // Reveal ها روی markupِ موجود: کامپوننتِ Reveal اینجا رندر نمی‌شود، پس
-  // همان قرارداد (data-visible) را با یک observer برقرار می‌کنیم.
-  const io = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        (e.target as HTMLElement).dataset.visible = 'true';
-        io.unobserve(e.target);
-      }
-    },
-    { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
-  );
-  main.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+  // ندارد — عمداً دست‌نخورده می‌ماند. هیرو و «اسکرولِ زنده»ی صفحه‌ی اصلی
+  // (۰۹-۱۳) تماماً CSS‌اند و چیزی برای سوارکردن ندارند؛ بومِ جریان، ذره‌ها،
+  // و آشکارسازیِ Reveal با خودِ آن کامپوننت‌ها حذف شدند.
 }
 
 /** پوسته: یک بار سوار می‌شود و بینِ صفحه‌ها دست‌نخورده می‌ماند. */
 function mountShell() {
   swap(document, 'header.site-header', <Header />, 'div', false);
-  swap(document, '.scroll-progress', <ScrollProgress />, 'div', false);
   document.querySelectorAll('.askbot, .askbot__fab').forEach((el) => el.remove());
   append(<AskBot docs={KB} />);
-  append(<Cursor />);
 }
 
 function boot() {

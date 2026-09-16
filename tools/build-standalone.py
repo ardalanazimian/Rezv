@@ -64,7 +64,7 @@ CUSTOMER_ORDER = [
     'js/features/palette.js', 'js/features/notifications.js',
     'js/features/a11y.js', 'js/features/onboarding.js',
     'js/features/pull-refresh.js', 'js/features/swipe-actions.js',
-    'js/features/live-strip.js', 'js/user-profile.js', 'js/auth.js',
+    'js/features/live-strip.js', 'js/features/immersive.js', 'js/user-profile.js', 'js/auth.js',
     'js/theme-pwa.js', 'js/init.js', 'js/main.js',
 ]
 

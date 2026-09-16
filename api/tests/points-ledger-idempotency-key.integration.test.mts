@@ -84,7 +84,7 @@ before(async () => {
 });
 
 after(async () => {
-  await db.pointsLedger.deleteMany({ where: { userId: { in: [userId, referrerId, cashbackUserId] } } }).catch(() => {});
+  // ⚠️ ۰۸۹/FP-009: دفترِ امتیاز فقط-افزودنی است — پاک‌سازیِ ردیف‌هایش ممکن نیست و تلاش برایش رد می‌شود. ردیف‌های [DEMO] در دیتابیسِ هر اجرا (که تازه ساخته می‌شود) می‌مانند.
   await db.referral.deleteMany({ where: { referrerId } }).catch(() => {});
   await db.reservationItem.deleteMany({ where: { reservation: { restaurantId } } }).catch(() => {});
   await db.reservationEvent.deleteMany({ where: { reservation: { restaurantId } } }).catch(() => {});
@@ -124,30 +124,41 @@ describe('ستونِ idempotency_key — قیدِ واقعی در DB (فازِ �
     });
 
     // ── قرمز: ایندکس را موقتاً حذف کن ──
-    await db.$executeRawUnsafe('DROP INDEX IF EXISTS points_ledger_idempotency_key_key');
+    //
+    // ⚠️ بازنویسی ۲۰۲۶-۰۹-۱۶ (مهاجرتِ ۰۸۹ / FP-009): نسخه‌ی پیشین ردیفِ تکراری را
+    // می‌ساخت و بعد با `deleteMany` پاکش می‌کرد تا ایندکس دوباره ساخته شود. حالا
+    // دفتر فقط-افزودنی است و آن حذف رد می‌شود — یعنی ایندکسِ ۰۸۱ **برای کلِ بقیه‌ی
+    // سوئیت حذف‌شده می‌ماند** و هیچ‌کس نمی‌فهمد. پس کلِ فازِ قرمز داخلِ یک تراکنشِ
+    // برگشت‌خورده اجرا می‌شود: در PostgreSQL خودِ DDL هم تراکنشی است، پس rollback
+    // هم ردیفِ تکراری را می‌برد و هم ایندکس را برمی‌گرداند — بدونِ هیچ حذفی.
+    class RolledBack extends Error {}
     let secondSucceeded = false;
-    try {
-      await db.pointsLedger.create({
+    let rowsWithoutIndex = 0;
+    await db.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('DROP INDEX IF EXISTS points_ledger_idempotency_key_key');
+      await tx.pointsLedger.create({
         data: { userId, restaurantId, delta: 1, reason: 'adjustment', note: '[DEMO] دوم-بدونِ-قید', idempotencyKey: key },
       });
       secondSucceeded = true;
-    } finally {
-      const rowsWithoutIndex = await db.pointsLedger.count({ where: { idempotencyKey: key } });
-      assert.equal(secondSucceeded, true, 'بدونِ ایندکس، insertِ دوم باید موفق شود — این خودِ اثباتِ قرمز است');
-      assert.equal(rowsWithoutIndex, 2, 'بدونِ ایندکس، دو ردیفِ تکراری واقعاً ساخته می‌شوند (باگی که قید باید جلویش را بگیرد)');
+      rowsWithoutIndex = await tx.pointsLedger.count({ where: { idempotencyKey: key } });
+      throw new RolledBack();
+    }).catch((e: unknown) => { if (!(e instanceof RolledBack)) throw e; });
 
-      // ── بازگردانی: دوباره‌سازیِ همان ایندکس (عیناً migration 081 — UNIQUE
-      // معمولی، بدونِ WHERE؛ NULL در Postgres با NULL برابر شمرده نمی‌شود) ──
-      await db.pointsLedger.deleteMany({ where: { idempotencyKey: key } }); // پاک‌سازیِ ردیفِ تکراریِ حالتِ قرمز
-      await db.$executeRawUnsafe(
-        'CREATE UNIQUE INDEX IF NOT EXISTS points_ledger_idempotency_key_key ON points_ledger (idempotency_key)',
-      );
-    }
+    assert.equal(secondSucceeded, true, 'بدونِ ایندکس، insertِ دوم باید موفق شود — این خودِ اثباتِ قرمز است');
+    assert.equal(rowsWithoutIndex, 2, 'بدونِ ایندکس، دو ردیفِ تکراری واقعاً ساخته می‌شوند (باگی که قید باید جلویش را بگیرد)');
+    // کنترلِ بازگردانی: ایندکس باید با rollback برگشته باشد، وگرنه ادعای «سبز» زیر تهی است.
+    const idx = await db.$queryRaw<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM pg_indexes
+      WHERE tablename = 'points_ledger' AND indexname = 'points_ledger_idempotency_key_key'`;
+    assert.equal(idx[0].n, 1, 'ایندکسِ ۰۸۱ باید پس از rollback برگشته باشد');
+    assert.equal(await db.pointsLedger.count({ where: { idempotencyKey: key } }), 1,
+      'ردیفِ تکراریِ فازِ قرمز باید با rollback رفته باشد');
 
     // ── سبز: با ایندکسِ بازگردانده‌شده، دوباره همان سناریو ──
-    await db.pointsLedger.create({
-      data: { userId, restaurantId, delta: 1, reason: 'adjustment', note: '[DEMO] اول-دوباره', idempotencyKey: key },
-    });
+    // ⚠️ ردیفِ «اول» از ابتدای همین تست هنوز سرِ جایش است (rollback فقط ردیفِ فازِ
+    // قرمز را برد، نه آن را) و دفتر هم دیگر پاک‌شدنی نیست — پس ساختنِ دوباره‌ی آن
+    // لازم نیست و اصلاً ممکن هم نیست. ادعای سبز همین است: با ایندکسِ برگشته،
+    // insertِ بعدی با همان کلید باید رد شود.
     await assert.rejects(
       db.pointsLedger.create({
         data: { userId, restaurantId, delta: 1, reason: 'adjustment', note: '[DEMO] دوم-دوباره', idempotencyKey: key },
