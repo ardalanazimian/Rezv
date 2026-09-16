@@ -21,6 +21,24 @@
 // ═══════════════════════════════════════════════════════════
 import { Err } from './errors';
 
+/**
+ * ارقامِ فارسی (۰–۹، U+06F0) و عربی-هندی (٠–٩، U+0660) → ASCII.
+ *
+ * ⚠️ چرا (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `\d`ِ جاوااسکریپت فقط 0–9ِ
+ * ASCII است، پس «۰۹۱۲۳۴۵۶۷۸۹» — همان چیزی که کیبوردِ فارسی تایپ می‌کند و
+ * placeholderِ همین فرم‌ها نشان می‌دهد — از `zPhone` رد می‌شد. فقط برخی فرم‌ها
+ * پیش از ارسال تبدیل می‌کردند (ورودِ OTP، ساختِ رستوران)؛ دعوتِ دوست، جست‌وجوی
+ * مشتری در پنلِ شرکت، واک‌این، رزروِ دستی و کارتِ هدیه نمی‌کردند و ۴۲۲
+ * می‌گرفتند. تبدیل در لایه‌ی سرور یک‌بار همه را می‌بندد و مقدارِ ذخیره‌شده را
+ * هم یکدست می‌کند.
+ */
+export function toAsciiDigits(s: string): string {
+  return s.replace(/[۰-۹٠-٩]/g, (d) => {
+    const c = d.charCodeAt(0);
+    return String(c >= 0x06F0 ? c - 0x06F0 : c - 0x0660);
+  });
+}
+
 export interface Issue { field: string; message: string }
 
 export class SchemaError extends Error {
@@ -94,7 +112,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 class StringSchema extends Schema<string> {
   private _min?: number; private _max?: number; private _regex?: RegExp; private _trim = false;
-  private _regexMsg?: string;
+  private _regexMsg?: string; private _asciiDigits = false;
+  /** ارقامِ فارسی/عربی را پیش از بقیه‌ی قواعد به ASCII برمی‌گرداند (رجوع کن به toAsciiDigits). */
+  asciiDigits() { const c = this.clone(); c._asciiDigits = true; return c; }
   min(n: number) { const c = this.clone(); c._min = n; return c; }
   max(n: number) { const c = this.clone(); c._max = n; return c; }
   regex(r: RegExp, msg?: string) { const c = this.clone(); c._regex = r; c._regexMsg = msg; return c; }
@@ -109,6 +129,7 @@ class StringSchema extends Schema<string> {
       if (typeof s === 'number') s = String(s); // پذیرشِ نرمِ عدد → رشته
       else return { ok: false, issues: [{ field: path, message: 'باید رشته باشد' }] };
     }
+    if (this._asciiDigits) s = toAsciiDigits(s as string);
     if (this._trim) s = (s as string).trim();
     const str = s as string;
     if (this._min !== undefined && str.length < this._min) return { ok: false, issues: [{ field: path, message: `حداقل ${this._min} کاراکتر` }] };

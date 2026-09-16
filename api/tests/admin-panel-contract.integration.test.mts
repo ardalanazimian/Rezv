@@ -51,7 +51,7 @@ const OVERVIEW: Consumed = [
 
 /** apps/company/js/api.js:126-151 — مپِ apiR.* رویِ هر آیتمِ restaurants[] */
 const RESTAURANT_ITEM: Consumed = [
-  ['id', 'string'], ['tenant_id', 'string'], ['name', 'string'],
+  ['id', 'string'], ['tenant_id', 'string'], ['name', 'string'], ['city', 'string'],
   ['plan', 'string'], ['subscription_status', 'string'], ['days_left', 'number'],
   ['is_open', 'boolean'], ['members', 'number'], ['reservations', 'number'],
   ['sms_total_sent', 'number'], ['sms_balance', 'number'],
@@ -149,7 +149,7 @@ describe('قراردادِ پنلِ شرکت — هشت endpointِ ادمین د
     });
     bizTenantId = bt.id;
     const r = await db.restaurant.create({
-      data: { tenantId: bt.id, slug: `demo-contract-${SFX}`, name: '[DEMO] رستورانِ قرارداد', clubPrefix: 'DCT', isOpen: true, smsBalance: 50 },
+      data: { tenantId: bt.id, slug: `demo-contract-${SFX}`, name: '[DEMO] رستورانِ قرارداد', clubPrefix: 'DCT', isOpen: true, smsBalance: 50, city: 'تهران' },
       select: { id: true },
     });
     restaurantId = r.id;
@@ -194,7 +194,7 @@ describe('قراردادِ پنلِ شرکت — هشت endpointِ ادمین د
     assertConsumed(await res.json(), OVERVIEW, 'overview');
   });
 
-  test('restaurants — هر ۱۳ فیلدِ مپِ api.js رویِ یک آیتمِ **واقعی**', async () => {
+  test('restaurants — هر ۱۴ فیلدِ مپِ api.js رویِ یک آیتمِ **واقعی**', async () => {
     const res = await restaurants.GET(req('GET'));
     assert.equal(res.status, 200);
     const body = await res.json();

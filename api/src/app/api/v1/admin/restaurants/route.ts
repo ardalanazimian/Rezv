@@ -28,6 +28,9 @@ async function GET_impl(req: Request) {
         const sub = computeSubscriptionStatus(r.tenant.planExpiresAt, r.tenant.trialEndsAt);
         return {
           id: r.id, name: r.name, slug: r.slug, cuisine: r.cuisine,
+          // پنلِ شرکت ستونِ «شهر» و جست‌وجو بر اساسِ شهر دارد؛ تا ۲۰۲۶-۰۹-۱۳ این
+          // فیلد فرستاده نمی‌شد و پنل cuisine را جای شهر نشان می‌داد.
+          city: r.city,
           tenant_id: r.tenant.id, plan: r.tenant.plan, is_open: r.isOpen,
           members: r._count.members, reservations: r._count.reservations,
           sms_balance: r.smsBalance, sms_total_sent: r.smsTotalSent,
@@ -77,6 +80,7 @@ const createSchema = z.object({
 });
 
 async function POST_impl(req: Request) {
+  let idem: Awaited<ReturnType<typeof withIdempotency<{ status: number; body: unknown }>>> | undefined;
   try {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
@@ -86,7 +90,7 @@ async function POST_impl(req: Request) {
     // ناقصِ retry؛ وگرنه retryِ صادقانه ۴۲۲ می‌گرفت (در دودِ زنده دیده شد).
     const idemKey = req.headers.get('Idempotency-Key') ?? undefined;
     if (!idemKey) throw Err.validation('هدرِ Idempotency-Key اجباری است (جلوگیری از ساختِ دوباره با دابل‌کلیک/retry)');
-    const idem = await withIdempotency<{ status: number; body: unknown }>(idemKey, 'admin-provision', `admin:${admin.sub}`);
+    idem = await withIdempotency<{ status: number; body: unknown }>(idemKey, 'admin-provision', `admin:${admin.sub}`);
     if (idem.replayed) {
       return NextResponse.json(idem.response.body, { status: idem.response.status });
     }
@@ -126,7 +130,14 @@ async function POST_impl(req: Request) {
     };
     await idem.commit({ status: 201, body });
     return NextResponse.json(body, { status: 201 });
-  } catch (e) { return errorResponse(e); }
+  } catch (e) {
+    // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): پنلِ شرکت کلید را برای
+    // «اصلاح و ارسالِ دوباره‌ی» همان فرم نگه می‌دارد (overview.js:211)؛ پیش از
+    // این، هر ردِ slug_unavailable/username_taken/validation کلید را in_progress
+    // می‌گذاشت و ارسالِ اصلاح‌شده تا ۶۰ ثانیه ۴۰۹ می‌گرفت. ردِ ۴xx آزادش می‌کند.
+    if (idem && !idem.replayed) await idem.release(e);
+    return errorResponse(e);
+  }
 }
 
 export const POST = withApiMetrics('/api/v1/admin/restaurants', POST_impl);

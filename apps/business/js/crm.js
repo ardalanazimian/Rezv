@@ -532,7 +532,7 @@ function setCustTab(t){
   document.querySelectorAll('#v-customers .itab').forEach((b,i)=>b.classList.toggle('active',['overview','profiles','campaign','ai'][i]===t));
   document.querySelectorAll('#v-customers .isub').forEach(s=>s.classList.toggle('active',s.id==='ct-'+t));
 }
-const RFM_LABEL_FA={champions:'قهرمانان',loyal:'وفادار',potential:'بالقوه',at_risk:'در خطر ریزش',new:'جدید',hibernating:'غیرفعال',lost:'از دست‌رفته',unknown:'نامشخص'};
+const RFM_LABEL_FA={champions:'قهرمانان',loyal:'وفادار',potential:'بالقوه',new_promising:'تازه و امیدبخش',needs_attention:'نیازمندِ توجه',at_risk:'در خطر ریزش',cant_lose:'نباید از دست داد',new:'جدید',hibernating:'غیرفعال',lost:'از دست‌رفته',unknown:'نامشخص'};
 
 // ─── تب ۱: نمای کلی (واقعی، از /restaurant/rfm + /restaurant/ai) ───
 // نگاشت رنگ و نام هر سگمنت RFM
@@ -540,6 +540,11 @@ const RFM_META={
   champions:{fa:'قهرمانان',c:'#12A150',d:'بهترین مشتری‌ها — زیاد و تازه'},
   loyal:{fa:'وفادار',c:'#4F46E5',d:'مرتب برمی‌گردن'},
   potential:{fa:'بالقوه',c:'#7C6FF0',d:'پتانسیل وفادار شدن'},
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: بک‌اند (api/src/lib/rfm.ts) `new_promising` و
+  // `needs_attention` می‌سازد و این دو کلید اینجا نبودند ⇒ هر دو سگمنت به
+  // `unknown` می‌افتادند و دو خانه‌ی خاکستریِ یکسانِ «نامشخص» دیده می‌شد.
+  new_promising:{fa:'تازه و امیدبخش',c:'#0EA5E9',d:'تازه آمده‌اند، هنوز کم‌تکرار'},
+  needs_attention:{fa:'نیازمندِ توجه',c:'#F59E0B',d:'مدتی است کم‌پیدا شده‌اند'},
   promising:{fa:'امیدبخش',c:'#0EA5E9',d:'تازه‌وارد فعال'},
   new_customer:{fa:'جدید',c:'#06B6D4',d:'اولین بازدیدها'},
   at_risk:{fa:'در خطر ریزش',c:'#E8925A',d:'مدتیه نیامدن'},
@@ -787,6 +792,7 @@ const HOURS_SAVE_LABEL='ارسالِ پیشنهاد برای تأیید';
 async function loadHours(){
   if(!API.getToken()) return;
   const res=await API.hoursGet();
+  markLoad('hours', !!(res.ok && res.data));
   if(res.ok && res.data){
     const d=res.data;
     HOURS_STATE={
@@ -829,6 +835,12 @@ function hoursStatusBannerHTML(){
 function profRenderHours(){
   const el=document.getElementById('pt-hours'); if(!el) return;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایش ساعات کاری به اتصال بک‌اند نیاز دارد — در حالت دمو در دسترس نیست.</div>`; return; }
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): فرم پیش از رسیدنِ دادهٔ واقعی (و پس از
+  // شکستِ آن) با پیش‌فرض‌ها (`closures:[]`) رندر می‌شد؛ «افزودنِ یک تعطیلی +
+  // ارسال» همه‌ی تعطیلی‌های آینده‌ی ذخیره‌شده را **پاک** می‌کرد، چون PUT آن‌ها
+  // را فوراً جایگزین می‌کند. تا دادهٔ واقعی نیامده، فرمی نیست.
+  if(loadFailed('hours')){ el.innerHTML=loadErrorBlock('ساعتِ کاری بارگیری نشد','loadHours().then(profRenderHours)'); return; }
+  if(!_hoursLoaded){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">در حالِ بارگیریِ ساعتِ کاری…</div>`; return; }
   const oh=HOURS_STATE.draft||{};
   // ⚠️ رفعِ از‌دست‌رفتنِ بی‌صدای داده (۲۰۲۶-۰۸-۲۶):
   // `_hoursDirty` در ۶ جا **نوشته** می‌شد و در کلِ ریپو در هیچ‌جا **خوانده**
@@ -908,6 +920,7 @@ function addClosure(){
 function removeClosure(i){ HOURS_STATE.closures.splice(i,1); _hoursDirty=true; profRenderHours(); }
 async function saveHours(){
   if(!API.getToken()){ toast('','برای ذخیره باید وارد شده باشی'); return; }
+  if(!_hoursLoaded){ toast('','ساعتِ فعلی هنوز بارگیری نشده — ذخیره روی دادهٔ ناقص انجام نمی‌شود'); return; }
   // ⚠️ Part 3: این دیگر «ذخیره‌ی زنده» نیست — پیشنهاد می‌فرستد. بک‌اند
   // (PUT /restaurant/hours) خودش pending می‌سازد، اینجا فقط draft را می‌فرستد.
   const res=await API.hoursSave({opening_hours:HOURS_STATE.draft, closures:HOURS_STATE.closures});
@@ -930,12 +943,16 @@ let _cancelPolicyDirty=false;
 async function loadCancellationPolicy(){
   if(!API.getToken()) return;
   const res=await API.cancellationPolicyGet();
+  markLoad('cancellation', !!(res.ok && res.data));
   if(res.ok && res.data){ CANCEL_POLICY_STATE={...res.data}; _cancelPolicyDirty=false; }
 }
 
 function profRenderCancellationPolicy(){
   const el=document.getElementById('pt-cancellation'); if(!el) return;
   if(!API.getToken()){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">ویرایشِ سیاستِ کنسلی به اتصالِ بک‌اند نیاز دارد — در حالتِ دمو در دسترس نیست.</div>`; return; }
+  // همان رفعِ ساعتِ کاری: ذخیره روی پیش‌فرضِ ۲۴/۲/۵۰ سیاستِ اختصاصیِ رستوران را بازنویسی می‌کرد.
+  if(loadFailed('cancellation')){ el.innerHTML=loadErrorBlock('سیاستِ کنسلی بارگیری نشد','loadCancellationPolicy().then(profRenderCancellationPolicy)'); return; }
+  if(loadPending('cancellation')){ el.innerHTML=`<div class="panel" style="text-align:center;padding:40px;color:var(--t2)">در حالِ بارگیریِ سیاستِ کنسلی…</div>`; return; }
   const s=CANCEL_POLICY_STATE;
   // ═══════════════════════════════════════════════════════════
   //  ⚠️ صداقتِ اجرا (پروتکل §۳/§۹/§۱۰)
@@ -998,6 +1015,7 @@ function updateCancelPolicyField(key,val){ CANCEL_POLICY_STATE[key]=Number(val)|
 function toggleCancelPolicyField(key){ CANCEL_POLICY_STATE[key]=!CANCEL_POLICY_STATE[key]; _cancelPolicyDirty=true; profRenderCancellationPolicy(); }
 async function saveCancellationPolicy(){
   if(!API.getToken()){ toast('','برای ذخیره باید وارد شده باشی'); return; }
+  if(LOAD_STATE.cancellation!=='ok'){ toast('','سیاستِ فعلی هنوز بارگیری نشده — ذخیره انجام نمی‌شود'); return; }
   const s=CANCEL_POLICY_STATE;
   if(Number(s.partial_penalty_hours)>Number(s.free_cancel_hours)){ toast('','آستانه‌ی جریمه‌ی جزئی نمی‌تونه از پنجره‌ی آزاد بزرگ‌تر باشه'); return; }
   const res=await API.cancellationPolicySave({

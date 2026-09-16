@@ -242,7 +242,8 @@ function syncProfileTripCount(){
     if(res.ok && Array.isArray(res.data)){
       setTripCount(res.data.length);
       const now = document.getElementById('pcTrips');
-      if(now) now.textContent = fmtFa(res.data.length);
+      // /me/reservations حداکثر ۵۰ ردیف می‌دهد (take: 50) — ۵۰ یعنی «دست‌کم ۵۰».
+      if(now) now.textContent = fmtFa(res.data.length) + (res.data.length >= 50 ? '+' : '');
     }
     // سرور نگفت → «—»ی که از قبل رندر شده دست نمی‌خورد
   }).catch(()=>{}).finally(()=>{ _tripCountInFlight = null; });

@@ -151,7 +151,7 @@ async function removeWL(id){
 }
 let _tablesLoaded=false;
 async function rFloor(){
-  if(!_tablesLoaded && API.getToken()){ await loadTables(); _tablesLoaded=true; }
+  if(!_tablesLoaded && API.getToken()){ await loadTables(); }
   syncTablesFromReservations();
   // ⚠️ فازِ ۲ (§۶): cleaning/maintenance به شمارنده اضافه شدند. پیش از این
   // `occ[t.s]++` رویِ کلیدِ ناموجود NaN تولید می‌کرد و نرخِ اشغال را خراب می‌کرد.

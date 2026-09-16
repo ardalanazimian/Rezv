@@ -109,7 +109,9 @@ test('error با details.reason → پیامِ فارسیِ مشخص، نه «خ
   await fillCommitted(page, '#pvPhone', '09121234569');
   await page.locator('#pvSubmit').click();
   await expect(page.locator('#pvErr')).toBeVisible();
-  await expect(page.locator('#pvErr')).toContainText('قبلاً مالکِ یک رستوران');
+  // ۲۰۲۶-۰۹-۱۳: متن اصلاح شد — سرور (provisioning.ts) هر کارمندِ فعال با این شماره را
+  // می‌گیرد، نه فقط مالک؛ «قبلاً مالکِ یک رستوران» برای شماره‌ی یک مدیر غلط بود.
+  await expect(page.locator('#pvErr')).toContainText('قبلاً به یک کسب‌وکار (مالک یا کارمند) وصل است');
   // فرم باز مانده تا اصلاح ممکن باشد؛ دکمه دوباره فعال است
   await expect(page.locator('#pvSubmit')).toBeEnabled();
 });

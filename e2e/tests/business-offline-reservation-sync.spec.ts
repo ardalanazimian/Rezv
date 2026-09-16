@@ -45,7 +45,11 @@ async function mockBizApi(page: Page, opts: { failReservationPost: boolean }, se
       return route.fulfill(json({ reservation: { code: 'OFF1' } }));
     }
     if (p === '/restaurant/reservations' && m === 'GET') return route.fulfill(json({ reservations: [], next_cursor: null }));
-    if (p === '/restaurant/tables') return route.fulfill(json({ items: [] }));
+    // یک میزِ آزادِ واقعی: شماره‌ی میز باید از انتخابِ کاربر بیاید. پیش از
+    // ۲۰۲۶-۰۹-۱۳ این mock خالی بود و تستِ «table_number در بدنه هست» فقط به
+    // لطفِ fallbackِ ساختگیِ `||1` سبز می‌شد — همان «میزِ ۱»ای که رزروِ دستی
+    // بی‌صدا روی رستورانِ واقعی می‌نشاند.
+    if (p === '/restaurant/tables') return route.fulfill(json({ items: [{ id: '11111111-1111-4111-8111-111111111111', number: 4, capacity: 4, state: 'free', is_active: true }] }));
     return route.fulfill(json({ ok: true }));
   });
 }
@@ -90,7 +94,7 @@ test('B-03: بدنه‌ی صف‌شده‌ی آفلاین همان قراردا�
   expect(b.date, 'date باید YYYY-MM-DD باشد، نه کلیدِ تبِ تاریخ').toMatch(/^\d{4}-\d{2}-\d{2}$/);
   expect(b.time, 'time باید ارقامِ لاتین باشد، نه فارسی').toMatch(/^\d{2}:\d{2}$/);
   // فیلدهایی که مسیرِ آنلاین می‌فرستد و مسیرِ آفلاین جا می‌انداخت:
-  expect(b.guest?.table_number, 'شماره‌ی میز در بدنه‌ی آفلاین جا افتاده بود').toBeDefined();
+  expect(b.guest?.table_number, 'شماره‌ی میز در بدنه‌ی آفلاین جا افتاده بود (یا از انتخاب نیامد)').toBe(4);
   expect(b.notify_sms, 'notify_sms در بدنه‌ی آفلاین جا افتاده بود').toBeDefined();
 });
 

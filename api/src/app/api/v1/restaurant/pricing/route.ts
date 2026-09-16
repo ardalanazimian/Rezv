@@ -14,6 +14,10 @@ const rulesSchema = z.array(z.object({
   from: zTimeStr,
   to: zTimeStr,
   min_toman: z.number().int().min(0),
+  // برچسبِ نمایشیِ پیشنهادِ پذیرفته‌شده («شب‌های آخر هفته»). staff-system.js آن
+  // را می‌فرستد و در «قواعدِ فعال» نشانش می‌دهد؛ تا ۲۰۲۶-۰۹-۱۳ این schema
+  // نداشتش و `z.object` بی‌صدا دورش می‌ریخت ⇒ بعد از رفرش فقط حروفِ روزها.
+  label: z.string().max(80).trim().optional(),
 })).max(50).optional();
 const pricingSchema = z.object({
   rules: rulesSchema,

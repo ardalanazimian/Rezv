@@ -145,6 +145,13 @@ function renderDashWaitlist(){
 // اکشن ثبت ورود از داشبورد — به منطق موجود markArrived وصل می‌شود
 function dashCheckIn(idx){
   const r = RES[idx]; if(!r) return;
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `idx` اندیسِ `RES` است،
+  // ولی markArrived/changeStatus ردیف را از `(RES_VIEW||RES)[i]` برمی‌دارند و
+  // `RES_VIEW` آخرین فهرستِ تبِ «رزروها» است (مثلاً «فردا») و هرگز پاک نمی‌شد.
+  // پس بعد از یک بار باز کردنِ آن تب، «ثبت ورود»ِ داشبورد وضعیتِ **مهمانِ
+  // دیگری** را PATCH می‌کرد و پیامکِ خوش‌آمد را به شماره‌ی او می‌فرستاد.
+  // RES_VIEW فقط مالِ همان تب است و با رندرِ بعدیِ آن دوباره ست می‌شود.
+  RES_VIEW = null;
   if(typeof markArrived==='function'){ markArrived(idx); }
   else { r.status='arrived'; }
   renderEnterpriseDashboard();
@@ -336,6 +343,14 @@ function renderHeatmap(){
 
 // ── مشتریان برتر ──
 function renderTopCustomers(){
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `/restaurant/customers` به canViewAnalytics
+  // نیاز دارد که staff پیش‌فرض ندارد؛ شکست (۴۰۳/قطعی) GUESTS_DEMO را روی داشبوردِ
+  // «زنده» می‌گذاشت (نشانِ زنده `_guestsLoaded` را نمی‌پرسد). با نشستِ واقعی و
+  // بدونِ دادهٔ واقعی، هیچ اسمی نشان داده نمی‌شود.
+  if(API.getToken() && !_guestsLoaded){
+    document.getElementById('topCustomers').innerHTML=`<div class="dr-empty">فهرستِ مشتریانِ برتر در دسترس نیست</div>`;
+    return;
+  }
   const top=[...GUESTS].sort((a,b)=>b.visits-a.visits).slice(0,5);
   document.getElementById('topCustomers').innerHTML=top.map((c,i)=>`
     <div class="top-cust" onclick="viewCustomerHistory(${jsq(c.name)})">

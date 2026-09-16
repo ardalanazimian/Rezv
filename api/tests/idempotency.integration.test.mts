@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
 import { withIdempotency, cleanupIdempotencyKeys } from '../src/lib/idempotency.ts';
+// ⚠️ بدونِ پسوند، عمداً: زیرِ tsx، `errors.ts` و `errors` دو نمونه‌ی جدای ماژول
+// می‌سازند (اندازه‌گیری‌شده، ۲۰۲۶-۰۹-۱۳: `ApiError === ApiError` → false) و
+// idempotency.ts با `./errors` import می‌کند؛ با پسوند، `instanceof` در کد رد
+// می‌شد و تستِ آزادسازی به دلیلِ غلط قرمز می‌ماند.
+const { Err } = await import('../src/lib/errors');
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Idempotency — تستِ زنده رویِ Postgresِ واقعی
@@ -155,5 +160,53 @@ describe('Idempotency — رفتارِ پایه', () => {
       'ردیفِ منقضی باید حذف شود');
     assert.equal(await db.idempotencyKey.count({ where: { scope } }), 1,
       'ردیفِ زنده باید بماند');
+  });
+});
+
+describe('Idempotency — آزادسازی پس از ردِ قطعیِ handler (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳)', () => {
+  // ⚠️ باگی که این بلوک قفل می‌کند: کلید قبل از منطقِ دامنه claim می‌شد و وقتی
+  // handler خطا می‌داد هرگز آزاد نمی‌شد. پنلِ شرکت و پنلِ رستوران عمداً همان
+  // کلید را برای ارسالِ اصلاح‌شده‌ی همان فرم نگه می‌دارند ⇒ «slug گرفته شده →
+  // اصلاح → ارسال» تا ۶۰ ثانیه ۴۰۹ IDEMPOTENCY_CONFLICT می‌گرفت.
+
+  test('ردِ ۴xx کلید را آزاد می‌کند: همان کلید دوباره claim می‌شود، نه ۴۰۹', async () => {
+    const key = clientKey('release-4xx');
+    const scope = `${TAG}:admin-provision`;
+    const first = await withIdempotency<unknown>(key, scope, 'admin:a1');
+    if (first.replayed) throw new Error('پیش‌شرط شکست');
+    await first.release(Err.conflict('slug_unavailable', 'slug گرفته شده'));
+
+    const retry = await withIdempotency<unknown>(key, scope, 'admin:a1');
+    assert.equal(retry.replayed, false, 'تلاشِ دوباره پس از ردِ ۴xx باید تازه claim کند');
+  });
+
+  test('خطای ناشناخته/۵xx کلید را نگه می‌دارد (ممکن است اثرِ جانبی رخ داده باشد)', async () => {
+    // کنترلِ منفی: بدونِ این، «آزادکردنِ همه‌چیز» هم از تستِ بالا سبز می‌گذشت
+    // و retry بعد از یک خطای پساکامیت، رزروِ دوم می‌ساخت.
+    const key = clientKey('release-5xx');
+    const scope = `${TAG}:reservation`;
+    const first = await withIdempotency<unknown>(key, scope, 'customer:c9');
+    if (first.replayed) throw new Error('پیش‌شرط شکست');
+    await first.release(new Error('boom after commit'));
+    await first.release(Err.serviceUnavailable('down'));
+
+    await assert.rejects(
+      () => withIdempotency<unknown>(key, scope, 'customer:c9'),
+      (e: unknown) => (e as { status?: number }).status === 409,
+      'کلید باید in_progress بماند ⇒ ۴۰۹',
+    );
+  });
+
+  test('release روی کلیدِ done پاسخِ ذخیره‌شده را پاک نمی‌کند', async () => {
+    const key = clientKey('release-done');
+    const scope = `${TAG}:walkin`;
+    const first = await withIdempotency<{ code: string }>(key, scope, 'restaurant:r1');
+    if (first.replayed) throw new Error('پیش‌شرط شکست');
+    await first.commit({ code: 'RZDONE01' });
+    await first.release(Err.validation('late'));
+
+    const again = await withIdempotency<{ code: string }>(key, scope, 'restaurant:r1');
+    assert.equal(again.replayed, true, 'پاسخِ done باید برای replay بماند');
+    if (again.replayed) assert.equal(again.response.code, 'RZDONE01');
   });
 });

@@ -91,12 +91,19 @@ export const API = {
    *
    * سرور مالکیت را چک می‌کند: مشتری فقط رزروِ خودش. پس توکن لازم است.
    */
-  async reservationQrSvg(code, size){
+  async reservationQrSvg(code, size, _retried = false){
     if (!this.getToken()) return { ok:false, error:{ message:'برای دیدنِ کد باید وارد شوی' } };
     try {
       const res = await fetch(`${this.base}/api/v1/reservations/${encodeURIComponent(code)}/qr?size=${encodeURIComponent(size || 360)}`, {
         headers: { Authorization: 'Bearer ' + this.getToken() },
       });
+      // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: fetchِ مستقیم مسیرِ ۴۰۱→refresh→retryِ `request()` را
+      // نداشت؛ پس از ۱۵ دقیقه روی صفحه‌ی سفرها (معمولاً دمِ درِ رستوران) «کد ساخته
+      // نشد» می‌آمد در حالی که نشست معتبر بود.
+      if (res.status === 401 && this._refresh && !_retried) {
+        if (await this._doRefresh()) return this.reservationQrSvg(code, size, true);
+        this._onSessionExpired();
+      }
       if (!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
       return { ok:true, data:{ svg: await res.text() } };
     } catch {

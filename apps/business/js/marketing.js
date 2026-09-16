@@ -27,9 +27,14 @@ function automationConversionFa(a){
              :'نرخِ تبدیل هنوز اندازه‌پذیر نیست';
 }
 
+let COUPONS_ERROR=null;
 async function loadMarketing(){
   if(!API.getToken()) return;
   const [c,a]=await Promise.all([API.couponsList(),API.automationsList()]);
+  // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: تبِ بازاریابی canManageCampaigns می‌خواهد ولی
+  // `/restaurant/coupons` canManageCoupons؛ ۴۰۳ (یا قطعی) بی‌صدا «هنوز کوپنی
+  // ساخته نشده» نشان می‌داد. حالا علتِ واقعی گفته می‌شود.
+  COUPONS_ERROR = c.ok ? null : (c.offline ? 'اتصال به سرور برقرار نشد' : (c.error?.message || 'کوپن‌ها بارگیری نشد'));
   if(c.ok) COUPONS=c.data?.items||[];
   if(a.ok){ AUTOMATIONS=a.data?.items||[]; AUTOMATION_ATTRIBUTION=a.data?.attribution||null; }
   _mktLoaded=true;
@@ -73,8 +78,8 @@ function renderCoupons(){
       <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="createCoupon()">ساخت کوپن</button>
     </div>
     <div class="panel">
-      <div class="panel-head"><div class="panel-title">کوپن‌های فعال</div><div class="panel-sub">${fa(COUPONS.length)} کوپن</div></div>
-      ${COUPONS.length?COUPONS.map(c=>`
+      <div class="panel-head"><div class="panel-title">کوپن‌های فعال</div><div class="panel-sub">${COUPONS_ERROR?'—':fa(COUPONS.length)+' کوپن'}</div></div>
+      ${COUPONS_ERROR?`<div style="text-align:center;color:var(--t2);padding:30px">${esc(COUPONS_ERROR)}</div>`:COUPONS.length?COUPONS.map(c=>`
         <div class="staff-row">
           <div style="flex:1">
             <div style="font-size:14px;font-weight:700;direction:ltr;text-align:right">${esc(c.code)}</div>
@@ -226,13 +231,23 @@ async function doSendCampaign(){
       if(!CLUB.length){ CLUB = await (typeof loadClubMembers==='function'?loadClubMembers():Promise.resolve(CLUB)); }
       phones=(CLUB||[]).filter(m=>m.bMonth===currentMonthFa()&&m.phone).map(m=>String(m.phone));
     }else{
-      const cs=await API.customers('segment='+encodeURIComponent(aud.value)+'&limit=500');
-      if(!cs.ok){
-        toast('', (cs.error&&cs.error.message)||'فهرستِ مخاطب بارگیری نشد — کمپین ارسال نشد');
+      // ⚠️ رفعِ P0 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `limit=500` بود و
+      // سرور `limit` را حداکثر ۵۰ می‌پذیرد ⇒ **هر** کمپینِ سگمنتیِ «در خطر /
+      // VIP / مشتریِ جدید» ۴۲۲ «limit: حداکثر 50» می‌گرفت و هیچ پیامکی نمی‌رفت.
+      // حالا صفحه‌به‌صفحه با next_cursor تا سقفِ ۵۰۰ شماره‌ی روتِ پیامک.
+      let cursor=null, failed=null;
+      do{
+        const cs=await API.customers('segment='+encodeURIComponent(aud.value)+'&limit=50'+(cursor?'&cursor='+encodeURIComponent(cursor):''));
+        if(!cs.ok){ failed=cs; break; }
+        phones.push(...(cs.data.items||[]).map(x=>x.phone).filter(Boolean).map(String));
+        cursor=cs.data.next_cursor||null;
+      }while(cursor && phones.length<500);
+      if(failed){
+        toast('', (failed.error&&failed.error.message)||'فهرستِ مخاطب بارگیری نشد — کمپین ارسال نشد');
         if(btn){btn.disabled=false;btn.textContent='بله، ارسال کن';}
         return;
       }
-      phones=(cs.data.items||[]).map(x=>x.phone).filter(Boolean).map(String);
+      phones=[...new Set(phones)].slice(0,500);
     }
     if(!phones.length){
       toast('','در سگمنتِ «'+aud.label+'» شماره‌ی معتبری برای ارسال نیست');

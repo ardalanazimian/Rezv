@@ -27,12 +27,18 @@ const PERM_DEFS=[
   ['canManageSettings','مدیریت تنظیمات'],
 ];
 
+let _staffLoadError=null;
 async function loadStaff(){
   if(!API.getToken()) return; // آفلاین/دمو
   const res=await API.staffList();
-  if(res.ok && Array.isArray(res.data?.items)) STAFF_LIST=res.data.items;
-  _staffLoaded=true;
+  // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `_staffLoaded=true` بی‌قیدوشرط بود. نقشِ
+  // staff از `/restaurant/staff` ۴۰۳ می‌گیرد و پس از رفرش (نقش هنوز نامعلوم) تب
+  // دیده می‌شود ⇒ دو کارمندِ نمونه بدونِ نوتِ «نمونه» به‌عنوانِ کارکنانِ واقعی، و
+  // ذخیره‌ی دسترسیِ `staff_id:'demo2'` ⇒ ۴۲۲. حالا شکست خطای صریح است.
+  if(res.ok && Array.isArray(res.data?.items)){ STAFF_LIST=res.data.items; _staffLoaded=true; _staffLoadError=null; }
+  else _staffLoadError=res.offline?'اتصال به سرور برقرار نشد':(res.error?.message||'فهرستِ کارکنان بارگیری نشد');
 }
+function retryStaff(){ _staffLoadError=null; rStaff(); }
 
 // ═══════════ تغییرِ رمزِ خود (مهاجرتِ ۰۷۴) ═══════════
 // ⚠️ چرا اینجا و نه در پنلِ شرکت: رمزِ اولیه را شرکت می‌سازد، ولی از آن
@@ -56,9 +62,16 @@ async function submitPasswordChange(){
 }
 
 function rStaff(){
-  if(!_staffLoaded && API.getToken()){ loadStaff().then(()=>rStaff()); }
+  // `_staffLoadError` جلوی حلقه‌ی «شکست → رندر → دوباره fetch» را می‌گیرد؛ تلاشِ
+  // دوباره فقط با دکمه.
+  if(!_staffLoaded && !_staffLoadError && API.getToken()){ loadStaff().then(()=>rStaff()); }
   const avatar=s=>(s.name||s.phone||'?').toString().trim().charAt(0);
-  const isDemo=!API.getToken()||!_staffLoaded;
+  const isDemo=!API.getToken();
+  const staffRows=API.getToken()&&!_staffLoaded
+    ? (_staffLoadError
+        ? `<div class="empty-state"><div class="empty-state-desc">${esc(_staffLoadError)}</div><button class="btn btn-ghost btn-sm" onclick="retryStaff()">تلاش دوباره</button></div>`
+        : `<div class="empty-state"><div class="empty-state-desc">در حال بارگیریِ کارکنان…</div></div>`)
+    : null;
   document.getElementById('v-staff').innerHTML=(isDemo?`<div class="cash-note">${icon('info',{size:13})} فهرستِ زیر نمونه است، کارکنانِ واقعیِ تو نیست.</div>`:'')+`
     <div class="panel">
       <div class="panel-head"><div>
@@ -76,8 +89,8 @@ function rStaff(){
       </div>
     </div>`+`
     <div class="panel">
-      <div class="panel-head"><div><div class="panel-title">کارکنان</div><div class="panel-sub">${fa(STAFF_LIST.length)} نفر · مدیریت دسترسی</div></div></div>
-      ${STAFF_LIST.map(s=>`<div class="staff-row">
+      <div class="panel-head"><div><div class="panel-title">کارکنان</div><div class="panel-sub">${staffRows?'مدیریت دسترسی':`${fa(STAFF_LIST.length)} نفر · مدیریت دسترسی`}</div></div></div>
+      ${staffRows||STAFF_LIST.map(s=>`<div class="staff-row">
         <div class="staff-ava">${esc(avatar(s))}</div>
         <div style="flex:1"><div style="font-size:14px;font-weight:700">${esc(s.name||toFaDigits(s.phone||''))}</div><div style="font-size:12px;color:var(--t2)">${esc(toFaDigits(s.phone||''))}</div></div>
         <span class="role-tag ${esc(s.role)}">${esc(ROLE_FA[s.role]||s.role)}</span>

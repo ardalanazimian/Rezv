@@ -201,13 +201,28 @@ export async function acceptWL(){
     toast('',res.error?.message||'ثبتِ رزرو ناموفق بود');
   }
 }
+// ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): هر دو تابع `.catch(()=>{})` داشتند، ولی
+// `API.post/request` هرگز throw نمی‌کنند — `{ok:false}` برمی‌گردانند — پس آن catch
+// هیچ‌وقت چیزی نمی‌گرفت و «آفر رد شد» / «از صف خارج شدی» **بی‌قیدوشرط** نشان داده
+// و ورودی محلی پاک می‌شد. آفلاین یا ۴۲۹/۴۲۲، مهمان روی سرور هنوز waiting/offered
+// می‌ماند: پیامکِ آفرِ بعدی می‌گرفت و میزی برایش نگه داشته می‌شد. حالا فقط
+// پاسخِ موفقِ سرور ورودی را پاک می‌کند؛ در غیرِ این صورت خطا گفته و وضعیت حفظ می‌شود.
 export async function declineWL(){
   clearInterval(wlTimer);
-  await API.post(`/waitlist/${WL.id}/decline${wlAuthQS()}`).catch(()=>{});
+  const res=await API.post(`/waitlist/${WL.id}/decline${wlAuthQS()}`);
+  if(!res.ok){
+    toast('',res.offline?'اتصال به سرور برقرار نشد — آفر هنوز رد نشده':(res.error?.message||'ردِ آفر ناموفق بود'));
+    showWaitlistStatus();
+    return;
+  }
   toast('','آفر رد شد');WL=null;closeSheet();
 }
 export async function leaveWL(){
-  await API.request(`/waitlist/${WL.id}${wlAuthQS()}`,{method:'DELETE'}).catch(()=>{});
+  const res=await API.request(`/waitlist/${WL.id}${wlAuthQS()}`,{method:'DELETE'});
+  if(!res.ok){
+    toast('',res.offline?'اتصال به سرور برقرار نشد — هنوز در صف هستی':(res.error?.message||'خروج از صف ناموفق بود'));
+    return;
+  }
   toast('','از صف خارج شدی');WL=null;closeSheet();
 }
 

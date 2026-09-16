@@ -5,16 +5,13 @@ import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, parseQuery, zDateStr, z } from '@/lib/schemas';
 
 import { withApiMetrics } from '@/lib/api-metrics';
+import { bookableStatus } from '@/lib/restaurant-bookable';
 
 const paramsSchema = z.object({ slug: z.string().min(1).max(150) });
 const querySchema = z.object({
   date: zDateStr,
   party: z.number().int().min(1).max(30).default(2),
 });
-
-// همان آستانه‌ای که موتورِ رزرو استفاده می‌کند (lib/reservations.ts) و همان
-// چیزی که فهرستِ عمومیِ رستوران‌ها با آن فیلتر می‌کند (restaurants/route.ts).
-const ONLINE_WINDOW_MS = 90_000;
 
 /** GET /api/v1/restaurants/{slug}/availability?date=2026-06-12&party=2 */
 async function GET_impl(req: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -42,14 +39,13 @@ async function GET_impl(req: Request, { params }: { params: Promise<{ slug: stri
     // معتبرِ کسب‌وکار است، نه خطای کلاینت. ولی سانسِ آزاد نمی‌دهد و علتش را
     // صریح می‌گوید تا اپ بتواند حقیقت را نشان دهد.
     const payload = await getAvailability(r.id, date, party);
-    const online = !r.onlineGating
-      || (r.lastSeenAt != null && Date.now() - new Date(r.lastSeenAt).getTime() < ONLINE_WINDOW_MS);
-    if (!r.isOpen || !online) {
+    const status = bookableStatus(r);
+    if (status !== 'online') {
       return NextResponse.json({
         ...payload,
         slots: [],
-        restaurant_status: !r.isOpen ? 'closed' : 'offline',
-        reason: !r.isOpen
+        restaurant_status: status,
+        reason: status === 'closed'
           ? 'این رستوران فعلاً رزروِ آنلاین نمی‌پذیرد'
           : 'این رستوران موقتاً برای رزروِ آنلاین در دسترس نیست',
       });

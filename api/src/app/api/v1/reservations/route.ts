@@ -19,7 +19,8 @@ import { withApiMetrics } from '@/lib/api-metrics';
 // نمی‌شدند و مستقیم (فقط با ?? پیش‌فرض) به createReservation می‌رفتند — یعنی
 // شکلِ دلخواه از کلاینت مستقیم وارد منطق مالی/رزرو می‌شد.
 const reservationSchema = z.object({
-  restaurant_id: zUuid,
+  // اجباری فقط برای مشتری — برای staff رستوران از contextِ احراز می‌آید (پایین).
+  restaurant_id: zUuid.optional(),
   date: zDateStr,
   time: zTimeStr,
   party_size: zPartySize,
@@ -46,6 +47,7 @@ const reservationSchema = z.object({
 
 /** POST /api/v1/reservations — مشتری (app) یا staff (manual) */
 async function POST_impl(req: Request) {
+  let idem: Awaited<ReturnType<typeof withIdempotency<any>>> | undefined;
   try {
     // ⚠️ سقفِ اختصاصی — تا امروز **هیچ‌جا اعمال نمی‌شد** (ممیزیِ نهایی،
     // ۲۰۲۶-۰۸-۲۵). `RULES.reservation` از روزِ اول تعریف شده بود و
@@ -76,11 +78,13 @@ async function POST_impl(req: Request) {
     // ⚠️ هویتِ درخواست‌کننده بخشی از کلیدِ کش است (رجوع کن به lib/idempotency.ts):
     // بدونِ آن، هر کسی که همان Idempotency-Key را بفرستد پاسخِ نفرِ قبلی را
     // می‌گرفت — با اجرای زنده اثبات و در ۲۰۲۶-۰۸-۲۰ رفع شد.
-    const idem = await withIdempotency<any>(idemKey, 'reservation', `${auth.kind}:${auth.sub}`);
+    idem = await withIdempotency<any>(idemKey, 'reservation', `${auth.kind}:${auth.sub}`);
     if (idem.replayed) return NextResponse.json(idem.response, { status: 201 });
 
     const isStaff = auth.kind === 'staff';
     let staffGuestUserId: string | undefined;
+    let restaurantId = b.restaurant_id;
+    if (!isStaff && !restaurantId) throw Err.validation('restaurant_id: الزامی است');
     if (isStaff) {
       // ⚠️ رفعِ P1 (فازِ ۲، پروتکل §۷): این شاخه فقط چک می‌کرد که
       // `b.restaurant_id` به تنانتِ فراخوان تعلق دارد، و بعد همان idِ
@@ -98,7 +102,15 @@ async function POST_impl(req: Request) {
       // مشتری هم سرویس می‌دهد و آن wrapper مسیرِ مشتری را می‌شکست.
       await requirePermission(auth, 'canManageReservations');
       const branch = await resolveStaffRestaurant(auth, req);
-      if (branch.id !== b.restaurant_id) throw Err.forbidden('رزرو فقط برایِ شعبه‌ی فعالِ خودت مجاز است');
+      // ⚠️ رفعِ P0 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): `restaurant_id`
+      // برای staff اجباری بود، ولی پنل آن را از `STAFF_INFO` می‌فرستد که فقط
+      // لاگین پرش می‌کند — بازیابیِ نشست از localStorage (حالتِ روزمره‌ی
+      // تبلت) آن را خالی می‌گذاشت و هر رزروِ دستی ۴۲۲ می‌گرفت؛ و بعد از
+      // تعویضِ شعبه کهنه بود و ۴۰۳. رستوران از contextِ احراز می‌آید، نه بدنه
+      // (قاعده‌ی CLAUDE.md). اگر بدنه یکی بفرستد و با شعبه‌ی فعال نخواند، هنوز
+      // ۴۰۳ است — صفِ آفلاینی که برای شعبه‌ی دیگری ساخته شده نباید اینجا بنشیند.
+      if (restaurantId && branch.id !== restaurantId) throw Err.forbidden('رزرو فقط برایِ شعبه‌ی فعالِ خودت مجاز است');
+      restaurantId = branch.id;
       if (b.guest && !b.guest.name) throw Err.validation('اسم مهمان برای رزرو دستی الزامی است');
       // اگر شماره‌ی مهمان داده شده، کاربر واقعی را پیدا/بساز تا منطق آماده‌ی
       // عضویت باشگاه + کش‌بک (که قبلاً فقط برای userId اجرا می‌شد) برای رزروهای
@@ -120,7 +132,7 @@ async function POST_impl(req: Request) {
     }
 
     const result = await createReservation({
-      restaurantId: b.restaurant_id,
+      restaurantId: restaurantId!,
       date: b.date, time: b.time,
       partySize: b.party_size,
       preferences: b.preferences,
@@ -144,7 +156,12 @@ async function POST_impl(req: Request) {
     });
     await idem.commit(result);  // ذخیره‌ی پاسخ برای replayهای بعدی همان کلید
     return NextResponse.json(result, { status: 201 });
-  } catch (e) { return errorResponse(e); }
+  } catch (e) {
+    // ردِ قطعیِ ۴xx (SLOT_FULL، validation، forbidden…) کلید را آزاد می‌کند تا
+    // تلاشِ دوباره‌ی همان فرم ۶۰ ثانیه ۴۰۹ نگیرد — رجوع کن به lib/idempotency.ts.
+    if (idem && !idem.replayed) await idem.release(e);
+    return errorResponse(e);
+  }
 }
 
 // ── رصدپذیری: تنها نقطه‌ی شمارشِ HTTPِ این route (rezervno_http_*).

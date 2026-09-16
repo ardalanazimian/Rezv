@@ -328,12 +328,30 @@ const API = {
    * از `request()` (که همیشه `res.json()` می‌زند) عبور کند. شکلِ خروجی عمداً
    * همان قراردادِ بقیه است تا فراخوان مجبور نباشد این یکی را جور دیگری هندل کند.
    */
+  /**
+   * fetchِ احرازشده برای پاسخِ غیرِJSON (SVGِ QR) — همان دو قاعده‌ی `request()`:
+   * هدرِ `X-Restaurant-Id` و ۴۰۱ → refresh → یک تلاشِ دوباره.
+   *
+   * ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): دو fetchِ QR فقط
+   * `Authorization` می‌فرستادند. بدونِ هدرِ شعبه، سرور شعبه‌ی پیش‌فرضِ تنانت را
+   * برمی‌دارد ⇒ QRِ میزِ شعبه‌ی دیگر ۴۰۴ «میز» می‌داد، و QRِ منو آدرسِ منویِ
+   * **شعبه‌ی دیگری** را چاپ می‌کرد در حالی که کارت آدرسِ درست را نشان می‌داد.
+   * بعد از ۱۵ دقیقه (عمرِ access) هم هر دو ۴۰۱ می‌دادند.
+   */
+  async _authedRaw(path, _retried = false){
+    const headers = { Authorization: 'Bearer ' + this._token };
+    if (this._restaurantId) headers['X-Restaurant-Id'] = this._restaurantId;
+    const res = await fetch(this.base + '/api/v1' + path, { headers });
+    if (res.status === 401 && this._refresh && !_retried) {
+      if (await this._doRefresh()) return this._authedRaw(path, true);
+      this._onSessionExpired();
+    }
+    return res;
+  },
   async tableQrSvg(id, size){
     if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
     try{
-      const res = await fetch(this.base + `/api/v1/restaurant/tables/${encodeURIComponent(id)}/qr?size=` + encodeURIComponent(size||512), {
-        headers: { Authorization: 'Bearer ' + this._token },
-      });
+      const res = await this._authedRaw(`/restaurant/tables/${encodeURIComponent(id)}/qr?size=` + encodeURIComponent(size||512));
       if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
       return { ok:true, data:{
         svg: await res.text(),
@@ -411,7 +429,10 @@ const API = {
   menuItemPhotoUpload(id, file){
     const fd = new FormData();
     fd.append('file', file);
-    return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'POST', body: fd });
+    // ⚠️ ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳: از `request` (سقفِ ۸ ثانیه) می‌رفت در حالی که سرور تا ۸MB
+    // می‌پذیرد و گالری از قبل `requestRaw` با ۶۰ ثانیه دارد ⇒ روی موبایل «زمان
+    // درخواست تمام شد» در حالی که عکس شاید ذخیره شده بود.
+    return this.requestRaw('/restaurant/menu/' + encodeURIComponent(id) + '/photo', fd, 60000);
   },
   menuItemPhotoDelete(id){
     return this.request('/restaurant/menu/' + encodeURIComponent(id) + '/photo', { method: 'DELETE' });
@@ -427,9 +448,7 @@ const API = {
   async menuQrSvg(size){
     if(!this._token) return { ok:false, error:{ message:'برای گرفتنِ QR باید وارد شوی' } };
     try{
-      const res = await fetch(this.base + '/api/v1/restaurant/menu/qr?size=' + encodeURIComponent(size||512), {
-        headers: { Authorization: 'Bearer ' + this._token },
-      });
+      const res = await this._authedRaw('/restaurant/menu/qr?size=' + encodeURIComponent(size||512));
       if(!res.ok) return { ok:false, status:res.status, error:{ message:`خطای ${res.status}` } };
       return { ok:true, data:{ svg: await res.text(), url: decodeURI(res.headers.get('X-Menu-Url') || '') } };
     }catch{
@@ -737,12 +756,20 @@ async function loadTables(){
   const res = await API.listTables();
   if (res.ok && Array.isArray(res.data?.items)) {
     TABLES = res.data.items.map(mapApiTable);
-  } else if (!TABLES.length) {
-    // بک‌اند در دسترس نیست → میزهای نمونه (مثل بقیه‌ی داده‌های دمو) تا پلان سالن و
-    // KPI اشغال خالی نمانند
-    TABLES = DEMO_TABLES.map(t=>({...t}));
+    _tablesLoaded = true;
+  } else if (!API.getToken()) {
+    // دمو (بدونِ نشست) → میزهای نمونه تا پلان سالن و KPI اشغال خالی نمانند
+    if (!TABLES.length) TABLES = DEMO_TABLES.map(t=>({...t}));
+    _tablesLoaded = true;
+  } else {
+    // ⚠️ رفعِ P1 (ممیزیِ قراردادِ فرانت↔بک، ۲۰۲۶-۰۹-۱۳): با نشستِ واقعی هم شکستِ لود (۴۰۳،
+    // قطعی) میزهای نمونه می‌ساخت و `_tablesLoaded` را بالا می‌برد. آن میزها به
+    // انتخاب‌گرِ واک‌این (`table_id:'demo-t1'` ⇒ ۴۲۲) و رزروِ دستی (شماره‌ی میزِ
+    // نمونه، که شاید در رستورانِ واقعی میزِ دیگری باشد) می‌رفتند. حالا فهرست
+    // همان است که بود (در شروع خالی) و پرچم پایین می‌ماند تا دفعه‌ی بعد دوباره
+    // تلاش شود؛ پلانِ خالی «نمی‌دانیم» را نشان می‌دهد، نه میزِ ساختگی.
+    _tablesLoaded = false;
   }
-  _tablesLoaded = true;
   return TABLES;
 }
 // ⚠️ رفعِ باگ (همان الگویِ RES): این آرایه قبلاً «const GUESTS» بود — یعنی
