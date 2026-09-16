@@ -131,8 +131,16 @@ describe('points_ledger فقط-افزودنی (مهاجرتِ ۰۸۹ — RT-22 �
       select: { id: true },
     });
     await db.pointsLedger.create({ data: { userId: v.id, delta: 30, reason: 'signup', note: '[DEMO]' } });
+    // ⚠️ M-09 (۲۰۲۶-۰۹-۱۶): آرگومانِ دوم پیش از این یک **رشته** بود — Node آن را پیامِ
+    // خودِ assert می‌خواند، پس هر شکستی (مثلاً P2025ِ «ردیف پیدا نشد») تست را سبز
+    // می‌کرد. هویتِ شکست حالا دقیقاً همان است که روی DBِ زنده اندازه گرفته شد:
+    // P2003 روی `points_ledger_user_id_fkey`.
     await assert.rejects(() => db.user.delete({ where: { id: v.id } }),
-      'حذفِ کاربرِ دارای ردیفِ امتیاز باید رد شود — وگرنه دفتر از راهِ والد پاک می‌شود');
+      (e: unknown) => {
+        const err = e as { code?: string; meta?: { field_name?: unknown } };
+        return err.code === 'P2003' && String(err.meta?.field_name ?? '').startsWith('points_ledger_user_id_fkey');
+      },
+      'حذفِ کاربرِ دارای ردیفِ امتیاز باید با FKِ دفتر (P2003 روی points_ledger_user_id_fkey) رد شود — نه به هر دلیلِ دیگر');
   });
 
   test('کنترل: افزودنِ ردیفِ تازه همچنان کار می‌کند', async () => {
