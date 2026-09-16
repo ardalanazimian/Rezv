@@ -178,7 +178,7 @@ function grabExpression(text, matchStart, searchFrom = matchStart) {
 // (icon) یا رشته‌ی صرفاً عددی/escape‌شده (fa/fmtFa/esc/chatEsc/...). این
 // فهرست دستی نگه‌داشته می‌شود و باید با shared/js/format.js + الگویِ
 // تکرارشده در apps/* هماهنگ بماند.
-const TRUSTED_CALL_NAMES = ['icon', 'fa', 'fmtFa', 'esc', 'chatEsc', 'faTime', 'faRelative', 'faD', 'toFaDigits', 'fnl'];
+const TRUSTED_CALL_NAMES = ['esc', 'chatEsc', 'faRelative'];
 const TRUSTED_CALL_RE = new RegExp(`^(?:${TRUSTED_CALL_NAMES.join('|')})\\s*\\(`);
 
 const TRUSTED_INTERP_PATTERNS = [
@@ -320,7 +320,7 @@ function extractRhs(expr, kind) {
 // ⚠️ `faNum` عمداً در این فهرست **نیست**: فقط ارقام را نگاشت می‌کند و بقیه
 //    را خام رد می‌کند. اگر روزی کسی وسوسه شد اضافه‌اش کند، اول باید خودِ
 //    faNum را به یک escaper تبدیل کند.
-const SAFE_GENERATORS = /^\$\{\s*(?:icon|fmtFa|gradFor|jsq|esc)\s*\(/;
+const SAFE_GENERATORS = /^\$\{\s*(?:gradFor|jsq|esc)\s*\(/;
 
 function isSafeInterp(interp) {
   if (/\b(?:esc|jsq)\s*\(/.test(interp)) return true;
