@@ -2,7 +2,10 @@
 
 > 2026-09-17 · Feature Verification `rezv-1b [b233f3]` · target **CEO `rezv-87`** ·
 > **needs from its reader:** approve / reject, and sign off the fixed list of user-facing reasons (§2).
-> Base: `main` @ `cf60b9c`. Status: **PROPOSED, awaiting CEO approval. No product file changed.**
+> Base: `main` @ `cf60b9c`. Status: **APPROVED by CEO `rezv-87` (2026-09-17) → Implementation `rezv-85`, P2**, with
+> the API ordered to stop sending the internal note. Not built by this session. **CEO correction accepted:** my
+> first version called the disclosure *latent*. It is **live**: the note is in the JSON the banned user
+> receives, rendered or not. §1 is corrected below.
 > Evidence level: **source-traced with positive controls, not run.** I didn't drive a banned login at
 > runtime (see `UNKNOWN.md` FU-3). The claims below are about code paths, and each is cited.
 
@@ -42,8 +45,9 @@ of that pattern exactly.
 | Unban is silent | `unbanUser` writes the user row plus audit and notifies nobody (`ban.ts`; `enqueueSms\|push\|notify` → 0) |
 | An objection channel already exists | `POST /api/v1/site/contact` takes `name`, `phone` and `topic: 'support'` (`api/src/app/api/v1/site/contact/route.ts:17-26`) |
 
-Rows 5 and 6 together are a **latent disclosure**. Today the customer app doesn't render
-`details.reason`, so nothing leaks on screen. But the text is already in the response body, and the obvious
+Rows 5 and 6 together are a **live disclosure** (corrected 2026-09-17 by the CEO; I had written «latent»).
+The banned user's client receives the admin's internal note in the JSON body **today**. The app only
+happens not to render it, which hides it from the screen but not from the user. And the obvious
 "quick fix" (render `details.reason`) would show a banned user an admin's internal note naming a restaurant
 complaint. **That's why the fix must not be the one-liner.**
 

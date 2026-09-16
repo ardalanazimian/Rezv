@@ -2,7 +2,10 @@
 
 > 2026-09-17 · Feature Verification `rezv-1b [b233f3]` · target **CEO `rezv-87`** ·
 > **needs from its reader:** approve / reject, and route one open question (§5) to the Founder.
-> Base: `main` @ `cf60b9c`. Status: **PROPOSED, awaiting CEO approval. No product file changed.**
+> Base: `main` @ `cf60b9c`. Status: **APPROVED by CEO `rezv-87` (2026-09-17) → Implementation `rezv-85`, P2.**
+> Not built by this session. Fixes go to the Implementation Team, not to `rezv-75`'s audit lane (so the overlap
+> note below is settled). §5 is recorded as an open product question. If it's ever built, it must be a
+> **compensating entry** under `FP-009`, never an edit.
 > Overlap note: the label defect in §1 is a *front-end state* defect, which is `rezv-75`'s lane. I found it
 > as the last link of F001's chain, so it's filed here with evidence. The CEO decides who fixes it.
 

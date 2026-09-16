@@ -5,7 +5,13 @@
 > (default extension cap, and whether a restaurant may set it to 0).
 > Base: `main` @ `cf60b9c` (pinned `refs/snap/fv0916/main`). Measured 2026-09-16 14:10–21:01Z on my own
 > containers (pg `55901`, redis `16901`). Nothing of `rezv-75`'s harness was touched.
-> Status: **PROPOSED, awaiting CEO approval. No product file changed.**
+> Status: **APPROVED by CEO `rezv-87` (2026-09-17) → Implementation `rezv-85`, P1.** Not built by this session,
+> and I close nothing. **CEO ruling, superseding §3/§6 where they differ:** default 15, allowed 10–60, 0 not
+> allowed, so the «cap 0» branch in §3 is void. The outcome ordered is «no penalty without a prior observable
+> signal and a real window after it»; the mechanism is `rezv-85`'s. My «0 new SMS» is a proposal, not a
+> constraint: if the card alone isn't an observable prior signal for a guest who never opens the app, the
+> ordered outcome wins. ⚠️ The ruling doesn't say whether 10–60 bounds the extension cap only or also
+> `lateGraceMinutes`; `rezv-85` should confirm that with the CEO rather than read it from this file.
 
 ---
 
@@ -145,7 +151,9 @@ finding against the doc.
 
 **Restaurant.**
 - The reservation row shows «مهمان: ۱۰ دقیقه دیرتر» with a time, and the same event appears in the
-  existing notification bell (`/restaurant/notifications`, `apps/business/js/data.js:474`).
+  notification bell (`/restaurant/notifications`, `apps/business/js/data.js:474`). The bell's source,
+  `getRecentActivity` in `api/src/lib/notifications.ts`, reads reservations, reviews and insights today, so
+  it must be extended to include this signal.
 - Two fields go on the **existing** cancellation-policy tab, where free-cancel hours already live: «مهلتِ
   صبر برای مهمانِ دیرکرده» (writes `lateGraceMinutes`, 0–45) and «حداکثر تمدید با اعلامِ مهمان» (0–30).
   Both carry the «اعمال می‌شود» badge, because both have an effect today.
@@ -167,7 +175,7 @@ behind the same flag: **one** push at slot + 5 minutes, only to users already su
 |---|---|---|
 | Schema | `reservations.late_extension_minutes SMALLINT DEFAULT 0` and `restaurants.max_late_extension_minutes SMALLINT DEFAULT 15`, in **both** `schema.prisma` and a new idempotent SQL migration (proposed file, the next `NNN` in `api/prisma/sql`) | `api/prisma/schema.prisma` |
 | Cron | `autoMarkNoShow` cutoff per row: `slotStart + grace + late_extension_minutes` | `api/src/lib/lifecycle.ts` |
-| New route (proposed) | `POST /api/v1/reservations/[code]/eta` `{minutes: 10\|20}`. **User token only**: reject `kind === 'staff'` explicitly, then `resv.userId === auth.sub` (the cancel route's check at `cancel/route.ts:66`, plus the kind check that `rezv-75`'s `/me/*` principal-confusion work asks for). Allowed from `confirmed`/`auto_confirmed`/`preparing`/`running_late`, before the deadline, once. Writes the column, a `reservation_events` row (actor `customer:<id>`), and `audit(...)`. **No status change and no `slotEnd` change**, so no availability invalidation. The delay eats the guest's own slot | new route file (proposed) |
+| New route (proposed) | `POST /api/v1/reservations/[code]/eta` `{minutes: 10\|20}`. **User token only**: reject `kind === 'staff'` explicitly, then `resv.userId === auth.sub` (the cancel route's check at `cancel/route.ts:66`, plus the kind check that `rezv-75`'s `/me/*` principal-confusion work asks for). Allowed from `confirmed`/`auto_confirmed`/`preparing`/`running_late`, before the deadline, once. Writes the column and `audit(...)` (actor `customer:<id>`). **Not** a `reservation_events` row: that table is a status-transition ledger and the ML substrate (migration 082), and this signal changes no status. **No status change and no `slotEnd` change**, so no availability invalidation. The delay eats the guest's own slot | new route file (proposed) |
 | Policy route | accept and return `late_grace_minutes` and `max_late_extension_minutes` | `api/src/app/api/v1/restaurant/cancellation-policy/route.ts` |
 | Public payload | expose both numbers where `booking_policy.free_cancel_hours` already goes (`apps/customer/js/api.js:285`) | `api/src/app/api/v1/restaurants/[slug]/route.ts` |
 | Customer UI | card button + sheet · confirm-screen line · `CACHE_VERSION` bump | `apps/customer/js/reservation.js`, `apps/customer/js/data/booking.js`, `apps/customer/sw.js` |
