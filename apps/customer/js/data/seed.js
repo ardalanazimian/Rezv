@@ -1,8 +1,11 @@
 // ═══ رزرونو — داده‌های نمونه: رستوران‌ها، گرادیان، مزایا، نشان‌ها (بخشی از اپ کاستومر) ═══
+// ۰۹-۱۳: به‌جای شش گرادیانِ خطیِ Tailwind، به هشت «غذا»ی مشترکِ اپ و لندینگ اشاره
+// می‌کند (--dish-* در css/app.css). همان کلیدهای ۱..۶ و همان خانواده‌ی رنگ (سبز،
+// نارنجی، کهربایی، فیروزه‌ای، قرمز، بنفش) تا هیچ رستورانی رنگش را عوض‌شده نبیند.
 export const GRAD = {
-  1:'linear-gradient(135deg,#34D399,#059669)', 2:'linear-gradient(135deg,#FB923C,#EA580C)',
-  3:'linear-gradient(135deg,#FBBF24,#D97706)', 4:'linear-gradient(135deg,#22D3EE,#0891B2)',
-  5:'linear-gradient(135deg,#F87171,#DC2626)', 6:'linear-gradient(160deg,#818CF8,#4F46E5 60%,#1E1B4B)'
+  1:'var(--dish-pistachio)', 2:'var(--dish-saffron)',
+  3:'var(--dish-tea)', 4:'var(--dish-turquoise)',
+  5:'var(--dish-pomegranate)', 6:'var(--dish-eggplant)'
 };
 // گرادیانِ پس‌زمینه برای هر رستوران — GRAD با کلیدِ عددیِ ۱..۶ ساخته شده بود،
 // ولی idِ رستورانِ واقعی UUID است؛ GRAD[uuid] همیشه undefined می‌شد و کارت/هیرو
@@ -14,6 +17,20 @@ export function gradFor(id){
   const k = String(id ?? '');
   let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
   return GRAD[(h % 6) + 1];
+}
+/**
+ * واژه‌ی درشتِ کاشی/کارت/نمای تمام‌صفحه (۰۹-۱۳، جانشینِ ایموجی): اولین بخشِ `cuisine`
+ * («ایتالیایی · فیوژن» → «ایتالیایی»)، وگرنه اولین واژه‌ی نام بدونِ «[DEMO]». فقط متن
+ * است و در قالب همیشه از esc می‌گذرد. مثلِ gradFor تزئینی است و ادعای داده‌ای ندارد.
+ */
+export function dishWord(r){
+  const c = String(r?.cuisine || '').split(/[·،,/]/)[0].trim();
+  if (c) return c;
+  return String(r?.n || '').replace(/\[DEMO\]/g, '').trim().split(/\s+/)[0] || '';
+}
+/** طولِ دیداریِ واژه برای اندازه‌ی فونت (--len) — نیم‌فاصله حرف نیست. */
+export function dishLen(w){
+  return Math.max(2, String(w).replace(/\u200c/g, '').length);
 }
 // ═══════════════════════════════════════════════════════════
 //  DS-006 §۴ — شکلِ آیتمِ منو: یک قرارداد، نه دو

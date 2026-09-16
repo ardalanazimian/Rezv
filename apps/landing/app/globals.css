@@ -1,15 +1,27 @@
 /* ═══════════════════════════════════════════════════════════════════════
    وب‌سایتِ عمومیِ رزرونو — سیستمِ طراحی
+   ۲۰۲۶-۰۹-۱۳ · جهت: «اپل + تیک‌تاک + اکسپلورِ اینستاگرام» (دستورِ مالک)
+
+   قاعده‌ی لایه‌بندی (DS-010 §۳): **سیستم اپلی است، محتوا تیک‌تاکی.**
+     • chrome (زمینه، متن، دکمه، کارت، هدر) → تک‌رنگ، تخت، آرام: سفید / خاکستریِ
+       ‎#f5f5f7 / جوهرِ ‎#1d1d1f / مشکیِ واقعی برای بخش‌های «شب». یک رنگِ کنش.
+     • محتوا (کاشی‌های اکسپلور، ریلِ گوشی) → رنگِ زنده، لبه‌به‌لبه.
+   پیش از این زمینه کرِمِ گرم با اکسنتِ اخرایی، نشانِ «کپسولی» بالای هر تیتر،
+   و کارت با سایه و بلندشدن روی hover بود — دقیقاً کیتِ پیش‌فرضِ صفحه‌های
+   قالبی. هیچ‌کدام از آن‌ها «اپل» نیست.
 
    ساختار (همان دو لایه‌ی shared/css/tokens.css):
      ۱) Primitive — مقیاس‌ها و رنگ‌های خام
      ۲) Semantic  — نقش‌ها (سطح، متن، حاشیه). فقط این‌ها در کامپوننت‌ها.
 
-   حالتِ روشن/تاریک: هر دو کاملاً طراحی شده‌اند. انتخابِ کاربر روی
-   <html data-theme> می‌نشیند و بر ترجیحِ سیستم غالب است.
+   حالتِ روشن/تاریک: هر توکن یک بار با light-dark(). انتخابِ کاربر روی
+   <html data-theme> فقط color-scheme را قفل می‌کند. بخشِ «شب» (`.is-night`)
+   همان سازوکار را محلی به کار می‌برد — بدونِ یک پالتِ دوم (بلوکِ Semantic را
+   ببین که چرا انتخابگرش `:root, .is-night` است).
 
-   شیشه (glass): فقط روی هدرِ چسبان و عناصرِ شناور، همیشه با یک لایه‌ی
-   پس‌زمینه‌ی مات زیرِ blur → متن هیچ‌وقت روی محتوای متحرک شناور نمی‌ماند.
+   ⚠️ فاصله‌ی حروف (letter-spacing) در کلِ سایت صفر است. خطِ فارسی پیوسته است؛
+   فاصله‌ی منفیِ «اپلی» اتصالِ حروف را در بعضی موتورها می‌شکند. سلسله‌مراتب از
+   **وزن** می‌آید (۹۰۰ در برابرِ ۴۰۰)، نه از فشردگی.
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -19,20 +31,22 @@
   --fs-sm: 0.8125rem;
   --fs-md: 0.9375rem;
   --fs-base: 1rem;
-  --fs-lg: 1.125rem;
-  --fs-xl: 1.375rem;
-  --fs-2xl: 1.75rem;
-  --fs-3xl: 2.25rem;
-  --fs-4xl: 2.875rem;
-  --fs-5xl: 3.75rem;
+  --fs-body: 1.0625rem;   /* ۱۷px — اندازه‌ی بدنه‌ی اپل؛ فارسی با ۱۶px ریز خوانده می‌شود */
+  --fs-lg: 1.1875rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 2rem;
+  --fs-3xl: 2.75rem;
+  --fs-4xl: 3.5rem;
+  --fs-5xl: 4.5rem;
 
-  --lh-tight: 1.15;
-  --lh-snug: 1.35;
-  --lh-normal: 1.65;
-  --lh-relaxed: 1.9;
+  --lh-tight: 1.12;
+  --lh-snug: 1.4;
+  --lh-normal: 1.8;       /* فارسی به ارتفاعِ خطِ بیشتری از لاتین نیاز دارد */
+  --lh-relaxed: 1.95;
 
-  --ls-tight: -0.03em;
-  --ls-snug: -0.015em;
+  /* حفظ‌شده برای سازگاری — هر دو صفرند (بالا را ببین) */
+  --ls-tight: 0;
+  --ls-snug: 0;
 
   /* ── Primitive: فاصله (شبکه‌ی ۴px) ── */
   --sp-1: 0.25rem;
@@ -49,22 +63,25 @@
   --sp-24: 6rem;
   --sp-32: 8rem;
 
-  /* ── Primitive: شعاع ── */
+  /* ── Primitive: شعاع — سه نقش، نه هفت مقدار ──
+     کنترل (ورودی، چیپِ مربعی) · سطح (کاشی، کارت) · کپسول (دکمه).
+     نام‌های قدیمی alias می‌مانند تا کامپوننت‌های فرم/استودیو دست نخورند. */
+  --r-control: 12px;
+  --r-tile: 28px;
   --r-xs: 8px;
   --r-sm: 10px;
-  --r-md: 14px;
+  --r-md: var(--r-control);
   --r-lg: 18px;
-  --r-xl: 24px;
-  --r-2xl: 32px;
+  --r-xl: 22px;
+  --r-2xl: var(--r-tile);
   --r-full: 9999px;
 
   /* ── Primitive: کوچک‌ترین هدفِ لمسی (Apple HIG / Material) ──
      هم‌ارزِ --touch-min در shared/css/tokens.css. عمداً اینجا هم تعریف شده:
-     این اپ توکن‌هایش را از shared نمی‌گیرد (دو سیستمِ موازی — ADR 0002)، پس
-     var(--touch-min) بدونِ این خط به هیچ resolve می‌شد و قاعده بی‌اثر بود. */
+     این اپ توکن‌هایش را از shared نمی‌گیرد (دو سیستمِ موازی — ADR 0002). */
   --touch-min: 44px;
 
-  /* ── Primitive: حرکت ── */
+  /* ── Primitive: حرکت — دو منحنی، سه مدت ── */
   --t-fast: 130ms;
   --t-base: 220ms;
   --t-slow: 420ms;
@@ -72,34 +89,48 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 
-  /* ── Primitive: برند — «شبِ سرویس» ──
-     زمینه از دنیای خودِ محصول می‌آید: سالنِ رستوران بعد از غروب. برای همین
-     خنثی‌ها گرم‌اند (متمایل به قهوه‌ای)، نه مشکیِ آبی‌مایلِ داشبوردی.
-     دو رنگِ گرمِ هم‌خانواده کار می‌کنند — اخرا (آتشِ آشپزخانه) و برنجی (نورِ
-     گرمِ سرویس) — نه یک رنگِ نئونِ تنها روی مشکی.
-     فیروزه‌ای عمداً رنگِ برند نیست: فقط معنای «زنده/آزاد» را حمل می‌کند. */
-  --ember-700: #a83c14;
-  --ember-600: #c74d1e;
-  --ember-500: #e2612c;   /* اخرا — رنگِ اصلیِ کنش */
-  --ember-400: #f07f4d;
-  --ember-300: #f7a37b;
-  --ember-100: #fce6da;
-  --ember-50:  #fdf3ee;
+  /* ── Primitive: برند ──
+     اخرا فقط رنگِ **کنش** است (دکمه‌ی اصلی، ساعتِ انتخاب‌شده، پیوند). روی سفید
+     ‎#c8430f با متنِ سفید ۴٫۹:۱ است — AA برای متنِ ۱۷px؛ ‎#e2612cِ قبلی ۳٫۴ بود. */
+  --ember-900: #2b0f05;
+  --ember-700: #9a3309;
+  --ember-600: #b23a0c;
+  --ember-500: #c8430f;
+  --ember-400: #ff6b35;
+  --ember-300: #ff8552;
+  --ember-100: #fde6db;
+  --ember-50:  #fdf2ec;
 
   --brass-600: #a8801f;
-  --brass-500: #c79a2c;   /* برنجی — عددها، تأکیدِ گرم */
+  --brass-500: #c79a2c;
   --brass-400: #ddb457;
   --brass-300: #ebcd8b;
 
   /* وضعیت‌های زنده — معنایی، نه تزئینی */
-  --live-500: #2aa87c;
-  --live-400: #45c99a;
+  --live-500: #1f9d6c;
+  --live-400: #34c38a;
 
-  --clay-500: #8c6a52;    /* خنثیِ گرمِ میانی، برای خط و جداکننده */
+  /* ── Primitive: رنگِ محتوا — کاشی‌های اکسپلور و ریلِ گوشی ──
+     این‌ها رنگِ **برند** نیستند؛ رنگِ غذا و حال‌وهوا هستند و فقط روی کاشی
+     می‌نشینند (DS-010 §۳: رنگ از محتوا می‌آید). هر کاشی دو لایه‌ی شعاعی روی
+     یک پایه دارد تا مثلِ نورِ یک عکس عمق بگیرد، نه مثلِ گرادیانِ خطیِ دکمه.
+     در هر دو تم ثابت‌اند — عکسِ غذا هم در تمِ تاریک رنگش عوض نمی‌شود.
+     ⚠️ ۰۹-۱۳ (ممیزیِ کنتراستِ e2e، بدترین ایستگاه): هایلایت‌های اولیه (مثلاً ‎#ffc24b)
+     با متنِ سفید ۱٫۴ تا ۱٫۹:۱ بودند. هر ایستگاه حالا با متنِ سفید ≥ ۳٫۳:۱ است
+     (AA ِ متنِ درشت) — روشنایی در HSL پایین آمد، اشباع نه، تا رنگ گِل نشود. */
+  --dish-saffron:  radial-gradient(120% 90% at 85% 8%, #c07f00 0%, transparent 58%), radial-gradient(90% 80% at 10% 100%, #b4380a 0%, transparent 62%), #d77011;
+  --dish-pomegranate: radial-gradient(110% 90% at 80% 0%, #ff465c 0%, transparent 55%), radial-gradient(100% 90% at 0% 100%, #5c0a1e 0%, transparent 65%), #a3132f;
+  --dish-pistachio: radial-gradient(120% 90% at 90% 10%, #739912 0%, transparent 55%), radial-gradient(90% 90% at 0% 100%, #1f4d19 0%, transparent 65%), #5a8f2a;
+  --dish-turquoise: radial-gradient(110% 90% at 85% 5%, #0b9ba6 0%, transparent 55%), radial-gradient(100% 90% at 5% 100%, #083f55 0%, transparent 65%), #0e7c93;
+  --dish-rosewater: radial-gradient(110% 90% at 80% 5%, #ff3b88 0%, transparent 55%), radial-gradient(100% 90% at 0% 100%, #7a1446 0%, transparent 65%), #d44b8a;
+  --dish-eggplant: radial-gradient(110% 90% at 85% 0%, #9874ff 0%, transparent 55%), radial-gradient(100% 90% at 0% 100%, #1c0b3d 0%, transparent 65%), #4b2a97;
+  --dish-charcoal: radial-gradient(90% 70% at 20% 100%, #ff4b0a 0%, transparent 55%), radial-gradient(100% 90% at 90% 0%, #3a3a3c 0%, transparent 60%), #111112;
+  --dish-tea: radial-gradient(110% 90% at 85% 5%, #ce760d 0%, transparent 55%), radial-gradient(100% 90% at 0% 100%, #3d1a05 0%, transparent 65%), #8a4412;
 
   --container: 1200px;
+  --container-wide: 1440px;
   --container-narrow: 760px;
-  --header-h: 68px;
+  --header-h: 52px;
 }
 
 /* ── Semantic: هر توکن یک بار، با light-dark() ──
@@ -108,35 +139,43 @@
    موقعِ تغییرِ پالت، بلوکِ @media جا ماند و کاربری که تم را دستی انتخاب
    نکرده بود هنوز رنگ‌های قدیمی می‌دید.
 
-   حالا مقدارها یک‌جا هستند و انتخاب با color-scheme انجام می‌شود:
-     :root            → color-scheme: light dark  (پیروی از سیستم)
-     [data-theme=...] → فقط color-scheme را قفل می‌کند
-   یعنی افزودنِ رنگِ تازه دیگر نمی‌تواند نیمه‌کاره بماند. */
-:root {
-  color-scheme: light dark;
+   ⚠️ چرا انتخابگر `:root, .is-night` است و نه فقط `:root` (سنجیده ۰۹-۱۳):
+   کروم light-dark() ِ درونِ یک custom property را **روی عنصری که آن را اعلان
+   کرده** resolve می‌کند، نه روی عنصری که مصرفش می‌کند. با اعلانِ فقط روی :root،
+   `.is-night { color-scheme: dark }` هیچ توکنی را عوض نمی‌کرد: تیترِ بخشِ مشکی
+   getComputedStyle = rgb(29, 29, 31) می‌داد — جوهر روی مشکی، نامرئی. اعلانِ
+   دوباره‌ی **همان** مقدارها روی جزیره‌ی تیره آن‌ها را با color-scheme ِ خودِ
+   جزیره resolve می‌کند؛ مقدارها هنوز فقط یک جا نوشته شده‌اند. */
+:root { color-scheme: light dark; }
 
-  --bg:         light-dark(#f6f4f1, #100c0a);
-  --bg-subtle:  light-dark(#efece7, #171210);
-  --bg-sunken:  light-dark(#e6e2db, #0a0706);
+:root,
+.is-night {
+  --bg:        light-dark(#ffffff, #000000);
+  --bg-subtle:  light-dark(#f5f5f7, #0b0b0c);
+  --bg-sunken:  light-dark(#e8e8ed, #000000);
 
-  --surface:         light-dark(#ffffff, #1a1513);
-  --surface-2:       light-dark(#f6f4f1, #221b18);
-  --surface-3:       light-dark(#eae6e0, #2c231f);
-  --surface-inverse: light-dark(#17120f, #f7f2ec);
+  --surface:         light-dark(#ffffff, #1c1c1e);
+  --surface-2:       light-dark(#f5f5f7, #1c1c1e);
+  --surface-3:       light-dark(#e8e8ed, #2c2c2e);
+  --surface-inverse: light-dark(#1d1d1f, #f5f5f7);
 
-  --text-1:       light-dark(#17120f, #f4ece3);
-  --text-2:       light-dark(#5a504a, #b7a89c);
-  --text-3:       light-dark(#8b8078, #8a7a6e);
-  --text-inverse: light-dark(#f7f2ec, #17120f);
+  /* سه رنگِ متن و بس (DS-010 §۲‑۱). text-3 روی سفید ۴٫۶:۱ است، نه ۳٫۶ ِ
+     خاکستریِ رایجِ اپل — راهنماهای ریزِ فارسی باید AA بمانند. */
+  --text-1:       light-dark(#1d1d1f, #f5f5f7);
+  --text-2:       light-dark(#6e6e73, #a1a1a6);
+  --text-3:       light-dark(#76767b, #8e8e93);
+  --text-inverse: light-dark(#f5f5f7, #1d1d1f);
 
-  --border:        light-dark(rgba(23, 18, 15, 0.11), rgba(244, 236, 227, 0.1));
-  --border-strong: light-dark(rgba(23, 18, 15, 0.2), rgba(244, 236, 227, 0.2));
+  --border:        light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.1));
+  --border-strong: light-dark(rgba(0, 0, 0, 0.18), rgba(255, 255, 255, 0.22));
 
-  --brand:          light-dark(#c74d1e, #e2612c);
-  --brand-ink:      light-dark(#a83c14, #f07f4d);
-  --brand-soft:     light-dark(#fdf3ee, rgba(226, 97, 44, 0.16));
+  /* --brand زمینه‌ی دکمه است (با متنِ سفید، در هر دو تم)؛ --brand-ink رنگِ
+     **متن**ِ اخرایی است و در تمِ تاریک روشن می‌شود تا روی مشکی خوانا بماند. */
+  --brand:          #c8430f;
+  --brand-ink:      light-dark(#b23a0c, #ff8552);
+  --brand-soft:     light-dark(#fdf2ec, rgba(255, 107, 53, 0.16));
   --brand-contrast: #ffffff;
-  --accent:         light-dark(#a8801f, #ddb457);
+  --accent:         var(--brand-ink);
 
   --success:      light-dark(#16794f, #45c99a);
   --success-soft: light-dark(#e3f3ec, rgba(69, 201, 154, 0.15));
@@ -147,30 +186,38 @@
   --info:         light-dark(#2a6b8f, #6fb3d1);
   --info-soft:    light-dark(#e6f0f5, rgba(111, 179, 209, 0.15));
 
-  --sh-sm: light-dark(0 1px 2px rgba(23,18,15,.06), 0 1px 2px rgba(0,0,0,.55));
-  --sh-md: light-dark(0 6px 16px rgba(23,18,15,.08), 0 6px 18px rgba(0,0,0,.55));
-  --sh-lg: light-dark(0 18px 40px rgba(23,18,15,.11), 0 20px 44px rgba(0,0,0,.62));
-  --sh-xl: light-dark(0 32px 72px rgba(23,18,15,.15), 0 34px 80px rgba(0,0,0,.7));
-  --sh-brand: light-dark(0 14px 34px rgba(199,77,30,.26), 0 14px 38px rgba(226,97,44,.36));
+  /* سایه فقط برای لایه‌ای که واقعاً روی لایه‌ی دیگر است (منو، گوشی، شیت) —
+     کارت‌ها سایه ندارند. */
+  --sh-sm: light-dark(0 1px 2px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.6));
+  --sh-md: light-dark(0 4px 14px rgba(0,0,0,.08), 0 6px 18px rgba(0,0,0,.6));
+  --sh-lg: light-dark(0 14px 34px rgba(0,0,0,.1), 0 20px 44px rgba(0,0,0,.66));
+  --sh-xl: light-dark(0 30px 70px rgba(0,0,0,.16), 0 34px 80px rgba(0,0,0,.72));
+  --sh-brand: none;
 
-  /* شیشه: آلفا عمداً بالاست تا متن روی محتوای متحرک خوانا بماند. */
-  /* آلفا عمداً بالا: بهینه‌سازِ CSS نسخه‌ی استانداردِ backdrop-filter را حذف
-     می‌کند و فقط پیشوندِ webkit می‌ماند، پس نمی‌شود روی بلور حساب کرد. با
-     این آلفا متن حتی بدونِ هیچ بلوری هم خوانا می‌ماند — با تست دیده شد که
-     محتوای پشتِ هدر از لای شیشه خوانده می‌شد. */
-  --glass-bg:     light-dark(rgba(246, 244, 241, 0.95), rgba(20, 16, 14, 0.94));
-  --glass-border: light-dark(rgba(23, 18, 15, 0.1), rgba(244, 236, 227, 0.11));
-  --glass-blur: 16px;
-
-  --aurora-1:  light-dark(rgba(226, 97, 44, 0.13), rgba(226, 97, 44, 0.24));
-  --aurora-2:  light-dark(rgba(199, 154, 44, 0.12), rgba(199, 154, 44, 0.18));
-  --aurora-3:  light-dark(rgba(140, 106, 82, 0.09), rgba(140, 106, 82, 0.14));
-  --grid-line: light-dark(rgba(23, 18, 15, 0.05), rgba(244, 236, 227, 0.055));
+  /* شیشه: فقط هدر و منوی بازشو (DS-010 §۲‑۲). آلفا عمداً بالاست تا متن بدونِ
+     بلور هم خوانا بماند.
+     ⚠️ سنجیده ۰۹-۱۳ روی خروجیِ `next build`: وقتی منبع **هر دو** شکل را
+     می‌نوشت (`backdrop-filter` + `-webkit-backdrop-filter`)، Lightning CSS فقط
+     پیشوندی را نگه می‌داشت و کروم `backdropFilter: none` می‌داد — هدرِ «شیشه‌ای»
+     بلور نداشت. فقط شکلِ استاندارد را بنویس؛ پیشوند را خودِ بهینه‌ساز اضافه
+     می‌کند و هر دو در خروجی می‌مانند. */
+  --glass-bg:     light-dark(rgba(255, 255, 255, 0.8), rgba(22, 22, 23, 0.8));
+  --glass-border: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.1));
+  --glass-blur: 20px;
 }
 
 /* انتخابِ صریحِ کاربر فقط color-scheme را قفل می‌کند — مقدارها بالا یک‌جا هستند. */
 :root[data-theme='light'] { color-scheme: light; }
 :root[data-theme='dark']  { color-scheme: dark; }
+
+/* بخشِ «شب» — مشکیِ واقعی در هر دو تم: بخشِ اسکرولِ زنده، نوارِ فراخوان، پلنِ
+   پیشنهادی، صحنه‌ی بی‌عکس، بومِ سالن. چون توکن‌ها روی همین کلاس دوباره اعلان
+   می‌شوند (بالا)، کارت، متن و دکمه‌ی داخلش بدونِ هیچ قاعده‌ی اضافه درست‌اند. */
+.is-night {
+  color-scheme: dark;
+  background: #000;
+  color: var(--text-1);
+}
 
 /* ═══════════════ پایه ═══════════════ */
 
@@ -190,18 +237,17 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text-1);
-  font-size: var(--fs-md);
+  font-size: var(--fs-body);
   line-height: var(--lh-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  transition: background-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
 }
 
 h1, h2, h3, h4, h5 {
   margin: 0;
   line-height: var(--lh-tight);
-  letter-spacing: var(--ls-tight);
+  letter-spacing: 0;
   font-weight: 800;
   color: var(--text-1);
   text-wrap: balance;
@@ -223,7 +269,7 @@ button, input, textarea, select {
 }
 
 :focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--brand-ink);
   outline-offset: 3px;
   border-radius: var(--r-xs);
 }
@@ -262,16 +308,19 @@ button, input, textarea, select {
   padding-inline: var(--sp-5);
 }
 
+/* فاصله‌ی بخش‌ها سلسله‌مراتب است، نه خط و کادر (DS-010 §۲‑۲). کف روی موبایل
+   ۴۸px — صفحه‌ی اصلی روی ۳۹۰px پیش‌تر ۱۶ صفحه بود و هوای خالی سهمِ بزرگی
+   داشت (اندازه‌گیریِ ۰۹-۱۲). */
 .section {
   position: relative;
-  padding-block: clamp(var(--sp-16), 9vw, var(--sp-32));
+  padding-block: clamp(var(--sp-12), 9vw, var(--sp-32));
 }
-.section--tight { padding-block: clamp(var(--sp-12), 6vw, var(--sp-20)); }
+.section--tight { padding-block: clamp(var(--sp-8), 6vw, var(--sp-20)); }
 .section--subtle { background: var(--bg-subtle); }
 .section--sunken { background: var(--bg-sunken); }
 
-/* خطِ جداکننده‌ی نرم بین بخش‌ها */
-.section--edge { border-top: 1px solid var(--border); }
+/* جداکننده‌ی بخش‌ها تغییرِ زمینه است، نه خط — کلاس برای سازگاری می‌ماند. */
+.section--edge { border-top: 0; }
 
 .stack { display: flex; flex-direction: column; }
 .stack-2 { gap: var(--sp-2); }
@@ -287,27 +336,37 @@ button, input, textarea, select {
   flex-wrap: wrap;
 }
 
-.grid { display: grid; gap: var(--sp-5); }
+.grid { display: grid; gap: var(--sp-3); }
 .grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .grid-3 { grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); }
 .grid-4 { grid-template-columns: repeat(auto-fit, minmax(206px, 1fr)); }
-
-/* ═══════════════ تایپوگرافی ═══════════════ */
-
-.display {
-  font-size: clamp(2.25rem, 6.2vw, var(--fs-5xl));
-  font-weight: 800;
-  letter-spacing: var(--ls-tight);
-  line-height: 1.08;
+@media (min-width: 900px) {
+  .grid { gap: var(--sp-5); }
+  /* شش قابلیت در auto-fit روی ۱۲۰۰px چهار ستون می‌شد و دو کاشیِ یتیم با
+     حفره می‌ماند (اسکرین‌شاتِ ۰۹-۱۳). سه‌تایی یعنی دقیقاً سه ستون. */
+  .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* روی صفحه‌ی باریک، چهارتایی دوستونی می‌شود نه یک ستونِ بلند. */
+@media (max-width: 640px) {
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
 }
 
-.h1 { font-size: clamp(1.875rem, 4.6vw, var(--fs-4xl)); }
-.h2 { font-size: clamp(1.625rem, 3.6vw, var(--fs-3xl)); }
-.h3 { font-size: clamp(1.25rem, 2.4vw, var(--fs-2xl)); }
+/* ═══════════════ تایپوگرافی ═══════════════
+   پنج نقش. نمایشی ۹۰۰، تیترها ۸۰۰، بدنه ۴۰۰، برچسب ۶۰۰. */
+
+.display {
+  font-size: clamp(2.75rem, 10.5vw, 6.75rem);
+  font-weight: 900;
+  line-height: 1.06;
+}
+
+.h1 { font-size: clamp(2.25rem, 6vw, var(--fs-4xl)); font-weight: 800; }
+.h2 { font-size: clamp(1.875rem, 4.6vw, var(--fs-3xl)); font-weight: 800; }
+.h3 { font-size: clamp(1.3125rem, 2.3vw, 1.75rem); font-weight: 700; }
 .h4 { font-size: var(--fs-xl); font-weight: 700; }
 
 .lead {
-  font-size: clamp(var(--fs-base), 1.6vw, var(--fs-lg));
+  font-size: clamp(var(--fs-body), 1.6vw, 1.3125rem);
   line-height: var(--lh-normal);
   color: var(--text-2);
   text-wrap: pretty;
@@ -318,39 +377,30 @@ button, input, textarea, select {
 .small { font-size: var(--fs-sm); }
 .tiny { font-size: var(--fs-xs); }
 
+/* برچسبِ بالای تیتر: متنِ ساده به رنگِ کنش — مثلِ «جدید» روی صفحه‌ی محصولِ
+   اپل. کپسول، حاشیه و پس‌زمینه نمی‌گیرد؛ برچسبی که مثلِ دکمه به‌نظر برسد با
+   دکمه رقابت می‌کند. */
 .eyebrow {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.5;
   color: var(--brand-ink);
-  background: var(--brand-soft);
-  padding: 0.375rem 0.75rem;
-  border-radius: var(--r-full);
-  border: 1px solid color-mix(in srgb, var(--brand) 18%, transparent);
 }
 
-.text-gradient {
-  background: linear-gradient(100deg, var(--brand) 0%, var(--brass-500) 45%, var(--accent) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-:root[data-theme='dark'] .text-gradient {
-  background: linear-gradient(100deg, var(--ember-300) 0%, var(--brass-400) 48%, var(--brass-400) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
+/* تیترِ دوصدایی — نیمه‌ی دوم خاکستری. نام تاریخی است (پیش‌تر گرادیانِ متنی
+   بود)؛ حالا یک رنگِ واقعی دارد و هرگز `color: transparent` نمی‌گیرد، پس
+   باگِ «نیمه‌ی تیتر نامرئی شد» (css.test.mts) از ریشه ممکن نیست. */
+.text-gradient { color: var(--text-2); }
 
 .section-head {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
   max-width: 46rem;
-  margin-bottom: clamp(var(--sp-8), 4vw, var(--sp-12));
+  margin-bottom: clamp(var(--sp-8), 5vw, var(--sp-16));
 }
 .section-head--center {
   align-items: center;
@@ -358,49 +408,43 @@ button, input, textarea, select {
   margin-inline: auto;
 }
 
-/* ═══════════════ دکمه ═══════════════ */
+/* ═══════════════ دکمه ═══════════════
+   کپسولِ تخت. بدونِ سایه، بدونِ گرادیان، بدونِ بلندشدن. بازخوردِ لمس یک
+   فشردگیِ ۱۳۰ms است (DS-010 §۲‑۳) — تنها جایی که فنر مجاز است. */
 
 .btn {
-  --btn-bg: var(--surface);
+  --btn-bg: var(--surface-2);
   --btn-fg: var(--text-1);
-  --btn-border: var(--border-strong);
+  --btn-border: transparent;
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--sp-2);
   min-height: 44px;
-  padding: 0.6875rem 1.25rem;
+  padding: 0.625rem 1.375rem;
   border-radius: var(--r-full);
   border: 1px solid var(--btn-border);
   background: var(--btn-bg);
   color: var(--btn-fg);
-  font-size: var(--fs-md);
+  font-size: var(--fs-base);
   font-weight: 600;
+  line-height: 1.4;
   cursor: pointer;
   white-space: nowrap;
   transition: transform var(--t-fast) var(--ease-spring),
-    box-shadow var(--t-base) var(--ease), background-color var(--t-base) var(--ease),
-    border-color var(--t-base) var(--ease), opacity var(--t-base) var(--ease);
+    background-color var(--t-base) var(--ease), border-color var(--t-base) var(--ease),
+    color var(--t-base) var(--ease), opacity var(--t-base) var(--ease);
 }
 
-.btn:hover:not(:disabled) { transform: translateY(-1px); }
-.btn:active:not(:disabled) { transform: translateY(0); }
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn--primary {
-  --btn-bg: linear-gradient(135deg, var(--ember-500), var(--brass-500));
-  --btn-fg: #ffffff;
-  --btn-border: transparent;
-  box-shadow: var(--sh-brand);
+  --btn-bg: var(--brand);
+  --btn-fg: var(--brand-contrast);
 }
-.btn--primary:hover:not(:disabled) {
-  box-shadow: 0 16px 40px rgba(79, 70, 229, 0.34);
-}
-:root[data-theme='dark'] .btn--primary {
-  --btn-bg: linear-gradient(135deg, var(--ember-400), var(--brass-400));
-  --btn-fg: #0b1020;
-}
+.btn--primary:hover:not(:disabled) { --btn-bg: var(--ember-600); }
 
 .btn--ghost {
   --btn-bg: transparent;
@@ -411,73 +455,66 @@ button, input, textarea, select {
   --btn-border: var(--text-3);
 }
 
+/* دکمه‌ی جوهری — کنشِ دوم وقتی اخرا روی صفحه هست */
+.btn--ink {
+  --btn-bg: var(--surface-inverse);
+  --btn-fg: var(--text-inverse);
+}
+.btn--ink:hover:not(:disabled) { opacity: 0.86; }
+
 .btn--soft {
   --btn-bg: var(--brand-soft);
   --btn-fg: var(--brand-ink);
-  --btn-border: transparent;
 }
 
 .btn--quiet {
   --btn-bg: transparent;
-  --btn-border: transparent;
   --btn-fg: var(--text-2);
 }
 .btn--quiet:hover:not(:disabled) { --btn-fg: var(--text-1); --btn-bg: var(--surface-2); }
 
-.btn--lg { min-height: 52px; padding: 0.875rem 1.75rem; font-size: var(--fs-base); }
-.btn--sm { min-height: 36px; padding: 0.375rem 0.875rem; font-size: var(--fs-sm); }
+.btn--lg { min-height: 52px; padding: 0.8125rem 1.875rem; font-size: var(--fs-body); }
+.btn--sm { min-height: 34px; padding: 0.3125rem 0.9375rem; font-size: var(--fs-sm); }
 .btn--block { width: 100%; }
 
-/* پیکانِ ظریفی که با hover حرکت می‌کند (RTL → به چپ) */
-.btn__arrow {
-  transition: transform var(--t-base) var(--ease-spring);
-}
+.btn__arrow { transition: transform var(--t-base) var(--ease-out); }
 .btn:hover .btn__arrow { transform: translateX(-3px); }
 
-/* ═══════════════ سطح و کارت ═══════════════ */
+/* پیوندِ متنی با پیکانِ کوچک — «بیشتر بدانید ‹» */
+.link-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-block-size: var(--touch-min);
+  font-weight: 600;
+  color: var(--brand-ink);
+}
+.link-more:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+/* ═══════════════ سطح و کارت ═══════════════
+   کاشیِ اپلی: خاکستریِ تخت روی سفید (مشکیِ ‎#1c1c1e روی مشکی)، گوشه‌ی ۲۸،
+   بدونِ حاشیه و سایه. hover چیزی را جابه‌جا نمی‌کند. */
 
 .card {
   position: relative;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border: 1px solid transparent;
   border-radius: var(--r-xl);
   padding: var(--sp-6);
-  transition: transform var(--t-base) var(--ease-out), box-shadow var(--t-base) var(--ease),
-    border-color var(--t-base) var(--ease), background-color var(--t-base) var(--ease);
 }
+@media (min-width: 900px) { .card { border-radius: var(--r-tile); padding: var(--sp-8); } }
 
-.card--hover:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--sh-lg);
-  border-color: color-mix(in srgb, var(--brand) 26%, var(--border));
-}
+/* روی بخشِ خاکستری، کاشی سفید می‌شود تا از زمینه جدا بماند */
+.section--subtle .card { background: var(--surface); }
 
-.card--flat { background: var(--surface-2); border-color: transparent; }
+.card--hover { transition: background-color var(--t-base) var(--ease); }
+.card--flat { background: var(--surface-2); }
 .card--pad-lg { padding: var(--sp-8); }
-
-/* کارتی که با حرکتِ اشاره‌گر یک هاله‌ی نرم دنبال می‌کند (روی دسکتاپ) */
-.card--spot::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(
-    22rem circle at var(--mx, 50%) var(--my, 0%),
-    color-mix(in srgb, var(--brand) 12%, transparent),
-    transparent 62%
-  );
-  opacity: 0;
-  transition: opacity var(--t-slow) var(--ease);
-  pointer-events: none;
-}
-.card--spot:hover::before { opacity: 1; }
 
 .glass {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  /* fallback مات برای مرورگرِ بدونِ backdrop-filter — متن هرگز روی محتوا نمی‌ماند */
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
 }
 @supports not (backdrop-filter: blur(1px)) {
   .glass { background: var(--surface); }
@@ -494,7 +531,7 @@ button, input, textarea, select {
   padding: 0.1875rem 0.625rem;
   border-radius: var(--r-full);
   font-size: var(--fs-xs);
-  font-weight: 700;
+  font-weight: 600;
   background: var(--surface-3);
   color: var(--text-2);
   white-space: nowrap;
@@ -510,25 +547,25 @@ button, input, textarea, select {
   align-items: center;
   gap: var(--sp-2);
   min-height: 38px;
-  padding: 0.4375rem 0.9375rem;
+  padding: 0.4375rem 1rem;
   border-radius: var(--r-full);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-2);
+  border: 1px solid transparent;
+  background: var(--surface-2);
+  color: var(--text-1);
   font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--t-base) var(--ease);
+  transition: background-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
 }
-.chip:hover { border-color: var(--border-strong); color: var(--text-1); }
+.chip:hover { background: var(--surface-3); }
 .chip[aria-selected='true'],
 .chip[data-active='true'] {
-  background: var(--brand-soft);
-  border-color: color-mix(in srgb, var(--brand) 32%, transparent);
-  color: var(--brand-ink);
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
 }
 
-/* ═══════════════ آیکن ═══════════════ */
+/* ═══════════════ آیکن ═══════════════
+   آیکن گلیفِ خالص است، نه آیکن داخلِ مربعِ رنگی. */
 
 .icon-tile {
   display: grid;
@@ -536,12 +573,11 @@ button, input, textarea, select {
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
-  border-radius: var(--r-md);
-  background: var(--brand-soft);
+  border-radius: var(--r-control);
+  background: var(--surface);
   color: var(--brand-ink);
-  transition: transform var(--t-base) var(--ease-spring), background-color var(--t-base) var(--ease);
 }
-.card--hover:hover .icon-tile { transform: scale(1.06) rotate(-3deg); }
+.section--subtle .icon-tile { background: var(--surface-2); }
 
 /* ═══════════════ فرم ═══════════════ */
 
@@ -558,13 +594,13 @@ button, input, textarea, select {
 .textarea,
 .select {
   width: 100%;
-  min-height: 46px;
-  padding: 0.6875rem 0.875rem;
-  border-radius: var(--r-md);
+  min-height: 48px;
+  padding: 0.6875rem 0.9375rem;
+  border-radius: var(--r-control);
   border: 1px solid var(--border-strong);
   background: var(--surface);
   color: var(--text-1);
-  font-size: var(--fs-md);
+  font-size: var(--fs-base);
   transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease),
     background-color var(--t-base) var(--ease);
 }
@@ -577,7 +613,7 @@ button, input, textarea, select {
 .textarea:focus,
 .select:focus {
   outline: none;
-  border-color: var(--brand);
+  border-color: var(--brand-ink);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 16%, transparent);
 }
 
@@ -606,7 +642,7 @@ button, input, textarea, select {
   display: flex;
   gap: var(--sp-3);
   padding: var(--sp-4);
-  border-radius: var(--r-md);
+  border-radius: var(--r-control);
   font-size: var(--fs-sm);
   line-height: var(--lh-snug);
   border: 1px solid transparent;
@@ -616,84 +652,14 @@ button, input, textarea, select {
 .notice--info { background: var(--info-soft); color: var(--info); border-color: color-mix(in srgb, var(--info) 24%, transparent); }
 .notice--warning { background: var(--warning-soft); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 24%, transparent); }
 
-/* ═══════════════ حرکت ═══════════════ */
+/* ═══════════════ حرکت ═══════════════
+   ۰۹-۱۳: «آشکارسازیِ اسکرول‌محور» (هر بخش کم‌رنگ و ۱۸px پایین‌تر تا دیده
+   شود)، هاله‌ی شناورِ هیرو، شبکه‌ی پس‌زمینه، دانه‌ی فیلم، نشانگرِ سفارشی و
+   نوارِ پیشرفتِ اسکرول **حذف** شدند. هر شش یک رفتارِ پیش‌فرض بودند که روی هر
+   بخش تکرار می‌شد؛ حرکتِ این سایت حالا فقط یک لحظه‌ی هماهنگ است — ریلِ
+   سنجاق‌شده‌ی صفحه‌ی اصلی — به‌علاوه‌ی بازخوردِ لمس. */
 
-/* آشکارسازیِ اسکرول‌محور — عنصر تا وقتی دیده نشده کمی پایین‌تر و کم‌رنگ است.
-   حالتِ اولیه فقط وقتی اعمال می‌شود که JS کلاسِ js-reveal را روی <html>
-   گذاشته باشد → بدونِ جاوااسکریپت هیچ محتوایی پنهان نمی‌ماند. */
-.js-reveal .reveal {
-  opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 0.65s var(--ease-out), transform 0.65s var(--ease-out);
-  transition-delay: var(--reveal-delay, 0ms);
-  will-change: opacity, transform;
-}
-.js-reveal .reveal[data-visible='true'] {
-  opacity: 1;
-  transform: none;
-}
-
-/* هاله‌ی رنگیِ متحرکِ پس‌زمینه‌ی هیرو */
-.aurora {
-  position: absolute;
-  inset: -30% -10% auto -10%;
-  height: 130%;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-  mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
-}
-.aurora__blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(70px);
-  opacity: 0.9;
-  animation: drift 26s var(--ease) infinite alternate;
-}
-.aurora__blob:nth-child(1) {
-  width: 46rem; height: 34rem; inset-inline-end: -8rem; top: -6rem;
-  background: var(--aurora-1);
-}
-.aurora__blob:nth-child(2) {
-  width: 38rem; height: 30rem; inset-inline-start: -6rem; top: 3rem;
-  background: var(--aurora-2);
-  animation-duration: 32s; animation-direction: alternate-reverse;
-}
-.aurora__blob:nth-child(3) {
-  width: 26rem; height: 22rem; inset-inline-start: 38%; top: 12rem;
-  background: var(--aurora-3);
-  animation-duration: 38s;
-}
-
-@keyframes drift {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(-4%, 6%, 0) scale(1.14); }
-}
-
-/* شبکه‌ی ظریفِ پس‌زمینه */
-.grid-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 78%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 78%);
-}
-
-/* شناوریِ ملایمِ عناصرِ تزئینی */
-.float { animation: float 7s var(--ease) infinite alternate; }
-.float--slow { animation-duration: 11s; }
-@keyframes float {
-  from { transform: translateY(0); }
-  to { transform: translateY(-10px); }
-}
-
-/* نوارِ نبضِ زنده (نشانگرِ وضعیت) */
+/* نشانگرِ زنده (نبض) — تنها حلقه‌ی بی‌پایانِ مجاز: وضعیتِ واقعی را نشان می‌دهد */
 .pulse-dot {
   position: relative;
   width: 8px; height: 8px;
@@ -738,20 +704,6 @@ button, input, textarea, select {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* نوارِ پیشرفتِ اسکرولِ صفحه */
-.scroll-progress {
-  position: fixed;
-  inset-block-start: 0;
-  inset-inline: 0;
-  height: 2px;
-  z-index: 60;
-  background: linear-gradient(90deg, var(--ember-500), var(--brass-500), var(--accent));
-  transform-origin: 100% 50%;
-  transform: scaleX(var(--progress, 0));
-  transition: transform 90ms linear;
-  pointer-events: none;
-}
-
 /* ── احترام به ترجیحِ کاهشِ حرکت: همه‌ی حرکت‌ها خاموش، محتوا کاملاً دیده ── */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -762,16 +714,14 @@ button, input, textarea, select {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-  .js-reveal .reveal { opacity: 1 !important; transform: none !important; }
-  .btn:hover:not(:disabled),
-  .card--hover:hover { transform: none; }
+  .btn:active:not(:disabled) { transform: none; }
 }
 
 /* ═══════════════ محتوای متنی (مقاله/حقوقی) ═══════════════ */
 
 .prose {
   color: var(--text-2);
-  font-size: var(--fs-base);
+  font-size: var(--fs-body);
   line-height: var(--lh-relaxed);
   max-width: 68ch;
 }
@@ -780,7 +730,6 @@ button, input, textarea, select {
   font-size: var(--fs-2xl);
   color: var(--text-1);
   margin-top: var(--sp-12);
-  letter-spacing: var(--ls-snug);
 }
 .prose h3 {
   font-size: var(--fs-xl);
@@ -791,7 +740,7 @@ button, input, textarea, select {
 .prose ul, .prose ol { padding-inline-start: var(--sp-6); }
 .prose li + li { margin-top: var(--sp-2); }
 .prose a { color: var(--brand-ink); text-decoration: underline; text-underline-offset: 3px; }
-.prose a:hover { color: var(--brand); }
+.prose a:hover { color: var(--text-1); }
 .prose code {
   background: var(--surface-2);
   padding: 0.125rem 0.375rem;
@@ -805,36 +754,34 @@ button, input, textarea, select {
   font-style: normal;
 }
 
-/* ═══════════════ جدول ═══════════════ */
+/* ═══════════════ جدول ═══════════════
+   بدونِ کادرِ بیرونی؛ فقط خطِ مویی بینِ ردیف‌ها — جدولِ مشخصاتِ اپل. */
 
 .table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--surface);
 }
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   min-width: 34rem;
 }
 .table th,
 .table td {
-  padding: var(--sp-4);
+  padding: var(--sp-4) var(--sp-3);
   text-align: start;
   border-bottom: 1px solid var(--border);
 }
 .table th {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-1);
-  background: var(--surface-2);
+  background: var(--bg);
   position: sticky;
   top: 0;
 }
-.table tbody tr:last-child td { border-bottom: 0; }
-.table tbody tr { transition: background-color var(--t-fast) var(--ease); }
-.table tbody tr:hover { background: var(--surface-2); }
+.section--subtle .table th { background: var(--bg-subtle); }
+.table tbody tr:last-child td,
+.table tbody tr:last-child th { border-bottom: 0; }
 .table td.is-num { font-variant-numeric: tabular-nums; }
 
 /* ═══════════════ دسترسی‌پذیری ═══════════════ */
@@ -855,7 +802,7 @@ button, input, textarea, select {
   inset-inline-start: var(--sp-3);
   z-index: 100;
   padding: var(--sp-3) var(--sp-5);
-  border-radius: var(--r-md);
+  border-radius: var(--r-control);
   background: var(--brand);
   color: #fff;
   font-weight: 700;
@@ -865,28 +812,19 @@ button, input, textarea, select {
 .skip-link:focus-visible { transform: none; }
 
 /* ═══════════════════════════════════════════════════════════════════
-   لایه‌ی سینمایی — پرده‌ی ورود، نشانگر، دانه‌ی فیلم، میدانِ جریان
+   پرده‌ی ورود
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── ۱) پرده‌ی ورود ─────────────────────────────────────────────────
+/* ── پرده‌ی ورود ─────────────────────────────────────────────────────
    کلِ کار با CSS انجام می‌شود و با forwards تمام می‌شود، پس بدونِ JS هم
    پرده بالا می‌رود.
 
-   ⚠️ [L4 · ۲۰۲۶-۰۹-۱۱ · حکمِ مالک] مدتِ کل از ۱٫۲s به ۰٫۴s رسید — پرده
-   می‌ماند، کوتاه می‌شود. و **یک دستگیره** دارد، نه شش عددِ پراکنده:
-   `--intro-t`. پیش از این، تیغه‌ها (0.40 + 5×0.05 + 0.55 = 1.20s)،
-   محوشدنِ نشان (0.36 + 0.34)، کلمه (0.6)، خط (0.08 + 0.7) و شمارنده
-   (0.06 + 0.62) هر کدام عددِ خودشان را داشتند و فقط با یک کامنت به هم
-   بند بودند. کوتاه‌کردنِ `1.2s` به‌تنهایی پرده را وسطِ کارِ تیغه‌ها بالا
-   می‌برد و نشان را نیمه‌ظاهر قطع می‌کرد — همان «تأخیرِ جفت‌شده»ای که
-   قرار بود از آن پرهیز شود. حالا همه نسبتی از یک زمانِ کل‌اند؛ تغییرِ
-   یک عدد کلِ کورئوگرافی را با هم می‌کشد.
+   ⚠️ [L4 · ۲۰۲۶-۰۹-۱۱ · حکمِ مالک] مدتِ کل ۰٫۴s — پرده می‌ماند، کوتاه.
+   **یک دستگیره** دارد: `--intro-t`؛ همه‌ی زمان‌های دیگر نسبتی از آن‌اند و
+   تغییرِ یک عدد کلِ کورئوگرافی را با هم می‌کشد.
 
-   ⚠️ سنجیده، نه ادعا (tools/measure-landing-lcp.mjs، N=5، همان ماشین):
-   با ۱٫۲s، LCP میانه ۶۷۲ms و بدونِ پرده (reduced-motion) ۵۹۶ms — یعنی
-   پرده روی **متریکِ LCP** نمی‌نشست، برخلافِ کامنتِ قبلیِ همین بلوک؛ آنچه
-   عقب می‌انداخت **دیده‌شدنِ محتوا** بود: پرده در میانه‌ی ۱۸۸۰ms برداشته
-   می‌شد. عددِ «بعد» در پیامِ کامیت. */
+   ۰۹-۱۳: فقط رنگ عوض شد — تیغه‌ها مشکیِ واقعی و نشان سفید (پیش‌تر زمینه‌ی
+   کرِم و واژه‌ی گرادیانیِ اخرا/برنجی). زمان‌بندی دست‌نخورده است. */
 .intro {
   --intro-t: 0.4s;
   position: fixed;
@@ -897,9 +835,8 @@ button, input, textarea, select {
   /* پس از پایانِ انیمیشن، هیچ لایه‌ای روی صفحه نمی‌ماند.
      کارِ اصلی را opacity می‌کند نه visibility: کروم مقدارِ visibility را در
      حالتِ fill-forwards اعمال نمی‌کرد و پرده روی صفحه می‌ماند (در مرورگر
-     دیده شد). opacity همه‌جا قطعی است؛ visibility فقط یک امتیازِ اضافه.
-     ⚠️ به‌شکلِ longhand، چون calc() با زمان داخلِ shorthandِ animation در
-     همه‌ی مرورگرها قابلِ اتکا نیست. */
+     دیده شد). ⚠️ به‌شکلِ longhand، چون calc() با زمان داخلِ shorthandِ
+     animation در همه‌ی مرورگرها قابلِ اتکا نیست. */
   animation-name: intro-off;
   animation-duration: 10ms;
   animation-timing-function: linear;
@@ -909,15 +846,13 @@ button, input, textarea, select {
 @keyframes intro-off { to { opacity: 0; visibility: hidden; } }
 
 .intro__bar {
-  /* [L7] `0%` صریح — همان دلیلِ `.door` در site.css: دو باندلر، دو خروجی برای `0`. */
+  /* [L7] `0%` صریح — دو باندلر، دو خروجی برای `0`. */
   flex: 1 1 0%;
-  background: var(--bg-sunken);
+  background: #000;
   transform-origin: 50% 0%;
   will-change: transform;
-  /* هر تیغه کمی دیرتر از قبلی بالا می‌رود → موجی از راست به چپ در RTL.
-     نسبت‌ها همان نسبت‌های ۱٫۲sِ قبلی‌اند (شروع ⅓، پله ¹⁄₂₄، مدت ¹¹⁄₂₄):
-     آخرین تیغه دقیقاً در ⅓ + 5×¹⁄₂₄ + ¹¹⁄₂₄ = 1 × --intro-t تمام می‌شود، یعنی
-     همان لحظه‌ی intro-off — پرده وسطِ کار قطع نمی‌شود، با هر مقداری از دستگیره. */
+  /* هر تیغه کمی دیرتر از قبلی بالا می‌رود. آخرین تیغه دقیقاً در
+     ⅓ + 5×¹⁄₂₄ + ¹¹⁄₂₄ = 1 × --intro-t تمام می‌شود، یعنی همان لحظه‌ی intro-off. */
   animation-name: intro-bar;
   animation-duration: calc(var(--intro-t) * 11 / 24);
   animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
@@ -937,7 +872,6 @@ button, input, textarea, select {
   align-items: center;
   justify-content: center;
   gap: var(--sp-4);
-  /* نسبت‌های ۱٫۲sِ قبلی: مدت ¹⁷⁄₆₀، تأخیر ³⁄₁₀ — با --intro-t مقیاس می‌گیرد */
   animation-name: intro-mark;
   animation-duration: calc(var(--intro-t) * 17 / 60);
   animation-timing-function: var(--ease);
@@ -950,13 +884,8 @@ button, input, textarea, select {
 
 .intro__word {
   font-size: clamp(2rem, 7vw, 3.4rem);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  background: linear-gradient(100deg, var(--ember-400), var(--brass-400));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  /* حروف از پشتِ یک ماسک بالا می‌آیند — مدت ½ × --intro-t (نسبتِ قبلی) */
+  font-weight: 900;
+  color: #fff;
   animation-name: intro-word;
   animation-duration: calc(var(--intro-t) / 2);
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
@@ -971,9 +900,8 @@ button, input, textarea, select {
   inline-size: min(38vw, 15rem);
   block-size: 2px;
   border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--ember-500), transparent);
+  background: linear-gradient(90deg, transparent, var(--ember-400), transparent);
   transform-origin: 50% 50%;
-  /* مدت ⁷⁄₁₂، تأخیر ¹⁄₁₅ × --intro-t (نسبت‌های قبلی) */
   animation-name: intro-line;
   animation-duration: calc(var(--intro-t) * 7 / 12);
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
@@ -982,110 +910,10 @@ button, input, textarea, select {
 }
 @keyframes intro-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-/* شمارنده‌ی «۰→۱۰۰» حذف شد — L4 · DS-010 §۴‑ب (حکمِ طراح): در ۴۰۰ms هر عدد ~۴۰ms
-   بود، زیرِ آستانه‌ی خواندن. توضیحِ کامل در Intro.tsx. */
-
 /* بازگشتِ دوباره در همان نشست → بدونِ پرده. همین‌طور در حالتِ کاهشِ حرکت. */
 html[data-intro='done'] .intro { display: none; }
 @media (prefers-reduced-motion: reduce) { .intro { display: none; } }
 
-/* ── ۲) نشانگرِ سفارشی ───────────────────────────────────────────── */
-.cur {
-  /* ⚠️ رفعِ باگ: نشانگرِ سفارشی نامرئی بود چون لنگرِ CSS منطقی
-     (inset-inline-start) بود ولی جابه‌جاییِ آن در Cursor.tsx با
-     translate3d(e.clientX, e.clientY, 0) — یعنی مختصاتِ فیزیکیِ همیشه از
-     گوشه‌یِ چپِ-بالا — انجام می‌شود. در این صفحه‌ی dir="rtl"،
-     inset-inline-start معادلِ right:0 است، پس نقطه‌یِ لنگر از گوشه‌یِ
-     راست بود و translateِ فیزیکی نشانگر را کاملاً خارج از صفحه می‌فرستاد
-     (نشانگرِ سیستم هم با cursor:none مخفی بود ← ماوس کلاً دیده نمی‌شد).
-     چون مختصاتِ pointer همیشه فیزیکی‌اند، لنگر هم باید فیزیکی (left) باشد. */
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 210;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 160ms linear;
-  /* difference یعنی روی هر پس‌زمینه‌ای — روشن یا تاریک — دیده می‌شود */
-  mix-blend-mode: difference;
-}
-html.cur-on .cur { opacity: 1; }
-.cur--dot {
-  inline-size: 6px;
-  block-size: 6px;
-  border-radius: 50%;
-  background: #fff;
-}
-.cur--ring {
-  inline-size: 30px;
-  block-size: 30px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.75);
-  transition: opacity 160ms linear, border-color 180ms var(--ease), background-color 180ms var(--ease);
-}
-.cur--ring.is-hot { border-color: #fff; background: rgba(255, 255, 255, 0.12); }
-.cur--ring.is-down { background: rgba(255, 255, 255, 0.3); }
-/* نشانگرِ سیستم فقط وقتی خاموش می‌شود که جایگزینش واقعاً ساخته شده باشد */
-html.has-cursor,
-html.has-cursor * { cursor: none !important; }
-/* ورودی‌های متنی استثنا هستند: caret بدونِ نشانگرِ متن قابلِ‌هدف‌گیری نیست */
-html.has-cursor :is(input, textarea, [contenteditable]) { cursor: text !important; }
-
-/* ── ۳) دانه‌ی فیلم ───────────────────────────────────────────────
-   یک تکسچرِ feTurbulence که هر ۸ فریم می‌پرد. گرادیان‌ها را از حالتِ
-   «رندرِ تخت» در می‌آورد و به تصویر عمق می‌دهد. هزینه‌اش یک لایه‌ی
-   composite است، نه محاسبه‌ی هر فریم. */
-.grain {
-  position: fixed;
-  /* فقط به‌اندازه‌ی جابه‌جاییِ کی‌فریم (حداکثر ۶٪) حاشیه لازم است. مقدارِ
-     بزرگ‌تر هم سطحِ رنگ‌آمیزی را بیهوده زیاد می‌کند و هم می‌تواند به ناحیه‌ی
-     اسکرول اضافه شود. */
-  inset: -20%;
-  z-index: 95;
-  pointer-events: none;
-  opacity: light-dark(0.035, 0.055);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: grain 0.9s steps(8, end) infinite;
-  will-change: transform;
-}
-@keyframes grain {
-  0%   { transform: translate3d(0, 0, 0); }
-  12%  { transform: translate3d(-3%, -4%, 0); }
-  25%  { transform: translate3d(-6%, 2%, 0); }
-  37%  { transform: translate3d(4%, -3%, 0); }
-  50%  { transform: translate3d(-2%, 5%, 0); }
-  62%  { transform: translate3d(3%, 3%, 0); }
-  75%  { transform: translate3d(-4%, -2%, 0); }
-  87%  { transform: translate3d(5%, -5%, 0); }
-  100% { transform: translate3d(0, 0, 0); }
-}
-@media (prefers-reduced-motion: reduce) { .grain { animation: none; } }
-
-/* ── ۴) میدانِ جریان (بومِ هیرو) ─────────────────────────────────── */
-.flowfield {
-  position: absolute;
-  inset: 0;
-  inline-size: 100%;
-  block-size: 100%;
-  z-index: 0;
-  pointer-events: none;
-  /* پایینِ بوم محو می‌شود تا مرزِ تیزی با بخشِ بعدی نسازد */
-  mask-image: linear-gradient(to bottom, #000 58%, transparent 96%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 96%);
-}
-
-/* ── ۵) کِششِ سرعتِ اسکرول ────────────────────────────────────────
-   --vel را ScrollProgress می‌نویسد (۱- تا ۱). اثر عمداً روی عنصرهای
-   انتخاب‌شده اعمال می‌شود، نه روی <main>: هر transform روی نیای یک عنصرِ
-   sticky زمینه‌ی چسبندگی را می‌شکند و صحنه‌ی سنجاق‌شده از کار می‌افتد. */
-.vel {
-  transform: scaleY(calc(1 + var(--vel, 0) * 0.022)) translateY(calc(var(--vel, 0) * -6px));
-  transform-origin: 50% 50%;
-  will-change: transform;
-}
-@media (prefers-reduced-motion: reduce) { .vel { transform: none; } }
-
 @media print {
-  .site-header, .site-footer, .scroll-progress, .aurora, .grid-bg,
-  .intro, .grain, .flowfield, .cur { display: none !important; }
+  .site-header, .site-footer, .intro { display: none !important; }
 }

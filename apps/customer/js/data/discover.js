@@ -1,9 +1,9 @@
 // ═══ رزرونو — ناوبری + رندرِ کشف: فید، وایب، مناسبت، رویداد (بخشی از اپ کاستومر) ═══
-import { API } from '../api.js';
+import { API, applyRestaurantDetail, loadRestaurantDetail, resolveMediaUrl } from '../api.js';
 import { esc, jsq, toast, undoSnack } from '../auth.js';
 import { openRest } from './detail.js';
 import { labelForISO, quickBook } from './booking.js';
-import { bookingCtx, favHas, favs, gradFor, saveFavs, pts } from './seed.js';
+import { bookingCtx, dishLen, dishWord, favHas, favs, gradFor, saveFavs, pts } from './seed.js';
 import { renderProfile } from '../features/food-dna.js';
 import { renderLoyalty } from '../features/loyalty.js';
 import { renderEconomy } from '../features/economy.js';
@@ -17,9 +17,10 @@ export function go(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('[data-nav]').forEach(n=>n.classList.toggle('active',n.dataset.nav===p));
-  // در صفحه‌ی رستوران، نوار ناوبری مخفی می‌شود تا نوار رزرو پایین بنشیند
+  // در صفحه‌ی رستوران، نوار ناوبری مخفی می‌شود تا نوار رزرو پایین بنشیند؛
+  // در نمای تمام‌صفحه (immersive) هم — آنجا یک رستوران کلِ صفحه را دارد.
   const botnav=document.querySelector('.botnav');
-  if(botnav)botnav.style.display=(p==='rest'||p==='chat')?'none':'';
+  if(botnav)botnav.style.display=(p==='rest'||p==='chat'||p==='immersive')?'none':'';
   window.scrollTo({top:0,behavior:'instant'});
   if(p==='favorites')renderFavs();
   if(p==='trips')renderTrips();
@@ -57,7 +58,9 @@ export function slotsHTML(r){
  */
 export function paintSlots(list){
   const byId = new Map((list||[]).map(r=>[String(r.id), r]));
-  document.querySelectorAll('#feed .rc[data-rid]').forEach(card=>{
+  // دو مصرف‌کننده، یک نقاش: کارت‌های فید (اگر جایی برای چیپ داشته باشند) و
+  // آیتم‌های نمای تمام‌صفحه (features/immersive.js) که همین چیپ‌ها را می‌خواهند.
+  document.querySelectorAll('#feed .rc[data-rid], #imFeed .im-item[data-rid]').forEach(card=>{
     const r = byId.get(card.dataset.rid);
     if(!r) return;
     const box = card.querySelector('.rc-slots');
@@ -102,6 +105,132 @@ export function cardHTML(r){
     </div>
   </article>`;
 }
+// ═══ DS-011 (۲۰۲۶-۰۹-۱۲): کشف = Explore ═══════════════════════════════
+//  حکمِ مالک: صفحه‌ی کشف باید مثلِ Explore اینستاگرام باشد (موزاییکِ متراکم) و
+//  لمسِ هر تایل مثلِ اسکرولِ زنده‌ی تیک‌تاک (تمام‌صفحه، یک رستوران در هر صفحه —
+//  features/immersive.js). اندازه‌گیریِ پیش از این: کارتِ ۲۷۰px تمام‌عرض یعنی
+//  **۲ رستوران در هر صفحه‌ی ۳۹۰×۸۴۴**؛ و هیچ عکسی در فید نبود.
+//
+//  `cardHTML` دست نخورده می‌ماند — علاقه‌مندی‌ها (reservation.js) هنوز همان را
+//  می‌کشد. `tileHTML` رندرِ تازه‌ی فید است.
+//
+//  ⚠️ تایل کلاسِ `rc` را نگه می‌دارد: `tools/measure-home-s1.mjs` (گیتِ CI،
+//  DS-007) «کارتِ رستوران در فید» را با `#feed .rc` می‌شمارد و e2e هم همین را
+//  می‌خواند. تایل یک کارتِ رستوران است؛ کلاس دروغ نمی‌گوید. قواعدِ CSSِ کارتِ
+//  قدیمی که به تایل نمی‌خورند (ارتفاعِ ۲۷۰، شعاعِ ۲۶، لیفتِ hover) در app.css
+//  صریحاً برایِ `.xgrid>.xt` خنثی شده‌اند.
+//
+//  عکس: فهرستِ عمومی (/restaurants) هیچ فیلدِ تصویری ندارد؛ عکس فقط از
+//  جزئیات (loadRestaurantDetail → applyRestaurantDetail → r.photos) می‌آید.
+//  پس تایل با گرادیانِ هویتی (gradFor) رندر می‌شود و وقتی دیده شد، جزئیات
+//  را می‌خواهد و اگر عکسی بود رویِ گرادیان محو می‌شود. رستورانِ نمونه slug
+//  ندارد، پس هرگز عکس نمی‌گیرد — درست و صادقانه؛ هیچ تصویری اختراع نمی‌شود.
+let FEED_LIST = [];
+/** فهرستی که فید همین الان از آن رندر شده (بعد از فیلترِ چیپ/مناسبت/جست‌وجو). */
+export function feedList(){ return FEED_LIST; }
+
+export function tileHTML(r, i){
+  const hero = i % 7 === 0;             // ریتمِ Explore: هر هفتمی ۲×۲؛ dense بقیه را پر می‌کند
+  const hasRt = Number.isFinite(r.rt) && r.rt > 0;
+  const on = favHas(r.id);
+  const badge = isHot(r)
+    ? `<span class="xt-badge">${icon('flame',{size:12,fill:true})} داغ</span>`
+    : r.ai ? `<span class="xt-badge ai">${icon('sparkle',{size:12,fill:true})} AI</span>` : '';
+  // تایلِ کوچک هیچ دکمه‌ای جز خودش ندارد (Explore هم ندارد — کنترلِ ۴۴px داخلِ
+  // ۱۳۰px شلوغی است). قلب فقط رویِ هیروی ۲×۲؛ چیپِ ساعت و بقیه در نمای تمام‌صفحه.
+  return `<article class="rc xt${hero?' xt-hero':''}" data-rid="${esc(String(r.id))}">
+    <div class="rc-bg" style="background:${gradFor(r.id)}"><span class="xt-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</span></div>
+    <button type="button" class="xt-tap" aria-label="دیدنِ ${esc(r.n)}" onclick="openImmersive(${jsq(String(r.id))})"></button>
+    ${badge}
+    ${hero?`<button class="rc-fav" type="button" aria-pressed="${on}" aria-label="${on?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}" onclick="event.stopPropagation();toggleFav(${jsq(String(r.id))},this);haptic('like')">${icon('heart',{size:20,fill:on})}</button>`:''}
+    <div class="xt-cap">
+      <div class="xt-name">${esc(r.n)}</div>
+      <div class="xt-row">${hasRt?`<span class="rc-rating">${icon('star',{size:12,fill:true,class:'star'})}${fmtFa(r.rt)}</span>`:'<span class="rc-rating rc-rating-new">تازه‌وارد</span>'}${hero?`<span class="rc-meta">${esc(r.cuisine)}${r.price?` · ${esc(r.price)}`:''}${r.cb>0?` · <span class="rc-cb">${fmtFa(r.cb)}٪ کش‌بک</span>`:''}</span>`:''}</div>
+      ${hero&&Number.isFinite(r.visits7d)&&r.visits7d>0?`<div class="xt-social"><b>${fmtFa(r.visits7d)} رزرو</b> هفته‌ی گذشته</div>`:''}
+    </div>
+  </article>`;
+}
+
+// ── صفِ جزئیات: حداکثر ۳ درخواستِ هم‌زمان ────────────────────────────
+//  تایل‌ها با اسکرول به‌سرعت وارد دید می‌شوند؛ بدونِ سقف، یک فلیک ده‌ها GET
+//  می‌فرستد. درخواستِ در جریان برایِ یک slug به اشتراک گذاشته می‌شود (بدونِ
+//  GETِ دوم). شکست کش نمی‌شود (loadRestaurantDetail)، ولی تا رندرِ بعدیِ فید
+//  دوباره تلاش نمی‌کنیم — وگرنه آفلاین هر بار که تایل وارد دید شود یک درخواستِ
+//  محکوم می‌رود. رندرِ تازه (pull-to-refresh، دادهٔ سرور) فرصتِ تازه است.
+const DETAIL_MAX = 3;
+const _detailQ = [];
+const _detailPending = new Map();
+const _photoFailed = new Set();
+let _detailInFlight = 0;
+/** جزئیاتِ یک رستوران را (با سقفِ هم‌زمانی) می‌گیرد و رویِ رکورد می‌نشاند. true = جزئیات هست. */
+export function requestDetail(r){
+  return new Promise(resolve=>{ _detailQ.push({r,resolve}); pumpDetail(); });
+}
+function pumpDetail(){
+  while(_detailInFlight < DETAIL_MAX && _detailQ.length){
+    const {r,resolve} = _detailQ.shift();
+    if(!r){ resolve(false); continue; }
+    if(r.detailLoaded){ resolve(true); continue; }
+    if(!r.slug || !API.online || _photoFailed.has(r.slug)){ resolve(false); continue; }
+    let p = _detailPending.get(r.slug);
+    if(!p){
+      _detailInFlight++;
+      p = loadRestaurantDetail(r.slug).catch(()=>null)
+        .finally(()=>{ _detailInFlight--; _detailPending.delete(r.slug); pumpDetail(); });
+      _detailPending.set(r.slug, p);
+    }
+    p.then(d=>{
+      if(d){ applyRestaurantDetail(r, d); resolve(true); }
+      else { _photoFailed.add(r.slug); resolve(false); }
+    });
+  }
+}
+/** آدرسِ اولین عکسِ واقعی، یا null اگر (هنوز) نمی‌دانیم/نداریم. */
+export function photoUrl(r){
+  return r?.photos?.length ? resolveMediaUrl(r.photos[0].url) : null;
+}
+/** عکس را فقط بعد از بارگذاریِ موفق رویِ گرادیان می‌نشاند و محو می‌کند.
+ *  شکستِ بارگذاری عمداً بی‌صداست: هیچ <img>ِ شکسته، هیچ توست — «نمی‌دانیم»
+ *  هرگز «وجود ندارد» رندر نمی‌شود؛ گرادیان، که همیشه درست است، می‌ماند. */
+export function mountPhoto(host, url, cls){
+  if(!host || !url || host.dataset.photo) return;
+  host.dataset.photo = '1';
+  const img = new Image();
+  img.alt = '';
+  img.decoding = 'async';
+  img.className = cls;
+  img.addEventListener('load', ()=>{
+    host.appendChild(img);
+    host.closest('[data-rid]')?.classList.add('has-photo');
+    requestAnimationFrame(()=>img.classList.add('in'));
+  });
+  img.src = url;
+}
+// ── ارتقایِ تنبلِ تایل: فقط تایلی که دیده می‌شود جزئیات می‌خواهد ──
+let TILE_IO = null;
+function armTilePhotos(root, list){
+  if(TILE_IO) TILE_IO.disconnect();
+  const byId = new Map(list.map(r=>[String(r.id), r]));
+  TILE_IO = new IntersectionObserver(es=>{
+    for(const e of es){
+      if(!e.isIntersecting) continue;
+      TILE_IO.unobserve(e.target);
+      upgradeTile(e.target, byId.get(e.target.dataset.rid));
+    }
+  },{rootMargin:'240px 0px'});
+  root.querySelectorAll('.xt[data-rid]').forEach(t=>TILE_IO.observe(t));
+}
+function upgradeTile(tile, r){
+  if(!r) return;
+  const bg = tile.querySelector('.rc-bg');
+  const known = photoUrl(r);
+  if(known){ mountPhoto(bg, known, 'xt-photo'); return; }
+  if(r.detailLoaded) return;      // جزئیات آمده و عکسی نبود — گرادیان حقیقت است، نه جای خالی
+  requestDetail(r).then(ok=>{
+    const url = ok ? photoUrl(r) : null;
+    if(url && tile.isConnected) mountPhoto(bg, url, 'xt-photo');
+  });
+}
 // ═══════════════════════════════════════════════════════════
 //  اثباتِ اجتماعی — فقط از دادهٔ واقعیِ بک‌اند
 //
@@ -117,9 +246,13 @@ export function cardHTML(r){
 //  اومدن» فنی درست ولی گمراه‌کننده است.
 // ═══════════════════════════════════════════════════════════
 
+/** تعدادِ آواتارِ تزئینی برایِ n رزرو — یک فرمول، دو رندرکننده (کارت: HTML، immersive: DOM). */
+export function avatarCount(n, max = 4){
+  return Math.min(max, Math.max(1, Math.ceil(n / 4)));
+}
 /** آواتارهای تزئینی — تعدادشان بر پایه‌ی عددِ واقعی، خودشان aria-hidden. */
 function avatarStack(n, max = 4){
-  const count = Math.min(max, Math.max(1, Math.ceil(n / 4)));
+  const count = avatarCount(n, max);
   return `<div class="rc-avas" aria-hidden="true">${Array.from({length:count},()=>`<span class="avatar avatar-sm"></span>`).join('')}</div>`;
 }
 
@@ -186,6 +319,7 @@ export function invalidateFeed(){ return ++FEED_TOKEN; }
 export function renderFeed(list){
   const f=document.getElementById('feed');
   const token=invalidateFeed();
+  FEED_LIST = list;   // نمای تمام‌صفحه از همین فهرست ساخته می‌شود — فیلترها با کاربر می‌آیند
   // ⚠️ فهرستِ خالی باید **حالتِ خالیِ صادق** بدهد، نه صفحه‌ی سفید.
   // این مسیر از وقتی زنده شد که loadRestaurants دیگر روی پاسخِ موفقِ
   // `200 {items:[]}` دادهٔ نمونه برنمی‌گرداند (توضیحِ کامل در js/api.js).
@@ -200,12 +334,15 @@ export function renderFeed(list){
     </div>`;
     return;
   }
-  f.innerHTML=list.map(()=>`<div class="rc" style="opacity:1;transform:none"><div class="rc-img sk" style="border-radius:0"></div><div class="rc-body"><div class="sk" style="height:16px;width:65%;margin-bottom:9px"></div><div class="sk" style="height:12px;width:40%;margin-bottom:16px"></div><div class="sk" style="height:30px"></div></div></div>`).join('');
+  // اسکلت با همان ریتمِ موزاییک (هر هفتمی ۲×۲) تا چیدمان هنگامِ جایگزینی نپرد.
+  f.innerHTML=list.map((_,i)=>`<div class="xt xt-sk sk${i%7===0?' xt-hero':''}" aria-hidden="true"></div>`).join('');
   setTimeout(()=>{
     if(token!==FEED_TOKEN) return;   // رندرِ تازه‌تری از راه رسیده — این یکی کهنه است
-    f.innerHTML=list.map(cardHTML).join('') + moreBtnHTML(list);
-    const io=new IntersectionObserver(es=>es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),i*50);io.unobserve(e.target)}}),{threshold:.05});
-    f.querySelectorAll('.rc').forEach(c=>io.observe(c));
+    f.innerHTML=list.map(tileHTML).join('') + moreBtnHTML(list);
+    _photoFailed.clear();            // رندرِ تازه = فرصتِ تازه برایِ عکس‌هایی که بارِ قبل نرسیدند
+    armTilePhotos(f, list);
+    // نمای تمام‌صفحه اگر باز است، از فهرستِ تازه دوباره ساخته می‌شود (immersive.js گوش می‌دهد).
+    document.dispatchEvent(new CustomEvent('rz:feed',{detail:{list}}));
   },280);
 }
 // کشف بر اساس موقعیت — هر موقعیت به چند vibe نگاشت می‌شود (منطق واقعی روی داده)
@@ -224,8 +361,8 @@ export function pickOccasion(occ, el){
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
   if(already){
     document.querySelector('.chip')?.classList.add('active');
-    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
-    const sub=document.querySelector('.section-sub'); if(sub) sub.textContent=`${fmtFa(R.length)} رستوران فعال`;
+    document.getElementById('feedTitle').textContent='محبوب امشب';
+    renderSub(`${fmtFa(R.length)} رستوران فعال`);
     renderFeed(R);
     return;
   }
@@ -236,7 +373,7 @@ export function pickOccasion(occ, el){
                    .sort((a,b)=>(b.rt||0)-(a.rt||0));
   const list = matched.length ? matched : R;
   document.getElementById('feedTitle').textContent = m.title;
-  const sub=document.querySelector('.section-sub'); if(sub) sub.textContent = m.sub;
+  renderSub(m.sub);
   renderFeed(list);
   // اسکرول نرم به فید تا نتیجه دیده بشه
   document.getElementById('feed')?.scrollIntoView({behavior:'smooth',block:'start'});
@@ -245,7 +382,7 @@ export function filterVibe(v,el){
   document.querySelectorAll('.occ-card').forEach(c=>c.classList.remove('on'));
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');
   const list=v==='all'?R:R.filter(r=>r.vibes.includes(v));
-  document.getElementById('feedTitle').innerHTML=v==='all'?icon('flame',{size:16,fill:true})+' محبوب امشب':esc(el.textContent.trim());
+  document.getElementById('feedTitle').textContent=v==='all'?'محبوب امشب':el.textContent.trim();
   renderFeed(list);
 }
 // ── نزدیک تو (کارت افقی کوچک) ──
@@ -253,7 +390,7 @@ export function hCardHTML(r,extra){
   // امتیاز: اگر واقعاً نداریم «—» — نه ۴٫۵ِ اختراعی (ادعای ساختگی درباره‌ی یک کسب‌وکارِ واقعی بود).
   const rating=Number.isFinite(r.rt)&&r.rt>0?fmtFa(r.rt):(Number.isFinite(r.rating)&&r.rating>0?fmtFa(r.rating):'—');
   return `<div class="hcard" role="button" tabindex="0" onclick="openRest(${jsq(String(r.id))})">
-    <div class="hcard-img" style="background:${gradFor(r.id)}">${r.e?esc(r.e):icon('utensils',{size:22})}${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
+    <div class="hcard-img" style="background:${gradFor(r.id)}"><span class="hcard-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</span>${extra?`<span class="hcard-tag">${extra}</span>`:''}</div>
     <div class="hcard-name">${esc(r.n)}</div>
     <div class="hcard-meta">${icon('star',{size:12,fill:true})} ${rating} · ${esc((r.tags&&r.tags[0])||r.cuisine||'')}${r.slug?'':' · نمونه'}</div>
   </div>`;
@@ -280,6 +417,16 @@ function haversineKm(a,b){
   return 2*Rk*Math.asin(Math.sqrt(s));
 }
 const hasCoords=r=>Number.isFinite(r.lat)&&Number.isFinite(r.lng);
+/** برچسبِ فاصله — یک قالب برایِ «نزدیک تو» و نمای تمام‌صفحه. */
+function kmLabel(km){
+  return km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`;
+}
+/** فاصله‌ی واقعی تا رستوران، یا null — بدونِ موقعیتِ کاربر (اجازه‌ی از قبل داده‌شده)
+ *  یا بدونِ مختصاتِ رستوران، هیچ عددی ساخته نمی‌شود. */
+export function distanceLabel(r){
+  if(!userPos||!r||!hasCoords(r)) return null;
+  return kmLabel(haversineKm(userPos,{lat:r.lat,lng:r.lng}));
+}
 
 export function renderNearby(){
   const el=document.getElementById('nearbyScroll');if(!el)return;
@@ -291,8 +438,7 @@ export function renderNearby(){
       .sort((a,b)=>a.km-b.km).slice(0,6);
     if(withDist.length){
       if(title)title.textContent='نزدیک تو';
-      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,
-        km<1?`${fmtFa(Math.round(km*1000))} متر`:`${fmtFa(Math.round(km*10)/10)} کیلومتر`)).join('');
+      el.innerHTML=withDist.map(({r,km})=>hCardHTML(r,kmLabel(km))).join('');
       return;
     }
   }
@@ -388,8 +534,12 @@ export function renderRestaurantSections(){
   renderNearby();
   renderTrending();
   // اعداد را به دادهٔ واقعی وصل کن (نه ثابتِ hard-coded) — C4
-  const sub=document.querySelector('#page-discover .section-sub');
-  if(sub && Array.isArray(R) && R.length) sub.textContent=`${fmtFa(R.length)} رستوران فعال · ${searchCtxLabel()}`;
+  // ⚠️ [۲۰۲۶-۰۹-۱۲] اینجا `textContent` بود و **قرصِ زمینه را پاک می‌کرد**: این
+  // تابع در هر بوت/سینک اجرا می‌شود، پس روی بارِ سرد قرص هرگز روی صفحه نبود و
+  // کاربر هیچ راهی به «کِی و چند نفر» نداشت — همان نقصِ صحتی که DS-007 §۶ گفته
+  // بود این قرص جلویش را می‌گیرد (چیپِ «۱۹:۰۰» یعنی امروزِ ۲ نفره و quickBook
+  // مستقیم رد می‌شود). حالا این سطر **یک نقاش** دارد: renderSub.
+  if(Array.isArray(R) && R.length) renderSub(`${fmtFa(R.length)} رستوران فعال`);
   // چیپِ امتیاز عمداً اینجا نوشته نمی‌شود: منبعِ واحدش syncNavPoints در
   // api.js است که مقدار را از /me/loyalty می‌گیرد. نوشتنِ ptsِ محلی اینجا
   // باعث می‌شد مهمانِ ناشناس عددِ ساختگی ببیند (باگِ ۳۴۰).
@@ -457,7 +607,7 @@ export function doSearch(q){
   if(q!==undefined) _query=String(q);
   const query=_query.trim();
   if(!query){
-    document.getElementById('feedTitle').innerHTML=icon('flame',{size:16,fill:true})+' محبوب امشب';
+    document.getElementById('feedTitle').textContent='محبوب امشب';
     renderSub(`${fmtFa(R.length)} رستوران فعال`);
     renderFeed(R);return;
   }

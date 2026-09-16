@@ -13,17 +13,88 @@ import { readFileSync } from 'node:fs';
 const site = readFileSync(new URL('../app/site.css', import.meta.url), 'utf8');
 const globals = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
 
-describe('تیترِ گرادیانیِ متحرک', () => {
-  // باگِ واقعی: .text-gradient روی پوسته color:transparent می‌گذارد، ولی
-  // .kx-word__in یک transform دارد و لایه‌ی جدا می‌سازد؛ پس‌زمینه‌ی
-  // برش‌خورده به آن نمی‌رسد و نیمی از تیترِ هیرو نامرئی می‌شد.
-  test('کلمه‌های متحرک باید گرادیانِ خودشان را داشته باشند', () => {
-    assert.match(site, /\.text-gradient\s+\.kx-word__in\s*\{[^}]*background:\s*linear-gradient/);
-    assert.match(site, /\.text-gradient\s+\.kx-word__in\s*\{[^}]*background-clip:\s*text/);
+describe('تیترِ دوتُنی', () => {
+  // باگِ واقعی (تا ۰۹-۱۲): .text-gradient روی پوسته color:transparent و
+  // background-clip:text می‌گذاشت، ولی کلمه‌ی متحرکِ داخلش transform داشت و
+  // لایه‌ی جدا می‌ساخت؛ پس‌زمینه‌ی برش‌خورده به آن نمی‌رسید و نیمی از تیترِ
+  // هیرو نامرئی می‌شد. ۰۹-۱۳ نیمه‌ی دوم یک رنگِ واقعی (خاکستری) گرفت و ورودِ
+  // کلمه‌به‌کلمه رفت — این تست جلوی بازگشتِ همان کلاسِ باگ را می‌گیرد: هر
+  // قاعده‌ای که به .text-gradient متنِ شفاف بدهد قرمز است.
+  test('.text-gradient رنگِ واقعی دارد و هرگز متنِ شفاف نمی‌گیرد', () => {
+    const rules = [...(globals + site).matchAll(/([^{}]*\.text-gradient[^{}]*)\{([^}]*)\}/g)];
+    assert.ok(rules.length > 0, 'قاعده‌ی .text-gradient باید وجود داشته باشد');
+    assert.ok(rules.some((r) => /(^|;)\s*color:\s*var\(--text-/.test(r[2])), 'باید یک color از توکن‌های متن داشته باشد');
+    for (const r of rules) {
+      assert.doesNotMatch(r[2], /color:\s*transparent/, `متنِ شفاف در «${r[1].trim()}»`);
+      assert.doesNotMatch(r[2], /background-clip:\s*text/, `برشِ پس‌زمینه در «${r[1].trim()}»`);
+    }
+  });
+});
+
+describe('بخشِ «شب»', () => {
+  // باگِ واقعی (۰۹-۱۳، سنجیده با getComputedStyle): کروم light-dark() ِ درونِ
+  // custom property را روی عنصرِ اعلان‌کننده resolve می‌کند. توکن‌ها فقط روی
+  // :root بودند، پس `.is-night { color-scheme: dark }` تیترِ بخشِ مشکی را
+  // rgb(29, 29, 31) می‌داد — جوهر روی مشکی. رفع: همان اعلان روی .is-night هم.
+  test('توکن‌های معنایی روی .is-night دوباره اعلان می‌شوند', () => {
+    const m = /:root,\s*\.is-night\s*\{([^}]*)\}/.exec(globals);
+    assert.ok(m, 'بلوکِ توکن‌های معنایی باید انتخابگرِ «:root, .is-night» داشته باشد');
+    for (const token of ['--bg', '--surface-2', '--text-1', '--text-2', '--border', '--brand-ink']) {
+      assert.match(m[1], new RegExp(`${token}:\\s*light-dark\\(`), `${token} باید در همان بلوک باشد`);
+    }
   });
 
-  test('نسخه‌ی تمِ تاریک هم باید باشد، وگرنه تیتر روی زمینه‌ی تیره کم‌جان است', () => {
-    assert.match(site, /\[data-theme='dark'\]\s+\.text-gradient\s+\.kx-word__in/);
+  test('جزیره‌ی تیره color-scheme: dark دارد', () => {
+    assert.match(globals, /\.is-night\s*\{[^}]*color-scheme:\s*dark/);
+  });
+});
+
+/** زنجیره‌ی at-ruleهایی که یک موقعیت در CSS داخلشان است (با شمارشِ آکولاد). */
+function enclosingAtRules(css: string, index: number): string[] {
+  const stack: string[] = [];
+  let preludeStart = 0;
+  for (let i = 0; i < index; i++) {
+    const ch = css[i];
+    if (ch === '{') { stack.push(css.slice(preludeStart, i).trim()); preludeStart = i + 1; }
+    else if (ch === '}') { stack.pop(); preludeStart = i + 1; }
+    else if (ch === ';') { preludeStart = i + 1; }
+  }
+  return stack.filter((p) => p.startsWith('@'));
+}
+
+describe('حرکتِ اسکرول‌محور', () => {
+  // قاعده‌ی سراسریِ کاهشِ حرکت در globals فقط animation-duration را صفر
+  // می‌کند؛ انیمیشنی که به scroll()/view() بسته است duration ندارد و از آن
+  // قاعده **سالم می‌گذرد** (برای موزاییکِ ۰۹-۱۲ همین دیده شد). پس هر
+  // animation-timeline فقط داخلِ «prefers-reduced-motion: no-preference» مجاز
+  // است، و داخلِ @supports تا مرورگرِ بدونِ پشتیبانی چیدمانِ ثابت ببیند.
+  // کامنت‌ها با فاصله جایگزین می‌شوند (خط‌ها حفظ، تا شماره‌ی خطِ پیامِ خطا درست بماند)
+  const css = site.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+  // فقط اعلان (بعد از «{» یا «;»)، نه متنِ شرطِ `@supports (animation-timeline: …)`
+  const uses = [...css.matchAll(/[{;]\s*animation-timeline:\s*[^;{}]+;/g)]
+    .map((m) => ({ index: (m.index ?? 0) + m[0].indexOf('animation-timeline') }));
+
+  test('دست‌کم یک انیمیشنِ اسکرول‌محور هست (وگرنه این گارد چیزی نمی‌سنجد)', () => {
+    assert.ok(uses.length >= 2, `فقط ${uses.length} اعلانِ animation-timeline پیدا شد`);
+  });
+
+  test('هر animation-timeline داخلِ no-preference و @supports است', () => {
+    for (const u of uses) {
+      const chain = enclosingAtRules(css, u.index ?? 0);
+      const line = css.slice(0, u.index).split('\n').length;
+      assert.ok(chain.some((p) => /prefers-reduced-motion:\s*no-preference/.test(p)), `site.css:${line} بیرون از no-preference است`);
+      assert.ok(chain.some((p) => /@supports\s*\(animation-timeline/.test(p)), `site.css:${line} بیرون از @supports است`);
+    }
+  });
+
+  test('سنجاقِ اسکرولِ زنده هم فقط در همان بلوک است — بیرونش چیدمانِ ثابت', () => {
+    const decl = /view-timeline:\s*--ls/.exec(css);
+    assert.ok(decl, 'view-timeline: --ls باید تعریف شده باشد');
+    const chain = enclosingAtRules(css, decl.index);
+    assert.ok(chain.some((p) => /no-preference/.test(p)) && chain.some((p) => /@supports/.test(p)));
+    const sticky = /\.ls__stage\s*\{[^}]*position:\s*sticky/.exec(css);
+    assert.ok(sticky, '.ls__stage باید sticky داشته باشد');
+    assert.ok(enclosingAtRules(css, sticky.index).some((p) => /no-preference/.test(p)), 'sticky بیرون از no-preference است');
   });
 });
 
@@ -63,24 +134,6 @@ describe('پرده‌ی ورود', () => {
       lastEnds <= 1 + 0.001,
       `آخرین تیغه در ${lastEnds.toFixed(3)}× --intro-t تمام می‌شود ولی پرده در ۱× بسته می‌شود`,
     );
-  });
-});
-
-describe('نشانگرِ سفارشی', () => {
-  // اگر cursor:none بی‌قید اعمال شود و JS اجرا نشود، کاربر نشانگر ندارد.
-  test('cursor:none فقط با کلاسی که JS می‌گذارد فعال می‌شود', () => {
-    assert.match(globals, /html\.has-cursor[\s\S]{0,60}cursor:\s*none/);
-    assert.doesNotMatch(globals, /^\s*body\s*\{[^}]*cursor:\s*none/m);
-  });
-
-  test('ورودی‌های متنی باید نشانگرِ متن داشته باشند', () => {
-    assert.match(globals, /has-cursor\s*:is\(input, textarea, \[contenteditable\]\)[\s\S]{0,60}cursor:\s*text/);
-  });
-});
-
-describe('دانه‌ی فیلم', () => {
-  test('نباید جلوی کلیک را بگیرد', () => {
-    assert.match(globals, /\.grain\s*\{[^}]*pointer-events:\s*none/);
   });
 });
 

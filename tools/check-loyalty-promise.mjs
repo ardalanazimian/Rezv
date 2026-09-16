@@ -105,7 +105,94 @@ for (const model of ['PointsLedger', 'ClubMember']) {
   }
 }
 
-// ── طرفِ خطر ۲: هر کدی که امتیاز کم کند ──────────────────────────────
+// ── طرفِ خطر ۱ب: تضمینِ دیتابیسی — این، نه regexهای پایین، ضامن است ─────
+// RT-18 (Red Team، RETEST-2026-09-13): اسکنِ متنیِ پایین با یک منفیِ hoisted
+// (`const adjustment = 0 - row.points; … delta: adjustment`) دور خورد. پس ضامن قیدِ
+// CHECKِ مهاجرتِ ۰۸۸ است: delta منفی فقط با reasonِ مجاز. این گارد می‌سنجد که قید
+// هنوز هست، حذف نشده، و فهرستِ مجازش بی‌صدا گشاد نشده. اسکنِ کد در ادامه فقط هشدارِ زودتر است.
+const NEG_CONSTRAINT = 'points_ledger_negative_delta_reason';
+const ALLOWED_NEGATIVE_REASONS = ['cashback', 'redemption'];
+const sqlDir = 'api/prisma/sql';
+const sqlFiles = existsSync(join(REPO, sqlDir))
+  ? readdirSync(join(REPO, sqlDir)).filter((f) => f.endsWith('.sql')).sort().map((f) => `${sqlDir}/${f}`)
+  : [];
+if (sqlFiles.length === 0) {
+  violations.push(`هیچ مهاجرتی در ${sqlDir} پیدا نشد — قیدِ ${NEG_CONSTRAINT} قابلِ سنجش نیست.`);
+}
+let constraintDef = null;
+for (const f of sqlFiles) {
+  const sql = (read(f) ?? '').replace(/--[^\n]*/g, '');
+  if (new RegExp(`DROP\\s+CONSTRAINT\\s+(IF\\s+EXISTS\\s+)?${NEG_CONSTRAINT}\\b`, 'i').test(sql)) {
+    violations.push(`${f} قیدِ ${NEG_CONSTRAINT} را حذف می‌کند — کسرِ امتیاز با هر reasonی ممکن می‌شود، ولی اپِ مشتری «منقضی نمی‌شن» می‌گوید.`);
+  }
+  const m = sql.match(new RegExp(`ADD\\s+CONSTRAINT\\s+${NEG_CONSTRAINT}\\s+CHECK\\s*\\(([\\s\\S]*?)\\)\\s*(NOT\\s+VALID)?\\s*;`, 'i'));
+  if (m) constraintDef = { file: f, body: m[1] };
+}
+if (!constraintDef) {
+  violations.push(`قیدِ ${NEG_CONSTRAINT} در هیچ مهاجرتی نیست — تنها تضمینِ وعده روی DB غایب است (مهاجرتِ ۰۸۸).`);
+} else {
+  const inList = constraintDef.body.match(/reason\s+IN\s*\(([^)]*)\)/i);
+  const reasons = inList ? [...inList[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort() : null;
+  if (!/delta\s*>=\s*0/i.test(constraintDef.body) || !reasons) {
+    violations.push(`${constraintDef.file}: شکلِ قیدِ ${NEG_CONSTRAINT} عوض شده («${constraintDef.body.trim()}») — گارد نمی‌تواند مجازها را بخواند.`);
+  } else if (reasons.join(',') !== ALLOWED_NEGATIVE_REASONS.join(',')) {
+    violations.push(
+      `${constraintDef.file}: فهرستِ reasonهای مجاز برای کسر [${reasons.join(', ')}] است، نه [${ALLOWED_NEGATIVE_REASONS.join(', ')}]. `
+      + 'گشادکردنش یعنی کسرِ تازه‌ای که شاید انقضا باشد؛ اگر مشروع است، این فهرست را آگاهانه همین‌جا عوض کن.',
+    );
+  }
+}
+// ── طرفِ خطر ۱ج: فقط-افزودنی بودنِ دفتر (مهاجرتِ ۰۸۹ — RT-22/RT-25، حکمِ FP-009) ──
+// CHECKِ ۰۸۸ فقط **شکلِ ردیفِ نوشته‌شده** را می‌بندد. کم‌کردنِ موجودی از راهِ حذف،
+// صفرکردن یا TRUNCATE هیچ ردیفِ منفی نمی‌نویسد و از آن رد می‌شود. این سه تریگر
+// ضامنِ آن سمت‌اند؛ این‌جا فقط می‌سنجیم که در مهاجرت‌ها **هستند** و بعداً بی‌صدا
+// برداشته نشده‌اند (DROPِ کنارِ CREATEِ خودشان طبیعی است و شمرده نمی‌شود).
+const LEDGER_TRIGGERS = ['points_ledger_no_delete', 'points_ledger_no_truncate', 'points_ledger_no_update'];
+for (const trg of LEDGER_TRIGGERS) {
+  const created = sqlFiles.filter((f) => new RegExp(`CREATE\\s+TRIGGER\\s+${trg}\\b`, 'i').test((read(f) ?? '')));
+  if (created.length === 0) {
+    violations.push(`تریگرِ ${trg} در هیچ مهاجرتی ساخته نمی‌شود — دفترِ امتیاز فقط-افزودنی نیست (مهاجرتِ ۰۸۹).`);
+    continue;
+  }
+  const last = created[created.length - 1];
+  for (const f of sqlFiles) {
+    if (f <= last) continue; // DROPِ پیش از CREATEِ خودش، بخشِ idempotent بودنِ همان فایل است
+    const sql = (read(f) ?? '').replace(/--[^\n]*/g, '');
+    if (new RegExp(`DROP\\s+TRIGGER\\s+(IF\\s+EXISTS\\s+)?${trg}\\b`, 'i').test(sql)
+      && !new RegExp(`CREATE\\s+TRIGGER\\s+${trg}\\b`, 'i').test(sql)) {
+      violations.push(`${f} تریگرِ ${trg} را برمی‌دارد و دوباره نمی‌سازد — راهِ کم‌کردنِ موجودی بازمی‌شود.`);
+    }
+  }
+}
+// و کلیدِ خارجی: یک خطِ `ON DELETE CASCADE` کافی است تا «حذفِ کاربر» کلِ ردِ مالی را
+// ببرد — و آن تغییر معمولاً به‌عنوانِ «رفعِ حذفِ کاربر» بازبینی می‌شود، نه تغییرِ پول
+// (پیشنهادِ رد تیم، RT-24 §۳؛ حکمِ FP-009: RESTRICT می‌ماند).
+for (const f of sqlFiles) {
+  const sql = (read(f) ?? '').replace(/--[^\n]*/g, '');
+  const m = sql.match(/ADD\s+CONSTRAINT\s+points_ledger_user_id_fkey[\s\S]{0,200}?;/i);
+  if (m && /ON\s+DELETE\s+CASCADE/i.test(m[0])) {
+    violations.push(`${f}: FKِ points_ledger_user_id_fkey را CASCADE می‌کند — حذفِ کاربر ردِ مالی‌اش را هم می‌برد (FP-009: RESTRICT می‌ماند).`);
+  }
+}
+const ledgerModel = schema.match(/model\s+PointsLedger\b[^{]*\{([\s\S]*?)\n\}/);
+if (ledgerModel && /@relation\([^)]*onDelete:\s*Cascade/i.test(ledgerModel[1])) {
+  violations.push('schema.prisma: رابطه‌ی PointsLedger.user با onDelete: Cascade — همان درِ حذف از راهِ والد (FP-009: RESTRICT می‌ماند).');
+}
+
+// و خودِ enum: reasonی که اسمش انقضاست، وعده را پیش از هر کدی نقض می‌کند.
+const reasonEnum = schema.match(/enum\s+PointsReason\s*\{([\s\S]*?)\n\}/);
+if (!reasonEnum) {
+  violations.push('enum PointsReason در اسکیما نیست — قیدِ reason روی چیزِ دیگری ایستاده.');
+} else {
+  for (const line of reasonEnum[1].split('\n')) {
+    const v = line.trim().split(/\s+/)[0];
+    if (v && !v.startsWith('//') && !v.startsWith('@@') && /expir|stale|decay|sweep|ttl|forfeit/i.test(v)) {
+      violations.push(`PointsReason.${v} — reasonِ انقضا به enum آمده، ولی اپِ مشتری «منقضی نمی‌شن» می‌گوید.`);
+    }
+  }
+}
+
+// ── طرفِ خطر ۲: هر کدی که امتیاز کم کند (هشدارِ زودتر، نه ضامن) ──────────
 // انقضا لازم نیست ستون باشد؛ یک کرونِ «امتیازهای کهنه را صفر کن» هم همان اثر
 // را دارد. و چون خودِ routeها چیزی نمی‌نویسند و به lib تفویض می‌کنند، هر دو
 // اسکن می‌شوند.
@@ -248,6 +335,8 @@ if (violations.length) {
 console.log(`✓ وعده‌ی «امتیاز منقضی نمی‌شود» با مکانیزم هم‌داستان است (${claimants.length} محلِ ادعا).`);
 console.log('  PointsLedger و ClubMember هیچ فیلدِ انقضا ندارند؛ هیچ کسرِ سن/زمان‌محوری در');
 console.log(`  ${SCAN_DIRS.join(' و ')} نیست (${SCANNED.length} فایل اسکن شد).`);
+console.log(`  ضامن: قیدِ ${NEG_CONSTRAINT} در ${constraintDef.file} — کسر فقط با [${ALLOWED_NEGATIVE_REASONS.join(', ')}].`);
+console.log('  (اسکنِ متنیِ بالا فقط هشدارِ زودتر است؛ منفیِ hoisted را نمی‌بیند — RT-18.)');
 if (allowed.length) {
   // ⚠️ عمداً چاپ می‌شود: «هیچ کسری نبود» و «کسرهایی بود و همه سنجیده شدند» دو
   // حکمِ متفاوت‌اند. سکوت درباره‌شان همان سبزیِ بی‌دلیل است.

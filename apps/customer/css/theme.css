@@ -5,7 +5,7 @@
 
 /* ── پلِ تم: اپ مشتری (دارک) — نگاشتِ semantic به توکن‌های موجود ── */
 :root {
-  --surface: var(--card-solid, #141026);
+  --surface: var(--card-solid, #1C1C1E);
   --surface-2: rgba(255,255,255,.05);
   --surface-hover: rgba(255,255,255,.06);
   --text-1: rgba(255,255,255,.95);
@@ -13,8 +13,8 @@
   --text-3: rgba(255,255,255,.45);
   --skeleton-base: rgba(255,255,255,.06);
   --skeleton-hi: rgba(255,255,255,.12);
-  --brand-500: #6A4BFF;
-  --brand-600: #5a3fe0;
+  --brand-500: #C8430F;
+  --brand-600: #B23A0C;
 }
 
 /* ⚠️ رفعِ رگرسیونِ merge (اندازه‌گیری‌شده ۲۰۲۶-۰۸-۲۴): این پل زمانی نوشته شد
@@ -28,9 +28,9 @@
   --surface: var(--card-solid, #FFFFFF);
   --surface-2: rgba(22, 15, 38, .05);
   --surface-hover: rgba(22, 15, 38, .06);
-  --text-1: var(--t1, #160F26);
-  --text-2: var(--t2, #5A5182);
-  --text-3: var(--t3, #6C6585);
+  --text-1: var(--t1, #1D1D1F);
+  --text-2: var(--t2, #5E5E63);
+  --text-3: var(--t3, #646469);
   --skeleton-base: rgba(22, 15, 38, .06);
   --skeleton-hi: rgba(22, 15, 38, .12);
 }

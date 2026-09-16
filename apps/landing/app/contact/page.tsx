@@ -43,9 +43,6 @@ export default function ContactPage() {
       />
 
       <section className="hero hero--compact">
-        <div className="aurora" aria-hidden="true">
-          <span className="aurora__blob" /><span className="aurora__blob" /><span className="aurora__blob" />
-        </div>
         <div className="container hero__inner hero__inner--split">
           <div className="hero__content">
             <Reveal><span className="eyebrow"><Icon name="mail" size={14} />تماس با فروش</span></Reveal>

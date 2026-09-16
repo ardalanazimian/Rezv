@@ -58,10 +58,6 @@ export default async function DemoPage() {
       />
 
       <section className="hero hero--compact">
-        <div className="aurora" aria-hidden="true">
-          <span className="aurora__blob" /><span className="aurora__blob" /><span className="aurora__blob" />
-        </div>
-        <div className="grid-bg" aria-hidden="true" />
 
         <div className="container hero__inner hero__inner--split">
           <div className="hero__content">

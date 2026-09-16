@@ -73,19 +73,31 @@ before(async () => {
   token = signAccess({ sub: userId, kind: 'customer' });
 });
 
+// ⚠️ بازنویسی ۲۰۲۶-۰۹-۱۶ (مهاجرتِ ۰۸۹ / FP-009): این hook پیش از هر تست دفتر را
+// پاک می‌کرد تا موجودی صفر شود. دفترِ امتیاز حالا فقط-افزودنی است و آن حذف رد
+// می‌شود. به‌جای بازکردنِ درِ فرار در تریگر، **کاربرِ تازه به‌ازای هر تست** ساخته
+// می‌شود — انزوای قوی‌تری هم هست: دیگر هیچ تستی ردیفِ تستِ قبلی را نمی‌بیند.
 beforeEach(async () => {
-  await db.pointsLedger.deleteMany({ where: { userId } });
-  await db.reservation.deleteMany({ where: { userId } });
-  await db.user.update({ where: { id: userId }, data: { notificationPrefs: {} } });
+  const u = await db.user.create({
+    // ⚠️ پیشوندِ ۰۹۲۱ مالِ همین فایل است — به tests/_phone.helper.mts رجوع کن.
+    data: { phone: fixturePhone('0921'), firstName: '[DEMO] کاربرِ DNA' },
+    select: { id: true },
+  });
+  userId = u.id;
+  token = signAccess({ sub: userId, kind: 'customer' });
 });
 
 after(async () => {
-  await db.pointsLedger.deleteMany({ where: { userId } });
-  await db.reservation.deleteMany({ where: { userId } });
-  await db.menuItem.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
-  await db.user.delete({ where: { id: userId } });
-  for (const id of restaurantIds) await db.restaurant.delete({ where: { id } });
-  await db.tenant.delete({ where: { id: tenantId } });
+  // ⚠️ دامنه‌ی پاک‌سازی از «کاربر» به «رستوران» رفت: حالا هر تست کاربرِ خودش را
+  // می‌سازد (بالا)، پس رزروهای کاربرانِ قبلی با فیلترِ userId جا می‌ماندند و
+  // حذفِ رستوران را با FK می‌شکستند.
+  await db.reservation.deleteMany({ where: { restaurantId: { in: restaurantIds } } }).catch(() => {});
+  await db.menuItem.deleteMany({ where: { restaurantId: { in: restaurantIds } } }).catch(() => {});
+  // ۰۸۹: ردیف‌های دفتر می‌مانند، پس FK حذفِ کاربر را رد می‌کند — و کاربرانِ تست‌های
+  // دیگرِ همین فایل هم می‌مانند. دیتابیسِ هر اجرا تازه است.
+  await db.user.delete({ where: { id: userId } }).catch(() => {});
+  for (const id of restaurantIds) await db.restaurant.delete({ where: { id } }).catch(() => {});
+  await db.tenant.delete({ where: { id: tenantId } }).catch(() => {});
 });
 
 // ───────────────────────────────────────────────────────────────────────

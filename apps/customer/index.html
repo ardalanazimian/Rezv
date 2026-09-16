@@ -132,36 +132,36 @@
 
   <div class="wrap">
     <div class="occ-wrap">
-      <div class="occ-q">امشب چه خبره؟ 🎉</div>
+      <div class="occ-q">امشب چه خبره؟</div>
       <div class="occ-row" id="occRow">
-        <div class="occ-card" style="background:linear-gradient(135deg,#f093fb,#f5576c)" onclick="pickOccasion('date',this)">
-          <div class="occ-emoji">💕</div><div><div class="occ-label">قرار عاشقانه</div><div class="occ-sub">دنج و رمانتیک</div></div>
+        <div class="occ-card" style="background:var(--dish-pomegranate)" onclick="pickOccasion('date',this)">
+          <div><div class="occ-label">قرار عاشقانه</div><div class="occ-sub">دنج و رمانتیک</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#4facfe,#00f2fe)" onclick="pickOccasion('friends',this)">
-          <div class="occ-emoji">🎊</div><div><div class="occ-label">با رفقا</div><div class="occ-sub">شلوغ و باحال</div></div>
+        <div class="occ-card" style="background:var(--dish-turquoise)" onclick="pickOccasion('friends',this)">
+          <div><div class="occ-label">با رفقا</div><div class="occ-sub">شلوغ و باحال</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#fa709a,#fee140)" onclick="pickOccasion('birthday',this)">
-          <div class="occ-emoji">🎂</div><div><div class="occ-label">تولد</div><div class="occ-sub">خاص و به‌یادموندنی</div></div>
+        <div class="occ-card" style="background:var(--dish-rosewater)" onclick="pickOccasion('birthday',this)">
+          <div><div class="occ-label">تولد</div><div class="occ-sub">خاص و به‌یادموندنی</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#667eea,#764ba2)" onclick="pickOccasion('business',this)">
-          <div class="occ-emoji">💼</div><div><div class="occ-label">قرار کاری</div><div class="occ-sub">آروم و رسمی</div></div>
+        <div class="occ-card" style="background:var(--dish-charcoal)" onclick="pickOccasion('business',this)">
+          <div><div class="occ-label">قرار کاری</div><div class="occ-sub">آروم و رسمی</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#30cfd0,#330867)" onclick="pickOccasion('solo',this)">
-          <div class="occ-emoji">🧘</div><div><div class="occ-label">تنهایی</div><div class="occ-sub">یه جای دنج</div></div>
+        <div class="occ-card" style="background:var(--dish-eggplant)" onclick="pickOccasion('solo',this)">
+          <div><div class="occ-label">تنهایی</div><div class="occ-sub">یه جای دنج</div></div>
         </div>
-        <div class="occ-card" style="background:linear-gradient(135deg,#f6d365,#fda085)" onclick="pickOccasion('family',this)">
-          <div class="occ-emoji">👨‍👩‍👧</div><div><div class="occ-label">خانواده</div><div class="occ-sub">راحت برای همه</div></div>
+        <div class="occ-card" style="background:var(--dish-saffron)" onclick="pickOccasion('family',this)">
+          <div><div class="occ-label">خانواده</div><div class="occ-sub">راحت برای همه</div></div>
         </div>
       </div>
     </div>
     <div class="chips" id="chips">
-      <button class="chip active" onclick="filterVibe('all',this)">✨ همه</button>
-      <button class="chip" onclick="filterVibe('رمانتیک',this)">💫 رمانتیک</button>
-      <button class="chip" onclick="filterVibe('آروم',this)">🌿 آروم</button>
-      <button class="chip" onclick="filterVibe('لوکس',this)">👑 لوکس</button>
-      <button class="chip" onclick="filterVibe('ویو',this)">🌆 ویو</button>
-      <button class="chip" onclick="filterVibe('سریع',this)">⚡ سریع</button>
-      <button class="chip" onclick="filterVibe('خانوادگی',this)">👨‍👩‍👧 خانوادگی</button>
+      <button class="chip active" onclick="filterVibe('all',this)">همه</button>
+      <button class="chip" onclick="filterVibe('رمانتیک',this)">رمانتیک</button>
+      <button class="chip" onclick="filterVibe('آروم',this)">آروم</button>
+      <button class="chip" onclick="filterVibe('لوکس',this)">لوکس</button>
+      <button class="chip" onclick="filterVibe('ویو',this)">ویو</button>
+      <button class="chip" onclick="filterVibe('سریع',this)">سریع</button>
+      <button class="chip" onclick="filterVibe('خانوادگی',this)">خانوادگی</button>
     </div>
   </div>
 
@@ -188,11 +188,12 @@
 
   <div class="wrap section">
     <div class="section-head">
-      <div><div class="section-title" id="feedTitle">🔥 محبوب امشب</div><div class="section-sub">رستوران‌های فعال</div></div>
+      <div><div class="section-title" id="feedTitle">محبوب امشب</div><div class="section-sub">رستوران‌های فعال</div></div>
     </div>
     <!-- نوارِ زنده: با دادهٔ واقعی از /restaurants/live-stats پر می‌شود (features/live-strip.js). -->
     <div class="live-strip" id="liveStrip" aria-live="polite"></div>
-    <div class="grid" id="feed"></div>
+    <!-- DS-011: موزاییکِ Explore — کلاسِ `.grid` مالِ علاقه‌مندی‌هاست و دست نخورده می‌ماند. -->
+    <div class="xgrid" id="feed"></div>
   </div>
 
   <!-- نزدیک تو -->
@@ -205,15 +206,24 @@
 
   <!-- ترند هفته -->
   <div class="wrap section">
-    <div class="section-head"><div><div class="section-title">📈 ترند این هفته</div><div class="section-sub">پرطرفدارترین‌های اخیر</div></div></div>
+    <div class="section-head"><div><div class="section-title">ترند این هفته</div><div class="section-sub">پرطرفدارترین‌های اخیر</div></div></div>
     <div class="hscroll" id="trendingScroll"></div>
   </div>
 
   <!-- رویدادهای ویژه -->
   <div class="wrap section" id="eventsSection">
-    <div class="section-head"><div><div class="section-title">🎉 رویدادهای ویژه</div><div class="section-sub">شب‌های خاص رستوران‌ها</div></div></div>
+    <div class="section-head"><div><div class="section-title">رویدادهای ویژه</div><div class="section-sub">شب‌های خاص رستوران‌ها</div></div></div>
     <div class="events-list" id="eventsList"></div>
   </div>
+</div>
+
+<!-- ═══════════ IMMERSIVE (DS-011: اسکرولِ تمام‌صفحه‌ی تیک‌تاکی؛ features/immersive.js) ═══════════ -->
+<div id="page-immersive" class="page" role="region" aria-label="مرورِ تمام‌صفحه‌ی رستوران‌ها">
+  <button type="button" class="im-close" onclick="closeImmersive()" aria-label="بستنِ مرورِ تمام‌صفحه">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="im-count" id="imCount" aria-live="polite"></div>
+  <div class="im-feed" id="imFeed"></div>
 </div>
 
 <!-- ═══════════ RESTAURANT PROFILE (Airbnb-style) ═══════════ -->

@@ -11,12 +11,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Icon } from '../site/Icon';
-import { Reveal, CountUp } from '../site/Motion';
-import { LiveFlow } from './LiveFlow';
+import { Reveal } from '../site/Motion';
 import { PinnedStory } from './PinnedStory';
-import { FlowField } from './FlowField';
-import { HeroLight } from './Caustics';
-import { SplitText, Magnetic, Ambient, Tilt, Parallax } from '../site/Kinetic';
 import { Visual } from './Visuals';
 import { Scene, Gallery, PhotoSplit } from './PhotoBlocks';
 import { PlanCards } from '../pricing/PlanCards';
@@ -24,6 +20,7 @@ import { FaqAccordion } from '../site/FaqAccordion';
 import { renderMarkdown } from '@/lib/markdown';
 import { faDate } from '@/lib/format';
 import type { Section, SiteFaq, SitePlan, SiteTestimonial, Cta } from '@/lib/content-types';
+import type { HeroHeading } from '@/lib/cms-page';
 
 // ── کمک‌کننده‌های خواندنِ امنِ فیلدهای CMS ──
 const s = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null);
@@ -49,12 +46,7 @@ function CtaButtons({ primary, secondary, size = 'lg' }: { primary: Cta | null; 
   return (
     <div className="row cta-row" style={{ gap: 'var(--sp-3)' }}>
       {primary && (
-        <Magnetic>
-          <Link href={primary.href} className={`btn btn--primary ${cls}`}>
-            {primary.label}
-            <Icon name="arrowLeft" size={18} className="btn__arrow" />
-          </Link>
-        </Magnetic>
+        <Link href={primary.href} className={`btn btn--primary ${cls}`}>{primary.label}</Link>
       )}
       {secondary && (
         <Link href={secondary.href} className={`btn btn--ghost ${cls}`}>{secondary.label}</Link>
@@ -78,14 +70,17 @@ function Head({ eyebrow, title, subtitle, center = true }: {
 
 // ═══════════════ hero ═══════════════
 
-function Hero({ sec }: { sec: Section }) {
+function Hero({ sec, heading = 'h1' }: { sec: Section; heading?: HeroHeading }) {
+  const Heading = heading;
   const panelKind = (sec.panel as { kind?: string } | undefined)?.kind;
   const hasPanel = Boolean(panelKind);
   const variant = s(sec.variant);
   const compact = variant === 'compact';
-  // «stage» = هیروِ تمام‌قد: تیترِ درشت روی نورِ زنده و پنل به‌جای کارتِ کنارِ
-  // متن، پشتِ آن و بریده از لبه. چیدمانِ دوستونیِ «متن | کارت» رایج‌ترین
-  // امضای قالب‌های آماده است؛ صفحه‌ی اصلی از آن بیرون می‌آید.
+  // «stage» = تیترِ درشتِ وسط‌چین و پنل به‌جای کارتِ کنارِ متن، زیرِ آن در یک
+  // قابِ تیره. چیدمانِ دوستونیِ «متن | کارت» رایج‌ترین امضای قالب‌های آماده
+  // است؛ صفحه‌ی اصلی از آن بیرون می‌آید.
+  // ۰۹-۱۳: پس‌زمینه‌های متحرک (شیدرِ کاستیک، میدانِ جریان، ذره‌ها، شبکه) و
+  // ورودِ کلمه‌به‌کلمه‌ی تیتر حذف شدند — «اپل» یعنی تیتر روی زمینه‌ی ساکت.
   const stage = variant === 'stage';
   const bullets = list<string>(sec.bullets);
 
@@ -93,28 +88,16 @@ function Hero({ sec }: { sec: Section }) {
     <section
       className={`hero${compact ? ' hero--compact' : ''}${stage ? ' hero--stage' : ''}${hasPanel && !stage ? '' : ' hero--center'}`}
     >
-      {stage ? <HeroLight /> : <FlowField />}
-      <div className="grid-bg" aria-hidden="true" />
-      <Ambient />
 
       <div className={`container hero__inner${hasPanel && !stage ? ' hero__inner--split' : ''}`}>
         <div className="hero__content">
-          {s(sec.eyebrow) && (
-            <Reveal>
-              <span className="eyebrow">
-                <Icon name="sparkle" size={14} />
-                {s(sec.eyebrow)}
-              </span>
-            </Reveal>
-          )}
+          {s(sec.eyebrow) && <span className="eyebrow">{s(sec.eyebrow)}</span>}
 
-          {/* عنوان کلمه‌به‌کلمه از پایین می‌آید — نه یک بلوکِ محو */}
-          <h1 className="display">
-            {s(sec.title) && <SplitText text={s(sec.title) as string} delay={120} />}
-            {s(sec.highlight) && (
-              <> <SplitText className="text-gradient" text={s(sec.highlight) as string} delay={340} /></>
-            )}
-          </h1>
+          {/* تیترِ دوتُنی: عنوان جوهری، highlight خاکستری */}
+          <Heading className="display">
+            {s(sec.title)}
+            {s(sec.highlight) && <> <span className="text-gradient">{s(sec.highlight)}</span></>}
+          </Heading>
 
           {s(sec.subtitle) && (
             <Reveal delay={120}>
@@ -143,33 +126,16 @@ function Hero({ sec }: { sec: Section }) {
           )}
         </div>
 
-        {hasPanel && !stage && (
-          <Parallax speed={0.1}>
-            <Reveal delay={140}>
-              <Visual kind={panelKind} />
-            </Reveal>
-          </Parallax>
-        )}
+        {hasPanel && !stage && <Visual kind={panelKind} />}
       </div>
 
-      {/* در حالتِ stage پنل کارتِ کنارِ متن نیست: یک صحنه‌ی پهن زیرِ تیتر که
-          از لبه‌ی پایین بیرون می‌زند. همین «بریدگی» است که به صفحه عمق می‌دهد
-          و از حسِ «قالبِ آماده» بیرونش می‌آورد. */}
+      {/* در حالتِ stage پنل کارتِ کنارِ متن نیست: یک صحنه‌ی پهن زیرِ تیتر. */}
       {hasPanel && stage && (
-        <div className="hero__stage" aria-hidden="false">
-          <Parallax speed={0.06}>
-            <Reveal delay={220}>
-              <div className="hero__stage-inner"><Visual kind={panelKind} /></div>
-            </Reveal>
-          </Parallax>
+        <div className="hero__stage">
+          <div className="hero__stage-inner"><Visual kind={panelKind} /></div>
         </div>
       )}
 
-      {stage && (
-        <span className="hero__scroll" aria-hidden="true">
-          <span className="hero__scroll-line" />
-        </span>
-      )}
     </section>
   );
 }
@@ -185,14 +151,12 @@ function Metrics({ sec }: { sec: Section }) {
     <section className="section section--tight">
       <div className="container">
         <Head eyebrow={s(sec.eyebrow)} title={s(sec.title)} subtitle={s(sec.subtitle)} />
-        {/* vel: با اسکرولِ سریع کمی کشیده می‌شود و بعد جا می‌افتد — همان حسِ
-            اسکرولِ اینرسیایی، بدونِ اینکه اسکرولِ مرورگر دست بخورد. */}
-        <div className="grid grid-4 vel">
+        <div className="metrics">
           {items.map((m, i) => (
             <Reveal key={`${m.label}-${i}`} delay={i * 70}>
               <div className="metric">
                 <span className="metric__value">
-                  <CountUp value={m.value ?? ''} />
+                  {m.value}
                   {m.suffix && <span className="metric__suffix">{m.suffix}</span>}
                 </span>
                 {m.label && <span className="metric__label">{m.label}</span>}
@@ -217,16 +181,13 @@ function Apps({ sec }: { sec: Section }) {
     <section className="section section--subtle section--edge">
       <div className="container">
         <Head eyebrow={s(sec.eyebrow)} title={s(sec.title)} subtitle={s(sec.subtitle)} />
-        {/* ادعای «یک دادهٔ واحد بینِ دو اپ» را نشان می‌دهد، نه فقط می‌گوید:
-            رزروها از سمتِ اپِ مشتری حرکت می‌کنند و در پنل می‌نشینند. */}
-        <Reveal>
-          <div style={{ marginBlockEnd: 'var(--sp-10)' }}><LiveFlow /></div>
-        </Reveal>
-        <div className="grid grid-2">
+        {/* روی موبایل ردیفِ لغزان (snap-row) به‌جای دو کارتِ روی‌هم؛ ناحیه‌ی
+            نام‌دار و فوکوس‌پذیر تا با کیبورد هم پیمایش شود. */}
+        <div className="grid grid-2 snap-row" role="region" aria-label={s(sec.title) ?? 'دو اپ'} tabIndex={0}>
           {cards.map((card, i) => (
             <Reveal key={card.title ?? i} delay={i * 100}>
-              <Tilt><article className="app-card">
-                {card.badge && <span className="eyebrow" style={{ alignSelf: 'flex-start' }}>{card.badge}</span>}
+              <article className="app-card">
+                {card.badge && <span className="eyebrow">{card.badge}</span>}
                 {card.title && <h3 className="h3">{card.title}</h3>}
                 {card.body && <p className="body">{card.body}</p>}
                 {card.points?.length ? (
@@ -237,12 +198,12 @@ function Apps({ sec }: { sec: Section }) {
                   </ul>
                 ) : null}
                 {card.cta && (
-                  <Link href={card.cta.href} className="btn btn--ghost" style={{ alignSelf: 'flex-start' }}>
+                  <Link href={card.cta.href} className="link-more">
                     {card.cta.label}
-                    <Icon name="arrowLeft" size={16} className="btn__arrow" />
+                    <Icon name="chevronLeft" size={16} />
                   </Link>
                 )}
-              </article></Tilt>
+              </article>
             </Reveal>
           ))}
         </div>
@@ -257,18 +218,17 @@ function Apps({ sec }: { sec: Section }) {
 function Ticker({ sec }: { sec: Section }) {
   const items = list<string>(sec.items);
   if (!items.length) return null;
-  // دو بار تکرار می‌شود چون انیمیشن تا ۵۰٪ می‌رود و بی‌درز حلقه می‌زند.
-  const row = [...items, ...items];
+  // ۰۹-۱۲: دیگر marquee نیست (حلقه‌ی ۳۴ثانیه‌ایِ تایمری که نیمی از قابلیت‌ها
+  // را همیشه بیرونِ قاب داشت). روی موبایل یک نوارِ چیپِ لمس‌پیماست و روی
+  // دسکتاپ همه‌ی چیپ‌ها می‌شکنند و یک‌جا دیده می‌شوند — هیچ قابلیتی پشتِ
+  // حرکت یا بریدگی نمی‌ماند، و هیچ تایمری در کار نیست.
   return (
-    <div className="kx-ticker" aria-label={s(sec.title) ?? 'قابلیت‌ها'}>
-      <div className="kx-ticker__row">
-        {row.map((it, i) => (
-          <span className="kx-ticker__item" key={i} aria-hidden={i >= items.length}>
-            <Icon name="sparkle" size={15} />
-            {it}
-          </span>
+    <div className="kx-ticker">
+      <ul className="kx-ticker__row" aria-label={s(sec.title) ?? 'قابلیت‌ها'}>
+        {items.map((it) => (
+          <li className="kx-ticker__item" key={it}>{it}</li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -284,7 +244,8 @@ function Features({ sec }: { sec: Section }) {
     <section className="section">
       <div className="container">
         <Head eyebrow={s(sec.eyebrow)} title={s(sec.title)} subtitle={s(sec.subtitle)} />
-        <div className="grid grid-3 vel">
+        {/* grid--dense: روی موبایل دوستونی و فشرده — شش کارتِ روی‌هم ۱٫۹۵ صفحه بود */}
+        <div className="grid grid-3 grid--dense">
           {items.map((f, i) => (
             <Reveal key={f.title ?? i} delay={(i % 3) * 80}>
               <article className="card card--hover feature">
@@ -325,9 +286,9 @@ function Split({ sec }: { sec: Section }) {
           )}
           {link && (
             <Reveal delay={180}>
-              <Link href={link.href} className="btn btn--ghost">
+              <Link href={link.href} className="link-more">
                 {link.label}
-                <Icon name="arrowLeft" size={16} className="btn__arrow" />
+                <Icon name="chevronLeft" size={16} />
               </Link>
             </Reveal>
           )}
@@ -540,7 +501,7 @@ function CtaBand({ sec }: { sec: Section }) {
     <section className="section">
       <div className="container">
         <Reveal>
-          <div className="cta-band">
+          <div className="cta-band is-night">
             {s(sec.title) && <h2 className="h1" style={{ marginBottom: 'var(--sp-4)' }}>{s(sec.title)}</h2>}
             {s(sec.body) && (
               <p className="lead" style={{ maxWidth: '46ch', marginInline: 'auto', marginBottom: 'var(--sp-8)' }}>
@@ -551,7 +512,6 @@ function CtaBand({ sec }: { sec: Section }) {
               {cta(sec.primary) && (
                 <Link href={cta(sec.primary)!.href} className="btn btn--primary btn--lg">
                   {cta(sec.primary)!.label}
-                  <Icon name="arrowLeft" size={18} className="btn__arrow" />
                 </Link>
               )}
               {cta(sec.secondary) && (
@@ -561,7 +521,7 @@ function CtaBand({ sec }: { sec: Section }) {
               )}
             </div>
             {s(sec.note) && (
-              <p className="small" style={{ marginTop: 'var(--sp-5)', color: 'rgba(255,255,255,.82)' }}>
+              <p className="small cta-band__note">
                 {s(sec.note)}
               </p>
             )}
@@ -609,8 +569,8 @@ function Legal({ sec }: { sec: Section }) {
 
 // ═══════════════ رجیستری ═══════════════
 
-const BLOCKS: Record<string, (props: { sec: Section; data: SectionData }) => ReactNode> = {
-  hero: ({ sec }) => <Hero sec={sec} />,
+const BLOCKS: Record<string, (props: { sec: Section; data: SectionData; heroHeading: HeroHeading }) => ReactNode> = {
+  hero: ({ sec, heroHeading }) => <Hero sec={sec} heading={heroHeading} />,
   metrics: ({ sec }) => <Metrics sec={sec} />,
   apps: ({ sec }) => <Apps sec={sec} />,
   ticker: ({ sec }) => <Ticker sec={sec} />,
@@ -644,7 +604,7 @@ export function faqScopesOf(sections: Section[]): string[] {
     .map((sec) => (typeof sec.scope === 'string' ? sec.scope : 'general'));
 }
 
-export function SectionRenderer({ sections, data }: { sections: Section[]; data: SectionData }) {
+export function SectionRenderer({ sections, data, heroHeading = 'h1' }: { sections: Section[]; data: SectionData; heroHeading?: HeroHeading }) {
   return (
     <>
       {sections.map((sec, i) => {
@@ -652,7 +612,7 @@ export function SectionRenderer({ sections, data }: { sections: Section[]; data:
         // بلوکِ ناشناخته (مثلاً نوعی که در استودیو ساخته شده ولی هنوز کامپوننت
         // ندارد) بی‌صدا رد می‌شود — صفحه‌ی زنده نباید بشکند.
         if (!Block) return null;
-        return <Block key={`${sec.type}-${i}`} sec={sec} data={data} />;
+        return <Block key={`${sec.type}-${i}`} sec={sec} data={data} heroHeading={heroHeading} />;
       })}
     </>
   );

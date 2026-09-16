@@ -199,7 +199,7 @@ test.describe('F6 — صفحه‌بندیِ رستوران‌ها قابلِ د�
   test('بدونِ next_cursor هیچ دکمه‌ی «بیشتر»ی ساخته نمی‌شود', async ({ page }) => {
     await mockApi(page);        // next_cursor: null
     await gotoApp(page);
-    await expect(page.locator('.rc .rc-open').first()).toBeVisible();
+    await expect(page.locator('#feed .rc .xt-tap').first()).toBeVisible();
     await expect(page.locator('#feedMore')).toHaveCount(0);
   });
 });
@@ -210,7 +210,7 @@ test.describe('RC-6 — بوتِ سرد `GET /events` را دوبار نمی‌�
     await mockApi(page);
     await gotoApp(page);
     // syncRestaurants و رندرِ دومِ بخش‌ها باید تمام شده باشند.
-    await expect(page.locator('.rc .rc-open').first()).toBeVisible();
+    await expect(page.locator('#feed .rc .xt-tap').first()).toBeVisible();
     await page.waitForTimeout(1500);
     expect(hits.length, `انتظار ۱ درخواست، دیده شد ${hits.length}`).toBe(1);
   });
@@ -221,7 +221,7 @@ test.describe('IS-3 — pull-to-refresh واقعاً از سرور می‌خوا
     const hits = countRequests(page, /\/api\/v1\/restaurants(\?|$)/);
     await mockApi(page);
     await gotoApp(page);
-    await expect(page.locator('.rc .rc-open').first()).toBeVisible();
+    await expect(page.locator('#feed .rc .xt-tap').first()).toBeVisible();
     await page.waitForTimeout(600);
     const before = hits.length;
 

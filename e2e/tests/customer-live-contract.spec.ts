@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { gotoApp } from './helpers/actions';
+import { gotoApp, openImmersiveTile } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  قراردادِ کلاینت↔سرور با **شکلِ واقعیِ پاسخِ بک‌اند** (فازِ ۲، Batch 17)
@@ -91,13 +91,19 @@ test('بازه‌ی قیمت از priceBandِ سرور می‌آید، نه از
   await mockLiveApi(page);
   await gotoApp(page);
 
-  const noReviews = page.locator('.rc').filter({ hasText: 'رستورانِ بدونِ نظر' }).first();
-  const withReviews = page.locator('.rc').filter({ hasText: 'رستورانِ دارایِ نظر' }).first();
+  // ⚠️ [DS-011] بازه‌ی قیمت روی تایلِ کوچکِ موزاییک جا نمی‌شود (فقط تایلِ ۲×۲
+  // آن را دارد)، ولی نمای تمام‌صفحه همیشه همان مقدار را از همان رکورد می‌کشد —
+  // پس ادعا همان است، نه ضعیف‌تر: هر دو رستوران اینجا دیده می‌شوند،
+  // حتی آنکه تایلش هیرو نیست.
+  await expect(page.locator('#feed .rc').first()).toBeVisible({ timeout: 15_000 });
+  await openImmersiveTile(page, 0);
+  const noReviews = page.locator('#imFeed .im-item').filter({ hasText: 'رستورانِ بدونِ نظر' }).first();
+  const withReviews = page.locator('#imFeed .im-item').filter({ hasText: 'رستورانِ دارایِ نظر' }).first();
   await expect(noReviews).toBeVisible({ timeout: 15_000 });
 
   // priceBand:3 → '$$$'، priceBand:1 → '$'. اگر قرارداد شکسته بود هر دو
   // مقدارِ یکسانِ نمونه ('$$') می‌گرفتند.
-  await expect(noReviews.locator('.rc-meta')).toContainText('$$$');
-  await expect(withReviews.locator('.rc-meta')).toContainText('$');
-  await expect(withReviews.locator('.rc-meta'), 'نباید بازه‌ی نمونه را بگیرد').not.toContainText('$$');
+  await expect(noReviews.locator('.im-meta')).toContainText('$$$');
+  await expect(withReviews.locator('.im-meta')).toContainText('$');
+  await expect(withReviews.locator('.im-meta'), 'نباید بازه‌ی نمونه را بگیرد').not.toContainText('$$');
 });

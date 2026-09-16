@@ -132,7 +132,7 @@ describe('اقتصادِ امتیاز — نرخِ کانونی، کسب، خر�
   after(async () => {
     await resetRedemptionFlag();
     const ids = Object.values(users);
-    await db.pointsLedger.deleteMany({ where: { userId: { in: ids } } }).catch(() => {});
+    // ⚠️ ۰۸۹/FP-009: دفترِ امتیاز فقط-افزودنی است — پاک‌سازیِ ردیف‌هایش ممکن نیست و تلاش برایش رد می‌شود. ردیف‌های [DEMO] در دیتابیسِ هر اجرا (که تازه ساخته می‌شود) می‌مانند.
     await db.reservationItem.deleteMany({ where: { reservation: { restaurantId } } }).catch(() => {});
     await db.reservationEvent.deleteMany({ where: { reservation: { restaurantId } } }).catch(() => {});
     await db.modelPrediction.deleteMany({ where: { restaurantId } }).catch(() => {});
