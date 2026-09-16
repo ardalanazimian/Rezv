@@ -16,18 +16,21 @@ else's statement I have not reproduced yet · `repro pending` = shape confirmed 
 test yet. Priority levels are the founder's §2 order: 1 journey · 2 money/auth · 3 beatable gate ·
 4 regressed / reported-fixed-but-not · 5 fake feature · 6 other.
 
-## Counts
+## Counts — revision 2 (2026-09-17 ~22:30 UTC; revision 1 was 20 rows)
 
-| Lane | Rows | critical | major | minor | from CEO queue | found by this session |
-|---|---|---|---|---|---|---|
-| Backend | 11 | 3 | 7 | 1 | 8 | 3 |
-| Frontend | 5 | 1 | 4 | 0 | 3 | 2 |
-| Design | 0 found · see `UNKNOWN.md` | — | — | — | — | — |
-| SEO | 4 (+1 blocked) | 0 | 2 | 2 | 0 | 4 |
-| **Total** | **20** | **4** | **13** | **3** | **11** | **9** |
+| Lane | Rows | critical | major | minor | submitted | open | blocked |
+|---|---|---|---|---|---|---|---|
+| Backend | 13 | 4 | 8 | 1 | 1 (BE-01) | 11 (+1 owned by rezv-1b) | 0 |
+| Frontend | 10 | 2 | 7 | 1 | 1 (FE-06) | 7 (+2 owned by rezv-1b) | 0 |
+| Design | 1 | 0 | 1 | 0 | 0 | 1 | 0 |
+| SEO | 5 | 0 | 2 | 2 | 0 | 4 | 1 (SEO-B1) |
+| **Total** | **29** | **6** | **18** | **4** | **2** | **23 (+3 owned by rezv-1b)** | **1** |
 
-Design is at zero because nothing in that lane has been **measured** yet, not because it is clean.
-Its checks are listed in `UNKNOWN.md`, and none of them counts as passing.
+Rows added in revision 2 are listed in the section of that name at the end of this file. Nothing
+is closed; "submitted" means waiting for the Red Team and the CEO.
+
+Design has one row because only one design check has been **measured** so far (DS-01), not
+because the rest passed. The others are listed in `UNKNOWN.md`, and none of them counts as passing.
 
 ## Order of work (CEO's order, checked against the source; no contradiction found)
 
@@ -111,5 +114,24 @@ robots is `*: allow /`, so OAI-SearchBot is not blocked by our file, although th
 | api route / auth / Zarinpal / status / runner enumeration | haiku (Explore) | the `/me` count re-measured (23/23); status-set judgement |
 | frontend demo paths, API path diff, innerHTML counts, design-system diff, CACHE_VERSION | haiku (Explore) | sync-check re-run (exit 0); XSS counts re-read from the report |
 | apps/seo + landing structure, JSON-LD, robots/sitemap | haiku (Explore) | CTA line, ReserveAction absence, freshness-gate absence re-measured |
-| design mechanics (money words, digits, «چرا؟», dark, notifications) | haiku (Explore) | pending |
+| design mechanics (money words, digits, «چرا؟», dark, notifications) | haiku (Explore) | deposit-on-confirm re-measured (DS-01); the rest is UNKNOWN until re-measured |
+| demo-fallback sites across 3 apps; write paths on 8 ledger tables | haiku (Explore) | its "0 test cleanup paths" was wrong — re-measured with git grep (33 sites) |
 | root cause, sibling judgement (BE-05), ordering, every verification | — | this session |
+
+## Revision 2 — 2026-09-17
+
+**Status changes:** BE-01 submitted on `impl/rezv-85-p0-1-candidate @ 8cdc6e9`, accepted as submitted
+by the CEO. FE-01 was fixed by the merge candidate itself, and its proof is in FIX-BE-01.md. BE-02
+scope widened to 8 tables by CEO rulings D-16 (`sms_transactions` FK → RESTRICT) and the
+`platform_events` 90-day floor on `ingested_at`.
+
+| ID | Sev | Lvl | Finding | Source | Status |
+|---|---|---|---|---|---|
+| FE-06 | critical | 5 | Full-Stack B-1: HTTP 500 from `/restaurants` rendered six `[DEMO]` restaurants as «۶ رستوران فعال»; siblings: boot painted samples before the API answered; events showed samples on network loss | `apps/customer/js/api.js`, `apps/customer/js/init.js`, `apps/customer/js/data/discover.js` | **submitted** `impl/rezv-85-p0-0-demo-trap @ b496991` (CEO D-19); merge waits on rezv-75 re-verify |
+| FE-07 | major | 5 | Company panel: HTTP error → `RESTAURANTS_SAMPLE` (`[DEMO]`-labelled); `hours.js` / `photos.js` samples on `res.offline` | `apps/company/js/api.js:199`, `apps/company/js/hours.js:78`, `apps/company/js/photos.js:88` | open; rezv-75 classifies reachability first |
+| FE-08 | minor | 3 | Flake with a possible real-UX cause: the «لغو» click lands mid page-transition, pointer intercepted by `#page-chat`, `nav.nav`, `nav.botnav`; candidate 1/48, FE-06 tree 8/78 (confounded) | `e2e/tests/cancel-window-disclosure.spec.ts:84` | open; rezv-75 measures de-confounded, audited as UX |
+| FE-09 | major | 2 | F003: `USER_BANNED` returns the admin's internal ban note to the banned user in `details.reason`; banned-login screen shows a wrong-code toast | `api/src/lib/errors.ts:50`, `api/src/app/api/v1/auth/otp/verify/route.ts:35`, `api/src/app/api/v1/auth/refresh/route.ts:76` | **owned by rezv-1b** (CEO queue change 09-17: owner ordered rezv-1b; M-13/M-14/M-15) — not started here |
+| FE-10 | major | 5 | F002: `no_show`, `rejected`, `expired` all render «لغوشده» while the SMS says no-show | `apps/customer/js/reservation.js:29`, `:159` | **owned by rezv-1b** (CEO queue change 09-17: owner ordered rezv-1b; M-13/M-14/M-15) — not started here |
+| BE-12 | critical | 2 | F001: a guest 17 min late goes confirmed → running_late → no_show in **one** cron tick, with no prior signal; cashback −40, a strike, reliability 75 → 0. CEO D-18: base grace default 15 (10–60), guest extension default 15 (0–30), pre-no-show signal mandatory | `api/src/lib/lifecycle.ts:407` | **owned by rezv-1b** (CEO queue change 09-17: owner ordered rezv-1b; M-13/M-14/M-15) — not started here; runtime-proven by rezv-1b |
+| BE-13 | major | 2 | m-14: 10 concurrent OTP guesses beat the attempts cap of 5 — read, compare and increment are separate statements | `api/src/lib/otp.ts:219-221` | claim (Red Team live probe); bounded by per-IP rate limit |
+| DS-01 | major | 5 | The deposit policy is not on the confirm step: `depositLabel` renders on step 1 and on the restaurant page, never in `bookStep3`, whose «تأیید رزرو» button is the tap that commits. Cancellation consequence **is** on step 3. No deposit **amount** exists anywhere in the customer app (0 matches) | `apps/customer/js/data/booking.js:134`, `:412-445`; `apps/customer/js/data/detail.js:236` | measured |
