@@ -301,6 +301,90 @@ fi
 CHK_ONLY_PROD=$(LC_ALL=C comm -13 /tmp/_drift_chk_ci.txt /tmp/_drift_chk_prod.txt)
 CHK_ONLY_CI=$(LC_ALL=C comm -23 /tmp/_drift_chk_ci.txt /tmp/_drift_chk_prod.txt)
 
+# ⚠️ لایه‌ی پنجم: **دفترِ امتیاز — FK روی RESTRICT و هر سه تریگرِ ۰۸۹**
+#
+# چرا اینجا و نه یک اسکریپتِ تازه (بندِ ۵ی FP-009، ۲۰۲۶-۰۹-۱۶): این اسکریپت
+# از قبل psql و **هر دو شکلِ دیتابیس** را دارد؛ هر گاردِ جدا باید همان را از نو
+# بسازد.
+#
+# چه چیزی را نگه می‌دارد: Red Team نشان داد تضمینِ «امتیاز هرگز منقضی نمی‌شود»
+# با **یک خط** بی‌صدا برمی‌گردد — `FK: RESTRICT → CASCADE`. کسی که روزی
+# «حذفِ کاربر خراب است» را رفع می‌کند دقیقاً همین خط را می‌نویسد و فکر می‌کند
+# دارد یک باگ را می‌بندد، نه اینکه دفترِ مالی را باز می‌کند. با CASCADE،
+# `DELETE FROM users …` ردیف‌های دفتر را می‌برد و **هیچ تریگری شلیک نمی‌کند**
+# (پروبِ Red Team: `DELETE 1` و `ledger_rows_left = 0`).
+#
+# ⚠️ مقایسه‌ی نامی نیست و عمداً: نامِ constraint بینِ دو مسیر فرق می‌کند (همان
+# دلیلی که لایه‌ی FK بالا نام را حذف کرد). محور روی **رابطه + ستون** می‌ایستد.
+#
+# ⚠️ تریگرها با **نام** سنجیده نمی‌شوند بلکه با **کلاسِ رفتاری**: BEFORE UPDATE
+# (ردیفی)، BEFORE DELETE (ردیفی) و BEFORE TRUNCATE (سطحِ statement). دلیل:
+# نامِ تریگر سلیقه است و تغییرش گارد را بی‌صدا می‌کند، ولی کلاسِ رفتاری همان
+# چیزی است که تصمیم وعده‌اش را داده. `tgenabled` هم سنجیده می‌شود، چون تریگرِ
+# `DISABLE`شده در pg_trigger هست و از یک چکِ «وجود دارد؟» سالم رد می‌شود.
+#
+# ⚠️ آنچه این محور **نمی‌سنجد**: درِ SUPERUSER
+# (`SET session_replication_role = replica` همه‌ی تریگرها را خاموش می‌کند) —
+# آن `P0-022` است و اینجا بسته نمی‌شود؛ گاردِ ایستای
+# tools/check-session-replication-role.mjs فقط مسیرِ کدِ اپ را می‌بندد.
+LEDGER_FKQ="SELECT c.confdeltype::text
+       FROM pg_constraint c
+       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+       WHERE c.contype = 'f'
+         AND c.conrelid = 'points_ledger'::regclass
+         AND a.attname = 'user_id'"
+
+# ۱=BEFORE ردیفی · ۲=BEFORE · ۸=DELETE · ۱۶=UPDATE · ۳۲=TRUNCATE (pg_trigger.tgtype)
+LEDGER_TRGQ="SELECT
+         count(*) FILTER (WHERE (t.tgtype & 2) > 0 AND (t.tgtype & 16) > 0 AND (t.tgtype & 1) > 0)::text
+      || ' ' || count(*) FILTER (WHERE (t.tgtype & 2) > 0 AND (t.tgtype &  8) > 0 AND (t.tgtype & 1) > 0)::text
+      || ' ' || count(*) FILTER (WHERE (t.tgtype & 2) > 0 AND (t.tgtype & 32) > 0)::text
+       FROM pg_trigger t
+       WHERE t.tgrelid = 'points_ledger'::regclass
+         AND NOT t.tgisinternal
+         AND t.tgenabled = 'O'"
+
+LEDGER_FAIL=''
+for _db in "$PROD_DB" "$PRISMA_DB"; do
+  _shape='تولید (migrate deploy + apply-sql)'
+  [ "$_db" = "$PRISMA_DB" ] && _shape='دیتابیسِ تستِ CI (db push + apply-sql)'
+
+  _del="$(psql "$BASE/$_db" -Atc "$LEDGER_FKQ" | tr -d '[:space:]')"
+  if [ -z "$_del" ]; then
+    # صفرِ توخالی: یا جدول/ستون نیست یا کوئری شکسته — هیچ‌کدام «سالم» نیست.
+    LEDGER_FAIL="${LEDGER_FAIL}
+    [$_shape] کلیدِ خارجیِ points_ledger.user_id اصلاً پیدا نشد — خودِ چک خراب است یا جدول رفته."
+  elif [ "$_del" != "r" ]; then
+    LEDGER_FAIL="${LEDGER_FAIL}
+    [$_shape] ON DELETE روی points_ledger.user_id باید RESTRICT ('r') باشد، هست: '$_del'  (a=NO ACTION · c=CASCADE · n=SET NULL · d=SET DEFAULT)"
+  fi
+
+  _trg="$(psql "$BASE/$_db" -Atc "$LEDGER_TRGQ")"
+  _u="$(printf '%s' "$_trg" | cut -d' ' -f1)"
+  _d="$(printf '%s' "$_trg" | cut -d' ' -f2)"
+  _t="$(printf '%s' "$_trg" | cut -d' ' -f3)"
+  [ "${_u:-0}" -ge 1 ] 2>/dev/null || LEDGER_FAIL="${LEDGER_FAIL}
+    [$_shape] تریگرِ فعالِ BEFORE UPDATE (ردیفی) روی points_ledger نیست"
+  [ "${_d:-0}" -ge 1 ] 2>/dev/null || LEDGER_FAIL="${LEDGER_FAIL}
+    [$_shape] تریگرِ فعالِ BEFORE DELETE (ردیفی) روی points_ledger نیست"
+  [ "${_t:-0}" -ge 1 ] 2>/dev/null || LEDGER_FAIL="${LEDGER_FAIL}
+    [$_shape] تریگرِ فعالِ BEFORE TRUNCATE (سطحِ statement) روی points_ledger نیست"
+done
+
+if [ -n "$LEDGER_FAIL" ]; then
+  echo ""
+  echo "✗ نقضِ FP-009 — تضمینِ «دفترِ امتیاز تغییرناپذیر و حذف‌ناپذیر است»:"
+  echo "$LEDGER_FAIL"
+  echo ""
+  echo "  این گارد از بندِ ۵ی FP-009 (docs/DECISIONS.md) می‌آید. اگر داری FK را"
+  echo "  به CASCADE می‌بری تا «حذفِ کاربر» کار کند: آن تصمیم گرفته شده و جوابش"
+  echo "  نه است — حذفِ کاربرِ دارای امتیاز عمداً ممکن نیست؛ راهِ آینده"
+  echo "  ناشناس‌سازیِ ردیفِ users است، نه حذفِ ردیفِ مالی."
+  echo "  اگر تریگرها نیستند: مهاجرتِ ۰۸۹ هنوز اعمال نشده — این گارد با همان"
+  echo "  مهاجرت ادغام می‌شود، نه جلوتر از آن."
+  exit 1
+fi
+
 MISSING=$(LC_ALL=C comm -23 /tmp/_drift_prisma.txt /tmp/_drift_prod.txt)
 
 if [ -n "$MISSING" ]; then
@@ -393,4 +477,4 @@ if [ -n "$FK_GONE" ]; then
   echo "$FK_GONE" | sed 's/^/    /'
 fi
 
-echo "✓ بدونِ انحراف — تولید هرچه Prisma لازم دارد را دارد ($(wc -l < /tmp/_drift_prisma.txt) ستون، $(wc -l < /tmp/_drift_fk_prisma.txt) کلیدِ خارجی، $(wc -l < /tmp/_drift_idx_prisma.txt) ایندکس، $(wc -l < /tmp/_drift_chk_prod.txt) قیدِ CHECK · baseline: $(wc -l < /tmp/_drift_fk_base.txt) FK + $(wc -l < /tmp/_drift_idx_base.txt) ایندکس)"
+echo "✓ بدونِ انحراف + FP-009 برقرار (FK=RESTRICT، هر سه تریگرِ دفتر فعال) — تولید هرچه Prisma لازم دارد را دارد ($(wc -l < /tmp/_drift_prisma.txt) ستون، $(wc -l < /tmp/_drift_fk_prisma.txt) کلیدِ خارجی، $(wc -l < /tmp/_drift_idx_prisma.txt) ایندکس، $(wc -l < /tmp/_drift_chk_prod.txt) قیدِ CHECK · baseline: $(wc -l < /tmp/_drift_fk_base.txt) FK + $(wc -l < /tmp/_drift_idx_base.txt) ایندکس)"
