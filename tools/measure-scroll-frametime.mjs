@@ -56,5 +56,5 @@ console.log(`hydration: ${evidence.next ? `next=true fiber=${evidence.fiber}` : 
 if (evidence.next && !evidence.fiber) console.log('⚠️ صفحه hydrate نشده (fiber=false) — این توزیع مالِ HTMLِ ایستا است، نه صفحه‌ی واقعی. 127.0.0.1 زده‌ای؟ localhost بزن.');
 console.log('run  frames  p50   p95   max   >33  >50');
 runs.forEach((r, i) => console.log(`${String(i + 1).padStart(3)}  ${String(r.frames).padStart(6)}  ${String(r.p50).padStart(4)}  ${String(r.p95).padStart(4)}  ${String(r.max).padStart(5)}  ${String(r.over33).padStart(3)}  ${String(r.over50).padStart(3)}`));
-console.log(`median over ${N}: p95 ${med(col('p95'))} · max ${med(col('max'))} · >33ms ${med(col('over33'))} · >50ms ${med(col('over50'))}   |  worst max ${Math.max(...col('max'))}`);
+console.log(`median over ${N}: p50 ${med(col('p50'))} · p95 ${med(col('p95'))} · max ${med(col('max'))} · >33ms ${med(col('over33'))} · >50ms ${med(col('over50'))}   |  worst max ${Math.max(...col('max'))}`);
 console.log('⚠️ headless روی PC — فقط برای مقایسه‌ی قبل/بعد با همان پروتکل. یک اجرا نویز است.');
