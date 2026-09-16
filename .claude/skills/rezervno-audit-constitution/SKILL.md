@@ -79,7 +79,13 @@ more often than the finding is.** Every one of these produced a confident, wrong
   first to commit carried both, and the second got «nothing to commit». Nothing was lost, but one
   session's work now sits under the other's commit message — and the author who checks
   `git show --stat` sees only the file they expected. On a shared tree, `git diff --cached` before
-  committing is the check that pathspec cannot give you.
+  committing is the check that pathspec cannot give you — **read as content, not as names.**
+  **`git diff --cached --name-only` defeats it:** a second session's edit to the same file prints the
+  same filename. Measured 2026-09-11 (`6c04db0`): the Deputy and the Reviewer both ran `--name-only`
+  in the same minute, both saw only `ROUTING.md`, and the commit carried both rows. The one signal
+  present was a line count — `2 insertions(+), 2 deletions(-)` against an intended 1 and 1 — and
+  it was ignored. Use `git diff --cached -- <file>` and read which lines changed, or count `+`/`-`
+  lines against what you intended to change.
 
 - **A null result whose *control* also came back null is not a measurement.** Added 2026-09-10 by
   the Red Team session, and the asymmetry is the point it made: a dead control looks like a
@@ -149,8 +155,9 @@ The risk is not "writing"; it is **writing a file that is not exclusively yours*
 Both collisions that produced this rule were the first kind. Neither was the second.
 
 Until your worktree exists, the old discipline still binds and is still insufficient on its own:
-`git diff --cached` before every commit — not `git show --stat`, which shows you the file you
-expected and hides that its contents are wider than your change.
+`git diff --cached -- <file>` before every commit, **read as content** — not `--name-only` and not
+`git show --stat`, both of which show you the file you expected and hide that its contents are
+wider than your change.
 
 ### Count with a parser before you report a number
 
