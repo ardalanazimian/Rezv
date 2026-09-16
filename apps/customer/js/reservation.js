@@ -32,6 +32,22 @@ const TRIP_STATUS_MAP = {
 export function mapTripStatus(apiStatus){
   return TRIP_STATUS_MAP[apiStatus] || 'up';
 }
+// ⚠️ رفعِ STATE M-15 (F002): سطلِ «cancelled» بالا علت را دور می‌ریخت، پس عدم‌حضور،
+// ردشدن و منقضی‌شدن هر سه «لغوشده» نشان داده می‌شدند — در حالی که پیامکِ همان
+// انتقال (`NOTIFY` در api/src/lib/lifecycle.ts) «عدم حضور ثبت شد» یا «رزرو شما تأیید
+// نشد» می‌گفت، و برای عدم‌حضور سرور کش‌بک را برگردانده و strike ثبت کرده بود.
+// سطل دست نخورد (شمارشِ خلاصه و swipe به آن بسته‌اند)؛ فقط برچسب از علت ساخته می‌شود.
+// هر متن با پیامکِ همان وضعیت یکی است؛ `expired` پیامکی ندارد.
+const CLOSED_LABEL = {
+  no_show:'عدم حضور ثبت شد', noshow:'عدم حضور ثبت شد',
+  rejected:'تأیید نشد',
+  expired:'منقضی شد',
+};
+const CLOSED_STEP = { no_show:'عدم حضور', noshow:'عدم حضور', rejected:'تأیید نشد', expired:'منقضی' };
+export function closedLabel(apiStatus){
+  return CLOSED_LABEL[apiStatus] || 'لغوشده';
+}
+function isNoShow(t){ return t.apiStatus==='no_show' || t.apiStatus==='noshow'; }
 export function mapApiTrip(apiR){
   // ⚠️ رفع‌شده (R3): قبلاً رستورانِ متناظر فقط با تطبیقِ *اسم* پیدا می‌شد —
   // اگر دو رستوران اسمِ یکسان داشتند (یا حتی یک فاصله‌ی اضافه)، به رستورانِ
@@ -75,6 +91,12 @@ export function mapApiTrip(apiR){
     // کرده). قبلاً `pending` هم مثلِ `confirmed` فقط «پیش‌رو» نشان داده می‌شد،
     // یعنی مشتری فکر می‌کرد میزش قطعی است در حالی که رستوران هنوز تأیید نکرده.
     awaitingApproval: apiR.status === 'pending',
+    // علتِ واقعیِ بسته‌شدن و واقعیت‌های ثبت‌شده‌ی عدم‌حضور — هر دو از سرور. `noShow`
+    // null یعنی «سرور چیزی نگفته» و برگه‌ی «چرا؟» آن‌وقت هیچ ادعایی نمی‌سازد.
+    apiStatus: apiR.status || null,
+    restaurantSlug: apiR.restaurant?.slug || null,
+    noShow: apiR.noShow || null,
+    depositStatus: apiR.depositStatus || null,
   };
 }
 
@@ -101,9 +123,9 @@ function cancelPolicyRow(t){
   </div>`;
 }
 
-function tripTimeline(status){
+function tripTimeline(status, apiStatus){
   const steps = status==='cancelled'
-    ? [['ثبت','done'],['لغو','cancel']]
+    ? [['ثبت','done'],[CLOSED_STEP[apiStatus]||'لغو','cancel']]
     : [['ثبت','done'],['تأیید',status==='up'?'active':'done'],['حضور',status==='done'?'done':'future'],['تکمیل',status==='done'?'active':'future']];
   return `<ol class="tl" aria-label="روند رزرو">${steps.map(([l,st])=>`<li class="tl-step ${st}"><span class="tl-dot" aria-hidden="true"></span><span class="tl-lbl">${l}</span></li>`).join('')}</ol>`;
 }
@@ -156,7 +178,7 @@ export async function renderTrips(){
     const gradId=t._grad||t.rid||1;
     const statusLabel=t.awaitingApproval?`${icon('clock',{size:12})} در انتظارِ تأییدِ رستوران`
       :t.status==='up'?`<span class="live-dot" aria-hidden="true"></span> پیش‌رو`
-      :t.status==='cancelled'?`${icon('close',{size:12})} لغوشده`
+      :t.status==='cancelled'?`${icon('close',{size:12})} ${esc(closedLabel(t.apiStatus))}`
       :`${icon('check',{size:12})} تجربه‌شده`;
     // اکشنِ swipe (C16): کارتِ «پیش‌رو» → لغو، کارتِ «تجربه‌شده» با rid → رزرو مجدد.
     // دکمه‌ی متناظر با data-swipe-action علامت می‌خورد تا ژستِ swipe همان هندلرِ سیم‌کشی‌شده را کلیک کند.
@@ -164,7 +186,10 @@ export async function renderTrips(){
       :(t.status!=='cancelled'&&t.rid)?{cls:'repeat',ic:'calendar',label:'رزرو مجدد'}:null;
     const acts=t.status==='up'
       ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR(${jsq(t.code)},${jsq(name)})">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},${jsq(t.slotStartIso||'')})">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},'apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip(${jsq(t.code)},this)">لغو</button>`
-      : t.status==='cancelled' ? ''
+      : t.status==='cancelled'
+        ? (isNoShow(t)
+          ? `<button class="btn btn-sm btn-ghost" onclick="openNoShowWhy(${jsq(t.code)})">چرا؟</button>${(t.restaurantSlug&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="messageRestaurantAbout(${jsq(t.code)})">پیام به رستوران</button>`:''}`
+          : '')
       : `${t.rid?`<button class="btn btn-sm btn-primary" data-swipe-action onclick="buzz&&buzz();repeatReservation(${jsq(String(t.rid))})">رزرو مجدد</button>${(t.serverRestaurantId&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="buzz&&buzz();openReviewSheet(${jsq(t.serverRestaurantId)},${jsq(t.serverReservationId)},${jsq(name)})">ثبت نظر</button>`:''}`:''}`;
     return `<div class="trip-card reveal ${t.status}${swipe?' has-swipe':''}">
       ${swipe?`<div class="trip-swipe-pad ${swipe.cls}" aria-hidden="true">${icon(swipe.ic,{size:18})}<span>${swipe.label}</span></div>`:''}
@@ -178,7 +203,7 @@ export async function renderTrips(){
           <div class="trip-card-meta"><span>${icon('calendar',{size:13})} ${esc(t.date)}</span><span class="tcm-dot">·</span><span>${icon('clock',{size:13})} ${esc(t.time)}</span><span class="tcm-dot">·</span><span>${icon('users',{size:13})} ${esc(t.party)}</span></div>
           <div class="trip-card-code">کد رزرو: <b>${esc(t.code)}</b></div>
           ${cancelPolicyRow(t)}
-          ${tripTimeline(t.status)}
+          ${tripTimeline(t.status, t.apiStatus)}
           ${acts?`<div class="trip-card-actions">${acts}</div>`:''}
         </div>
       </div>

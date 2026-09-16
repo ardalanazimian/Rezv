@@ -11,7 +11,7 @@
 //
 //  نسخه‌بندی: با تغییرِ CACHE_VERSION، کشِ قدیمی خودکار پاک می‌شود.
 // ═══════════════════════════════════════════════════════════
-const CACHE_VERSION = 'rezervno-v48';   // ادغامِ main (v44) و session/rezv-ba-design (v47) — بزرگ‌تر از هر دو
+const CACHE_VERSION = 'rezervno-v50';   // F002 (M-15): reservation.js/trips.js — v49 را شاخه‌ی impl/rezv-85-p0-0-demo-trap برداشته، پس ۵۰ (ادغام: بزرگ‌تر از هر دو)
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

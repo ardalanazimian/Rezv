@@ -2,7 +2,7 @@
 // ── Calendar Sync: تولید فایل .ics واقعی ──
 import { API, isLoggedIn } from '../api.js';
 import { icon } from '../icons.js';
-import { closeSheet, esc, jsq, openSheet, toast, undoSnack } from '../auth.js';
+import { closeSheet, esc, faNum, jsq, openSheet, toast, undoSnack } from '../auth.js';
 import { openRest } from '../data/detail.js';
 import { fmtFa, go } from '../data/discover.js';
 import { myTrips } from '../data/seed.js';
@@ -314,7 +314,68 @@ export async function submitReview(restaurantId, reservationId){
 }
 
 
+// ── «چرا عدم حضور؟» (STATE M-15 · F002) ──
+/**
+ * برگه‌ی توضیحِ عدم‌حضور — **فقط** واقعیت‌هایی که سرور ثبت کرده (`noShow` در
+ * `GET /me/reservations`)، هر جمله مشروط به فیلدِ خودش:
+ *   • کش‌بک فقط اگر ردیفِ جبرانیِ دفتر وجود دارد (`cashbackReversedPoints > 0`)
+ *   • سابقه فقط اگر ردیفِ دفترِ اقتصاد هست (`strikeRecorded`)، با دوره‌ی کاهشِ خودِ سرور
+ *   • «پولی کسر نشده» فقط اگر `depositStatus === 'none'`؛ هر حالتِ دیگر سکوت است، نه حدس
+ *   • زمان و عامل فقط اگر رویدادِ انتقال ثبت شده (`recordedAt`)
+ *
+ * ⚠️ هیچ وعده‌ی برگشتی داده نمی‌شود: امروز رستوران راهی برای اصلاحِ عدم‌حضور ندارد
+ * (`no_show` در `TRANSITIONS` پایانی است). «پیام به رستوران» فقط گفتگو است.
+ */
+function faClock(d){
+  return faNum(String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'));
+}
+export function openNoShowWhy(code){
+  const t=liveTrip(code);
+  const ns=t?.noShow;
+  if(!t || !ns){ toast('','جزئیاتِ این رزرو در دسترس نیست'); return; }
+  const rec=ns.recordedAt ? new Date(ns.recordedAt) : null;
+  const recOk=rec && Number.isFinite(rec.getTime());
+  const slot=t.slotStartIso ? new Date(t.slotStartIso) : null;
+  const sameDay=recOk && slot && rec.toDateString()===slot.toDateString();
+  const when=recOk ? `${sameDay?'':faNum(rec.toLocaleDateString('fa-IR'))+' '}ساعتِ ${faClock(rec)}` : '';
+  const who=ns.byRestaurant ? 'توسطِ رستوران' : 'به‌صورتِ خودکار';
+  const intro=`ساعتِ رزروت ${esc(t.time)} بود. `
+    + (recOk ? `«عدم حضور» ${esc(when)} ${who} ثبت شد.` : '«عدم حضور» برای این رزرو ثبت شده است.');
+  const facts=[];
+  if(typeof ns.cashbackReversedPoints==='number' && ns.cashbackReversedPoints>0){
+    facts.push(`کش‌بکِ این رزرو (${esc(fmtFa(ns.cashbackReversedPoints))} امتیاز) برگشت.`);
+  }
+  if(ns.strikeRecorded===true && typeof ns.strikeDecayDays==='number'){
+    facts.push(`یک مورد در سابقه‌ی حضورت ثبت شد. اگر ${esc(fmtFa(ns.strikeDecayDays))} روز موردِ تازه‌ای ثبت نشود، یکی از این موارد خودبه‌خود کم می‌شود.`);
+  }
+  const money=t.depositStatus==='none' ? '<p style="margin:10px 0 0">هیچ پولی از تو دریافت یا کسر نشده.</p>' : '';
+  const canMessage=!!(t.restaurantSlug && t.serverReservationId);
+  openSheet(`
+    <div class="sheet-title">چرا «عدم حضور»؟</div>
+    <div class="sheet-sub">${esc(t._name)} · کد رزرو ${esc(t.code)}</div>
+    <div style="font-size:13px;color:var(--t2);line-height:1.9;margin:10px 2px 16px">
+      <p style="margin:0">${intro}</p>
+      ${facts.length?`<ul style="margin:10px 0 0;padding-inline-start:18px">${facts.map(f=>`<li>${f}</li>`).join('')}</ul>`:''}
+      ${money}
+    </div>
+    ${canMessage?`<button class="btn btn-primary btn-lg btn-block" onclick="messageRestaurantAbout(${jsq(t.code)})">پیام به رستوران</button>`:''}
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
+  `);
+}
+/** گفتگو با رستوران درباره‌ی **همین** رزرو (مالکیت در `lib/chat.ts` سمتِ سرور بررسی می‌شود). */
+export function messageRestaurantAbout(code){
+  const t=liveTrip(code);
+  if(!t?.restaurantSlug || !t?.serverReservationId || typeof window.openChat!=='function'){
+    toast('','گفتگو با این رستوران در دسترس نیست');
+    return;
+  }
+  closeSheet();
+  window.openChat(t.restaurantSlug, t.serverReservationId);
+}
+
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
+window.openNoShowWhy = openNoShowWhy;
+window.messageRestaurantAbout = messageRestaurantAbout;
 window.addToCalendar = addToCalendar;
 window.addToWallet = addToWallet;
 window.showCheckInQR = showCheckInQR;
