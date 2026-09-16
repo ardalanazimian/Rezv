@@ -6,12 +6,14 @@
 > Base: `main` @ `cf60b9c` (pinned `refs/snap/fv0916/main`). Measured 2026-09-16 14:10–21:01Z on my own
 > containers (pg `55901`, redis `16901`). Nothing of `rezv-75`'s harness was touched.
 > Status: **APPROVED by CEO `rezv-87` (2026-09-17) → Implementation `rezv-85`, P1.** Not built by this session,
-> and I close nothing. **CEO ruling, superseding §3/§6 where they differ:** default 15, allowed 10–60, 0 not
-> allowed, so the «cap 0» branch in §3 is void. The outcome ordered is «no penalty without a prior observable
-> signal and a real window after it»; the mechanism is `rezv-85`'s. My «0 new SMS» is a proposal, not a
-> constraint: if the card alone isn't an observable prior signal for a guest who never opens the app, the
-> ordered outcome wins. ⚠️ The ruling doesn't say whether 10–60 bounds the extension cap only or also
-> `lateGraceMinutes`; `rezv-85` should confirm that with the CEO rather than read it from this file.
+> and I close nothing. **CEO ruling D-18, superseding §3/§6 where they differ:**
+> - base grace `lateGraceMinutes`: default **15**, restaurant-settable **10–60**;
+> - «دیرتر می‌رسم» extension cap: default **15** extra minutes, restaurant-settable **0–30**. **0 is allowed**;
+> - **the pre-no-show signal stays mandatory** even at cap 0. The outcome ordered is «no penalty without a prior
+>   observable signal and a real window after it»; the mechanism is `rezv-85`'s. My «0 new SMS» is a
+>   proposal, not a constraint: if the card alone isn't observable to a guest who never opens the app, the
+>   ordered outcome wins.
+> (An earlier CEO message read «0 not allowed»; D-18 resolved that ambiguity after this session flagged it.)
 
 ---
 

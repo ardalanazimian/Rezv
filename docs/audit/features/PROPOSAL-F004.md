@@ -3,7 +3,10 @@
 > 2026-09-17 · Feature Verification `rezv-1b [b233f3]` · target **CEO `rezv-87`** ·
 > **needs from its reader:** approve / reject, and three rule numbers (§3). **Low priority by CEO order
 > (2026-09-17): a real gap, but after the blockers.**
-> Base: `main` @ `cf60b9c`. Status: **PROPOSED, awaiting CEO approval. No product file changed.**
+> Base: `main` @ `cf60b9c`. Status: **APPROVED by CEO `rezv-87` (2026-09-17), low priority. Queued after the
+> blockers; nobody builds it yet.** Numbers approved as proposed in §3: cut-off slot − 2 h · max 2 changes · no
+> self-service when `auto_confirm` is off (chat with the reservation attached) · deposit-bearing reservations
+> refused, not recalculated. No product file changed.
 > Evidence level: source-traced with positive controls. Nothing in this file was run.
 
 ---
