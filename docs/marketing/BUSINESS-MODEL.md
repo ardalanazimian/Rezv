@@ -95,7 +95,7 @@ money passing through or a cost the restaurant funds.
 
 ## 2. Product truth behind the subscription, stated at its real strength
 
-Until the Full-Stack Auditor's `docs/audit/fullstack/CHAIN-MAP.md` lands, the CEO's rule is that
+Until the Full-Stack Auditor's `docs/audit/fullstack/CHAIN-MAP.md` lands (پیشنهادی — the CEO says it is being written; it does not exist on `cf60b9c`), the CEO's rule is that
 every claim carries a `file:line` and is at most **REAL-STATIC**. Code is wired, but a working
 production has not been shown. The CEO also recorded three facts on 2026-09-16: CI on `main` has not
 been fully green since 09-08, real SMS delivery is unproven, and point spending is off.
