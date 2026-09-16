@@ -2,7 +2,7 @@
 
 > ⚠️ **Session ids written in this file may be stale.** `docs/audit/prompts/ROUTING.md` is the single
 > source of truth for who the CEO session is right now — an id changes whenever a session restarts.
-> If an id below does not resolve, ROUTING.md wins. Do not guess; ask the founder.
+> If an id below does not resolve, ROUTING.md wins. Do not guess; ask the Founder session (its row in ROUTING.md; the owner only when none is alive).
 >
 > Load the skills `rezervno-audit-constitution` and `genz-agent-charter` before your first change.
 > The first is the evidence standard; the second is why this product exists. **Neither is optional
@@ -105,14 +105,16 @@ seven sessions by generalising from its own.
 | Layer | Owner |
 |---|---|
 | `api/src/**`, `api/prisma/**`, `api/tests/**` | **you** |
-| `apps/customer`, `apps/business`, `apps/company` | Launch Engineer |
-| `apps/landing`, `apps/seo` | Launch Engineer |
+| `apps/landing`, `apps/seo`, and the UI of `apps/customer` | **Designer** (`FP-007`) |
+| `apps/customer/js/features/**`, `apps/customer/js/data/**` | Launch Engineer, while it has open work there (`FP-007`) |
+| `apps/business`, `apps/company` panels | `panels-ui-engineer` under the Designer's direction; their defects through the Launch Engineer (`FP-007`) |
 | `shared/css`, design tokens | `ds-token-guardian` |
 | Design decisions, specs, flows | Designer |
 | `tools/**`, `.github/workflows/ci.yml` | **no single owner** — whoever adds a guard writes it *and* proves it falsifiable |
 
 **`standalone/*.html` is generated** from `apps/*` by `tools/build-standalone.py`. If a change of
-yours requires a frontend change, that is the Launch Engineer's — send a spec, do not edit.
+yours requires a frontend change, send a spec — never edit. It goes to the **Designer** for UI, and
+to the **Launch Engineer** for `apps/customer/js/features/**` and `js/data/**` (`FP-007`).
 
 ---
 
