@@ -381,6 +381,24 @@ before claiming one is available, exercise it the way a user reaches it: render 
 viewport, read it from the real response, call it from the real code path. **A grep proves presence;
 only a traversal proves reach.**
 
+## 4i. "Green" and "pushed" are claims about the remote — promoted 2026-09-16
+
+**Two instances, one handoff, same shape: a claim about shared state, measured on a local proxy.**
+
+| Claim written | Measured on | What the remote said |
+|---|---|---|
+| "`main` is green" (`HANDOFF-2026-09-16-ceo.md`) | 18 local `node tools/*.mjs`, all exit 0 | No fully green CI run on `main` since `3e22075` (09-08). On `cf60b9c`, run `35055753423` has 3 e2e jobs red, and `booking-context.spec.ts` had been reading selectors removed in `b3e22da` for 6 days |
+| "everything is pushed" (the usage stop, Founder `STATE.md`) | the author's own branch | `adc8c8f` (migration 089, the RT-18/22/25 fix) existed only on local `integration/launch-rc4`. A staged merge resolution, two FP-009 guards and three tagged commits were on no origin ref |
+
+**So:**
+- **"Green" names a CI run id for that exact sha, plus the list of non-success jobs.** Local guards
+  exiting 0 are reported as "guards 0", never as "green". A job that has been red long enough to
+  be called "known red" is not covering anything, so name the tests that stopped running.
+- **"Pushed" / "nothing lost" shows the machine, not the branch:** the raw output of
+  `git log --branches --tags --not --remotes=origin` and `git status --porcelain` for **every**
+  entry in `git worktree list`. One shared `.git` has many worktrees; the one you're standing in
+  is a sample.
+
 ## 5. Every shipped artifact needs a CI job that actually builds it
 
 What is not built is broken and nobody knows. A `postinstall: prisma generate` hook broke

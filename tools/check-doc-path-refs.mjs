@@ -46,7 +46,12 @@ const PATH_RE = new RegExp(
 // («فایلِ X سرِ فلان ساعت staged بود و بعد ?? شد»)، نه دستورالعمل. اگر فایلی که
 // در حادثه نقش داشته بعداً حذف شود، حادثه همچنان درست است — و ویرایشِ حافظه‌ی
 // ایجنتِ دیگر برای ساکت‌کردنِ یک گارد، بدترین شکلِ سبزکردن است.
-const HISTORICAL = /^(audit\/round-|docs\/audit\/(directives|reports|redteam|round-|deputy|fixes|design|research)\/|docs\/recovery\/|docs\/AUDIT-FIXES|docs\/audit\/PRE-LAUNCH|docs\/audit\/SESSION-HANDOFF|\.claude\/agent-memory\/)/;
+// ⚠️ ۲۰۲۶-۰۹-۱۶ (CEO `rezv-87`): پوشه‌های گزارشِ موجِ ۰۹-۱۶ — `sync`، `fullstack`،
+// `impl`، `features` — همان کلاسِ `redteam`/`fixes` هستند: عکسِ یک لحظه که به
+// شاخه‌ی ادغام‌نشده و فایلِ untracked ارجاع می‌دهد، چون موضوعش همین است
+// (`SYNC-2026-09-16.md` ده ارجاع به فایل‌هایی داشت که فقط روی شاخه یا دیسک‌اند).
+// ویرایشِ گزارشِ نشستِ دیگر برای سبزکردنِ گارد همان «بدترین شکل» ِ بالاست.
+const HISTORICAL = /^(audit\/round-|docs\/audit\/(directives|reports|redteam|round-|deputy|fixes|design|research|sync|fullstack|impl|features)\/|docs\/recovery\/|docs\/AUDIT-FIXES|docs\/audit\/PRE-LAUNCH|docs\/audit\/SESSION-HANDOFF|\.claude\/agent-memory\/)/;
 
 // نشانه‌هایی که می‌گویند نویسنده **می‌داند** این مسیر وجود ندارد.
 const CONTEXT_OK = [
