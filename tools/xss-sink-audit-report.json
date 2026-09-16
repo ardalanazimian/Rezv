@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T04:17:50.218Z",
+  "generated_at": "2026-09-16T03:38:00.496Z",
   "scan_paths": [
     "apps/customer",
     "apps/business",
@@ -3460,7 +3460,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7255,
+      "line": 7256,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
       "sink_hash": "c28b447caa85",
@@ -3468,7 +3468,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7307,
+      "line": 7308,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = _items.length ? _items.map(itemHTML).join('') : '<li class=\"cmdk-empty\">چیزی پیدا نشد</li>';",
       "sink_hash": "47cc0edc3c61",
@@ -3476,7 +3476,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7484,
+      "line": 7485,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
       "sink_hash": "26029e2a3329",
@@ -3484,7 +3484,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7504,
+      "line": 7505,
       "kind": "innerHTML",
       "snippet": "tabs.innerHTML = Object.entries(CATS).map(([k,v])=>`<button class=\"notif-tab ${k===_filter?'on':''}\" role=\"tab\" aria-selected=\"${k===_filter}\" data-k=\"${k}\">${v",
       "sink_hash": "1b2bb0949140",
@@ -3492,7 +3492,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7511,
+      "line": 7512,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = `<div class=\"notif-empty\"><div class=\"notif-empty-ic\">${icon('bell',{size:36})}</div><div>اعلانی نداری</div></div>`;",
       "sink_hash": "d0ee35031d21",
@@ -3500,7 +3500,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7514,
+      "line": 7515,
       "kind": "innerHTML",
       "snippet": "list.innerHTML = items.map(n=>{",
       "sink_hash": "bfeecbd03f2a",
@@ -3508,7 +3508,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7620,
+      "line": 7621,
       "kind": "innerHTML",
       "snippet": "ov.querySelector('.onb-emoji').innerHTML = icon(s.icon, { size: 40 });",
       "sink_hash": "c52ffe65e269",
@@ -3516,7 +3516,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7634,
+      "line": 7635,
       "kind": "innerHTML",
       "snippet": "ov.innerHTML =",
       "sink_hash": "650b709cbb1e",
@@ -3524,7 +3524,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7709,
+      "line": 7710,
       "kind": "innerHTML",
       "snippet": "e.innerHTML = '<div class=\"ptr-spin\"></div>';",
       "sink_hash": "7a7fabc9cd3a",
@@ -3532,7 +3532,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7925,
+      "line": 7926,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = out; // موفق+صفر → خالیِ صادق. ناموفق/شبکه → همان خالی، هرگز عددِ جعلی.",
       "sink_hash": "9bc628165d01",
@@ -3540,7 +3540,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 7987,
+      "line": 7988,
       "kind": "innerHTML",
       "snippet": "el.innerHTML = `",
       "sink_hash": "039ee68fafe8",
@@ -3548,7 +3548,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 8167,
+      "line": 8168,
       "kind": "innerHTML",
       "snippet": "b.innerHTML = icon('heart', { size: 20, fill: on });",
       "sink_hash": "52675d8e6e36",
@@ -3556,7 +3556,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 8277,
+      "line": 8278,
       "kind": "innerHTML",
       "snippet": "now.innerHTML = ready",
       "sink_hash": "132d66d70dcb",
@@ -3564,7 +3564,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 8582,
+      "line": 8583,
       "kind": "innerHTML",
       "snippet": "document.getElementById('sheetBody').innerHTML=html;",
       "sink_hash": "c3f66162e387",
@@ -3572,7 +3572,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 8637,
+      "line": 8638,
       "kind": "innerHTML",
       "snippet": "s.innerHTML='<span class=\"us-msg\"></span><button class=\"us-btn\" type=\"button\">بازگرداندن</button>';",
       "sink_hash": "786f5cd20229",
@@ -3580,7 +3580,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 8672,
+      "line": 8673,
       "kind": "innerHTML",
       "snippet": "function updateThemeIcon(){ const k=document.getElementById('themeKnob'); if(k) k.innerHTML=icon(_root.getAttribute('data-theme')==='dark'?'moon':'sun',{size:16",
       "sink_hash": "eb4ace403f91",
@@ -3588,7 +3588,7 @@
     },
     {
       "file": "standalone/customer.html",
-      "line": 8730,
+      "line": 8731,
       "kind": "innerHTML",
       "snippet": "b.innerHTML=`",
       "sink_hash": "0a8560de8728",

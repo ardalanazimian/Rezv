@@ -39,6 +39,7 @@
 
 import { API } from '../api.js';
 import { closeSheet, esc, openSheet, toast } from '../auth.js';
+import { icon } from '../icons.js';
 
 /** پارامترِ کدِ میز در URL. اگر نبود، `null`. */
 export function pendingCheckInCode() {
@@ -109,7 +110,7 @@ let pendingQrCode = null;
 
 function askReservationCode() {
   openSheet(`<div style="padding:4px 0">
-    <div style="font-size:44px;line-height:1;text-align:center">🎫</div>
+    <div style="display:flex;justify-content:center;color:var(--blue-text)" aria-hidden="true">${icon('ticket',{size:40})}</div>
     <div class="sheet-title" style="text-align:center;margin-top:8px">کدِ رزروت رو وارد کن</div>
     <div class="sheet-sub" style="text-align:center;margin-bottom:18px">برای اینکه مطمئن بشیم این رزرو مالِ خودته. کد رو در پیامکِ تأیید یا صفحه‌ی رزروت می‌بینی.</div>
     <input id="checkinResvCode" class="inp" type="text" inputmode="latin" autocomplete="off" placeholder="RZXXXXXXX" style="direction:ltr;text-align:center;font-family:monospace">
