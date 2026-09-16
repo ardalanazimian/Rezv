@@ -1,7 +1,7 @@
 # BUSINESS-MODEL — who pays, for what, and what the code actually charges today
 
-**Date:** 2026-09-16 · **Session:** `rezv-c6 [897f2f]` (Marketer, scope widened by the owner) ·
-**Target:** the CEO `rezv-87 [09dbab]` · **Status:** v1 draft, **submitted — not closed** ·
+**Date:** 2026-09-16, **v2 2026-09-17** · **Session:** `rezv-c6 [897f2f]` (Marketer, scope widened by the owner) ·
+**Target:** the CEO `rezv-87 [09dbab]` · **Status:** v2 draft, **submitted — not closed** ·
 **Base:** `main = cf60b9c`, code read on that tree the same day.
 
 **What it needs:** CEO: re-verify §2 against code (every row has a `file:line`) and route §0's
@@ -10,10 +10,11 @@ treated as a price. Counsel: §5.
 
 **Written name-free.** `E-001` is open. Where a name would go, this document writes ⟨NAME⟩.
 
-**What v1 does not have:** market size, a unit cost for SMS, hosting cost, a churn benchmark, and
-live competitor prices re-measured after 2026-09-09. Those are marked `UNKNOWN` below and are the
-subject of the market research the owner ordered on 2026-09-16 («تحقیق کامل کن از بازار، تمام
-رقبا را کامل بسنج»). §3 and §4 get rewritten when it lands. v1 does not guess them.
+**What v2 changed (2026-09-17):** §3 and §4 are rewritten from the market research the owner
+ordered («تحقیق کامل کن از بازار، تمام رقبا را کامل بسنج»), which is now in `research/` and was
+reviewed by me before use. §8 is new: competitive risks to the model, with SnappFood's Foodro
+recorded **as a risk, not a fact**, per the CEO. **Still `UNKNOWN`:** market size (there is no
+official count, see §8), hosting cost, CAC and our own churn. v2 does not guess them.
 
 ---
 
@@ -61,7 +62,7 @@ version the code already matches):
 |---|---|---|
 | Features added tier by tier on the cards | Every card: «همه‌ی قابلیت‌های پنل». Cards differ only in **term, support level, onboarding** | Matches the lead paragraph and the code (`tenantPlan: "pro"` for all) |
 | «قواعدِ قیمتِ هوشمند و حداقلِ خریدِ پویا» | «حداقلِ خرید بر اساسِ روز و ساعت، با پیشنهاد از روی رزروهای خودتان» | States the mechanism (`api/src/lib/pricing.ts:151-234`) without calling it intelligence |
-| «امتیاز، کش‌بک و کارتِ هدیه» | «امتیاز و کش‌بک» (and no gift card until the flag is on) | `gift_card_purchase_enabled` is off, and point spending is off too (FP-008), so even «امتیاز» needs the CEO's ruling |
+| «امتیاز، کش‌بک و کارتِ هدیه» | «کسبِ امتیاز و کش‌بک» (no gift card and no "spend points" until their flags are on) | CEO's ruling (STATE M-12, `session/rezv-87-ceo @ 76a431e`): earning is real, spending is off (FP-008), and the copy must say which |
 | «بازبینیِ فصلیِ عملکرد با تیمِ رزرونو» | «بازبینیِ فصلیِ عملکرد با تیمِ ما» | `E-001` is open, and the service needs an owner before it's sold |
 
 **(c) Billing is manual, and expiry is reported but not enforced.** A purchase is a lead: the
@@ -132,28 +133,43 @@ A committed copy also exists in `apps/landing/content/site-content.json`, but th
 (`apps/landing/test/plan-price-honesty.test.mts`). So a stale hard-coded price cannot quietly
 reach a buyer.
 
-**Against the only Iranian figures on file.** Both are from 2026-09-05 fetches, and both competitors
-publish internally contradictory prices (`BUSINESS-MODEL-KPI.md` §1):
+**Against the market, re-measured 2026-09-16** (`research/COMPETITORS-IRAN-2026-09-16.md`, reviewed;
+`research/BENCHMARKS-GLOBAL-2026-09-16.md`, reviewed). Only published prices are listed, with classes
+as in those files. VAT (+10%) is shown where the page states it.
 
-| | Per year (toman) | What it buys |
-|---|---|---|
-| RSEE Professional / Complete | 990,000 / 2,990,000–3,990,000 | Reservation SaaS; a free tier exists |
-| SmartX reservation module | 21,450,000 **or** 52,800,000 (unreconciled) | One module |
-| SmartX customer club | 51,000,000 | One module |
-| SmartX 4-product bundle | 199,250,000 | Everything |
-| **Our m12 placeholder** | **65,000,000** | Everything |
+| Player | Per year (toman) | What it buys | Class |
+|---|---|---|---|
+| RSEE Professional / Complete | 990,000 / 2,990,000 (6 mo) – 3,990,000 (12 mo) | A dedicated reservation product. The diner also pays prepaid credit | REAL (re-fetched, unchanged since 09-05) |
+| Softmenu | 4,900,000 – 25,000,000 | Digital menu + a birthday-SMS "club" | REAL (price) / CLAIMED ("club") |
+| Mupra Base → Pro+ | 19,900,000 → 160,650,000, **+10% VAT** | POS suite. **The reservation module is priced only on request** | REAL |
+| SmartX reservation module | 21,450,000 **or** 52,800,000 | One module. Two live pages still contradict each other | REAL (both pages) |
+| SmartX customer club / bundle | 51,000,000 / 199,250,000 | One module / all four | REAL |
+| Duvita Basic → Unlimited | 36,000,000 → 84,000,000 (3M–7M/mo), **+10% VAT** | POS suite, tiered by orders/day. No reservation feature found | REAL |
+| SnappFood (delivery) | Commission, reported 15–22% of sales | Delivery marketplace. Foodro booking terms `UNKNOWN` (§8) | SECONDARY |
+| **Our placeholder** | **72M (m3×4) / 68M (m6×2) / 65M (m12)** | Everything, no VAT line stated | Placeholder |
 
-What this table can and cannot say: the placeholder is **16–65× RSEE** and **about ⅓ of SmartX's
-bundle**. Which of the two the buyer compares us with is `UNKNOWN`: nobody has interviewed a
-restaurant owner. All figures are a year old in an inflationary currency by the time anyone signs,
-so any price decision needs a re-measure first. That is part of the ordered research.
+**What this can and cannot say:**
+- **We would sit in the "full platform" band (36–90M/yr)** next to Duvita and Mupra's middle tiers.
+  We are not in the "reservation tool" band, where RSEE is at 1/16 to 1/65 of our price.
+- **We are the only reservation-first product with a published all-inclusive price** among the ten
+  checked. Every POS suite hides its reservation module behind a sales call. That is a positioning
+  asset *only if the owner keeps prices public*.
+- **Two pricing axes exist besides tiering by feature, and both are REAL elsewhere:** tiers by
+  booking volume (Tablein, resOS) and a free entry tier (Eat App ≤100 covers/mo, resOS ≤25
+  bookings/mo). Volume tiers would let tiers differ **honestly** without building feature gating (§7.2).
+- **Not answerable from desk research:** whether an owner compares us with RSEE (cheap tool) or with
+  a POS suite (full platform). Only restaurant interviews answer that, and none have happened.
+- **Inflation:** food-group point-to-point inflation is 127.5% (Mordad 1405, SECONDARY). A 12-month
+  price fixed today loses real value monthly. The price-review cadence is part of the owner's price
+  decision (§7.1).
 
 ---
 
 ## 4. Unit economics: the formula, with every input honestly empty
 
-No input below has a source today, so no output is computed. This section defines what must be
-measured, so the business plan cannot fill it with invented numbers.
+v2: one input now has a primary source (SMS cost). Churn has a cross-industry benchmark but no
+restaurant-software one. Everything else is still `UNKNOWN`, so **no LTV or payback is computed
+here.** The business plan uses the scenarios below, labelled as assumptions.
 
 ```text
 ARPA / month      = subscription price / months  (+ SMS top-up margin, if R2 gets priced)
@@ -167,11 +183,25 @@ LTV               = ARPA × gross margin % / monthly churn
 |---|---|---|
 | ARPA | Placeholder only (§3) | Owner's price decision |
 | Hosting cost per restaurant | `UNKNOWN` | Launch Engineer, once production exists |
-| SMS unit cost (Melipayamak) | `UNKNOWN` | Provider price list, part of the research order |
+| SMS unit cost (Melipayamak) | **10.6–17.9 toman per Persian SMS page** (by operator and line type), plus a 40-rial surcharge and 10% VAT. So ≈ **16–24 toman all-in**. REAL for "the provider states", as of Tir 1405 | `melipayamak.com/blog/posts/sms-pricing/`, fetched 2026-09-17 |
 | Onboarding hours per restaurant | `UNKNOWN` | The first ten activations. The m6 card already promises «راه‌اندازی و انتقالِ دادهٔ اولیه» |
 | CAC | `UNKNOWN` | Measured from `SiteOrder` rows (lead → call → activation) |
-| Monthly churn | `UNKNOWN`. No external benchmark was found either (`BUSINESS-MODEL-KPI.md` §3) | Research, then our own renewals |
+| Monthly churn | `UNKNOWN` for us. **No restaurant-software company in the research set publishes a churn %** (Toast, PAR, Booking/OpenTable: confirmed non-disclosure, SECONDARY). Cross-industry SaaS: top quartile 1–2%/mo, median 3–4%/mo (ChartMogul, 2023 data, REAL for "the survey says") | Our own renewals |
 | Trial → paid conversion | `UNKNOWN` | `SiteOrder.kind = 'trial'` → plan set by admin |
+
+**What the SMS number already tells us.** At ≈24 toman all-in, 1,000 messages a month cost ≈24,000
+toman. That is **<0.5%** of the ~5.4–6M toman monthly equivalent of the placeholder price. SMS is
+not a margin risk at plausible restaurant volumes, and it is not a meaningful revenue line either
+unless top-ups carry a markup (§7.4). Arithmetic on a REAL input and a placeholder, so no price
+decision rests on it.
+
+**Churn scenarios, labelled as assumptions, for the business plan.** Expected lifetime in months = 1 / monthly churn.
+
+| Scenario | Monthly churn (assumption) | Expected lifetime | Basis |
+|---|---|---|---|
+| Good | 2% | 50 months | ChartMogul top quartile, cross-industry |
+| Middle | 4% | 25 months | ChartMogul median, cross-industry |
+| Stressed | 8% | 12.5 months | **No source.** Chosen because the sector is contracting (−45% customers at Tehran food vendors, CLAIMED; café closures 30–40%, CLAIMED) and small businesses that close stop paying |
 
 **Minimum instrumentation, proposed and not built.** The funnel is already stored as rows (`SiteOrder`
 status plus `Tenant.planExpiresAt`), so every number above except hosting and SMS cost can be
@@ -215,11 +245,12 @@ told about in advance.
 ## 7. Decisions needed
 
 **Owner**
-1. **Prices.** Confirm, change or withdraw the 18/34/65M placeholders. Do it after the research
-   re-measures competitor prices, not before.
+1. **Prices.** Confirm, change or withdraw the 18/34/65M placeholders. The research is in (§3). Also
+   decide how often prices are reviewed, since food-group inflation is 127.5% (SECONDARY).
 2. **Tiers.** Either tiers differ **only** in term and support (then the cards lose per-tier
    features), or tiers really gate features (then the lead paragraph is false and gating has to be
-   built). One of the two must change. The first matches the code.
+   built). One of the two must change. The first matches the code. A third, honest option exists
+   elsewhere: tiers by booking volume (§3).
 3. **Deposits.** A, B or C in §5, with counsel. The CEO carries this to the owner as a decision
    package. Until the owner decides, the default stays A because that is what the code does.
 4. **SMS.** Is SMS credit a revenue line (priced top-ups) or a cost folded into the subscription?
@@ -231,15 +262,30 @@ told about in advance.
   §0-b's copy table is a proposal only.
 - Re-verify §2's classes when `CHAIN-MAP.md` lands.
 
-**Research (ordered by the owner; the CEO approved the location `docs/marketing/research/` and the
-scope, max three sonnet agents plus haiku for extraction, on 2026-09-16; running)**
-- Market size: restaurant and café counts, Tehran first.
-- Live competitor prices, re-measured, including any names the Scout has not covered.
-- SMS unit cost, restaurant SaaS churn, CAC benchmarks.
+**Research: done 2026-09-16 and reviewed, `session/rezv-c6-marketing @ 8e5d2ce`.** Still open:
+- An official restaurant/café count (none exists at any class; §8).
+- Foodro's live status and restaurant terms (§8).
+- **Restaurant-owner interviews.** Desk research cannot tell which price band the buyer compares us
+  with (§3). This is the highest-value next input, and it needs people, not agents.
+
+## 8. Competitive risks to the model (new in v2)
+
+| Risk | What we know | Class | What it would do to the model |
+|---|---|---|---|
+| **SnappFood's Foodro bundles table booking into the app restaurants already pay** | Launched 1404/05/15 (≈ 2025-08-06) in Tehran, Karaj, Mashhad, Isfahan, Shiraz and Qom («رزرو میز»), re-fetched from Zoomit. **Whether it is live today is `UNKNOWN`:** `food.snapp.ir/foodro/` redirects to itself. Restaurant terms are `UNKNOWN`. SnappFood's diner app shows 4.4M Bazaar installs, and it claims >35,000 standard restaurant contracts | Launch: REAL (press). Status and terms: `UNKNOWN`. Contracts: CLAIMED | **If** live and funded from the existing commission, a restaurant already on SnappFood gets booking at no extra price. Our subscription would then have to justify itself against "free inside what I already pay". The strongest counter we own is value ۲ in `BRAND.md` (the club is yours): Foodro's guests are SnappFood's guests. **This is a risk until it is checked first-hand** |
+| **POS suites sell the same budget line** | SmartX, Sepidz, Mupra and Duvita bundle club, SMS and menu with POS at 20–200M/yr. Every one of them sells reservation behind a sales call | REAL (prices) | The owner may already pay one of them. Our pitch has to work *alongside* a POS, not replace it, since we have none (`research/COMPETITORS-IRAN-2026-09-16.md` C.1) |
+| **The status quo costs zero** | Instagram DM + phone booking is the default | Described, not measured | The pitch has to beat free: recovered no-shows and a club the restaurant owns, in toman terms. That needs our own numbers, which pre-launch we don't have |
+| **Demand is contracting** | −45% customers at Tehran food vendors YoY (CLAIMED, re-fetched). Cafés −50% revenue and 30–40% of juice/ice-cream/coffee units closed (CLAIMED, not re-fetched) | CLAIMED | A growth pitch ("fill more tables") meets owners who are cutting costs. The retention pitch (money kept) fits better. Churn from closures belongs in the stressed scenario (§4) |
+| **Market size is unknowable today** | No official count. Private databases say 14,432–19,935 restaurants, while SnappFood's own «<2%» framing implies >150,000 | SECONDARY / CLAIMED, contradicting each other by ~10× | No TAM figure may leave the company. The plan sizes the first year bottom-up (restaurants we can actually reach), not top-down |
+
+**The first-hand check the Foodro risk needs, and who can do it:** someone opens the SnappFood app on
+a real phone in Tehran and records whether «فودرو» or table booking appears. Our research programme
+never installs apps. The owner's own phone test is one of the six things reserved to him, so this is
+**offered to the owner as an optional two-minute check, not assigned.**
 
 ---
 
-**Line for the CEO:** «Marketer `rezv-c6` → `docs/marketing/BUSINESS-MODEL.md` v1 (submitted): مدل =
-اشتراکِ رستوران، دینر رایگان، یک خطِ درآمد (R1) که دستی فروخته می‌شود؛ §۵ سه گزینه‌ی بیعانه با هزینه و
-ریسک — تصمیم نه با من نه با CEO؛ §۰-ب پیشنهادِ متنِ صادقانه برای کارت‌های pricing؛ §۳ و §۴ تا رسیدنِ
-تحقیقِ بازار placeholder و UNKNOWN می‌مانند.»
+**Line for the CEO:** «Marketer `rezv-c6` → `docs/marketing/BUSINESS-MODEL.md` v2 (submitted): §۳ با قیمتِ
+رقبا از تحقیق — ما در باندِ «پلتفرمِ کامل» ۳۶–۹۰ میلیون، تنها رزرومحورِ با قیمتِ منتشرشده؛ §۴ هزینه‌ی
+پیامک از منبعِ دست‌اول (≈۱۶–۲۴ تومان، <۰.۵٪ قیمت) و سه سناریوی churn برچسب‌خورده؛ §۸ تازه: فودرو
+به‌عنوانِ ریسک نه واقعیت، رقابتِ POSها، وضعِ موجودِ رایگان، انقباضِ تقاضا، و اینکه هیچ TAMی بیرون نمی‌رود.»
