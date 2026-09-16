@@ -4285,7 +4285,11 @@ function pickSampleFallback(apiR){
   return R_SAMPLE[h % R_SAMPLE.length];
 }
 
-// بارگذاری رستوران‌ها: تلاش برای API، در صورت شکست → نمونه
+// شکستِ آخرین بارگذاریِ فهرست — `null` یعنی «شکستی نبود». renderFeed با این
+// «فهرستِ خالی چون خالی است» را از «فهرستِ خالی چون نرسید» جدا می‌کند.
+let LIST_ERROR = null;
+
+// بارگذاری رستوران‌ها: API؛ شکست → حالتِ خطا (دادهٔ نمونه فقط در دموی آفلاینِ file://)
 async function loadRestaurants(){
   const res = await API.get('/restaurants');
   // پاسخ جدید: { items, next_cursor, has_more } — با pagination
@@ -4293,6 +4297,7 @@ async function loadRestaurants(){
   const list = res.ok ? (res.data?.items || res.data?.restaurants || (Array.isArray(res.data) ? res.data : null)) : null;
   if (list && list.length) {
     API.online = true;
+    LIST_ERROR = null;
     NEXT_CURSOR = res.data?.next_cursor || null;  // برای بارگذاری صفحه‌ی بعد
     return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
   }
@@ -4307,14 +4312,29 @@ async function loadRestaurants(){
   // است اینترنتِ پنل‌ها لحظه‌ای قطع شود تا فهرست خالی برگردد.
   if (res.ok) {
     API.online = true;      // سرور سالم است — فقط چیزی برای نشان‌دادن نیست
+    LIST_ERROR = null;
     NEXT_CURSOR = null;
     return [];              // حالتِ خالیِ صادق، نه دادهٔ ساختگی
   }
-  // فقط اینجا داده‌ی نمونه مجاز است: بک‌اند واقعاً در دسترس نیست
-  // (`file://`، تایم‌اوت، یا خطای شبکه) — یعنی همان تجربه‌ی دموی آفلاین.
   API.online = false;
-  if (res.offline) console.info('[رزرونو] بک‌اند در دسترس نیست — نمایش داده‌ی نمونه');
-  return R_SAMPLE;
+  NEXT_CURSOR = null;
+  // ⚠️ B-1 (ممیزیِ فول‌استک، ۲۰۲۶-۰۹-۱۶): کامنتِ قبلیِ اینجا می‌گفت نمونه فقط وقتی
+  // «بک‌اند واقعاً در دسترس نیست»، ولی شرط `!res.ok` بود — و `api-core.js` پاسخِ
+  // HTTPِ خطا (۵۰۰/۵۰۳/۴۲۹/۴۰۳) را **بدونِ** `offline` برمی‌گرداند. سرور زنده بود و
+  // کاربرِ واقعی شش رستورانِ `[DEMO]` زیرِ «۶ رستوران فعال» می‌دید.
+  //
+  // گیت حالا همان است که notifications.js و reservation.js و auth.js دارند:
+  // `isOfflineDemo()` — بسته‌ی آفلاینِ `file://`. روی http(s) قطعیِ شبکه هم دمو
+  // نیست؛ کاربرِ واقعی با اینترنتِ قطع باید «وصل نشدیم» ببیند، نه رستورانِ ساختگی.
+  if (isOfflineDemo()) {
+    LIST_ERROR = null;
+    console.info('[رزرونو] دموی آفلاین (file://) — نمایش داده‌ی نمونه');
+    return R_SAMPLE;
+  }
+  LIST_ERROR = res.offline
+    ? 'اتصال به سرور برقرار نشد — اینترنتت را چک کن و دوباره امتحان کن.'
+    : `سرور الان جوابِ درستی نداد${res.status ? ` (خطای ${faNum(res.status)})` : ''} — مشکل از سمتِ ماست، نه تو.`;
+  return [];
 }
 let NEXT_CURSOR = null; // cursor صفحه‌ی بعد (lazy loading)
 // بارگذاری صفحه‌ی بعد رستوران‌ها (هنگام اسکرول یا دکمه‌ی بیشتر)
@@ -4834,6 +4854,13 @@ function moreBtnHTML(list){
 let FEED_TOKEN = 0;
 /** ابطالِ هر رندرِ در جریانِ فید — هر کسی که مستقیم #feed را می‌نویسد باید صدایش بزند. */
 function invalidateFeed(){ return ++FEED_TOKEN; }
+/** اسکلتِ فید تا رسیدنِ اولین پاسخِ سرور — هیچ کارتی، نه نمونه و نه «خالی». */
+function renderFeedLoading(){
+  const f=document.getElementById('feed');
+  if(!f) return;
+  invalidateFeed();
+  f.innerHTML=Array.from({length:7},(_,i)=>`<div class="xt xt-sk sk${i%7===0?' xt-hero':''}" aria-hidden="true"></div>`).join('');
+}
 function renderFeed(list){
   const f=document.getElementById('feed');
   const token=invalidateFeed();
@@ -4842,6 +4869,20 @@ function renderFeed(list){
   // این مسیر از وقتی زنده شد که loadRestaurants دیگر روی پاسخِ موفقِ
   // `200 {items:[]}` دادهٔ نمونه برنمی‌گرداند (توضیحِ کامل در js/api.js).
   // آن‌جا دروغ برداشته شد؛ اینجا جایش را حقیقت پر می‌کند.
+  //
+  // ⚠️ و «خالی چون نرسید» خالی نیست (B-1، ۲۰۲۶-۰۹-۱۶): وقتی بارگذاری شکست خورده،
+  // «الان رستورانِ فعالی نیست» همان دروغِ نمونه است با لباسِ دیگر — کاربر فکر
+  // می‌کند چیزی نیست، در حالی که ما نتوانستیم بپرسیم.
+  if(!list.length && LIST_ERROR){
+    f.innerHTML=`
+    <div class="empty feed-error" role="alert" style="grid-column:1/-1">
+      <div class="empty-emoji" aria-hidden="true">📡</div>
+      <div class="empty-title">فهرستِ رستوران‌ها بارگذاری نشد</div>
+      <div class="empty-text">${esc(LIST_ERROR)}</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="location.reload()">تلاشِ دوباره</button>
+    </div>`;
+    return;
+  }
   if(!list.length){
     f.innerHTML=`
     <div class="empty" style="grid-column:1/-1">
@@ -5024,8 +5065,12 @@ async function renderEvents(){
     el.innerHTML=eventsHtml(events,false);
     return;
   }
-  if(!res.offline){
-    el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('alert',{size:40})}</div><div class="empty-state-title">رویدادها بارگذاری نشد</div><div class="empty-state-desc">${res.status?`خطای ${res.status}`:'دوباره تلاش کن'}</div></div>`;
+  // ⚠️ برادرِ B-1 (۲۰۲۶-۰۹-۱۶): گیت قبلاً `res.offline` بود — یعنی کاربرِ واقعی روی
+  // https با اینترنتِ قطع سه رویدادِ ساختگی (با چیپِ «نمونه») می‌دید. نمونه فقط در
+  // دموی آفلاینِ file://، همان قاعده‌ی loadRestaurants.
+  if(!isOfflineDemo()){
+    const why=res.offline?'اتصال به سرور برقرار نشد':(res.status?`خطای ${fmtFa(res.status)}`:'دوباره تلاش کن');
+    el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('alert',{size:40})}</div><div class="empty-state-title">رویدادها بارگذاری نشد</div><div class="empty-state-desc">${esc(why)}</div></div>`;
     return;
   }
   el.innerHTML=eventsHtml(SAMPLE_EVENTS,true);
@@ -5129,6 +5174,8 @@ function doSearch(q){
   }
   const list=R.filter(r=>r.n.includes(query)||r.cuisine.includes(query)||r.vibes.some(v=>v.includes(query)));
   document.getElementById('feedTitle').textContent=`نتایج «${query}»`;
+  // فهرست نرسیده بود → «چیزی پیدا نشد» دروغ است؛ همان حالتِ خطای فید (B-1).
+  if(!list.length && LIST_ERROR){ renderSub('جست‌وجو ممکن نشد'); renderFeed(list); return; }
   renderSub(list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد');
   if(list.length){ renderFeed(list); return; }
   // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
@@ -8763,7 +8810,18 @@ window.dismissInstall = dismissInstall;
 //  رزرونو — شروع اپ (ES Module)
 //  R متغیر زنده‌ی رستوران‌هاست: اول از نمونه (نمایش فوری)، بعد از API به‌روز می‌شود.
 // ═══════════════════════════════════════════════════════════
-let R = R_SAMPLE;
+
+
+
+
+
+
+
+// ⚠️ مقدارِ اولیه دیگر همیشه R_SAMPLE نیست (برادرِ B-1، ۲۰۲۶-۰۹-۱۶): boot آن را
+// پیش از رسیدنِ پاسخِ سرور رنگ می‌زد، و روی شبکه‌ی موبایلی که پاسخ بیش از ۲۸۰msِ
+// اسکلت طول بکشد، کاربرِ واقعی هر بار شش کارتِ `[DEMO]` می‌دید. نمونه فقط در دموی
+// آفلاینِ file:// — همان گیتِ loadRestaurants.
+let R = isOfflineDemo() ? R_SAMPLE : [];
 
 // پیداکردنِ رستوران با id — همیشه با مقایسه‌ی String، چون idِ نمونه عدد است و
 // idِ واقعیِ بک‌اند UUID (string). مقایسه‌ی === مستقیم بین این دو، برای هر
@@ -8774,7 +8832,8 @@ const findR = id => R.find(x => String(x.id) === String(id));
 function boot(){
   Actions.init();                    // رفتارهایِ کیبوردِ سراسری (Escape / Enter-Space)
   updateThemeIcon();                 // آیکونِ تم (حالا DOM آماده است)
-  renderFeed(R);                     // نمایش فوری با داده‌ی نمونه
+  if (R.length) renderFeed(R);       // دموی آفلاین: نمایشِ فوری با داده‌ی نمونه
+  else renderFeedLoading();          // وگرنه اسکلت تا پاسخِ سرور — نه «خالی»، نه نمونه
   renderDiscoverSections();          // نزدیک تو، ترند، رویدادها
   armReveals();                      // انیمیشنِ اسکرول
   restoreSession();                  // بازیابی نشست
