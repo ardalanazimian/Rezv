@@ -12,6 +12,9 @@ import { readFileSync } from 'node:fs';
 
 const site = readFileSync(new URL('../app/site.css', import.meta.url), 'utf8');
 const globals = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+// ادعاهای پرده روی **کد** سنجیده می‌شوند، نه روی کامنتی که آن‌ها را نقل می‌کند (منشور §4f).
+// نسخه‌ی api همین را با stripCss می‌کرد؛ جابه‌جایی به suiteِ لندینگ نباید این قوت را بیندازد.
+const globalsCode = globals.replace(/\/\*[\s\S]*?\*\//g, '');
 
 describe('تیترِ گرادیانیِ متحرک', () => {
   // باگِ واقعی: .text-gradient روی پوسته color:transparent می‌گذارد، ولی
@@ -41,20 +44,79 @@ describe('پرده‌ی ورود', () => {
   });
 
   test('در حالتِ کاهشِ حرکت پرده اصلاً نباید رندر شود', () => {
-    assert.match(globals, /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.intro\s*\{\s*display:\s*none/);
+    assert.match(globalsCode, /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.intro\s*\{\s*display:\s*none/);
   });
 
-  // تیغه‌ها باید پیش از بسته‌شدنِ پرده تمام شده باشند وگرنه وسطِ کار قطع می‌شود.
-  test('زمان‌بندی: آخرین تیغه نباید بعد از intro-off تمام شود', () => {
-    const bar = /\.intro__bar\s*\{[\s\S]*?animation:\s*intro-bar\s+([\d.]+)s[\s\S]*?animation-delay:\s*calc\(([\d.]+)s\s*\+\s*var\(--i\)\s*\*\s*([\d.]+)s\)/.exec(globals);
-    const off = /\.intro\s*\{[\s\S]*?animation:\s*intro-off\s+[\d.]+m?s\s+\w+\s+([\d.]+)s/.exec(globals);
-    assert.ok(bar && off, 'زمان‌بندیِ تیغه و پرده باید قابلِ‌خواندن باشد');
+  // ⚠️ [L4 · ۲۰۲۶-۰۹-۱۱] پرده حالا **یک دستگیره** دارد (`--intro-t`) و همه‌ی
+  // زمان‌ها نسبتی از آن‌اند؛ پس زمان‌بندی در واحدِ «× دستگیره» خوانده می‌شود،
+  // نه ثانیه‌ی لفظی. نسخه‌ی قبلیِ این تست ثانیه‌ی لفظی می‌خواند و با آن
+  // بازنویسی «قابلِ‌خواندن نیست» می‌داد — یعنی از f637948 تا اینجا jobِ
+  // `landing → Unit tests` قرمز بود و نویسنده‌ی همان تغییر (LE) ندیده بود،
+  // چون suiteِ لندینگ را زیرِ cmd.exe زده بود که glob را باز نمی‌کند.
+  //
+  // ⚠️ چه چیزی این تست را قرمز می‌کند و چه چیزی نه — صریح، چون مهم است:
+  //   • تغییرِ **نسبت‌ها** (مثلاً مدتِ تیغه ۱۱⁄۲۴→۱۴⁄۲۴) ⇒ تیغه بعد از پرده تمام
+  //     می‌شود ⇒ قرمز. همین است که «وسطِ کار قطع‌شدن» را می‌گیرد.
+  //   • تغییرِ خودِ `--intro-t` (۰٫۴→۰٫۲) ⇒ همه با هم مقیاس می‌گیرند ⇒ سبز.
+  //     این سبز، درست است: با یک دستگیره کوتاه‌کردنِ پرده **نمی‌تواند** تیغه را
+  //     قطع کند — عینِ دلیلِ وجودِ دستگیره. مقدارِ ۰٫۴ حکمِ مالک است و جدا
+  //     پین می‌شود (تستِ بعدی).
+  /** `calc(var(--intro-t) * a / b)` یا `calc(var(--intro-t) / c)` یا `var(--intro-t)` → ضریب */
+  const ratio = (expr: string): number => {
+    const e = expr.replace(/\s+/g, '');
+    if (e === 'var(--intro-t)') return 1;
+    let m = /^calc\(var\(--intro-t\)\*(\d+)\/(\d+)\)$/.exec(e);
+    if (m) return Number(m[1]) / Number(m[2]);
+    m = /^calc\(var\(--intro-t\)\/(\d+)\)$/.exec(e);
+    if (m) return 1 / Number(m[1]);
+    throw new Error(`زمانِ پرده به دستگیره بند نیست یا شکلش ناشناخته است: ${expr}`);
+  };
+
+  /** پایانِ آخرین تیغه و لحظه‌ی برداشتنِ پرده، هر دو در واحدِ «× دستگیره» — روی CSSِ بی‌کامنت. */
+  const curtainTiming = () => {
+    const bar = /\.intro__bar\s*\{([\s\S]*?)\n\}/.exec(globalsCode);
+    const intro = /\.intro\s*\{([\s\S]*?)\n\}/.exec(globalsCode);
+    assert.ok(bar && intro, 'قاعده‌های .intro و .intro__bar باید قابلِ‌خواندن باشند');
+    const dur = /animation-duration:\s*([^;]+);/.exec(bar![1]);
+    const del = /animation-delay:\s*calc\(\s*(var\(--intro-t\)\s*\/\s*\d+)\s*\+\s*var\(--i\)\s*\*\s*(var\(--intro-t\)\s*\/\s*\d+)\s*\)/.exec(bar![1]);
+    const off = /animation-delay:\s*([^;]+);/.exec(intro![1]);
+    assert.ok(dur && del && off, 'زمان‌بندیِ تیغه و پرده باید قابلِ‌خواندن باشد (مدت، تأخیرِ پله‌ای، برداشتنِ پرده)');
     const bars = 6; // با BARS در components/site/Intro.tsx یکی است
-    const lastEnds = Number(bar[2]) + (bars - 1) * Number(bar[3]) + Number(bar[1]);
+    const lastEnds = ratio(`calc(${del![1]})`) + (bars - 1) * ratio(`calc(${del![2]})`) + ratio(dur![1]);
+    const curtain = ratio(off![1]);
+    return { lastEnds, curtain };
+  };
+
+  test('زمان‌بندی: آخرین تیغه نباید بعد از intro-off تمام شود', () => {
+    const { lastEnds, curtain } = curtainTiming();
     assert.ok(
-      lastEnds <= Number(off[1]) + 0.001,
-      `آخرین تیغه در ${lastEnds.toFixed(2)}s تمام می‌شود ولی پرده در ${off[1]}s بسته می‌شود`,
+      lastEnds <= curtain + 1e-9,
+      `آخرین تیغه در ${lastEnds.toFixed(4)}× دستگیره تمام می‌شود ولی پرده در ${curtain}× برداشته می‌شود — وسطِ کار قطع می‌شود`,
     );
+  });
+  test('آخرین تیغه دقیقاً در لحظه‌ی برداشتنِ پرده تمام می‌شود — نه زودتر', () => {
+    // ⅓ + 5×¹⁄₂₄ + ¹¹⁄₂₄ = 1 × --intro-t. تستِ بالا فقط «نه دیرتر» را می‌گیرد (قطع‌شدنِ تیغه)؛
+    // این یکی «نه زودتر» را هم — کوتاه‌شدنِ یک نسبت پرده را بعد از آخرین تیغه بی‌کار روی صفحه
+    // نگه می‌دارد. این ادعا تا دستورِ ۰۵۰ در api/tests بود و در جابه‌جایی نباید گم شود.
+    const { lastEnds, curtain } = curtainTiming();
+    assert.ok(
+      Math.abs(lastEnds - curtain) < 1e-9,
+      `آخرین تیغه در ${lastEnds.toFixed(4)}× دستگیره تمام می‌شود و پرده در ${curtain}× برداشته می‌شود — باید برابر باشند`,
+    );
+  });
+
+  test('دستگیره‌ی پرده ۰٫۴s است (حکمِ مالک، ۲۰۲۶-۰۹-۱۱) و به‌شکلِ متغیر', () => {
+    assert.match(globalsCode, /\.intro\s*\{[^}]*--intro-t:\s*0?\.4s/, 'مالک ۴۰۰ms را انتخاب کرد؛ تغییرش تصمیمِ مالک است نه رفعِ فنی');
+    assert.match(globalsCode, /\.intro\s*\{[^}]*animation-delay:\s*var\(--intro-t\)\s*;/,
+      'پرده باید دقیقاً در ۱× دستگیره برداشته شود — وگرنه ۴۰۰msِ مالک با یک ضریب بی‌صدا عوض می‌شود');
+  });
+
+  test('هیچ زمانِ ثابتی در کورئوگرافیِ پرده نمانده — همه نسبتی از دستگیره‌اند', () => {
+    // «تأخیرِ جفت‌شده»: یک عددِ ثابتِ جامانده با هر تغییرِ دستگیره از بقیه جدا می‌افتد.
+    const block = globalsCode.slice(globalsCode.indexOf('.intro {'), globalsCode.indexOf('html[data-intro='));
+    const fixed = [...block.matchAll(/animation(?:-duration|-delay)?:\s*[^;]*?\b(\d*\.?\d+)(s|ms)\b/g)]
+      .map((m) => m[0]).filter((s) => !/var\(--intro-t\)/.test(s) && !/\b10ms\b/.test(s)); // 10ms = طولِ خودِ intro-off، عمداً ثابت
+    assert.deepEqual(fixed, [], 'زمان‌های ثابتِ جامانده در پرده: ' + fixed.join(' | '));
   });
 });
 
