@@ -75,25 +75,31 @@ describe('DS-009 L3 — --vel روی <html> نوشته نمی‌شود (ناور
   const motion = read('../components/site/Motion.tsx')
     .replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => { const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i); }).join('\n');
 
-  test('⚠️ هیچ setPropertyای برای --vel روی documentElement/root نیست', () => {
-    assert.doesNotMatch(motion, /(documentElement|root)\.style\.setProperty\(\s*['"]--vel/,
-      'نوشتنِ --vel روی <html> برگشته ⇒ ابطالِ style کلِ سند در هر فریمِ اسکرول (L3)');
+  // ⚠️ درسِ L3 به **هیچ** ویژگیِ خاصی بند نیست: نوشتنِ یک custom property روی ریشه در
+  // هر فریمِ اسکرول، styleِ کلِ سند را باطل می‌کند. پس این ادعا حتی پس از حذفِ خودِ
+  // `--vel` (DS-012) هم معنا دارد و روی **هر** نامِ ویژگی می‌ایستد.
+  test('⚠️ هیچ custom propertyای در مسیرِ اسکرول روی documentElement/root نوشته نمی‌شود', () => {
+    assert.doesNotMatch(motion, /(documentElement|root)\.style\.setProperty\(\s*['"]--/,
+      'نوشتنِ یک custom property روی <html> برگشته ⇒ ابطالِ styleِ کلِ سند در هر فریمِ اسکرول (L3)');
   });
 
-  // ⚠️ ۲۰۲۶-۰۹-۱۳ (DS-012): نسخه‌ی پیشینِ این تست **مکانیزم** را پین می‌کرد — «--vel روی
-  // مصرف‌کننده‌های .vel نوشته می‌شود و .vel از var(--vel) می‌خواند». با بازطراحیِ لندینگ
-  // (666c171) کلِ کششِ سرعتِ اسکرول رفت: نه ScrollProgress ِ نویسنده هست، نه `.vel`ِ
-  // مصرف‌کننده. ادعای L3 («هیچ نوشتنِ هر فریمی روی ریشه») نه‌تنها برقرار است، بلکه
-  // قوی‌تر شده: هیچ نوشتنِ هر فریمیِ --vel هیچ‌جا نیست. این تست همان قوی‌تر را پین
-  // می‌کند؛ اگر کسی مکانیزم را برگرداند، این قرمز می‌شود و باید آگاهانه به شکلِ
-  // قبلی (نوشتن روی مصرف‌کننده، نه ریشه) برگردد — و آن‌وقت تستِ اول هنوز مرز را نگه می‌دارد.
-  test('⚠️ هیچ مکانیزمِ --vel در منبعِ لندینگ نمانده — نه نویسنده، نه مصرف‌کننده', () => {
-    assert.doesNotMatch(motion, /--vel/, 'Motion.tsx نباید --vel بنویسد یا بخواند');
-    for (const f of ['../app/globals.css', '../app/site.css']) {
-      assert.doesNotMatch(stripCss(read(f)), /--vel\b|\.vel\b/, `${f}: کششِ اسکرول‌محورِ --vel برگشته`);
+  // ⚠️ گاردِ خودبازنشسته (همان الگوی referral-promise-honesty): DS-012 کلِ مکانیزمِ
+  // کِششِ `--vel` را برداشت — `.vel` دیگر در globals.css نیست و Motion.tsx اسکرول را
+  // اصلاً گوش نمی‌دهد (۳۳ خط، بدونِ setProperty/rAF؛ اندازه‌گیری ۲۰۲۶-۰۹-۱۶). پس
+  // ادعای «روی مصرف‌کننده‌ها نوشته می‌شود» موضوع ندارد و **تخت قرمز نگه‌داشتنش
+  // فقط سر و صدا بود**. ولی حذفش هم درس را می‌برد: اگر کسی فردا `.vel` را برگرداند،
+  // قرارداد باید همان باشد. پس ادعا مشروط شد و خودش دوباره فعال می‌شود.
+  test('اگر .vel برگردد، قراردادش همان است (وگرنه این ادعا موضوع ندارد)', () => {
+    const css = stripCss(read('../app/globals.css'));
+    const hasVelRule = /\.vel\s*\{/.test(css);
+    if (!hasVelRule) {
+      assert.doesNotMatch(motion, /querySelectorAll<HTMLElement>\(\s*['"]\.vel['"]\s*\)/,
+        'CSS دیگر `.vel` ندارد ولی Motion.tsx هنوز دنبالش می‌گردد — یک طرفِ قرارداد جا مانده');
+      return;
     }
-    // کنترلِ مثبت: خودِ فایل هنوز چیزی را می‌خواند (نه رشته‌ی خالی)
-    assert.ok(motion.includes('Reveal'), 'Motion.tsx خوانده نشد یا خالی است');
+    assert.match(motion, /querySelectorAll<HTMLElement>\(\s*['"]\.vel['"]\s*\)/, 'باید مصرف‌کننده‌ها را پیدا کند');
+    assert.match(css, /\.vel\s*\{[^}]*var\(--vel,\s*0\)/, '`.vel` باید همچنان از var(--vel) بخواند — قرارداد عوض نشده');
+    assert.match(css, /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.vel\s*\{\s*transform:\s*none/, 'reduced-motion باید کشش را خاموش نگه دارد');
   });
 });
 

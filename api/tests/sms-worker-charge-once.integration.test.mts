@@ -197,6 +197,7 @@ describe('worker — پیامکِ رستوران دقیقاً یک اعتبار 
     const to = fixturePhone(PHONE_PREFIX);
     const rid = await makeRestaurant(10);
     plan.set(to, ['accept']);
+    const dupBefore = counter('rezervno_sms_duplicate_send_total');
     const jid = await enqueueSmsJob(to, rid);
 
     await runWorker();
@@ -217,6 +218,19 @@ describe('worker — پیامکِ رستوران دقیقاً یک اعتبار 
     const m = await money(rid);
     assert.equal(m.balance, 9, `همان job دو بار اجرا شد و موجودی ${m.balance} است — کسر باید به‌ازای job یکتا باشد`);
     assert.equal(m.debits, 1, 'کلیدِ یکتایی به‌ازای job: یک کسر در دفتر، هر چند بار که اجرا شود');
+
+    // ⚠️ RT-20 (رد تیم، ۲۰۲۶-۰۹-۱۳) — ادعای تازه روی همان سناریو.
+    //
+    // `calls.get(to) === 2` بالا تا امروز فقط **پیش‌شرط** بود («reclaim اجرا
+    // شد»). ولی همان عدد یک هزینه هم هست: پیامِ دوم واقعاً به مهمان رفت و
+    // پلتفرم دو بار به ارائه‌دهنده پول داد. صورت‌حساب درست است (یک کسر) و
+    // دقیقاً به همین دلیل هیچ‌چیز در دفتر این را نشان نمی‌دهد.
+    //
+    // پیش از این پچ، `already_charged` تنها خروجیِ `sendSmsCharged` بود که نه
+    // لاگ داشت نه متریک — در کلِ `api/src` فقط در `sms-balance.ts` ظاهر می‌شد
+    // و هیچ مصرف‌کننده‌ای نداشت. حالا شمرده می‌شود.
+    assert.equal(counter('rezervno_sms_duplicate_send_total'), dupBefore + 1,
+      'پیامِ دومِ واقعی به مهمان باید دیده شود — «یک کسر» یعنی «یک ارسال» نیست');
   });
 
   test('کنترل: موجودیِ صفر → اصلاً ارسال نمی‌شود و چیزی کسر نمی‌شود', async () => {
