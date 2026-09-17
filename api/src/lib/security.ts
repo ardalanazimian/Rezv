@@ -71,41 +71,76 @@ export const Validate = {
 // درخواست به شبکه‌ی داخلی/metadata (169.254.169.254) شود (SSRF, OWASP A10).
 // events.ts علاوه بر این با redirect:'manual' جلوی دور زدن از طریق ریدایرکت را می‌گیرد.
 // self-hosted که عمداً webhook داخلی می‌خواهد: ALLOW_PRIVATE_WEBHOOKS=true.
+function isPrivateV4(a: number, b: number): boolean {
+  if (a === 10 || a === 127 || a === 0) return true;   // private / loopback / this-host
+  if (a === 169 && b === 254) return true;             // link-local + cloud metadata
+  if (a === 172 && b >= 16 && b <= 31) return true;    // private
+  if (a === 192 && b === 168) return true;             // private
+  if (a === 100 && b >= 64 && b <= 127) return true;   // CGNAT (RFC 6598)
+  if (a >= 224) return true;                            // multicast / reserved
+  return false;
+}
+
+/** یک IPv6 (فشرده/گسترده، با یا بدونِ IPv4ِ نقطه‌ای در دُم) → ۸ هگزتتِ عددی، یا null. */
+function expandIPv6(input: string): number[] | null {
+  let s = input.trim().toLowerCase();
+  if (!s.includes(':')) return null;
+  // IPv4ِ نقطه‌ایِ دُم (مثلِ ::ffff:169.254.169.254 یا 64:ff9b::1.2.3.4) → دو هگزتت
+  const tailV4 = s.match(/:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (tailV4) {
+    const o = tailV4.slice(1).map(Number);
+    if (o.some((n) => n > 255)) return null;
+    s = s.slice(0, s.length - tailV4[0].length) + ':' +
+        (((o[0] << 8) | o[1]).toString(16)) + ':' + (((o[2] << 8) | o[3]).toString(16));
+  }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const hasGap = halves.length === 2;
+  const tail = hasGap ? (halves[1] ? halves[1].split(':') : []) : [];
+  let groups: string[];
+  if (hasGap) {
+    const missing = 8 - head.length - tail.length;
+    if (missing < 1) return null;
+    groups = [...head, ...Array(missing).fill('0'), ...tail];
+  } else {
+    groups = head;
+  }
+  if (groups.length !== 8) return null;
+  const nums = groups.map((g) => (g === '' ? NaN : parseInt(g, 16)));
+  if (nums.some((n) => Number.isNaN(n) || n < 0 || n > 0xffff)) return null;
+  return nums;
+}
+
 export function isPrivateIp(ip: string): boolean {
   const s = ip.trim().toLowerCase();
-  // IPv4-mapped IPv6 — both notations. RT-31: the hex form (`::ffff:a9fe:a9fe`) previously
-  // matched neither the IPv4 regex nor the IPv6 prefixes and slipped through (a9fe:a9fe =
-  // 169.254.169.254). Normalise both to dotted IPv4 before the range checks.
-  let v4 = s;
-  const mappedDotted = s.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-  const mappedHex = s.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-  if (mappedDotted) {
-    v4 = mappedDotted[1];
-  } else if (mappedHex) {
-    const hi = parseInt(mappedHex[1], 16), lo = parseInt(mappedHex[2], 16);
-    v4 = `${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`;
+  const dm = s.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (dm) {
+    const o = dm.slice(1).map(Number);
+    if (o.some((n) => n > 255)) return false;
+    return isPrivateV4(o[0], o[1]);
   }
-  const m = v4.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (m) {
-    const a = Number(m[1]), b = Number(m[2]);
-    if (a === 10 || a === 127 || a === 0) return true;   // private / loopback / this-host
-    if (a === 169 && b === 254) return true;             // link-local + cloud metadata
-    if (a === 172 && b >= 16 && b <= 31) return true;    // private
-    if (a === 192 && b === 168) return true;             // private
-    if (a === 100 && b >= 64 && b <= 127) return true;   // CGNAT (RFC 6598)
-    if (a >= 224) return true;                           // multicast / reserved
-    return false;
-  }
-  // IPv6 range checks — only for strings that are actually IPv6 (contain ':').
-  // RT-31: guarding on ':' fixes the false positive where `fcbarcelona.com` (a hostname,
-  // no colon) matched `startsWith('fc')` and was wrongly treated as unique-local.
-  if (s.includes(':')) {
-    if (s === '::1' || s === '::') return true;          // loopback / unspecified
-    if (s.startsWith('fe80')) return true;               // link-local
-    if (s.startsWith('fc') || s.startsWith('fd')) return true; // unique-local (fc00::/7)
-    return false;
-  }
-  return false; // not an IP literal (e.g. a hostname) — the caller must resolve first
+  // RT-31: hostnames (no ':') are never IP literals — the fc/fd check used to wrongly
+  // flag `fcbarcelona.com`. Only strings that are actually IPv6 get the range checks.
+  if (!s.includes(':')) return false;
+  const g = expandIPv6(s);
+  if (!g) return false;
+  // ::/0..1 loopback / unspecified
+  if (g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0 && g[6] === 0 && (g[7] === 0 || g[7] === 1)) return true;
+  if ((g[0] & 0xffc0) === 0xfe80) return true;           // fe80::/10 link-local
+  if ((g[0] & 0xfe00) === 0xfc00) return true;           // fc00::/7 unique-local
+  // RT-31 follow-up: check the EMBEDDED IPv4 of every wrapper form, in the expanded
+  // (canonical) address — so uncompressed `0:0:0:0:0:ffff:a9fe:a9fe`, 6to4 and NAT64 are
+  // all caught, not just the `::ffff:` literal the URL parser happens to normalise.
+  // isPrivateV4 only needs the first two octets, which live in a single hextet.
+  const embedded = (hextet: number) => isPrivateV4((hextet >> 8) & 255, hextet & 255);
+  // ::ffff:0:0/96  IPv4-mapped
+  if (g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0xffff) return embedded(g[6]);
+  // 2002::/16  6to4 — embedded IPv4 is the next 32 bits (g[1] holds its first two octets)
+  if (g[0] === 0x2002) return embedded(g[1]);
+  // 64:ff9b::/96  NAT64 — embedded IPv4 is the low 32 bits
+  if (g[0] === 0x0064 && g[1] === 0xff9b) return embedded(g[6]);
+  return false;
 }
 
 /**

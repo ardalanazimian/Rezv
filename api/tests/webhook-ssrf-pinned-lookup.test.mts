@@ -9,14 +9,31 @@ import { isPrivateIp, isBlockedWebhookHost, safeLookup } from '../src/lib/securi
 //   (3) the guard resolved the host, then fetch() re-resolved it → DNS-rebinding window.
 //       The fix pins the connection to the validated resolution via safeLookup.
 
-test('isPrivateIp — IPv4-mapped IPv6 in BOTH notations is caught (regression 1)', () => {
-  assert.equal(isPrivateIp('::ffff:a9fe:a9fe'), true, 'hex-form mapped metadata IP must be private');
-  assert.equal(isPrivateIp('::ffff:169.254.169.254'), true, 'dotted-form mapped metadata IP must be private');
-  assert.equal(isPrivateIp('::ffff:7f00:0001'), true, 'hex-form mapped 127.0.0.1 must be private');
+test('isPrivateIp — IPv4-mapped IPv6 in every notation is caught (regression 1)', () => {
+  assert.equal(isPrivateIp('::ffff:a9fe:a9fe'), true, 'compressed hex-form mapped metadata IP');
+  assert.equal(isPrivateIp('::ffff:169.254.169.254'), true, 'compressed dotted-form mapped metadata IP');
+  assert.equal(isPrivateIp('::ffff:7f00:0001'), true, 'compressed hex-form mapped 127.0.0.1');
+  // RT-31 follow-up (rezv-75): the UNCOMPRESSED mapped form used to slip through because it
+  // never hit the `::ffff:` literal branch. getaddrinfo strings don't pass the URL parser.
+  assert.equal(isPrivateIp('0:0:0:0:0:ffff:a9fe:a9fe'), true, 'uncompressed hex-form mapped metadata');
+  assert.equal(isPrivateIp('0:0:0:0:0:ffff:169.254.169.254'), true, 'uncompressed dotted-form mapped metadata');
   assert.equal(isPrivateIp('169.254.169.254'), true);
   assert.equal(isPrivateIp('10.0.0.5'), true);
   assert.equal(isPrivateIp('::1'), true);
+  assert.equal(isPrivateIp('0:0:0:0:0:0:0:1'), true, 'uncompressed loopback');
   assert.equal(isPrivateIp('fd12::1'), true);
+  assert.equal(isPrivateIp('fe80::1'), true);
+});
+
+test('isPrivateIp — 6to4 and NAT64 wrappers are judged by their embedded IPv4 (regression 1b)', () => {
+  // 2002:AABB:CCDD::/16 embeds AABB.CCDD as IPv4
+  assert.equal(isPrivateIp('2002:a9fe:a9fe::'), true, '6to4 wrapping 169.254.169.254');
+  assert.equal(isPrivateIp('2002:7f00:0001::'), true, '6to4 wrapping 127.0.0.1');
+  assert.equal(isPrivateIp('2002:0808:0808::'), false, '6to4 wrapping public 8.8.8.8 is allowed');
+  // 64:ff9b::/96 NAT64 embeds the low 32 bits as IPv4
+  assert.equal(isPrivateIp('64:ff9b::a9fe:a9fe'), true, 'NAT64 wrapping 169.254.169.254 (hex)');
+  assert.equal(isPrivateIp('64:ff9b::169.254.169.254'), true, 'NAT64 wrapping 169.254.169.254 (dotted)');
+  assert.equal(isPrivateIp('64:ff9b::8.8.8.8'), false, 'NAT64 wrapping public 8.8.8.8 is allowed');
 });
 
 test('isPrivateIp — hostnames are never treated as private IPs (regression 2)', () => {
