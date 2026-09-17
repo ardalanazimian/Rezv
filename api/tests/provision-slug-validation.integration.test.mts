@@ -92,10 +92,8 @@ after(async () => {
   for (const t of madeTenants) {
     await db.table.deleteMany({ where: { restaurant: { tenantId: t } } });
     await db.staffInvite.deleteMany({ where: { restaurant: { tenantId: t } } });
-    // AuditLog فقط restaurantId (بدونِ relation) دارد — فیلترِ `restaurant: {tenantId}`
-    // PrismaClientValidationError می‌داد و کلِ پاک‌سازی (و ۳ تست) می‌مرد (۲۰۲۶-۰۹-۰۳).
-    const rids = (await db.restaurant.findMany({ where: { tenantId: t }, select: { id: true } })).map(r => r.id);
-    await db.auditLog.deleteMany({ where: { restaurantId: { in: rids } } });
+    // ⚠️ مهاجرتِ ۰۹۰ (FP-009 §۴): ردیفِ audit_logs حذف نمی‌شود — فقط retentionِ ۱ساله حذف می‌کند.
+    // (audit_logs هیچ FKی به restaurants ندارد، پس ماندنش جلوی حذفِ رستوران را نمی‌گیرد.)
     await db.staff.deleteMany({ where: { tenantId: t } });
     await db.restaurant.deleteMany({ where: { tenantId: t } });
     await db.tenant.deleteMany({ where: { id: t } });

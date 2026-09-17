@@ -127,6 +127,7 @@ import './points-ledger-idempotency-key.integration.test.mts';
 import './points-redemption.integration.test.mts';
 import './points-ledger-negative-reason.integration.test.mts';
 import './points-ledger-append-only.integration.test.mts';
+import './append-only-ledgers.integration.test.mts';
 import './lifecycle-cron.integration.test.mts';
 import './loyalty-status.test.mts';
 import './loyalty-tier-panel-parity.test.mts';

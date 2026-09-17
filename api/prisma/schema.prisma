@@ -1420,7 +1420,8 @@ model SmsTransaction {
   restaurantId String     @map("restaurant_id") @db.Uuid
   // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19):
   // این مدل با raw SQL ساخته شده بود بدونِ relation field → بدونِ FK واقعی روی DB.
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  // حکمِ D-16 (مهاجرتِ ۰۹۰): دفترِ اعتبارِ پیامک cascade نمی‌شود — حذفِ رستوران با ردیفِ دفتر رد می‌شود (همان اصلِ FP-009).
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
   delta        Int        // مثبت = شارژ، منفی = مصرف
   reason       String     // 'admin_topup' | 'campaign' | 'reservation_notify'
   balanceAfter Int        @map("balance_after")

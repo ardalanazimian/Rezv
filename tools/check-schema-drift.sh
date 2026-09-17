@@ -301,6 +301,95 @@ fi
 CHK_ONLY_PROD=$(LC_ALL=C comm -13 /tmp/_drift_chk_ci.txt /tmp/_drift_chk_prod.txt)
 CHK_ONLY_CI=$(LC_ALL=C comm -23 /tmp/_drift_chk_ci.txt /tmp/_drift_chk_prod.txt)
 
+# ⚠️ لایه‌ی پنجم: **دفترهای فقط-افزودنی** — تریگرها با کلاسِ رفتاری، و FKهای RESTRICT
+#
+# چرا اینجا و نه اسکریپتِ تازه (بندِ ۵ی FP-009): این اسکریپت از قبل psql و **هر دو شکلِ
+# دیتابیس** را دارد، و در این نقطه هر دو apply-sql خورده‌اند (لایه‌ی CHECK بالا
+# `$PRISMA_DB` را جلو برد) — پس تریگرهای SQL در هر دو باید باشند.
+#
+# ⚠️ پیش از ۰۹۰ هیچ گاردی نبود: Red Team (`rezv-31`، INTEGRITY.md §۶) اندازه گرفت که
+# baselineهای این اسکریپت فقط FK و ایندکس‌اند و `grep -ic trigger` روی هر سه صفر است؛
+# یعنی DROPِ تنها تریگرهای موجود (reservation_events) هم در CI دیده نمی‌شد.
+#
+# دامنه = FP-009 (points_ledger، مهاجرتِ ۰۸۹) + هشت جدولِ مهاجرتِ ۰۹۰ (حکم‌های CEO،
+# ۲۰۲۶-۰۹-۱۶/۱۷). نسخه‌ی اولِ این لایه فقط points_ledger را می‌دید (نجات‌یافته از نشستِ
+# Backend، `backup/rescue-0916/fp009-guards-wt-rezv-c9 @ 5ae45a2`) — Red Team درست
+# گفت گارد باید **کلِ** مجموعه را بپوشاند، نه یک جدول.
+#
+# ⚠️ تریگرها با **نام** سنجیده نمی‌شوند بلکه با **کلاسِ رفتاری** — BEFORE UPDATE (ردیفی)،
+# BEFORE DELETE (ردیفی)، BEFORE TRUNCATE (statement) — و فقط اگر `tgenabled = 'O'`:
+# نامِ تریگر سلیقه است، و تریگرِ DISABLEشده در pg_trigger هست و از چکِ «وجود دارد؟»
+# سالم رد می‌شود. (tgtype: 1=ROW · 2=BEFORE · 8=DELETE · 16=UPDATE · 32=TRUNCATE)
+#
+# ⚠️ FK با **رابطه + ستون** سنجیده می‌شود نه نامِ constraint (همان دلیلِ لایه‌ی FK بالا).
+# دو FK: points_ledger.user_id (FP-009) و sms_transactions.restaurant_id (D-16، ۰۹۰).
+#
+# ⚠️ آنچه **نمی‌سنجد**: درِ SUPERUSER (`session_replication_role = replica` همه‌ی
+# تریگرها را در نشست خاموش می‌کند) — آن P0-022 است؛ گاردِ ایستای
+# tools/check-session-replication-role.mjs فقط مسیرِ کدِ اپ را می‌بندد.
+AO_TABLES="points_ledger reservation_events audit_logs platform_events economy_ledger_entries sms_transactions campaign_logs coupon_redemptions reward_redemptions"
+AO_FKS="points_ledger:user_id sms_transactions:restaurant_id"
+
+AO_FAIL=''
+for _db in "$PROD_DB" "$PRISMA_DB"; do
+  _shape='تولید (migrate deploy + apply-sql)'
+  [ "$_db" = "$PRISMA_DB" ] && _shape='دیتابیسِ تستِ CI (db push + apply-sql)'
+
+  for _t in $AO_TABLES; do
+    _row="$(psql "$BASE/$_db" -Atc "SELECT
+         (to_regclass('public.$_t') IS NOT NULL)::int::text
+      || ' ' || count(t.tgname) FILTER (WHERE (t.tgtype & 2) > 0 AND (t.tgtype & 1) > 0 AND (t.tgtype & 16) > 0)::text
+      || ' ' || count(t.tgname) FILTER (WHERE (t.tgtype & 2) > 0 AND (t.tgtype & 1) > 0 AND (t.tgtype &  8) > 0)::text
+      || ' ' || count(t.tgname) FILTER (WHERE (t.tgtype & 2) > 0 AND (t.tgtype & 1) = 0 AND (t.tgtype & 32) > 0)::text
+       FROM (SELECT 1) one
+       LEFT JOIN pg_trigger t ON t.tgrelid = to_regclass('public.$_t')
+                            AND NOT t.tgisinternal AND t.tgenabled = 'O'")"
+    _exists="$(printf '%s' "$_row" | cut -d' ' -f1)"
+    _u="$(printf '%s' "$_row" | cut -d' ' -f2)"
+    _d="$(printf '%s' "$_row" | cut -d' ' -f3)"
+    _tr="$(printf '%s' "$_row" | cut -d' ' -f4)"
+    if [ "$_exists" != "1" ]; then
+      # صفرِ توخالی: جدول نیست یا کوئری شکسته — هیچ‌کدام «سالم» نیست.
+      AO_FAIL="${AO_FAIL}
+    [$_shape] جدولِ $_t پیدا نشد (یا کوئری شکست: «$_row») — خودِ چک خراب است یا جدول رفته"
+      continue
+    fi
+    [ "${_u:-0}" -ge 1 ] 2>/dev/null || AO_FAIL="${AO_FAIL}
+    [$_shape] $_t: تریگرِ فعالِ BEFORE UPDATE (ردیفی) نیست"
+    [ "${_d:-0}" -ge 1 ] 2>/dev/null || AO_FAIL="${AO_FAIL}
+    [$_shape] $_t: تریگرِ فعالِ BEFORE DELETE (ردیفی) نیست"
+    [ "${_tr:-0}" -ge 1 ] 2>/dev/null || AO_FAIL="${AO_FAIL}
+    [$_shape] $_t: تریگرِ فعالِ BEFORE TRUNCATE (statement) نیست"
+  done
+
+  for _pair in $AO_FKS; do
+    _rel="${_pair%%:*}"; _col="${_pair#*:}"
+    _del="$(psql "$BASE/$_db" -Atc "SELECT c.confdeltype::text
+       FROM pg_constraint c
+       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+       WHERE c.contype = 'f' AND c.conrelid = to_regclass('public.$_rel') AND a.attname = '$_col'" | tr -d '[:space:]')"
+    if [ -z "$_del" ]; then
+      AO_FAIL="${AO_FAIL}
+    [$_shape] کلیدِ خارجیِ $_rel.$_col پیدا نشد — خودِ چک خراب است یا FK رفته"
+    elif [ "$_del" != "r" ]; then
+      AO_FAIL="${AO_FAIL}
+    [$_shape] ON DELETE روی $_rel.$_col باید RESTRICT ('r') باشد، هست: '$_del'  (a=NO ACTION · c=CASCADE · n=SET NULL · d=SET DEFAULT)"
+    fi
+  done
+done
+
+if [ -n "$AO_FAIL" ]; then
+  echo ""
+  echo "✗ نقضِ FP-009 / مهاجرتِ ۰۹۰ — «دفترهای مالی و حسابرسی فقط-افزودنی‌اند»:"
+  echo "$AO_FAIL"
+  echo ""
+  echo "  منبع: docs/DECISIONS.md (FP-009) و حکم‌های CEO برای ۰۹۰ (D-16). اگر داری FK را به"
+  echo "  CASCADE می‌بری تا «حذفِ کاربر/رستوران» کار کند: جوابش گرفته شده و نه است —"
+  echo "  حذفِ حسابِ دارای ردِ مالی یعنی ناشناس‌سازی، نه حذفِ ردیفِ دفتر."
+  echo "  اگر تریگری نیست یا DISABLE شده: api/prisma/sql/089 و 090 را ببین."
+  exit 1
+fi
+
 MISSING=$(LC_ALL=C comm -23 /tmp/_drift_prisma.txt /tmp/_drift_prod.txt)
 
 if [ -n "$MISSING" ]; then
@@ -393,4 +482,4 @@ if [ -n "$FK_GONE" ]; then
   echo "$FK_GONE" | sed 's/^/    /'
 fi
 
-echo "✓ بدونِ انحراف — تولید هرچه Prisma لازم دارد را دارد ($(wc -l < /tmp/_drift_prisma.txt) ستون، $(wc -l < /tmp/_drift_fk_prisma.txt) کلیدِ خارجی، $(wc -l < /tmp/_drift_idx_prisma.txt) ایندکس، $(wc -l < /tmp/_drift_chk_prod.txt) قیدِ CHECK · baseline: $(wc -l < /tmp/_drift_fk_base.txt) FK + $(wc -l < /tmp/_drift_idx_base.txt) ایندکس)"
+echo "✓ بدونِ انحراف + دفترهای فقط-افزودنی برقرار (۹ جدول با هر سه کلاسِ تریگرِ فعال، ۲ FKِ RESTRICT) — تولید هرچه Prisma لازم دارد را دارد ($(wc -l < /tmp/_drift_prisma.txt) ستون، $(wc -l < /tmp/_drift_fk_prisma.txt) کلیدِ خارجی، $(wc -l < /tmp/_drift_idx_prisma.txt) ایندکس، $(wc -l < /tmp/_drift_chk_prod.txt) قیدِ CHECK · baseline: $(wc -l < /tmp/_drift_fk_base.txt) FK + $(wc -l < /tmp/_drift_idx_base.txt) ایندکس)"

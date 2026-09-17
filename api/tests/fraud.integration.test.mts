@@ -1,4 +1,4 @@
-import { test, describe, before, after, beforeEach } from 'node:test';
+import { test, describe, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
@@ -63,38 +63,35 @@ const profileOf = (userId: string) =>
     select: { hasActiveAbuseFlag: true, lastViolationAt: true, strikeCount: true },
   });
 
+// ⚠️ هوک‌ها داخلِ یک describe‌اند، نه در سطحِ ماژول (مهاجرتِ ۰۹۰، ۲۰۲۶-۰۹-۱۷).
+// runnerِ تک‌پردازه‌ای (`_all.runner.mts`) هوکِ سطحِ ماژول را روی **ریشه** ثبت می‌کند،
+// پس beforeEachِ قبلیِ این فایل پیش از *هر* تستِ کلِ سوئیت اجرا می‌شد. وقتی DELETEِ
+// کوپن‌ردیمِ آن به تریگرِ فقط-افزودنیِ ۰۹۰ خورد، ۱۸۲۹ تستِ نامربوط با همان خطا قرمز شدند.
+//
+// ⚠️ و ایزولاسیون دیگر با پاک‌کردنِ دفتر نیست (FP-009 §۴): هر تست رستورانِ **تازه‌ی** خودش
+// را می‌گیرد، پس ردیم‌ها، رزروها و ردیف‌های audit تستِ قبلی در دامنه‌ی تستِ بعدی نیستند
+// (همه‌ی detectorها به restaurantId مقیدند). هیچ پاک‌سازی‌ای نیست؛ DBِ هر اجرا تازه است.
+describe('fraud.integration — تشخیصِ سوءاستفاده', () => {
+
+let restaurantSeq = 0;
+
 before(async () => {
   const t = await db.tenant.create({ data: { name: `[DEMO] ${TAG}` }, select: { id: true } });
   tenantId = t.id;
+});
+
+beforeEach(async () => {
   const r = await db.restaurant.create({
     data: {
-      tenantId, slug: TAG, name: '[DEMO] رستورانِ تقلب', clubPrefix: 'FR',
+      tenantId, slug: `${TAG}-${++restaurantSeq}`, name: '[DEMO] رستورانِ تقلب', clubPrefix: 'FR',
       timezone: 'Asia/Tehran', isOpen: true,
     },
     select: { id: true },
   });
   restaurantId = r.id;
-});
-
-beforeEach(async () => {
-  await db.$executeRaw`DELETE FROM reservations WHERE restaurant_id = ${restaurantId}::uuid`;
   if (madeUsers.length) {
     await db.customerEconomyProfile.deleteMany({ where: { userId: { in: madeUsers } } }).catch(() => {});
   }
-  await db.$executeRaw`DELETE FROM coupon_redemptions WHERE coupon_id IN (SELECT id FROM coupons WHERE restaurant_id = ${restaurantId}::uuid)`;
-  await db.coupon.deleteMany({ where: { restaurantId } }).catch(() => {});
-  await db.auditLog.deleteMany({ where: { restaurantId } }).catch(() => {});
-});
-
-after(async () => {
-  await db.$executeRaw`DELETE FROM reservations WHERE restaurant_id = ${restaurantId}::uuid`.catch(() => 0);
-  await db.auditLog.deleteMany({ where: { restaurantId } }).catch(() => {});
-  if (madeUsers.length) {
-    await db.customerEconomyProfile.deleteMany({ where: { userId: { in: madeUsers } } }).catch(() => {});
-    await db.user.deleteMany({ where: { id: { in: madeUsers } } }).catch(() => {});
-  }
-  await db.restaurant.deleteMany({ where: { id: restaurantId } }).catch(() => {});
-  await db.tenant.deleteMany({ where: { id: tenantId } }).catch(() => {});
 });
 
 describe('تشخیصِ سوءاستفاده — آستانه‌ها و خطای مثبت', () => {
@@ -382,3 +379,5 @@ describe('تشخیصِ سوءاستفاده — مسیرِ دستی و appeal', 
     );
   });
 });
+
+}); // fraud.integration — پایانِ describeِ دربرگیرنده

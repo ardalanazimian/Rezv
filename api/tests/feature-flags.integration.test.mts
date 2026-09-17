@@ -89,7 +89,7 @@ beforeEach(clearFlags);
 
 after(async () => {
   await clearFlags();
-  await db.auditLog.deleteMany({ where: { actorId: ADMIN_ID } });
+  // ⚠️ مهاجرتِ ۰۹۰ (FP-009 §۴): ردیفِ audit_logs حذف نمی‌شود — فقط retentionِ ۱ساله حذف می‌کند.
 });
 
 describe('feature-flags · پیش‌فرضِ fail-open', () => {
