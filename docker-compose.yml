@@ -80,6 +80,9 @@ services:
       # امنیت: منشأهای مجاز (CSRF) و کلید نگهداری (cron)
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       MAINTENANCE_KEY: ${MAINTENANCE_KEY:-}
+      # کلیدِ رمزنگاریِ رازهای ذخیره‌شده (S-05) — اجباری: بدونش api در production بالا نمی‌آید
+      SECRETS_KEYRING: ${SECRETS_KEYRING:?حلقه‌ی کلیدِ رازها را در .env تنظیم کن}
+      SECRETS_ACTIVE_KEY_ID: ${SECRETS_ACTIVE_KEY_ID:?شناسه‌ی کلیدِ فعال را در .env تنظیم کن}
       # سطح لاگ (production: info، توسعه: debug)
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # اعلان (اختیاری)

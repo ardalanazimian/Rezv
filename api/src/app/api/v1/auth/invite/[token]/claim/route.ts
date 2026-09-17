@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { Err, errorResponse } from '@/lib/errors';
 import { parseParams, z } from '@/lib/schemas';
+import { bearerTokenMatches, hashBearerToken } from '@/lib/secret-box';
 
 import { withApiMetrics } from '@/lib/api-metrics';
 
@@ -29,14 +30,16 @@ async function POST_impl(req: Request, { params }: { params: Promise<{ token: st
     await enforceRateLimit(clientIp(req), RULES.auth);
     const { token } = parseParams(await params, paramsSchema);
 
+    // S-05 (D-24): ستونِ token فقط هش دارد (مهاجرتِ ۰۹۴). هشِ ذخیره‌شده خودش توکن نیست:
+    // کسی که DB را خوانده و همان رشته را بفرستد، هشِ آن را جست‌وجو می‌کند و ۴۰۴ می‌گیرد.
     const invite = await db.staffInvite.findUnique({
-      where: { token },
+      where: { token: hashBearerToken(token) },
       select: {
-        status: true, expiresAt: true, phone: true,
+        token: true, status: true, expiresAt: true, phone: true,
         restaurant: { select: { name: true, slug: true } },
       },
     });
-    if (!invite) throw Err.notFound('دعوت');
+    if (!invite || !bearerTokenMatches(token, invite.token)) throw Err.notFound('دعوت');
 
     const state =
       invite.status === 'ACCEPTED' ? 'used'
