@@ -135,4 +135,16 @@ SELECT ensure_reservation_partition(CURRENT_DATE + interval '3 months');
 --
 --  حذف داده‌ی قدیمی (مثلاً رزروهای > ۲ سال) با DROP فوری:
 --    DROP TABLE reservations_YYYY_MM;   -- بدون VACUUM سنگین
+--
+--  ⚠️ به‌روزشده ۲۰۲۶-۰۹-۱۷ (مهاجرتِ ۰۹۰، اندازه‌گیری روی DBِ خراشی با همین شکل — نه اجرای این
+--  فایل، که با ستون‌های حذف‌شده و block_endِ تعریف‌نشده قابلِ اجرا نیست): این روش با دفترهای
+--  فقط-افزودنی سازگار نیست و **بی‌صدا** یکپارچگیِ ارجاع را می‌شکند:
+--    • پس از جابه‌جاییِ مرحله‌ی ۶، FKِ economy_ledger_entries.reservation_id (و هر FKِ دیگری به
+--      reservations) همراهِ نامِ تازه به reservations_old می‌رود؛ و FK به جدولِ partitioned روی
+--      reservation_id به‌تنها **ممکن نیست** («no unique constraint matching» — PK = (id, slot_start)).
+--    • DROP TABLE reservations_YYYY_MM موفق می‌شود و به دفتر دست نمی‌زند؛ DROP TABLE reservations_old
+--      بدونِ CASCADE رد می‌شود و با CASCADE خودِ FK را بی‌صدا حذف می‌کند — ردیف‌های دفتر با
+--      reservation_idِ یتیم می‌مانند. تریگرهای ۰۹۰ روی DDL شلیک نمی‌کنند.
+--  پیش از اجرای این راهنما روی دیتابیسی که ردِ مالی دارد، سیاستِ نگه‌داریِ رزرو باید با FP-009 و
+--  ۰۹۰ از نو تصمیم‌گیری شود (docs/DECISIONS.md) — «DROP partition» به‌تنها روشِ مجاز نیست.
 -- ═══════════════════════════════════════════════════════════════════════

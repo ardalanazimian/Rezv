@@ -78,6 +78,32 @@ or a coupon or gift card that was a reward result, is **rejected**.
 - Pinned by a new test in `ml-substrate-m0`: a user's no_show reservation with ledger rows cannot be
   deleted.
 
+### The documented partition-retention procedure (CEO condition on the ruling above)
+
+`api/prisma/sql/011-reservations-partitioning.sql` and `api/prisma/sql/002-partitioning-guide.sql`
+(both `@manual-only`; `reservations` is a plain table in every applied schema, measured) document
+old-data removal as swap-then-`DROP TABLE reservations_YYYY_MM` and later `DROP TABLE reservations_old`.
+Nothing automates it (per the CEO's `git grep`).
+
+**Measured on a scratch DB** (`probe-partition-drop.sql`, `session_replication_role = origin` on line 0).
+This is a minimal emulation of the procedure's shape, because 011 itself is not runnable as written: its
+column list is elided and its EXCLUDE references an undefined `block_end`.
+
+| Step | Result |
+|---|---|
+| A. Before partitioning: `DELETE` a reservation referenced by a ledger row (FK `SET NULL`, ledger has 090-style UPDATE trigger) | **rejected**: `ledger فقط-افزودنی است: UPDATE مجاز نیست` |
+| B. Documented swap (rename `reservations` → `reservations_old`, partitioned → `reservations`) | the ledger FK **follows the rename** to `reservations_old` (`confdeltype n`); adding an FK to the partitioned table on `reservation_id` alone is **impossible**: `no unique constraint matching given keys` (PK is `(id, slot_start)`) |
+| C. `DROP TABLE reservations_2024_01` | **succeeds**; the ledger row is untouched and still points at `reservations_old` |
+| D. `DROP TABLE reservations_old` | **refused** (`constraint … depends on table reservations_old`); with `CASCADE` it **silently drops the FK**, and the ledger row keeps `reservation_id` with `parent_exists = f` |
+
+**Answer to the CEO's question:** a partition DROP is neither blocked nor rejected by the trigger
+(triggers do not fire on DDL). The procedure **silently orphans** ledger references once
+`reservations_old` is dropped with CASCADE. Amounts and the `(reservation_id, kind)` idempotency key
+survive unchanged; referential integrity does not. Both comments are updated to say so, and to require
+that retention be re-decided against FP-009 and 090 before the guide is used on a DB with financial rows.
+(The CLAUDE.md rule "never edit a previous migration file" is about applied SQL; both files are
+`@manual-only`, the edit is comments only, and no tool or test reads them; `git grep` found 0.)
+
 ## Proofs — tested
 
 Environment: own Postgres 17 containers. The `tmpl_*` templates are `CREATE DATABASE … TEMPLATE`
