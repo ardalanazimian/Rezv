@@ -107,7 +107,7 @@ rule). The card copy is proposed Persian in the «روراست» voice (`BRAND.m
 | «حداقلِ خرید بر اساسِ روز و ساعت، با پیشنهاد از روی رزروهای خودتان» | REAL-STATIC, as a rule engine | `api/src/lib/pricing.ts:151-234`. Never «هوشمند» (`api/src/lib/pricing.ts:1-10`) |
 | «کوپن و پیامکِ خودکار» | **PARTIAL.** Panel and API wired, real delivery unproven | `apps/business/js/marketing.js`, `api/src/lib/sms.ts:78`. **Gate:** on the card only after the CEO certifies SMS delivery (`BUSINESS-PLAN.md` §5, Phase 0). If it isn't certified at launch, the line comes off |
 | «چند شعبه با یک حساب» | REAL-STATIC | `api/src/app/api/v1/restaurant/branches/route.ts` |
-| «کارکنان با سطحِ دسترسی، بدونِ سقفِ تعداد» | REAL-STATIC for the roles. **"No cap" is an absence claim** | Permissions via `withRestaurantAuth` (`CLAUDE.md`, backend conventions). `git grep -iE "max_?staff\|staffLimit\|maxUsers"` over `api/src` returned nothing, with no positive control. **CEO to confirm before "بدونِ سقف" ships** |
+| «کارکنان با سطحِ دسترسی، بدونِ سقفِ تعداد» | REAL-STATIC, including "no cap". **Confirmed by the CEO on 2026-09-17 with a positive control** | Permissions via `withRestaurantAuth` (`CLAUDE.md`, backend conventions). The absence was measured by CEO `rezv-87` on `origin/main`: `max_?staff\|staffLimit\|maxUsers\|staff_?limit\|max_?seats\|seatLimit` over `api/src` → **0 files**. Positive control `maxPartySize\|max_party` → **2 files**, so the search works. `db.staff.count` appears on no request path, and no gate by plan exists. Keep this row with the command, and re-run it if staff or plan code changes |
 | «اتصال به سیستم‌های دیگر (Webhook)» | REAL-STATIC at schema and outbound level | `api/prisma/schema.prisma:1357`, `api/src/lib/outbound-http.ts` |
 | «۳۰ روز رایگان برای شروع» | REAL-STATIC | `api/src/lib/site-orders.ts:36` |
 
@@ -174,8 +174,9 @@ The landing and the seed are not mine to edit. The CEO routes these to the Imple
 
 ## 7. What happens next
 
-1. **CEO:** verify §3's evidence column, and confirm or strike "بدونِ سقف" (the absence claim).
-   Route §6 with M-12.
+1. **CEO:** verify §3's evidence column. ~~Confirm "بدونِ سقف"~~ done 2026-09-17, with a positive
+   control. §6 rows 4 and 6 were added to M-12 the same day. The CEO takes this file to the owner as a
+   decision package, and nothing is applied until he chooses.
 2. **Owner:** choose A, B, or a different number with a reason. Answer §4.1–4.3. He sees the final
    numbers before `main`.
 3. **Implementation Team** (after 1 and 2): the seed prices and cards, the landing lead, the FAQ
