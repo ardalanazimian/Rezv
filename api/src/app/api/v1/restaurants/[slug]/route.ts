@@ -33,6 +33,7 @@ async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: str
           paymentEnabled: true,
           address: true, city: true, district: true, postalCode: true, country: true,
           latitude: true, longitude: true, openingHours: true, timezone: true,
+          lateGraceMinutes: true, // F001 (M-13): «تا N دقیقه صبر می‌کنیم» کنارِ دکمه‌ی تأییدِ رزرو
           // ترتیبِ نمایشِ منو = خواستِ رستوران‌دار (sortOrder)، نه آمارِ فروش.
           // تا مهاجرتِ ۰۵۲ اینجا `soldCount: 'desc'` بود، یعنی چیدمانِ منو را
           // پرفروش‌بودن تعیین می‌کرد؛ برایِ گزارش درست است، برایِ منو نه.
@@ -157,6 +158,9 @@ async function GET_impl(_req: Request, { params }: { params: Promise<{ slug: str
           // ⚠️ افشا **کافی نیست** — رندرِ صادقانه‌اش کارِ `apps/customer` است.
           // این کلید فقط داده را در دسترس می‌گذارد.
           online_payment_enabled: r.paymentEnabled ?? false,
+          // F001 (STATE M-13، D-18): مهلتِ صبر برای مهمانِ دیرکرده — پیامدی که باید **پیش** از تأیید
+          // گفته شود (معیارِ صداقتِ پولی: پیامد روی همان صفحه‌ی دکمه‌ی تأیید). ۱۰..۶۰، CHECK در ۰۹۲.
+          late_grace_minutes: r.lateGraceMinutes,
         },
       };
     });

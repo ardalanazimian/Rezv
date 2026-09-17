@@ -11,6 +11,8 @@ import { addClubPoints, ARRIVAL_POINTS, reverseReservationCashback } from './loy
 import {
   RULE_VERSION, holdoutBucket, guestKeyOf, transitionDecisionInputs,
 } from './ml-substrate';
+import { autoNoShowDueAt, guestDeadline } from './late-arrival';
+import { metrics } from './metrics';
 
 const log = createLogger('lifecycle');
 
@@ -94,13 +96,14 @@ export async function transitionReservation(opts: {
       where: { id: reservationId },
       // ⚠️ `tenantId` برای زیرساختِ M0 اضافه شد — ستونِ دیگری روی همان joinِ
       // موجود است، نه یک کوئریِ اضافه.
-      include: { restaurant: { select: { timezone: true, tenantId: true } } },
+      include: { restaurant: { select: { timezone: true, tenantId: true, lateGraceMinutes: true } } },
     });
     if (!resv) throw Err.notFound('رزرو');
     const from = resv.status as RStatus;
     const timezone = resv.restaurant.timezone ?? 'Asia/Tehran';
+    const lateGraceMinutes = resv.restaurant.lateGraceMinutes;
 
-    if (from === to) return { resv, changed: false, from, timezone };
+    if (from === to) return { resv, changed: false, from, timezone, lateGraceMinutes };
     if (!canTransition(from, to)) throw Err.invalidTransition(from, to);
 
     // ⚠️ رقابتِ «دو بار انتقال» (فازِ ۲ — با تستِ واقعی پیدا شد، نه فرض).
@@ -122,7 +125,7 @@ export async function transitionReservation(opts: {
     });
     if (claimed.count === 0) {
       const current = await tx.reservation.findUnique({ where: { id: reservationId } });
-      return { resv: current ?? resv, changed: false, from, timezone };
+      return { resv: current ?? resv, changed: false, from, timezone, lateGraceMinutes };
     }
     const updated = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId } });
 
@@ -151,7 +154,7 @@ export async function transitionReservation(opts: {
       },
     });
 
-    return { resv: updated, changed: true, from, timezone };
+    return { resv: updated, changed: true, from, timezone, lateGraceMinutes };
   });
 
   // بعد از commit: اقتصادِ یکپارچه‌ی مشتری (economy.ts) — دقیقاً همون الگویِ
@@ -286,6 +289,32 @@ export async function transitionReservation(opts: {
   }
 
   // بعد از commit: اعلان (خارج از transaction تا تراکنش را کند نکند)
+  if (result.changed && notify && to === 'running_late' && result.resv.guestPhone) {
+    // ── هشدارِ دیرکرد (F001 · STATE M-13 · حکمِ CEO D-20) ─────────────────────
+    //
+    // چه بود: `running_late` هیچ پیامکی نداشت (در NOTIFY نبود) و autoMarkNoShow از `slotStart`
+    // می‌شمرد — مهمانِ ۱۷ دقیقه دیرکرده در یک تیک هم running_late شد هم no_show، بدونِ هیچ
+    // سیگنالی. حالا این پیامک **پیش‌شرطِ** هر no_showِ خودکار است: `late_warned_at` فقط وقتی ست
+    // می‌شود که ارائه‌دهنده ارسال را پذیرفت (`markLateWarningAccepted` در sms.ts)، و cron بدونِ
+    // آن جریمه نمی‌کند. ساعتِ داخلِ پیامک `guestDeadline` است — زودترین لحظه‌ای که **هر** مسیری
+    // (cron یا پرسنل) می‌تواند مهمان را غایب ثبت کند؛ پس «تا این ساعت صبر می‌کنیم» هرگز دروغ نمی‌شود.
+    const deadline = guestDeadline(result.resv, result.lateGraceMinutes);
+    const clock = new Intl.DateTimeFormat('fa-IR', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: result.timezone,
+    }).format(deadline);
+    await enqueueSms({
+      to: result.resv.guestPhone,
+      template: 'booking_late',
+      tokens: [result.resv.guestName ?? 'مهمان', result.resv.code, clock],
+      restaurantId: result.resv.restaurantId,  // C6: همان قاعده‌ی booking_noshow — از موجودیِ رستوران (D-20b)
+      lateWarningFor: result.resv.id,
+    }).catch((e) => {
+      log.error('صف‌کردنِ هشدارِ دیرکرد ناموفق — این رزرو خودکار no_show نمی‌شود', {
+        reservationId: result.resv.id, error: (e as Error).message,
+      });
+    });
+  }
+
   if (result.changed && notify) {
     const n = NOTIFY[to];
     if (n && result.resv.guestPhone) {
@@ -399,23 +428,46 @@ export async function autoMarkRunningLate(restaurantId: string): Promise<number>
 }
 
 /**
- * علامت‌گذاری خودکار «عدم حضور» (no_show):
- * رزروهای running_late که از مهلت تأخیر (lateGraceMinutes) هم گذشته‌اند.
+ * علامت‌گذاری خودکار «عدم حضور» (no_show) — F001 · STATE M-13 · حکمِ CEO D-20.
+ *
+ * فقط رزروِ running_lateی که **هر دو** شرط را دارد:
+ *   ۱) هشدارِ دیرکردش پذیرفته شده (`late_warned_at` ست است)، و
+ *   ۲) `autoNoShowDueAt` گذشته — `max(slotStart + grace, late_warned_at + کف) + تمدیدِ مهمان`.
+ *
+ * چه بود: `slotStart < now − grace` و بس. مهمانِ ۱۷ دقیقه دیرکرده در یک تیک هم running_late شد هم
+ * no_show، بدونِ هیچ پیامکی. و «مسیرِ دومرحله‌ای» فقط اسماً دومرحله‌ای بود.
+ *
+ * ردیفی که مهلتش گذشته ولی هشداری به دستش نرسیده **عمداً** جریمه نمی‌شود؛ شمرده می‌شود
+ * (`rezervno_no_show_blocked_unwarned_total`، آلارمِ NoShowBlockedUnwarned) و پرسنل پس از مهلتِ
+ * خودش (`guestDeadline`) می‌تواند دستی ثبتش کند. جریمه‌ی بی‌صدا بدتر از نبودنِ جریمه است.
  */
 export async function autoMarkNoShow(restaurantId: string): Promise<number> {
   const r = await db.restaurant.findUnique({ where: { id: restaurantId }, select: { lateGraceMinutes: true } });
   const grace = r?.lateGraceMinutes ?? 15;
-  const cutoff = new Date(Date.now() - grace * 60_000);
-  const due = await db.reservation.findMany({
+  const now = new Date();
+  // پیش‌فیلترِ ارزان: هر دو مهلت (`guestDeadline` و `autoNoShowDueAt`) دست‌کم slotStart + grace‌اند.
+  const cutoff = new Date(now.getTime() - grace * 60_000);
+  const candidates = await db.reservation.findMany({
     where: { restaurantId, status: 'running_late', slotStart: { lt: cutoff } },
-    select: { id: true },
+    select: { id: true, slotStart: true, lateWarnedAt: true, lateExtensionMinutes: true },
   });
   let n = 0;
-  for (const x of due) {
+  let blocked = 0;
+  for (const x of candidates) {
+    const due = autoNoShowDueAt(x, grace);
+    if (!due) {
+      if (guestDeadline(x, grace) <= now) blocked++;
+      continue;
+    }
+    if (due > now) continue;
     try {
       await transitionReservation({ reservationId: x.id, to: 'no_show', actor: 'cron', isAutomatic: true });
       n++;
-    } catch { /* */ }
+    } catch { /* انتقالِ نامعتبر (وضعیت بینِ خواندن و اجرا عوض شده) رد می‌شود */ }
+  }
+  if (blocked > 0) {
+    metrics.noShowBlockedUnwarned.inc(undefined, blocked);
+    log.warn('رزروهای دیرکرده بدونِ هشدارِ پذیرفته‌شده — خودکار no_show نشدند', { restaurantId, blocked });
   }
   return n;
 }

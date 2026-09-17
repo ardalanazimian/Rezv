@@ -113,6 +113,14 @@ export function cancelPolicyLabel(r){
   return `لغوِ رایگان تا ${fmtFa(h)} ساعت پیش از زمانِ رزرو. دیرتر از آن، یک تخلف در سابقه‌ات ثبت می‌شود و نشانِ اعتبارت پایین می‌آید — این نشان به رستوران‌ها هم نشان داده می‌شود.`;
 }
 
+// F001 (STATE M-13، D-18/D-20): پیامدِ دیرکرد **پیش** از تأیید گفته می‌شود، روی همان صفحه‌ی دکمه —
+// همان قاعده‌ی `cancelPolicyLabel`. مقدارِ نامعلوم → سکوت.
+export function lateGraceLabel(r){
+  const m = r?.lateGraceMinutes;
+  if(typeof m !== 'number' || !(m > 0)) return '';
+  return `اگر دیر برسی، تا ${fmtFa(m)} دقیقه بعد از ساعتِ رزرو «عدم حضور» ثبت نمی‌شود؛ اگر در راهی، از کارتِ رزرو «دیرتر می‌رسم» را بزن.`;
+}
+
 // شیت رزرو که با دکمه‌ی پایین باز می‌شود (تاریخ/ساعت/نفر)
 export function openBookSheet(id){
   const r=findR(id);
@@ -442,6 +450,7 @@ export function bookStep3(r){
     ${r.cb>0?`<div class="reward-row"><div class="reward"><div class="rv teal">${fmtFa(r.cb)}٪</div><div class="rl">کش‌بک</div></div></div>`:''}
     <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px">امتیازِ اعتبار بعد از انجامِ رزرو به حسابت اضافه می‌شه</div>
     ${cancelPolicyLabel(r)?`<div class="cancel-policy-note" style="font-size:11.5px;color:var(--t3);margin:8px 2px 0;line-height:1.7">${icon('info',{size:13})} ${esc(cancelPolicyLabel(r))}</div>`:''}
+    ${lateGraceLabel(r)?`<div class="late-grace-note" style="font-size:11.5px;color:var(--t3);margin:6px 2px 0;line-height:1.7">${icon('clock',{size:13})} ${esc(lateGraceLabel(r))}</div>`:''}
     <button class="btn btn-primary btn-lg btn-block" onclick="confirmBook(${jsq(String(r.id))})">تأیید رزرو</button>`;
 }
 export async function confirmBook(id){

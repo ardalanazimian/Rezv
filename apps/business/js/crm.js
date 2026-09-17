@@ -924,7 +924,7 @@ async function saveHours(){
 // سطحِ اعتبارِ مشتری، abuse) خودکار و سمتِ بک‌اند (lib/cancellation-policy.ts
 // → resolvePolicy) روی همین پایه اعمال می‌شن، اینجا فقط پیکربندیِ پایه رو
 // می‌بینی/عوض می‌کنی.
-let CANCEL_POLICY_STATE={free_cancel_hours:24,partial_penalty_hours:2,partial_penalty_pct:50,deposit_required:false,auto_confirm:true,is_customized:false};
+let CANCEL_POLICY_STATE={free_cancel_hours:24,partial_penalty_hours:2,partial_penalty_pct:50,deposit_required:false,auto_confirm:true,is_customized:false,late_grace_minutes:15,max_late_extension_minutes:15};
 let _cancelPolicyDirty=false;
 
 async function loadCancellationPolicy(){
@@ -978,6 +978,16 @@ function profRenderCancellationPolicy(){
         <button class="toggle ${s.auto_confirm?'on':'off'}" onclick="toggleCancelPolicyField('auto_confirm')"></button>
       </div>
       <div class="staff-row">
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">مهلتِ صبر برای مهمانِ دیرکرده (دقیقه)</div><div style="font-size:12px;color:var(--t2)">پیش از این، نه سیستم نه پرسنل نمی‌توانند «نیومد» ثبت کنند. همین عدد به مهمان هم گفته می‌شود. ۱۰ تا ۶۰.</div></div>
+        ${okBadge}
+        <input class="inp" id="cpLateGrace" style="width:80px" type="number" min="10" max="60" value="${esc(s.late_grace_minutes)}" onchange="updateCancelPolicyField('late_grace_minutes',this.value)">
+      </div>
+      <div class="staff-row">
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">تمدید وقتی مهمان خبر می‌دهد (دقیقه)</div><div style="font-size:12px;color:var(--t2)">مهمان با «دیرتر می‌رسم» تا این مقدار وقتِ بیشتر می‌گیرد. ۰ یعنی تمدید نمی‌دهی، ولی خبرش را می‌بینی. ۰ تا ۳۰.</div></div>
+        ${okBadge}
+        <input class="inp" id="cpLateExt" style="width:80px" type="number" min="0" max="30" value="${esc(s.max_late_extension_minutes)}" onchange="updateCancelPolicyField('max_late_extension_minutes',this.value)">
+      </div>
+      <div class="staff-row">
         <div style="flex:1"><div style="font-size:13px;font-weight:700">آستانه‌ی جریمه‌یِ جزئی (ساعت)</div><div style="font-size:12px;color:var(--t2)">برایِ زمانی که پرداخت وصل شد — الان فقط ذخیره می‌شود</div></div>
         ${waitBadge}
         <input class="inp" style="width:80px" type="number" min="0" max="720" value="${esc(s.partial_penalty_hours)}" onchange="updateCancelPolicyField('partial_penalty_hours',this.value)">
@@ -1000,9 +1010,13 @@ async function saveCancellationPolicy(){
   if(!API.getToken()){ toast('','برای ذخیره باید وارد شده باشی'); return; }
   const s=CANCEL_POLICY_STATE;
   if(Number(s.partial_penalty_hours)>Number(s.free_cancel_hours)){ toast('','آستانه‌ی جریمه‌ی جزئی نمی‌تونه از پنجره‌ی آزاد بزرگ‌تر باشه'); return; }
+  const grace=Number(s.late_grace_minutes), ext=Number(s.max_late_extension_minutes);
+  if(!(grace>=10&&grace<=60)){ toast('','مهلتِ صبر باید بینِ ۱۰ و ۶۰ دقیقه باشه'); return; }
+  if(!(ext>=0&&ext<=30)){ toast('','تمدید باید بینِ ۰ و ۳۰ دقیقه باشه'); return; }
   const res=await API.cancellationPolicySave({
     free_cancel_hours:Number(s.free_cancel_hours), partial_penalty_hours:Number(s.partial_penalty_hours),
     partial_penalty_pct:Number(s.partial_penalty_pct), deposit_required:!!s.deposit_required, auto_confirm:!!s.auto_confirm,
+    late_grace_minutes:grace, max_late_extension_minutes:ext,
   });
   if(res.ok){ CANCEL_POLICY_STATE={...res.data}; _cancelPolicyDirty=false; toast('','سیاستِ کنسلی ذخیره شد'); profRenderCancellationPolicy(); }
   else{ toast('', res.error?.message||'ذخیره ناموفق بود'); }

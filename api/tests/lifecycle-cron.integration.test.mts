@@ -19,7 +19,7 @@ import { fixturePhone } from './_phone.helper.mts';
 //
 //    expireStaleHolds  → هولدِ منقضی، میز را آزاد می‌کند
 //    autoMarkRunningLate → confirmed/auto_confirmed/preparing → running_late
-//    autoMarkNoShow      → running_late → no_show (بعد از lateGraceMinutes)
+//    autoMarkNoShow      → running_late → no_show (فقط پس از هشدارِ پذیرفته‌شده و autoNoShowDueAt — F001/D-20)
 //    autoComplete        → seated/dining → completed
 //
 //  اگر هرکدام بی‌صدا بشکند، هیچ تستی نمی‌گیردش ولی اثرش مستقیم است:
@@ -30,7 +30,8 @@ import { fixturePhone } from './_phone.helper.mts';
 //   • completedی که ثبت نشود یعنی اقتصاد/وفاداریِ مشتری هرگز شلیک نمی‌شود.
 //
 //  این تست‌ها عمداً از *خودِ* توابعِ تولید عبور می‌کنند و وضعیت را دستی
-//  UPDATE نمی‌کنند؛ وگرنه فقط خودشان را می‌سنجیدند.
+//  UPDATE نمی‌کنند؛ وگرنه فقط خودشان را می‌سنجیدند. (`late_warned_at` دستی ست می‌شود: موضوعِ این
+//  فایل cron است، و پذیرشِ پیامک توسطِ ارائه‌دهنده در late-arrival-warning.integration سنجیده می‌شود.)
 // ═══════════════════════════════════════════════════════════════════════
 
 const TAG = `lc-${randomUUID().slice(0, 8)}`;
@@ -51,6 +52,8 @@ const nextCode = () => `LC${String(++codeSeq).padStart(3, '0')}${randomUUID().sl
 async function mkReservation(opts: {
   status: string; minutesAgo: number; durationMin?: number;
   restaurant?: string; table?: string; holdExpiresAt?: Date | null;
+  /** F001 (D-20): چند دقیقه پیش ارائه‌دهنده هشدارِ دیرکرد را پذیرفت؛ undefined = هرگز. */
+  warnedMinutesAgo?: number;
 }): Promise<{ id: string; slotStart: Date }> {
   const dur = opts.durationMin ?? 90;
   const slotStart = new Date(Date.now() - opts.minutesAgo * 60_000);
@@ -59,13 +62,15 @@ async function mkReservation(opts: {
   await db.$executeRaw`
     INSERT INTO reservations
       (id, code, restaurant_id, table_id, user_id, party_size, slot_start, slot_end,
-       duration_minutes, block_buffer_minutes, status, source, hold_expires_at, created_at)
+       duration_minutes, block_buffer_minutes, status, source, hold_expires_at, late_warned_at, created_at)
     VALUES
       (${id}::uuid, ${nextCode()}, ${opts.restaurant ?? restaurantId}::uuid,
        ${opts.table ?? tableId}::uuid, ${userId}::uuid, 2,
        ${slotStart}, ${slotEnd}, ${dur}, 15,
        CAST(${opts.status}::text AS "public"."reservation_status"), 'app',
-       ${opts.holdExpiresAt ?? null}, ${new Date(slotStart.getTime() - 86_400_000)})
+       ${opts.holdExpiresAt ?? null},
+       ${opts.warnedMinutesAgo === undefined ? null : new Date(Date.now() - opts.warnedMinutesAgo * 60_000)},
+       ${new Date(slotStart.getTime() - 86_400_000)})
   `;
   return { id, slotStart };
 }
@@ -324,6 +329,11 @@ describe('چرخه‌ی حیاتِ خودکار — مسیرِ دو مرحله�
     assert.equal(await autoMarkRunningLate(restaurantId), 1);
     assert.equal(await statusOf(id), 'running_late');
 
+    // ⚠️ تغییرِ قرارداد، D-20 (F001): پیش از پذیرشِ هشدار، cron جریمه نمی‌کند. تا ۰۹-۱۷ همین‌جا
+    // `autoMarkNoShow` مستقیم ۱ برمی‌گرداند — همان «فروپاشیِ یک‌تیکی».
+    assert.equal(await autoMarkNoShow(restaurantId), 0, 'هشداری پذیرفته نشده — no_show ممنوع');
+    // پذیرشِ هشدار ۱۱ دقیقه پیش (کفِ ۱۰ دقیقه گذشته؛ مهلتِ ۱۵ دقیقه از ساعتِ ۶۰-دقیقه‌پیش هم گذشته)
+    await db.reservation.update({ where: { id }, data: { lateWarnedAt: new Date(Date.now() - 11 * 60_000) } });
     assert.equal(await autoMarkNoShow(restaurantId), 1);
     assert.equal(await statusOf(id), 'no_show');
 
@@ -347,29 +357,45 @@ describe('چرخه‌ی حیاتِ خودکار — مسیرِ دو مرحله�
 
   test('مهلتِ تأخیر رعایت می‌شود: زیرِ grace هنوز no_show نیست', async () => {
     // lateGraceMinutes = ۱۵. رزروی که ۵ دقیقه پیش شروع شده هنوز مهلت دارد.
-    const { id } = await mkReservation({ status: 'running_late', minutesAgo: 5 });
+    // D-20: هشدار در هر دو ردیف از مدت‌ها پیش پذیرفته شده، تا این تست فقط **مهلت** را بسنجد نه هشدار را.
+    const { id } = await mkReservation({ status: 'running_late', minutesAgo: 5, warnedMinutesAgo: 30 });
     assert.equal(await autoMarkNoShow(restaurantId), 0, 'زیرِ مهلت نباید no_show شود');
     assert.equal(await statusOf(id), 'running_late');
 
     // و رزروی که ۲۰ دقیقه پیش شروع شده، شده.
-    const late = await mkReservation({ status: 'running_late', minutesAgo: 20, table: otherTableId, restaurant: otherRestaurantId });
+    const late = await mkReservation({ status: 'running_late', minutesAgo: 20, table: otherTableId, restaurant: otherRestaurantId, warnedMinutesAgo: 30 });
     assert.equal(await autoMarkNoShow(otherRestaurantId), 1);
     assert.equal(await statusOf(late.id), 'no_show');
   });
 
   test('مهلتِ سفارشیِ رستوران واقعاً خوانده می‌شود (نه ثابتِ ۱۵)', async () => {
     // ⚠️ اگر کسی grace را هاردکد کند، همه‌ی تست‌های بالا همچنان سبز می‌مانند.
-    await db.restaurant.update({ where: { id: otherRestaurantId }, data: { lateGraceMinutes: 120 } });
+    // ⚠️ تغییرِ قرارداد، D-18 (F001): مهلت تا ۰۹-۱۷ اینجا ۱۲۰ بود؛ حالا بازه‌ی مجاز ۱۰..۶۰ است
+    // (CHECK در ۰۹۲). ادعا همان است — «مهلتِ رستوران خوانده می‌شود» — با بیشینه‌ی مجاز و تأخیرِ ۴۵.
+    await db.restaurant.update({ where: { id: otherRestaurantId }, data: { lateGraceMinutes: 60 } });
     try {
       const { id } = await mkReservation({
-        status: 'running_late', minutesAgo: 60, table: otherTableId, restaurant: otherRestaurantId,
+        status: 'running_late', minutesAgo: 45, table: otherTableId, restaurant: otherRestaurantId, warnedMinutesAgo: 40,
       });
       assert.equal(await autoMarkNoShow(otherRestaurantId), 0,
-        'با مهلتِ ۱۲۰ دقیقه، تأخیرِ ۶۰ دقیقه‌ای نباید no_show شود');
+        'با مهلتِ ۶۰ دقیقه، تأخیرِ ۴۵ دقیقه‌ای نباید no_show شود');
       assert.equal(await statusOf(id), 'running_late');
     } finally {
       await db.restaurant.update({ where: { id: otherRestaurantId }, data: { lateGraceMinutes: 15 } });
     }
+  });
+
+  test('D-18: مهلتِ بیرون از ۱۰..۶۰ را خودِ دیتابیس رد می‌کند (CHECKِ ۰۹۲)', async () => {
+    // تستِ قبلیِ همین فایل مهلت را ۱۲۰ می‌گذاشت؛ حالا همان مقدار باید رد شود — نه بی‌صدا ذخیره.
+    for (const bad of [9, 61, 120]) {
+      await assert.rejects(
+        db.restaurant.update({ where: { id: otherRestaurantId }, data: { lateGraceMinutes: bad } }),
+        /restaurants_late_grace_minutes_range/,
+        `مهلتِ ${bad} باید با قیدِ CHECK رد شود`,
+      );
+    }
+    const row = await db.restaurant.findUniqueOrThrow({ where: { id: otherRestaurantId }, select: { lateGraceMinutes: true } });
+    assert.equal(row.lateGraceMinutes, 15, 'مقدارِ قبلی دست نخورده');
   });
 
   test('رزروِ آینده دست نمی‌خورد', async () => {
@@ -388,13 +414,42 @@ describe('چرخه‌ی حیاتِ خودکار — مسیرِ دو مرحله�
   });
 
   test('جداسازیِ رستوران: cronِ رستورانِ A رزروِ B را دست نمی‌زند', async () => {
-    const mine = await mkReservation({ status: 'running_late', minutesAgo: 60 });
+    // D-20: هر دو هشدار گرفته‌اند، تا این تست فقط **جداسازی** را بسنجد.
+    const mine = await mkReservation({ status: 'running_late', minutesAgo: 60, warnedMinutesAgo: 30 });
     const theirs = await mkReservation({
-      status: 'running_late', minutesAgo: 60, table: otherTableId, restaurant: otherRestaurantId,
+      status: 'running_late', minutesAgo: 60, table: otherTableId, restaurant: otherRestaurantId, warnedMinutesAgo: 30,
     });
     assert.equal(await autoMarkNoShow(restaurantId), 1, 'فقط رزروِ خودش');
     assert.equal(await statusOf(mine.id), 'no_show');
     assert.equal(await statusOf(theirs.id), 'running_late', 'رزروِ رستورانِ دیگر نباید عوض شود');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  STATE M-13 · F001 · حکمِ CEO D-20: «هیچ جریمه‌ای بدونِ سیگنالِ قابلِ‌مشاهده‌ی قبلی و
+//  یک پنجره‌ی واقعی پس از آن».
+//
+//  چرا این دو تست (Feature Verification، ۲۰۲۶-۰۹-۱۶، اندازه‌گیری‌شده): مهمانی که ۱۷ دقیقه دیر
+//  کرده بود در **یک** تیکِ cron هم running_late شد هم no_show — صفر پیامک پیش از آن، کش‌بک
+//  برگشت، strike ثبت شد، و `canTransition(no_show → seated)` false. «مسیرِ دومرحله‌ای» فقط
+//  روی کاغذ دومرحله‌ای بود، چون مهلت از `slotStart` شمرده می‌شد نه از لحظه‌ی هشدار.
+// ═══════════════════════════════════════════════════════════════════════
+describe('M-13 — عدمِ حضور فقط پس از هشدارِ پذیرفته‌شده و پنجره‌ی پس از آن', () => {
+  test('فروپاشیِ یک‌تیکی: مهمانِ ۱۷ دقیقه دیرکرده در همان تیک no_show نمی‌شود', async () => {
+    const { id } = await mkReservation({ status: 'confirmed', minutesAgo: 17 });
+    // همان ترتیبِ routeِ /maintenance/lifecycle در یک اجرا
+    await autoMarkRunningLate(restaurantId);
+    await autoMarkNoShow(restaurantId);
+    assert.equal(await statusOf(id), 'running_late',
+      'هشدار هنوز به مهمان نرسیده — no_show در همان تیک یعنی جریمه بدونِ هیچ سیگنالِ قبلی');
+  });
+
+  test('هشدارِ ارسال‌نشده: رزروِ دیرکرده هر قدر هم بگذرد خودکار no_show نمی‌شود', async () => {
+    // پیامکِ هشدار هرگز پذیرفته نشده (late_warned_at ثبت نشده) — مثلِ bodyIdِ تنظیم‌نشده یا اعتبارِ صفر.
+    const { id } = await mkReservation({ status: 'running_late', minutesAgo: 60 });
+    assert.equal(await autoMarkNoShow(restaurantId), 0,
+      'بدونِ هشدارِ پذیرفته‌شده، cron نباید جریمه کند؛ پرسنل پس از مهلتِ خودشان می‌توانند');
+    assert.equal(await statusOf(id), 'running_late');
   });
 });
 

@@ -55,6 +55,17 @@ export const Err = {
     banned_at: bannedAt ? bannedAt.toISOString() : null,
   }),
 
+  // ── دیرکرد و عدمِ حضور (F001 · STATE M-13/M-17 · حکمِ CEO D-20) ──
+  // پرسنل پیش از `guestDeadline` نمی‌تواند no_show ثبت کند؛ پاسخ خودِ مهلت را می‌گوید تا پنل نشانش دهد.
+  noShowBeforeDeadline: (allowedAt: Date) => new ApiError('NO_SHOW_BEFORE_DEADLINE', 'مهلتِ مهمان هنوز تمام نشده — ثبتِ «نیومد» از ساعتِ مهلت ممکن است', 409, {
+    no_show_allowed_at: allowedAt.toISOString(),
+  }),
+  // «دیرتر می‌رسم» یک‌بار برای هر رزرو است.
+  lateSignalAlreadySent: () => new ApiError('LATE_SIGNAL_ALREADY_SENT', 'برای این رزرو قبلاً خبر داده‌ای', 409),
+  // «دیرتر می‌رسم» بسته است: مهلت گذشته، یا رزرو دیگر منتظرِ مهمان نیست (لغو/نشسته/…).
+  lateSignalClosed: (reason: 'deadline_passed' | 'not_awaiting_guest') => new ApiError('LATE_SIGNAL_CLOSED',
+    reason === 'deadline_passed' ? 'مهلتِ این رزرو تمام شده' : 'این رزرو دیگر منتظرِ آمدنت نیست', 409, { reason }),
+
   // ── check-inِ QR: عاملِ دومِ هویت لازم است ──
   //
   // چرا کدِ اختصاصی و نه `forbidden()`: `FORBIDDEN_TENANT` یعنی «تو اجازه

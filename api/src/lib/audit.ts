@@ -37,6 +37,8 @@ export type AuditAction =
   //    در پنلِ زرین‌پال لازم دارد (authority، ref_id، مبلغ).
   | 'payment.refund_required'
   | 'reservation.cancel' | 'admin.action'
+  // F001 (STATE M-13): «دیرتر می‌رسم» — سیگنالِ مهمان، وضعیتی عوض نمی‌کند پس reservation_events نیست
+  | 'reservation.late_signal'
   | 'restaurant.activated' | 'restaurant.deactivated'
   | 'plan.changed' | 'subscription.cancelled'
   // بازبینیِ گالری: تصمیمِ انتشار روی برندِ پلتفرم است و باید ردِ انسانی

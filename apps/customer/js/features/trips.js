@@ -326,7 +326,7 @@ export async function submitReview(restaurantId, reservationId){
  * ⚠️ هیچ وعده‌ی برگشتی داده نمی‌شود: امروز رستوران راهی برای اصلاحِ عدم‌حضور ندارد
  * (`no_show` در `TRANSITIONS` پایانی است). «پیام به رستوران» فقط گفتگو است.
  */
-function faClock(d){
+export function faClock(d){
   return faNum(String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'));
 }
 export function openNoShowWhy(code){
@@ -373,7 +373,60 @@ export function messageRestaurantAbout(code){
   window.openChat(t.restaurantSlug, t.serverReservationId);
 }
 
+// ── «دیرتر می‌رسم» (STATE M-13 · F001 · حکمِ CEO D-20) ──
+/**
+ * برگه‌ی خبر دادنِ دیرکرد. همه‌ی اعداد از سرور می‌آیند (`late` در `GET /me/reservations`): مهلتِ
+ * رستوران، سقفِ تمدید، و `deadline` = همان `guestDeadline` که پیامکِ هشدار، cron و گیتِ پرسنل
+ * می‌خوانند. کلاینت قاعده‌ی دوم ندارد.
+ *
+ * وعده فقط همان چیزی است که سیستم **تضمین** می‌کند: «تا این ساعت عدمِ حضور ثبت نمی‌شود». «میزت نگه
+ * داشته می‌شود» گفته نمی‌شود — رستوران میز را می‌بیند، سیستم نه.
+ *
+ * سقفِ ۰ (D-18): گزینه‌ی دقیقه نیست، ولی خبر همچنان به رستوران می‌رسد.
+ */
+export function openLateSheet(code){
+  const t=liveTrip(code);
+  if(!t || !t.lateDeadlineIso){ toast('','جزئیاتِ مهلتِ این رزرو در دسترس نیست'); return; }
+  const cap=typeof t.lateMaxExtension==='number' ? t.lateMaxExtension : 0;
+  const choices=[...new Set([Math.min(10,cap), Math.min(20,cap)])].filter(m=>m>0);
+  const deadline=new Date(t.lateDeadlineIso);
+  const graceLine=typeof t.lateGraceMinutes==='number'
+    ? `این رستوران تا ${esc(fmtFa(t.lateGraceMinutes))} دقیقه بعد از ساعتِ رزرو «عدم حضور» ثبت نمی‌کند (تا ${esc(faClock(deadline))}).`
+    : `تا ${esc(faClock(deadline))} «عدم حضور» ثبت نمی‌شود.`;
+  const capLine=choices.length
+    ? ` اگر بگویی چقدر دیرتر می‌رسی، تا ${esc(fmtFa(cap))} دقیقه‌ی دیگر هم صبر می‌کند.`
+    : ' بیشتر از این صبر نمی‌کند — ولی خبرت به رستوران می‌رسد.';
+  openSheet(`
+    <div class="sheet-title">دیرتر می‌رسم</div>
+    <div class="sheet-sub">${esc(t._name)} · ساعتِ ${esc(t.time)}</div>
+    <div id="lateErr"></div>
+    <div style="font-size:13px;color:var(--t2);line-height:1.9;margin:10px 2px 14px">${graceLine}${capLine}</div>
+    ${choices.length
+      ? choices.map(m=>`<button class="btn btn-primary btn-lg btn-block" style="margin-top:8px" data-late-go onclick="sendLateSignal(${jsq(code)},${m})">حدودِ ${esc(fmtFa(m))} دقیقه دیرتر</button>`).join('')
+      : `<button class="btn btn-primary btn-lg btn-block" data-late-go onclick="sendLateSignal(${jsq(code)},10)">خبر بده در راهم</button>`}
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بی‌خیال</button>
+  `);
+}
+/** `POST /reservations/:code/eta` — چهار حالت: در حالِ ارسال (دکمه‌ها قفل) · خطا (پیامِ سرور + تلاشِ دوباره) · موفق. */
+export async function sendLateSignal(code, minutes){
+  const btns=document.querySelectorAll('[data-late-go]');
+  btns.forEach(b=>{ b.disabled=true; });
+  const errBox=document.getElementById('lateErr');
+  if(errBox) errBox.innerHTML='';
+  const res=await API.post('/reservations/'+encodeURIComponent(code)+'/eta',{minutes});
+  if(res.ok && res.data?.deadline){
+    closeSheet();
+    toast('',`به رستوران خبر دادیم — تا ${faClock(new Date(res.data.deadline))} «عدم حضور» برایت ثبت نمی‌شود`);
+    if(typeof window.renderTrips==='function') window.renderTrips();
+    return;
+  }
+  btns.forEach(b=>{ b.disabled=false; });
+  if(errBox) errBox.innerHTML=`<div role="alert" style="font-size:12px;line-height:1.7;color:var(--warning-ink);background:var(--warning-soft);border-radius:var(--radius-md);padding:8px 10px;margin:8px 0">${icon('alert',{size:13})} ${esc(res.offline?'اتصال برقرار نیست — خبر به رستوران نرسید. دوباره تلاش کن':(res.error?.message||'ارسال ناموفق بود'))}</div>`;
+}
+
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
+window.openLateSheet = openLateSheet;
+window.sendLateSignal = sendLateSignal;
 window.openNoShowWhy = openNoShowWhy;
 window.messageRestaurantAbout = messageRestaurantAbout;
 window.addToCalendar = addToCalendar;

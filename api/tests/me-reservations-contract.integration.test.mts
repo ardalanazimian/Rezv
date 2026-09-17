@@ -39,6 +39,8 @@ const made = { tenantIds: [] as string[], userIds: [] as string[] };
  *     slotStart، restaurantId، restaurant.name، restaurant.freeCancelHours)
  *   apps/customer/js/features/notifications.js → slotStart، code
  *   apps/customer/js/features/food-dna.js      → طولِ آرایه
+ *   apps/customer/js/reservation.js (F001)     → late.deadline، late.graceMinutes، late.maxExtensionMinutes،
+ *     lateExtensionMinutes، lateEtaSignaledAt
  * افزودنِ مصرف‌کننده‌ی تازه = افزودنِ ردیف به این جدول.
  */
 const CONSUMED: Array<[path: string, type: string]> = [
@@ -51,6 +53,11 @@ const CONSUMED: Array<[path: string, type: string]> = [
   ['restaurant.name', 'string'],
   ['restaurant.slug', 'string'],
   ['restaurant.freeCancelHours', 'number'],
+  // F001 (STATE M-13): کارتِ رزرو «تا HH:MM صبر می‌کنیم» و «دیرتر می‌رسم» را از این‌ها می‌سازد.
+  ['late.deadline', 'string'],
+  ['late.graceMinutes', 'number'],
+  ['late.maxExtensionMinutes', 'number'],
+  ['lateExtensionMinutes', 'number'],
 ];
 
 function pick(o: unknown, path: string): unknown {

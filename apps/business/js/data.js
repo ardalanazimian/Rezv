@@ -74,11 +74,18 @@ const STATUS_TRANSITIONS={
   completed:[],no_show:[],rejected:[],expired:[],cancelled:[],auto_cancelled:[],
 };
 // منوی تغییر وضعیت برای یک رزرو
+// F001/M-17 — مهلتِ «نیومد» از سرور (`no_show_allowed_at`). نامعلوم → محدود نکن (سرور خودش گیت دارد).
+function noShowTooEarly(r,now=Date.now()){ const t=r&&r.noShowAllowedAt?Date.parse(r.noShowAllowedAt):NaN; return Number.isFinite(t)&&now<t; }
+function noShowClock(r){ const d=new Date(r.noShowAllowedAt); return toFaDigits(String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')); }
 function openStatusMenu(i){
   const r=(RES_VIEW||RES)[i]; if(!r)return;
   const allowed=STATUS_TRANSITIONS[r.status]||[];
   if(!allowed.length){toast('','این رزرو در وضعیت نهایی است');return;}
-  const opts=allowed.map(s=>{const m=STATUS_META[s];return `<button class="status-opt" onclick="changeStatus(${i},'${s}')" style="--c:${m.fg};--bgc:${m.bg}"><span>${icon(m.icon,{size:13})}</span> ${m.label}</button>`;}).join('');
+  // F001/M-17: «نیومد» پیش از مهلتِ مهمان غیرفعال، با ساعتِ مجاز — همان مهلتی که سرور با ۴۰۹ اجبار می‌کند.
+  const nsEarly=noShowTooEarly(r);
+  const opts=allowed.map(s=>{const m=STATUS_META[s];
+    if(s==='no_show'&&nsEarly) return `<button class="status-opt" disabled title="پیش از مهلتِ مهمان ممکن نیست" style="--c:${m.fg};--bgc:${m.bg};opacity:.55"><span>${icon(m.icon,{size:13})}</span> ${m.label} (از ${noShowClock(r)})</button>`;
+    return `<button class="status-opt" onclick="changeStatus(${i},'${s}')" style="--c:${m.fg};--bgc:${m.bg}"><span>${icon(m.icon,{size:13})}</span> ${m.label}</button>`;}).join('');
   openModal(`<div class="bs-head"><div class="bs-title">تغییر وضعیت</div><div class="bs-rest">${esc(r.name)} · میز ${fa(r.table)}</div></div>
     <div style="margin:8px 0 4px;font-size:13px;color:var(--t3)">وضعیت فعلی: ${STATUS_META[r.status]?.label||r.status}</div>
     <div class="status-opts">${opts}</div>
@@ -987,6 +994,10 @@ function mapResRow(r){
     // نشانِ اعتبارِ رزرو (economy.ts) — از loyalty/seg کاملاً جداست، رجوع کن
     // به توضیحِ REPUTATION_BADGE در reservations.js
     reputationTier:r.reputation_tier||null,
+    // F001/M-17 (حکمِ CEO D-20c): «نیومد» پیش از این لحظه ۴۰۹ می‌گیرد — پنل همان را از سرور می‌خواند،
+    // نه قاعده‌ی موازیِ خودش. و «دیرتر می‌رسم»ِ مهمان (null = خبری نداده).
+    noShowAllowedAt:r.no_show_allowed_at||null,
+    lateEtaMinutes:typeof r.late_eta_minutes==='number'?r.late_eta_minutes:null,
   };
 }
 async function loadReservations(dateFilter){

@@ -10,7 +10,7 @@ import { esc, faNum, jsq } from './auth.js';
 import { openRest } from './data/detail.js';
 import { cardHTML, fmtFa, go } from './data/discover.js';
 import { TRIPS, dishLen, dishWord, favHas, gradFor, setMyTrips } from './data/seed.js';
-import { addToCalendar, addToWallet, cancelTrip, isLateCancel, openReviewSheet, repeatReservation, showCheckInQR } from './features/trips.js';
+import { addToCalendar, addToWallet, cancelTrip, faClock, isLateCancel, openReviewSheet, repeatReservation, showCheckInQR } from './features/trips.js';
 import { R, findR } from './init.js';
 import { armReveals, buzz } from './theme-pwa.js';
 import { icon } from './icons.js';
@@ -48,6 +48,31 @@ export function closedLabel(apiStatus){
   return CLOSED_LABEL[apiStatus] || 'لغوشده';
 }
 function isNoShow(t){ return t.apiStatus==='no_show' || t.apiStatus==='noshow'; }
+// ── «دیرتر می‌رسم» (STATE M-13 · F001) ──
+// وضعیت‌هایی که هنوز منتظرِ مهمان‌اند — همان `AWAITING_GUEST_STATUSES` در api/src/lib/late-arrival.ts.
+const AWAITING_GUEST = ['confirmed','auto_confirmed','preparing','running_late'];
+// دکمه از ۳۰ دقیقه پیش از ساعتِ رزرو نشان داده می‌شود؛ زودتر از آن «دیر می‌رسم» معنای روشنی ندارد و
+// لغو/تغییر مسیرِ درست است. سرور خودش فقط «پیش از مهلت» را اجبار می‌کند.
+const LATE_SIGNAL_OPENS_MIN = 30;
+function lateSignalOpen(t, now=Date.now()){
+  if(!AWAITING_GUEST.includes(t.apiStatus) || t.lateEtaSignaledAt || !t.lateDeadlineIso || !t.slotStartIso) return false;
+  const slot=Date.parse(t.slotStartIso), dl=Date.parse(t.lateDeadlineIso);
+  return Number.isFinite(slot) && Number.isFinite(dl) && now>=slot-LATE_SIGNAL_OPENS_MIN*60000 && now<dl;
+}
+/** خطِ وضعیتِ دیرکرد روی کارت — فقط وقتی سرور مهلت را داده. */
+function lateRow(t){
+  if(!AWAITING_GUEST.includes(t.apiStatus) || !t.lateDeadlineIso) return '';
+  const dl=new Date(t.lateDeadlineIso);
+  if(!Number.isFinite(dl.getTime())) return '';
+  if(t.lateEtaSignaledAt){
+    const said=t.lateExtensionMinutes>0 ? `حدودِ ${fmtFa(t.lateExtensionMinutes)} دقیقه دیرتر می‌رسی` : 'در راهی';
+    return `<div class="trip-late-note signaled" style="font-size:11.5px;line-height:1.7;color:var(--t2);margin-top:6px">${icon('clock',{size:12})} به رستوران گفتی ${said} — تا ${esc(faClock(dl))} «عدم حضور» برایت ثبت نمی‌شود.</div>`;
+  }
+  if(t.apiStatus==='running_late'){
+    return `<div class="trip-late-note late" style="font-size:11.5px;line-height:1.7;color:var(--warning-ink);background:var(--warning-soft);border-radius:var(--radius-md);padding:6px 8px;margin-top:6px">${icon('alert',{size:12})} ساعتِ رزروت گذشته — رستوران تا ${esc(faClock(dl))} صبر می‌کند. اگر در راهی، «دیرتر می‌رسم» را بزن.</div>`;
+  }
+  return '';
+}
 export function mapApiTrip(apiR){
   // ⚠️ رفع‌شده (R3): قبلاً رستورانِ متناظر فقط با تطبیقِ *اسم* پیدا می‌شد —
   // اگر دو رستوران اسمِ یکسان داشتند (یا حتی یک فاصله‌ی اضافه)، به رستورانِ
@@ -97,6 +122,12 @@ export function mapApiTrip(apiR){
     restaurantSlug: apiR.restaurant?.slug || null,
     noShow: apiR.noShow || null,
     depositStatus: apiR.depositStatus || null,
+    // F001 (M-13): مهلت و «دیرتر می‌رسم» — از سرور (`late` در /me/reservations). null → نه دکمه، نه ادعا.
+    lateDeadlineIso: apiR.late?.deadline || null,
+    lateGraceMinutes: typeof apiR.late?.graceMinutes==='number' ? apiR.late.graceMinutes : null,
+    lateMaxExtension: typeof apiR.late?.maxExtensionMinutes==='number' ? apiR.late.maxExtensionMinutes : null,
+    lateExtensionMinutes: typeof apiR.lateExtensionMinutes==='number' ? apiR.lateExtensionMinutes : 0,
+    lateEtaSignaledAt: apiR.lateEtaSignaledAt || null,
   };
 }
 
@@ -177,6 +208,7 @@ export async function renderTrips(){
     const name=t._name||r?.n||'رستوران';
     const gradId=t._grad||t.rid||1;
     const statusLabel=t.awaitingApproval?`${icon('clock',{size:12})} در انتظارِ تأییدِ رستوران`
+      :(t.status==='up' && t.apiStatus==='running_late' && t.lateDeadlineIso)?`${icon('clock',{size:12})} دیرکرده · تا ${esc(faClock(new Date(t.lateDeadlineIso)))}`
       :t.status==='up'?`<span class="live-dot" aria-hidden="true"></span> پیش‌رو`
       :t.status==='cancelled'?`${icon('close',{size:12})} ${esc(closedLabel(t.apiStatus))}`
       :`${icon('check',{size:12})} تجربه‌شده`;
@@ -185,7 +217,7 @@ export async function renderTrips(){
     const swipe=t.status==='up'?{cls:'cancel',ic:'close',label:'لغو رزرو'}
       :(t.status!=='cancelled'&&t.rid)?{cls:'repeat',ic:'calendar',label:'رزرو مجدد'}:null;
     const acts=t.status==='up'
-      ? `<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR(${jsq(t.code)},${jsq(name)})">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},${jsq(t.slotStartIso||'')})">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},'apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip(${jsq(t.code)},this)">لغو</button>`
+      ? `${lateSignalOpen(t)?`<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();openLateSheet(${jsq(t.code)})">دیرتر می‌رسم</button>`:''}<button class="btn btn-sm btn-primary" onclick="buzz&&buzz();showCheckInQR(${jsq(t.code)},${jsq(name)})">QR ورود</button><button class="btn btn-sm btn-ghost" onclick="addToCalendar(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},${jsq(t.slotStartIso||'')})">تقویم</button><button class="btn btn-sm btn-ghost" onclick="addToWallet(${jsq(t.code)},${jsq(name)},${jsq(t.date)},${jsq(t.time)},'apple')">کیف پول</button><button class="btn btn-sm btn-ghost" data-swipe-action onclick="cancelTrip(${jsq(t.code)},this)">لغو</button>`
       : t.status==='cancelled'
         ? (isNoShow(t)
           ? `<button class="btn btn-sm btn-ghost" onclick="openNoShowWhy(${jsq(t.code)})">چرا؟</button>${(t.restaurantSlug&&t.serverReservationId)?`<button class="btn btn-sm btn-ghost" onclick="messageRestaurantAbout(${jsq(t.code)})">پیام به رستوران</button>`:''}`
@@ -203,6 +235,7 @@ export async function renderTrips(){
           <div class="trip-card-meta"><span>${icon('calendar',{size:13})} ${esc(t.date)}</span><span class="tcm-dot">·</span><span>${icon('clock',{size:13})} ${esc(t.time)}</span><span class="tcm-dot">·</span><span>${icon('users',{size:13})} ${esc(t.party)}</span></div>
           <div class="trip-card-code">کد رزرو: <b>${esc(t.code)}</b></div>
           ${cancelPolicyRow(t)}
+          ${lateRow(t)}
           ${tripTimeline(t.status, t.apiStatus)}
           ${acts?`<div class="trip-card-actions">${acts}</div>`:''}
         </div>

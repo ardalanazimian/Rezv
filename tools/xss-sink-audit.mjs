@@ -756,9 +756,10 @@ const MANUAL_REVIEW_OVERRIDES = new Map([
    'ساعاتِ کاری. `dirtyBanner` (crm.js:838)، `hoursStatusBannerHTML()` (:817) و '
    + '`formatHoursCompact()` (:808) هر سه داده‌شان را esc() می‌کنند؛ `HOURS_DOW_FA` نگاشتِ '
    + 'ثابت است و `d` کلیدِ روز از `HOURS_DOW_ORDER`.'],
-  ['apps/business/js/crm.js#40c0adb2faf6',
+  ['apps/business/js/crm.js#5afc1eb68257',
    'سیاستِ کنسلی. `okBadge`/`waitBadge` دو رشته‌ی ثابتِ محلی با icon() هستند '
-   + '(crm.js:956-957)؛ بقیه ترنریِ رشته‌ی ثابت و fa() روی عدد است.'],
+   + '(crm.js:956-957)؛ بقیه ترنریِ رشته‌ی ثابت و fa() روی عدد است. خوانده‌شده دوباره ۲۰۲۶-۰۹-۱۷ '
+   + '(F001): دو ردیفِ تازه‌ی مهلت/تمدید فقط `${okBadge}` و esc() روی عددِ پاسخِ سرور درج می‌کنند.'],
   ['apps/business/js/crm.js#e51c8415f3ff',
    'لاگِ پیامک. `faRelative(l.created_at)` روی ISOِ سرور و `fa(l.recipients_count)` روی '
    + 'شمارنده؛ نامِ سگمنت از `SEG_FA` با esc() رد می‌شود و متنِ پیام esc() دارد.'],

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
+import { guestDeadline } from '@/lib/late-arrival';
 import { parseQuery, zReservationCode, z } from '@/lib/schemas';
 import { zonedTimeToUtc, dateKeyInTz } from '@/lib/hours';
 
@@ -83,6 +84,8 @@ export const GET = withRestaurantAuth(
         )
       : new Map<string, string>();
 
+    // F001/M-17: پنل «نیومد» را پیش از این مهلت غیرفعال نشان می‌دهد؛ همان مقداری که routeِ status با ۴۰۹ اجبار می‌کند.
+    const grace = (await db.restaurant.findUniqueOrThrow({ where: { id: restaurant.id }, select: { lateGraceMinutes: true } })).lateGraceMinutes;
     return NextResponse.json({
       reservations: list.map(r => ({
         code: r.code, status: r.status, party_size: r.partySize, slot_start: r.slotStart,
@@ -93,6 +96,9 @@ export const GET = withRestaurantAuth(
         preorder: r.items.map(i => i.menuItem.name),
         note: r.preferences.join('، '),
         reputation_tier: r.userId ? (tierByUserId.get(r.userId) ?? 'bronze') : null,
+        no_show_allowed_at: guestDeadline(r, grace).toISOString(),
+        late_eta_signaled_at: r.lateEtaSignaledAt,
+        late_eta_minutes: r.lateEtaSignaledAt ? r.lateExtensionMinutes : null,
       })),
       next_cursor: hasMore ? list[list.length - 1].code : null,
     });

@@ -40,13 +40,14 @@ export interface MockOptions {
 // [merge ۰۸-۲۵] `booking_policy` از خطِ ممیزی (PR #68) دست‌نخورده می‌ماند:
 // تست‌های صداقتِ بیعانه/لغو رویِ رکوردهای ۱و۲ به آن تکیه دارند؛ رستورانِ ۳
 // عمداً بدونِ policy می‌ماند تا حالتِ null هم پوشش داشته باشد.
+// F001 (M-13): فقط رستورانِ ۱ `late_grace_minutes` دارد (شکلِ واقعیِ `restaurants/[slug]`)؛ ۲ و ۳ برای «سکوت».
 // ⚠️ idها عمداً UUID هستند (ممیزیِ ۲۰۲۶-۰۸-۲۴): بک‌اندِ واقعی همیشه UUID
 // برمی‌گرداند، ولی این mock تا آن روز idِ عددیِ ۱..۳ می‌داد — به همین دلیل
 // باگِ واقعیِ «UUIDِ بدونِ کوتیشن در onclick که همه‌ی CTAهای کارت را
 // می‌شکست» هرگز در CI دیده نشد. mock باید همان شکلی را تولید کند که تولید
 // واقعاً می‌سازد.
 export const DEMO_RESTAURANTS = [
-  { id: 'a1b2c3d4-0000-4000-8000-000000000001', slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸', booking_policy: { deposit_required: false, free_cancel_hours: 24, auto_confirm: true } },
+  { id: 'a1b2c3d4-0000-4000-8000-000000000001', slug: 'demo-cafe-golha', name: '[DEMO] کافه گل‌ها', cuisine: 'ایرانی', rating: 4.7, price: '$$', cashback: 10, cover_emoji: '🌸', booking_policy: { deposit_required: false, free_cancel_hours: 24, auto_confirm: true, late_grace_minutes: 15 } },
   { id: 'a1b2c3d4-0000-4000-8000-000000000002', slug: 'demo-sushi-bar', name: '[DEMO] سوشی بار', cuisine: 'ژاپنی', rating: 4.5, price: '$$$', cashback: 8, cover_emoji: '🍣', booking_policy: { deposit_required: true, free_cancel_hours: 48, auto_confirm: false } },
   { id: 'a1b2c3d4-0000-4000-8000-000000000003', slug: 'demo-burger-lab', name: '[DEMO] برگر لب', cuisine: 'فست‌فود', rating: 4.6, price: '$$', cashback: 12, cover_emoji: '🍔' },
 ];

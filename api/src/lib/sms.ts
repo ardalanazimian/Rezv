@@ -1,4 +1,5 @@
 import { createLogger } from './logger';
+import { db } from './db';
 import { enqueue } from './queue';
 import { metrics } from './metrics';
 import { consumeSms, hasSmsBalance, chargeSmsForJob, type DebitOutcome } from './sms-balance';
@@ -11,11 +12,19 @@ export type SmsJob = {
     // ── قالب‌های چرخه‌ی حیات رزرو ──
     | 'booking_waitlist' | 'booking_preparing' | 'booking_rejected'
     | 'booking_cancelled' | 'booking_noshow' | 'booking_thanks'
+    // F001 (STATE M-13، D-20): هشدارِ دیرکرد پیش از هر عدم‌حضورِ خودکار — tokens: [guestName, code, deadline]
+    | 'booking_late'
     | 'waitlist_joined' | 'waitlist_offer'
     // SPEC-B: دعوتِ اولین‌ورودِ owner — tokens: [ownerName, restaurantName, inviteUrl]
     | 'staff_invite';
   tokens: string[];
   restaurantId?: string;  // اگر مشخص باشد، از موجودی SMS رستوران کم می‌شود (OTP سطح پلتفرم آن را ندارد)
+  /**
+   * F001 (STATE M-13، حکمِ CEO D-20a): شناسه‌ی رزروی که این پیامک **هشدارِ دیرکردِ** آن است.
+   * `reservations.late_warned_at` فقط وقتی ست می‌شود که ارائه‌دهنده ارسال را **پذیرفت** — نه وقتی
+   * job ساخته شد. «در صف» به مهمان چیزی نمی‌گوید، و cron بدونِ این ستون هرگز no_show نمی‌کند.
+   */
+  lateWarningFor?: string;
   /**
    * متنِ آزاد (فقط ملی‌پیامک). اگر پر باشد، به‌جایِ الگو یک پیامکِ متن‌آزاد از
    * خطِ اختصاصی ارسال می‌شود.
@@ -64,6 +73,7 @@ function bodyIdFor(template: SmsJob['template']): string | undefined {
     booking_rejected: process.env.MELIPAYAMAK_BODYID_REJECTED,
     booking_cancelled: process.env.MELIPAYAMAK_BODYID_CANCELLED,
     booking_noshow: process.env.MELIPAYAMAK_BODYID_NOSHOW,
+    booking_late: process.env.MELIPAYAMAK_BODYID_LATE,
     booking_thanks: process.env.MELIPAYAMAK_BODYID_THANKS,
     waitlist_joined: process.env.MELIPAYAMAK_BODYID_WL_JOIN,
     waitlist_offer: process.env.MELIPAYAMAK_BODYID_WL_OFFER,
@@ -178,6 +188,24 @@ export type SmsChargedOutcome =
   | { status: 'sent'; charge: DebitOutcome | 'not_applicable' | 'charge_failed' };
 
 /**
+ * هشدارِ دیرکرد به دستِ ارائه‌دهنده رسید → `late_warned_at` (F001، D-20a). تنها نویسنده‌ی این ستون
+ * از سمتِ پیامک؛ پنجره‌ی پس از هشدار (`LATE_WARNING_MIN_WINDOW_MINUTES`) از همین لحظه شمرده می‌شود.
+ *
+ * `lateWarnedAt: null` در شرط: retryِ همان job یا هشدارِ دوم لحظه‌ی اولین پذیرش را جابه‌جا نمی‌کند.
+ * شکستِ نوشتن throw نمی‌کند (پیامک رفته؛ throw یعنی retry و پیامِ تکراری) — ولی جهتِ خطا امن است:
+ * بدونِ این ستون cron جریمه نمی‌کند و متریکِ مسدودی بالا می‌رود.
+ */
+async function markLateWarningAccepted(reservationId: string, template: SmsJob['template']): Promise<void> {
+  try {
+    await db.reservation.updateMany({ where: { id: reservationId, lateWarnedAt: null }, data: { lateWarnedAt: new Date() } });
+  } catch (e) {
+    log.error('هشدارِ دیرکرد ارسال شد ولی late_warned_at ثبت نشد — cron این رزرو را جریمه نمی‌کند', {
+      reservationId, template, error: (e as Error).message,
+    });
+  }
+}
+
+/**
  * تنها قاعده‌ی پولِ پیامکِ رستوران: **چک ← ارسال ← کسر، و کسر فقط پس از پذیرشِ ارائه‌دهنده.**
  * worker و مسیرِ اضطراری هر دو از همین‌جا می‌روند — دو نسخه از یک قاعده همان
  * نقصی بود که `sendDirectFallback` یک‌بار با آن بی‌صورت‌حساب ارسال می‌کرد.
@@ -215,6 +243,7 @@ export async function sendSmsCharged(
 
   const sent = await sendSmsNow(job);
   if (!sent.accepted) return { status: 'not_accepted', reason: sent.reason };
+  if (job.lateWarningFor) await markLateWarningAccepted(job.lateWarningFor, job.template);
   if (!rid) return { status: 'sent', charge: 'not_applicable' };
 
   let result: DebitOutcome;

@@ -55,6 +55,15 @@ export interface ReviewRow {
   body: string | null;
   user: { firstName: string | null; lastName: string | null } | null;
 }
+/** F001 (STATE M-13): «دیرتر می‌رسم»ِ مهمان — تا رستوران پیش از رسیدنِ مهلت ببیند. */
+export interface LateSignalRow {
+  id: string;
+  code: string;
+  lateEtaSignaledAt: Date;
+  lateExtensionMinutes: number;
+  guestName: string | null;
+  user: { firstName: string | null; lastName: string | null } | null;
+}
 export interface AtRiskRow {
   userId: string;
   updatedAt: Date;
@@ -68,6 +77,7 @@ export function buildActivityFeed(
   reviews: readonly ReviewRow[],
   atRisk: readonly AtRiskRow[],
   limit: number,
+  lateSignals: readonly LateSignalRow[] = [],
 ): ActivityItem[] {
   const items: ActivityItem[] = [];
 
@@ -97,6 +107,17 @@ export function buildActivityFeed(
     });
   }
 
+  for (const l of lateSignals) {
+    items.push({
+      id: `late:${l.id}`, ic: 'amber', emoji: 'clock',
+      title: 'مهمان دیرتر می‌رسد',
+      text: l.lateExtensionMinutes > 0
+        ? `${displayName(l.user, l.guestName)} — حدودِ ${l.lateExtensionMinutes} دقیقه دیرتر (رزرو ${l.code})`
+        : `${displayName(l.user, l.guestName)} خبر داد در راه است (رزرو ${l.code})`,
+      at: l.lateEtaSignaledAt.toISOString(),
+    });
+  }
+
   // مرتب‌سازیِ پایدار بر اساسِ زمان (نزولی)؛ در تساویِ دقیق، ترتیبِ ورودی
   // (رزرو، نظر، ریسک) حفظ می‌شود چون Array.prototype.sort در Node پایدار است.
   items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
@@ -107,7 +128,7 @@ export function buildActivityFeed(
 export async function getRecentActivity(restaurantId: string, limit = 10): Promise<ActivityItem[]> {
   const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  const [reservations, reviews, atRisk] = await Promise.all([
+  const [reservations, reviews, atRisk, lateSignals] = await Promise.all([
     db.reservation.findMany({
       where: { restaurantId, createdAt: { gte: since } },
       orderBy: { createdAt: 'desc' },
@@ -135,7 +156,19 @@ export async function getRecentActivity(restaurantId: string, limit = 10): Promi
         user: { select: { firstName: true, lastName: true } },
       },
     }),
+    db.reservation.findMany({
+      where: { restaurantId, lateEtaSignaledAt: { gte: since } },
+      orderBy: { lateEtaSignaledAt: 'desc' },
+      take: limit,
+      select: {
+        id: true, code: true, lateEtaSignaledAt: true, lateExtensionMinutes: true, guestName: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+    }),
   ]);
 
-  return buildActivityFeed(reservations, reviews, atRisk, limit);
+  return buildActivityFeed(
+    reservations, reviews, atRisk, limit,
+    lateSignals.map((l) => ({ ...l, lateEtaSignaledAt: l.lateEtaSignaledAt as Date })),
+  );
 }

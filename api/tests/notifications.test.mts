@@ -44,6 +44,26 @@ describe('buildActivityFeed', () => {
     assert.ok(items[0].text.startsWith('مهمان '));
   });
 
+  test('«دیرتر می‌رسم» (F001) → آیتمِ کهربایی با دقیقه‌ها و کدِ رزرو، در ترتیبِ زمانی', () => {
+    const items = buildActivityFeed(
+      [{ id: 'r9', createdAt: new Date('2026-08-01T08:00:00Z'), partySize: 2, guestName: null, user: guest('سارا') }],
+      [], [], 10,
+      [
+        { id: 'l1', code: 'RZABC2345', lateEtaSignaledAt: new Date('2026-08-01T09:30:00Z'), lateExtensionMinutes: 10, guestName: null, user: guest('سارا') },
+        { id: 'l2', code: 'RZXYZ6789', lateEtaSignaledAt: new Date('2026-08-01T09:00:00Z'), lateExtensionMinutes: 0, guestName: 'مهمانِ بی‌حساب', user: null },
+      ],
+    );
+    assert.deepEqual(items.map((i) => i.id), ['late:l1', 'late:l2', 'resv:r9'], 'ترتیبِ نزولیِ زمان، منبعِ چهارم هم شاملش');
+    assert.equal(items[0].ic, 'amber');
+    assert.equal(items[0].title, 'مهمان دیرتر می‌رسد');
+    assert.equal(items[0].text, 'سارا — حدودِ 10 دقیقه دیرتر (رزرو RZABC2345)');
+    assert.equal(items[1].text, 'مهمانِ بی‌حساب خبر داد در راه است (رزرو RZXYZ6789)', 'سقفِ ۰: بدونِ ادعای دقیقه');
+  });
+
+  test('فراخوانیِ سه‌منبعیِ قدیمی بی‌تغییر کار می‌کند (منبعِ چهارم اختیاری است)', () => {
+    assert.deepEqual(buildActivityFeed([], [], [], 10), []);
+  });
+
   test('نظر با متن → نقل‌قولِ کوتاه‌شده در text', () => {
     const items = buildActivityFeed([], [
       { id: 'v1', createdAt: new Date('2026-08-01T09:00:00Z'), rating: 5, body: 'عالی بود، حتماً برمی‌گردم', user: guest('نیلوفر', 'رضایی') },

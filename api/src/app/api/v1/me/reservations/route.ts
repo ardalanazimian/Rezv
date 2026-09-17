@@ -4,6 +4,7 @@ import { dbRead as db } from '@/lib/db';
 import { Err, errorResponse } from '@/lib/errors';
 import { STRIKE_DECAY_PERIOD_DAYS } from '@/lib/economy';
 import { CASHBACK_REVERSAL_KEY_PREFIX } from '@/lib/loyalty';
+import { guestDeadline } from '@/lib/late-arrival';
 
 import { withApiMetrics } from '@/lib/api-metrics';
 
@@ -73,6 +74,7 @@ async function GET_impl(req: Request) {
           select: {
             name: true, slug: true,
             cancellationPolicy: { select: { freeCancelHours: true } },
+            lateGraceMinutes: true, maxLateExtensionMinutes: true,
           },
         },
         items: { include: { menuItem: { select: { name: true } } } },
@@ -101,6 +103,14 @@ async function GET_impl(req: Request) {
         freeCancelHours: r.restaurant.cancellationPolicy?.freeCancelHours ?? 24,
       },
       noShow: outcomes.get(r.id) ?? null,
+      // F001 (STATE M-13): کارتِ رزرو «تا HH:MM صبر می‌کنیم» و دکمه‌ی «دیرتر می‌رسم» را از **همین** مهلت
+      // می‌سازد — همان `guestDeadline` که پیامکِ هشدار، cron و گیتِ پرسنل می‌خوانند؛ کلاینت قاعده‌ی دوم ندارد.
+      // (`lateEtaSignaledAt`/`lateExtensionMinutes` از spreadِ ردیف می‌آیند.)
+      late: r.restaurant ? {
+        graceMinutes: r.restaurant.lateGraceMinutes,
+        maxExtensionMinutes: r.restaurant.maxLateExtensionMinutes,
+        deadline: guestDeadline(r, r.restaurant.lateGraceMinutes).toISOString(),
+      } : null,
     })));
   } catch (e) { return errorResponse(e); }
 }

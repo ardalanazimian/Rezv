@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { transitionReservation, type RStatus } from '@/lib/lifecycle';
 import { withRestaurantAuth } from '@/lib/with-restaurant-auth';
 import { Err } from '@/lib/errors';
+import { guestDeadline } from '@/lib/late-arrival';
 import { parseBody, parseParams, zReservationCode, z } from '@/lib/schemas';
 
 const RSTATUS = [
@@ -34,9 +35,23 @@ export const PATCH = withRestaurantAuth(
     // رزرو باید به همین رستوران (tenant احرازشده) تعلق داشته باشد.
     const resv = await db.reservation.findUnique({
       where: { code },
-      select: { id: true, restaurantId: true },
+      select: {
+        id: true, restaurantId: true, slotStart: true, lateExtensionMinutes: true,
+        restaurant: { select: { lateGraceMinutes: true } },
+      },
     });
     if (!resv || resv.restaurantId !== ctx.restaurant.id) throw Err.notFound('رزرو');
+
+    // ⚠️ STATE M-17 (F001، حکمِ CEO D-20c): این route هیچ شرطِ زمانی نداشت — پرسنل می‌توانست رزروِ
+    // confirmed را چند روز **پیش** از ساعتش no_show کند (strike، برگشتِ کش‌بک، اعتبارِ ۰ برای کاربرِ
+    // تازه) و پنل «نیومد» را روی هر ردیفِ پیش‌رو نشان می‌داد. حالا فقط از `guestDeadline` به بعد —
+    // همان ساعتی که به مهمان گفته می‌شود. هشدار لازم نیست: پرسنل میز را می‌بیند. لغو همچنان آزاد است.
+    if (b.status === 'no_show') {
+      const allowedAt = guestDeadline(resv, resv.restaurant.lateGraceMinutes);
+      if (Date.now() < allowedAt.getTime()) {
+        throw Err.noShowBeforeDeadline(allowedAt);
+      }
+    }
 
     const result = await transitionReservation({
       reservationId: resv.id,

@@ -299,6 +299,8 @@ export function mapApiRestaurant(apiR, sampleFallback){
     // کلید را برنگرداند، سکوتِ اپ آن را نمی‌پوشاند — تست قرمز می‌شود.
     onlinePaymentEnabled: apiR.booking_policy?.online_payment_enabled ?? null,
     freeCancelHours: apiR.booking_policy?.free_cancel_hours ?? null,
+    // F001 (M-13، D-18): مهلتِ صبرِ رستوران برای مهمانِ دیرکرده — null → سکوت، نه حدس.
+    lateGraceMinutes: apiR.booking_policy?.late_grace_minutes ?? null,
     lat: apiR.latitude ?? null,
     lng: apiR.longitude ?? null,
     vibes: apiR.vibes || sampleFallback?.vibes || [],

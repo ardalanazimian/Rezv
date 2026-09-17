@@ -171,6 +171,10 @@ export const metrics = {
   emailSent: new Counter('rezervno_email_sent_total', 'تعداد ایمیل‌هایی که ارائه‌دهنده واقعاً پذیرفت'),
   emailFailed: new Counter('rezervno_email_failed_total', 'تعداد ایمیل‌های ناموفق (به دستِ گیرنده نرسید)'),
   pushNotSent: new Counter('rezervno_push_not_sent_total', 'تعداد اعلان‌های push که ارسال نشدند چون ترنسپورتِ push هنوز ساخته نشده'),
+  // F001 (STATE M-13، حکمِ CEO D-20a): رزروی که مهلتش گذشته ولی هشدارِ دیرکردش هرگز پذیرفته نشده —
+  // cron عمداً جریمه‌اش نمی‌کند. هر اجرای cron برای هر ردیفِ مسدود یک بار می‌شمارد، پس نرخِ ماندگارِ
+  // بالای صفر یعنی پیامکِ هشدار کار نمی‌کند (bodyIdِ LATE تنظیم نشده، اعتبارِ رستوران صفر، …).
+  noShowBlockedUnwarned: new Counter('rezervno_no_show_blocked_unwarned_total', 'رزروهای دیرکرده‌ای که به‌خاطرِ نرسیدنِ هشدارِ پیامکی خودکار no_show نشدند'),
   // ⚠️ همان الگویِ smsSuppressed/inAppSuppressed، و به همان دلیل: «رویداد
   // رسید ولی درج نشد» نه موفقیت است نه خطا — و تا امروز **سکوتِ کامل** بود.
   //

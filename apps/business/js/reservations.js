@@ -158,11 +158,14 @@ function resItemHTML(r,i){
       </div>
       <div class="tl-meta">${dateBadge}${icon('users',{size:13})} ${fa(r.party)} نفر · میز ${fa(r.table)} · ${icon('phone',{size:13})} ${esc(r.phone)} ${r.pre?`· ${icon('utensils',{size:12})} پیش‌سفارش`:''}</div>
       ${r.note?`<div class="tl-meta" style="color:var(--amber)">${icon('inbox',{size:13})} ${esc(r.note)}</div>`:''}
+      ${r.lateEtaMinutes!=null?`<div class="tl-meta tl-late" style="color:var(--amber)">${icon('clock',{size:13})} مهمان خبر داد: ${r.lateEtaMinutes>0?`حدودِ ${fa(r.lateEtaMinutes)} دقیقه دیرتر می‌رسد`:'در راه است'}</div>`:''}
       ${r.cancelReason?`<div class="tl-meta" style="color:#B91C1C">${icon('alert',{size:13})} دلیل لغو: ${esc(r.cancelReason)}</div>`:''}
       ${!isPast?`<div class="tl-actions">
         ${allowed.includes('checked_in')?`<button class="btn btn-teal ${actBtn}" onclick="markArrived(${i})">${icon('check',{size:14})} رسید</button>`:''}
         ${allowed.includes('seated')?`<button class="btn btn-primary ${actBtn}" onclick="markSeated(${i})">${icon('utensils',{size:14})} نشاند</button>`:''}
-        ${allowed.includes('no_show')?`<button class="btn btn-ghost ${actBtn}" onclick="markNoShow(${i})">${icon('alert',{size:14})} نیومد</button>`:''}
+        ${allowed.includes('no_show')?(noShowTooEarly(r)
+          ?`<button class="btn btn-ghost ${actBtn}" disabled title="پیش از مهلتِ مهمان نمی‌شود «نیومد» ثبت کرد">${icon('alert',{size:14})} نیومد (از ${noShowClock(r)})</button>`
+          :`<button class="btn btn-ghost ${actBtn}" onclick="markNoShow(${i})">${icon('alert',{size:14})} نیومد</button>`):''}
         <button class="btn btn-ghost btn-sm" onclick="openStatusMenu(${i})">${icon('refresh',{size:14})} وضعیت</button>
         <button class="btn btn-ghost btn-sm" ${r.phone?`onclick="callCustomer(${jsq(r.phone)})"`:'disabled title="شماره‌ای ثبت نشده"'}>تماس</button>
         ${allowed.includes('cancelled')?`<button class="btn btn-danger ${actBtn}" onclick="cancelRes(${i})">لغو</button>`:''}
@@ -202,6 +205,8 @@ async function markSeated(i){
 // طبقِ ماموریت با تأییدِ صریح انجام می‌شه تا لمسِ اشتباه، رزروِ واقعی رو خراب نکنه.
 async function markNoShow(i){
   const r=(RES_VIEW||RES)[i]; if(!r)return;
+  // F001/M-17: دفاعِ دوم پشتِ دکمه‌ی غیرفعال — سرور هم ۴۰۹ می‌دهد.
+  if(noShowTooEarly(r)){ toast('',`ثبتِ «نیومد» از ساعتِ ${noShowClock(r)} ممکن است`); return; }
   if(!window.confirm(`${r.name} به‌عنوانِ «نیومد» ثبت بشه؟ این وضعیت برگشت‌پذیر نیست.`))return;
   await changeStatus(i,'no_show');
 }

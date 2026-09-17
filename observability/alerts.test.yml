@@ -247,3 +247,34 @@ tests:
       - eval_time: 80m
         alertname: PaymentRefundRequired
         exp_alerts: []
+
+  # ── NoShowBlockedUnwarned (F001، D-20): expr = sum(increase(...[15m])) > 0 ، for: 20m ──
+
+  # «فایر»: هر اجرای ۵ دقیقه‌ایِ cron همان یک رزروِ مسدود را دوباره می‌شمارد (هشدار هرگز پذیرفته نشد).
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_no_show_blocked_unwarned_total'
+        values: '0+0x4 1+0x4 2+0x4 3+0x4 4+0x4 5+0x4 6+0x4 7+0x4 8+0x4 9+0x4'
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: NoShowBlockedUnwarned
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "عدمِ حضورِ خودکار متوقف است: هشدارِ دیرکرد به مهمان نمی‌رسد"
+              description: "رزروهای دیرکرده‌ای هست که مهلتشان گذشته ولی پیامکِ booking_late هرگز پذیرفته نشده، پس cron عمداً جریمه‌شان نمی‌کند (D-20). rezervno_sms_failed_total{template=\"booking_late\"} را ببین: reason=missing_bodyid یعنی الگوی ملی‌پیامک ثبت/تنظیم نشده؛ اعتبارِ صفر در rezervno_sms_failed_total{reason=\"insufficient_balance\"} دیده نمی‌شود — موجودیِ رستوران را چک کن."
+
+  # «سکوت»: یک مسدودیِ گذرا در t=5m، بعد هشدار پذیرفته شد و شمارنده دیگر رشد نکرد.
+  # ⚠️ eval در t=15m عمدی است: وسطِ پنجره‌ی ۱۵ دقیقه‌ایِ increase. با for:20m هنوز pending است؛
+  # جهشِ «for: 5m» همین‌جا فایر می‌کند. نسخه‌ی اولِ این سناریو فقط t=40m را می‌سنجید و آن جهش را رد می‌داد.
+  - interval: 1m
+    input_series:
+      - series: 'rezervno_no_show_blocked_unwarned_total'
+        values: '0+0x4 1+0x40'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: NoShowBlockedUnwarned
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: NoShowBlockedUnwarned
+        exp_alerts: []

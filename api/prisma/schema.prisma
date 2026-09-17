@@ -173,7 +173,9 @@ model Restaurant {
   slotMinutes      Int @default(90) @map("slot_minutes") @db.SmallInt   // مدت پیش‌فرض هر رزرو
   bufferMinutes    Int @default(0)  @map("buffer_minutes") @db.SmallInt  // فاصله‌ی ایمنی بین رزروهای یک میز
   cleaningMinutes  Int @default(15) @map("cleaning_minutes") @db.SmallInt // زمان نظافت/چیدن میز
-  lateGraceMinutes Int @default(15) @map("late_grace_minutes") @db.SmallInt // مهلت تأخیر مهمان قبل از no_show
+  lateGraceMinutes Int @default(15) @map("late_grace_minutes") @db.SmallInt // مهلت تأخیر مهمان قبل از no_show — ۱۰..۶۰ (D-18، CHECK در ۰۹۲)
+  // F001 · ۰۹۲: سقفِ «دیرتر می‌رسم» که مهمان می‌تواند بخواهد — ۰..۳۰، پیش‌فرض ۱۵ (D-18؛ ۰ مجاز، ولی هشدارِ پیش از عدم‌حضور همچنان اجباری است).
+  maxLateExtensionMinutes Int @default(15) @map("max_late_extension_minutes") @db.SmallInt
   holdMinutes      Int @default(10) @map("hold_minutes") @db.SmallInt    // مدت هولد رزرو pending تا انقضا
   timezone      String           @default("Asia/Tehran")
   // ── دادهٔ مکانی برای Local/Restaurant SEO (ADR 0001, migration 030) — همه nullable،
@@ -524,6 +526,11 @@ model Reservation {
   /// زمانِ ارسالِ یادآوریِ پیامکی. NULL یعنی هنوز فرستاده نشده.
   /// منبعِ حقیقتِ «آیا این رزرو یادآوری‌اش را گرفت؟» — صف پاک می‌شود، این نه.
   reminderSentAt DateTime?       @map("reminder_sent_at")
+  // F001 · ۰۹۲ (STATE M-13، حکمِ CEO D-20): لحظه‌ای که ارائه‌دهنده پیامکِ هشدارِ دیرکرد را **پذیرفت**
+  // (نه لحظه‌ی صف‌شدن)، یا لحظه‌ی «دیرتر می‌رسم»ِ خودِ مهمان. NULL → cron هرگز no_show نمی‌کند.
+  lateWarnedAt   DateTime?       @map("late_warned_at")
+  lateEtaSignaledAt DateTime?    @map("late_eta_signaled_at")   // «دیرتر می‌رسم» — یک‌بار برای هر رزرو
+  lateExtensionMinutes Int      @default(0) @map("late_extension_minutes") @db.SmallInt  // ۰..۳۰ (CHECK در ۰۹۲)
   slotEnd      DateTime          @map("slot_end")
   status       ReservationStatus @default(confirmed)
   source       String            @default("app")
