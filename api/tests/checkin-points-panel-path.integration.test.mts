@@ -36,12 +36,12 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 
 import { fixturePhone } from './_phone.helper.mts';
 
-// ⚠️ پیشوندِ ۰۹۲۱ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش نکن.
+// ⚠️ پیشوندِ ۰۹۰۱ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش نکن.
 // برخوردِ شماره در رانرِ تک‌پروسه‌ای، hookِ `before` را می‌اندازد و node:test
 // **کلِ** سوئیت را cancel می‌کند (شرح کامل در tests/_phone.helper.mts).
 // این واقعاً همین‌جا رخ داد: نسخه‌ی اولِ این فایل شماره را دستی می‌ساخت و
 // دو اجرای کاملِ سوئیت را با دو نشانه‌ی کاملاً متفاوت قرمز کرد.
-const OWNER_PHONE_PREFIX = '0921';
+const OWNER_PHONE_PREFIX = '0901';
 
 const { db } = await import('../src/lib/db.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');

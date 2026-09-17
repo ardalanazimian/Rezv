@@ -85,8 +85,8 @@ before(async () => {
   });
   restaurantId = r.id;
   const u = await db.user.create({
-    // ⚠️ پیشوندِ ۰۹۳۳ مالِ همین فایل است — به tests/_phone.helper.mts رجوع کن.
-    data: { phone: fixturePhone('0933'), firstName: '[DEMO]', lastName: 'صف' },
+    // ⚠️ پیشوندِ ۰۹۴۸ مالِ همین فایل است — به tests/_phone.helper.mts رجوع کن.
+    data: { phone: fixturePhone('0948'), firstName: '[DEMO]', lastName: 'صف' },
     select: { id: true },
   });
   userId = u.id;
@@ -116,7 +116,7 @@ describe('صف — پیوستن و ترتیب', () => {
   test('مهمانِ بدونِ حساب توکنِ دسترسی می‌گیرد و فقط hashش ذخیره می‌شود', async () => {
     await mkTable(1);
     const res = await joinWaitlist({
-      restaurantId, partySize: 2, guest: { name: '[DEMO] مهمان', phone: fixturePhone('0933') },
+      restaurantId, partySize: 2, guest: { name: '[DEMO] مهمان', phone: fixturePhone('0948') },
     });
     assert.ok(res.guest_token, 'توکنِ خام باید یک‌بار برگردد');
     const row = await db.waitlistEntry.findUniqueOrThrow({
@@ -308,7 +308,7 @@ describe('صف — رد کردن و خروج، میز را آزاد می‌کن�
     const a = await joinWaitlist({ restaurantId, partySize: 2, userId });
     await promoteNext(restaurantId);
     const other = await db.user.create({
-      data: { phone: fixturePhone('0933'), firstName: '[DEMO]', lastName: 'صف' }, select: { id: true },
+      data: { phone: fixturePhone('0948'), firstName: '[DEMO]', lastName: 'صف' }, select: { id: true },
     });
     try {
       await assert.rejects(() => declineOffer(a.id, 'customer', { callerUserId: other.id }));

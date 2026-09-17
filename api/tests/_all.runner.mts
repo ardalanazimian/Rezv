@@ -60,6 +60,7 @@ import './admin-create-business.integration.test.mts';
 import './allowed-origins.test.mts';
 import './csrf-origin.test.mts';
 import './env-secrets.test.mts';
+import './phone-fixture-ownership.test.mts';
 import './availability-bulk.integration.test.mts';
 import './availability-offline-parity.integration.test.mts';
 import './ban.test.mts';

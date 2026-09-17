@@ -33,9 +33,9 @@ const madeReservations: string[] = [];
 const madeUsers: string[] = [];
 
 async function mkUser(): Promise<string> {
-  // ⚠️ پیشوندِ ۰۹۳۵ مالِ همین فایل است — به tests/_phone.helper.mts رجوع کن.
+  // ⚠️ پیشوندِ ۰۹۵۰ مالِ همین فایل است — به tests/_phone.helper.mts رجوع کن.
   const u = await db.user.create({
-    data: { phone: fixturePhone('0935'), firstName: '[DEMO]', lastName: 'زیرساخت' },
+    data: { phone: fixturePhone('0950'), firstName: '[DEMO]', lastName: 'زیرساخت' },
     select: { id: true },
   });
   madeUsers.push(u.id);

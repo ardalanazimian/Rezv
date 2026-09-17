@@ -69,9 +69,9 @@ before(async () => {
     select: { id: true },
   });
   restaurantId = r.id;
-  // پیشوندِ ۰۹۲۲ مالِ همین فایل است — رجوع کن به tests/_phone.helper.mts.
+  // پیشوندِ ۰۹۰۳ مالِ همین فایل است — رجوع کن به tests/_phone.helper.mts.
   const u = await db.user.create({
-    data: { phone: fixturePhone('0922'), firstName: '[DEMO]', lastName: 'نشت' },
+    data: { phone: fixturePhone('0903'), firstName: '[DEMO]', lastName: 'نشت' },
     select: { id: true },
   });
   userId = u.id;

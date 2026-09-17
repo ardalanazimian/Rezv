@@ -65,7 +65,7 @@ after(async () => {
 
 describe('claimِ دعوت (§۵-۴)', () => {
   test('توکنِ معتبر → state=valid + نامِ رستوران + ماسکِ شماره؛ بدونِ mutate', async () => {
-    const p = await makeProvisioned('0931');
+    const p = await makeProvisioned('0911');
     const res = await claimReq(p.token);
     assert.equal(res.status, 200);
     const d = await res.json();
@@ -81,7 +81,7 @@ describe('claimِ دعوت (§۵-۴)', () => {
   });
 
   test('حتی برای حسابِ دارای رمز، claim گزینه‌ی رمز اعلام نمی‌کند (OTP-only)', async () => {
-    const p = await makeProvisioned('0932', { username: `inv${SFX}`, password: 'Str0ngPass!' });
+    const p = await makeProvisioned('0940', { username: `inv${SFX}`, password: 'Str0ngPass!' });
     const d = await (await claimReq(p.token)).json();
     assert.equal(d.state, 'valid');
     assert.equal('methods' in d, false);
@@ -94,13 +94,13 @@ describe('claimِ دعوت (§۵-۴)', () => {
     const de = await (await claimReq(p.token)).json();
     assert.equal(de.state, 'expired');
 
-    const p2 = await makeProvisioned('0937');
+    const p2 = await makeProvisioned('0946');
     await db.staffInvite.updateMany({ where: { token: p2.token }, data: { status: 'ACCEPTED' } });
     const du = await (await claimReq(p2.token)).json();
     assert.equal(du.state, 'used');
 
     // REVOKED (ابطال با resend) هم برای دارنده‌ی لینکِ قدیمی «منقضی» است.
-    const p3 = await makeProvisioned('0938');
+    const p3 = await makeProvisioned('0947');
     await db.staffInvite.updateMany({ where: { token: p3.token }, data: { status: 'REVOKED' } });
     assert.equal((await (await claimReq(p3.token)).json()).state, 'expired');
 
@@ -110,7 +110,7 @@ describe('claimِ دعوت (§۵-۴)', () => {
 
 describe('پذیرشِ دعوت = side-effectِ اولین ورودِ موفق (§۶-۱ / C10)', () => {
   test('OTP: request→verify ⇒ invite=ACCEPTED و restaurant=ACTIVE؛ شکلِ پاسخِ verify ثابت', async () => {
-    const p = await makeProvisioned('0934');
+    const p = await makeProvisioned('0943');
     const local = p.phone.replace('+98', '0');
 
     const rq = await otpRequest(jreq('/api/v1/auth/staff/request', { phone: local }));
@@ -135,7 +135,7 @@ describe('پذیرشِ دعوت = side-effectِ اولین ورودِ موفق (
 
   test('ورود با رمز هم دعوت را می‌پذیرد', async () => {
     const uname = `invpw${SFX}`;
-    const p = await makeProvisioned('0935', { username: uname, password: 'Str0ngPass!' });
+    const p = await makeProvisioned('0945', { username: uname, password: 'Str0ngPass!' });
     const rv = await pwLogin(jreq('/api/v1/auth/staff/login', { username: uname, password: 'Str0ngPass!' }));
     assert.equal(rv.status, 200, await rv.clone().text());
     const inv = await db.staffInvite.findFirst({ where: { token: p.token } });
