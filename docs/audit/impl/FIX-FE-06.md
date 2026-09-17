@@ -9,7 +9,7 @@
 
 ## The claim fixed
 
-Full-Stack audit B-1 (`origin/audit/fullstack-2026-09-16 @ cb0d67e`, `docs/audit/fullstack/FRONTEND.md` §1),
+Full-Stack audit B-1 (`origin/audit/fullstack-2026-09-16 @ cb0d67e`, its `FRONTEND.md` §1; that file exists only on that branch),
 runtime-proven by `rezv-75`. `apps/customer/js/api.js` `loadRestaurants()` returned `R_SAMPLE` for
 **any** non-OK response. But `apps/customer/js/api-core.js` returns an HTTP error (500/503/429/403)
 **without** `offline`, so a live server that returned 500 put six `[DEMO]` cards under «۶ رستوران
@@ -81,6 +81,7 @@ sha1 for `js/api.js`, `js/init.js`, `js/data/discover.js` and `sw.js` versus the
 | `node tools/xss-escaping-regression.mjs` | exit 0 |
 | `python tools/build-standalone.py --check` | exit 0 |
 | `node --input-type=module --check` on the three modules | parse OK |
+| **Correction 2026-09-17:** every node guard `ci.yml` calls, re-run on a clean checkout of `b496991` with an exit-code-first runner | 18 guards · **2 failed**: `check-doc-path-refs` (this document linked `docs/`-path of a file that exists only on the audit branch, fixed in the follow-up commit) and `check-rejects-matcher` (inherited from base `99065a7`, fixed by `8cdc6e9`, which merges first). An earlier summary sent to the CEO said all guards exited 0; it was produced by a loop that read `$?` after a `printf` substitution, so it reported printf's exit code. |
 
 "Fresh DB clone" means a `CREATE DATABASE … TEMPLATE` of a database snapshotted immediately after a
 from-zero build with CI's three commands (`FRESHDB_OK 2026-09-16T21:53Z`), restored before each file.
