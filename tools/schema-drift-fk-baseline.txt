@@ -58,7 +58,6 @@ reward_redemptions(item_id) -> reward_marketplace_items  upd=c del=r
 reward_redemptions(result_coupon_id) -> coupons  upd=c del=n
 reward_redemptions(result_gift_card_id) -> gift_cards  upd=c del=n
 reward_redemptions(user_id) -> users  upd=c del=r
-sms_transactions(restaurant_id) -> restaurants  upd=c del=c
 staff(restaurant_id) -> restaurants  upd=c del=n
 staff_notes(restaurant_id) -> restaurants  upd=c del=r
 staff_permissions(staff_id) -> staff  upd=c del=r

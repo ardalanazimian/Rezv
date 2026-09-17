@@ -166,8 +166,14 @@ describe('M0 — فقط-افزودنی، با تریگر و نه RLS', () => {
   });
 
   test('⚠️ DELETE بدونِ دریچه‌ی صریح رد می‌شود، و با آن اجازه دارد', async () => {
-    const resvId = await mkReservation({ userId: await mkUser() });
+    // ⚠️ رزروِ **مهمان** (بدونِ حساب)، نه کاربر — مهاجرتِ ۰۹۰: no_showِ یک کاربر ردیفِ
+    // economy_ledger_entries می‌سازد و FKِ آن ردیف به رزرو `ON DELETE SET NULL` است؛ SET NULL یعنی
+    // UPDATE روی دفتر، که تریگرِ ۰۹۰ ردش می‌کند. این تست دربارهٔ گاردِ ۰۸۲ روی reservation_events
+    // است، پس فیکسچر عمداً بدونِ اثرِ اقتصادی است. رفتارِ تازه‌ی رزروِ کاربر در تستِ بعدی پین می‌شود.
+    const resvId = await mkReservation({ guestPhone: '+989900000082' });
     await transitionReservation({ reservationId: resvId, to: 'no_show', actor: 'system', notify: false });
+    assert.equal(await db.economyLedgerEntry.count({ where: { reservationId: resvId } }), 0,
+      'کنترلِ فیکسچر: رزروِ مهمان نباید ردیفِ اقتصاد بسازد — وگرنه نیمه‌ی cascade به دلیلِ دیگری شکست می‌خورد');
 
     await assert.rejects(
       () => db.$executeRawUnsafe(
@@ -183,6 +189,20 @@ describe('M0 — فقط-افزودنی، با تریگر و نه RLS', () => {
     // برمی‌گردد.
     await db.reservation.delete({ where: { id: resvId } });
     assert.equal(await db.reservationEvent.count({ where: { reservationId: resvId } }), 0);
+  });
+
+  test('🔴 مهاجرتِ ۰۹۰: رزروِ کاربری که ردِ اقتصادی دارد حذف‌شدنی نیست (SET NULL = UPDATE روی دفتر)', async () => {
+    // اثرِ جانبیِ آگاهانه‌ی ۰۹۰، پین‌شده تا کسی «برای رفعِ حذفِ رزرو» تریگرِ UPDATE را شل نکند:
+    // اجازه‌دادن به SET NULL یعنی اجازه‌ی تهی‌کردنِ reservation_id، و آن ستون نیمی از کلیدِ یکتایِ
+    // (reservation_id, kind) است که جلوی اعتبارِ دوباره برای همان رزرو را می‌گیرد.
+    const resvId = await mkReservation({ userId: await mkUser() });
+    await transitionReservation({ reservationId: resvId, to: 'no_show', actor: 'system', notify: false });
+    assert.ok(await db.economyLedgerEntry.count({ where: { reservationId: resvId } }) > 0,
+      'کنترلِ فیکسچر: no_showِ کاربر باید ردیفِ اقتصاد بسازد — وگرنه این تست چیزی نمی‌سنجد');
+    await assert.rejects(() => db.reservation.delete({ where: { id: resvId } }),
+      (e: unknown) => /economy_ledger_entries فقط-افزودنی است: UPDATE مجاز نیست/.test(String((e as Error)?.message)),
+      'حذفِ رزروِ دارای ردِ اقتصادی باید با تریگرِ UPDATEِ ۰۹۰ رد شود');
+    assert.equal(await db.reservation.count({ where: { id: resvId } }), 1, 'رزرو باید سرِ جایش بماند');
   });
 
   test('⚠️ هیچ فایلی در src/ رویدادها را حذف نمی‌کند و دریچه‌ای نمی‌شناسد', () => {

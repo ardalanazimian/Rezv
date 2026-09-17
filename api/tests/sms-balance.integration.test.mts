@@ -1,4 +1,4 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../src/lib/db.ts';
@@ -43,12 +43,9 @@ before(async () => {
   tenantId = t.id;
 });
 
-after(async () => {
-  const rs = await db.restaurant.findMany({ where: { tenantId }, select: { id: true } });
-  await db.smsTransaction.deleteMany({ where: { restaurantId: { in: rs.map(r => r.id) } } });
-  await db.restaurant.deleteMany({ where: { tenantId } });
-  await db.tenant.delete({ where: { id: tenantId } });
-});
+// ⚠️ پاک‌سازی نیست (مهاجرتِ ۰۹۰ · D-16 · FP-009 §۴): sms_transactions دفترِ اعتبار و
+// فقط-افزودنی است و FKِ آن به restaurants روی RESTRICT است؛ رستوران‌ها و تنانت با ردِ
+// شارژشان می‌مانند. DBِ هر اجرا تازه است.
 
 describe('موجودیِ پیامک — مصرف', () => {
   test('مصرفِ موفق موجودی را کم و تراکنش ثبت می‌کند', async () => {

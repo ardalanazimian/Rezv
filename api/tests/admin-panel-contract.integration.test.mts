@@ -178,13 +178,13 @@ describe('قراردادِ پنلِ شرکت — هشت endpointِ ادمین د
     if (saved.PLATFORM_ADMIN_TENANT_ID === undefined) delete process.env.PLATFORM_ADMIN_TENANT_ID;
     else process.env.PLATFORM_ADMIN_TENANT_ID = saved.PLATFORM_ADMIN_TENANT_ID;
     await db.job.deleteMany({ where: { lastError: 'demo' } }).catch(() => {});
-    await db.auditLog.deleteMany({ where: { targetId: userId } }).catch(() => {});
     await db.customerEconomyProfile.deleteMany({ where: { userId } }).catch(() => {});
     await db.user.deleteMany({ where: { id: userId } }).catch(() => {});
-    await db.auditLog.deleteMany({ where: { restaurantId } }).catch(() => {});
-    await db.restaurant.deleteMany({ where: { tenantId: bizTenantId } });
+    // ⚠️ مهاجرتِ ۰۹۰ (FP-009 §۴ · D-16): رستورانِ کسب‌وکار شارژِ پیامک دارد و دفترِ
+    // sms_transactions حذف‌ناپذیر است (FK = RESTRICT)، و ردیف‌های audit هم حذف نمی‌شوند؛
+    // پس رستوران و تنانتش می‌مانند — DBِ هر اجرا تازه است. فقط تنانتِ پلتفرم پاک می‌شود.
     await db.staff.deleteMany({ where: { tenantId: { in: [platformTenantId, bizTenantId] } } });
-    await db.tenant.deleteMany({ where: { id: { in: [platformTenantId, bizTenantId] } } });
+    await db.tenant.deleteMany({ where: { id: platformTenantId } });
     await db.$disconnect();
   });
 

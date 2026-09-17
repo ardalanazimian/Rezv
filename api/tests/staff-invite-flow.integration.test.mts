@@ -53,7 +53,7 @@ after(async () => {
     const rests = await db.restaurant.findMany({ where: { tenantId: tid }, select: { id: true } });
     for (const r of rests) {
       await db.table.deleteMany({ where: { restaurantId: r.id } });
-      await db.auditLog.deleteMany({ where: { restaurantId: r.id } });
+      // ⚠️ مهاجرتِ ۰۹۰ (FP-009 §۴): ردیفِ audit_logs حذف نمی‌شود — فقط retentionِ ۱ساله حذف می‌کند.
       await db.restaurant.delete({ where: { id: r.id } }).catch(() => {});
     }
     const staff = await db.staff.findMany({ where: { tenantId: tid }, select: { phone: true } });

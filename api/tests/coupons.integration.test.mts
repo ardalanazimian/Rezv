@@ -98,12 +98,9 @@ before(async () => {
 });
 
 after(async () => {
-  const cs = await db.coupon.findMany({ where: { restaurantId }, select: { id: true } });
-  await db.couponRedemption.deleteMany({ where: { couponId: { in: cs.map(c => c.id) } } });
-  await db.coupon.deleteMany({ where: { restaurantId } });
+  // ⚠️ مهاجرتِ ۰۹۰ (FP-009 §۴): coupon_redemptions فقط-افزودنی است و coupon → redemption روی
+  // RESTRICT؛ پس کوپن‌ها، رستوران و تنانت می‌مانند — DBِ هر اجرا تازه است.
   await db.customerInsight.deleteMany({ where: { restaurantId } });
-  await db.restaurant.deleteMany({ where: { tenantId } });
-  await db.tenant.delete({ where: { id: tenantId } });
   if (createdUserIds.length) await db.user.deleteMany({ where: { id: { in: createdUserIds } } });
 });
 
