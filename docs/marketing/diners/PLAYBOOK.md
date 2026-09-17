@@ -129,7 +129,8 @@ sound for reminders. Nothing in it argues for marketing, and the charter says op
    restaurant's own guests. They inherit the same opt-out default, so the restaurant pitch does not
    sell SMS campaigns either (`PRICING.md` §3 already gates «پیامکِ خودکار»).
 4. **Counsel:** Iranian rules for advertising SMS (sender lines, consent, the opt-out keyword) are not
-   researched here. *Requires review by counsel before any marketing SMS is sent.*
+   researched here. *Requires review by counsel before any marketing SMS is sent.* This is in the
+   owner's queue (CEO, D-25), and it is part of gate A4.
 
 **Email:** no diner email programme exists or is proposed.
 
@@ -166,15 +167,18 @@ sound for reminders. Nothing in it argues for marketing, and the charter says op
 ## 7. What this needs
 
 **CEO (rulings; I don't edit code)**
-1. **Marketing consent:** should `offers` and `dna` become opt-in, while reminders stay as they are?
-   Until then, no marketing SMS from us, and no SMS campaigns in the restaurant pitch.
-2. **Quiet hours and a frequency cap:** before launch, or accept "no marketing SMS" as the launch
-   state?
+1. ~~Marketing consent?~~ **Ruled 2026-09-17 (D-25):** `offers` and `dna` become **opt-in**, so a
+   missing value means "no". Reminders and transactional messages are untouched. Builder: `rezv-1b` (P2).
+2. ~~Quiet hours and a cap?~~ **Ruled (D-25):** the launch state is **no marketing SMS**, locked
+   server-side, not only in copy. A default-off flag blocks enqueueing marketing campaigns and
+   automations, so a restaurant cannot SMS everyone once real delivery is switched on. It turns on
+   only past gate A4: opt-in, quiet hours, a frequency cap, a 500-recipient cap and legal review.
+   Builder: `rezv-1b`.
 3. ~~Coupon redemption in the booking flow?~~ **Ruled 2026-09-17:** before launch (P2, `rezv-1b`
    after F001), with a live end-to-end proof and a Red Team attack on concurrent redemption. M-20.
    Per-channel coupons come after launch.
-4. **Reward marketplace and missions** with spending off: do they work end to end, and may diner copy
-   mention them?
+4. ~~Reward marketplace and missions?~~ **Ruled (D-25):** `UNKNOWN`. End-to-end measurement goes to
+   `rezv-75` (P3). **Diner copy does not mention them until measured.**
 
 **Owner (no new decisions, only the existing ones this depends on):** `E-001` (the at-venue kit), and
 the visual identity option (`BRAND.md` §3).
