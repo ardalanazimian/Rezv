@@ -12,7 +12,7 @@
 
 | Question | Answered in |
 |---|---|
-| Who pays, for what, and at what placeholder price | `BUSINESS-MODEL.md` v2 |
+| Who pays, for what | `BUSINESS-MODEL.md` v2 · prices: `PRICING.md` v2 (owner's decision) |
 | Who we are for, and the one true claim | `POSITIONING.md` |
 | Brand idea, values, tone, identity | `BRAND.md` |
 | Market, competitors, benchmarks, app-store footprint | `research/*-2026-09-16.md` (all four reviewed) |
@@ -21,7 +21,7 @@
 **Rules this plan keeps:**
 - No number without a class.
 - No TAM outside the company (`BUSINESS-MODEL.md` §8).
-- The old 18/34/65M prices are **not real prices** (owner, 2026-09-17). The replacement proposal is `PRICING.md`. Until the owner chooses, §7 still does its arithmetic on the old placeholder, and says so.
+- Prices are the owner's decision of 2026-09-17: **18 / 33 / 60M**, plus a **free display-only listing** in the customer app (`PRICING.md` v2). VAT is still open.
 - Every target in §5 is a **proposed gate for the owner to accept or change**, not a forecast.
 - No date is promised, because launch has no date. Everything is counted from launch day **L**.
 
@@ -110,6 +110,7 @@ measurement each channel must carry.
 | **Direct visits in one district** | Owners buy from a person who shows the working panel on a phone, not from a page | People-hours, `UNKNOWN` until §9 says who sells | Visits → `SiteOrder` (trial) → `activated`, counted weekly |
 | **Instagram, where restaurants already live** | Owners see real screens (not renders) from venues they know | Content time. **No paid ads** until positioning copy is approved | `SiteOrder.utmSource / utmMedium / utmCampaign`, which already exist in the schema |
 | **Referral from the first restaurants** | An owner trusts another owner more than us | A referral benefit, **to be decided by the owner**. It must be real and paid, because we have already once removed a referral promise the code never paid (`POSITIONING.md` §3) | A `utmSource` per referring restaurant |
+| **Free listing → paid** (owner's model, 2026-09-17) | A restaurant listed free sees diners who can't book it online, and upgrades | Zero to us per listing, plus the listing-proof work (`PRICING.md` §1, req. 5) | Free listings → trials → `activated`. **Not usable until the gating ships** |
 | **Guild channels (اتحادیه‌ها)** | The unions are publicly describing the demand squeeze (CLAIMED), which is an opening for a "money kept" talk | Low | **Hypothesis only.** Nobody has contacted a union, and nobody will without the owner's approval |
 
 **The pitch, in order:** money kept (no-shows recovered, stated as a mechanism until we have our own
@@ -169,7 +170,7 @@ in the same district, not a new district.
 | Monthly churn, measured | Compared against the scenarios in `BUSINESS-MODEL.md` §4 (2% / 4% / 8%) |
 | Restaurants from referral | At least some. A zero means the referral benefit or the product is wrong |
 | Diners who booked twice | Measured. This is the diner-side retention number |
-| A price decision on real conversations | The owner confirms or changes the placeholder (§9) |
+| The owner's price tested in real conversations | What owners say about 18/33/60 and the free listing, recorded per conversation |
 
 ### Phase 3 — L+6 to L+12: the two decisions
 
@@ -193,21 +194,21 @@ in the same district, not a new district.
 
 ---
 
-## 7. Financials — arithmetic on placeholders, and nothing invented
+## 7. Financials — arithmetic on the owner's prices, and nothing invented
 
 **No P&L, burn or break-even date is given**, because the cost base (people, hosting, office) is
 `UNKNOWN` and inventing it would make every number below it fiction. What can be computed honestly:
 
-**Revenue per restaurant count, at placeholder prices** (m12 = 65M/yr; m3 would be 72M/yr, m6
-68M/yr; before VAT; placeholder, not confirmed by the owner):
+**Revenue per paying restaurant count, at the owner's prices** (m12 = 60M/yr; m3 would be 72M/yr, m6
+66M/yr; before VAT, which is still open). Free listings pay nothing:
 
-| Restaurants | Annual subscription revenue (m12 placeholder) |
+| Paying restaurants | Annual subscription revenue (m12) |
 |---|---|
-| 10 | 650,000,000 toman |
-| 30 | 1,950,000,000 toman |
-| 100 | 6,500,000,000 toman |
+| 10 | 600,000,000 toman |
+| 30 | 1,800,000,000 toman |
+| 100 | 6,000,000,000 toman |
 
-**Restaurants needed per 100M toman of monthly cost base:** 100M ÷ (65M ÷ 12) ≈ **18.5 restaurants**,
+**Restaurants needed per 100M toman of monthly cost base:** 100M ÷ (60M ÷ 12) = **20 restaurants**,
 before margin. Whatever the owner's real monthly cost turns out to be, divide by 100M and multiply.
 The formula doesn't need us to guess the cost.
 
@@ -220,7 +221,7 @@ is arithmetic on the assumptions in `BUSINESS-MODEL.md` §4:
 | 100 | 2 | 4 | 8 |
 
 **SMS is not the cost to watch:** ≈24 toman all-in per message (REAL, provider's own tariff), so
-<0.5% of the placeholder at 1,000 messages a month (`BUSINESS-MODEL.md` §4).
+<0.5% of the m12 monthly price at 1,000 messages a month (`BUSINESS-MODEL.md` §4).
 
 **Inflation is:** a 12-month price fixed in toman while food-group inflation is 127.5% (SECONDARY)
 loses real value every month. The price-review cadence belongs in the owner's price decision.
@@ -251,9 +252,9 @@ loses real value every month. The price-review cadence belongs in the owner's pr
 3. **Which Tehran district, and which venue categories.** The charter says named categories, not named
    businesses, and that the owner chooses. My proposed categories: sit-down restaurants with evening
    peaks that already take DM bookings, and cafés with weekend queues (the waitlist use case).
-4. **Price:** the owner ruled on 2026-09-17 that the old placeholders are not real prices and must
-   change based on the research. The proposal is `PRICING.md`, which the owner sees before anything
-   reaches `main`. The first ten conversations (§4.1) then test it.
+4. ~~**Price**~~ **Decided 2026-09-17: 18 / 33 / 60M plus a free display-only listing** (`PRICING.md` v2).
+   Open with the owner: VAT and price lock (`PRICING.md` §4). The first ten conversations (§4.1) test
+   the price, and the free listing becomes marketable only when its gating ships (`PRICING.md` §1).
 5. **A referral benefit** for restaurant-to-restaurant referrals, real and paid, or none.
 6. **The Foodro phone check**, optional and two minutes (`BUSINESS-MODEL.md` §8).
 
@@ -271,6 +272,6 @@ loses real value every month. The price-review cadence belongs in the owner's pr
 
 **Line for the CEO:** «Marketer `rezv-c6` → `docs/marketing/BUSINESS-PLAN.md` v1 (submitted): برنامه‌ی
 ۱۲ماهه از روزِ لانچ (L)، پایین‌به‌بالا، بدونِ TAM؛ اول ده رستوران در یک محله‌ی تهران با فروشِ «پولی که
-می‌ماند» نه رشد؛ دروازه‌های پیشنهادی برای مالک در L+3 و L+6؛ مالی فقط حساب روی placeholder (۱۸.۵
+می‌ماند» نه رشد؛ دروازه‌های پیشنهادی برای مالک در L+3 و L+6؛ مالی فقط حساب روی قیمت‌های مالک (۱۸/۳۳/۶۰M؛ ۲۰
 رستوران برای هر ۱۰۰ میلیون هزینه‌ی ماهانه)؛ فاز ۰ سه دروازه‌ی تو را لازم دارد: M-12، اثباتِ پیامک، CI
 سبز؛ دو تصمیمِ مسدودکننده‌ی مالک: runway و اینکه چه کسی می‌فروشد.»

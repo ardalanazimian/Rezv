@@ -5,8 +5,8 @@
 **Base:** `main = cf60b9c`, code read on that tree the same day.
 
 **What it needs:** CEO: re-verify §2 against code (every row has a `file:line`) and route §0's
-findings (b) and (c), which are not my files. Owner: the decisions in §7. Nothing in §3 may be
-treated as a price. Counsel: §5.
+findings (b) and (c), which are not my files. Owner: the decisions still open in §7 (prices and
+deposits are decided; VAT and price lock are in `PRICING.md` §4). Counsel: §5, if deposits are re-opened.
 
 **Written name-free.** `E-001` is open. Where a name would go, this document writes ⟨NAME⟩.
 
@@ -78,6 +78,7 @@ recorded so the business plan does not assume renewals collect themselves.
 
 | # | Line | Who pays | State in code | Platform revenue? |
 |---|---|---|---|---|
+| R0 | **Free listing** (owner, 2026-09-17) | Nobody | **Not built.** There is no gating by plan, so every listed restaurant can take bookings today (`PRICING.md` §1) | **No.** It is catalogue depth for diners and an upgrade path |
 | R1 | **Subscription** (3 / 6 / 12 months) | Restaurant | Exists. Prices are seeded in the DB and editable from the company panel. Collection is manual (§0-c). New sign-ups get a 30-day trial on plan `free` (`api/src/lib/site-orders.ts:36,300`) | **Yes, the only one today** |
 | R2 | **SMS credit** | Restaurant | Each restaurant has `smsBalance` (starter 50, `api/src/lib/sms-balance.ts:8`), debited per send and topped up manually by an admin (`api/src/app/api/v1/admin/restaurants/[id]/sms/route.ts`). **No price for a top-up exists anywhere in the code** | **Possible, not priced.** The unit cost from Melipayamak is `UNKNOWN` |
 | R3 | **Deposits** (بیعانه) | Diner → restaurant | Collection works end-to-end when `paymentEnabled` is on. Forfeiture and refund on cancel are config only (`api/src/lib/cancellation-policy.ts:28,73`) and nothing executes them | **No. It is pass-through money,** and today it would sit with us (§0-a) |
@@ -113,18 +114,26 @@ been fully green since 09-08, real SMS delivery is unproven, and point spending 
 
 ---
 
-## 3. Price: the placeholder and its arithmetic
+## 3. Price: the owner's decision, and the market around it
 
-> **Placeholder, not confirmed by the owner.** The CEO has not measured these figures, and pricing
-> is a money decision reserved to the owner. Nothing below is a recommendation of a price.
+> **Decided by the owner on 2026-09-17** (`PRICING.md` v2 §0): **18M / 33M / 60M** for 3 / 6 / 12
+> months, «کمی زیرِ SmartX، هم‌تراز». **Plus a free tier:** a restaurant listing in the customer app,
+> **display only, with no online booking**. The business panel and the club are paid. The old
+> 18/34/65M were placeholders, and the owner ruled they were not real prices. VAT and price-lock
+> terms are still open with him (`PRICING.md` §4).
 
 | Plan | Months | Price (toman) | Per month | "Compare at" on the card |
 |---|---|---|---|---|
+| Free listing | — | 0 | — | — |
 | m3 | 3 | 18,000,000 | 6.00M | — |
-| m6 | 6 | 34,000,000 | 5.67M | 36,000,000 (= 2 × m3) |
-| m12 | 12 | 65,000,000 | 5.42M | 72,000,000 (= 4 × m3) |
+| m6 | 6 | 33,000,000 | 5.50M | 36,000,000 (= 2 × m3) |
+| m12 | 12 | 60,000,000 | 5.00M | 72,000,000 (= 4 × m3) |
 
-Source: `api/prisma/seed/site-content.json`, served from the DB and editable in the company panel.
+**⚠️ The free/paid boundary does not exist in code yet.** There is no gating by plan, expiry is not
+enforced, and there is no public contact field (`PRICING.md` §1, six requirements). Until the gating
+ships, the free tier must not be marketed as "listing without booking".
+
+Where prices live: `api/prisma/seed/site-content.json` (today still the old numbers, until the Implementation Team applies `PRICING.md`), served from the DB and editable in the company panel.
 A committed copy also exists in `apps/landing/content/site-content.json`, but the pricing page
 **deliberately does not show it** when the API is unconfigured or failing
 (`apps/landing/app/pricing/page.tsx:30-51`). A guard test pins that behaviour
@@ -144,11 +153,13 @@ as in those files. VAT (+10%) is shown where the page states it.
 | SmartX customer club / bundle | 51,000,000 / 199,250,000 | One module / all four | REAL |
 | Duvita Basic → Unlimited | 36,000,000 → 84,000,000 (3M–7M/mo), **+10% VAT** | POS suite, tiered by orders/day. No reservation feature found | REAL |
 | SnappFood (delivery) | Commission, reported 15–22% of sales | Delivery marketplace. Foodro booking terms `UNKNOWN` (§8) | SECONDARY |
-| **Our placeholder** | **72M (m3×4) / 68M (m6×2) / 65M (m12)** | Everything, no VAT line stated | Placeholder |
+| **Ours (owner, 2026-09-17)** | **72M (m3×4) / 66M (m6×2) / 60M (m12)**, plus a free display-only listing | Everything paid is identical. VAT still open | Owner's decision |
 
 **What this can and cannot say:**
 - **We would sit in the "full platform" band (36–90M/yr)** next to Duvita and Mupra's middle tiers.
-  We are not in the "reservation tool" band, where RSEE is at 1/16 to 1/65 of our price.
+  We are not in the "reservation tool" band, where RSEE is at 1/15 to 1/61 of our m12 price.
+  Against SmartX's matching pair (reservation + club), 60M is ≈17% below 72.45M and ≈42% below 103.8M.
+  That comparison is for sales conversations only, never public copy (`PRICING.md` §2).
 - **We are the only reservation-first product with a published all-inclusive price** among the ten
   checked. Every POS suite hides its reservation module behind a sales call. That is a positioning
   asset *only if the owner keeps prices public*.
@@ -179,7 +190,7 @@ LTV               = ARPA × gross margin % / monthly churn
 
 | Input | Value | Where it will come from |
 |---|---|---|
-| ARPA | Placeholder only (§3) | Owner's price decision |
+| ARPA | 5.0–6.0M toman/month by term (owner's prices, §3), before VAT | Decided 2026-09-17. The mix of terms is `UNKNOWN` until restaurants pay |
 | Hosting cost per restaurant | `UNKNOWN` | Launch Engineer, once production exists |
 | SMS unit cost (Melipayamak) | **10.6–17.9 toman per Persian SMS page** (by operator and line type), plus a 40-rial surcharge and 10% VAT. So ≈ **16–24 toman all-in**. REAL for "the provider states", as of Tir 1405 | `melipayamak.com/blog/posts/sms-pricing/`, fetched 2026-09-17 |
 | Onboarding hours per restaurant | `UNKNOWN` | The first ten activations. The m6 card already promises «راه‌اندازی و انتقالِ دادهٔ اولیه» |
@@ -188,10 +199,9 @@ LTV               = ARPA × gross margin % / monthly churn
 | Trial → paid conversion | `UNKNOWN` | `SiteOrder.kind = 'trial'` → plan set by admin |
 
 **What the SMS number already tells us.** At ≈24 toman all-in, 1,000 messages a month cost ≈24,000
-toman. That is **<0.5%** of the ~5.4–6M toman monthly equivalent of the placeholder price. SMS is
+toman. That is **<0.5%** of the 5.0–6.0M toman monthly equivalent of the owner's prices. SMS is
 not a margin risk at plausible restaurant volumes, and it is not a meaningful revenue line either
-unless top-ups carry a markup (§7.4). Arithmetic on a REAL input and a placeholder, so no price
-decision rests on it.
+unless top-ups carry a markup (§7.4). Arithmetic on a REAL input.
 
 **Churn scenarios, labelled as assumptions, for the business plan.** Expected lifetime in months = 1 / monthly churn.
 
@@ -245,8 +255,8 @@ told about in advance.
 ## 7. Decisions needed
 
 **Owner**
-1. **Prices.** Confirm, change or withdraw the 18/34/65M placeholders. The research is in (§3). Also
-   decide how often prices are reviewed, since food-group inflation is 127.5% (SECONDARY).
+1. ~~**Prices.**~~ **Decided 2026-09-17, owner: 18 / 33 / 60M, plus a free display-only listing** (§3,
+   `PRICING.md` v2). Still open with him: VAT and price lock (`PRICING.md` §4).
 2. **Tiers.** Either tiers differ **only** in term and support (then the cards lose per-tier
    features), or tiers really gate features (then the lead paragraph is false and gating has to be
    built). One of the two must change. The first matches the code. A third, honest option exists
