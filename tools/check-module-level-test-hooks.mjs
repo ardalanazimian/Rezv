@@ -24,9 +24,15 @@
 //  نادیده گرفته می‌شوند — همان روشِ tools/check-rejects-matcher.mjs، به‌علاوه‌ی تشخیصِ regex
 //  پس از کلیدواژه‌ها (`return /x/`).
 //
+//  ⚠️ نام‌های مستعار هم گرفته می‌شوند (پیگیریِ Red Team، ۲۰۲۶-۰۹-۱۷ — `const b = beforeEach; b(fn)`
+//  یک هوکِ ریشه‌ی واقعی ثبت می‌کند): هر ارجاعِ **غیرِ فراخوانی** به beforeEach/afterEach — در هر
+//  عمقی، چون محلِ فراخوانیِ مستعار را نمی‌شود دنبال کرد — و `import { beforeEach as x }`، به‌علاوه‌ی
+//  `ns.beforeEach(` در سطحِ ماژول وقتی `ns` از `import * as ns from 'node:test'` آمده باشد.
+//  تنها ارجاعِ بی‌فراخوانیِ مجاز، نامِ ساده در فهرستِ `import { … }` است.
+//
 //  ⚠️ آنچه **نمی‌سنجد**، صریح: `before`/`after`ِ سطحِ ماژول (یک‌بار برای کلِ سوئیت اجرا
-//  می‌شوند؛ کلاسِ خویشاوند، ولی دامنه‌ی این حکم نیست)؛ import با نامِ مستعار
-//  (`import { beforeEach as be }`)؛ فراخوانیِ عضو (`x.beforeEach(`).
+//  می‌شوند؛ کلاسِ خویشاوند، ولی دامنه‌ی این حکم نیست)؛ فراخوانیِ عضو روی شیئی که namespaceِ
+//  `node:test` نیست (`suite.beforeEach(`)؛ هوکی که ماژولِ دیگری هنگامِ import ثبت کند؛ `require`.
 //
 //  کنترلِ مثبت اجباری است (قاعده‌ی ۲ی CLAUDE.md): پیش از هر ادعا، اسکنر روی نمونه‌های
 //  ساختگی آزموده می‌شود؛ اگر نبیند یا اشتباه ببیند، با کدِ ۲ («گیت اجرا نشد») می‌میرد.
@@ -76,7 +82,13 @@ export function findModuleLevelHooks(src) {
   let i = 0;
   let prevMeaningful = ';';
   let lastWord = '';
+  let wordBeforeDot = '';
+  let importPending = false;   // پس از کلیدواژه‌ی import، تا from یا ;
+  let importBraceDepth = -1;   // عمقِ درونِ `import { … }`؛ -1 یعنی بیرون
   const lineAt = (idx) => src.slice(0, idx).split('\n').length;
+  const nodeTestNamespaces = new Set(
+    [...src.matchAll(/import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['"](?:node:)?test['"]/g)].map((m) => m[1]),
+  );
 
   while (i < src.length) {
     const c = src[i];
@@ -122,9 +134,19 @@ export function findModuleLevelHooks(src) {
       let j = i;
       while (j < src.length && /[A-Za-z0-9_$]/.test(src[j])) j++;
       const word = src.slice(i, j);
-      if (depth === 0 && HOOKS.includes(word) && prevMeaningful !== '.') {
-        const after = src.slice(j).match(/^\s*\(/);
-        if (after) hits.push({ hook: word, line: lineAt(i) });
+      if (word === 'import') importPending = true;
+      else if (word === 'from') importPending = false;
+      if (HOOKS.includes(word)) {
+        const isCall = /^\s*\(/.test(src.slice(j));
+        if (prevMeaningful === '.') {
+          if (depth === 0 && isCall && nodeTestNamespaces.has(wordBeforeDot)) hits.push({ hook: `${wordBeforeDot}.${word}`, line: lineAt(i) });
+        } else if (importBraceDepth !== -1 && depth >= importBraceDepth) {
+          if (/^\s+as\b/.test(src.slice(j))) hits.push({ hook: `${word} as …`, line: lineAt(i) });
+        } else if (!isCall) {
+          hits.push({ hook: `alias:${word}`, line: lineAt(i) });
+        } else if (depth === 0) {
+          hits.push({ hook: word, line: lineAt(i) });
+        }
       }
       lastWord = word;
       prevMeaningful = src[j - 1];
@@ -132,8 +154,14 @@ export function findModuleLevelHooks(src) {
       continue;
     }
 
+    if (c === '{' && importPending && importBraceDepth === -1) importBraceDepth = depth + 1;
+    if (c === ';') importPending = false;
     if (c === '(' || c === '[' || c === '{') depth++;
-    else if (c === ')' || c === ']' || c === '}') depth = Math.max(0, depth - 1);
+    else if (c === ')' || c === ']' || c === '}') {
+      depth = Math.max(0, depth - 1);
+      if (importBraceDepth !== -1 && depth < importBraceDepth) importBraceDepth = -1;
+    }
+    if (c === '.') wordBeforeDot = lastWord;
     if (!/\s/.test(c)) { prevMeaningful = c; lastWord = ''; }
     i++;
   }
@@ -149,6 +177,11 @@ const MUST_FLAG = [
   ['پس از return /x/ در یک تابع', 'function f() { return /[(]/.test(s); }\nafterEach(() => {});\n', 1],
   ['پس از رشته‌ی دارای آکولاد', "const s = '{{{';\nbeforeEach(() => {});\n", 1],
   ['پس از تمپلیتِ دارای ${}', 'const s = `${ {a: 1}.a }`;\nbeforeEach(() => {});\n', 1],
+  ['نامِ مستعار با انتساب (Red Team)', "import { beforeEach } from 'node:test';\nconst b = beforeEach;\nb(() => {});\n", 1],
+  ['نامِ مستعار در import', "import { beforeEach as be } from 'node:test';\nbe(() => {});\n", 1],
+  ['ارسال به‌عنوانِ مقدار', 'register(afterEach);\n', 1],
+  ['مستعار داخلِ describe هم (محلِ فراخوانی دنبال‌شدنی نیست)', "describe('a', () => {\n  const h = afterEach;\n  h(() => {});\n});\n", 1],
+  ['namespaceِ node:test در سطحِ ماژول', "import * as nt from 'node:test';\nnt.beforeEach(() => {});\n", 1],
 ];
 const MUST_NOT_FLAG = [
   ['داخلِ describe (تورفته)', "describe('a', () => {\n  beforeEach(() => {});\n});\n"],
@@ -158,6 +191,10 @@ const MUST_NOT_FLAG = [
   ['فراخوانیِ عضو', 'suite.beforeEach(() => {});\n'],
   ['شناسه‌ی مشابه', 'myBeforeEach(() => {});\nconst beforeEachCount = 1;\n'],
   ['هوکِ یک‌باره (خارج از دامنه)', 'before(async () => {});\nafter(async () => {});\n'],
+  ['نامِ ساده در فهرستِ import (چندخطی)', "import {\n  test,\n  beforeEach,\n  afterEach,\n} from 'node:test';\n"],
+  ['import با پیش‌فرض و فهرست', "import test, { afterEach } from 'node:test';\n"],
+  ['namespaceِ node:test داخلِ describe', "import * as nt from 'node:test';\ndescribe('a', () => {\n  nt.beforeEach(() => {});\n});\n"],
+  ['عضوِ شیئی که namespaceِ node:test نیست', "import * as other from './x.mts';\nother.beforeEach(() => {});\n"],
 ];
 
 function selfTest() {
@@ -219,7 +256,7 @@ function main() {
     if (hits.length > allowed) {
       const where = hits.map((h) => `${h.hook}:${h.line}`).join(' ');
       problems.push(allowed === 0
-        ? `تازه: ${f} (${where}) — هوک را داخلِ describe ِ همان فایل بگذار`
+        ? `تازه: ${f} (${where}) — ${hits.some((h) => /alias:|\.| as /.test(h.hook)) ? 'هوک را مستقیم با نامِ خودش و داخلِ describe صدا بزن (مستعار و namespace دنبال‌شدنی نیستند)' : 'هوک را داخلِ describe ِ همان فایل بگذار'}`
         : `بیشتر شد: ${f} ${allowed} → ${hits.length} (${where})`);
     }
   }

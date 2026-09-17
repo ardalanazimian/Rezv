@@ -67,10 +67,34 @@ files: business-panel-contract, admin-branches, and the route-permission guard. 
 30+ minutes. A two-file mini runner showed it also fails the tests of the file imported **before** it. A
 failing one-shot root hook is therefore as global as a per-test one. This guard does not cover it.
 
+## Alias hardening (Red Team P3, 2026-09-17)
+
+Red Team confirmed that `const b = beforeEach; b(fn)` registers a real root hook and that the scanner
+missed it. It was also not in this document's non-scope, which named only `import { … as … }`. Now
+flagged, in `tools/check-module-level-test-hooks.mjs`:
+
+- **Any non-call reference** to `beforeEach`/`afterEach`, at **any** depth. An alias's call site cannot be
+  followed, so even `const h = afterEach` inside a `describe` is refused. That covers `const b = beforeEach`,
+  `register(afterEach)`, and the like.
+- `import { beforeEach as x }`. A plain name in an `import { … }` list, even multi-line, stays allowed.
+- `ns.beforeEach(` at module level when `ns` comes from `import * as ns from 'node:test'`. Found while
+  closing the alias case: a namespace import is the same bypass through a member call.
+- The advice line tells the author to call the hook by its own name inside `describe`, rather than the
+  plain-hook advice, which would not clear an alias.
+
+| Case | Result |
+|---|---|
+| Real tree after the change | **exit 0**: `13 فایل / 13 هوک … (209 فایلِ اسکن‌شده) … 23 نمونه‌ی ساختگی`. No alias exists in `api/tests` today (`git grep` for alias shapes: 0) |
+| Self-test samples | 7 → 12 must-flag, 7 → 11 must-not-flag |
+| Mutant: alias detection removed | **exit 2**: `باید 1 می‌دید، دید 0: نامِ مستعار با انتساب (Red Team)` |
+| Mutant: import-list exemption removed | **exit 2**: the plain-hook sample now counts its own import (`دید 2`) |
+| Mutant: namespace member detection removed | **exit 2**: `… namespaceِ node:test در سطحِ ماژول` |
+| Real alias added to `env-secrets.test.mts` | **exit 1**: `تازه: … (alias:beforeEach:2)` with the alias advice; a plain module-level hook still gets the move-inside-describe advice (both checked); files restored |
+
 ## What I did not verify
 
 - **Linux CI** (the `design-system` job). Windows only.
-- Hooks imported under an alias (`import { beforeEach as be }`), or hooks defined through helpers that
-  call `beforeEach` at import time from another module. Neither shape exists in `api/tests` today, and
-  neither is covered.
+- Hooks registered through `require('node:test')`, through a member call on an object that is not a
+  `node:test` namespace import, or by another module at import time. None of these shapes exists in
+  `api/tests` today, and none is covered.
 - The 14 baseline files themselves were not audited or fixed, per the ruling.
