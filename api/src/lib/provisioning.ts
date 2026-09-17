@@ -248,6 +248,7 @@ async function sendInviteSms(p: { phone: string; ownerName: string; restaurantNa
   await enqueueSms({
     to: p.phone,
     template: 'staff_invite',
+    // ⚠️ جایگاهِ ۲ برای لینک قراردادِ مهاجرتِ ۰۹۶ است (پاک‌کردنِ توکن پس از پایانِ job) — جابه‌جا نکن.
     tokens: [p.ownerName, p.restaurantName, inviteUrl(p.token)],
     idempotencyKey: `staff-invite:${p.inviteId}`,
   });

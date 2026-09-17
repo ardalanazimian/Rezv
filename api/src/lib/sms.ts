@@ -13,6 +13,7 @@ export type SmsJob = {
     | 'booking_cancelled' | 'booking_noshow' | 'booking_thanks'
     | 'waitlist_joined' | 'waitlist_offer'
     // SPEC-B: دعوتِ اولین‌ورودِ owner — tokens: [ownerName, restaurantName, inviteUrl]
+    // ⚠️ مهاجرتِ ۰۹۶ (jobs_redact_invite_link) توکن را فقط در tokens[2] پاک می‌کند؛ ترتیب را عوض کردی، آن تریگر را هم عوض کن.
     | 'staff_invite';
   tokens: string[];
   restaurantId?: string;  // اگر مشخص باشد، از موجودی SMS رستوران کم می‌شود (OTP سطح پلتفرم آن را ندارد)
