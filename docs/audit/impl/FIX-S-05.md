@@ -36,7 +36,7 @@ platform_settings", and that line is corrected in this commit.
 |---|---|---|
 | `api/src/lib/events.ts` `emit` | copied the plaintext webhook secret into `jobs.payload` on every event. Completed jobs are kept 7 days, dead jobs 90 | **fixed**: the payload no longer carries it. Delivery reads the sealed secret from the `webhooks` row. Migration 094 strips `secret` from existing webhook job payloads |
 | Redis cache of `platform_settings` | would hold whatever `getPlatformSetting` cached | **fixed by design**: the cache holds the ciphertext. Plaintext exists only in the caller's memory |
-| `api/src/lib/provisioning.ts` `sendInviteSms` | the invite link (with the token) sits in `jobs.payload.tokens[2]` of the queued SMS for 7 days after sending | **not fixed, logged.** The SMS must carry the link. The claim route's own contract says the token is not authentication: it reveals the invite state, restaurant name and a masked phone, and login still requires OTP. Options for a ruling: redact `tokens` on completion, or shorten retention for `staff_invite` jobs |
+| `api/src/lib/provisioning.ts` `sendInviteSms` | the invite link (with the token) sits in `jobs.payload.tokens[2]` of the queued SMS for 7 days after sending (dead jobs: 90) | **fixed in the follow-up** (CEO ruling): migration 096 redacts `#token=…` once the job is completed or dead, on every write path. See "Follow-up after merge" |
 | `docs/DEPLOYMENT.md` §7 | the Melipayamak-in-DB premise | **corrected** |
 | No app code writes `webhooks.secret` | no create route exists; rows come from operators | documented: an operator inserts plaintext, then runs the reseal route with `seal_plaintext=1`. Until then the webhook delivery fails closed |
 
@@ -135,10 +135,48 @@ with migration 094 applied from the tree before the tests.
   environmental and not this change. The middleware path was proven directly (above). CI's `boot-path`
   job exercises the real boot and now generates a key.
 - **Linux CI**: not run (the branch is not main and has no PR).
-- **The invite SMS job payload sibling** (above) is open by design until ruled on.
 - **Key loss** makes the sealed values unreadable. That is inherent. The mitigation is the operator's
   backup of the keyring, stated in `.env.example` and ENVIRONMENT.md.
 - **No production data exists to migrate**, per the 2026-09-16 measurement (no deployed environment). The
   first-deploy step is documented, not exercised on real data.
 - **Throughput** of sealing and opening per request was not measured. It is one AES-GCM call per read of
   the merchant id or a webhook secret.
+
+## Follow-up after merge (CEO rulings on `bd80c1f`, 2026-09-17)
+
+Branch `impl/rezv-85-s05-followup`, one commit on main `92ba665`. It is a separate commit because S-05
+had already merged as `bd80c1f` after Red Team rated it HOLDS.
+
+**1. Invite link redacted from the SMS job at a terminal state.** Ruling: no bearer-ish link sits in a
+queue table once the job is done.
+- **Migration 096** (`096-jobs-redact-invite-link.sql`) adds a `BEFORE INSERT OR UPDATE` trigger on
+  `jobs` and backfills existing rows. It is a new file, not an edit of 094, because 094 is merged.
+  095 stays reserved for P1-4 A; the two are independent.
+- The trigger covers every write path: `completeJob`, `failJob`, the SQL in `reclaimStaleJobs`, and a
+  manual `UPDATE`.
+- Only `#token=…` is replaced (`#token=[redacted]`); the link's base stays for the operational trail.
+- Pending and retrying jobs keep the link, because they still have to send it.
+
+**2. Gate A2 refuses a deploy without a clean reseal.** In `tools/gate-deploy.mjs`, the evidence must
+reference `secrets_reseal.raw_output_path`, and the gate reads the response itself: an active key id, an
+empty `failed`, and `plaintext_skipped` equal to 0.
+
+**3. Runbook wording** (Red Team's operational note): the reseal runs **immediately after** the deploy.
+Between the two, payments and webhook deliveries are down by design. This is stated in `DEPLOYMENT.md` §7,
+`ENVIRONMENT.md`, and the route's header.
+
+| Step | Result |
+|---|---|
+| RED: the 3 new tests with 096 moved aside, fresh clone | `tests 17 · pass 14 · fail 3` · **exit 1**. Completed job still holds the token; dead job still holds it; the backfill test fails because 096 is absent |
+| GREEN with 096 applied after 094 | `secrets-at-rest` **17/17** · `staff-invite-flow` **6/6**, each exit 0. Covers: the retrying job keeps the link; completed, dead-lettered and SQL-updated jobs lose the token; 096 backfills a pre-096 completed job, restores its trigger, and a second run leaves the row byte-identical |
+| Mutants on 096, each on a fresh clone | **4/4 caught**: R1 dead jobs not redacted (1 fail) · R2 pending jobs redacted too (5 fails; retries could no longer send) · R3 no backfill (1 fail) · R4 whole link replaced instead of just the token (1 fail) |
+| Full api suite on the follow-up commit (clean checkout), after a full `apply-sql.sh` on a fresh clone (094 and 096 applied in order) | `apply-sql.sh` exit 0 · **tests 1927 · pass 1927 · fail 0 · exit 0**. The new trigger fires on every `jobs` write in the suite without breaking any queue, SMS or worker test |
+| `npm run lint` · `tsc --noEmit` · 20 `ci.yml` guards on a detached clean checkout | exit 0 · exit 0 · 20 guards, 0 failed |
+| Gate A2 against scratch evidence fixtures (the real tree has no staging evidence and stays red, exit 1) | this branch: clean reseal → **exit 0**; no `secrets_reseal` → **exit 1**; a `failed` entry → **exit 1**; `plaintext_skipped: 2` → **exit 1**; non-JSON output → **exit 1**. **Control, main's gate**: all five exit 0, which is the gap this closes |
+
+Not verified in the follow-up:
+- Linux CI.
+- A trigger on `jobs` under production load. It runs on every job write but only does work when `kind =
+  'sms'` and the status is terminal; throughput was not measured.
+- `INSERT` of an already-terminal staff_invite job: covered by the trigger definition, but no code path
+  does it and no test drives it.

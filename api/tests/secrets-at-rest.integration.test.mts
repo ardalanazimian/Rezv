@@ -35,6 +35,7 @@ const { emit, deliverWebhook, WEBHOOK_SECRET_CONTEXT } = await import('../src/li
 const { resealSecrets } = await import('../src/lib/secret-reseal');
 const resealRoute = await import('../src/app/api/v1/maintenance/secrets-reseal/route.ts');
 const { provisionBusiness } = await import('../src/lib/provisioning');
+const { completeJob, failJob } = await import('../src/lib/queue');
 const { POST: claim } = await import('../src/app/api/v1/auth/invite/[token]/claim/route.ts');
 const { signAccess } = await import('../src/lib/jwt');
 const { testIp } = await import('./helpers/test-ip.mts');
@@ -396,12 +397,20 @@ describe('staff_invites.token — فقط هش', () => {
     assert.equal((await claimReq(row.token)).status, 404, 'کسی که DB را خوانده با هش وارد نمی‌شود');
   });
 
-  test('🔴 دعوتِ پیش از مهاجرتِ ۰۹۴ پس از آن کار می‌کند؛ اجرای دوم no-op؛ CHECK متنِ ساده را می‌بندد', async () => {
-    const cli = 'node_modules/prisma/build/index.js';
-    assert.ok(existsSync(cli), 'CLIِ prisma لازم است — این تست باید واقعاً مهاجرت را اجرا کند');
-    const apply094 = () => execFileSync(process.execPath,
-      [cli, 'db', 'execute', '--schema', 'prisma/schema.prisma', '--file', 'prisma/sql/094-secrets-at-rest.sql'],
+  const PRISMA_CLI = 'node_modules/prisma/build/index.js';
+  const applySql = (file: string) => {
+    assert.ok(existsSync(PRISMA_CLI), 'CLIِ prisma لازم است — این تست باید واقعاً مهاجرت را اجرا کند');
+    return execFileSync(process.execPath,
+      [PRISMA_CLI, 'db', 'execute', '--schema', 'prisma/schema.prisma', '--file', `prisma/sql/${file}`],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  };
+  const apply094 = () => applySql('094-secrets-at-rest.sql');
+  const apply096 = () => applySql('096-jobs-redact-invite-link.sql');
+  const inviteJob = (inviteId: string) =>
+    db.job.findUniqueOrThrow({ where: { idempotencyKey: `staff-invite:${inviteId}` }, select: { id: true, kind: true, status: true, attempts: true, maxAttempts: true, payload: true } });
+  const linkOf = (payload: unknown) => String((payload as { tokens?: string[] }).tokens?.[2] ?? '');
+
+  test('🔴 دعوتِ پیش از مهاجرتِ ۰۹۴ پس از آن کار می‌کند؛ اجرای دوم no-op؛ CHECK متنِ ساده را می‌بندد', async () => {
 
     const { inviteId } = await provisionWithSmsToken();
     const legacy = randomBytes(32).toString('hex');
@@ -437,5 +446,61 @@ describe('staff_invites.token — فقط هش', () => {
       if (c.n === 0) apply094();
       await db.job.delete({ where: { id: legacyJob.id } }).catch(() => {});
     }
+  });
+
+  // ─── مهاجرتِ ۰۹۶، حکمِ CEO (۲۰۲۶-۰۹-۱۷): لینکِ دعوت (توکنِ حامل) پس از پایانِ jobِ پیامک در جدولِ jobs نمی‌ماند ───
+  // jobِ در انتظار/تلاشِ دوباره باید لینک را داشته باشد (هنوز باید فرستاده شود)؛ به محضِ حالتِ پایانی
+  // (completed یا dead) — از هر مسیری: completeJob، failJob، بازپس‌گیریِ SQL یا UPDATEِ دستی — حذف می‌شود.
+  test('🔴 لینکِ دعوت با تکمیلِ jobِ پیامک پاک می‌شود؛ jobِ تلاشِ دوباره هنوز آن را دارد', async () => {
+    const { inviteId, token } = await provisionWithSmsToken();
+    const job = await inviteJob(inviteId);
+    assert.equal(job.kind, 'sms');
+    assert.ok(linkOf(job.payload).endsWith(`#token=${token}`), 'پیش‌شرط: jobِ در انتظار لینک را دارد');
+
+    await failJob({ id: job.id, kind: job.kind, payload: job.payload, attempts: 1, maxAttempts: job.maxAttempts }, 's05 retry');
+    const retrying = await inviteJob(inviteId);
+    assert.equal(retrying.status, 'pending');
+    assert.ok(linkOf(retrying.payload).endsWith(`#token=${token}`), 'تلاشِ دوباره هنوز باید بتواند بفرستد');
+
+    await completeJob(job.id, { status: 'sent' });
+    const done = await inviteJob(inviteId);
+    assert.equal(done.status, 'completed');
+    assert.equal(JSON.stringify(done.payload).includes(token), false, 'توکن در payloadِ jobِ تکمیل‌شده نیست');
+    assert.match(linkOf(done.payload), /invite\.html#token=\[redacted\]$/, 'پایه‌ی لینک برای رد می‌ماند، فقط توکن پاک می‌شود');
+  });
+
+  test('🔴 همین برای DLQ (failJobِ پایانی) و برای تغییرِ وضعیت از مسیرِ SQL (مثلِ بازپس‌گیری)', async () => {
+    const a = await provisionWithSmsToken();
+    const ja = await inviteJob(a.inviteId);
+    assert.equal(await failJob({ id: ja.id, kind: ja.kind, payload: ja.payload, attempts: ja.maxAttempts, maxAttempts: ja.maxAttempts }, 's05 dead'), 'dead');
+    const deadJob = await inviteJob(a.inviteId);
+    assert.equal(deadJob.status, 'dead');
+    assert.equal(JSON.stringify(deadJob.payload).includes(a.token), false, 'jobِ مرده توکن ندارد');
+
+    const b = await provisionWithSmsToken();
+    const jb = await inviteJob(b.inviteId);
+    await db.$executeRaw`UPDATE jobs SET status = 'dead'::job_status WHERE id = ${jb.id}::uuid`;
+    assert.equal(JSON.stringify((await inviteJob(b.inviteId)).payload).includes(b.token), false, 'هر مسیرِ نوشتن، نه فقط کدِ queue');
+  });
+
+  test('🔴 ۰۹۶ jobهای پایانیِ قدیمی را هم پاک می‌کند، تریگر را برمی‌گرداند، و اجرای دومش no-op است', async () => {
+    const { inviteId, token } = await provisionWithSmsToken();
+    const job = await inviteJob(inviteId);
+    try {
+      // وضعیتِ «پیش از ۰۹۶»: بدونِ تریگر، jobِ تکمیل‌شده‌ای که هنوز توکن دارد.
+      await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS jobs_redact_invite_link ON jobs');
+      await db.$executeRaw`UPDATE jobs SET status = 'completed'::job_status WHERE id = ${job.id}::uuid`;
+      assert.ok(JSON.stringify((await inviteJob(inviteId)).payload).includes(token), 'پیش‌شرط: بی تریگر توکن می‌ماند');
+      apply096();
+      const once = (await inviteJob(inviteId)).payload;
+      assert.equal(JSON.stringify(once).includes(token), false, '۰۹۶ ردیفِ قدیمی را پاک کرد');
+      apply096();
+      assert.deepEqual((await inviteJob(inviteId)).payload, once, 'اجرای دومِ ۰۹۶ ردیف را عوض نمی‌کند');
+    } finally {
+      const [t] = await db.$queryRaw<Array<{ n: number }>>`SELECT count(*)::int AS n FROM pg_trigger WHERE tgname = 'jobs_redact_invite_link' AND NOT tgisinternal`;
+      if (t.n === 0) apply096();
+    }
+    const [t2] = await db.$queryRaw<Array<{ n: number }>>`SELECT count(*)::int AS n FROM pg_trigger WHERE tgname = 'jobs_redact_invite_link' AND NOT tgisinternal`;
+    assert.equal(t2.n, 1, 'تریگر پس از ۰۹۶ برقرار است');
   });
 });
