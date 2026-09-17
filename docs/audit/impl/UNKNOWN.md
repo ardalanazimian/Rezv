@@ -54,3 +54,13 @@ Nothing below is a finding and nothing below is green. Each row says what was no
 |---|---|---|
 | U-22 | Crawler UA vs edge (403?), OAI-SearchBot, rich-results test, sitemap from outside | No domain (`E-001`, owner). SEO-B1 |
 | U-23 | Core Web Vitals on a mid-range Android over an Iranian mobile connection | No device, no deployed page |
+
+## Added 2026-09-17 ~00:45 UTC (batch 2)
+
+| # | Unknown | Why |
+|---|---|---|
+| U-24 | Whether FE-06 raises the rate of the pre-existing `cancel-window-disclosure:84` flake (1/48 on the candidate, 8/78 on the fix tree, confounded by a concurrent DB build) | Handed to rezv-75 by the CEO for a de-confounded measurement; also to be audited as a possible real mis-tap during page transitions |
+| U-25 | Migration 090 on any real database | Test databases only. No production or staging DB in reach (see U-1) |
+| U-26 | The real partition-retention procedure | `011-reservations-partitioning.sql` is not runnable as written (elided columns, undefined `block_end`). Only a shape emulation was measured (FIX-BE-02 §partition) |
+| U-27 | The FP-009 gates on Linux CI | `impl/*` pushes do not trigger CI. The end-to-end drift run used a `psql` shim into the Postgres 17 container on Windows |
+| U-28 | 13 remaining files with module-level `beforeEach`/`afterEach` | Class logged as BE-14; not audited one by one |

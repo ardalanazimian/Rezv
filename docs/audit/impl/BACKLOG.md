@@ -16,15 +16,15 @@ else's statement I have not reproduced yet · `repro pending` = shape confirmed 
 test yet. Priority levels are the founder's §2 order: 1 journey · 2 money/auth · 3 beatable gate ·
 4 regressed / reported-fixed-but-not · 5 fake feature · 6 other.
 
-## Counts — revision 2 (2026-09-17 ~22:30 UTC; revision 1 was 20 rows)
+## Counts — revision 3 (2026-09-17 ~00:45 UTC; revision 2 was 29 rows)
 
 | Lane | Rows | critical | major | minor | submitted | open | blocked |
 |---|---|---|---|---|---|---|---|
-| Backend | 13 | 4 | 8 | 1 | 1 (BE-01) | 11 (+1 owned by rezv-1b) | 0 |
+| Backend | 14 | 4 | 9 | 1 | 3 (BE-01, BE-02, BE-03) | 10 (+1 owned by rezv-1b) | 0 |
 | Frontend | 10 | 2 | 7 | 1 | 1 (FE-06) | 7 (+2 owned by rezv-1b) | 0 |
 | Design | 1 | 0 | 1 | 0 | 0 | 1 | 0 |
 | SEO | 5 | 0 | 2 | 2 | 0 | 4 | 1 (SEO-B1) |
-| **Total** | **29** | **6** | **18** | **4** | **2** | **23 (+3 owned by rezv-1b)** | **1** |
+| **Total** | **30** | **6** | **19** | **4** | **4** | **22 (+3 owned by rezv-1b)** | **1** |
 
 Rows added in revision 2 are listed in the section of that name at the end of this file. Nothing
 is closed; "submitted" means waiting for the Red Team and the CEO.
@@ -135,3 +135,14 @@ scope widened to 8 tables by CEO rulings D-16 (`sms_transactions` FK → RESTRIC
 | BE-12 | critical | 2 | F001: a guest 17 min late goes confirmed → running_late → no_show in **one** cron tick, with no prior signal; cashback −40, a strike, reliability 75 → 0. CEO D-18: base grace default 15 (10–60), guest extension default 15 (0–30), pre-no-show signal mandatory | `api/src/lib/lifecycle.ts:407` | **owned by rezv-1b** (CEO queue change 09-17: owner ordered rezv-1b; M-13/M-14/M-15) — not started here; runtime-proven by rezv-1b |
 | BE-13 | major | 2 | m-14: 10 concurrent OTP guesses beat the attempts cap of 5 — read, compare and increment are separate statements | `api/src/lib/otp.ts:219-221` | claim (Red Team live probe); bounded by per-IP rate limit |
 | DS-01 | major | 5 | The deposit policy is not on the confirm step: `depositLabel` renders on step 1 and on the restaurant page, never in `bookStep3`, whose «تأیید رزرو» button is the tap that commits. Cancellation consequence **is** on step 3. No deposit **amount** exists anywhere in the customer app (0 matches) | `apps/customer/js/data/booking.js:134`, `:412-445`; `apps/customer/js/data/detail.js:236` | measured |
+
+## Revision 3 — 2026-09-17 ~00:45 UTC
+
+**Status changes:** **BE-02** submitted, `impl/rezv-85-090-append-only @ 247d103` + addendum `eeff902`
+(migration 090: 8 tables, D-16, platform_events 90-day floor on `ingested_at`, SET NULL decision upheld by
+the CEO, partition-retention procedure measured). **BE-03** submitted, same branch `@ 553ecf4` (schema-drift
+layer 5 over 9 tables + 2 FKs; §6 guard widened and wired into CI). Both wait for the Red Team.
+
+| ID | Sev | Lvl | Finding | Source | Status |
+|---|---|---|---|---|---|
+| BE-14 | major | 3 | Module-level `beforeEach`/`afterEach` in api test files are registered on the **root** of the one-process runner and fire before *every* test in the suite. One throwing hook (`fraud.integration.test.mts:84` once 090 landed) failed 1829 unrelated tests. 15 files have them; the two that 090 broke are fixed in BE-02. CEO: P2, the class-closer is a static guard with a self-test | `git grep -E "^(beforeEach|afterEach)(" -- api/tests` → 15 files (on 99065a7) | open (CEO: after 090 lands) |
