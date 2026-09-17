@@ -55,7 +55,7 @@
 **What we sell**, from `BUSINESS-MODEL.md` §2, never stronger:
 - Booking, waitlist, tables: REAL-STATIC.
 - Customer club / CRM: REAL-STATIC.
-- Coupons and SMS automations: **PARTIAL** (real SMS delivery unproven).
+- SMS automations: **PARTIAL** (real SMS delivery unproven). Coupons: creatable in the panel, but **no diner can redeem one**, because no UI sends the code (`PRICING.md` §3).
 - Earning points and cashback: **PARTIAL** (spending is off, FP-008).
 - Minimum-spend rules: REAL-STATIC, **as a rule engine**.
 
@@ -91,7 +91,7 @@ Detail and sources: `research/COMPETITORS-IRAN-2026-09-16.md` and `BUSINESS-MODE
 | Who | What the restaurant sees | Our answer, only where it is REAL-STATIC or better |
 |---|---|---|
 | **Status quo** (DM + phone) | Free, and a staff member checks messages | A waitlist and a booking record that don't depend on someone watching Instagram |
-| **SnappFood / Foodro** | Booking inside the app they may already pay commission to. **Live status and terms UNKNOWN** | «مالِ خودت»: the guest list and club stay with the restaurant (`BRAND.md` value ۲) |
+| **SnappFood / Foodro** | Booking inside the app they may already pay commission to. **Live status and terms UNKNOWN** | «مالِ خودت», said only as «در پنلِ خودتان می‌بینید» (no export exists for launch; CEO ruling 2026-09-17) (`BRAND.md` value ۲) |
 | **POS suites** (SmartX, Sepidz, Mupra, Duvita) | Everything in one box, reservation priced "on request", 20–200M/yr | A published, all-inclusive price, *if the owner keeps it public*. We work alongside a POS, not instead of one |
 | **RSEE** | A cheap reservation tool (0.99–3.99M/yr), and the diner pays prepaid credit | The diner pays nothing to book. Deposits are off at launch by the owner's decision, so this holds for the launch |
 

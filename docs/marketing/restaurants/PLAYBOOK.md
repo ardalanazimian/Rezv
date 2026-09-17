@@ -42,8 +42,8 @@ what they wait for.
 | **Commission discounts tied to exclusivity, and exit penalties** | Competition Council decision No. 740 against SnappFood's restaurant contracts (`docs/audit/research/ANTI-PATTERNS.md` #4) | REAL (regulator) | **A flat price and no commission** (`BUSINESS-MODEL.md` §1 R6, no commission code exists). **No exclusivity clause** is a proposal (`docs/audit/research/proposals/003-transparent-restaurant-terms.md`) that the owner must confirm in the actual contract terms before it is said (§7) |
 | **Opaque, contradictory or "call us" prices** | SmartX publishes two prices for one module. Mupra and Sepidz gate their reservation modules (`research/COMPETITORS-IRAN-2026-09-16.md`) | REAL | **A published price:** 18 / 33 / 60M (`PRICING.md` v2), once it ships to the pricing page |
 | **Billing that continues after cancelling** | A restaurant's review of TheFork describing debt collectors after termination (`ANTI-PATTERNS.md` #9) | REAL (a review exists) | **No automatic payment exists.** Nothing is charged to a card and nothing renews on its own: purchase is a request, then a call, then an invoice (`apps/landing/components/pricing/PurchaseDialog.tsx:106-121`, `apps/landing/app/pricing/page.tsx:92-97`) |
-| **Discounts funded from the restaurant's own margin** | SnappFood promotions are restaurant-funded, per a secondary source and SnappFood's own vendor-academy content (`profiles/snappfood-loyalty.md`) | CLAIMED / circumstantial | **We run no discount marketplace.** Coupons in the panel are the restaurant's own tool, aimed at its own guests |
-| **The platform owns the guest** | The dominant platform holds the diner relationship. Its vendor app shows a rating of **2** from 2,334 votes (`research/APP-STORE-FOOTPRINT-2026-09-16.md`) | REAL for the store figure; the *why* is `UNKNOWN` | **«مالِ خودت»:** tenant data comes only from the auth context (`CLAUDE.md`) and is never sold (`BUSINESS-MODEL.md` §6). **Not claimable yet:** a guest-data *export*. No export route was found in the restaurant API (§7) |
+| **Discounts funded from the restaurant's own margin** | SnappFood promotions are restaurant-funded, per a secondary source and SnappFood's own vendor-academy content (`profiles/snappfood-loyalty.md`) | CLAIMED / circumstantial | **We run no discount marketplace.** Do **not** pitch coupons: a restaurant can create them in the panel, but no diner can redeem one today, because no UI sends the code (`PRICING.md` §3) |
+| **The platform owns the guest** | The dominant platform holds the diner relationship. Its vendor app shows a rating of **2** from 2,334 votes (`research/APP-STORE-FOOTPRINT-2026-09-16.md`) | REAL for the store figure; the *why* is `UNKNOWN` | **«مالِ خودت»:** tenant data comes only from the auth context (`CLAUDE.md`) and is never sold (`BUSINESS-MODEL.md` §6). **Not claimable:** a guest-data *export*. CEO ruling 2026-09-17: no guest-data export exists (confirmed with a positive control) and none is built for launch; bulk export of phone numbers is a PII surface that needs privacy design (backlog, P3). So ownership is said **only** as «در پنلِ خودتان می‌بینید» |
 
 ---
 
@@ -52,7 +52,7 @@ what they wait for.
 ### The 60-second version (spoken, Persian, «شما»)
 
 > «رزروی که ثبت می‌شه و مهمان نمیاد، میزِ خالیه. ما یه پنل می‌دیم که رزرو، لیستِ انتظار و باشگاهِ
-> مشتری‌هاتون یه‌جا باشه — و مشتری‌ها مالِ خودتون می‌مونن، نه ما.
+> مشتری‌هاتون یه‌جا باشه — و مشتری‌هاتون رو توی پنلِ خودتون می‌بینید، نه توی اپِ کسِ دیگه.
 > کمیسیون نمی‌گیریم. قیمت ثابته و روی سایت نوشته. کارت نمی‌گیریم و چیزی خودکار تمدید نمی‌شه.
 > سی روز کاملش رو رایگان امتحان کنید؛ آخرِ ماه خودتون می‌بینید چند تا رزروِ بی‌حضور داشتید.»
 
@@ -61,7 +61,7 @@ what they wait for.
 | Line | Class | Gate / evidence |
 |---|---|---|
 | «پنل… رزرو، لیستِ انتظار و باشگاه یه‌جا» | REAL-STATIC | `PRICING.md` §3 (paid list) |
-| «مشتری‌ها مالِ خودتون می‌مونن» | REAL-STATIC as architecture | `BRAND.md` value ۲. Must never be stretched to "you can export them" (§1) |
+| «مشتری‌هاتون رو توی پنلِ خودتون می‌بینید» | REAL-STATIC | `BRAND.md` value ۲, in the only form the CEO allows (§1). Never "you can export them" or "take them with you": no export exists or is planned for launch |
 | «کمیسیون نمی‌گیریم. قیمت ثابته» | REAL-STATIC | No commission code (`BUSINESS-MODEL.md` §1 R6) |
 | «روی سایت نوشته» | **Gated** | True once the Implementation commit ships 18/33/60 to the pricing page (`PRICING.md` §7) |
 | «کارت نمی‌گیریم و چیزی خودکار تمدید نمی‌شه» | REAL-STATIC | No automatic payment (§1) |
@@ -82,7 +82,7 @@ only comparative line allowed in a sales conversation is the published-price fac
 
 | Owner says | Answer | Class |
 |---|---|---|
-| «اسنپ‌فود دارم» | «ما سفارش و ارسال نداریم؛ کنارِ اون کار می‌کنیم. رزرو و مشتری‌های حضوری‌تون اینجا ثبت می‌شن و مالِ خودتونه.» | REAL-STATIC |
+| «اسنپ‌فود دارم» | «ما سفارش و ارسال نداریم؛ کنارِ اون کار می‌کنیم. رزرو و مشتری‌های حضوری‌تون اینجا ثبت می‌شن و توی پنلِ خودتون می‌بینیدشون.» | REAL-STATIC |
 | «صندوق/نرم‌افزار دارم» | «جاش رو نمی‌گیریم. اتصالِ آماده به صندوقِ خاصی نداریم؛ Webhook داریم که تیمِ فنیِ صندوق‌تون می‌تونه ازش استفاده کنه.» | REAL-STATIC for webhooks (`api/prisma/schema.prisma:1357`). **No POS-specific integration exists, so we say so** |
 | «گرونه / کار کساده» | «سی روز رایگان امتحان کنید و تعدادِ بی‌حضورهای خودتون رو ببینید؛ بعد تصمیم بگیرید.» We never quote a saving we haven't measured | REAL-STATIC (trial) |
 | «مشتری‌هام تو دایرکت رزرو می‌کنن» | «دایرکت بمونه. لینکِ رزرو رو هم بذارید؛ لیستِ انتظار و سابقه‌ی مهمان دیگه به حافظه‌ی یه نفر بند نیست.» | REAL-STATIC |
@@ -97,9 +97,9 @@ only comparative line allowed in a sales conversation is the published-price fac
 |---|---|---|---|---|---|
 | 1 | Hears | A visit, Instagram, a referral | — | `SiteOrder.utmSource / utmMedium / utmCampaign` | — |
 | 2 | Lands | `/demo`: «همان لحظه فعال», «بدونِ کارتِ بانکی», «محصولِ کامل», «داده‌ها می‌مانند» | `apps/landing/app/demo/page.tsx:28-31` | Landing telemetry, not counted here | The form feels like a sales trap |
-| 3 | Signs up for the trial | Business name, contact, phone, email, city, branches, note | `apps/landing/components/forms/TrialForm.tsx` | `SiteOrder.kind = trial` | ⚠️ **This step will change:** the CEO routes phone-ownership proof (P1-4 Option A, consent/OTP) here |
+| 3 | Signs up for the trial | Business name, contact, phone, email, city, branches, note | `apps/landing/components/forms/TrialForm.tsx` | `SiteOrder.kind = trial` | ⚠️ **Not final — do not script this step yet.** P1-4 Option A is not built (`rezv-85`). The CEO's expected shape: the form still creates the account, the owner row stays "unconfirmed" until the phone's owner first logs in by OTP, and that login shows a one-time confirmation prompt. The CEO sends the final flow when it exists |
 | 4 | Account created instantly | Tenant, restaurant, owner staff and starter tables, plus a tracking code at `/order/{code}` | `api/src/lib/site-orders.ts:1-20`, `api/src/lib/provisioning.ts:31` | `SiteOrder` + `Tenant.trialEndsAt` | — |
-| 5 | Logs into the panel | OTP to the same phone | `apps/landing/app/demo/page.tsx:35` | `Restaurant.lastSeenAt` (panel heartbeat, `api/prisma/schema.prisma:156`) | **SMS doesn't arrive.** Delivery is unproven, so this is the highest-risk step |
+| 5 | Logs into the panel | OTP to the same phone | `apps/landing/app/demo/page.tsx:35` | `Restaurant.lastSeenAt` (panel heartbeat, `api/prisma/schema.prisma:156`) | 🔴 **BLOCKED until real SMS delivery is proven**, the owner's blocker S-07 (CEO, 2026-09-17). Nothing downstream of this step can be tested with a real restaurant before then |
 | 6 | Sets up | Tables, hours, menu | demo page, "after" list | Counts of tables and menu items per restaurant | Menu entry is tedious. Who helps? (§7, onboarding) |
 | 7 | Turns on booking | The restaurant page goes live in the customer app | demo page, "after" list; `api/src/app/api/v1/restaurants/route.ts:41` | — | — |
 | 8 | **First booking** | A real diner books | `Reservation` rows | **Time to first booking** = first `Reservation.createdAt` − `SiteOrder.createdAt` | Nobody sends diners (the at-venue QR needs `E-001`'s domain, `BUSINESS-PLAN.md` §4.2) |
@@ -184,14 +184,10 @@ something like «رزرو: دایرکت» or a phone number.
 5. **The founding offer** (`PRICING.md` §4.3), since it changes the day-25 conversation.
 
 **CEO** (code questions; I read, I don't edit)
-1. **Is there a guest-data export** for restaurants? I found no CSV or export route under
-   `api/src/app/api/v1/restaurant`. Until one exists, "your guests are yours" stops at architecture.
-2. **When P1-4 Option A lands on the trial form** (step 3), what does the owner see? The funnel and
-   pitch change with it.
-3. **SMS delivery proof:** steps 5 and 8 and the reminder line all wait on it.
-4. **`Reservation.source` values in use:** `'app'` by default and `'walkin'` (`api/src/lib/reservations.ts:991`).
-   There is no value per acquisition channel. Should diner channels get one (for the diners playbook),
-   or is that out of scope for launch?
+1. ~~Guest-data export?~~ **Answered 2026-09-17:** none exists (positive control: `content-disposition` found in `media/[...key]/route.ts`), none for launch, PII design first (P3 backlog). Pitch wording changed accordingly (§1, §2).
+2. ~~P1-4 on the trial form?~~ **Answered:** not built yet (`rezv-85`). Expected shape recorded at step 3. The CEO sends the final flow.
+3. ~~SMS?~~ **Answered:** the owner's blocker S-07. Step 5 is marked BLOCKED.
+4. ~~Channel in `Reservation.source`?~~ **Answered:** out of scope for launch, no migration. Diner channels are measured with a coupon code per channel instead (`restaurant/coupons`, `coupon_redemptions`), and **that coupon path must be verified at runtime first**, since it is REAL-STATIC only (`docs/marketing/diners/PLAYBOOK.md`).
 
 ---
 
