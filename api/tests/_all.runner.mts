@@ -213,6 +213,7 @@ import './sms-queue-fallback-balance.integration.test.mts';
 import './sms-worker-charge-once.integration.test.mts';
 import './sms-welcome-arrival-proof.integration.test.mts';
 import './site-orders.test.mts';
+import './site-trial-owner-check.integration.test.mts';
 import './subscription.test.mts';
 import './table-merge-occupancy-concurrency.test.mts';
 import './slot-lock-failopen-double-booking.test.mts';
