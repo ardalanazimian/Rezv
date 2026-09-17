@@ -63,6 +63,8 @@ import './env-secrets.test.mts';
 import './availability-bulk.integration.test.mts';
 import './availability-offline-parity.integration.test.mts';
 import './ban.test.mts';
+import './user-ban-public-reason.integration.test.mts';
+import './ban-reason-copy-binding.test.mts';
 import './branch-isolation.integration.test.mts';
 import './cancellation-policy.test.mts';
 import './booking-policy-contract.integration.test.mts';

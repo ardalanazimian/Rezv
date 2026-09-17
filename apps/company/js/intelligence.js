@@ -740,7 +740,7 @@ function renderCustomer360(d){
             : `<button class="btn btn-sm" onclick="flagAbuse360(${jsq(u.id)})">نشان‌گذاری</button>`}
         </div>
       </div>
-      ${m.is_banned?`<div style="margin-top:10px;font-size:12.5px;color:var(--red-600);line-height:1.7">${icon('alert',{size:13})} بن‌شده در ${new Date(m.banned_at).toLocaleString('fa-IR')}${m.banned_reason?` — دلیل: ${esc(m.banned_reason)}`:''}</div>`:''}
+      ${m.is_banned?`<div style="margin-top:10px;font-size:12.5px;color:var(--red-600);line-height:1.7">${icon('alert',{size:13})} بن‌شده در ${new Date(m.banned_at).toLocaleString('fa-IR')}${m.banned_reason_key?` — کاربر می‌بیند: «${esc(banReasonLabel(m.banned_reason_key))}»`:' — بدونِ دلیلِ عمومی (بنِ پیش از ۰۹۱)'}${m.banned_reason?` — یادداشتِ داخلی: ${esc(m.banned_reason)}`:''}</div>`:''}
       ${(!m.is_banned && m.unbanned_at)?`<div style="margin-top:10px;font-size:12.5px;color:var(--t2);line-height:1.7">${icon('info',{size:13})} آخرین بن در ${new Date(m.unbanned_at).toLocaleString('fa-IR')} رفع شد${m.unban_reason?` — دلیل: ${esc(m.unban_reason)}`:''}</div>`:''}
     </div>
     <div class="kpi-grid" style="margin-top:14px">
@@ -773,21 +773,35 @@ function renderCustomer360(d){
       </div>`).join('')}
     </div>`:''}`;
 }
+// F003 (STATE M-14): همان پنج کلیدِ enumِ `BanReasonKey` (مهاجرتِ ۰۹۱). برچسب‌ها همان جمله‌هایی‌اند که
+// اپِ مشتری به خودِ کاربر نشان می‌دهد — ادمین دقیقاً می‌بیند کاربر چه خواهد خواند.
+const BAN_REASON_OPTIONS=[
+  ['repeated_no_show','چند بار رزرو کردی و حاضر نشدی، بدونِ لغو.'],
+  ['promo_abuse','استفاده‌ی غیرعادی از کدِ تخفیف، دعوت یا امتیاز دیده شد.'],
+  ['abusive_conduct','گزارشِ رفتارِ نامناسب با رستوران یا کاربرانِ دیگر.'],
+  ['user_request','به درخواستِ خودت.'],
+  ['under_review','حسابت در حالِ بررسی است.'],
+];
+function banReasonLabel(key){ const o=BAN_REASON_OPTIONS.find(x=>x[0]===key); return o?o[1]:''; }
 function openBanModal(userId,name){
   openModal(`
     <div class="modal-title">${icon('shield',{size:18})} بن‌کردنِ ${esc(name)}</div>
     <div class="modal-sub">این حساب دیگه نمی‌تونه وارد بشه یا رزروِ آنلاین ثبت کنه.</div>
-    <div class="field-label">دلیل (الزامی)</div>
+    <div class="field-label">دلیلی که کاربر می‌بیند (الزامی)</div>
+    <select class="inp" id="banReasonKey"><option value="">انتخاب کن…</option>${BAN_REASON_OPTIONS.map(([k,l])=>`<option value="${esc(k)}">${esc(l)}</option>`).join('')}</select>
+    <div class="field-label" style="margin-top:10px">یادداشتِ داخلی — کاربر نمی‌بیند (الزامی)</div>
     <textarea class="inp" id="banReason" rows="3" placeholder="مثلاً: تخلفِ تکراری، شکایتِ رسمیِ رستوران، ..."></textarea>
     <button class="btn btn-danger btn-block btn-lg" style="margin-top:14px" onclick="submitBan(${jsq(userId)})">تأییدِ بن</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeModal()">انصراف</button>
   `);
 }
 async function submitBan(userId){
+  const reasonKey=(document.getElementById('banReasonKey')?.value||'').trim();
   const reason=(document.getElementById('banReason')?.value||'').trim();
-  if(!reason){toast('','دلیلِ بن رو بنویس');return;}
+  if(!reasonKey){toast('','دلیلی که کاربر می‌بیند رو انتخاب کن');return;}
+  if(!reason){toast('','یادداشتِ داخلیِ بن رو بنویس');return;}
   if(!confirm('مطمئنی؟ این حساب فوراً از دسترسی خارج می‌شه.'))return;
-  const res=await API.banUser(userId,reason);
+  const res=await API.banUser(userId,reasonKey,reason);
   if(!res.ok){toast('',res.error?.message||'بن ناموفق بود');return;}
   closeModal();
   toast('',res.data?.already_banned?'این کاربر از قبل بن بود':'کاربر بن شد');

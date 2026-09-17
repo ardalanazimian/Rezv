@@ -87,7 +87,8 @@ const API = {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrPhone);
     return isUuid ? this.get(`/admin/users/${idOrPhone}`) : this.get(`/admin/users?phone=${encodeURIComponent(idOrPhone)}`);
   },
-  banUser(userId, reason){ return this.post(`/admin/users/${userId}/ban`, { reason }); },
+  // F003: reason_key = دلیلِ عمومی (کاربر می‌بیند)، reason = یادداشتِ داخلی (هرگز به کاربر نمی‌رسد).
+  banUser(userId, reasonKey, reason){ return this.post(`/admin/users/${userId}/ban`, { reason_key: reasonKey, reason }); },
   unbanUser(userId, reason){ return this.post(`/admin/users/${userId}/unban`, reason?{reason}:{}); },
   // ── نشان‌هایِ کنترل‌شده‌یِ پلتفرم (فازِ ۳) ──
   listBadges(){ return this.get('/admin/badges?include_inactive=true'); },

@@ -118,11 +118,73 @@ export async function confirmOtp(){
       toast('','در حالت دمو، کد ۱۲۳۴ است');
       if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
     }
+  } else if (res.error?.code === 'USER_BANNED') {
+    // ⚠️ F003 (STATE M-14): کد درست بود، حساب مسدود است. برگه را لایه‌ی API
+    // (`onUserBanned`) باز کرده؛ این‌جا نباید «کد اشتباه است» گفته شود.
   } else {
     // کد اشتباه از سرور
     toast('', res.error?.message || 'کد اشتباه است');
     if (btn) { btn.disabled = false; btn.textContent = 'تأیید و ورود'; }
   }
+}
+
+// ═══ حسابِ مسدود — F003 (STATE M-14) ═══
+// سرور فقط `reason_key` (یکی از پنج کلیدِ بسته‌ی enumِ `BanReasonKey`) و `banned_at` می‌دهد؛
+// یادداشتِ داخلیِ ادمین هرگز به این‌جا نمی‌رسد. متنِ هر کلید این‌جاست.
+// کلیدِ ناشناخته یا null (بنِ پیش از مهاجرتِ ۰۹۱) → پیامِ عمومی، بدونِ حدسِ دلیل.
+const BAN_REASON_FA = {
+  repeated_no_show: 'چند بار رزرو کردی و حاضر نشدی، بدونِ لغو.',
+  promo_abuse: 'استفاده‌ی غیرعادی از کدِ تخفیف، دعوت یا امتیاز دیده شد.',
+  abusive_conduct: 'گزارشِ رفتارِ نامناسب با رستوران یا کاربرانِ دیگر.',
+  user_request: 'به درخواستِ خودت.',
+  under_review: 'حسابت در حالِ بررسی است.',
+};
+export function showBannedSheet(details){
+  const why = BAN_REASON_FA[details?.reason_key] || 'دلیلی برای نمایش ثبت نشده — از «اعتراض» بپرس.';
+  const at = details?.banned_at ? new Date(details.banned_at) : null;
+  const since = at && Number.isFinite(at.getTime()) ? faNum(at.toLocaleDateString('fa-IR')) : '';
+  openSheet(`
+    <div class="sheet-title" id="bannedTitle">حسابت مسدود شده</div>
+    ${since?`<div class="sheet-sub">از ${esc(since)}</div>`:''}
+    <div style="font-size:13px;color:var(--t2);line-height:1.9;margin:10px 2px 14px">
+      <p style="margin:0"><b>چرا؟</b> ${esc(why)}</p>
+      <p style="margin:8px 0 0"><b>امتیازها و سابقه‌ات چه می‌شوند؟</b> پاک نشده‌اند؛ تا رفعِ مسدودیت قابلِ استفاده نیستند.</p>
+    </div>
+    <div id="banAppeal">
+      <div class="field-label">اسمت</div>
+      <input class="otp-input" id="banAppealName" style="font-size:16px;letter-spacing:0;text-align:right" maxlength="80" autocomplete="name">
+      <div class="field-label" style="margin-top:10px">شماره موبایل</div>
+      <input class="otp-input" id="banAppealPhone" inputmode="tel" style="font-size:16px;letter-spacing:.05em" value="${esc(_loginPhone)}">
+      <div class="field-label" style="margin-top:10px">توضیح <span style="color:var(--t3);font-weight:400">(اختیاری)</span></div>
+      <textarea class="inp" id="banAppealMsg" rows="3" maxlength="3000"></textarea>
+      <div id="banAppealErr"></div>
+      <button class="btn btn-primary btn-lg btn-block" id="banAppealGo" style="margin-top:12px" onclick="submitBanAppeal()">اعتراض</button>
+    </div>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" onclick="closeSheet()">بستن</button>
+  `);
+}
+/** اعتراض → همان فرمِ تماسِ موجود (`POST /site/contact`) که در صندوقِ پنلِ شرکت دیده می‌شود. چهار حالت. */
+export async function submitBanAppeal(){
+  const name = (document.getElementById('banAppealName')?.value||'').trim();
+  const rawPhone = (document.getElementById('banAppealPhone')?.value||'').trim();
+  const phone = rawPhone.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'');
+  const extra = (document.getElementById('banAppealMsg')?.value||'').trim();
+  const errBox = document.getElementById('banAppealErr');
+  const showErr = (m)=>{ if(errBox) errBox.innerHTML=`<div role="alert" style="font-size:12px;line-height:1.7;color:var(--warning-ink);background:var(--warning-soft);border-radius:var(--radius-md);padding:8px 10px;margin-top:8px">${esc(m)}</div>`; };
+  if (name.length < 2) { showErr('اسمت را بنویس (دست‌کم دو حرف).'); return; }
+  if (!/^09\d{9}$/.test(phone)) { showErr('شماره موبایل معتبر وارد کن (مثل ۰۹۱۲۳۴۵۶۷۸۹).'); return; }
+  const go = document.getElementById('banAppealGo');
+  if (go) { go.disabled = true; go.textContent = 'در حالِ ارسال…'; }
+  if (errBox) errBox.innerHTML = '';
+  const message = 'اعتراض به مسدودیِ حساب' + (extra ? '\n' + extra : '');
+  const res = await API.post('/site/contact', { name, phone, topic: 'support', message });
+  if (res.ok) {
+    const box = document.getElementById('banAppeal');
+    if (box) box.innerHTML = `<div role="status" style="font-size:13px;line-height:1.8;color:var(--t2);padding:6px 2px">اعتراضت ثبت شد.</div>`;
+    return;
+  }
+  if (go) { go.disabled = false; go.textContent = 'اعتراض'; }
+  showErr(res.offline ? 'اتصال برقرار نیست — اعتراض ثبت نشد. دوباره تلاش کن.' : (res.error?.message || 'ثبتِ اعتراض ناموفق بود.'));
 }
 // مرحله‌ی ثبت‌نام: گرفتن نام برای کاربر جدید
 export function showRegisterStep(demo){
@@ -305,6 +367,7 @@ export function undoSnack(msg, onUndo, onCommit, seconds){
 
 // ── نمایشِ توابعِ onclick روی window (صدازده‌شده در رشته‌های HTML) ──
 window.openLogin = openLogin;
+window.submitBanAppeal = submitBanAppeal;
 window.sendOtp = sendOtp;
 window.confirmOtp = confirmOtp;
 window.completeRegister = completeRegister;

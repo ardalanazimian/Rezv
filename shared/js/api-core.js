@@ -74,6 +74,11 @@ export async function httpJson(url, opts = {}, timeoutMs = 8000) {
 //
 //  رفتار عیناً همان قبل است: چند ۴۰۱ِ هم‌زمان یک Promiseِ مشترک می‌گیرند
 //  (بدونِ رقابت)، و refresh هم rotate می‌شود.
+//
+//  ⚠️ F003 (STATE M-14، ۲۰۲۶-۰۹-۱۷): شکستِ refresh تا امروز فقط `false` بود، پس
+//  «حسابت مسدود شده» (۴۰۳ USER_BANNED) و «نشست منقضی شد» برای اپ یکی بودند و کاربرِ
+//  بن‌شده پیامِ انقضا می‌دید. حالا خطای سرور در `api._refreshError` می‌ماند (در موفقیت
+//  null). افزایشی است: صداکننده‌ای که آن را نمی‌خواند رفتارش عوض نمی‌شود.
 // ═══════════════════════════════════════════════════════════
 export function refreshAccessToken(api) {
   if (api._refreshing) return api._refreshing;
@@ -86,12 +91,14 @@ export function refreshAccessToken(api) {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.access) {
+        api._refreshError = null;
         api.setToken(data.access);
         api.setRefresh(data.refresh);   // rotation: refresh هم نو می‌شود
         return true;
       }
+      api._refreshError = data?.error || null;
       return false;
-    } catch { return false; }
+    } catch { api._refreshError = null; return false; }
     finally { api._refreshing = null; }
   })();
   return api._refreshing;

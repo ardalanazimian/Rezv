@@ -3,8 +3,8 @@ import { verifyOtp } from '@/lib/otp';
 import { signAccess, signRefresh } from '@/lib/jwt';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { db } from '@/lib/db';
-import { isCurrentlyBanned } from '@/lib/ban';
-import { ApiError, Err, errorResponse } from '@/lib/errors';
+import { bannedError, isCurrentlyBanned } from '@/lib/ban';
+import { ApiError, errorResponse } from '@/lib/errors';
 import { parseBody, zPhone, zOtpCode, z } from '@/lib/schemas';
 import { audit, maskPhone } from '@/lib/audit';
 import { withApiMetrics } from '@/lib/api-metrics';
@@ -29,11 +29,12 @@ async function POST_impl(req: Request) {
     const userId = await verifyOtp(phone, code);
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { id: true, phone: true, firstName: true, lastName: true, avatarUrl: true, bannedAt: true, unbannedAt: true, bannedReason: true },
+      select: { id: true, phone: true, firstName: true, lastName: true, avatarUrl: true, bannedAt: true, unbannedAt: true, bannedReasonKey: true },
     });
-    // بن سختِ پلتفرم: OTP درست بود، ولی حسابِ بن‌شده نباید توکن بگیرد.
-    if (user && isCurrentlyBanned(user)) throw Err.userBanned(user.bannedReason);
-    const { bannedAt: _ba, unbannedAt: _ua, bannedReason: _br, ...publicUser } = user ?? {};
+    // بن سختِ پلتفرم: OTP درست بود، ولی حسابِ بن‌شده نباید توکن بگیرد. فقط کلیدِ عمومی
+    // به کاربر می‌رسد (F003)؛ یادداشتِ داخلیِ ادمین حتی select هم نمی‌شود.
+    if (user && isCurrentlyBanned(user)) throw bannedError(user);
+    const { bannedAt: _ba, unbannedAt: _ua, bannedReasonKey: _bk, ...publicUser } = user ?? {};
     await audit({
       action: 'auth.login', actorId: userId, actorType: 'customer', ip,
       detail: { channel: 'otp', phone_masked: phoneMasked },

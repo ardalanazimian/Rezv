@@ -47,7 +47,13 @@ export const Err = {
   concurrencyRetry: () => new ApiError('CONCURRENCY_RETRY', 'به دلیل ترافیک بالا رزرو ثبت نشد؛ لطفاً دوباره تلاش کنید', 409),
 
   // ── بن سختِ پلتفرم (کاملاً جدا از فلگِ نرمِ abuse) ──
-  userBanned: (reason?: string | null) => new ApiError('USER_BANNED', 'دسترسیِ این حساب توسطِ رزرونو مسدود شده است', 403, reason ? { reason } : {}),
+  // ⚠️ F003 (STATE M-14): `details` فقط کلیدِ **عمومی** و تاریخ را دارد. تا ۲۰۲۶-۰۹-۱۷ این‌جا
+  // `{ reason }` بود — یادداشتِ آزادِ ادمین (placeholderِ مودال: «شکایتِ رسمیِ رستوران») — و در
+  // بدنه‌ی JSON به خودِ کاربرِ بن‌شده تحویل می‌شد، رندرشده یا نه. یادداشتِ داخلی از سرور بیرون نمی‌رود.
+  userBanned: (reasonKey: string | null, bannedAt: Date | null) => new ApiError('USER_BANNED', 'دسترسیِ این حساب توسطِ رزرونو مسدود شده است', 403, {
+    reason_key: reasonKey,
+    banned_at: bannedAt ? bannedAt.toISOString() : null,
+  }),
 
   // ── check-inِ QR: عاملِ دومِ هویت لازم است ──
   //

@@ -25,6 +25,17 @@ model Tenant {
 }
 
 // پلنِ اشتراک — enum به‌جای String: از ورودِ 'Pro'/'PRO'/فاصله جلوگیری می‌کند
+// دلیلِ عمومیِ بنِ کاربر (F003 · مهاجرتِ ۰۹۱). فهرستِ بسته — متنِ فارسیِ هر کلید در اپ است.
+enum BanReasonKey {
+  repeated_no_show
+  promo_abuse
+  abusive_conduct
+  user_request
+  under_review
+
+  @@map("ban_reason_key")
+}
+
 enum SubscriptionPlan {
   free
   starter
@@ -60,6 +71,9 @@ model User {
   bannedByAdminId String?   @map("banned_by_admin_id") @db.Uuid  // فقط شناسه (بدونِ relationِ Prisma) — هم‌راستا با referredById
   unbannedAt      DateTime? @map("unbanned_at")
   unbanReason     String?   @map("unban_reason")
+  // F003 (STATE M-14): دلیلِ **عمومیِ** بن — تنها چیزی که به خودِ کاربر می‌رسد. `bannedReason` بالا
+  // یادداشتِ داخلیِ ادمین است و هرگز از سرور بیرون نمی‌رود. NULL = بنِ پیش از ۰۹۱ (پیامِ عمومی).
+  bannedReasonKey BanReasonKey? @map("banned_reason_key")
   reservations Reservation[]
   memberships  ClubMember[]
   waitlistEntries WaitlistEntry[]

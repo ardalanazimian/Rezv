@@ -13,7 +13,7 @@
 //  تنظیم آدرس API: اگر فرانت و بک روی یک دامنه‌اند، همین '' کافی است
 //  (nginx مسیر /api را پراکسی می‌کند). برای دامنه‌ی جدا، URL کامل بگذار.
 // ═══════════════════════════════════════════════════════════
-import { toast } from './auth.js';
+import { showBannedSheet, toast } from './auth.js';
 import { go } from './data/discover.js';
 import { R_SAMPLE, normalizeMenuEntry } from './data/seed.js';
 import { R } from './init.js';
@@ -60,10 +60,17 @@ export const API = {
       // ۴۰۱ روی توکن منقضی → یک‌بار refresh کن و درخواست را تکرار کن
       const refreshed = await this._doRefresh();
       if (refreshed) return this.request(path, opts, true);
+      // ⚠️ F003 (STATE M-14): refresh به‌خاطرِ **مسدودی** رد شد — «نشست منقضی شد» دروغ است.
+      if (this._refreshError?.code === 'USER_BANNED') {
+        onUserBanned(this._refreshError.details);
+        return { ok: false, status: 403, error: this._refreshError };
+      }
       this._onSessionExpired(); // refresh هم شکست خورد → نشست تمام است
     }
     if (r.ok) return { ok: true, status: r.status, data: r.data };
     if (r.offline) return { ok: false, offline: true, error: r.error };
+    // مسدودی از هر مسیری (ورود، رزرو، صف، نظر، ماموریت، جایزه) یک جا گرفته می‌شود.
+    if (r.error?.code === 'USER_BANNED') onUserBanned(r.error.details);
     const msg = r.error?.message || `خطای ${r.status}`;
     return { ok: false, status: r.status, error: r.error || { message: msg } };
   },
@@ -154,6 +161,15 @@ export function onSessionExpired(){
   refreshAuthUI();
   toast('🔒','نشست منقضی شد، دوباره وارد شو');
   go('discover');
+}
+// حسابِ مسدود (۴۰۳ USER_BANNED) — F003 (STATE M-14).
+// نشست پاک می‌شود و به‌جای یک toastِ گذرا («کد اشتباه است» یا «نشست منقضی شد»)
+// برگه‌ای باز می‌شود که می‌گوید چرا، با امتیازها چه می‌شود، و کجا اعتراض کند.
+export function onUserBanned(details){
+  API.setToken(null); API.setRefresh(null);
+  USER = null;
+  refreshAuthUI();
+  showBannedSheet(details);
 }
 // به‌روزرسانی نمایش‌های وابسته به کاربر (آواتار و...)
 export function refreshAuthUI(){

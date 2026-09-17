@@ -18,7 +18,7 @@ export async function buildCustomer360(userId: string) {
     where: { id: userId },
     select: {
       id: true, phone: true, firstName: true, lastName: true, email: true, avatarUrl: true, createdAt: true,
-      bannedAt: true, bannedReason: true, bannedByAdminId: true, unbannedAt: true, unbanReason: true,
+      bannedAt: true, bannedReason: true, bannedReasonKey: true, bannedByAdminId: true, unbannedAt: true, unbanReason: true,
     },
   });
   if (!user) throw Err.notFound('کاربر');
@@ -47,7 +47,7 @@ export async function buildCustomer360(userId: string) {
     },
     moderation: {
       is_banned: isCurrentlyBanned(user),
-      banned_at: user.bannedAt, banned_reason: user.bannedReason, banned_by_admin_id: user.bannedByAdminId,
+      banned_at: user.bannedAt, banned_reason: user.bannedReason, banned_reason_key: user.bannedReasonKey, banned_by_admin_id: user.bannedByAdminId,
       unbanned_at: user.unbannedAt, unban_reason: user.unbanReason,
       has_active_abuse_flag: !!(economyProfile as any).hasActiveAbuseFlag,
     },
