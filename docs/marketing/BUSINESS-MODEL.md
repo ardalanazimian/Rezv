@@ -117,7 +117,7 @@ been fully green since 09-08, real SMS delivery is unproven, and point spending 
 ## 3. Price: the owner's decision, and the market around it
 
 > **Decided by the owner on 2026-09-17** (`PRICING.md` v2 §0): **18M / 33M / 60M** for 3 / 6 / 12
-> months, «کمی زیرِ SmartX، هم‌تراز». **Plus a free tier:** a restaurant listing in the customer app,
+> months (rationale: private repo, see `PRICING.md` §2). **Plus a free tier:** a restaurant listing in the customer app,
 > **display only, with no online booking**. The business panel and the club are paid. The old
 > 18/34/65M were placeholders, and the owner ruled they were not real prices. VAT and price-lock
 > terms are still open with him (`PRICING.md` §4).
@@ -158,8 +158,6 @@ as in those files. VAT (+10%) is shown where the page states it.
 **What this can and cannot say:**
 - **We would sit in the "full platform" band (36–90M/yr)** next to Duvita and Mupra's middle tiers.
   We are not in the "reservation tool" band, where RSEE is at 1/15 to 1/61 of our m12 price.
-  Against SmartX's matching pair (reservation + club), 60M is ≈17% below 72.45M and ≈42% below 103.8M.
-  That comparison is for sales conversations only, never public copy (`PRICING.md` §2).
 - **We are the only reservation-first product with a published all-inclusive price** among the ten
   checked. Every POS suite hides its reservation module behind a sales call. That is a positioning
   asset *only if the owner keeps prices public*.

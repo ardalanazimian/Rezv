@@ -82,8 +82,9 @@ what they wait for.
 ### Objections — answer with facts about us, never about them
 
 **Rule:** we never bring up a competitor. If the owner names one, we state facts about ourselves. The
-only comparative line allowed in a sales conversation is the published-price fact the CEO approved
-(`PRICING.md` §2). Nothing about competitors goes into anything written.
+only comparative line allowed in a sales conversation is the one the CEO approved, and it is kept
+in the private repository (`PRICING.md` §2), not here. Nothing about competitors goes into anything
+written.
 
 | Owner says | Answer | Class |
 |---|---|---|

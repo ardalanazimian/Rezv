@@ -14,7 +14,7 @@ does the push to `main`.
 | # | Decision | Owner's words | Recorded |
 |---|---|---|---|
 | 1 | The old 18/34/65M prices were not real and must follow the research | «نه، نسبت به جواب تحقیق مارکتینگ تغییر بده» (relayed by the CEO) | v1 |
-| 2 | **Prices compete with SmartX: slightly below, on par** → **18M / 33M / 60M** | «قیمت ها با smartx باید رقابت کنه», then he chose «کمی زیرِ SmartX، هم‌تراز» from three priced options, in this session. **Final**, recorded as final by CEO `rezv-87` | v2 |
+| 2 | **The paid prices: 18M / 33M / 60M** | The owner chose them from three priced options in this session. **Final**, recorded as final by CEO `rezv-87`. His words and the competitive rationale are in the private repository `ardalanazimian/Rezv-security`, `business/pricing/PRICING.internal.md` (commit `97bdc4f`) (owner ruling 09-17: investment and competitive-positioning content leaves the public repo) | v2 |
 | 3 | **Listing a restaurant in the customer app is free. The business panel and customer club are paid** | «ثبت نام رستوران تو پنل کاستومر رایگان هست ولی پنل بیزنس و باشگاه مشتریان نه» | v2 |
 | 4 | **The free listing is display only, with no online booking** | He chose «فقط نمایش، بدونِ رزرو» from three options | v2 |
 | 5 | Deposits are off at launch | «بیعانه فعلاً خاموش می‌مونه» (relayed by the CEO) | `BUSINESS-MODEL.md` §5 |
@@ -84,53 +84,11 @@ commercial terms. The free card waits for the gating.
 
 ---
 
-## 2. The evidence behind 18 / 33 / 60
+## 2. The evidence behind 18 / 33 / 60 — moved
 
-**SmartX, re-fetched by me on 2026-09-17**, because the owner's price is anchored on it. The CEO
-marks these figures UNVERIFIED-EXTERNAL, so the sources and access dates travel with them:
-
-| SmartX item | Price as printed | Source · accessed |
-|---|---|---|
-| رزرو و نوبت دهی (reservation) | «52.800.000 تومان» | `https://smartx.ir/pricing/` · 2026-09-17 |
-| رزرو هوشمند رستورانی (reservation, service page) | «21.450.000 تومان/سالانه» | `https://smartx.ir/services/reserve/restaurant/` · 2026-09-17 |
-| باشگاه مشتریان هوشمند (club) | «51.000.000 تومان» | `https://smartx.ir/pricing/` · 2026-09-17 |
-| پکیج مدیریت رستوران هوشمند (4-product bundle) | «199.250.000 تومان» | same |
-| Reservation add-ons | «افزونه یکپارچگی با صندوق: 6.6400.000» (**garbled as printed**) · «افزونه پیش پرداخت: 6.200.000» · «افزونه رزرو آنلاین: 17.300.000». The summary says they are included in bundles. **Whether they add to the standalone module is UNCLEAR** | same |
-| Per-use fees | «به ازای هر رزرو: 10.000 تومان» · «به ازای هر پیش پرداخت: 10.000 تومان». **UNCLEAR** whether this belongs to the usage-based plan (29.5M activation + per transaction, `research/COMPETITORS-IRAN-2026-09-16.md`) or is charged on top of the subscription | same |
-
-WebFetch returns a model's summary of each page, so quotes are as returned. The two SmartX pages
-still contradict each other, as they did on 09-05 and 09-16.
-
-**Where 60M sits against SmartX's equivalent** (reservation + club, the two modules our product
-matches):
-
-| SmartX pair | Sum | Our m12 (60M) is |
-|---|---|---|
-| Service-page reservation + club | 21.45 + 51 = **72.45M** | **≈17% below** |
-| Pricing-page reservation + club | 52.8 + 51 = **103.8M** | ≈42% below |
-| Pricing page + online-booking add-on, *if* additive | 52.8 + 17.3 + 51 = 121.1M | ≈50% below (UNCLEAR premise) |
-
-**"Below SmartX" is a sales-conversation line only.** The charter bans naming a competitor in public
-copy (`docs/audit/prompts/marketer.md`), and the CEO confirmed that on 2026-09-17.
-
-**The risks of pricing on par, kept in view as the owner chose:**
-1. **We cost more than the POS suites' entry tiers and have no POS:** Mupra Advanced 49.5M + VAT
-   (54.45M), Duvita Basic 36M + VAT (39.6M). Both REAL, 09-16.
-2. **SmartX sells things we don't have today:** a prepayment add-on (our deposits are off by
-   decision 5) and POS integration. Our SMS delivery is unproven and point spending is off
-   (`BUSINESS-MODEL.md` §2). On par in price is not on par in features, so the pitch has to be
-   honest about it.
-3. **No track record.** Pre-launch, with no references, the 30-day trial and the first ten
-   conversations carry the sale (`BUSINESS-PLAN.md` §4.1).
-
-**Anchors for the free tier** (REAL, fetched 09-16): RSEE has a free restaurant tier, Eat App is
-free up to 100 covers a month, and resOS is free up to 25 bookings a month. **Ours is stricter:**
-free means no booking at all. That makes the upgrade reason obvious ("your diners want to book, not
-call") and gives the diner a worse experience on free listings. How many free listings convert to
-paid is `UNKNOWN`.
-
-**Alternatives shown to the owner and not chosen**, kept for the record: A = 6/11/20M (below
-SmartX's reservation module alone, ~60 restaurants per 100M monthly cost); B = 9/16.5/30M (~40).
+**Moved on 2026-09-17** to the private repository `ardalanazimian/Rezv-security`, `business/pricing/PRICING.internal.md` (commit `97bdc4f`), by the owner's ruling relayed by the CEO: competitive price comparisons and the internal sales line
+leave this public repository. The public market research that fed it remains in `research/COMPETITORS-IRAN-2026-09-16.md` and
+`research/BENCHMARKS-GLOBAL-2026-09-16.md`. Everything pushed before this commit still exists in this repository's git history.
 
 ---
 
@@ -245,9 +203,6 @@ Unchanged from v1 except rows 1 and 7. The CEO added rows 4 and 6 to M-12 on 202
 
 ---
 
-**Line for the CEO:** «Marketer `rezv-c6` → `docs/marketing/PRICING.md` v2: تصمیم‌های مالک ثبت شد — ۱۸ / ۳۳ / ۶۰M
-(هم‌تراز و کمی زیرِ SmartX؛ ۶۰M ≈ ۱۷٪ زیرِ ۷۲.۴۵M)؛ لیستینگِ رایگان در اپِ مشتری، **فقط نمایش، بدونِ
-رزرو**؛ پنل و باشگاه پولی. SmartX را امروز خودم دوباره گرفتم (با لینک و تاریخ؛ افزونه‌ها و کارمزدِ
-«هر رزرو ۱۰,۰۰۰» UNCLEAR). ⚠️ مدلِ رایگان/پولی در کد وجود ندارد: شش نیازمندی در §۱ (گیتِ رزرو و پنل با
-پلن، اعمالِ انقضا، فیلدِ تماسِ عمومی، اثباتِ مالکیتِ شماره — پیوند با آیتمِ ۶ِ handoff) — تا نیامده، کارتِ
-رایگان منتشر نشود. §۴ = بسته‌ی VAT و قفلِ قیمت برای مالک.»
+**Line for the CEO:** «Marketer `rezv-c6` → `docs/marketing/PRICING.md` v2.3: قیمت‌های مالک ۱۸ / ۳۳ / ۶۰M + ۱۰٪ مالیات؛
+لانچ پولی، حساب را تیم می‌سازد، لیستینگِ رایگان بعد از لانچ؛ منطقِ رقابتیِ قیمت و خطِ داخلیِ فروش به ریپوی خصوصی رفت
+(`business/pricing/PRICING.internal.md`، `97bdc4f`).»
