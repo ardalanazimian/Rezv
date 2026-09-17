@@ -37,9 +37,7 @@ returns nothing. Refunds exist only as a `REFUND_REQUIRED` alert for a human
 (`api/src/app/api/v1/payments/callback/route.ts:130,153-164`). Today this is dormant because
 `Restaurant.paymentEnabled` defaults to `false` (`api/prisma/schema.prisma:184`). It stops being
 dormant for any restaurant where someone turns it on. See §5, which lays out three options with
-their cost and risk. **The choice belongs to the owner, with counsel. The CEO is taking it to him
-as a decision package. It is not the Marketer's decision and not the CEO's** (CEO `rezv-87`,
-2026-09-16).
+their cost and risk. **Decided 2026-09-17 by the owner: option A, deposits OFF at launch.** Owner's words, relayed by CEO `rezv-87`: «بیعانه فعلاً خاموش می‌مونه». Verified: `Restaurant.paymentEnabled` defaults to `false` (`api/prisma/schema.prisma:184`). **Consequence for every marketing surface:** no copy, pricing card or plan may promise online deposits or prepayment until the owner re-decides.
 
 **(b) The public pricing page contradicts itself and the code.** Its lead paragraph says
 «تفاوتِ پلن‌ها در مدت و سطحِ پشتیبانی است، نه در قفل‌بودنِ قابلیت‌ها. هر پلنی که بگیرید، محصولِ
@@ -205,8 +203,11 @@ decision rests on it.
 
 **Minimum instrumentation, proposed and not built.** The funnel is already stored as rows (`SiteOrder`
 status plus `Tenant.planExpiresAt`), so every number above except hosting and SMS cost can be
-counted with queries, without new tracking. The one missing field is **why** a lead did not convert.
-Today that reason lives only in the head of whoever made the call.
+counted with queries, without new tracking. **Corrected 2026-09-17:** v1 said the reason a lead did
+not convert is stored nowhere. That was wrong. `SiteOrder` has `rejectedReason`, `adminNote`, `city`
+and `utmSource/utmMedium/utmCampaign` (`api/prisma/schema.prisma`, model `SiteOrder`), so channel
+attribution and rejection reasons exist. What is missing is a *required* reason on `cancelled`
+rows, which only have the optional `adminNote`.
 
 ---
 
@@ -215,8 +216,7 @@ Today that reason lives only in the head of whoever made the call.
 > **Requires review by counsel before action.** I am not a lawyer. These are the options the code
 > makes possible and the questions counsel must answer. None of it says any option is permitted.
 
-**Options, not a recommendation.** The CEO ruled on 2026-09-16 that this is a money and legal
-decision for the owner, and that the CEO carries it to him as a decision package.
+**Decided 2026-09-17 by the owner: option A, deposits OFF at launch.** Owner's words, relayed by CEO `rezv-87`: «بیعانه فعلاً خاموش می‌مونه». Verified: `Restaurant.paymentEnabled` defaults to `false` (`api/prisma/schema.prisma:184`). **Consequence for every marketing surface:** no copy, pricing card or plan may promise online deposits or prepayment until the owner re-decides. Options B and C below stay on file for when it is re-opened, and both still need counsel.
 
 | Option | How money moves | Cost to build and run | Risk |
 |---|---|---|---|
@@ -251,8 +251,8 @@ told about in advance.
    features), or tiers really gate features (then the lead paragraph is false and gating has to be
    built). One of the two must change. The first matches the code. A third, honest option exists
    elsewhere: tiers by booking volume (§3).
-3. **Deposits.** A, B or C in §5, with counsel. The CEO carries this to the owner as a decision
-   package. Until the owner decides, the default stays A because that is what the code does.
+3. ~~**Deposits.**~~ **Decided 2026-09-17, owner: A, off at launch** (§5). Re-opening it means B or C,
+   and both need counsel.
 4. **SMS.** Is SMS credit a revenue line (priced top-ups) or a cost folded into the subscription?
 5. **Trial.** Is the 30-day free trial a decision or a default? It is in code (`api/src/lib/site-orders.ts:36`)
    and in the OG image (`apps/landing/app/opengraph-image.tsx:84`).
