@@ -1,5 +1,9 @@
 # PASTE THIS INTO A FRESH CLAUDE CODE SESSION (in the repo, its own terminal)
 
+> 🔒 **Owner ruling 2026-09-17: attack material is PRIVATE.** Every artifact named below as `docs/audit/redteam/…` is written to
+> the private repository `ardalanazimian/Rezv-security` under `redteam/<date>-<topic>/`, never pushed to this public repo.
+> The public `docs/audit/redteam/` folder holds only "moved" tombstones (see `COORDINATION-2026-09-16.md` D-30).
+
 > ⚠️ **Session ids written in this file may be stale.** `docs/audit/prompts/ROUTING.md` is the single
 > source of truth for who the CEO session is right now — a session id changes whenever that session
 > restarts. If an id below does not resolve, ROUTING.md wins. Do not guess; ask the Founder session (its row in ROUTING.md; the owner only when none is alive).
