@@ -48,10 +48,11 @@ const HOOKS = ['beforeEach', 'afterEach'];
  * فایل → تعدادِ هوکِ هر-تستِ سطحِ ماژول که امروز وجود دارد (شمرده روی درختِ مهاجرتِ ۰۹۰،
  * `impl/rezv-85-090-append-only @ 553ecf4`). **فقط کوچک شود.** هر فایلی که هوکش را داخلِ
  * describe برد، خطش را همین‌جا پاک کند.
+ *
+ * کوچک‌شده: dna-summary (۲۰۲۶-۰۹-۱۷، m-21 — هوکِ کاربرِ تازه داخلِ دو describeی مصرف‌کننده رفت).
  */
 const BASELINE = {
   'api/tests/automation.integration.test.mts': 1,
-  'api/tests/dna-summary.integration.test.mts': 1,
   'api/tests/economy-ledger.integration.test.mts': 1,
   'api/tests/feature-flags.integration.test.mts': 1,
   'api/tests/lifecycle-cron.integration.test.mts': 1,

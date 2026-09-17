@@ -49,6 +49,24 @@ unrelated tests red and hid the real failures underneath.
 | M4: break the scanner (drop the `depth === 0` condition) | **exit 2**: self-test names both inside-describe samples |
 | All reverted | **exit 0**; `git status` shows only the new tool |
 
+## Baseline shrink after m-21 (2026-09-17)
+
+Branch `impl/rezv-85-be14-after-m21`: the guard commit cherry-picked unchanged onto the m-21 fix, plus one
+commit that removes `dna-summary.integration.test.mts` from `BASELINE`. It is a new branch, so the
+already-pushed `impl/rezv-85-be14-hook-guard` was not force-pushed.
+
+| Case | Result |
+|---|---|
+| Guard on the m-21 tree, baseline unchanged | **exit 1**: `کوچک شد (پیشرفت): api/tests/dna-summary.integration.test.mts 1 → 0`, so the ratchet demands the shrink |
+| Baseline shrunk | **exit 0**: `13 فایل / 13 هوک … (208 فایلِ اسکن‌شده)` |
+| Mutation: a module-level `beforeEach` re-added to dna-summary | **exit 1**: `تازه: … dna-summary.integration.test.mts (beforeEach:80)`; file restored byte-identical |
+
+**Measured sibling (still out of scope, now with evidence):** during m-21's discovery run, a throw inside
+`vip-and-clv-honesty`'s module-level **`before`** (runs once, not per test) cancelled the tests of other
+files: business-panel-contract, admin-branches, and the route-permission guard. The full run then hung for
+30+ minutes. A two-file mini runner showed it also fails the tests of the file imported **before** it. A
+failing one-shot root hook is therefore as global as a per-test one. This guard does not cover it.
+
 ## What I did not verify
 
 - **Linux CI** (the `design-system` job). Windows only.
