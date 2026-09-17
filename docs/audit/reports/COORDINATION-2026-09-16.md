@@ -72,7 +72,7 @@ Rule applied as written: **a WRONG claim contradicted by source means the report
 | Full-Stack `rezv-75` | 4 (1/1 blocker) | 4 | 0 | 1844/1844 fresh-DB run not re-run by me |
 | Implementation `rezv-85` | 3 | 2 (+1 partial) | 0 | the "6 failed" count is confirmed; the per-spec list for card-slots/social-proof is not in the capped annotations |
 | **my agent: verify-design-market-escalations** | 5 | 3 | **2 wrong** | "089 nowhere" and "082 nowhere" (searched `api/prisma/migrations/`). **Report rejected**; the parts used here I re-derived myself |
-| **me, CEO `rezv-87`** | caught by others | — | **3 errors** | `ROUTING.md:103` (stale tree, caught by `rezv-31`) · "relay-wt probably CRLF" (Sync) · "8 days red" imprecise (`rezv-85`). A 4th I found myself: I told Sync that `git write-tree` was "without modifying" the index, and it rewrote the index's cache-tree extension (staged entries unchanged, disclosed) |
+| **me, CEO `rezv-87`** | caught by others | — | **4 errors** (the 4th: on 09-17 I told the owner no session transcript showed the `cf60b9c → aa3d1bf` main push and that it was "probably you". Sync `rezv-7a` pushed it under the owner's explicit authorization, and its transcript has the push output. My grep pattern was too narrow for a pinned-SHA push. Same class as the memory rule "grep the .jsonl before claiming") | `ROUTING.md:103` (stale tree, caught by `rezv-31`) · "relay-wt probably CRLF" (Sync) · "8 days red" imprecise (`rezv-85`). A 4th I found myself: I told Sync that `git write-tree` was "without modifying" the index, and it rewrote the index's cache-tree extension (staged entries unchanged, disclosed) |
 
 ---
 
