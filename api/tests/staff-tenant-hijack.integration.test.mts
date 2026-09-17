@@ -37,7 +37,7 @@ const { normalizePhone } = await import('../src/lib/otp');
 const { findStaffForLogin } = await import('../src/lib/staff-helpers');
 
 const TAG = 'hijack';
-const PHONE = fixturePhone('0926');
+const PHONE = fixturePhone('0908');
 let victimTenant: string;
 let attackerTenant: string;
 let victimStaffId: string;
@@ -148,7 +148,7 @@ describe('ورودِ کارکنان — قدیمی‌ترین ثبت برنده 
 //  قاعده‌ی تازه: ردیفِ `owner` مقدم است؛ بینِ بقیه همان «قدیمی‌ترین».
 // ═══════════════════════════════════════════════════════════════════════
 describe('ورودِ کارکنان — ردیفِ owner بر squatterِ قدیمی‌تر مقدم است', () => {
-  const SQ_PHONE = fixturePhone('0926');
+  const SQ_PHONE = fixturePhone('0908');
   let squatterTenant = '';
   let ownerTenant = '';
   let squatterStaffId = '';
@@ -215,7 +215,7 @@ describe('ورودِ کارکنان — ردیفِ owner بر squatterِ قدی�
     // همه‌ی کارکنانِ عادی را می‌کشت. رفعِ کامل = فلوی دعوت برای staff هم.
     //
     // اگر روزی آن فلو ساخته شد، این تست باید **بشکند** و ادعایش برعکس شود.
-    const noOwnerPhone = fixturePhone('0926');
+    const noOwnerPhone = fixturePhone('0908');
     const t1 = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-nownr-a` }, select: { id: true } });
     const t2 = await db.tenant.create({ data: { name: `[DEMO] ${TAG}-nownr-b` }, select: { id: true } });
     try {

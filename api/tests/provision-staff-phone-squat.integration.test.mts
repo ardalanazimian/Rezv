@@ -56,7 +56,7 @@ async function squat(phone: string, role: 'staff' | 'owner', label: string) {
 
 describe('provisionBusiness — تعارضِ شماره فقط با ownerِ واقعی', () => {
   test('🔴 ردیفِ staffِ بی‌اثبات دیگر جلویِ ثبتِ کسب‌وکار را نمی‌گیرد', async () => {
-    const phone = fixturePhone('0929');
+    const phone = fixturePhone('0910');
     await squat(phone, 'staff', 'a');
 
     const res = await provisionBusiness(input(phone, 'a'), actor);
@@ -72,7 +72,7 @@ describe('provisionBusiness — تعارضِ شماره فقط با ownerِ وا
   test('✓ کنترلِ منفی — ownerِ واقعیِ تکراری همچنان ۴۰۹ِ duplicate_owner_phone می‌گیرد', async () => {
     // بدونِ این، «باریک‌کردنِ چک» می‌توانست به «برداشتنِ چک» تبدیل شده باشد و
     // حسابِ مرده بسازد (ownerِ دومی که هرگز نمی‌تواند وارد شود).
-    const phone = fixturePhone('0929');
+    const phone = fixturePhone('0910');
     await squat(phone, 'owner', 'b');
 
     await assert.rejects(

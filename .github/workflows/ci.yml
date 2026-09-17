@@ -617,6 +617,11 @@ jobs:
       # حالتِ ماندگارِ DB را لایه‌ی پنجمِ tools/check-schema-drift.sh (jobِ schema-drift) می‌سنجد.
       - name: No app code path switches off append-only triggers
         run: node tools/check-session-replication-role.mjs
+      # BE-14: beforeEach/afterEach ِ بیرونِ describe در runnerِ تک‌پردازه‌ای پیش/پس از *هر* تستِ
+      # سوئیت اجرا می‌شود (یک throw در fraud، ۱۸۲۹ تست را قرمز کرد). ratchet: فایلِ تازه و هوکِ
+      # بیشتر قرمز، و baseline فقط کوچک می‌شود. خودآزمایی دارد (کدِ ۲ = گیت اجرا نشد).
+      - name: No new module-level per-test hooks in api/tests
+        run: node tools/check-module-level-test-hooks.mjs
       # ⚠️ ۲۰۲۶-۰۹-۰۸: ۸ فیکسچرِ تستِ integration یک مقدارِ ساعتِ اجرا
       # (`Date.now()`) را با `.toISOString().slice(0, 10)` به کلیدِ UTC تبدیل
       # می‌کردند و به `createReservation` می‌دادند — همان چیزی که

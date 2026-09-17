@@ -156,7 +156,7 @@ describe('ساختِ کسب‌وکار از پنلِ شرکت', () => {
 
   test('SPEC-B: دعوت + پیامک + audit — همه در یک provision', async () => {
     const adminToken = await makeAdminToken();
-    const phone = fixturePhone('0921');
+    const phone = fixturePhone('0900');
     const jobsBefore = await db.job.count({ where: { kind: 'sms' } });
     const r = await createBusiness(req({
       business_name: `[DEMO] full ${SFX}`, owner_phone: phone, trial_days: 14, plan: 'pro',

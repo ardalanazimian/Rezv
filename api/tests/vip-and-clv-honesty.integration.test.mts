@@ -28,8 +28,8 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 
 import { fixturePhone } from './_phone.helper.mts';
 
-// ⚠️ پیشوندِ ۰۹۲۲ مالِ همین فایل است — رجوع کن به tests/_phone.helper.mts.
-const PHONE_PREFIX_FILE = '0922';
+// ⚠️ پیشوندِ ۰۹۰۲ مالِ همین فایل است — رجوع کن به tests/_phone.helper.mts.
+const PHONE_PREFIX_FILE = '0902';
 
 const { db } = await import('../src/lib/db.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');

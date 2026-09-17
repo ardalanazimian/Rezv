@@ -26,17 +26,65 @@ import { randomInt } from 'node:crypto';
 //  رفع: یک تولیدکننده‌ی مشترک با آنتروپیِ رمزنگارانه به‌جای زمان، و
 //  پیشوندِ اجباریِ **متفاوت** برای هر فایل. چون تولیدکننده یکی است، دیگر
 //  نمی‌شود یک نسخه را عوض کرد و نسخه‌های دیگر عقب بمانند.
+//
+//  ⚠️ افزوده‌ی ۲۰۲۶-۰۹-۱۷ (m-21، یافته‌ی rezv-31، سنجیده‌ی CEO روی main): «یک پیشوند
+//  برای هر فایل» فقط یک قرارِ نوشته بود. سرشماری روی main (8b63e61): **۲۷** پیشوند در بیش از
+//  یک فایل (۰۹۲۱ در سه فایل، ۰۹۲۲ در چهار). و «تصادف لایه‌ی دوم» احتمالاتی است: dna-summary
+//  یک `beforeEach`ِ سطحِ ماژول داشت که در رانرِ تک‌پروسه برای تست‌های فایل‌های دیگر هم کاربرِ
+//  ۰۹۲۱ می‌ساخت (اجرای کامل ۳۶۵ تا باقی گذاشت) — هر شماره‌ی تکراری `users_phone_key` را
+//  می‌شکند و تستی را قرمز می‌کند که ربطی ندارد. پس هر دو لایه حالا **اجرا** می‌شوند، نه توصیه:
+//   ۱) مالکیتِ پیشوند: اولین فایلی که یک پیشوند را برمی‌دارد مالکش است؛ فایلِ دیگر همان
+//      لحظه خطای PHONE_PREFIX_REUSE می‌گیرد با نامِ هر دو فایل — قرمزِ قطعی، نه ۱۶٪.
+//      فایل از stackِ فراخوان خوانده می‌شود، پس پیشوندی که از ثابت یا متغیر می‌آید هم دیده می‌شود.
+//   ۲) یکتاییِ درون‌پروسه: شماره‌ای که یک‌بار داده شده دوباره داده نمی‌شود.
 // ═══════════════════════════════════════════════════════════════════════
+
+/** دفترِ مالکیتِ پیشوند و شماره‌های داده‌شده. تابعِ سازنده صادر می‌شود تا تستِ خودِ قاعده دفترِ سراسری را آلوده نکند. */
+export function createPhoneRegistry(suffix: () => number = () => randomInt(0, 10_000_000)) {
+  const owners = new Map<string, string>();
+  const issued = new Set<string>();
+  return {
+    ownerOf: (prefix: string) => owners.get(prefix),
+    claim(prefix: string, file: string): void {
+      const owner = owners.get(prefix);
+      if (owner === undefined) { owners.set(prefix, file); return; }
+      if (owner !== file) {
+        throw new Error(
+          `PHONE_PREFIX_REUSE: پیشوندِ «${prefix}» مالِ ${owner} است و ${file} هم برداشتش — ` +
+          'برای این فایل پیشوندِ تازه‌ای انتخاب کن (tests/_phone.helper.mts).',
+        );
+      }
+    },
+    issue(prefix: string): string {
+      for (;;) {
+        const phone = `${prefix}${String(suffix()).padStart(7, '0')}`;
+        if (!issued.has(phone)) { issued.add(phone); return phone; }
+      }
+    },
+  };
+}
+
+const registry = createPhoneRegistry();
+
+/** نامِ فایلِ تستی که fixturePhone را صدا زده (نسبی به tests/)، از stack. */
+export function callerTestFile(stack: string | undefined): string {
+  for (const line of (stack ?? '').split('\n').slice(1)) {
+    const m = line.match(/[\\/]tests[\\/]([^\s():]+\.m?[jt]s)/);
+    if (m && !m[1].endsWith('_phone.helper.mts')) return m[1].replace(/\\/g, '/');
+  }
+  throw new Error('PHONE_PREFIX_REUSE: فایلِ فراخوانِ fixturePhone از stack پیدا نشد — قاعده‌ی مالکیت اجراشدنی نیست');
+}
 
 /**
  * شماره‌ی موبایلِ ایرانیِ ۱۱رقمیِ یکتا برای فیکسچر.
  *
  * @param prefix چهار رقمِ اول (مثلِ `0938`). برای هر فایلِ تست **متفاوت**
- *   انتخابش کن؛ این لایه‌ی اولِ دفاع است و تصادف لایه‌ی دوم.
+ *   انتخابش کن — حالا اجرا می‌شود: پیشوندِ فایلِ دیگر خطای PHONE_PREFIX_REUSE می‌دهد.
  */
 export function fixturePhone(prefix: string): string {
   if (!/^0\d{3}$/.test(prefix)) {
     throw new Error(`پیشوندِ نامعتبر «${prefix}» — باید ۴ رقم و با ۰ شروع شود`);
   }
-  return `${prefix}${String(randomInt(0, 10_000_000)).padStart(7, '0')}`;
+  registry.claim(prefix, callerTestFile(new Error().stack));
+  return registry.issue(prefix);
 }

@@ -36,9 +36,9 @@ const madeItems: string[] = [];
 const UNDELIVERABLE = ['priority_boost', 'free_item', 'event_access'] as const;
 
 async function mkUser(coins: number, tier = 'bronze'): Promise<string> {
-  // ⚠️ پیشوندِ ۰۹۳۴ مالِ همین فایل است — به tests/_phone.helper.mts رجوع کن.
+  // ⚠️ پیشوندِ ۰۹۴۹ مالِ همین فایل است — به tests/_phone.helper.mts رجوع کن.
   const u = await db.user.create({
-    data: { phone: fixturePhone('0934'), firstName: '[DEMO]', lastName: 'گاردِ تحویل' },
+    data: { phone: fixturePhone('0949'), firstName: '[DEMO]', lastName: 'گاردِ تحویل' },
     select: { id: true },
   });
   await db.customerEconomyProfile.create({

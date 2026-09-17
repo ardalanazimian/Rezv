@@ -65,7 +65,7 @@ async function makeTenant(label: string): Promise<Ctx> {
   // بازترین حالتِ ممکن برای فراخوان، پس اگر باز هم ۴۰۳ بگیرد، گارد واقعاً
   // به تنانت بسته است و نه به قفلِ شعبه.
   const staff = await db.staff.create({
-    data: { tenantId: t.id, role: 'owner', isActive: true, phone: fixturePhone('0928'), restaurantId: null },
+    data: { tenantId: t.id, role: 'owner', isActive: true, phone: fixturePhone('0909'), restaurantId: null },
     select: { id: true },
   });
   return {

@@ -68,8 +68,8 @@ before(async () => {
   restaurantId = r.id;
   await db.table.create({ data: { restaurantId, number: 1, capacity: 4, isActive: true } });
   const u = await db.user.create({
-    // ⚠️ پیشوندِ ۰۹۳۷ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش نکن.
-    data: { phone: fixturePhone('0937'), firstName: '[DEMO]', lastName: 'دفتر' },
+    // ⚠️ پیشوندِ ۰۹۵۴ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش نکن.
+    data: { phone: fixturePhone('0954'), firstName: '[DEMO]', lastName: 'دفتر' },
     select: { id: true },
   });
   userId = u.id;

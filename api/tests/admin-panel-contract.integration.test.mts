@@ -136,7 +136,7 @@ describe('قراردادِ پنلِ شرکت — هشت endpointِ ادمین د
     platformTenantId = pt.id;
     process.env.PLATFORM_ADMIN_TENANT_ID = pt.id;
     const admin = await db.staff.create({
-      data: { tenantId: pt.id, phone: fixturePhone('0961'), name: '[DEMO] مدیر', role: 'owner', isActive: true },
+      data: { tenantId: pt.id, phone: fixturePhone('0964'), name: '[DEMO] مدیر', role: 'owner', isActive: true },
       select: { id: true },
     });
     token = signAccess({ sub: admin.id, kind: 'staff', tenantId: pt.id, role: 'owner' });
@@ -155,7 +155,7 @@ describe('قراردادِ پنلِ شرکت — هشت endpointِ ادمین د
     restaurantId = r.id;
 
     // یک کاربرِ علامت‌خورده تا flagged_abuse_users غیرخالی باشد.
-    const u = await db.user.create({ data: { phone: fixturePhone('0962'), firstName: '[DEMO]', lastName: 'مشتری' }, select: { id: true } });
+    const u = await db.user.create({ data: { phone: fixturePhone('0965'), firstName: '[DEMO]', lastName: 'مشتری' }, select: { id: true } });
     userId = u.id;
     // ⚠️ بدونِ .catch: اگر fixture ساخته نشود باید همین‌جا بترکد، نه اینکه
     // تستِ پایین رویِ آرایه‌ی خالی بی‌صدا سبز بماند (قاعده‌ی ۵ِ CLAUDE.md).

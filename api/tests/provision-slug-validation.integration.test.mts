@@ -36,7 +36,7 @@ function input(slug: string) {
   phoneSeq += 1;
   return {
     businessName: `[DEMO] اعتبارسنجیِ slug ${SFX}-${phoneSeq}`,
-    ownerPhone: fixturePhone(String(980 + phoneSeq).padStart(4, '0')),
+    ownerPhone: fixturePhone('0977'),
     ownerName: '[DEMO] مالک',
     slug,
     seedTables: 0,

@@ -97,10 +97,10 @@ before(async () => {
   const tb = await db.table.create({ data: { restaurantId, number: 1, capacity: 4, isActive: true }, select: { id: true } });
   tableId = tb.id;
   const u = await db.user.create({
-    // ⚠️ پیشوندِ ۰۹۳۶ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش
+    // ⚠️ پیشوندِ ۰۹۵۳ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش
     // نکن. این فایل و feature-parity قبلاً هر دو ۰۹۳۸ بودند و همان برخورد
     // کلِ سوئیت را در CI می‌انداخت (شرح در tests/_phone.helper.mts).
-    data: { phone: fixturePhone('0936'), firstName: '[DEMO]', lastName: 'نشتِ زمانی' },
+    data: { phone: fixturePhone('0953'), firstName: '[DEMO]', lastName: 'نشتِ زمانی' },
     select: { id: true },
   });
   userId = u.id;
