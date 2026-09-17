@@ -11,7 +11,7 @@ import { addClubPoints, ARRIVAL_POINTS, reverseReservationCashback } from './loy
 import {
   RULE_VERSION, holdoutBucket, guestKeyOf, transitionDecisionInputs,
 } from './ml-substrate';
-import { autoNoShowDueAt, guestDeadline } from './late-arrival';
+import { autoNoShowDueAt, guestDeadline, isCatchUpTransition } from './late-arrival';
 import { metrics } from './metrics';
 
 const log = createLogger('lifecycle');
@@ -103,7 +103,7 @@ export async function transitionReservation(opts: {
     const timezone = resv.restaurant.timezone ?? 'Asia/Tehran';
     const lateGraceMinutes = resv.restaurant.lateGraceMinutes;
 
-    if (from === to) return { resv, changed: false, from, timezone, lateGraceMinutes };
+    if (from === to) return { resv, changed: false, from, timezone, lateGraceMinutes, catchUp: false };
     if (!canTransition(from, to)) throw Err.invalidTransition(from, to);
 
     // ⚠️ رقابتِ «دو بار انتقال» (فازِ ۲ — با تستِ واقعی پیدا شد، نه فرض).
@@ -125,9 +125,18 @@ export async function transitionReservation(opts: {
     });
     if (claimed.count === 0) {
       const current = await tx.reservation.findUnique({ where: { id: reservationId } });
-      return { resv: current ?? resv, changed: false, from, timezone, lateGraceMinutes };
+      return { resv: current ?? resv, changed: false, from, timezone, lateGraceMinutes, catchUp: false };
     }
-    const updated = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId } });
+    let updated = await tx.reservation.findUniqueOrThrow({ where: { id: reservationId } });
+
+    // D-26 (STATE M-13): running_late **پس از** مهلتِ مهمان = تیکِ جبرانی. تصمیم همین‌جا، اتمیک با خودِ انتقال،
+    // روی رزرو ثبت می‌شود — نه بعداً از زمانِ رویداد: تغییرِ بعدیِ مهلتِ رستوران (D-18) آن محاسبه را جابه‌جا
+    // می‌کرد و ردیفِ جبرانی ناگهان جریمه‌پذیر می‌شد.
+    const transitionAt = new Date();
+    const catchUp = to === 'running_late' && isCatchUpTransition(updated, lateGraceMinutes, transitionAt);
+    if (catchUp) {
+      updated = await tx.reservation.update({ where: { id: reservationId }, data: { lateCatchupAt: transitionAt } });
+    }
 
     // ثبت در audit log — و از مهاجرتِ ۰۸۲، همچنین زیرساختِ رویدادِ ML (M0).
     //
@@ -154,7 +163,7 @@ export async function transitionReservation(opts: {
       },
     });
 
-    return { resv: updated, changed: true, from, timezone, lateGraceMinutes };
+    return { resv: updated, changed: true, from, timezone, lateGraceMinutes, catchUp };
   });
 
   // بعد از commit: اقتصادِ یکپارچه‌ی مشتری (economy.ts) — دقیقاً همون الگویِ
@@ -289,7 +298,14 @@ export async function transitionReservation(opts: {
   }
 
   // بعد از commit: اعلان (خارج از transaction تا تراکنش را کند نکند)
-  if (result.changed && notify && to === 'running_late' && result.resv.guestPhone) {
+  if (result.changed && result.catchUp) {
+    // ── D-26: تیکِ جبرانی — نه پیامک، نه no_showِ خودکار (autoMarkNoShow ردیف‌های late_catchup_at را نمی‌بیند) ──
+    // پیامک ساعتی گذشته را می‌گفت و «دیرتر می‌رسم» بسته است؛ «قطعیِ cron هرگز نباید جریمه بسازد».
+    metrics.lateCatchupUnwarned.inc();
+    log.warn('running_late پس از مهلتِ مهمان (تیکِ جبرانی) — بدونِ هشدار و بدونِ no_showِ خودکار؛ تصمیم با پرسنل', {
+      reservationId: result.resv.id, restaurantId: result.resv.restaurantId,
+    });
+  } else if (result.changed && notify && to === 'running_late' && result.resv.guestPhone) {
     // ── هشدارِ دیرکرد (F001 · STATE M-13 · حکمِ CEO D-20) ─────────────────────
     //
     // چه بود: `running_late` هیچ پیامکی نداشت (در NOTIFY نبود) و autoMarkNoShow از `slotStart`
@@ -437,6 +453,9 @@ export async function autoMarkRunningLate(restaurantId: string): Promise<number>
  * چه بود: `slotStart < now − grace` و بس. مهمانِ ۱۷ دقیقه دیرکرده در یک تیک هم running_late شد هم
  * no_show، بدونِ هیچ پیامکی. و «مسیرِ دومرحله‌ای» فقط اسماً دومرحله‌ای بود.
  *
+ * و هرگز ردیفی که انتقالش به running_late **پس از** مهلت بود (`late_catchup_at`، تیکِ جبرانی — D-26): آن ردیف
+ * نه جریمه می‌شود نه «مسدود» شمرده می‌شود؛ متریکِ خودش را همان لحظه‌ی انتقال گرفته است.
+ *
  * ردیفی که مهلتش گذشته ولی هشداری به دستش نرسیده **عمداً** جریمه نمی‌شود؛ شمرده می‌شود
  * (`rezervno_no_show_blocked_unwarned_total`، آلارمِ NoShowBlockedUnwarned) و پرسنل پس از مهلتِ
  * خودش (`guestDeadline`) می‌تواند دستی ثبتش کند. جریمه‌ی بی‌صدا بدتر از نبودنِ جریمه است.
@@ -448,7 +467,8 @@ export async function autoMarkNoShow(restaurantId: string): Promise<number> {
   // پیش‌فیلترِ ارزان: هر دو مهلت (`guestDeadline` و `autoNoShowDueAt`) دست‌کم slotStart + grace‌اند.
   const cutoff = new Date(now.getTime() - grace * 60_000);
   const candidates = await db.reservation.findMany({
-    where: { restaurantId, status: 'running_late', slotStart: { lt: cutoff } },
+    // D-26: ردیفِ جبرانی (`late_catchup_at`) هرگز نامزد نیست — نه جریمه، نه شمارشِ «مسدود».
+    where: { restaurantId, status: 'running_late', slotStart: { lt: cutoff }, lateCatchupAt: null },
     select: { id: true, slotStart: true, lateWarnedAt: true, lateExtensionMinutes: true },
   });
   let n = 0;

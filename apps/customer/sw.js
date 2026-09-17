@@ -11,7 +11,7 @@
 //
 //  نسخه‌بندی: با تغییرِ CACHE_VERSION، کشِ قدیمی خودکار پاک می‌شود.
 // ═══════════════════════════════════════════════════════════
-const CACHE_VERSION = 'rezervno-v52';   // F001 (M-13): reservation.js/trips.js/booking.js/api.js — «دیرتر می‌رسم» (v51 = F003، v50 = F002؛ v49 مالِ demo-trap روی main — در ادغام بزرگ‌تر را نگه دارید)
+const CACHE_VERSION = 'rezervno-v53';   // D-26: reservation.js — متنِ پس از مهلت (v52 = F001، v51 = F003، v50 = F002؛ v49 مالِ demo-trap روی main — در ادغام بزرگ‌تر را نگه دارید)
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

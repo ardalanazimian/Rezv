@@ -2,8 +2,9 @@
 
 > 2026-09-17 · Feature Verification `rezv-1b` · target **CEO `rezv-87`** ·
 > **needs from its reader:** (1) close or reopen STATE M-13 and M-17 on the evidence below; (2) a ruling on residual
-> **R1** (§6); (3) Red Team attack before merge, which you ordered and which has **not** happened yet. The fix is one
-> commit on `fix/rezv-1b-features` after F003 `cddf476`, status SUBMITTED. Rulings implemented: D-18 and D-20.
+> **R1** (§6, since ruled: D-26, implemented in §9); (3) Red Team attack before merge, which you ordered and which has
+> **not** happened yet. The fix is commit `813dc1d` on `fix/rezv-1b-features` after F003 `cddf476`, plus the D-26
+> amendment commit after it, both SUBMITTED. Rulings implemented: D-18, D-20, D-26.
 > Design: PROPOSAL-F001 on branch `audit/features-2026-09-16`. Migration number: 092 (after main's 090 and F003's 091).
 
 ## 1. What was wrong (measured 2026-09-16 on `c234479`)
@@ -28,6 +29,7 @@
 | D-18 | `api/src/app/api/v1/restaurant/cancellation-policy/route.ts`, `apps/business/js/crm.js` | panel fields for grace (10..60) and extension cap (0..30, 0 allowed) with the «اعمال می‌شود» badge |
 | guest UI | `apps/customer/js/reservation.js`, `apps/customer/js/features/trips.js`, `apps/customer/js/data/booking.js` | «دیرکرده · تا HH:MM»; «دیرتر می‌رسم» from 30 min before the slot until the deadline, with choices capped by the restaurant; the grace line on the confirm sheet only when the server declares it; sw v52 |
 | payloads | `/me/reservations`, `/restaurant/reservations`, `/restaurants/:slug`, bell feed (`api/src/lib/notifications.ts`) | `late{…}`, `no_show_allowed_at`, `late_eta_*`, `booking_policy.late_grace_minutes`, «مهمان دیرتر می‌رسد» |
+| **D-26** (amendment) | `api/prisma/sql/093-late-catchup.sql`, `api/src/lib/late-arrival.ts` (`isCatchUpTransition`), `api/src/lib/lifecycle.ts`, `api/src/lib/metrics.ts`, `apps/customer/js/reservation.js` | running_late **at or after** `guestDeadline` = catch-up: `late_catchup_at` set atomically in the transition, **no** `booking_late` SMS, `rezervno_late_catchup_unwarned_total` +1, never an auto no-show candidate (and not counted as "blocked"). Guest card after the deadline: no «صبر می‌کند»/«ثبت نمی‌شود» promise and no pointer to the closed button; label «دیرکرده · مهلت گذشت». sw v53 |
 
 **Owner consequence (D-20a, must be seen):** `MELIPAYAMAK_BODYID_LATE` needs a pattern registered with Melipayamak,
 which only the owner can do. Until it is registered, no warning is sent, so **auto no-show is effectively off**.
@@ -40,6 +42,10 @@ Each is listed in the commit message with its reason:
 2–3, 5. grace and isolation tests get `warnedMinutesAgo: 30`, so they measure only what they claim. **D-20 contract.**
 4. custom grace 120 → 60 (delay 60 → 45, warned 40). 120 is now rejected. **D-18**; the claim is unchanged.
 6. new test: the DB CHECK rejects 9, 61 and 120, and leaves the previous value untouched.
+7. (D-26 commit) the two-stage test now starts **on time** (5 min late, then the slot is aged 55 min): a reservation
+   already 60 min late at its first tick is a catch-up and must never be auto no-show. **D-26 contract**; the claim
+   (two stages, never a shortcut) is unchanged. In `api/tests/late-arrival-warning.integration.test.mts` the warning scenarios likewise
+   start with an on-time transition and age the slot, for the same reason.
 
 ## 4. Proof chain
 
@@ -106,10 +112,11 @@ These are recorded as **flaky, not green**. Four repeats cannot rule out a small
   gets a past time and no way to reply. Options: (a) accept, since it only occurs during a cron outage; (b) when
   `guestDeadline ≤ now` at the transition, skip the SMS, so there is no auto no-show for that row and staff mark by hand;
   (c) token = `max(guestDeadline, now + floor)` **and** move the staff gate to `max(guestDeadline, warnedAt + floor)`,
-  which changes D-20c. **Needs a ruling; not changed.**
+  which changes D-20c. **RULED 2026-09-17: (b), recorded as D-26 → implemented, see §9.**
 - **R2 — the blocked metric also counts a warning still in the queue.** In the one-tick case the row is past the deadline
   with `late_warned_at` NULL for the seconds until the worker sends. The alert (`increase[15m] > 0 for 20m`) never
   fires on one tick (silence scenario); a restaurant whose warnings are never accepted increments every tick and does fire.
+  **Accepted as documented (CEO, 2026-09-17).**
 
 ## 7. Found while proving this, outside F001 (reported, not fixed)
 
@@ -118,8 +125,8 @@ measured in the DB: `expireOffers()` is global, while the injection targets only
 tests leave offers with a 5-minute TTL (`OFFER_TTL_MINUTES = 5`, created 04:12:27, expiring 04:17:27). Under a
 concurrent e2e load the suite took 891 s instead of 487 s, and the test ran at 04:18:55, after those 18 foreign offers
 had expired. The same tree on a fresh DB with no load: 1925/1925. Suite speed decides the outcome, so CI can flake the same way. Another session had already seen the same line (:337) fail on main `8b63e61` while two suites ran in parallel (833 s vs 369 s solo), without recording a mechanism. This is distinct from m-21 (the phone-fixture collision).
-Suggested fix, test-only: expire or neutralize other restaurants' offers before calling `expireOffers()`, or assert
-per-restaurant counts.
+Recorded as **STATE m-23**. CEO ruling on the fix: test-only, **assert per restaurant** (not by neutralizing global
+state); assigned to this session, P2, after the coupon field (M-20).
 
 ## 8. What this does not cover
 
@@ -131,3 +138,46 @@ per-restaurant counts.
 - **Real SMS:** the provider is stubbed (`fetch`), per CLAUDE.md rule 6. Acceptance semantics come from `sendSmsNow`'s
   contract, not from a live Melipayamak call; the `booking_late` pattern text is owner-registered and not in the repo.
 - e2e mocks the API → UI only. The real 409 and the D-18 ranges are pinned in the api tests.
+
+## 9. D-26 amendment: a catch-up tick sends no warning and makes no auto no-show
+
+**Ruling (CEO, 2026-09-17):** "When a tick runs after guestDeadline (a catch-up after a cron outage), send no booking_late
+SMS and do no auto no-show. The row stays running_late, a 'catch-up without warning' metric increments, and staff decide by
+hand under D-20(c), unchanged."
+
+**Design choices, stated:**
+- **The decision is persisted, not recomputed.** `reservations.late_catchup_at` is set in the same transaction as the status
+  change (compare-and-set). Recomputing later from `reservation_events.created_at` was rejected: a later change of
+  `lateGraceMinutes` (D-18) would flip a catch-up row into a penalizable one. Also, `reservation_events` rejects UPDATE (082), so
+  tests could not age such rows consistently. Measured along the way: Prisma writes event `created_at` in UTC even with the
+  database timezone set to `Asia/Tehran` (delta 1–2 ms), so the event clock was not the problem; the recompute was.
+- **New file 093, not an edit of 092.** CLAUDE.md forbids editing a previous migration file, even before merge. So the M-19
+  migration number moves up by one.
+- **Boundary `≥`.** At exactly `guestDeadline` staff may already mark no-show and the SMS clock would read "now", so there is no chance to reply.
+- **Scope: any transition to running_late, and the guest's own /eta signal does not override it.** A guest who signalled before
+  the outage and whose extended deadline also passed is still left to staff. Literal reading of "do no auto no-show";
+  the alternative (let D-20a's own-signal warning allow cron) is one line if you prefer it.
+- **Not counted as "blocked".** `autoMarkNoShow` excludes `late_catchup_at IS NOT NULL` rows, so `NoShowBlockedUnwarned` keeps
+  meaning "warnings are not being accepted", not "the cron was down". The catch-up metric has no alert; none was ordered, and the
+  binding guard lists it as unalerted (a warning, not a failure).
+- **Guest UI honesty found in review:** after the deadline the card said «رستوران تا [past time] صبر می‌کند … «دیرتر می‌رسم» را بزن»
+  with that button already hidden. This applied to every running_late row between its deadline and a no-show, not only catch-ups.
+
+**Proof chain:**
+- **Red** on the F001 code (`813dc1d` + tests only): unit 2/2 fail (function absent); lifecycle-cron 2 fail (the one-tick test's
+  `late_catchup_at` assertion; a catch-up with the guest's own signal was **auto no-shown**, 1 !== 0) while the on-time control passed;
+  warning test 1 fail (**a booking_late job was enqueued** on a catch-up, 1 !== 0) while all 6 restructured tests stayed green on the old
+  code. e2e: 2 new specs fail on the exact text «رستوران تا ۰۸:۵۷ صبر می‌کند … «دیرتر می‌رسم» را بزن», rendered after 08:57.
+- **Green:** unit 14/14 · lifecycle-cron 22/22 · warning 7/7 · no-show gate 22/22 · writers guard 4/4 · late-arrival e2e 10/10 (desktop,
+  served file sha256 = tree).
+- **Server mutations** (unmutated 43/43, restored 43/43), all exit=1: DM1 catch-up never detected (3 fail) · DM2 cron sees catch-up
+  rows (2) · DM3 SMS still sent on catch-up (1) · DM4 boundary `>` (2) · DM5 metric not incremented (1) · DM6 flag not persisted (3).
+- **UI mutations** (restored 10/10), both exit=1: UD1 note ignores the deadline (2 fail) · UD2 label ignores the deadline (1).
+- **Guards:** 22 exit=0 (XSS review 18, unsafe 41 unchanged); tsc 0; eslint 0.
+- **Full api suite**, fresh DB with 093 (3 late constraints validated, `late_catchup_at` present), alone: **1930 pass, 0 fail, exit=0** (289 s).
+- **Schema drift:** exit=0, 833 columns (832 + `late_catchup_at`), 77 FKs, 211 indexes, 17 CHECKs. The gate's positive control for
+  exactly this class (a column missing from the SQL) went red on this tree an hour earlier; it was not repeated for 093.
+- **e2e**, CI=1, three projects, the 8 specs around trip cards and the no-show gate: **178 pass, 2 fail, exit=1**. Both are
+  already-measured flakes, not D-26: `cancel-window-disclosure.spec.ts:84` on WebKit (passes in isolation on both trees) and the
+  business login-overlay step, here in `business-no-show-gate.spec.ts:104` on mobile-chrome. That same class reproduced on base
+  `cddf476` without F001, and D-26 changes no business-panel file.

@@ -107,6 +107,37 @@ test.describe('«دیرتر می‌رسم»', () => {
     await expect(card(page, 'RZSIGNALD').locator('.trip-late-note.signaled')).toContainText('حدودِ ۱۰ دقیقه دیرتر می‌رسی');
   });
 
+  // D-26: پس از قطعیِ cron رزرو ممکن است پس از مهلت running_late شود؛ و در حالتِ عادی هم بینِ مهلت و no_show
+  // فاصله هست. کارت نباید بگوید «رستوران تا [ساعتِ گذشته] صبر می‌کند» یا به دکمه‌ای اشاره کند که دیگر نیست.
+  test('پس از مهلت: نه «صبر می‌کند»، نه دستور به دکمه‌ای که نیست، و برچسب می‌گوید مهلت گذشت', async ({ page }) => {
+    const slot = Date.now() - 40 * MIN;
+    await openTrips(page, [trip({
+      slotStart: new Date(slot).toISOString(),
+      late: { graceMinutes: 15, maxExtensionMinutes: 15, deadline: new Date(slot + 15 * MIN).toISOString() },
+    })]);
+    const c = card(page, 'RZLATE234');
+    await expect(c.getByRole('button', { name: 'دیرتر می‌رسم' })).toHaveCount(0);
+    const note = c.locator('.trip-late-note');
+    await expect(note).toHaveCount(1);
+    await expect(note).toContainText('مهلتِ صبرِ رستوران');
+    await expect(note).toContainText('تمام شد');
+    await expect(note).not.toContainText('صبر می‌کند');
+    await expect(note).not.toContainText('دیرتر می‌رسم');
+    await expect(c.locator('.trip-card-status')).toContainText('مهلت گذشت');
+  });
+
+  test('پس از مهلت، با خبرِ قبلیِ مهمان: وعده‌ی «ثبت نمی‌شود» تکرار نمی‌شود', async ({ page }) => {
+    const slot = Date.now() - 40 * MIN;
+    await openTrips(page, [trip({
+      slotStart: new Date(slot).toISOString(), lateEtaSignaledAt: new Date(slot + 5 * MIN).toISOString(), lateExtensionMinutes: 10,
+      late: { graceMinutes: 15, maxExtensionMinutes: 15, deadline: new Date(slot + 25 * MIN).toISOString() },
+    })]);
+    const note = card(page, 'RZLATE234').locator('.trip-late-note.signaled');
+    await expect(note).toContainText('حدودِ ۱۰ دقیقه دیرتر می‌رسی');
+    await expect(note).toContainText('تمام شد');
+    await expect(note).not.toContainText('برایت ثبت نمی‌شود');
+  });
+
   test('بدونِ دادهٔ مهلت از سرور: نه دکمه، نه ادعا', async ({ page }) => {
     await openTrips(page, [trip({ late: null })]);
     const c = card(page, 'RZLATE234');

@@ -175,6 +175,9 @@ export const metrics = {
   // cron عمداً جریمه‌اش نمی‌کند. هر اجرای cron برای هر ردیفِ مسدود یک بار می‌شمارد، پس نرخِ ماندگارِ
   // بالای صفر یعنی پیامکِ هشدار کار نمی‌کند (bodyIdِ LATE تنظیم نشده، اعتبارِ رستوران صفر، …).
   noShowBlockedUnwarned: new Counter('rezervno_no_show_blocked_unwarned_total', 'رزروهای دیرکرده‌ای که به‌خاطرِ نرسیدنِ هشدارِ پیامکی خودکار no_show نشدند'),
+  // D-26: running_late **پس از** مهلتِ مهمان (تیکِ جبرانی پس از قطعیِ cron) — نه پیامک، نه no_showِ خودکار.
+  // جدا از noShowBlockedUnwarned تا آلارمِ «هشدار نمی‌رسد» برای قطعیِ cron فایر نکند؛ یک‌بار به‌ازای هر انتقال.
+  lateCatchupUnwarned: new Counter('rezervno_late_catchup_unwarned_total', 'رزروهایی که پس از مهلتِ مهمان running_late شدند (تیکِ جبرانی) و بدونِ هشدار و بدونِ no_showِ خودکار ماندند'),
   // ⚠️ همان الگویِ smsSuppressed/inAppSuppressed، و به همان دلیل: «رویداد
   // رسید ولی درج نشد» نه موفقیت است نه خطا — و تا امروز **سکوتِ کامل** بود.
   //

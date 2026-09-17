@@ -104,10 +104,26 @@ async function warningJob(reservationId: string) {
 const warnedAt = async (id: string) =>
   (await db.reservation.findUniqueOrThrow({ where: { id }, select: { lateWarnedAt: true } })).lateWarnedAt;
 
-function blockedCounter(): number {
-  const m = /^rezervno_no_show_blocked_unwarned_total(?:\{\})?\s+(\d+(?:\.\d+)?)\s*$/m.exec(renderMetrics());
+function counter(name: string): number {
+  const m = new RegExp(String.raw`^${name}(?:\{\})?\s+(\d+(?:\.\d+)?)\s*$`, 'm').exec(renderMetrics());
   return m ? Number(m[1]) : 0;
 }
+const blockedCounter = () => counter('rezervno_no_show_blocked_unwarned_total');
+const catchupCounter = () => counter('rezervno_late_catchup_unwarned_total');
+
+/**
+ * «گذشتِ زمان» پس از یک انتقالِ **به‌موقع**: ساعتِ رزرو را عقب می‌برد. (D-26: انتقالی که از اول پس از مهلت
+ * رخ دهد جبرانی است و اصلاً پیامک ندارد — پس سناریوهای هشدار با انتقالِ به‌موقع شروع می‌شوند.)
+ */
+async function ageSlot(id: string, minutes: number) {
+  const r = await db.reservation.findUniqueOrThrow({ where: { id }, select: { slotStart: true, slotEnd: true } });
+  await db.reservation.update({
+    where: { id },
+    data: { slotStart: new Date(r.slotStart.getTime() - minutes * 60_000), slotEnd: new Date(r.slotEnd.getTime() - minutes * 60_000) },
+  });
+}
+const catchupAt = async (id: string) =>
+  (await db.reservation.findUniqueOrThrow({ where: { id }, select: { lateCatchupAt: true } })).lateCatchupAt;
 
 async function send(job: { id: string; payload: unknown }) {
   return sendSmsCharged(job.payload as never, { jobId: job.id, reason: 'campaign' });
@@ -116,7 +132,10 @@ async function send(job: { id: string; payload: unknown }) {
 describe('M-13 — هشدارِ دیرکرد: صف ≠ هشدار؛ پذیرشِ ارائه‌دهنده = هشدار', () => {
   test('running_late یک پیامکِ booking_late صف می‌کند با ساعتِ مهلت — و صف‌شدن هنوز هشدار نیست', async () => {
     const s = await scenario({ minutesAgo: 3 });
+    const catchupBefore = catchupCounter();
     await transitionReservation({ reservationId: s.resv.id, to: 'running_late', actor: 'cron', isAutomatic: true });
+    assert.equal(await catchupAt(s.resv.id), null, 'D-26 کنترل: انتقالِ پیش از مهلت جبرانی نیست');
+    assert.equal(catchupCounter(), catchupBefore, 'D-26 کنترل: متریکِ جبرانی نباید تکان بخورد');
     const job = await warningJob(s.resv.id);
     const p = job.payload as { template: string; to: string; tokens: string[]; restaurantId: string };
     assert.equal(p.template, 'booking_late');
@@ -131,10 +150,12 @@ describe('M-13 — هشدارِ دیرکرد: صف ≠ هشدار؛ پذیرشِ
   });
 
   test('ارائه‌دهنده پذیرفت → late_warned_at ست می‌شود، و no_show فقط پس از کفِ ۱۰ دقیقه', async () => {
-    const s = await scenario({ minutesAgo: 30 });
+    const s = await scenario({ minutesAgo: 3 });
     await transitionReservation({ reservationId: s.resv.id, to: 'running_late', actor: 'cron', isAutomatic: true });
+    const job = await warningJob(s.resv.id);
+    await ageSlot(s.resv.id, 27);   // پیامک در صف ماند و دیر رسید: حالا ساعتِ رزرو ۳۰ دقیقه پیش است
     reply.set(s.phone, 'accept');
-    const out = await send(await warningJob(s.resv.id));
+    const out = await send(job);
     assert.equal(out.status, 'sent');
     const at = await warnedAt(s.resv.id);
     assert.ok(at && Date.now() - at.getTime() < 60_000, 'late_warned_at باید همین لحظه ست شده باشد');
@@ -145,7 +166,7 @@ describe('M-13 — هشدارِ دیرکرد: صف ≠ هشدار؛ پذیرشِ
   });
 
   test('ارسالِ دوم لحظه‌ی اولین پذیرش را جابه‌جا نمی‌کند', async () => {
-    const s = await scenario({ minutesAgo: 30 });
+    const s = await scenario({ minutesAgo: 3 });
     await transitionReservation({ reservationId: s.resv.id, to: 'running_late', actor: 'cron', isAutomatic: true });
     reply.set(s.phone, 'accept');
     const job = await warningJob(s.resv.id);
@@ -166,11 +187,12 @@ describe('M-13 — هشدارِ دیرکرد: صف ≠ هشدار؛ پذیرشِ
   ];
   for (const [label, arrange, expectedStatus] of unsendable) {
     test(`ارسال‌نشدنی (${label}): late_warned_at خالی، هیچ no_showِ خودکار، متریک +۱`, async () => {
-      const s = await scenario({ minutesAgo: 60 });
+      const s = await scenario({ minutesAgo: 3 });
       await transitionReservation({ reservationId: s.resv.id, to: 'running_late', actor: 'cron', isAutomatic: true });
       await arrange(s);
       const out = await send(await warningJob(s.resv.id));
       assert.equal(out.status, expectedStatus);
+      await ageSlot(s.resv.id, 57);   // یک ساعت گذشت و هیچ هشداری نرسید
       assert.equal(await warnedAt(s.resv.id), null, 'هشداری نرسید — ستون نباید ادعای هشدار کند');
       const before = blockedCounter();
       assert.equal(await autoMarkNoShow(s.restaurantId), 0, 'بدونِ هشدارِ پذیرفته‌شده cron جریمه نمی‌کند');
@@ -179,6 +201,24 @@ describe('M-13 — هشدارِ دیرکرد: صف ≠ هشدار؛ پذیرشِ
       assert.equal(row.status, 'running_late');
     });
   }
+
+  test('D-26: انتقال پس از مهلت (تیکِ جبرانی) → هیچ پیامکی، late_catchup_at ثبت، متریکِ جبرانی +۱، نه «مسدود»', async () => {
+    // cron به اندازه‌ی مهلت خاموش بوده: اولین تیک رزروِ ۳۰-دقیقه-دیر را همین حالا running_late می‌کند.
+    const s = await scenario({ minutesAgo: 30 });
+    const catchupBefore = catchupCounter();
+    await transitionReservation({ reservationId: s.resv.id, to: 'running_late', actor: 'cron', isAutomatic: true });
+    const jobs = await db.job.findMany({ where: { kind: 'sms', payload: { path: ['lateWarningFor'], equals: s.resv.id } } });
+    assert.equal(jobs.length, 0, 'پیامکی با ساعتِ گذشته و «دیرتر می‌رسم»ِ بسته هیچ فرصتی به مهمان نمی‌دهد (D-26)');
+    const at = await catchupAt(s.resv.id);
+    assert.ok(at && Date.now() - at.getTime() < 60_000, 'تصمیمِ جبرانی باید همان لحظه روی رزرو ثبت شود');
+    assert.equal(catchupCounter() - catchupBefore, 1, 'متریکِ «جبرانی بدونِ هشدار» باید +۱ شود');
+    const blockedBefore = blockedCounter();
+    assert.equal(await autoMarkNoShow(s.restaurantId), 0, 'D-26: قطعیِ cron هرگز جریمه نمی‌سازد');
+    assert.equal(blockedCounter(), blockedBefore,
+      'ردیفِ جبرانی «هشدارِ ناموفق» نیست — آلارمِ NoShowBlockedUnwarned نباید برای قطعیِ cron فایر کند');
+    const row = await db.reservation.findUniqueOrThrow({ where: { id: s.resv.id }, select: { status: true } });
+    assert.equal(row.status, 'running_late', 'پرسنل طبقِ D-20(c) تصمیم می‌گیرند');
+  });
 });
 
 after(async () => {

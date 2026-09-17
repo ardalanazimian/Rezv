@@ -81,6 +81,19 @@ const statusOf = async (id: string) =>
 const eventsOf = (id: string) =>
   db.reservationEvent.findMany({ where: { reservationId: id }, orderBy: { createdAt: 'asc' } });
 
+/** «گذشتِ زمان» پس از یک انتقالِ به‌موقع: ساعتِ رزرو را عقب می‌برد (رویدادها append-only‌اند و جابه‌جا نمی‌شوند). */
+async function ageSlot(id: string, minutes: number) {
+  await db.$executeRaw`
+    UPDATE reservations
+    SET slot_start = slot_start - make_interval(mins => ${minutes}::int),
+        slot_end   = slot_end   - make_interval(mins => ${minutes}::int)
+    WHERE id = ${id}::uuid`;
+}
+
+/** D-26: لحظه‌ی «انتقالِ جبرانی» (running_late پس از مهلتِ مهمان)، یا null. */
+const catchupAt = async (id: string) =>
+  (await db.reservation.findUniqueOrThrow({ where: { id }, select: { lateCatchupAt: true } })).lateCatchupAt;
+
 before(async () => {
   // ⚠️ پاک‌سازیِ باقی‌ماندهٔ اجراهای قبلی (۲۰۲۶-۰۹-۰۷، هنگامِ رفعِ B-05).
   // هر اجرا رستورانِ تازه با UUIDِ تازه می‌سازد، پس `beforeEach` فقط ردیف‌های
@@ -320,7 +333,10 @@ describe('چرخه‌ی حیاتِ خودکار — مسیرِ دو مرحله�
     // ⚠️ چرا دو مرحله‌ای بودنش مهم است: مرحله‌ی running_late همان جایی است
     // که به مهمان اطلاع داده می‌شود دیر کرده. اگر cron مستقیم no_show کند،
     // مهمان بدونِ هیچ هشداری «غایب» ثبت می‌شود.
-    const { id } = await mkReservation({ status: 'confirmed', minutesAgo: 60 });
+    // ⚠️ تغییرِ قرارداد، D-26 (F001): تا ۰۹-۱۷ این رزرو از اول ۶۰ دقیقه دیر بود؛ حالا چنین انتقالی «جبرانی»
+    // است (پس از مهلت) و هرگز خودکار no_show نمی‌شود — تستِ خودش در describeِ M-13. پس مسیرِ دومرحله‌ای با
+    // انتقالِ **به‌موقع** (۵ دقیقه پس از ساعت) شروع می‌شود و بعد زمان جلو می‌رود.
+    const { id } = await mkReservation({ status: 'confirmed', minutesAgo: 5 });
 
     assert.equal(await autoMarkNoShow(restaurantId), 0,
       'رزروِ confirmed نباید مستقیم no_show شود — اول باید running_late شود');
@@ -328,6 +344,7 @@ describe('چرخه‌ی حیاتِ خودکار — مسیرِ دو مرحله�
 
     assert.equal(await autoMarkRunningLate(restaurantId), 1);
     assert.equal(await statusOf(id), 'running_late');
+    await ageSlot(id, 55);   // یک ساعت از ساعتِ رزرو گذشت
 
     // ⚠️ تغییرِ قرارداد، D-20 (F001): پیش از پذیرشِ هشدار، cron جریمه نمی‌کند. تا ۰۹-۱۷ همین‌جا
     // `autoMarkNoShow` مستقیم ۱ برمی‌گرداند — همان «فروپاشیِ یک‌تیکی».
@@ -442,6 +459,25 @@ describe('M-13 — عدمِ حضور فقط پس از هشدارِ پذیرفت�
     await autoMarkNoShow(restaurantId);
     assert.equal(await statusOf(id), 'running_late',
       'هشدار هنوز به مهمان نرسیده — no_show در همان تیک یعنی جریمه بدونِ هیچ سیگنالِ قبلی');
+    // D-26: ۱۷ دقیقه با مهلتِ ۱۵ → این انتقال پس از مهلت بود، پس «جبرانی» ثبت می‌شود.
+    assert.ok(await catchupAt(id), 'انتقالِ پس از مهلت باید late_catchup_at بگیرد');
+  });
+
+  test('D-26: تیکِ جبرانی حتی با سیگنالِ خودِ مهمان هم no_showِ خودکار نمی‌سازد', async () => {
+    // مهمان ۴۵ دقیقه پیش خبر داده بود (late_warned_at) و مهلتش هم گذشته؛ ولی cron خاموش بوده و انتقال
+    // همین حالا، پس از مهلت، رخ می‌دهد. پیش از D-26 همین تیک no_show می‌کرد — «قطعیِ cron جریمه ساخت».
+    const { id } = await mkReservation({ status: 'confirmed', minutesAgo: 40, warnedMinutesAgo: 45 });
+    await autoMarkRunningLate(restaurantId);
+    assert.equal(await autoMarkNoShow(restaurantId), 0, 'D-26: تیکِ جبرانی → پرسنل تصمیم می‌گیرند، نه cron');
+    assert.equal(await statusOf(id), 'running_late');
+    assert.ok(await catchupAt(id), 'تصمیمِ جبرانی باید روی خودِ رزرو ثبت شده باشد');
+  });
+
+  test('D-26 کنترل: انتقالِ به‌موقع (۵ دقیقه پس از ساعت) جبرانی نیست', async () => {
+    const { id } = await mkReservation({ status: 'confirmed', minutesAgo: 5 });
+    await autoMarkRunningLate(restaurantId);
+    assert.equal(await statusOf(id), 'running_late');
+    assert.equal(await catchupAt(id), null, 'پیش از مهلت — مسیرِ عادیِ هشدار');
   });
 
   test('هشدارِ ارسال‌نشده: رزروِ دیرکرده هر قدر هم بگذرد خودکار no_show نمی‌شود', async () => {

@@ -60,16 +60,25 @@ function lateSignalOpen(t, now=Date.now()){
   return Number.isFinite(slot) && Number.isFinite(dl) && now>=slot-LATE_SIGNAL_OPENS_MIN*60000 && now<dl;
 }
 /** خطِ وضعیتِ دیرکرد روی کارت — فقط وقتی سرور مهلت را داده. */
-function lateRow(t){
+function lateRow(t, now=Date.now()){
   if(!AWAITING_GUEST.includes(t.apiStatus) || !t.lateDeadlineIso) return '';
   const dl=new Date(t.lateDeadlineIso);
   if(!Number.isFinite(dl.getTime())) return '';
+  // D-26: پس از مهلت هیچ وعده‌ی «صبر می‌کند/ثبت نمی‌شود» و هیچ اشاره‌ای به «دیرتر می‌رسم» (که دیگر بسته است)
+  // نمی‌ماند. «می‌تواند» عمداً — پرسنل از همین لحظه مجاز است (D-20c)؛ cron شاید هرگز (تیکِ جبرانی).
+  const passed=now>=dl.getTime();
   if(t.lateEtaSignaledAt){
     const said=t.lateExtensionMinutes>0 ? `حدودِ ${fmtFa(t.lateExtensionMinutes)} دقیقه دیرتر می‌رسی` : 'در راهی';
-    return `<div class="trip-late-note signaled" style="font-size:11.5px;line-height:1.7;color:var(--t2);margin-top:6px">${icon('clock',{size:12})} به رستوران گفتی ${said} — تا ${esc(faClock(dl))} «عدم حضور» برایت ثبت نمی‌شود.</div>`;
+    const tail=passed
+      ? `مهلتت ساعتِ ${esc(faClock(dl))} تمام شد.`
+      : `تا ${esc(faClock(dl))} «عدم حضور» برایت ثبت نمی‌شود.`;
+    return `<div class="trip-late-note signaled" style="font-size:11.5px;line-height:1.7;color:var(--t2);margin-top:6px">${icon('clock',{size:12})} به رستوران گفتی ${said} — ${tail}</div>`;
   }
   if(t.apiStatus==='running_late'){
-    return `<div class="trip-late-note late" style="font-size:11.5px;line-height:1.7;color:var(--warning-ink);background:var(--warning-soft);border-radius:var(--radius-md);padding:6px 8px;margin-top:6px">${icon('alert',{size:12})} ساعتِ رزروت گذشته — رستوران تا ${esc(faClock(dl))} صبر می‌کند. اگر در راهی، «دیرتر می‌رسم» را بزن.</div>`;
+    const text=passed
+      ? `مهلتِ صبرِ رستوران ساعتِ ${esc(faClock(dl))} تمام شد — از این پس رستوران می‌تواند «عدم حضور» ثبت کند.`
+      : `ساعتِ رزروت گذشته — رستوران تا ${esc(faClock(dl))} صبر می‌کند. اگر در راهی، «دیرتر می‌رسم» را بزن.`;
+    return `<div class="trip-late-note late" style="font-size:11.5px;line-height:1.7;color:var(--warning-ink);background:var(--warning-soft);border-radius:var(--radius-md);padding:6px 8px;margin-top:6px">${icon('alert',{size:12})} ${text}</div>`;
   }
   return '';
 }
@@ -208,7 +217,7 @@ export async function renderTrips(){
     const name=t._name||r?.n||'رستوران';
     const gradId=t._grad||t.rid||1;
     const statusLabel=t.awaitingApproval?`${icon('clock',{size:12})} در انتظارِ تأییدِ رستوران`
-      :(t.status==='up' && t.apiStatus==='running_late' && t.lateDeadlineIso)?`${icon('clock',{size:12})} دیرکرده · تا ${esc(faClock(new Date(t.lateDeadlineIso)))}`
+      :(t.status==='up' && t.apiStatus==='running_late' && t.lateDeadlineIso)?(Date.now()>=Date.parse(t.lateDeadlineIso)?`${icon('clock',{size:12})} دیرکرده · مهلت گذشت`:`${icon('clock',{size:12})} دیرکرده · تا ${esc(faClock(new Date(t.lateDeadlineIso)))}`)
       :t.status==='up'?`<span class="live-dot" aria-hidden="true"></span> پیش‌رو`
       :t.status==='cancelled'?`${icon('close',{size:12})} ${esc(closedLabel(t.apiStatus))}`
       :`${icon('check',{size:12})} تجربه‌شده`;

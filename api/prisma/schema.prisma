@@ -531,6 +531,7 @@ model Reservation {
   lateWarnedAt   DateTime?       @map("late_warned_at")
   lateEtaSignaledAt DateTime?    @map("late_eta_signaled_at")   // «دیرتر می‌رسم» — یک‌بار برای هر رزرو
   lateExtensionMinutes Int      @default(0) @map("late_extension_minutes") @db.SmallInt  // ۰..۳۰ (CHECK در ۰۹۲)
+  lateCatchupAt  DateTime?       @map("late_catchup_at")  // D-26: running_late پس از guestDeadline ثبت شد → نه پیامک، نه no_showِ خودکار (۰۹۳)
   slotEnd      DateTime          @map("slot_end")
   status       ReservationStatus @default(confirmed)
   source       String            @default("app")

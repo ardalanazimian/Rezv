@@ -6,7 +6,8 @@
 //  no_show (صفر پیامک پیش از آن)، و پرسنل می‌توانست رزرو را حتی **پیش** از ساعتش no_show کند.
 //
 //  حالا سه مصرف‌کننده، یک تعریف — تا از هم جدا نیفتند:
-//    • cron (`autoMarkNoShow`)             → `autoNoShowDueAt`   (هشدارِ پذیرفته‌شده لازم است)
+//    • cron (`autoMarkNoShow`)             → `autoNoShowDueAt`   (هشدارِ پذیرفته‌شده لازم است؛ و هرگز برای
+//                                            انتقالِ جبرانی — `isCatchUpTransition`، D-26)
 //    • پرسنل (`PATCH …/status`)            → `guestDeadline`     (هشدار لازم نیست؛ میز را می‌بیند)
 //    • مهمان (`POST …/eta`، کارتِ رزرو، پیامکِ هشدار) → `guestDeadline`
 //
@@ -58,6 +59,17 @@ export function autoNoShowDueAt(
   const fromSlot = r.slotStart.getTime() + lateGraceMinutes * 60_000;
   const fromWarning = r.lateWarnedAt.getTime() + LATE_WARNING_MIN_WINDOW_MINUTES * 60_000;
   return addMinutes(new Date(Math.max(fromSlot, fromWarning)), r.lateExtensionMinutes ?? 0);
+}
+
+/**
+ * انتقالِ «جبرانی» (حکمِ CEO D-26): رزرو **پس از** مهلتِ مهمان running_late شد — یعنی cron به اندازه‌ی مهلت
+ * خاموش بوده. در آن لحظه پیامکِ هشدار ساعتی گذشته را می‌گوید و «دیرتر می‌رسم» بسته است، پس مهمان هیچ فرصتی
+ * ندارد: نه پیامک، نه no_showِ خودکار؛ پرسنل طبقِ D-20(c) تصمیم می‌گیرند.
+ *
+ * مرز «≥» است: در همان لحظه‌ی مهلت پرسنل مجازِ «نیومد» است و ساعتِ پیامک «همین حالا» می‌شد.
+ */
+export function isCatchUpTransition(r: LateFields, lateGraceMinutes: number, transitionAt: Date): boolean {
+  return transitionAt.getTime() >= guestDeadline(r, lateGraceMinutes).getTime();
 }
 
 /** تمدیدی که به مهمان داده می‌شود: درخواستش، محدود به سقفِ رستوران و سقفِ مطلقِ D-18. */

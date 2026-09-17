@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 const {
   LATE_WARNING_MIN_WINDOW_MINUTES, LATE_GRACE_MINUTES_MIN, LATE_GRACE_MINUTES_MAX, LATE_EXTENSION_MINUTES_MAX,
-  guestDeadline, autoNoShowDueAt, grantedExtension,
+  guestDeadline, autoNoShowDueAt, grantedExtension, isCatchUpTransition,
 } = await import('../src/lib/late-arrival');
 
 const T0 = new Date('2026-09-17T16:30:00.000Z');          // ساعتِ رزرو
@@ -93,5 +93,23 @@ describe('grantedExtension', () => {
     assert.equal(grantedExtension(45, 99), 30);
     assert.equal(grantedExtension(-5, 15), 0);
     assert.equal(grantedExtension(12.9, 15), 12);
+  });
+});
+
+// D-26: انتقالی که پس از مهلتِ مهمان رخ می‌دهد (cron خاموش بوده) «جبرانی» است — نه پیامک، نه no_showِ خودکار.
+describe('isCatchUpTransition (D-26)', () => {
+  test('دقیقاً در لحظه‌ی مهلت یا پس از آن جبرانی است؛ یک میلی‌ثانیه پیش از آن نه', () => {
+    const r = { slotStart: T0, lateExtensionMinutes: 0 };
+    const dl = guestDeadline(r, 15);
+    // مرز «≥» است: در همان لحظه پرسنل مجازِ «نیومد» است و ساعتِ پیامک «همین حالا» می‌شد — هیچ فرصتی نمی‌ماند.
+    assert.equal(isCatchUpTransition(r, 15, dl), true);
+    assert.equal(isCatchUpTransition(r, 15, new Date(dl.getTime() - 1)), false);
+    assert.equal(isCatchUpTransition(r, 15, min(40)), true);
+    assert.equal(isCatchUpTransition(r, 15, min(3)), false);
+  });
+  test('تمدیدِ مهمان مرز را جابه‌جا می‌کند', () => {
+    const r = { slotStart: T0, lateExtensionMinutes: 10 };
+    assert.equal(isCatchUpTransition(r, 15, min(20)), false);
+    assert.equal(isCatchUpTransition(r, 15, min(25)), true);
   });
 });
