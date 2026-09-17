@@ -13,11 +13,11 @@
 //  تنظیم آدرس API: اگر فرانت و بک روی یک دامنه‌اند، همین '' کافی است
 //  (nginx مسیر /api را پراکسی می‌کند). برای دامنه‌ی جدا، URL کامل بگذار.
 // ═══════════════════════════════════════════════════════════
-import { toast } from './auth.js';
+import { faNum, toast } from './auth.js';
 import { go } from './data/discover.js';
 import { R_SAMPLE, normalizeMenuEntry } from './data/seed.js';
 import { R } from './init.js';
-import { httpJson, refreshAccessToken, resolveApiBase } from './api-core.js';
+import { httpJson, isOfflineDemo, refreshAccessToken, resolveApiBase } from './api-core.js';
 // آدرسِ پایه‌ی API — قابلِ تنظیم بدونِ build:
 //   ۱) window.RZ_API_BASE (اگر پیش از main.js ست شود)، یا
 //   ۲) <meta name="rz-api-base" content="https://..."> در index.html
@@ -338,7 +338,11 @@ function pickSampleFallback(apiR){
   return R_SAMPLE[h % R_SAMPLE.length];
 }
 
-// بارگذاری رستوران‌ها: تلاش برای API، در صورت شکست → نمونه
+// شکستِ آخرین بارگذاریِ فهرست — `null` یعنی «شکستی نبود». renderFeed با این
+// «فهرستِ خالی چون خالی است» را از «فهرستِ خالی چون نرسید» جدا می‌کند.
+export let LIST_ERROR = null;
+
+// بارگذاری رستوران‌ها: API؛ شکست → حالتِ خطا (دادهٔ نمونه فقط در دموی آفلاینِ file://)
 export async function loadRestaurants(){
   const res = await API.get('/restaurants');
   // پاسخ جدید: { items, next_cursor, has_more } — با pagination
@@ -346,6 +350,7 @@ export async function loadRestaurants(){
   const list = res.ok ? (res.data?.items || res.data?.restaurants || (Array.isArray(res.data) ? res.data : null)) : null;
   if (list && list.length) {
     API.online = true;
+    LIST_ERROR = null;
     NEXT_CURSOR = res.data?.next_cursor || null;  // برای بارگذاری صفحه‌ی بعد
     return list.map(apiR => mapApiRestaurant(apiR, pickSampleFallback(apiR)));
   }
@@ -360,14 +365,29 @@ export async function loadRestaurants(){
   // است اینترنتِ پنل‌ها لحظه‌ای قطع شود تا فهرست خالی برگردد.
   if (res.ok) {
     API.online = true;      // سرور سالم است — فقط چیزی برای نشان‌دادن نیست
+    LIST_ERROR = null;
     NEXT_CURSOR = null;
     return [];              // حالتِ خالیِ صادق، نه دادهٔ ساختگی
   }
-  // فقط اینجا داده‌ی نمونه مجاز است: بک‌اند واقعاً در دسترس نیست
-  // (`file://`، تایم‌اوت، یا خطای شبکه) — یعنی همان تجربه‌ی دموی آفلاین.
   API.online = false;
-  if (res.offline) console.info('[رزرونو] بک‌اند در دسترس نیست — نمایش داده‌ی نمونه');
-  return R_SAMPLE;
+  NEXT_CURSOR = null;
+  // ⚠️ B-1 (ممیزیِ فول‌استک، ۲۰۲۶-۰۹-۱۶): کامنتِ قبلیِ اینجا می‌گفت نمونه فقط وقتی
+  // «بک‌اند واقعاً در دسترس نیست»، ولی شرط `!res.ok` بود — و `api-core.js` پاسخِ
+  // HTTPِ خطا (۵۰۰/۵۰۳/۴۲۹/۴۰۳) را **بدونِ** `offline` برمی‌گرداند. سرور زنده بود و
+  // کاربرِ واقعی شش رستورانِ `[DEMO]` زیرِ «۶ رستوران فعال» می‌دید.
+  //
+  // گیت حالا همان است که notifications.js و reservation.js و auth.js دارند:
+  // `isOfflineDemo()` — بسته‌ی آفلاینِ `file://`. روی http(s) قطعیِ شبکه هم دمو
+  // نیست؛ کاربرِ واقعی با اینترنتِ قطع باید «وصل نشدیم» ببیند، نه رستورانِ ساختگی.
+  if (isOfflineDemo()) {
+    LIST_ERROR = null;
+    console.info('[رزرونو] دموی آفلاین (file://) — نمایش داده‌ی نمونه');
+    return R_SAMPLE;
+  }
+  LIST_ERROR = res.offline
+    ? 'اتصال به سرور برقرار نشد — اینترنتت را چک کن و دوباره امتحان کن.'
+    : `سرور الان جوابِ درستی نداد${res.status ? ` (خطای ${faNum(res.status)})` : ''} — مشکل از سمتِ ماست، نه تو.`;
+  return [];
 }
 export let NEXT_CURSOR = null; // cursor صفحه‌ی بعد (lazy loading)
 // بارگذاری صفحه‌ی بعد رستوران‌ها (هنگام اسکرول یا دکمه‌ی بیشتر)

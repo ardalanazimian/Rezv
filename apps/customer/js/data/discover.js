@@ -7,7 +7,8 @@ import { bookingCtx, dishLen, dishWord, favHas, favs, gradFor, saveFavs, pts } f
 import { renderProfile } from '../features/food-dna.js';
 import { renderLoyalty } from '../features/loyalty.js';
 import { renderEconomy } from '../features/economy.js';
-import { NEXT_CURSOR } from '../api.js';
+import { LIST_ERROR, NEXT_CURSOR } from '../api.js';
+import { isOfflineDemo } from '../api-core.js';
 import { R } from '../init.js';
 import { renderFavs, renderTrips } from '../reservation.js';
 import { icon } from '../icons.js';
@@ -316,6 +317,13 @@ function moreBtnHTML(list){
 let FEED_TOKEN = 0;
 /** ابطالِ هر رندرِ در جریانِ فید — هر کسی که مستقیم #feed را می‌نویسد باید صدایش بزند. */
 export function invalidateFeed(){ return ++FEED_TOKEN; }
+/** اسکلتِ فید تا رسیدنِ اولین پاسخِ سرور — هیچ کارتی، نه نمونه و نه «خالی». */
+export function renderFeedLoading(){
+  const f=document.getElementById('feed');
+  if(!f) return;
+  invalidateFeed();
+  f.innerHTML=Array.from({length:7},(_,i)=>`<div class="xt xt-sk sk${i%7===0?' xt-hero':''}" aria-hidden="true"></div>`).join('');
+}
 export function renderFeed(list){
   const f=document.getElementById('feed');
   const token=invalidateFeed();
@@ -324,6 +332,20 @@ export function renderFeed(list){
   // این مسیر از وقتی زنده شد که loadRestaurants دیگر روی پاسخِ موفقِ
   // `200 {items:[]}` دادهٔ نمونه برنمی‌گرداند (توضیحِ کامل در js/api.js).
   // آن‌جا دروغ برداشته شد؛ اینجا جایش را حقیقت پر می‌کند.
+  //
+  // ⚠️ و «خالی چون نرسید» خالی نیست (B-1، ۲۰۲۶-۰۹-۱۶): وقتی بارگذاری شکست خورده،
+  // «الان رستورانِ فعالی نیست» همان دروغِ نمونه است با لباسِ دیگر — کاربر فکر
+  // می‌کند چیزی نیست، در حالی که ما نتوانستیم بپرسیم.
+  if(!list.length && LIST_ERROR){
+    f.innerHTML=`
+    <div class="empty feed-error" role="alert" style="grid-column:1/-1">
+      <div class="empty-emoji" aria-hidden="true">📡</div>
+      <div class="empty-title">فهرستِ رستوران‌ها بارگذاری نشد</div>
+      <div class="empty-text">${esc(LIST_ERROR)}</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="location.reload()">تلاشِ دوباره</button>
+    </div>`;
+    return;
+  }
   if(!list.length){
     f.innerHTML=`
     <div class="empty" style="grid-column:1/-1">
@@ -507,8 +529,12 @@ export async function renderEvents(){
     el.innerHTML=eventsHtml(events,false);
     return;
   }
-  if(!res.offline){
-    el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('alert',{size:40})}</div><div class="empty-state-title">رویدادها بارگذاری نشد</div><div class="empty-state-desc">${res.status?`خطای ${res.status}`:'دوباره تلاش کن'}</div></div>`;
+  // ⚠️ برادرِ B-1 (۲۰۲۶-۰۹-۱۶): گیت قبلاً `res.offline` بود — یعنی کاربرِ واقعی روی
+  // https با اینترنتِ قطع سه رویدادِ ساختگی (با چیپِ «نمونه») می‌دید. نمونه فقط در
+  // دموی آفلاینِ file://، همان قاعده‌ی loadRestaurants.
+  if(!isOfflineDemo()){
+    const why=res.offline?'اتصال به سرور برقرار نشد':(res.status?`خطای ${fmtFa(res.status)}`:'دوباره تلاش کن');
+    el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${icon('alert',{size:40})}</div><div class="empty-state-title">رویدادها بارگذاری نشد</div><div class="empty-state-desc">${esc(why)}</div></div>`;
     return;
   }
   el.innerHTML=eventsHtml(SAMPLE_EVENTS,true);
@@ -613,6 +639,8 @@ export function doSearch(q){
   }
   const list=R.filter(r=>r.n.includes(query)||r.cuisine.includes(query)||r.vibes.some(v=>v.includes(query)));
   document.getElementById('feedTitle').textContent=`نتایج «${query}»`;
+  // فهرست نرسیده بود → «چیزی پیدا نشد» دروغ است؛ همان حالتِ خطای فید (B-1).
+  if(!list.length && LIST_ERROR){ renderSub('جست‌وجو ممکن نشد'); renderFeed(list); return; }
   renderSub(list.length?`${fmtFa(list.length)} نتیجه`:'چیزی پیدا نشد');
   if(list.length){ renderFeed(list); return; }
   // نتیجه‌ی خالی یعنی خالی. نسخه‌ی قبل کلِ فهرست را نشان می‌داد و فقط یک toast
