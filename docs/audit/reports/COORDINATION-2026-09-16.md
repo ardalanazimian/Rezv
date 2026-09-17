@@ -66,7 +66,7 @@ Rule applied as written: **a WRONG claim contradicted by source means the report
 | Designer `6c9efba5` | 15 (100% blocker-class) | 6 incl. the e2e root cause, re-derived by me | 0 | DS-012 figures are runtime-only |
 | old Marketer `0330c828` | 10 | 9 | 0 (1 stale line ref) | |
 | Scout | 7 proposal statuses | 7 | 0 | |
-| Sync `rezv-7a` (SYNC + MERGE-BACKLOG) | 13 | 10 | **5 wrong → all corrected by the author** (C-8, C-9; 23/106/23 conflict counts miscounted, the root cause was its own `tail -n +2` taking message lines; the 048 "collision" retracted) | C-8, C-9; its re-run is accepted |
+| Sync `rezv-7a` (SYNC + MERGE-BACKLOG) | 13 | 10 | **5 wrong → all corrected by the author**; **a 6th, found later by `rezv-1b` (`cddf476`):** the "`shared/js` 4 of 5 diverged, api-core +7/-5" in SYNC §4F is the sync tool's export-strip transform, not divergence (the tool owns all 3 copies; `--check` exit 0; `cmp` after sync shows only the edited lines). Not yet re-derived by me; (C-8, C-9; 23/106/23 conflict counts miscounted, the root cause was its own `tail -n +2` taking message lines; the 048 "collision" retracted) | C-8, C-9; its re-run is accepted |
 | Red Team `rezv-31` | 8 (4/4 blockers) | 8 | 0 | caught my own citation error |
 | Full-Stack `rezv-75` | 4 (1/1 blocker) | 4 | 0 | 1844/1844 fresh-DB run not re-run by me |
 | Implementation `rezv-85` | 3 | 2 (+1 partial) | 0 | the "6 failed" count is confirmed; the per-spec list for card-slots/social-proof is not in the capped annotations |
