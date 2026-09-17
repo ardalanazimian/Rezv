@@ -201,6 +201,7 @@ import './no-show-provenance.integration.test.mts';
 import './rls-policy-honesty.integration.test.mts';
 import './schema-drift.integration.test.mts';
 import './security-hardening.integration.test.mts';
+import './webhook-ssrf-pinned-lookup.test.mts';
 import './shell-scripts-lf.test.mts';
 import './sms-balance.integration.test.mts';
 import './sms-melipayamak.test.mts';

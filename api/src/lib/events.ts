@@ -1,6 +1,9 @@
+import { request as httpsRequest } from 'node:https';
+import { request as httpRequest } from 'node:http';
+import type { LookupFunction } from 'node:net';
 import { db } from './db';
 import { enqueue } from './queue';
-import { assertPublicHttpUrl } from './security';
+import { assertPublicHttpUrl, isBlockedWebhookHost, safeLookup } from './security';
 import { createLogger } from './logger';
 import { outboundHttpSignal } from './outbound-http';
 
@@ -84,34 +87,11 @@ export function assertSafeWebhookUrl(rawUrl: string): URL {
 
   if (u.protocol !== 'https:') throw new Error('آدرس وب‌هوک باید https باشد');
 
-  const host = u.hostname.toLowerCase();
-
-  // بلاک هاست‌نیم‌های داخلی رایج
-  const blockedHosts = ['localhost', 'metadata.google.internal', 'metadata', 'kubernetes.default'];
-  if (blockedHosts.includes(host) || host.endsWith('.internal') || host.endsWith('.local')) {
-    throw new Error('آدرس وب‌هوک مجاز نیست (میزبان داخلی)');
-  }
-
-  // اگر میزبان یک IP است، بازه‌های خصوصی/loopback/link-local را رد کن
-  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-    const isPrivate =
-      a === 10 ||                             // 10.0.0.0/8
-      (a === 172 && b >= 16 && b <= 31) ||    // 172.16.0.0/12
-      (a === 192 && b === 168) ||             // 192.168.0.0/16
-      (a === 100 && b >= 64 && b <= 127) ||   // 100.64.0.0/10 CGNAT
-      (a === 198 && (b === 18 || b === 19)) || // 198.18.0.0/15 benchmark
-      a === 127 ||                            // 127.0.0.0/8 loopback
-      (a === 169 && b === 254) ||             // 169.254.0.0/16 link-local (metadata!)
-      a === 0 ||                              // 0.0.0.0/8
-      a >= 224;                               // multicast/reserved
-    if (isPrivate) throw new Error('آدرس وب‌هوک مجاز نیست (IP داخلی)');
-  }
-  // IPv6 loopback/link-local/unique-local
-  if (host === '::1' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd') || host === '[::1]') {
-    throw new Error('آدرس وب‌هوک مجاز نیست (IPv6 داخلی)');
-  }
+  // میزبان‌های داخلی + IPِ لفظیِ خصوصی — تکِ مرجع `isBlockedWebhookHost` (security.ts).
+  // RT-31: نسخه‌ی درون‌خطیِ قبلی دو باگ داشت که هر دو این‌جا بسته می‌شود:
+  //  • `host.startsWith('fc'|'fd')` روی **نام** اجرا می‌شد → `fcbarcelona.com` را غلط بلاک می‌کرد.
+  //  • IPv4-mapped IPv6ِ هگز (`[::ffff:a9fe:a9fe]` = 169.254.169.254) هیچ شاخه‌ای را نمی‌گرفت.
+  if (isBlockedWebhookHost(u.hostname)) throw new Error('آدرس وب‌هوک مجاز نیست (میزبان داخلی)');
 
   return u;
 }
@@ -145,18 +125,37 @@ export async function deliverWebhook(payload: {
     headers['X-Rezervno-Signature'] = `sha256=${sig}`;
   }
 
-  // گارد SSRF: قبل از fetch مطمئن شو URL به شبکه‌ی داخلی/metadata اشاره نمی‌کند.
+  // گارد SSRF (پیش‌بررسی): نام/IPِ لفظی و یک resolveِ اولیه (پیامِ خطای روشن).
   await assertPublicHttpUrl(payload.url);
-  // redirect: 'manual' تا نتوان با ریدایرکت به آدرس داخلی، گارد SSRF را دور زد.
-  const res = await fetch(payload.url, {
-    method: 'POST', headers, body,
-    redirect: 'manual',
-    // همان ۱۰ ثانیه‌ی قبلی — فقط حالا از مرجعِ مشترک می‌آید تا سه مسیرِ
-    // خروجی و «اجاره»ی صف به یک عدد گره بخورند، نه به سه کپی.
-    signal: outboundHttpSignal(),
-  });
-  if (!res.ok && res.type !== 'opaqueredirect') {
-    throw new Error(`webhook ${payload.url} پاسخ ${res.status} داد`); // worker retry می‌کند
+  // گاردِ قطعی: تحویل با `lookup: safeLookup` می‌رود، پس resolveی که وصل می‌شود همان است
+  // که اعتبارسنجی شده — DNS-rebinding دومین resolve ندارد که ببرد. `fetch` این را نمی‌دهد.
+  const status = await postWebhookPinned(payload.url, headers, body);
+  // 2xx و 3xx (بدونِ دنبال‌کردنِ redirect) قابلِ قبول‌اند؛ 4xx/5xx → worker retry.
+  if (status < 200 || status >= 400) {
+    throw new Error(`webhook ${payload.url} پاسخ ${status} داد`);
   }
   log.info('webhook تحویل شد', { event: payload.event, url: payload.url });
+}
+
+/**
+ * POSTِ webhook با DNSِ pin‌شده. `http(s).request({ lookup: safeLookup })` باعث می‌شود
+ * تنها resolveِ موجود همانی باشد که `safeLookup` اعتبارسنجی می‌کند و سوکت به آن وصل می‌شود.
+ * redirect دنبال نمی‌شود (رفتارِ `redirect:'manual'`ِ قبلی). خروجی: کدِ وضعیتِ HTTP.
+ */
+async function postWebhookPinned(rawUrl: string, headers: Record<string, string>, body: string): Promise<number> {
+  const u = new URL(rawUrl);
+  const requestFn = u.protocol === 'http:' ? httpRequest : httpsRequest;
+  return await new Promise<number>((resolve, reject) => {
+    const req = requestFn(rawUrl, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Length': String(Buffer.byteLength(body)) },
+      lookup: safeLookup as LookupFunction, // ← رزولوشنِ pin‌شده و اعتبارسنجی‌شده در زمانِ اتصال
+      signal: outboundHttpSignal(),  // همان سقفِ ۱۰ ثانیه از مرجعِ مشترک
+    }, (res) => {
+      res.resume(); // بدنه را drain کن (نشتِ سوکت را ببند)؛ فقط کدِ وضعیت را می‌خواهیم
+      resolve(res.statusCode ?? 0);
+    });
+    req.on('error', reject);
+    req.end(body);
+  });
 }

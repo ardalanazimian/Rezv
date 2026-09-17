@@ -1,4 +1,5 @@
 import { lookup } from 'dns/promises';
+import { lookup as dnsLookupCb, type LookupAddress, type LookupOptions } from 'dns';
 import { redis } from './redis';
 import { Err } from './errors';
 
@@ -70,25 +71,117 @@ export const Validate = {
 // درخواست به شبکه‌ی داخلی/metadata (169.254.169.254) شود (SSRF, OWASP A10).
 // events.ts علاوه بر این با redirect:'manual' جلوی دور زدن از طریق ریدایرکت را می‌گیرد.
 // self-hosted که عمداً webhook داخلی می‌خواهد: ALLOW_PRIVATE_WEBHOOKS=true.
-function isPrivateIp(ip: string): boolean {
-  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (m) {
-    const a = Number(m[1]), b = Number(m[2]);
-    if (a === 10 || a === 127 || a === 0) return true;   // private / loopback / this-host
-    if (a === 169 && b === 254) return true;             // link-local + cloud metadata
-    if (a === 172 && b >= 16 && b <= 31) return true;    // private
-    if (a === 192 && b === 168) return true;             // private
-    if (a === 100 && b >= 64 && b <= 127) return true;   // CGNAT (RFC 6598)
-    if (a >= 224) return true;                           // multicast / reserved
-    return false;
-  }
-  const low = ip.toLowerCase();
-  if (low === '::1' || low === '::') return true;         // loopback / unspecified
-  if (low.startsWith('fe80')) return true;               // link-local
-  if (low.startsWith('fc') || low.startsWith('fd')) return true; // unique-local
-  const mapped = low.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-  if (mapped) return isPrivateIp(mapped[1]);
+function isPrivateV4(a: number, b: number): boolean {
+  if (a === 10 || a === 127 || a === 0) return true;   // private / loopback / this-host
+  if (a === 169 && b === 254) return true;             // link-local + cloud metadata
+  if (a === 172 && b >= 16 && b <= 31) return true;    // private
+  if (a === 192 && b === 168) return true;             // private
+  if (a === 100 && b >= 64 && b <= 127) return true;   // CGNAT (RFC 6598)
+  if (a >= 224) return true;                            // multicast / reserved
   return false;
+}
+
+/** یک IPv6 (فشرده/گسترده، با یا بدونِ IPv4ِ نقطه‌ای در دُم) → ۸ هگزتتِ عددی، یا null. */
+function expandIPv6(input: string): number[] | null {
+  let s = input.trim().toLowerCase();
+  if (!s.includes(':')) return null;
+  // IPv4ِ نقطه‌ایِ دُم (مثلِ ::ffff:169.254.169.254 یا 64:ff9b::1.2.3.4) → دو هگزتت
+  const tailV4 = s.match(/:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (tailV4) {
+    const o = tailV4.slice(1).map(Number);
+    if (o.some((n) => n > 255)) return null;
+    s = s.slice(0, s.length - tailV4[0].length) + ':' +
+        (((o[0] << 8) | o[1]).toString(16)) + ':' + (((o[2] << 8) | o[3]).toString(16));
+  }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const hasGap = halves.length === 2;
+  const tail = hasGap ? (halves[1] ? halves[1].split(':') : []) : [];
+  let groups: string[];
+  if (hasGap) {
+    const missing = 8 - head.length - tail.length;
+    if (missing < 1) return null;
+    groups = [...head, ...Array(missing).fill('0'), ...tail];
+  } else {
+    groups = head;
+  }
+  if (groups.length !== 8) return null;
+  const nums = groups.map((g) => (g === '' ? NaN : parseInt(g, 16)));
+  if (nums.some((n) => Number.isNaN(n) || n < 0 || n > 0xffff)) return null;
+  return nums;
+}
+
+export function isPrivateIp(ip: string): boolean {
+  const s = ip.trim().toLowerCase();
+  const dm = s.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (dm) {
+    const o = dm.slice(1).map(Number);
+    if (o.some((n) => n > 255)) return false;
+    return isPrivateV4(o[0], o[1]);
+  }
+  // RT-31: hostnames (no ':') are never IP literals — the fc/fd check used to wrongly
+  // flag `fcbarcelona.com`. Only strings that are actually IPv6 get the range checks.
+  if (!s.includes(':')) return false;
+  const g = expandIPv6(s);
+  if (!g) return false;
+  // ::/0..1 loopback / unspecified
+  if (g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0 && g[6] === 0 && (g[7] === 0 || g[7] === 1)) return true;
+  if ((g[0] & 0xffc0) === 0xfe80) return true;           // fe80::/10 link-local
+  if ((g[0] & 0xfe00) === 0xfc00) return true;           // fc00::/7 unique-local
+  // RT-31 follow-up: check the EMBEDDED IPv4 of every wrapper form, in the expanded
+  // (canonical) address — so uncompressed `0:0:0:0:0:ffff:a9fe:a9fe`, 6to4 and NAT64 are
+  // all caught, not just the `::ffff:` literal the URL parser happens to normalise.
+  // isPrivateV4 only needs the first two octets, which live in a single hextet.
+  const embedded = (hextet: number) => isPrivateV4((hextet >> 8) & 255, hextet & 255);
+  // ::ffff:0:0/96  IPv4-mapped
+  if (g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0xffff) return embedded(g[6]);
+  // 2002::/16  6to4 — embedded IPv4 is the next 32 bits (g[1] holds its first two octets)
+  if (g[0] === 0x2002) return embedded(g[1]);
+  // 64:ff9b::/96  NAT64 — embedded IPv4 is the low 32 bits
+  if (g[0] === 0x0064 && g[1] === 0xff9b) return embedded(g[6]);
+  return false;
+}
+
+/**
+ * نامِ میزبان‌های داخلی که هرگز نباید webhook برود — پیش از resolve (fast fail).
+ * فقط نام و IPِ لفظی را می‌سنجد؛ resolveِ واقعی و pinning در `safeLookup` است.
+ */
+export function isBlockedWebhookHost(host: string): boolean {
+  const h = host.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h) return true;
+  if (h === 'localhost' || h.endsWith('.localhost')) return true;
+  if (h === 'metadata' || h === 'metadata.google.internal') return true;
+  if (h.endsWith('.internal') || h.endsWith('.local')) return true;
+  return isPrivateIp(h); // literal private/loopback/link-local/mapped IP (hostnames → false)
+}
+
+/**
+ * lookup سازگار با `http(s).request({ lookup })`. در **زمانِ اتصال** صدا زده می‌شود، پس
+ * همان resolveی که اینجا اعتبارسنجی می‌شود دقیقاً همانی است که سوکت به آن وصل می‌شود —
+ * پنجره‌ی TOCTOU/DNS-rebinding بسته می‌شود (برخلافِ resolve-سپس-fetch(hostname) که دو
+ * resolveِ مستقل داشت). هر آدرسِ برگشتی با همان `isPrivateIp` مشترک سنجیده می‌شود.
+ */
+export function safeLookup(
+  hostname: string,
+  options: unknown,
+  callback: (err: NodeJS.ErrnoException | null, address?: string | LookupAddress[], family?: number) => void,
+): void {
+  const guarded = process.env.ALLOW_PRIVATE_WEBHOOKS !== 'true';
+  dnsLookupCb(hostname, options as LookupOptions, (err: NodeJS.ErrnoException | null, address: string | LookupAddress[], family: number) => {
+    if (err) { callback(err); return; }
+    if (guarded) {
+      const addrs: LookupAddress[] = Array.isArray(address) ? address : [{ address: address as string, family }];
+      for (const a of addrs) {
+        if (isPrivateIp(a.address)) {
+          const e: NodeJS.ErrnoException = new Error(`آدرس webhook به شبکه‌ی داخلی resolve شد (${a.address})`);
+          e.code = 'EAI_BLOCKED';
+          callback(e); return;
+        }
+      }
+    }
+    callback(null, address, family);
+  });
 }
 
 export async function assertPublicHttpUrl(rawUrl: string): Promise<void> {
@@ -99,14 +192,15 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<void> {
     throw Err.validation('پروتکل webhook باید http یا https باشد');
   }
   const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, ''); // IPv6 را از [] در بیاور
-  if (host === 'localhost' || host.endsWith('.localhost') || host === 'metadata.google.internal') {
-    throw Err.validation('آدرس webhook مجاز نیست (شبکه‌ی داخلی)');
-  }
-  if (isPrivateIp(host)) throw Err.validation('آدرس webhook مجاز نیست (شبکه‌ی داخلی)');
-  let address: string;
-  try { ({ address } = await lookup(host)); }
+  if (isBlockedWebhookHost(host)) throw Err.validation('آدرس webhook مجاز نیست (شبکه‌ی داخلی)');
+  // پیش‌بررسیِ resolve (fail fast با پیامِ روشن). گاردِ قطعیِ ضدِ rebinding خودِ
+  // `safeLookup` در زمانِ اتصال است — این‌جا فقط برای پیامِ خطای بهتر می‌ماند.
+  let addresses: LookupAddress[];
+  try { addresses = await lookup(host, { all: true }); }
   catch { throw Err.validation('آدرس webhook قابل‌resolve نیست'); }
-  if (isPrivateIp(address)) throw Err.validation('آدرس webhook مجاز نیست (شبکه‌ی داخلی)');
+  for (const a of addresses) {
+    if (isPrivateIp(a.address)) throw Err.validation('آدرس webhook مجاز نیست (شبکه‌ی داخلی)');
+  }
 }
 
 // ── محدودیت اندازه‌ی بدنه‌ی درخواست (جلوگیری از DoS) ──
