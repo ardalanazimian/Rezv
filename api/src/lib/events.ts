@@ -6,8 +6,12 @@ import { enqueue } from './queue';
 import { assertPublicHttpUrl, isBlockedWebhookHost, safeLookup } from './security';
 import { createLogger } from './logger';
 import { outboundHttpSignal } from './outbound-http';
+import { openSecret } from './secret-box';
 
 const log = createLogger('events');
+
+/** contextِ AADِ secretِ وب‌هوک در secret-box (S-05). */
+export const WEBHOOK_SECRET_CONTEXT = 'webhooks.secret';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Event Bus سبک + Webhook خروجی
@@ -46,7 +50,7 @@ export async function emit(opts: EmitOptions): Promise<void> {
         isActive: true,
         events: { has: opts.event },
       },
-      select: { id: true, url: true, secret: true },
+      select: { id: true, url: true },
     });
 
     for (const hook of hooks) {
@@ -56,7 +60,8 @@ export async function emit(opts: EmitOptions): Promise<void> {
         payload: {
           webhookId: hook.id,
           url: hook.url,
-          secret: hook.secret,
+          // ⚠️ S-05 (D-24): secret عمداً در payloadِ job نیست — آن ردیف در جدولِ jobs تا ۷ روز
+          // پس از تکمیل می‌ماند. تحویل، secretِ رمزشده را از خودِ ردیفِ webhook می‌خواند.
           event: opts.event,
           data: opts.payload,
           restaurantId: opts.restaurantId,
@@ -101,7 +106,7 @@ export function assertSafeWebhookUrl(rawUrl: string): URL {
  * امضای HMAC در هدر تا گیرنده صحت را تأیید کند.
  */
 export async function deliverWebhook(payload: {
-  webhookId: string; url: string; secret: string | null;
+  webhookId: string; url: string;
   event: string; data: Record<string, unknown>; restaurantId: string;
 }): Promise<void> {
   // گارد SSRF: قبل از هر fetch، امنیت URL بررسی می‌شود (H9).
@@ -118,10 +123,17 @@ export async function deliverWebhook(payload: {
     'Content-Type': 'application/json',
     'X-Rezervno-Event': payload.event,
   };
+  const hook = await db.webhook.findUnique({ where: { id: payload.webhookId }, select: { secret: true } });
+  if (!hook) {
+    // اشتراک پس از صف‌شدن حذف شده: نه تحویلِ بی‌امضا، نه retryِ بی‌حاصل.
+    log.warn('webhook حذف شده؛ تحویل انجام نشد', { webhookId: payload.webhookId, event: payload.event });
+    return;
+  }
   // امضای HMAC-SHA256 برای تأیید صحت (مثل Stripe/GitHub)
-  if (payload.secret) {
+  // secretِ رمزنشده یا رمزگشاییِ ناموفق = throw (worker retry → DLQ)، هرگز تحویلِ بی‌امضا.
+  if (hook.secret) {
     const { createHmac } = await import('crypto');
-    const sig = createHmac('sha256', payload.secret).update(body).digest('hex');
+    const sig = createHmac('sha256', openSecret(hook.secret, WEBHOOK_SECRET_CONTEXT)).update(body).digest('hex');
     headers['X-Rezervno-Signature'] = `sha256=${sig}`;
   }
 

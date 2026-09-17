@@ -312,7 +312,12 @@ jobs:
           ALLOWED_ORIGINS: https://ci.example.invalid
 
       - name: Boot path (docker-entrypoint.sh on a history-less DB)
-        run: sh tools/check-boot-path.sh
+        # S-05 (D-24): بوتِ production بدونِ حلقه‌ی کلیدِ رازها ۵۰۰ می‌دهد. کلید همین‌جا در
+        # runner ساخته می‌شود، نه در این فایل — هیچ کلیدی (حتی ساختگی) در مخزن نمی‌نشیند.
+        run: |
+          export SECRETS_KEYRING="ci-boot:$(openssl rand -base64 32)"
+          export SECRETS_ACTIVE_KEY_ID=ci-boot
+          sh tools/check-boot-path.sh
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/rezervno_boot
           # لازم چون `npm run start` انتهایِ اسکریپت در حالتِ production

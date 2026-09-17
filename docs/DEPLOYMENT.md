@@ -182,8 +182,18 @@ curl -s -o /dev/null -w "%{http_code}\n" https://<domain>/api/v1/maintenance/exp
 - Generate strong secrets: `openssl rand -base64 48` for
   `JWT_SECRET` / `JWT_REFRESH_SECRET` / `CRON_SECRET` / `MAINTENANCE_KEY` /
   `REDIS_PASSWORD`.
-- Runtime provider secrets (Zarinpal merchant id, Melipayamak credentials) can live in
-  `platform_settings` (editable from the company panel) with env as fallback.
+- The Zarinpal merchant id can live in `platform_settings` (set through `PATCH /api/v1/admin/settings`),
+  with env as the fallback. It is stored **encrypted** (AES-256-GCM, `api/src/lib/secret-box.ts`), and so is
+  `webhooks.secret`. Melipayamak credentials are env-only (`api/src/lib/sms.ts`); they are not in the DB.
+  (Corrected 2026-09-17, S-05 / D-24: this line used to say the Melipayamak credentials could live there too.)
+- `SECRETS_KEYRING` + `SECRETS_ACTIVE_KEY_ID` are required in production. Generate a key with
+  `echo "k1:$(openssl rand -base64 32)"`. Keep the keyring in the host secret store, never in the DB.
+  - **First deploy of migration 094:** run
+    `POST /api/v1/maintenance/secrets-reseal?seal_plaintext=1` with the maintenance key once. Until then,
+    existing plaintext rows are refused, not read. Invite tokens are hashed by 094 itself, and open invite
+    links keep working.
+  - **Rotation:** add the new key, set it active, restart, `POST /api/v1/maintenance/secrets-reseal`.
+    Remove the old key only after a run reports `rekeyed: 0` and `failed: []`.
 - Set secrets in Vercel dashboard (managed) or `.env` on the host (self-host).
 
 ---

@@ -86,6 +86,8 @@ function assertProductionSecretsSafe(): void {
       MAINTENANCE_KEY: process.env.MAINTENANCE_KEY,
       JWT_SECRET: process.env.JWT_SECRET,
       JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+      SECRETS_KEYRING: process.env.SECRETS_KEYRING,
+      SECRETS_ACTIVE_KEY_ID: process.env.SECRETS_ACTIVE_KEY_ID,
     });
     if (problems.length) {
       throw new Error('پیکربندیِ ناامن در production:\n  · ' + problems.join('\n  · '));
