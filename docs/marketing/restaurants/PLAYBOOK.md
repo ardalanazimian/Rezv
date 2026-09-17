@@ -91,7 +91,7 @@ only comparative line allowed in a sales conversation is the published-price fac
 | «صندوق/نرم‌افزار دارم» | «جاش رو نمی‌گیریم. اتصالِ آماده به صندوقِ خاصی نداریم؛ Webhook داریم که تیمِ فنیِ صندوق‌تون می‌تونه ازش استفاده کنه.» | REAL-STATIC for webhooks (`api/prisma/schema.prisma:1357`). **No POS-specific integration exists, so we say so** |
 | «گرونه / کار کساده» | «قبل از خرید، پنلِ واقعی رو همین‌جا روی گوشی ببینید؛ ماهِ اول تعدادِ بی‌حضورهای خودتون رو می‌بینید.» We never quote a saving we haven't measured, and we never offer a free account in the pitch | REAL-STATIC (panel demo mode with labelled `[DEMO]` data, `CLAUDE.md`) |
 | «مشتری‌هام تو دایرکت رزرو می‌کنن» | «دایرکت بمونه. لینکِ رزرو رو هم بذارید؛ لیستِ انتظار و سابقه‌ی مهمان دیگه به حافظه‌ی یه نفر بند نیست.» | REAL-STATIC |
-| «اگه بخوام قطع کنم؟» | «چیزی خودکار تمدید نمی‌شه. تمدید فقط با درخواستِ خودتون.» We do **not** promise data export (§1) | REAL-STATIC |
+| «اگه بخوام قطع کنم؟» | «چیزی خودکار تمدید نمی‌شه. تمدید فقط با درخواستِ خودتون.» We do **not** promise data export (§1). **Once M-21 ships** (not before), the seller may add: «اگه تمدید نکنید رزروِ تازه بسته می‌شه، ولی رزروهای قبلی رو می‌تونید مدیریت کنید و هیچ داده‌ای پاک نمی‌شه.» | REAL-STATIC (renewal). The day-0 line is decided, not built |
 | «هوشمنده؟ هوش مصنوعی داره؟» | «نه. قاعده‌هاش مشخصه و می‌گیم چطور کار می‌کنه.» | Truth (`api/src/lib/pricing.ts:1-10`) |
 
 ---
@@ -112,7 +112,8 @@ The self-serve trial path is **not** the launch funnel. It still exists in code 
 | 7 | Owner logs in | OTP to the owner's phone | — | `Restaurant.lastSeenAt` (`api/prisma/schema.prisma:156`) | 🔴 **BLOCKED until real SMS delivery is proven** (S-07) |
 | 8 | Restaurant enters its info | Tables, hours, menu, photos. **The restaurant's own job while subscribed** (owner, 09-17) | — | Counts of tables and menu items | Menu entry is tedious. Whether our team helps is `UNKNOWN` (§7) |
 | 9 | **First booking** | A real diner books | `Reservation` rows | Time to first booking = first `Reservation.createdAt` − activation | Nobody sends diners (the at-venue QR needs `E-001`) |
-| 10 | 15 days before expiry | The panel shows days left and a renewal notice (owner, 09-17) | **Not built** (`PRICING.md` §1a L2) | — | Until it's built, a human checks the admin list weekly |
+| 10 | 15 days before expiry | The panel shows days left and a renewal notice (owner, 09-17) | **Routed, not built:** M-21, `rezv-1b` (`PRICING.md` §1a L2) | — | Until it ships, a human checks the admin list weekly |
+| 10b | Day 0 without renewal | Editing locks, new bookings close, the restaurant is hidden from the customer app, existing bookings stay manageable, nothing is deleted | **Decided, not built** (`PRICING.md` §1a L4) | — | — |
 | 11 | Renews, or not | A renewal is a new purchase, steps 3–6 | Same | `activated` again, or `rejectedReason` / `adminNote` for why not | — |
 
 **Minimum instrumentation.** Almost all of it already exists as rows. Only three things are missing:
