@@ -16,15 +16,18 @@ else's statement I have not reproduced yet · `repro pending` = shape confirmed 
 test yet. Priority levels are the founder's §2 order: 1 journey · 2 money/auth · 3 beatable gate ·
 4 regressed / reported-fixed-but-not · 5 fake feature · 6 other.
 
-## Counts — revision 3 (2026-09-17 ~00:45 UTC; revision 2 was 29 rows)
+## Counts — revision 4 (2026-09-17 ~08:30 UTC; revision 3 was 30 rows)
 
 | Lane | Rows | critical | major | minor | submitted | open | blocked |
 |---|---|---|---|---|---|---|---|
-| Backend | 14 | 4 | 9 | 1 | 3 (BE-01, BE-02, BE-03) | 10 (+1 owned by rezv-1b) | 0 |
+| Backend | 18 | 5 | 10 | 3 | 7 (BE-01, BE-02, BE-03, BE-14, BE-15, BE-16, BE-17) | 10 (+1 owned by rezv-1b) | 0 |
 | Frontend | 10 | 2 | 7 | 1 | 1 (FE-06) | 7 (+2 owned by rezv-1b) | 0 |
 | Design | 1 | 0 | 1 | 0 | 0 | 1 | 0 |
 | SEO | 5 | 0 | 2 | 2 | 0 | 4 | 1 (SEO-B1) |
-| **Total** | **30** | **6** | **19** | **4** | **4** | **22 (+3 owned by rezv-1b)** | **1** |
+| **Total** | **34** | **7** | **20** | **6** | **8** | **22 (+3 owned by rezv-1b)** | **1** |
+
+BE-04 stays **open**: I-1 closed only its R2 path. R1, R3 and R4 are P1-4 Option A, next in the queue.
+"On main" is not "closed". Only the CEO closes a row.
 
 Rows added in revision 2 are listed in the section of that name at the end of this file. Nothing
 is closed; "submitted" means waiting for the Red Team and the CEO.
@@ -146,3 +149,21 @@ layer 5 over 9 tables + 2 FKs; §6 guard widened and wired into CI). Both wait f
 | ID | Sev | Lvl | Finding | Source | Status |
 |---|---|---|---|---|---|
 | BE-14 | major | 3 | Module-level `beforeEach`/`afterEach` in api test files are registered on the **root** of the one-process runner and fire before *every* test in the suite. One throwing hook (`fraud.integration.test.mts:84` once 090 landed) failed 1829 unrelated tests. 15 files have them; the two that 090 broke are fixed in BE-02. CEO: P2, the class-closer is a static guard with a self-test | `git grep -E "^(beforeEach|afterEach)(" -- api/tests` → 15 files (on 99065a7) | open (CEO: after 090 lands) |
+
+## Revision 4 (2026-09-17 batch 3): status changes and rows added
+
+### Status changes (every sha measured with `git ls-remote` / `git merge-base` when it was reported)
+
+| Row | Change | Evidence |
+|---|---|---|
+| BE-04 | **R2 submitted as I-1** (`91a4766`), rated SOUND by Red Team, **on main** (`8b63e61`). R1/R3/R4 open → P1-4 Option A (migration 095, with m-19) | `FIX-BE-04-I1.md` |
+| BE-14 | **submitted, on main** (`e19f394`, with the baseline shrink after m-21), then the Red Team P3 hardening (alias and `node:test` namespace calls flagged), **on main** (`b3b53e9`) | `FIX-BE-14.md` §"Baseline shrink after m-21", §"Alias hardening" |
+
+### Rows added
+
+| ID | Sev | Lvl | Finding | Source | Status |
+|---|---|---|---|---|---|
+| BE-15 | major | 3 | **m-21: fixture phone prefixes shared across test files.** The census found **27** prefixes in more than one file (the finding said 1). dna-summary's module-level hook left **365** `0921` users per run (the finding said ~1899), and the ~16% rate was not reproduced | STATE m-21 (rezv-31); census on `8b63e61` | **submitted, on main** (`e19f394`): ownership enforced (`PHONE_PREFIX_REUSE`), numbers unique per run; 5 sequential full suites 1900/0, zero collisions. P3: owner = outermost `*.test.mts` frame (`b3b53e9`). `FIX-m-21.md` |
+| BE-16 | critical | 2 | **S-05: provider secrets and invite tokens in plaintext at rest.** Sibling: the webhook secret was copied into `jobs.payload` on every emit | P0-007 / A3-008 / D-12, D-24 | **submitted, on main** (`bd80c1f`). Red Team: HOLDS (live crypto probe 16/16). AES-256-GCM with an env keyring, invite tokens hashed, migration 094, reseal and rotation route. `FIX-S-05.md` |
+| BE-17 | minor | 2 | **S-05 follow-up:** the invite link (bearer token) stayed in the SMS job payload after sending; gate A2 did not require the post-deploy reseal | CEO ruling on `bd80c1f` | **submitted** (`impl/rezv-85-s05-followup @ 5467289`): migration 096 trigger redacts on completed/dead from every path; `gate-deploy.mjs` reads the reseal response; full suite 1927/0. **On main** (fast-forward `5467289`); the CEO acked number 096, with 095 reserved for P1-4 A |
+| BE-18 | minor | 3 | **A throw in a module-level `before` (one-shot) cancels the tests of every file in the process**, including files imported before it. Measured during m-21: a discovery run hung for 30+ minutes | m-21 discovery run; two-file mini runner | open. The CEO put it in STATE as a MINOR test-infra row, not to be fixed now. Outside the BE-14 guard's scope |

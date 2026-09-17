@@ -64,3 +64,14 @@ Nothing below is a finding and nothing below is green. Each row says what was no
 | U-26 | The real partition-retention procedure | `011-reservations-partitioning.sql` is not runnable as written (elided columns, undefined `block_end`). Only a shape emulation was measured (FIX-BE-02 §partition) |
 | U-27 | The FP-009 gates on Linux CI | `impl/*` pushes do not trigger CI. The end-to-end drift run used a `psql` shim into the Postgres 17 container on Windows |
 | U-28 | 13 remaining files with module-level `beforeEach`/`afterEach` | Class logged as BE-14; not audited one by one |
+
+## Added 2026-09-17 ~08:30 UTC (batch 3)
+
+| # | Unknown | Why |
+|---|---|---|
+| U-29 | A live `next start` boot with and without `SECRETS_KEYRING` | A local production build of **main itself** (`e19f394`) fails on this machine while prerendering `/_global-error` ("Invariant: Expected workStore to be initialized"). Only `middleware()` was driven directly. CI `boot-path` is the witness (CEO: environmental) |
+| U-30 | The ~16% per-run collision rate in m-21 | Not reproduced. Measured instead: 365 `0921` users per run (≈0.7% birthday estimate) and no collision in the baseline run |
+| U-31 | The jobs redaction trigger (096) under production load | It runs on every `jobs` write; only its correctness was measured, not its cost |
+| U-32 | S-05 and m-21 on Linux CI | `impl/*` pushes don't trigger CI. Everything was measured on Windows; main CI measures the merged trees |
+| U-33 | The first real deploy of 094 (reseal immediately after) | There is no deployed environment; the step is documented and gated (A2), not exercised |
+| U-34 | Whether an unmerged branch now collides with a prefix m-21 assigned | Enforcement turns it into a deterministic red on the merged tree, but no unmerged branch was run against it |
