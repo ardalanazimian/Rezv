@@ -129,8 +129,9 @@ platform)? The answer decides the price (§9).
 | **The restaurant's own Instagram and Telegram** | The restaurant's followers book when the restaurant tells them to | Same |
 | **Our own Instagram** | Screens and the «روراست» voice, no giveaways | Bookings, not followers |
 
-**Blocked on `E-001`, recorded and not asked:** printed QR codes need a domain that resolves
-(directive 036). Physical materials wait for the name and domain. Digital channels don't.
+**`E-001` moved:** the owner said on 2026-09-17 that the domain has been bought. **Whether it resolves
+has not been checked**, and the domain name is not recorded here; the CEO is asking the owner. Printed
+QR codes still need it to resolve (directive 036). Digital channels don't.
 
 ---
 
@@ -248,14 +249,16 @@ loses real value every month. The price-review cadence belongs in the owner's pr
 **Owner — two of these block the plan:**
 1. **Runway: is raising money a constraint or a preference?** (open since `BRIEF-2026-09-11.md`). It
    decides whether Phase 3 raises or the plan stretches. **Blocks `THE-ASK.md`.**
-2. **Who sells and activates in Phase 1?** Without a named person, the §5 gates have no one to hit
-   them. **Blocks Phase 1.**
+2. **Who makes the sales calls in Phase 1?** Without a named person, the §5 gates have no one to hit
+   them. **Blocks Phase 1.** Accounts are created from the company panel (owner, 09-17). The caller is
+   still `UNKNOWN` and in the owner's queue.
 3. **Which Tehran district, and which venue categories.** The charter says named categories, not named
    businesses, and that the owner chooses. My proposed categories: sit-down restaurants with evening
    peaks that already take DM bookings, and cafés with weekend queues (the waitlist use case).
 4. ~~**Price**~~ **Decided 2026-09-17: 18 / 33 / 60M plus a free display-only listing** (`PRICING.md` v2).
-   Open with the owner: VAT and price lock (`PRICING.md` §4). The first ten conversations (§4.1) test
-   the price, and the free listing becomes marketable only when its gating ships (`PRICING.md` §1).
+   Since then, all decided (09-17): +10% VAT, a sold subscription keeps its price until its term ends,
+   no founding offer, the free demo removed for the paid launch, and the free listing after launch
+   (`PRICING.md` decisions 6–13). The first ten conversations (§4.1) test the price.
 5. **A referral benefit** for restaurant-to-restaurant referrals, real and paid, or none.
 6. **The Foodro phone check**, optional and two minutes (`BUSINESS-MODEL.md` §8).
 

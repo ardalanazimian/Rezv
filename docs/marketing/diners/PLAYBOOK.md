@@ -38,7 +38,7 @@ launch mechanic, a four-week content calendar **described, not written**, and em
 
 | Channel | What we know | Class | Use at launch |
 |---|---|---|---|
-| **At the venue** (table tent, QR on the bill, the host saying it) | The diner is already at the restaurant, and it costs nothing but print | Reasoning, not measured | **Yes, first.** Printed QR codes are blocked until a domain resolves (`E-001`; directive 036: the host does not resolve) |
+| **At the venue** (table tent, QR on the bill, the host saying it) | The diner is already at the restaurant, and it costs nothing but print | Reasoning, not measured | **Yes, first.** Printed QR codes need a domain that resolves (directive 036). **The owner says the domain was bought (2026-09-17); resolution not checked** |
 | **The restaurant's own Instagram** | Iranian restaurants already take bookings by DM (`restaurants/PLAYBOOK.md` §5 criteria) | Described | **Yes**, a booking link in the bio or a story, posted by the restaurant with its consent |
 | **Our own Instagram** | Instagram is filtered in Iran and used through VPNs | SECONDARY (widely reported, not fetched in this programme) | **Yes, small:** real screens, no giveaways (`BRAND.md` §5) |
 | **Telegram** | Also filtered and reached through VPNs | SECONDARY | A channel for restaurant partners at most. Not a diner growth bet |
@@ -77,8 +77,9 @@ restaurant asked them to*. Word of mouth is a hypothesis to measure (§6), not a
 
 ## 3. The at-venue kit — described, not designed
 
-Everything here is blocked on a resolvable domain (`E-001`) and on the Designer's visual identity
-decision (`BRAND.md` §3). The owner decides both.
+Everything here waits on a domain that **resolves**, and on the Designer's visual identity decision
+(`BRAND.md` §3). The owner says the domain was bought on 2026-09-17, but resolution has not been
+checked and the name isn't recorded here. The identity option is still the owner's.
 
 | Piece | Content (described) | Rules |
 |---|---|---|

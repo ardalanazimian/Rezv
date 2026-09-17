@@ -68,6 +68,7 @@ what they wait for.
 | «کمیسیون نمی‌گیریم. قیمت ثابته» | REAL-STATIC | No commission code (`BUSINESS-MODEL.md` §1 R6) |
 | «روی سایت نوشته» | **Gated** | True once the Implementation commit ships 18/33/60 to the pricing page (`PRICING.md` §7) |
 | «کارت نمی‌گیریم و چیزی خودکار تمدید نمی‌شه» | REAL-STATIC | No automatic payment (§1) |
+| «قیمتی که الان می‌خرید تا آخرِ دوره‌ی اشتراک‌تون ثابت می‌مونه» | Owner decision 10, REAL-STATIC support | The purchase stores a price snapshot (`amountToman`, `model SiteOrder`). **Never** «قیمت هیچ‌وقت عوض نمی‌شه»: new prices may change |
 | «حسابتون رو تیمِ ما می‌سازه» | REAL-STATIC | `provisionBusiness` (`api/src/lib/provisioning.ts:94`). Owner decision 09-17 |
 | «به‌علاوه‌ی ۱۰٪ مالیات» | Owner decision | `PRICING.md` decision 6 |
 | ~~«سی روز کاملش رو رایگان»~~ | **Removed** | Owner 09-17: launch is paid, and free accounts are at our discretion only, never pitched |
@@ -189,12 +190,12 @@ something like «رزرو: دایرکت» or a phone number.
 
 **Owner**
 1. **The district** (it blocks §5).
-2. **Who visits and sells** (it blocks §4, and `BUSINESS-PLAN.md` §9.2).
+2. **Who visits and makes the sales calls** (it blocks §4, and `BUSINESS-PLAN.md` §9.2). Still `UNKNOWN`, in the owner's queue (CEO, 09-17).
 3. **No exclusivity clause in the restaurant terms:** confirm it, so §1's answer can be said
    (`docs/audit/research/proposals/003-transparent-restaurant-terms.md` is only a proposal).
-4. ~~Who creates accounts~~ **Decided 09-17:** our team creates the account and the restaurant enters its own info. Still open: **who on the team** does steps 4 and 6, and whether we help with menu entry (step 8).
-5. **The founding offer and price lock** (`PRICING.md` §4.2–4.3). The CEO recommended "yes" to both, and the owner has not answered.
-6. **Which venues get the discretionary free accounts,** and who decides. They are never offered in a pitch.
+4. ~~Who creates accounts~~ **Decided 09-17:** our team creates the account and the restaurant enters its own info. **Decided 09-17: accounts are created from the company panel** (`apps/company/js/overview.js:206`, «ساختِ رستورانِ جدید»). Still open: who makes the calls (item 2), and whether we help with menu entry (step 8).
+5. ~~Founding offer and price lock~~ **Decided 09-17:** no founding offer. A sold subscription keeps its price until its term ends, and new prices may change (`PRICING.md` decisions 10–11).
+6. ~~Discretionary free accounts~~ **Decided 09-17: the company decides who gets one.** They are never offered in a pitch.
 
 **CEO** (code questions; I read, I don't edit)
 1. ~~Guest-data export?~~ **Answered 2026-09-17:** none exists (positive control: `content-disposition` found in `media/[...key]/route.ts`), none for launch, PII design first (P3 backlog). Pitch wording changed accordingly (§1, §2).
