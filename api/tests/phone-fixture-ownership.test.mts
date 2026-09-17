@@ -46,18 +46,48 @@ describe('مالکیتِ پیشوندِ شماره‌ی فیکسچر', () => {
   });
 
   test('فایلِ فراخوان از stack خوانده می‌شود — مسیرِ ویندوز، POSIX و file:// ؛ خودِ helper نادیده', () => {
-    const stack = (frame: string) => [
+    const stack = (...frames: string[]) => [
       'Error',
       '    at fixturePhone (C:\\r\\api\\tests\\_phone.helper.mts:70:31)',
-      frame,
+      ...frames,
     ].join('\n');
     assert.equal(callerTestFile(stack('    at <anonymous> (C:\\r\\api\\tests\\dna-summary.integration.test.mts:81:25)')), 'dna-summary.integration.test.mts');
     assert.equal(callerTestFile(stack('    at makeUser (/home/runner/work/Rezv/Rezv/api/tests/fraud.integration.test.mts:40:7)')), 'fraud.integration.test.mts');
-    assert.equal(callerTestFile(stack('    at file:///C:/r/api/tests/helpers/seed-user.mts:12:3')), 'helpers/seed-user.mts');
+    assert.equal(callerTestFile(stack('    at file:///C:/r/api/tests/helpers/seed-user.mts:12:3', '    at file:///C:/r/api/tests/a.integration.test.mts:30:9')), 'a.integration.test.mts');
+  });
+
+  test('🔴 helperِ مشترک مالک نمی‌شود: مالک بیرونی‌ترین فریمِ tests/*.test.mts است (پیگیریِ Red Team)', () => {
+    const viaHelper = (testFile: string) => [
+      'Error',
+      '    at fixturePhone (/r/api/tests/_phone.helper.mts:90:3)',
+      '    at seedUser (/r/api/tests/helpers/seed-user.mts:12:3)',
+      `    at <anonymous> (/r/api/tests/${testFile}:40:7)`,
+      '    at TestContext.<anonymous> (node:internal/test_runner/test:797:9)',
+    ].join('\n');
+    const r = createPhoneRegistry();
+    r.claim('0921', callerTestFile(viaHelper('a.integration.test.mts')));
+    assert.throws(() => r.claim('0921', callerTestFile(viaHelper('b.integration.test.mts'))), /PHONE_PREFIX_REUSE/,
+      'دو فایلِ تست از راهِ یک helperِ مشترک همان پیشوند را برداشتند و باید قرمز شود');
+    // تستی که تابعِ فایلِ تستِ دیگری را صدا بزند: بیرونی‌ترین فایل (که runner اجرایش کرده) مالک است.
+    const nested = ['Error', '    at fixturePhone (/r/api/tests/_phone.helper.mts:90:3)',
+      '    at makeOwner (/r/api/tests/a.integration.test.mts:10:3)', '    at <anonymous> (/r/api/tests/b.integration.test.mts:20:3)'].join('\n');
+    assert.equal(callerTestFile(nested), 'b.integration.test.mts');
+  });
+
+  test('🔴 مالکیت به سقفِ stackِ محیط وابسته نیست: با Error.stackTraceLimit = 1 هم فایلِ تست پیدا می‌شود', () => {
+    // با سقفِ ۱، stackِ معمولی فقط فریمِ خودِ helper را دارد؛ پشتِ چند helperِ تودرتو (سقفِ پیش‌فرضِ ۱۰)
+    // همین بریدگی رخ می‌دهد. fixturePhone باید stackِ کامل را خودش بگیرد و سقف را برگرداند.
+    const limit = Error.stackTraceLimit;
+    Error.stackTraceLimit = 1;
+    try {
+      assert.match(fixturePhone('0998'), /^0998\d{7}$/);
+      assert.equal(Error.stackTraceLimit, 1, 'سقفِ محیط دست‌نخورده برمی‌گردد');
+    } finally { Error.stackTraceLimit = limit; }
   });
 
   test('🔴 stackِ بی‌فایلِ تست خطاست، نه «مالکِ ناشناس» که همه را قبول کند', () => {
     assert.throws(() => callerTestFile('Error\n    at node:internal/process/task_queues:95:5'), /PHONE_PREFIX_REUSE/);
+    assert.throws(() => callerTestFile('Error\n    at x (/r/api/tests/helpers/seed-user.mts:1:1)'), /PHONE_PREFIX_REUSE/, 'فقط helper، بی فایلِ تست');
     assert.throws(() => callerTestFile(undefined), /PHONE_PREFIX_REUSE/);
   });
 

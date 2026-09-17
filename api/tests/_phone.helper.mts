@@ -66,13 +66,29 @@ export function createPhoneRegistry(suffix: () => number = () => randomInt(0, 10
 
 const registry = createPhoneRegistry();
 
-/** نامِ فایلِ تستی که fixturePhone را صدا زده (نسبی به tests/)، از stack. */
+/**
+ * نامِ فایلِ تستی که مالکِ این فراخوانی است (نسبی به tests/)، از stack.
+ *
+ * ⚠️ پیگیریِ Red Team (۲۰۲۶-۰۹-۱۷): نسخه‌ی قبلی اولین فریمِ غیرِ helper را برمی‌داشت. پس helperِ
+ * مشترکی زیرِ tests/ (مثلاً tests/helpers/seed.mts) که دو فایلِ تست صدایش بزنند، خودش «مالک» می‌شد
+ * و تکرارِ پیشوند میانِ آن دو فایل پنهان می‌ماند. حالا مالک **بیرونی‌ترین** فریمِ `tests/*.test.mts`
+ * است — همان فایلی که runner واقعاً import کرده.
+ */
 export function callerTestFile(stack: string | undefined): string {
+  let owner: string | null = null;
   for (const line of (stack ?? '').split('\n').slice(1)) {
-    const m = line.match(/[\\/]tests[\\/]([^\s():]+\.m?[jt]s)/);
-    if (m && !m[1].endsWith('_phone.helper.mts')) return m[1].replace(/\\/g, '/');
+    const m = line.match(/[\\/]tests[\\/]([^\s():]+\.test\.m?[jt]s)/);
+    if (m) owner = m[1].replace(/\\/g, '/');
   }
-  throw new Error('PHONE_PREFIX_REUSE: فایلِ فراخوانِ fixturePhone از stack پیدا نشد — قاعده‌ی مالکیت اجراشدنی نیست');
+  if (owner) return owner;
+  throw new Error('PHONE_PREFIX_REUSE: هیچ فایلِ tests/*.test.mts در stackِ فراخوانِ fixturePhone نیست — قاعده‌ی مالکیت اجراشدنی نیست');
+}
+
+/** stackِ کامل: با سقفِ پیش‌فرضِ ۱۰ فریم، فریمِ فایلِ تست زیرِ چند helperِ تودرتو بریده می‌شد. */
+function fullStack(): string | undefined {
+  const limit = Error.stackTraceLimit;
+  Error.stackTraceLimit = 100;
+  try { return new Error().stack; } finally { Error.stackTraceLimit = limit; }
 }
 
 /**
@@ -85,6 +101,6 @@ export function fixturePhone(prefix: string): string {
   if (!/^0\d{3}$/.test(prefix)) {
     throw new Error(`پیشوندِ نامعتبر «${prefix}» — باید ۴ رقم و با ۰ شروع شود`);
   }
-  registry.claim(prefix, callerTestFile(new Error().stack));
+  registry.claim(prefix, callerTestFile(fullStack()));
   return registry.issue(prefix);
 }
