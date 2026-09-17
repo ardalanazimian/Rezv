@@ -18,23 +18,37 @@ does the push to `main`.
 | 3 | **Listing a restaurant in the customer app is free. The business panel and customer club are paid** | «ثبت نام رستوران تو پنل کاستومر رایگان هست ولی پنل بیزنس و باشگاه مشتریان نه» | v2 |
 | 4 | **The free listing is display only, with no online booking** | He chose «فقط نمایش، بدونِ رزرو» from three options | v2 |
 | 5 | Deposits are off at launch | «بیعانه فعلاً خاموش می‌مونه» (relayed by the CEO) | `BUSINESS-MODEL.md` §5 |
+| 6 | **All published prices exclude VAT; +10% is added.** Every card and price surface shows «+ ۱۰٪ مالیات بر ارزش افزوده» | Relayed by the CEO, 09-17 | v2.2, closes §4.1 |
+| 7 | **Our team creates the restaurant's panel account after the subscription is bought.** While subscribed, the restaurant enters and updates its own information. **15 days before the subscription ends, the panel shows the days left and a renewal notice** | Relayed by the CEO, 09-17 | v2.2 (§1a) |
+| 8 | **The first launch is paid.** We give free accounts to a few venues at our own discretion, and everyone else buys. **The free display-only listing (decisions 3–4) moves to after launch**, so no free plan is advertised in launch copy | Relayed by the CEO, 09-17 | v2.2 |
 
 ### The price list
 
-| Tier | Price (toman) | Per month | Includes |
+| Tier | Price (toman) **+ ۱۰٪ مالیات بر ارزش افزوده** | Per month (excl. VAT) | Includes |
 |---|---|---|---|
-| **Free listing** (نمایش در اپِ مشتری) | 0 | — | Profile, photos and menu shown to diners. **No online booking, no panel, no club** (§3) |
+| ~~Free listing~~ **after launch** (decision 8) | 0 | — | Display only, no booking. **Not in launch copy.** A few free accounts at our discretion are not a plan and are never advertised |
 | سه‌ماهه (`m3`) | **18,000,000** | 6.0M | Everything in §3's paid list |
 | شش‌ماهه (`m6`) | **33,000,000** | 5.5M | Same |
 | یک‌ساله (`m12`) | **60,000,000** | 5.0M | Same |
 
-The three paid plans include the same product and differ only in term. VAT and price-lock terms are
-still **open, and they are the owner's** (§4). The 30-day free trial of the full product stays, and
-§1 says what happens when it ends.
+The three paid plans include the same product and differ only in term. **VAT is decided: +10% on top
+(decision 6).** Price lock and the founding-restaurants offer are still open with the owner (§4); the
+CEO has recommended "yes" to both. **There is no self-serve trial at launch:** the team creates the
+account after purchase (decision 7). The code's 30-day trial path (`api/src/lib/site-orders.ts:36`)
+and the landing's trial copy are therefore not part of the launch (§6, row 9).
 
 ---
 
-## 1. ⚠️ What the decisions need from code — the free tier does not exist yet
+## 1a. What decision 7 needs from code, for launch
+
+| # | Requirement | State in code |
+|---|---|---|
+| L1 | The team creates the account after purchase | **Exists:** `provisionBusiness` (`api/src/lib/provisioning.ts:94`), used by the admin restaurants route (`api/src/app/api/v1/admin/restaurants/route.ts`). Plan and expiry are set by admin activation (`api/src/app/api/v1/admin/restaurants/[id]/control/route.ts:44-96`). REAL-STATIC |
+| L2 | **The restaurant's panel shows days left and a renewal notice at 15 days** | **Not built:** `git grep` for `planExpiresAt|plan_expires_at|تمدید|روز باقی` over `apps/business/js` and `api/src/app/api/v1/restaurant` finds only token-refresh code, and nothing about plan expiry. Positive control: `planExpiresAt` hits `api/src/app/api/v1/admin/restaurants/route.ts` (3) and `api/src/lib/subscription.ts` (3). The admin status marks «رو به اتمام» at ≤14 days (`api/src/lib/subscription.ts` comment); the owner's rule is 15 days, shown in the restaurant's own panel |
+| L3 | The self-serve trial is not reachable at launch | The trial form and `/demo` page are live in the landing (`apps/landing/app/demo/page.tsx`, `apps/landing/components/forms/TrialForm.tsx`). Whether to hide them or keep them for later is for the CEO to route |
+| L4 | Expiry has a consequence | Still reported only (`api/src/lib/subscription.ts:30`). With a paid launch and a renewal notice, what happens on day 0 must be decided (owner/CEO); the notice alone is not enforcement |
+
+## 1. ⚠️ What the free tier needs from code — **after launch** (decision 8)
 
 **Today the code has no boundary between free and paid.** Measured on `cf60b9c`:
 - **No gating by plan anywhere.** `git grep` for plan comparisons over `api/src` and `apps` finds
@@ -125,7 +139,7 @@ SmartX's reservation module alone, ~60 restaurants per 100M monthly cost); B = 9
 At most REAL-STATIC until `CHAIN-MAP.md` lands (the CEO's rule). Card copy is proposed Persian in the
 «روراست» voice (`BRAND.md` §2).
 
-### Free listing
+### Free listing — **after launch** (decision 8), kept for that release
 
 | Proposed card line | Class | Evidence / gap |
 |---|---|---|
@@ -148,7 +162,7 @@ At most REAL-STATIC until `CHAIN-MAP.md` lands (the CEO's rule). Card copy is pr
 | «چند شعبه با یک حساب» | REAL-STATIC | `api/src/app/api/v1/restaurant/branches/route.ts` |
 | «کارکنان با سطحِ دسترسی، بدونِ سقفِ تعداد» | REAL-STATIC, including "no cap". **Confirmed by the CEO on 2026-09-17 with a positive control** | Permissions via `withRestaurantAuth` (`CLAUDE.md`). The CEO's measurement on `origin/main`: `max_?staff\|staffLimit\|maxUsers\|staff_?limit\|max_?seats\|seatLimit` over `api/src` → 0 files; positive control `maxPartySize\|max_party` → 2 files; `db.staff.count` on no request path; no gating by plan. Re-run if staff or plan code changes |
 | «اتصال به سیستم‌های دیگر (Webhook)» | REAL-STATIC at schema and outbound level | `api/prisma/schema.prisma:1357`, `api/src/lib/outbound-http.ts` |
-| «۳۰ روز رایگانِ کامل برای شروع» | REAL-STATIC | `api/src/lib/site-orders.ts:36`. What happens after day 30 (falling back to the free listing) needs requirement 3 |
+| ~~«۳۰ روز رایگانِ کامل برای شروع»~~ | **Removed for launch** | Decision 7: the team creates the account after purchase; decision 8: free accounts only at our discretion, never advertised |
 
 ### Not on any card
 
@@ -164,9 +178,8 @@ At most REAL-STATIC until `CHAIN-MAP.md` lands (the CEO's rule). Card copy is pr
 
 ## 4. Open — the owner's (money and tax), sent to the CEO as one package
 
-1. **VAT.** Is ⟨NAME⟩'s entity VAT-registered, and do the cards show «+ ۱۰٪ مالیات بر ارزش افزوده»
-   or «با احتساب مالیات»? Mupra and Duvita show "+10% VAT" (REAL). An accountant answers this, not
-   marketing.
+1. ~~**VAT.**~~ **Decided 2026-09-17 (decision 6):** prices exclude VAT, and every card shows
+   «+ ۱۰٪ مالیات بر ارزش افزوده», as Mupra and Duvita do (REAL).
 2. **Price lock.** Proposed: a paid term keeps its price until it ends, and prices for *new*
    sign-ups are reviewed each quarter (food-group inflation 127.5%, SECONDARY).
 3. **Founding restaurants (optional).** For the first ten, in exchange for feedback and permission
@@ -213,7 +226,9 @@ Unchanged from v1 except rows 1 and 7. The CEO added rows 4 and 6 to M-12 on 202
 | 4 | Badge «محبوب‌ترین» on m6 (`api/prisma/seed/site-content.json:31`) | No sales exist pre-launch, so "most popular" cannot be true | No badge. «بهترین ارزش» (`:51`) may become «کمترین قیمتِ ماهانه», which is arithmetic and true |
 | 5 | «بازبینیِ فصلیِ عملکرد با تیمِ رزرونو» · «پشتیبانیِ اولویت‌دار / اختصاصی» | A name `E-001` hasn't settled, and unstaffed services | Removed. One real support line on every card |
 | 6 | FAQ «…اتصالِ درگاهِ پرداخت در برنامه‌ی بعد از انتشار است.» (`api/prisma/seed/site-content.json:217`, mirrored in `apps/landing/content/` and `shared/content/`) | Promises online payment; the owner ruled it off for now | Keep the first two sentences, drop the last |
-| 7 | *(new)* A free-listing card | Would be false until §1 requirements 1–3 ship | **Don't add the card yet.** Add it in the same change that ships the gating |
+| 7 | *(new)* A free-listing card | Would be false until §1 requirements 1–3 ship, **and the owner moved the free tier to after launch** (decision 8) | **No free card at launch** |
+| 8 | *(new, decision 6)* Prices shown with no VAT line | The owner decided prices exclude VAT | «+ ۱۰٪ مالیات بر ارزش افزوده» on every card and price surface |
+| 9 | *(new, decisions 7–8)* The trial offer: the `/demo` page title «دموی رایگان ۳۰ روزه» (`apps/landing/app/demo/page.tsx:20`), the OG image «دموی ۳۰ روزه‌ی رایگان» (`apps/landing/app/opengraph-image.tsx:84`), and the trial form | Launch has no self-serve trial: the team creates accounts after purchase | Remove from launch copy, or re-point to «درخواستِ خرید / تماس». The CEO routes whether the page is hidden or rewritten |
 
 ---
 

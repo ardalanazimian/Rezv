@@ -78,8 +78,8 @@ recorded so the business plan does not assume renewals collect themselves.
 
 | # | Line | Who pays | State in code | Platform revenue? |
 |---|---|---|---|---|
-| R0 | **Free listing** (owner, 2026-09-17) | Nobody | **Not built.** There is no gating by plan, so every listed restaurant can take bookings today (`PRICING.md` §1) | **No.** It is catalogue depth for diners and an upgrade path |
-| R1 | **Subscription** (3 / 6 / 12 months) | Restaurant | Exists. Prices are seeded in the DB and editable from the company panel. Collection is manual (§0-c). New sign-ups get a 30-day trial on plan `free` (`api/src/lib/site-orders.ts:36,300`) | **Yes, the only one today** |
+| R0 | **Free listing** (owner, 2026-09-17) — **after launch** (owner, same day) | Nobody | **Not built.** There is no gating by plan, so every listed restaurant can take bookings today (`PRICING.md` §1) | **No.** It is catalogue depth for diners and an upgrade path |
+| R1 | **Subscription** (3 / 6 / 12 months), **+10% VAT on top** (owner, 09-17) | Restaurant | Exists. **At launch our team creates the account after purchase** (owner, 09-17; `provisionBusiness`, `api/src/lib/provisioning.ts:94`). A few free accounts at our discretion. Prices are seeded in the DB and editable from the company panel. Collection is manual (§0-c). New sign-ups get a 30-day trial on plan `free` (`api/src/lib/site-orders.ts:36,300`) | **Yes, the only one today** |
 | R2 | **SMS credit** | Restaurant | Each restaurant has `smsBalance` (starter 50, `api/src/lib/sms-balance.ts:8`), debited per send and topped up manually by an admin (`api/src/app/api/v1/admin/restaurants/[id]/sms/route.ts`). **No price for a top-up exists anywhere in the code** | **Possible, not priced.** The unit cost from Melipayamak is `UNKNOWN` |
 | R3 | **Deposits** (بیعانه) | Diner → restaurant | Collection works end-to-end when `paymentEnabled` is on. Forfeiture and refund on cancel are config only (`api/src/lib/cancellation-policy.ts:28,73`) and nothing executes them | **No. It is pass-through money,** and today it would sit with us (§0-a) |
 | R4 | **Gift cards** | Diner → restaurant | Purchase is flagged **off**: it would mint spendable balance with no payment step (`api/src/lib/feature-flags.ts:36-45`) | No, and it is pass-through if ever turned on |
@@ -124,7 +124,7 @@ been fully green since 09-08, real SMS delivery is unproven, and point spending 
 
 | Plan | Months | Price (toman) | Per month | "Compare at" on the card |
 |---|---|---|---|---|
-| Free listing | — | 0 | — | — |
+| Free listing (**after launch**) | — | 0 | — | — |
 | m3 | 3 | 18,000,000 | 6.00M | — |
 | m6 | 6 | 33,000,000 | 5.50M | 36,000,000 (= 2 × m3) |
 | m12 | 12 | 60,000,000 | 5.00M | 72,000,000 (= 4 × m3) |
@@ -196,7 +196,7 @@ LTV               = ARPA × gross margin % / monthly churn
 | Onboarding hours per restaurant | `UNKNOWN` | The first ten activations. The m6 card already promises «راه‌اندازی و انتقالِ دادهٔ اولیه» |
 | CAC | `UNKNOWN` | Measured from `SiteOrder` rows (lead → call → activation) |
 | Monthly churn | `UNKNOWN` for us. **No restaurant-software company in the research set publishes a churn %** (Toast, PAR, Booking/OpenTable: confirmed non-disclosure, SECONDARY). Cross-industry SaaS: top quartile 1–2%/mo, median 3–4%/mo (ChartMogul, 2023 data, REAL for "the survey says") | Our own renewals |
-| Trial → paid conversion | `UNKNOWN` | `SiteOrder.kind = 'trial'` → plan set by admin |
+| Conversation → purchase | `UNKNOWN` | Visits logged by hand → `SiteOrder.kind = 'purchase'` → `activated`. (No self-serve trial at launch.) |
 
 **What the SMS number already tells us.** At ≈24 toman all-in, 1,000 messages a month cost ≈24,000
 toman. That is **<0.5%** of the 5.0–6.0M toman monthly equivalent of the owner's prices. SMS is
@@ -264,7 +264,9 @@ told about in advance.
 3. ~~**Deposits.**~~ **Decided 2026-09-17, owner: A, off at launch** (§5). Re-opening it means B or C,
    and both need counsel.
 4. **SMS.** Is SMS credit a revenue line (priced top-ups) or a cost folded into the subscription?
-5. **Trial.** Is the 30-day free trial a decision or a default? It is in code (`api/src/lib/site-orders.ts:36`)
+5. ~~**Trial.**~~ **Decided 2026-09-17:** no self-serve trial at launch. The team creates accounts after
+   purchase, and a few free accounts are given at our discretion (`PRICING.md` decisions 7–8). The code
+   path still exists (`api/src/lib/site-orders.ts:36`)
    and in the OG image (`apps/landing/app/opengraph-image.tsx:84`).
 
 **CEO**

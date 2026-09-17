@@ -36,7 +36,7 @@
 3. **Sell money kept, not growth.** Demand is contracting (−45% customers at Tehran food vendors,
    CLAIMED, re-fetched), so the pitch is recovered no-shows plus a club the restaurant owns, not
    "fill more tables".
-4. **Get our own numbers.** A no-show rate before and after, 30-day retention, and a trial→paid
+4. **Get our own numbers.** A no-show rate before and after, 30-day retention, and a conversation→purchase
    rate. They replace every `UNKNOWN` in the business model, and they are the only thing an
    investor will believe.
 5. **Decide the second city and the raise at L+6 months, on those numbers, not before.**
@@ -110,7 +110,7 @@ measurement each channel must carry.
 | **Direct visits in one district** | Owners buy from a person who shows the working panel on a phone, not from a page | People-hours, `UNKNOWN` until §9 says who sells | Visits → `SiteOrder` (trial) → `activated`, counted weekly |
 | **Instagram, where restaurants already live** | Owners see real screens (not renders) from venues they know | Content time. **No paid ads** until positioning copy is approved | `SiteOrder.utmSource / utmMedium / utmCampaign`, which already exist in the schema |
 | **Referral from the first restaurants** | An owner trusts another owner more than us | A referral benefit, **to be decided by the owner**. It must be real and paid, because we have already once removed a referral promise the code never paid (`POSITIONING.md` §3) | A `utmSource` per referring restaurant |
-| **Free listing → paid** (owner's model, 2026-09-17) | A restaurant listed free sees diners who can't book it online, and upgrades | Zero to us per listing, plus the listing-proof work (`PRICING.md` §1, req. 5) | Free listings → trials → `activated`. **Not usable until the gating ships** |
+| **Free listing → paid** (owner's model, 2026-09-17; **moved to after launch** the same day) | A restaurant listed free sees diners who can't book it online, and upgrades | Zero to us per listing, plus the listing-proof work (`PRICING.md` §1, req. 5) | Free listings → trials → `activated`. **Not usable until the gating ships** |
 | **Guild channels (اتحادیه‌ها)** | The unions are publicly describing the demand squeeze (CLAIMED), which is an opening for a "money kept" talk | Low | **Hypothesis only.** Nobody has contacted a union, and nobody will without the owner's approval |
 
 **The pitch, in order:** money kept (no-shows recovered, stated as a mechanism until we have our own
@@ -156,7 +156,7 @@ numbers and said go, whatever the numbers are. Targets are marked as hypotheses.
 | Restaurants activated | 10 | `SiteOrder.status = activated` |
 | Still active at day 30 | Hypothesis: 7 of 10 | Bookings in the last 7 days per restaurant |
 | Our own no-show rate, before and after | Measured, whatever it is. Resos' 2.33% is the reference, not the target | `Reservation.status = no_show` ÷ bookings |
-| Trial → paid | Measured | `SiteOrder.kind = trial` → activated |
+| Conversation → purchase | Measured (no self-serve trial at launch, owner 09-17) | Hand-logged visits → `SiteOrder.kind = purchase` → `activated` |
 | Why leads did not convert | Every `rejected` row carries `rejectedReason`. `cancelled` rows have only `adminNote`, so it must be filled | `api/prisma/schema.prisma`, `SiteOrder` |
 
 **Gate:** the owner reviews these five numbers. Pass → Phase 2. Fail → fix the product or the pitch
@@ -188,7 +188,8 @@ in the same district, not a new district.
 |---|---|---|
 | **A person who sells and activates** | Billing is lead → call → invoice → admin activation (`BUSINESS-MODEL.md` §0-c) | `UNKNOWN`: owner decision (§9) |
 | **Onboarding** (menu, tables, staff) | The m6 card promises «راه‌اندازی و انتقالِ دادهٔ اولیه» | Hours per restaurant `UNKNOWN`. Counted from the first ten |
-| **Renewals** | Expiry is reported and not enforced (`api/src/lib/subscription.ts:30`) | A human checks the admin list monthly until the owner decides otherwise |
+| **Account creation** | Owner, 09-17: our team creates the account after purchase; the restaurant keeps its own info up to date | `provisionBusiness` exists (`api/src/lib/provisioning.ts:94`). Who on the team does it is `UNKNOWN` (§9.2) |
+| **Renewals** | Owner, 09-17: a notice in the restaurant's panel 15 days before expiry. Expiry itself is reported and not enforced (`api/src/lib/subscription.ts:30`) | **The notice is not built** (`PRICING.md` §1a L2). Until it is, a human checks the admin list weekly |
 | **Support** | The cards promise weekday, priority and dedicated support by tier | Nobody is named. The promise should match whoever exists |
 | **SMS top-ups** | Admin tops up by hand (`BUSINESS-MODEL.md` §1 R2) | Pricing a top-up is an owner decision (`BUSINESS-MODEL.md` §7.4) |
 
@@ -200,7 +201,7 @@ in the same district, not a new district.
 `UNKNOWN` and inventing it would make every number below it fiction. What can be computed honestly:
 
 **Revenue per paying restaurant count, at the owner's prices** (m12 = 60M/yr; m3 would be 72M/yr, m6
-66M/yr; before VAT, which is still open). Free listings pay nothing:
+66M/yr). **Before VAT: the owner decided +10% is added on top**, and it is not our revenue. Free accounts pay nothing:
 
 | Paying restaurants | Annual subscription revenue (m12) |
 |---|---|

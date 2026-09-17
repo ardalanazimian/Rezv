@@ -30,8 +30,11 @@ what they wait for.
 4. **Make the terms the pitch.** The research shows restaurants burned by commission tied to
    exclusivity, by opaque "call us" prices and by billing that continues after cancellation (§1). We
    can truthfully offer the opposite of all three today.
-5. **Every trial is a measurement.** The trial restaurant learns its own no-show count, and so do we.
-   That number replaces every adjective in the pitch after the first month.
+5. **Every first month is a measurement.** The restaurant learns its own no-show count, and so do we.
+   That number replaces every adjective in the pitch.
+6. **Launch is paid (owner, 09-17).** There is no self-serve trial: contact → purchase → our team
+   creates the account. A few free accounts are given at our discretion, and **the pitch never
+   offers one**.
 
 ---
 
@@ -53,8 +56,8 @@ what they wait for.
 
 > «رزروی که ثبت می‌شه و مهمان نمیاد، میزِ خالیه. ما یه پنل می‌دیم که رزرو، لیستِ انتظار و باشگاهِ
 > مشتری‌هاتون یه‌جا باشه — و مشتری‌هاتون رو توی پنلِ خودتون می‌بینید، نه توی اپِ کسِ دیگه.
-> کمیسیون نمی‌گیریم. قیمت ثابته و روی سایت نوشته. کارت نمی‌گیریم و چیزی خودکار تمدید نمی‌شه.
-> سی روز کاملش رو رایگان امتحان کنید؛ آخرِ ماه خودتون می‌بینید چند تا رزروِ بی‌حضور داشتید.»
+> کمیسیون نمی‌گیریم. قیمت ثابته — به‌علاوه‌ی ۱۰٪ مالیات — و روی سایت نوشته. کارت نمی‌گیریم و چیزی خودکار تمدید نمی‌شه.
+> حسابتون رو تیمِ ما می‌سازه؛ آخرِ ماهِ اول خودتون می‌بینید چند تا رزروِ بی‌حضور داشتید.»
 
 **Line by line, with class and gate:**
 
@@ -65,7 +68,9 @@ what they wait for.
 | «کمیسیون نمی‌گیریم. قیمت ثابته» | REAL-STATIC | No commission code (`BUSINESS-MODEL.md` §1 R6) |
 | «روی سایت نوشته» | **Gated** | True once the Implementation commit ships 18/33/60 to the pricing page (`PRICING.md` §7) |
 | «کارت نمی‌گیریم و چیزی خودکار تمدید نمی‌شه» | REAL-STATIC | No automatic payment (§1) |
-| «سی روز کاملش رو رایگان» | REAL-STATIC | `api/src/lib/site-orders.ts:36` |
+| «حسابتون رو تیمِ ما می‌سازه» | REAL-STATIC | `provisionBusiness` (`api/src/lib/provisioning.ts:94`). Owner decision 09-17 |
+| «به‌علاوه‌ی ۱۰٪ مالیات» | Owner decision | `PRICING.md` decision 6 |
+| ~~«سی روز کاملش رو رایگان»~~ | **Removed** | Owner 09-17: launch is paid, and free accounts are at our discretion only, never pitched |
 | «آخرِ ماه می‌بینید چند تا رزروِ بی‌حضور داشتید» | REAL-STATIC as a count | `Reservation.status = no_show` exists (`api/prisma/schema.prisma`, `ReservationStatus`). It counts only if staff mark it, as Resos also warns |
 
 **Not in the pitch until gated:**
@@ -84,32 +89,37 @@ only comparative line allowed in a sales conversation is the published-price fac
 |---|---|---|
 | «اسنپ‌فود دارم» | «ما سفارش و ارسال نداریم؛ کنارِ اون کار می‌کنیم. رزرو و مشتری‌های حضوری‌تون اینجا ثبت می‌شن و توی پنلِ خودتون می‌بینیدشون.» | REAL-STATIC |
 | «صندوق/نرم‌افزار دارم» | «جاش رو نمی‌گیریم. اتصالِ آماده به صندوقِ خاصی نداریم؛ Webhook داریم که تیمِ فنیِ صندوق‌تون می‌تونه ازش استفاده کنه.» | REAL-STATIC for webhooks (`api/prisma/schema.prisma:1357`). **No POS-specific integration exists, so we say so** |
-| «گرونه / کار کساده» | «سی روز رایگان امتحان کنید و تعدادِ بی‌حضورهای خودتون رو ببینید؛ بعد تصمیم بگیرید.» We never quote a saving we haven't measured | REAL-STATIC (trial) |
+| «گرونه / کار کساده» | «قبل از خرید، پنلِ واقعی رو همین‌جا روی گوشی ببینید؛ ماهِ اول تعدادِ بی‌حضورهای خودتون رو می‌بینید.» We never quote a saving we haven't measured, and we never offer a free account in the pitch | REAL-STATIC (panel demo mode with labelled `[DEMO]` data, `CLAUDE.md`) |
 | «مشتری‌هام تو دایرکت رزرو می‌کنن» | «دایرکت بمونه. لینکِ رزرو رو هم بذارید؛ لیستِ انتظار و سابقه‌ی مهمان دیگه به حافظه‌ی یه نفر بند نیست.» | REAL-STATIC |
 | «اگه بخوام قطع کنم؟» | «چیزی خودکار تمدید نمی‌شه. تمدید فقط با درخواستِ خودتون.» We do **not** promise data export (§1) | REAL-STATIC |
 | «هوشمنده؟ هوش مصنوعی داره؟» | «نه. قاعده‌هاش مشخصه و می‌گیم چطور کار می‌کنه.» | Truth (`api/src/lib/pricing.ts:1-10`) |
 
 ---
 
-## 3. The onboarding funnel — as the code runs it today
+## 3. The onboarding funnel — contact → purchase → our team creates the account (owner, 09-17)
 
-| # | Step | What the owner does or sees | Evidence in code | How it's counted | Likely drop (hypothesis) |
+The self-serve trial path is **not** the launch funnel. It still exists in code (`/demo`,
+`TrialForm.tsx`, `api/src/lib/site-orders.ts:36`), and `PRICING.md` §6 row 9 routes its copy.
+
+| # | Step | What happens | Evidence in code | How it's counted | Likely drop (hypothesis) |
 |---|---|---|---|---|---|
-| 1 | Hears | A visit, Instagram, a referral | — | `SiteOrder.utmSource / utmMedium / utmCampaign` | — |
-| 2 | Lands | `/demo`: «همان لحظه فعال», «بدونِ کارتِ بانکی», «محصولِ کامل», «داده‌ها می‌مانند» | `apps/landing/app/demo/page.tsx:28-31` | Landing telemetry, not counted here | The form feels like a sales trap |
-| 3 | Signs up for the trial | Business name, contact, phone, email, city, branches, note | `apps/landing/components/forms/TrialForm.tsx` | `SiteOrder.kind = trial` | ⚠️ **Not final — do not script this step yet.** P1-4 Option A is not built (`rezv-85`). The CEO's expected shape: the form still creates the account, the owner row stays "unconfirmed" until the phone's owner first logs in by OTP, and that login shows a one-time confirmation prompt. The CEO sends the final flow when it exists |
-| 4 | Account created instantly | Tenant, restaurant, owner staff and starter tables, plus a tracking code at `/order/{code}` | `api/src/lib/site-orders.ts:1-20`, `api/src/lib/provisioning.ts:31` | `SiteOrder` + `Tenant.trialEndsAt` | — |
-| 5 | Logs into the panel | OTP to the same phone | `apps/landing/app/demo/page.tsx:35` | `Restaurant.lastSeenAt` (panel heartbeat, `api/prisma/schema.prisma:156`) | 🔴 **BLOCKED until real SMS delivery is proven**, the owner's blocker S-07 (CEO, 2026-09-17). Nothing downstream of this step can be tested with a real restaurant before then |
-| 6 | Sets up | Tables, hours, menu | demo page, "after" list | Counts of tables and menu items per restaurant | Menu entry is tedious. Who helps? (§7, onboarding) |
-| 7 | Turns on booking | The restaurant page goes live in the customer app | demo page, "after" list; `api/src/app/api/v1/restaurants/route.ts:41` | — | — |
-| 8 | **First booking** | A real diner books | `Reservation` rows | **Time to first booking** = first `Reservation.createdAt` − `SiteOrder.createdAt` | Nobody sends diners (the at-venue QR needs `E-001`'s domain, `BUSINESS-PLAN.md` §4.2) |
-| 9 | Decides to pay | Purchase request, call, invoice, activation | `apps/landing/components/pricing/PurchaseDialog.tsx`, `SiteOrderStatus` pending → contacted → activated | `SiteOrder.kind = purchase` status flow. `rejectedReason` on rejections | Nobody calls on day 25 because no one is assigned (§7) |
-| 10 | Trial ends | **Today, nothing happens:** expiry is not enforced | `api/src/lib/subscription.ts:30` | — | Once gating ships (`PRICING.md` §1), this falls back to the free listing |
+| 1 | Hears | A visit, Instagram, a referral | — | Visits in a hand log. Web leads carry `SiteOrder.utmSource / utmMedium / utmCampaign` | — |
+| 2 | Sees the panel | The seller shows the business panel on a phone | Demo mode with labelled `[DEMO]` data when there is no token (`CLAUDE.md`, demo/OTP section) | Hand log | The demo looks fake. Show real screens, labelled |
+| 3 | Asks to buy | In person, or the purchase dialog on `/pricing` | `apps/landing/components/pricing/PurchaseDialog.tsx` → `SiteOrder.kind = purchase`, `pending` | `SiteOrder` | The price with VAT surprises them. Say «+ ۱۰٪» up front |
+| 4 | Call and invoice | Our team calls and issues an invoice with +10% VAT | `apps/landing/app/pricing/page.tsx:92-97`; `SiteOrderStatus.contacted` | Status | Nobody calls fast enough. Who calls is `UNKNOWN` (§7) |
+| 5 | Pays | Outside the product, no online subscription payment | «پرداختِ آنلاینِ خودکار نداریم» (`apps/landing/app/pricing/page.tsx:235`) | `UNKNOWN`: there is no paid-date field. Record it in `adminNote` until one exists | — |
+| 6 | **Our team creates the account** | Tenant, restaurant and owner staff; plan and expiry set | `provisionBusiness` (`api/src/lib/provisioning.ts:94`) via `api/src/app/api/v1/admin/restaurants/route.ts`; activation at `api/src/app/api/v1/admin/restaurants/[id]/control/route.ts:44-96` | `SiteOrder.activated`, `Tenant.planExpiresAt` | ⚠️ Phone-ownership proof (P1-4 Option A) applies at the owner's first login; the CEO sends the final flow |
+| 7 | Owner logs in | OTP to the owner's phone | — | `Restaurant.lastSeenAt` (`api/prisma/schema.prisma:156`) | 🔴 **BLOCKED until real SMS delivery is proven** (S-07) |
+| 8 | Restaurant enters its info | Tables, hours, menu, photos. **The restaurant's own job while subscribed** (owner, 09-17) | — | Counts of tables and menu items | Menu entry is tedious. Whether our team helps is `UNKNOWN` (§7) |
+| 9 | **First booking** | A real diner books | `Reservation` rows | Time to first booking = first `Reservation.createdAt` − activation | Nobody sends diners (the at-venue QR needs `E-001`) |
+| 10 | 15 days before expiry | The panel shows days left and a renewal notice (owner, 09-17) | **Not built** (`PRICING.md` §1a L2) | — | Until it's built, a human checks the admin list weekly |
+| 11 | Renews, or not | A renewal is a new purchase, steps 3–6 | Same | `activated` again, or `rejectedReason` / `adminNote` for why not | — |
 
-**Minimum instrumentation.** Almost all of it already exists as rows. Only two things are missing:
+**Minimum instrumentation.** Almost all of it already exists as rows. Only three things are missing:
 1. A **reason on `cancelled`** site orders (only `rejectedReason` is structured).
-2. A **weekly view** of steps 3→5→8→9 per trial, which is a query, not a feature. Asking for it is the
-   CEO's call.
+2. A **paid date** (step 5): until a field exists, `adminNote`.
+3. A **weekly view** of steps 2→3→6→7→9 per restaurant, which is a query, not a feature. Asking for it
+   is the CEO's call.
 
 ---
 
@@ -117,10 +127,10 @@ only comparative line allowed in a sales conversation is the published-price fac
 
 | Channel | Hypothesis | Weekly effort (proposal) | Measured by | Stop if |
 |---|---|---|---|---|
-| **In-person visits, one district** | An owner who sees the panel on a phone starts a trial on the spot | 15–20 visits a week at quiet hours (15:00–18:00) | Visits logged by hand → trials (`SiteOrder`) | After 30 visits, fewer than 3 trials: the pitch is wrong, so fix it before continuing |
-| **Instagram DM to venues that already take DM bookings** | They feel the DM-booking pain today | 20 messages a week, hand-written, no templates blasted. **Never scraped lists** (charter) | `utmSource=instagram` on the trial link | No replies after 40: stop, not escalate |
-| **Referral from trial restaurants** | Owners trust owners | One ask per restaurant that reaches its first booking | `utmSource=ref-⟨id⟩` | — |
-| **Free listing → paid** (owner's model) | A listed venue sees demand it can't take online | — | **Not usable until the gating ships** (`PRICING.md` §1) | — |
+| **In-person visits, one district** | An owner who sees the panel on a phone asks to buy, or books a follow-up call | 15–20 visits a week at quiet hours (15:00–18:00) | Visits logged by hand → purchase requests (`SiteOrder.kind = purchase`) | After 30 visits, fewer than 3 purchase requests: the pitch or the price is wrong, so fix it before continuing |
+| **Instagram DM to venues that already take DM bookings** | They feel the DM-booking pain today | 20 messages a week, hand-written, no templates blasted. **Never scraped lists** (charter) | `utmSource=instagram` on the purchase-request link | No replies after 40: stop, not escalate |
+| **Referral from paying restaurants** | Owners trust owners | One ask per restaurant that reaches its first booking | `utmSource=ref-⟨id⟩` | — |
+| **Free listing → paid** (owner's model) | A listed venue sees demand it can't take online | — | **After launch** (owner, 09-17), and only once the gating ships (`PRICING.md` §1) | — |
 | **Guild channels** | Unions are publicly describing the squeeze | **None** without the owner's approval | — | — |
 
 **Not a channel:** paid ads (until positioning copy is approved), bought lists, fake reviews, or
@@ -153,9 +163,9 @@ something like «رزرو: دایرکت» or a phone number.
 | Weeks | Work | Output |
 |---|---|---|
 | 1–2 | Walk the district, list reachable venues, score them | **The reachable count**, the plan's first real market number (`BUSINESS-PLAN.md` §2) |
-| 3–6 | Visits and trials, top scores first | Trials started, and step 5 success (logged in) |
-| 5–8 | Setup help and chasing the first booking | Time to first booking, per trial |
-| 8–10 | Day-25 conversations: price, objections, pay or not | `activated`, plus the reason for every no |
+| 3–6 | Visits, panel demos and purchase requests, top scores first | Purchase requests (step 3), and accounts created (step 6) |
+| 5–8 | Restaurants entering their info, and chasing the first booking | Time to first booking, per restaurant |
+| 8–10 | Follow-up on every open request: price, VAT, objections | `activated`, plus the reason for every no |
 
 **The gate** is the one in `BUSINESS-PLAN.md` §5, Phase 1, reviewed by the owner.
 
@@ -180,12 +190,13 @@ something like «رزرو: دایرکت» or a phone number.
 2. **Who visits and sells** (it blocks §4, and `BUSINESS-PLAN.md` §9.2).
 3. **No exclusivity clause in the restaurant terms:** confirm it, so §1's answer can be said
    (`docs/audit/research/proposals/003-transparent-restaurant-terms.md` is only a proposal).
-4. **Who helps a trial restaurant with setup** (menu entry, step 6), and whether it's free.
-5. **The founding offer** (`PRICING.md` §4.3), since it changes the day-25 conversation.
+4. ~~Who creates accounts~~ **Decided 09-17:** our team creates the account and the restaurant enters its own info. Still open: **who on the team** does steps 4 and 6, and whether we help with menu entry (step 8).
+5. **The founding offer and price lock** (`PRICING.md` §4.2–4.3). The CEO recommended "yes" to both, and the owner has not answered.
+6. **Which venues get the discretionary free accounts,** and who decides. They are never offered in a pitch.
 
 **CEO** (code questions; I read, I don't edit)
 1. ~~Guest-data export?~~ **Answered 2026-09-17:** none exists (positive control: `content-disposition` found in `media/[...key]/route.ts`), none for launch, PII design first (P3 backlog). Pitch wording changed accordingly (§1, §2).
-2. ~~P1-4 on the trial form?~~ **Answered:** not built yet (`rezv-85`). Expected shape recorded at step 3. The CEO sends the final flow.
+2. ~~P1-4 on the trial form?~~ **Answered:** not built yet (`rezv-85`). With team-created accounts it applies at the owner's first login (step 6). The CEO sends the final flow.
 3. ~~SMS?~~ **Answered:** the owner's blocker S-07. Step 5 is marked BLOCKED.
 4. ~~Channel in `Reservation.source`?~~ **Answered:** out of scope for launch, no migration. Diner channels are measured with a coupon code per channel instead (`restaurant/coupons`, `coupon_redemptions`), and **that coupon path must be verified at runtime first**, since it is REAL-STATIC only (`docs/marketing/diners/PLAYBOOK.md`).
 
