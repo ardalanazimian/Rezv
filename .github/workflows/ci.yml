@@ -611,6 +611,12 @@ jobs:
       # بود). تا امروز، ۱۵۷ فایلِ تست فقط با انضباطِ انسانی محافظت می‌شدند.
       - name: Every test file is actually imported by the runner
         run: node tools/check-runner-completeness.mjs
+      # FP-009 §۶ + مهاجرتِ ۰۹۰: هیچ مسیرِ کدی در api/src تریگرهای فقط-افزودنی را خاموش
+      # نکند (session_replication_role · DISABLE/ENABLE REPLICA/DROP TRIGGER). خودآزمایی
+      # دارد: اگر الگو نمونه‌های ساختگی را نبیند، با کدِ ۲ («گیت اجرا نشد») می‌میرد نه ۰.
+      # حالتِ ماندگارِ DB را لایه‌ی پنجمِ tools/check-schema-drift.sh (jobِ schema-drift) می‌سنجد.
+      - name: No app code path switches off append-only triggers
+        run: node tools/check-session-replication-role.mjs
       # ⚠️ ۲۰۲۶-۰۹-۰۸: ۸ فیکسچرِ تستِ integration یک مقدارِ ساعتِ اجرا
       # (`Date.now()`) را با `.toISOString().slice(0, 10)` به کلیدِ UTC تبدیل
       # می‌کردند و به `createReservation` می‌دادند — همان چیزی که
