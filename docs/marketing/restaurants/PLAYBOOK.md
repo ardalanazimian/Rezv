@@ -190,7 +190,7 @@ something like «رزرو: دایرکت» or a phone number.
 
 **Owner**
 1. **The district** (it blocks §5).
-2. **Who visits and makes the sales calls** (it blocks §4, and `BUSINESS-PLAN.md` §9.2). Still `UNKNOWN`, in the owner's queue (CEO, 09-17).
+2. ~~Who visits and makes the sales calls~~ **Answered 2026-09-18: the owner himself** («تیم فروش با خودم»). §4's «15–20 visits a week» was sized for a dedicated seller and **is now a hypothesis he should reset** to what he will actually do weekly — a target nobody hits stops being a measurement. What this unlocks is bigger than the slot it fills: founder-led selling is the fastest route to the restaurant-owner interviews the model has been missing (`BUSINESS-MODEL.md` §7). Still open, and smaller: who does onboarding and menu entry after the sale (step 8).
 3. **No exclusivity clause in the restaurant terms:** confirm it, so §1's answer can be said
    (`docs/audit/research/proposals/003-transparent-restaurant-terms.md` is only a proposal).
 4. ~~Who creates accounts~~ **Decided 09-17:** our team creates the account and the restaurant enters its own info. **Decided 09-17: accounts are created from the company panel** (`apps/company/js/overview.js:206`, «ساختِ رستورانِ جدید»). Still open: who makes the calls (item 2), and whether we help with menu entry (step 8).

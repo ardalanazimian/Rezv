@@ -16,7 +16,7 @@
 | Who we are for, and the one true claim | `POSITIONING.md` |
 | Brand idea, values, tone, identity | `BRAND.md` |
 | Market, competitors, benchmarks, app-store footprint | `research/*-2026-09-16.md` (all four reviewed) |
-| Capital: whether, when, from whom | `fundraising/INVESTORS.md`, `fundraising/PAYMENT-PATHS.md` |
+| Capital: whether, when, from whom | **Private repository only** (`Rezv-security`, `business/fundraising/`), owner's ruling 2026-09-17 and 2026-09-18 |
 
 **Rules this plan keeps:**
 - No number without a class.
@@ -29,8 +29,9 @@
 
 ## 0. The plan in five lines
 
-1. **Launch is the first milestone, not fundraising.** This follows `INVESTORS.md` §6: raise after
-   launch and let the launch be the pitch.
+1. **Launch is the first milestone, not fundraising.** Confirmed 2026-09-18: the owner ruled raising
+   a preference, not a constraint, so the plan is not sized around it. Capital strategy lives in the
+   private repository (`Rezv-security`, `business/fundraising/`), not here.
 2. **Win ten restaurants in one Tehran district before anything else.** The reach is small and
    dense, so it can be served by hand. Billing is manual anyway (`BUSINESS-MODEL.md` §0-c).
 3. **Sell money kept, not growth.** Demand is contracting (−45% customers at Tehran food vendors,
@@ -177,9 +178,11 @@ in the same district, not a new district.
 
 1. **Second city or deeper in Tehran.** Foodro launched in Tehran, Karaj, Mashhad, Isfahan, Shiraz
    and Qom (live status `UNKNOWN`). The second-city choice should re-check it first-hand.
-2. **Raise or not, and how.** Follow `INVESTORS.md` §6: accelerator or صندوق نوآوری و شکوفایی first,
-   then licensed crowdfunding, then VC, and project participation before equity unless a fund asks
-   otherwise. The ask (`THE-ASK.md`) is still blocked on the owner's runway answer (§9).
+2. **Raise or not, and how.** **Decided 2026-09-18 by the owner: raising is a preference, not a
+   constraint** — so this phase has a real choice, not a forced step. The route, the order of
+   instruments and the ask are **capital strategy and live in the private repository**
+   (`Rezv-security`, `business/fundraising/`), by the owner's ruling of the same day. Nothing about
+   how or from whom we would raise belongs in this file.
 
 ---
 
@@ -235,7 +238,8 @@ loses real value every month. The price-review cadence belongs in the owner's pr
 - **Competitive:** Foodro, POS suites, the free status quo, contracting demand (`BUSINESS-MODEL.md` §8).
 - **Money and legal:** deposits are off at launch by the owner's decision (2026-09-17). The
   platform-merchant flow with no settlement code only matters if that is re-opened
-  (`BUSINESS-MODEL.md` §5, counsel). Every non-domestic capital path needs counsel (`PAYMENT-PATHS.md`).
+  (`BUSINESS-MODEL.md` §5, counsel). Capital paths and their counsel requirements are in the private
+  repository (`Rezv-security`, `business/fundraising/`).
 - **Honesty:** one caught exaggeration breaks the brand (`BRAND.md` §0). The live pricing page is
   the current exposure, and it has been routed.
 - **Execution:** manual billing and unenforced expiry hold at ten restaurants and leak at fifty (§6).
@@ -246,12 +250,28 @@ loses real value every month. The price-review cadence belongs in the owner's pr
 
 ## 9. Decisions needed
 
-**Owner — two of these block the plan:**
-1. **Runway: is raising money a constraint or a preference?** (open since `BRIEF-2026-09-11.md`). It
-   decides whether Phase 3 raises or the plan stretches. **Blocks `THE-ASK.md`.**
-2. **Who makes the sales calls in Phase 1?** Without a named person, the §5 gates have no one to hit
-   them. **Blocks Phase 1.** Accounts are created from the company panel (owner, 09-17). The caller is
-   still `UNKNOWN` and in the owner's queue.
+**Owner — both blockers are now answered (2026-09-18). Nothing in this plan is blocked on him.**
+1. ~~**Runway: constraint or preference?**~~ **Answered 2026-09-18: a preference.** Owner's words:
+   «جذب سرمایه ترجیح هست». The plan is therefore **not** sized around a raise. The answer's
+   implications and `THE-ASK.md` are capital strategy and live in the private repository
+   (`Rezv-security`, `business/fundraising/`); this row records only that the question is closed.
+2. ~~**Who makes the sales calls in Phase 1?**~~ **Answered 2026-09-18: the owner himself.** His
+   words: «تیم فروش با خودم». **This is the single most consequential input the plan was waiting
+   for**, and it changes the shape of Phase 1 rather than just filling a blank — see below.
+
+**What "the owner sells" actually means for Phase 1, stated so it is not mistaken for a formality:**
+- **The §5 gates now have an owner, and it is the person who also sets them.** That is a real risk of
+  marking one's own homework. The counter is that every Phase 1 gate is already defined as a count
+  from `SiteOrder` rows, not a judgement — keep it that way.
+- **Selling capacity is now bounded by one person's calendar**, and the same person runs the company.
+  The 15–20 visits a week in `restaurants/PLAYBOOK.md` §4 is a hypothesis built for a dedicated
+  seller; at founder capacity it should be re-set by the owner to what he will actually do weekly,
+  because a target nobody hits stops being a measurement.
+- **The upside is large and worth saying:** founder-led sales for the first ten is the fastest way to
+  get the interviews the model is missing (`BUSINESS-MODEL.md` §7 — which price band the buyer
+  compares us with). He does not need to file a report; the ten conversations answer it.
+- **Still open, and smaller:** who does onboarding and account creation after the sale (§6). It does
+  not block Phase 1.
 3. **Which Tehran district, and which venue categories.** The charter says named categories, not named
    businesses, and that the owner chooses. My proposed categories: sit-down restaurants with evening
    peaks that already take DM bookings, and cafés with weekend queues (the waitlist use case).
