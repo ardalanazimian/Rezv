@@ -229,6 +229,62 @@ author — auditing us — had to lowercase `EXIT=` to `exit=` and elide a hostn
 recorded evidence** to get the gate green. The gate was editing the record. If a check punishes
 verbatim evidence, the check is wrong, not the evidence.
 
+**List before you count whenever the pattern is loose** — the list shows what you actually matched,
+and it is one flag's difference. A count is not a measurement until the instrument has been shown to
+return non-zero on a known positive. And the negative control matters as much as the positive one:
+**a check that has never been shown to fail is not evidence.**
+
+Promoted 2026-09-18 after the same defect appeared four times in one morning, wearing different
+clothes each time. The shared fault is never the count — it is that the instrument's **scope** was
+never checked against something it must find:
+
+- `git ls-remote | grep -ic backup` → `10`, read as "the refs are still there". Listing instead of
+  counting showed all ten were unrelated pre-existing branches (`backup/launch-rc4`,
+  `backup/rescue-0916/*`); `grep -c reclaim-0918` → `0`. This one reached the owner as a wrong
+  statement before its author caught it — during an audit whose whole subject was measurement rigour.
+- A `refs/tags/backup/*` glob silently misses `backup/a/b`, because `*` does not cross `/`. A session
+  nearly reported its own tags as lost.
+- `raw.githubusercontent.com` returned HTTP 200 with a **zero-byte body** for every request in one
+  window, including a URL that had returned 11,085 B minutes earlier. Read as absence, that is a
+  false all-clear on a live exposure question. Treat a suspicious zero as a broken instrument, not a
+  result, and re-run it with a control.
+- A same-path comparison against the private repo reports total loss, because that repo deliberately
+  re-files red-team material under `redteam/branches/<branch>/`. **Compare by blob, not by path**,
+  whenever the two trees organise differently — a path check answers a question you did not ask.
+
+The negative-control half is the stronger half and it generalises §3's red-before-green from test
+suites to **every guard, probe and rescue check**. A patch-preservation check that passed on all
+eleven worktrees carried no information until its author fed it a deliberately corrupted patch and
+watched it reject that. Only then did the passes mean anything.
+
+**Report the api suite's DURATION next to its result, or the result is not evidence.** Measured
+2026-09-18, and the first version of this rule was wrong in an instructive way — it said two test
+files were "non-deterministic", which is the kind of claim that makes a real, findable cause look
+like weather. Its own author re-measured and found the mechanism:
+
+```
+run with 8 failures : 1,082,050 ms  (18.0 min)
+control, 0 failures :   296,043 ms  ( 4.9 min)
+confirm, 0 failures :   354,560 ms  ( 5.9 min)   ← same tree as the "failing" run
+```
+
+`expireOffers()` is global, earlier waitlist tests leave offers on a **5-minute TTL**, and a slow
+suite reaches `api/tests/waitlist-promotion-observability.test.mts:337` after they have expired — so
+it counts 1 injected failure instead of 2. `api/tests/secrets-at-rest.integration.test.mts:220` is
+the same class: reseal and key-rotation assertions over time-bounded state. **Past roughly six
+minutes on this hardware, failures start belonging to the clock rather than to the diff.** The slow
+run was slow because several sessions were hammering the same machine.
+
+So: a green suite is trustworthy inside the band and unproven outside it, and **a red suite is not a
+verdict on your change until you know how long it ran.** Before a green is cited for a decision, give
+its duration; before a red is blamed on a change, run the control more than once. One run per arm
+cannot separate a cause from a flake, and a control that is itself a sample of one proves nothing.
+
+Note what the correction cost and what it bought: the first framing would have sent someone hunting a
+phantom, and it nearly reached the owner as "our security gate is flaky". The second is actionable in
+one line. **"Non-deterministic" is a hypothesis, not a finding — treat it as the label you use after
+you have failed to find the mechanism, never before you have looked.**
+
 ## 4d. Three promoted 2026-09-10 — all from the Backend Engineer session, all about scope
 
 **Turn the claim into a testable condition BEFORE you write the guard.** Asked to pin the one
