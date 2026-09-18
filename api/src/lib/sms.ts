@@ -13,6 +13,7 @@ export type SmsJob = {
     | 'booking_cancelled' | 'booking_noshow' | 'booking_thanks'
     | 'waitlist_joined' | 'waitlist_offer'
     // SPEC-B: دعوتِ اولین‌ورودِ owner — tokens: [ownerName, restaurantName, inviteUrl]
+    // ⚠️ مهاجرتِ ۰۹۶ (jobs_redact_invite_link) توکن را فقط در tokens[2] پاک می‌کند؛ ترتیب را عوض کردی، آن تریگر را هم عوض کن.
     | 'staff_invite';
   tokens: string[];
   restaurantId?: string;  // اگر مشخص باشد، از موجودی SMS رستوران کم می‌شود (OTP سطح پلتفرم آن را ندارد)
@@ -234,6 +235,21 @@ export async function sendSmsCharged(
       template: job.template, restaurantId: rid, jobId: charge.jobId,
     });
     metrics.smsUncharged.inc({ template: job.template, reason: 'insufficient_balance' });
+  }
+  if (result === 'already_charged') {
+    // ⚠️ RT-20 (رد تیم، ۲۰۲۶-۰۹-۱۳): رسیدن به این خط یعنی `sendSmsNow` **بالاتر
+    // موفق شده** و بعد کسر به ایندکسِ یکتا خورده — پس این یک پیامِ دومِ واقعی
+    // به مهمان است، نه یک تلاشِ بی‌اثر. صورت‌حساب درست است (یک کسر)، ولی
+    // مهمان دو پیام گرفته و پلتفرم دو بار به ارائه‌دهنده پول داده.
+    //
+    // تا امروز این تنها خروجیِ `sendSmsCharged` بود که نه لاگ داشت نه متریک:
+    // `already_charged` در کلِ `api/src` فقط در `sms-balance.ts` ظاهر می‌شد و
+    // هیچ مصرف‌کننده‌ای نداشت. سطحِ `error` و نه `warn`، چون هزینه‌ی بیرونی
+    // دارد و مهمان می‌بیندش.
+    log.error('همان job دوباره اجرا شد — پیامِ دومِ واقعی به مهمان رفت (کسر قبلاً انجام شده بود)', {
+      template: job.template, restaurantId: rid, jobId: charge.jobId,
+    });
+    metrics.smsDuplicateSend.inc({ template: job.template });
   }
   return { status: 'sent', charge: result };
 }

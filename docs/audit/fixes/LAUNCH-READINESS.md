@@ -21,6 +21,8 @@ success  build · test (219s) · schema-drift · image-build · boot-path · sec
          design-system · standalone · seo · landing (54s) · rejects-ratchet          base-freshness: skipped (فقط PR)
 failure  e2e (mobile-safari) · e2e (mobile-chrome) · e2e (desktop-chrome)   — هر سه **completed**، نه cancelled
          هر پروژه: 188 passed · 6 failed — همان ۶ تستِ بدهیِ DS-007 (زیر)
+
+run 34737255890 · 42ba301 (RT-13 + RT-14) — همان حکم: ۱۳ سبز، e2e همان ۶ (188 passed، 20.5m)
 ```
 
 ---
@@ -34,9 +36,9 @@ failure  e2e (mobile-safari) · e2e (mobile-chrome) · e2e (desktop-chrome)   �
 | **سفرِ طلاییِ مشتری** | **UNKNOWN** | هرگز سرتاسر روی staging با OTPِ واقعی و SMSِ تأیید اجرا نشده. e2e با APIِ mock است و ثابت نمی‌کند. و نقصِ قرصِ «کِی و چند نفر» (بالا) مستقیم روی همین سفر است |
 | **سفرِ طلاییِ کسب‌وکار** | **UNKNOWN** | همان. B-01 (تاریخِ رزروِ دستی) حالا روی مرزِ روز و دستگاهِ UTC در CI سبز است — جزئی از سفر، نه خودِ سفر |
 | **سفرِ طلاییِ شرکت** | **UNKNOWN** | همان؛ TOTP و شارژِ SMS اثبات‌نشده |
-| **پول — بیعانه‌ی زرین‌پال** | **🟡 submitted** | #86: قفلِ ردیفِ رزرو + ایندکسِ ۰۸۶ (Red Team: HOLDS). RT-13: پرداختِ تکراریِ واقعی حالا متریک + آلارمِ `PaymentRefundRequired` + ردِ حسابرسی دارد (FIX-RT-13). ⚠️ آلارم به کسی پیج نمی‌شود تا C-3 (alertmanager) بسته نشود |
+| **پول — بیعانه‌ی زرین‌پال** | **🟡 submitted — تشخیص PARTIAL** | #86: قفلِ ردیفِ رزرو + ایندکسِ ۰۸۶ (Red Team: HOLDS). RT-13: پرداختِ تکراریِ واقعی حالا متریک + قاعده‌ی `PaymentRefundRequired` + ردِ حسابرسی دارد (FIX-RT-13؛ Red Team: ردِ حسابرسی HOLDS). ❌ **ولی آلارم به هیچ‌کس نمی‌رسد:** `observability/prometheus.yml` بلوکِ `alerting:` ندارد و `docker-compose.observability.yml` سرویسِ alertmanager ندارد (Red Team اندازه گرفت، RETEST-2026-09-13). تا `BACKLOG` C-3، **تنها تشخیصِ واقعی کوئریِ SQLِ داخلِ annotation است که یک انسان باید اجرا کند** — کسی آن را خودکار اجرا نمی‌کند |
 | **پول — اعتبارِ پیامکِ رستوران** | **🟡 submitted** | ۰۴۹ اندازه‌گیری شد: یک پیام دو اعتبار (retry)، پیامِ ردشده یک اعتبار. حالا یک اعتبار به‌ازای پیامِ پذیرفته‌شده، کلیددار روی job (مهاجرتِ ۰۸۷). `test` روی لینوکس سبز (FIX-049) |
-| **گاردهای CI که فریب نخورند** | **🟡 submitted** | RT-14: گاردِ وعده‌ی امتیاز ۲ از ۱۷ پوشه را می‌دید؛ حالا کلِ `api/src` و طرفِ ادعا هم کشف می‌شود (FIX-RT-14). گاردهای لندینگ به سوئیتِ لندینگ رفتند (FIX-050) |
+| **گاردهای CI که فریب نخورند** | **🟡 submitted** | RT-14: گاردِ وعده‌ی امتیاز ۲ از ۱۷ پوشه را می‌دید؛ حالا کلِ `api/src` (Red Team: دامنه HOLDS). **RT-18:** همان گارد با منفیِ hoisted دور می‌خورد — regex هرگز کافی نبود؛ ضامن حالا قیدِ CHECKِ مهاجرتِ ۰۸۸ روی `points_ledger` است و گارد وجود و فهرستِ مجازِ آن را می‌سنجد (FIX-RT-18). گاردهای لندینگ به سوئیتِ لندینگ رفتند (FIX-050) |
 | **لایه‌ی وب** | **UNKNOWN — و بخشیش پارک** | دامنه resolve نمی‌شود (§۳). گیتِ freshness هنوز نوشته نشده. `landing` در CI سبز است — یعنی تست/تایپ/لینت/build، نه crawlability |
 | **صفر ردیفِ FAKE** | **UNKNOWN — census کهنه** | آخرین census (`audit/round-16/feature-census.json`، ۰۹-۰۳): FAKE=۹. دوباره اندازه گرفته نشده؛ به‌عنوانِ وضعِ امروز نمی‌خوانمش |
 | **زیرساختِ ML** | **🟡 M0 submitted (از ۰۹-۰۹)** | `dca88ad` — بی‌تغییر امروز. فازِ «decision_inputs در زمانِ رزرو» شروع نشده |
@@ -46,7 +48,7 @@ failure  e2e (mobile-safari) · e2e (mobile-chrome) · e2e (desktop-chrome)   �
 | **مانورِ backup** | **UNKNOWN** | `tools/restore-drill.sh` هست؛ اجرا با شمارشِ ردیف ثبت نشده |
 | **تاب‌آوری** | **UNKNOWN** | کشتنِ کانتینرِ DB/ریبوت اجرا نشده |
 | **دسترسیِ ایران** | **UNKNOWN** | هیچ سطحی از دو ISPِ ایرانی بارگذاری نشده |
-| **Red Team پاک** | **❌ نه هنوز** | `RETEST-2026-09-12`: HOLDS ۲ · FAKEABLE ۱ (RT-14) · BLIND ۱ (RT-13). هر دو امروز submitted؛ Red Team هنوز دوباره نزده. ۱۷ از ۲۰ پچِ #86 حمله‌نشده |
+| **Red Team پاک** | **❌ نه هنوز** | `RETEST-2026-09-12`: HOLDS ۲ · FAKEABLE ۱ (RT-14) · BLIND ۱ (RT-13). `RETEST-2026-09-13` (دوباره‌زنی): RT-14 دامنه HOLDS · RT-13 PARTIAL (بالا) · **RT-18 FAKEABLE تازه** → امروز submitted، هنوز دوباره زده نشده. ۰۴۹ (پیامک) هدفِ بعدیِ Red Team است. ۱۷ از ۲۰ پچِ #86 حمله‌نشده |
 | **آزمونِ مالک** | **UNKNOWN** | مالک هنوز چهار سطح را روی گوشیِ خودش استفاده نکرده |
 
 ---

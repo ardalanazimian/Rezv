@@ -9,6 +9,7 @@ import { hashPassword, normalizeUsername, passwordPolicyError, usernamePolicyErr
 import { isOwnerPhoneUniqueViolation, isUsernameUniqueViolation } from './staff-helpers';
 import { clubPrefixFrom, slugSeed, uniqueRestaurantSlug } from './site-orders';
 import { createLogger } from './logger';
+import { hashBearerToken } from './secret-box';
 
 const log = createLogger('provisioning');
 
@@ -194,7 +195,8 @@ export async function provisionBusiness(
     const invite = await tx.staffInvite.create({
       data: {
         tenantId: tenant.id, restaurantId: restaurant.id, staffId: staff.id,
-        phone, token, expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+        // S-05 (D-24): فقط هشِ توکن در DB؛ خودِ توکن فقط در لینکِ پیامکِ دعوت می‌رود.
+        phone, token: hashBearerToken(token), expiresAt: new Date(Date.now() + INVITE_TTL_MS),
       },
       select: { id: true },
     });
@@ -246,6 +248,7 @@ async function sendInviteSms(p: { phone: string; ownerName: string; restaurantNa
   await enqueueSms({
     to: p.phone,
     template: 'staff_invite',
+    // ⚠️ جایگاهِ ۲ برای لینک قراردادِ مهاجرتِ ۰۹۶ است (پاک‌کردنِ توکن پس از پایانِ job) — جابه‌جا نکن.
     tokens: [p.ownerName, p.restaurantName, inviteUrl(p.token)],
     idempotencyKey: `staff-invite:${p.inviteId}`,
   });
@@ -318,7 +321,7 @@ export async function resendInvite(
     return tx.staffInvite.create({
       data: {
         tenantId: restaurant.tenantId, restaurantId, staffId: owner.id,
-        phone: owner.phone, token, expiresAt,
+        phone: owner.phone, token: hashBearerToken(token), expiresAt,
       },
       select: { id: true },
     });

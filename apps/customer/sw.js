@@ -11,7 +11,7 @@
 //
 //  نسخه‌بندی: با تغییرِ CACHE_VERSION، کشِ قدیمی خودکار پاک می‌شود.
 // ═══════════════════════════════════════════════════════════
-const CACHE_VERSION = 'rezervno-v44';
+const CACHE_VERSION = 'rezervno-v49';   // B-1: api.js/init.js/discover.js — دادهٔ نمونه فقط در file:// (v48 = ادغامِ main v44 و ba-design v47)
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

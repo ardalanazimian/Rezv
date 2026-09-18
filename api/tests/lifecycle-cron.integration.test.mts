@@ -143,18 +143,25 @@ before(async () => {
 // economy_ledger_entries (economy.ts:212). یعنی این پاک‌سازی هرگز اختیاری
 // نبود؛ نبودش با کدِ ۲۳۵۰۳ کلِ سوئیت را می‌خواباند (رانر همه را در یک
 // پروسه import می‌کند). payments هم همان قید را دارد و بمبِ بعدی بود.
+//
+// ⚠️ مهاجرتِ ۰۹۰ (FP-009 §۴): ردیفِ economy_ledger_entries دیگر حذف‌شدنی نیست، و حذفِ رزروی که
+// چنین ردیفی دارد هم رد می‌شود (FK = SET NULL → UPDATE روی دفتر). پس این پاک‌سازی فقط رزروهایی را
+// حذف می‌کند که ردِ اقتصادی ندارند. آن‌هایی که دارند می‌مانند — و بی‌خطرند: economy.ts:102-108 فقط
+// روی انتقال به completed/no_show/cancelled ردیف می‌نویسد، یعنی همه‌شان در وضعیتِ **پایانی**اند و
+// هیچ‌کدام از cronهای این فایل (running_late/no_show/complete روی وضعیت‌های فعال، expireStaleHolds
+// روی pending) دوباره نمی‌شماردشان.
 async function purgeReservations(ids: string[]) {
   await db.$executeRaw`
-    DELETE FROM economy_ledger_entries WHERE reservation_id IN
-      (SELECT id FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[]))`;
-  await db.$executeRaw`
     DELETE FROM payments WHERE reservation_id IN
-      (SELECT id FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[]))`;
+      (SELECT id FROM reservations r WHERE r.restaurant_id = ANY(${ids}::uuid[])
+         AND NOT EXISTS (SELECT 1 FROM economy_ledger_entries e WHERE e.reservation_id = r.id))`;
   // ⚠️ حذفِ صریحِ reservation_events برداشته شد (مهاجرتِ ۰۸۲): جدول حالا
   // فقط-افزودنی است و حذفِ **مستقیم** در حالی که رزرو زنده است رد می‌شود.
   // این خط از اول هم زائد بود — FK با `onDelete: Cascade` است، پس حذفِ رزرو
   // خودش رویدادهایش را می‌برد. رفتارِ پاک‌سازی عوض نمی‌شود.
-  await db.$executeRaw`DELETE FROM reservations WHERE restaurant_id = ANY(${ids}::uuid[])`;
+  await db.$executeRaw`
+    DELETE FROM reservations r WHERE r.restaurant_id = ANY(${ids}::uuid[])
+      AND NOT EXISTS (SELECT 1 FROM economy_ledger_entries e WHERE e.reservation_id = r.id)`;
 }
 
 beforeEach(async () => {

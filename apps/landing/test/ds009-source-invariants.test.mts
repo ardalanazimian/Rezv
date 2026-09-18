@@ -75,14 +75,29 @@ describe('DS-009 L3 — --vel روی <html> نوشته نمی‌شود (ناور
   const motion = read('../components/site/Motion.tsx')
     .replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => { const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i); }).join('\n');
 
-  test('⚠️ هیچ setPropertyای برای --vel روی documentElement/root نیست', () => {
-    assert.doesNotMatch(motion, /(documentElement|root)\.style\.setProperty\(\s*['"]--vel/,
-      'نوشتنِ --vel روی <html> برگشته ⇒ ابطالِ style کلِ سند در هر فریمِ اسکرول (L3)');
+  // ⚠️ درسِ L3 به **هیچ** ویژگیِ خاصی بند نیست: نوشتنِ یک custom property روی ریشه در
+  // هر فریمِ اسکرول، styleِ کلِ سند را باطل می‌کند. پس این ادعا حتی پس از حذفِ خودِ
+  // `--vel` (DS-012) هم معنا دارد و روی **هر** نامِ ویژگی می‌ایستد.
+  test('⚠️ هیچ custom propertyای در مسیرِ اسکرول روی documentElement/root نوشته نمی‌شود', () => {
+    assert.doesNotMatch(motion, /(documentElement|root)\.style\.setProperty\(\s*['"]--/,
+      'نوشتنِ یک custom property روی <html> برگشته ⇒ ابطالِ styleِ کلِ سند در هر فریمِ اسکرول (L3)');
   });
 
-  test('⚠️ --vel روی مصرف‌کننده‌های .vel نوشته می‌شود و CSSِ مصرف‌کننده دست‌نخورده است', () => {
-    assert.match(motion, /querySelectorAll<HTMLElement>\(\s*['"]\.vel['"]\s*\)/, 'باید مصرف‌کننده‌ها را پیدا کند');
+  // ⚠️ گاردِ خودبازنشسته (همان الگوی referral-promise-honesty): DS-012 کلِ مکانیزمِ
+  // کِششِ `--vel` را برداشت — `.vel` دیگر در globals.css نیست و Motion.tsx اسکرول را
+  // اصلاً گوش نمی‌دهد (۳۳ خط، بدونِ setProperty/rAF؛ اندازه‌گیری ۲۰۲۶-۰۹-۱۶). پس
+  // ادعای «روی مصرف‌کننده‌ها نوشته می‌شود» موضوع ندارد و **تخت قرمز نگه‌داشتنش
+  // فقط سر و صدا بود**. ولی حذفش هم درس را می‌برد: اگر کسی فردا `.vel` را برگرداند،
+  // قرارداد باید همان باشد. پس ادعا مشروط شد و خودش دوباره فعال می‌شود.
+  test('اگر .vel برگردد، قراردادش همان است (وگرنه این ادعا موضوع ندارد)', () => {
     const css = stripCss(read('../app/globals.css'));
+    const hasVelRule = /\.vel\s*\{/.test(css);
+    if (!hasVelRule) {
+      assert.doesNotMatch(motion, /querySelectorAll<HTMLElement>\(\s*['"]\.vel['"]\s*\)/,
+        'CSS دیگر `.vel` ندارد ولی Motion.tsx هنوز دنبالش می‌گردد — یک طرفِ قرارداد جا مانده');
+      return;
+    }
+    assert.match(motion, /querySelectorAll<HTMLElement>\(\s*['"]\.vel['"]\s*\)/, 'باید مصرف‌کننده‌ها را پیدا کند');
     assert.match(css, /\.vel\s*\{[^}]*var\(--vel,\s*0\)/, '`.vel` باید همچنان از var(--vel) بخواند — قرارداد عوض نشده');
     assert.match(css, /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.vel\s*\{\s*transform:\s*none/, 'reduced-motion باید کشش را خاموش نگه دارد');
   });

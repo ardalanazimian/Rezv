@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { sampleRestaurantNames } from './helpers/sample-names';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  «فهرستِ خالی» با «سرور در دسترس نیست» یکی نیست
@@ -46,7 +47,9 @@ test('⚠️ پاسخِ موفقِ خالی هیچ رستورانِ [DEMO]ای �
   const text = await feed.innerText();
   // نه برچسبِ [DEMO]، نه هیچ‌کدام از نام‌های دادهٔ نمونه‌ی apps/customer/js/data/seed.js
   expect(text).not.toContain('[DEMO]');
-  for (const name of ['ویستا', 'باغِ ایرانی', 'کافه نورا', 'سنتوری', 'لاویا', 'ترمه']) {
+  // ⚠️ فهرستِ دستیِ قبلی شش نام داشت که پنج‌تایش دیگر در seed.js نبود — آن پنج
+  // ادعا هرگز نمی‌توانست قرمز شود. نام‌ها حالا از خودِ seed.js خوانده می‌شوند.
+  for (const name of sampleRestaurantNames()) {
     expect(text, `نامِ نمونه‌ی «${name}» به کاربرِ واقعی نشان داده شد`).not.toContain(name);
   }
   expect(pageErrors, 'حالتِ خالی نباید خطای صفحه بدهد').toEqual([]);

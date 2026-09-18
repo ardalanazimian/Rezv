@@ -58,7 +58,7 @@ before(async () => {
 
 after(async () => {
   const ids = [todayUserId, otherUserId].filter(Boolean);
-  await db.pointsLedger.deleteMany({ where: { userId: { in: ids } } }).catch(() => {});
+  // ⚠️ ۰۸۹/FP-009: دفترِ امتیاز فقط-افزودنی است — پاک‌سازیِ ردیف‌هایش ممکن نیست و تلاش برایش رد می‌شود. ردیف‌های [DEMO] در دیتابیسِ هر اجرا (که تازه ساخته می‌شود) می‌مانند.
   await db.user.deleteMany({ where: { id: { in: ids } } }).catch(() => {});
 });
 

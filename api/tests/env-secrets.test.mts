@@ -1,7 +1,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 
 const { isPlaceholderSecret, productionSecretProblems } = await import('../src/lib/env.ts');
+
+// کلیدِ آزمایشی در همین پروسه ساخته می‌شود — هیچ کلیدی در مخزن نیست.
+const realKey = () => randomBytes(32).toString('base64');
 
 // ═══════════════════════════════════════════════════════════════════════
 //  رازهای خطرناکِ production — همان الگویِ allowed-origins.test.mts
@@ -52,6 +56,8 @@ describe('productionSecretProblems', () => {
     MAINTENANCE_KEY: '9f2c1d8b4e7a3056c1f9b2d4e8a70536c1f9b2d4e8a70536c1f9b2d4e8a70536',
     JWT_SECRET: '4b1e9c7d2a8f5036b1e9c7d2a8f5036b1e9c7d2a8f5036b1e9c7d2a8f5036b1e',
     JWT_REFRESH_SECRET: 'c3a7f1d5b9e2064ac3a7f1d5b9e2064ac3a7f1d5b9e2064ac3a7f1d5b9e2064a',
+    SECRETS_KEYRING: `k1:${realKey()}`,
+    SECRETS_ACTIVE_KEY_ID: 'k1',
   };
 
   test('پیکربندیِ سالم هیچ ایرادی ندارد', () => {
@@ -118,6 +124,47 @@ describe('productionSecretProblems', () => {
       JWT_REFRESH_SECRET: '7c2e'.repeat(16),
     }), []);
   });
+
+  // ── حلقه‌ی کلیدِ رازهای ذخیره‌شده (S-05، حکمِ D-24، ۲۰۲۶-۰۹-۱۷) ──
+  //
+  // بدونِ این، سرور بی‌کلید بالا می‌آمد و اولین پرداخت یا اولین تحویلِ وب‌هوک با
+  // خطای رمزگشایی می‌شکست — همان «خطایِ پیکربندی در لباسِ باگ» که این فایل برایش ساخته شد.
+  const keyringProblems = (ring: string | undefined, active: string | undefined) =>
+    productionSecretProblems({ ...SAFE, SECRETS_KEYRING: ring, SECRETS_ACTIVE_KEY_ID: active });
+
+  test('🔴 SECRETS_KEYRINGِ غایب یا خالی ایراد است', () => {
+    for (const ring of [undefined, '', '  ']) {
+      const p = keyringProblems(ring, undefined);
+      assert.equal(p.length, 1, `حلقه‌ی «${ring}»`);
+      assert.match(p[0], /SECRETS_KEYRING/);
+    }
+  });
+
+  test('🔴 هر شکلِ نادرستِ حلقه ایراد است — و پیام هرگز خودِ کلید را نمی‌آورد', () => {
+    const k = realKey();
+    const cases: Array<[string, string, string, RegExp]> = [
+      ['بدونِ id', k, 'k1', /id:base64/],
+      ['idِ نامعتبر', `K 1:${k}`, 'k1', /id:base64/],
+      ['۳۱ بایت', `k1:${randomBytes(31).toString('base64')}`, 'k1', /۳۲ بایت/],
+      ['۳۳ بایت', `k1:${randomBytes(33).toString('base64')}`, 'k1', /۳۲ بایت/],
+      ['base64ِ غیرِ کانونی (بیت‌های اضافه‌ی نویسه‌ی آخر)', `k1:${k.slice(0, 42)}B=`, 'k1', /۳۲ بایت/],
+      ['کلیدِ تمام‌صفر', `k1:${'A'.repeat(43)}=`, 'k1', /تمام‌صفر/],
+      ['idِ تکراری', `k1:${k},k1:${realKey()}`, 'k1', /تکراری/],
+      ['کلیدِ فعالِ غایب', `k1:${k}`, '', /SECRETS_ACTIVE_KEY_ID/],
+      ['کلیدِ فعالِ بیرونِ حلقه', `k1:${k}`, 'k2', /در SECRETS_KEYRING نیست/],
+    ];
+    for (const [label, ring, active, re] of cases) {
+      const p = keyringProblems(ring, active);
+      assert.equal(p.length, 1, `${label}: ${JSON.stringify(p)}`);
+      assert.match(p[0], re, label);
+      const material = ring.split(',').map((e) => e.slice(e.indexOf(':') + 1)).filter((m) => m.length >= 16);
+      for (const m of material) assert.equal(p[0].includes(m), false, `${label}: پیام نباید کلید را نشان دهد`);
+    }
+  });
+
+  test('کنترلِ منفی: دو کلیدِ درست با فعالِ دومی (وسطِ چرخش) ایراد ندارد', () => {
+    assert.deepEqual(keyringProblems(`k2026a:${realKey()}, k2026b:${realKey()}`, 'k2026b'), []);
+  });
 });
 
 describe('`.env.example` خودش مقدارِ خطرناک ندارد', () => {
@@ -156,6 +203,8 @@ describe('`.env.example` خودش مقدارِ خطرناک ندارد', () => {
       MAINTENANCE_KEY: val('MAINTENANCE_KEY'),
       JWT_SECRET: val('JWT_SECRET'),
       JWT_REFRESH_SECRET: val('JWT_REFRESH_SECRET'),
-    }).length, 3, 'کپیِ خامِ این فایل باید در بوتِ production روی هر سه راز قرمز شود، نه سبز');
+      SECRETS_KEYRING: val('SECRETS_KEYRING'),
+      SECRETS_ACTIVE_KEY_ID: val('SECRETS_ACTIVE_KEY_ID'),
+    }).length, 4, 'کپیِ خامِ این فایل باید در بوتِ production روی هر چهار راز قرمز شود، نه سبز');
   });
 });

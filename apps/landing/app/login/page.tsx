@@ -3,9 +3,7 @@ import type { Metadata } from 'next';
 import { JsonLd } from '@/components/site/JsonLd';
 import { Icon } from '@/components/site/Icon';
 import { Reveal } from '@/components/site/Motion';
-import { SplitText } from '@/components/site/Kinetic';
 import { DoorPicker, type Door } from '@/components/site/DoorPicker';
-import { HeroLight } from '@/components/sections/Caustics';
 import { buildMetadata } from '@/lib/seo';
 import { SITE, appBase } from '@/lib/i18n';
 import { graph, webPageJsonLd, breadcrumbJsonLd } from '@/lib/site-schema';
@@ -71,7 +69,6 @@ export default function LoginPage() {
       />
 
       <section className="gate">
-        <HeroLight />
 
         <div className="container gate__inner">
           <Reveal>
@@ -79,8 +76,7 @@ export default function LoginPage() {
           </Reveal>
 
           <h1 className="gate__title">
-            <SplitText text="کدام" delay={100} />{' '}
-            <SplitText className="text-gradient" text="حساب؟" delay={220} />
+            کدام <span className="text-gradient">حساب؟</span>
           </h1>
 
           <Reveal delay={140}>

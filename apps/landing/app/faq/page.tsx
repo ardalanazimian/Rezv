@@ -50,7 +50,6 @@ export default async function FaqPage() {
       />
 
       <section className="hero hero--compact hero--center">
-        <div className="grid-bg" aria-hidden="true" />
         <div className="container hero__inner">
           <div className="hero__content">
             <Reveal><span className="eyebrow"><Icon name="chat" size={14} />پرسش‌های متداول</span></Reveal>

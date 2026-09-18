@@ -7,13 +7,15 @@ import { API, isLoggedIn } from '../api.js';
 import { esc } from '../auth.js';
 import { fmtFa } from '../data/discover.js';
 import { PERKS, setPts } from '../data/seed.js';
+// ۰۹-۱۳: مزایا با آیکنِ خطی به‌جای ایموجیِ PERKS[i][0] (کش‌بک، رزروِ سریع، هدیه‌ی تولد، میزِ VIP)
+const PERK_ICON = ['wallet', 'clock', 'gift', 'crown'];
 import { openGiftCards, openReferral, openRewardsDates } from './rewards.js';
 import { armReveals, buzz } from '../theme-pwa.js';
 import { icon } from '../icons.js';
 
 function perksBlock(){
   return `<div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای باشگاه مشتریان</div></div>
-    <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>`;
+    <div class="perks reveal">${PERKS.map((p,i)=>`<div class="perk"><div class="perk-emoji" aria-hidden="true">${icon(PERK_ICON[i]||'gift',{size:22})}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>`;
 }
 
 export async function renderLoyalty(){
@@ -108,7 +110,7 @@ export async function renderLoyalty(){
     </div>
 
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">مزایای تو</div></div>
-    <div class="perks reveal">${PERKS.map(p=>`<div class="perk"><div class="perk-emoji">${p[0]}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
+    <div class="perks reveal">${PERKS.map((p,i)=>`<div class="perk"><div class="perk-emoji" aria-hidden="true">${icon(PERK_ICON[i]||'gift',{size:22})}</div><div class="perk-name">${p[1]}</div><div class="perk-desc">${p[2]}</div></div>`).join('')}</div>
     <div class="section-head reveal" style="margin-top:32px"><div class="section-title">نشان‌ها</div></div>
     <div class="badge-grid reveal">${badges.map(b=>`<div class="bdg ${b.earned?'earned':'locked'}"><div class="bdg-emoji">${esc(b.emoji)}</div><div class="bdg-name">${esc(b.name)}</div><div class="bdg-desc">${b.earned?`${icon('check',{size:12})} کسب شد`:'قفل'}</div></div>`).join('')}</div>
   </div>`;

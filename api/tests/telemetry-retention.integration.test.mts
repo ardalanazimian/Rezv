@@ -1,4 +1,4 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET = 'a'.repeat(32);
@@ -6,9 +6,12 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 
 // آستانه‌ها را قبل از importِ ماژول قطعی می‌کنیم (retentionDays() هر بار
 // process.env را می‌خواند، ولی صریح‌بودن این‌جا تست را از پیش‌فرض‌ها مستقل می‌کند).
-process.env.TELEMETRY_RETENTION_ANON_DAYS = '30';
-process.env.TELEMETRY_RETENTION_AUTH_DAYS = '60';
-process.env.TELEMETRY_RETENTION_VERIFIED_DAYS = '365';
+// ⚠️ مهاجرتِ ۰۹۰: platform_events حذفِ ردیفِ جوان‌تر از ۹۰ روز (ingested_at) را رد می‌کند — کفِ
+// کوچک‌ترین ردیفِ شیپ‌شده. آستانه‌های قبلیِ این فایل (۳۰/۶۰/۳۶۵) زیرِ آن کف بودند؛ حالا همان
+// پیش‌فرض‌های شیپ‌شده‌اند (۹۰/۱۸۰/۴۰۰) و عمرِ ردیف‌ها به همان نسبت جابه‌جا شد. ادعاها عوض نشدند.
+process.env.TELEMETRY_RETENTION_ANON_DAYS = '90';
+process.env.TELEMETRY_RETENTION_AUTH_DAYS = '180';
+process.env.TELEMETRY_RETENTION_VERIFIED_DAYS = '400';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  رگرسیونِ هرسِ نگه‌داریِ تله‌متری (فازِ ۲، پروتکل §۱۴)
@@ -50,30 +53,27 @@ async function alive(id: string) {
   return (await db.platformEvent.count({ where: { eventId: `${SFX}-${id}` } })) > 0;
 }
 
+// ⚠️ پاک‌سازیِ قبل/بعد برداشته شد (مهاجرتِ ۰۹۰): ردیف‌های جوان‌تر از کف حذف‌شدنی نیستند، و
+// TYPE با SFX یکتاست — ردیف‌های این فایل با ردیف‌های اجرای دیگر مخلوط نمی‌شوند.
 before(async () => {
-  await db.platformEvent.deleteMany({ where: { type: TYPE } }).catch(() => {});
-  await seed('anon-old', 'ANONYMOUS_CLIENT', 45);
+  await seed('anon-old', 'ANONYMOUS_CLIENT', 100);
   await seed('anon-fresh', 'ANONYMOUS_CLIENT', 5);
-  await seed('auth-old', 'AUTHENTICATED_CLIENT', 45);
-  await seed('verified-old', 'SERVER_VERIFIED', 45);
-  await seed('synthetic-old', 'SYNTHETIC', 45);
+  await seed('auth-old', 'AUTHENTICATED_CLIENT', 100);
+  await seed('verified-old', 'SERVER_VERIFIED', 100);
+  await seed('synthetic-old', 'SYNTHETIC', 100);
   // درج شده همین حالا، ولی مدعیِ وقوع در ۴۰۰ روز پیش — نباید حذف شود.
   await seed('backdated', 'ANONYMOUS_CLIENT', 0, 400);
-});
-
-after(async () => {
-  await db.platformEvent.deleteMany({ where: { type: TYPE } }).catch(() => {});
 });
 
 describe('هرسِ نگه‌داریِ platform_events (§۱۴)', () => {
   test('هرس بر اساسِ سطحِ اعتماد تفکیک می‌شود', async () => {
     await prunePlatformEvents();
 
-    assert.equal(await alive('anon-old'), false, 'ناشناسِ ۴۵ روزه باید حذف شود (آستانه ۳۰)');
-    assert.equal(await alive('synthetic-old'), false, 'ساختگیِ ۴۵ روزه باید حذف شود');
+    assert.equal(await alive('anon-old'), false, 'ناشناسِ ۱۰۰ روزه باید حذف شود (آستانه ۹۰)');
+    assert.equal(await alive('synthetic-old'), false, 'ساختگیِ ۱۰۰ روزه باید حذف شود');
     assert.equal(await alive('anon-fresh'), true, 'ناشناسِ ۵ روزه باید بماند');
-    assert.equal(await alive('auth-old'), true, 'احرازشده‌ی ۴۵ روزه باید بماند (آستانه ۶۰)');
-    assert.equal(await alive('verified-old'), true, 'حقیقتِ سروری باید بماند (آستانه ۳۶۵)');
+    assert.equal(await alive('auth-old'), true, 'احرازشده‌ی ۱۰۰ روزه باید بماند (آستانه ۱۸۰)');
+    assert.equal(await alive('verified-old'), true, 'حقیقتِ سروری باید بماند (آستانه ۴۰۰)');
   });
 
   test('مبنایِ هرس زمانِ سروری است، نه ادعایِ کلاینت', async () => {

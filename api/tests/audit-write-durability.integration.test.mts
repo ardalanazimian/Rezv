@@ -78,7 +78,7 @@ before(async () => {
 
 after(async () => {
   (db.auditLog as unknown as { create: unknown }).create = realCreate;
-  await db.auditLog.deleteMany({ where: { targetId: userId } });
+  // ⚠️ مهاجرتِ ۰۹۰: ردیف‌های audit حذف نمی‌شوند (فقط retentionِ ۱ساله) — هر تست targetِ یکتای خودش را دارد.
   await db.customerEconomyProfile.deleteMany({ where: { userId } });
   await db.user.deleteMany({ where: { id: userId } });
 });
@@ -96,7 +96,6 @@ describe('ماندگاریِ audit — مسیرِ سالم (کنترلِ مثب�
     // نبودِ موضوع = خطا، نه عبور.
     assert.equal(rows.length, 1, `ردیفِ audit ننشست — ادعایِ ماندگاری بی‌موضوع می‌شود (دیده شد ${rows.length})`);
     assert.equal(rows[0].action, 'security.abuse_flag');
-    await db.auditLog.deleteMany({ where: { targetId: target } });
   });
 });
 
@@ -136,7 +135,6 @@ describe('ماندگاریِ audit — سینکِ شکسته', () => {
     });
     const after = sampleValue(renderMetrics(), METRIC, (l) => l.includes('action="security.abuse_flag"'));
     assert.equal(after, before, `نوشتنِ موفق نباید شمارنده‌ی شکست را تکان دهد (${before} → ${after})`);
-    await db.auditLog.deleteMany({ where: { targetId: target } });
   });
 });
 
@@ -160,14 +158,16 @@ describe('clearAbuseFlag — نوشتنِ برگشت‌ناپذیر نباید �
 
   test('کنترلِ مثبت: با سینکِ سالم، audited=true و ردیفِ واقعی وجود دارد', async () => {
     await db.customerEconomyProfile.update({ where: { userId }, data: { hasActiveAbuseFlag: true } });
-    await db.auditLog.deleteMany({ where: { targetId: userId } });
+    // ⚠️ مهاجرتِ ۰۹۰: به‌جای پاک‌کردنِ ردیف‌های قبلی (دیگر ممکن نیست)، «دقیقاً یک ردیفِ تازه» با
+    // شمارشِ پیش/پس سنجیده می‌شود — همان ادعا، بدونِ درِ فرار.
+    const auditBefore = await db.auditLog.count({ where: { targetId: userId } });
 
     const res = await clearAbuseFlag(userId, staffActorId, null, 'staff');
     assert.equal(res.cleared, 1);
     assert.equal(res.audited, true, 'روی DBِ سالم باید ماندگاری true باشد');
 
-    const rows = await db.auditLog.findMany({ where: { targetId: userId }, select: { detail: true } });
-    assert.equal(rows.length, 1, `نبودِ موضوع = خطا: انتظار یک ردیفِ audit، دیده شد ${rows.length}`);
+    const rows = await db.auditLog.findMany({ where: { targetId: userId }, select: { detail: true }, orderBy: { createdAt: 'desc' } });
+    assert.equal(rows.length, auditBefore + 1, `نبودِ موضوع = خطا: انتظار یک ردیفِ تازه‌ی audit، دیده شد ${rows.length - auditBefore}`);
     const detail = rows[0].detail as Record<string, unknown>;
     assert.equal(detail.cleared, true);
     // دامنه‌ی واقعیِ نوشتن صریح در ردِ حسابرسی می‌آید — تحقیقِ بعدی نباید

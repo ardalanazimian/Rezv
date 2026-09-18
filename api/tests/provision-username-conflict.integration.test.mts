@@ -60,10 +60,10 @@ async function trackTenant(res: { tenantId: string }) {
 describe('نامِ کاربریِ تکراری در provisionBusiness', () => {
   test('مسیرِ ترتیبی: دومین ثبت‌نام ۴۰۹ِ username_taken می‌گیرد، نه خطای خام', async () => {
     const uname = `demo_owner_${SFX}`;
-    await trackTenant(await provisionBusiness(input(uname, '0971'), actor));
+    await trackTenant(await provisionBusiness(input(uname, '0966'), actor));
 
     await assert.rejects(
-      () => provisionBusiness(input(uname, '0972'), actor),
+      () => provisionBusiness(input(uname, '0967'), actor),
       (e: any) => {
         assert.equal(e?.status, 409, `باید ۴۰۹ باشد — گرفت: ${e?.status} / ${e?.code}`);
         assert.equal((e?.details?.reason ?? e?.code), 'username_taken',

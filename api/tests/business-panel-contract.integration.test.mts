@@ -216,7 +216,6 @@ describe('قراردادِ پنلِ business — /restaurant/* در برابرِ
   after(async () => {
     await db.customerInsight.deleteMany({ where: { restaurantId } });
     await db.restaurantPhoto.deleteMany({ where: { restaurantId } });
-    await db.campaignLog.deleteMany({ where: { restaurantId } });
     await db.specialEvent.deleteMany({ where: { restaurantId } });
     await db.staffNote.deleteMany({ where: { restaurantId } });
     await db.marketingAutomation.deleteMany({ where: { restaurantId } });
@@ -228,11 +227,9 @@ describe('قراردادِ پنلِ business — /restaurant/* در برابرِ
     await db.waitlistEntry.deleteMany({ where: { restaurantId } });
     await db.reservation.deleteMany({ where: { restaurantId } });
     await db.table.deleteMany({ where: { restaurantId } });
-    await db.auditLog.deleteMany({ where: { restaurantId } }).catch(() => {});
+    // ⚠️ مهاجرتِ ۰۹۰ (FP-009 §۴): campaign_logs و audit_logs فقط-افزودنی‌اند و campaign_logs →
+    // restaurants روی RESTRICT است؛ پس رستوران، کارکنان و تنانت می‌مانند — DBِ هر اجرا تازه است.
     await db.user.deleteMany({ where: { id: userId } });
-    await db.restaurant.deleteMany({ where: { tenantId } });
-    await db.staff.deleteMany({ where: { tenantId } });
-    await db.tenant.deleteMany({ where: { id: tenantId } });
     await db.$disconnect();
   });
 

@@ -121,7 +121,7 @@ before(async () => {
 
 after(async () => {
   const rests = [A.restaurantId, B.restaurantId];
-  await db.auditLog.deleteMany({ where: { restaurantId: { in: rests } } });
+  // ⚠️ مهاجرتِ ۰۹۰ (FP-009 §۴): ردیفِ audit_logs حذف نمی‌شود — فقط retentionِ ۱ساله حذف می‌کند.
   await db.reservation.deleteMany({ where: { restaurantId: { in: rests } } });
   await db.table.deleteMany({ where: { restaurantId: { in: rests } } });
   await db.restaurant.deleteMany({ where: { id: { in: rests } } });

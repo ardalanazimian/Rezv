@@ -182,8 +182,23 @@ curl -s -o /dev/null -w "%{http_code}\n" https://<domain>/api/v1/maintenance/exp
 - Generate strong secrets: `openssl rand -base64 48` for
   `JWT_SECRET` / `JWT_REFRESH_SECRET` / `CRON_SECRET` / `MAINTENANCE_KEY` /
   `REDIS_PASSWORD`.
-- Runtime provider secrets (Zarinpal merchant id, Melipayamak credentials) can live in
-  `platform_settings` (editable from the company panel) with env as fallback.
+- The Zarinpal merchant id can live in `platform_settings` (set through `PATCH /api/v1/admin/settings`),
+  with env as the fallback. It is stored **encrypted** (AES-256-GCM, `api/src/lib/secret-box.ts`), and so is
+  `webhooks.secret`. Melipayamak credentials are env-only (`api/src/lib/sms.ts`); they are not in the DB.
+  (Corrected 2026-09-17, S-05 / D-24: this line used to say the Melipayamak credentials could live there too.)
+- `SECRETS_KEYRING` + `SECRETS_ACTIVE_KEY_ID` are required in production. Generate a key with
+  `echo "k1:$(openssl rand -base64 32)"`. Keep the keyring in the host secret store, never in the DB.
+  - **First deploy of migration 094: run the reseal immediately after the deploy.**
+    `POST /api/v1/maintenance/secrets-reseal?seal_plaintext=1` with the maintenance key, once.
+    - Between the deploy and this call, **payments (Zarinpal merchant id) and webhook deliveries are down by
+      design**: existing plaintext rows are refused, not read. The server itself looks healthy.
+    - Save the raw JSON response and reference it from `audit/staging/golden-journeys.json` (the staging
+      evidence file; it does not exist yet, because no staging host exists) as `secrets_reseal.raw_output_path`. `tools/gate-deploy.mjs` (gate A2) refuses the deploy without it, or
+      when the response shows any `failed` entry or `plaintext_skipped` above 0.
+    - Invite tokens are hashed by 094 itself, so open invite links keep working. Migration 096 strips the
+      invite link from SMS jobs once they are completed or dead.
+  - **Rotation:** add the new key, set it active, restart, `POST /api/v1/maintenance/secrets-reseal`.
+    Remove the old key only after a run reports `rekeyed: 0` and `failed: []`.
 - Set secrets in Vercel dashboard (managed) or `.env` on the host (self-host).
 
 ---

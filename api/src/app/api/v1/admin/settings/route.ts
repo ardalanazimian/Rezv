@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { enforceRateLimit, clientIp, RULES } from '@/lib/ratelimit';
 import { requireAdmin } from '@/lib/admin-auth';
-import { setPlatformSetting } from '@/lib/platform-settings';
+import { setPlatformSetting, SEALED_SETTING_KEYS, SEALED_SETTING_MASK } from '@/lib/platform-settings';
 import { audit } from '@/lib/audit';
-import { errorResponse } from '@/lib/errors';
+import { Err, errorResponse } from '@/lib/errors';
 import { parseBody, z } from '@/lib/schemas';
 
 import { withApiMetrics } from '@/lib/api-metrics';
@@ -33,7 +33,8 @@ async function GET_impl(req: Request) {
     const rows = await db.platformSettings.findMany({ where: { key: { in: [...ALLOWED_KEYS] } } });
     const settings: Record<string, string> = {};
     for (const k of ALLOWED_KEYS) settings[k] = '';
-    for (const r of rows) settings[r.key] = r.value;
+    // S-05 (D-24): کلیدِ رمزشده فقط «تنظیم شده» را نشان می‌دهد؛ نه متنِ رمز، نه متنِ ساده.
+    for (const r of rows) settings[r.key] = SEALED_SETTING_KEYS.has(r.key) ? SEALED_SETTING_MASK : r.value;
     return NextResponse.json({ settings });
   } catch (e) { return errorResponse(e); }
 }
@@ -44,6 +45,10 @@ async function PATCH_impl(req: Request) {
     await enforceRateLimit(clientIp(req), RULES.auth);
     const admin = await requireAdmin(req);
     const { settings } = await parseBody(req, patchSchema);
+    // فرمی که مقدارِ پوشیده‌ی GET را دست‌نخورده برگرداند، نباید رازِ واقعی را با «••••» جایگزین کند.
+    if (settings.some((s) => SEALED_SETTING_KEYS.has(s.key) && s.value === SEALED_SETTING_MASK)) {
+      throw Err.validation('مقدارِ پوشیده ذخیره نمی‌شود؛ برای تغییر، مقدارِ واقعی را وارد کنید.');
+    }
 
     for (const s of settings) {
       await setPlatformSetting(s.key, s.value, admin.sub);

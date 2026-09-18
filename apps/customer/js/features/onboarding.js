@@ -5,12 +5,13 @@
 //  reduced-motion. تست‌های e2e با ست‌کردنِ rz_onboarded این را رد می‌کنند.
 // ═══════════════════════════════════════════════════════════
 import { lockAppSurfaces, unlockAppSurfaces } from '../auth.js';
+import { icon } from '../icons.js';
 
 const KEY = 'rz_onboarded';
 const SLIDES = [
-  { emoji:'🍽️', title:'بهترین رستوران‌های شهر', text:'کشف کن، ببین کجا شلوغه و چی محبوبه — با پیشنهادِ هوشمند بر اساس سلیقه‌ات.' },
-  { emoji:'⚡', title:'رزرو، ساده مثل پیام دادن', text:'میز رزرو کن در چند ثانیه — بدون تماس، بدون معطلی.' },
-  { emoji:'🎁', title:'امتیاز بگیر، کش‌بک ببر', text:'با هر رزرو امتیاز جمع کن و از باشگاهِ مشتریان کش‌بک بگیر.' },
+  { icon:'utensils', title:'بهترین رستوران‌های شهر', text:'کشف کن، ببین کجا شلوغه و چی محبوبه — با پیشنهادِ هوشمند بر اساس سلیقه‌ات.' },
+  { icon:'clock', title:'رزرو، ساده مثل پیام دادن', text:'میز رزرو کن در چند ثانیه — بدون تماس، بدون معطلی.' },
+  { icon:'gift', title:'امتیاز بگیر، کش‌بک ببر', text:'با هر رزرو امتیاز جمع کن و از باشگاهِ مشتریان کش‌بک بگیر.' },
 ];
 let _i = 0;
 
@@ -25,7 +26,8 @@ function done(){
 function paint(){
   const s = SLIDES[_i];
   const ov = document.getElementById('onb'); if(!ov) return;
-  ov.querySelector('.onb-emoji').textContent = s.emoji;
+  // آیکنِ خطی (icons.js — SVGِ ثابت، نه دادهٔ کاربر) به‌جای ایموجی؛ کلاس تاریخی ماند.
+  ov.querySelector('.onb-emoji').innerHTML = icon(s.icon, { size: 40 });
   ov.querySelector('.onb-title').textContent = s.title;
   ov.querySelector('.onb-text').textContent = s.text;
   ov.querySelectorAll('.onb-dot').forEach((d,i)=>d.classList.toggle('on', i===_i));

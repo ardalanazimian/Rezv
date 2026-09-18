@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockApi } from './helpers/mock-api';
-import { gotoApp, openFirstRestaurant } from './helpers/actions';
+import { closeSearchCtxSheet, gotoApp, openFirstRestaurant, openRestaurantTile, openSearchCtxSheet } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  زمینه‌ی رزرو: تاریخِ واقعی + ماندگاری بینِ رستوران‌ها
@@ -28,7 +28,9 @@ test.beforeEach(async ({ page }) => {
 test('انتخابگرِ تاریخ افقِ واقعی دارد، نه چند کلمه‌ی ثابت', async ({ page }) => {
   await gotoApp(page);
 
-  const opts = page.locator('#sWhen option');
+  // ⚠️ [DS-007 §۶] افقِ تاریخ از selectِ هیرو به شیتِ «کِی و چند نفر؟» رفت.
+  await openSearchCtxSheet(page);
+  const opts = page.locator('#ctxWhen option');
   expect(await opts.count()).toBeGreaterThanOrEqual(30);
 
   // مقدارها باید ISO باشند تا بک‌اند نیازی به حدس‌زدنِ «پنجشنبه» نداشته باشد
@@ -49,9 +51,11 @@ test('انتخابگرِ تاریخ افقِ واقعی دارد، نه چند �
 test('انتخابِ نوارِ جست‌وجو تا شیتِ رزرو دنبال می‌آید', async ({ page }) => {
   await gotoApp(page);
 
-  const target = await page.locator('#sWhen option').nth(5).getAttribute('value');
-  await page.selectOption('#sWhen', target!);
-  await page.selectOption('#sParty', '4');
+  await openSearchCtxSheet(page);
+  const target = await page.locator('#ctxWhen option').nth(5).getAttribute('value');
+  await page.selectOption('#ctxWhen', target!);
+  await page.selectOption('#ctxParty', '4');
+  await closeSearchCtxSheet(page);
 
   await openFirstRestaurant(page);
   await page.getByRole('button', { name: /رزرو میز/ }).click();
@@ -63,9 +67,11 @@ test('انتخابِ نوارِ جست‌وجو تا شیتِ رزرو دنبا�
 test('زمینه بعد از رفتن به رستورانِ دیگر هم می‌ماند', async ({ page }) => {
   await gotoApp(page);
 
-  const target = await page.locator('#sWhen option').nth(7).getAttribute('value');
-  await page.selectOption('#sWhen', target!);
-  await page.selectOption('#sParty', '6');
+  await openSearchCtxSheet(page);
+  const target = await page.locator('#ctxWhen option').nth(7).getAttribute('value');
+  await page.selectOption('#ctxWhen', target!);
+  await page.selectOption('#ctxParty', '6');
+  await closeSearchCtxSheet(page);
 
   // رستورانِ اول → شیت → بستن → برگشت به کشف
   await openFirstRestaurant(page);
@@ -75,8 +81,7 @@ test('زمینه بعد از رفتن به رستورانِ دیگر هم می�
   await page.evaluate(() => (window as unknown as { go?: (p: string) => void }).go?.('discover'));
 
   // رستورانِ دوم — همان تاریخ و تعداد باید از قبل انتخاب باشد
-  await page.locator('.rc .rc-open').nth(1).click();
-  await expect(page.locator('#page-rest')).toBeVisible();
+  await openRestaurantTile(page, 1);
   await page.getByRole('button', { name: /رزرو میز/ }).click();
 
   await expect(page.locator('#bwDate')).toHaveValue(target!);
@@ -85,7 +90,9 @@ test('زمینه بعد از رفتن به رستورانِ دیگر هم می�
 
 test('خلاصه‌ی تأیید همان تاریخ و تعدادِ انتخاب‌شده را نشان می‌دهد', async ({ page }) => {
   await gotoApp(page);
-  await page.selectOption('#sParty', '3');
+  await openSearchCtxSheet(page);
+  await page.selectOption('#ctxParty', '3');
+  await closeSearchCtxSheet(page);
 
   await openFirstRestaurant(page);
   await page.getByRole('button', { name: /رزرو میز/ }).click();

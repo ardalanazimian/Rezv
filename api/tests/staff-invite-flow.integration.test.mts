@@ -43,8 +43,20 @@ async function makeProvisioned(phonePrefix: string, extra: Record<string, unknow
     ...extra,
   } as any, admin);
   made.tenantIds.push(r.tenantId);
-  const invite = await db.staffInvite.findUniqueOrThrow({ where: { id: r.inviteId }, select: { token: true, phone: true } });
-  return { ...r, token: invite.token, phone: invite.phone };
+  const invite = await db.staffInvite.findUniqueOrThrow({ where: { id: r.inviteId }, select: { phone: true } });
+  return { ...r, token: await tokenFromInviteSms(r.inviteId), phone: invite.phone };
+}
+
+/**
+ * ⚠️ S-05 (D-24): DB فقط هشِ توکن را دارد، پس توکنِ واقعی از همان کانالی برداشته می‌شود
+ * که دارنده‌اش می‌گیرد — لینکِ پیامکِ دعوت در صف (`staff-invite:<inviteId>`).
+ */
+async function tokenFromInviteSms(inviteId: string): Promise<string> {
+  const job = await db.job.findUniqueOrThrow({ where: { idempotencyKey: `staff-invite:${inviteId}` }, select: { payload: true } });
+  const url = String((job.payload as { tokens?: string[] }).tokens?.[2] ?? '');
+  const m = url.match(/#token=([0-9a-f]{64})$/);
+  assert.ok(m, `لینکِ دعوت در پیامک توکن ندارد: ${url}`);
+  return m[1];
 }
 
 after(async () => {
@@ -53,7 +65,7 @@ after(async () => {
     const rests = await db.restaurant.findMany({ where: { tenantId: tid }, select: { id: true } });
     for (const r of rests) {
       await db.table.deleteMany({ where: { restaurantId: r.id } });
-      await db.auditLog.deleteMany({ where: { restaurantId: r.id } });
+      // ⚠️ مهاجرتِ ۰۹۰ (FP-009 §۴): ردیفِ audit_logs حذف نمی‌شود — فقط retentionِ ۱ساله حذف می‌کند.
       await db.restaurant.delete({ where: { id: r.id } }).catch(() => {});
     }
     const staff = await db.staff.findMany({ where: { tenantId: tid }, select: { phone: true } });
@@ -65,7 +77,7 @@ after(async () => {
 
 describe('claimِ دعوت (§۵-۴)', () => {
   test('توکنِ معتبر → state=valid + نامِ رستوران + ماسکِ شماره؛ بدونِ mutate', async () => {
-    const p = await makeProvisioned('0931');
+    const p = await makeProvisioned('0911');
     const res = await claimReq(p.token);
     assert.equal(res.status, 200);
     const d = await res.json();
@@ -76,12 +88,12 @@ describe('claimِ دعوت (§۵-۴)', () => {
     // اعلام می‌کرد) از قراردادِ claim حذف شد.
     assert.equal('methods' in d, false, 'هیچ اعلامی از روش‌های ورود — صفحه فقط OTP دارد');
     // claim چیزی را عوض نکرده
-    const inv = await db.staffInvite.findFirst({ where: { token: p.token } });
+    const inv = await db.staffInvite.findUnique({ where: { id: p.inviteId } });
     assert.equal(inv!.status, 'PENDING');
   });
 
   test('حتی برای حسابِ دارای رمز، claim گزینه‌ی رمز اعلام نمی‌کند (OTP-only)', async () => {
-    const p = await makeProvisioned('0932', { username: `inv${SFX}`, password: 'Str0ngPass!' });
+    const p = await makeProvisioned('0940', { username: `inv${SFX}`, password: 'Str0ngPass!' });
     const d = await (await claimReq(p.token)).json();
     assert.equal(d.state, 'valid');
     assert.equal('methods' in d, false);
@@ -90,18 +102,18 @@ describe('claimِ دعوت (§۵-۴)', () => {
 
   test('سه‌حالتیِ توکنِ شناخته‌شده: expired و used؛ ناشناخته → ۴۰۴', async () => {
     const p = await makeProvisioned('0933');
-    await db.staffInvite.updateMany({ where: { token: p.token }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    await db.staffInvite.updateMany({ where: { id: p.inviteId }, data: { expiresAt: new Date(Date.now() - 1000) } });
     const de = await (await claimReq(p.token)).json();
     assert.equal(de.state, 'expired');
 
-    const p2 = await makeProvisioned('0937');
-    await db.staffInvite.updateMany({ where: { token: p2.token }, data: { status: 'ACCEPTED' } });
+    const p2 = await makeProvisioned('0946');
+    await db.staffInvite.updateMany({ where: { id: p2.inviteId }, data: { status: 'ACCEPTED' } });
     const du = await (await claimReq(p2.token)).json();
     assert.equal(du.state, 'used');
 
     // REVOKED (ابطال با resend) هم برای دارنده‌ی لینکِ قدیمی «منقضی» است.
-    const p3 = await makeProvisioned('0938');
-    await db.staffInvite.updateMany({ where: { token: p3.token }, data: { status: 'REVOKED' } });
+    const p3 = await makeProvisioned('0947');
+    await db.staffInvite.updateMany({ where: { id: p3.inviteId }, data: { status: 'REVOKED' } });
     assert.equal((await (await claimReq(p3.token)).json()).state, 'expired');
 
     assert.equal((await claimReq('deadbeef'.repeat(8))).status, 404, 'توکنِ ناشناخته افشا نمی‌شود');
@@ -110,7 +122,7 @@ describe('claimِ دعوت (§۵-۴)', () => {
 
 describe('پذیرشِ دعوت = side-effectِ اولین ورودِ موفق (§۶-۱ / C10)', () => {
   test('OTP: request→verify ⇒ invite=ACCEPTED و restaurant=ACTIVE؛ شکلِ پاسخِ verify ثابت', async () => {
-    const p = await makeProvisioned('0934');
+    const p = await makeProvisioned('0943');
     const local = p.phone.replace('+98', '0');
 
     const rq = await otpRequest(jreq('/api/v1/auth/staff/request', { phone: local }));
@@ -124,7 +136,7 @@ describe('پذیرشِ دعوت = side-effectِ اولین ورودِ موفق (
     // قفلِ شکل (C10): همان کلیدهای همیشگی — نه بیشتر نه کمتر
     assert.deepEqual(Object.keys(rvd).sort(), ['access', 'refresh', 'staff']);
 
-    const inv = await db.staffInvite.findFirst({ where: { token: p.token } });
+    const inv = await db.staffInvite.findUnique({ where: { id: p.inviteId } });
     assert.equal(inv!.status, 'ACCEPTED');
     const rest = await db.restaurant.findUnique({ where: { id: p.restaurant.id }, select: { provisionStatus: true } });
     assert.equal(rest!.provisionStatus, 'ACTIVE');
@@ -135,10 +147,10 @@ describe('پذیرشِ دعوت = side-effectِ اولین ورودِ موفق (
 
   test('ورود با رمز هم دعوت را می‌پذیرد', async () => {
     const uname = `invpw${SFX}`;
-    const p = await makeProvisioned('0935', { username: uname, password: 'Str0ngPass!' });
+    const p = await makeProvisioned('0945', { username: uname, password: 'Str0ngPass!' });
     const rv = await pwLogin(jreq('/api/v1/auth/staff/login', { username: uname, password: 'Str0ngPass!' }));
     assert.equal(rv.status, 200, await rv.clone().text());
-    const inv = await db.staffInvite.findFirst({ where: { token: p.token } });
+    const inv = await db.staffInvite.findUnique({ where: { id: p.inviteId } });
     assert.equal(inv!.status, 'ACCEPTED');
     const rest = await db.restaurant.findUnique({ where: { id: p.restaurant.id }, select: { provisionStatus: true } });
     assert.equal(rest!.provisionStatus, 'ACTIVE');
@@ -153,12 +165,13 @@ describe('resend (§۸)', () => {
     const r = await resendInvite(p.restaurant.id, admin);
     assert.match(r.inviteSentTo, /\*\*\*/);
 
-    const old = await db.staffInvite.findFirst({ where: { token: p.token } });
+    const old = await db.staffInvite.findUnique({ where: { id: p.inviteId } });
     assert.equal(old!.status, 'REVOKED');
     assert.equal((await (await claimReq(p.token)).json()).state, 'expired', 'لینکِ قدیمی برای دارنده‌اش «منقضی» است');
 
     const fresh = await db.staffInvite.findFirst({ where: { restaurantId: p.restaurant.id, status: 'PENDING' } });
-    assert.ok(fresh && fresh.token !== p.token, 'توکنِ تازه');
+    assert.ok(fresh && fresh.id !== p.inviteId && fresh.token !== old!.token, 'توکنِ تازه');
+    assert.equal((await (await claimReq(await tokenFromInviteSms(fresh.id))).json()).state, 'valid', 'لینکِ پیامکِ تازه معتبر است');
     assert.equal(await db.job.count({ where: { kind: 'sms' } }), jobsBefore + 1, 'پیامکِ مجدد صف شد');
   });
 });

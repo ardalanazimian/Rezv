@@ -32,6 +32,7 @@ let tenantId: string;
 let userId: string;
 let token: string;
 const restaurantIds: string[] = [];
+const userIds: string[] = [];
 
 /** «الان»ِ ثابت برای همه‌ی تست‌ها: ۳ شهریورِ ۱۴۰۵ ⇒ ماهِ کامل‌شده = مرداد ۱۴۰۵. */
 const NOW = new Date('2026-08-25T12:00:00Z');
@@ -64,28 +65,44 @@ async function visit(restaurantId: string, slotStart: Date, status = 'completed'
 before(async () => {
   const t = await db.tenant.create({ data: { name: `[DEMO] تنانتِ DNA ${TAG}` }, select: { id: true } });
   tenantId = t.id;
+});
+
+// ⚠️ بازنویسی ۲۰۲۶-۰۹-۱۶ (مهاجرتِ ۰۸۹ / FP-009): این hook پیش از هر تست دفتر را
+// پاک می‌کرد تا موجودی صفر شود. دفترِ امتیاز حالا فقط-افزودنی است و آن حذف رد
+// می‌شود. به‌جای بازکردنِ درِ فرار در تریگر، **کاربرِ تازه به‌ازای هر تست** ساخته
+// می‌شود — انزوای قوی‌تری هم هست: دیگر هیچ تستی ردیفِ تستِ قبلی را نمی‌بیند.
+//
+// ⚠️ m-21 (۲۰۲۶-۰۹-۱۷): این hook سطحِ ماژول بود، و این فایل **اولین** importِ
+// `_all.runner.mts` است؛ پس hook به تست‌های فایل‌های دیگر هم می‌رسید. اجرای کاملِ main
+// (8b63e61) ۳۶۵ کاربرِ ۰۹۲۱ باقی گذاشت که `after` فقط آخری‌شان را پاک می‌کرد، و برخوردِ
+// تصادفیِ شماره‌شان jobِ test را به نامِ هر تستی که در حالِ اجرا بود قرمز می‌کرد. حالا فقط دو
+// describeی که کاربر می‌خواهند صدایش می‌زنند، و هر کاربرِ ساخته‌شده در `userIds` ثبت و در `after` پاک می‌شود.
+async function freshUser() {
   const u = await db.user.create({
     // ⚠️ پیشوندِ ۰۹۲۱ مالِ همین فایل است — به tests/_phone.helper.mts رجوع کن.
     data: { phone: fixturePhone('0921'), firstName: '[DEMO] کاربرِ DNA' },
     select: { id: true },
   });
+  userIds.push(u.id);
   userId = u.id;
   token = signAccess({ sub: userId, kind: 'customer' });
-});
-
-beforeEach(async () => {
-  await db.pointsLedger.deleteMany({ where: { userId } });
-  await db.reservation.deleteMany({ where: { userId } });
-  await db.user.update({ where: { id: userId }, data: { notificationPrefs: {} } });
-});
+}
 
 after(async () => {
-  await db.pointsLedger.deleteMany({ where: { userId } });
-  await db.reservation.deleteMany({ where: { userId } });
-  await db.menuItem.deleteMany({ where: { restaurantId: { in: restaurantIds } } });
-  await db.user.delete({ where: { id: userId } });
-  for (const id of restaurantIds) await db.restaurant.delete({ where: { id } });
-  await db.tenant.delete({ where: { id: tenantId } });
+  // ⚠️ دامنه‌ی پاک‌سازی از «کاربر» به «رستوران» رفت: حالا هر تست کاربرِ خودش را
+  // می‌سازد (بالا)، پس رزروهای کاربرانِ قبلی با فیلترِ userId جا می‌ماندند و
+  // حذفِ رستوران را با FK می‌شکستند.
+  await db.reservation.deleteMany({ where: { restaurantId: { in: restaurantIds } } }).catch(() => {});
+  await db.menuItem.deleteMany({ where: { restaurantId: { in: restaurantIds } } }).catch(() => {});
+  // ۰۸۹ (FP-009): کاربری که ردیفِ دفترِ امتیاز دارد عمداً حذف‌شدنی نیست (FKِ RESTRICT).
+  // بقیه — بدونِ catch، تا پاک‌سازیِ شکست‌خورده بی‌صدا نماند.
+  const ledgerBound = await db.pointsLedger.findMany({
+    where: { userId: { in: userIds } }, distinct: ['userId'], select: { userId: true },
+  });
+  const keep = new Set(ledgerBound.map((r) => r.userId));
+  await db.user.deleteMany({ where: { id: { in: userIds.filter((id) => !keep.has(id)) } } });
+  for (const id of restaurantIds) await db.restaurant.delete({ where: { id } }).catch(() => {});
+  await db.tenant.delete({ where: { id: tenantId } }).catch(() => {});
 });
 
 // ───────────────────────────────────────────────────────────────────────
@@ -143,6 +160,7 @@ describe('مرزِ ماهِ شمسی — منطقِ خالص', () => {
 
 // ───────────────────────────────────────────────────────────────────────
 describe('محتوایِ خلاصه — فقط از دادهٔ واقعی', () => {
+  beforeEach(freshUser);
 
   test('🔴 ماهِ بدونِ بازدید هیچ خلاصه‌ای نمی‌گیرد (نه یک خلاصه‌ی پر از صفر)', async () => {
     // مهم‌ترین قاعده‌ی ML_CONTRACT اینجا: «۰ بار بیرون رفتی!» به‌عنوانِ
@@ -272,6 +290,7 @@ describe('محتوایِ خلاصه — فقط از دادهٔ واقعی', () =
 
 // ───────────────────────────────────────────────────────────────────────
 describe('endpoint و اعمالِ واقعیِ رضایت', () => {
+  beforeEach(freshUser);
 
   const call = () => dnaRoute.GET(
     new Request('http://x/api/v1/me/dna-summary', {

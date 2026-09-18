@@ -282,10 +282,16 @@ export async function createTrialAccount(input: LeadInput, ctx: RequestContext):
     };
   }
 
-  // شماره‌ای که از قبل به یک کسب‌وکارِ دیگر وصل است → ورود، نه ساختِ حسابِ تازه
+  // شماره‌ای که از قبل **مالکِ** یک کسب‌وکارِ دیگر است → ورود، نه ساختِ حسابِ تازه
   // ⚠️ fast-pathِ UX با TOCTOU؛ ضمانتِ واقعی ایندکسِ یکتایِ جزئیِ ۰۷۹ است
   // (staff_owner_phone_unique_idx) — نگاشتِ بازنده‌ی race دورِ تراکنشِ پایین.
-  const existingStaff = await db.staff.findFirst({ where: { phone }, select: { id: true } });
+  //
+  // ⚠️ I-1 (حکمِ D-23، ۲۰۲۶-۰۹-۱۷): این چک `where: { phone }` بود — **هر** ردیفِ staff، با هر
+  // نقش و در هر تنانت. و `POST /restaurant/staff` هیچ اثباتِ مالکیتِ شماره نمی‌خواهد؛ پس مالکِ
+  // هر تنانتی شماره‌ی کسی را «کارمند» می‌کرد و دموی خودِ صاحبِ شماره ۴۲۲ می‌گرفت و به ورودی
+  // فرستاده می‌شد که در تنانتِ مهاجم می‌نشیند (بازتولید: P1-4 / R2). همان باریک‌سازیِ
+  // provisioning.ts در ۲۰۲۶-۰۹-۱۱: فقط تعارضِ واقعی، یعنی یک ownerِ دیگر با همین شماره.
+  const existingStaff = await db.staff.findFirst({ where: { phone, role: 'owner' }, select: { id: true } });
   if (existingStaff) {
     throw Err.validation('این شماره از قبل حسابِ کسب‌وکار دارد؛ از همان شماره وارد پنل شوید.');
   }

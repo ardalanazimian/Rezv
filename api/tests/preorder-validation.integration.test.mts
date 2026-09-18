@@ -94,10 +94,10 @@ describe('اعتبارسنجیِ pre-order (SPEC-A فاز ۲ / ۰۷۸)', () => {
     await db.table.deleteMany({ where: { restaurantId: restA } });
     await db.restaurant.deleteMany({ where: { id: { in: [restA, restB] } } });
     // happy path امتیاز/اقتصاد ثبت می‌کند و FKِ user را قفل می‌کند
-    await db.pointsLedger.deleteMany({ where: { userId } }).catch(() => {});
+    // ⚠️ ۰۸۹/FP-009: دفترِ امتیاز فقط-افزودنی است — پاک‌سازیِ ردیف‌هایش ممکن نیست و تلاش برایش رد می‌شود. ردیف‌های [DEMO] در دیتابیسِ هر اجرا (که تازه ساخته می‌شود) می‌مانند.
     await db.economyLedgerEntry.deleteMany({ where: { userId } }).catch(() => {});
     await db.customerEconomyProfile.deleteMany({ where: { userId } }).catch(() => {});
-    await db.user.deleteMany({ where: { id: userId } });
+    await db.user.deleteMany({ where: { id: userId } }).catch(() => {}); // ۰۸۹: ردیفِ دفتر می‌ماند، پس FK این حذف را رد می‌کند
     await db.tenant.deleteMany({ where: { id: tenantId } });
   });
 

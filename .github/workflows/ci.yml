@@ -312,7 +312,12 @@ jobs:
           ALLOWED_ORIGINS: https://ci.example.invalid
 
       - name: Boot path (docker-entrypoint.sh on a history-less DB)
-        run: sh tools/check-boot-path.sh
+        # S-05 (D-24): بوتِ production بدونِ حلقه‌ی کلیدِ رازها ۵۰۰ می‌دهد. کلید همین‌جا در
+        # runner ساخته می‌شود، نه در این فایل — هیچ کلیدی (حتی ساختگی) در مخزن نمی‌نشیند.
+        run: |
+          export SECRETS_KEYRING="ci-boot:$(openssl rand -base64 32)"
+          export SECRETS_ACTIVE_KEY_ID=ci-boot
+          sh tools/check-boot-path.sh
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/rezervno_boot
           # لازم چون `npm run start` انتهایِ اسکریپت در حالتِ production
@@ -611,6 +616,17 @@ jobs:
       # بود). تا امروز، ۱۵۷ فایلِ تست فقط با انضباطِ انسانی محافظت می‌شدند.
       - name: Every test file is actually imported by the runner
         run: node tools/check-runner-completeness.mjs
+      # FP-009 §۶ + مهاجرتِ ۰۹۰: هیچ مسیرِ کدی در api/src تریگرهای فقط-افزودنی را خاموش
+      # نکند (session_replication_role · DISABLE/ENABLE REPLICA/DROP TRIGGER). خودآزمایی
+      # دارد: اگر الگو نمونه‌های ساختگی را نبیند، با کدِ ۲ («گیت اجرا نشد») می‌میرد نه ۰.
+      # حالتِ ماندگارِ DB را لایه‌ی پنجمِ tools/check-schema-drift.sh (jobِ schema-drift) می‌سنجد.
+      - name: No app code path switches off append-only triggers
+        run: node tools/check-session-replication-role.mjs
+      # BE-14: beforeEach/afterEach ِ بیرونِ describe در runnerِ تک‌پردازه‌ای پیش/پس از *هر* تستِ
+      # سوئیت اجرا می‌شود (یک throw در fraud، ۱۸۲۹ تست را قرمز کرد). ratchet: فایلِ تازه و هوکِ
+      # بیشتر قرمز، و baseline فقط کوچک می‌شود. خودآزمایی دارد (کدِ ۲ = گیت اجرا نشد).
+      - name: No new module-level per-test hooks in api/tests
+        run: node tools/check-module-level-test-hooks.mjs
       # ⚠️ ۲۰۲۶-۰۹-۰۸: ۸ فیکسچرِ تستِ integration یک مقدارِ ساعتِ اجرا
       # (`Date.now()`) را با `.toISOString().slice(0, 10)` به کلیدِ UTC تبدیل
       # می‌کردند و به `createReservation` می‌دادند — همان چیزی که

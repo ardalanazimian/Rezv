@@ -5,7 +5,8 @@
 //  دستورِ خودمختاریِ v2 §A2: هر چهار golden journey روی staging و روی دامنه‌ی
 //  واقعی پاس شده باشند با خروجیِ خام ثبت‌شده · CI سبز · مسیرِ rollback با
 //  **اجرای واقعیِ یک‌بار** اثبات شده باشد (دیپلوی → برگشت → تأیید که نسخه‌ی
-//  قبلی سرو می‌شود).
+//  قبلی سرو می‌شود) · و (S-05، ۲۰۲۶-۰۹-۱۷) خروجیِ خامِ secrets-reseal بی شکست و
+//  بی متنِ ساده‌ی باقی‌مانده (`secrets_reseal.raw_output_path` در شواهد).
 //
 //  اجرا:  node tools/gate-deploy.mjs
 //  خروج:  ۰ = مجاز · غیرِصفر = ممنوع
@@ -67,4 +68,19 @@ if (rb?.executed !== true) deny('مسیرِ rollback اجرا نشده — یک 
 if (rb.verified_previous_version_served !== true) deny('پس از rollback تأیید نشده که نسخه‌ی قبلی سرو می‌شود');
 if (!rb.raw_output_path || !existsSync(join(REPO, rb.raw_output_path))) deny('خروجیِ خامِ rollback وجود ندارد');
 
-console.log(`✅ گیتِ A2 مجاز کرد — ${e.journeys.length} journey روی ${e.journeys[0].base_url} · rollback اجراشده`);
+// S-05 (حکمِ CEO، ۲۰۲۶-۰۹-۱۷): مهاجرتِ ۰۹۴ رازها را فقط در حالتِ رمزشده می‌خواند. تا اپراتور یک‌بار
+// POST /api/v1/maintenance/secrets-reseal?seal_plaintext=1 را روی همان استقرار نزند، merchant_idِ زرین‌پال
+// و تحویلِ وب‌هوک fail-closed می‌مانند — سرور سالم است و پرداخت/وب‌هوک نه. پس «دیپلوی تمام شد» بدونِ
+// خروجیِ خامِ همان مسیر پذیرفته نیست، و خودِ پاسخ (نه ادعا) خوانده می‌شود: هیچ شکستی و هیچ متنِ ساده‌ی
+// باقی‌مانده‌ای. اجرای بی seal_plaintext که متنِ ساده را فقط شمرده باشد (plaintext_skipped > 0) رد می‌شود.
+const sr = e.secrets_reseal;
+if (!sr?.raw_output_path || !existsSync(join(REPO, sr.raw_output_path))) {
+  deny('خروجیِ خامِ secrets-reseal (مهاجرتِ ۰۹۴) ثبت نشده — merchant_id و وب‌هوک‌ها fail-closed می‌مانند');
+}
+let reseal;
+try { reseal = JSON.parse(readFileSync(join(REPO, sr.raw_output_path), 'utf8')); } catch (err) { deny(`خروجیِ secrets-reseal JSON نیست: ${err}`); }
+if (typeof reseal.active_key_id !== 'string' || !reseal.active_key_id) deny('خروجیِ secrets-reseal شناسه‌ی کلیدِ فعال ندارد — پاسخِ آن مسیر نیست');
+if (!Array.isArray(reseal.failed) || reseal.failed.length !== 0) deny(`secrets-reseal شکست داشت: ${JSON.stringify(reseal.failed)}`);
+if (reseal.plaintext_skipped !== 0) deny(`secrets-reseal هنوز ${reseal.plaintext_skipped} رازِ متنِ ساده باقی گذاشت — با ?seal_plaintext=1 اجرا نشده`);
+
+console.log(`✅ گیتِ A2 مجاز کرد — ${e.journeys.length} journey روی ${e.journeys[0].base_url} · rollback اجراشده · رازها رمزشده (کلیدِ ${reseal.active_key_id})`);

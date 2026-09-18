@@ -25,10 +25,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.argv[2] || 3201);
 const WIDTH = Number(process.argv[3] || 390);
-// ⚠️ مسیر پارامتر است چون **دو جا** در رندر می‌کنند: `HomeGate.tsx` (صفحه‌ی
-// اول) و `app/login/page.tsx`. گزارشِ اولیه مسیر را نمی‌گفت، و سنجیدنِ یکی و
-// نتیجه‌گرفتن برای دیگری همان حدسی است که باید از آن پرهیز کرد.
-const PATH_ = process.argv[4] || '/';
+// ⚠️ مسیر پارامتر است. تا ۰۹-۱۲ **دو جا** در رندر می‌کردند: HomeGate (صفحه‌ی
+// اول) و `app/login/page.tsx`. از ۰۹-۱۳ صفحه‌ی اول درِ کارتی ندارد (دو صدای
+// تیترِ ExploreHero هر کدام دکمه‌ی خودش را دارد)، پس پیش‌فرض `/login` است —
+// تنها جایی که `.doors` هنوز هست. روی `/` این ابزار درست می‌گوید «`.doors`
+// پیدا نشد».
+const PATH_ = process.argv[4] || '/login';
 // ⚠️ آرگومانِ اول می‌تواند یک URL کامل هم باشد (`file://…` یا `http://…`) —
 // لازم شد چون نسخه‌ی `standalone/website.html` یک **اسنپ‌شاتِ تاریخ‌دار** است
 // که `build-standalone` نه می‌سازدش و نه تازگی‌اش را چک می‌کند، پس می‌تواند

@@ -1263,7 +1263,7 @@ model StaffInvite {
   staffId      String            @map("staff_id") @db.Uuid
   staff        Staff             @relation(fields: [staffId], references: [id], onDelete: Cascade)
   phone        String
-  token        String            @unique
+  token        String            @unique        // S-05: فقط هش — sha256:<hex> (secret-box.ts؛ مهاجرتِ ۰۹۴ + CHECK)
   status       StaffInviteStatus @default(PENDING)
   expiresAt    DateTime          @map("expires_at") @db.Timestamptz
   createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
@@ -1362,7 +1362,7 @@ model Webhook {
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   url          String
   events       String[]                              // رویدادهایی که این webhook می‌خواهد
-  secret       String?                               // برای امضای HMAC
+  secret       String?                               // برای امضای HMAC — S-05: فقط رمزشده (enc:v1:…، secret-box.ts)
   isActive     Boolean    @default(true) @map("is_active")
   createdAt    DateTime   @default(now()) @map("created_at")
 
@@ -1420,7 +1420,8 @@ model SmsTransaction {
   restaurantId String     @map("restaurant_id") @db.Uuid
   // ⚠️ همگام‌سازی‌شده با DB زنده (migration 022_audit_fixes_2026_07_19):
   // این مدل با raw SQL ساخته شده بود بدونِ relation field → بدونِ FK واقعی روی DB.
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  // حکمِ D-16 (مهاجرتِ ۰۹۰): دفترِ اعتبارِ پیامک cascade نمی‌شود — حذفِ رستوران با ردیفِ دفتر رد می‌شود (همان اصلِ FP-009).
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
   delta        Int        // مثبت = شارژ، منفی = مصرف
   reason       String     // 'admin_topup' | 'campaign' | 'reservation_notify'
   balanceAfter Int        @map("balance_after")

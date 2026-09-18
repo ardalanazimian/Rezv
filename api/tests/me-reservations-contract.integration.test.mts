@@ -71,7 +71,7 @@ async function seed(freeCancelHours: number | null) {
   const seq = ++_seq;
   const t = await db.tenant.create({ data: { name: `[DEMO] contract ${SFX}-${seq}` } });
   made.tenantIds.push(t.id);
-  const u = await db.user.create({ data: { phone: fixturePhone('0951') } });
+  const u = await db.user.create({ data: { phone: fixturePhone('0960') } });
   made.userIds.push(u.id);
   const r = await db.restaurant.create({
     data: {
@@ -89,7 +89,7 @@ async function seed(freeCancelHours: number | null) {
       restaurantId: r.id, userId: u.id, code: `CT${SFX}${seq}`.slice(0, 12),
       status: 'confirmed', partySize: 2,
       slotStart: start, slotEnd: new Date(start.getTime() + 90 * 60_000),
-      guestName: 'مهمانِ قرارداد', guestPhone: fixturePhone('0952'),
+      guestName: 'مهمانِ قرارداد', guestPhone: fixturePhone('0963'),
     },
   });
   return signAccess({ sub: u.id, kind: 'customer' });

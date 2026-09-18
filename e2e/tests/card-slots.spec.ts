@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockApi, DEMO_RESTAURANTS } from './helpers/mock-api';
-import { gotoApp } from './helpers/actions';
+import { closeSearchCtxSheet, gotoApp, openImmersiveTile, openSearchCtxSheet } from './helpers/actions';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  چیپِ ساعتِ کارت — از availabilityِ واقعی، نه حدس
@@ -16,13 +16,19 @@ import { gotoApp } from './helpers/actions';
 //      نه یک ساعتِ اختراعی.
 // ═══════════════════════════════════════════════════════════════════════
 
+// ⚠️ [DS-011 · ۲۰۲۶-۰۹-۱۲] چیپ‌های ساعت از کارتِ فید به نمای تمام‌صفحه رفتند:
+// تایلِ ۱۲۸pxِ موزاییکِ Explore جای کنترلِ ۴۴px ندارد. ادعاها عوض نشده‌اند —
+// فقط جایی که سنجیده می‌شوند. paintSlots همان یک نقاش است و آیتم‌های
+// #imFeed را با همان داده می‌کشد، و نما از کلِ فهرستِ فید ساخته می‌شود،
+// پس یک‌بار باز کردن برای دیدنِ چیپِ هر رستورانِ فهرست کافی است.
 const timeChips = (page: import('@playwright/test').Page, rid: string) =>
-  page.locator(`#feed .rc[data-rid="${rid}"] .rc-slot`);
+  page.locator(`#imFeed .im-item[data-rid="${rid}"] .rc-slot`);
 
 test('کارتِ رستورانِ زنده ساعتِ واقعیِ سرور را نشان می‌دهد', async ({ page }) => {
   await mockApi(page);
   await gotoApp(page);
 
+  await openImmersiveTile(page, 0);
   const chips = timeChips(page, DEMO_RESTAURANTS[0].id);
   await expect(chips.first()).toHaveText('19:00');
   await expect(chips.nth(1)).toHaveText('20:00');
@@ -33,6 +39,7 @@ test('⚠️ رستورانِ بدونِ سانسِ آزاد ساعتِ اختر
   await gotoApp(page);
 
   // mock فقط به رستورانِ اول سانس می‌دهد؛ بقیه باید CTAِ آرام بگیرند.
+  await openImmersiveTile(page, 0);
   const chips = timeChips(page, DEMO_RESTAURANTS[1].id);
   await expect(chips).toHaveCount(1);
   await expect(chips.first()).toHaveText('ببین سانس‌ها');
@@ -63,12 +70,19 @@ test('⚠️ تغییرِ تاریخ/تعدادِ نفر ساعت‌ها را د
   });
 
   await gotoApp(page);
+  await openImmersiveTile(page, 0);
   const chips = timeChips(page, DEMO_RESTAURANTS[0].id);
   await expect(chips.first()).toHaveText('19:00');
 
-  const tomorrow = await page.locator('#sWhen option').nth(1).getAttribute('value');
-  await page.selectOption('#sWhen', tomorrow!);
-  await page.selectOption('#sParty', '6');
+  // تنظیمِ «کِی و چند نفر؟» روی صفحه‌ی کشف است، پس اول از نما بیرون می‌آییم.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#page-discover')).toBeVisible();
+  await openSearchCtxSheet(page);
+  const tomorrow = await page.locator('#ctxWhen option').nth(1).getAttribute('value');
+  await page.selectOption('#ctxWhen', tomorrow!);
+  await page.selectOption('#ctxParty', '6');
+  await closeSearchCtxSheet(page);
+  await openImmersiveTile(page, 0);
 
   // چیپ باید به سانسِ گروهِ ۶نفره برسد — نه ساعتِ انتخابِ قبلی.
   await expect(chips.first()).toHaveText('21:00');
@@ -85,7 +99,9 @@ test('⚠️ شکستِ availability هیچ ساعتی نمی‌سازد', async
     route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: { message: 'خطا' } }) }));
 
   await gotoApp(page);
+  await openImmersiveTile(page, 0);
   const chips = timeChips(page, DEMO_RESTAURANTS[0].id);
   await expect(chips.first()).toHaveText('ببین سانس‌ها');
-  await expect(page.locator('#feed')).not.toContainText('19:00');
+  // ساعتِ اختراعی حالا در نما ظاهر می‌شد، نه در فید — همان‌جا را می‌سنجیم.
+  await expect(page.locator('#imFeed')).not.toContainText('19:00');
 });

@@ -20,7 +20,7 @@ function ReservationPanel() {
     { name: 'حسین اکبری', sub: '۳ نفر · لیستِ انتظار', time: '۲۱:۱۵', tag: 'در صف' },
   ];
   return (
-    <div className="viz float float--slow" aria-hidden="true">
+    <div className="viz" aria-hidden="true">
       <div className="viz__bar">
         <span className="viz__title">رزروهای امشب</span>
         <span className="row" style={{ gap: 6 }}>
@@ -112,7 +112,7 @@ function PhonePanel() {
     { t: '۱۹:۳۰', s: 'picked' }, { t: '۲۰:۰۰', s: 'free' }, { t: '۲۰:۳۰', s: 'full' },
   ] as const;
   return (
-    <div className="phone-frame float" aria-hidden="true">
+    <div className="phone-frame" aria-hidden="true">
       <span className="phone-frame__notch" />
       <div className="phone-frame__screen">
         <div className="row" style={{ justifyContent: 'space-between' }}>

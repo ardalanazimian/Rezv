@@ -2,7 +2,7 @@
 //  توجه: جریانِ رزرو به data/booking.js منتقل شد (جداسازیِ مسئولیت).
 import { esc, jsq, toast } from '../auth.js';
 import { detailSocialProof, fmtFa, go, toggleRestFav } from './discover.js';
-import { curRest, favHas, gradFor, setCurRest } from './seed.js';
+import { curRest, dishLen, dishWord, favHas, gradFor, setCurRest } from './seed.js';
 import { API, applyRestaurantDetail, loadRestaurantDetail, mapApiRestaurant, resolveMediaUrl } from '../api.js';
 import { R, findR } from '../init.js';
 // depositLabel: تنها منبعِ متنِ پیش‌پرداخت (P1-3، خطِ ممیزی) — در نوارِ رزرو مصرف می‌شود.
@@ -120,7 +120,7 @@ const MENU_TAG_FA = {
 /** کارتِ یک آیتمِ منو — همه‌ی متن‌های سرورساخته esc می‌شوند (انضباطِ 7ecd0d6). */
 function menuItemHTML(m){
   return `<div class="menu-item glass"${m.out?' style="opacity:.62"':''}>
-    <div class="menu-emoji">${m.img?`<img class="menu-thumb" src="${esc(resolveMediaUrl(m.img))}" alt="" loading="lazy">`:esc(m.e)}</div>
+    ${m.img?`<div class="menu-emoji"><img class="menu-thumb" src="${esc(resolveMediaUrl(m.img))}" alt="" loading="lazy"></div>`:''}
     <div class="menu-info">
       <div class="menu-name">${esc(m.n)}${m.out?' <span style="font-size:10px;background:var(--amber,#d97706);color:#fff;border-radius:6px;padding:1px 6px;white-space:nowrap">ناموجود</span>':''}</div>
       ${m.d?`<div style="font-size:11px;color:var(--t2);margin:1px 0 2px;line-height:1.7">${esc(m.d)}</div>`:''}
@@ -157,13 +157,12 @@ function renderRestPage(r){
     :`background:${gradFor(id)}`;
   document.getElementById('page-rest').innerHTML=`
     <div class="rp-hero${heroPhoto?' rp-hero--photo':''}" style="${heroBg}">
-      <div class="rp-hero-mesh"${heroPhoto?' style="display:none"':''}></div>
       <button class="rp-hero-back glass" onclick="go('discover')" aria-label="بازگشت به کشف">→</button>
       <div class="rp-hero-actions">
         <button class="rp-hero-icon glass" onclick="haptic('light');shareRestaurant(${jsq(String(r.id))})" aria-label="اشتراک‌گذاری رستوران">${icon('share',{size:20})}</button>
         <button class="rp-hero-icon glass" id="rpFav" onclick="haptic('like');toggleRestFav(${jsq(String(r.id))})" aria-pressed="${favHas(id)}" aria-label="${favHas(id)?'حذف از علاقه‌مندی‌ها':'افزودن به علاقه‌مندی‌ها'}">${icon('heart',{size:22,fill:favHas(id)})}</button>
       </div>
-      ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-emoji">${esc(r.e)}</div>`}
+      ${r.logo?`<img class="rp-hero-logo" src="${esc(resolveMediaUrl(r.logo))}" alt="لوگوی ${esc(r.n)}">`:heroPhoto?'':`<div class="rp-hero-word" aria-hidden="true" style="--len:${esc(String(dishLen(dishWord(r))))}">${esc(dishWord(r))}</div>`}
       <div class="rp-hero-overlay">
         <div class="rp-hero-badges">
           ${r.now?`<span class="rp-hero-badge live"><span class="live-dot" aria-hidden="true"></span> الان باز</span>`:''}
@@ -213,25 +212,25 @@ function renderRestPage(r){
             // می‌گفت در حالی که hero «۵ نظر» نشان می‌داد؛ تناقضِ داده. حالا اگر
             // امتیازِ تجمیعیِ واقعی هست، همان را صادقانه خلاصه می‌کنیم.
             if (Number.isFinite(r.reviews) && r.reviews > 0) {
-              return `<div class="rb-overall glass" style="text-align:center"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">میانگینِ ${fmtFa(r.reviews)} نظر — متنِ نظرها به‌زودی این‌جا</div></div>`;
+              return `<div class="rb-overall tile" style="text-align:center"><div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">میانگینِ ${fmtFa(r.reviews)} نظر — متنِ نظرها به‌زودی این‌جا</div></div>`;
             }
             return `<p class="rp-empty">هنوز نظری برای این رستوران ثبت نشده.</p>`;
           }
           return `
-        ${hasRatingBars?`<div class="rb-grid glass">
+        ${hasRatingBars?`<div class="rb-grid tile">
           <div class="rb-overall">${r.rt!=null?`<div class="rb-big">${fmtFa(r.rt)}</div><div class="rb-stars">${stars(r.rt)}</div><div class="rb-count">${fmtFa(r.reviews)} نظر</div>`:'<div class="rb-count">هنوز نظری ثبت نشده</div>'}</div>
           <div class="rb-bars">${[['غذا',r.rb.food],['سرویس',r.rb.service],['فضا',r.rb.atmo],['ارزش',r.rb.value]].map(([l,v])=>`<div class="rb-bar-row"><span class="rl">${l}</span><div class="rb-track"><div class="rb-fill" style="width:0" data-w="${v/5*100}"></div></div><span class="rv">${fmtFa(v)}</span></div>`).join('')}</div>
         </div>`:''}
-        ${hasAiSummary?`<div class="ai-review glass">
+        ${hasAiSummary?`<div class="ai-review tile">
           <div class="ai-review-head"><div class="icn">${icon('sparkle',{size:16,fill:true})}</div><div class="ttl">خلاصه‌ی هوشمند نظرها</div><span class="tag">AI</span></div>
           ${r.good.length?`<div class="ai-col"><div class="ai-col-label">${icon('thumbsUp',{size:14})} مهمان‌ها تعریف می‌کنن از:</div>${r.good.map(g=>`<div class="ai-point"><span class="ic good">${icon('check',{size:12})}</span>${esc(g)}</div>`).join('')}</div>`:''}
           ${r.bad.length?`<div class="ai-col"><div class="ai-col-label">${icon('thumbsDown',{size:14})} گاهی گله دارن از:</div>${r.bad.map(b=>`<div class="ai-point"><span class="ic bad">!</span>${esc(b)}</div>`).join('')}</div>`:''}
         </div>`:''}
-        ${r.revs.map(rv=>`<div class="review reveal"><div class="review-ava">${rv[1]}</div><div class="review-body"><div class="review-top"><span class="review-name">${esc(rv[0])}</span><span class="review-date">${esc(rv[4])}</span></div><div class="review-stars">${Array.from({length:+rv[2]},()=>icon('star',{size:12,fill:true})).join('')}</div><div class="review-text">${esc(rv[3])}</div></div></div>`).join('')}`;
+        ${r.revs.map(rv=>`<div class="review reveal"><div class="review-ava" aria-hidden="true">${esc(String(rv[0]||'').trim().slice(0,1))}</div><div class="review-body"><div class="review-top"><span class="review-name">${esc(rv[0])}</span><span class="review-date">${esc(rv[4])}</span></div><div class="review-stars">${Array.from({length:+rv[2]},()=>icon('star',{size:12,fill:true})).join('')}</div><div class="review-text">${esc(rv[3])}</div></div></div>`).join('')}`;
         })()}
       </div>
     </div>
-    <div class="rp-bookbar glass">
+    <div class="rp-bookbar">
       <div class="rp-bookbar-info">
         <div class="rp-bookbar-cb">${icon('wallet',{size:13})} ${fmtFa(r.cb)}٪ کش‌بک</div>
         <div class="rp-bookbar-sub">${depositLabel(r)}</div>

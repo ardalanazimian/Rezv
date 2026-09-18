@@ -46,7 +46,21 @@ const PATH_RE = new RegExp(
 // («فایلِ X سرِ فلان ساعت staged بود و بعد ?? شد»)، نه دستورالعمل. اگر فایلی که
 // در حادثه نقش داشته بعداً حذف شود، حادثه همچنان درست است — و ویرایشِ حافظه‌ی
 // ایجنتِ دیگر برای ساکت‌کردنِ یک گارد، بدترین شکلِ سبزکردن است.
-const HISTORICAL = /^(audit\/round-|docs\/audit\/(directives|reports|redteam|round-|deputy|fixes|design|research)\/|docs\/recovery\/|docs\/AUDIT-FIXES|docs\/audit\/PRE-LAUNCH|docs\/audit\/SESSION-HANDOFF|\.claude\/agent-memory\/)/;
+// ⚠️ ۲۰۲۶-۰۹-۱۶ (CEO `rezv-87`): پوشه‌های گزارشِ موجِ ۰۹-۱۶ — `sync`، `fullstack`،
+// `impl`، `features` — همان کلاسِ `redteam`/`fixes` هستند: عکسِ یک لحظه که به
+// شاخه‌ی ادغام‌نشده و فایلِ untracked ارجاع می‌دهد، چون موضوعش همین است
+// (`SYNC-2026-09-16.md` ده ارجاع به فایل‌هایی داشت که فقط روی شاخه یا دیسک‌اند).
+// ویرایشِ گزارشِ نشستِ دیگر برای سبزکردنِ گارد همان «بدترین شکل» ِ بالاست.
+// ⚠️ تنگ‌تر شد به حکمِ Red Team (`rezv-31`، ATTACKS-2026-09-16-rt31): معافیتِ **کلِ پوشه** پیش از
+// آنکه محتوایی داشته باشد یعنی قضاوتِ «این واقعاً عکسِ لحظه است؟» هرگز انجام نمی‌شود — یک
+// CHAIN-MAP یا منشورِ زنده که آنجا بیفتد بی‌صدا اسکن نمی‌شود. پس در این چهار پوشه فقط فایلِ
+// **تاریخ‌دار** (`…-YYYY-MM-DD….md`) تاریخی است، و README/INDEX/ROUTING هرگز.
+// ⚠️ حمله‌ی دوم (`rezv-31`، eddf149): «تاریخ‌دار» نشانه‌ی «عکسِ لحظه» نیست — این مخزن میزهای
+// **زنده** را هم تاریخ‌دار نام می‌گذارد (STATE-…، COORDINATION-…، MANDATE-…). پس هر نامی که
+// یکی از این واژه‌ها را **هر جای** نام (بی‌حساسیت به حروف) دارد هرگز معاف نیست.
+const WAVE_SNAPSHOT = /^docs\/audit\/(sync|fullstack|impl|features)\/(?![^/]*(readme|index|routing|state|mandate|charter|coordination|desk|chain-map))[^/]*-20\d\d-\d\d-\d\d[^/]*\.md$/i;
+const HISTORICAL_DIRS = /^(audit\/round-|docs\/audit\/(directives|reports|redteam|round-|deputy|fixes|design|research)\/|docs\/recovery\/|docs\/AUDIT-FIXES|docs\/audit\/PRE-LAUNCH|docs\/audit\/SESSION-HANDOFF|\.claude\/agent-memory\/)/;
+const HISTORICAL = { test: (f) => HISTORICAL_DIRS.test(f) || WAVE_SNAPSHOT.test(f) };
 
 // نشانه‌هایی که می‌گویند نویسنده **می‌داند** این مسیر وجود ندارد.
 const CONTEXT_OK = [

@@ -27,9 +27,9 @@ const setSmsTransport = (on: boolean) => { for (const k of MELI_KEYS) { if (on) 
 
 import { fixturePhone } from './_phone.helper.mts';
 
-// ⚠️ پیشوندِ ۰۹۲۴ مالِ همین فایل است — در فایلِ دیگری تکرارش نکن
+// ⚠️ پیشوندِ ۰۹۰۶ مالِ همین فایل است — در فایلِ دیگری تکرارش نکن
 // (دلیل: tests/_phone.helper.mts).
-const PHONE_PREFIX = '0924';
+const PHONE_PREFIX = '0906';
 
 const { db } = await import('../src/lib/db.ts');
 const { enqueueSms } = await import('../src/lib/sms.ts');

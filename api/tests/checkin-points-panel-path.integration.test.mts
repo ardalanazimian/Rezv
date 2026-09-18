@@ -36,12 +36,12 @@ process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 
 import { fixturePhone } from './_phone.helper.mts';
 
-// ⚠️ پیشوندِ ۰۹۲۱ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش نکن.
+// ⚠️ پیشوندِ ۰۹۰۱ مالِ همین فایل است — عوضش نکن و در فایلِ دیگری تکرارش نکن.
 // برخوردِ شماره در رانرِ تک‌پروسه‌ای، hookِ `before` را می‌اندازد و node:test
 // **کلِ** سوئیت را cancel می‌کند (شرح کامل در tests/_phone.helper.mts).
 // این واقعاً همین‌جا رخ داد: نسخه‌ی اولِ این فایل شماره را دستی می‌ساخت و
 // دو اجرای کاملِ سوئیت را با دو نشانه‌ی کاملاً متفاوت قرمز کرد.
-const OWNER_PHONE_PREFIX = '0921';
+const OWNER_PHONE_PREFIX = '0901';
 
 const { db } = await import('../src/lib/db.ts');
 const { signAccess } = await import('../src/lib/jwt.ts');
@@ -126,7 +126,7 @@ before(async () => {
 });
 
 after(async () => {
-  await db.pointsLedger.deleteMany({ where: { userId } }).catch(() => {});
+  // ⚠️ ۰۸۹/FP-009: دفترِ امتیاز فقط-افزودنی است — پاک‌سازیِ ردیف‌هایش ممکن نیست و تلاش برایش رد می‌شود. ردیف‌های [DEMO] در دیتابیسِ هر اجرا (که تازه ساخته می‌شود) می‌مانند.
   await db.reservationEvent.deleteMany({
     where: { reservation: { restaurantId } },
   }).catch(() => {});
@@ -291,8 +291,11 @@ describe('سطحِ باشگاه (tier) واقعاً نوشته می‌شود (§
     // با «هنوز bronze است» به‌طورِ کاذب سبز می‌ماند.
     assert.notEqual(pre?.tier, 'bronze', 'پیش‌شرط: باید از سطحِ پایه بالاتر رفته باشد');
     const balance = await getClubPointsBalance(userId, restaurantId);
+    // reason: 'redemption' و نه 'adjustment': از مهاجرتِ ۰۸۸ (RT-18) کسرِ امتیاز فقط با
+    // بازخرید یا برگشتِ کش‌بک روی DB مجاز است. ادعای این تست «کسر سطح را پایین می‌آورد»
+    // است، و بازخرید دقیقاً همان کسرِ واقعی‌ای است که در محصول رخ می‌دهد.
     const after = await addClubPoints({
-      userId, restaurantId, delta: -(balance - 10), reason: 'adjustment', note: '[DEMO] کسر',
+      userId, restaurantId, delta: -(balance - 10), reason: 'redemption', note: '[DEMO] کسر',
     });
     assert.equal(after, 10);
     const m = await db.clubMember.findUnique({

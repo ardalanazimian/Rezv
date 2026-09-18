@@ -5,11 +5,16 @@
 
 import { Actions } from './actions.js';
 import { API, hydrateSlots, loadMoreRestaurants, loadRestaurants, refreshAuthUI, setUSER } from './api.js';
-import { activeQuery, doSearch, paintSlots, renderDiscoverSections, renderFeed, renderRestaurantSections } from './data/discover.js';
+import { isOfflineDemo } from './api-core.js';
+import { activeQuery, doSearch, paintSlots, renderDiscoverSections, renderFeed, renderFeedLoading, renderRestaurantSections } from './data/discover.js';
 import { R_SAMPLE, bookingCtx } from './data/seed.js';
 import { runPendingCheckIn } from './features/checkin.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
-export let R = R_SAMPLE;
+// ⚠️ مقدارِ اولیه دیگر همیشه R_SAMPLE نیست (برادرِ B-1، ۲۰۲۶-۰۹-۱۶): boot آن را
+// پیش از رسیدنِ پاسخِ سرور رنگ می‌زد، و روی شبکه‌ی موبایلی که پاسخ بیش از ۲۸۰msِ
+// اسکلت طول بکشد، کاربرِ واقعی هر بار شش کارتِ `[DEMO]` می‌دید. نمونه فقط در دموی
+// آفلاینِ file:// — همان گیتِ loadRestaurants.
+export let R = isOfflineDemo() ? R_SAMPLE : [];
 
 // پیداکردنِ رستوران با id — همیشه با مقایسه‌ی String، چون idِ نمونه عدد است و
 // idِ واقعیِ بک‌اند UUID (string). مقایسه‌ی === مستقیم بین این دو، برای هر
@@ -20,7 +25,8 @@ export const findR = id => R.find(x => String(x.id) === String(id));
 function boot(){
   Actions.init();                    // رفتارهایِ کیبوردِ سراسری (Escape / Enter-Space)
   updateThemeIcon();                 // آیکونِ تم (حالا DOM آماده است)
-  renderFeed(R);                     // نمایش فوری با داده‌ی نمونه
+  if (R.length) renderFeed(R);       // دموی آفلاین: نمایشِ فوری با داده‌ی نمونه
+  else renderFeedLoading();          // وگرنه اسکلت تا پاسخِ سرور — نه «خالی»، نه نمونه
   renderDiscoverSections();          // نزدیک تو، ترند، رویدادها
   armReveals();                      // انیمیشنِ اسکرول
   restoreSession();                  // بازیابی نشست

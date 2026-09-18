@@ -101,7 +101,7 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
     // این همان چیزی است که NO-GO را برای بازدیدِ پنل باز می‌کند: در
     // production بدونِ کلیدِ کاوه‌نگار، `requestOtp` معمولاً
     // `serviceUnavailable` می‌دهد. برای این یک شماره نباید بدهد.
-    const bg = newPhone('0922');
+    const bg = newPhone('0904');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     setNodeEnv('production');
@@ -119,7 +119,7 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
 
   test('🔴 کدِ اشتباه روی همین شماره هم رد می‌شود', async () => {
     // یعنی «شماره‌ی اضطراری» به معنیِ «هر کدی قبول است» نیست.
-    const bg = newPhone('0922');
+    const bg = newPhone('0904');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     await requestOtp(bg);
@@ -128,7 +128,7 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
 
   test('⚠️ شمارشِ تلاشِ ناموفق دور زده نمی‌شود', async () => {
     // پنج تلاشِ غلط باید کد را بسوزاند، حتی برای شماره‌ی اضطراری.
-    const bg = newPhone('0922');
+    const bg = newPhone('0904');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     await requestOtp(bg);
@@ -139,7 +139,7 @@ describe('ورودِ اضطراری — وقتی درست پیکربندی شد�
   test('⚠️ ریت‌لیمیتِ per-phone برای شماره‌ی اضطراری هم دور زده نمی‌شود', async () => {
     // گاردِ «فقط تحویلِ کد را دور می‌زند، نه محدودیت‌ها را» — با عدد:
     // `RULES.otpPerPhone` سقفِ ۳ در ۱۰ دقیقه است، پس چهارمی باید ۴۲۹ بگیرد.
-    const bg = newPhone('0922');
+    const bg = newPhone('0904');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     setSmsTransport(true);
@@ -198,7 +198,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
 
   test('بدونِ هیچ متغیرِ محیطی، قابلیت اصلاً وجود ندارد', async () => {
     // کنترلِ پایه: در حالتِ پیش‌فرضِ مخزن، هیچ شماره‌ای کدِ ثابت نمی‌گیرد.
-    const bg = newPhone('0922');
+    const bg = newPhone('0904');
     delete process.env.BREAK_GLASS_PHONE;
     delete process.env.BREAK_GLASS_CODE;
     setSmsTransport(true);
@@ -209,14 +209,14 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
   test('با فقط **یکی** از دو متغیر، فعال نمی‌شود', async () => {
     // ⚠️ مهم: نیمه‌پیکربندی نباید نیمه‌فعال شود. یک `BREAK_GLASS_PHONE`ِ
     // جامانده در env نباید به‌تنهایی چیزی را باز کند.
-    const a = newPhone('0922');
+    const a = newPhone('0904');
     process.env.BREAK_GLASS_PHONE = a;
     delete process.env.BREAK_GLASS_CODE;
     setSmsTransport(true);
     await requestOtp(a);
     await assert.rejects(() => verifyOtp(a, CODE));
 
-    const b = newPhone('0922');
+    const b = newPhone('0904');
     delete process.env.BREAK_GLASS_PHONE;
     process.env.BREAK_GLASS_CODE = CODE;
     await requestOtp(b);
@@ -225,8 +225,8 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
 
   test('🔴 روی هیچ شماره‌ی دیگری اثر ندارد', async () => {
     // مهم‌ترین گارد: یک شماره باز می‌شود، نه یک کدِ سراسری.
-    const bg = newPhone('0922');
-    const other = newPhone('0923');
+    const bg = newPhone('0904');
+    const other = newPhone('0905');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     setSmsTransport(true);
@@ -239,8 +239,8 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
   test('🔴 و برای شماره‌ی دیگر در production بدونِ کلیدِ پیامک، همچنان fail-closed است', async () => {
     // یعنی گاردِ اصلیِ «بدونِ پیامک ادعای موفقیت نکن» دست‌نخورده مانده و
     // break-glass آن را برای همه باز نکرده.
-    const bg = newPhone('0922');
-    const other = newPhone('0923');
+    const bg = newPhone('0904');
+    const other = newPhone('0905');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = CODE;
     setNodeEnv('production');
@@ -252,7 +252,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
 
   test('کدِ نامعتبر در پیکربندی، قابلیت را **غیرفعال** می‌کند، نه نیمه‌فعال', async () => {
     // پیکربندیِ غلط نباید به یک حالتِ عجیبِ میانی منجر شود.
-    const bg = newPhone('0922');
+    const bg = newPhone('0904');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = 'abcdef';   // رقم نیست
     setSmsTransport(true);
@@ -265,7 +265,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
     // امنیتِ واقعیِ مسیر به «مخفی‌بودنِ شماره» تنزل می‌کند. چون هزینه‌ی
     // ۶ رقمی‌کردن برای صاحبِ شماره صفر است، پیکربندیِ ضعیف **رد** می‌شود
     // نه اینکه با هشدار قبول شود.
-    const bg = newPhone('0922');
+    const bg = newPhone('0904');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = '1234';
     setSmsTransport(true);
@@ -276,7 +276,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
 
   test('🔴 کدِ بلندتر از ۶ رقم هم پذیرفته نمی‌شود', async () => {
     // چکِ «دقیقاً ۶» است نه «حداقل ۶» — تا پیکربندی یکتا و قابلِ‌بازبینی بماند.
-    const bg = newPhone('0922');
+    const bg = newPhone('0904');
     process.env.BREAK_GLASS_PHONE = bg;
     process.env.BREAK_GLASS_CODE = '1234567';
     setSmsTransport(true);
@@ -285,7 +285,7 @@ describe('🔴 گاردها — چیزهایی که نباید کار کنند',
   });
 
   test('شماره‌ی نامعتبر در پیکربندی هم قابلیت را غیرفعال می‌کند', async () => {
-    const bg = newPhone('0922');
+    const bg = newPhone('0904');
     process.env.BREAK_GLASS_PHONE = 'not-a-phone';
     process.env.BREAK_GLASS_CODE = CODE;
     setSmsTransport(true);
