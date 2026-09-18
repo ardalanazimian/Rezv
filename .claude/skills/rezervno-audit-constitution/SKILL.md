@@ -285,6 +285,36 @@ phantom, and it nearly reached the owner as "our security gate is flaky". The se
 one line. **"Non-deterministic" is a hypothesis, not a finding — treat it as the label you use after
 you have failed to find the mechanism, never before you have looked.**
 
+**Before pushing any rescued, rebased or resurrected branch to a PUBLIC remote, diff its TREE against
+`main` for files `main` has SHRUNK or DELETED — because a deletion is exactly what a resurrected tree
+undoes.** Promoted 2026-09-18 after two sessions, independently and hours apart, published content
+that an owner ruling had removed. Neither was careless. Both verified that the *cargo* they were
+rescuing was present and never asked what else the hold contained.
+
+The trap is that the branch need not be about the sensitive thing at all. A branch cut from a commit
+that predates the removal carries the removal's target **by construction**, whatever its subject. Two
+local tags created purely to stop `git gc` collecting detached e2e **test-suite** commits were later
+found to carry `ATTACKS.md` at 11,085 B and `INVESTORS.md` at 12,923 B for exactly this reason.
+
+Note the diagnostic that is NOT sufficient: `git diff --name-only main...<ref>` lists files the branch
+**changed**, so a file merely *sitting* in the tree at full size is invisible to it. It will report
+clean on a branch that republishes everything. Measure `git cat-file -s <ref>:<path>` against the same
+path on `main` — sizes, not names. A CEO audit using the name-only form called three refs clean that
+were not.
+
+**And know what deletion buys, because it is less than it looks.** Removing the ref stops
+discovery-by-name; it does not stop retrieval. On GitHub the objects stay fetchable by exact sha —
+including the 7-character short sha — until a garbage collection you cannot schedule or verify from
+outside, and the branch-creation event is itself public. Measured with controls: a deleted commit
+returned HTTP 200, a bogus sha returned 422.
+
+The wider measurement is the one that decides remediation, and it inverts the obvious plan: on this
+repository **47 of 89 public refs served the full file by branch name, no sha required** — against 6
+carrying the stub and 36 predating the file. So the objects were never *unreachable*, and asking a
+host to garbage-collect unreachable objects would have achieved nothing. **Establish the true blast
+radius across every ref before choosing a remedy**, or you will spend the expensive option on the
+narrow case and leave the wide one untouched.
+
 ## 4d. Three promoted 2026-09-10 — all from the Backend Engineer session, all about scope
 
 **Turn the claim into a testable condition BEFORE you write the guard.** Asked to pin the one
