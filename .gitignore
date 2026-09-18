@@ -113,3 +113,9 @@ audit/round-16/A11-logs/a11-secrets.env
 # افزونه‌ی Supabase را «توصیه» می‌کند، در حالی که Supabase از مسیرِ بحرانی
 # خارج شده و در صفِ decommission است (audit/round-19/supabase-decommission-checklist.md).
 .vscode/
+
+# شواهدِ اجرای سفرهای طلایی — خروجیِ زمانِ استقرار است، نه منبع.
+# عمداً ignore می‌شود: اگر commit شود، یک اجرای localhost می‌تواند بعدها به
+# چشمِ «سفرها روی staging اجرا شدند» خوانده شود. tools/run-golden-journeys.mjs
+# آن را در همان محیطی می‌سازد که استقرار در آن انجام شده.
+audit/staging/
