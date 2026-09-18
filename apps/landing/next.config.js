@@ -1,6 +1,23 @@
 /** @type {import('next').NextConfig} */
 // وب‌سایتِ عمومیِ رزرونو — SSR/ISR. جزئیات در docs/adr/0001-seo-rendering-architecture.md
 
+// ── میزبانِ عکسِ گالری، از env (۲۰۲۶-۰۹-۱۸) ──
+// تا امروز `api.rezervno.ir`ِ ثابت بود. روی هر دامنه‌ی دیگری next/image **هر عکسِ
+// گالری را بی‌صدا رد می‌کند**: صفحه بالا می‌آید، لاگ خالی است، سایت فقط «شکسته»
+// به‌نظر می‌رسد. ترتیبِ خواندن عمداً همانِ `.env.example` است.
+// زیردامنه‌ی API را از آدرسِ سایت می‌سازد (`www.` برداشته می‌شود) — همتایِ appBase().
+const apiFromSite = (site) => (site ? new URL(site).origin.replace('://www.', '://').replace('://', '://api.') : '');
+
+// ⚠️ پیش‌فرضِ آخر عمداً روی همین خط است، کنارِ خواندنِ env: گاردِ
+// tools/check-hardcoded-domain.mjs یک دامنه‌ی ثابت را فقط روی خطی می‌پذیرد که خودش
+// env هم می‌خواند — یعنی «پیش‌فرضِ یک متغیر» مجاز است و «آدرسِ ثابتِ کد» نه.
+const MEDIA_BASE_RAW = process.env.NEXT_PUBLIC_MEDIA_BASE || process.env.NEXT_PUBLIC_API_BASE || apiFromSite(process.env.NEXT_PUBLIC_SITE_URL) || 'https://api.rezervno.ir';
+
+const MEDIA_HOST = (() => {
+  const u = new URL(MEDIA_BASE_RAW);
+  return { protocol: u.protocol.replace(':', ''), hostname: u.hostname };
+})();
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ناحیه‌ی SEO (Next Multi-Zones) — چرا این rewrite وجود دارد
 //
@@ -67,7 +84,7 @@ module.exports = {
     remotePatterns: [
       // عکس‌هایی که رستوران‌ها آپلود می‌کنند از همین مسیرِ API سرو می‌شوند.
       // بدونِ این، next/image آن‌ها را رد می‌کند.
-      { protocol: 'https', hostname: 'api.rezervno.ir', pathname: '/api/v1/media/**' },
+      { protocol: MEDIA_HOST.protocol, hostname: MEDIA_HOST.hostname, pathname: '/api/v1/media/**' },
       { protocol: 'http', hostname: 'localhost', pathname: '/api/v1/media/**' },
     ],
     // SVG هرگز از مسیرِ بهینه‌سازی رد نمی‌شود (پیش‌فرضِ Next هم همین است، ولی

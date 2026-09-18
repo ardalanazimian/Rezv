@@ -611,6 +611,12 @@ jobs:
       # جایگزین خوش‌ساخت بود، fail-fastِ middleware (که فقط نحو را می‌سنجد) نمی‌گرفتش.
       - name: No duplicate keys in env example files
         run: node tools/check-env-example-duplicates.mjs
+      # ۲۰۲۶-۰۹-۱۸: جاروی ۰۹-۰۸ هفت کپیِ hardcode از دامنه را جمع کرد و **دو تا را جا
+      # انداخت** — Listing.tsx (لینکِ هر کارت) و layout.tsx (metadataBase، یعنی canonicalِ
+      # هر صفحه) — به‌علاوه‌ی میزبانِ next/image در لندینگ، که روی دامنه‌ی دیگر هر عکسِ
+      # گالری را بی‌صدا رد می‌کند. رفعِ نمونه بدونِ گارد، ده روز دوام آورد.
+      - name: No hardcoded copies of our own public domain
+        run: node tools/check-hardcoded-domain.mjs
       # هر عاملی باید منشورِ Gen-Z و قانوننامهی ممیزی را preload کند. عاملی که
       # این دو را ندارد به دستور اعتراض نمیکند و heuristic را هوش برچسب میزند.
       - name: Every agent carries both charter skills

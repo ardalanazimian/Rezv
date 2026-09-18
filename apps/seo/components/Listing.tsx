@@ -1,7 +1,10 @@
 import type { RestaurantListItem } from '@/lib/api';
 import { listJsonLd } from '@/lib/schema';
-
-const SITE = 'https://rezervno.ir';
+// ⚠️ ۲۰۲۶-۰۹-۱۸: اینجا یک SITEِ ثابت بود — یکی از دو کپی‌ای که جاروی ۰۹-۰۸
+// (هفت کپی → یک منبع، lib/urls.ts) از قلم انداخت. اثرش همانی بود که خودِ
+// lib/urls.ts هشدارش را نوشته: روی هر دامنه‌ی دیگری، از جمله هر preview و هر
+// staging، لینکِ هر کارت و breadcrumb به دامنه‌ی تولید می‌رفت.
+import { SITE } from '@/lib/urls';
 const BAND = ['', 'اقتصادی', 'متوسط', 'گران', 'لوکس'];
 
 // کامپوننتِ مشترکِ صفحاتِ لیست (شهر/آشپزی) — رندرِ کارت‌ها + تزریقِ JSON-LD.
