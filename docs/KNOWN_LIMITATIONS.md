@@ -289,6 +289,12 @@
     specific restaurant — the toast copy says "لینکِ رزرونو" (Rezervno's link),
     not "لینکِ این رستوران", to stay honest about what was actually copied.
     Building real deep-linking is a separate, larger change.
+    **✅ Resolved 2026-09-17 (D-31):** that larger change shipped —
+    `apps/customer/js/features/deeplink.js` adds a `?r=<slug>` (plus optional
+    `d=`/`p=`) entry point, `shareRestaurant` now copies that per-restaurant
+    link when the restaurant has a slug, and the toast says "لینکِ این
+    رستوران". The old wording is still used verbatim for slug-less sample
+    records, so the honesty rule above still holds in that case.
   - **Real gap:** a discover-feed card with zero preview slots (`r.slots`
     empty) rendered no call-to-action at all. Fixed with a calm "ببین سانس‌ها"
     fallback that opens the real availability sheet — never an invented time.

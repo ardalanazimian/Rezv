@@ -2,7 +2,8 @@
 //  توجه: جریانِ رزرو به data/booking.js منتقل شد (جداسازیِ مسئولیت).
 import { esc, jsq, toast } from '../auth.js';
 import { detailSocialProof, fmtFa, go, toggleRestFav } from './discover.js';
-import { curRest, dishLen, dishWord, favHas, gradFor, setCurRest } from './seed.js';
+import { bookingCtx, curRest, dishLen, dishWord, favHas, gradFor, setCurRest } from './seed.js';
+import { buildRestaurantLink } from '../features/deeplink.js';
 import { API, applyRestaurantDetail, loadRestaurantDetail, mapApiRestaurant, resolveMediaUrl } from '../api.js';
 import { R, findR } from '../init.js';
 // depositLabel: تنها منبعِ متنِ پیش‌پرداخت (P1-3، خطِ ممیزی) — در نوارِ رزرو مصرف می‌شود.
@@ -14,11 +15,11 @@ import { icon } from '../icons.js';
 // toast('لینک کپی شد') می‌داد بدونِ اینکه واقعاً چیزی کپی کند — دقیقاً همون
 // دسته‌بندیِ «فیدبکِ موفقیتِ ساختگی» که این ماموریت صریحاً ممنوع کرده. حالا
 // یا Web Share API واقعی (شیتِ اشتراکِ بومی) یا کپیِ واقعیِ آدرسِ همین صفحه.
-// توجه: این اپ deep-link به‌ازایِ هر رستوران ندارد (SPA بدونِ روتینگِ URL) —
-// پس لینکِ کپی‌شده آدرسِ کلیِ اپ است، نه لینکی که مستقیم همین رستوران را باز
-// کند؛ برای همین متنِ toast صریحاً «لینکِ رزرونو» می‌گوید، نه «لینکِ این رستوران».
-// ساختنِ deep-link واقعی (routing بر اساسِ query/hash) خارج از دامنه‌ی این
-// رفعِ نقطه‌ای است — به KNOWN_LIMITATIONS اضافه شده.
+// ✅ به‌روز شد (D-31، ۲۰۲۶-۰۹-۱۷): این اپ حالا deep-linkِ هر رستوران **دارد**
+// (`features/deeplink.js`، پارامترِ `?r=`)، پس لینکِ اشتراک دیگر آدرسِ کلیِ اپ
+// نیست و متنِ toast هم می‌تواند صادقانه «لینکِ این رستوران» بگوید.
+// اگر رستوران slug نداشت (رکوردِ نمونه‌ی آفلاین) به همان رفتارِ قبلی
+// برمی‌گردیم و toast هم همان «لینکِ رزرونو» می‌ماند — بدونِ ادعای اضافه.
 // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): این تابع قبلاً نامِ رستوران را مستقیم از
 // داخلِ onclickِ اینلاین می‌گرفت — `shareRestaurant('${esc(r.n)}')`. برای
 // رستورانِ زنده، r.n نامِ owner-controlledِ سرور است و esc فقط برای متنِ HTML
@@ -28,8 +29,13 @@ import { icon } from '../icons.js';
 // بردارِ تزریقِ JS باز می‌کرد. حالا فقط idِ UUID (فرمتِ امن) پاس می‌شود و نام
 // این‌جا از state حل می‌شود — هیچ متنِ سرور واردِ رشته‌ی HTML/JS نمی‌شود.
 export async function shareRestaurant(id){
-  const name = findR(id)?.n || 'رزرونو';
-  const url = location.href;
+  const r = findR(id);
+  const name = r?.n || 'رزرونو';
+  // slug داریم ⇒ لینکِ مستقیمِ همین رستوران (با تاریخ/نفرِ فعلی)؛ نداریم ⇒
+  // همان آدرسِ صفحه، و toast هم ادعای بیشتری نمی‌کند.
+  const isDirect = !!r?.slug;
+  const url = isDirect ? buildRestaurantLink(r.slug, bookingCtx) : location.href;
+  const copied = isDirect ? 'لینکِ این رستوران کپی شد' : 'لینکِ رزرونو کپی شد';
   if (navigator.share) {
     try { await navigator.share({ title: name, url }); } catch { /* کاربر لغو کرد یا مرورگر رد کرد — چیزی نگو */ }
     return;
@@ -42,7 +48,7 @@ export async function shareRestaurant(id){
   // حالا هر سه حالت پاسخ دارند و در هیچ‌کدام موفقیتِ دروغین ادعا نمی‌شود.
   if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(url)
-      .then(() => toast('', 'لینکِ رزرونو کپی شد'))
+      .then(() => toast('', copied))
       .catch(() => toast('⚠️', 'کپی نشد — می‌تونی آدرس رو از نوارِ مرورگر برداری'));
     return;
   }
@@ -76,18 +82,23 @@ export function openRest(id){
 // صفحه‌ی بارگذاری‌شده‌ی فید نباشد (فید صفحه‌بندی‌شده است). اگر در R بود همان
 // مسیرِ عادی؛ وگرنه از endpointِ جزئیات یک رکوردِ کمینه می‌سازیم، به R اضافه
 // می‌کنیم و صفحه را باز می‌کنیم — به‌جای کلیکِ مرده یا توستِ «در دسترس نیست».
+// ⚠️ D-31: حالا `true`/`false` برمی‌گرداند. افزایشی است — هیچ صداکننده‌ی
+// موجودی مقدارش را نمی‌خواند (onclickِ اینلاین و `window.openRestBySlug`).
+// لینکِ مستقیم به این نتیجه نیاز دارد تا بتواند «پیدا نشد» را به‌صورتِ یک
+// **حالتِ واقعی** نشان بدهد، نه یک توستِ گذرا روی فیدِ جایگزین.
 export async function openRestBySlug(id, slug){
   const existing = findR(id) || (slug ? R.find(x => x.slug === slug) : null);
-  if (existing) { openRest(existing.id); return; }
-  if (!slug || !API.online) { toast('','این رستوران فعلاً در دسترس نیست'); return; }
+  if (existing) { openRest(existing.id); return true; }
+  if (!slug || !API.online) { toast('','این رستوران فعلاً در دسترس نیست'); return false; }
   const d = await loadRestaurantDetail(slug);
-  if (!d) { toast('','این رستوران فعلاً در دسترس نیست'); return; }
+  if (!d) { toast('','این رستوران فعلاً در دسترس نیست'); return false; }
   // رکوردِ کمینه با همان شکلی که mapApiRestaurant می‌سازد (رستورانِ زنده:
   // فیلدهای روایی خالی می‌مانند، هیچ‌چیز از نمونه قرض گرفته نمی‌شود).
   const r = mapApiRestaurant({ id: d.id, slug: d.slug, name: d.name, cuisine: d.cuisine, vibes: d.vibes, priceBand: d.price_band });
   applyRestaurantDetail(r, d);
   R.push(r);
   openRest(r.id);
+  return true;
 }
 
 /** بعد از رندرِ اولیه، جزئیاتِ واقعی را از سرور بگیر و صفحه را کامل کن. */

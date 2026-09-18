@@ -6,7 +6,7 @@
 import { API, USER, applyRestaurantDetail, isLoggedIn, loadRestaurantDetail, syncNavPoints, userName } from '../api.js';
 import { closeSheet, esc, jsq, openLogin, openSheet, setAfterLogin, toast } from '../auth.js';
 import { doSearch, fmtFa } from './discover.js';
-import { TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js';
+import { PARTY_MAX, TRIPS, bk, bookingCtx, setBk, setBookingCtx, todayISO } from './seed.js';
 import { findR, invalidateCardSlots } from '../init.js';
 import { offerWaitlist } from '../waitlist.js';
 import { genIdempotencyKey } from '../api-core.js';
@@ -39,7 +39,6 @@ export function dateOptions(){
   }
   return out;
 }
-const PARTY_MAX = 12;
 
 // ═══════════════════════════════════════════════════════════
 //  برچسبِ پیش‌پرداخت — رفعِ P1-3 (پروتکل §۲۰ و §۳)

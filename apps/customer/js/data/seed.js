@@ -161,6 +161,12 @@ export function setBk(v){ bk=v; }
 //  زمینه‌ی رزرو — تاریخ و تعدادِ نفر، مشترک بینِ همه‌ی صفحه‌ها
 // ═══════════════════════════════════════════════════════════
 const CTX_KEY = 'rz_booking_ctx';
+// سقفِ تعدادِ نفر. تا D-31 این عدد فقط در `data/booking.js` بود؛ با آمدنِ
+// لینکِ مستقیم (`features/deeplink.js`) دو مصرف‌کننده پیدا کرد. این‌جا
+// می‌نشیند — نه در booking.js — چون seed.js تنها ماژولِ بی‌وابستگی است و هر
+// دو از قبل ازش import می‌کنند: بدونِ یالِ تازه در گرافِ ماژول، و بدونِ عددِ
+// دومی که بی‌صدا واگرا شود.
+export const PARTY_MAX = 12;
 export const todayISO = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;

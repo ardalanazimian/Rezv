@@ -2916,6 +2916,12 @@ function setBk(v){ bk=v; }
 //  زمینه‌ی رزرو — تاریخ و تعدادِ نفر، مشترک بینِ همه‌ی صفحه‌ها
 // ═══════════════════════════════════════════════════════════
 const CTX_KEY = 'rz_booking_ctx';
+// سقفِ تعدادِ نفر. تا D-31 این عدد فقط در `data/booking.js` بود؛ با آمدنِ
+// لینکِ مستقیم (`features/deeplink.js`) دو مصرف‌کننده پیدا کرد. این‌جا
+// می‌نشیند — نه در booking.js — چون seed.js تنها ماژولِ بی‌وابستگی است و هر
+// دو از قبل ازش import می‌کنند: بدونِ یالِ تازه در گرافِ ماژول، و بدونِ عددِ
+// دومی که بی‌صدا واگرا شود.
+const PARTY_MAX = 12;
 const todayISO = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -3189,7 +3195,6 @@ function dateOptions(){
   }
   return out;
 }
-const PARTY_MAX = 12;
 
 // ═══════════════════════════════════════════════════════════
 //  برچسبِ پیش‌پرداخت — رفعِ P1-3 (پروتکل §۲۰ و §۳)
@@ -5253,9 +5258,117 @@ window.toggleFav = toggleFav;
 window.toggleRestFav = toggleRestFav;
 
 
+/* ═══ js/features/deeplink.js ═══ */
+// ═══════════════════════════════════════════════════════════════════════
+//  لینکِ مستقیمِ رستوران — D-31 (m-24 · سفرِ طلاییِ ۴)
+//
+//  چرا: تا امروز این اپ deep-link به‌ازای هر رستوران **نداشت** (SPA بدونِ
+//  روتینگِ URL)، پس `shareRestaurant` آدرسِ کلیِ اپ را می‌داد و QRِ میز /
+//  فاکتور / اینستاگرامِ رستوران هیچ راهی نداشتند که مستقیم «همان رستوران» را
+//  باز کنند — در حالی که طبقِ playbookِ مهمان، مهمانِ لانچ دقیقاً از همین سه
+//  مسیر می‌آید.
+//
+//  ── چرا query و نه مسیر (`/r/<slug>`) ──
+//  مسیر نیازِ rewrite در nginx/caddy دارد (سطحِ استقرار، سه فایلِ دیگر) و در
+//  بسته‌ی آفلاینِ `file://` اصلاً کار نمی‌کند. query روی هر سه کار می‌کند،
+//  مسیرِ سند را عوض نمی‌کند (پس shellِ service worker همان می‌ماند) و
+//  قابلِ اشتراک است. همان الگویی که `?checkin=` از قبل دارد.
+//
+//  ── یک تفاوتِ عمدی با `?checkin=` ──
+//  آن پارامتر بعد از اجرا **پاک** می‌شود تا رفرش دوباره check-in نکند. این‌جا
+//  برعکس: لینک باید با رفرش و اشتراک‌گذاری همان رستوران را باز کند، پس پاک
+//  نمی‌شود.
+//
+//  ── ورودی نامعتبر است تا خلافش ثابت شود ──
+//  slug و پارامترها از یک لینکِ بیرونی می‌آیند. هیچ‌کدام بدونِ اعتبارسنجی به
+//  DOM یا به URLِ درخواست نمی‌روند، و هیچ‌جا ناوبریِ خارجی از روی ورودی ساخته
+//  نمی‌شود (بدونِ open redirect).
+// ═══════════════════════════════════════════════════════════════════════
+// ⚠️ عمداً `data/detail.js` را import نمی‌کند: خودِ detail برای ساختنِ لینکِ
+// اشتراک به این ماژول نیاز دارد، و importِ دوطرفه یک چرخه می‌سازد. هماهنگیِ
+// «لینک را بخوان و رستوران را باز کن» در `init.js` انجام می‌شود که هر دو را
+// از قبل می‌شناسد.
+
+
+
+
+// حروفِ مجازِ slug: لاتینِ کوچک، رقم، خطِ تیره، و حروفِ فارسی.
+// اعراب (U+064B..U+0652, U+0670) عمداً **مجاز نیست**: از D-31 به بعد slugِ
+// تولیدی اعراب ندارد، و پذیرفتنش این‌جا یعنی برگرداندنِ همان لینکِ
+// تایپ‌نشدنی از درِ پشتی.
+const SLUG_OK = /^[a-z0-9\u0621-\u064A\u066E-\u06D3\u06F0-\u06F9-]{2,60}$/;
+const DIACRITIC = /[\u064B-\u0652\u0670]/;
+
+/** پارامترهای لینک، یا `null` اگر لینک deep-link نیست. */
+function parseDeepLink(search) {
+  let p;
+  try { p = new URLSearchParams(search ?? location.search); } catch { return null; }
+  const slug = (p.get('r') || '').trim();
+  if (!slug || !SLUG_OK.test(slug) || DIACRITIC.test(slug)) return null;
+
+  const out = { slug, date: null, party: null };
+
+  const d = (p.get('d') || '').trim();
+  // تاریخِ گذشته یا بدشکل نادیده گرفته می‌شود، ولی خودِ لینک باطل نمی‌شود:
+  // مهمان باید رستوران را ببیند، حتی اگر تاریخِ لینک کهنه باشد.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d) && d >= todayISO()) out.date = d;
+
+  const n = Number((p.get('p') || '').trim());
+  if (Number.isInteger(n) && n >= 1 && n <= PARTY_MAX) out.party = n;
+
+  return out;
+}
+
+/** لینکِ قابلِ اشتراکِ همین رستوران. خروجی همیشه هم‌مبدأ است. */
+function buildRestaurantLink(slug, ctx) {
+  const u = new URL(location.href);
+  u.hash = '';
+  u.search = '';
+  u.searchParams.set('r', slug);
+  if (ctx?.date) u.searchParams.set('d', ctx.date);
+  if (ctx?.party) u.searchParams.set('p', String(ctx.party));
+  return u.toString();
+}
+
+/** حالتِ صادقانه‌ی «پیدا نشد» — نه فیدِ جایگزین، نه توستِ گذرا. */
+function renderNotFound(slug) {
+  const el = document.getElementById('page-rest');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="empty" role="alert" style="padding:48px 20px;text-align:center">
+      <div style="display:flex;justify-content:center;color:var(--t3)" aria-hidden="true">${icon('alert', { size: 40 })}</div>
+      <div class="empty-title" style="margin-top:12px">این رستوران پیدا نشد</div>
+      <div class="empty-text">لینکی که باز کردی به رستورانی اشاره می‌کند که دیگر در دسترس نیست
+        — شاید آدرسش عوض شده باشد.</div>
+      <div class="tiny" style="color:var(--t3);margin-top:8px;direction:ltr">${esc(slug)}</div>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="go('discover')">دیدنِ رستوران‌ها</button>
+    </div>`;
+  go('rest');
+}
+
+/**
+ * تاریخ/نفرِ لینک را **قبل** از بازشدنِ صفحه می‌نشاند تا شیتِ رزرو از ابتدا
+ * همان‌ها را نشان بدهد، نه مقدارِ پیش‌فرض و بعد یک پرش.
+ * خروجی: همان لینکِ معتبر، یا `null` اگر لینک deep-link نبود.
+ */
+function applyDeepLinkContext() {
+  const link = parseDeepLink();
+  if (!link) return null;
+  const patch = {};
+  if (link.date) patch.date = link.date;
+  if (link.party) patch.party = link.party;
+  if (Object.keys(patch).length) setBookingCtx(patch);
+  return link;
+}
+
+// برای onclickِ اینلاینِ حالتِ «پیدا نشد»
+if (typeof window !== 'undefined') window.go = window.go || go;
+
+
 /* ═══ js/data/detail.js ═══ */
 // ═══ رزرونو — جزئیاتِ رستوران (صفحه‌ی rest) · بخشی از اپ کاستومر ═══
 //  توجه: جریانِ رزرو به data/booking.js منتقل شد (جداسازیِ مسئولیت).
+
 
 
 
@@ -5269,11 +5382,11 @@ window.toggleRestFav = toggleRestFav;
 // toast('لینک کپی شد') می‌داد بدونِ اینکه واقعاً چیزی کپی کند — دقیقاً همون
 // دسته‌بندیِ «فیدبکِ موفقیتِ ساختگی» که این ماموریت صریحاً ممنوع کرده. حالا
 // یا Web Share API واقعی (شیتِ اشتراکِ بومی) یا کپیِ واقعیِ آدرسِ همین صفحه.
-// توجه: این اپ deep-link به‌ازایِ هر رستوران ندارد (SPA بدونِ روتینگِ URL) —
-// پس لینکِ کپی‌شده آدرسِ کلیِ اپ است، نه لینکی که مستقیم همین رستوران را باز
-// کند؛ برای همین متنِ toast صریحاً «لینکِ رزرونو» می‌گوید، نه «لینکِ این رستوران».
-// ساختنِ deep-link واقعی (routing بر اساسِ query/hash) خارج از دامنه‌ی این
-// رفعِ نقطه‌ای است — به KNOWN_LIMITATIONS اضافه شده.
+// ✅ به‌روز شد (D-31، ۲۰۲۶-۰۹-۱۷): این اپ حالا deep-linkِ هر رستوران **دارد**
+// (`features/deeplink.js`، پارامترِ `?r=`)، پس لینکِ اشتراک دیگر آدرسِ کلیِ اپ
+// نیست و متنِ toast هم می‌تواند صادقانه «لینکِ این رستوران» بگوید.
+// اگر رستوران slug نداشت (رکوردِ نمونه‌ی آفلاین) به همان رفتارِ قبلی
+// برمی‌گردیم و toast هم همان «لینکِ رزرونو» می‌ماند — بدونِ ادعای اضافه.
 // ⚠️ رفع‌شده (ممیزیِ ۲۰۲۶-۰۸-۲۵): این تابع قبلاً نامِ رستوران را مستقیم از
 // داخلِ onclickِ اینلاین می‌گرفت — `shareRestaurant('${esc(r.n)}')`. برای
 // رستورانِ زنده، r.n نامِ owner-controlledِ سرور است و esc فقط برای متنِ HTML
@@ -5283,8 +5396,13 @@ window.toggleRestFav = toggleRestFav;
 // بردارِ تزریقِ JS باز می‌کرد. حالا فقط idِ UUID (فرمتِ امن) پاس می‌شود و نام
 // این‌جا از state حل می‌شود — هیچ متنِ سرور واردِ رشته‌ی HTML/JS نمی‌شود.
 async function shareRestaurant(id){
-  const name = findR(id)?.n || 'رزرونو';
-  const url = location.href;
+  const r = findR(id);
+  const name = r?.n || 'رزرونو';
+  // slug داریم ⇒ لینکِ مستقیمِ همین رستوران (با تاریخ/نفرِ فعلی)؛ نداریم ⇒
+  // همان آدرسِ صفحه، و toast هم ادعای بیشتری نمی‌کند.
+  const isDirect = !!r?.slug;
+  const url = isDirect ? buildRestaurantLink(r.slug, bookingCtx) : location.href;
+  const copied = isDirect ? 'لینکِ این رستوران کپی شد' : 'لینکِ رزرونو کپی شد';
   if (navigator.share) {
     try { await navigator.share({ title: name, url }); } catch { /* کاربر لغو کرد یا مرورگر رد کرد — چیزی نگو */ }
     return;
@@ -5297,7 +5415,7 @@ async function shareRestaurant(id){
   // حالا هر سه حالت پاسخ دارند و در هیچ‌کدام موفقیتِ دروغین ادعا نمی‌شود.
   if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(url)
-      .then(() => toast('', 'لینکِ رزرونو کپی شد'))
+      .then(() => toast('', copied))
       .catch(() => toast('⚠️', 'کپی نشد — می‌تونی آدرس رو از نوارِ مرورگر برداری'));
     return;
   }
@@ -5331,18 +5449,23 @@ function openRest(id){
 // صفحه‌ی بارگذاری‌شده‌ی فید نباشد (فید صفحه‌بندی‌شده است). اگر در R بود همان
 // مسیرِ عادی؛ وگرنه از endpointِ جزئیات یک رکوردِ کمینه می‌سازیم، به R اضافه
 // می‌کنیم و صفحه را باز می‌کنیم — به‌جای کلیکِ مرده یا توستِ «در دسترس نیست».
+// ⚠️ D-31: حالا `true`/`false` برمی‌گرداند. افزایشی است — هیچ صداکننده‌ی
+// موجودی مقدارش را نمی‌خواند (onclickِ اینلاین و `window.openRestBySlug`).
+// لینکِ مستقیم به این نتیجه نیاز دارد تا بتواند «پیدا نشد» را به‌صورتِ یک
+// **حالتِ واقعی** نشان بدهد، نه یک توستِ گذرا روی فیدِ جایگزین.
 async function openRestBySlug(id, slug){
   const existing = findR(id) || (slug ? R.find(x => x.slug === slug) : null);
-  if (existing) { openRest(existing.id); return; }
-  if (!slug || !API.online) { toast('','این رستوران فعلاً در دسترس نیست'); return; }
+  if (existing) { openRest(existing.id); return true; }
+  if (!slug || !API.online) { toast('','این رستوران فعلاً در دسترس نیست'); return false; }
   const d = await loadRestaurantDetail(slug);
-  if (!d) { toast('','این رستوران فعلاً در دسترس نیست'); return; }
+  if (!d) { toast('','این رستوران فعلاً در دسترس نیست'); return false; }
   // رکوردِ کمینه با همان شکلی که mapApiRestaurant می‌سازد (رستورانِ زنده:
   // فیلدهای روایی خالی می‌مانند، هیچ‌چیز از نمونه قرض گرفته نمی‌شود).
   const r = mapApiRestaurant({ id: d.id, slug: d.slug, name: d.name, cuisine: d.cuisine, vibes: d.vibes, priceBand: d.price_band });
   applyRestaurantDetail(r, d);
   R.push(r);
   openRest(r.id);
+  return true;
 }
 
 /** بعد از رندرِ اولیه، جزئیاتِ واقعی را از سرور بگیر و صفحه را کامل کن. */
@@ -8817,6 +8940,8 @@ window.dismissInstall = dismissInstall;
 
 
 
+
+
 // ⚠️ مقدارِ اولیه دیگر همیشه R_SAMPLE نیست (برادرِ B-1، ۲۰۲۶-۰۹-۱۶): boot آن را
 // پیش از رسیدنِ پاسخِ سرور رنگ می‌زد، و روی شبکه‌ی موبایلی که پاسخ بیش از ۲۸۰msِ
 // اسکلت طول بکشد، کاربرِ واقعی هر بار شش کارتِ `[DEMO]` می‌دید. نمونه فقط در دموی
@@ -8837,11 +8962,39 @@ function boot(){
   renderDiscoverSections();          // نزدیک تو، ترند، رویدادها
   armReveals();                      // انیمیشنِ اسکرول
   restoreSession();                  // بازیابی نشست
-  syncRestaurants();                 // داده‌ی واقعی از بک‌اند
+  const sync = syncRestaurants();    // داده‌ی واقعی از بک‌اند
   // ورود با QRِ میز — فقط وقتی لینک `?checkin=` دارد کاری می‌کند.
   // عمداً `await` نمی‌شود و بعد از رندرِ اولیه صدا زده می‌شود: مهمانی که
   // کدِ میز را اسکن کرده باید اپ را ببیند، نه صفحه‌ی سفیدِ منتظرِ شبکه.
   runPendingCheckIn();
+  openDeepLinkIfAny(sync);           // لینکِ مستقیمِ رستوران — `?r=` (D-31)
+}
+
+/**
+ * لینکِ مستقیمِ رستوران (D-31). هماهنگی عمداً این‌جاست نه در `features/deeplink.js`:
+ * آن ماژول را `data/detail.js` برای ساختنِ لینکِ اشتراک import می‌کند، و اگر خودش
+ * هم `detail` را import می‌کرد یک چرخه می‌شد.
+ *
+ * ⚠️ عمداً **پیش از** `sync` باز می‌کنیم، نه بعدش. `openRestBySlug` روی
+ * `API.online` گیت دارد و آن پرچم فقط با شکستِ `GET /restaurants` به false
+ * می‌رود (api.js:372). نسخه‌ی اولِ همین تابع منتظرِ sync می‌ماند، و نتیجه‌اش
+ * اندازه‌گیری شد: وقتی *فهرست* ۵۰۰ می‌داد ولی `GET /restaurants/<slug>` سالم
+ * بود، یک لینکِ کاملاً درست «این رستوران پیدا نشد» می‌گرفت — دقیقاً همان
+ * دروغی که این حالت قرار بود نگوید. (تستِ «فهرست ۵۰۰ … ولی لینک باز می‌شود».)
+ */
+async function openDeepLinkIfAny(sync){
+  const link = applyDeepLinkContext();
+  if (!link) return;
+  const opened = await openRestBySlug(null, link.slug);
+  if (!opened) { renderNotFound(link.slug); return; }
+  // ⚠️ یک چیز را باید بعد از sync ترمیم کرد: `syncRestaurants` کلِ `R` را یک‌جا
+  // جایگزین می‌کند، و رکوردی که `openRestBySlug` از مسیرِ جزئیات ساخته ممکن است
+  // در صفحه‌ی اولِ فهرست نباشد (فید صفحه‌بندی‌شده است). بدونِ این چند خط،
+  // `findR(id)` بعد از رسیدنِ فهرست undefined می‌شود و دکمه‌ی «رزرو میز»ِ همان
+  // صفحه‌ی بازشده — یعنی خودِ مسیرِ QRِ میز — بی‌صدا از کار می‌افتد.
+  const r = R.find(x => x.slug === link.slug);
+  try { await sync; } catch { /* شکستِ شبکه را خودِ فید گزارش می‌کند */ }
+  if (r && !R.some(x => String(x.id) === String(r.id))) R.push(r);
 }
 
 // بازیابی نشست از localStorage — اگر توکن داشت، کاربر را دوباره وارد نگه دار

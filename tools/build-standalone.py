@@ -56,7 +56,12 @@ CUSTOMER_ORDER = [
     # apps/ اضافه شد و به این فهرست نه.
     'js/icons.js', 'js/api-core.js', 'js/api-errors.js', 'js/data/seed.js', 'js/waitlist.js',
     'js/data/booking.js', 'js/store.js', 'js/actions.js', 'js/api.js',
-    'js/analytics.js', 'js/data/discover.js', 'js/data/detail.js',
+    # ⚠️ `features/deeplink.js` باید **پیش از** `data/detail.js` بیاید — detail
+    # ازش `buildRestaurantLink` می‌خواهد (لینکِ اشتراک). D-31 · ۲۰۲۶-۰۹-۱۷:
+    # همان کلاسِ خرابیِ سرآیندِ بالا برایِ سومین بار — ماژولِ تازه به apps/
+    # اضافه شد و به این فهرست نه؛ باندل بدونِ هیچ خطایی ساخته می‌شد و
+    # `parseDeepLink` اصلاً درونش نبود.
+    'js/analytics.js', 'js/data/discover.js', 'js/features/deeplink.js', 'js/data/detail.js',
     'js/reservation.js', 'js/features/trips.js', 'js/features/loyalty.js',
     'js/features/economy.js',
     'js/features/rewards.js', 'js/features/food-dna.js', 'js/features/chat.js',

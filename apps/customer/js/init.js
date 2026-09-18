@@ -9,6 +9,8 @@ import { isOfflineDemo } from './api-core.js';
 import { activeQuery, doSearch, paintSlots, renderDiscoverSections, renderFeed, renderFeedLoading, renderRestaurantSections } from './data/discover.js';
 import { R_SAMPLE, bookingCtx } from './data/seed.js';
 import { runPendingCheckIn } from './features/checkin.js';
+import { applyDeepLinkContext, renderNotFound } from './features/deeplink.js';
+import { openRestBySlug } from './data/detail.js';
 import { armReveals, updateThemeIcon } from './theme-pwa.js';
 // ⚠️ مقدارِ اولیه دیگر همیشه R_SAMPLE نیست (برادرِ B-1، ۲۰۲۶-۰۹-۱۶): boot آن را
 // پیش از رسیدنِ پاسخِ سرور رنگ می‌زد، و روی شبکه‌ی موبایلی که پاسخ بیش از ۲۸۰msِ
@@ -30,11 +32,39 @@ function boot(){
   renderDiscoverSections();          // نزدیک تو، ترند، رویدادها
   armReveals();                      // انیمیشنِ اسکرول
   restoreSession();                  // بازیابی نشست
-  syncRestaurants();                 // داده‌ی واقعی از بک‌اند
+  const sync = syncRestaurants();    // داده‌ی واقعی از بک‌اند
   // ورود با QRِ میز — فقط وقتی لینک `?checkin=` دارد کاری می‌کند.
   // عمداً `await` نمی‌شود و بعد از رندرِ اولیه صدا زده می‌شود: مهمانی که
   // کدِ میز را اسکن کرده باید اپ را ببیند، نه صفحه‌ی سفیدِ منتظرِ شبکه.
   runPendingCheckIn();
+  openDeepLinkIfAny(sync);           // لینکِ مستقیمِ رستوران — `?r=` (D-31)
+}
+
+/**
+ * لینکِ مستقیمِ رستوران (D-31). هماهنگی عمداً این‌جاست نه در `features/deeplink.js`:
+ * آن ماژول را `data/detail.js` برای ساختنِ لینکِ اشتراک import می‌کند، و اگر خودش
+ * هم `detail` را import می‌کرد یک چرخه می‌شد.
+ *
+ * ⚠️ عمداً **پیش از** `sync` باز می‌کنیم، نه بعدش. `openRestBySlug` روی
+ * `API.online` گیت دارد و آن پرچم فقط با شکستِ `GET /restaurants` به false
+ * می‌رود (api.js:372). نسخه‌ی اولِ همین تابع منتظرِ sync می‌ماند، و نتیجه‌اش
+ * اندازه‌گیری شد: وقتی *فهرست* ۵۰۰ می‌داد ولی `GET /restaurants/<slug>` سالم
+ * بود، یک لینکِ کاملاً درست «این رستوران پیدا نشد» می‌گرفت — دقیقاً همان
+ * دروغی که این حالت قرار بود نگوید. (تستِ «فهرست ۵۰۰ … ولی لینک باز می‌شود».)
+ */
+async function openDeepLinkIfAny(sync){
+  const link = applyDeepLinkContext();
+  if (!link) return;
+  const opened = await openRestBySlug(null, link.slug);
+  if (!opened) { renderNotFound(link.slug); return; }
+  // ⚠️ یک چیز را باید بعد از sync ترمیم کرد: `syncRestaurants` کلِ `R` را یک‌جا
+  // جایگزین می‌کند، و رکوردی که `openRestBySlug` از مسیرِ جزئیات ساخته ممکن است
+  // در صفحه‌ی اولِ فهرست نباشد (فید صفحه‌بندی‌شده است). بدونِ این چند خط،
+  // `findR(id)` بعد از رسیدنِ فهرست undefined می‌شود و دکمه‌ی «رزرو میز»ِ همان
+  // صفحه‌ی بازشده — یعنی خودِ مسیرِ QRِ میز — بی‌صدا از کار می‌افتد.
+  const r = R.find(x => x.slug === link.slug);
+  try { await sync; } catch { /* شکستِ شبکه را خودِ فید گزارش می‌کند */ }
+  if (r && !R.some(x => String(x.id) === String(r.id))) R.push(r);
 }
 
 // بازیابی نشست از localStorage — اگر توکن داشت، کاربر را دوباره وارد نگه دار

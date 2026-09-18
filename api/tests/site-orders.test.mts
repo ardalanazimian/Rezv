@@ -6,7 +6,7 @@ process.env.JWT_SECRET = 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET = 'b'.repeat(32);
 
 // import پویا عمداً — مطابقِ بقیه‌ی تست‌های این پروژه (باگ محیطیِ tsx+node:test).
-const { addMonths, publicOrderView, SITE_RULES, TRIAL_DAYS, contextFromRequest } =
+const { addMonths, publicOrderView, SITE_RULES, TRIAL_DAYS, contextFromRequest, slugSeed } =
   await import('../src/lib/site-orders.ts');
 
 describe('addMonths — تمدیدِ اشتراک بدونِ سرریزِ روز', () => {
@@ -143,5 +143,48 @@ describe('contextFromRequest — انتسابِ کمپین', () => {
   test('نبودِ referrer در بدنه → از هدرِ referer', () => {
     const ctx = contextFromRequest(req({ referer: 'https://google.com/search' }), {});
     assert.equal(ctx.referrer, 'https://google.com/search');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  slugSeed — اعرابِ نامرئی داخلِ slug نمی‌ماند (D-31 · m-24)
+//
+//  چرا (ممیزیِ فول‌استک، ۲۰۲۶-۰۹-۱۷): کلاسِ `[^a-z0-9؀-ۿ]` کلِ بلاکِ
+//  U+0600–U+06FF را نگه می‌دارد، و اعراب (U+064B..U+0652 و U+0670) هم داخلِ
+//  همان بلاک‌اند. نتیجه‌اش slugی بود مثلِ «رستورانِ-سفرِ-آزمایشی» با دو کسره‌ی
+//  نامرئی: کاربری که نامِ رستوران را می‌خواند و تایپ می‌کند به ۴۰۴ می‌رسید،
+//  چون املایِ بدونِ اعراب رشته‌ی دیگری است (NFC هم یکی‌شان نمی‌کند — علامتِ
+//  ترکیبیِ مستقل، فرمِ ترکیب‌شده ندارد).
+//
+//  حروفِ فارسی عمداً می‌مانند؛ فقط اعراب می‌رود.
+// ═══════════════════════════════════════════════════════════════════════
+describe('slugSeed — slug باید تایپ‌شدنی باشد (D-31)', () => {
+  const DIACRITICS = ['\u064B', '\u064C', '\u064D', '\u064E', '\u064F', '\u0650', '\u0651', '\u0652', '\u0670'];
+
+  test('اعرابِ نامرئی از slug حذف می‌شود', () => {
+    const withMarks = 'رستورانِ سفرِ آزمایشی';
+    const got = slugSeed(withMarks, '123456');
+    for (const d of DIACRITICS) {
+      assert.ok(!got.includes(d), `slug نباید U+${d.codePointAt(0)!.toString(16)} داشته باشد — got ${JSON.stringify(got)}`);
+    }
+    assert.equal(got, 'رستوران-سفر-آزمایشی', 'همان چیزی که یک انسان از رویِ نام تایپ می‌کند');
+  });
+
+  test('هر عَلامتِ اعراب جداگانه حذف می‌شود', () => {
+    for (const d of DIACRITICS) {
+      const got = slugSeed(`کافه${d}بار`, 'fallback');
+      assert.equal(got, 'کافه‌بار'.replace('\u200c', ''), `U+${d.codePointAt(0)!.toString(16)} نماند`);
+    }
+  });
+
+  // کنترلِ مثبت: مبادا «رفع» به قیمتِ حذفِ کلِ فارسی تمام شود
+  test('کنترلِ مثبت: حروفِ فارسی و لاتین و رقم سرِ جای خود می‌مانند', () => {
+    assert.equal(slugSeed('کافه رستوران ۱', 'fb'), 'کافه-رستوران-۱');
+    assert.equal(slugSeed('Cafe Vista 2', 'fb'), 'cafe-vista-2');
+    assert.equal(slugSeed('نون و نمک', 'fb'), 'نون-و-نمک');
+  });
+
+  test('نامِ فقط-اعراب به fallback می‌افتد، نه به رشته‌ی خالی', () => {
+    assert.equal(slugSeed('\u0650\u064E', 'ab12cd'), 'ab12cd');
   });
 });
