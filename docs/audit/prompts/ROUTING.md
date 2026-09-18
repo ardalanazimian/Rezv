@@ -182,9 +182,32 @@ a `--resume`, or a crash. On 2026-09-08 this session restarted and became `rezv-
 one of the seven prompts committed that morning still names `rezv-b0 [d8087d]`, and a session
 following those instructions would address a peer that no longer exists.
 
-That is the same defect class as `apps/seo` hardcoding `https://rezervno.ir` in `robots.ts` and
-`sitemap.ts` instead of reading it from the environment: **one fact, many copies, and the copies
-cannot all be right.** The fix is the same — one authority, everyone else points at it.
+That is the same defect class as a domain hardcoded in many places instead of read from one
+environment variable: **one fact, many copies, and the copies cannot all be right.** The fix is the
+same — one authority, everyone else points at it.
+
+> ✅ **۲۰۲۶-۰۹-۱۸ — این مثال تصحیح شد، و خودِ تصحیح نمونه‌ی همان درس است.**
+> نسخه‌ی پیشینِ این بند می‌گفت «`apps/seo` دامنه را در `robots.ts` و `sitemap.ts` هاردکد
+> کرده». **این دیگر درست نیست.** مهندسِ لانچ `rezv-8c` روی `ba87829` سنجید: هر دو
+> فایل حالا `SITE` را از `apps/seo/lib/urls.ts:23` می‌گیرند که
+> `process.env.NEXT_PUBLIC_SITE_URL` را می‌خواند (با fallback)، و `apps/landing/lib/i18n.ts:9`
+> هم همین‌طور. CEO (`rezv-46`) مستقل تأیید کرد: تنها ارجاع‌های `rezervno.ir` در
+> `robots.ts` **کامنت‌اند**، نه کد.
+>
+> **چرا این مهم است و صرفاً یک تصحیحِ کوچک نیست:** CEO همین مثالِ کهنه را در پیامی به یک
+> نشست تکرار کرد بی‌آنکه بسنجد آیا هنوز روی درخت صادق است — یعنی دقیقاً همان نقصی که این
+> فایل برای رفعش نوشته شده، توسطِ کسی که داشت از همین فایل نقل می‌کرد. **مثالی که واقعیتِ
+> غلط یاد می‌دهد از نداشتنِ مثال بدتر است**، چون هر نشستی که آن را می‌خواند یک باورِ غلط
+> درباره‌ی `main` برمی‌دارد.
+>
+> **آنچه واقعاً هنوز هاردکد است** (سنجیده، نه نقل — پنج نقطه، و هر کدام روی دامنه‌ی
+> دیگر می‌شکند): `apps/seo/components/Listing.tsx:4` · `apps/seo/app/layout.tsx:9,25`
+> (`metadataBase` و `openGraph.url`) · `apps/landing/next.config.js:70`
+> (`api.rezervno.ir` — بهینه‌سازِ تصویرِ Next تصویرِ هر هاستِ دیگری را **بی‌صدا** بلاک
+> می‌کند) · `apps/customer/index.html:18,50` و `apps/customer/sitemap.xml:6` (و آینه‌شان
+> در `standalone/`). هیچ گاردی این کلاس را نمی‌گیرد: تنها فایلِ `tools/` که رشته‌ی
+> `rezervno.ir` را می‌شناسد `check-doc-staleness.mjs` است. رفعش با حکمِ نام‌بُردهِ CEO به
+> `rezv-8c` سپرده شد، چون `FP-007` این سطح را به طراح می‌دهد و در این موج طراحی نیست.
 
 ## How to resolve the CEO session yourself
 
