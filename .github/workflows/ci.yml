@@ -604,6 +604,13 @@ jobs:
       # backspace که heredoc تولید کرده بود، یک regex را بیصدا از کار انداخت.
       - name: No invisible control bytes in runnable files
         run: node tools/check-control-bytes.mjs
+      # ۲۰۲۶-۰۹-۱۸: `.env.example` متغیرِ ALLOWED_ORIGINS را دو بار تعریف کرده بود —
+      # یکی زیرِ هشدارِ «مهم‌ترین متغیرِ لانچ» که اپراتور ویرایشش می‌کند، و یکی پایین‌تر
+      # با دامنه‌های ثابتِ rezervno.ir. با `docker compose config` اندازه گرفته شد:
+      # مقدارِ آخر برنده است، پس ویرایشِ اپراتور بی‌صدا دور می‌رفت. و چون مقدارِ
+      # جایگزین خوش‌ساخت بود، fail-fastِ middleware (که فقط نحو را می‌سنجد) نمی‌گرفتش.
+      - name: No duplicate keys in env example files
+        run: node tools/check-env-example-duplicates.mjs
       # هر عاملی باید منشورِ Gen-Z و قانوننامهی ممیزی را preload کند. عاملی که
       # این دو را ندارد به دستور اعتراض نمیکند و heuristic را هوش برچسب میزند.
       - name: Every agent carries both charter skills
