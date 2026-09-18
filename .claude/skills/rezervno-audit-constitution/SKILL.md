@@ -315,6 +315,28 @@ host to garbage-collect unreachable objects would have achieved nothing. **Estab
 radius across every ref before choosing a remedy**, or you will spend the expensive option on the
 narrow case and leave the wide one untouched.
 
+**"Absent" is not "lost" — and the unit you measure absence in is a screen, never a verdict.**
+Promoted 2026-09-18 after the same auditor made this error twice in two days at two different levels,
+which is what proves the unit was never the problem.
+
+`git log --find-object=<blob>` returning 0 proves those **bytes** are on no remote. It says nothing
+about whether the **work** is, because **every superseded intermediate version of a file is by
+construction a unique blob on no remote.** A heavily-edited document generates one such orphan per
+save. The same error one level up reads sha-absence as work-absence, and a rebased commit is exactly
+that: new sha, same work.
+
+**The test that actually decides it:** does the **path** exist on a remote, and is the remote's
+version **newer or older** than the local one? Only a path present nowhere on any remote, or a remote
+version demonstrably older, is a loss candidate. Worked example, the one that produced the retraction:
+a branch was reported as the only copy of `docs/DEPLOYMENT.md` (10,610 B) and
+`docs/audit/impl/FIX-S-05.md` (15,482 B) on the strength of blob-absence. Both paths were on `main`
+all along, at **10,693 B and 15,929 B** — newer and larger, carrying two evidence rows the branch
+lacked — and the branch's own diff against `main` *removes* lines. Nothing would have been lost.
+
+The instinct this guards against is the one that feels most responsible: treating a scary-looking
+absence as an emergency and acting on it. Screen with blob or sha absence if you like, then **confirm
+at the path level before anyone spends effort, deletes anything, or reports a loss.**
+
 ## 4d. Three promoted 2026-09-10 — all from the Backend Engineer session, all about scope
 
 **Turn the claim into a testable condition BEFORE you write the guard.** Asked to pin the one
