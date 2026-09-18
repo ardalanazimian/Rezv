@@ -474,6 +474,14 @@ function setStaffGateLocked(locked){
 // ⚠️ مسیرِ اصلیِ ورود از ۲۰۲۶-۰۸-۲۶ نام کاربری و رمز است، نه OTP.
 // دلیل: بدونِ KAVENEGAR_API_KEY هیچ پیامکی نمی‌رفت و هیچ‌کس نمی‌توانست
 // وارد پنل شود. OTP حذف نشد و به‌عنوانِ مسیرِ پشتیبان می‌ماند.
+// ⚠️ حصارِ M-01 (۲۰۲۶-۰۹-۱۸): طبقِ حکمِ مالک، احرازِ هویتِ پنل فقط
+// نام‌کاربری و رمز است. سمتِ سرور دو روتِ OTP بسته شده‌اند
+// (api/src/lib/staff-otp-fence.ts). این ثابت همان سوویچ در سمتِ پنل است:
+// بدونِ آن، دکمهٔ «ورود با پیامک» می‌ماند و همیشه خطا می‌داد —
+// یعنی دقیقاً همان «دکمهٔ مرده»ی که این پروژه می‌شمارد.
+// روشن‌کردنِ دوباره = همین یک خط + همان یک خطِ سمتِ سرور.
+const STAFF_OTP_LOGIN_ENABLED = false;
+
 function showStaffLogin(){
   setStaffGateLocked(true);
   document.getElementById('loginCard').innerHTML = `
@@ -485,7 +493,7 @@ function showStaffLogin(){
     <label class="login-field-label" for="staffPass">رمز عبور</label>
     <input class="login-inp" id="staffPass" type="password" autocomplete="current-password" placeholder="رمز عبور" onkeydown="if(event.key==='Enter')staffPasswordLogin()">
     <button class="login-btn" id="staffLoginBtn" onclick="staffPasswordLogin()">ورود به پنل</button>
-    <button class="login-back" onclick="showStaffLoginPhone()">ورود با پیامک</button>
+    ${STAFF_OTP_LOGIN_ENABLED ? '<button class="login-back" onclick="showStaffLoginPhone()">ورود با پیامک</button>' : ''}
     <div class="login-foot">اگر نام کاربری نداری، با پشتیبانی رزرونو تماس بگیر</div>`;
   setTimeout(()=>document.getElementById('staffUser')?.focus(),200);
 }

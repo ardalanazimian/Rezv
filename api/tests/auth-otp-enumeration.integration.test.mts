@@ -50,6 +50,8 @@ const { db } = await import('../src/lib/db.ts');
 const { redis } = await import('../src/lib/redis.ts');
 const { RULES } = await import('../src/lib/ratelimit.ts');
 const { normalizePhone } = await import('../src/lib/otp.ts');
+// حصارِ M-01 — تله‌ی پایینِ بلاکِ staff از همین می‌خواند.
+const { STAFF_OTP_LOGIN_ENABLED } = await import('../src/lib/staff-otp-fence.ts');
 const adminReq = await import('../src/app/api/v1/auth/admin/request/route.ts');
 const staffReq = await import('../src/app/api/v1/auth/staff/request/route.ts');
 
@@ -172,15 +174,32 @@ describe('POST /auth/staff/request — شمارش‌ناپذیریِ کارکن�
   // همدیگر را خراب می‌کنند. هر سوئیت مقدارِ خودش را دوباره تثبیت می‌کند.
   beforeEach(() => { process.env.PLATFORM_ADMIN_TENANT_ID = platformTenant; });
 
-  test('هر سه حالتِ نامعتبر/غیرفعال پاسخِ یکسان می‌گیرند', async () => {
+  // ⚠️ حصارِ M-01 (۲۰۲۶-۰۹-۱۸): این روت پشتِ `STAFF_OTP_LOGIN_ENABLED=false`
+  // بسته است، پس امروز اصلاً قابلِ رسیدن نیست. ادعاهای زیر **ضعیف‌تر** نشدند،
+  // قوی‌تر شدند: به‌جای «سه حالتِ نامعتبر از هم جدا نیستند»، حالا «هیچ‌کدام از
+  // حالت‌ها — حتی کارمندِ فعال — نه پاسخِ متفاوتی می‌گیرد و نه کدی می‌سازد».
+  // تله‌ی پایینِ همین بلاک مراقب است: اگر سوییچ باز شود، این فایل قرمز می‌شود
+  // و باید ادعاهای اصلی (۲۰۴ و یکدستی) برگردند — چون اوراکلِ شمارش دوباره
+  // قابلِ رسیدن می‌شود. متنِ اصلی عمداً در تاریخچه‌ی git می‌ماند.
+  test('⚠️ تله: اگر حصارِ OTPِ کارمند باز شود، ادعاهای این فایل دیگر معتبر نیستند', () => {
+    assert.equal(STAFF_OTP_LOGIN_ENABLED, false,
+      'حصار باز شده است — ادعاهای شمارش‌ناپذیری (۲۰۴ و یکدستیِ سه حالت) را از تاریخچه برگردان، '
+      + 'وگرنه این فایل یک روتِ زنده را با انتظارِ «بسته» می‌سنجد و هیچ‌چیز را نمی‌پاید.');
+  });
+
+  test('حصار: هر سه حالت — ناشناس، غیرفعال، و کارمندِ فعال — پاسخِ یکسانِ بسته می‌گیرند', async () => {
     await clearLimits();
     const unknown = await fingerprint(await staffReq.POST(post({ phone: PHONE_UNKNOWN })));
     const deactivated = await fingerprint(await staffReq.POST(post({ phone: PHONE_DEACTIVATED })));
+    const active = await fingerprint(await staffReq.POST(post({ phone: PHONE_ACTIVE_STAFF })));
 
     assert.deepEqual(unknown, deactivated,
       '«این شماره کارمند نیست» و «این حساب غیرفعال شده» نباید از هم قابلِ تفکیک باشند');
-    assert.equal(unknown.status, 204);
-    assert.equal(unknown.body, '');
+    assert.deepEqual(unknown, active,
+      'با حصارِ بسته حتی کارمندِ فعال هم نباید از یک شماره‌ی ناشناس قابلِ تفکیک باشد');
+    assert.equal(unknown.status, 503, 'حصار باید خطای روشن بدهد، نه ۴۰۴ِ خاموش و نه ۲۰۴');
+    assert.match(String(unknown.body), /FEATURE_DISABLED/,
+      'کلاینت باید ماشین‌خوان بفهمد مسیر بسته است، نه اینکه حدس بزند');
   });
 
   test('برایِ کارمندِ غیرفعال هیچ کدِ OTPی ساخته نمی‌شود', async () => {

@@ -7,6 +7,7 @@ import { audit, maskPhone } from '@/lib/audit';
 
 import { withApiMetrics } from '@/lib/api-metrics';
 import { findStaffForLogin } from '@/lib/staff-helpers';
+import { assertStaffOtpLoginEnabled } from '@/lib/staff-otp-fence';
 
 const schema = z.object({ phone: zPhone });
 
@@ -39,6 +40,11 @@ const schema = z.object({ phone: zPhone });
 async function POST_impl(req: Request) {
   const ip = clientIp(req);
   try {
+    // ⚠️ حصارِ M-01 — **اولین** کار، پیش از هر کارِ دیگری. عمداً پیش از
+    // rate-limit و پیش از parse: وقتی مسیر بسته است نباید نه سهمیه‌ای مصرف
+    // شود، نه شماره‌ای خوانده شود، نه ردیفی در DB جست‌وجو شود.
+    // یک سوییچ، یک جا: lib/staff-otp-fence.ts.
+    assertStaffOtpLoginEnabled();
     await enforceRateLimit(ip, RULES.otpVerify);
     const { phone } = await parseBody(req, schema);
     const phoneMasked = maskPhone(phone);

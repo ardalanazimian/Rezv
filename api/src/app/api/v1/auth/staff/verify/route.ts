@@ -10,6 +10,7 @@ import { findStaffForLogin, resolveStaffRestaurant } from '@/lib/staff-helpers';
 import { audit, maskPhone } from '@/lib/audit';
 
 import { withApiMetrics } from '@/lib/api-metrics';
+import { assertStaffOtpLoginEnabled } from '@/lib/staff-otp-fence';
 
 const schema = z.object({ phone: zPhone, code: zOtpCode });
 
@@ -18,6 +19,9 @@ async function POST_impl(req: Request) {
   const ip = clientIp(req);
   let phoneMasked: string | null = null;
   try {
+    // ⚠️ حصارِ M-01 — **اولین** کار، پیش از rate-limit و پیش از خواندنِ بدنه.
+    // یک سوویچ، یک جا: lib/staff-otp-fence.ts.
+    assertStaffOtpLoginEnabled();
     await enforceRateLimit(ip, RULES.otpVerify);
     const { phone, code } = await parseBody(req, schema);
     phoneMasked = maskPhone(phone);
