@@ -34,11 +34,25 @@ export async function sendPush(userId: string, title: string, _body: string): Pr
  * آیا ایمیل واقعاً قابلِ ارسال است؟ مسیرهایی که **نتیجه‌شان به رسیدنِ ایمیل
  * وابسته است** باید پیش از ادعای موفقیت این را بپرسند — همان قراردادِ
  * `smsTransportReady()` در lib/sms.ts.
+ *
+ * سابقه (ادغامِ ۲۰۲۶-۰۸-۲۶): دو شاخه هم‌زمان همین ناحیه را رفع کردند. این
+ * شاخه جعلِ موفقیت را مستند و صادقانه fail کرد (تا آن روز تنها فراخوانِ
+ * واقعیِ ارسال یک خطِ **کامنت‌شده** بود ولی «[EMAIL:ارسال]» لاگ می‌شد و صف
+ * ۱۰۰٪ سبز می‌ماند — با ۶ مصرف‌کننده‌ی واقعی)؛ شاخه‌ی open-tasks-review
+ * ارائه‌دهنده‌ی واقعی (SendGrid) را پیاده کرد. پیاده‌سازیِ واقعی نگه داشته
+ * شد؛ این یادداشت می‌ماند تا «چرا متریکِ ایمیل تازه است» بی‌جواب نماند.
  */
 export function emailTransportReady(): boolean {
   return Boolean(process.env.EMAIL_API_KEY);
 }
 
+/**
+ * ارسالِ واقعیِ ایمیل از طریقِ SendGrid v3.
+ *
+ * ⚠️ وضعیتِ فعلی: **آماده، نه فعال.** کد واقعی است ولی تا وقتی
+ * `EMAIL_API_KEY` تنظیم نشود هیچ ایمیلی نمی‌رود — و آن حالت حالا **بلند**
+ * است (متریک + لاگِ خطا در production)، نه سکوت.
+ */
 export async function sendEmail(to: string, subject: string, body: string): Promise<void> {
   const apiKey = process.env.EMAIL_API_KEY;
   const from = process.env.EMAIL_FROM || 'noreply@rezervno.ir';
@@ -84,7 +98,7 @@ export async function queueEmail(to: string, subject: string, body: string, idem
   try {
     await enqueue({ kind: 'email', payload: { to, subject, body }, idempotencyKey });
   } catch {
-    await sendEmail(to, subject, body).catch(() => {});
+    await sendEmail(to, subject, body).catch(() => {}); // fallback
   }
 }
 
@@ -92,6 +106,6 @@ export async function queuePush(userId: string, title: string, body: string, ide
   try {
     await enqueue({ kind: 'push', payload: { userId, title, body }, idempotencyKey });
   } catch {
-    await sendPush(userId, title, body).catch(() => {});
+    await sendPush(userId, title, body).catch(() => {}); // fallback
   }
 }
