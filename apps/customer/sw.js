@@ -11,18 +11,16 @@
 //
 //  نسخه‌بندی: با تغییرِ CACHE_VERSION، کشِ قدیمی خودکار پاک می‌شود.
 // ═══════════════════════════════════════════════════════════
-const CACHE_VERSION = 'rezervno-v49';   // B-1: api.js/init.js/discover.js — دادهٔ نمونه فقط در file:// (v48 = ادغامِ main v44 و ba-design v47)
+const CACHE_VERSION = 'rezervno-v50';   // A1-001: هرگز پاسخِ /me و درخواستِ Authorizationدار را کش نکن؛ خروج کشِ runtime را می‌پاشد
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
-// فایل‌های اصلیِ اپ که باید همیشه در دسترس باشند (App Shell)
 const SHELL_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
 ];
 
-// ── نصب: کشِ App Shell ──
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(SHELL_CACHE)
@@ -32,7 +30,6 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// ── فعال‌سازی: پاک‌کردنِ کشِ نسخه‌های قدیمی ──
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
@@ -43,6 +40,23 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function isPrivateApi(request, url) {
+  if (request.headers.get('Authorization')) return true;
+  const p = url.pathname;
+  return /\/(?:api\/)?v1\/me(?:\/|$)/.test(p)
+    || /\/me(?:\/|$)/.test(p)
+    || /\/waitlist\//.test(p)
+    || /\/reservations\//.test(p);
+}
+
+self.addEventListener('message', (event) => {
+  if (event.data === 'PURGE_RUNTIME') {
+    event.waitUntil(
+      caches.delete(RUNTIME_CACHE).then(() => caches.open(RUNTIME_CACHE)).catch(() => {})
+    );
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -51,7 +65,7 @@ self.addEventListener('fetch', (event) => {
 
   const isApi = url.pathname.startsWith('/api/') || url.pathname.startsWith('/v1/') || url.pathname.includes('/api/');
   if (isApi) {
-    event.respondWith(networkFirst(request));
+    event.respondWith(isPrivateApi(request, url) ? networkOnly(request) : networkFirst(request));
     return;
   }
 
@@ -64,6 +78,10 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(cacheFirst(request));
 });
+
+async function networkOnly(request) {
+  return fetch(request);
+}
 
 async function networkFirst(request) {
   try {
