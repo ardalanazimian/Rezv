@@ -48,7 +48,8 @@ export async function sendPush(userId: string, title: string, body: string, extr
       payload,
       { TTL: 300 },
     );
-    metrics.pushSent.inc();
+    const sent = (metrics as { pushSent?: { inc: () => void } }).pushSent;
+    if (sent) sent.inc();
     log.info('push ارسال شد', { userId, tag: extra?.tag ?? null });
   } catch (e) {
     const msg = (e as Error).message || '';
