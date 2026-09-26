@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 //  گیتِ A2 — دیپلوی تولید و DNS
 //
 //  دستورِ خودمختاریِ v2 §A2: هر چهار golden journey روی staging و روی دامنه‌ی
@@ -14,8 +14,9 @@
 //  ⚠️ امروز این گیت **قرمز است و باید باشد**: نه میزبانِ staging وجود دارد،
 //     نه دامنه، نه هیچ journeyی اجرا شده. گیتی که پیش از وجودِ زیرساخت سبز
 //     باشد، چیزی را نمی‌سنجد.
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 import { readFileSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -26,6 +27,27 @@ const REQUIRED_JOURNEYS = ['customer-pwa', 'business-panel', 'company-panel', 'w
 const MAX_AGE_HOURS = Number(process.env.DEPLOY_EVIDENCE_MAX_AGE_HOURS ?? 24);
 
 const deny = (r) => { console.error(`❌ گیتِ A2 رد کرد — دیپلوی تولید/DNS مجاز نیست.\n   دلیل: ${r}`); process.exit(1); };
+
+// P0-022 (حکمِ ۲۰۲۶-۰۹-۱۸): نقشِ اتصال را از خودِ اتصال بخوان، نه از فایلِ ادعا.
+// خروجِ ۱ = قرمز · خروجِ ۲ = UNKNOWN. هر دو دیپلوی را می‌بندند.
+{
+  const probe = spawnSync(process.execPath, [join(REPO, 'tools/check-db-privileges.mjs')], {
+    cwd: REPO,
+    encoding: 'utf8',
+    env: process.env,
+  });
+  const out = `${probe.stdout ?? ''}${probe.stderr ?? ''}`.trim();
+  if (out) console.error(out);
+  if (probe.error) deny(`گاردِ P0-022 اجرا نشد: ${probe.error.message}`);
+  if (probe.status === 2) {
+    console.error('❌ گیتِ A2 رد کرد — دیپلوی تولید/DNS مجاز نیست.');
+    console.error('   دلیل: نقشِ اتصالِ تولید خوانده نشد (P0-022 UNKNOWN — fail-closed).');
+    process.exit(2);
+  }
+  if (probe.status !== 0) {
+    deny('نقشِ اتصالِ زنده سوپریوزر، BYPASSRLS، یا مالکِ دفتر است (P0-022)');
+  }
+}
 
 if (!existsSync(EVID)) {
   deny(
@@ -47,10 +69,8 @@ if (missing.length) deny(`journeyهای غایب: ${missing.join('، ')}`);
 for (const j of e.journeys) {
   if (j.passed !== true) deny(`journey «${j.name}» پاس نشده (passed=${j.passed})`);
   if (j.exit_code !== 0) deny(`journey «${j.name}» کدِ خروجِ ${j.exit_code} داشت`);
-  // «خروجیِ خام ثبت‌شده» یعنی فایلش واقعاً هست، نه اینکه ادعا شده باشد.
   if (!j.raw_output_path) deny(`journey «${j.name}» مسیرِ خروجیِ خام ندارد`);
   if (!existsSync(join(REPO, j.raw_output_path))) deny(`خروجیِ خامِ «${j.name}» وجود ندارد: ${j.raw_output_path}`);
-  // دامنه‌ی واقعی، نه localhost — کلِ نکته‌ی این گیت همین است.
   if (!j.base_url || /localhost|127\.0\.0\.1|\.local\b/i.test(j.base_url)) {
     deny(`journey «${j.name}» روی «${j.base_url ?? '(نامشخص)'}» اجرا شده — لوکال شاهدِ staging نیست`);
   }
@@ -68,11 +88,6 @@ if (rb?.executed !== true) deny('مسیرِ rollback اجرا نشده — یک 
 if (rb.verified_previous_version_served !== true) deny('پس از rollback تأیید نشده که نسخه‌ی قبلی سرو می‌شود');
 if (!rb.raw_output_path || !existsSync(join(REPO, rb.raw_output_path))) deny('خروجیِ خامِ rollback وجود ندارد');
 
-// S-05 (حکمِ CEO، ۲۰۲۶-۰۹-۱۷): مهاجرتِ ۰۹۴ رازها را فقط در حالتِ رمزشده می‌خواند. تا اپراتور یک‌بار
-// POST /api/v1/maintenance/secrets-reseal?seal_plaintext=1 را روی همان استقرار نزند، merchant_idِ زرین‌پال
-// و تحویلِ وب‌هوک fail-closed می‌مانند — سرور سالم است و پرداخت/وب‌هوک نه. پس «دیپلوی تمام شد» بدونِ
-// خروجیِ خامِ همان مسیر پذیرفته نیست، و خودِ پاسخ (نه ادعا) خوانده می‌شود: هیچ شکستی و هیچ متنِ ساده‌ی
-// باقی‌مانده‌ای. اجرای بی seal_plaintext که متنِ ساده را فقط شمرده باشد (plaintext_skipped > 0) رد می‌شود.
 const sr = e.secrets_reseal;
 if (!sr?.raw_output_path || !existsSync(join(REPO, sr.raw_output_path))) {
   deny('خروجیِ خامِ secrets-reseal (مهاجرتِ ۰۹۴) ثبت نشده — merchant_id و وب‌هوک‌ها fail-closed می‌مانند');
